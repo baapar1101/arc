@@ -4,10 +4,10 @@ import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:package_info_plus/package_info_plus.dart';
-import 'package:path_provider/path_provider.dart';
 
 import '../../core/android_update_platform.dart';
 import '../../core/android_update_prefs.dart';
+import 'android_apk_download_coordinator.dart';
 import 'android_update_models.dart';
 import 'android_update_version.dart';
 
@@ -20,7 +20,6 @@ class AndroidUpdateService {
 
   final Dio _dio;
   final MethodChannel _channel;
-  CancelToken? _downloadCancel;
 
   AndroidUpdateService({
     Dio? dio,
@@ -62,8 +61,6 @@ class AndroidUpdateService {
       }
 
       if (installed == null) {
-        // Cannot compare; treat as update available so user can still upgrade
-        // after aligning versionName with Forgejo tags.
         return AndroidUpdateCheckResult(
           availability: AndroidUpdateAvailability.updateAvailable,
           installedVersion: null,
@@ -163,75 +160,20 @@ class AndroidUpdateService {
     AndroidRemoteRelease release, {
     void Function(AndroidUpdateDownloadProgress progress)? onProgress,
     bool Function()? isCancelled,
-  }) async {
+  }) {
     if (!supportsAndroidApkUpdate) {
       throw UnsupportedError('Android APK update is not supported on this platform');
     }
 
-    await cancelDownload();
-    _downloadCancel = CancelToken();
-
-    final dir = await getTemporaryDirectory();
-    final updatesDir = Directory('${dir.path}/apk_updates');
-    if (!await updatesDir.exists()) {
-      await updatesDir.create(recursive: true);
-    }
-
-    final safeName = release.apk.name.replaceAll(RegExp(r'[^\w.\-]+'), '_');
-    final savePath = '${updatesDir.path}/$safeName';
-
-    // Remove stale file with same name.
-    final existing = File(savePath);
-    if (await existing.exists()) {
-      await existing.delete();
-    }
-
-    try {
-      await _dio.download(
-        release.apk.downloadUrl,
-        savePath,
-        cancelToken: _downloadCancel,
-        onReceiveProgress: (received, total) {
-          if (isCancelled?.call() == true) {
-            _downloadCancel?.cancel('cancelled');
-            return;
-          }
-          onProgress?.call(
-            AndroidUpdateDownloadProgress(received: received, total: total),
-          );
-        },
-        options: Options(
-          responseType: ResponseType.bytes,
-          followRedirects: true,
-          validateStatus: (s) => s != null && s >= 200 && s < 400,
-        ),
-      );
-    } on DioException catch (e) {
-      if (CancelToken.isCancel(e) || isCancelled?.call() == true) {
-        try {
-          await File(savePath).delete();
-        } catch (_) {}
-        throw AndroidUpdateCancelledException();
-      }
-      rethrow;
-    } finally {
-      _downloadCancel = null;
-    }
-
-    final file = File(savePath);
-    if (!await file.exists() || await file.length() == 0) {
-      throw StateError('Downloaded APK is missing or empty');
-    }
-    return savePath;
+    return AndroidApkDownloadCoordinator.instance.startDownload(
+      release,
+      onProgress: onProgress,
+      isCancelled: isCancelled,
+    );
   }
 
-  Future<void> cancelDownload() async {
-    final token = _downloadCancel;
-    if (token != null && !token.isCancelled) {
-      token.cancel('cancelled');
-    }
-    _downloadCancel = null;
-  }
+  Future<void> cancelDownload() =>
+      AndroidApkDownloadCoordinator.instance.cancelDownload();
 
   Future<bool> canRequestPackageInstalls() async {
     if (!supportsAndroidApkUpdate) return false;
@@ -257,6 +199,12 @@ class AndroidUpdateService {
     if (!allowed) {
       throw AndroidUpdateInstallPermissionException();
     }
+
+    final file = File(filePath);
+    if (!await file.exists() || await file.length() == 0) {
+      throw StateError('Downloaded APK is missing or empty');
+    }
+
     await _channel.invokeMethod<void>('installApk', {'filePath': filePath});
   }
 }

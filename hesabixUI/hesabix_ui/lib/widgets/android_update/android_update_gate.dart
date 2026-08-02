@@ -1,12 +1,17 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 
 import '../../core/android_update_platform.dart';
 import '../../core/android_update_prefs.dart';
+import '../../services/android_update/android_apk_download_coordinator.dart';
+import '../../services/android_update/android_update_bootstrap.dart';
 import '../../services/android_update/android_update_models.dart';
 import '../../services/android_update/android_update_service.dart';
 import '../../services/android_update/android_update_version.dart';
 import '../../utils/snackbar_helper.dart';
+import 'android_update_download_sheet.dart';
 
 /// Runs a single automatic update check after the app shell is ready (Android only).
 class AndroidUpdateGate extends StatefulWidget {
@@ -18,15 +23,44 @@ class AndroidUpdateGate extends StatefulWidget {
   State<AndroidUpdateGate> createState() => _AndroidUpdateGateState();
 }
 
-class _AndroidUpdateGateState extends State<AndroidUpdateGate> {
+class _AndroidUpdateGateState extends State<AndroidUpdateGate>
+    with WidgetsBindingObserver {
   bool _scheduled = false;
+  StreamSubscription<AndroidApkDownloadSession>? _downloadSub;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     if (supportsAndroidApkUpdate) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => _schedule());
+      WidgetsBinding.instance.addPostFrameCallback((_) => _bootstrap());
     }
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _downloadSub?.cancel();
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      unawaited(_promptInstallIfReady());
+    }
+  }
+
+  Future<void> _bootstrap() async {
+    await initAndroidApkUpdateInfrastructure();
+    _downloadSub ??=
+        AndroidApkDownloadCoordinator.instance.sessions.listen((session) {
+      if (session.phase == AndroidApkDownloadPhase.complete) {
+        unawaited(_promptInstallIfReady());
+      }
+    });
+    _schedule();
+    await _promptInstallIfReady();
   }
 
   void _schedule() {
@@ -36,6 +70,47 @@ class _AndroidUpdateGateState extends State<AndroidUpdateGate> {
       if (!mounted) return;
       await AndroidUpdateFlow.runStartupCheck(context);
     });
+  }
+
+  Future<void> _promptInstallIfReady() async {
+    if (!mounted) return;
+    final session =
+        await AndroidApkDownloadCoordinator.instance.consumeCompletedInstall();
+    if (session == null || !mounted) return;
+    final path = session.filePath;
+    final release = session.release;
+    if (path == null || release == null) return;
+
+    final t = AppLocalizations.of(context);
+    final install = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        icon: Icon(
+          Icons.download_done_rounded,
+          color: Theme.of(ctx).colorScheme.primary,
+          size: 36,
+        ),
+        title: Text(t.androidUpdateDownloadCompleteTitle),
+        content: Text(
+          t.androidUpdateDownloadCompleteMessage(release.version.toString()),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(t.androidUpdateLater),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text(t.androidUpdateInstallNow),
+          ),
+        ],
+      ),
+    );
+
+    if (!mounted) return;
+    if (install == true) {
+      await AndroidUpdateFlow.installDownloadedApk(context, path);
+    }
   }
 
   @override
@@ -64,27 +139,23 @@ class AndroidUpdateFlow {
     if (!context.mounted) return;
 
     if (autoDownload) {
-      // In-app notification + immediate download (cancellable).
       SnackBarHelper.show(
         context,
         message: AppLocalizations.of(context).androidUpdateAvailableTitle,
       );
-      final proceed = await _confirmUpdate(context, result, emphasizeAuto: true);
-      if (!context.mounted) return;
-      if (!proceed) {
-        await AndroidUpdatePrefs.setSkippedVersion(remote.tagName);
-        return;
-      }
-      await downloadAndInstall(context, remote);
-    } else {
-      final proceed = await _confirmUpdate(context, result, emphasizeAuto: false);
-      if (!context.mounted) return;
-      if (!proceed) {
-        await AndroidUpdatePrefs.setSkippedVersion(remote.tagName);
-        return;
-      }
-      await downloadAndInstall(context, remote);
     }
+
+    final proceed = await _confirmUpdate(
+      context,
+      result,
+      emphasizeAuto: autoDownload,
+    );
+    if (!context.mounted) return;
+    if (!proceed) {
+      await AndroidUpdatePrefs.setSkippedVersion(remote.tagName);
+      return;
+    }
+    await downloadAndInstall(context, remote);
   }
 
   static Future<bool> _isSkipped(AndroidAppVersion remote) async {
@@ -145,7 +216,9 @@ class AndroidUpdateFlow {
                 ],
                 const SizedBox(height: 8),
                 Text(
-                  t.androidUpdateApkSizeHint(_formatBytes(remote.apk.size)),
+                  t.androidUpdateApkSizeHintBackground(
+                    formatAndroidUpdateBytes(remote.apk.size),
+                  ),
                   style: Theme.of(ctx).textTheme.bodySmall?.copyWith(
                         color: Theme.of(ctx).colorScheme.onSurfaceVariant,
                       ),
@@ -197,74 +270,35 @@ class AndroidUpdateFlow {
     AndroidRemoteRelease remote,
   ) async {
     final t = AppLocalizations.of(context);
-    var cancelled = false;
-    final progressNotifier =
-        ValueNotifier<AndroidUpdateDownloadProgress?>(null);
+    await ensureAndroidApkDownloadPermissions();
+    if (!context.mounted) return;
+    configureAndroidApkDownloadNotifications(t);
 
-    showDialog<void>(
+    final sheetResult = await showAndroidUpdateDownloadSheet(
       context: context,
-      barrierDismissible: false,
-      builder: (ctx) {
-        return PopScope(
-          canPop: false,
-          child: AlertDialog(
-            title: Text(t.androidUpdateDownloadingTitle),
-            content: ValueListenableBuilder<AndroidUpdateDownloadProgress?>(
-              valueListenable: progressNotifier,
-              builder: (context, progress, _) {
-                final fraction = progress?.fraction;
-                final percent = progress?.percent ?? 0;
-                final label = progress == null
-                    ? t.androidUpdateDownloadingPreparing
-                    : t.androidUpdateDownloadProgress(
-                        percent,
-                        _formatBytes(progress.received),
-                        progress.total > 0
-                            ? _formatBytes(progress.total)
-                            : '—',
-                      );
-                return Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    if (fraction != null)
-                      LinearProgressIndicator(value: fraction)
-                    else
-                      const LinearProgressIndicator(),
-                    const SizedBox(height: 12),
-                    Text(label, textAlign: TextAlign.center),
-                  ],
-                );
-              },
-            ),
-            actions: [
-              TextButton(
-                onPressed: () {
-                  cancelled = true;
-                  _service.cancelDownload();
-                },
-                child: Text(t.cancel),
-              ),
-            ],
-          ),
+      release: remote,
+      startDownload: ({
+        void Function(AndroidUpdateDownloadProgress progress)? onProgress,
+        bool Function()? isCancelled,
+      }) {
+        return _service.downloadApk(
+          remote,
+          onProgress: onProgress,
+          isCancelled: isCancelled,
         );
       },
     );
 
-    try {
-      final path = await _service.downloadApk(
-        remote,
-        onProgress: (p) {
-          progressNotifier.value = p;
-        },
-        isCancelled: () => cancelled,
-      );
-
-      if (context.mounted) {
-        Navigator.of(context, rootNavigator: true).pop();
-      }
-
-      if (cancelled) {
+    switch (sheetResult) {
+      case AndroidUpdateDownloadSheetResult.background:
+        if (context.mounted) {
+          SnackBarHelper.show(
+            context,
+            message: t.androidUpdateDownloadingBackgroundHint,
+          );
+        }
+        return;
+      case AndroidUpdateDownloadSheetResult.cancelled:
         if (context.mounted) {
           SnackBarHelper.show(
             context,
@@ -272,30 +306,32 @@ class AndroidUpdateFlow {
           );
         }
         return;
-      }
-
-      await AndroidUpdatePrefs.clearSkippedVersion();
-      if (!context.mounted) return;
-      await _installWithPermission(context, path);
-    } on AndroidUpdateCancelledException {
-      if (context.mounted) {
-        Navigator.of(context, rootNavigator: true).pop();
-        SnackBarHelper.show(
-          context,
-          message: t.androidUpdateDownloadCancelled,
-        );
-      }
-    } catch (e) {
-      if (context.mounted) {
-        Navigator.of(context, rootNavigator: true).pop();
-        SnackBarHelper.showError(
-          context,
-          message: t.androidUpdateDownloadFailed(e.toString()),
-        );
-      }
-    } finally {
-      progressNotifier.dispose();
+      case AndroidUpdateDownloadSheetResult.failed:
+        if (context.mounted) {
+          SnackBarHelper.showError(
+            context,
+            message: t.androidUpdateDownloadFailed(
+              AndroidApkDownloadCoordinator.instance.current.errorMessage ??
+                  'unknown',
+            ),
+          );
+        }
+        return;
+      case AndroidUpdateDownloadSheetResult.completed:
+        final session = AndroidApkDownloadCoordinator.instance.current;
+        final path = session.filePath;
+        if (path == null) return;
+        await AndroidUpdatePrefs.clearSkippedVersion();
+        if (!context.mounted) return;
+        await installDownloadedApk(context, path);
     }
+  }
+
+  static Future<void> installDownloadedApk(
+    BuildContext context,
+    String path,
+  ) async {
+    await _installWithPermission(context, path);
   }
 
   static Future<void> _installWithPermission(
@@ -355,18 +391,5 @@ class AndroidUpdateFlow {
         );
       }
     }
-  }
-
-  static String _formatBytes(int bytes) {
-    if (bytes <= 0) return '0 B';
-    const units = ['B', 'KB', 'MB', 'GB'];
-    var value = bytes.toDouble();
-    var unit = 0;
-    while (value >= 1024 && unit < units.length - 1) {
-      value /= 1024;
-      unit++;
-    }
-    final digits = unit == 0 ? 0 : 1;
-    return '${value.toStringAsFixed(digits)} ${units[unit]}';
   }
 }

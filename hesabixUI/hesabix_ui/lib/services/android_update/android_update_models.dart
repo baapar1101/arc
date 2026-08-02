@@ -95,3 +95,42 @@ class AndroidUpdateInstallPermissionException implements Exception {
   @override
   String toString() => 'Install unknown apps permission required';
 }
+
+enum AndroidApkDownloadPhase {
+  idle,
+  downloading,
+  paused,
+  complete,
+  failed,
+  cancelled;
+
+  bool get isTerminal =>
+      this == complete || this == failed || this == cancelled;
+}
+
+class AndroidApkDownloadSession {
+  final AndroidApkDownloadPhase phase;
+  final AndroidRemoteRelease? release;
+  final AndroidUpdateDownloadProgress? progress;
+  final String? filePath;
+  final String? errorMessage;
+
+  const AndroidApkDownloadSession({
+    required this.phase,
+    this.release,
+    this.progress,
+    this.filePath,
+    this.errorMessage,
+  });
+
+  const AndroidApkDownloadSession.idle()
+      : phase = AndroidApkDownloadPhase.idle,
+        release = null,
+        progress = null,
+        filePath = null,
+        errorMessage = null;
+
+  bool get isActive =>
+      phase == AndroidApkDownloadPhase.downloading ||
+      phase == AndroidApkDownloadPhase.paused;
+}

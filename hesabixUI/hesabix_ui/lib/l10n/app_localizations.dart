@@ -23691,7 +23691,7 @@ abstract class AppLocalizations {
   /// No description provided for @androidUpdateAutoDownloadStarting.
   ///
   /// In en, this message translates to:
-  /// **'Confirm to start download and install.'**
+  /// **'Confirm to start a background download. You can leave the app while it completes.'**
   String get androidUpdateAutoDownloadStarting;
 
   /// No description provided for @androidUpdateDownloadingTitle.
@@ -23769,6 +23769,78 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Could not start install: {error}'**
   String androidUpdateInstallFailed(String error);
+
+  /// No description provided for @androidUpdateDownloadingSheetTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Downloading new version'**
+  String get androidUpdateDownloadingSheetTitle;
+
+  /// No description provided for @androidUpdateDownloadingBackgroundHint.
+  ///
+  /// In en, this message translates to:
+  /// **'You can leave the app or switch to another one. Download progress will appear in the system notification.'**
+  String get androidUpdateDownloadingBackgroundHint;
+
+  /// No description provided for @androidUpdateContinueInBackground.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue in background'**
+  String get androidUpdateContinueInBackground;
+
+  /// No description provided for @androidUpdateBackgroundNotificationRunning.
+  ///
+  /// In en, this message translates to:
+  /// **'Downloading update'**
+  String get androidUpdateBackgroundNotificationRunning;
+
+  /// No description provided for @androidUpdateBackgroundNotificationComplete.
+  ///
+  /// In en, this message translates to:
+  /// **'Download complete'**
+  String get androidUpdateBackgroundNotificationComplete;
+
+  /// No description provided for @androidUpdateBackgroundNotificationError.
+  ///
+  /// In en, this message translates to:
+  /// **'Download failed'**
+  String get androidUpdateBackgroundNotificationError;
+
+  /// No description provided for @androidUpdateBackgroundNotificationPaused.
+  ///
+  /// In en, this message translates to:
+  /// **'Download paused'**
+  String get androidUpdateBackgroundNotificationPaused;
+
+  /// No description provided for @androidUpdateBackgroundNotificationCanceled.
+  ///
+  /// In en, this message translates to:
+  /// **'Download canceled'**
+  String get androidUpdateBackgroundNotificationCanceled;
+
+  /// No description provided for @androidUpdateDownloadCompleteTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Update ready to install'**
+  String get androidUpdateDownloadCompleteTitle;
+
+  /// No description provided for @androidUpdateDownloadCompleteMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Version {version} downloaded successfully.'**
+  String androidUpdateDownloadCompleteMessage(String version);
+
+  /// No description provided for @androidUpdateInstallNow.
+  ///
+  /// In en, this message translates to:
+  /// **'Install now'**
+  String get androidUpdateInstallNow;
+
+  /// No description provided for @androidUpdateApkSizeHintBackground.
+  ///
+  /// In en, this message translates to:
+  /// **'Approximate size: {size} — download continues in the background'**
+  String androidUpdateApkSizeHintBackground(String size);
 
   /// No description provided for @accountSettingsWindowsUpdateTitle.
   ///

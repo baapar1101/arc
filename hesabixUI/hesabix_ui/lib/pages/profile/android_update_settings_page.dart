@@ -1,11 +1,15 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:intl/intl.dart';
 
 import '../../core/android_update_platform.dart';
 import '../../core/android_update_prefs.dart';
+import '../../services/android_update/android_apk_download_coordinator.dart';
 import '../../services/android_update/android_update_models.dart';
 import '../../utils/snackbar_helper.dart';
+import '../../widgets/android_update/android_update_download_sheet.dart';
 import '../../widgets/android_update/android_update_gate.dart';
 
 class AndroidUpdateSettingsPage extends StatefulWidget {
@@ -25,11 +29,26 @@ class _AndroidUpdateSettingsPageState extends State<AndroidUpdateSettingsPage> {
   AndroidUpdateCheckResult? _result;
   DateTime? _lastCheckAt;
   String? _error;
+  StreamSubscription<AndroidApkDownloadSession>? _downloadSub;
+  AndroidApkDownloadSession _downloadSession =
+      const AndroidApkDownloadSession.idle();
 
   @override
   void initState() {
     super.initState();
+    _downloadSession = AndroidApkDownloadCoordinator.instance.current;
+    _downloadSub =
+        AndroidApkDownloadCoordinator.instance.sessions.listen((session) {
+      if (!mounted) return;
+      setState(() => _downloadSession = session);
+    });
     _load();
+  }
+
+  @override
+  void dispose() {
+    _downloadSub?.cancel();
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -264,6 +283,10 @@ class _AndroidUpdateSettingsPageState extends State<AndroidUpdateSettingsPage> {
                     ),
                   ),
                 ],
+                if (_downloadSession.isActive) ...[
+                  const SizedBox(height: 12),
+                  _buildActiveDownloadCard(theme, t),
+                ],
                 const SizedBox(height: 12),
                 Card(
                   child: Column(
@@ -341,6 +364,73 @@ class _AndroidUpdateSettingsPageState extends State<AndroidUpdateSettingsPage> {
                 ),
               ],
             ),
+    );
+  }
+
+  Widget _buildActiveDownloadCard(ThemeData theme, AppLocalizations t) {
+    final progress = _downloadSession.progress;
+    final fraction = progress?.fraction;
+    final version = _downloadSession.release?.version.toString() ?? '—';
+
+    return Card(
+      color: theme.colorScheme.primaryContainer.withValues(alpha: 0.35),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  Icons.cloud_download_outlined,
+                  color: theme.colorScheme.primary,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    t.androidUpdateDownloadingSheetTitle,
+                    style: theme.textTheme.titleSmall,
+                  ),
+                ),
+                Text(
+                  version,
+                  style: theme.textTheme.labelLarge?.copyWith(
+                    color: theme.colorScheme.primary,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(999),
+              child: LinearProgressIndicator(value: fraction, minHeight: 8),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              progress == null
+                  ? t.androidUpdateDownloadingPreparing
+                  : t.androidUpdateDownloadProgress(
+                      progress.percent,
+                      formatAndroidUpdateBytes(progress.received),
+                      progress.total > 0
+                          ? formatAndroidUpdateBytes(progress.total)
+                          : '—',
+                    ),
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              t.androidUpdateDownloadingBackgroundHint,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+                height: 1.4,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

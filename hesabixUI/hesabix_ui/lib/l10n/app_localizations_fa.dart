@@ -12665,7 +12665,7 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get androidUpdateInfoBody =>
-      'نصب نهایی نیاز به تأیید شما در صفحه سیستم اندروید دارد. نسخه برنامه باید با تگ ریلیز (مثلاً 70.9.911) هم‌خوان باشد.';
+      'نصب نهایی نیاز به تأیید شما در صفحه سیستم اندروید دارد. دانلود در پس‌زمینه ادامه می‌یابد و پیشرفت آن در اعلان سیستم نمایش داده می‌شود.';
 
   @override
   String get androidUpdateAvailableTitle => 'نسخه جدید آماده است';
@@ -12688,7 +12688,7 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get androidUpdateAutoDownloadStarting =>
-      'با تأیید، دانلود و نصب آغاز می‌شود.';
+      'با تأیید، دانلود در پس‌زمینه آغاز می‌شود و می‌توانید از اپ خارج شوید.';
 
   @override
   String get androidUpdateDownloadingTitle => 'در حال دانلود به‌روزرسانی';
@@ -12738,6 +12738,48 @@ class AppLocalizationsFa extends AppLocalizations {
   @override
   String androidUpdateInstallFailed(String error) {
     return 'شروع نصب ناموفق بود: $error';
+  }
+
+  @override
+  String get androidUpdateDownloadingSheetTitle => 'در حال دریافت نسخه جدید';
+
+  @override
+  String get androidUpdateDownloadingBackgroundHint =>
+      'می‌توانید اپ را ببندید یا به برنامه دیگری بروید. پیشرفت دانلود در اعلان سیستم نمایش داده می‌شود.';
+
+  @override
+  String get androidUpdateContinueInBackground => 'ادامه در پس‌زمینه';
+
+  @override
+  String get androidUpdateBackgroundNotificationRunning =>
+      'در حال دانلود به‌روزرسانی';
+
+  @override
+  String get androidUpdateBackgroundNotificationComplete => 'دانلود کامل شد';
+
+  @override
+  String get androidUpdateBackgroundNotificationError => 'دانلود ناموفق بود';
+
+  @override
+  String get androidUpdateBackgroundNotificationPaused => 'دانلود متوقف شد';
+
+  @override
+  String get androidUpdateBackgroundNotificationCanceled => 'دانلود لغو شد';
+
+  @override
+  String get androidUpdateDownloadCompleteTitle => 'نسخه جدید آماده نصب است';
+
+  @override
+  String androidUpdateDownloadCompleteMessage(String version) {
+    return 'نسخه $version با موفقیت دانلود شد.';
+  }
+
+  @override
+  String get androidUpdateInstallNow => 'نصب اکنون';
+
+  @override
+  String androidUpdateApkSizeHintBackground(String size) {
+    return 'حجم تقریبی: $size — دانلود در پس‌زمینه ادامه می‌یابد';
   }
 
   @override

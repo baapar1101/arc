@@ -197,7 +197,8 @@ class _InvoiceTransactionsWidgetState extends State<InvoiceTransactionsWidget> {
       return;
     }
 
-    final zeroIdx = widget.transactions.indexWhere((t) => t.amount == 0);
+    final zeroIdx =
+        widget.transactions.indexWhere((t) => t.settlesAgainstInvoice == 0);
     if (zeroIdx >= 0) {
       final t = widget.transactions[zeroIdx];
       final newList = List<InvoiceTransaction>.from(widget.transactions);
@@ -1254,8 +1255,6 @@ class _TransactionDialogState extends State<TransactionDialog> {
           formatWithThousands(widget.transaction!.amount, decimalPlaces: 0);
       _paymentAmountManuallyEdited = true;
     } else {
-      // مبلغ پرداخت را بعد از مشخص شدن ارز حساب از روی تسویه×نرخ پر می‌کنیم
-      // تا عدد ارزی فاکتور اشتباهاً به‌عنوان مبلغ ریالی ثبت نشود.
       _amountController.text = '';
     }
     _commissionController.text = widget.transaction?.commission != null
@@ -1267,11 +1266,9 @@ class _TransactionDialogState extends State<TransactionDialog> {
         widget.transaction!.settlesAmount!,
         decimalPlaces: 2,
       );
-    } else if (widget.initialAmount != null && widget.transaction == null) {
-      _settlesAmountController.text = formatWithThousands(
-        widget.initialAmount!,
-        decimalPlaces: 2,
-      );
+    }
+    if (widget.initialAmount != null && widget.transaction == null) {
+      _applyInitialAmountPrefill();
     }
     if (widget.transaction?.fxRate != null) {
       _fxRateController.text = formatFxRateForDisplay(widget.transaction!.fxRate);
@@ -1384,6 +1381,34 @@ class _TransactionDialogState extends State<TransactionDialog> {
       }
     } catch (e) {
       // در صورت خطا، لیست‌ها خالی باقی می‌مانند
+    }
+  }
+
+  /// پر کردن ماندهٔ فاکتور در فیلدهای مناسب با توجه به تک‌/چندارزی بودن.
+  void _applyInitialAmountPrefill() {
+    final initial = widget.initialAmount;
+    if (initial == null || widget.transaction != null) return;
+
+    if (_settlesAmountController.text.trim().isEmpty) {
+      _settlesAmountController.text =
+          formatWithThousands(initial, decimalPlaces: 2);
+    }
+
+    if (!_isMultiCurrency) {
+      if (_amountController.text.trim().isEmpty) {
+        _amountController.text =
+            formatWithThousands(initial, decimalPlaces: 0);
+      }
+      return;
+    }
+
+    if (!_isCrossCurrencyPayment) {
+      if (_amountController.text.trim().isEmpty &&
+          !_paymentAmountManuallyEdited) {
+        _amountController.text =
+            formatWithThousands(initial, decimalPlaces: 0);
+      }
+      return;
     }
   }
 
@@ -1670,13 +1695,7 @@ class _TransactionDialogState extends State<TransactionDialog> {
       _paymentCurrencyUnit = null;
     }
     if (_isCrossCurrencyPayment) {
-      if (_settlesAmountController.text.trim().isEmpty &&
-          widget.initialAmount != null) {
-        _settlesAmountController.text = formatWithThousands(
-          widget.initialAmount!,
-          decimalPlaces: 2,
-        );
-      }
+      _applyInitialAmountPrefill();
       // ورود به حالت بین‌ارزی یا تغییر ارز حساب → مبلغ پرداخت را از تسویه×نرخ بساز
       final shouldForce = !wasCross ||
           prevPay != currencyId ||
@@ -1694,6 +1713,8 @@ class _TransactionDialogState extends State<TransactionDialog> {
       _recalcPaymentAmountFromSettles(
         force: shouldForce || _amountController.text.trim().isEmpty,
       );
+    } else {
+      _applyInitialAmountPrefill();
     }
   }
 

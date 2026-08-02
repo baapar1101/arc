@@ -4909,7 +4909,7 @@
   "androidUpdateDownloadAndInstall": "دانلود و نصب",
   "androidUpdateOpenPermissionSettings": "تنظیمات نصب از منابع ناشناس",
   "androidUpdateInfoTitle": "نکته",
-  "androidUpdateInfoBody": "نصب نهایی نیاز به تأیید شما در صفحه سیستم اندروید دارد. نسخه برنامه باید با تگ ریلیز (مثلاً 70.9.911) هم‌خوان باشد.",
+  "androidUpdateInfoBody": "نصب نهایی نیاز به تأیید شما در صفحه سیستم اندروید دارد. دانلود در پس‌زمینه ادامه می‌یابد و پیشرفت آن در اعلان سیستم نمایش داده می‌شود.",
   "androidUpdateAvailableTitle": "نسخه جدید آماده است",
   "androidUpdateAvailableMessage": "نسخه {latest} در دسترس است. نسخه فعلی شما: {current}",
   "@androidUpdateAvailableMessage": {
@@ -4926,7 +4926,7 @@
     }
   },
   "androidUpdateLater": "بعداً",
-  "androidUpdateAutoDownloadStarting": "با تأیید، دانلود و نصب آغاز می‌شود.",
+  "androidUpdateAutoDownloadStarting": "با تأیید، دانلود در پس‌زمینه آغاز می‌شود و می‌توانید از اپ خارج شوید.",
   "androidUpdateDownloadingTitle": "در حال دانلود به‌روزرسانی",
   "androidUpdateDownloadingPreparing": "آماده‌سازی دانلود…",
   "androidUpdateDownloadProgress": "{percent}% — {received} از {total}",
@@ -4954,6 +4954,28 @@
   "@androidUpdateInstallFailed": {
     "placeholders": {
       "error": { "type": "String" }
+    }
+  },
+  "androidUpdateDownloadingSheetTitle": "در حال دریافت نسخه جدید",
+  "androidUpdateDownloadingBackgroundHint": "می‌توانید اپ را ببندید یا به برنامه دیگری بروید. پیشرفت دانلود در اعلان سیستم نمایش داده می‌شود.",
+  "androidUpdateContinueInBackground": "ادامه در پس‌زمینه",
+  "androidUpdateBackgroundNotificationRunning": "در حال دانلود به‌روزرسانی",
+  "androidUpdateBackgroundNotificationComplete": "دانلود کامل شد",
+  "androidUpdateBackgroundNotificationError": "دانلود ناموفق بود",
+  "androidUpdateBackgroundNotificationPaused": "دانلود متوقف شد",
+  "androidUpdateBackgroundNotificationCanceled": "دانلود لغو شد",
+  "androidUpdateDownloadCompleteTitle": "نسخه جدید آماده نصب است",
+  "androidUpdateDownloadCompleteMessage": "نسخه {version} با موفقیت دانلود شد.",
+  "@androidUpdateDownloadCompleteMessage": {
+    "placeholders": {
+      "version": { "type": "String" }
+    }
+  },
+  "androidUpdateInstallNow": "نصب اکنون",
+  "androidUpdateApkSizeHintBackground": "حجم تقریبی: {size} — دانلود در پس‌زمینه ادامه می‌یابد",
+  "@androidUpdateApkSizeHintBackground": {
+    "placeholders": {
+      "size": { "type": "String" }
     }
   },
   "accountSettingsWindowsUpdateTitle": "به‌روزرسانی برنامه (ویندوز)",

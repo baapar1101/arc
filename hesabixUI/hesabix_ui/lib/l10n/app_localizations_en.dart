@@ -12757,7 +12757,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get androidUpdateAutoDownloadStarting =>
-      'Confirm to start download and install.';
+      'Confirm to start a background download. You can leave the app while it completes.';
 
   @override
   String get androidUpdateDownloadingTitle => 'Downloading update';
@@ -12807,6 +12807,47 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String androidUpdateInstallFailed(String error) {
     return 'Could not start install: $error';
+  }
+
+  @override
+  String get androidUpdateDownloadingSheetTitle => 'Downloading new version';
+
+  @override
+  String get androidUpdateDownloadingBackgroundHint =>
+      'You can leave the app or switch to another one. Download progress will appear in the system notification.';
+
+  @override
+  String get androidUpdateContinueInBackground => 'Continue in background';
+
+  @override
+  String get androidUpdateBackgroundNotificationRunning => 'Downloading update';
+
+  @override
+  String get androidUpdateBackgroundNotificationComplete => 'Download complete';
+
+  @override
+  String get androidUpdateBackgroundNotificationError => 'Download failed';
+
+  @override
+  String get androidUpdateBackgroundNotificationPaused => 'Download paused';
+
+  @override
+  String get androidUpdateBackgroundNotificationCanceled => 'Download canceled';
+
+  @override
+  String get androidUpdateDownloadCompleteTitle => 'Update ready to install';
+
+  @override
+  String androidUpdateDownloadCompleteMessage(String version) {
+    return 'Version $version downloaded successfully.';
+  }
+
+  @override
+  String get androidUpdateInstallNow => 'Install now';
+
+  @override
+  String androidUpdateApkSizeHintBackground(String size) {
+    return 'Approximate size: $size — download continues in the background';
   }
 
   @override

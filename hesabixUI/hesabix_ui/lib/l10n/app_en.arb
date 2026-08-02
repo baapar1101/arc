@@ -4867,7 +4867,7 @@
   "androidUpdateDownloadAndInstall": "Download & install",
   "androidUpdateOpenPermissionSettings": "Unknown apps install settings",
   "androidUpdateInfoTitle": "Note",
-  "androidUpdateInfoBody": "Final install requires your confirmation in the Android system installer. The app versionName should match the release tag (e.g. 70.9.911).",
+  "androidUpdateInfoBody": "Final install requires your confirmation in the Android system installer. Downloads continue in the background and progress is shown in the system notification.",
   "androidUpdateAvailableTitle": "Update available",
   "androidUpdateAvailableMessage": "Version {latest} is available. Your current version: {current}",
   "@androidUpdateAvailableMessage": {
@@ -4884,7 +4884,7 @@
     }
   },
   "androidUpdateLater": "Later",
-  "androidUpdateAutoDownloadStarting": "Confirm to start download and install.",
+  "androidUpdateAutoDownloadStarting": "Confirm to start a background download. You can leave the app while it completes.",
   "androidUpdateDownloadingTitle": "Downloading update",
   "androidUpdateDownloadingPreparing": "Preparing download…",
   "androidUpdateDownloadProgress": "{percent}% — {received} of {total}",
@@ -4912,6 +4912,28 @@
   "@androidUpdateInstallFailed": {
     "placeholders": {
       "error": { "type": "String" }
+    }
+  },
+  "androidUpdateDownloadingSheetTitle": "Downloading new version",
+  "androidUpdateDownloadingBackgroundHint": "You can leave the app or switch to another one. Download progress will appear in the system notification.",
+  "androidUpdateContinueInBackground": "Continue in background",
+  "androidUpdateBackgroundNotificationRunning": "Downloading update",
+  "androidUpdateBackgroundNotificationComplete": "Download complete",
+  "androidUpdateBackgroundNotificationError": "Download failed",
+  "androidUpdateBackgroundNotificationPaused": "Download paused",
+  "androidUpdateBackgroundNotificationCanceled": "Download canceled",
+  "androidUpdateDownloadCompleteTitle": "Update ready to install",
+  "androidUpdateDownloadCompleteMessage": "Version {version} downloaded successfully.",
+  "@androidUpdateDownloadCompleteMessage": {
+    "placeholders": {
+      "version": { "type": "String" }
+    }
+  },
+  "androidUpdateInstallNow": "Install now",
+  "androidUpdateApkSizeHintBackground": "Approximate size: {size} — download continues in the background",
+  "@androidUpdateApkSizeHintBackground": {
+    "placeholders": {
+      "size": { "type": "String" }
     }
   },
   "accountSettingsWindowsUpdateTitle": "App Update (Windows)",
