@@ -7,6 +7,7 @@ import '../../core/api_client.dart';
 import '../../services/bytes_export/bytes_export_service.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
+import '../common/excel_import_dialog_shell.dart';
 
 class ProductImportDialog extends StatefulWidget {
   final int businessId;
@@ -18,7 +19,6 @@ class ProductImportDialog extends StatefulWidget {
 }
 
 class _ProductImportDialogState extends State<ProductImportDialog> {
-  final TextEditingController _pathCtrl = TextEditingController();
   bool _dryRun = true;
   String _matchBy = 'code';
   String _conflictPolicy = 'upsert';
@@ -41,12 +41,6 @@ class _ProductImportDialogState extends State<ProductImportDialog> {
     });
   }
 
-  @override
-  void dispose() {
-    _pathCtrl.dispose();
-    super.dispose();
-  }
-
   Future<void> _pickFile() async {
     if (!_isInitialized) {
       if (mounted) {
@@ -61,17 +55,15 @@ class _ProductImportDialogState extends State<ProductImportDialog> {
       if (picked != null) {
         setState(() {
           _selectedFile = picked;
-          _pathCtrl.text = picked.name;
         });
       }
     } catch (e) {
       if (mounted) {
         final t = AppLocalizations.of(context);
         SnackBarHelper.show(
-        context,
-        message:
-            '${t.pickFileError}: ${ErrorExtractor.forContext(e, context)}',
-      );
+          context,
+          message: '${t.pickFileError}: ${ErrorExtractor.forContext(e, context)}',
+        );
       }
     }
   }
@@ -117,10 +109,9 @@ class _ProductImportDialogState extends State<ProductImportDialog> {
       if (mounted) {
         final t = AppLocalizations.of(context);
         SnackBarHelper.show(
-        context,
-        message:
-            '${t.templateDownloadError}: ${ErrorExtractor.forContext(e, context)}',
-      );
+          context,
+          message: '${t.templateDownloadError}: ${ErrorExtractor.forContext(e, context)}',
+        );
       }
     } finally {
       if (mounted) setState(() => _loading = false);
@@ -164,9 +155,9 @@ class _ProductImportDialogState extends State<ProductImportDialog> {
       if (mounted) {
         final t = AppLocalizations.of(context);
         SnackBarHelper.show(
-        context,
-        message: '${t.importError}: ${ErrorExtractor.forContext(e, context)}',
-      );
+          context,
+          message: '${t.importError}: ${ErrorExtractor.forContext(e, context)}',
+        );
       }
     } finally {
       if (mounted) setState(() => _loading = false);
@@ -177,173 +168,136 @@ class _ProductImportDialogState extends State<ProductImportDialog> {
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
     final isFa = Localizations.localeOf(context).languageCode == 'fa';
-    return AlertDialog(
-      title: Text(t.importFromExcel),
-      content: SizedBox(
-        width: 560,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Row(children: [
-              Expanded(
-                child: TextField(
-                  controller: _pathCtrl,
-                  readOnly: true,
-                  decoration: InputDecoration(
-                    labelText: t.selectedFile,
-                    hintText: t.noFileSelected,
-                    isDense: true,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              OutlinedButton.icon(
-                onPressed: (_loading || !_isInitialized) ? null : _pickFile,
-                icon: const Icon(Icons.attach_file),
-                label: Text(t.chooseFile),
-              ),
-            ]),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Expanded(
-                  child: DropdownButtonFormField<String>(
-                    initialValue: _matchBy,
-                    isDense: true,
-                    items: [
-                      DropdownMenuItem(value: 'code', child: Text('${t.matchBy}: ${t.code}')),
-                      DropdownMenuItem(value: 'name', child: Text('${t.matchBy}: ${t.title}')),
-                    ],
-                    onChanged: (v) => setState(() => _matchBy = v ?? 'code'),
-                    decoration: const InputDecoration(isDense: true),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: DropdownButtonFormField<String>(
-                    initialValue: _conflictPolicy,
-                    isDense: true,
-                    items: [
-                      DropdownMenuItem(value: 'insert', child: Text('${t.conflictPolicy}: ${t.policyInsertOnly}')),
-                      DropdownMenuItem(value: 'update', child: Text('${t.conflictPolicy}: ${t.policyUpdateExisting}')),
-                      DropdownMenuItem(value: 'upsert', child: Text('${t.conflictPolicy}: ${t.policyUpsert}')),
-                    ],
-                    onChanged: (v) => setState(() => _conflictPolicy = v ?? 'upsert'),
-                    decoration: const InputDecoration(isDense: true),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Expanded(
-                  child: DropdownButtonFormField<String>(
-                    initialValue: _onMissingCategory,
-                    isDense: true,
-                    items: [
-                      DropdownMenuItem(
-                        value: 'error',
-                        child: Text(isFa ? 'دسته‌بندی ناموجود: خطا' : 'Missing category: Error'),
-                      ),
-                      DropdownMenuItem(
-                        value: 'create',
-                        child: Text(isFa ? 'دسته‌بندی ناموجود: ایجاد خودکار' : 'Missing category: Auto-create'),
-                      ),
-                    ],
-                    onChanged: (v) => setState(() => _onMissingCategory = v ?? 'error'),
-                    decoration: const InputDecoration(isDense: true),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: DropdownButtonFormField<String>(
-                    initialValue: _onMissingAttributes,
-                    isDense: true,
-                    items: [
-                      DropdownMenuItem(
-                        value: 'error',
-                        child: Text(isFa ? 'ویژگی ناموجود: خطا' : 'Missing attribute: Error'),
-                      ),
-                      DropdownMenuItem(
-                        value: 'create',
-                        child: Text(isFa ? 'ویژگی ناموجود: ایجاد خودکار' : 'Missing attribute: Auto-create'),
-                      ),
-                    ],
-                    onChanged: (v) => setState(() => _onMissingAttributes = v ?? 'error'),
-                    decoration: const InputDecoration(isDense: true),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 6),
-            Align(
-              alignment: Alignment.centerRight,
-              child: Text(
-                isFa
-                    ? 'نکته: برای دسته‌بندی می‌توانید «مسیر دسته‌بندی» مثل «مواد اولیه > پلاستیک» وارد کنید. '
-                        'تعداد اولیه و بهای تمام‌شده فقط برای کالا با کنترل موجودی فعال و در سند تراز افتتاحیه ثبت می‌شوند؛ '
-                        'انبار را با شناسه، کد یا نام مشخص کنید.'
-                    : 'Tip: Use Category Path like "Raw materials > Plastics". '
-                        'Opening balance qty/cost apply only to tracked products and are stored in the opening balance document; '
-                        'specify warehouse by ID, code, or name.',
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Checkbox(
-                  value: _dryRun,
-                  onChanged: (v) => setState(() => _dryRun = v ?? true),
-                ),
-                Text(t.dryRunValidateOnly),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                OutlinedButton.icon(
-                  onPressed: _loading ? null : _downloadTemplate,
-                  icon: const Icon(Icons.download),
-                  label: Text(t.downloadTemplate),
-                ),
-                const SizedBox(width: 8),
-                FilledButton.icon(
-                  onPressed: _loading ? null : () => _runImport(dryRun: _dryRun),
-                  icon: _loading ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.play_arrow),
-                  label: Text(_dryRun ? t.reviewDryRun : t.import),
-                ),
-                const SizedBox(width: 8),
-                if (_dryRun)
-                  FilledButton.tonalIcon(
-                    onPressed: _loading ? null : () async {
-                      setState(() => _dryRun = false);
-                      await _runImport(dryRun: false);
-                    },
-                    icon: const Icon(Icons.cloud_upload),
-                    label: Text(t.importReal),
-                  ),
-              ],
-            ),
-            if (_result != null) ...[
-              const SizedBox(height: 12),
-              Align(
-                alignment: Alignment.centerRight,
-                child: Text('${t.result}:', style: Theme.of(context).textTheme.titleSmall),
-              ),
-              const SizedBox(height: 8),
-              _ResultSummary(result: _result!),
-            ],
-          ],
-        ),
-      ),
+
+    return ExcelImportDialogShell(
+      title: t.importFromExcel,
+      onClose: _loading ? null : () => Navigator.of(context).pop(false),
       actions: [
         TextButton(
           onPressed: _loading ? null : () => Navigator.of(context).pop(false),
           child: Text(t.close),
         ),
+        OutlinedButton.icon(
+          onPressed: _loading ? null : _downloadTemplate,
+          icon: const Icon(Icons.download),
+          label: Text(t.downloadTemplate),
+        ),
+        FilledButton.icon(
+          onPressed: _loading ? null : () => _runImport(dryRun: _dryRun),
+          icon: _loading
+              ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+              : const Icon(Icons.play_arrow),
+          label: Text(_dryRun ? t.reviewDryRun : t.import),
+        ),
+        if (_dryRun)
+          FilledButton.tonalIcon(
+            onPressed: _loading
+                ? null
+                : () async {
+                    setState(() => _dryRun = false);
+                    await _runImport(dryRun: false);
+                  },
+            icon: const Icon(Icons.cloud_upload),
+            label: Text(t.importReal),
+          ),
       ],
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          ExcelImportFilePicker(
+            fileName: _selectedFile?.name,
+            emptyHint: t.noFileSelected,
+            chooseLabel: t.chooseFile,
+            onPick: _pickFile,
+            enabled: !_loading && _isInitialized,
+          ),
+          const SizedBox(height: 16),
+          ExcelImportResponsiveGroup(
+            children: [
+              ExcelImportDropdownField(
+                label: t.matchBy,
+                value: _matchBy,
+                items: [
+                  DropdownMenuItem(value: 'code', child: Text(t.code)),
+                  DropdownMenuItem(value: 'name', child: Text(t.title)),
+                ],
+                onChanged: _loading ? null : (v) => setState(() => _matchBy = v ?? 'code'),
+              ),
+              ExcelImportDropdownField(
+                label: t.conflictPolicy,
+                value: _conflictPolicy,
+                items: [
+                  DropdownMenuItem(value: 'insert', child: Text(t.policyInsertOnly)),
+                  DropdownMenuItem(value: 'update', child: Text(t.policyUpdateExisting)),
+                  DropdownMenuItem(value: 'upsert', child: Text(t.policyUpsert)),
+                ],
+                onChanged: _loading ? null : (v) => setState(() => _conflictPolicy = v ?? 'upsert'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          ExcelImportResponsiveGroup(
+            children: [
+              ExcelImportDropdownField(
+                label: isFa ? 'دسته‌بندی ناموجود' : 'Missing category',
+                value: _onMissingCategory,
+                items: [
+                  DropdownMenuItem(
+                    value: 'error',
+                    child: Text(isFa ? 'خطا' : 'Error'),
+                  ),
+                  DropdownMenuItem(
+                    value: 'create',
+                    child: Text(isFa ? 'ایجاد خودکار' : 'Auto-create'),
+                  ),
+                ],
+                onChanged: _loading ? null : (v) => setState(() => _onMissingCategory = v ?? 'error'),
+              ),
+              ExcelImportDropdownField(
+                label: isFa ? 'ویژگی ناموجود' : 'Missing attribute',
+                value: _onMissingAttributes,
+                items: [
+                  DropdownMenuItem(
+                    value: 'error',
+                    child: Text(isFa ? 'خطا' : 'Error'),
+                  ),
+                  DropdownMenuItem(
+                    value: 'create',
+                    child: Text(isFa ? 'ایجاد خودکار' : 'Auto-create'),
+                  ),
+                ],
+                onChanged: _loading ? null : (v) => setState(() => _onMissingAttributes = v ?? 'error'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          ExcelImportInfoBanner(
+            message: isFa
+                ? 'برای دسته‌بندی می‌توانید «مسیر دسته‌بندی» مثل «مواد اولیه > پلاستیک» وارد کنید. '
+                    'تعداد اولیه و بهای تمام‌شده فقط برای کالا با کنترل موجودی فعال و در سند تراز افتتاحیه ثبت می‌شوند؛ '
+                    'انبار را با شناسه، کد یا نام مشخص کنید.'
+                : 'Tip: Use Category Path like "Raw materials > Plastics". '
+                    'Opening balance qty/cost apply only to tracked products and are stored in the opening balance document; '
+                    'specify warehouse by ID, code, or name.',
+          ),
+          const SizedBox(height: 8),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: Text(t.dryRunValidateOnly),
+            value: _dryRun,
+            onChanged: _loading ? null : (v) => setState(() => _dryRun = v),
+          ),
+          if (_result != null) ...[
+            const SizedBox(height: 16),
+            Text(
+              '${t.result}:',
+              style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 8),
+            _ResultSummary(result: _result!),
+          ],
+        ],
+      ),
     );
   }
 }
@@ -367,7 +321,7 @@ class _ResultSummaryBody extends StatefulWidget {
 }
 
 class _ResultSummaryBodyState extends State<_ResultSummaryBody> {
-  String _previewFilter = 'all'; // all | warnings | would_create | resolved
+  String _previewFilter = 'all';
   int _previewLimit = 50;
 
   String _fmtMap(Object? v) {
@@ -430,8 +384,8 @@ class _ResultSummaryBodyState extends State<_ResultSummaryBody> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Wrap(
-          spacing: 12,
-          runSpacing: 4,
+          spacing: 8,
+          runSpacing: 6,
           children: [
             _chip(t.total, summary['total']),
             _chip(t.valid, summary['valid']),
@@ -445,8 +399,8 @@ class _ResultSummaryBodyState extends State<_ResultSummaryBody> {
         if (refSummary != null) ...[
           const SizedBox(height: 8),
           Wrap(
-            spacing: 12,
-            runSpacing: 4,
+            spacing: 8,
+            runSpacing: 6,
             children: [
               _chip(isFa ? 'Resolve دسته‌بندی' : 'Resolved category', (refSummary['resolved'] as Map?)?['category']),
               _chip(isFa ? 'Resolve انبار' : 'Resolved warehouse', (refSummary['resolved'] as Map?)?['warehouse']),
@@ -460,8 +414,8 @@ class _ResultSummaryBodyState extends State<_ResultSummaryBody> {
             ],
           ),
         ],
-        const SizedBox(height: 8),
         if (preview.isNotEmpty) ...[
+          const SizedBox(height: 8),
           ExpansionTile(
             tilePadding: EdgeInsets.zero,
             childrenPadding: EdgeInsets.zero,
@@ -470,7 +424,9 @@ class _ResultSummaryBodyState extends State<_ResultSummaryBody> {
               style: Theme.of(context).textTheme.titleSmall,
             ),
             subtitle: Text(
-              isFa ? 'نمایش $shownCount ردیف (از ${filteredPreview.length})' : 'Showing $shownCount rows (of ${filteredPreview.length})',
+              isFa
+                  ? 'نمایش $shownCount ردیف (از ${filteredPreview.length})'
+                  : 'Showing $shownCount rows (of ${filteredPreview.length})',
               style: Theme.of(context).textTheme.bodySmall,
             ),
             children: [
@@ -502,48 +458,48 @@ class _ResultSummaryBodyState extends State<_ResultSummaryBody> {
                 ],
               ),
               const SizedBox(height: 8),
-              SizedBox(
-                height: 220,
-                child: ListView.builder(
-                  itemCount: shownCount,
-                  itemBuilder: (context, i) {
-                    final row = filteredPreview[i];
-                    final rowNo = row['row'];
-                    final resolved = row['resolved'];
-                    final wouldCreate = row['would_create'];
-                    final warnings = row['warnings'];
-                    final openingBalance = row['opening_balance'];
-                    final resolvedText = _fmtMap(resolved);
-                    final wouldCreateText = _fmtMap(wouldCreate);
-                    final warningsText = _fmtMap(warnings);
-                    final openingBalanceText = _fmtMap(openingBalance);
+              ListView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: shownCount,
+                itemBuilder: (context, i) {
+                  final row = filteredPreview[i];
+                  final rowNo = row['row'];
+                  final resolved = row['resolved'];
+                  final wouldCreate = row['would_create'];
+                  final warnings = row['warnings'];
+                  final openingBalance = row['opening_balance'];
+                  final resolvedText = _fmtMap(resolved);
+                  final wouldCreateText = _fmtMap(wouldCreate);
+                  final warningsText = _fmtMap(warnings);
+                  final openingBalanceText = _fmtMap(openingBalance);
 
-                    final lines = <String>[];
-                    if (resolvedText.isNotEmpty) {
-                      lines.add((isFa ? 'Resolve: ' : 'Resolved: ') + resolvedText);
-                    }
-                    if (wouldCreateText.isNotEmpty) {
-                      lines.add((isFa ? 'ایجادشدنی: ' : 'Would create: ') + wouldCreateText);
-                    }
-                    if (openingBalanceText.isNotEmpty) {
-                      lines.add((isFa ? 'تعداد اولیه: ' : 'Opening balance: ') + openingBalanceText);
-                    }
-                    if (warningsText.isNotEmpty) {
-                      lines.add((isFa ? 'هشدار: ' : 'Warnings: ') + warningsText);
-                    }
+                  final lines = <String>[];
+                  if (resolvedText.isNotEmpty) {
+                    lines.add((isFa ? 'Resolve: ' : 'Resolved: ') + resolvedText);
+                  }
+                  if (wouldCreateText.isNotEmpty) {
+                    lines.add((isFa ? 'ایجادشدنی: ' : 'Would create: ') + wouldCreateText);
+                  }
+                  if (openingBalanceText.isNotEmpty) {
+                    lines.add((isFa ? 'تعداد اولیه: ' : 'Opening balance: ') + openingBalanceText);
+                  }
+                  if (warningsText.isNotEmpty) {
+                    lines.add((isFa ? 'هشدار: ' : 'Warnings: ') + warningsText);
+                  }
 
-                    return ListTile(
-                      dense: true,
-                      contentPadding: EdgeInsets.zero,
-                      leading: const Icon(Icons.info_outline),
-                      title: Text('${t.row} ${rowNo ?? '-'}'),
-                      subtitle: Text(lines.join('\n')),
-                    );
-                  },
-                ),
+                  return ListTile(
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.info_outline, size: 20),
+                    title: Text('${t.row} ${rowNo ?? '-'}'),
+                    subtitle: Text(lines.join('\n')),
+                  );
+                },
               ),
               const SizedBox(height: 8),
-              Row(
+              Wrap(
+                spacing: 8,
                 children: [
                   if (_previewLimit < filteredPreview.length)
                     TextButton(
@@ -559,31 +515,33 @@ class _ResultSummaryBodyState extends State<_ResultSummaryBody> {
               ),
             ],
           ),
-          const SizedBox(height: 8),
         ],
         if (errors.isNotEmpty)
-          SizedBox(
-            height: 160,
-            child: ListView.builder(
-              itemCount: errors.length,
-              itemBuilder: (context, i) {
-                final e = errors[i];
-                return ListTile(
-                  dense: true,
-                  leading: const Icon(Icons.error_outline, color: Colors.red),
-                  title: Text('${t.row} ${e['row']}'),
-                  subtitle: Text(((e['errors'] as List?)?.join(', ')) ?? ''),
-                );
-              },
-            ),
+          ListView.separated(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: errors.length,
+            separatorBuilder: (_, __) => const Divider(height: 1),
+            itemBuilder: (context, i) {
+              final e = errors[i];
+              return ListTile(
+                dense: true,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 0),
+                leading: const Icon(Icons.error_outline, color: Colors.red, size: 20),
+                title: Text('${t.row} ${e['row']}'),
+                subtitle: Text(((e['errors'] as List?)?.join(', ')) ?? ''),
+              );
+            },
           ),
       ],
     );
   }
 
   Widget _chip(String label, Object? value) {
-    return Chip(label: Text('$label: ${value ?? '-'}'));
+    return Chip(
+      label: Text('$label: ${value ?? '-'}'),
+      visualDensity: VisualDensity.compact,
+      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+    );
   }
 }
-
-

@@ -7,6 +7,7 @@ import '../../core/api_client.dart';
 import '../../services/bytes_export/bytes_export_service.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
+import '../common/excel_import_dialog_shell.dart';
 
 class PersonImportDialog extends StatefulWidget {
   final int businessId;
@@ -18,7 +19,6 @@ class PersonImportDialog extends StatefulWidget {
 }
 
 class _PersonImportDialogState extends State<PersonImportDialog> {
-  final TextEditingController _pathCtrl = TextEditingController();
   bool _dryRun = true;
   String _matchBy = 'code';
   String _conflictPolicy = 'upsert';
@@ -41,12 +41,6 @@ class _PersonImportDialogState extends State<PersonImportDialog> {
     });
   }
 
-  @override
-  void dispose() {
-    _pathCtrl.dispose();
-    super.dispose();
-  }
-
   Future<void> _pickFile() async {
     if (!_isInitialized) {
       if (mounted) {
@@ -55,23 +49,21 @@ class _PersonImportDialogState extends State<PersonImportDialog> {
       }
       return;
     }
-    
+
     try {
       final picked = await FilePickerBridge.pickExcel();
       if (picked != null) {
         setState(() {
           _selectedFile = picked;
-          _pathCtrl.text = picked.name;
         });
       }
     } catch (e) {
       if (mounted) {
         final t = AppLocalizations.of(context);
         SnackBarHelper.show(
-        context,
-        message:
-            '${t.pickFileError}: ${ErrorExtractor.forContext(e, context)}',
-      );
+          context,
+          message: '${t.pickFileError}: ${ErrorExtractor.forContext(e, context)}',
+        );
       }
     }
   }
@@ -117,10 +109,9 @@ class _PersonImportDialogState extends State<PersonImportDialog> {
       if (mounted) {
         final t = AppLocalizations.of(context);
         SnackBarHelper.show(
-        context,
-        message:
-            '${t.templateDownloadError}: ${ErrorExtractor.forContext(e, context)}',
-      );
+          context,
+          message: '${t.templateDownloadError}: ${ErrorExtractor.forContext(e, context)}',
+        );
       }
     } finally {
       if (mounted) setState(() => _loading = false);
@@ -128,7 +119,6 @@ class _PersonImportDialogState extends State<PersonImportDialog> {
   }
 
   Future<void> _runImport({required bool dryRun}) async {
-    // Ensure file is selected
     if (_selectedFile == null) {
       await _pickFile();
       if (_selectedFile == null) return;
@@ -167,9 +157,9 @@ class _PersonImportDialogState extends State<PersonImportDialog> {
       if (mounted) {
         final t = AppLocalizations.of(context);
         SnackBarHelper.show(
-        context,
-        message: '${t.importError}: ${ErrorExtractor.forContext(e, context)}',
-      );
+          context,
+          message: '${t.importError}: ${ErrorExtractor.forContext(e, context)}',
+        );
       }
     } finally {
       if (mounted) setState(() => _loading = false);
@@ -179,117 +169,91 @@ class _PersonImportDialogState extends State<PersonImportDialog> {
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
-    return AlertDialog(
-      title: Text(t.importPersonsFromExcel),
-      content: SizedBox(
-        width: 560,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Row(children: [
-              Expanded(
-                child: TextField(
-                  controller: _pathCtrl,
-                  readOnly: true,
-                  decoration: InputDecoration(
-                    labelText: t.selectedFile,
-                    hintText: t.noFileSelected,
-                    isDense: true,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              OutlinedButton.icon(
-                onPressed: (_loading || !_isInitialized) ? null : _pickFile,
-                icon: const Icon(Icons.attach_file),
-                label: Text(t.chooseFile),
-              ),
-            ]),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Expanded(
-                  child: DropdownButtonFormField<String>(
-                    initialValue: _matchBy,
-                    isDense: true,
-                    items: [
-                      DropdownMenuItem(value: 'code', child: Text('${t.matchBy}: ${t.code}')),
-                      DropdownMenuItem(value: 'national_id', child: Text('${t.matchBy}: ${t.personNationalId}')),
-                      DropdownMenuItem(value: 'email', child: Text('${t.matchBy}: ${t.personEmail}')),
-                    ],
-                    onChanged: (v) => setState(() => _matchBy = v ?? 'code'),
-                    decoration: const InputDecoration(isDense: true),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: DropdownButtonFormField<String>(
-                    initialValue: _conflictPolicy,
-                    isDense: true,
-                    items: [
-                      DropdownMenuItem(value: 'insert', child: Text('${t.conflictPolicy}: ${t.policyInsertOnly}')),
-                      DropdownMenuItem(value: 'update', child: Text('${t.conflictPolicy}: ${t.policyUpdateExisting}')),
-                      DropdownMenuItem(value: 'upsert', child: Text('${t.conflictPolicy}: ${t.policyUpsert}')), 
-                    ],
-                    onChanged: (v) => setState(() => _conflictPolicy = v ?? 'upsert'),
-                    decoration: const InputDecoration(isDense: true),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Checkbox(
-                  value: _dryRun,
-                  onChanged: (v) => setState(() => _dryRun = v ?? true),
-                ),
-                Text(t.dryRunValidateOnly)
-              ],
-            ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                OutlinedButton.icon(
-                  onPressed: _loading ? null : _downloadTemplate,
-                  icon: const Icon(Icons.download),
-                  label: Text(t.downloadTemplate),
-                ),
-                const SizedBox(width: 8),
-                FilledButton.icon(
-                  onPressed: _loading ? null : () => _runImport(dryRun: _dryRun),
-                  icon: _loading ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.play_arrow),
-                  label: Text(_dryRun ? t.reviewDryRun : t.import),
-                ),
-                const SizedBox(width: 8),
-                if (_dryRun)
-                  FilledButton.tonalIcon(
-                    onPressed: _loading ? null : () async {
-                      await _runImport(dryRun: false);
-                    },
-                    icon: const Icon(Icons.cloud_upload),
-                    label: Text(t.importReal),
-                  )
-              ],
-            ),
-            if (_result != null) ...[
-              const SizedBox(height: 12),
-              Align(
-                alignment: Alignment.centerRight,
-                child: Text('${t.result}:', style: Theme.of(context).textTheme.titleSmall),
-              ),
-              const SizedBox(height: 8),
-              _ResultSummary(result: _result!),
-            ],
-          ],
-        ),
-      ),
+
+    return ExcelImportDialogShell(
+      title: t.importPersonsFromExcel,
+      onClose: _loading ? null : () => Navigator.of(context).pop(_shouldRefreshParent),
       actions: [
         TextButton(
           onPressed: _loading ? null : () => Navigator.of(context).pop(_shouldRefreshParent),
           child: Text(t.close),
         ),
+        OutlinedButton.icon(
+          onPressed: _loading ? null : _downloadTemplate,
+          icon: const Icon(Icons.download),
+          label: Text(t.downloadTemplate),
+        ),
+        FilledButton.icon(
+          onPressed: _loading ? null : () => _runImport(dryRun: _dryRun),
+          icon: _loading
+              ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+              : const Icon(Icons.play_arrow),
+          label: Text(_dryRun ? t.reviewDryRun : t.import),
+        ),
+        if (_dryRun)
+          FilledButton.tonalIcon(
+            onPressed: _loading
+                ? null
+                : () async {
+                    await _runImport(dryRun: false);
+                  },
+            icon: const Icon(Icons.cloud_upload),
+            label: Text(t.importReal),
+          ),
       ],
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          ExcelImportFilePicker(
+            fileName: _selectedFile?.name,
+            emptyHint: t.noFileSelected,
+            chooseLabel: t.chooseFile,
+            onPick: _pickFile,
+            enabled: !_loading && _isInitialized,
+          ),
+          const SizedBox(height: 16),
+          ExcelImportResponsiveGroup(
+            children: [
+              ExcelImportDropdownField(
+                label: t.matchBy,
+                value: _matchBy,
+                items: [
+                  DropdownMenuItem(value: 'code', child: Text(t.code)),
+                  DropdownMenuItem(value: 'national_id', child: Text(t.personNationalId)),
+                  DropdownMenuItem(value: 'email', child: Text(t.personEmail)),
+                ],
+                onChanged: _loading ? null : (v) => setState(() => _matchBy = v ?? 'code'),
+              ),
+              ExcelImportDropdownField(
+                label: t.conflictPolicy,
+                value: _conflictPolicy,
+                items: [
+                  DropdownMenuItem(value: 'insert', child: Text(t.policyInsertOnly)),
+                  DropdownMenuItem(value: 'update', child: Text(t.policyUpdateExisting)),
+                  DropdownMenuItem(value: 'upsert', child: Text(t.policyUpsert)),
+                ],
+                onChanged: _loading ? null : (v) => setState(() => _conflictPolicy = v ?? 'upsert'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: Text(t.dryRunValidateOnly),
+            value: _dryRun,
+            onChanged: _loading ? null : (v) => setState(() => _dryRun = v),
+          ),
+          if (_result != null) ...[
+            const SizedBox(height: 16),
+            Text(
+              '${t.result}:',
+              style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 8),
+            _ResultSummary(result: _result!),
+          ],
+        ],
+      ),
     );
   }
 }
@@ -313,8 +277,8 @@ class _ResultSummary extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Wrap(
-          spacing: 12,
-          runSpacing: 4,
+          spacing: 8,
+          runSpacing: 6,
           children: [
             _chip(t.total, summary['total']),
             _chip(t.valid, summary['valid']),
@@ -322,9 +286,7 @@ class _ResultSummary extends StatelessWidget {
             _chip(t.inserted, summary['inserted']),
             _chip(t.updated, summary['updated']),
             _chip(t.skipped, summary['skipped']),
-            if (skipApply != null &&
-                skipApply is num &&
-                skipApply.toInt() > 0)
+            if (skipApply != null && skipApply is num && skipApply.toInt() > 0)
               _chip(t.importSkippedApply, skipApply),
             _chip(t.dryRun, isDry ? t.yes : t.no),
             if (isDry) ...[
@@ -334,57 +296,62 @@ class _ResultSummary extends StatelessWidget {
             ],
           ],
         ),
-        const SizedBox(height: 8),
         if (warnings.isNotEmpty) ...[
-          Align(
-            alignment: Alignment.centerRight,
-            child: Text(
-              t.importWarningsTitle,
-              style: Theme.of(context).textTheme.titleSmall,
-            ),
+          const SizedBox(height: 12),
+          Text(
+            t.importWarningsTitle,
+            style: Theme.of(context).textTheme.titleSmall,
           ),
           const SizedBox(height: 4),
-          SizedBox(
-            height: 120,
-            child: ListView.builder(
-              itemCount: warnings.length,
-              itemBuilder: (context, i) {
-                final w = warnings[i];
-                return ListTile(
-                  dense: true,
-                  leading:
-                      Icon(Icons.warning_amber_outlined, color: Theme.of(context).colorScheme.tertiary),
-                  title: Text('${t.row} ${w['row']}'),
-                  subtitle: Text(w['message']?.toString() ?? ''),
-                );
-              },
-            ),
+          ListView.separated(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: warnings.length,
+            separatorBuilder: (_, __) => const Divider(height: 1),
+            itemBuilder: (context, i) {
+              final w = warnings[i];
+              return ListTile(
+                dense: true,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 0),
+                leading: Icon(
+                  Icons.warning_amber_outlined,
+                  color: Theme.of(context).colorScheme.tertiary,
+                  size: 20,
+                ),
+                title: Text('${t.row} ${w['row']}'),
+                subtitle: Text(w['message']?.toString() ?? ''),
+              );
+            },
           ),
-          const SizedBox(height: 8),
         ],
-        if (errors.isNotEmpty)
-          SizedBox(
-            height: 160,
-            child: ListView.builder(
-              itemCount: errors.length,
-              itemBuilder: (context, i) {
-                final e = errors[i];
-                return ListTile(
-                  dense: true,
-                  leading: const Icon(Icons.error_outline, color: Colors.red),
-                  title: Text('${t.row} ${e['row']}'),
-                  subtitle: Text(((e['errors'] as List?)?.join(', ')) ?? ''),
-                );
-              },
-            ),
+        if (errors.isNotEmpty) ...[
+          const SizedBox(height: 8),
+          ListView.separated(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            itemCount: errors.length,
+            separatorBuilder: (_, __) => const Divider(height: 1),
+            itemBuilder: (context, i) {
+              final e = errors[i];
+              return ListTile(
+                dense: true,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 0),
+                leading: const Icon(Icons.error_outline, color: Colors.red, size: 20),
+                title: Text('${t.row} ${e['row']}'),
+                subtitle: Text(((e['errors'] as List?)?.join(', ')) ?? ''),
+              );
+            },
           ),
+        ],
       ],
     );
   }
 
   Widget _chip(String label, Object? value) {
-    return Chip(label: Text('$label: ${value ?? '-'}'));
+    return Chip(
+      label: Text('$label: ${value ?? '-'}'),
+      visualDensity: VisualDensity.compact,
+      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+    );
   }
 }
-
-
