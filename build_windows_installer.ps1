@@ -212,9 +212,10 @@ $edits = @(
     @("/edit", $AipPath, "/SetProperty", "Manufacturer=$Manufacturer"),
     @("/edit", $AipPath, "/SetAppdir", "-buildname", "DefaultBuild", "-path", "[ProgramFiles64Folder][Manufacturer]\[ProductName]"),
     @("/edit", $AipPath, "/SetShortcutdir", "-buildname", "DefaultBuild", "-path", "[ProgramMenuFolder][ProductName]"),
-    # Sync Application Folder with Flutter Release output
+    # Sync Flutter Release output directly into APPDIR (no extra Release\ subfolder).
+    # AddFolder would create APPDIR\Release\... and break shortcut targets.
     @("/edit", $AipPath, "/DelFolder", "APPDIR"),
-    @("/edit", $AipPath, "/AddFolder", "APPDIR", $ReleaseDir),
+    @("/edit", $AipPath, "/NewSync", "APPDIR", $ReleaseDir),
     # Start menu shortcut
     @("/edit", $AipPath, "/DelShortcut", "-name", $ProductName, "-dir", "SHORTCUTDIR"),
     @("/edit", $AipPath, "/NewShortcut", "-name", $ProductName, "-dir", "SHORTCUTDIR", "-target", $shortcutTarget, "-wkdir", "APPDIR", "-icon", $shortcutIconPath),
