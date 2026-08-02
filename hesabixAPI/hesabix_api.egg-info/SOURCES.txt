@@ -679,6 +679,7 @@ app/services/warehouse_reports_service.py
 app/services/warehouse_service.py
 app/services/warranty_service.py
 app/services/woocommerce_integration_service.py
+app/services/woocommerce_stock_push_hook.py
 app/services/ws_api_key_handshake.py
 app/services/year_end_closing_service.py
 app/services/zohal_service.py
@@ -1148,6 +1149,7 @@ tests/test_basalam_dlq.py
 tests/test_basalam_observability.py
 tests/test_basalam_openapi_contract.py
 tests/test_basalam_workflow_license_gate.py
+tests/test_bitpay_amount_unit.py
 tests/test_business_ai_provider_byok.py
 tests/test_business_backup_financial_policy.py
 tests/test_business_backup_orphan_cleanup.py

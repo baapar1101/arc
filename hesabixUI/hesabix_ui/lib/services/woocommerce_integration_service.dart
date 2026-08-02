@@ -277,7 +277,7 @@ class WoocommerceIntegrationService {
   }) async {
     final res = await _api.get<Map<String, dynamic>>(
       '/api/v1/woocommerce/business/$businessId/bridge/control/stock-conflicts',
-      queryParameters: <String, dynamic>{'limit': limit},
+      query: <String, dynamic>{'limit': limit},
     );
     return _dataMap(res.data);
   }
