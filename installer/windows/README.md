@@ -28,6 +28,7 @@ The script:
 - Locates `AdvancedInstaller.com`
 - Creates/refreshes a simple AIP that packages the Flutter `Release` folder
 - Sets Product Version from `pubspec.yaml` (`MAJOR.MINOR.PATCH`)
+- Creates Start Menu + **Desktop** shortcuts named `Hesabix` (with app icon)
 - Builds `hesabix-windows.<version>.msi` under `installer\windows\dist\`
 
 Uses an Advanced Installer **professional** project (CLI `-type professional`).

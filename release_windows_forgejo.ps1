@@ -82,14 +82,14 @@ function Get-PubspecVersionName {
 }
 
 function Get-AuthHeaders {
-    if ($Token) {
-        return @{ Authorization = "token $Token" }
-    }
     if ($User -and $Password) {
         $pair = "{0}:{1}" -f $User, $Password
         $bytes = [System.Text.Encoding]::ASCII.GetBytes($pair)
         $b64 = [Convert]::ToBase64String($bytes)
         return @{ Authorization = "Basic $b64" }
+    }
+    if ($Token) {
+        return @{ Authorization = "token $Token" }
     }
     throw "Auth required: set FORGEJO_TOKEN or FORGEJO_USER+FORGEJO_PASSWORD"
 }
@@ -123,14 +123,14 @@ if (-not $Body) {
 $headers = Get-AuthHeaders
 $headers["Accept"] = "application/json"
 
-Write-Host "[INFO] Version (tag): $VERSION"
-Write-Host "[INFO] MSI:           $MsiPath"
-Write-Host "[INFO] Asset name:    $ASSET_NAME"
-Write-Host "[INFO] Repo:          $Owner/$Repo @ $Target"
-Write-Host "[INFO] API:           $ApiBase"
+Write-Host "INFO: Version (tag): $VERSION"
+Write-Host "INFO: MSI:           $MsiPath"
+Write-Host "INFO: Asset name:    $ASSET_NAME"
+Write-Host "INFO: Repo:          $Owner/$Repo @ $Target"
+Write-Host "INFO: API:           $ApiBase"
 
 if ($DryRun) {
-    Write-Host "[INFO] Dry-run only — no release will be created/updated."
+    Write-Host "INFO: Dry-run only - no release will be created/updated."
     exit 0
 }
 
@@ -170,19 +170,15 @@ function Invoke-ForgejoJson {
 }
 
 $tagUrl = "$ApiBase/repos/$Owner/$Repo/releases/tags/$VERSION"
-$existing = $null
-try {
-    $existing = Invoke-RestMethod -Method GET -Uri $tagUrl -Headers $headers
-} catch {
-    $status = $null
-    try { $status = [int]$_.Exception.Response.StatusCode } catch {}
-    if ($status -ne 404) { throw }
+$existing = Invoke-ForgejoJson -Method GET -Url $tagUrl
+if ($null -eq $existing) {
+    Write-Host "INFO: No existing release found for tag $VERSION."
 }
 
 $releaseId = $null
-if ($existing -and $existing.id) {
+if ($null -ne $existing -and $null -ne $existing.id -and "$($existing.id)" -ne "") {
     $releaseId = $existing.id
-    Write-Host "[INFO] Release $VERSION already exists (id=$releaseId) — attaching Windows asset only."
+    Write-Host ("INFO: Release {0} already exists (id={1}) - attaching Windows asset only." -f $VERSION, $releaseId)
 
     $winAssets = @($existing.assets | Where-Object {
             $_.name -and (
@@ -195,19 +191,23 @@ if ($existing -and $existing.id) {
         })
     foreach ($a in $winAssets) {
         if ($a.name -eq $ASSET_NAME -or $ForceAsset) {
-            Write-Host "[WARN] Deleting existing asset $($a.name) (id=$($a.id))"
-            Invoke-RestMethod -Method DELETE `
-                -Uri "$ApiBase/repos/$Owner/$Repo/releases/assets/$($a.id)" `
-                -Headers $headers | Out-Null
+            Write-Host "WARN: Deleting existing asset $($a.name) (id=$($a.id))"
+            try {
+                Invoke-RestMethod -Method DELETE `
+                    -Uri "$ApiBase/repos/$Owner/$Repo/releases/assets/$($a.id)" `
+                    -Headers $headers | Out-Null
+            } catch {
+                Write-Host "WARN: Could not delete asset $($a.name); continuing upload ($($_.Exception.Message))"
+            }
         }
     }
-    $existing = Invoke-RestMethod -Method GET -Uri $tagUrl -Headers $headers
+    $existing = Invoke-ForgejoJson -Method GET -Url $tagUrl
     $dup = @($existing.assets | Where-Object { $_.name -eq $ASSET_NAME })
     if ($dup.Count -gt 0) {
         throw "Asset $ASSET_NAME already exists on release $VERSION. Use -ForceAsset to replace."
     }
 } else {
-    Write-Host "[INFO] Creating release $VERSION..."
+    Write-Host "INFO: Creating release $VERSION..."
     $payload = @{
         tag_name         = $VERSION
         target_commitish = $Target
@@ -215,15 +215,15 @@ if ($existing -and $existing.id) {
         body             = $Body
         draft            = $false
         prerelease       = $false
-    } | ConvertTo-Json -Compress
-    $created = Invoke-RestMethod -Method POST -Uri "$ApiBase/repos/$Owner/$Repo/releases" `
-        -Headers $headers -ContentType "application/json; charset=utf-8" -Body $payload
+    } | ConvertTo-Json -Compress -Depth 5
+    $created = Invoke-ForgejoJson -Method POST -Url "$ApiBase/repos/$Owner/$Repo/releases" `
+        -BodyJson $payload -ContentType "application/json; charset=utf-8"
     if (-not $created.id) { throw "Failed to create release: $($created | ConvertTo-Json -Compress)" }
     $releaseId = $created.id
-    Write-Host "[INFO] Release id=$releaseId $($created.html_url)"
+    Write-Host ("INFO: Release id={0} {1}" -f $releaseId, $created.html_url)
 }
 
-Write-Host "[INFO] Uploading $ASSET_NAME..."
+Write-Host "INFO: Uploading $ASSET_NAME..."
 $uploadUrl = "$ApiBase/repos/$Owner/$Repo/releases/$releaseId/assets?name=$ASSET_NAME"
 $uploadHeaders = @{
     Authorization = $headers.Authorization
@@ -233,12 +233,12 @@ $uploaded = Invoke-RestMethod -Method POST -Uri $uploadUrl -Headers $uploadHeade
 if (-not $uploaded.id) {
     throw "Upload failed: $($uploaded | ConvertTo-Json -Compress)"
 }
-Write-Host "[INFO] Asset uploaded: $($uploaded.name) size=$($uploaded.size)"
-Write-Host "[INFO] Download: $($uploaded.browser_download_url)"
+Write-Host "INFO: Asset uploaded: $($uploaded.name) size=$($uploaded.size)"
+Write-Host "INFO: Download: $($uploaded.browser_download_url)"
 
 $latest = Invoke-RestMethod -Method GET -Uri "$ApiBase/repos/$Owner/$Repo/releases/latest" -Headers $headers
-Write-Host "[INFO] Latest release is now: $($latest.tag_name)"
+Write-Host "INFO: Latest release is now: $($latest.tag_name)"
 foreach ($a in @($latest.assets)) {
-    Write-Host "[INFO]  - $($a.name) $($a.browser_download_url)"
+    Write-Host "INFO:  - $($a.name) $($a.browser_download_url)"
 }
-Write-Host "[INFO] Done."
+Write-Host "INFO: Done."

@@ -92,6 +92,50 @@ function Get-PubspecVersionName {
     throw "Could not parse version from $Path"
 }
 
+function Get-ShortcutIconPath {
+    param(
+        [string]$ReleaseDirectory,
+        [string]$ExecutableName
+    )
+    $candidates = @(
+        (Join-Path $ReleaseDirectory $ExecutableName),
+        (Join-Path $ReleaseDirectory "data\flutter_assets\assets\app_icon.ico"),
+        (Join-Path $ReleaseDirectory "app_icon.ico")
+    )
+    foreach ($path in $candidates) {
+        if (Test-Path -LiteralPath $path) {
+            return (Resolve-Path -LiteralPath $path).Path
+        }
+    }
+    throw "No shortcut icon source found under $ReleaseDirectory"
+}
+
+function Repair-InstallerShortcutComponents {
+    param(
+        [string]$AipFile,
+        [string]$ExecutableName = "hesabix_ui.exe"
+    )
+    if (-not (Test-Path -LiteralPath $AipFile)) { return }
+
+    $lines = Get-Content -LiteralPath $AipFile -Encoding UTF8
+    $changed = $false
+    $fixed = foreach ($line in $lines) {
+        if ($line -match '<ROW Shortcut=' -and $line -match ('Target="APPDIR\\' + [regex]::Escape($ExecutableName) + '"')) {
+            $newLine = [regex]::Replace($line, 'Component_="[^"]*"', ('Component_="' + $ExecutableName + '"'))
+            if ($newLine -ne $line) { $changed = $true }
+            $newLine
+        } else {
+            $line
+        }
+    }
+    if ($changed) {
+        Set-Content -LiteralPath $AipFile -Value $fixed -Encoding UTF8
+        Write-Host "[step] Repaired shortcut components -> $ExecutableName" -ForegroundColor Cyan
+    } else {
+        Write-Host "[warn] Could not repair shortcut components in $AipFile" -ForegroundColor Yellow
+    }
+}
+
 function Invoke-AdvInst {
     param(
         [string]$Exe,
@@ -158,6 +202,8 @@ if ($needNew -or -not (Test-Path -LiteralPath $AipPath)) {
 }
 
 $msiPath = Join-Path $OutDir $ASSET_NAME
+$shortcutIconPath = Get-ShortcutIconPath -ReleaseDirectory $ReleaseDir -ExecutableName $ExeName
+$shortcutTarget = "APPDIR\$ExeName"
 
 # Configure product metadata + package the Release folder.
 $edits = @(
@@ -169,7 +215,12 @@ $edits = @(
     # Sync Application Folder with Flutter Release output
     @("/edit", $AipPath, "/DelFolder", "APPDIR"),
     @("/edit", $AipPath, "/AddFolder", "APPDIR", $ReleaseDir),
-    @("/edit", $AipPath, "/NewShortcut", "-name", $ProductName, "-dir", "SHORTCUTDIR", "-target", "APPDIR\$ExeName", "-wkdir", "APPDIR"),
+    # Start menu shortcut
+    @("/edit", $AipPath, "/DelShortcut", "-name", $ProductName, "-dir", "SHORTCUTDIR"),
+    @("/edit", $AipPath, "/NewShortcut", "-name", $ProductName, "-dir", "SHORTCUTDIR", "-target", $shortcutTarget, "-wkdir", "APPDIR", "-icon", $shortcutIconPath),
+    # Desktop shortcut (Hesabix + app icon)
+    @("/edit", $AipPath, "/DelShortcut", "-name", $ProductName, "-dir", "DesktopFolder"),
+    @("/edit", $AipPath, "/NewShortcut", "-name", $ProductName, "-dir", "DesktopFolder", "-target", $shortcutTarget, "-wkdir", "APPDIR", "-icon", $shortcutIconPath),
     @("/edit", $AipPath, "/SetOutputLocation", "-buildname", "DefaultBuild", "-path", $OutDir),
     @("/edit", $AipPath, "/SetPackageName", $msiPath)
 )
@@ -182,6 +233,8 @@ foreach ($editArgs in $edits) {
         # Some DelFolder/NewShortcut calls are best-effort on first create.
     }
 }
+
+Repair-InstallerShortcutComponents -AipFile $AipPath -ExecutableName $ExeName
 
 Write-Host "[step] Building MSI..." -ForegroundColor Cyan
 $code = Invoke-AdvInst -Exe $AdvInst -CliArgs @("/build", $AipPath)
