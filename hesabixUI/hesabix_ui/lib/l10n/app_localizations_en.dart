@@ -12734,7 +12734,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get androidUpdateInfoBody =>
-      'Final install requires your confirmation in the Android system installer. The app versionName should match the release tag (e.g. 70.9.911).';
+      'Final install requires your confirmation in the Android system installer. Downloads continue in the background and progress is shown in the system notification.';
 
   @override
   String get androidUpdateAvailableTitle => 'Update available';

@@ -39,8 +39,40 @@ void main() {
   group('isFilesystemRoutePath', () {
     test('detects Windows drive paths', () {
       expect(SmsBankLaunchNavigation.isFilesystemRoutePath('/C:/Program Files/Hesabix'), isTrue);
+      expect(SmsBankLaunchNavigation.isFilesystemRoutePath('/D/hesabixArc/build'), isTrue);
       expect(SmsBankLaunchNavigation.isFilesystemRoutePath('/user/profile/dashboard'), isFalse);
       expect(SmsBankLaunchNavigation.isFilesystemRoutePath('/'), isFalse);
+    });
+  });
+
+  group('isRecognizedAppRoutePath', () {
+    test('accepts app routes', () {
+      expect(SmsBankLaunchNavigation.isRecognizedAppRoutePath('/'), isTrue);
+      expect(SmsBankLaunchNavigation.isRecognizedAppRoutePath('/login'), isTrue);
+      expect(SmsBankLaunchNavigation.isRecognizedAppRoutePath('/user/profile/dashboard'), isTrue);
+      expect(SmsBankLaunchNavigation.isRecognizedAppRoutePath('/business/5/tab0/invoices'), isTrue);
+    });
+
+    test('rejects filesystem-like paths', () {
+      expect(SmsBankLaunchNavigation.isRecognizedAppRoutePath('/C:/Program Files/Hesabix'), isFalse);
+      expect(SmsBankLaunchNavigation.isRecognizedAppRoutePath('/Program Files/Hesabix'), isFalse);
+    });
+  });
+
+  group('shouldRedirectUnknownPathToRoot', () {
+    test('redirects unknown desktop paths', () {
+      expect(
+        SmsBankLaunchNavigation.shouldRedirectUnknownPathToRoot('/C:/Program Files/Hesabix'),
+        isTrue,
+      );
+      expect(
+        SmsBankLaunchNavigation.shouldRedirectUnknownPathToRoot('/Program Files/Hesabix'),
+        isTrue,
+      );
+      expect(
+        SmsBankLaunchNavigation.shouldRedirectUnknownPathToRoot('/user/profile/dashboard'),
+        isFalse,
+      );
     });
   });
 }

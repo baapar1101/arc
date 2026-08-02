@@ -836,8 +836,17 @@ class _MyAppState extends State<MyApp> {
         _themeController == null || 
         _authStore == null) {
       final loadingRouter = GoRouter(
+        // همان نرمال‌سازی ویندوز؛ بدون آن مسیر فایل‌سیستمی در RouteInformationProvider می‌ماند.
+        initialLocation:
+            SmsBankLaunchNavigation.normalizeInitialLocation(Uri.base),
+        overridePlatformDefaultLocation:
+            SmsBankLaunchNavigation.shouldOverridePlatformDefault(Uri.base),
         redirect: (context, state) {
-          // در حین loading، هیچ redirect نکن - URL را حفظ کن
+          if (SmsBankLaunchNavigation.shouldRedirectUnknownPathToRoot(
+            state.uri.path,
+          )) {
+            return '/';
+          }
           return null;
         },
         routes: <RouteBase>[
@@ -908,8 +917,8 @@ class _MyAppState extends State<MyApp> {
           return '/';
         }
 
-        // Desktop filesystem paths (e.g. /C:/Program Files/...) must not stick as routes.
-        if (SmsBankLaunchNavigation.isFilesystemRoutePath(currentPath)) {
+        // Desktop filesystem / unknown paths must not stick as routes (Windows 404 on relaunch).
+        if (SmsBankLaunchNavigation.shouldRedirectUnknownPathToRoot(currentPath)) {
           return '/';
         }
         

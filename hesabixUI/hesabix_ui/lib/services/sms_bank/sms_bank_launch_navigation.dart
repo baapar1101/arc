@@ -79,8 +79,30 @@ class SmsBankLaunchNavigation {
     if (path.isEmpty || path == '/') return false;
     // Windows drive letter as first segment: /C:/... or /C:\...
     if (RegExp(r'^/[A-Za-z]:').hasMatch(path)) return true;
+    // Some Windows builds omit the colon: /D/hesabixArc/...
+    if (RegExp(r'^/[A-Za-z]/').hasMatch(path)) return true;
     if (path.contains(r'\') || path.toLowerCase().endsWith('.exe')) return true;
     return false;
+  }
+
+  /// Registered GoRouter paths (plus synthetic paths handled by redirect).
+  /// On desktop, anything else often comes from [Uri.base] filesystem URLs.
+  static bool isRecognizedAppRoutePath(String path) {
+    if (path.isEmpty || path == '/') return true;
+    if (path == '/login' || path == '/404') return true;
+    if (path == '/capture' || path.startsWith('/sms-bank/')) return true;
+    if (path.startsWith('/public/')) return true;
+    if (path.startsWith('/i/') || path.startsWith('/p/')) return true;
+    if (path.startsWith('/wallet/')) return true;
+    if (path.startsWith('/mobile-launcher/')) return true;
+    if (path.startsWith('/user/profile/')) return true;
+    if (path.startsWith('/business/')) return true;
+    return false;
+  }
+
+  /// Redirect desktop / stale route information away from non-app paths (404).
+  static bool shouldRedirectUnknownPathToRoot(String path) {
+    return isFilesystemRoutePath(path) || !isRecognizedAppRoutePath(path);
   }
 
   static bool _isDesktopFilesystemBase(Uri base) {
