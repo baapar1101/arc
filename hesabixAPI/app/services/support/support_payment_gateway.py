@@ -15,6 +15,12 @@ from adapters.db.models.payment_gateway import PaymentGateway
 from adapters.db.models.support.billing import SupportPaymentSession
 from app.core.responses import ApiError
 from app.core.settings import get_settings
+from app.services.payment_service import (
+	_BITPAY_WIRE_MAX,
+	_BITPAY_WIRE_MIN,
+	_bitpay_amount_unit,
+	_bitpay_wire_amount,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -443,16 +449,23 @@ def _initiate_bitpay(
 	api_key = str(cfg.get("api") or "").strip()
 	if not api_key:
 		raise ApiError("INVALID_CONFIG", "api الزامی است", http_status=400)
-	if amount < 5000:
-		raise ApiError("INVALID_AMOUNT", "حداقل مبلغ ۵۰۰۰ ریال است", http_status=400)
+	unit = _bitpay_amount_unit(cfg)
+	wire_amount = _bitpay_wire_amount(amount, cfg)
+	if wire_amount < _BITPAY_WIRE_MIN[unit]:
+		raise ApiError("INVALID_AMOUNT", "حداقل مبلغ ۵۰٬۰۰۰ ریال (۵٬۰۰۰ تومان) است", http_status=400)
+	if wire_amount > _BITPAY_WIRE_MAX[unit]:
+		raise ApiError(
+			"AMOUNT_TOO_LARGE",
+			"حداکثر مبلغ هر تراکنش در بیت‌پی ۵۰۰٬۰۰۰٬۰۰۰ ریال است",
+			http_status=400,
+		)
 	cb_url = _build_callback_from_gateway_cfg(cfg, "bitpay", session.id, source)
-	cb_encoded = quote(cb_url, safe="")
 	base_url = "https://bitpay.ir/payment-test" if gw.is_sandbox else "https://bitpay.ir/payment"
 	gateway_send_url = f"{base_url}/gateway-send"
 	data = {
 		"api": api_key,
-		"redirect": cb_encoded,
-		"amount": int(round(float(amount))),
+		"redirect": cb_url,
+		"amount": wire_amount,
 		"factorId": str(session.id),
 		"description": description or "Support subscription",
 	}

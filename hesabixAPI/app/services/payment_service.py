@@ -16,12 +16,32 @@ from app.services.wallet_service import confirm_top_up
 logger = logging.getLogger(__name__)
 
 _BITPAY_ERROR_MESSAGES: Dict[int, str] = {
-	-1: "کلید API بیت‌پی نامعتبر است",
-	-2: "مبلغ کمتر از حداقل ۵٬۰۰۰ ریال است",
+	-1: "کلید API بیت‌پی با نوع درگاه سازگار نیست",
+	-2: "مبلغ نامعتبر است یا کمتر از حداقل مجاز بیت‌پی است",
 	-3: "آدرس بازگشت (callback) نامعتبر است",
-	-4: "درگاه بیت‌پی فعال نیست",
+	-4: "درگاه بیت‌پی فعال نیست یا یافت نشد",
 	-5: "شناسه فاکتور تکراری است",
 }
+
+# بیت‌پی در عمل مبلغ را به تومان می‌گیرد (۵۰٬۰۰۰ ریال = ۵٬۰۰۰ تومان).
+_BITPAY_WIRE_MIN = {"toman": 5000, "rial": 50_000}
+_BITPAY_WIRE_MAX = {"toman": 50_000_000, "rial": 500_000_000}
+
+
+def _bitpay_amount_unit(cfg: Dict[str, Any]) -> str:
+	"""واحد ارسال مبلغ به بیت‌پی: toman (پیش‌فرض) یا rial."""
+	raw = str(cfg.get("amount_unit") or cfg.get("currency") or "toman").strip().lower()
+	if raw in ("r", "rial", "irr"):
+		return "rial"
+	return "toman"
+
+
+def _bitpay_wire_amount(internal_rial_amount: float, cfg: Dict[str, Any]) -> int:
+	"""تبدیل مبلغ داخلی (ریال حسابیکس) به واحد ارسالی بیت‌پی."""
+	amt = float(internal_rial_amount)
+	if _bitpay_amount_unit(cfg) == "toman":
+		return int(round(amt / 10.0))
+	return int(round(amt))
 
 
 @dataclass
@@ -327,7 +347,7 @@ def _initiate_bitpay(db: Session, gw: PaymentGateway, cfg: Dict[str, Any], busin
 	"""
 	BitPay integration:
 	- expects cfg fields: api (52 characters), callback_url (redirect)
-	- amount must be at least 5000 Rials (500 Tomans)
+	- amount_unit (اختیاری): toman (پیش‌فرض) | rial — مبلغ داخلی همیشه ریال است
 	- returns id_get which is used to build payment URL
 	"""
 	api_key = str(cfg.get("api") or "").strip()
@@ -336,14 +356,25 @@ def _initiate_bitpay(db: Session, gw: PaymentGateway, cfg: Dict[str, Any], busin
 		raise ApiError("INVALID_CONFIG", "api و callback_url الزامی هستند", http_status=400)
 	if len(api_key) != 52:
 		raise ApiError("INVALID_CONFIG", "API key باید 52 کاراکتر باشد", http_status=400)
-	# حداقل مبلغ 5000 ریال
-	if amount < 5000:
-		raise ApiError("INVALID_AMOUNT", "حداقل مبلغ 5000 ریال (500 تومان) است", http_status=400)
+	unit = _bitpay_amount_unit(cfg)
+	wire_amount = _bitpay_wire_amount(amount, cfg)
+	if wire_amount < _BITPAY_WIRE_MIN[unit]:
+		raise ApiError(
+			"INVALID_AMOUNT",
+			"حداقل مبلغ پرداخت ۵۰٬۰۰۰ ریال (۵٬۰۰۰ تومان) است",
+			http_status=400,
+		)
+	if wire_amount > _BITPAY_WIRE_MAX[unit]:
+		raise ApiError(
+			"AMOUNT_TOO_LARGE",
+			"حداکثر مبلغ هر تراکنش در بیت‌پی ۵۰۰٬۰۰۰٬۰۰۰ ریال (۵۰٬۰۰۰٬۰۰۰ تومان) است",
+			http_status=400,
+		)
 	# تعیین URL بر اساس sandbox
 	base_url = "https://bitpay.ir/payment-test" if gw.is_sandbox else "https://bitpay.ir/payment"
 	gateway_send_url = f"{base_url}/gateway-send"
-	# encode کردن callback_url و اضافه کردن tx_id و source
-	from urllib.parse import urlencode, urlparse, parse_qsl, urlunparse, quote
+	# اضافه کردن tx_id و source به callback
+	from urllib.parse import urlencode, urlparse, parse_qsl, urlunparse
 	
 	# استخراج source از extra_info تراکنش
 	source = "app"  # پیش‌فرض
@@ -361,11 +392,8 @@ def _initiate_bitpay(db: Session, gw: PaymentGateway, cfg: Dict[str, Any], busin
 		q["tx_id"] = str(tx_id)
 		q["source"] = source
 		cb_url = urlunparse((u.scheme, u.netloc, u.path, u.params, urlencode(q), u.fragment))
-		# encode کردن کل URL برای BitPay (مطابق مستندات)
-		cb_url = quote(cb_url, safe='')
 	except Exception:
-		cb_url_temp = f"{callback_url}{'&' if '?' in callback_url else '?'}tx_id={tx_id}&source={source}"
-		cb_url = quote(cb_url_temp, safe='')
+		cb_url = f"{callback_url}{'&' if '?' in callback_url else '?'}tx_id={tx_id}&source={source}"
 	# بارگذاری اطلاعات کاربر از تراکنش
 	_tx = db.query(WalletTransaction).filter(WalletTransaction.id == int(tx_id)).first()
 	user_name = None
@@ -386,7 +414,7 @@ def _initiate_bitpay(db: Session, gw: PaymentGateway, cfg: Dict[str, Any], busin
 	data = {
 		"api": api_key,
 		"redirect": cb_url,
-		"amount": int(round(float(amount))),
+		"amount": wire_amount,
 		"factorId": str(tx_id),  # شماره فاکتور
 	}
 	
@@ -452,6 +480,8 @@ def _initiate_bitpay(db: Session, gw: PaymentGateway, cfg: Dict[str, Any], busin
 			"provider": "bitpay",
 			"id_get": id_get,
 			"payment_url": payment_url,
+			"bitpay_amount_unit": unit,
+			"bitpay_wire_amount": wire_amount,
 		})
 		_tx.external_ref = id_get
 		_tx.extra_info = json.dumps(extra, ensure_ascii=False)
