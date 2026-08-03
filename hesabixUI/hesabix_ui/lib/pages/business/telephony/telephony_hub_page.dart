@@ -680,7 +680,77 @@ class _TelephonySettingsPageState extends State<TelephonySettingsPage> {
                   ),
                 Text('مراحل راه‌اندازی', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800)),
                 const SizedBox(height: 8),
-                const Text('۱) مرکز تلفن بسازید و توکن را کپی کنید\n۲) Connector را روی Issabel نصب کنید\n۳) داخلی‌ها را تعریف و به کاربران وصل کنید'),
+                const Text(
+                  '۱) مرکز تلفن بسازید و توکن را کپی کنید\n'
+                  '۲) روی سرور Issabel/Asterisk دستور نصب را اجرا کنید\n'
+                  '۳) داخلی‌ها را تعریف و به کاربران وصل کنید',
+                ),
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: scheme.surfaceContainerHighest.withValues(alpha: 0.55),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: scheme.outlineVariant.withValues(alpha: 0.5)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'نصب یک‌خطی روی Issabel',
+                        style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+                      ),
+                      const SizedBox(height: 6),
+                      const Text(
+                        'این دستور کانکتور را از مخزن حسابیکس نصب می‌کند و دستور hesabix-pbx را می‌سازد:',
+                        style: TextStyle(height: 1.4),
+                      ),
+                      const SizedBox(height: 10),
+                      SelectableText(
+                        'curl -fsSL https://source.hesabix.ir/hesabix/arc/raw/branch/master/extraScripts/HesabixTelephonyConnector/install.sh | sudo bash',
+                        style: const TextStyle(fontFamily: 'monospace', fontSize: 12, height: 1.35),
+                      ),
+                      const SizedBox(height: 10),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          OutlinedButton.icon(
+                            onPressed: () async {
+                              const cmd =
+                                  'curl -fsSL https://source.hesabix.ir/hesabix/arc/raw/branch/master/extraScripts/HesabixTelephonyConnector/install.sh | sudo bash';
+                              await Clipboard.setData(const ClipboardData(text: cmd));
+                              if (mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('دستور نصب کپی شد')),
+                                );
+                              }
+                            },
+                            icon: const Icon(Icons.copy_rounded, size: 18),
+                            label: const Text('کپی دستور نصب'),
+                          ),
+                          TextButton(
+                            onPressed: () async {
+                              const help = 'hesabix-pbx status\nhesabix-pbx test\nhesabix-pbx update\nhesabix-pbx restart\nhesabix-pbx configure\nhesabix-pbx logs';
+                              await Clipboard.setData(const ClipboardData(text: help));
+                              if (mounted) {
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('دستورات مدیریت کپی شد')),
+                                );
+                              }
+                            },
+                            child: const Text('کپی دستورات مدیریت'),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'بعد از نصب: hesabix-pbx test  ·  به‌روزرسانی: hesabix-pbx update',
+                        style: TextStyle(color: scheme.onSurfaceVariant, fontSize: 12),
+                      ),
+                    ],
+                  ),
+                ),
                 const SizedBox(height: 16),
                 SwitchListTile(
                   title: const Text('Screen Pop'),
