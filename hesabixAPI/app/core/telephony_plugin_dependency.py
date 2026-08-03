@@ -4,9 +4,14 @@ from __future__ import annotations
 
 from datetime import datetime
 
+from fastapi import Depends, Request
 from sqlalchemy.orm import Session
 
 from adapters.db.models.marketplace import BusinessPlugin, MarketplacePlugin
+from adapters.db.session import get_db
+from app.core.auth_dependency import AuthContext, get_current_user
+from app.core.permissions import has_business_permission_for_business
+from app.core.responses import ApiError
 
 PLUGIN_CODE = "asterisk_issabel_connector"
 
@@ -43,12 +48,6 @@ def check_telephony_plugin_active(db: Session, business_id: int) -> bool:
 
 
 def require_telephony_plugin_active(business_id_param: str = "business_id"):
-	from fastapi import Depends, Request
-
-	from adapters.db.session import get_db
-	from app.core.auth_dependency import get_current_user
-	from app.core.responses import ApiError
-
 	def dependency(
 		request: Request,
 		_ctx=Depends(get_current_user),
@@ -89,12 +88,6 @@ def require_telephony_plugin_active(business_id_param: str = "business_id"):
 
 def require_telephony_click_or_view(business_id_param: str = "business_id"):
 	"""اجازه Click-to-Call با مجوز click_to_call یا view (برای اپراتورهای عادی)."""
-	from fastapi import Depends, Request
-
-	from adapters.db.session import get_db
-	from app.core.auth_dependency import AuthContext, get_current_user
-	from app.core.permissions import has_business_permission_for_business
-	from app.core.responses import ApiError
 
 	def dependency(
 		request: Request,
