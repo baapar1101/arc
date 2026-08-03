@@ -2668,10 +2668,11 @@ class _BusinessShellState extends State<BusinessShell> {
                               child: Row(
                                 mainAxisAlignment: railExtended ? MainAxisAlignment.start : MainAxisAlignment.center,
                                 children: [
-                                  Icon(
-                                    isChildActive ? child.selectedIcon : child.icon,
+                                  _buildSidebarMenuIcon(
+                                    child,
                                     color: isChildActive ? activeFg : sideFg,
                                     size: railExtended ? 20 : 22,
+                                    active: isChildActive,
                                   ),
                                   if (railExtended) ...[
                                     const SizedBox(width: 12),
@@ -2848,10 +2849,11 @@ class _BusinessShellState extends State<BusinessShell> {
                                 Stack(
                                   clipBehavior: Clip.none,
                                   children: [
-                                    Icon(
-                                      active ? item.selectedIcon : item.icon,
+                                    _buildSidebarMenuIcon(
+                                      item,
                                       color: active ? activeFg : sideFg,
                                       size: railExtended ? 24 : 28,
+                                      active: active,
                                     ),
                                     // آیکون expand/collapse کوچک در گوشه برای حالت Rail
                                     if (!railExtended && item.type == _MenuItemType.expandable)
@@ -3032,7 +3034,12 @@ class _BusinessShellState extends State<BusinessShell> {
                     final section = _sectionForLabel(item.label, t);
                     final canAdd = section != null && (widget.authStore.hasBusinessPermission(section, 'add'));
                     return ListTile(
-                      leading: Icon(item.selectedIcon, color: active ? activeFg : sideFg),
+                      leading: _buildSidebarMenuIcon(
+                        item,
+                        color: active ? activeFg : sideFg,
+                        size: 24,
+                        active: active,
+                      ),
                       title: Text(item.label, style: TextStyle(color: active ? activeFg : sideFg, fontWeight: active ? FontWeight.w600 : FontWeight.w400)),
                       selected: active,
                       selectedTileColor: activeBg,
@@ -3080,7 +3087,12 @@ class _BusinessShellState extends State<BusinessShell> {
                     // فیلتر کردن زیرآیتم‌ها بر اساس دسترسی
                     final visibleChildren = (item.children ?? []).where((child) => _hasAccessToMenuItem(child)).toList();
                     return ExpansionTile(
-                      leading: Icon(item.icon, color: sideFg),
+                      leading: _buildSidebarMenuIcon(
+                        item,
+                        color: sideFg,
+                        size: 24,
+                        active: false,
+                      ),
                       title: Text(item.label, style: TextStyle(color: sideFg)),
                       initiallyExpanded: isExpanded(item),
                       onExpansionChanged: (expanded) {
@@ -3273,6 +3285,26 @@ class _BusinessShellState extends State<BusinessShell> {
     } finally {
       dismissLoader();
     }
+  }
+
+  Widget _buildSidebarMenuIcon(
+    _MenuItem item, {
+    required Color color,
+    required double size,
+    required bool active,
+  }) {
+    if (item.key == 'telephony') {
+      return BusinessShellTelephonyGlyph(
+        color: color,
+        size: size,
+        filled: active,
+      );
+    }
+    return Icon(
+      active ? item.selectedIcon : item.icon,
+      color: color,
+      size: size,
+    );
   }
 
   String _menuKey(_MenuItem item) {
@@ -3607,6 +3639,7 @@ class _BusinessShellState extends State<BusinessShell> {
       return 'payroll';
     }
     if (label == t.distributionMenu || label == 'Field distribution') return 'distribution';
+    if (label == 'مرکز تماس' || label == 'Telephony') return 'telephony';
     if (label == t.basalamIntegrationMenuTitle) return 'basalam';
     if (label == t.woocommerceIntegrationMenuTitle) return 'woocommerce';
     if (label == 'هوش مصنوعی' || label == 'AI Tools') return 'ai';
