@@ -3,7 +3,7 @@
 # استفاده: hesabix-pbx <command>
 set -euo pipefail
 
-VERSION="1.0.0"
+VERSION="1.1.0"
 INSTALL_DIR="${HESABIX_PBX_DIR:-/opt/HesabixTelephonyConnector}"
 ENV_FILE="${INSTALL_DIR}/.env"
 SERVICE_NAME="hesabix-telephony-connector"
@@ -14,6 +14,17 @@ REPO_URL="${HESABIX_PBX_REPO:-https://source.hesabix.ir/hesabix/arc.git}"
 REPO_BRANCH="${HESABIX_PBX_BRANCH:-master}"
 RAW_BASE="${HESABIX_PBX_RAW_BASE:-https://source.hesabix.ir/hesabix/arc/raw/branch/${REPO_BRANCH}/extraScripts/HesabixTelephonyConnector}"
 CONN_REL_PATH="extraScripts/HesabixTelephonyConnector"
+
+# پیش‌فرض آدرس API حسابیکس (قابل بازنویسی با متغیر محیطی قبل از ویزارد)
+HESABIX_DEFAULT_API_URL="https://hsxn.hesabix.ir"
+
+# تشخیص توزیع (با detect_os پر می‌شود)
+OS_ID=""
+OS_ID_LIKE=""
+OS_NAME=""
+OS_FAMILY=""   # debian | rhel | unknown
+PKG_MGR=""     # apt-get | dnf | yum | ""
+IS_ISSABEL=0
 
 # فایل‌های ضروری کانکتور (برای حالت بدون git)
 CONNECTOR_FILES=(
@@ -43,11 +54,138 @@ die()  { err "$*"; exit 1; }
 
 need_root() {
   if [[ "${EUID:-$(id -u)}" -ne 0 ]]; then
-    die "این دستور را با root اجرا کنید: sudo hesabix-pbx $*"
+    if have sudo; then
+      die "این دستور را با root اجرا کنید: sudo hesabix-pbx $*"
+    fi
+    die "این دستور را با کاربر root اجرا کنید (sudo در این سیستم نیست): hesabix-pbx $*"
   fi
 }
 
 have() { command -v "$1" >/dev/null 2>&1; }
+
+# تشخیص سیستم‌عامل و مدیر بسته (Debian/Ubuntu vs RHEL/CentOS/Issabel)
+# توجه: /etc/os-release را در ساب‌شل می‌خوانیم تا VERSION اسکریپت بازنویسی نشود.
+detect_os() {
+  OS_ID=""
+  OS_ID_LIKE=""
+  OS_NAME=""
+  OS_FAMILY="unknown"
+  PKG_MGR=""
+  IS_ISSABEL=0
+
+  if [[ -r /etc/os-release ]]; then
+    # یک ساب‌شل تا VERSION/NAME اسکریپت آلوده نشود
+    # shellcheck disable=SC1091
+    local os_vars
+    os_vars="$(. /etc/os-release; printf '%s\0%s\0%s' "${ID:-}" "${ID_LIKE:-}" "${PRETTY_NAME:-${NAME:-}}")"
+    OS_ID="${os_vars%%$'\0'*}"
+    os_vars="${os_vars#*$'\0'}"
+    OS_ID_LIKE="${os_vars%%$'\0'*}"
+    OS_NAME="${os_vars#*$'\0'}"
+    [[ -n "$OS_NAME" ]] || OS_NAME="$OS_ID"
+  elif [[ -r /etc/redhat-release ]]; then
+    OS_ID="rhel"
+    OS_NAME="$(tr -d '\n' < /etc/redhat-release)"
+  elif [[ -r /etc/debian_version ]]; then
+    OS_ID="debian"
+    OS_NAME="Debian $(tr -d '\n' < /etc/debian_version)"
+  fi
+
+  if [[ -f /etc/issabel.conf ]] || [[ -d /etc/issabel ]] \
+    || [[ -f /etc/asterisk/issabel.conf ]] \
+    || grep -qi issabel /etc/redhat-release 2>/dev/null \
+    || grep -qi issabel /etc/os-release 2>/dev/null; then
+    IS_ISSABEL=1
+    OS_NAME="${OS_NAME:-Issabel}"
+  fi
+
+  local fingerprint
+  fingerprint=" ${OS_ID} ${OS_ID_LIKE} "
+  if [[ "$fingerprint" =~ (debian|ubuntu|raspbian|linuxmint|pop) ]]; then
+    OS_FAMILY="debian"
+  elif [[ "$fingerprint" =~ (rhel|centos|fedora|rocky|almalinux|alma|ol|scientific|amzn|oracle|sangoma|freepbx) ]]; then
+    OS_FAMILY="rhel"
+  elif [[ -f /etc/debian_version ]]; then
+    OS_FAMILY="debian"
+  elif [[ -f /etc/redhat-release ]] || [[ $IS_ISSABEL -eq 1 ]]; then
+    OS_FAMILY="rhel"
+  fi
+
+  if have dnf; then
+    PKG_MGR="dnf"
+  elif have yum; then
+    PKG_MGR="yum"
+  elif have apt-get; then
+    PKG_MGR="apt-get"
+  elif [[ "$OS_FAMILY" == "rhel" ]]; then
+    # Issabel/CentOS قدیمی ممکن است yum داشته باشد ولی هنوز در PATH نباشد
+    PKG_MGR="yum"
+  elif [[ "$OS_FAMILY" == "debian" ]]; then
+    PKG_MGR="apt-get"
+  fi
+}
+
+# نصب بسته بدون اتکا به sudo (فرض: همین‌الان root هستیم)
+pkg_install() {
+  [[ $# -gt 0 ]] || return 0
+  [[ -n "$PKG_MGR" ]] || detect_os
+  case "$PKG_MGR" in
+    dnf)
+      dnf install -y "$@"
+      ;;
+    yum)
+      yum install -y "$@"
+      ;;
+    apt-get)
+      export DEBIAN_FRONTEND=noninteractive
+      apt-get update -qq
+      apt-get install -y "$@"
+      ;;
+    *)
+      die "مدیر بسته شناخته نشد. بسته‌های لازم را دستی نصب کنید: $*"
+      ;;
+  esac
+}
+
+# نصب پیش‌نیازهای اجرا بر اساس توزیع
+ensure_prerequisites() {
+  detect_os
+  local label="$OS_NAME"
+  if [[ $IS_ISSABEL -eq 1 ]]; then
+    label="${label} [Issabel]"
+  fi
+  log "سیستم‌عامل: ${label:-نامشخص} | خانواده: ${OS_FAMILY} | مدیر بسته: ${PKG_MGR:-نامشخص}"
+
+  local missing=()
+  have python3 || missing+=(python3)
+  have rsync || missing+=(rsync)
+  if ! have curl && ! have wget; then
+    missing+=(curl)
+  fi
+  have git || missing+=(git)
+
+  if ((${#missing[@]} == 0)); then
+    ok "پیش‌نیازها از قبل نصب‌اند."
+    return 0
+  fi
+
+  if [[ -z "$PKG_MGR" ]] || ! have "$PKG_MGR"; then
+    die "پیش‌نیازهای زیر نصب نیستند و مدیر بسته در دسترس نیست: ${missing[*]}
+روی Debian/Ubuntu: apt-get install -y ${missing[*]}
+روی Issabel/CentOS/RHEL: yum install -y ${missing[*]}   یا   dnf install -y ${missing[*]}"
+  fi
+
+  log "نصب پیش‌نیازها (${PKG_MGR}): ${missing[*]}"
+  if ! pkg_install "${missing[@]}"; then
+    die "نصب پیش‌نیازها ناموفق بود: ${missing[*]}"
+  fi
+
+  have python3 || die "python3 پس از نصب در PATH نیست."
+  if ! have curl && ! have wget; then
+    die "curl یا wget پس از نصب در PATH نیست."
+  fi
+  ok "پیش‌نیازها نصب شدند."
+}
 
 prompt() {
   # prompt "سؤال" "پیش‌فرض"
@@ -223,8 +361,11 @@ cmd_configure() {
   echo
   echo -e "${c_bold}پیکربندی اتصال حسابیکس ↔ Issabel/Asterisk${c_reset}"
   echo "مقادیر را از تنظیمات مرکز تماس در حسابیکس بردارید."
+  echo "آدرس API پیش‌فرض: ${HESABIX_DEFAULT_API_URL}"
   echo
 
+  # اولویت: مقدار موجود در .env → متغیر محیطی قبل از ویزارد → پیش‌فرض hsxn
+  local env_override_api="${HESABIX_API_URL:-}"
   local cur_api="" cur_bid="" cur_pid="" cur_token="" cur_ami_host="127.0.0.1" cur_ami_port="5038" cur_ami_user="hesabix" cur_ami_secret=""
   if [[ -f "$ENV_FILE" ]]; then
     # shellcheck disable=SC1090
@@ -238,9 +379,10 @@ cmd_configure() {
     cur_ami_user="${AMI_USER:-hesabix}"
     cur_ami_secret="${AMI_SECRET:-}"
   fi
+  cur_api="${cur_api:-${env_override_api:-$HESABIX_DEFAULT_API_URL}}"
 
   local api bid pid token ami_host ami_port ami_user ami_secret
-  api="$(prompt "آدرس API حسابیکس (مثلاً https://hsxn.hesabix.ir)" "$cur_api")"
+  api="$(prompt "آدرس API حسابیکس" "$cur_api")"
   bid="$(prompt "شناسه کسب‌وکار (Business ID)" "$cur_bid")"
   pid="$(prompt "شناسه مرکز تلفن (PBX ID)" "$cur_pid")"
   token="$(prompt_secret "توکن Connector" "$cur_token")"
@@ -354,6 +496,16 @@ cmd_status() {
   echo "نصب:     $INSTALL_DIR"
   if [[ -f "$INSTALL_DIR/VERSION" ]]; then
     echo "نسخه:     $(tr -d '\n' < "$INSTALL_DIR/VERSION")"
+  fi
+  if [[ -z "$OS_FAMILY" || "$OS_FAMILY" == "unknown" ]]; then
+    detect_os || true
+  fi
+  if [[ -n "$OS_NAME" || -n "$OS_FAMILY" ]]; then
+    local os_line="${OS_NAME:-—} (${OS_FAMILY}"
+    [[ -n "$PKG_MGR" ]] && os_line+=", ${PKG_MGR}"
+    [[ $IS_ISSABEL -eq 1 ]] && os_line+=", Issabel"
+    os_line+=")"
+    echo "سیستم:   $os_line"
   fi
   if [[ -f "$ENV_FILE" ]]; then
     # shellcheck disable=SC1090
@@ -474,14 +626,7 @@ cmd_install() {
   echo "مسیر نصب: $INSTALL_DIR"
   echo
 
-  if ! have python3; then
-    die "python3 نصب نیست. روی Issabel/CentOS: yum install -y python3"
-  fi
-  if ! have rsync; then
-    if have yum; then yum install -y rsync >/dev/null 2>&1 || true
-    elif have apt-get; then apt-get install -y rsync >/dev/null 2>&1 || true
-    fi
-  fi
+  ensure_prerequisites
 
   sync_connector
   install_cli
@@ -509,6 +654,7 @@ cmd_install() {
 cmd_update() {
   need_root update
   [[ -d "$INSTALL_DIR" ]] || die "نصب پیدا نشد. اول: hesabix-pbx install"
+  ensure_prerequisites
   log "به‌روزرسانی کانکتور از مخزن…"
   sync_connector
   install_cli
@@ -553,14 +699,17 @@ cmd_help() {
   cat <<EOF
 ${c_bold}hesabix-pbx${c_reset} v${VERSION} — مدیریت اتصال حسابیکس به Issabel/Asterisk
 
-${c_bold}نصب اول:${c_reset}
+${c_bold}نصب اول (با root):${c_reset}
+  # اگر sudo دارید:
   curl -fsSL ${RAW_BASE}/install.sh | sudo bash
+  # اگر sudo ندارید (Debian/Issabel با ورود root):
+  curl -fsSL ${RAW_BASE}/install.sh | bash
 
 ${c_bold}دستورات:${c_reset}
-  hesabix-pbx install       نصب کامل (دانلود + پیکربندی + سرویس)
+  hesabix-pbx install       نصب کامل (پیش‌نیاز + دانلود + پیکربندی + سرویس)
   hesabix-pbx update        به‌روزرسانی از مخزن حسابیکس
   hesabix-pbx reinstall     نصب مجدد (حفظ .env)
-  hesabix-pbx configure     ویزارد پیکربندی / تغییر توکن و AMI
+  hesabix-pbx configure     ویزارد پیکربندی / تغییر توکن، AMI و آدرس API
   hesabix-pbx start         شروع سرویس
   hesabix-pbx stop          توقف سرویس
   hesabix-pbx restart       ری‌استارت
@@ -575,6 +724,11 @@ ${c_bold}متغیرهای اختیاری:${c_reset}
   HESABIX_PBX_DIR=/opt/HesabixTelephonyConnector
   HESABIX_PBX_REPO=${REPO_URL}
   HESABIX_PBX_BRANCH=${REPO_BRANCH}
+  HESABIX_API_URL=${HESABIX_DEFAULT_API_URL}   # پیش‌فرض ویزارد پیکربندی
+
+${c_bold}توزیع‌های پشتیبانی‌شده:${c_reset}
+  Debian / Ubuntu (apt-get) — بدون نیاز به sudo اگر با root اجرا شود
+  CentOS / RHEL / Rocky / Alma / Issabel (yum یا dnf)
 
 مخزن:
   https://source.hesabix.ir/hesabix/arc/src/branch/master/extraScripts/HesabixTelephonyConnector
