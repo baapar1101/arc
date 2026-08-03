@@ -155,7 +155,7 @@ def upgrade() -> None:
 		sa.Column("talk_sec", sa.Integer(), nullable=True),
 		sa.Column("hangup_cause", sa.String(length=80), nullable=True),
 		sa.Column("recording_status", sa.String(length=20), nullable=False, server_default="none"),
-		sa.Column("recording_file_storage_id", sa.Integer(), nullable=True),
+		sa.Column("recording_file_storage_id", sa.String(length=36), nullable=True),
 		sa.Column("recording_remote_path", sa.String(length=512), nullable=True),
 		sa.Column("recording_url", sa.String(length=1024), nullable=True),
 		sa.Column("person_id", sa.Integer(), nullable=True),

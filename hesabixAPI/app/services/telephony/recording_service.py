@@ -107,10 +107,9 @@ def apply_recording_meta(
 	call.recording_remote_path = payload.get("recording_path") or call.recording_remote_path
 	call.recording_url = payload.get("recording_url") or call.recording_url
 	if payload.get("file_storage_id"):
-		try:
-			call.recording_file_storage_id = int(payload["file_storage_id"])
-		except Exception:
-			pass
+		fid = str(payload["file_storage_id"]).strip()
+		if fid:
+			call.recording_file_storage_id = fid
 	call.updated_at = datetime.utcnow()
 	return call
 

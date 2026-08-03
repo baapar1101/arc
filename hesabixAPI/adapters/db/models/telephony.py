@@ -232,8 +232,8 @@ class TelephonyCall(Base):
 		String(20), nullable=False, default="none", server_default="none",
 		comment="none | pending | available | failed",
 	)
-	recording_file_storage_id: Mapped[int | None] = mapped_column(
-		Integer, ForeignKey("file_storage.id", ondelete="SET NULL"), nullable=True
+	recording_file_storage_id: Mapped[str | None] = mapped_column(
+		String(36), ForeignKey("file_storage.id", ondelete="SET NULL"), nullable=True
 	)
 	recording_remote_path: Mapped[str | None] = mapped_column(String(512), nullable=True)
 	recording_url: Mapped[str | None] = mapped_column(String(1024), nullable=True)
