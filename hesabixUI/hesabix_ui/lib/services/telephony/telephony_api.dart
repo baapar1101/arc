@@ -1,4 +1,4 @@
-import '../core/api_client.dart';
+import '../../core/api_client.dart';
 
 /// کلاینت REST افزونه اتصال آستریکس/ایزابل.
 class TelephonyApi {

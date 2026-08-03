@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+
 import '../in_app_notifications_hub.dart';
 import 'telephony_api.dart';
 
