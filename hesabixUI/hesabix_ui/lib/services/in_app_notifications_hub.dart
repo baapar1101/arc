@@ -38,6 +38,9 @@ class InAppNotificationsHub extends ChangeNotifier {
   final List<void Function(Map<String, dynamic> item)> _foregroundAlertListeners =
       <void Function(Map<String, dynamic> item)>[];
 
+  final List<void Function(Map<String, dynamic> msg)> _rawMessageListeners =
+      <void Function(Map<String, dynamic> msg)>[];
+
   final LinkedHashSet<String> _recentDedupKeys = LinkedHashSet<String>();
 
   bool get isForeground => _lifecycle == AppLifecycleState.resumed;
@@ -48,6 +51,23 @@ class InAppNotificationsHub extends ChangeNotifier {
 
   void removeForegroundAlertListener(void Function(Map<String, dynamic> item) listener) {
     _foregroundAlertListeners.remove(listener);
+  }
+
+  /// رویدادهای خام WebSocket (مثلاً telephony.*) برای ماژول‌های تخصصی.
+  void addRawMessageListener(void Function(Map<String, dynamic> msg) listener) {
+    _rawMessageListeners.add(listener);
+  }
+
+  void removeRawMessageListener(void Function(Map<String, dynamic> msg) listener) {
+    _rawMessageListeners.remove(listener);
+  }
+
+  void _dispatchRawMessage(Map<String, dynamic> msg) {
+    for (final listener in List<void Function(Map<String, dynamic>)>.from(_rawMessageListeners)) {
+      try {
+        listener(msg);
+      } catch (_) {}
+    }
   }
 
   void setAppIsJalali(bool value) {
@@ -83,6 +103,7 @@ class InAppNotificationsHub extends ChangeNotifier {
     if (supportsAndroidNotificationKeepAlive) {
       await _keepAlive.ensureInitialized();
       _keepAlive.setOnNotificationMessage((msg) {
+        _dispatchRawMessage(msg);
         if ('${msg['type'] ?? ''}' == 'notification') {
           _ingestNotification(msg);
         }
@@ -113,6 +134,19 @@ class InAppNotificationsHub extends ChangeNotifier {
         if (running) {
           _usingKeepAlive = true;
           await _keepAlive.updateUiAttached(isForeground);
+          // همچنان WebSocket داخل‌پردازه‌ای برای رویدادهای telephony.* لازم است
+          // (keep-alive اندروید فقط اعلان‌های عمومی را پوشش می‌دهد).
+          _ws = createNotificationsWsClient();
+          _ws!.connect(
+            apiKey: apiKey,
+            onMessage: (msg) {
+              try {
+                _dispatchRawMessage(msg);
+                if ('${msg['type'] ?? ''}' != 'notification') return;
+                // اعلان‌ها از keep-alive می‌آیند؛ از دوباره‌کاری جلوگیری می‌کنیم
+              } catch (_) {}
+            },
+          );
           return;
         }
       } catch (_) {}
@@ -125,6 +159,7 @@ class InAppNotificationsHub extends ChangeNotifier {
       apiKey: apiKey,
       onMessage: (msg) {
         try {
+          _dispatchRawMessage(msg);
           if ('${msg['type'] ?? ''}' != 'notification') return;
           _ingestNotification(msg);
         } catch (_) {}

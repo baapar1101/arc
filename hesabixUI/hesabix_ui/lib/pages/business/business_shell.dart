@@ -38,6 +38,7 @@ import '../../services/business_menu_preferences_service.dart';
 import '../../widgets/ai/ai_chat_dialog.dart';
 import '../../widgets/calculator/calculator_dialog.dart';
 import '../../widgets/business/business_shell_glyphs.dart';
+import '../../widgets/telephony/telephony_phone_bar.dart';
 import '../../core/date_utils.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/responsive_helper.dart';
@@ -215,10 +216,27 @@ class _BusinessShellState extends State<BusinessShell> {
         return t.businessPanelTabRouteRepairShopSettings;
       case 'payroll':
         return t.payrollMenu;
+      case 'telephony':
+        return 'مرکز تماس';
+      case 'telephony/calls':
+        return 'تاریخچه تماس';
+      case 'telephony/live':
+        return 'داشبورد زنده تماس';
+      case 'telephony/reports':
+        return 'گزارش تماس‌ها';
+      case 'telephony/softphone':
+        return 'سافت‌فون';
+      case 'settings/telephony':
+        return 'تنظیمات مرکز تماس';
+      case 'distribution':
+        return t.distributionMenu;
       case 'hscript':
         return 'گزارش‌ساز اسکریپتی';
       default:
         break;
+    }
+    if (pathTailBase.startsWith('telephony/')) {
+      return 'مرکز تماس';
     }
     if (pathTailBase.startsWith('payroll/')) {
       return t.payrollMenu;
@@ -1131,6 +1149,8 @@ class _BusinessShellState extends State<BusinessShell> {
 
   bool _isPayrollPluginActive() => _isPluginCodeLicensed('payroll');
 
+  bool _isTelephonyPluginActive() => _isPluginCodeLicensed('asterisk_issabel_connector');
+
   bool _isWooCommerceHesabixPluginActive() {
     try {
       final plug = _businessPlugins.firstWhere(
@@ -1837,6 +1857,15 @@ class _BusinessShellState extends State<BusinessShell> {
         hasAddButton: true,
       ),
       _MenuItem(
+        key: 'telephony',
+        label: 'مرکز تماس',
+        icon: Icons.phone_in_talk_outlined,
+        selectedIcon: Icons.phone_in_talk,
+        path: _bu('telephony'),
+        type: _MenuItemType.simple,
+        hasAddButton: false,
+      ),
+      _MenuItem(
         key: 'distribution',
         label: t.distributionMenu,
         icon: Icons.local_shipping_outlined,
@@ -2503,8 +2532,26 @@ class _BusinessShellState extends State<BusinessShell> {
 
     final content = Container(
       color: scheme.surface,
-        child: SafeArea(
-        child: shellMainChild,
+      child: SafeArea(
+        child: Stack(
+          children: [
+            Column(
+              children: [
+                TelephonyPhoneBarHost(
+                  businessId: widget.businessId,
+                  authStore: widget.authStore,
+                  pluginActive: _isTelephonyPluginActive(),
+                ),
+                Expanded(child: shellMainChild),
+              ],
+            ),
+            TelephonyScreenPopLayer(
+              businessId: widget.businessId,
+              authStore: widget.authStore,
+              pluginActive: _isTelephonyPluginActive(),
+            ),
+          ],
+        ),
       ),
     );
 
@@ -3388,6 +3435,13 @@ class _BusinessShellState extends State<BusinessShell> {
       }
     }
 
+    // مرکز تماس آستریکس/ایزابل
+    if (section == 'telephony') {
+      if (!_showPluginGatedMenu(_isTelephonyPluginActive())) {
+        return false;
+      }
+    }
+
     // اتصال باسلام
     if (section == 'basalam') {
       if (!_showPluginGatedMenu(_isBasalamPluginActive())) {
@@ -3464,6 +3518,8 @@ class _BusinessShellState extends State<BusinessShell> {
         return 'reports';
       case 'payroll':
         return 'payroll';
+      case 'telephony':
+        return 'telephony';
       case 'customer-club':
         return 'customer_club';
       case 'repair-shop':
@@ -3481,6 +3537,7 @@ class _BusinessShellState extends State<BusinessShell> {
     if (path != null) {
       if (path.contains('/hscript')) return 'reports';
       if (path.contains('/payroll')) return 'payroll';
+      if (path.contains('/telephony')) return 'telephony';
       if (path.contains('/customer-club')) return 'customer_club';
       if (path.contains('/repair-shop')) return 'repair_shop';
       if (path.contains('/warranty')) return 'warranty';

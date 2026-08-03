@@ -8,6 +8,7 @@ import 'package:hesabix_ui/utils/error_extractor.dart';
 import 'package:hesabix_ui/widgets/crm/crm_section_card.dart';
 import 'package:hesabix_ui/widgets/invoice/person_combobox_widget.dart';
 import 'package:hesabix_ui/widgets/permission/permission_widgets.dart';
+import 'package:hesabix_ui/services/telephony/telephony_session_controller.dart';
 import 'package:intl/intl.dart';
 
 /// نمای ۳۶۰ درجه مشتری: خلاصه، ارتباطات، معاملات، برچسب‌ها و تایم‌لاین
@@ -285,7 +286,7 @@ class _CrmCustomer360PageState extends State<CrmCustomer360Page> {
         : (name.isNotEmpty ? name : (person['company_name']?.toString() ?? 'مشتری'));
     final theme = Theme.of(context);
     final contactRows = <Widget>[];
-    void addContact(IconData icon, String? value) {
+    void addContact(IconData icon, String? value, {bool callEnabled = false}) {
       if (value != null && value.isNotEmpty) {
         contactRows.add(Padding(
           padding: const EdgeInsets.only(top: 6),
@@ -294,14 +295,39 @@ class _CrmCustomer360PageState extends State<CrmCustomer360Page> {
               Icon(icon, size: 16, color: theme.colorScheme.onSurfaceVariant),
               const SizedBox(width: 8),
               Expanded(child: Text(value, style: theme.textTheme.bodyMedium)),
+              if (callEnabled)
+                IconButton(
+                  tooltip: 'تماس',
+                  visualDensity: VisualDensity.compact,
+                  icon: Icon(Icons.phone_forwarded_rounded, size: 18, color: theme.colorScheme.primary),
+                  onPressed: () async {
+                    final session = TelephonySessionStore.instance.controller;
+                    session.bindBusiness(widget.businessId, pluginActive: true);
+                    try {
+                      await session.clickToCall(
+                        destination: value,
+                        personId: person['id'] is int ? person['id'] as int : int.tryParse('${person['id']}'),
+                      );
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('در حال برقراری تماس…')),
+                        );
+                      }
+                    } catch (e) {
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+                      }
+                    }
+                  },
+                ),
             ],
           ),
         ));
       }
     }
 
-    addContact(Icons.phone, person['mobile']?.toString());
-    addContact(Icons.phone_outlined, person['phone']?.toString());
+    addContact(Icons.phone, person['mobile']?.toString(), callEnabled: true);
+    addContact(Icons.phone_outlined, person['phone']?.toString(), callEnabled: true);
     addContact(Icons.email_outlined, person['email']?.toString());
     addContact(Icons.location_on_outlined, [person['province'], person['city'], person['address']]
         .where((e) => e != null && e.toString().isNotEmpty)

@@ -147,9 +147,14 @@ import 'pages/business/payroll/payroll_main_page.dart';
 import 'pages/business/payroll/payroll_reports_page.dart';
 import 'pages/business/payroll/payroll_run_edit_page.dart';
 import 'pages/business/payroll/payroll_settings_page.dart';
+import 'pages/business/telephony/telephony_hub_page.dart';
+import 'pages/business/telephony/telephony_live_dashboard_page.dart';
+import 'pages/business/telephony/telephony_reports_page.dart';
+import 'pages/business/telephony/telephony_softphone_page.dart';
 import 'pages/business/distribution/distribution_main_page.dart';
 import 'widgets/marketplace/distribution_plugin_gate.dart';
 import 'widgets/marketplace/payroll_plugin_gate.dart';
+import 'widgets/marketplace/telephony_plugin_gate.dart';
 import 'pages/business/basalam/basalam_integration_page.dart';
 import 'pages/business/basalam/basalam_settings_page.dart';
 import 'pages/business/woocommerce/woocommerce_integration_page.dart';
@@ -2473,6 +2478,102 @@ class _MyAppState extends State<MyApp> {
                       businessId: businessId,
                       authStore: _authStore!,
                       calendarController: _calendarController!,
+                    ),
+                  ),
+                );
+              },
+            ),
+            GoRoute(
+              path: 'telephony',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                return hesabixNoTransitionPage(
+                  state,
+                  TelephonyPluginGate(
+                    businessId: businessId,
+                    child: TelephonyHubPage(
+                      businessId: businessId,
+                      authStore: _authStore!,
+                    ),
+                  ),
+                );
+              },
+            ),
+            GoRoute(
+              path: 'telephony/calls',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                return hesabixNoTransitionPage(
+                  state,
+                  TelephonyPluginGate(
+                    businessId: businessId,
+                    child: TelephonyCallsPage(
+                      businessId: businessId,
+                      authStore: _authStore!,
+                    ),
+                  ),
+                );
+              },
+            ),
+            GoRoute(
+              path: 'telephony/live',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                return hesabixNoTransitionPage(
+                  state,
+                  TelephonyPluginGate(
+                    businessId: businessId,
+                    child: TelephonyLiveDashboardPage(
+                      businessId: businessId,
+                      authStore: _authStore!,
+                    ),
+                  ),
+                );
+              },
+            ),
+            GoRoute(
+              path: 'telephony/reports',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                return hesabixNoTransitionPage(
+                  state,
+                  TelephonyPluginGate(
+                    businessId: businessId,
+                    child: TelephonyReportsPage(
+                      businessId: businessId,
+                      authStore: _authStore!,
+                    ),
+                  ),
+                );
+              },
+            ),
+            GoRoute(
+              path: 'telephony/softphone',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                return hesabixNoTransitionPage(
+                  state,
+                  TelephonyPluginGate(
+                    businessId: businessId,
+                    child: TelephonySoftphonePage(
+                      businessId: businessId,
+                      authStore: _authStore!,
+                    ),
+                  ),
+                );
+              },
+            ),
+            GoRoute(
+              path: 'settings/telephony',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                return hesabixNoTransitionPage(
+                  state,
+                  TelephonyPluginGate(
+                    businessId: businessId,
+                    child: TelephonySettingsPage(
+                      businessId: businessId,
+                      authStore: _authStore!,
                     ),
                   ),
                 );

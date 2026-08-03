@@ -212,3 +212,16 @@ from .distribution import (  # noqa: F401
 	DistributionVan,
 	DistributionOfflineSyncBatch,
 )
+from .telephony import (  # noqa: F401
+	TelephonySettings,
+	TelephonyPbxConnection,
+	TelephonyExtension,
+	TelephonyUserExtension,
+	TelephonyQueue,
+	TelephonyCall,
+	TelephonyCallEvent,
+	TelephonyCommand,
+	TelephonyNumberAlias,
+	TelephonyEventDeadLetter,
+	TelephonyMetricCounter,
+)
