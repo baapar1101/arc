@@ -702,7 +702,8 @@ class _TelephonySettingsPageState extends State<TelephonySettingsPage> {
                       ),
                       const SizedBox(height: 6),
                       const Text(
-                        'این دستور کانکتور را از مخزن حسابیکس نصب می‌کند و دستور hesabix-pbx را می‌سازد:',
+                        'این دستور کانکتور را از مخزن حسابیکس نصب می‌کند و دستور hesabix-pbx را می‌سازد. '
+                        'در ویزارد فقط کلید API (پروفایل ← کلیدهای API) را وارد کنید؛ کسب‌وکار و مرکز تلفن را از لیست انتخاب می‌کنید.',
                         style: TextStyle(height: 1.4),
                       ),
                       const SizedBox(height: 10),

@@ -64,16 +64,20 @@ hesabix-pbx help
 | Debian | Debian، Ubuntu | `apt-get` |
 | RHEL | CentOS، Rocky، Alma، Issabel | `yum` یا `dnf` |
 
-## پیکربندی دستی (.env)
-
-اگر ویزارد را نمی‌خواهید:
+## پیکربندی (ویزارد)
 
 ```bash
-cp /opt/HesabixTelephonyConnector/config.example.env /opt/HesabixTelephonyConnector/.env
-nano /opt/HesabixTelephonyConnector/.env
-hesabix-pbx restart
-hesabix-pbx test
+hesabix-pbx configure
 ```
+
+از شما فقط می‌پرسد:
+1. آدرس API (پیش‌فرض `https://hsxn.hesabix.ir`)
+2. **کلید API** از حسابیکس: پروفایل ← کلیدهای API
+3. انتخاب کسب‌وکار از لیست
+4. انتخاب یا ایجاد مرکز تلفن (توکن Connector خودکار گرفته می‌شود)
+5. تنظیمات AMI محلی
+
+دیگر نیازی به وارد کردن دستی Business ID / PBX ID نیست.
 
 مقدار پیش‌فرض `HESABIX_API_URL` برابر `https://hsxn.hesabix.ir` است.
 

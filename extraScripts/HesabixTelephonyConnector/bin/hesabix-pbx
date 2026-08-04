@@ -3,7 +3,7 @@
 # استفاده: hesabix-pbx <command>
 set -euo pipefail
 
-VERSION="1.1.2"
+VERSION="1.2.0"
 INSTALL_DIR="${HESABIX_PBX_DIR:-/opt/HesabixTelephonyConnector}"
 ENV_FILE="${INSTALL_DIR}/.env"
 SERVICE_NAME="hesabix-telephony-connector"
@@ -386,6 +386,70 @@ install_systemd() {
   ok "سرویس systemd ثبت شد: $SERVICE_NAME"
 }
 
+# ─── Hesabix API helpers (ویزارد تعاملی) ─────────────────────────────────────
+
+api_request_json() {
+  # api_request_json METHOD URL API_KEY [JSON_BODY]
+  # خروجی: بدنه JSON؛ کد HTTP در متغیر سراسری API_HTTP_CODE
+  local method="$1" url="$2" api_key="$3" body="${4:-}"
+  API_HTTP_CODE="0"
+  HESABIX_API_KEY="$api_key" HESABIX_HTTP_METHOD="$method" HESABIX_HTTP_URL="$url" HESABIX_HTTP_BODY="$body" \
+  python3 - <<'PY'
+import json, os, sys, urllib.error, urllib.request
+method = os.environ["HESABIX_HTTP_METHOD"].upper()
+url = os.environ["HESABIX_HTTP_URL"]
+key = os.environ["HESABIX_API_KEY"]
+body = os.environ.get("HESABIX_HTTP_BODY") or ""
+data = body.encode("utf-8") if body else None
+req = urllib.request.Request(
+    url,
+    data=data,
+    method=method,
+    headers={
+        "Authorization": f"ApiKey {key}",
+        "Accept": "application/json",
+        "Content-Type": "application/json",
+        "User-Agent": "hesabix-pbx/1.2",
+    },
+)
+try:
+    with urllib.request.urlopen(req, timeout=30) as resp:
+        raw = resp.read().decode("utf-8", "replace")
+        print(resp.status, file=sys.stderr)
+        sys.stdout.write(raw)
+except urllib.error.HTTPError as e:
+    raw = e.read().decode("utf-8", "replace")
+    print(e.code, file=sys.stderr)
+    sys.stdout.write(raw or json.dumps({"success": False, "error": {"message": str(e)}}))
+    sys.exit(0)
+except Exception as e:
+    print(0, file=sys.stderr)
+    sys.stdout.write(json.dumps({"success": False, "error": {"message": str(e)}}))
+    sys.exit(0)
+PY
+}
+
+api_extract() {
+  # api_extract JSON PYTHON_EXPR → چاپ نتیجه
+  local json="$1" expr="$2"
+  HESABIX_JSON="$json" HESABIX_EXPR="$expr" python3 - <<'PY'
+import json, os, sys
+data = json.loads(os.environ["HESABIX_JSON"] or "{}")
+expr = os.environ["HESABIX_EXPR"]
+try:
+    val = eval(expr, {"data": data, "json": json})  # noqa: S307 — ورودی خودمان
+except Exception as e:
+    print("", end="")
+    sys.exit(0)
+if val is None:
+    print("", end="")
+elif isinstance(val, (dict, list)):
+    print(json.dumps(val, ensure_ascii=False))
+else:
+    print(val, end="")
+PY
+}
+
 # ─── configure ──────────────────────────────────────────────────────────────
 
 cmd_configure() {
@@ -394,11 +458,11 @@ cmd_configure() {
 
   echo
   echo -e "${c_bold}پیکربندی اتصال حسابیکس ↔ Issabel/Asterisk${c_reset}"
-  echo "مقادیر را از تنظیمات مرکز تماس در حسابیکس بردارید."
+  echo "۱) در حسابیکس بروید به: پروفایل ← کلیدهای API و یک کلید بسازید/کپی کنید"
+  echo "۲) اینجا وارد کنید؛ کسب‌وکار و مرکز تلفن را از لیست انتخاب می‌کنید"
   echo "آدرس API پیش‌فرض: ${HESABIX_DEFAULT_API_URL}"
   echo
 
-  # اولویت: مقدار موجود در .env → متغیر محیطی قبل از ویزارد → پیش‌فرض hsxn
   local env_override_api="${HESABIX_API_URL:-}"
   local cur_api="" cur_bid="" cur_pid="" cur_token="" cur_ami_host="127.0.0.1" cur_ami_port="5038" cur_ami_user="hesabix" cur_ami_secret=""
   if [[ -f "$ENV_FILE" ]]; then
@@ -415,31 +479,234 @@ cmd_configure() {
   fi
   cur_api="${cur_api:-${env_override_api:-$HESABIX_DEFAULT_API_URL}}"
 
-  local api bid pid token ami_host ami_port ami_user ami_secret
+  local api user_key
   api="$(prompt "آدرس API حسابیکس" "$cur_api")"
-  bid="$(prompt "شناسه کسب‌وکار (Business ID)" "$cur_bid")"
-  pid="$(prompt "شناسه مرکز تلفن (PBX ID)" "$cur_pid")"
-  token="$(prompt_secret "توکن Connector" "$cur_token")"
+  api="${api%/}"
+  user_key="$(prompt_secret "کلید API حسابیکس (از پروفایل)" "")"
+  [[ -n "$api" && -n "$user_key" ]] || die "آدرس API و کلید API الزامی است."
+
+  log "در حال دریافت لیست کسب‌وکارها…"
+  local biz_raw biz_code
+  local tmp_http tmp_body
+  tmp_http="$(mktemp)"
+  tmp_body="$(mktemp)"
+  api_request_json POST "${api}/api/v1/businesses/list?take=100&skip=0" "$user_key" "{}" \
+    >"$tmp_body" 2>"$tmp_http" || true
+  biz_code="$(tr -d '[:space:]' < "$tmp_http")"
+  biz_raw="$(cat "$tmp_body")"
+  rm -f "$tmp_http" "$tmp_body"
+
+  if [[ "$biz_code" != "200" ]]; then
+    err "ورود با کلید API ناموفق بود (HTTP ${biz_code:-?})."
+    echo "$(api_extract "$biz_raw" "data.get('error',{}).get('message') or data.get('message') or ''")"
+    echo "کلید را از: پروفایل ← کلیدهای API بررسی کنید."
+    exit 1
+  fi
+
+  local biz_json
+  # normalize items
+  biz_json="$(HESABIX_JSON="$biz_raw" python3 - <<'PY'
+import json, os
+root = json.loads(os.environ["HESABIX_JSON"])
+payload = root.get("data", root)
+items = payload.get("items") if isinstance(payload, dict) else payload
+if not isinstance(items, list):
+    items = []
+print(json.dumps(items, ensure_ascii=False))
+PY
+)"
+
+  local biz_count
+  biz_count="$(HESABIX_JSON="$biz_json" python3 -c 'import json,os; print(len(json.loads(os.environ["HESABIX_JSON"])))')"
+  if [[ "$biz_count" -eq 0 ]]; then
+    die "هیچ کسب‌وکاری برای این کاربر پیدا نشد."
+  fi
+
+  local -a biz_labels=()
+  local i label
+  for ((i = 0; i < biz_count; i++)); do
+    label="$(HESABIX_JSON="$biz_json" HESABIX_I="$i" python3 - <<'PY'
+import json, os
+items = json.loads(os.environ["HESABIX_JSON"])
+b = items[int(os.environ["HESABIX_I"])]
+print(f"{b.get('name') or 'بدون‌نام'}  (ID: {b.get('id')})")
+PY
+)"
+    biz_labels+=("$label")
+  done
+
+  local biz_choice biz_id biz_name
+  # پیش‌فرض روی کسب‌وکار قبلی اگر در لیست باشد
+  local default_biz="1"
+  if [[ -n "$cur_bid" ]]; then
+    default_biz="$(HESABIX_JSON="$biz_json" HESABIX_BID="$cur_bid" python3 - <<'PY'
+import json, os
+items = json.loads(os.environ["HESABIX_JSON"])
+want = str(os.environ.get("HESABIX_BID") or "")
+for i, b in enumerate(items):
+    if str(b.get("id")) == want:
+        print(i + 1)
+        break
+else:
+    print(1)
+PY
+)"
+  fi
+  echo
+  echo -e "${c_bold}انتخاب کسب‌وکار${c_reset}"
+  for i in "${!biz_labels[@]}"; do
+    printf "  %b%d)%b %s\n" "$c_cyan" "$((i + 1))" "$c_reset" "${biz_labels[$i]}"
+  done
+  biz_choice="$(prompt "شماره کسب‌وکار" "$default_biz")"
+  [[ "$biz_choice" =~ ^[0-9]+$ ]] && (( biz_choice >= 1 && biz_choice <= biz_count )) \
+    || die "انتخاب کسب‌وکار نامعتبر است."
+  biz_id="$(HESABIX_JSON="$biz_json" HESABIX_I="$((biz_choice - 1))" python3 -c 'import json,os; print(json.loads(os.environ["HESABIX_JSON"])[int(os.environ["HESABIX_I"])]["id"])')"
+  biz_name="$(HESABIX_JSON="$biz_json" HESABIX_I="$((biz_choice - 1))" python3 -c 'import json,os; print(json.loads(os.environ["HESABIX_JSON"])[int(os.environ["HESABIX_I"])].get("name") or "")')"
+  ok "کسب‌وکار انتخاب شد: $biz_name (#$biz_id)"
+
+  log "دریافت مراکز تلفن…"
+  local pbx_raw pbx_code pbx_json pbx_count
+  tmp_http="$(mktemp)"; tmp_body="$(mktemp)"
+  api_request_json GET "${api}/api/v1/telephony/business/${biz_id}/pbx" "$user_key" \
+    >"$tmp_body" 2>"$tmp_http" || true
+  pbx_code="$(tr -d '[:space:]' < "$tmp_http")"
+  pbx_raw="$(cat "$tmp_body")"
+  rm -f "$tmp_http" "$tmp_body"
+
+  if [[ "$pbx_code" == "403" ]]; then
+    err "افزونه تلفن برای این کسب‌وکار فعال نیست یا مجوز ندارید (HTTP 403)."
+    echo "در حسابیکس: مارکت‌پلیس ← اتصال به آستریکس و ایزابل را فعال کنید."
+    exit 1
+  fi
+  if [[ "$pbx_code" != "200" ]]; then
+    err "دریافت مراکز تلفن ناموفق (HTTP ${pbx_code:-?})."
+    echo "$(api_extract "$pbx_raw" "data.get('error',{}).get('message') or data.get('message') or ''")"
+    exit 1
+  fi
+
+  pbx_json="$(HESABIX_JSON="$pbx_raw" python3 - <<'PY'
+import json, os
+root = json.loads(os.environ["HESABIX_JSON"])
+payload = root.get("data", root)
+items = payload.get("items") if isinstance(payload, dict) else []
+print(json.dumps(items if isinstance(items, list) else [], ensure_ascii=False))
+PY
+)"
+  pbx_count="$(HESABIX_JSON="$pbx_json" python3 -c 'import json,os; print(len(json.loads(os.environ["HESABIX_JSON"])))')"
+
+  local pbx_id="" token="" pbx_name=""
+  local create_new="N"
+  if [[ "$pbx_count" -eq 0 ]]; then
+    warn "مرکز تلفنی تعریف نشده."
+    create_new="$(prompt "یک مرکز تلفن جدید بسازم؟ (Y/n)" "Y")"
+    [[ "$create_new" =~ ^[Yy]$ ]] || die "بدون مرکز تلفن نمی‌توان ادامه داد. در UI بسازید یا دوباره configure بزنید."
+  else
+    local -a pbx_labels=()
+    for ((i = 0; i < pbx_count; i++)); do
+      label="$(HESABIX_JSON="$pbx_json" HESABIX_I="$i" python3 - <<'PY'
+import json, os
+p = json.loads(os.environ["HESABIX_JSON"])[int(os.environ["HESABIX_I"])]
+print(f"{p.get('name') or 'PBX'}  (ID: {p.get('id')}) · وضعیت: {p.get('status') or '—'} · توکن: {p.get('connector_token_prefix') or ''}…")
+PY
+)"
+      pbx_labels+=("$label")
+    done
+    pbx_labels+=("➕ ایجاد مرکز تلفن جدید")
+    echo
+    echo -e "${c_bold}انتخاب مرکز تلفن (PBX)${c_reset}"
+    for i in "${!pbx_labels[@]}"; do
+      printf "  %b%d)%b %s\n" "$c_cyan" "$((i + 1))" "$c_reset" "${pbx_labels[$i]}"
+    done
+    local pbx_choice default_pbx="1"
+    if [[ -n "$cur_pid" ]]; then
+      default_pbx="$(HESABIX_JSON="$pbx_json" HESABIX_PID="$cur_pid" python3 - <<'PY'
+import json, os
+items = json.loads(os.environ["HESABIX_JSON"])
+want = str(os.environ.get("HESABIX_PID") or "")
+for i, p in enumerate(items):
+    if str(p.get("id")) == want:
+        print(i + 1)
+        break
+else:
+    print(1)
+PY
+)"
+    fi
+    pbx_choice="$(prompt "شماره مرکز تلفن" "$default_pbx")"
+    [[ "$pbx_choice" =~ ^[0-9]+$ ]] || die "انتخاب نامعتبر"
+    if (( pbx_choice == pbx_count + 1 )); then
+      create_new="Y"
+    elif (( pbx_choice >= 1 && pbx_choice <= pbx_count )); then
+      pbx_id="$(HESABIX_JSON="$pbx_json" HESABIX_I="$((pbx_choice - 1))" python3 -c 'import json,os; print(json.loads(os.environ["HESABIX_JSON"])[int(os.environ["HESABIX_I"])]["id"])')"
+      pbx_name="$(HESABIX_JSON="$pbx_json" HESABIX_I="$((pbx_choice - 1))" python3 -c 'import json,os; print(json.loads(os.environ["HESABIX_JSON"])[int(os.environ["HESABIX_I"])].get("name") or "")')"
+      ok "مرکز تلفن: $pbx_name (#$pbx_id)"
+    else
+      die "انتخاب مرکز تلفن نامعتبر است."
+    fi
+  fi
+
+  if [[ "$create_new" =~ ^[Yy]$ ]]; then
+    local new_name
+    new_name="$(prompt "نام مرکز تلفن" "Issabel اصلی")"
+    log "ایجاد مرکز تلفن…"
+    tmp_http="$(mktemp)"; tmp_body="$(mktemp)"
+    api_request_json POST "${api}/api/v1/telephony/business/${biz_id}/pbx" "$user_key" \
+      "$(HESABIX_N="$new_name" python3 -c 'import json,os; print(json.dumps({"name":os.environ["HESABIX_N"],"pbx_type":"issabel"},ensure_ascii=False))')" \
+      >"$tmp_body" 2>"$tmp_http" || true
+    local create_code create_raw
+    create_code="$(tr -d '[:space:]' < "$tmp_http")"
+    create_raw="$(cat "$tmp_body")"
+    rm -f "$tmp_http" "$tmp_body"
+    [[ "$create_code" == "200" ]] || die "ایجاد PBX ناموفق (HTTP ${create_code}). $(api_extract "$create_raw" "data.get('error',{}).get('message') or ''")"
+    pbx_id="$(HESABIX_JSON="$create_raw" python3 -c 'import json,os; d=json.loads(os.environ["HESABIX_JSON"]).get("data",{}); print(d.get("id") or "")')"
+    token="$(HESABIX_JSON="$create_raw" python3 -c 'import json,os; d=json.loads(os.environ["HESABIX_JSON"]).get("data",{}); print(d.get("connector_token") or "")')"
+    pbx_name="$new_name"
+    [[ -n "$pbx_id" && -n "$token" ]] || die "پاسخ ایجاد PBX ناقص بود."
+    ok "مرکز تلفن ساخته شد (#$pbx_id) و توکن Connector دریافت شد."
+  else
+    # توکن قبلی فقط یک‌بار نمایش داده می‌شود؛ برای اتصال باید rotate کنیم یا از .env قبلی استفاده کنیم
+    if [[ -n "$cur_token" && "$cur_pid" == "$pbx_id" && "$cur_bid" == "$biz_id" ]]; then
+      local keep
+      keep="$(prompt "توکن فعلی .env را نگه دارم؟ (Y=نگه دار / n=توکن جدید)" "Y")"
+      if [[ "$keep" =~ ^[Yy]$ ]]; then
+        token="$cur_token"
+        ok "همان توکن قبلی استفاده می‌شود."
+      fi
+    fi
+    if [[ -z "$token" ]]; then
+      log "صدور توکن جدید Connector (rotate)…"
+      tmp_http="$(mktemp)"; tmp_body="$(mktemp)"
+      api_request_json POST "${api}/api/v1/telephony/business/${biz_id}/pbx/${pbx_id}/rotate-token" "$user_key" "{}" \
+        >"$tmp_body" 2>"$tmp_http" || true
+      local rot_code rot_raw
+      rot_code="$(tr -d '[:space:]' < "$tmp_http")"
+      rot_raw="$(cat "$tmp_body")"
+      rm -f "$tmp_http" "$tmp_body"
+      [[ "$rot_code" == "200" ]] || die "صدور توکن ناموفق (HTTP ${rot_code}). مجوز telephony.manage لازم است."
+      token="$(HESABIX_JSON="$rot_raw" python3 -c 'import json,os; d=json.loads(os.environ["HESABIX_JSON"]).get("data",{}); print(d.get("connector_token") or "")')"
+      [[ -n "$token" ]] || die "توکن در پاسخ نبود."
+      ok "توکن Connector جدید دریافت شد."
+    fi
+  fi
+
+  echo
+  echo -e "${c_bold}تنظیمات AMI روی همین سرور تلفن${c_reset}"
+  local ami_host ami_port ami_user ami_secret
   ami_host="$(prompt "آدرس AMI" "$cur_ami_host")"
   ami_port="$(prompt "پورت AMI" "$cur_ami_port")"
   ami_user="$(prompt "کاربر AMI" "$cur_ami_user")"
   ami_secret="$(prompt_secret "رمز AMI" "$cur_ami_secret")"
 
-  [[ -n "$api" && -n "$bid" && -n "$pid" && -n "$token" && -n "$ami_user" && -n "$ami_secret" ]] \
-    || {
-      err "مقادیر ضروری ناقص است."
-      echo "اگر نصب را با curl|bash زده‌اید، پیکربندی را جداگانه اجرا کنید:"
-      echo "  hesabix-pbx configure"
-      echo "فیلدهای لازم: API، Business ID، PBX ID، توکن Connector، کاربر و رمز AMI"
-      exit 1
-    }
+  [[ -n "$api" && -n "$biz_id" && -n "$pbx_id" && -n "$token" && -n "$ami_user" && -n "$ami_secret" ]] \
+    || die "مقادیر ضروری ناقص است."
 
   umask 077
   cat > "$ENV_FILE" <<EOF
 # تولیدشده توسط hesabix-pbx — $(date -u +%Y-%m-%dT%H:%M:%SZ)
+# کسب‌وکار: ${biz_name} | مرکز تلفن: ${pbx_name}
 HESABIX_API_URL=${api}
-HESABIX_BUSINESS_ID=${bid}
-HESABIX_PBX_ID=${pid}
+HESABIX_BUSINESS_ID=${biz_id}
+HESABIX_PBX_ID=${pbx_id}
 HESABIX_CONNECTOR_TOKEN=${token}
 AMI_HOST=${ami_host}
 AMI_PORT=${ami_port}
@@ -448,6 +715,8 @@ AMI_SECRET=${ami_secret}
 EOF
   chmod 600 "$ENV_FILE"
   ok "پیکربندی ذخیره شد: $ENV_FILE"
+  echo "  Business ID = $biz_id"
+  echo "  PBX ID      = $pbx_id"
 
   local setup_ami
   setup_ami="$(prompt "کاربر AMI را در manager.conf بسازم؟ (y/N)" "N")"
