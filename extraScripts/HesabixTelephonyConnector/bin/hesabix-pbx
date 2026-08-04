@@ -3,7 +3,7 @@
 # استفاده: hesabix-pbx <command>
 set -euo pipefail
 
-VERSION="1.1.0"
+VERSION="1.1.1"
 INSTALL_DIR="${HESABIX_PBX_DIR:-/opt/HesabixTelephonyConnector}"
 ENV_FILE="${INSTALL_DIR}/.env"
 SERVICE_NAME="hesabix-telephony-connector"
@@ -74,14 +74,13 @@ detect_os() {
   IS_ISSABEL=0
 
   if [[ -r /etc/os-release ]]; then
-    # یک ساب‌شل تا VERSION/NAME اسکریپت آلوده نشود
+    # ساب‌شل جدا تا VERSION/NAME اسکریپت آلوده نشود؛ بدون null-byte (هشدار bash)
     # shellcheck disable=SC1091
     local os_vars
-    os_vars="$(. /etc/os-release; printf '%s\0%s\0%s' "${ID:-}" "${ID_LIKE:-}" "${PRETTY_NAME:-${NAME:-}}")"
-    OS_ID="${os_vars%%$'\0'*}"
-    os_vars="${os_vars#*$'\0'}"
-    OS_ID_LIKE="${os_vars%%$'\0'*}"
-    OS_NAME="${os_vars#*$'\0'}"
+    os_vars="$(. /etc/os-release; printf '%s\n%s\n%s' "${ID:-}" "${ID_LIKE:-}" "${PRETTY_NAME:-${NAME:-}}")"
+    OS_ID="$(printf '%s\n' "$os_vars" | sed -n '1p')"
+    OS_ID_LIKE="$(printf '%s\n' "$os_vars" | sed -n '2p')"
+    OS_NAME="$(printf '%s\n' "$os_vars" | sed -n '3p')"
     [[ -n "$OS_NAME" ]] || OS_NAME="$OS_ID"
   elif [[ -r /etc/redhat-release ]]; then
     OS_ID="rhel"
@@ -234,9 +233,11 @@ download() {
 # ─── fetch connector files ──────────────────────────────────────────────────
 
 fetch_via_git() {
-  local tmp
+  # مسیر temp را فوری در trap می‌گنجانیم تا با set -u بعد از خروج تابع unbound نشود
+  local tmp src env_bak=""
   tmp="$(mktemp -d /tmp/hesabix-pbx.XXXXXX)"
-  trap 'rm -rf "$tmp"' RETURN
+  # shellcheck disable=SC2064
+  trap "rm -rf '${tmp}'" RETURN
 
   log "دریافت کانکتور از مخزن (sparse git)…"
   log "منبع: $REPO_URL  شاخه: $REPO_BRANCH"
@@ -245,7 +246,7 @@ fetch_via_git() {
       -b "$REPO_BRANCH" "$REPO_URL" "$tmp/repo" >/dev/null 2>&1; then
     # بعضی سرورها filter را پشتیبانی نمی‌کنند
     git clone --depth 1 -b "$REPO_BRANCH" "$REPO_URL" "$tmp/repo" >/dev/null 2>&1 \
-      || die "کلون مخزن ناموفق بود. دسترسی شبکه به source.hesabix.ir را بررسی کنید."
+      || { warn "کلون مخزن ناموفق بود."; return 1; }
   fi
 
   (
@@ -255,12 +256,14 @@ fetch_via_git() {
     fi
   )
 
-  local src="$tmp/repo/$CONN_REL_PATH"
-  [[ -d "$src" ]] || die "پوشه کانکتور در مخزن پیدا نشد: $CONN_REL_PATH"
+  src="$tmp/repo/$CONN_REL_PATH"
+  if [[ ! -d "$src" ]]; then
+    warn "پوشه کانکتور در مخزن پیدا نشد: $CONN_REL_PATH"
+    return 1
+  fi
 
   mkdir -p "$INSTALL_DIR"
   # حفظ .env
-  local env_bak=""
   if [[ -f "$ENV_FILE" ]]; then
     env_bak="$(mktemp)"
     cp -a "$ENV_FILE" "$env_bak"
@@ -284,6 +287,7 @@ fetch_via_git() {
   fi
 
   ok "فایل‌های کانکتور در $INSTALL_DIR به‌روز شد."
+  return 0
 }
 
 fetch_via_raw() {
