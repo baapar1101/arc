@@ -30,6 +30,25 @@ from urllib import error, request
 LOG = logging.getLogger("hesabix.telephony.connector")
 
 
+def load_dotenv(path: str) -> None:
+	"""بارگذاری ساده .env بدون وابستگی خارجی (برای وقتی EnvironmentFile اعمال نشده)."""
+	if not os.path.isfile(path):
+		return
+	try:
+		with open(path, "r", encoding="utf-8") as f:
+			for raw in f:
+				line = raw.strip()
+				if not line or line.startswith("#") or "=" not in line:
+					continue
+				key, _, val = line.partition("=")
+				key = key.strip()
+				val = val.strip().strip("'").strip('"')
+				if key and key not in os.environ:
+					os.environ[key] = val
+	except Exception as e:
+		LOG.warning("could not read .env (%s): %s", path, e)
+
+
 def env(key: str, default: Optional[str] = None) -> str:
 	v = os.environ.get(key, default)
 	if v is None or v == "":
@@ -133,6 +152,23 @@ class AmiClient:
 
 	def _login(self) -> None:
 		self._send({"Action": "Login", "Username": self.username, "Secret": self.secret})
+		# پاسخ Login را بخوان
+		deadline = time.time() + 5
+		buf = b""
+		assert self._sock is not None
+		while time.time() < deadline:
+			try:
+				chunk = self._sock.recv(4096)
+				if not chunk:
+					break
+				buf += chunk
+				if b"\r\n\r\n" in buf:
+					break
+			except socket.timeout:
+				continue
+		text = buf.decode("utf-8", errors="ignore")
+		if "Success" not in text and "Authentication accepted" not in text:
+			raise RuntimeError(f"AMI login rejected: {text[:300]!r}")
 
 	def originate(self, extension: str, destination: str, context: str = "from-internal", timeout_ms: int = 30000) -> None:
 		self._send(
@@ -226,21 +262,48 @@ def map_ami_event(ev: Dict[str, str]) -> Optional[Dict[str, Any]]:
 
 def main() -> int:
 	logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
-	api = HesabixClient(
-		base_url=env("HESABIX_API_URL"),
-		business_id=int(env("HESABIX_BUSINESS_ID")),
-		pbx_id=int(env("HESABIX_PBX_ID")),
-		token=env("HESABIX_CONNECTOR_TOKEN"),
-	)
-	ami = AmiClient(
-		host=os.environ.get("AMI_HOST", "127.0.0.1"),
-		port=int(os.environ.get("AMI_PORT", "5038")),
-		username=env("AMI_USER"),
-		secret=env("AMI_SECRET"),
-	)
-	LOG.info("Connecting AMI…")
-	ami.connect()
-	api.heartbeat(status="ok")
+	# مسیرهای محتمل .env
+	for candidate in (
+		os.environ.get("HESABIX_PBX_ENV"),
+		"/opt/HesabixTelephonyConnector/.env",
+		os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), ".env"),
+		os.path.join(os.getcwd(), ".env"),
+	):
+		if candidate:
+			load_dotenv(candidate)
+
+	try:
+		api = HesabixClient(
+			base_url=env("HESABIX_API_URL"),
+			business_id=int(env("HESABIX_BUSINESS_ID")),
+			pbx_id=int(env("HESABIX_PBX_ID")),
+			token=env("HESABIX_CONNECTOR_TOKEN"),
+		)
+		ami = AmiClient(
+			host=os.environ.get("AMI_HOST", "127.0.0.1"),
+			port=int(os.environ.get("AMI_PORT", "5038")),
+			username=env("AMI_USER"),
+			secret=env("AMI_SECRET"),
+		)
+	except Exception as e:
+		LOG.error("پیکربندی ناقص یا نامعتبر: %s", e)
+		return 1
+
+	LOG.info("Connecting AMI %s@%s:%s …", ami.username, ami.host, ami.port)
+	try:
+		ami.connect()
+	except Exception as e:
+		LOG.error("اتصال/ورود AMI ناموفق: %s", e)
+		LOG.error("روی سرور تلفن بررسی کنید: manager.conf، AMI_USER/AMI_SECRET، و: asterisk -rx 'manager show connected'")
+		return 1
+
+	try:
+		api.heartbeat(status="ok")
+	except Exception as e:
+		LOG.error("heartbeat حسابیکس ناموفق: %s", e)
+		return 1
+
+	LOG.info("Connector آماده است (AMI + Hesabix OK).")
 
 	last_hb = 0.0
 	last_poll = 0.0
@@ -275,7 +338,6 @@ def main() -> int:
 							channel = cmd.get("channel")
 							if channel and ctype == "hold":
 								ami.park_or_hold(str(channel))
-							# resume is environment-specific; ack accepted for pipeline continuity
 						if cid:
 							api.ack(str(cid), accepted=True)
 					except Exception as e:
@@ -288,6 +350,9 @@ def main() -> int:
 				api.send_event(mapped)
 	except KeyboardInterrupt:
 		LOG.info("Stopping…")
+	except Exception as e:
+		LOG.exception("حلقه رویداد قطع شد: %s", e)
+		return 1
 	finally:
 		ami.close()
 	return 0
