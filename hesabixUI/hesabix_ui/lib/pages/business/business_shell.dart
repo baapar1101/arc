@@ -38,6 +38,7 @@ import '../../services/business_menu_preferences_service.dart';
 import '../../widgets/ai/ai_chat_dialog.dart';
 import '../../widgets/calculator/calculator_dialog.dart';
 import '../../widgets/business/business_shell_glyphs.dart';
+import '../../widgets/telephony/telephony_phone_bar.dart';
 import '../../core/date_utils.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/responsive_helper.dart';
@@ -215,10 +216,27 @@ class _BusinessShellState extends State<BusinessShell> {
         return t.businessPanelTabRouteRepairShopSettings;
       case 'payroll':
         return t.payrollMenu;
+      case 'telephony':
+        return 'مرکز تماس';
+      case 'telephony/calls':
+        return 'تاریخچه تماس';
+      case 'telephony/live':
+        return 'داشبورد زنده تماس';
+      case 'telephony/reports':
+        return 'گزارش تماس‌ها';
+      case 'telephony/softphone':
+        return 'سافت‌فون';
+      case 'settings/telephony':
+        return 'تنظیمات مرکز تماس';
+      case 'distribution':
+        return t.distributionMenu;
       case 'hscript':
         return 'گزارش‌ساز اسکریپتی';
       default:
         break;
+    }
+    if (pathTailBase.startsWith('telephony/')) {
+      return 'مرکز تماس';
     }
     if (pathTailBase.startsWith('payroll/')) {
       return t.payrollMenu;
@@ -1131,6 +1149,8 @@ class _BusinessShellState extends State<BusinessShell> {
 
   bool _isPayrollPluginActive() => _isPluginCodeLicensed('payroll');
 
+  bool _isTelephonyPluginActive() => _isPluginCodeLicensed('asterisk_issabel_connector');
+
   bool _isWooCommerceHesabixPluginActive() {
     try {
       final plug = _businessPlugins.firstWhere(
@@ -1837,6 +1857,15 @@ class _BusinessShellState extends State<BusinessShell> {
         hasAddButton: true,
       ),
       _MenuItem(
+        key: 'telephony',
+        label: 'مرکز تماس',
+        icon: Icons.phone_in_talk_outlined,
+        selectedIcon: Icons.phone_in_talk,
+        path: _bu('telephony'),
+        type: _MenuItemType.simple,
+        hasAddButton: false,
+      ),
+      _MenuItem(
         key: 'distribution',
         label: t.distributionMenu,
         icon: Icons.local_shipping_outlined,
@@ -2503,8 +2532,26 @@ class _BusinessShellState extends State<BusinessShell> {
 
     final content = Container(
       color: scheme.surface,
-        child: SafeArea(
-        child: shellMainChild,
+      child: SafeArea(
+        child: Stack(
+          children: [
+            Column(
+              children: [
+                TelephonyPhoneBarHost(
+                  businessId: widget.businessId,
+                  authStore: widget.authStore,
+                  pluginActive: _isTelephonyPluginActive(),
+                ),
+                Expanded(child: shellMainChild),
+              ],
+            ),
+            TelephonyScreenPopLayer(
+              businessId: widget.businessId,
+              authStore: widget.authStore,
+              pluginActive: _isTelephonyPluginActive(),
+            ),
+          ],
+        ),
       ),
     );
 
@@ -2621,10 +2668,11 @@ class _BusinessShellState extends State<BusinessShell> {
                               child: Row(
                                 mainAxisAlignment: railExtended ? MainAxisAlignment.start : MainAxisAlignment.center,
                                 children: [
-                                  Icon(
-                                    isChildActive ? child.selectedIcon : child.icon,
+                                  _buildSidebarMenuIcon(
+                                    child,
                                     color: isChildActive ? activeFg : sideFg,
                                     size: railExtended ? 20 : 22,
+                                    active: isChildActive,
                                   ),
                                   if (railExtended) ...[
                                     const SizedBox(width: 12),
@@ -2801,10 +2849,11 @@ class _BusinessShellState extends State<BusinessShell> {
                                 Stack(
                                   clipBehavior: Clip.none,
                                   children: [
-                                    Icon(
-                                      active ? item.selectedIcon : item.icon,
+                                    _buildSidebarMenuIcon(
+                                      item,
                                       color: active ? activeFg : sideFg,
                                       size: railExtended ? 24 : 28,
+                                      active: active,
                                     ),
                                     // آیکون expand/collapse کوچک در گوشه برای حالت Rail
                                     if (!railExtended && item.type == _MenuItemType.expandable)
@@ -2985,7 +3034,12 @@ class _BusinessShellState extends State<BusinessShell> {
                     final section = _sectionForLabel(item.label, t);
                     final canAdd = section != null && (widget.authStore.hasBusinessPermission(section, 'add'));
                     return ListTile(
-                      leading: Icon(item.selectedIcon, color: active ? activeFg : sideFg),
+                      leading: _buildSidebarMenuIcon(
+                        item,
+                        color: active ? activeFg : sideFg,
+                        size: 24,
+                        active: active,
+                      ),
                       title: Text(item.label, style: TextStyle(color: active ? activeFg : sideFg, fontWeight: active ? FontWeight.w600 : FontWeight.w400)),
                       selected: active,
                       selectedTileColor: activeBg,
@@ -3033,7 +3087,12 @@ class _BusinessShellState extends State<BusinessShell> {
                     // فیلتر کردن زیرآیتم‌ها بر اساس دسترسی
                     final visibleChildren = (item.children ?? []).where((child) => _hasAccessToMenuItem(child)).toList();
                     return ExpansionTile(
-                      leading: Icon(item.icon, color: sideFg),
+                      leading: _buildSidebarMenuIcon(
+                        item,
+                        color: sideFg,
+                        size: 24,
+                        active: false,
+                      ),
                       title: Text(item.label, style: TextStyle(color: sideFg)),
                       initiallyExpanded: isExpanded(item),
                       onExpansionChanged: (expanded) {
@@ -3228,6 +3287,26 @@ class _BusinessShellState extends State<BusinessShell> {
     }
   }
 
+  Widget _buildSidebarMenuIcon(
+    _MenuItem item, {
+    required Color color,
+    required double size,
+    required bool active,
+  }) {
+    if (item.key == 'telephony') {
+      return BusinessShellTelephonyGlyph(
+        color: color,
+        size: size,
+        filled: active,
+      );
+    }
+    return Icon(
+      active ? item.selectedIcon : item.icon,
+      color: color,
+      size: size,
+    );
+  }
+
   String _menuKey(_MenuItem item) {
     if (item.key != null && item.key!.trim().isNotEmpty) {
       return item.key!;
@@ -3388,6 +3467,13 @@ class _BusinessShellState extends State<BusinessShell> {
       }
     }
 
+    // مرکز تماس آستریکس/ایزابل
+    if (section == 'telephony') {
+      if (!_showPluginGatedMenu(_isTelephonyPluginActive())) {
+        return false;
+      }
+    }
+
     // اتصال باسلام
     if (section == 'basalam') {
       if (!_showPluginGatedMenu(_isBasalamPluginActive())) {
@@ -3464,6 +3550,8 @@ class _BusinessShellState extends State<BusinessShell> {
         return 'reports';
       case 'payroll':
         return 'payroll';
+      case 'telephony':
+        return 'telephony';
       case 'customer-club':
         return 'customer_club';
       case 'repair-shop':
@@ -3481,6 +3569,7 @@ class _BusinessShellState extends State<BusinessShell> {
     if (path != null) {
       if (path.contains('/hscript')) return 'reports';
       if (path.contains('/payroll')) return 'payroll';
+      if (path.contains('/telephony')) return 'telephony';
       if (path.contains('/customer-club')) return 'customer_club';
       if (path.contains('/repair-shop')) return 'repair_shop';
       if (path.contains('/warranty')) return 'warranty';
@@ -3550,6 +3639,7 @@ class _BusinessShellState extends State<BusinessShell> {
       return 'payroll';
     }
     if (label == t.distributionMenu || label == 'Field distribution') return 'distribution';
+    if (label == 'مرکز تماس' || label == 'Telephony') return 'telephony';
     if (label == t.basalamIntegrationMenuTitle) return 'basalam';
     if (label == t.woocommerceIntegrationMenuTitle) return 'woocommerce';
     if (label == 'هوش مصنوعی' || label == 'AI Tools') return 'ai';

@@ -416,6 +416,13 @@ class CrmActivity(Base):
         comment="low | normal | high | urgent",
     )
     extra_info: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    telephony_call_id: Mapped[int | None] = mapped_column(
+        Integer,
+        ForeignKey("telephony_calls.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+        comment="پیوند به تماس ثبت‌شده در افزونه تلفن",
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime,

@@ -1291,6 +1291,15 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
         'post': t.payrollPermissionPost,
         'approve': t.payrollPermissionApprove,
       },
+      'telephony': {
+        'view': t.localeName.startsWith('fa') ? 'مشاهده مرکز تماس' : 'View telephony center',
+        'manage': t.localeName.startsWith('fa') ? 'مدیریت اتصال و داخلی‌ها' : 'Manage PBX & extensions',
+        'click_to_call': t.localeName.startsWith('fa') ? 'Click-to-Call' : 'Click to call',
+        'listen_recordings': t.localeName.startsWith('fa') ? 'پخش ضبط مکالمات' : 'Listen to recordings',
+        'live_monitor': t.localeName.startsWith('fa') ? 'مانیتورینگ زنده' : 'Live monitor',
+        'reports': t.localeName.startsWith('fa') ? 'گزارش‌های تماس' : 'Call reports',
+        'control_calls': t.localeName.startsWith('fa') ? 'کنترل تماس از CRM' : 'Control calls from CRM',
+      },
       'basalam': {
         'view': t.localeName.startsWith('fa') ? 'مشاهدهٔ اتصال باسلام' : 'View Basalam integration',
         'manage': t.localeName.startsWith('fa') ? 'مدیریت تنظیمات باسلام' : 'Manage Basalam settings',
@@ -1865,6 +1874,11 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
         'sections': ['payroll'],
       },
       {
+        'title': t.localeName.startsWith('fa') ? 'مرکز تماس' : 'Telephony',
+        'icon': Icons.phone_in_talk_outlined,
+        'sections': ['telephony'],
+      },
+      {
         'title': t.localeName.startsWith('fa') ? 'اتصال فروشگاه' : 'Store integrations',
         'icon': Icons.store_mall_directory_outlined,
         'sections': ['basalam', 'woocommerce'],
@@ -2024,6 +2038,8 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
         return t.distributionMenu;
       case 'payroll':
         return t.payrollMenu;
+      case 'telephony':
+        return t.localeName.startsWith('fa') ? 'مرکز تماس' : 'Telephony';
       case 'basalam':
         return t.localeName.startsWith('fa') ? 'اتصال باسلام' : 'Basalam';
       case 'woocommerce':

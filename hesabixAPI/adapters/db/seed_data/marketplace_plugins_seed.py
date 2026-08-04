@@ -164,6 +164,20 @@ _DEFAULT_PLUGINS: Tuple[_PluginSeed, ...] = (
 		trial_allowed=True,
 		plans=(("monthly", 220_000), ("yearly", 2_200_000), ("lifetime", 8_800_000)),
 	),
+	_PluginSeed(
+		code="asterisk_issabel_connector",
+		name="اتصال به آستریکس و ایزابل",
+		description=(
+			"یکپارچگی مرکز تلفن Issabel/Asterisk با حسابیکس: Screen Pop، Click-to-Call، "
+			"تاریخچه تماس، نگاشت داخلی کاربران، اعلان لحظه‌ای و ثبت خودکار در CRM. "
+			"نیاز به نصب Hesabix Telephony Connector روی سرور تلفن دارد."
+		),
+		category="integration",
+		icon_url=None,
+		trial_days=14,
+		trial_allowed=True,
+		plans=(("monthly", 350_000), ("yearly", 3_500_000)),
+	),
 )
 
 

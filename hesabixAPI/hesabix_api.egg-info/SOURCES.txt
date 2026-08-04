@@ -79,6 +79,7 @@ adapters/api/v1/tax_reports.py
 adapters/api/v1/tax_settings.py
 adapters/api/v1/tax_types.py
 adapters/api/v1/tax_units.py
+adapters/api/v1/telephony.py
 adapters/api/v1/transfers.py
 adapters/api/v1/users.py
 adapters/api/v1/wallet.py
@@ -306,6 +307,7 @@ adapters/db/models/tax_setting.py
 adapters/db/models/tax_type.py
 adapters/db/models/tax_unit.py
 adapters/db/models/telegram.py
+adapters/db/models/telephony.py
 adapters/db/models/user.py
 adapters/db/models/user_ui_preferences.py
 adapters/db/models/wallet.py
@@ -429,6 +431,7 @@ app/core/responses.py
 app/core/security.py
 app/core/settings.py
 app/core/smart_normalizer.py
+app/core/telephony_plugin_dependency.py
 app/core/transaction_lock.py
 app/core/warranty_plugin_dependency.py
 app/core/woocommerce_bridge_rate_limit.py
@@ -893,6 +896,12 @@ app/services/support/ticket_access_service.py
 app/services/support/ticket_engagement_service.py
 app/services/support/ticket_event_service.py
 app/services/support/ticket_lifecycle_service.py
+app/services/telephony/__init__.py
+app/services/telephony/live_service.py
+app/services/telephony/phone_normalizer.py
+app/services/telephony/recording_service.py
+app/services/telephony/reports_service.py
+app/services/telephony/telephony_service.py
 app/services/voice/__init__.py
 app/services/voice/stt.py
 app/services/voice/tts.py
@@ -1092,6 +1101,8 @@ migrations/versions/20260726_000001_business_ai_provider_configs.py
 migrations/versions/20260726_000002_hscript_schedules.py
 migrations/versions/20260727_000001_business_print_settings_tax_discount_display.py
 migrations/versions/20260731_000001_crm_sales_automation_upgrade.py
+migrations/versions/20260803_000001_telephony_asterisk_issabel_plugin.py
+migrations/versions/20260803_000002_telephony_phase2_ops_tables.py
 tests/__init__.py
 tests/test_account_balance_core.py
 tests/test_account_tree_roots.py
@@ -1220,6 +1231,7 @@ tests/test_stock_count.py
 tests/test_sunway_sms_provider.py
 tests/test_tax_key_material_service.py
 tests/test_telegram_link_token_expiry.py
+tests/test_telephony_phone_normalizer.py
 tests/test_template_design_v2_compiler.py
 tests/test_user_list_query_service.py
 tests/test_v2_p0_p1_fx_reports.py

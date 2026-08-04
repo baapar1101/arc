@@ -1,0 +1,1235 @@
+#!/usr/bin/env bash
+# hesabix-pbx — نصب و مدیریت Hesabix Telephony Connector روی Issabel/Asterisk
+# استفاده: hesabix-pbx <command>
+set -euo pipefail
+
+VERSION="1.2.2"
+INSTALL_DIR="${HESABIX_PBX_DIR:-/opt/HesabixTelephonyConnector}"
+ENV_FILE="${INSTALL_DIR}/.env"
+SERVICE_NAME="hesabix-telephony-connector"
+SERVICE_FILE="/etc/systemd/system/${SERVICE_NAME}.service"
+BIN_LINK="/usr/local/bin/hesabix-pbx"
+
+REPO_URL="${HESABIX_PBX_REPO:-https://source.hesabix.ir/hesabix/arc.git}"
+REPO_BRANCH="${HESABIX_PBX_BRANCH:-master}"
+RAW_BASE="${HESABIX_PBX_RAW_BASE:-https://source.hesabix.ir/hesabix/arc/raw/branch/${REPO_BRANCH}/extraScripts/HesabixTelephonyConnector}"
+CONN_REL_PATH="extraScripts/HesabixTelephonyConnector"
+
+# پیش‌فرض آدرس API حسابیکس (قابل بازنویسی با متغیر محیطی قبل از ویزارد)
+HESABIX_DEFAULT_API_URL="https://hsxn.hesabix.ir"
+
+# تشخیص توزیع (با detect_os پر می‌شود)
+OS_ID=""
+OS_ID_LIKE=""
+OS_NAME=""
+OS_FAMILY=""   # debian | rhel | unknown
+PKG_MGR=""     # apt-get | dnf | yum | ""
+IS_ISSABEL=0
+
+# فایل‌های ضروری کانکتور (برای حالت بدون git)
+CONNECTOR_FILES=(
+  "app/main.py"
+  "bin/hesabix-pbx"
+  "config.example.env"
+  "README.md"
+  "VERSION"
+  "systemd/hesabix-telephony-connector.service"
+  "install.sh"
+)
+
+# ─── helpers ────────────────────────────────────────────────────────────────
+
+c_reset=$(printf '\033[0m')
+c_green=$(printf '\033[0;32m')
+c_yellow=$(printf '\033[0;33m')
+c_red=$(printf '\033[0;31m')
+c_cyan=$(printf '\033[0;36m')
+c_bold=$(printf '\033[1m')
+
+log()  { printf "%b[*]%b %s\n" "$c_cyan" "$c_reset" "$*"; }
+ok()   { printf "%b[✔]%b %s\n" "$c_green" "$c_reset" "$*"; }
+warn() { printf "%b[!]%b %s\n" "$c_yellow" "$c_reset" "$*"; }
+err()  { printf "%b[✖]%b %s\n" "$c_red" "$c_reset" "$*" >&2; }
+die()  { err "$*"; exit 1; }
+
+need_root() {
+  if [[ "${EUID:-$(id -u)}" -ne 0 ]]; then
+    if have sudo; then
+      die "این دستور را با root اجرا کنید: sudo hesabix-pbx $*"
+    fi
+    die "این دستور را با کاربر root اجرا کنید (sudo در این سیستم نیست): hesabix-pbx $*"
+  fi
+}
+
+have() { command -v "$1" >/dev/null 2>&1; }
+
+# تشخیص سیستم‌عامل و مدیر بسته (Debian/Ubuntu vs RHEL/CentOS/Issabel)
+# توجه: /etc/os-release را در ساب‌شل می‌خوانیم تا VERSION اسکریپت بازنویسی نشود.
+detect_os() {
+  OS_ID=""
+  OS_ID_LIKE=""
+  OS_NAME=""
+  OS_FAMILY="unknown"
+  PKG_MGR=""
+  IS_ISSABEL=0
+
+  if [[ -r /etc/os-release ]]; then
+    # ساب‌شل جدا تا VERSION/NAME اسکریپت آلوده نشود؛ بدون null-byte (هشدار bash)
+    # shellcheck disable=SC1091
+    local os_vars
+    os_vars="$(. /etc/os-release; printf '%s\n%s\n%s' "${ID:-}" "${ID_LIKE:-}" "${PRETTY_NAME:-${NAME:-}}")"
+    OS_ID="$(printf '%s\n' "$os_vars" | sed -n '1p')"
+    OS_ID_LIKE="$(printf '%s\n' "$os_vars" | sed -n '2p')"
+    OS_NAME="$(printf '%s\n' "$os_vars" | sed -n '3p')"
+    [[ -n "$OS_NAME" ]] || OS_NAME="$OS_ID"
+  elif [[ -r /etc/redhat-release ]]; then
+    OS_ID="rhel"
+    OS_NAME="$(tr -d '\n' < /etc/redhat-release)"
+  elif [[ -r /etc/debian_version ]]; then
+    OS_ID="debian"
+    OS_NAME="Debian $(tr -d '\n' < /etc/debian_version)"
+  fi
+
+  if [[ -f /etc/issabel.conf ]] || [[ -d /etc/issabel ]] \
+    || [[ -f /etc/asterisk/issabel.conf ]] \
+    || grep -qi issabel /etc/redhat-release 2>/dev/null \
+    || grep -qi issabel /etc/os-release 2>/dev/null; then
+    IS_ISSABEL=1
+    OS_NAME="${OS_NAME:-Issabel}"
+  fi
+
+  local fingerprint
+  fingerprint=" ${OS_ID} ${OS_ID_LIKE} "
+  if [[ "$fingerprint" =~ (debian|ubuntu|raspbian|linuxmint|pop) ]]; then
+    OS_FAMILY="debian"
+  elif [[ "$fingerprint" =~ (rhel|centos|fedora|rocky|almalinux|alma|ol|scientific|amzn|oracle|sangoma|freepbx) ]]; then
+    OS_FAMILY="rhel"
+  elif [[ -f /etc/debian_version ]]; then
+    OS_FAMILY="debian"
+  elif [[ -f /etc/redhat-release ]] || [[ $IS_ISSABEL -eq 1 ]]; then
+    OS_FAMILY="rhel"
+  fi
+
+  if have dnf; then
+    PKG_MGR="dnf"
+  elif have yum; then
+    PKG_MGR="yum"
+  elif have apt-get; then
+    PKG_MGR="apt-get"
+  elif [[ "$OS_FAMILY" == "rhel" ]]; then
+    # Issabel/CentOS قدیمی ممکن است yum داشته باشد ولی هنوز در PATH نباشد
+    PKG_MGR="yum"
+  elif [[ "$OS_FAMILY" == "debian" ]]; then
+    PKG_MGR="apt-get"
+  fi
+}
+
+# نصب بسته بدون اتکا به sudo (فرض: همین‌الان root هستیم)
+pkg_install() {
+  [[ $# -gt 0 ]] || return 0
+  [[ -n "$PKG_MGR" ]] || detect_os
+  case "$PKG_MGR" in
+    dnf)
+      dnf install -y "$@"
+      ;;
+    yum)
+      yum install -y "$@"
+      ;;
+    apt-get)
+      export DEBIAN_FRONTEND=noninteractive
+      apt-get update -qq
+      apt-get install -y "$@"
+      ;;
+    *)
+      die "مدیر بسته شناخته نشد. بسته‌های لازم را دستی نصب کنید: $*"
+      ;;
+  esac
+}
+
+# نصب پیش‌نیازهای اجرا بر اساس توزیع
+ensure_prerequisites() {
+  detect_os
+  local label="$OS_NAME"
+  if [[ $IS_ISSABEL -eq 1 ]]; then
+    label="${label} [Issabel]"
+  fi
+  log "سیستم‌عامل: ${label:-نامشخص} | خانواده: ${OS_FAMILY} | مدیر بسته: ${PKG_MGR:-نامشخص}"
+
+  local missing=()
+  have python3 || missing+=(python3)
+  have rsync || missing+=(rsync)
+  if ! have curl && ! have wget; then
+    missing+=(curl)
+  fi
+  have git || missing+=(git)
+
+  if ((${#missing[@]} == 0)); then
+    ok "پیش‌نیازها از قبل نصب‌اند."
+    return 0
+  fi
+
+  if [[ -z "$PKG_MGR" ]] || ! have "$PKG_MGR"; then
+    die "پیش‌نیازهای زیر نصب نیستند و مدیر بسته در دسترس نیست: ${missing[*]}
+روی Debian/Ubuntu: apt-get install -y ${missing[*]}
+روی Issabel/CentOS/RHEL: yum install -y ${missing[*]}   یا   dnf install -y ${missing[*]}"
+  fi
+
+  log "نصب پیش‌نیازها (${PKG_MGR}): ${missing[*]}"
+  if ! pkg_install "${missing[@]}"; then
+    die "نصب پیش‌نیازها ناموفق بود: ${missing[*]}"
+  fi
+
+  have python3 || die "python3 پس از نصب در PATH نیست."
+  if ! have curl && ! have wget; then
+    die "curl یا wget پس از نصب در PATH نیست."
+  fi
+  ok "پیش‌نیازها نصب شدند."
+}
+
+# ورودی تعاملی: وقتی اسکریپت با curl|bash اجرا شود stdin لوله است؛ از /dev/tty بخوان.
+read_tty() {
+  # استفاده: read_tty [-s] var_name
+  local secret=0
+  if [[ "${1:-}" == "-s" ]]; then
+    secret=1
+    shift
+  fi
+  local __var="$1"
+  local __ans=""
+  if [[ -r /dev/tty ]]; then
+    if [[ $secret -eq 1 ]]; then
+      read -r -s __ans < /dev/tty || true
+    else
+      read -r __ans < /dev/tty || true
+    fi
+  else
+    if [[ $secret -eq 1 ]]; then
+      read -r -s __ans || true
+    else
+      read -r __ans || true
+    fi
+  fi
+  printf -v "$__var" '%s' "$__ans"
+}
+
+prompt() {
+  # prompt "سؤال" "پیش‌فرض"
+  local q="$1" d="${2:-}" ans
+  if [[ -n "$d" ]]; then
+    printf '%b%s%b [%s]: ' "$c_bold" "$q" "$c_reset" "$d" > /dev/tty 2>/dev/null || printf '%b%s%b [%s]: ' "$c_bold" "$q" "$c_reset" "$d"
+  else
+    printf '%b%s%b: ' "$c_bold" "$q" "$c_reset" > /dev/tty 2>/dev/null || printf '%b%s%b: ' "$c_bold" "$q" "$c_reset"
+  fi
+  read_tty ans
+  echo "${ans:-$d}"
+}
+
+prompt_secret() {
+  local q="$1" d="${2:-}" ans
+  if [[ -n "$d" ]]; then
+    printf '%b%s%b [پنهان/Enter=همان]: ' "$c_bold" "$q" "$c_reset" > /dev/tty 2>/dev/null || printf '%b%s%b [پنهان/Enter=همان]: ' "$c_bold" "$q" "$c_reset"
+  else
+    printf '%b%s%b: ' "$c_bold" "$q" "$c_reset" > /dev/tty 2>/dev/null || printf '%b%s%b: ' "$c_bold" "$q" "$c_reset"
+  fi
+  read_tty -s ans
+  # خط جدید بعد از ورودی مخفی
+  if [[ -w /dev/tty ]]; then
+    printf '\n' > /dev/tty
+  else
+    echo
+  fi
+  echo "${ans:-$d}"
+}
+
+load_env() {
+  [[ -f "$ENV_FILE" ]] || return 1
+  set -a
+  # shellcheck disable=SC1090
+  source "$ENV_FILE"
+  set +a
+}
+
+download() {
+  local url="$1" out="$2"
+  if have curl; then
+    curl -fsSL --connect-timeout 20 --max-time 120 "$url" -o "$out"
+  elif have wget; then
+    wget -q -O "$out" "$url"
+  else
+    die "curl یا wget لازم است."
+  fi
+}
+
+# ─── fetch connector files ──────────────────────────────────────────────────
+
+fetch_via_git() {
+  # مسیر temp را فوری در trap می‌گنجانیم تا با set -u بعد از خروج تابع unbound نشود
+  local tmp src env_bak=""
+  tmp="$(mktemp -d /tmp/hesabix-pbx.XXXXXX)"
+  # shellcheck disable=SC2064
+  trap "rm -rf '${tmp}'" RETURN
+
+  log "دریافت کانکتور از مخزن (sparse git)…"
+  log "منبع: $REPO_URL  شاخه: $REPO_BRANCH"
+
+  if ! git clone --depth 1 --filter=blob:none --sparse \
+      -b "$REPO_BRANCH" "$REPO_URL" "$tmp/repo" >/dev/null 2>&1; then
+    # بعضی سرورها filter را پشتیبانی نمی‌کنند
+    git clone --depth 1 -b "$REPO_BRANCH" "$REPO_URL" "$tmp/repo" >/dev/null 2>&1 \
+      || { warn "کلون مخزن ناموفق بود."; return 1; }
+  fi
+
+  (
+    cd "$tmp/repo"
+    if git sparse-checkout set "$CONN_REL_PATH" >/dev/null 2>&1; then
+      :
+    fi
+  )
+
+  src="$tmp/repo/$CONN_REL_PATH"
+  if [[ ! -d "$src" ]]; then
+    warn "پوشه کانکتور در مخزن پیدا نشد: $CONN_REL_PATH"
+    return 1
+  fi
+
+  mkdir -p "$INSTALL_DIR"
+  # حفظ .env
+  if [[ -f "$ENV_FILE" ]]; then
+    env_bak="$(mktemp)"
+    cp -a "$ENV_FILE" "$env_bak"
+  fi
+
+  if have rsync; then
+    rsync -a --delete \
+      --exclude '.env' \
+      --exclude '.env.*' \
+      --exclude '__pycache__/' \
+      --exclude '*.pyc' \
+      "$src/" "$INSTALL_DIR/"
+  else
+    # بدون rsync: کپی فایل‌ها بدون پاک کردن .env
+    find "$INSTALL_DIR" -mindepth 1 -maxdepth 1 ! -name '.env' ! -name '.env.*' -exec rm -rf {} +
+    cp -a "$src/." "$INSTALL_DIR/"
+  fi
+
+  if [[ -n "$env_bak" ]]; then
+    mv -f "$env_bak" "$ENV_FILE"
+  fi
+
+  ok "فایل‌های کانکتور در $INSTALL_DIR به‌روز شد."
+  return 0
+}
+
+fetch_via_raw() {
+  log "git در دسترس نیست یا کلون ناموفق — دانلود فایل‌به‌فایل…"
+  mkdir -p "$INSTALL_DIR/app" "$INSTALL_DIR/bin" "$INSTALL_DIR/systemd"
+
+  local env_bak=""
+  if [[ -f "$ENV_FILE" ]]; then
+    env_bak="$(mktemp)"
+    cp -a "$ENV_FILE" "$env_bak"
+  fi
+
+  local f
+  for f in "${CONNECTOR_FILES[@]}"; do
+    log "  ↓ $f"
+    mkdir -p "$(dirname "$INSTALL_DIR/$f")"
+    download "${RAW_BASE}/${f}" "$INSTALL_DIR/$f" \
+      || die "دانلود ناموفق: $f"
+  done
+
+  if [[ -n "$env_bak" ]]; then
+    mv -f "$env_bak" "$ENV_FILE"
+  fi
+  ok "دانلود خام کامل شد."
+}
+
+sync_connector() {
+  if have git; then
+    if fetch_via_git; then
+      return 0
+    fi
+    warn "sparse/git ناموفق — تلاش با دانلود خام…"
+  fi
+  fetch_via_raw
+}
+
+install_cli() {
+  local src="$INSTALL_DIR/bin/hesabix-pbx"
+  [[ -f "$src" ]] || die "فایل CLI پیدا نشد: $src"
+  chmod +x "$src" "$INSTALL_DIR/install.sh" 2>/dev/null || true
+  chmod +x "$INSTALL_DIR/app/main.py" 2>/dev/null || true
+  ln -sfn "$src" "$BIN_LINK"
+  ok "دستور سیستم‌عامل آماده است: hesabix-pbx"
+}
+
+install_systemd() {
+  local unit_src="$INSTALL_DIR/systemd/hesabix-telephony-connector.service"
+  [[ -f "$unit_src" ]] || die "فایل systemd پیدا نشد."
+
+  # بازنویسی مسیرها مطابق INSTALL_DIR
+  sed -e "s|/opt/HesabixTelephonyConnector|${INSTALL_DIR}|g" \
+      -e "s|WorkingDirectory=.*|WorkingDirectory=${INSTALL_DIR}|g" \
+      -e "s|EnvironmentFile=.*|EnvironmentFile=${ENV_FILE}|g" \
+      -e "s|ExecStart=.*|ExecStart=/usr/bin/python3 ${INSTALL_DIR}/app/main.py|g" \
+      "$unit_src" > "$SERVICE_FILE"
+
+  # اگر python3 جای دیگری است
+  local py
+  py="$(command -v python3 || true)"
+  if [[ -n "$py" && "$py" != "/usr/bin/python3" ]]; then
+    sed -i "s|^ExecStart=.*|ExecStart=${py} ${INSTALL_DIR}/app/main.py|" "$SERVICE_FILE"
+  fi
+
+  systemctl daemon-reload
+  systemctl enable "$SERVICE_NAME" >/dev/null 2>&1 || true
+  ok "سرویس systemd ثبت شد: $SERVICE_NAME"
+}
+
+# ─── Hesabix API helpers (ویزارد تعاملی) ─────────────────────────────────────
+
+api_request_json() {
+  # api_request_json METHOD URL API_KEY [JSON_BODY]
+  # خروجی: بدنه JSON؛ کد HTTP در متغیر سراسری API_HTTP_CODE
+  local method="$1" url="$2" api_key="$3" body="${4:-}"
+  API_HTTP_CODE="0"
+  HESABIX_API_KEY="$api_key" HESABIX_HTTP_METHOD="$method" HESABIX_HTTP_URL="$url" HESABIX_HTTP_BODY="$body" \
+  python3 - <<'PY'
+import json, os, sys, urllib.error, urllib.request
+method = os.environ["HESABIX_HTTP_METHOD"].upper()
+url = os.environ["HESABIX_HTTP_URL"]
+key = os.environ["HESABIX_API_KEY"]
+body = os.environ.get("HESABIX_HTTP_BODY") or ""
+data = body.encode("utf-8") if body else None
+req = urllib.request.Request(
+    url,
+    data=data,
+    method=method,
+    headers={
+        "Authorization": f"ApiKey {key}",
+        "Accept": "application/json",
+        "Content-Type": "application/json",
+        "User-Agent": "hesabix-pbx/1.2",
+    },
+)
+try:
+    with urllib.request.urlopen(req, timeout=30) as resp:
+        raw = resp.read().decode("utf-8", "replace")
+        print(resp.status, file=sys.stderr)
+        sys.stdout.write(raw)
+except urllib.error.HTTPError as e:
+    raw = e.read().decode("utf-8", "replace")
+    print(e.code, file=sys.stderr)
+    sys.stdout.write(raw or json.dumps({"success": False, "error": {"message": str(e)}}))
+    sys.exit(0)
+except Exception as e:
+    print(0, file=sys.stderr)
+    sys.stdout.write(json.dumps({"success": False, "error": {"message": str(e)}}))
+    sys.exit(0)
+PY
+}
+
+api_extract() {
+  # api_extract JSON PYTHON_EXPR → چاپ نتیجه
+  local json="$1" expr="$2"
+  HESABIX_JSON="$json" HESABIX_EXPR="$expr" python3 - <<'PY'
+import json, os, sys
+data = json.loads(os.environ["HESABIX_JSON"] or "{}")
+expr = os.environ["HESABIX_EXPR"]
+try:
+    val = eval(expr, {"data": data, "json": json})  # noqa: S307 — ورودی خودمان
+except Exception as e:
+    print("", end="")
+    sys.exit(0)
+if val is None:
+    print("", end="")
+elif isinstance(val, (dict, list)):
+    print(json.dumps(val, ensure_ascii=False))
+else:
+    print(val, end="")
+PY
+}
+
+# ─── configure ──────────────────────────────────────────────────────────────
+
+cmd_configure() {
+  need_root configure
+  mkdir -p "$INSTALL_DIR"
+
+  echo
+  echo -e "${c_bold}پیکربندی اتصال حسابیکس ↔ Issabel/Asterisk${c_reset}"
+  echo "۱) در حسابیکس بروید به: پروفایل ← کلیدهای API و یک کلید بسازید/کپی کنید"
+  echo "۲) اینجا وارد کنید؛ کسب‌وکار و مرکز تلفن را از لیست انتخاب می‌کنید"
+  echo "آدرس API پیش‌فرض: ${HESABIX_DEFAULT_API_URL}"
+  echo
+
+  local env_override_api="${HESABIX_API_URL:-}"
+  local cur_api="" cur_bid="" cur_pid="" cur_token="" cur_ami_host="127.0.0.1" cur_ami_port="5038" cur_ami_user="hesabix" cur_ami_secret=""
+  if [[ -f "$ENV_FILE" ]]; then
+    # shellcheck disable=SC1090
+    source "$ENV_FILE" || true
+    cur_api="${HESABIX_API_URL:-}"
+    cur_bid="${HESABIX_BUSINESS_ID:-}"
+    cur_pid="${HESABIX_PBX_ID:-}"
+    cur_token="${HESABIX_CONNECTOR_TOKEN:-}"
+    cur_ami_host="${AMI_HOST:-127.0.0.1}"
+    cur_ami_port="${AMI_PORT:-5038}"
+    cur_ami_user="${AMI_USER:-hesabix}"
+    cur_ami_secret="${AMI_SECRET:-}"
+  fi
+  cur_api="${cur_api:-${env_override_api:-$HESABIX_DEFAULT_API_URL}}"
+
+  local api user_key
+  api="$(prompt "آدرس API حسابیکس" "$cur_api")"
+  api="${api%/}"
+  user_key="$(prompt_secret "کلید API حسابیکس (از پروفایل)" "")"
+  [[ -n "$api" && -n "$user_key" ]] || die "آدرس API و کلید API الزامی است."
+
+  log "در حال دریافت لیست کسب‌وکارها…"
+  local biz_raw biz_code
+  local tmp_http tmp_body
+  tmp_http="$(mktemp)"
+  tmp_body="$(mktemp)"
+  api_request_json POST "${api}/api/v1/businesses/list?take=100&skip=0" "$user_key" "{}" \
+    >"$tmp_body" 2>"$tmp_http" || true
+  biz_code="$(tr -d '[:space:]' < "$tmp_http")"
+  biz_raw="$(cat "$tmp_body")"
+  rm -f "$tmp_http" "$tmp_body"
+
+  if [[ "$biz_code" != "200" ]]; then
+    err "ورود با کلید API ناموفق بود (HTTP ${biz_code:-?})."
+    echo "$(api_extract "$biz_raw" "data.get('error',{}).get('message') or data.get('message') or ''")"
+    echo "کلید را از: پروفایل ← کلیدهای API بررسی کنید."
+    exit 1
+  fi
+
+  local biz_json
+  # normalize items
+  biz_json="$(HESABIX_JSON="$biz_raw" python3 - <<'PY'
+import json, os
+root = json.loads(os.environ["HESABIX_JSON"])
+payload = root.get("data", root)
+items = payload.get("items") if isinstance(payload, dict) else payload
+if not isinstance(items, list):
+    items = []
+print(json.dumps(items, ensure_ascii=False))
+PY
+)"
+
+  local biz_count
+  biz_count="$(HESABIX_JSON="$biz_json" python3 -c 'import json,os; print(len(json.loads(os.environ["HESABIX_JSON"])))')"
+  if [[ "$biz_count" -eq 0 ]]; then
+    die "هیچ کسب‌وکاری برای این کاربر پیدا نشد."
+  fi
+
+  local -a biz_labels=()
+  local i label
+  for ((i = 0; i < biz_count; i++)); do
+    label="$(HESABIX_JSON="$biz_json" HESABIX_I="$i" python3 - <<'PY'
+import json, os
+items = json.loads(os.environ["HESABIX_JSON"])
+b = items[int(os.environ["HESABIX_I"])]
+print(f"{b.get('name') or 'بدون‌نام'}  (ID: {b.get('id')})")
+PY
+)"
+    biz_labels+=("$label")
+  done
+
+  local biz_choice biz_id biz_name
+  # پیش‌فرض روی کسب‌وکار قبلی اگر در لیست باشد
+  local default_biz="1"
+  if [[ -n "$cur_bid" ]]; then
+    default_biz="$(HESABIX_JSON="$biz_json" HESABIX_BID="$cur_bid" python3 - <<'PY'
+import json, os
+items = json.loads(os.environ["HESABIX_JSON"])
+want = str(os.environ.get("HESABIX_BID") or "")
+for i, b in enumerate(items):
+    if str(b.get("id")) == want:
+        print(i + 1)
+        break
+else:
+    print(1)
+PY
+)"
+  fi
+  echo
+  echo -e "${c_bold}انتخاب کسب‌وکار${c_reset}"
+  for i in "${!biz_labels[@]}"; do
+    printf "  %b%d)%b %s\n" "$c_cyan" "$((i + 1))" "$c_reset" "${biz_labels[$i]}"
+  done
+  biz_choice="$(prompt "شماره کسب‌وکار" "$default_biz")"
+  [[ "$biz_choice" =~ ^[0-9]+$ ]] && (( biz_choice >= 1 && biz_choice <= biz_count )) \
+    || die "انتخاب کسب‌وکار نامعتبر است."
+  biz_id="$(HESABIX_JSON="$biz_json" HESABIX_I="$((biz_choice - 1))" python3 -c 'import json,os; print(json.loads(os.environ["HESABIX_JSON"])[int(os.environ["HESABIX_I"])]["id"])')"
+  biz_name="$(HESABIX_JSON="$biz_json" HESABIX_I="$((biz_choice - 1))" python3 -c 'import json,os; print(json.loads(os.environ["HESABIX_JSON"])[int(os.environ["HESABIX_I"])].get("name") or "")')"
+  ok "کسب‌وکار انتخاب شد: $biz_name (#$biz_id)"
+
+  log "دریافت مراکز تلفن…"
+  local pbx_raw pbx_code pbx_json pbx_count
+  tmp_http="$(mktemp)"; tmp_body="$(mktemp)"
+  api_request_json GET "${api}/api/v1/telephony/business/${biz_id}/pbx" "$user_key" \
+    >"$tmp_body" 2>"$tmp_http" || true
+  pbx_code="$(tr -d '[:space:]' < "$tmp_http")"
+  pbx_raw="$(cat "$tmp_body")"
+  rm -f "$tmp_http" "$tmp_body"
+
+  if [[ "$pbx_code" == "403" ]]; then
+    err "افزونه تلفن برای این کسب‌وکار فعال نیست یا مجوز ندارید (HTTP 403)."
+    echo "در حسابیکس: مارکت‌پلیس ← اتصال به آستریکس و ایزابل را فعال کنید."
+    exit 1
+  fi
+  if [[ "$pbx_code" != "200" ]]; then
+    err "دریافت مراکز تلفن ناموفق (HTTP ${pbx_code:-?})."
+    echo "$(api_extract "$pbx_raw" "data.get('error',{}).get('message') or data.get('message') or ''")"
+    exit 1
+  fi
+
+  pbx_json="$(HESABIX_JSON="$pbx_raw" python3 - <<'PY'
+import json, os
+root = json.loads(os.environ["HESABIX_JSON"])
+payload = root.get("data", root)
+items = payload.get("items") if isinstance(payload, dict) else []
+print(json.dumps(items if isinstance(items, list) else [], ensure_ascii=False))
+PY
+)"
+  pbx_count="$(HESABIX_JSON="$pbx_json" python3 -c 'import json,os; print(len(json.loads(os.environ["HESABIX_JSON"])))')"
+
+  local pbx_id="" token="" pbx_name=""
+  local create_new="N"
+  if [[ "$pbx_count" -eq 0 ]]; then
+    warn "مرکز تلفنی تعریف نشده."
+    create_new="$(prompt "یک مرکز تلفن جدید بسازم؟ (Y/n)" "Y")"
+    [[ "$create_new" =~ ^[Yy]$ ]] || die "بدون مرکز تلفن نمی‌توان ادامه داد. در UI بسازید یا دوباره configure بزنید."
+  else
+    local -a pbx_labels=()
+    for ((i = 0; i < pbx_count; i++)); do
+      label="$(HESABIX_JSON="$pbx_json" HESABIX_I="$i" python3 - <<'PY'
+import json, os
+p = json.loads(os.environ["HESABIX_JSON"])[int(os.environ["HESABIX_I"])]
+print(f"{p.get('name') or 'PBX'}  (ID: {p.get('id')}) · وضعیت: {p.get('status') or '—'} · توکن: {p.get('connector_token_prefix') or ''}…")
+PY
+)"
+      pbx_labels+=("$label")
+    done
+    pbx_labels+=("➕ ایجاد مرکز تلفن جدید")
+    echo
+    echo -e "${c_bold}انتخاب مرکز تلفن (PBX)${c_reset}"
+    for i in "${!pbx_labels[@]}"; do
+      printf "  %b%d)%b %s\n" "$c_cyan" "$((i + 1))" "$c_reset" "${pbx_labels[$i]}"
+    done
+    local pbx_choice default_pbx="1"
+    if [[ -n "$cur_pid" ]]; then
+      default_pbx="$(HESABIX_JSON="$pbx_json" HESABIX_PID="$cur_pid" python3 - <<'PY'
+import json, os
+items = json.loads(os.environ["HESABIX_JSON"])
+want = str(os.environ.get("HESABIX_PID") or "")
+for i, p in enumerate(items):
+    if str(p.get("id")) == want:
+        print(i + 1)
+        break
+else:
+    print(1)
+PY
+)"
+    fi
+    pbx_choice="$(prompt "شماره مرکز تلفن" "$default_pbx")"
+    [[ "$pbx_choice" =~ ^[0-9]+$ ]] || die "انتخاب نامعتبر"
+    if (( pbx_choice == pbx_count + 1 )); then
+      create_new="Y"
+    elif (( pbx_choice >= 1 && pbx_choice <= pbx_count )); then
+      pbx_id="$(HESABIX_JSON="$pbx_json" HESABIX_I="$((pbx_choice - 1))" python3 -c 'import json,os; print(json.loads(os.environ["HESABIX_JSON"])[int(os.environ["HESABIX_I"])]["id"])')"
+      pbx_name="$(HESABIX_JSON="$pbx_json" HESABIX_I="$((pbx_choice - 1))" python3 -c 'import json,os; print(json.loads(os.environ["HESABIX_JSON"])[int(os.environ["HESABIX_I"])].get("name") or "")')"
+      ok "مرکز تلفن: $pbx_name (#$pbx_id)"
+    else
+      die "انتخاب مرکز تلفن نامعتبر است."
+    fi
+  fi
+
+  if [[ "$create_new" =~ ^[Yy]$ ]]; then
+    local new_name
+    new_name="$(prompt "نام مرکز تلفن" "Issabel اصلی")"
+    log "ایجاد مرکز تلفن…"
+    tmp_http="$(mktemp)"; tmp_body="$(mktemp)"
+    api_request_json POST "${api}/api/v1/telephony/business/${biz_id}/pbx" "$user_key" \
+      "$(HESABIX_N="$new_name" python3 -c 'import json,os; print(json.dumps({"name":os.environ["HESABIX_N"],"pbx_type":"issabel"},ensure_ascii=False))')" \
+      >"$tmp_body" 2>"$tmp_http" || true
+    local create_code create_raw
+    create_code="$(tr -d '[:space:]' < "$tmp_http")"
+    create_raw="$(cat "$tmp_body")"
+    rm -f "$tmp_http" "$tmp_body"
+    [[ "$create_code" == "200" ]] || die "ایجاد PBX ناموفق (HTTP ${create_code}). $(api_extract "$create_raw" "data.get('error',{}).get('message') or ''")"
+    pbx_id="$(HESABIX_JSON="$create_raw" python3 -c 'import json,os; d=json.loads(os.environ["HESABIX_JSON"]).get("data",{}); print(d.get("id") or "")')"
+    token="$(HESABIX_JSON="$create_raw" python3 -c 'import json,os; d=json.loads(os.environ["HESABIX_JSON"]).get("data",{}); print(d.get("connector_token") or "")')"
+    pbx_name="$new_name"
+    [[ -n "$pbx_id" && -n "$token" ]] || die "پاسخ ایجاد PBX ناقص بود."
+    ok "مرکز تلفن ساخته شد (#$pbx_id) و توکن Connector دریافت شد."
+  else
+    # توکن قبلی فقط یک‌بار نمایش داده می‌شود؛ برای اتصال باید rotate کنیم یا از .env قبلی استفاده کنیم
+    if [[ -n "$cur_token" && "$cur_pid" == "$pbx_id" && "$cur_bid" == "$biz_id" ]]; then
+      local keep
+      keep="$(prompt "توکن فعلی .env را نگه دارم؟ (Y=نگه دار / n=توکن جدید)" "Y")"
+      if [[ "$keep" =~ ^[Yy]$ ]]; then
+        token="$cur_token"
+        ok "همان توکن قبلی استفاده می‌شود."
+      fi
+    fi
+    if [[ -z "$token" ]]; then
+      log "صدور توکن جدید Connector (rotate)…"
+      tmp_http="$(mktemp)"; tmp_body="$(mktemp)"
+      api_request_json POST "${api}/api/v1/telephony/business/${biz_id}/pbx/${pbx_id}/rotate-token" "$user_key" "{}" \
+        >"$tmp_body" 2>"$tmp_http" || true
+      local rot_code rot_raw
+      rot_code="$(tr -d '[:space:]' < "$tmp_http")"
+      rot_raw="$(cat "$tmp_body")"
+      rm -f "$tmp_http" "$tmp_body"
+      [[ "$rot_code" == "200" ]] || die "صدور توکن ناموفق (HTTP ${rot_code}). مجوز telephony.manage لازم است."
+      token="$(HESABIX_JSON="$rot_raw" python3 -c 'import json,os; d=json.loads(os.environ["HESABIX_JSON"]).get("data",{}); print(d.get("connector_token") or "")')"
+      [[ -n "$token" ]] || die "توکن در پاسخ نبود."
+      ok "توکن Connector جدید دریافت شد."
+    fi
+  fi
+
+  echo
+  echo -e "${c_bold}تنظیمات AMI روی همین سرور تلفن${c_reset}"
+  local ami_host ami_port ami_user ami_secret
+  ami_host="$(prompt "آدرس AMI" "$cur_ami_host")"
+  ami_port="$(prompt "پورت AMI" "$cur_ami_port")"
+  ami_user="$(prompt "کاربر AMI" "$cur_ami_user")"
+  ami_secret="$(prompt_secret "رمز AMI" "$cur_ami_secret")"
+
+  [[ -n "$api" && -n "$biz_id" && -n "$pbx_id" && -n "$token" && -n "$ami_user" && -n "$ami_secret" ]] \
+    || die "مقادیر ضروری ناقص است."
+
+  umask 077
+  # مقادیر را برای EnvironmentFile systemd با کوتیشن امن می‌نویسیم
+  qenv() { python3 -c 'import json,sys; print(json.dumps(sys.argv[1]))' "$1"; }
+  cat > "$ENV_FILE" <<EOF
+# generated by hesabix-pbx $(date -u +%Y-%m-%dT%H:%M:%SZ)
+# business_id=${biz_id} pbx_id=${pbx_id}
+HESABIX_API_URL=$(qenv "$api")
+HESABIX_BUSINESS_ID=$(qenv "$biz_id")
+HESABIX_PBX_ID=$(qenv "$pbx_id")
+HESABIX_CONNECTOR_TOKEN=$(qenv "$token")
+AMI_HOST=$(qenv "$ami_host")
+AMI_PORT=$(qenv "$ami_port")
+AMI_USER=$(qenv "$ami_user")
+AMI_SECRET=$(qenv "$ami_secret")
+EOF
+  chmod 600 "$ENV_FILE"
+  ok "پیکربندی ذخیره شد: $ENV_FILE"
+  echo "  Business ID = $biz_id"
+  echo "  PBX ID      = $pbx_id"
+
+  local setup_ami
+  setup_ami="$(prompt "کاربر AMI را در manager.conf بسازم؟ (y/N)" "N")"
+  if [[ "$setup_ami" =~ ^[Yy]$ ]]; then
+    setup_ami_user "$ami_user" "$ami_secret"
+  fi
+}
+
+enable_ami_general() {
+  # فعال‌سازی AMI در [general] — بدون این، پورت 5038 بسته است (Connection refused)
+  local conf="${1:-/etc/asterisk/manager.conf}"
+  local port="${2:-5038}"
+  local bind="${3:-127.0.0.1}"
+  [[ -f "$conf" ]] || { warn "فایل $conf نیست."; return 1; }
+
+  cp -a "$conf" "${conf}.bak.hesabix-enable-$(date +%Y%m%d%H%M%S)" 2>/dev/null || true
+
+  python3 - "$conf" "$port" "$bind" <<'PY'
+import re, sys
+path, port, bind = sys.argv[1], sys.argv[2], sys.argv[3]
+text = open(path, "r", encoding="utf-8", errors="replace").read()
+# بخش general را پیدا کن
+m = re.search(r"(?ms)^\[general\]\s*\n(.*?)(?=^\[|\Z)", text)
+if not m:
+    block = f"[general]\nenabled = yes\nport = {port}\nbindaddr = {bind}\nwebenabled = no\n\n"
+    text = block + text
+else:
+    body = m.group(1)
+    def set_kv(body, key, val):
+        pat = re.compile(rf"(?im)^(\s*{re.escape(key)}\s*=\s*).*$")
+        if pat.search(body):
+            return pat.sub(rf"\1{val}", body, count=1)
+        return body.rstrip() + f"\n{key} = {val}\n"
+    body = set_kv(body, "enabled", "yes")
+    body = set_kv(body, "port", port)
+    body = set_kv(body, "bindaddr", bind)
+    # بعضی نصب‌ها bindaddr را جدا دارند
+    text = text[: m.start(1)] + body + text[m.end(1) :]
+open(path, "w", encoding="utf-8").write(text)
+print(f"AMI enabled in {path} (bind={bind}:{port})")
+PY
+}
+
+setup_ami_user() {
+  local user="$1" secret="$2"
+  local port="${AMI_PORT:-5038}"
+  local bind="${AMI_HOST:-127.0.0.1}"
+  # اگر bind روی 0.0.0.0 باشد برای listen مناسب‌تر است؛ برای کلاینت 127.0.0.1 بماند
+  local listen_bind="127.0.0.1"
+  if [[ "$bind" != "127.0.0.1" && "$bind" != "localhost" ]]; then
+    listen_bind="0.0.0.0"
+  fi
+
+  local main_conf="/etc/asterisk/manager.conf"
+  if [[ ! -f "$main_conf" ]]; then
+    warn "manager.conf پیدا نشد — آیا Asterisk نصب است؟"
+    return 1
+  fi
+
+  log "فعال‌سازی AMI در manager.conf …"
+  enable_ami_general "$main_conf" "$port" "$listen_bind" || return 1
+
+  local conf=""
+  if [[ -d /etc/asterisk/manager.d ]]; then
+    conf="/etc/asterisk/manager.d/hesabix.conf"
+  elif [[ -f /etc/asterisk/manager_custom.conf ]]; then
+    conf="/etc/asterisk/manager_custom.conf"
+  else
+    conf="$main_conf"
+  fi
+
+  # کاربر را بساز یا secret را به‌روز کن
+  if grep -q "^\[${user}\]" "$conf" 2>/dev/null || grep -q "^\[${user}\]" "$main_conf" 2>/dev/null; then
+    log "کاربر [$user] هست — secret را در $conf همگام می‌کنم…"
+    local target="$conf"
+    if ! grep -q "^\[${user}\]" "$conf" 2>/dev/null; then
+      target="$main_conf"
+    fi
+    cp -a "$target" "${target}.bak.hesabix-user-$(date +%Y%m%d%H%M%S)" 2>/dev/null || true
+    python3 - "$target" "$user" "$secret" <<'PY'
+import re, sys
+path, user, secret = sys.argv[1], sys.argv[2], sys.argv[3]
+text = open(path, "r", encoding="utf-8", errors="replace").read()
+pat = re.compile(rf"(?ms)^\[{re.escape(user)}\]\s*\n(.*?)(?=^\[|\Z)")
+m = pat.search(text)
+if not m:
+    sys.exit(0)
+body = m.group(1)
+if re.search(r"(?im)^\s*secret\s*=", body):
+    body = re.sub(r"(?im)^(\s*secret\s*=\s*).*$", rf"\1{secret}", body, count=1)
+else:
+    body = f"secret = {secret}\n" + body
+# اطمینان از permit لوکال
+if not re.search(r"(?im)^\s*permit\s*=", body):
+    body += "permit = 127.0.0.1/255.255.255.255\n"
+text = text[: m.start(1)] + body + text[m.end(1) :]
+open(path, "w", encoding="utf-8").write(text)
+print(f"updated [{user}] in {path}")
+PY
+    ok "کاربر AMI [$user] به‌روز شد ($target)."
+  else
+    cp -a "$conf" "${conf}.bak.hesabix-$(date +%Y%m%d%H%M%S)" 2>/dev/null || true
+    mkdir -p "$(dirname "$conf")"
+    cat >> "$conf" <<EOF
+
+; --- Hesabix Telephony Connector ($(date +%Y-%m-%d)) ---
+[${user}]
+secret = ${secret}
+deny = 0.0.0.0/0.0.0.0
+permit = 127.0.0.1/255.255.255.255
+read = system,call,log,verbose,command,agent,user,originate,dialplan
+write = system,call,log,verbose,command,agent,user,originate,dialplan
+writetimeout = 5000
+EOF
+    ok "کاربر AMI به $conf اضافه شد."
+  fi
+
+  # Asterisk در حال اجرا باشد
+  if have systemctl; then
+    if ! systemctl is-active --quiet asterisk 2>/dev/null \
+      && ! systemctl is-active --quiet asterisk.service 2>/dev/null; then
+      log "سرویس asterisk در حال اجرا نیست — تلاش برای start…"
+      systemctl start asterisk 2>/dev/null || systemctl start asterisk.service 2>/dev/null || true
+      sleep 2
+    fi
+  fi
+
+  if have asterisk; then
+    asterisk -rx "manager reload" >/dev/null 2>&1 && ok "manager reload شد." \
+      || warn "manager reload ناموفق"
+    sleep 1
+    local ami_state
+    ami_state="$(asterisk -rx "manager show settings" 2>/dev/null | grep -i "Manager (AMI)" || true)"
+    echo "  $ami_state"
+    if echo "$ami_state" | grep -qi "No"; then
+      warn "هنوز AMI=No است. اگر Issabel/FreePBX دارید از پنل Settings → Asterisk Manager هم Enabled کنید."
+      warn "یا فایل /etc/asterisk/manager.conf را دستی چک کنید و: fwconsole reload"
+    fi
+  else
+    warn "دستور asterisk پیدا نشد."
+  fi
+
+  # بررسی پورت
+  if have ss; then
+    if ss -lnt | grep -q ":${port} "; then
+      ok "پورت AMI ${port} در حال listen است."
+    else
+      warn "پورت ${port} هنوز listen نیست — Connection refused ادامه خواهد داشت."
+      echo "  ss -lntp | grep ${port}"
+      echo "  asterisk -rx 'manager show settings'"
+    fi
+  elif have netstat; then
+    netstat -lnt 2>/dev/null | grep -q ":${port} " && ok "پورت ${port} listen است." \
+      || warn "پورت ${port} listen نیست."
+  fi
+}
+
+# ─── service ops ────────────────────────────────────────────────────────────
+
+cmd_start() {
+  need_root start
+  [[ -f "$ENV_FILE" ]] || die "ابتدا پیکربندی کنید: hesabix-pbx configure"
+  [[ -f "$SERVICE_FILE" ]] || install_systemd
+  systemctl start "$SERVICE_NAME"
+  ok "سرویس شروع شد."
+  cmd_status
+}
+
+cmd_stop() {
+  need_root stop
+  systemctl stop "$SERVICE_NAME" 2>/dev/null || true
+  ok "سرویس متوقف شد."
+}
+
+cmd_restart() {
+  need_root restart
+  [[ -f "$ENV_FILE" ]] || die "ابتدا پیکربندی کنید: hesabix-pbx configure"
+  [[ -f "$SERVICE_FILE" ]] || install_systemd
+  systemctl restart "$SERVICE_NAME"
+  ok "سرویس ری‌استارت شد."
+  sleep 1
+  cmd_status
+}
+
+cmd_status() {
+  echo -e "${c_bold}وضعیت Hesabix PBX Connector${c_reset}"
+  echo "نصب:     $INSTALL_DIR"
+  if [[ -f "$INSTALL_DIR/VERSION" ]]; then
+    echo "نسخه:     $(tr -d '\n' < "$INSTALL_DIR/VERSION")"
+  fi
+  if [[ -z "$OS_FAMILY" || "$OS_FAMILY" == "unknown" ]]; then
+    detect_os || true
+  fi
+  if [[ -n "$OS_NAME" || -n "$OS_FAMILY" ]]; then
+    local os_line="${OS_NAME:-—} (${OS_FAMILY}"
+    [[ -n "$PKG_MGR" ]] && os_line+=", ${PKG_MGR}"
+    [[ $IS_ISSABEL -eq 1 ]] && os_line+=", Issabel"
+    os_line+=")"
+    echo "سیستم:   $os_line"
+  fi
+  if [[ -f "$ENV_FILE" ]]; then
+    # shellcheck disable=SC1090
+    source "$ENV_FILE" || true
+    echo "API:      ${HESABIX_API_URL:-—}"
+    echo "Business: ${HESABIX_BUSINESS_ID:-—}"
+    echo "PBX ID:   ${HESABIX_PBX_ID:-—}"
+    echo "AMI:      ${AMI_USER:-—}@${AMI_HOST:-—}:${AMI_PORT:-—}"
+  else
+    warn "فایل .env وجود ندارد — hesabix-pbx configure"
+  fi
+  echo
+  if have systemctl && [[ -f "$SERVICE_FILE" ]]; then
+    systemctl --no-pager --full status "$SERVICE_NAME" 2>/dev/null | sed -n '1,12p' || true
+  else
+    warn "سرویس systemd نصب نشده."
+  fi
+}
+
+cmd_logs() {
+  local n="${1:-80}"
+  if have journalctl; then
+    journalctl -u "$SERVICE_NAME" -n "$n" --no-pager -l
+  else
+    die "journalctl در دسترس نیست."
+  fi
+}
+
+cmd_follow() {
+  journalctl -u "$SERVICE_NAME" -f -l
+}
+
+# ─── test ───────────────────────────────────────────────────────────────────
+
+cmd_test() {
+  [[ -f "$ENV_FILE" ]] || die "ابتدا: hesabix-pbx configure"
+  set -a
+  # shellcheck disable=SC1090
+  source "$ENV_FILE"
+  set +a
+
+  echo -e "${c_bold}۱) تست AMI${c_reset}"
+  python3 - <<'PY' || die "تست AMI ناموفق"
+import os, socket, sys
+host = os.environ.get("AMI_HOST", "127.0.0.1")
+port = int(os.environ.get("AMI_PORT", "5038"))
+user = os.environ.get("AMI_USER") or ""
+secret = os.environ.get("AMI_SECRET") or ""
+if not user or not secret:
+    print("AMI_USER/AMI_SECRET در محیط نیست. .env را بررسی کنید:", os.environ.get("HESABIX_PBX_ENV", "/opt/HesabixTelephonyConnector/.env"))
+    sys.exit(1)
+try:
+    s = socket.create_connection((host, port), timeout=5)
+except Exception as e:
+    print("AMI connect failed:", e)
+    sys.exit(1)
+banner = s.recv(256).decode("utf-8", "ignore")
+payload = f"Action: Login\r\nUsername: {user}\r\nSecret: {secret}\r\n\r\n"
+s.sendall(payload.encode())
+s.settimeout(5)
+data = b""
+while b"\r\n\r\n" not in data:
+    chunk = s.recv(4096)
+    if not chunk:
+        break
+    data += chunk
+s.close()
+text = data.decode("utf-8", "ignore")
+if "Success" in text or "Authentication accepted" in text:
+    print("AMI OK —", banner.strip().splitlines()[0] if banner.strip() else "connected")
+    sys.exit(0)
+print("AMI login failed:\n", text[:400])
+sys.exit(1)
+PY
+  ok "AMI پذیرفته شد."
+
+  echo
+  echo -e "${c_bold}۲) تست Heartbeat حسابیکس${c_reset}"
+  python3 - <<'PY' || die "تست API ناموفق"
+import json, os, sys, urllib.request, urllib.error
+base = (os.environ.get("HESABIX_API_URL") or "").rstrip("/")
+token = os.environ.get("HESABIX_CONNECTOR_TOKEN") or ""
+bid = os.environ.get("HESABIX_BUSINESS_ID") or ""
+pid = os.environ.get("HESABIX_PBX_ID") or ""
+if not all([base, token, bid, pid]):
+    print("متغیرهای Hesabix ناقص است")
+    sys.exit(1)
+url = f"{base}/api/v1/telephony/connector/heartbeat"
+body = json.dumps({"status": "ok", "connector_version": "cli-test"}).encode()
+req = urllib.request.Request(
+    url,
+    data=body,
+    headers={
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "application/json",
+        "X-Hesabix-Business-Id": str(bid),
+        "X-Hesabix-Pbx-Id": str(pid),
+    },
+    method="POST",
+)
+try:
+    with urllib.request.urlopen(req, timeout=20) as resp:
+        raw = resp.read().decode()
+        print("HTTP", resp.status, raw[:300])
+        if resp.status >= 400:
+            sys.exit(1)
+except urllib.error.HTTPError as e:
+    print("HTTP", e.code, e.read().decode()[:400])
+    sys.exit(1)
+except Exception as e:
+    print("API error:", e)
+    sys.exit(1)
+print("Hesabix heartbeat OK")
+PY
+  ok "اتصال به حسابیکس برقرار است."
+  echo
+  ok "هر دو تست موفق بودند. در UI وضعیت مرکز تلفن باید online شود."
+}
+
+cmd_fix_ami() {
+  need_root fix-ami
+  [[ -f "$ENV_FILE" ]] || die "ابتدا: hesabix-pbx configure"
+  set -a
+  # shellcheck disable=SC1090
+  source "$ENV_FILE"
+  set +a
+  local user="${AMI_USER:-hesabix}" secret="${AMI_SECRET:-}"
+  [[ -n "$secret" ]] || die "AMI_SECRET در .env خالی است — hesabix-pbx configure"
+  setup_ami_user "$user" "$secret"
+  systemctl restart "$SERVICE_NAME" || true
+  sleep 1
+  cmd_test
+}
+
+cmd_add_extension() {
+  need_root add-extension
+  local ext="${1:-}"
+  [[ -n "$ext" ]] || ext="$(prompt "شماره داخلی" "500")"
+  [[ -f "$ENV_FILE" ]] || die "ابتدا: hesabix-pbx configure"
+  set -a
+  # shellcheck disable=SC1090
+  source "$ENV_FILE"
+  set +a
+  local api="${HESABIX_API_URL%/}" bid="${HESABIX_BUSINESS_ID}" pid="${HESABIX_PBX_ID}"
+  local user_key display
+  user_key="$(prompt_secret "کلید API حسابیکس (پروفایل)" "")"
+  display="$(prompt "نام نمایشی داخلی" "داخلی $ext")"
+  [[ -n "$user_key" ]] || die "کلید API لازم است."
+
+  log "ثبت داخلی $ext در حسابیکس…"
+  local tmp_http tmp_body code raw
+  tmp_http="$(mktemp)"; tmp_body="$(mktemp)"
+  api_request_json POST "${api}/api/v1/telephony/business/${bid}/extensions" "$user_key" \
+    "$(EXT="$ext" PID="$pid" DN="$display" python3 -c 'import json,os; print(json.dumps({"pbx_id":int(os.environ["PID"]),"extension":os.environ["EXT"],"display_name":os.environ["DN"]},ensure_ascii=False))')" \
+    >"$tmp_body" 2>"$tmp_http" || true
+  code="$(tr -d '[:space:]' < "$tmp_http")"
+  raw="$(cat "$tmp_body")"
+  rm -f "$tmp_http" "$tmp_body"
+  [[ "$code" == "200" ]] || die "ثبت داخلی ناموفق (HTTP $code). $raw"
+  ok "داخلی $ext در حسابیکس ثبت شد."
+  echo
+  warn "اگر این داخلی روی خود Issabel/Asterisk هنوز وجود ندارد، از پنل Issabel (PBX → Extensions) هم بسازید تا تلفن واقعی زنگ بخورد."
+}
+# ─── install / update / uninstall ───────────────────────────────────────────
+
+cmd_install() {
+  need_root install
+  echo
+  echo -e "${c_bold}نصب Hesabix Telephony Connector${c_reset}"
+  echo "مسیر نصب: $INSTALL_DIR"
+  echo
+
+  ensure_prerequisites
+
+  sync_connector
+  install_cli
+  install_systemd
+
+  if [[ ! -f "$ENV_FILE" ]]; then
+    cmd_configure
+  else
+    warn ".env موجود است — برای تغییر: hesabix-pbx configure"
+  fi
+
+  systemctl restart "$SERVICE_NAME" || systemctl start "$SERVICE_NAME"
+  echo
+  ok "نصب کامل شد."
+  echo
+  echo "دستورات مفید:"
+  echo "  hesabix-pbx status"
+  echo "  hesabix-pbx test"
+  echo "  hesabix-pbx logs"
+  echo "  hesabix-pbx update"
+  echo
+  cmd_status
+}
+
+cmd_update() {
+  need_root update
+  [[ -d "$INSTALL_DIR" ]] || die "نصب پیدا نشد. اول: hesabix-pbx install"
+  ensure_prerequisites
+  log "به‌روزرسانی کانکتور از مخزن…"
+  sync_connector
+  install_cli
+  install_systemd
+  if [[ -f "$ENV_FILE" ]]; then
+    systemctl restart "$SERVICE_NAME" || true
+  fi
+  ok "به‌روزرسانی انجام شد."
+  cmd_status
+}
+
+cmd_reinstall() {
+  need_root reinstall
+  warn "نصب مجدد — .env حفظ می‌شود."
+  cmd_update
+  if [[ ! -f "$ENV_FILE" ]]; then
+    cmd_configure
+  fi
+  systemctl restart "$SERVICE_NAME" || systemctl start "$SERVICE_NAME"
+  ok "نصب مجدد کامل شد."
+}
+
+cmd_uninstall() {
+  need_root uninstall
+  local keep
+  keep="$(prompt "فایل .env نگه داشته شود؟ (Y/n)" "Y")"
+  systemctl stop "$SERVICE_NAME" 2>/dev/null || true
+  systemctl disable "$SERVICE_NAME" 2>/dev/null || true
+  rm -f "$SERVICE_FILE"
+  systemctl daemon-reload 2>/dev/null || true
+  rm -f "$BIN_LINK"
+  if [[ "$keep" =~ ^[Nn]$ ]]; then
+    rm -rf "$INSTALL_DIR"
+    ok "همه چیز حذف شد."
+  else
+    # فقط کد را پاک نکن — فقط نشان بده متوقف شده
+    ok "سرویس و دستور حذف شد. پوشه $INSTALL_DIR (با .env) باقی ماند."
+  fi
+}
+
+cmd_help() {
+  cat <<EOF
+${c_bold}hesabix-pbx${c_reset} v${VERSION} — مدیریت اتصال حسابیکس به Issabel/Asterisk
+
+${c_bold}نصب اول (با root):${c_reset}
+  # اگر sudo دارید:
+  curl -fsSL ${RAW_BASE}/install.sh | sudo bash
+  # اگر sudo ندارید (Debian/Issabel با ورود root):
+  curl -fsSL ${RAW_BASE}/install.sh | bash
+
+${c_bold}دستورات:${c_reset}
+  hesabix-pbx install       نصب کامل (پیش‌نیاز + دانلود + پیکربندی + سرویس)
+  hesabix-pbx update        به‌روزرسانی از مخزن حسابیکس
+  hesabix-pbx reinstall     نصب مجدد (حفظ .env)
+  hesabix-pbx configure     ویزارد پیکربندی / تغییر توکن، AMI و آدرس API
+  hesabix-pbx start         شروع سرویس
+  hesabix-pbx stop          توقف سرویس
+  hesabix-pbx restart       ری‌استارت
+  hesabix-pbx status        وضعیت اتصال و سرویس
+  hesabix-pbx test          تست AMI + Heartbeat حسابیکس
+  hesabix-pbx fix-ami       ساخت/تعمیر کاربر AMI در manager.conf
+  hesabix-pbx add-extension ثبت داخلی در حسابیکس (مثلاً 500)
+  hesabix-pbx logs [N]      آخرین لاگ‌ها (پیش‌فرض ۸۰ خط)
+  hesabix-pbx follow        دنبال کردن زنده لاگ
+  hesabix-pbx uninstall     حذف سرویس
+  hesabix-pbx help          همین راهنما
+
+${c_bold}متغیرهای اختیاری:${c_reset}
+  HESABIX_PBX_DIR=/opt/HesabixTelephonyConnector
+  HESABIX_PBX_REPO=${REPO_URL}
+  HESABIX_PBX_BRANCH=${REPO_BRANCH}
+  HESABIX_API_URL=${HESABIX_DEFAULT_API_URL}   # پیش‌فرض ویزارد پیکربندی
+
+${c_bold}توزیع‌های پشتیبانی‌شده:${c_reset}
+  Debian / Ubuntu (apt-get) — بدون نیاز به sudo اگر با root اجرا شود
+  CentOS / RHEL / Rocky / Alma / Issabel (yum یا dnf)
+
+مخزن:
+  https://source.hesabix.ir/hesabix/arc/src/branch/master/extraScripts/HesabixTelephonyConnector
+EOF
+}
+
+# ─── main ───────────────────────────────────────────────────────────────────
+
+main() {
+  local cmd="${1:-help}"
+  shift || true
+  case "$cmd" in
+    install)    cmd_install "$@" ;;
+    update)     cmd_update "$@" ;;
+    reinstall)  cmd_reinstall "$@" ;;
+    configure|config|setup) cmd_configure "$@" ;;
+    start)      cmd_start "$@" ;;
+    stop)       cmd_stop "$@" ;;
+    restart)    cmd_restart "$@" ;;
+    status)     cmd_status "$@" ;;
+    test|check) cmd_test "$@" ;;
+    fix-ami|ami-fix) cmd_fix_ami "$@" ;;
+    add-extension|extension) cmd_add_extension "$@" ;;
+    logs|log)   cmd_logs "$@" ;;
+    follow|tail) cmd_follow "$@" ;;
+    uninstall|remove) cmd_uninstall "$@" ;;
+    help|-h|--help) cmd_help ;;
+    version|-V|--version) echo "hesabix-pbx $VERSION" ;;
+    *)
+      err "دستور ناشناخته: $cmd"
+      echo
+      cmd_help
+      exit 1
+      ;;
+  esac
+}
+
+main "$@"
