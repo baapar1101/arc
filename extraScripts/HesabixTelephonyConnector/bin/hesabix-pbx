@@ -3,7 +3,7 @@
 # استفاده: hesabix-pbx <command>
 set -euo pipefail
 
-VERSION="1.2.1"
+VERSION="1.2.2"
 INSTALL_DIR="${HESABIX_PBX_DIR:-/opt/HesabixTelephonyConnector}"
 ENV_FILE="${INSTALL_DIR}/.env"
 SERVICE_NAME="hesabix-telephony-connector"
@@ -727,35 +727,102 @@ EOF
   fi
 }
 
+enable_ami_general() {
+  # فعال‌سازی AMI در [general] — بدون این، پورت 5038 بسته است (Connection refused)
+  local conf="${1:-/etc/asterisk/manager.conf}"
+  local port="${2:-5038}"
+  local bind="${3:-127.0.0.1}"
+  [[ -f "$conf" ]] || { warn "فایل $conf نیست."; return 1; }
+
+  cp -a "$conf" "${conf}.bak.hesabix-enable-$(date +%Y%m%d%H%M%S)" 2>/dev/null || true
+
+  python3 - "$conf" "$port" "$bind" <<'PY'
+import re, sys
+path, port, bind = sys.argv[1], sys.argv[2], sys.argv[3]
+text = open(path, "r", encoding="utf-8", errors="replace").read()
+# بخش general را پیدا کن
+m = re.search(r"(?ms)^\[general\]\s*\n(.*?)(?=^\[|\Z)", text)
+if not m:
+    block = f"[general]\nenabled = yes\nport = {port}\nbindaddr = {bind}\nwebenabled = no\n\n"
+    text = block + text
+else:
+    body = m.group(1)
+    def set_kv(body, key, val):
+        pat = re.compile(rf"(?im)^(\s*{re.escape(key)}\s*=\s*).*$")
+        if pat.search(body):
+            return pat.sub(rf"\1{val}", body, count=1)
+        return body.rstrip() + f"\n{key} = {val}\n"
+    body = set_kv(body, "enabled", "yes")
+    body = set_kv(body, "port", port)
+    body = set_kv(body, "bindaddr", bind)
+    # بعضی نصب‌ها bindaddr را جدا دارند
+    text = text[: m.start(1)] + body + text[m.end(1) :]
+open(path, "w", encoding="utf-8").write(text)
+print(f"AMI enabled in {path} (bind={bind}:{port})")
+PY
+}
+
 setup_ami_user() {
   local user="$1" secret="$2"
-  local conf=""
-  for c in /etc/asterisk/manager.conf /etc/asterisk/manager_custom.conf /etc/asterisk/manager.d/hesabix.conf; do
-    if [[ -f "$(dirname "$c")" ]] || [[ -d "$(dirname "$c")" ]]; then
-      :
-    fi
-  done
+  local port="${AMI_PORT:-5038}"
+  local bind="${AMI_HOST:-127.0.0.1}"
+  # اگر bind روی 0.0.0.0 باشد برای listen مناسب‌تر است؛ برای کلاینت 127.0.0.1 بماند
+  local listen_bind="127.0.0.1"
+  if [[ "$bind" != "127.0.0.1" && "$bind" != "localhost" ]]; then
+    listen_bind="0.0.0.0"
+  fi
 
+  local main_conf="/etc/asterisk/manager.conf"
+  if [[ ! -f "$main_conf" ]]; then
+    warn "manager.conf پیدا نشد — آیا Asterisk نصب است؟"
+    return 1
+  fi
+
+  log "فعال‌سازی AMI در manager.conf …"
+  enable_ami_general "$main_conf" "$port" "$listen_bind" || return 1
+
+  local conf=""
   if [[ -d /etc/asterisk/manager.d ]]; then
     conf="/etc/asterisk/manager.d/hesabix.conf"
   elif [[ -f /etc/asterisk/manager_custom.conf ]]; then
     conf="/etc/asterisk/manager_custom.conf"
-  elif [[ -f /etc/asterisk/manager.conf ]]; then
-    conf="/etc/asterisk/manager.conf"
   else
-    warn "فایل manager.conf پیدا نشد — کاربر AMI را دستی بسازید."
-    return 0
+    conf="$main_conf"
   fi
 
-  if grep -q "^\[${user}\]" "$conf" 2>/dev/null; then
-    warn "کاربر AMI [$user] از قبل در $conf وجود دارد — تغییری داده نشد."
-    return 0
-  fi
-
-  # پشتیبان
-  cp -a "$conf" "${conf}.bak.hesabix-$(date +%Y%m%d%H%M%S)" 2>/dev/null || true
-
-  cat >> "$conf" <<EOF
+  # کاربر را بساز یا secret را به‌روز کن
+  if grep -q "^\[${user}\]" "$conf" 2>/dev/null || grep -q "^\[${user}\]" "$main_conf" 2>/dev/null; then
+    log "کاربر [$user] هست — secret را در $conf همگام می‌کنم…"
+    local target="$conf"
+    if ! grep -q "^\[${user}\]" "$conf" 2>/dev/null; then
+      target="$main_conf"
+    fi
+    cp -a "$target" "${target}.bak.hesabix-user-$(date +%Y%m%d%H%M%S)" 2>/dev/null || true
+    python3 - "$target" "$user" "$secret" <<'PY'
+import re, sys
+path, user, secret = sys.argv[1], sys.argv[2], sys.argv[3]
+text = open(path, "r", encoding="utf-8", errors="replace").read()
+pat = re.compile(rf"(?ms)^\[{re.escape(user)}\]\s*\n(.*?)(?=^\[|\Z)")
+m = pat.search(text)
+if not m:
+    sys.exit(0)
+body = m.group(1)
+if re.search(r"(?im)^\s*secret\s*=", body):
+    body = re.sub(r"(?im)^(\s*secret\s*=\s*).*$", rf"\1{secret}", body, count=1)
+else:
+    body = f"secret = {secret}\n" + body
+# اطمینان از permit لوکال
+if not re.search(r"(?im)^\s*permit\s*=", body):
+    body += "permit = 127.0.0.1/255.255.255.255\n"
+text = text[: m.start(1)] + body + text[m.end(1) :]
+open(path, "w", encoding="utf-8").write(text)
+print(f"updated [{user}] in {path}")
+PY
+    ok "کاربر AMI [$user] به‌روز شد ($target)."
+  else
+    cp -a "$conf" "${conf}.bak.hesabix-$(date +%Y%m%d%H%M%S)" 2>/dev/null || true
+    mkdir -p "$(dirname "$conf")"
+    cat >> "$conf" <<EOF
 
 ; --- Hesabix Telephony Connector ($(date +%Y-%m-%d)) ---
 [${user}]
@@ -766,12 +833,46 @@ read = system,call,log,verbose,command,agent,user,originate,dialplan
 write = system,call,log,verbose,command,agent,user,originate,dialplan
 writetimeout = 5000
 EOF
-  ok "کاربر AMI به $conf اضافه شد."
+    ok "کاربر AMI به $conf اضافه شد."
+  fi
+
+  # Asterisk در حال اجرا باشد
+  if have systemctl; then
+    if ! systemctl is-active --quiet asterisk 2>/dev/null \
+      && ! systemctl is-active --quiet asterisk.service 2>/dev/null; then
+      log "سرویس asterisk در حال اجرا نیست — تلاش برای start…"
+      systemctl start asterisk 2>/dev/null || systemctl start asterisk.service 2>/dev/null || true
+      sleep 2
+    fi
+  fi
 
   if have asterisk; then
-    asterisk -rx "manager reload" >/dev/null 2>&1 && ok "AMI reload شد." || warn "reload AMI ناموفق — دستی: asterisk -rx 'manager reload'"
+    asterisk -rx "manager reload" >/dev/null 2>&1 && ok "manager reload شد." \
+      || warn "manager reload ناموفق"
+    sleep 1
+    local ami_state
+    ami_state="$(asterisk -rx "manager show settings" 2>/dev/null | grep -i "Manager (AMI)" || true)"
+    echo "  $ami_state"
+    if echo "$ami_state" | grep -qi "No"; then
+      warn "هنوز AMI=No است. اگر Issabel/FreePBX دارید از پنل Settings → Asterisk Manager هم Enabled کنید."
+      warn "یا فایل /etc/asterisk/manager.conf را دستی چک کنید و: fwconsole reload"
+    fi
   else
-    warn "دستور asterisk پیدا نشد — AMI را دستی reload کنید."
+    warn "دستور asterisk پیدا نشد."
+  fi
+
+  # بررسی پورت
+  if have ss; then
+    if ss -lnt | grep -q ":${port} "; then
+      ok "پورت AMI ${port} در حال listen است."
+    else
+      warn "پورت ${port} هنوز listen نیست — Connection refused ادامه خواهد داشت."
+      echo "  ss -lntp | grep ${port}"
+      echo "  asterisk -rx 'manager show settings'"
+    fi
+  elif have netstat; then
+    netstat -lnt 2>/dev/null | grep -q ":${port} " && ok "پورت ${port} listen است." \
+      || warn "پورت ${port} listen نیست."
   fi
 }
 
