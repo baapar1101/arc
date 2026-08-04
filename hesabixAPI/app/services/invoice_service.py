@@ -7308,6 +7308,8 @@ def invoice_document_to_dict(
             result["total_profit"] = profit_data["total_profit"]
             result["total_profit_percent"] = profit_data["total_profit_percent"]
         result["total_overhead"] = profit_data.get("total_overhead", 0.0)
+        result["total_cost"] = profit_data.get("total_cost", 0.0)
+        result["total_sales"] = profit_data.get("total_sales", 0.0)
         result["line_profits"] = profit_data.get("line_profits", [])
         # پس‌زمینه: gross_profit / line_profits = محاسبه تحلیلی زنده (تنظیمات جاری)
         result["profit_calculation_context"] = "analytical_live"

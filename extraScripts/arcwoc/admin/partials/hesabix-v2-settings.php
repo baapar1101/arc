@@ -162,6 +162,12 @@ $hsx_post = ini_get('post_max_size') ?: '';
 <div class="wrap hesabix-v2-wrap">
 	<h1><?php echo esc_html(get_admin_page_title()); ?></h1>
 
+	<?php
+	if (class_exists('Hesabix_V2_Marketplace_License')) {
+		Hesabix_V2_Marketplace_License::render_admin_notices('settings');
+	}
+	?>
+
 	<?php settings_errors('hesabix_v2_messages'); ?>
 
 	<form method="post" action="">

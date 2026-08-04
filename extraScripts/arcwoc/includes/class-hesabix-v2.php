@@ -105,6 +105,10 @@ class Hesabix_V2
 		 */
 		require_once HESABIX_V2_PLUGIN_DIR . 'includes/class-hesabix-v2-order-sync-meta.php';
 
+		require_once HESABIX_V2_PLUGIN_DIR . 'includes/class-hesabix-v2-invoice-profit-service.php';
+
+		require_once HESABIX_V2_PLUGIN_DIR . 'includes/class-hesabix-v2-marketplace-license.php';
+
 		require_once HESABIX_V2_PLUGIN_DIR . 'includes/class-hesabix-v2-order-fiscal-service.php';
 
 		/**
@@ -214,6 +218,10 @@ class Hesabix_V2
 		$this->loader->add_action('wp_ajax_hesabix_v2_orphans_cleanup_batch', $plugin_admin, 'ajax_orphans_cleanup_batch');
 		$this->loader->add_action('wp_ajax_hesabix_v2_orders_unsync_batch', $plugin_admin, 'ajax_orders_unsync_batch');
 		$this->loader->add_action('wp_ajax_hesabix_v2_orders_set_pause', $plugin_admin, 'ajax_orders_set_pause');
+		$this->loader->add_action('wp_ajax_hesabix_v2_refresh_order_profit', $plugin_admin, 'ajax_refresh_order_profit');
+		$this->loader->add_action('wp_ajax_hesabix_v2_refresh_orders_profit_batch', $plugin_admin, 'ajax_refresh_orders_profit_batch');
+		$this->loader->add_action('wp_ajax_hesabix_v2_marketplace_license_refresh', $plugin_admin, 'ajax_marketplace_license_refresh');
+		$this->loader->add_action('wp_ajax_hesabix_v2_marketplace_banner_dismiss', $plugin_admin, 'ajax_marketplace_banner_dismiss');
 		$this->loader->add_action('wp_ajax_hesabix_v2_opening_inventory_accounts', $plugin_admin, 'ajax_opening_inventory_accounts');
 		$this->loader->add_action('wp_ajax_hesabix_v2_opening_inventory_preview', $plugin_admin, 'ajax_opening_inventory_preview');
 		$this->loader->add_action('wp_ajax_hesabix_v2_opening_inventory_cancel', $plugin_admin, 'ajax_opening_inventory_cancel');

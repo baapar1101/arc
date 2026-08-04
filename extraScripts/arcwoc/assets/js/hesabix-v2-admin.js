@@ -33,6 +33,66 @@
 			$(document).on('click', '.hesabix-v2-test-connection', this.testConnection);
 
 			$(document).on('click', '#hesabix-v2-bridge-generate-token', this.bridgeGenerateToken);
+
+			$(document).on('click', '#hesabix-v2-mp-refresh-license', this.refreshMarketplaceLicense);
+			$(document).on('click', '#hesabix-v2-mp-dismiss-banner', this.dismissMarketplaceBanner);
+		},
+
+		refreshMarketplaceLicense: function(e) {
+			e.preventDefault();
+			if (typeof hesabix_v2_ajax === 'undefined') {
+				return;
+			}
+			var st = hesabix_v2_ajax.strings || {};
+			var $btn = $(this);
+			if (!$btn.data('orig-label')) {
+				$btn.data('orig-label', $btn.text());
+			}
+			$btn.prop('disabled', true).text(st.mp_checking || '…');
+			$.post(hesabix_v2_ajax.ajax_url, {
+				action: 'hesabix_v2_marketplace_license_refresh',
+				nonce: hesabix_v2_ajax.nonce
+			})
+				.done(function(res) {
+					if (res && res.success && res.data && res.data.active) {
+						window.alert(st.mp_active || '');
+						window.location.reload();
+						return;
+					}
+					var msg = (res && res.data && res.data.status && res.data.status.error)
+						? res.data.status.error
+						: (st.mp_inactive || '');
+					window.alert(msg);
+					$btn.prop('disabled', false).text($btn.data('orig-label'));
+				})
+				.fail(function() {
+					window.alert(st.error || '');
+					$btn.prop('disabled', false).text($btn.data('orig-label'));
+				});
+		},
+
+		dismissMarketplaceBanner: function(e) {
+			e.preventDefault();
+			if (typeof hesabix_v2_ajax === 'undefined') {
+				return;
+			}
+			var st = hesabix_v2_ajax.strings || {};
+			$.post(hesabix_v2_ajax.ajax_url, {
+				action: 'hesabix_v2_marketplace_banner_dismiss',
+				nonce: hesabix_v2_ajax.nonce
+			})
+				.done(function(res) {
+					if (res && res.success) {
+						$('.hesabix-v2-mp-banner').slideUp(200, function() {
+							$(this).remove();
+						});
+					} else {
+						window.alert(st.error || '');
+					}
+				})
+				.fail(function() {
+					window.alert(st.error || '');
+				});
 		},
 
 		bootstrapConnectionPanels: function() {

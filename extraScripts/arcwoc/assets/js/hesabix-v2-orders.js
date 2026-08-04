@@ -128,6 +128,46 @@
 			});
 		});
 
+		$('#hesabix-v2-bulk-profit').on('click', function () {
+			var ids = getSelectedIds();
+			if (!ids.length) return;
+			if (!window.confirm(window.hesabix_v2_orders.strings.confirmBulkProfit || '')) return;
+			clearFeedback();
+			runBatches(ids, 'hesabix_v2_refresh_orders_profit_batch', function () {
+				window.location.reload();
+			});
+		});
+
+		$(document).on('click', '.hesabix-v2-refresh-profit', function (e) {
+			e.preventDefault();
+			var $btn = $(this);
+			var orderId = parseInt($btn.data('order-id'), 10);
+			if (!orderId || !window.hesabix_v2_orders) return;
+			var st = window.hesabix_v2_orders.strings || {};
+			$btn.prop('disabled', true);
+			$.post(window.hesabix_v2_orders.ajax_url, {
+				action: 'hesabix_v2_refresh_order_profit',
+				nonce: window.hesabix_v2_orders.nonce,
+				order_id: orderId,
+			})
+				.done(function (res) {
+					if (res && res.success && res.data && res.data.html_list) {
+						$btn.closest('td').html(res.data.html_list);
+						return;
+					}
+					var msg =
+						res && res.data && res.data.message
+							? res.data.message
+							: st.genericError || '';
+					window.alert(msg);
+					$btn.prop('disabled', false);
+				})
+				.fail(function () {
+					window.alert(st.requestFailed || '');
+					$btn.prop('disabled', false);
+				});
+		});
+
 		$(document).on('click', '.hesabix-v2-pause-toggle', function () {
 			var $b = $(this);
 			var orderId = parseInt($b.data('order-id'), 10);

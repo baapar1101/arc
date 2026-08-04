@@ -1098,6 +1098,20 @@ class Hesabix_V2_Api
 	}
 
 	/**
+	 * لیست لایسنس‌های بازار افزونه برای کسب‌وکار فعلی.
+	 *
+	 * @since 4.9.0
+	 * @return array
+	 */
+	public function get_business_marketplace_plugins()
+	{
+		return $this->request(
+			'GET',
+			"/marketplace/business/{$this->business_id}/plugins"
+		);
+	}
+
+	/**
 	 * Search invoices
 	 *
 	 * @since    2.0.0

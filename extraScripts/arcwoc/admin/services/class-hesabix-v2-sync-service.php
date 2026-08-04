@@ -1153,6 +1153,14 @@ class Hesabix_V2_Sync_Service
 							$oobj->add_order_note((string) $meta_note['fiscal_note']);
 						}
 
+						if (class_exists('Hesabix_V2_Invoice_Profit_Service')) {
+							Hesabix_V2_Invoice_Profit_Service::maybe_refresh_after_sync(
+								(int) $oid,
+								(int) $hid,
+								$this->api
+							);
+						}
+
 						$res['success']++;
 						$res['per_order'][ $oid ] = array(
 							'success' => true,
@@ -1406,6 +1414,14 @@ class Hesabix_V2_Sync_Service
 						$rp_gate,
 						$invoice_data,
 						$hesabix_id
+					);
+				}
+
+				if (class_exists('Hesabix_V2_Invoice_Profit_Service')) {
+					Hesabix_V2_Invoice_Profit_Service::maybe_refresh_after_sync(
+						(int) $order_id,
+						(int) $hesabix_id,
+						$this->api
 					);
 				}
 

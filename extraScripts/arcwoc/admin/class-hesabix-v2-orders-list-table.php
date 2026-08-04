@@ -61,6 +61,7 @@ class Hesabix_V2_Orders_List_Table extends WP_List_Table
 			'status' => __('وضعیت', 'hesabix-v2'),
 			'customer' => __('خریدار', 'hesabix-v2'),
 			'total' => __('مبلغ', 'hesabix-v2'),
+			'profit' => __('سود', 'hesabix-v2'),
 			'hesabix' => __('حسابیکس', 'hesabix-v2'),
 			'pause' => __('همگام خودکار', 'hesabix-v2'),
 			'actions' => __('عملیات', 'hesabix-v2'),
@@ -179,6 +180,18 @@ class Hesabix_V2_Orders_List_Table extends WP_List_Table
 	protected function column_total($item)
 	{
 		return wp_kses_post($item->get_formatted_order_total());
+	}
+
+	/**
+	 * @param WC_Order $item
+	 * @return string
+	 */
+	protected function column_profit($item)
+	{
+		if (!class_exists('Hesabix_V2_Invoice_Profit_Service')) {
+			return '—';
+		}
+		return Hesabix_V2_Invoice_Profit_Service::render_list_cell($item);
 	}
 
 	/**
