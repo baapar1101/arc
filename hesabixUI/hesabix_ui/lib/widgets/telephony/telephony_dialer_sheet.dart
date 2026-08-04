@@ -11,15 +11,27 @@ Future<void> showTelephonyDialerSheet(
   required int businessId,
   required TelephonySessionController session,
 }) {
-  return showModalBottomSheet<void>(
+  return showDialog<void>(
     context: context,
-    isScrollControlled: true,
-    showDragHandle: true,
-    backgroundColor: Theme.of(context).colorScheme.surface,
-    shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
-    ),
-    builder: (ctx) => TelephonyDialerSheet(businessId: businessId, session: session),
+    barrierDismissible: true,
+    builder: (ctx) {
+      final screen = MediaQuery.sizeOf(ctx);
+      return Dialog(
+        insetPadding: EdgeInsets.symmetric(
+          horizontal: screen.width < 480 ? 16 : 24,
+          vertical: screen.height < 640 ? 12 : 24,
+        ),
+        clipBehavior: Clip.antiAlias,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxWidth: 420,
+            maxHeight: screen.height * 0.88,
+          ),
+          child: TelephonyDialerSheet(businessId: businessId, session: session),
+        ),
+      );
+    },
   );
 }
 
@@ -34,6 +46,21 @@ class TelephonyDialerSheet extends StatefulWidget {
 }
 
 class _TelephonyDialerSheetState extends State<TelephonyDialerSheet> {
+  static const _digits = <String, String>{
+    '1': '',
+    '2': 'ABC',
+    '3': 'DEF',
+    '4': 'GHI',
+    '5': 'JKL',
+    '6': 'MNO',
+    '7': 'PQRS',
+    '8': 'TUV',
+    '9': 'WXYZ',
+    '*': '',
+    '0': '+',
+    '#': '',
+  };
+
   final _ctrl = TextEditingController();
   final _api = TelephonyApi();
   List<Map<String, dynamic>> _suggestions = [];
@@ -93,98 +120,193 @@ class _TelephonyDialerSheetState extends State<TelephonyDialerSheet> {
     HapticFeedback.selectionClick();
   }
 
+  String _displayNumber(Object? value) => value?.toString() ?? '';
+
+  Widget _buildKey(String digit) {
+    final letters = _digits[digit] ?? '';
+    final scheme = Theme.of(context).colorScheme;
+
+    return Material(
+      color: scheme.surfaceContainerHighest.withValues(alpha: 0.55),
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: () => _tapDigit(digit),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              digit,
+              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    height: 1,
+                  ),
+            ),
+            if (letters.isNotEmpty)
+              Text(
+                letters,
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      letterSpacing: 1.4,
+                      color: scheme.onSurfaceVariant,
+                      height: 1.2,
+                    ),
+              )
+            else
+              const SizedBox(height: 14),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final bottom = MediaQuery.viewInsetsOf(context).bottom;
+    final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
+
     return Padding(
-      padding: EdgeInsets.fromLTRB(20, 8, 20, 20 + bottom),
+      padding: EdgeInsets.only(bottom: bottomInset),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Text('شماره‌گیر', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _ctrl,
-            keyboardType: TextInputType.phone,
-            textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.headlineSmall?.copyWith(letterSpacing: 1.2, fontWeight: FontWeight.w700),
-            decoration: InputDecoration(
-              hintText: 'شماره را وارد کنید',
-              filled: true,
-              fillColor: scheme.surfaceContainerHighest.withValues(alpha: 0.45),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
-            ),
-            onChanged: _onChanged,
-          ),
-          if (_suggestions.isNotEmpty) ...[
-            const SizedBox(height: 8),
-            ..._suggestions.take(4).map(
-              (p) => ListTile(
-                dense: true,
-                leading: const Icon(Icons.person_outline),
-                title: Text('${p['name']}'),
-                subtitle: Text('${p['mobile'] ?? p['phone'] ?? ''}'),
-                onTap: () {
-                  _ctrl.text = '${p['mobile'] ?? p['phone'] ?? ''}';
-                  _call(personId: p['id'] is int ? p['id'] as int : int.tryParse('${p['id']}'));
-                },
-              ),
-            ),
-          ],
-          const SizedBox(height: 12),
-          GridView.count(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            crossAxisCount: 3,
-            mainAxisSpacing: 8,
-            crossAxisSpacing: 8,
-            childAspectRatio: 1.55,
-            children: [
-              for (final d in ['1', '2', '3', '4', '5', '6', '7', '8', '9', '*', '0', '#'])
-                FilledButton.tonal(
-                  onPressed: () => _tapDigit(d),
-                  style: FilledButton.styleFrom(
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                  ),
-                  child: Text(d, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w700)),
-                ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          SizedBox(
-            width: double.infinity,
-            height: 52,
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 8, 8, 0),
             child: Row(
               children: [
+                const SizedBox(width: 40),
                 Expanded(
-                  child: FilledButton.icon(
-                    onPressed: _calling ? null : () => _call(),
-                    icon: _calling
-                        ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                        : const Icon(Icons.phone_rounded),
-                    label: const Text('تماس'),
-                    style: FilledButton.styleFrom(
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                    ),
+                  child: Text(
+                    'شماره‌گیر',
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
                   ),
                 ),
-                const SizedBox(width: 10),
-                SizedBox(
-                  height: 52,
-                  width: 52,
-                  child: IconButton.filledTonal(
-                    tooltip: 'پاک کردن',
-                    onPressed: () {
-                      if (_ctrl.text.isEmpty) return;
-                      _ctrl.text = _ctrl.text.substring(0, _ctrl.text.length - 1);
-                      _ctrl.selection = TextSelection.collapsed(offset: _ctrl.text.length);
-                      _onChanged(_ctrl.text);
-                    },
-                    icon: const Icon(Icons.backspace_outlined),
-                  ),
+                IconButton(
+                  tooltip: 'بستن',
+                  onPressed: () => Navigator.of(context).pop(),
+                  icon: const Icon(Icons.close_rounded),
                 ),
               ],
+            ),
+          ),
+          Flexible(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Directionality(
+                    textDirection: TextDirection.ltr,
+                    child: TextField(
+                      controller: _ctrl,
+                      keyboardType: TextInputType.phone,
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                            letterSpacing: 1.4,
+                            fontWeight: FontWeight.w700,
+                            fontFeatures: const [FontFeature.tabularFigures()],
+                          ),
+                      decoration: InputDecoration(
+                        hintText: 'شماره را وارد کنید',
+                        hintTextDirection: TextDirection.rtl,
+                        filled: true,
+                        fillColor: scheme.surfaceContainerHighest.withValues(alpha: 0.45),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          borderSide: BorderSide.none,
+                        ),
+                      ),
+                      onChanged: _onChanged,
+                    ),
+                  ),
+                  if (_suggestions.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    ..._suggestions.take(4).map(
+                      (p) {
+                        final number = _displayNumber(p['mobile'] ?? p['phone']);
+                        return ListTile(
+                          dense: true,
+                          contentPadding: EdgeInsets.zero,
+                          leading: const Icon(Icons.person_outline),
+                          title: Text('${p['name']}'),
+                          subtitle: Directionality(
+                            textDirection: TextDirection.ltr,
+                            child: Align(
+                              alignment: AlignmentDirectional.centerStart,
+                              child: Text(number),
+                            ),
+                          ),
+                          onTap: () {
+                            _ctrl.text = number;
+                            _call(personId: p['id'] is int ? p['id'] as int : int.tryParse('${p['id']}'));
+                          },
+                        );
+                      },
+                    ),
+                  ],
+                  const SizedBox(height: 12),
+                  Directionality(
+                    textDirection: TextDirection.ltr,
+                    child: GridView.count(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      crossAxisCount: 3,
+                      mainAxisSpacing: 10,
+                      crossAxisSpacing: 10,
+                      childAspectRatio: 1.25,
+                      children: [
+                        for (final d in ['1', '2', '3', '4', '5', '6', '7', '8', '9', '*', '0', '#'])
+                          _buildKey(d),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          SafeArea(
+            top: false,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
+              child: SizedBox(
+                width: double.infinity,
+                height: 52,
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: FilledButton.icon(
+                        onPressed: _calling ? null : () => _call(),
+                        icon: _calling
+                            ? const SizedBox(
+                                width: 18,
+                                height: 18,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : const Icon(Icons.phone_rounded),
+                        label: const Text('تماس'),
+                        style: FilledButton.styleFrom(
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    SizedBox(
+                      height: 52,
+                      width: 52,
+                      child: IconButton.filledTonal(
+                        tooltip: 'پاک کردن',
+                        onPressed: () {
+                          if (_ctrl.text.isEmpty) return;
+                          _ctrl.text = _ctrl.text.substring(0, _ctrl.text.length - 1);
+                          _ctrl.selection = TextSelection.collapsed(offset: _ctrl.text.length);
+                          _onChanged(_ctrl.text);
+                        },
+                        icon: const Icon(Icons.backspace_outlined),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
           ),
         ],
