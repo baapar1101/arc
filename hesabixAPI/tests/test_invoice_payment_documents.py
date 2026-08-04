@@ -31,7 +31,7 @@ def test_build_invoice_payment_account_line_preserves_transaction_date():
     assert line["cash_register_id"] == 7
 
 
-@patch("app.services.invoice_service._validate_invoice_payment_item_currency")
+@patch("app.services.invoice_service._validate_invoice_payment_item_currency", return_value=None)
 @patch("app.services.receipt_payment_service.create_receipt_payment")
 def test_create_receipt_payment_documents_for_invoice_payments_creates_one_per_item(
     mock_create,
@@ -90,7 +90,7 @@ def test_create_receipt_payment_documents_for_invoice_payments_creates_one_per_i
     assert second_call["account_lines"][0]["transaction_date"] == "2024-03-12"
 
 
-@patch("app.services.invoice_service._validate_invoice_payment_item_currency")
+@patch("app.services.invoice_service._validate_invoice_payment_item_currency", return_value=None)
 @patch("app.services.receipt_payment_service.create_receipt_payment")
 def test_create_receipt_payment_documents_skips_zero_amount_items(
     mock_create,
@@ -127,3 +127,50 @@ def test_create_receipt_payment_documents_skips_zero_amount_items(
     assert created_ids == [201]
     assert mock_create.call_count == 1
     assert mock_create.call_args.kwargs["data"]["person_lines"][0]["amount"] == 50000.0
+
+
+def test_validate_invoice_payment_rejects_bank_from_other_business():
+    from types import SimpleNamespace
+
+    from app.core.responses import ApiError
+    from app.services.invoice_service import _validate_invoice_payment_item_currency
+
+    db = MagicMock()
+    db.query.return_value.filter.return_value.first.return_value = SimpleNamespace(
+        id=3395,
+        business_id=5433,
+        currency_id=1,
+    )
+    try:
+        _validate_invoice_payment_item_currency(
+            db,
+            1,
+            {"type": "bank", "bank_id": 3395, "amount": 100},
+            INVOICE_SALES,
+            business_id=6342,
+        )
+        assert False, "expected ApiError"
+    except ApiError as exc:
+        assert exc.status_code == 400
+        assert exc.detail["error"]["code"] == "PAYMENT_ACCOUNT_BUSINESS_MISMATCH"
+
+
+def test_validate_invoice_payment_accepts_bank_of_same_business():
+    from types import SimpleNamespace
+
+    from app.services.invoice_service import _validate_invoice_payment_item_currency
+
+    db = MagicMock()
+    db.query.return_value.filter.return_value.first.return_value = SimpleNamespace(
+        id=4387,
+        business_id=6342,
+        currency_id=1,
+    )
+    result = _validate_invoice_payment_item_currency(
+        db,
+        1,
+        {"type": "bank", "bank_id": 4387, "amount": 100},
+        INVOICE_SALES,
+        business_id=6342,
+    )
+    assert result is None

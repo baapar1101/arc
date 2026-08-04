@@ -2380,6 +2380,12 @@ def _validate_invoice_payment_item_currency(
             acct = db.query(BankAccount).filter(BankAccount.id == int(ref_id)).first()
             if not acct:
                 raise ApiError("PAYMENT_ACCOUNT_NOT_FOUND", "Bank account not found", http_status=404)
+            if business_id is not None and int(acct.business_id) != int(business_id):
+                raise ApiError(
+                    "PAYMENT_ACCOUNT_BUSINESS_MISMATCH",
+                    "Bank account does not belong to this business",
+                    http_status=400,
+                )
             if int(acct.currency_id) != invoice_currency_id:
                 raise ApiError(
                     "PAYMENT_CURRENCY_MISMATCH",
@@ -2392,6 +2398,12 @@ def _validate_invoice_payment_item_currency(
             acct = db.query(CashRegister).filter(CashRegister.id == int(ref_id)).first()
             if not acct:
                 raise ApiError("PAYMENT_ACCOUNT_NOT_FOUND", "Cash register not found", http_status=404)
+            if business_id is not None and int(acct.business_id) != int(business_id):
+                raise ApiError(
+                    "PAYMENT_ACCOUNT_BUSINESS_MISMATCH",
+                    "Cash register does not belong to this business",
+                    http_status=400,
+                )
             if int(acct.currency_id) != invoice_currency_id:
                 raise ApiError(
                     "PAYMENT_CURRENCY_MISMATCH",
@@ -2404,6 +2416,12 @@ def _validate_invoice_payment_item_currency(
             acct = db.query(PettyCash).filter(PettyCash.id == int(ref_id)).first()
             if not acct:
                 raise ApiError("PAYMENT_ACCOUNT_NOT_FOUND", "Petty cash not found", http_status=404)
+            if business_id is not None and int(acct.business_id) != int(business_id):
+                raise ApiError(
+                    "PAYMENT_ACCOUNT_BUSINESS_MISMATCH",
+                    "Petty cash does not belong to this business",
+                    http_status=400,
+                )
             if int(acct.currency_id) != invoice_currency_id:
                 raise ApiError(
                     "PAYMENT_CURRENCY_MISMATCH",
@@ -2417,6 +2435,12 @@ def _validate_invoice_payment_item_currency(
         chk = db.query(Check).filter(Check.id == int(ref_id)).first()
         if not chk:
             raise ApiError("PAYMENT_ACCOUNT_NOT_FOUND", "Check not found", http_status=404)
+        if business_id is not None and int(chk.business_id) != int(business_id):
+            raise ApiError(
+                "PAYMENT_ACCOUNT_BUSINESS_MISMATCH",
+                "Check does not belong to this business",
+                http_status=400,
+            )
         if int(chk.currency_id) != invoice_currency_id:
             raise ApiError(
                 "PAYMENT_CURRENCY_MISMATCH",

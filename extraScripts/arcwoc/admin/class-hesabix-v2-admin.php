@@ -2526,6 +2526,10 @@ class Hesabix_V2_Admin
 		$api = new Hesabix_V2_Api();
 		$warehouses = array();
 		$banks = array();
+		$cash_registers = array();
+		$currencies = array();
+		$errors = array();
+		$warnings = array();
 
 		$wh_res = $api->get_warehouses();
 		if (!empty($wh_res['success']) && !empty($wh_res['data'])) {
@@ -2538,6 +2542,12 @@ class Hesabix_V2_Admin
 					$warehouses[] = array('id' => (int) $id, 'name' => $name, 'code' => $code);
 				}
 			}
+		} elseif (is_array($wh_res) && isset($wh_res['success']) && $wh_res['success'] === false) {
+			$errors[] = sprintf(
+				/* translators: %s: API error message */
+				__('انبارها: %s', 'hesabix-v2'),
+				isset($wh_res['message']) ? (string) $wh_res['message'] : __('خطای ناشناخته', 'hesabix-v2')
+			);
 		}
 
 		$bank_res = $api->get_bank_accounts();
@@ -2551,9 +2561,14 @@ class Hesabix_V2_Admin
 					$banks[] = array('id' => (string) $id, 'name' => $name, 'code' => $code);
 				}
 			}
+		} elseif (is_array($bank_res) && isset($bank_res['success']) && $bank_res['success'] === false) {
+			$errors[] = sprintf(
+				/* translators: %s: API error message */
+				__('حساب‌های بانکی: %s', 'hesabix-v2'),
+				isset($bank_res['message']) ? (string) $bank_res['message'] : __('خطای ناشناخته', 'hesabix-v2')
+			);
 		}
 
-		$cash_registers = array();
 		$cash_res = $api->get_cash_registers();
 		if (!empty($cash_res['success']) && !empty($cash_res['data'])) {
 			$items = isset($cash_res['data']['items']) ? $cash_res['data']['items'] : (is_array($cash_res['data']) ? $cash_res['data'] : array());
@@ -2565,9 +2580,14 @@ class Hesabix_V2_Admin
 					$cash_registers[] = array('id' => (string) $id, 'name' => $name, 'code' => $code);
 				}
 			}
+		} elseif (is_array($cash_res) && isset($cash_res['success']) && $cash_res['success'] === false) {
+			$errors[] = sprintf(
+				/* translators: %s: API error message */
+				__('صندوق‌ها: %s', 'hesabix-v2'),
+				isset($cash_res['message']) ? (string) $cash_res['message'] : __('خطای ناشناخته', 'hesabix-v2')
+			);
 		}
 
-		$currencies = array();
 		$cur_res = $api->get_business_currencies();
 		$cur_rows = Hesabix_V2_Currency_Service::normalize_rows_from_api_response($cur_res);
 		foreach ($cur_rows as $row) {
@@ -2579,12 +2599,64 @@ class Hesabix_V2_Admin
 			);
 		}
 
+		$bank_ids = array();
+		foreach ($banks as $b) {
+			$bank_ids[ (string) $b['id'] ] = true;
+		}
+		$cash_ids = array();
+		foreach ($cash_registers as $c) {
+			$cash_ids[ (string) $c['id'] ] = true;
+		}
+
+		$saved_bank = trim((string) get_option('hesabix_v2_default_bank_id', ''));
+		$saved_cash = trim((string) get_option('hesabix_v2_default_cash_register_id', ''));
+		$cleared_defaults = array();
+
+		if ($saved_bank !== '' && empty($errors) && !isset($bank_ids[ $saved_bank ])) {
+			delete_option('hesabix_v2_default_bank_id');
+			$cleared_defaults[] = 'bank';
+			$warnings[] = sprintf(
+				/* translators: %s: bank account id */
+				__('حساب بانکی پیش‌فرض ذخیره‌شده (#%s) در این کسب‌وکار یافت نشد و پاک شد. لطفاً حساب بانکی معتبر را دوباره انتخاب و ذخیره کنید.', 'hesabix-v2'),
+				$saved_bank
+			);
+			$saved_bank = '';
+		}
+
+		if ($saved_cash !== '' && empty($errors) && !isset($cash_ids[ $saved_cash ])) {
+			delete_option('hesabix_v2_default_cash_register_id');
+			$cleared_defaults[] = 'cash_register';
+			$warnings[] = sprintf(
+				/* translators: %s: cash register id */
+				__('صندوق پیش‌فرض ذخیره‌شده (#%s) در این کسب‌وکار یافت نشد و پاک شد. لطفاً صندوق معتبر را دوباره انتخاب و ذخیره کنید.', 'hesabix-v2'),
+				$saved_cash
+			);
+			$saved_cash = '';
+		}
+
+		if (empty($banks) && empty($cash_registers) && empty($errors)) {
+			$warnings[] = __('هیچ حساب بانکی یا صندوقی در حسابیکس برای این کسب‌وکار تعریف نشده است. برای ثبت دریافت فاکتور، ابتدا در حسابیکس بانک یا صندوق بسازید.', 'hesabix-v2');
+		}
+
+		$message = '';
+		if (!empty($errors)) {
+			$message = implode(' — ', $errors);
+		} elseif (!empty($warnings)) {
+			$message = implode(' — ', $warnings);
+		}
+
 		wp_send_json(array(
-			'success' => true,
+			'success' => empty($errors),
 			'warehouses' => $warehouses,
 			'banks' => $banks,
 			'cash_registers' => $cash_registers,
 			'currencies' => $currencies,
+			'errors' => $errors,
+			'warnings' => $warnings,
+			'cleared_defaults' => $cleared_defaults,
+			'saved_bank_id' => $saved_bank,
+			'saved_cash_register_id' => $saved_cash,
+			'message' => $message,
 		));
 	}
 

@@ -1245,10 +1245,11 @@ class Hesabix_V2_Api
 	 */
 	public function get_bank_accounts()
 	{
+		// QueryInfo.take در API حسابیکس حداکثر ۱۰۰ است (le=100)؛ مقدار بالاتر → 422 و لیست خالی در تنظیمات.
 		return $this->request(
 			'POST',
 			"/bank-accounts/businesses/{$this->business_id}/bank-accounts",
-			array('take' => 500, 'skip' => 0)
+			array('take' => 100, 'skip' => 0)
 		);
 	}
 
@@ -1261,10 +1262,11 @@ class Hesabix_V2_Api
 	 */
 	public function get_cash_registers()
 	{
+		// QueryInfo.take در API حسابیکس حداکثر ۱۰۰ است (le=100).
 		return $this->request(
 			'POST',
 			"/cash-registers/businesses/{$this->business_id}/cash-registers",
-			array('take' => 500, 'skip' => 0)
+			array('take' => 100, 'skip' => 0)
 		);
 	}
 

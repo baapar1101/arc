@@ -1170,70 +1170,86 @@ $hsx_post = ini_get('post_max_size') ?: '';
 					$btn.prop('disabled', true);
 				}
 				if (!isAuto) {
-					$status.text('<?php echo esc_js(__('در حال بارگذاری...', 'hesabix-v2')); ?>');
+					$status.text('<?php echo esc_js(__('در حال بارگذاری...', 'hesabix-v2')); ?>').css('color', '');
 				}
 				$.post(hesabix_v2_ajax.ajax_url, {
 					action: 'hesabix_v2_get_warehouses_and_banks',
 					nonce: hesabix_v2_ajax.nonce
 				}).done(function(res){
-					if (res.success) {
-						var $wh = $('#hesabix_v2_default_warehouse_id');
-						$wh.find('option:not(:first)').remove();
-						(res.warehouses || []).forEach(function(w){
-							$wh.append($('<option></option>').val(String(w.id)).text((w.code ? w.code + ' - ' : '') + w.name));
-						});
-						if (savedWarehouse !== '') {
-							$wh.val(String(savedWarehouse));
-						}
-						var $spwh = $('#hesabix_v2_stock_pull_wh_select');
-						if ($spwh.length) {
-							$spwh.empty();
-							(res.warehouses || []).forEach(function(w){
-								var label = (w.code ? w.code + ' - ' : '') + w.name;
-								$spwh.append($('<option></option>').val(String(w.id)).text(label));
-							});
-							if (savedStockPullWhIds && savedStockPullWhIds.length) {
-								savedStockPullWhIds.forEach(function(id){
-									$spwh.find('option[value="' + String(id) + '"]').prop('selected', true);
-								});
-							}
-						}
-						hesabixV2FillInvoiceWarehouseRuleSelects(res.warehouses || []);
+					if (!res) {
+						$status.text('<?php echo esc_js(__('خطا در بارگذاری', 'hesabix-v2')); ?>').css('color', 'red');
+						return;
+					}
+					if (typeof res.saved_bank_id !== 'undefined') {
+						savedBank = String(res.saved_bank_id || '');
+					}
+					if (typeof res.saved_cash_register_id !== 'undefined') {
+						savedCashRegister = String(res.saved_cash_register_id || '');
+					}
 
-						var $bank = $('#hesabix_v2_default_bank_id');
-						$bank.find('option:not(:first)').remove();
-						(res.banks || []).forEach(function(b){
-							$bank.append($('<option></option>').val(String(b.id)).text((b.code ? b.code + ' - ' : '') + b.name));
+					var $wh = $('#hesabix_v2_default_warehouse_id');
+					$wh.find('option:not(:first)').remove();
+					(res.warehouses || []).forEach(function(w){
+						$wh.append($('<option></option>').val(String(w.id)).text((w.code ? w.code + ' - ' : '') + w.name));
+					});
+					if (savedWarehouse !== '') {
+						$wh.val(String(savedWarehouse));
+					}
+					var $spwh = $('#hesabix_v2_stock_pull_wh_select');
+					if ($spwh.length) {
+						$spwh.empty();
+						(res.warehouses || []).forEach(function(w){
+							var label = (w.code ? w.code + ' - ' : '') + w.name;
+							$spwh.append($('<option></option>').val(String(w.id)).text(label));
 						});
-						if (savedBank !== '') {
-							$bank.val(String(savedBank));
+						if (savedStockPullWhIds && savedStockPullWhIds.length) {
+							savedStockPullWhIds.forEach(function(id){
+								$spwh.find('option[value="' + String(id) + '"]').prop('selected', true);
+							});
 						}
-						var $cash = $('#hesabix_v2_default_cash_register_id');
-						$cash.find('option:not(:first)').remove();
-						(res.cash_registers || []).forEach(function(c){
-							$cash.append($('<option></option>').val(String(c.id)).text((c.code ? c.code + ' - ' : '') + c.name));
-						});
-						if (savedCashRegister !== '') {
-							$cash.val(String(savedCashRegister));
+					}
+					hesabixV2FillInvoiceWarehouseRuleSelects(res.warehouses || []);
+
+					var $bank = $('#hesabix_v2_default_bank_id');
+					$bank.find('option:not(:first)').remove();
+					(res.banks || []).forEach(function(b){
+						$bank.append($('<option></option>').val(String(b.id)).text((b.code ? b.code + ' - ' : '') + b.name));
+					});
+					if (savedBank !== '') {
+						$bank.val(String(savedBank));
+					}
+					var $cash = $('#hesabix_v2_default_cash_register_id');
+					$cash.find('option:not(:first)').remove();
+					(res.cash_registers || []).forEach(function(c){
+						$cash.append($('<option></option>').val(String(c.id)).text((c.code ? c.code + ' - ' : '') + c.name));
+					});
+					if (savedCashRegister !== '') {
+						$cash.val(String(savedCashRegister));
+					}
+					var $cur = $('#hesabix_v2_currency_id');
+					var $keep = $cur.find('option[value="0"]');
+					$cur.find('option').not($keep).remove();
+					(res.currencies || []).forEach(function(c){
+						var label = (c.code ? c.code + ' — ' : '') + (c.title || '');
+						if (c.is_default) {
+							label += ' <?php echo esc_js(__('(پیش‌فرض کسب‌وکار)', 'hesabix-v2')); ?>';
 						}
-						var $cur = $('#hesabix_v2_currency_id');
-						var $keep = $cur.find('option[value="0"]');
-						$cur.find('option').not($keep).remove();
-						(res.currencies || []).forEach(function(c){
-							var label = (c.code ? c.code + ' — ' : '') + (c.title || '');
-							if (c.is_default) {
-								label += ' <?php echo esc_js(__('(پیش‌فرض کسب‌وکار)', 'hesabix-v2')); ?>';
-							}
-							$cur.append($('<option></option>').val(String(c.id)).text(label));
-						});
-						if (savedCurrency !== '' && savedCurrency !== '0') {
-							$cur.val(String(savedCurrency));
-						}
-						if (!isAuto) {
-							$status.text('<?php echo esc_js(__('بارگذاری شد.', 'hesabix-v2')); ?>').css('color', 'green');
-						}
+						$cur.append($('<option></option>').val(String(c.id)).text(label));
+					});
+					if (savedCurrency !== '' && savedCurrency !== '0') {
+						$cur.val(String(savedCurrency));
+					}
+
+					var warnMsg = (res.warnings && res.warnings.length) ? res.warnings.join(' — ') : '';
+					var errMsg = (res.errors && res.errors.length) ? res.errors.join(' — ') : (res.message || '');
+					if (!res.success) {
+						$status.text(errMsg || '<?php echo esc_js(__('خطا در بارگذاری', 'hesabix-v2')); ?>').css('color', 'red');
+					} else if (warnMsg) {
+						$status.text(warnMsg).css('color', '#b32d2e');
+					} else if (!isAuto) {
+						$status.text('<?php echo esc_js(__('بارگذاری شد.', 'hesabix-v2')); ?>').css('color', 'green');
 					} else {
-						$status.text(res.message || '<?php echo esc_js(__('خطا در بارگذاری', 'hesabix-v2')); ?>').css('color', 'red');
+						$status.text('').css('color', '');
 					}
 				}).fail(function(){
 					$status.text('<?php echo esc_js(__('خطا در ارتباط با سرور', 'hesabix-v2')); ?>').css('color', 'red');
