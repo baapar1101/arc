@@ -18,6 +18,11 @@ param(
     [string]$Manufacturer = "Hesabix",
     [string]$ExeName = "hesabix_ui.exe",
     [string]$ProjectType = "professional",
+    [string]$SignPfxPath = "",
+    [string]$SignPfxPassword = "",
+    [switch]$Sign,
+    [switch]$SkipSign,
+    [switch]$RequireSign,
     [switch]$SkipNewProject,
     [switch]$DryRun,
     [switch]$Help
@@ -39,6 +44,11 @@ Options:
   -AipPath PATH        Advanced Installer project (.aip)
   -OutDir PATH         Output directory for MSI
   -ProjectType TYPE    Advanced Installer project type (default: professional)
+  -Sign                Sign release binaries + MSI (default when cert env is set)
+  -SkipSign            Do not sign (unsigned MSI; SmartScreen may block install)
+  -RequireSign         Fail if no code-signing certificate is configured
+  -SignPfxPath PATH    PFX file (or env WIN_CODESIGN_PFX)
+  -SignPfxPassword PWD PFX password (or env WIN_CODESIGN_PASSWORD)
   -SkipNewProject      Do not recreate AIP; only edit version/files and build
   -DryRun              Print actions only
   -Help                Show help
@@ -147,6 +157,43 @@ function Invoke-AdvInst {
     return $p.ExitCode
 }
 
+function Resolve-FirstNonEmpty {
+    param([string[]]$Values)
+    foreach ($v in $Values) {
+        if ($v -and $v.Trim()) { return $v.Trim() }
+    }
+    return ""
+}
+
+function Test-CodeSignConfigured {
+    param(
+        [string]$Pfx,
+        [string]$Password
+    )
+    if ($Pfx -and (Test-Path -LiteralPath $Pfx)) { return $true }
+    if (Resolve-FirstNonEmpty @($env:WIN_CODESIGN_THUMBPRINT)) { return $true }
+    if (Resolve-FirstNonEmpty @($env:WIN_CODESIGN_SUBJECT)) { return $true }
+    $defaultPfx = Join-Path $REPO_ROOT "installer\windows\codesign.pfx"
+    if ((Test-Path -LiteralPath $defaultPfx) -and $Password) { return $true }
+    return $false
+}
+
+function Invoke-WindowsCodeSign {
+    param(
+        [string[]]$Paths,
+        [string]$Pfx,
+        [string]$Password,
+        [switch]$Verify
+    )
+    $signScript = Join-Path $REPO_ROOT "scripts\sign_windows_artifact.ps1"
+    if (-not (Test-Path -LiteralPath $signScript)) {
+        throw "Signing script not found: $signScript"
+    }
+    Write-Host "[step] Code signing: $($Paths -join ', ')" -ForegroundColor Cyan
+    & $signScript -Path $Paths -PfxPath $Pfx -PfxPassword $Password $(if ($Verify) { '-Verify' }) $(if ($DryRun) { '-DryRun' })
+    if ($null -ne $LASTEXITCODE -and $LASTEXITCODE -ne 0) { throw "Code signing failed (exit $LASTEXITCODE)" }
+}
+
 if (-not $ProjectRoot) {
     $ProjectRoot = Join-Path $REPO_ROOT "hesabixUI\hesabix_ui"
 }
@@ -167,6 +214,40 @@ $AdvInst = Find-AdvancedInstallerCom -Explicit $AdvInstPath
 $VERSION = Get-PubspecVersionName -Path $PubspecPath
 $ASSET_NAME = "hesabix-windows.$VERSION.msi"
 $EXE_PATH = Join-Path $ReleaseDir $ExeName
+
+$resolvedPfx = Resolve-FirstNonEmpty @(
+    $SignPfxPath,
+    $env:WIN_CODESIGN_PFX,
+    $env:HESABIX_WIN_CODESIGN_PFX,
+    (Join-Path $REPO_ROOT "installer\windows\codesign.pfx")
+)
+$resolvedPfxPassword = Resolve-FirstNonEmpty @(
+    $SignPfxPassword,
+    $env:WIN_CODESIGN_PASSWORD,
+    $env:HESABIX_WIN_CODESIGN_PASSWORD
+)
+if ($resolvedPfx -and -not (Test-Path -LiteralPath $resolvedPfx)) {
+    $resolvedPfx = ""
+}
+$signConfigured = Test-CodeSignConfigured -Pfx $resolvedPfx -Password $resolvedPfxPassword
+$shouldSign = $false
+if ($SkipSign) {
+    $shouldSign = $false
+} elseif ($Sign) {
+    $shouldSign = $true
+} elseif ($signConfigured) {
+    $shouldSign = $true
+}
+if ($RequireSign -and -not $shouldSign) {
+    throw "Code signing required (-RequireSign) but no certificate is configured. Set WIN_CODESIGN_PFX + WIN_CODESIGN_PASSWORD."
+}
+if ($shouldSign -and -not $signConfigured) {
+    if ($RequireSign) {
+        throw "Code signing required but no certificate found."
+    }
+    Write-Host "[warn] Signing requested but no certificate configured; continuing unsigned." -ForegroundColor Yellow
+    $shouldSign = $false
+}
 
 Write-Host ""
 Write-Host "Advanced Installer: $AdvInst"
@@ -237,6 +318,11 @@ foreach ($editArgs in $edits) {
 
 Repair-InstallerShortcutComponents -AipFile $AipPath -ExecutableName $ExeName
 
+if ($shouldSign) {
+    Write-Host "[step] Signing Flutter release binaries before packaging..." -ForegroundColor Cyan
+    Invoke-WindowsCodeSign -Paths @($ReleaseDir) -Pfx $resolvedPfx -Password $resolvedPfxPassword
+}
+
 Write-Host "[step] Building MSI..." -ForegroundColor Cyan
 $code = Invoke-AdvInst -Exe $AdvInst -CliArgs @("/build", $AipPath)
 if ($code -ne 0) { throw "Advanced Installer build failed (exit $code)" }
@@ -258,6 +344,24 @@ if (-not $DryRun) {
     if (-not (Test-Path -LiteralPath $msiPath)) {
         throw "MSI not found after build under $OutDir"
     }
+    if ($shouldSign) {
+        Write-Host "[step] Signing MSI package..." -ForegroundColor Cyan
+        Invoke-WindowsCodeSign -Paths @($msiPath) -Pfx $resolvedPfx -Password $resolvedPfxPassword -Verify
+        $sig = Get-AuthenticodeSignature -LiteralPath $msiPath
+        if ($sig.Status -eq "Valid") {
+            Write-Host "[ok] MSI signature: Valid ($($sig.SignerCertificate.Subject))" -ForegroundColor Green
+        } elseif ($sig.Status -eq "NotSigned") {
+            Write-Host "[warn] MSI is still unsigned after signing step." -ForegroundColor Yellow
+        } else {
+            Write-Host "[warn] MSI signature status: $($sig.Status) - $($sig.StatusMessage)" -ForegroundColor Yellow
+            Write-Host "       Use an OV/EV certificate from a public CA for SmartScreen trust." -ForegroundColor Yellow
+        }
+    } else {
+        Write-Host ""
+        Write-Host "[warn] MSI is UNSIGNED. Windows may block installation (SmartScreen / enterprise policy)." -ForegroundColor Yellow
+        Write-Host "       Configure WIN_CODESIGN_PFX + WIN_CODESIGN_PASSWORD, then rebuild with signing enabled." -ForegroundColor Yellow
+    }
+
     $sizeMb = [math]::Round(((Get-Item -LiteralPath $msiPath).Length / 1MB), 1)
     Write-Host ""
     Write-Host "MSI ready: $msiPath ($sizeMb MB)" -ForegroundColor Green

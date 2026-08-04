@@ -45,8 +45,10 @@
 # 2) بیلد Flutter Windows
 .\build_windows.ps1 -Mode release -Clean
 
-# 3) ساخت MSI با Advanced Installer
-.\build_windows_installer.ps1
+# 3) ساخت MSI با Advanced Installer (با امضای دیجیتال در صورت تنظیم گواهی)
+$env:WIN_CODESIGN_PFX='C:\secrets\hesabix-codesign.pfx'
+$env:WIN_CODESIGN_PASSWORD='...'
+.\build_windows_installer.ps1 -RequireSign
 
 # 4) آپلود به Forgejo (همان تگ؛ در صورت وجود ریلیز اندروید فقط asset ویندوز اضافه می‌شود)
 $env:FORGEJO_TOKEN='...'
@@ -67,6 +69,6 @@ $env:FORGEJO_TOKEN='...'
 
 ## نکات امنیتی / عملیاتی
 
-- MSI را در صورت امکان **Code Sign** کنید تا SmartScreen کمتر مزاحم شود.
+- MSI و فایل‌های داخل بسته باید با **گواهی Code Signing معتبر (OV/EV)** امضا شوند؛ در غیر این صورت SmartScreen یا سیاست سازمانی نصب را مسدود می‌کند. جزئیات: `installer/windows/README.md#code-signing`
 - برای جایگزینی فایل‌های در حال اجرا، اپ پس از شروع نصب‌کننده بسته می‌شود (UAC ممکن است ظاهر شود).
 - ریلیز مشترک با اندروید: یک تگ، چند asset (`app-release.*.apk` + `hesabix-windows.*.msi`).
