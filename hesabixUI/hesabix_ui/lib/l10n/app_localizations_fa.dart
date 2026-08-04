@@ -12856,6 +12856,16 @@ class AppLocalizationsFa extends AppLocalizations {
   }
 
   @override
+  String get windowsExitConfirmTitle => 'بستن Hesabix Arc';
+
+  @override
+  String get windowsExitConfirmMessage =>
+      'آیا مطمئن هستید می‌خواهید برنامه را ببندید؟';
+
+  @override
+  String get windowsExitConfirmAction => 'بستن';
+
+  @override
   String get windowsUpdateInstallWillCloseApp =>
       'پس از شروع نصب‌کننده، برنامه بسته می‌شود تا فایل‌ها قابل جایگزینی باشند.';
 

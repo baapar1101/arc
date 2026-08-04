@@ -56,10 +56,14 @@ Future<BytesExportResult> _save({
 
   if (_supportsSaveAs) {
     try {
+      // Windows native saveAs only opens the dialog and returns the path;
+      // bytes must be written in Dart (file_saver windows/file_saver_plugin.cpp).
+      // Windows also expects ext with a leading dot for the default filename/filter.
+      final saveAsExt = Platform.isWindows ? '.$ext' : ext;
       final path = await FileSaver.instance.saveAs(
         name: baseName,
         bytes: bytes,
-        ext: ext,
+        ext: saveAsExt,
         mimeType: mime.mimeType,
         customMimeType: mime.customMimeType,
       );
@@ -72,10 +76,13 @@ Future<BytesExportResult> _save({
       if (_looksLikeSaveError(path)) {
         throw Exception(path);
       }
+      final savedPath = Platform.isWindows
+          ? await _writeBytesToPath(bytes: bytes, path: path, ext: ext)
+          : path;
       return BytesExportResult(
         outcome: BytesExportOutcome.saved,
         filename: filename,
-        path: path,
+        path: savedPath,
       );
     } on UnimplementedError {
       // Fall through to Downloads-style saveFile.
@@ -104,6 +111,24 @@ bool get _supportsSaveAs {
     return true;
   }
   return false;
+}
+
+Future<String> _writeBytesToPath({
+  required Uint8List bytes,
+  required String path,
+  required String ext,
+}) async {
+  var target = path;
+  if (ext.isNotEmpty) {
+    final dotted = ext.startsWith('.') ? ext : '.$ext';
+    if (!target.toLowerCase().endsWith(dotted.toLowerCase())) {
+      target = '$target$dotted';
+    }
+  }
+  final file = File(target);
+  await file.parent.create(recursive: true);
+  await file.writeAsBytes(bytes, flush: true);
+  return file.path;
 }
 
 bool _looksLikeSaveError(String path) {

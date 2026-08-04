@@ -5010,6 +5010,9 @@
       "size": { "type": "String" }
     }
   },
+  "windowsExitConfirmTitle": "بستن Hesabix Arc",
+  "windowsExitConfirmMessage": "آیا مطمئن هستید می‌خواهید برنامه را ببندید؟",
+  "windowsExitConfirmAction": "بستن",
   "windowsUpdateInstallWillCloseApp": "پس از شروع نصب‌کننده، برنامه بسته می‌شود تا فایل‌ها قابل جایگزینی باشند.",
   "windowsUpdateLater": "بعداً",
   "windowsUpdateAutoDownloadStarting": "با تأیید، دانلود و نصب آغاز می‌شود.",

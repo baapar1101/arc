@@ -4968,6 +4968,9 @@
       "size": { "type": "String" }
     }
   },
+  "windowsExitConfirmTitle": "Close Hesabix Arc",
+  "windowsExitConfirmMessage": "Are you sure you want to close the application?",
+  "windowsExitConfirmAction": "Close",
   "windowsUpdateInstallWillCloseApp": "The app will close after the installer starts so files can be replaced.",
   "windowsUpdateLater": "Later",
   "windowsUpdateAutoDownloadStarting": "Confirm to start download and install.",

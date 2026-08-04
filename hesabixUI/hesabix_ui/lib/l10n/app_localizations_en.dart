@@ -12924,6 +12924,16 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get windowsExitConfirmTitle => 'Close Hesabix Arc';
+
+  @override
+  String get windowsExitConfirmMessage =>
+      'Are you sure you want to close the application?';
+
+  @override
+  String get windowsExitConfirmAction => 'Close';
+
+  @override
   String get windowsUpdateInstallWillCloseApp =>
       'The app will close after the installer starts so files can be replaced.';
 

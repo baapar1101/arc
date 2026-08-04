@@ -23968,6 +23968,24 @@ abstract class AppLocalizations {
   /// **'Approximate file size: {size}'**
   String windowsUpdateInstallerSizeHint(String size);
 
+  /// No description provided for @windowsExitConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Close Hesabix Arc'**
+  String get windowsExitConfirmTitle;
+
+  /// No description provided for @windowsExitConfirmMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Are you sure you want to close the application?'**
+  String get windowsExitConfirmMessage;
+
+  /// No description provided for @windowsExitConfirmAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Close'**
+  String get windowsExitConfirmAction;
+
   /// No description provided for @windowsUpdateInstallWillCloseApp.
   ///
   /// In en, this message translates to:

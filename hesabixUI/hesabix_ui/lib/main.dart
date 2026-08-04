@@ -282,9 +282,11 @@ import 'pages/business/crm/crm_web_chat_page.dart';
 import 'pages/business/crm/business_crm_settings_page.dart';
 import 'pages/business/crm/crm_lead_record_page.dart';
 import 'pages/business/crm/crm_deal_record_page.dart';
+import 'widgets/windows_close/windows_close_confirm_gate.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
+  WindowsCloseConfirmGate.installPlatformHandler();
   // Use path-based routing instead of hash routing
   usePathUrlStrategy();
   // با push/replace؛ آدرس مرورگر باید آخرین صفحهٔ پشته را نشان دهد؛ وگرنه URL روی مسیر قبلی می‌ماند و دکمهٔ بازگشت درست عمل نمی‌کند.
@@ -4575,14 +4577,16 @@ class _MyAppState extends State<MyApp> {
                   authStore: _authStore!,
                   calendarController: _calendarController,
                   child: AndroidUpdateGate(
-                    child: WindowsUpdateGate(
-                      child: BiometricLockGate(
-                        authStore: _authStore!,
-                        lockController: _biometricLockController,
-                        child: DefaultTextStyle(
-                          style: baseStyle,
-                          child: KeyboardShortcutListener(
-                            child: child ?? const SizedBox(),
+                    child: WindowsCloseConfirmGate(
+                      child: WindowsUpdateGate(
+                        child: BiometricLockGate(
+                          authStore: _authStore!,
+                          lockController: _biometricLockController,
+                          child: DefaultTextStyle(
+                            style: baseStyle,
+                            child: KeyboardShortcutListener(
+                              child: child ?? const SizedBox(),
+                            ),
                           ),
                         ),
                       ),
