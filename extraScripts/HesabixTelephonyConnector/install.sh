@@ -47,4 +47,9 @@ export HESABIX_PBX_RAW_BASE="$RAW_BASE"
 export HESABIX_API_URL="${HESABIX_API_URL:-https://hsxn.hesabix.ir}"
 
 # نصب کامل (شامل تشخیص توزیع + پیش‌نیازها + ویزارد)
-exec /usr/local/bin/hesabix-pbx install
+# ورودی ترمینال را وصل می‌کنیم تا ویزارد با curl|bash هم کار کند
+if [[ -r /dev/tty ]]; then
+  exec /usr/local/bin/hesabix-pbx install </dev/tty
+else
+  exec /usr/local/bin/hesabix-pbx install
+fi

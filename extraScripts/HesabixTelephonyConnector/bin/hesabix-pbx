@@ -3,7 +3,7 @@
 # استفاده: hesabix-pbx <command>
 set -euo pipefail
 
-VERSION="1.1.1"
+VERSION="1.1.2"
 INSTALL_DIR="${HESABIX_PBX_DIR:-/opt/HesabixTelephonyConnector}"
 ENV_FILE="${INSTALL_DIR}/.env"
 SERVICE_NAME="hesabix-telephony-connector"
@@ -186,29 +186,59 @@ ensure_prerequisites() {
   ok "پیش‌نیازها نصب شدند."
 }
 
+# ورودی تعاملی: وقتی اسکریپت با curl|bash اجرا شود stdin لوله است؛ از /dev/tty بخوان.
+read_tty() {
+  # استفاده: read_tty [-s] var_name
+  local secret=0
+  if [[ "${1:-}" == "-s" ]]; then
+    secret=1
+    shift
+  fi
+  local __var="$1"
+  local __ans=""
+  if [[ -r /dev/tty ]]; then
+    if [[ $secret -eq 1 ]]; then
+      read -r -s __ans < /dev/tty || true
+    else
+      read -r __ans < /dev/tty || true
+    fi
+  else
+    if [[ $secret -eq 1 ]]; then
+      read -r -s __ans || true
+    else
+      read -r __ans || true
+    fi
+  fi
+  printf -v "$__var" '%s' "$__ans"
+}
+
 prompt() {
   # prompt "سؤال" "پیش‌فرض"
   local q="$1" d="${2:-}" ans
   if [[ -n "$d" ]]; then
-    read -r -p "$(printf '%b%s%b [%s]: ' "$c_bold" "$q" "$c_reset" "$d")" ans || true
-    echo "${ans:-$d}"
+    printf '%b%s%b [%s]: ' "$c_bold" "$q" "$c_reset" "$d" > /dev/tty 2>/dev/null || printf '%b%s%b [%s]: ' "$c_bold" "$q" "$c_reset" "$d"
   else
-    read -r -p "$(printf '%b%s%b: ' "$c_bold" "$q" "$c_reset")" ans || true
-    echo "$ans"
+    printf '%b%s%b: ' "$c_bold" "$q" "$c_reset" > /dev/tty 2>/dev/null || printf '%b%s%b: ' "$c_bold" "$q" "$c_reset"
   fi
+  read_tty ans
+  echo "${ans:-$d}"
 }
 
 prompt_secret() {
   local q="$1" d="${2:-}" ans
   if [[ -n "$d" ]]; then
-    read -r -s -p "$(printf '%b%s%b [پنهان/Enter=همان]: ' "$c_bold" "$q" "$c_reset")" ans || true
-    echo
-    echo "${ans:-$d}"
+    printf '%b%s%b [پنهان/Enter=همان]: ' "$c_bold" "$q" "$c_reset" > /dev/tty 2>/dev/null || printf '%b%s%b [پنهان/Enter=همان]: ' "$c_bold" "$q" "$c_reset"
   else
-    read -r -s -p "$(printf '%b%s%b: ' "$c_bold" "$q" "$c_reset")" ans || true
-    echo
-    echo "$ans"
+    printf '%b%s%b: ' "$c_bold" "$q" "$c_reset" > /dev/tty 2>/dev/null || printf '%b%s%b: ' "$c_bold" "$q" "$c_reset"
   fi
+  read_tty -s ans
+  # خط جدید بعد از ورودی مخفی
+  if [[ -w /dev/tty ]]; then
+    printf '\n' > /dev/tty
+  else
+    echo
+  fi
+  echo "${ans:-$d}"
 }
 
 load_env() {
@@ -396,7 +426,13 @@ cmd_configure() {
   ami_secret="$(prompt_secret "رمز AMI" "$cur_ami_secret")"
 
   [[ -n "$api" && -n "$bid" && -n "$pid" && -n "$token" && -n "$ami_user" && -n "$ami_secret" ]] \
-    || die "مقادیر ضروری ناقص است."
+    || {
+      err "مقادیر ضروری ناقص است."
+      echo "اگر نصب را با curl|bash زده‌اید، پیکربندی را جداگانه اجرا کنید:"
+      echo "  hesabix-pbx configure"
+      echo "فیلدهای لازم: API، Business ID، PBX ID، توکن Connector، کاربر و رمز AMI"
+      exit 1
+    }
 
   umask 077
   cat > "$ENV_FILE" <<EOF
