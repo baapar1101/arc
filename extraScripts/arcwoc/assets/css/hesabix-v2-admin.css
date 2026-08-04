@@ -510,6 +510,17 @@ progress::-moz-progress-bar {
 	color: #646970;
 }
 
+.hesabix-v2-profit-curr-hint {
+	font-size: 11px;
+	color: #646970;
+}
+
+.hesabix-v2-profit-details__warn {
+	color: #8a6116;
+	font-size: 11px;
+	line-height: 1.5;
+}
+
 .hesabix-v2-refresh-profit.button-link {
 	font-size: 11px;
 	padding: 0;

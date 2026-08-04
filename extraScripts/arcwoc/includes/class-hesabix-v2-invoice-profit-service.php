@@ -39,6 +39,12 @@ class Hesabix_V2_Invoice_Profit_Service
 	/** @var string جمع فروش مبنای سود */
 	const META_TOTAL_SALES = '_hesabix_v2_invoice_total_sales';
 
+	/** @var string کد ارز فاکتور حسابیکس (مثلاً IRR) */
+	const META_CURRENCY_CODE = '_hesabix_v2_invoice_profit_currency';
+
+	/** @var string عنوان ارز فاکتور */
+	const META_CURRENCY_TITLE = '_hesabix_v2_invoice_profit_currency_title';
+
 	/**
 	 * خواندن سود ذخیره‌شده برای سفارش.
 	 *
@@ -64,6 +70,8 @@ class Hesabix_V2_Invoice_Profit_Service
 			'net_profit' => null,
 			'total_cost' => null,
 			'total_sales' => null,
+			'currency_code' => null,
+			'currency_title' => null,
 			'refreshed_at' => null,
 			'invoice_id' => null,
 			'cost_missing' => false,
@@ -81,6 +89,8 @@ class Hesabix_V2_Invoice_Profit_Service
 		$hid = $order->get_meta(self::META_INVOICE_ID, true);
 		$total_cost = self::meta_float_or_null($order, self::META_TOTAL_COST);
 		$total_sales = self::meta_float_or_null($order, self::META_TOTAL_SALES);
+		$ccode = $order->get_meta(self::META_CURRENCY_CODE, true);
+		$ctitle = $order->get_meta(self::META_CURRENCY_TITLE, true);
 
 		return array(
 			'has_value' => true,
@@ -90,6 +100,8 @@ class Hesabix_V2_Invoice_Profit_Service
 			'net_profit' => self::meta_float_or_null($order, self::META_NET),
 			'total_cost' => $total_cost,
 			'total_sales' => $total_sales,
+			'currency_code' => ($ccode !== '' && $ccode !== null) ? strtoupper((string) $ccode) : null,
+			'currency_title' => ($ctitle !== '' && $ctitle !== null) ? (string) $ctitle : null,
 			'refreshed_at' => ($at !== '' && $at !== null) ? (int) $at : null,
 			'invoice_id' => ($hid !== '' && $hid !== null) ? (int) $hid : null,
 			'cost_missing' => (
@@ -125,6 +137,8 @@ class Hesabix_V2_Invoice_Profit_Service
 			self::META_INVOICE_ID,
 			self::META_TOTAL_COST,
 			self::META_TOTAL_SALES,
+			self::META_CURRENCY_CODE,
+			self::META_CURRENCY_TITLE,
 		) as $key) {
 			$order->delete_meta_data($key);
 		}
@@ -298,6 +312,14 @@ class Hesabix_V2_Invoice_Profit_Service
 			'total_sales' => isset($invoice['total_sales']) && is_numeric($invoice['total_sales'])
 				? (float) $invoice['total_sales']
 				: null,
+			'currency_code' => isset($invoice['currency_code']) && is_string($invoice['currency_code'])
+				? strtoupper(trim($invoice['currency_code']))
+				: null,
+			'currency_title' => isset($invoice['currency_title']) && is_string($invoice['currency_title'])
+				? trim($invoice['currency_title'])
+				: (isset($invoice['currency_name']) && is_string($invoice['currency_name'])
+					? trim($invoice['currency_name'])
+					: null),
 		);
 	}
 
@@ -336,7 +358,7 @@ class Hesabix_V2_Invoice_Profit_Service
 			return $html;
 		}
 
-		$amount = self::format_money((float) $data['profit'], $order);
+		$amount = self::format_money((float) $data['profit'], $order, $data);
 		$tone = ((float) $data['profit'] >= 0) ? 'positive' : 'negative';
 		$html = '<span class="hesabix-v2-profit-amount hesabix-v2-profit-' . esc_attr($tone) . '">'
 			. esc_html($amount)
@@ -345,6 +367,20 @@ class Hesabix_V2_Invoice_Profit_Service
 		if ($data['profit_percent'] !== null) {
 			$html .= '<br /><span class="hesabix-v2-profit-pct">'
 				. esc_html(self::format_percent((float) $data['profit_percent']))
+				. '</span>';
+		}
+
+		$cc = isset($data['currency_code']) ? (string) $data['currency_code'] : '';
+		$wc = method_exists($order, 'get_currency') ? strtoupper((string) $order->get_currency()) : '';
+		if ($cc !== '' && $wc !== '' && $cc !== $wc) {
+			$html .= '<br /><span class="hesabix-v2-profit-curr-hint">'
+				. esc_html(
+					sprintf(
+						/* translators: %s: Hesabix currency code */
+						__('واحد حسابیکس: %s', 'hesabix-v2'),
+						$cc
+					)
+				)
 				. '</span>';
 		}
 
@@ -388,28 +424,46 @@ class Hesabix_V2_Invoice_Profit_Service
 					?>
 					<p class="hesabix-v2-profit-hero hesabix-v2-profit-<?php echo esc_attr($tone); ?>">
 						<span class="hesabix-v2-profit-hero__label"><?php esc_html_e('سود نهایی', 'hesabix-v2'); ?></span>
-						<span class="hesabix-v2-profit-hero__value"><?php echo esc_html(self::format_money((float) $data['profit'], $order)); ?></span>
+						<span class="hesabix-v2-profit-hero__value"><?php echo esc_html(self::format_money((float) $data['profit'], $order, $data)); ?></span>
 						<?php if ($data['profit_percent'] !== null) : ?>
 							<span class="hesabix-v2-profit-hero__pct"><?php echo esc_html(self::format_percent((float) $data['profit_percent'])); ?></span>
 						<?php endif; ?>
 					</p>
+					<?php
+					$cc = isset($data['currency_code']) ? (string) $data['currency_code'] : '';
+					$wc = strtoupper((string) $order->get_currency());
+					if ($cc !== '' && $wc !== '' && $cc !== $wc) :
+						?>
+						<p class="description hesabix-v2-profit-curr-hint" style="margin:4px 0 8px;">
+							<?php
+							echo esc_html(
+								sprintf(
+									/* translators: 1: Hesabix currency, 2: WooCommerce currency */
+									__('مبالغ سود به واحد حسابیکس (%1$s) است؛ مبلغ سفارش ووکامرس (%2$s) است.', 'hesabix-v2'),
+									$cc,
+									$wc
+								)
+							);
+							?>
+						</p>
+					<?php endif; ?>
 					<ul class="hesabix-v2-profit-details">
 						<?php if ($data['gross_profit'] !== null) : ?>
 							<li>
 								<span><?php esc_html_e('ناخالص', 'hesabix-v2'); ?></span>
-								<strong><?php echo esc_html(self::format_money((float) $data['gross_profit'], $order)); ?></strong>
+								<strong><?php echo esc_html(self::format_money((float) $data['gross_profit'], $order, $data)); ?></strong>
 							</li>
 						<?php endif; ?>
 						<?php if ($data['net_profit'] !== null) : ?>
 							<li>
 								<span><?php esc_html_e('خالص', 'hesabix-v2'); ?></span>
-								<strong><?php echo esc_html(self::format_money((float) $data['net_profit'], $order)); ?></strong>
+								<strong><?php echo esc_html(self::format_money((float) $data['net_profit'], $order, $data)); ?></strong>
 							</li>
 						<?php endif; ?>
 						<?php if ($data['total_cost'] !== null) : ?>
 							<li>
 								<span><?php esc_html_e('بهای تمام‌شده', 'hesabix-v2'); ?></span>
-								<strong><?php echo esc_html(self::format_money((float) $data['total_cost'], $order)); ?></strong>
+								<strong><?php echo esc_html(self::format_money((float) $data['total_cost'], $order, $data)); ?></strong>
 							</li>
 						<?php endif; ?>
 						<?php if (!empty($data['cost_missing'])) : ?>
@@ -465,6 +519,31 @@ class Hesabix_V2_Invoice_Profit_Service
 		} else {
 			$order->delete_meta_data(self::META_TOTAL_SALES);
 		}
+		if (!empty($parsed['currency_code'])) {
+			$order->update_meta_data(self::META_CURRENCY_CODE, strtoupper((string) $parsed['currency_code']));
+		} else {
+			// fallback از تنظیمات ارز فاکتور افزونه
+			if (class_exists('Hesabix_V2_Currency_Service')) {
+				$row = Hesabix_V2_Currency_Service::resolve_invoice_currency_row();
+				if ($row && !empty($row['code'])) {
+					$order->update_meta_data(self::META_CURRENCY_CODE, strtoupper((string) $row['code']));
+					if (!empty($row['title'])) {
+						$order->update_meta_data(self::META_CURRENCY_TITLE, (string) $row['title']);
+					}
+				} else {
+					$order->delete_meta_data(self::META_CURRENCY_CODE);
+				}
+			} else {
+				$order->delete_meta_data(self::META_CURRENCY_CODE);
+			}
+		}
+		if (!empty($parsed['currency_title'])) {
+			$order->update_meta_data(self::META_CURRENCY_TITLE, (string) $parsed['currency_title']);
+		} elseif (empty($parsed['currency_code'])) {
+			// title ممکن است همراه fallback کد تنظیم شده باشد
+		} else {
+			$order->delete_meta_data(self::META_CURRENCY_TITLE);
+		}
 
 		if (doing_action('woocommerce_update_order')) {
 			$order->save_meta_data();
@@ -474,23 +553,42 @@ class Hesabix_V2_Invoice_Profit_Service
 	}
 
 	/**
-	 * @param float    $amount
-	 * @param WC_Order $order
+	 * قالب‌بندی مبلغ سود به واحد ارز فاکتور حسابیکس (نه ارز ووکامرس).
+	 *
+	 * @param float         $amount
+	 * @param WC_Order      $order
+	 * @param array|null    $profit_data خروجی get_for_order / extract
 	 * @return string
 	 */
-	public static function format_money($amount, WC_Order $order)
+	public static function format_money($amount, WC_Order $order, $profit_data = null)
 	{
-		if (function_exists('wc_price')) {
-			return wp_strip_all_tags(
-				wc_price(
-					$amount,
-					array(
-						'currency' => $order->get_currency(),
-					)
-				)
-			);
+		$code = null;
+		$title = null;
+		if (is_array($profit_data)) {
+			$code = isset($profit_data['currency_code']) ? $profit_data['currency_code'] : null;
+			$title = isset($profit_data['currency_title']) ? $profit_data['currency_title'] : null;
 		}
-		return number_format_i18n($amount, 0);
+		if (!$code) {
+			$meta_code = $order->get_meta(self::META_CURRENCY_CODE, true);
+			if ($meta_code !== '' && $meta_code !== null) {
+				$code = (string) $meta_code;
+			}
+			$meta_title = $order->get_meta(self::META_CURRENCY_TITLE, true);
+			if ($meta_title !== '' && $meta_title !== null) {
+				$title = (string) $meta_title;
+			}
+		}
+
+		if (class_exists('Hesabix_V2_Currency_Service')) {
+			return Hesabix_V2_Currency_Service::format_hesabix_money((float) $amount, $code, $title);
+		}
+
+		// fallback نادر
+		$formatted = number_format_i18n((float) $amount, 0);
+		if ($code && strtoupper((string) $code) === 'IRR') {
+			return sprintf(__('%s ریال', 'hesabix-v2'), $formatted);
+		}
+		return $formatted;
 	}
 
 	/**
