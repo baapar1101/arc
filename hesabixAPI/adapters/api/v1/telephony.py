@@ -324,7 +324,7 @@ def create_person(
 	request: Request,
 	business_id: int,
 	call_id: int,
-	payload: Dict[str, Any] = Body(default={}),
+	payload: Dict[str, Any] = Body(default=None),
 	_: None = Depends(locale_dependency),
 	__: None = Depends(require_business_access_dep),
 	___: None = Depends(require_telephony_plugin_active()),
@@ -340,7 +340,7 @@ def create_lead(
 	request: Request,
 	business_id: int,
 	call_id: int,
-	payload: Dict[str, Any] = Body(default={}),
+	payload: Dict[str, Any] = Body(default=None),
 	_: None = Depends(locale_dependency),
 	__: None = Depends(require_business_access_dep),
 	___: None = Depends(require_telephony_plugin_active()),
@@ -457,7 +457,7 @@ def connector_poll(
 def connector_ack(
 	request: Request,
 	command_id: str,
-	payload: Dict[str, Any] = Body(default={}),
+	payload: Dict[str, Any] = Body(default=None),
 	authorization: Optional[str] = Header(None),
 	x_hesabix_business_id: Optional[int] = Header(None, alias="X-Hesabix-Business-Id"),
 	x_hesabix_pbx_id: Optional[int] = Header(None, alias="X-Hesabix-Pbx-Id"),
@@ -689,3 +689,267 @@ def ops_dlq_resolve(
 	from app.services.telephony import recording_service as rec_svc
 
 	return _resp(rec_svc.resolve_dead_letter(db, business_id, dlq_id), request)
+
+
+# ─── Softphone (Media Relay) ─────────────────────────────────────────────────
+
+
+def _require_softphone_operator():
+	"""softphone یا click_to_call یا view."""
+
+	def _dep(
+		business_id: int,
+		ctx: AuthContext = Depends(get_current_user),
+		db: Session = Depends(get_db),
+	) -> None:
+		from app.core.permissions import has_business_permission_for_business
+
+		uid_ok = (
+			has_business_permission_for_business(ctx, db, business_id, "telephony", "softphone")
+			or has_business_permission_for_business(ctx, db, business_id, "telephony", "click_to_call")
+			or has_business_permission_for_business(ctx, db, business_id, "telephony", "view")
+		)
+		if not uid_ok:
+			raise ApiError("FORBIDDEN", "دسترسی Softphone ندارید.", http_status=403)
+
+	return _dep
+
+
+@router.get("/business/{business_id}/softphone/health")
+def softphone_health(
+	request: Request,
+	business_id: int,
+	_: None = Depends(locale_dependency),
+	__: None = Depends(require_business_access_dep),
+	___: None = Depends(require_telephony_plugin_active()),
+	____: None = Depends(_require_softphone_operator()),
+	db: Session = Depends(get_db),
+	ctx: AuthContext = Depends(get_current_user),
+) -> dict:
+	from app.services.telephony import softphone_service as soft_svc
+
+	return _resp(soft_svc.softphone_health(db, business_id, ctx.get_user_id()), request)
+
+
+@router.get("/business/{business_id}/softphone/devices-config")
+def softphone_devices_config(
+	request: Request,
+	business_id: int,
+	_: None = Depends(locale_dependency),
+	__: None = Depends(require_business_access_dep),
+	___: None = Depends(require_telephony_plugin_active()),
+	____: None = Depends(_require_softphone_operator()),
+	db: Session = Depends(get_db),
+	_ctx: AuthContext = Depends(get_current_user),
+) -> dict:
+	from app.services.telephony import softphone_service as soft_svc
+
+	return _resp(soft_svc.softphone_devices_config(db, business_id), request)
+
+
+@router.post("/business/{business_id}/softphone/sessions")
+def softphone_create_session(
+	request: Request,
+	business_id: int,
+	payload: Dict[str, Any] = Body(default=None),
+	_: None = Depends(locale_dependency),
+	__: None = Depends(require_business_access_dep),
+	___: None = Depends(require_telephony_plugin_active()),
+	____: None = Depends(_require_softphone_operator()),
+	db: Session = Depends(get_db),
+	ctx: AuthContext = Depends(get_current_user),
+) -> dict:
+	from app.services.telephony import softphone_service as soft_svc
+
+	return _resp(soft_svc.create_session(db, business_id, ctx.get_user_id(), payload or {}), request)
+
+
+@router.post("/business/{business_id}/softphone/sessions/{session_id}/heartbeat")
+def softphone_session_heartbeat(
+	request: Request,
+	business_id: int,
+	session_id: str,
+	_: None = Depends(locale_dependency),
+	__: None = Depends(require_business_access_dep),
+	___: None = Depends(require_telephony_plugin_active()),
+	____: None = Depends(_require_softphone_operator()),
+	db: Session = Depends(get_db),
+	ctx: AuthContext = Depends(get_current_user),
+) -> dict:
+	from app.services.telephony import softphone_service as soft_svc
+
+	return _resp(soft_svc.heartbeat_session(db, business_id, ctx.get_user_id(), session_id), request)
+
+
+@router.delete("/business/{business_id}/softphone/sessions/{session_id}")
+def softphone_end_session(
+	request: Request,
+	business_id: int,
+	session_id: str,
+	_: None = Depends(locale_dependency),
+	__: None = Depends(require_business_access_dep),
+	___: None = Depends(require_telephony_plugin_active()),
+	____: None = Depends(_require_softphone_operator()),
+	db: Session = Depends(get_db),
+	ctx: AuthContext = Depends(get_current_user),
+) -> dict:
+	from app.services.telephony import softphone_service as soft_svc
+	from app.services.telephony.media_hub import media_hub
+	import asyncio
+
+	data = soft_svc.end_session(db, business_id, ctx.get_user_id(), session_id, reason="api_delete")
+	try:
+		loop = asyncio.get_event_loop()
+		if loop.is_running():
+			asyncio.create_task(media_hub.unregister_client(session_id, reason="api_delete"))
+		else:
+			loop.run_until_complete(media_hub.unregister_client(session_id, reason="api_delete"))
+	except Exception:
+		pass
+	return _resp(data, request)
+
+
+@router.post("/business/{business_id}/softphone/calls")
+def softphone_outbound_call(
+	request: Request,
+	business_id: int,
+	payload: Dict[str, Any] = Body(...),
+	_: None = Depends(locale_dependency),
+	__: None = Depends(require_business_access_dep),
+	___: None = Depends(require_telephony_plugin_active()),
+	____: None = Depends(_require_softphone_operator()),
+	db: Session = Depends(get_db),
+	ctx: AuthContext = Depends(get_current_user),
+) -> dict:
+	from app.services.telephony import softphone_service as soft_svc
+	from app.services.telephony.media_hub import media_hub
+	import asyncio
+
+	result = soft_svc.start_outbound_relay_call(db, business_id, ctx.get_user_id(), payload or {})
+	session_id = result.get("session_id")
+	call = result.get("call") or {}
+	as_uuid = result.get("audiosocket_uuid")
+	if session_id:
+		try:
+			loop = asyncio.get_event_loop()
+			coro = media_hub.start_bridge(
+				session_id=session_id,
+				call_id=call.get("id"),
+				direction="outbound",
+				audiosocket_uuid=as_uuid,
+			)
+			if loop.is_running():
+				asyncio.create_task(coro)
+			else:
+				loop.run_until_complete(coro)
+		except Exception:
+			pass
+	return _resp(result, request)
+
+
+@router.post("/business/{business_id}/softphone/calls/{call_id}/answer")
+def softphone_answer_call(
+	request: Request,
+	business_id: int,
+	call_id: int,
+	payload: Dict[str, Any] = Body(default=None),
+	_: None = Depends(locale_dependency),
+	__: None = Depends(require_business_access_dep),
+	___: None = Depends(require_telephony_plugin_active()),
+	____: None = Depends(_require_softphone_operator()),
+	db: Session = Depends(get_db),
+	ctx: AuthContext = Depends(get_current_user),
+) -> dict:
+	from app.services.telephony import softphone_service as soft_svc
+	from app.services.telephony.media_hub import media_hub
+	import asyncio
+
+	result = soft_svc.enqueue_answer_inbound(db, business_id, ctx.get_user_id(), call_id, payload or {})
+	session_id = result.get("session_id")
+	as_uuid = result.get("audiosocket_uuid")
+	if session_id:
+		try:
+			loop = asyncio.get_event_loop()
+			coro = media_hub.start_bridge(
+				session_id=session_id,
+				call_id=call_id,
+				direction="inbound",
+				audiosocket_uuid=as_uuid,
+			)
+			if loop.is_running():
+				asyncio.create_task(coro)
+			else:
+				loop.run_until_complete(coro)
+		except Exception:
+			pass
+	return _resp(result, request)
+
+
+@router.post("/business/{business_id}/softphone/calls/{call_id}/dtmf")
+def softphone_dtmf(
+	request: Request,
+	business_id: int,
+	call_id: int,
+	payload: Dict[str, Any] = Body(...),
+	_: None = Depends(locale_dependency),
+	__: None = Depends(require_business_access_dep),
+	___: None = Depends(require_telephony_plugin_active()),
+	____: None = Depends(_require_softphone_operator()),
+	db: Session = Depends(get_db),
+	ctx: AuthContext = Depends(get_current_user),
+) -> dict:
+	from app.services.telephony import softphone_service as soft_svc
+
+	digit = str((payload or {}).get("digit") or "")
+	session_id = (payload or {}).get("session_id")
+	return _resp(
+		soft_svc.enqueue_dtmf(db, business_id, ctx.get_user_id(), call_id, digit, session_id=session_id),
+		request,
+	)
+
+
+@router.post("/connector/media/events")
+def connector_media_events(
+	request: Request,
+	payload: Dict[str, Any] = Body(...),
+	authorization: Optional[str] = Header(default=None),
+	x_hesabix_business_id: Optional[str] = Header(default=None),
+	x_hesabix_pbx_id: Optional[str] = Header(default=None),
+	db: Session = Depends(get_db),
+) -> dict:
+	"""رویدادهای کنترل رسانه از Connector (علاوه بر WSS)."""
+	token = _bearer_token(authorization)
+	business_id = int(x_hesabix_business_id or 0)
+	pbx_id = int(x_hesabix_pbx_id or 0)
+	pbx = svc.authenticate_connector(db, token=token, business_id=business_id, pbx_id=pbx_id)
+	from app.services.telephony.media_hub import media_hub
+	import asyncio
+
+	tunnel = media_hub.tunnel_snapshot(pbx.id)
+	return _resp({"ok": True, "tunnel": tunnel, "received": payload.get("type")}, request)
+
+
+@router.post("/connector/media/quality")
+def connector_media_quality(
+	request: Request,
+	payload: Dict[str, Any] = Body(...),
+	authorization: Optional[str] = Header(default=None),
+	x_hesabix_business_id: Optional[str] = Header(default=None),
+	x_hesabix_pbx_id: Optional[str] = Header(default=None),
+	db: Session = Depends(get_db),
+) -> dict:
+	token = _bearer_token(authorization)
+	business_id = int(x_hesabix_business_id or 0)
+	pbx_id = int(x_hesabix_pbx_id or 0)
+	svc.authenticate_connector(db, token=token, business_id=business_id, pbx_id=pbx_id)
+	from app.services.telephony import softphone_service as soft_svc
+
+	session_id = str(payload.get("session_id") or "")
+	if session_id:
+		soft_svc.mark_session_state(
+			db,
+			session_id,
+			str(payload.get("state") or "in_call"),
+			quality=payload.get("metrics") if isinstance(payload.get("metrics"), dict) else payload,
+		)
+	return _resp({"ok": True}, request)

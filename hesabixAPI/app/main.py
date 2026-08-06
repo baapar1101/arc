@@ -104,6 +104,7 @@ from adapters.api.v1.integrations.telegram import router as telegram_integration
 from adapters.api.v1.integrations.bale import router as bale_integration_router
 from adapters.api.v1.basalam_integration import router as basalam_integration_router
 from adapters.api.v1.telephony import router as telephony_router
+from adapters.api.v1.telephony_softphone_ws import router as telephony_softphone_ws_router
 from adapters.api.v1.woocommerce_integration import router as woocommerce_integration_router
 from adapters.api.v1.notifications import router as notifications_router
 from adapters.api.v1.admin.notification_templates import router as admin_notification_templates_router
@@ -1090,6 +1091,7 @@ def create_app() -> FastAPI:
     application.include_router(basalam_integration_router, prefix=settings.api_v1_prefix)
     application.include_router(woocommerce_integration_router, prefix=settings.api_v1_prefix)
     application.include_router(telephony_router, prefix=settings.api_v1_prefix)
+    application.include_router(telephony_softphone_ws_router)
     # Notifications
     application.include_router(notifications_router, prefix=settings.api_v1_prefix)
     application.include_router(notifications_ws_router)

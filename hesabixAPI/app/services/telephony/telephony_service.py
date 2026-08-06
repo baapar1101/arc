@@ -157,6 +157,14 @@ def create_pbx(db: Session, business_id: int, payload: Dict[str, Any]) -> Dict[s
 		settings=payload.get("settings") or {
 			"originate_context": "from-internal",
 			"originate_timeout_ms": 30000,
+			"softphone": {
+				"relay_enabled": True,
+				"direct_enabled": False,
+				"media_codec_prefs": ["pcm_ws_v1"],
+				"max_concurrent_softphone_sessions": 50,
+				"audiosocket_host": "127.0.0.1",
+				"audiosocket_port": 9092,
+			},
 		},
 		status="pending",
 		is_active=True,
@@ -325,6 +333,9 @@ def user_extension_to_dict(row: TelephonyUserExtension) -> Dict[str, Any]:
 		"receive_screen_pop": bool(row.receive_screen_pop),
 		"can_click_to_call": bool(row.can_click_to_call),
 		"caller_id_override": row.caller_id_override,
+		"endpoint_mode": getattr(row, "endpoint_mode", None) or "desk",
+		"allow_mode_fallback": bool(getattr(row, "allow_mode_fallback", True)),
+		"direct_sip_user": getattr(row, "direct_sip_user", None),
 	}
 
 
@@ -391,6 +402,15 @@ def upsert_user_extension(db: Session, business_id: int, payload: Dict[str, Any]
 		row.can_click_to_call = bool(payload["can_click_to_call"])
 	if "caller_id_override" in payload:
 		row.caller_id_override = payload.get("caller_id_override")
+	if "endpoint_mode" in payload:
+		mode = str(payload.get("endpoint_mode") or "desk").strip().lower()
+		if mode not in ("relay", "direct", "desk"):
+			raise ApiError("VALIDATION_ERROR", "endpoint_mode باید relay، direct یا desk باشد.", http_status=400)
+		row.endpoint_mode = mode
+	if "allow_mode_fallback" in payload:
+		row.allow_mode_fallback = bool(payload.get("allow_mode_fallback"))
+	if "direct_sip_user" in payload:
+		row.direct_sip_user = payload.get("direct_sip_user")
 	row.pbx_id = ext.pbx_id
 	row.updated_at = _now()
 	db.commit()
@@ -432,6 +452,19 @@ def get_my_extension_context(db: Session, business_id: int, user_id: int) -> Dic
 		.scalar()
 		or 0
 	)
+	from app.services.telephony import softphone_service as softphone_svc
+	from app.services.telephony.media_hub import media_hub
+
+	softphone_ctx: Dict[str, Any] = {
+		"endpoint_mode": (primary or {}).get("endpoint_mode") or "desk",
+		"supported_profiles": ["pcm_ws_v1"],
+	}
+	try:
+		softphone_ctx = softphone_svc.softphone_health(db, business_id, user_id)
+	except Exception:
+		softphone_ctx["media_hub"] = media_hub.health()
+		softphone_ctx["tunnel"] = None
+
 	return {
 		"plugin_active": True,
 		"settings": settings,
@@ -440,6 +473,7 @@ def get_my_extension_context(db: Session, business_id: int, user_id: int) -> Dic
 		"pbx_connections": pbx_list,
 		"missed_today": int(missed_today),
 		"has_extension": bool(links),
+		"softphone": softphone_ctx,
 	}
 
 

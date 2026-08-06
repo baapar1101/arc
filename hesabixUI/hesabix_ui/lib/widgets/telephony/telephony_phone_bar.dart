@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/auth_store.dart';
 import '../../core/business_nav.dart';
+import '../../services/telephony/softphone_engine.dart';
 import '../../services/telephony/telephony_session_controller.dart';
 import 'telephony_dialer_sheet.dart';
 import 'telephony_post_call_sheet.dart';
@@ -27,6 +28,7 @@ class TelephonyPhoneBarHost extends StatefulWidget {
 
 class _TelephonyPhoneBarHostState extends State<TelephonyPhoneBarHost> with SingleTickerProviderStateMixin {
   late final TelephonySessionController _session;
+  SoftphoneEngine? _softphone;
   late final AnimationController _pulse;
 
   @override
@@ -36,6 +38,11 @@ class _TelephonyPhoneBarHostState extends State<TelephonyPhoneBarHost> with Sing
     TelephonySessionStore.instance.ensureWs();
     _session.bindBusiness(widget.businessId, pluginActive: widget.pluginActive);
     _session.addListener(_onSession);
+    _softphone = SoftphoneEngineStore.instance.obtain(
+      businessId: widget.businessId,
+      authStore: widget.authStore,
+    );
+    _softphone!.addListener(_onSoftphone);
     _pulse = AnimationController(vsync: this, duration: const Duration(milliseconds: 1100));
   }
 
@@ -44,12 +51,24 @@ class _TelephonyPhoneBarHostState extends State<TelephonyPhoneBarHost> with Sing
     super.didUpdateWidget(oldWidget);
     if (oldWidget.businessId != widget.businessId || oldWidget.pluginActive != widget.pluginActive) {
       _session.bindBusiness(widget.businessId, pluginActive: widget.pluginActive);
+      _softphone?.removeListener(_onSoftphone);
+      _softphone = SoftphoneEngineStore.instance.obtain(
+        businessId: widget.businessId,
+        authStore: widget.authStore,
+      );
+      _softphone?.addListener(_onSoftphone);
     }
+  }
+
+  void _onSoftphone() {
+    if (!mounted) return;
+    setState(() {});
   }
 
   void _onSession() {
     if (!mounted) return;
-    final ringing = _session.presenceLabel == 'ringing';
+    final ringing = _session.presenceLabel == 'ringing' ||
+        _softphone?.state == SoftphoneConnectionState.ringing;
     if (ringing && !_pulse.isAnimating) {
       _pulse.repeat(reverse: true);
     } else if (!ringing && _pulse.isAnimating) {
@@ -68,11 +87,19 @@ class _TelephonyPhoneBarHostState extends State<TelephonyPhoneBarHost> with Sing
   @override
   void dispose() {
     _session.removeListener(_onSession);
+    _softphone?.removeListener(_onSoftphone);
     _pulse.dispose();
     super.dispose();
   }
 
   Color _statusColor(ColorScheme scheme) {
+    final sf = _softphone?.state;
+    if (sf == SoftphoneConnectionState.ringing) return const Color(0xFFD97706);
+    if (sf == SoftphoneConnectionState.inCall) return scheme.primary;
+    if (sf == SoftphoneConnectionState.registered) return const Color(0xFF059669);
+    if (sf == SoftphoneConnectionState.error || sf == SoftphoneConnectionState.reconnecting) {
+      return scheme.error;
+    }
     switch (_session.presenceLabel) {
       case 'ringing':
         return const Color(0xFFD97706);
@@ -88,6 +115,13 @@ class _TelephonyPhoneBarHostState extends State<TelephonyPhoneBarHost> with Sing
   }
 
   String _statusText() {
+    final sf = _softphone?.state;
+    if (sf == SoftphoneConnectionState.connecting) return 'Softphone در حال اتصال';
+    if (sf == SoftphoneConnectionState.registered) return 'Softphone آماده';
+    if (sf == SoftphoneConnectionState.ringing) return 'Softphone: زنگ';
+    if (sf == SoftphoneConnectionState.inCall) return 'Softphone: مکالمه';
+    if (sf == SoftphoneConnectionState.reconnecting) return 'Softphone: اتصال مجدد';
+    if (sf == SoftphoneConnectionState.error) return 'Softphone: خطا';
     switch (_session.presenceLabel) {
       case 'ringing':
         return 'زنگ می‌خورد';
@@ -110,8 +144,11 @@ class _TelephonyPhoneBarHostState extends State<TelephonyPhoneBarHost> with Sing
     final width = MediaQuery.sizeOf(context).width;
     final compact = width < 720;
     final statusColor = _statusColor(scheme);
-    final ringing = _session.presenceLabel == 'ringing';
-    final inCall = _session.presenceLabel == 'in_call';
+    final ringing = _session.presenceLabel == 'ringing' ||
+        _softphone?.state == SoftphoneConnectionState.ringing;
+    final inCall = _session.presenceLabel == 'in_call' ||
+        _softphone?.state == SoftphoneConnectionState.inCall;
+    final softReady = _softphone?.isReady == true;
 
     return Material(
       color: Colors.transparent,
@@ -126,7 +163,9 @@ class _TelephonyPhoneBarHostState extends State<TelephonyPhoneBarHost> with Sing
             begin: Alignment.centerRight,
             end: Alignment.centerLeft,
             colors: [
-              (ringing || inCall) ? statusColor.withValues(alpha: 0.12) : scheme.surfaceContainerHighest.withValues(alpha: 0.95),
+              (ringing || inCall)
+                  ? statusColor.withValues(alpha: 0.12)
+                  : scheme.surfaceContainerHighest.withValues(alpha: 0.95),
               scheme.surfaceContainerLow.withValues(alpha: 0.98),
             ],
           ),
@@ -170,7 +209,7 @@ class _TelephonyPhoneBarHostState extends State<TelephonyPhoneBarHost> with Sing
                     context.go(context.businessPanelUrl(widget.businessId, 'settings/telephony'));
                     return;
                   }
-                  context.go(context.businessPanelUrl(widget.businessId, 'telephony'));
+                  context.go(context.businessPanelUrl(widget.businessId, 'telephony/softphone'));
                 },
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -196,32 +235,65 @@ class _TelephonyPhoneBarHostState extends State<TelephonyPhoneBarHost> with Sing
                 ),
               ),
             ),
-            if (_session.missedToday > 0)
-              Padding(
-                padding: const EdgeInsetsDirectional.only(end: 6),
-                child: InkWell(
-                  onTap: () => context.go(context.businessPanelUrl(widget.businessId, 'telephony/calls')),
-                  child: Badge(
-                    label: Text('${_session.missedToday}'),
-                    child: Icon(Icons.call_missed_outgoing_rounded, color: scheme.error, size: 22),
-                  ),
+            if (inCall || ringing) ...[
+              if (ringing && int.tryParse('${_softphone?.activeCall?['id'] ?? ''}') != null)
+                IconButton(
+                  tooltip: 'پاسخ Softphone',
+                  onPressed: () async {
+                    final id = int.parse('${_softphone!.activeCall!['id']}');
+                    await _softphone!.answer(id);
+                  },
+                  icon: Icon(Icons.call_rounded, color: scheme.primary),
+                ),
+              IconButton(
+                tooltip: _softphone?.muted == true ? 'رفع بی‌صدایی' : 'بی‌صدا',
+                onPressed: softReady ? () => _softphone!.setMuted(!(_softphone!.muted)) : null,
+                icon: Icon(
+                  _softphone?.muted == true ? Icons.mic_off_rounded : Icons.mic_rounded,
+                  color: scheme.onSurfaceVariant,
                 ),
               ),
-            IconButton(
-              tooltip: 'شماره‌گیر',
-              onPressed: () => showTelephonyDialerSheet(
-                context,
-                businessId: widget.businessId,
-                session: _session,
-              ),
-              icon: Icon(Icons.dialpad_rounded, color: scheme.primary),
-            ),
-            if (!compact)
               IconButton(
-                tooltip: 'تاریخچه',
-                onPressed: () => context.go(context.businessPanelUrl(widget.businessId, 'telephony/calls')),
-                icon: Icon(Icons.history_rounded, color: scheme.onSurfaceVariant),
+                tooltip: 'قطع',
+                onPressed: softReady ? () => _softphone!.hangup() : () => _session.hangupActiveCall(),
+                icon: Icon(Icons.call_end_rounded, color: scheme.error),
               ),
+            ] else ...[
+              IconButton(
+                tooltip: softReady ? 'Softphone آنلاین است' : 'Softphone',
+                onPressed: () => context.go(context.businessPanelUrl(widget.businessId, 'telephony/softphone')),
+                icon: Icon(
+                  Icons.headset_mic_rounded,
+                  color: softReady ? const Color(0xFF059669) : scheme.primary,
+                ),
+              ),
+              if (_session.missedToday > 0)
+                Padding(
+                  padding: const EdgeInsetsDirectional.only(end: 6),
+                  child: InkWell(
+                    onTap: () => context.go(context.businessPanelUrl(widget.businessId, 'telephony/calls')),
+                    child: Badge(
+                      label: Text('${_session.missedToday}'),
+                      child: Icon(Icons.call_missed_outgoing_rounded, color: scheme.error, size: 22),
+                    ),
+                  ),
+                ),
+              IconButton(
+                tooltip: 'شماره‌گیر',
+                onPressed: () => showTelephonyDialerSheet(
+                  context,
+                  businessId: widget.businessId,
+                  session: _session,
+                ),
+                icon: Icon(Icons.dialpad_rounded, color: scheme.primary),
+              ),
+              if (!compact)
+                IconButton(
+                  tooltip: 'تاریخچه',
+                  onPressed: () => context.go(context.businessPanelUrl(widget.businessId, 'telephony/calls')),
+                  icon: Icon(Icons.history_rounded, color: scheme.onSurfaceVariant),
+                ),
+            ],
           ],
         ),
       ),
@@ -256,7 +328,6 @@ class TelephonyScreenPopLayer extends StatelessWidget {
         return Positioned.fill(
           child: Stack(
             children: [
-              // backdrop ملایم — کلیک برای بستن فقط وقتی تماس ringing نیست
               Positioned.fill(
                 child: GestureDetector(
                   onTap: () {

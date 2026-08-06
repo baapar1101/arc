@@ -620,18 +620,198 @@ class _TelephonySettingsPageState extends State<TelephonySettingsPage> {
     }
     final userId = widget.authStore.currentUserId;
     if (userId == null) return;
-    final ext = _extensions.first;
+    await _editUserExtensionMapping(
+      userId: userId,
+      extensionId: int.tryParse('${_extensions.first['id']}'),
+      endpointMode: 'relay',
+      allowFallback: true,
+      isPrimary: true,
+    );
+  }
+
+  Future<void> _editUserExtensionMapping({
+    required int userId,
+    int? linkId,
+    int? extensionId,
+    String endpointMode = 'desk',
+    bool allowFallback = true,
+    bool isPrimary = true,
+    String? directSipUser,
+  }) async {
+    if (_extensions.isEmpty) return;
+    var selectedExtId = extensionId ?? int.tryParse('${_extensions.first['id']}');
+    var mode = endpointMode;
+    var fallback = allowFallback;
+    var primary = isPrimary;
+    final sipCtrl = TextEditingController(text: directSipUser ?? '');
+
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setLocal) {
+            return AlertDialog(
+              title: Text(linkId == null ? 'نگاشت داخلی / Softphone' : 'ویرایش نگاشت Softphone'),
+              content: SizedBox(
+                width: 420,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    DropdownButtonFormField<int>(
+                      value: selectedExtId,
+                      decoration: const InputDecoration(labelText: 'داخلی'),
+                      items: _extensions
+                          .map(
+                            (e) => DropdownMenuItem(
+                              value: int.tryParse('${e['id']}'),
+                              child: Text('${e['extension']} ${e['display_name'] ?? ''}'),
+                            ),
+                          )
+                          .where((e) => e.value != null)
+                          .toList(),
+                      onChanged: (v) => setLocal(() => selectedExtId = v),
+                    ),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<String>(
+                      value: mode,
+                      decoration: const InputDecoration(
+                        labelText: 'حالت endpoint',
+                        helperText: 'relay = Softphone داخل اپ · desk = تلفن رومیزی · direct = PJSIP/WebRTC',
+                      ),
+                      items: const [
+                        DropdownMenuItem(value: 'relay', child: Text('Relay (Softphone داخل حسابیکس)')),
+                        DropdownMenuItem(value: 'desk', child: Text('Desk (تلفن SIP خارجی)')),
+                        DropdownMenuItem(value: 'direct', child: Text('Direct (رجیستر مستقیم اختیاری)')),
+                      ],
+                      onChanged: (v) => setLocal(() => mode = v ?? 'desk'),
+                    ),
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text('اجازه fallback'),
+                      subtitle: const Text('اگر حالت اصلی در دسترس نبود، حالت جایگزین'),
+                      value: fallback,
+                      onChanged: (v) => setLocal(() => fallback = v),
+                    ),
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text('داخلی اصلی'),
+                      value: primary,
+                      onChanged: (v) => setLocal(() => primary = v),
+                    ),
+                    if (mode == 'direct')
+                      TextField(
+                        controller: sipCtrl,
+                        decoration: const InputDecoration(
+                          labelText: 'SIP user (Direct)',
+                          hintText: 'اختیاری — برای provision مستقیم',
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('انصراف')),
+                FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('ذخیره')),
+              ],
+            );
+          },
+        );
+      },
+    );
+    if (ok != true || selectedExtId == null) return;
     await _api.upsertUserExtension(widget.businessId, {
       'user_id': userId,
-      'extension_id': ext['id'],
-      'is_primary': true,
+      'extension_id': selectedExtId,
+      'is_primary': primary,
       'receive_screen_pop': true,
       'can_click_to_call': true,
+      'endpoint_mode': mode,
+      'allow_mode_fallback': fallback,
+      if (mode == 'direct') 'direct_sip_user': sipCtrl.text.trim(),
     });
     await _load();
     TelephonySessionStore.instance.controller.refresh();
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('داخلی به حساب شما وصل شد')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('نگاشت ذخیره شد ($mode)')),
+      );
+    }
+  }
+
+  Future<void> _editPbxSoftphone(Map<String, dynamic> pbx) async {
+    final settings = Map<String, dynamic>.from((pbx['settings'] as Map?) ?? const {});
+    final soft = Map<String, dynamic>.from((settings['softphone'] as Map?) ?? const {});
+    var relay = soft['relay_enabled'] != false;
+    var direct = soft['direct_enabled'] == true;
+    final maxCtrl = TextEditingController(
+      text: '${soft['max_concurrent_softphone_sessions'] ?? 50}',
+    );
+    final portCtrl = TextEditingController(
+      text: '${soft['audiosocket_port'] ?? 9092}',
+    );
+
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setLocal) {
+            return AlertDialog(
+              title: Text('Softphone — ${pbx['name']}'),
+              content: SizedBox(
+                width: 420,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text('فعال بودن Relay'),
+                      subtitle: const Text('صدا از طریق Connector بدون باز کردن PBX'),
+                      value: relay,
+                      onChanged: (v) => setLocal(() => relay = v),
+                    ),
+                    SwitchListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: const Text('فعال بودن Direct'),
+                      subtitle: const Text('رجیستر مستقیم WebRTC/PJSIP (نیاز به دسترسی شبکه به PBX)'),
+                      value: direct,
+                      onChanged: (v) => setLocal(() => direct = v),
+                    ),
+                    TextField(
+                      controller: maxCtrl,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(labelText: 'سقف سشن همزمان Softphone'),
+                    ),
+                    TextField(
+                      controller: portCtrl,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(labelText: 'پورت AudioSocket محلی Connector'),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('انصراف')),
+                FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('ذخیره')),
+              ],
+            );
+          },
+        );
+      },
+    );
+    if (ok != true) return;
+    settings['softphone'] = {
+      ...soft,
+      'relay_enabled': relay,
+      'direct_enabled': direct,
+      'max_concurrent_softphone_sessions': int.tryParse(maxCtrl.text.trim()) ?? 50,
+      'audiosocket_host': soft['audiosocket_host'] ?? '127.0.0.1',
+      'audiosocket_port': int.tryParse(portCtrl.text.trim()) ?? 9092,
+      'media_codec_prefs': soft['media_codec_prefs'] ?? ['pcm_ws_v1'],
+    };
+    await _api.patchPbx(widget.businessId, int.parse('${pbx['id']}'), {'settings': settings});
+    await _load();
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('تنظیمات Softphone ذخیره شد')));
     }
   }
 
@@ -683,7 +863,42 @@ class _TelephonySettingsPageState extends State<TelephonySettingsPage> {
                 const Text(
                   '۱) مرکز تلفن بسازید و توکن را کپی کنید\n'
                   '۲) روی سرور Issabel/Asterisk دستور نصب را اجرا کنید\n'
-                  '۳) داخلی‌ها را تعریف و به کاربران وصل کنید',
+                  '۳) داخلی‌ها را تعریف و به کاربران وصل کنید\n'
+                  '۴) برای Softphone داخل‌برنامه: حالت endpoint را روی Relay بگذارید',
+                ),
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: scheme.primaryContainer.withValues(alpha: 0.35),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: scheme.outlineVariant.withValues(alpha: 0.5)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'راه‌اندازی Softphone Relay',
+                        style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+                      ),
+                      const SizedBox(height: 6),
+                      const Text(
+                        'پس از نصب Connector، روی سرور تلفن:\n'
+                        '• pip install -r requirements-softphone.txt\n'
+                        '• MEDIA_TUNNEL_ENABLED=1 و AUDIOSOCKET_PORT=9092 در .env\n'
+                        '• hesabix-pbx restart\n'
+                        'سپس نگاشت کاربر را Relay کنید و از صفحه Softphone آنلاین شوید.',
+                        style: TextStyle(height: 1.45),
+                      ),
+                      const SizedBox(height: 8),
+                      TextButton.icon(
+                        onPressed: () =>
+                            context.go(context.businessPanelUrl(widget.businessId, 'telephony/softphone')),
+                        icon: const Icon(Icons.headset_mic_outlined),
+                        label: const Text('باز کردن Softphone'),
+                      ),
+                    ],
+                  ),
                 ),
                 const SizedBox(height: 12),
                 Container(
@@ -845,22 +1060,41 @@ class _TelephonySettingsPageState extends State<TelephonySettingsPage> {
                   trailing: TextButton(onPressed: _addPbx, child: const Text('افزودن')),
                 ),
                 ..._pbx.map(
-                  (p) => ListTile(
-                    leading: Icon(
-                      Icons.cloud_done_outlined,
-                      color: '${p['status']}' == 'online' ? const Color(0xFF159947) : scheme.outline,
-                    ),
-                    title: Text('${p['name']}'),
-                    subtitle: Text('${p['status']} · ${p['connector_token_prefix'] ?? ''}…'),
-                    trailing: TextButton(
-                      onPressed: () async {
-                        final r = await _api.rotateToken(widget.businessId, int.parse('${p['id']}'));
-                        setState(() => _freshToken = r['connector_token']?.toString());
-                        await _load();
-                      },
-                      child: const Text('توکن جدید'),
-                    ),
-                  ),
+                  (p) {
+                    final soft = ((p['settings'] as Map?)?['softphone'] as Map?) ?? const {};
+                    final relayOn = soft['relay_enabled'] != false;
+                    final directOn = soft['direct_enabled'] == true;
+                    return ListTile(
+                      leading: Icon(
+                        Icons.cloud_done_outlined,
+                        color: '${p['status']}' == 'online' ? const Color(0xFF159947) : scheme.outline,
+                      ),
+                      title: Text('${p['name']}'),
+                      subtitle: Text(
+                        '${p['status']} · Softphone: '
+                        '${relayOn ? 'Relay' : '—'}'
+                        '${directOn ? '+Direct' : ''} · '
+                        '${p['connector_token_prefix'] ?? ''}…',
+                      ),
+                      trailing: Wrap(
+                        spacing: 4,
+                        children: [
+                          TextButton(
+                            onPressed: () => _editPbxSoftphone(p),
+                            child: const Text('Softphone'),
+                          ),
+                          TextButton(
+                            onPressed: () async {
+                              final r = await _api.rotateToken(widget.businessId, int.parse('${p['id']}'));
+                              setState(() => _freshToken = r['connector_token']?.toString());
+                              await _load();
+                            },
+                            child: const Text('توکن جدید'),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
                 ),
                 const Divider(),
                 ListTile(
@@ -876,14 +1110,31 @@ class _TelephonySettingsPageState extends State<TelephonySettingsPage> {
                 ),
                 const Divider(),
                 ListTile(
-                  title: const Text('نگاشت کاربر ↔ داخلی'),
-                  trailing: TextButton(onPressed: _mapMe, child: const Text('وصل کردن من')),
+                  title: const Text('نگاشت کاربر ↔ داخلی / Softphone'),
+                  subtitle: const Text('حالت Relay برای Softphone داخل اپ، Desk برای تلفن رومیزی'),
+                  trailing: TextButton(onPressed: _mapMe, child: const Text('وصل کردن من (Relay)')),
                 ),
                 ..._userExt.map(
                   (e) => ListTile(
                     leading: const Icon(Icons.person_outline),
                     title: Text('کاربر ${e['user_id']} → داخلی ${e['extension']}'),
-                    subtitle: Text(e['is_primary'] == true ? 'اصلی' : 'فرعی'),
+                    subtitle: Text(
+                      '${e['is_primary'] == true ? 'اصلی' : 'فرعی'} · حالت ${e['endpoint_mode'] ?? 'desk'}'
+                      '${e['allow_mode_fallback'] == false ? ' · بدون fallback' : ''}',
+                    ),
+                    trailing: IconButton(
+                      tooltip: 'ویرایش Softphone',
+                      icon: const Icon(Icons.edit_outlined),
+                      onPressed: () => _editUserExtensionMapping(
+                        userId: int.parse('${e['user_id']}'),
+                        linkId: int.tryParse('${e['id']}'),
+                        extensionId: int.tryParse('${e['extension_id']}'),
+                        endpointMode: '${e['endpoint_mode'] ?? 'desk'}',
+                        allowFallback: e['allow_mode_fallback'] != false,
+                        isPrimary: e['is_primary'] == true,
+                        directSipUser: e['direct_sip_user']?.toString(),
+                      ),
+                    ),
                   ),
                 ),
                 const Divider(),

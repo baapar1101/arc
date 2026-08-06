@@ -1,0 +1,19 @@
+; نمونه دیال‌پلن Softphone Relay حسابیکس
+; مسیر پیشنهادی: /etc/asterisk/extensions_custom.conf یا فایل include سفارشی
+;
+; توجه: این فقط قالب است. قبل از production با dialplan مشتری ادغام شود.
+;
+; نیاز: AudioSocket در Asterisk فعال باشد و Connector روی 127.0.0.1:9092 گوش دهد.
+
+[hesabix-softphone-relay]
+exten => _X.,1,NoOp(Hesabix Softphone Relay for ${EXTEN})
+ same => n,Set(HSX_UUID=${IF($["${HSX_UUID}"=""]?${UNIQUEID}:${HSX_UUID})})
+ same => n,AudioSocket(127.0.0.1:9092,${HSX_UUID})
+ same => n,Hangup()
+
+; برای Originate خروجی Softphone، Connector معمولاً از Local channel
+; به مقصد ترانک می‌زند و پای اپراتور را به AudioSocket پل می‌کند.
+; مثال مفهومی (اجرا توسط AMI، نه کپی مستقیم):
+;   Channel: Local/{destination}@from-internal
+;   Application: AudioSocket
+;   Data: 127.0.0.1:9092,{uuid}

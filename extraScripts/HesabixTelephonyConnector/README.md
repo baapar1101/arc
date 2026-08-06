@@ -81,8 +81,26 @@ hesabix-pbx configure
 
 مقدار پیش‌فرض `HESABIX_API_URL` برابر `https://hsxn.hesabix.ir` است.
 
-## امنیت
+## Softphone Media Relay
 
-- فقط خروجی HTTPS به حسابیکس لازم است؛ پورت AMI را به اینترنت باز نکنید.
-- فایل `.env` با مجوز `600` ذخیره می‌شود.
-- اگر توکن لو رفت: در حسابیکس «توکن جدید» بزنید، بعد `hesabix-pbx configure`.
+از نسخهٔ دارای Softphone، Connector علاوه بر AMI یک **تونل رسانه خروجی (WSS)** به حسابیکس و یک **AudioSocket محلی** (`127.0.0.1:9092`) دارد.
+
+نیازمندی اضافه:
+
+```bash
+pip install websocket-client
+```
+
+متغیرهای `.env`:
+
+```bash
+AUDIOSOCKET_HOST=127.0.0.1
+AUDIOSOCKET_PORT=9092
+MEDIA_TUNNEL_ENABLED=1
+```
+
+نمونه دیال‌پلن: `dialplan/hesabix-softphone-relay.conf.sample`
+
+در حسابیکس: نگاشت کاربر↔داخلی را روی `endpoint_mode=relay` بگذارید، سپس از صفحه Softphone «آنلاین شدن» را بزنید.
+
+**امنیت:** همچنان هیچ پورت ورودی روی PBX لازم نیست؛ فقط خروجی HTTPS/WSS به API حسابیکس.

@@ -2,7 +2,8 @@
 """
 Hesabix Telephony Connector — عامل سمت Issabel/Asterisk
 
-رویدادهای AMI را به Hesabix می‌فرستد و دستورات Originate را اجرا می‌کند.
+رویدادهای AMI را به Hesabix می‌فرستد، دستورات Originate/Softphone را اجرا می‌کند،
+و تونل رسانه خروجی (Softphone Relay) را نگه می‌دارد.
 نصب: روی سرور تلفن مشتری (نه روی سرور حسابیکس).
 
 پیکربندی از متغیر محیطی یا فایل .env:
@@ -14,6 +15,9 @@ Hesabix Telephony Connector — عامل سمت Issabel/Asterisk
   AMI_PORT=5038
   AMI_USER=hesabix
   AMI_SECRET=secret
+  AUDIOSOCKET_HOST=127.0.0.1
+  AUDIOSOCKET_PORT=9092
+  MEDIA_TUNNEL_ENABLED=1
 """
 from __future__ import annotations
 
@@ -28,6 +32,14 @@ from typing import Any, Dict, Optional
 from urllib import error, request
 
 LOG = logging.getLogger("hesabix.telephony.connector")
+
+try:
+	from media_audiosocket import AudioSocketServer
+	from media_tunnel import MediaTunnelClient
+except ImportError:
+	# وقتی به‌صورت پکیج از parent اجرا شود
+	from app.media_audiosocket import AudioSocketServer  # type: ignore
+	from app.media_tunnel import MediaTunnelClient  # type: ignore
 
 
 def load_dotenv(path: str) -> None:
@@ -184,6 +196,33 @@ class AmiClient:
 			}
 		)
 
+	def originate_to_application(
+		self,
+		channel: str,
+		application: str,
+		data: str,
+		*,
+		caller_id: str = "",
+		timeout_ms: int = 30000,
+		variable: Optional[str] = None,
+	) -> None:
+		payload: Dict[str, str] = {
+			"Action": "Originate",
+			"Channel": channel,
+			"Application": application,
+			"Data": data,
+			"Timeout": str(timeout_ms),
+			"Async": "true",
+		}
+		if caller_id:
+			payload["CallerID"] = caller_id
+		if variable:
+			payload["Variable"] = variable
+		self._send(payload)
+
+	def play_dtmf(self, channel: str, digit: str) -> None:
+		self._send({"Action": "PlayDTMF", "Channel": channel, "Digit": digit})
+
 	def hangup(self, channel: str) -> None:
 		self._send({"Action": "Hangup", "Channel": channel})
 
@@ -298,12 +337,93 @@ def main() -> int:
 		return 1
 
 	try:
-		api.heartbeat(status="ok")
+		api.heartbeat(status="ok", media_tunnel=False)
 	except Exception as e:
 		LOG.error("heartbeat حسابیکس ناموفق: %s", e)
 		return 1
 
-	LOG.info("Connector آماده است (AMI + Hesabix OK).")
+	# Softphone media state
+	as_uuid_to_session: Dict[str, str] = {}
+	session_to_as_uuid: Dict[str, str] = {}
+	media_lock = threading.Lock()
+	tunnel_ref: Dict[str, Any] = {"client": None}
+
+	def on_as_pcm(as_uuid: str, pcm: bytes) -> None:
+		with media_lock:
+			session_id = as_uuid_to_session.get(as_uuid)
+		client: Optional[MediaTunnelClient] = tunnel_ref.get("client")
+		if session_id and client:
+			client.send_pcm(session_id, pcm)
+
+	def on_as_hangup(as_uuid: str) -> None:
+		with media_lock:
+			session_id = as_uuid_to_session.pop(as_uuid, None)
+			if session_id:
+				session_to_as_uuid.pop(session_id, None)
+		client = tunnel_ref.get("client")
+		if client and session_id:
+			client.send_json({"type": "bridge.failed", "session_id": session_id, "reason": "audiosocket_hangup", "audiosocket_uuid": as_uuid})
+
+	def on_tunnel_pcm(session_id: str, pcm: bytes) -> None:
+		with media_lock:
+			as_uuid = session_to_as_uuid.get(session_id)
+		if as_uuid:
+			audio_server.send_pcm(as_uuid, pcm)
+
+	def on_tunnel_json(payload: Dict[str, Any]) -> None:
+		typ = payload.get("type")
+		if typ == "bridge.start":
+			session_id = str(payload.get("session_id") or "")
+			as_uuid = str(payload.get("audiosocket_uuid") or "")
+			if session_id and as_uuid:
+				with media_lock:
+					as_uuid_to_session[as_uuid] = session_id
+					session_to_as_uuid[session_id] = as_uuid
+				client = tunnel_ref.get("client")
+				if client:
+					client.send_json({"type": "bridge.active", "bridge_id": payload.get("bridge_id"), "session_id": session_id})
+		elif typ == "bridge.stop":
+			session_id = str(payload.get("session_id") or "")
+			as_uuid = str(payload.get("audiosocket_uuid") or "")
+			with media_lock:
+				if not as_uuid:
+					as_uuid = session_to_as_uuid.pop(session_id, "")
+				else:
+					session_to_as_uuid.pop(session_id, None)
+				if as_uuid:
+					as_uuid_to_session.pop(as_uuid, None)
+			if as_uuid:
+				audio_server.hangup(as_uuid)
+		elif typ == "agent.online":
+			LOG.info("softphone agent online ext=%s session=%s", payload.get("extension"), payload.get("session_id"))
+		elif typ == "agent.offline":
+			LOG.info("softphone agent offline session=%s", payload.get("session_id"))
+
+	audio_host = os.environ.get("AUDIOSOCKET_HOST", "127.0.0.1")
+	audio_port = int(os.environ.get("AUDIOSOCKET_PORT", "9092"))
+	audio_server = AudioSocketServer(host=audio_host, port=audio_port, on_pcm=on_as_pcm, on_hangup=on_as_hangup)
+	try:
+		audio_server.start()
+	except Exception as e:
+		LOG.error("شروع AudioSocket ناموفق: %s — Softphone Relay کار نمی‌کند تا پورت آزاد شود.", e)
+
+	media_enabled = os.environ.get("MEDIA_TUNNEL_ENABLED", "1") != "0"
+	if media_enabled:
+		tunnel = MediaTunnelClient(
+			api_base=api.base,
+			business_id=api.business_id,
+			pbx_id=api.pbx_id,
+			token=api.token,
+			on_json=on_tunnel_json,
+			on_pcm=on_tunnel_pcm,
+		)
+		tunnel_ref["client"] = tunnel
+		tunnel.start()
+		LOG.info("Media tunnel starter → %s", tunnel.ws_url)
+	else:
+		LOG.warning("MEDIA_TUNNEL_ENABLED=0 — فقط CTI بدون Softphone Relay")
+
+	LOG.info("Connector آماده است (AMI + Hesabix + Softphone media).")
 
 	last_hb = 0.0
 	last_poll = 0.0
@@ -311,8 +431,11 @@ def main() -> int:
 		for ev in ami.read_events():
 			now = time.time()
 			if now - last_hb > 60:
-				api.heartbeat(status="ok")
+				api.heartbeat(status="ok", media_tunnel=bool(tunnel_ref.get("client") and tunnel_ref["client"].connected))
 				last_hb = now
+				client = tunnel_ref.get("client")
+				if client and client.connected:
+					client.send_json({"type": "ping", "ts": int(now)})
 			if now - last_poll > 2:
 				for cmd in api.poll_commands():
 					cid = cmd.get("command_id")
@@ -325,10 +448,87 @@ def main() -> int:
 								context=str(cmd.get("context") or "from-internal"),
 								timeout_ms=int(cmd.get("timeout_ms") or 30000),
 							)
+						elif ctype == "softphone_bridge_out":
+							destination = str(cmd.get("destination"))
+							context = str(cmd.get("context") or "from-internal")
+							as_uuid = str(cmd.get("audiosocket_uuid") or uuid.uuid4())
+							session_id = str(cmd.get("session_id") or "")
+							host = str(cmd.get("audiosocket_host") or audio_host)
+							port = int(cmd.get("audiosocket_port") or audio_port)
+							with media_lock:
+								if session_id:
+									as_uuid_to_session[as_uuid] = session_id
+									session_to_as_uuid[session_id] = as_uuid
+							# کانال مقصد را Originate کن و Application=AudioSocket برای پای اپراتور
+							# الگوی پایدار: Local/{dest}@context وارد شود و همزمان AudioSocket برای پل
+							ami.originate_to_application(
+								channel=f"Local/{destination}@{context}",
+								application="AudioSocket",
+								data=f"{host}:{port},{as_uuid}",
+								caller_id=str(cmd.get("extension") or ""),
+								timeout_ms=int(cmd.get("timeout_ms") or 30000),
+								variable=f"HSX_UUID={as_uuid}",
+							)
+							client = tunnel_ref.get("client")
+							if client:
+								client.send_json(
+									{
+										"type": "bridge.active",
+										"session_id": session_id,
+										"audiosocket_uuid": as_uuid,
+										"call_id": cmd.get("call_id"),
+									}
+								)
+						elif ctype == "softphone_bridge_in":
+							as_uuid = str(cmd.get("audiosocket_uuid") or uuid.uuid4())
+							session_id = str(cmd.get("session_id") or "")
+							channel = cmd.get("channel")
+							host = str(cmd.get("audiosocket_host") or audio_host)
+							port = int(cmd.get("audiosocket_port") or audio_port)
+							with media_lock:
+								if session_id:
+									as_uuid_to_session[as_uuid] = session_id
+									session_to_as_uuid[session_id] = as_uuid
+							if channel:
+								# انتقال کانال زنگ‌خور به AudioSocket
+								ami.redirect(str(channel), "s", context="hesabix-softphone-relay")
+								# اگر redirect سفارشی ممکن نباشد، Originate موازی
+							else:
+								ext = str(cmd.get("extension") or "")
+								ami.originate_to_application(
+									channel=f"Local/{ext}@from-internal",
+									application="AudioSocket",
+									data=f"{host}:{port},{as_uuid}",
+									caller_id=ext,
+									timeout_ms=30000,
+									variable=f"HSX_UUID={as_uuid}",
+								)
+							client = tunnel_ref.get("client")
+							if client:
+								client.send_json(
+									{
+										"type": "bridge.active",
+										"session_id": session_id,
+										"audiosocket_uuid": as_uuid,
+										"call_id": cmd.get("call_id"),
+									}
+								)
+						elif ctype == "softphone_dtmf":
+							channel = cmd.get("channel")
+							digit = str(cmd.get("digit") or "")
+							if channel and digit:
+								ami.play_dtmf(str(channel), digit)
 						elif ctype == "hangup":
 							channel = cmd.get("channel")
 							if channel:
 								ami.hangup(str(channel))
+							session_id = str(cmd.get("session_id") or "")
+							with media_lock:
+								as_uuid = session_to_as_uuid.pop(session_id, None) if session_id else None
+								if as_uuid:
+									as_uuid_to_session.pop(as_uuid, None)
+							if as_uuid:
+								audio_server.hangup(as_uuid)
 						elif ctype == "transfer":
 							channel = cmd.get("channel")
 							target = cmd.get("target")
@@ -354,6 +554,10 @@ def main() -> int:
 		LOG.exception("حلقه رویداد قطع شد: %s", e)
 		return 1
 	finally:
+		client = tunnel_ref.get("client")
+		if client:
+			client.stop()
+		audio_server.stop()
 		ami.close()
 	return 0
 

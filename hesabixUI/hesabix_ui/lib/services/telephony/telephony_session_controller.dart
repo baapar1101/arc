@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 import '../in_app_notifications_hub.dart';
+import 'softphone_engine.dart';
 import 'telephony_api.dart';
 
 /// وضعیت جلسه تلفن برای یک کسب‌وکار در کلاینت.
@@ -26,6 +27,22 @@ class TelephonySessionController extends ChangeNotifier {
   bool get pluginLikelyActive => _pluginLikelyActive;
 
   String get presenceLabel {
+    final softEngine = SoftphoneEngineStore.instance.engine;
+    if (softEngine != null && softEngine.businessId == _businessId) {
+      switch (softEngine.state) {
+        case SoftphoneConnectionState.ringing:
+          return 'ringing';
+        case SoftphoneConnectionState.inCall:
+          return 'in_call';
+        case SoftphoneConnectionState.registered:
+          return 'idle';
+        case SoftphoneConnectionState.error:
+        case SoftphoneConnectionState.reconnecting:
+          return 'offline';
+        default:
+          break;
+      }
+    }
     final status = '${activeCall?['status'] ?? ''}';
     if (status == 'ringing') return 'ringing';
     if (status == 'answered') return 'in_call';
@@ -36,6 +53,14 @@ class TelephonySessionController extends ChangeNotifier {
     }
     if (contextData?['has_extension'] == true) return 'idle';
     return 'no_extension';
+  }
+
+  String? get endpointMode {
+    final primary = contextData?['primary'];
+    if (primary is Map) return '${primary['endpoint_mode'] ?? 'desk'}';
+    final soft = contextData?['softphone'];
+    if (soft is Map) return '${soft['endpoint_mode'] ?? ''}';
+    return null;
   }
 
   String? get primaryExtension {
@@ -163,6 +188,20 @@ class TelephonySessionController extends ChangeNotifier {
   }) async {
     final bid = _businessId;
     if (bid == null) return null;
+
+    // اگر Softphone Relay آنلاین است، تماس از داخل اپ برود (نه Originate به گوشی خارجی)
+    final engine = SoftphoneEngineStore.instance.engine;
+    final mode = endpointMode;
+    if (engine != null &&
+        engine.businessId == bid &&
+        engine.isReady &&
+        (mode == null || mode == 'relay' || mode.isEmpty)) {
+      await engine.dial(destination, personId: personId, leadId: leadId);
+      activeCall = engine.activeCall;
+      notifyListeners();
+      return {'call': activeCall, 'via': 'softphone_relay'};
+    }
+
     final result = await _api.clickToCall(bid, {
       'destination': destination,
       if (personId != null) 'person_id': personId,

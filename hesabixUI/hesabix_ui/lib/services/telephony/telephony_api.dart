@@ -64,6 +64,14 @@ class TelephonyApi {
     return _data(res.data);
   }
 
+  Future<Map<String, dynamic>> patchPbx(int businessId, int pbxId, Map<String, dynamic> payload) async {
+    final res = await _api.patch<Map<String, dynamic>>(
+      '/api/v1/telephony/business/$businessId/pbx/$pbxId',
+      data: payload,
+    );
+    return _data(res.data);
+  }
+
   Future<List<Map<String, dynamic>>> listExtensions(int businessId, {int? pbxId}) async {
     final res = await _api.get<Map<String, dynamic>>(
       '/api/v1/telephony/business/$businessId/extensions',
@@ -253,5 +261,72 @@ class TelephonyApi {
     await _api.post<Map<String, dynamic>>(
       '/api/v1/telephony/business/$businessId/ops/dead-letters/$dlqId/resolve',
     );
+  }
+
+  // ── Softphone Relay ──────────────────────────────────────────────────────
+
+  Future<Map<String, dynamic>> softphoneHealth(int businessId) async {
+    final res = await _api.get<Map<String, dynamic>>('/api/v1/telephony/business/$businessId/softphone/health');
+    return _data(res.data);
+  }
+
+  Future<Map<String, dynamic>> softphoneDevicesConfig(int businessId) async {
+    final res =
+        await _api.get<Map<String, dynamic>>('/api/v1/telephony/business/$businessId/softphone/devices-config');
+    return _data(res.data);
+  }
+
+  Future<Map<String, dynamic>> createSoftphoneSession(int businessId, Map<String, dynamic> payload) async {
+    final res = await _api.post<Map<String, dynamic>>(
+      '/api/v1/telephony/business/$businessId/softphone/sessions',
+      data: payload,
+    );
+    return _data(res.data);
+  }
+
+  Future<Map<String, dynamic>> softphoneHeartbeat(int businessId, String sessionId) async {
+    final res = await _api.post<Map<String, dynamic>>(
+      '/api/v1/telephony/business/$businessId/softphone/sessions/$sessionId/heartbeat',
+    );
+    return _data(res.data);
+  }
+
+  Future<Map<String, dynamic>> endSoftphoneSession(int businessId, String sessionId) async {
+    final res = await _api.delete<Map<String, dynamic>>(
+      '/api/v1/telephony/business/$businessId/softphone/sessions/$sessionId',
+    );
+    return _data(res.data);
+  }
+
+  Future<Map<String, dynamic>> softphoneOutboundCall(int businessId, Map<String, dynamic> payload) async {
+    final res = await _api.post<Map<String, dynamic>>(
+      '/api/v1/telephony/business/$businessId/softphone/calls',
+      data: payload,
+    );
+    return _data(res.data);
+  }
+
+  Future<Map<String, dynamic>> softphoneAnswerCall(
+    int businessId,
+    int callId,
+    Map<String, dynamic> payload,
+  ) async {
+    final res = await _api.post<Map<String, dynamic>>(
+      '/api/v1/telephony/business/$businessId/softphone/calls/$callId/answer',
+      data: payload,
+    );
+    return _data(res.data);
+  }
+
+  Future<Map<String, dynamic>> softphoneDtmf(
+    int businessId,
+    int callId,
+    Map<String, dynamic> payload,
+  ) async {
+    final res = await _api.post<Map<String, dynamic>>(
+      '/api/v1/telephony/business/$businessId/softphone/calls/$callId/dtmf',
+      data: payload,
+    );
+    return _data(res.data);
   }
 }

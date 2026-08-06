@@ -151,12 +151,73 @@ class TelephonyUserExtension(Base):
 	receive_screen_pop: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="1")
 	can_click_to_call: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="1")
 	caller_id_override: Mapped[str | None] = mapped_column(String(40), nullable=True)
+	endpoint_mode: Mapped[str] = mapped_column(
+		String(20),
+		nullable=False,
+		default="desk",
+		server_default="desk",
+		comment="relay | direct | desk",
+	)
+	allow_mode_fallback: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="1")
+	direct_sip_user: Mapped[str | None] = mapped_column(String(80), nullable=True)
 	created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
 	updated_at: Mapped[datetime] = mapped_column(
 		DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
 	)
 
 	extension_row: Mapped["TelephonyExtension"] = relationship(back_populates="user_links")
+
+
+class TelephonySoftphoneSession(Base):
+	"""سشن Softphone (رجیستر رسانه / آماده‌باش اپراتور)."""
+
+	__tablename__ = "telephony_softphone_sessions"
+	__table_args__ = (
+		UniqueConstraint("session_id", name="uq_telephony_softphone_sessions_sid"),
+		Index("idx_telephony_softphone_sessions_biz_user", "business_id", "user_id"),
+		Index("idx_telephony_softphone_sessions_pbx_state", "pbx_id", "state"),
+		Index("idx_telephony_softphone_sessions_expires", "expires_at"),
+	)
+
+	id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+	session_id: Mapped[str] = mapped_column(String(36), nullable=False)
+	business_id: Mapped[int] = mapped_column(
+		Integer, ForeignKey("businesses.id", ondelete="CASCADE"), nullable=False, index=True
+	)
+	pbx_id: Mapped[int] = mapped_column(
+		Integer, ForeignKey("telephony_pbx_connections.id", ondelete="CASCADE"), nullable=False, index=True
+	)
+	user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+	extension: Mapped[str] = mapped_column(String(32), nullable=False)
+	mode: Mapped[str] = mapped_column(
+		String(20), nullable=False, default="relay", server_default="relay", comment="relay | direct"
+	)
+	state: Mapped[str] = mapped_column(
+		String(30),
+		nullable=False,
+		default="creating",
+		server_default="creating",
+		comment="creating | registered | ringing | in_call | ended | failed",
+	)
+	media_ticket_hash: Mapped[str] = mapped_column(String(128), nullable=False)
+	media_ticket_prefix: Mapped[str | None] = mapped_column(String(16), nullable=True)
+	media_edge_node: Mapped[str | None] = mapped_column(String(80), nullable=True)
+	connector_tunnel_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
+	call_id: Mapped[int | None] = mapped_column(
+		Integer, ForeignKey("telephony_calls.id", ondelete="SET NULL"), nullable=True
+	)
+	ice_policy: Mapped[str | None] = mapped_column(String(40), nullable=True)
+	turn_used: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="0")
+	last_quality_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+	client_info: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+	last_heartbeat_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+	expires_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+	ended_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+	end_reason: Mapped[str | None] = mapped_column(String(120), nullable=True)
+	created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+	updated_at: Mapped[datetime] = mapped_column(
+		DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False
+	)
 
 
 class TelephonyQueue(Base):
