@@ -907,6 +907,7 @@ app/services/support/ticket_event_service.py
 app/services/support/ticket_lifecycle_service.py
 app/services/telephony/__init__.py
 app/services/telephony/live_service.py
+app/services/telephony/media_edge.py
 app/services/telephony/media_hub.py
 app/services/telephony/phone_normalizer.py
 app/services/telephony/recording_service.py
@@ -1245,6 +1246,7 @@ tests/test_stock_count.py
 tests/test_sunway_sms_provider.py
 tests/test_tax_key_material_service.py
 tests/test_telegram_link_token_expiry.py
+tests/test_telephony_media_edge.py
 tests/test_telephony_phone_normalizer.py
 tests/test_telephony_softphone_media_hub.py
 tests/test_template_design_v2_compiler.py

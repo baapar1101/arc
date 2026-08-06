@@ -1,0 +1,68 @@
+<p>فصل <strong>بانکداری و نقدینگی</strong> جریان پول واقعی کسب‌وکار شما را در حسابیکس آرک مدیریت می‌کند: حساب بانکی، صندوق نقد، تنخواه، دریافت و پرداخت از مشتری/تأمین‌کننده، انتقال بین حساب‌ها و چک.</p>
+
+<h2>ساختار منو</h2>
+
+<h3>زیرمنوی «بانکداری»</h3>
+<table>
+<thead><tr><th>آیتم</th><th>مسیر</th><th>کاربرد</th></tr></thead>
+<tbody>
+<tr><td><strong>حساب‌ها</strong> (+)</td><td><code>/accounts</code></td><td>حساب بانکی سازمانی</td></tr>
+<tr><td><strong>تنخواه</strong> (+)</td><td><code>/petty-cash</code></td><td>تنخواه گردان</td></tr>
+<tr><td><strong>صندوق</strong> (+)</td><td><code>/cash-box</code></td><td>صندوق فروشگاه/نقد</td></tr>
+<tr><td><strong>کیف پول</strong></td><td><code>/wallet</code></td><td>کیف پول Hesabix (شارژ، تسویه)</td></tr>
+<tr><td><strong>تسهیلات</strong></td><td><code>/loan-facilities</code></td><td>وام و اقساط بانکی</td></tr>
+</tbody>
+</table>
+
+<h3>آیتم‌های مرتبط در «حسابداری»</h3>
+<table>
+<thead><tr><th>آیتم</th><th>مسیر</th></tr></thead>
+<tbody>
+<tr><td><strong>دریافت و پرداخت</strong> (+)</td><td><code>/receipts-payments</code></td></tr>
+<tr><td><strong>انتقالات</strong></td><td><code>/transfers</code></td></tr>
+<tr><td><strong>چک‌ها</strong></td><td><code>/checks</code></td></tr>
+</tbody>
+</table>
+
+<h2>درس‌های فصل</h2>
+<table>
+<thead><tr><th>درس</th><th>موضوع</th><th>دسترسی</th></tr></thead>
+<tbody>
+<tr><td><strong>تعریف حساب بانکی</strong></td><td>بانک، صندوق، تنخواه — ساختار مشابه</td><td>رایگان</td></tr>
+<tr><td><strong>دریافت و پرداخت</strong></td><td>تسویه مشتری/تأمین‌کننده، لینک فاکتور، اقساط</td><td>رایگان</td></tr>
+<tr><td><strong>مدیریت چک‌ها</strong></td><td>ثبت، سپرده، وصول، واگذاری، برگشت</td><td>اعضا</td></tr>
+</tbody>
+</table>
+
+<h2>جریان مالی ساده</h2>
+<pre>
+فاکتور فروش (بدهی مشتری)
+    ↓
+دریافت (نقد/بانک/چک) ← طرف: مشتری | حساب: صندوق
+    ↓
+مانده مشتری کم می‌شود — گزارش بانک/صندوق زیاد می‌شود
+</pre>
+
+<h2>گزارش‌ها و داشبورد</h2>
+<ul>
+<li><strong>گزارش‌ها</strong> ← گزارشات بانک و صندوق: گردش حساب‌های بانکی، گردش صندوق و تنخواه</li>
+<li>ویجت داشبورد: چک‌های امروز/فردا/ماه، آخرین دریافت و پرداخت</li>
+<li>کلیک روی نام حساب بانکی در لیست → <strong>کاردکس</strong> همان حساب</li>
+</ul>
+
+<h2>دسترسی‌ها (خلاصه)</h2>
+<ul>
+<li><code>bank_accounts</code> — حساب‌های بانکی</li>
+<li><code>cash</code> — صندوق</li>
+<li><code>petty_cash</code> — تنخواه</li>
+<li><code>people_transactions</code> — دریافت و پرداخت</li>
+<li><code>checks</code> — چک (+ وصول، انتقال، برگشت)</li>
+<li><code>transfers</code> — انتقالات</li>
+</ul>
+
+<h2>ترتیب یادگیری</h2>
+<ol>
+<li>حداقل یک <strong>صندوق</strong> یا <strong>حساب بانکی</strong></li>
+<li><strong>دریافت و پرداخت</strong> پس از اولین فاکتور</li>
+<li><strong>چک‌ها</strong> اگر با چک کار می‌کنید</li>
+</ol>
