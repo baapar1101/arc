@@ -148,6 +148,9 @@ def should_skip_firewall_path(path: str) -> bool:
 	# مدیریت فایروال باید حتی وقتی IP در لیست رد است در دسترس باشد (با توکن معتبر)
 	if path.startswith("/api/v1/admin/firewall"):
 		return True
+	# WebSocketها معمولاً از HTTP middleware رد نمی‌شوند؛ برای probeهای HTTP و یکنواختی
+	if path.startswith("/ws/"):
+		return True
 	return False
 
 

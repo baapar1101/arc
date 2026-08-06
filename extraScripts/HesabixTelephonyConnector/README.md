@@ -124,3 +124,29 @@ MEDIA_TUNNEL_ENABLED=1
 در حسابیکس: نگاشت کاربر↔داخلی را روی `endpoint_mode=relay` بگذارید، سپس از صفحه Softphone «آنلاین شدن» را بزنید.
 
 **امنیت:** همچنان هیچ پورت ورودی روی PBX لازم نیست؛ فقط خروجی HTTPS/WSS به API حسابیکس.
+
+### عیب‌یابی: `Handshake status 403 Forbidden`
+
+اگر AMI و AudioSocket بالا می‌آیند ولی تونل رسانه با **403** قطع می‌شود:
+
+1. روی خودِ PBX تست کنید (باید `101 Switching Protocols` ببینید، نه 403):
+
+```bash
+python3 - <<'PY'
+from websocket import create_connection
+url = "wss://hsxn.hesabix.ir/ws/telephony/connector/media"
+ws = create_connection(url, timeout=10, suppress_origin=True)
+print("OK", ws.connected)
+ws.close()
+PY
+```
+
+2. اگر همین تست روی PBX **403** است ولی از جای دیگر OK است → معمولاً **WAF آروان** IP عمومی سرور PBX را برای Upgrade وب‌سوکت مسدود کرده. IP را در پنل آروان whitelist کنید، یا تونل را به origin مستقیم بزنید:
+
+```bash
+# در /opt/HesabixTelephonyConnector/.env
+HESABIX_MEDIA_WS_URL=wss://YOUR_ORIGIN_HOST/ws/telephony/connector/media
+systemctl restart hesabix-telephony-connector
+```
+
+3. اگر تست OK است ولی سرویس هنوز 403 می‌دهد → `hesabix-pbx update` و ری‌استارت سرویس.
