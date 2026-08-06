@@ -31,6 +31,7 @@ class _SmsBankAssistantSettingsPageState extends State<SmsBankAssistantSettingsP
   List<SmsBankEvent> _events = [];
   final _minAmountController = TextEditingController();
   final _sampleController = TextEditingController();
+  final _sampleSenderController = TextEditingController(text: 'Tejarat');
 
   String? get _businessName {
     final current = ApiClient.getAuthStore()?.currentBusiness;
@@ -50,6 +51,7 @@ class _SmsBankAssistantSettingsPageState extends State<SmsBankAssistantSettingsP
   void dispose() {
     _minAmountController.dispose();
     _sampleController.dispose();
+    _sampleSenderController.dispose();
     super.dispose();
   }
 
@@ -177,9 +179,10 @@ class _SmsBankAssistantSettingsPageState extends State<SmsBankAssistantSettingsP
       SnackBarHelper.showError(context, message: 'متن پیامک نمونه را وارد کنید');
       return;
     }
+    final sender = _sampleSenderController.text.trim();
     final match = await _service.testMatch(
       body: body,
-      sender: '',
+      sender: sender,
       patterns: _patterns,
       preferredBusinessId: widget.businessId,
     );
@@ -212,7 +215,9 @@ class _SmsBankAssistantSettingsPageState extends State<SmsBankAssistantSettingsP
       return;
     }
     final event = await _service.processIncomingSms(
-      sender: 'TEST',
+      sender: _sampleSenderController.text.trim().isEmpty
+          ? 'Tejarat'
+          : _sampleSenderController.text.trim(),
       body: body,
       notify: true,
       preferredBusinessId: widget.businessId,
@@ -442,6 +447,15 @@ class _SmsBankAssistantSettingsPageState extends State<SmsBankAssistantSettingsP
                 Text(
                   'آزمایش با پیامک نمونه',
                   style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: _sampleSenderController,
+                  decoration: const InputDecoration(
+                    labelText: 'فرستنده (برای تست واقعی‌تر)',
+                    hintText: 'مثلاً Tejarat یا بانک ملت',
+                    border: OutlineInputBorder(),
+                  ),
                 ),
                 const SizedBox(height: 8),
                 TextField(

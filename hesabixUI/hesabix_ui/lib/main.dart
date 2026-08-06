@@ -4648,6 +4648,7 @@ class _MyAppState extends State<MyApp> {
                 child: SmsBankBootstrap(
                   authStore: _authStore!,
                   calendarController: _calendarController,
+                  biometricLockController: _biometricLockController,
                   child: AndroidUpdateGate(
                     child: WindowsCloseConfirmGate(
                       child: WindowsUpdateGate(

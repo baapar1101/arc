@@ -5,6 +5,8 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/android_sms_bank_platform.dart';
 import '../../core/auth_store.dart';
+import '../../core/biometric_lock_controller.dart';
+import '../../core/biometric_platform.dart';
 import '../../core/calendar_controller.dart';
 import '../../services/notification_tap_navigation.dart';
 import '../../services/sms_bank/sms_bank_assistant_service.dart';
@@ -17,6 +19,7 @@ import 'sms_quick_capture_sheet.dart';
 class SmsBankBootstrap extends StatefulWidget {
   final AuthStore authStore;
   final CalendarController? calendarController;
+  final BiometricLockController? biometricLockController;
   final Widget child;
 
   const SmsBankBootstrap({
@@ -24,6 +27,7 @@ class SmsBankBootstrap extends StatefulWidget {
     required this.authStore,
     required this.child,
     this.calendarController,
+    this.biometricLockController,
   });
 
   @override
@@ -35,6 +39,11 @@ class _SmsBankBootstrapState extends State<SmsBankBootstrap> with WidgetsBinding
   bool _ready = false;
   bool _showing = false;
   String? _lastShownId;
+  /// Held while biometric lock is active; presented after unlock.
+  SmsBankEvent? _waitingForUnlock;
+
+  bool get _isBiometricLocked =>
+      supportsBiometricLock && (widget.biometricLockController?.isLocked ?? false);
 
   @override
   void initState() {
@@ -42,7 +51,17 @@ class _SmsBankBootstrapState extends State<SmsBankBootstrap> with WidgetsBinding
     WidgetsBinding.instance.addObserver(this);
     SmsBankCaptureNavigation.instance.addListener(_onQueued);
     widget.authStore.addListener(_onAuth);
+    widget.biometricLockController?.addListener(_onLockChanged);
     unawaited(_boot());
+  }
+
+  @override
+  void didUpdateWidget(covariant SmsBankBootstrap oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.biometricLockController != widget.biometricLockController) {
+      oldWidget.biometricLockController?.removeListener(_onLockChanged);
+      widget.biometricLockController?.addListener(_onLockChanged);
+    }
   }
 
   @override
@@ -50,13 +69,29 @@ class _SmsBankBootstrapState extends State<SmsBankBootstrap> with WidgetsBinding
     WidgetsBinding.instance.removeObserver(this);
     SmsBankCaptureNavigation.instance.removeListener(_onQueued);
     widget.authStore.removeListener(_onAuth);
+    widget.biometricLockController?.removeListener(_onLockChanged);
     _service.setOnEvent(null);
     super.dispose();
   }
 
   void _onAuth() => unawaited(_syncBusinessAndDrain());
 
+  void _onLockChanged() {
+    if (_isBiometricLocked) return;
+    final waiting = _waitingForUnlock ?? SmsBankCaptureNavigation.instance.peek();
+    if (waiting != null) {
+      _waitingForUnlock = null;
+      unawaited(_present(waiting));
+      return;
+    }
+    unawaited(_syncBusinessAndDrain());
+  }
+
   void _onQueued(SmsBankEvent event) {
+    if (_isBiometricLocked) {
+      _waitingForUnlock = event;
+      return;
+    }
     unawaited(_present(event));
   }
 
@@ -100,13 +135,17 @@ class _SmsBankBootstrapState extends State<SmsBankBootstrap> with WidgetsBinding
       }
     }
 
-    final launchId = await _service.consumeLaunchEventId();
+    final launchId = await _service.peekLaunchEventId();
     if (launchId != null && launchId.isNotEmpty) {
       final event = await _resolveEvent(launchId);
       if (event != null) {
         await _present(event);
         return;
       }
+    }
+
+    if (_isBiometricLocked) {
+      return;
     }
 
     final settings = await _service.getSettings();
@@ -125,6 +164,9 @@ class _SmsBankBootstrapState extends State<SmsBankBootstrap> with WidgetsBinding
   Future<SmsBankEvent?> _resolveEvent(String id) async {
     final cached = await _service.getEvent(id);
     if (cached != null) return cached;
+    final taken = await _service.takePendingEvent(id);
+    if (taken != null) return taken;
+    // Fallback: legacy path if native take is unavailable.
     final pending = await _service.drainPendingEvents();
     for (final e in pending) {
       if (e.id == id) return e;
@@ -152,6 +194,10 @@ class _SmsBankBootstrapState extends State<SmsBankBootstrap> with WidgetsBinding
       SmsBankCaptureNavigation.instance.enqueue(event);
       return;
     }
+    if (_isBiometricLocked) {
+      _waitingForUnlock = event;
+      return;
+    }
     if (event.status != SmsBankEventStatus.pending &&
         event.status != SmsBankEventStatus.captured) {
       return;
@@ -159,12 +205,28 @@ class _SmsBankBootstrapState extends State<SmsBankBootstrap> with WidgetsBinding
 
     await Future<void>.delayed(Duration.zero);
     if (!mounted) return;
+    if (_isBiometricLocked) {
+      _waitingForUnlock = event;
+      return;
+    }
 
     _ensureSafeRouteForCapture();
 
     _showing = true;
     _lastShownId = event.id;
     SmsBankCaptureNavigation.instance.consume();
+    if (!mounted) {
+      _showing = false;
+      _waitingForUnlock = event;
+      return;
+    }
+    // Clear launch id only once we are about to show the sheet successfully.
+    await _service.clearLaunchEventId();
+    if (!mounted) {
+      _showing = false;
+      _waitingForUnlock = event;
+      return;
+    }
     try {
       await showSmsQuickCaptureSheet(
         context: context,

@@ -111,8 +111,9 @@ object SmsBankNotifier {
 
         try {
             NotificationManagerCompat.from(context).notify(notifId, builder.build())
-        } catch (_: SecurityException) {
-            // POST_NOTIFICATIONS may be missing on Android 13+
+        } catch (e: SecurityException) {
+            // POST_NOTIFICATIONS may be missing on Android 13+; event stays in pending queue.
+            android.util.Log.w("SmsBankNotifier", "Notification permission missing", e)
         }
     }
 

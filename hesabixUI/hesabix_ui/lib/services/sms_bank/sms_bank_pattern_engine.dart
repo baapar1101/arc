@@ -1,4 +1,5 @@
 import '../../utils/number_normalizer.dart';
+import 'sms_bank_match_policy.dart';
 import 'sms_bank_models.dart';
 
 /// Converts user-friendly templates into regex and extracts bank SMS fields.
@@ -39,23 +40,39 @@ class SmsBankPatternEngine {
     required String sender,
     required List<SmsBankPattern> patterns,
   }) {
-    final normalizedBody = _normalizeBody(body);
-    final normalizedSender = _normalizeBody(sender);
+    final normalizedBody = SmsBankMatchPolicy.normalize(body);
+    final normalizedSender = SmsBankMatchPolicy.normalize(sender);
     final results = <SmsBankMatchResult>[];
 
     for (final pattern in patterns.where((p) => p.enabled)) {
-      final hintsOk = _senderMatches(normalizedSender, normalizedBody, pattern.senderHints);
-      if (!hintsOk && pattern.senderHints.isNotEmpty) continue;
+      // Empty hints never match (blocks legacy broad seeds like short_signed).
+      if (pattern.senderHints.isEmpty) continue;
+
+      final requireSender = SmsBankMatchPolicy.isGenericSeedId(pattern.id);
+      final hintsOk = SmsBankMatchPolicy.senderHintsAllowMatch(
+        sender: normalizedSender,
+        body: normalizedBody,
+        hints: pattern.senderHints,
+        requireSenderForGeneric: requireSender,
+      );
+      if (!hintsOk) continue;
+
+      // Generic seeds additionally require a bank-looking sender.
+      if (requireSender && !SmsBankMatchPolicy.senderLooksLikeBank(normalizedSender)) {
+        continue;
+      }
 
       var result = _matchTemplate(normalizedBody, pattern);
       if (!result.matched) continue;
-      result = _withScoreBonuses(result, pattern, hintsMatched: hintsOk || pattern.senderHints.isEmpty);
+      result = _withScoreBonuses(result, pattern, hintsMatched: true);
+      if (result.confidence < SmsBankMatchPolicy.minAcceptConfidence) continue;
       results.add(result);
     }
 
     if (results.isEmpty) {
       final heuristic = _heuristicMatch(normalizedBody, normalizedSender, patterns);
-      if (heuristic.matched) {
+      if (heuristic.matched &&
+          heuristic.confidence >= SmsBankMatchPolicy.minAcceptConfidence) {
         results.add(heuristic);
       }
     }
@@ -193,33 +210,10 @@ class SmsBankPatternEngine {
     return match(body: sampleBody, sender: sender, patterns: [pattern]);
   }
 
-  static String _normalizeBody(String input) {
-    var s = toEnglishDigits(input);
-    // Normalize Arabic Yeh/Kaf variants commonly used in bank SMS
-    s = s
-        .replaceAll('ي', 'ی')
-        .replaceAll('ك', 'ک')
-        .replaceAll('\u200f', '')
-        .replaceAll('\u200e', '')
-        .replaceAll('\u202a', '')
-        .replaceAll('\u202c', '')
-        .replaceAll('\u202b', '')
-        .replaceAll('\u00a0', ' ');
-    return s.trim();
-  }
-
-  static bool _senderMatches(String sender, String body, List<String> hints) {
-    if (hints.isEmpty) return true;
-    final hay = '$sender\n$body'.toLowerCase();
-    for (final h in hints) {
-      final needle = _normalizeBody(h).toLowerCase();
-      if (needle.isNotEmpty && hay.contains(needle)) return true;
-    }
-    return false;
-  }
+  static String _normalizeBody(String input) => SmsBankMatchPolicy.normalize(input);
 
   static SmsBankMatchResult _matchTemplate(String body, SmsBankPattern pattern) {
-    final template = pattern.template.trim();
+    final template = SmsBankMatchPolicy.normalize(pattern.template).trim();
     if (template.isEmpty) return SmsBankMatchResult.none;
 
     final regex = _templateToRegex(template);
@@ -233,9 +227,9 @@ class SmsBankPatternEngine {
       final softRegex = _templateToRegex(softTemplate);
       final m2 = softRegex?.firstMatch(softBody);
       if (m2 == null) return SmsBankMatchResult.none;
-      return _resultFromMatch(m2, pattern, confidence: 0.85);
+      return _resultFromMatch(m2, pattern, body: softBody, confidence: 0.85);
     }
-    return _resultFromMatch(m, pattern, confidence: 1.0);
+    return _resultFromMatch(m, pattern, body: body, confidence: 1.0);
   }
 
   static RegExp? _templateToRegex(String template) {
@@ -292,6 +286,7 @@ class SmsBankPatternEngine {
   static SmsBankMatchResult _resultFromMatch(
     RegExpMatch m,
     SmsBankPattern pattern, {
+    required String body,
     required double confidence,
   }) {
     final fields = <String, String>{};
@@ -302,11 +297,18 @@ class SmsBankPatternEngine {
 
     final amountRaw = fields['amount'] ?? fields['amount_signed'] ?? '';
     final amount = parseAmount(amountRaw);
-    final direction = _resolveDirection(
+    var direction = _resolveDirection(
       fields['direction'],
       amountRaw,
       amount,
     );
+    if (direction == SmsBankDirection.unknown) {
+      if (RegExp(r'برداشت').hasMatch(body)) {
+        direction = SmsBankDirection.debit;
+      } else if (RegExp(r'واریز|واريز').hasMatch(body)) {
+        direction = SmsBankDirection.credit;
+      }
+    }
     final balance = fields.containsKey('balance') ? parseAmount(fields['balance']!) : null;
 
     if (amount == null || amount <= 0) {
@@ -336,21 +338,25 @@ class SmsBankPatternEngine {
     String sender,
     List<SmsBankPattern> patterns,
   ) {
-    // Prefer patterns whose sender hints match, even without template hit
+    // Prefer patterns whose sender hints match on the *sender* (not body alone).
     SmsBankPattern? hinted;
     for (final p in patterns.where((e) => e.enabled)) {
-      if (_senderMatches(sender, body, p.senderHints)) {
+      if (p.senderHints.isEmpty) continue;
+      if (SmsBankMatchPolicy.hintMatchesSender(sender, p.senderHints)) {
         hinted = p;
         break;
       }
     }
 
-    // Generic Iranian bank SMS cues
-    final looksBank = RegExp(
-      r'مانده|موجودی|برداشت|واریز|واريز|ریال|ريال|بانک|بانك|شتاب',
-      caseSensitive: false,
-    ).hasMatch(body);
-    if (!looksBank && hinted == null) return SmsBankMatchResult.none;
+    final senderLooksBank = SmsBankMatchPolicy.senderLooksLikeBank(sender);
+    if (hinted == null && !senderLooksBank) {
+      return SmsBankMatchResult.none;
+    }
+
+    // Require strong bank SMS structure to avoid promo / OTP / side SMS.
+    if (!SmsBankMatchPolicy.bodyHasStrongBankStructure(body)) {
+      return SmsBankMatchResult.none;
+    }
 
     SmsBankDirection direction = SmsBankDirection.unknown;
     if (RegExp(r'برداشت').hasMatch(body)) {
@@ -360,7 +366,6 @@ class SmsBankPatternEngine {
     }
 
     double? amount;
-    // Labeled amount
     final labeled = RegExp(
       r'(?:برداشت|واریز|واريز|مبلغ)\s*(?:از\s*[:：]?\s*)?[:：]?\s*([+\-]?\d[\d,٬٫]*)\s*(?:ریال|ريال)?',
       caseSensitive: false,
@@ -369,7 +374,6 @@ class SmsBankPatternEngine {
       amount = parseAmount(labeled.group(1)!);
     }
 
-    // Signed standalone line like 150,000,000- or +25,000,000
     if (amount == null) {
       final signed = RegExp(
         r'(?:^|\n)\s*([+\-]?\d{1,3}(?:,\d{3})+)\s*-?\s*(?:ریال|ريال)?\s*(?:$|\n)|(?:^|\n)\s*([+\-]\d[\d,]*)\s*(?:ریال|ريال)?',
@@ -385,7 +389,6 @@ class SmsBankPatternEngine {
       }
     }
 
-    // Trailing minus: 150,000,000-
     if (amount == null) {
       final trailing = RegExp(r'((?:\d{1,3},)*\d{3}|\d+)\s*-').firstMatch(body);
       if (trailing != null) {
@@ -396,14 +399,12 @@ class SmsBankPatternEngine {
 
     if (amount == null || amount <= 0) return SmsBankMatchResult.none;
 
-    // Avoid picking balance as amount when labeled "مانده"
     final balanceMatch = RegExp(
-      r'(?:مانده|موجودی)\s*[:：]?\s*([+\-]?\d[\d,٬٫]*)',
+      r'(?:مانده|موجودی|موجودي)\s*[:：]?\s*([+\-]?\d[\d,٬٫]*)',
       caseSensitive: false,
     ).firstMatch(body);
     final balance = balanceMatch != null ? parseAmount(balanceMatch.group(1)!) : null;
     if (balance != null && amount == balance.abs() && labeled == null) {
-      // Ambiguous — skip heuristic
       return SmsBankMatchResult.none;
     }
 
@@ -411,6 +412,10 @@ class SmsBankPatternEngine {
       r'(?:حساب|برداشت از|واریز|واريز)\s*[:：]?\s*([\d×xX*\-.\u00D7]+)',
       caseSensitive: false,
     ).firstMatch(body);
+
+    final confidence = hinted != null
+        ? SmsBankMatchPolicy.heuristicConfidenceWithSenderHint
+        : SmsBankMatchPolicy.heuristicConfidenceBankSenderOnly;
 
     return SmsBankMatchResult(
       matched: true,
@@ -424,7 +429,7 @@ class SmsBankPatternEngine {
       bankAccountName: hinted?.bankAccountName,
       businessId: hinted?.businessId,
       businessName: hinted?.businessName,
-      confidence: hinted != null ? 0.7 : 0.55,
+      confidence: confidence,
     );
   }
 

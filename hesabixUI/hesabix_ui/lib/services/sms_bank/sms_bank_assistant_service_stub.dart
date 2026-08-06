@@ -62,6 +62,12 @@ class SmsBankAssistantService {
   }) async =>
       null;
 
+  Future<SmsBankEvent?> takePendingEvent(String id) async => null;
+
+  Future<String?> peekLaunchEventId() async => null;
+
+  Future<void> clearLaunchEventId() async {}
+
   Future<String?> consumeLaunchEventId() async => null;
 }
 

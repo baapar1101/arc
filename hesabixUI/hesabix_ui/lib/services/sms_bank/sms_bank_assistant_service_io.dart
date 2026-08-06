@@ -8,6 +8,7 @@ import 'package:uuid/uuid.dart';
 
 import '../../core/android_sms_bank_platform.dart';
 import '../system_notifications/system_notifications_service.dart';
+import 'sms_bank_match_policy.dart';
 import 'sms_bank_models.dart';
 import 'sms_bank_pattern_engine.dart';
 import 'sms_bank_seed_patterns.dart';
@@ -90,7 +91,8 @@ class SmsBankAssistantService {
           await updateEventStatus(eventId, SmsBankEventStatus.dismissed);
         } else if (eventId.isNotEmpty) {
           _launchEventId = eventId;
-          final event = await getEvent(eventId);
+          var event = await getEvent(eventId);
+          event ??= await takePendingEvent(eventId);
           if (event != null) _onEvent?.call(event);
         }
         return true;
@@ -132,10 +134,20 @@ class SmsBankAssistantService {
     if (raw == null || raw.isEmpty) return const [];
     try {
       final list = jsonDecode(raw) as List<dynamic>;
-      final all = list
+      var all = list
           .whereType<Map>()
           .map((e) => SmsBankPattern.fromJson(Map<String, dynamic>.from(e)))
           .toList();
+      final migrated = SmsBankSeedPatterns.migrate(all);
+      if (!identical(migrated, all)) {
+        all = migrated;
+        await prefs.setString(
+          _kPrefsPatterns,
+          jsonEncode(all.map((e) => e.toJson()).toList()),
+        );
+        // Keep native matcher in sync with tightened seeds.
+        unawaited(syncNativeConfig());
+      }
       if (businessId == null) return all;
       return all.where((p) => p.businessId == businessId).toList();
     } catch (_) {
@@ -365,6 +377,7 @@ class SmsBankAssistantService {
       preferredBusinessId: preferredBusinessId ?? settings.activeBusinessId,
     );
     if (!match.matched || match.amount < settings.minAmount) return null;
+    if (match.confidence < SmsBankMatchPolicy.minAcceptConfidence) return null;
 
     // Never invent a business from activeBusinessId when disambiguation is required.
     final businessId = match.needsBusinessChoice
@@ -457,16 +470,54 @@ class SmsBankAssistantService {
     return buf.toString();
   }
 
-  Future<String?> consumeLaunchEventId() async {
-    final id = _launchEventId;
+  Future<SmsBankEvent?> takePendingEvent(String id) async {
+    try {
+      final native = await _channel.invokeMethod<dynamic>(
+        'takePendingEvent',
+        <String, dynamic>{'event_id': id},
+      );
+      if (native is Map) {
+        final event = SmsBankEvent.fromJson(Map<String, dynamic>.from(native));
+        await _persistEvent(event);
+        return event;
+      }
+    } catch (_) {}
+    return null;
+  }
+
+  Future<String?> peekLaunchEventId() async {
+    if (_launchEventId != null && _launchEventId!.isNotEmpty) {
+      return _launchEventId;
+    }
+    try {
+      final launch = await _channel.invokeMethod<String>('getLaunchEventId');
+      if (launch != null && launch.isNotEmpty) {
+        _launchEventId = launch;
+        return launch;
+      }
+    } catch (_) {}
+    final prefs = await SharedPreferences.getInstance();
+    final stored = prefs.getString(_kPrefsLaunchEvent);
+    if (stored != null && stored.isNotEmpty) {
+      _launchEventId = stored;
+      return stored;
+    }
+    return null;
+  }
+
+  Future<void> clearLaunchEventId() async {
     _launchEventId = null;
     try {
       await _channel.invokeMethod('clearLaunchEventId');
     } catch (_) {}
     final prefs = await SharedPreferences.getInstance();
-    final stored = prefs.getString(_kPrefsLaunchEvent);
     await prefs.remove(_kPrefsLaunchEvent);
-    return id ?? stored;
+  }
+
+  Future<String?> consumeLaunchEventId() async {
+    final id = await peekLaunchEventId();
+    await clearLaunchEventId();
+    return id;
   }
 }
 

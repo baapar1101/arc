@@ -40,6 +40,16 @@ object SmsBankPlugin {
                     }
                     result.success(list)
                 }
+                "takePendingEvent" -> {
+                    val args = call.arguments as? Map<*, *>
+                    val id = args?.get("event_id")?.toString()
+                    if (id.isNullOrEmpty()) {
+                        result.error("ARG", "event_id required", null)
+                    } else {
+                        val obj = SmsBankStore.takePendingEvent(context, id)
+                        result.success(obj?.let { jsonToMap(it) })
+                    }
+                }
                 "updateEventStatus" -> {
                     val args = call.arguments as? Map<*, *>
                     val id = args?.get("event_id")?.toString()

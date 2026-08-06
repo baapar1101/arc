@@ -12,6 +12,39 @@ import kotlin.math.abs
  * Uses numbered capture groups (API 21+ safe) instead of named groups.
  */
 object SmsBankMatcher {
+    const val MIN_ACCEPT_CONFIDENCE = 0.72
+    private const val HEURISTIC_CONFIDENCE_WITH_SENDER_HINT = 0.78
+    private const val HEURISTIC_CONFIDENCE_BANK_SENDER_ONLY = 0.72
+    private const val MIN_BODY_HINT_LENGTH = 5
+
+    private val commonBankSenderHints = listOf(
+        "بانک تجارت", "tejarat", "تجارت",
+        "بانک ملت", "bmellat", "mellat", "ملت",
+        "بانک ملی", "bmi", "melli", "ملی",
+        "بانک صادرات", "bsi", "saderat", "صادرات",
+        "پاسارگاد", "pasargad",
+        "پارسیان", "parsian",
+        "سامان", "saman",
+        "اقتصاد نوین", "enbank", "آوای نوین",
+        "توسعه تعاون", "ttbank",
+        "کشاورزی", "bki",
+        "مسکن", "maskan",
+        "رفاه", "refah",
+        "سینا", "sina",
+        "آینده", "ayandeh",
+        "شهر", "shahr",
+        "بانک دی", "day",
+        "رسالت", "resalat",
+        "گردشگری", "tourism",
+        "ایران زمین", "izbank",
+        "کارآفرین", "karafarin",
+        "مهر", "mebank",
+        "سپه", "banksepah",
+        "postbank", "پست بانک",
+        "blu", "blubank",
+        "bank",
+    )
+
     private val placeholderBodies = mapOf(
         "amount" to "[+\\-]?\\d{1,3}(?:[,\\u066C\\u066B٫٬]\\d{3})*(?:[.,]\\d+)?|[+\\-]?\\d+(?:[.,]\\d+)?",
         "amount_signed" to "[+\\-]?\\d{1,3}(?:[,\\u066C\\u066B٫٬]\\d{3})*(?:[.,]\\d+)?\\s*-?|-?\\s*[+\\-]?\\d{1,3}(?:[,\\u066C\\u066B٫٬]\\d{3})*(?:[.,]\\d+)?",
@@ -34,6 +67,9 @@ object SmsBankMatcher {
         preferredBusinessId: Int? = null,
         ambiguityDelta: Double = 0.12,
     ): JSONObject? {
+        // Align with Flutter: no patterns → no match (do not fall into heuristic alone).
+        if (patterns.length() == 0) return null
+
         val normBody = normalize(body)
         val normSender = normalize(sender)
         val results = mutableListOf<JSONObject>()
@@ -42,19 +78,26 @@ object SmsBankMatcher {
             val p = patterns.optJSONObject(i) ?: continue
             if (!p.optBoolean("enabled", true)) continue
             val hints = p.optJSONArray("sender_hints") ?: JSONArray()
-            val hintsOk = hints.length() == 0 || senderMatches(normSender, normBody, hints)
+            if (hints.length() == 0) continue
+
+            val patternId = p.optString("id", "")
+            val requireSender = isGenericSeedId(patternId)
+            val hintsOk = senderHintsAllowMatch(normSender, normBody, hints, requireSender)
             if (!hintsOk) continue
+            if (requireSender && !senderLooksLikeBank(normSender)) continue
 
             val template = p.optString("template", "").trim()
             if (template.isEmpty()) continue
 
             val result = matchTemplate(normBody, p, template) ?: continue
-            applyScoreBonuses(result, p, hintsOk)
+            applyScoreBonuses(result, p, hintsMatched = true)
+            if (result.optDouble("confidence", 0.0) < MIN_ACCEPT_CONFIDENCE) continue
             results.add(result)
         }
 
         if (results.isEmpty()) {
             val h = heuristic(normBody, normSender, patterns) ?: return null
+            if (h.optDouble("confidence", 0.0) < MIN_ACCEPT_CONFIDENCE) return null
             results.add(h)
         }
 
@@ -92,13 +135,62 @@ object SmsBankMatcher {
             return chosen
         }
 
-        // No business_id on matches
         if (preferredBusinessId != null) {
             top.put("business_id", preferredBusinessId)
         }
         top.put("needs_business_choice", !top.has("business_id") || top.isNull("business_id"))
         top.put("candidates", JSONArray())
         return top
+    }
+
+    private fun isGenericSeedId(patternId: String): Boolean =
+        patternId.startsWith("seed_generic")
+
+    private fun senderLooksLikeBank(sender: String): Boolean {
+        val s = normalize(sender).lowercase()
+        if (s.isEmpty()) return false
+        for (token in commonBankSenderHints) {
+            val t = normalize(token).lowercase()
+            if (t.isNotEmpty() && s.contains(t)) return true
+        }
+        return false
+    }
+
+    private fun hintMatchesSender(sender: String, hints: JSONArray): Boolean {
+        val hay = normalize(sender).lowercase()
+        for (i in 0 until hints.length()) {
+            val needle = normalize(hints.optString(i)).lowercase()
+            if (needle.isNotEmpty() && hay.contains(needle)) return true
+        }
+        return false
+    }
+
+    private fun hintMatchesBody(body: String, hints: JSONArray): Boolean {
+        val hay = normalize(body).lowercase()
+        for (i in 0 until hints.length()) {
+            val needle = normalize(hints.optString(i)).lowercase()
+            if (needle.length >= MIN_BODY_HINT_LENGTH && hay.contains(needle)) return true
+        }
+        return false
+    }
+
+    private fun senderHintsAllowMatch(
+        sender: String,
+        body: String,
+        hints: JSONArray,
+        requireSenderForGeneric: Boolean,
+    ): Boolean {
+        if (hints.length() == 0) return false
+        if (hintMatchesSender(sender, hints)) return true
+        if (requireSenderForGeneric) return false
+        return hintMatchesBody(body, hints)
+    }
+
+    private fun bodyHasStrongBankStructure(body: String): Boolean {
+        val hasDirection = Regex("برداشت|واریز|واريز").containsMatchIn(body)
+        val hasBalance = Regex("مانده|موجودی|موجودي").containsMatchIn(body)
+        val hasAmountCue = Regex("مبلغ|ریال|ريال").containsMatchIn(body)
+        return hasDirection && hasBalance && hasAmountCue
     }
 
     private fun applyScoreBonuses(result: JSONObject, pattern: JSONObject, hintsMatched: Boolean) {
@@ -147,30 +239,25 @@ object SmsBankMatcher {
         return sb.toString()
     }
 
-    private fun senderMatches(sender: String, body: String, hints: JSONArray): Boolean {
-        val hay = ("$sender\n$body").lowercase()
-        for (i in 0 until hints.length()) {
-            val h = normalize(hints.optString(i)).lowercase()
-            if (h.isNotEmpty() && hay.contains(h)) return true
-        }
-        return false
-    }
-
     private fun matchTemplate(body: String, pattern: JSONObject, template: String): JSONObject? {
-        val compiled = templateToRegex(template) ?: return null
+        val normalizedTemplate = normalize(template).trim()
+        if (normalizedTemplate.isEmpty()) return null
+        val compiled = templateToRegex(normalizedTemplate) ?: return null
         var m = compiled.pattern.matcher(body)
         var confidence = 1.0
         var groups = compiled.groups
+        var matchedBody = body
         if (!m.find()) {
             val softBody = body.replace(Regex("\\s+"), " ")
-            val softTemplate = template.replace(Regex("\\s+"), " ")
+            val softTemplate = normalizedTemplate.replace(Regex("\\s+"), " ")
             val soft = templateToRegex(softTemplate) ?: return null
             m = soft.pattern.matcher(softBody)
             if (!m.find()) return null
             confidence = 0.85
             groups = soft.groups
+            matchedBody = softBody
         }
-        return resultFromMatcher(m, groups, pattern, confidence)
+        return resultFromMatcher(m, groups, pattern, matchedBody, confidence)
     }
 
     private fun templateToRegex(template: String): Compiled? {
@@ -223,6 +310,7 @@ object SmsBankMatcher {
         m: Matcher,
         groups: Map<String, Int>,
         pattern: JSONObject,
+        body: String,
         confidence: Double,
     ): JSONObject? {
         fun group(name: String): String? {
@@ -238,7 +326,11 @@ object SmsBankMatcher {
         val amount = parseAmount(amountRaw) ?: return null
         if (amount <= 0) return null
         val directionWord = group("direction")
-        val direction = resolveDirection(directionWord, amountRaw)
+        var direction = resolveDirection(directionWord, amountRaw)
+        if (direction == "unknown") {
+            if (body.contains("برداشت")) direction = "debit"
+            else if (body.contains("واریز") || body.contains("واريز")) direction = "credit"
+        }
         val balanceRaw = group("balance")
         val balance = balanceRaw?.let { parseAmount(it) }
 
@@ -273,14 +365,16 @@ object SmsBankMatcher {
             val p = patterns.optJSONObject(i) ?: continue
             if (!p.optBoolean("enabled", true)) continue
             val hints = p.optJSONArray("sender_hints") ?: JSONArray()
-            if (hints.length() > 0 && senderMatches(sender, body, hints)) {
+            if (hints.length() == 0) continue
+            if (hintMatchesSender(sender, hints)) {
                 hinted = p
                 break
             }
         }
-        val looksBank = Regex("مانده|موجودی|برداشت|واریز|واريز|ریال|ريال|بانک|بانك|شتاب", RegexOption.IGNORE_CASE)
-            .containsMatchIn(body)
-        if (!looksBank && hinted == null) return null
+
+        val senderLooksBank = senderLooksLikeBank(sender)
+        if (hinted == null && !senderLooksBank) return null
+        if (!bodyHasStrongBankStructure(body)) return null
 
         var direction = "unknown"
         if (body.contains("برداشت")) direction = "debit"
@@ -302,10 +396,20 @@ object SmsBankMatcher {
         }
         if (amount == null || amount <= 0) return null
 
+        val balanceMatch = Regex(
+            "(?:مانده|موجودی|موجودي)\\s*[:：]?\\s*([+\\-]?\\d[\\d,٬٫]*)",
+            RegexOption.IGNORE_CASE,
+        ).find(body)
+        val balance = balanceMatch?.let { parseAmount(it.groupValues[1]) }
+        if (balance != null && amount == abs(balance) && labeled == null) {
+            return null
+        }
+
         val out = JSONObject()
         out.put("matched", true)
         out.put("amount", abs(amount))
         out.put("direction", direction)
+        if (balance != null) out.put("balance", abs(balance))
         hinted?.let { p ->
             out.put("pattern_id", p.optString("id"))
             out.put("pattern_name", p.optString("name"))
@@ -319,7 +423,11 @@ object SmsBankMatcher {
                 out.put("business_id", p.optInt("business_id"))
             }
         }
-        out.put("confidence", if (hinted != null) 0.7 else 0.55)
+        out.put(
+            "confidence",
+            if (hinted != null) HEURISTIC_CONFIDENCE_WITH_SENDER_HINT
+            else HEURISTIC_CONFIDENCE_BANK_SENDER_ONLY,
+        )
         return out
     }
 
@@ -407,12 +515,10 @@ object SmsBankMatcher {
         val biz = when {
             needsChoice -> null
             match.has("business_id") && !match.isNull("business_id") -> match.optInt("business_id")
-            else -> null // never invent from activeBusinessId when unresolved
+            else -> null
         }
         if (biz != null) event.put("business_id", biz)
-        // Soft hint only when still unresolved and single preferred exists — UI will ask.
         if (biz == null && !needsChoice && activeBusinessId != null) {
-            // Leave business_id empty so Flutter asks / picks; keep preferred as metadata
             event.put("preferred_business_id", activeBusinessId)
             event.put("needs_business_choice", true)
         }

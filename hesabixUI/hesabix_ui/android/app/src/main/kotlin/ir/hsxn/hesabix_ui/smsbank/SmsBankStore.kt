@@ -100,6 +100,34 @@ object SmsBankStore {
         return arr
     }
 
+    /** Remove and return a single pending event by id (does not drain the rest). */
+    fun takePendingEvent(context: Context, eventId: String): JSONObject? {
+        val arr = pendingArray(context)
+        var found: JSONObject? = null
+        val next = JSONArray()
+        for (i in 0 until arr.length()) {
+            val item = arr.optJSONObject(i) ?: continue
+            if (item.optString("id") == eventId) {
+                found = item
+            } else {
+                next.put(item)
+            }
+        }
+        if (found != null) {
+            prefs(context).edit().putString(KEY_PENDING, next.toString()).apply()
+        }
+        return found
+    }
+
+    fun getPendingEvent(context: Context, eventId: String): JSONObject? {
+        val arr = pendingArray(context)
+        for (i in 0 until arr.length()) {
+            val item = arr.optJSONObject(i) ?: continue
+            if (item.optString("id") == eventId) return item
+        }
+        return null
+    }
+
     fun updateEventStatus(context: Context, eventId: String, status: String) {
         val arr = pendingArray(context)
         val next = JSONArray()
