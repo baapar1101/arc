@@ -42,6 +42,11 @@ class _LabelTemplatesPageState extends State<LabelTemplatesPage> {
   bool get _canDesign =>
       widget.authStore.hasBusinessPermission('barcode_labels', 'design');
 
+  bool get _canPrint =>
+      widget.authStore.hasBusinessPermission('barcode_labels', 'print') ||
+      widget.authStore.hasBusinessPermission('barcode_labels', 'design') ||
+      widget.authStore.hasBusinessPermission('barcode_labels', 'view');
+
   @override
   void initState() {
     super.initState();
@@ -247,16 +252,6 @@ class _LabelTemplatesPageState extends State<LabelTemplatesPage> {
             icon: const Icon(Icons.print_outlined),
           ),
           IconButton(
-            tooltip: t.barcodeLabelExcelPrintTitle,
-            onPressed: () => LabelExcelPrintDialog.show(context, businessId: widget.businessId),
-            icon: const Icon(Icons.grid_on_outlined),
-          ),
-          IconButton(
-            tooltip: t.barcodeLabelSerialPrintTitle,
-            onPressed: () => LabelSerialPrintDialog.show(context, businessId: widget.businessId),
-            icon: const Icon(Icons.pin_outlined),
-          ),
-          IconButton(
             tooltip: t.refresh,
             onPressed: _loading ? null : _reload,
             icon: const Icon(Icons.refresh),
@@ -274,37 +269,82 @@ class _LabelTemplatesPageState extends State<LabelTemplatesPage> {
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-            child: Row(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Expanded(
-                  child: SearchBar(
-                    controller: _searchCtrl,
-                    hintText: t.barcodeLabelSearchHint,
-                    leading: const Icon(Icons.search),
-                    onSubmitted: (_) => _reload(),
-                    trailing: [
-                      if (_searchCtrl.text.isNotEmpty)
-                        IconButton(
-                          icon: const Icon(Icons.clear),
-                          onPressed: () {
-                            _searchCtrl.clear();
-                            _reload();
-                          },
+                if (_canPrint) ...[
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      FilledButton.tonalIcon(
+                        onPressed: () => LabelExcelPrintDialog.show(
+                          context,
+                          businessId: widget.businessId,
                         ),
+                        icon: const Icon(Icons.table_chart_outlined),
+                        label: Text(t.barcodeLabelExcelPrintTitle),
+                      ),
+                      FilledButton.tonalIcon(
+                        onPressed: () => LabelSerialPrintDialog.show(
+                          context,
+                          businessId: widget.businessId,
+                        ),
+                        icon: const Icon(Icons.format_list_numbered_outlined),
+                        label: Text(t.barcodeLabelSerialPrintTitle),
+                      ),
                     ],
                   ),
-                ),
-                const SizedBox(width: 12),
-                SegmentedButton<String>(
-                  segments: [
-                    ButtonSegment(value: 'all', label: Text(t.barcodeLabelFilterAll)),
-                    ButtonSegment(value: 'published', label: Text(t.barcodeLabelFilterPublished)),
-                    ButtonSegment(value: 'draft', label: Text(t.barcodeLabelFilterDraft)),
-                  ],
-                  selected: {_statusFilter},
-                  onSelectionChanged: (s) {
-                    setState(() => _statusFilter = s.first);
-                    _reload();
+                  const SizedBox(height: 12),
+                ],
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final narrow = constraints.maxWidth < 720;
+                    final search = SearchBar(
+                      controller: _searchCtrl,
+                      hintText: t.barcodeLabelSearchHint,
+                      leading: const Icon(Icons.search),
+                      onSubmitted: (_) => _reload(),
+                      trailing: [
+                        if (_searchCtrl.text.isNotEmpty)
+                          IconButton(
+                            icon: const Icon(Icons.clear),
+                            onPressed: () {
+                              _searchCtrl.clear();
+                              _reload();
+                            },
+                          ),
+                      ],
+                    );
+                    final filters = SegmentedButton<String>(
+                      segments: [
+                        ButtonSegment(value: 'all', label: Text(t.barcodeLabelFilterAll)),
+                        ButtonSegment(value: 'published', label: Text(t.barcodeLabelFilterPublished)),
+                        ButtonSegment(value: 'draft', label: Text(t.barcodeLabelFilterDraft)),
+                      ],
+                      selected: {_statusFilter},
+                      onSelectionChanged: (s) {
+                        setState(() => _statusFilter = s.first);
+                        _reload();
+                      },
+                    );
+                    if (narrow) {
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          search,
+                          const SizedBox(height: 10),
+                          filters,
+                        ],
+                      );
+                    }
+                    return Row(
+                      children: [
+                        Expanded(child: search),
+                        const SizedBox(width: 12),
+                        filters,
+                      ],
+                    );
                   },
                 ),
               ],

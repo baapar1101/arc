@@ -8,6 +8,7 @@ adapters/api/v1/activity_logs.py
 adapters/api/v1/announcements.py
 adapters/api/v1/auth.py
 adapters/api/v1/bank_accounts.py
+adapters/api/v1/barcode_labels.py
 adapters/api/v1/basalam_integration.py
 adapters/api/v1/boms.py
 adapters/api/v1/business_backups.py
@@ -146,6 +147,7 @@ adapters/api/v1/public/crm_chat_public.py
 adapters/api/v1/schema_models/__init__.py
 adapters/api/v1/schema_models/account.py
 adapters/api/v1/schema_models/bank_account.py
+adapters/api/v1/schema_models/barcode_label.py
 adapters/api/v1/schema_models/business_notification.py
 adapters/api/v1/schema_models/catalog_spec_field.py
 adapters/api/v1/schema_models/check.py
@@ -225,6 +227,7 @@ adapters/db/models/api_key.py
 adapters/db/models/auth_security_event.py
 adapters/db/models/bale.py
 adapters/db/models/bank_account.py
+adapters/db/models/barcode_label_settings.py
 adapters/db/models/business.py
 adapters/db/models/business_ai_provider_config.py
 adapters/db/models/business_backup_import_log.py
@@ -267,6 +270,7 @@ adapters/db/models/fx_rate_provider.py
 adapters/db/models/goods_expense_income.py
 adapters/db/models/hscript_report.py
 adapters/db/models/invoice_item_line.py
+adapters/db/models/label_template.py
 adapters/db/models/marketplace.py
 adapters/db/models/messenger_operator_session.py
 adapters/db/models/mobile_verification.py
@@ -392,6 +396,7 @@ app/openapi_local_docs.py
 app/openapi_query_filter_docs.py
 app/core/__init__.py
 app/core/auth_dependency.py
+app/core/barcode_label_plugin_dependency.py
 app/core/basalam_plugin_dependency.py
 app/core/batch_operations.py
 app/core/business_calendar.py
@@ -470,6 +475,9 @@ app/services/balance_sheet_account_classification.py
 app/services/balance_sheet_export_service.py
 app/services/balance_sheet_service.py
 app/services/bank_account_service.py
+app/services/barcode_label_design_validator.py
+app/services/barcode_label_presets.py
+app/services/barcode_label_service.py
 app/services/basalam_integration_service.py
 app/services/basalam_observability.py
 app/services/basalam_reports_service.py
@@ -1103,6 +1111,8 @@ migrations/versions/20260727_000001_business_print_settings_tax_discount_display
 migrations/versions/20260731_000001_crm_sales_automation_upgrade.py
 migrations/versions/20260803_000001_telephony_asterisk_issabel_plugin.py
 migrations/versions/20260803_000002_telephony_phase2_ops_tables.py
+migrations/versions/20260806_000001_barcode_label_studio.py
+migrations/versions/20260806_000002_barcode_label_printer_settings.py
 tests/__init__.py
 tests/test_account_balance_core.py
 tests/test_account_tree_roots.py

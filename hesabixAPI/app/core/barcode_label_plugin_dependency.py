@@ -4,9 +4,13 @@ from __future__ import annotations
 
 from datetime import datetime
 
+from fastapi import Depends, Request
 from sqlalchemy.orm import Session
 
 from adapters.db.models.marketplace import BusinessPlugin, MarketplacePlugin
+from adapters.db.session import get_db
+from app.core.auth_dependency import get_current_user
+from app.core.responses import ApiError
 
 PLUGIN_CODE = "barcode_label_studio"
 
@@ -43,11 +47,10 @@ def check_barcode_label_plugin_active(db: Session, business_id: int) -> bool:
 
 
 def require_barcode_label_plugin_active(business_id_param: str = "business_id"):
-	from fastapi import Depends, Request
-
-	from adapters.db.session import get_db
-	from app.core.auth_dependency import get_current_user
-	from app.core.responses import ApiError
+	"""Depends factory. Request/Depends must be module-level imports so
+	`from __future__ import annotations` still resolves Request as Starlette Request
+	(not a required query param named `request`).
+	"""
 
 	def dependency(
 		request: Request,

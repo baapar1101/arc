@@ -4,9 +4,13 @@ from __future__ import annotations
 
 from datetime import datetime
 
+from fastapi import Depends, Request
 from sqlalchemy.orm import Session
 
 from adapters.db.models.marketplace import BusinessPlugin, MarketplacePlugin
+from adapters.db.session import get_db
+from app.core.auth_dependency import AuthContext, get_current_user
+from app.core.responses import ApiError
 
 
 def check_customer_club_plugin_active(db: Session, business_id: int) -> bool:
@@ -41,13 +45,7 @@ def check_customer_club_plugin_active(db: Session, business_id: int) -> bool:
 
 
 def require_customer_club_plugin_active(business_id_param: str = "business_id"):
-	"""مانند سایر پلاگین‌ها؛ برای استفاده مستقیم در Depends بهتر است از dependency ترکیبی در ماژول API استفاده شود."""
-
-	from fastapi import Depends, Request
-
-	from adapters.db.session import get_db
-	from app.core.auth_dependency import AuthContext, get_current_user
-	from app.core.responses import ApiError
+	"""مانند سایر پلاگین‌ها؛ Request باید در سطح ماژول import شود تا با future annotations به query تبدیل نشود."""
 
 	def dependency(
 		request: Request,
