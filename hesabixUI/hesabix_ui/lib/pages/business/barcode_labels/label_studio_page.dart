@@ -56,10 +56,27 @@ class _LabelStudioPageState extends State<LabelStudioPage> {
   String? _savedFingerprint;
   double _canvasZoom = 1.0;
   bool _handleDragCheckpointed = false;
+  bool _draggingElement = false;
 
   static const double _pxPerMm = 3.7795275591; // ~96dpi
   static const double _canvasOffsetPx = 40.0;
   static const double _rulerThickness = 24.0;
+
+  /// Convert GestureDetector pan deltas to canvas mm.
+  /// Same approach as [WorkflowNodeWidget]: deltas inside InteractiveViewer are
+  /// viewport pixels, so divide by current zoom before px→mm.
+  Offset _deltaPxToMm(double dxPx, double dyPx) {
+    final scale = _transform.value.getMaxScaleOnAxis().abs();
+    final s = scale < 1e-6 ? 1.0 : scale;
+    return Offset(dxPx / (_pxPerMm * s), dyPx / (_pxPerMm * s));
+  }
+
+  double _snapMm(double value) {
+    if (!_design.canvas.snapToGrid) return value;
+    final g = _design.canvas.gridMm;
+    if (g <= 0) return value;
+    return (value / g).round() * g;
+  }
 
   bool get _canDesign =>
       widget.authStore.hasBusinessPermission('barcode_labels', 'design');
@@ -600,6 +617,9 @@ class _LabelStudioPageState extends State<LabelStudioPage> {
       minScale: 0.25,
       maxScale: 4,
       constrained: false,
+      // While dragging an element, keep the viewport still so pan doesn't fight move.
+      panEnabled: !_draggingElement,
+      scaleEnabled: !_draggingElement,
       boundaryMargin: const EdgeInsets.all(800),
       child: SizedBox(
         width: w + 80,
@@ -653,27 +673,46 @@ class _LabelStudioPageState extends State<LabelStudioPage> {
                                       sample: _sample,
                                       onTap: () => setState(() => _selectedId = el.id),
                                       onDragStart: _canDesign && !el.locked
-                                          ? () => _checkpoint()
+                                          ? () {
+                                              _checkpoint();
+                                              setState(() => _draggingElement = true);
+                                            }
                                           : null,
                                       onDrag: _canDesign && !el.locked
                                           ? (dxPx, dyPx) {
-                                              final dx = dxPx / _pxPerMm;
-                                              final dy = dyPx / _pxPerMm;
+                                              final d = _deltaPxToMm(dxPx, dyPx);
                                               setState(() {
                                                 _design = _design.copyWith(
                                                   elements: _design.elements.map((e) {
                                                     if (e.id != el.id) return e;
-                                                    var x = e.xMm + dx;
-                                                    var y = e.yMm + dy;
-                                                    if (_design.canvas.snapToGrid) {
-                                                      final g = _design.canvas.gridMm;
-                                                      x = (x / g).round() * g;
-                                                      y = (y / g).round() * g;
-                                                    }
-                                                    return e.copyWith(xMm: x, yMm: y);
+                                                    // Continuous drag without per-frame snap so
+                                                    // motion tracks the pointer; snap on end.
+                                                    return e.copyWith(
+                                                      xMm: e.xMm + d.dx,
+                                                      yMm: e.yMm + d.dy,
+                                                    );
                                                   }).toList(),
                                                 );
                                                 _selectedId = el.id;
+                                              });
+                                              _markDirty();
+                                            }
+                                          : null,
+                                      onDragEnd: _canDesign && !el.locked
+                                          ? () {
+                                              setState(() {
+                                                _draggingElement = false;
+                                                if (_design.canvas.snapToGrid) {
+                                                  _design = _design.copyWith(
+                                                    elements: _design.elements.map((e) {
+                                                      if (e.id != el.id) return e;
+                                                      return e.copyWith(
+                                                        xMm: _snapMm(e.xMm),
+                                                        yMm: _snapMm(e.yMm),
+                                                      );
+                                                    }).toList(),
+                                                  );
+                                                }
                                               });
                                               _markDirty();
                                             }
@@ -688,14 +727,16 @@ class _LabelStudioPageState extends State<LabelStudioPage> {
                                           if (!_handleDragCheckpointed) {
                                             _checkpoint();
                                             _handleDragCheckpointed = true;
+                                            setState(() => _draggingElement = true);
                                           }
                                           final current = _design.elements
                                               .firstWhere((e) => e.id == el.id);
+                                          final d = _deltaPxToMm(dxPx, dyPx);
                                           final updated = applyHandleDrag(
                                             element: current,
                                             kind: kind,
-                                            dxMm: dxPx / _pxPerMm,
-                                            dyMm: dyPx / _pxPerMm,
+                                            dxMm: d.dx,
+                                            dyMm: d.dy,
                                             canvasW: _design.canvas.widthMm,
                                             canvasH: _design.canvas.heightMm,
                                           );
@@ -708,7 +749,28 @@ class _LabelStudioPageState extends State<LabelStudioPage> {
                                           });
                                           _markDirty();
                                         },
-                                        onDragEnd: () => _handleDragCheckpointed = false,
+                                        onDragEnd: () {
+                                          _handleDragCheckpointed = false;
+                                          setState(() {
+                                            _draggingElement = false;
+                                            if (_design.canvas.snapToGrid) {
+                                              final current = _design.elements
+                                                  .firstWhere((e) => e.id == el.id);
+                                              final snapped = current.copyWith(
+                                                xMm: _snapMm(current.xMm),
+                                                yMm: _snapMm(current.yMm),
+                                                wMm: _snapMm(current.wMm).clamp(2, _design.canvas.widthMm),
+                                                hMm: _snapMm(current.hMm).clamp(2, _design.canvas.heightMm),
+                                              );
+                                              _design = _design.copyWith(
+                                                elements: _design.elements
+                                                    .map((e) => e.id == el.id ? snapped : e)
+                                                    .toList(),
+                                              );
+                                            }
+                                          });
+                                          _markDirty();
+                                        },
                                       ),
                                   ],
                                 ),
@@ -967,6 +1029,7 @@ class _ElementView extends StatelessWidget {
   final VoidCallback onTap;
   final VoidCallback? onDragStart;
   final void Function(double dx, double dy)? onDrag;
+  final VoidCallback? onDragEnd;
 
   const _ElementView({
     required this.element,
@@ -975,6 +1038,7 @@ class _ElementView extends StatelessWidget {
     required this.onTap,
     this.onDragStart,
     this.onDrag,
+    this.onDragEnd,
   });
 
   @override
@@ -1059,6 +1123,8 @@ class _ElementView extends StatelessWidget {
       onTap: onTap,
       onPanStart: onDrag == null ? null : (_) => onDragStart?.call(),
       onPanUpdate: onDrag == null ? null : (d) => onDrag!(d.delta.dx, d.delta.dy),
+      onPanEnd: onDrag == null ? null : (_) => onDragEnd?.call(),
+      onPanCancel: onDrag == null ? null : () => onDragEnd?.call(),
       child: DecoratedBox(
         decoration: BoxDecoration(
           border: Border.all(

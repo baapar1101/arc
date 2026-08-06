@@ -4,9 +4,13 @@ from __future__ import annotations
 
 from datetime import datetime
 
+from fastapi import Depends, Request
 from sqlalchemy.orm import Session
 
 from adapters.db.models.marketplace import BusinessPlugin, MarketplacePlugin
+from adapters.db.session import get_db
+from app.core.auth_dependency import get_current_user
+from app.core.responses import ApiError
 
 PLUGIN_CODE = "payroll"
 
@@ -43,11 +47,7 @@ def check_payroll_plugin_active(db: Session, business_id: int) -> bool:
 
 
 def require_payroll_plugin_active(business_id_param: str = "business_id"):
-	from fastapi import Depends, Request
-
-	from adapters.db.session import get_db
-	from app.core.auth_dependency import get_current_user
-	from app.core.responses import ApiError
+	"""Request/Depends در سطح ماژول تا با future annotations به query اجباری تبدیل نشود."""
 
 	def dependency(
 		request: Request,
