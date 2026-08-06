@@ -52,6 +52,8 @@ class MediaTunnelClient:
 		self._stop.clear()
 		self._thread = threading.Thread(target=self._run, name="hesabix-media-tunnel", daemon=True)
 		self._thread.start()
+		self._ping_thread = threading.Thread(target=self._ping_loop, name="hesabix-media-ping", daemon=True)
+		self._ping_thread.start()
 
 	def stop(self) -> None:
 		self._stop.set()
@@ -62,6 +64,15 @@ class MediaTunnelClient:
 			pass
 		if self._thread:
 			self._thread.join(timeout=3)
+		ping_th = getattr(self, "_ping_thread", None)
+		if ping_th:
+			ping_th.join(timeout=2)
+
+	def _ping_loop(self) -> None:
+		"""Keepalive اپلیکیشنی مستقل از حلقه AMI."""
+		while not self._stop.wait(15):
+			if self.connected:
+				self.send_json({"type": "ping", "ts": int(time.time())})
 
 	def send_json(self, payload: Dict[str, Any]) -> bool:
 		if not self._ws or not self.connected:

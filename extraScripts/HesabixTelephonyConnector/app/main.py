@@ -427,15 +427,19 @@ def main() -> int:
 
 	last_hb = 0.0
 	last_poll = 0.0
+	last_media_ping = 0.0
 	try:
 		for ev in ami.read_events():
 			now = time.time()
 			if now - last_hb > 60:
 				api.heartbeat(status="ok", media_tunnel=bool(tunnel_ref.get("client") and tunnel_ref["client"].connected))
 				last_hb = now
+			# ping رسانه جدا از heartbeat حسابیکس — تا tunnel_online سمت API پایدار بماند
+			if now - last_media_ping > 15:
 				client = tunnel_ref.get("client")
 				if client and client.connected:
 					client.send_json({"type": "ping", "ts": int(now)})
+				last_media_ping = now
 			if now - last_poll > 2:
 				for cmd in api.poll_commands():
 					cid = cmd.get("command_id")

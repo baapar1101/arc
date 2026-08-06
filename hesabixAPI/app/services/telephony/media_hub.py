@@ -1,4 +1,9 @@
-"""Media Hub درحافظه — تونل Connector و سشن‌های Softphone کلاینت."""
+"""Media Hub درحافظه — تونل Connector و سشن‌های Softphone کلاینت.
+
+این هاب باید فقط روی یک process (Media Edge با workers=1) زنده بماند.
+با چند worker، کلاینت/تونل/REST روی processهای متفاوت می‌افتند.
+رجوع: app/services/telephony/media_edge.py و docs/TELEPHONY_SOFTPHONE_MEDIA_EDGE.md
+"""
 from __future__ import annotations
 
 import asyncio
@@ -13,6 +18,8 @@ LOG = logging.getLogger("hesabix.telephony.media_hub")
 # پروفایل رسانه فاز R1: PCM16LE 8kHz mono روی WSS (سازگار با Asterisk AudioSocket)
 MEDIA_PROFILE_PCM_WS_V1 = "pcm_ws_v1"
 SUPPORTED_MEDIA_PROFILES = (MEDIA_PROFILE_PCM_WS_V1,)
+# Connector معمولاً هر ~۶۰ثانیه ping اپلیکیشنی می‌فرستد؛ حاشیه برای تأخیر شبکه/AMI
+TUNNEL_ONLINE_TTL_SEC = 120.0
 
 
 @dataclass
@@ -80,7 +87,7 @@ class TelephonyMediaHub:
 		t = self._tunnels_by_pbx.get(pbx_id)
 		if not t:
 			return False
-		return (time.time() - t.last_heartbeat_at) < 30
+		return (time.time() - t.last_heartbeat_at) < TUNNEL_ONLINE_TTL_SEC
 
 	def tunnel_snapshot(self, pbx_id: int) -> Optional[Dict[str, Any]]:
 		t = self._tunnels_by_pbx.get(pbx_id)

@@ -18,6 +18,12 @@ from adapters.db.models.telephony import (
 from app.core.responses import ApiError
 from app.core.security import hash_api_key
 from app.services.realtime import realtime_manager
+from app.services.telephony.media_edge import (
+	fetch_media_edge_snapshot,
+	is_media_edge_process,
+	process_role,
+	require_media_edge_process,
+)
 from app.services.telephony.media_hub import MEDIA_PROFILE_PCM_WS_V1, media_hub
 from app.services.telephony import telephony_service as tel
 
@@ -118,20 +124,28 @@ def _resolve_mode(link: TelephonyUserExtension, soft: Dict[str, Any], requested:
 
 
 def softphone_health(db: Session, business_id: int, user_id: int) -> Dict[str, Any]:
-	hub = media_hub.health()
 	try:
 		link = _primary_user_extension(db, business_id, user_id)
 		pbx = db.get(TelephonyPbxConnection, link.pbx_id)
 	except ApiError:
+		hub = media_hub.health() if is_media_edge_process() else (fetch_media_edge_snapshot() or {}).get("media_hub")
 		return {
 			"ok": False,
 			"reason": "no_extension",
-			"media_hub": hub,
+			"media_hub": hub or media_hub.health(),
 			"tunnel": None,
 			"endpoint_mode": None,
+			"process_role": process_role(),
+			"ws_client_connected": False,
 		}
 	soft = softphone_settings_from_pbx(pbx) if pbx else {}
-	tunnel = media_hub.tunnel_snapshot(link.pbx_id) if pbx else None
+	if is_media_edge_process():
+		hub = media_hub.health()
+		tunnel = media_hub.tunnel_snapshot(link.pbx_id) if pbx else None
+	else:
+		snap = fetch_media_edge_snapshot(pbx_id=link.pbx_id) or {}
+		hub = snap.get("media_hub") or {"node_id": None, "clients": 0, "tunnels": 0, "bridges": 0}
+		tunnel = snap.get("tunnel")
 	active = (
 		db.query(TelephonySoftphoneSession)
 		.filter(
@@ -143,6 +157,10 @@ def softphone_health(db: Session, business_id: int, user_id: int) -> Dict[str, A
 		.order_by(TelephonySoftphoneSession.id.desc())
 		.first()
 	)
+	ws_connected = bool(active and is_media_edge_process() and media_hub.get_client(active.session_id))
+	if active and not is_media_edge_process():
+		# روی API worker فقط از شمارش clients لبه تقریبی نداریم؛ state DB را گزارش می‌کنیم
+		ws_connected = bool(active.state in ("registered", "ringing", "in_call"))
 	ok = bool(pbx and pbx.status == "online" and (tunnel and tunnel.get("online")))
 	if link.endpoint_mode == "direct" and soft.get("direct_enabled"):
 		ok = bool(pbx and pbx.is_active)
@@ -158,6 +176,8 @@ def softphone_health(db: Session, business_id: int, user_id: int) -> Dict[str, A
 		"active_session": session_to_dict(active) if active else None,
 		"media_hub": hub,
 		"supported_profiles": [MEDIA_PROFILE_PCM_WS_V1],
+		"process_role": process_role(),
+		"ws_client_connected": ws_connected,
 	}
 
 
@@ -168,6 +188,7 @@ def create_session(
 	payload: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
 	payload = payload or {}
+	require_media_edge_process()
 	link = _primary_user_extension(db, business_id, user_id)
 	pbx = db.get(TelephonyPbxConnection, link.pbx_id)
 	if not pbx or not pbx.is_active:
@@ -256,7 +277,9 @@ def heartbeat_session(db: Session, business_id: int, user_id: int, session_id: s
 	row.last_heartbeat_at = _now()
 	row.expires_at = _now() + timedelta(minutes=SESSION_TTL_MINUTES)
 	row.updated_at = _now()
-	if row.state == "creating":
+	# فقط وقتی WebSocket واقعاً روی همین Media Edge ثبت شده، creating→registered
+	# (قبلاً heartbeat بدون WS سشن را registered می‌کرد و UI فکر می‌کرد آنلاین است)
+	if row.state == "creating" and is_media_edge_process() and media_hub.get_client(session_id):
 		row.state = "registered"
 	db.commit()
 	db.refresh(row)
@@ -385,6 +408,7 @@ def start_outbound_relay_call(
 	payload: Dict[str, Any],
 ) -> Dict[str, Any]:
 	"""شروع تماس خروجی در حالت relay: پل رسانه + Originate سمت مقصد."""
+	require_media_edge_process()
 	session_id = str(payload.get("session_id") or "").strip()
 	destination = str(payload.get("destination") or "").strip()
 	if not session_id or not destination:
@@ -393,12 +417,16 @@ def start_outbound_relay_call(
 	row = _get_user_session(db, business_id, user_id, session_id)
 	if row.mode != "relay":
 		raise ApiError("SOFTPHONE_MODE", "خروجی relay فقط در حالت relay مجاز است.", http_status=400)
-	if row.state not in ("registered", "creating", "in_call"):
-		raise ApiError("SOFTPHONE_SESSION_STATE", "سشن برای تماس آماده نیست.", http_status=409)
+	if row.state not in ("registered", "in_call"):
+		raise ApiError(
+			"SOFTPHONE_SESSION_STATE",
+			"سشن برای تماس آماده نیست. ابتدا Softphone را آنلاین کنید تا WebSocket وصل شود.",
+			http_status=409,
+		)
 	if not media_hub.get_client(session_id):
 		raise ApiError(
 			"SOFTPHONE_WS_REQUIRED",
-			"ابتدا به کانال Softphone وصل شوید (WebSocket).",
+			"کانال Softphone روی Media Edge ثبت نشده است. صفحه را رفرش کنید و دوباره آنلاین شوید.",
 			http_status=409,
 		)
 	if not media_hub.tunnel_online(row.pbx_id):
@@ -490,6 +518,7 @@ def enqueue_answer_inbound(
 	payload: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
 	payload = payload or {}
+	require_media_edge_process()
 	session_id = str(payload.get("session_id") or "").strip()
 	row = _get_user_session(db, business_id, user_id, session_id) if session_id else None
 	if row is None:
@@ -506,6 +535,12 @@ def enqueue_answer_inbound(
 		)
 	if not row:
 		raise ApiError("SOFTPHONE_NO_SESSION", "سشن Softphone فعال نیست.", http_status=409)
+	if not media_hub.get_client(row.session_id):
+		raise ApiError(
+			"SOFTPHONE_WS_REQUIRED",
+			"کانال Softphone روی Media Edge ثبت نشده است. صفحه را رفرش کنید و دوباره آنلاین شوید.",
+			http_status=409,
+		)
 
 	call = (
 		db.query(TelephonyCall)

@@ -70,7 +70,12 @@ async def softphone_client_ws(websocket: WebSocket) -> None:
 	اولین پیام:
 	{"type":"auth","api_key":"...","session_id":"...","media_ticket":"...","business_id":123}
 	"""
+	from app.services.telephony.media_edge import is_media_edge_process
+
 	await websocket.accept()
+	if not is_media_edge_process():
+		await close_ws_safe(websocket, 4503)
+		return
 	try:
 		auth = await _read_json_auth(websocket)
 	except WsAuthClientDisconnected:
@@ -231,7 +236,12 @@ async def connector_media_tunnel_ws(websocket: WebSocket) -> None:
 	  "capabilities":["audiosocket","pcm_ws_v1"]
 	}
 	"""
+	from app.services.telephony.media_edge import is_media_edge_process
+
 	await websocket.accept()
+	if not is_media_edge_process():
+		await close_ws_safe(websocket, 4503)
+		return
 	try:
 		auth = await _read_json_auth(websocket)
 	except WsAuthClientDisconnected:

@@ -276,6 +276,9 @@ class SoftphoneEngine extends ChangeNotifier {
   Future<void> dial(String destination, {int? personId, int? leadId}) async {
     final sid = sessionId;
     if (sid == null) throw StateError('ابتدا Softphone را آنلاین کنید');
+    if (!isReady || _ws == null || !_ws!.isConnected) {
+      throw StateError('کانال Softphone وصل نیست؛ دوباره آنلاین شوید');
+    }
     final result = await _api.softphoneOutboundCall(businessId, {
       'session_id': sid,
       'destination': destination,
@@ -290,6 +293,9 @@ class SoftphoneEngine extends ChangeNotifier {
   Future<void> answer(int callId) async {
     final sid = sessionId;
     if (sid == null) throw StateError('سشن Softphone نیست');
+    if (_ws == null || !_ws!.isConnected) {
+      throw StateError('کانال Softphone وصل نیست؛ دوباره آنلاین شوید');
+    }
     final result = await _api.softphoneAnswerCall(businessId, callId, {'session_id': sid});
     activeCall = result['call'] is Map ? Map<String, dynamic>.from(result['call'] as Map) : {'id': callId};
     state = SoftphoneConnectionState.inCall;

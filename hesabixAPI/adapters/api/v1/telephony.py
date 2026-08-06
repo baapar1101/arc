@@ -715,6 +715,43 @@ def _require_softphone_operator():
 	return _dep
 
 
+def _require_media_edge() -> None:
+	"""Softphone media ops فقط روی Media Edge (workers=1)."""
+	from app.services.telephony.media_edge import require_media_edge_process
+
+	require_media_edge_process()
+
+
+@router.get("/internal/media-edge/snapshot")
+def media_edge_internal_snapshot(
+	request: Request,
+	pbx_id: Optional[int] = Query(default=None),
+	x_hesabix_media_edge_token: Optional[str] = Header(default=None),
+) -> dict:
+	"""وضعیت media_hub برای API workers (فقط localhost یا token داخلی)."""
+	from app.core.settings import get_settings
+	from app.services.telephony.media_edge import is_media_edge_process, process_role
+	from app.services.telephony.media_hub import media_hub
+
+	client = request.client.host if request.client else ""
+	settings = get_settings()
+	expected = (settings.hesabix_media_edge_token or "").strip()
+	token_ok = bool(expected) and (x_hesabix_media_edge_token or "").strip() == expected
+	localhost_ok = client in ("127.0.0.1", "::1", "localhost")
+	if not (localhost_ok or token_ok):
+		raise ApiError("FORBIDDEN", "internal only", http_status=403)
+	if not is_media_edge_process():
+		raise ApiError("SOFTPHONE_MEDIA_EDGE_REQUIRED", "این نود Media Edge نیست.", http_status=503)
+	data: Dict[str, Any] = {
+		"process_role": process_role(),
+		"media_hub": media_hub.health(),
+		"tunnel": media_hub.tunnel_snapshot(pbx_id) if pbx_id is not None else None,
+	}
+	if pbx_id is not None:
+		data["tunnel_online"] = media_hub.tunnel_online(pbx_id)
+	return _resp(data, request)
+
+
 @router.get("/business/{business_id}/softphone/health")
 def softphone_health(
 	request: Request,
@@ -756,6 +793,7 @@ def softphone_create_session(
 	__: None = Depends(require_business_access_dep),
 	___: None = Depends(require_telephony_plugin_active()),
 	____: None = Depends(_require_softphone_operator()),
+	_____: None = Depends(_require_media_edge),
 	db: Session = Depends(get_db),
 	ctx: AuthContext = Depends(get_current_user),
 ) -> dict:
@@ -790,6 +828,7 @@ def softphone_end_session(
 	__: None = Depends(require_business_access_dep),
 	___: None = Depends(require_telephony_plugin_active()),
 	____: None = Depends(_require_softphone_operator()),
+	_____: None = Depends(_require_media_edge),
 	db: Session = Depends(get_db),
 	ctx: AuthContext = Depends(get_current_user),
 ) -> dict:
@@ -818,6 +857,7 @@ def softphone_outbound_call(
 	__: None = Depends(require_business_access_dep),
 	___: None = Depends(require_telephony_plugin_active()),
 	____: None = Depends(_require_softphone_operator()),
+	_____: None = Depends(_require_media_edge),
 	db: Session = Depends(get_db),
 	ctx: AuthContext = Depends(get_current_user),
 ) -> dict:
@@ -857,6 +897,7 @@ def softphone_answer_call(
 	__: None = Depends(require_business_access_dep),
 	___: None = Depends(require_telephony_plugin_active()),
 	____: None = Depends(_require_softphone_operator()),
+	_____: None = Depends(_require_media_edge),
 	db: Session = Depends(get_db),
 	ctx: AuthContext = Depends(get_current_user),
 ) -> dict:
@@ -915,6 +956,7 @@ def connector_media_events(
 	authorization: Optional[str] = Header(default=None),
 	x_hesabix_business_id: Optional[str] = Header(default=None),
 	x_hesabix_pbx_id: Optional[str] = Header(default=None),
+	_: None = Depends(_require_media_edge),
 	db: Session = Depends(get_db),
 ) -> dict:
 	"""رویدادهای کنترل رسانه از Connector (علاوه بر WSS)."""
@@ -923,7 +965,6 @@ def connector_media_events(
 	pbx_id = int(x_hesabix_pbx_id or 0)
 	pbx = svc.authenticate_connector(db, token=token, business_id=business_id, pbx_id=pbx_id)
 	from app.services.telephony.media_hub import media_hub
-	import asyncio
 
 	tunnel = media_hub.tunnel_snapshot(pbx.id)
 	return _resp({"ok": True, "tunnel": tunnel, "received": payload.get("type")}, request)

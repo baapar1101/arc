@@ -110,6 +110,14 @@ class Settings(BaseSettings):
 	redis_db: int = 0
 	redis_password: str | None = None
 
+	# Softphone Media Edge
+	# api = workerهای عمومی (بدون media_hub زنده)
+	# media_edge = نود واحد Softphone (uvicorn --workers 1)
+	# auto = dev/تست تک‌process (اجازه عملیات media)
+	hesabix_process_role: str = "auto"
+	hesabix_media_edge_url: str = "http://127.0.0.1:8001"
+	hesabix_media_edge_token: str | None = None
+
 	# مانیتورینگ صف اعلان / پیامک (آستانه هشدار در پنل)
 	monitoring_outbox_due_retry_warn: int = 500
 	monitoring_outbox_sms_pending_warn: int = 50

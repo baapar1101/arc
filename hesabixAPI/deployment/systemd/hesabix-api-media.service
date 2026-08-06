@@ -1,0 +1,32 @@
+[Unit]
+Description=Hesabix Softphone Media Edge (single-worker)
+Documentation=https://hesabix.com/docs/api
+After=network.target postgresql.service hesabix-api.service
+Wants=postgresql.service
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/opt/hesabix/app/hesabixAPI
+Environment=PATH=/usr/bin:/usr/local/bin:/opt/hesabix/app/hesabixAPI/.venv/bin
+Environment=PYTHONUNBUFFERED=1
+Environment=TZ=UTC
+Environment=HESABIX_PROCESS_ROLE=media_edge
+Environment=HESABIX_MEDIA_EDGE_URL=http://127.0.0.1:8001
+# توکن داخلی برای snapshot از API workers (اختیاری؛ بدون آن فقط localhost مجاز است)
+Environment=HESABIX_MEDIA_EDGE_TOKEN=hsx-media-edge-internal-2026
+# جلوگیری از اجرای background jobs روی Media Edge (فقط API عمومی leader باشد)
+Environment=HESABIX_BACKGROUND_JOBS_ENABLED=false
+LimitNOFILE=65535
+TimeoutStartSec=120
+# یک worker اجباری: media_hub در حافظه است و کلاینت WS + تونل Connector + REST تماس باید هم‌نود باشند
+ExecStart=/opt/hesabix/app/hesabixAPI/.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8001 --workers 1 --limit-concurrency 2000 --backlog 2048
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=hesabix-api-media
+
+[Install]
+WantedBy=multi-user.target
