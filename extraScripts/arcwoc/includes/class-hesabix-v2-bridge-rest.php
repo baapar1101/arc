@@ -73,10 +73,41 @@ class Hesabix_V2_Bridge_Rest
 	}
 
 	/**
+	 * هدرهای ضدکش برای پاسخ‌های پل (LiteSpeed گاهی با وجود Cache-Control وردپرس کش می‌کند).
+	 *
+	 * @param WP_REST_Response|WP_HTTP_Response|WP_Error|mixed $response
+	 * @param WP_REST_Server                                    $server
+	 * @param WP_REST_Request                                   $request
+	 * @return WP_REST_Response|WP_HTTP_Response|WP_Error|mixed
+	 */
+	public static function filter_rest_post_dispatch_nocache($response, $server, $request)
+	{
+		unset($server);
+		if (!($response instanceof WP_REST_Response) || !($request instanceof WP_REST_Request)) {
+			return $response;
+		}
+		$route = (string) $request->get_route();
+		if (strpos($route, '/' . self::NS) !== 0) {
+			return $response;
+		}
+		$response->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+		$response->header('Pragma', 'no-cache');
+		$response->header('Expires', '0');
+		$response->header('X-LiteSpeed-Cache-Control', 'no-cache');
+		return $response;
+	}
+
+	/**
 	 * @return void
 	 */
 	public static function register_routes()
 	{
+		static $nocache_hooked = false;
+		if (!$nocache_hooked) {
+			add_filter('rest_post_dispatch', array(__CLASS__, 'filter_rest_post_dispatch_nocache'), 10, 3);
+			$nocache_hooked = true;
+		}
+
 		register_rest_route(
 			self::NS,
 			'/health',
@@ -640,10 +671,15 @@ class Hesabix_V2_Bridge_Rest
 		);
 
 		$customers_total = 0;
-		if (function_exists('count_users')) {
+		if (class_exists('Hesabix_V2_Customer_Service')) {
+			$customers_total = (int) Hesabix_V2_Customer_Service::count_sync_customers();
+		} elseif (function_exists('count_users')) {
 			$uc = count_users();
 			if (isset($uc['avail_roles']['customer'])) {
 				$customers_total = (int) $uc['avail_roles']['customer'];
+			}
+			if (isset($uc['avail_roles']['subscriber'])) {
+				$customers_total += (int) $uc['avail_roles']['subscriber'];
 			}
 		}
 
@@ -695,7 +731,7 @@ class Hesabix_V2_Bridge_Rest
 			array(
 				'success' => true,
 				'data'    => array(
-					'bridge_version' => 3,
+					'bridge_version' => 4,
 					'plugin_version' => defined('HESABIX_V2_VERSION') ? HESABIX_V2_VERSION : '',
 					'wc_version'     => defined('WC_VERSION') ? WC_VERSION : '',
 					'wp_version'     => get_bloginfo('version'),
@@ -901,6 +937,10 @@ class Hesabix_V2_Bridge_Rest
 	}
 
 	/**
+	 * فهرست مشتریان/مشترکین (هم‌راستا با صفحهٔ همگام‌سازی افزونه).
+	 *
+	 * WC_Customer_Query در ووکامرس‌های جدید وجود ندارد؛ قبلاً باعث می‌شد همیشه items خالی برگردد.
+	 *
 	 * @param WP_REST_Request $request
 	 * @return WP_REST_Response|WP_Error
 	 */
@@ -910,22 +950,46 @@ class Hesabix_V2_Bridge_Rest
 		$per_page = min(self::MAX_PER_PAGE, max(1, (int) $request->get_param('per_page')));
 		$search   = trim((string) $request->get_param('search'));
 
-		if (!class_exists('WC_Customer_Query')) {
-			return new WP_REST_Response(array('success' => true, 'data' => array('items' => array(), 'total' => 0, 'page' => $page, 'per_page' => $per_page)), 200);
+		$roles = array('customer', 'subscriber');
+		if (class_exists('Hesabix_V2_Customer_Service')) {
+			$roles = Hesabix_V2_Customer_Service::get_customer_list_roles();
+		}
+		if ($roles === array()) {
+			return new WP_REST_Response(
+				array(
+					'success' => true,
+					'data'    => array(
+						'items'    => array(),
+						'total'    => 0,
+						'page'     => $page,
+						'per_page' => $per_page,
+					),
+				),
+				200
+			);
 		}
 
-		$cq_args = array(
-			'limit'   => $per_page,
-			'offset'  => ($page - 1) * $per_page,
-			'orderby' => 'registered_date',
-			'order'   => 'DESC',
+		$args = array(
+			'role__in'     => $roles,
+			'number'       => $per_page,
+			'offset'       => ($page - 1) * $per_page,
+			'orderby'      => 'registered',
+			'order'        => 'DESC',
+			'fields'       => 'ID',
+			'count_total'  => true,
 		);
 		if ($search !== '') {
-			$cq_args['search'] = '*' . wc_clean($search) . '*';
+			$term = function_exists('wc_clean') ? wc_clean($search) : sanitize_text_field($search);
+			$args['search']         = '*' . $term . '*';
+			$args['search_columns'] = array('user_login', 'user_email', 'user_nicename', 'display_name');
 		}
-		$q     = new WC_Customer_Query($cq_args);
+
+		$q     = new WP_User_Query($args);
 		$ids   = $q->get_results();
-		$total = method_exists($q, 'get_total') ? (int) $q->get_total() : count($ids);
+		$total = (int) $q->get_total();
+		if (!is_array($ids)) {
+			$ids = array();
+		}
 
 		$items = array();
 		foreach ($ids as $uid) {
@@ -933,19 +997,38 @@ class Hesabix_V2_Bridge_Rest
 			if ($uid <= 0) {
 				continue;
 			}
-			$c = new WC_Customer($uid);
+			if (class_exists('WC_Customer')) {
+				$c = new WC_Customer($uid);
+				$email      = (string) $c->get_email();
+				$first_name = (string) $c->get_first_name();
+				$last_name  = (string) $c->get_last_name();
+				$username   = (string) $c->get_username();
+				$created    = $c->get_date_created() ? $c->get_date_created()->date('c') : null;
+			} else {
+				$u = get_userdata($uid);
+				if (!($u instanceof WP_User)) {
+					continue;
+				}
+				$email      = (string) $u->user_email;
+				$first_name = (string) $u->first_name;
+				$last_name  = (string) $u->last_name;
+				$username   = (string) $u->user_login;
+				$created    = !empty($u->user_registered)
+					? gmdate('c', strtotime((string) $u->user_registered))
+					: null;
+			}
 			$map = self::hesabix_mapping_summary('customer', $uid, null);
 			$items[] = array(
-				'id'         => $uid,
-				'email'      => (string) $c->get_email(),
-				'first_name' => (string) $c->get_first_name(),
-				'last_name'  => (string) $c->get_last_name(),
-				'username'   => (string) $c->get_username(),
-				'date_created' => $c->get_date_created() ? $c->get_date_created()->date('c') : null,
-				'hesabix_id' => $map['hesabix_id'],
-				'sync_status' => $map['sync_status'],
-				'hesabix_last_sync_at' => $map['last_sync_at'],
-				'hesabix_error_message' => $map['error_message'],
+				'id'                      => $uid,
+				'email'                   => $email,
+				'first_name'              => $first_name,
+				'last_name'               => $last_name,
+				'username'                => $username,
+				'date_created'            => $created,
+				'hesabix_id'              => $map['hesabix_id'],
+				'sync_status'             => $map['sync_status'],
+				'hesabix_last_sync_at'    => $map['last_sync_at'],
+				'hesabix_error_message'   => $map['error_message'],
 			);
 		}
 
