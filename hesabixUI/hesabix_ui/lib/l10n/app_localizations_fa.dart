@@ -17026,4 +17026,322 @@ class AppLocalizationsFa extends AppLocalizations {
   @override
   String get businessSettingsPluginsLoadFailed =>
       'بارگذاری افزونه‌ها ناموفق بود. یکپارچه‌سازی‌ها و ماژول‌ها ممکن است کامل نمایش داده نشوند.';
+
+  @override
+  String get barcodeLabelsMenu => 'برچسب و بارکد';
+
+  @override
+  String get barcodeLabelPluginNotActive =>
+      'افزونه طراحی برچسب بارکد برای این کسب‌وکار فعال نیست.';
+
+  @override
+  String get barcodeLabelPluginNotActiveHint =>
+      'از بازار افزونه‌ها می‌توانید دوره آزمایشی را شروع کنید یا افزونه را خریداری کنید.';
+
+  @override
+  String get barcodeLabelCreateTitle => 'طرح برچسب جدید';
+
+  @override
+  String get barcodeLabelCreateSubtitle =>
+      'از یک قالب آماده شروع کنید یا بوم خالی بسازید.';
+
+  @override
+  String get barcodeLabelBlankCanvas => 'بوم خالی';
+
+  @override
+  String get barcodeLabelBlankCanvasHint => 'شروع از صفر در استودیوی طراحی';
+
+  @override
+  String get barcodeLabelNewTemplate => 'طرح جدید';
+
+  @override
+  String get barcodeLabelSearchHint => 'جستجوی نام طرح…';
+
+  @override
+  String get barcodeLabelFilterAll => 'همه';
+
+  @override
+  String get barcodeLabelFilterPublished => 'منتشرشده';
+
+  @override
+  String get barcodeLabelFilterDraft => 'پیش‌نویس';
+
+  @override
+  String get barcodeLabelFilterArchived => 'بایگانی';
+
+  @override
+  String get barcodeLabelEmptyTitle => 'هنوز طرحی ندارید';
+
+  @override
+  String get barcodeLabelEmptyBody =>
+      'با یک preset آماده شروع کنید و برچسب‌های قابل اسکن طراحی کنید.';
+
+  @override
+  String get barcodeLabelStartWithPreset => 'شروع با قالب آماده';
+
+  @override
+  String get barcodeLabelDefaultBadge => 'پیش‌فرض';
+
+  @override
+  String get barcodeLabelDefaultSet => 'طرح پیش‌فرض تنظیم شد';
+
+  @override
+  String get barcodeLabelPublished => 'طرح منتشر شد';
+
+  @override
+  String get barcodeLabelSaved => 'طرح ذخیره شد';
+
+  @override
+  String get barcodeLabelPreviewPdf => 'پیش‌نمایش PDF';
+
+  @override
+  String get barcodeLabelPublish => 'انتشار';
+
+  @override
+  String get barcodeLabelSetDefault => 'تنظیم به‌عنوان پیش‌فرض';
+
+  @override
+  String get barcodeLabelDuplicate => 'کپی طرح';
+
+  @override
+  String get barcodeLabelStudioTitle => 'استودیوی برچسب';
+
+  @override
+  String get barcodeLabelUntitled => 'طرح بدون‌نام';
+
+  @override
+  String get barcodeLabelToolText => 'متن';
+
+  @override
+  String get barcodeLabelToolBarcode => 'بارکد';
+
+  @override
+  String get barcodeLabelToolImage => 'تصویر';
+
+  @override
+  String get barcodeLabelToolShape => 'شکل';
+
+  @override
+  String get barcodeLabelToolLine => 'خط';
+
+  @override
+  String get barcodeLabelLayers => 'لایه‌ها';
+
+  @override
+  String get barcodeLabelProperties => 'ویژگی‌ها';
+
+  @override
+  String get barcodeLabelNoSelection => 'المانی انتخاب نشده است';
+
+  @override
+  String get barcodeLabelBinding => 'فیلد داده';
+
+  @override
+  String get barcodeLabelSymbology => 'نوع بارکد';
+
+  @override
+  String get barcodeLabelPermissionDesign => 'طراحی و مدیریت طرح‌های برچسب';
+
+  @override
+  String get barcodeLabelPermissionPrint => 'چاپ برچسب با طرح‌ها';
+
+  @override
+  String get barcodeLabelPrintJobTitle => 'چاپ برچسب با طرح';
+
+  @override
+  String get barcodeLabelSelectTemplate => 'طرح برچسب';
+
+  @override
+  String get barcodeLabelQtyAll => 'تعداد برای همه';
+
+  @override
+  String get barcodeLabelApplyQty => 'اعمال';
+
+  @override
+  String get barcodeLabelPrintItems => 'آیتم‌های چاپ';
+
+  @override
+  String get barcodeLabelSavePdf => 'ذخیره PDF';
+
+  @override
+  String get barcodeLabelSystemPrint => 'چاپ';
+
+  @override
+  String get barcodeLabelPrintWebHint =>
+      'در وب، فایل PDF ذخیره می‌شود؛ سپس از مرورگر چاپ کنید.';
+
+  @override
+  String get barcodeLabelNoPublishedTemplates =>
+      'هیچ طرح منتشرشده‌ای نیست. ابتدا در استودیو یک طرح بسازید و منتشر کنید.';
+
+  @override
+  String get barcodeLabelPreviewEmpty => 'پیش‌نمایش در دسترس نیست';
+
+  @override
+  String barcodeLabelPrintTotal(int count) {
+    return 'جمع برچسب‌ها: $count';
+  }
+
+  @override
+  String get barcodeLabelAdvancedPrint => 'چاپ حرفه‌ای برچسب';
+
+  @override
+  String get barcodeLabelPrintWithTemplate => 'چاپ بارکد عمومی با طرح…';
+
+  @override
+  String get barcodeLabelPrintUniqueWithTemplate => 'چاپ واحدهای یونیک با طرح…';
+
+  @override
+  String get barcodeLabelExcelPrintTitle => 'چاپ از اکسل';
+
+  @override
+  String get barcodeLabelExcelPrintHint =>
+      'فایل CSV/اکسل با ستون‌های code، barcode، name، qty را انتخاب کنید.';
+
+  @override
+  String get barcodeLabelPickExcel => 'انتخاب فایل';
+
+  @override
+  String get barcodeLabelExcelReadFailed => 'خواندن فایل ممکن نشد';
+
+  @override
+  String barcodeLabelExcelReady(int rows, int labels) {
+    return '$rows ردیف معتبر · $labels برچسب';
+  }
+
+  @override
+  String get barcodeLabelExcelErrors => 'خطاهای ردیف:';
+
+  @override
+  String barcodeLabelExcelRowError(int line, String field) {
+    return 'ردیف $line: فیلد $field ناقص است';
+  }
+
+  @override
+  String get barcodeLabelContinueToPrint => 'ادامه چاپ';
+
+  @override
+  String get barcodeLabelSerialPrintTitle => 'چاپ سریالی';
+
+  @override
+  String get barcodeLabelSerialPrintHint =>
+      'بازه شماره‌ها را مشخص کنید تا بارکدهای سریالی ساخته شود.';
+
+  @override
+  String get barcodeLabelSerialPrefix => 'پیشوند';
+
+  @override
+  String get barcodeLabelSerialSuffix => 'پسوند';
+
+  @override
+  String get barcodeLabelSerialStart => 'از';
+
+  @override
+  String get barcodeLabelSerialEnd => 'تا';
+
+  @override
+  String get barcodeLabelSerialPad => 'طول پد';
+
+  @override
+  String get barcodeLabelSerialQtyEach => 'تعداد هر کدام';
+
+  @override
+  String barcodeLabelSerialPreview(int count) {
+    return 'تعداد مقادیر: $count';
+  }
+
+  @override
+  String get barcodeLabelSerialItem => 'سریال تولیدشده';
+
+  @override
+  String get barcodeLabelSerialInvalidRange => 'بازه شروع/پایان نامعتبر است';
+
+  @override
+  String get barcodeLabelSerialTooMany =>
+      'حداکثر ۱۰۰۰۰ برچسب در یک job مجاز است';
+
+  @override
+  String get barcodeLabelPrintersTitle => 'پروفایل چاپگر رولی';
+
+  @override
+  String get barcodeLabelPrinterAdd => 'افزودن پروفایل';
+
+  @override
+  String get barcodeLabelPrinterEdit => 'ویرایش پروفایل';
+
+  @override
+  String get barcodeLabelPrinterName => 'نام چاپگر';
+
+  @override
+  String get barcodeLabelPrinterMode => 'حالت چاپ';
+
+  @override
+  String get barcodeLabelPrinterConnection => 'نوع اتصال';
+
+  @override
+  String get barcodeLabelPrinterHost => 'آدرس IP / Host';
+
+  @override
+  String get barcodeLabelPrinterPort => 'پورت';
+
+  @override
+  String get barcodeLabelPrinterWidthMm => 'عرض لیبل (mm)';
+
+  @override
+  String get barcodeLabelPrinterHeightMm => 'ارتفاع لیبل (mm)';
+
+  @override
+  String get barcodeLabelPrinterDpi => 'DPI';
+
+  @override
+  String get barcodeLabelPrinterEnabled => 'فعال';
+
+  @override
+  String get barcodeLabelPrinterDisabled => 'غیرفعال';
+
+  @override
+  String get barcodeLabelPrinterSetActive => 'پیش‌فرض';
+
+  @override
+  String get barcodeLabelPrintersSaved => 'پروفایل‌های چاپگر ذخیره شد';
+
+  @override
+  String get barcodeLabelPrintersEmpty =>
+      'هنوز پروفایلی تعریف نشده. برای چاپ رولی یک پروفایل اضافه کنید.';
+
+  @override
+  String get barcodeLabelPrintersWebBanner =>
+      'پیکربندی و چاپ خام رولی/Zebra روی وب محدود است؛ برای بهترین نتیجه از نسخه ویندوز یا اندروید استفاده کنید.';
+
+  @override
+  String get barcodeLabelPrintersSpikeNote =>
+      'حالت ZPL/ESC-POS آزمایشی است و نیاز به تأیید روی سخت‌افزار واقعی دارد. مسیر پایدار فعلی: PDF spooler با اندازه لیبل.';
+
+  @override
+  String get barcodeLabelSelectPrinter => 'پروفایل چاپگر';
+
+  @override
+  String get barcodeLabelRollPrint => 'چاپ رولی';
+
+  @override
+  String get barcodeLabelNoPrinterProfile =>
+      'پروفایل چاپگر فعالی انتخاب نشده است';
+
+  @override
+  String get barcodeLabelPrinterZplNeedsTcp =>
+      'برای ZPL، اتصال TCP و آدرس Host را در پروفایل تنظیم کنید';
+
+  @override
+  String get barcodeLabelPrinterZplSent => 'دستور ZPL به چاپگر ارسال شد';
+
+  @override
+  String get barcodeLabelPrinterEscPosFallback =>
+      'ESC/POS هنوز اسپایک نشده؛ چاپ با PDF رولی انجام می‌شود';
+
+  @override
+  String get barcodeLabelPrinterUnsupportedMode =>
+      'حالت چاپگر پشتیبانی نمی‌شود';
+
+  @override
+  String get barcodeLabelPrintFromProductForm => 'چاپ با طرح برچسب';
 }

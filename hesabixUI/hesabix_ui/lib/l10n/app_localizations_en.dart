@@ -17123,4 +17123,324 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get businessSettingsPluginsLoadFailed =>
       'Failed to load plugins. Integrations and modules may be incomplete.';
+
+  @override
+  String get barcodeLabelsMenu => 'Labels & barcodes';
+
+  @override
+  String get barcodeLabelPluginNotActive =>
+      'The barcode label studio add-on is not active for this business.';
+
+  @override
+  String get barcodeLabelPluginNotActiveHint =>
+      'Start a trial or purchase the add-on from the plugin marketplace.';
+
+  @override
+  String get barcodeLabelCreateTitle => 'New label template';
+
+  @override
+  String get barcodeLabelCreateSubtitle =>
+      'Start from a preset or a blank canvas.';
+
+  @override
+  String get barcodeLabelBlankCanvas => 'Blank canvas';
+
+  @override
+  String get barcodeLabelBlankCanvasHint =>
+      'Start from scratch in the design studio';
+
+  @override
+  String get barcodeLabelNewTemplate => 'New template';
+
+  @override
+  String get barcodeLabelSearchHint => 'Search templates…';
+
+  @override
+  String get barcodeLabelFilterAll => 'All';
+
+  @override
+  String get barcodeLabelFilterPublished => 'Published';
+
+  @override
+  String get barcodeLabelFilterDraft => 'Draft';
+
+  @override
+  String get barcodeLabelFilterArchived => 'Archived';
+
+  @override
+  String get barcodeLabelEmptyTitle => 'No templates yet';
+
+  @override
+  String get barcodeLabelEmptyBody =>
+      'Start with a preset and design scannable product labels.';
+
+  @override
+  String get barcodeLabelStartWithPreset => 'Start with a preset';
+
+  @override
+  String get barcodeLabelDefaultBadge => 'Default';
+
+  @override
+  String get barcodeLabelDefaultSet => 'Default template set';
+
+  @override
+  String get barcodeLabelPublished => 'Template published';
+
+  @override
+  String get barcodeLabelSaved => 'Template saved';
+
+  @override
+  String get barcodeLabelPreviewPdf => 'Preview PDF';
+
+  @override
+  String get barcodeLabelPublish => 'Publish';
+
+  @override
+  String get barcodeLabelSetDefault => 'Set as default';
+
+  @override
+  String get barcodeLabelDuplicate => 'Duplicate';
+
+  @override
+  String get barcodeLabelStudioTitle => 'Label studio';
+
+  @override
+  String get barcodeLabelUntitled => 'Untitled template';
+
+  @override
+  String get barcodeLabelToolText => 'Text';
+
+  @override
+  String get barcodeLabelToolBarcode => 'Barcode';
+
+  @override
+  String get barcodeLabelToolImage => 'Image';
+
+  @override
+  String get barcodeLabelToolShape => 'Shape';
+
+  @override
+  String get barcodeLabelToolLine => 'Line';
+
+  @override
+  String get barcodeLabelLayers => 'Layers';
+
+  @override
+  String get barcodeLabelProperties => 'Properties';
+
+  @override
+  String get barcodeLabelNoSelection => 'No element selected';
+
+  @override
+  String get barcodeLabelBinding => 'Data field';
+
+  @override
+  String get barcodeLabelSymbology => 'Symbology';
+
+  @override
+  String get barcodeLabelPermissionDesign =>
+      'Design and manage label templates';
+
+  @override
+  String get barcodeLabelPermissionPrint => 'Print labels with templates';
+
+  @override
+  String get barcodeLabelPrintJobTitle => 'Print labels with template';
+
+  @override
+  String get barcodeLabelSelectTemplate => 'Label template';
+
+  @override
+  String get barcodeLabelQtyAll => 'Qty for all';
+
+  @override
+  String get barcodeLabelApplyQty => 'Apply';
+
+  @override
+  String get barcodeLabelPrintItems => 'Print items';
+
+  @override
+  String get barcodeLabelSavePdf => 'Save PDF';
+
+  @override
+  String get barcodeLabelSystemPrint => 'Print';
+
+  @override
+  String get barcodeLabelPrintWebHint =>
+      'On web, the PDF is saved — print it from your browser.';
+
+  @override
+  String get barcodeLabelNoPublishedTemplates =>
+      'No published templates. Create and publish one in the studio first.';
+
+  @override
+  String get barcodeLabelPreviewEmpty => 'Preview unavailable';
+
+  @override
+  String barcodeLabelPrintTotal(int count) {
+    return 'Total labels: $count';
+  }
+
+  @override
+  String get barcodeLabelAdvancedPrint => 'Advanced label print';
+
+  @override
+  String get barcodeLabelPrintWithTemplate =>
+      'Print general barcodes with template…';
+
+  @override
+  String get barcodeLabelPrintUniqueWithTemplate =>
+      'Print unique units with template…';
+
+  @override
+  String get barcodeLabelExcelPrintTitle => 'Print from Excel';
+
+  @override
+  String get barcodeLabelExcelPrintHint =>
+      'Pick a CSV/Excel file with columns code, barcode, name, qty.';
+
+  @override
+  String get barcodeLabelPickExcel => 'Choose file';
+
+  @override
+  String get barcodeLabelExcelReadFailed => 'Could not read the file';
+
+  @override
+  String barcodeLabelExcelReady(int rows, int labels) {
+    return '$rows valid rows · $labels labels';
+  }
+
+  @override
+  String get barcodeLabelExcelErrors => 'Row errors:';
+
+  @override
+  String barcodeLabelExcelRowError(int line, String field) {
+    return 'Row $line: missing $field';
+  }
+
+  @override
+  String get barcodeLabelContinueToPrint => 'Continue to print';
+
+  @override
+  String get barcodeLabelSerialPrintTitle => 'Serial print';
+
+  @override
+  String get barcodeLabelSerialPrintHint =>
+      'Define a number range to generate serial barcodes.';
+
+  @override
+  String get barcodeLabelSerialPrefix => 'Prefix';
+
+  @override
+  String get barcodeLabelSerialSuffix => 'Suffix';
+
+  @override
+  String get barcodeLabelSerialStart => 'From';
+
+  @override
+  String get barcodeLabelSerialEnd => 'To';
+
+  @override
+  String get barcodeLabelSerialPad => 'Pad length';
+
+  @override
+  String get barcodeLabelSerialQtyEach => 'Qty each';
+
+  @override
+  String barcodeLabelSerialPreview(int count) {
+    return 'Value count: $count';
+  }
+
+  @override
+  String get barcodeLabelSerialItem => 'Generated serial';
+
+  @override
+  String get barcodeLabelSerialInvalidRange => 'Invalid start/end range';
+
+  @override
+  String get barcodeLabelSerialTooMany => 'Maximum 10000 labels per job';
+
+  @override
+  String get barcodeLabelPrintersTitle => 'Roll printer profiles';
+
+  @override
+  String get barcodeLabelPrinterAdd => 'Add profile';
+
+  @override
+  String get barcodeLabelPrinterEdit => 'Edit profile';
+
+  @override
+  String get barcodeLabelPrinterName => 'Printer name';
+
+  @override
+  String get barcodeLabelPrinterMode => 'Print mode';
+
+  @override
+  String get barcodeLabelPrinterConnection => 'Connection';
+
+  @override
+  String get barcodeLabelPrinterHost => 'Host / IP';
+
+  @override
+  String get barcodeLabelPrinterPort => 'Port';
+
+  @override
+  String get barcodeLabelPrinterWidthMm => 'Label width (mm)';
+
+  @override
+  String get barcodeLabelPrinterHeightMm => 'Label height (mm)';
+
+  @override
+  String get barcodeLabelPrinterDpi => 'DPI';
+
+  @override
+  String get barcodeLabelPrinterEnabled => 'Enabled';
+
+  @override
+  String get barcodeLabelPrinterDisabled => 'Disabled';
+
+  @override
+  String get barcodeLabelPrinterSetActive => 'Set active';
+
+  @override
+  String get barcodeLabelPrintersSaved => 'Printer profiles saved';
+
+  @override
+  String get barcodeLabelPrintersEmpty =>
+      'No profiles yet. Add one for roll printing.';
+
+  @override
+  String get barcodeLabelPrintersWebBanner =>
+      'Raw roll/Zebra printing is limited on web; use Windows or Android for best results.';
+
+  @override
+  String get barcodeLabelPrintersSpikeNote =>
+      'ZPL/ESC-POS is experimental and needs real-hardware validation. Stable path today: PDF spooler at label size.';
+
+  @override
+  String get barcodeLabelSelectPrinter => 'Printer profile';
+
+  @override
+  String get barcodeLabelRollPrint => 'Roll print';
+
+  @override
+  String get barcodeLabelNoPrinterProfile =>
+      'No active printer profile selected';
+
+  @override
+  String get barcodeLabelPrinterZplNeedsTcp =>
+      'For ZPL, set TCP connection and Host in the profile';
+
+  @override
+  String get barcodeLabelPrinterZplSent => 'ZPL sent to printer';
+
+  @override
+  String get barcodeLabelPrinterEscPosFallback =>
+      'ESC/POS not spiked yet; printing via roll PDF';
+
+  @override
+  String get barcodeLabelPrinterUnsupportedMode => 'Unsupported printer mode';
+
+  @override
+  String get barcodeLabelPrintFromProductForm => 'Print with label template';
 }

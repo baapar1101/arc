@@ -20,6 +20,10 @@ import '../../widgets/product/product_import_dialog.dart';
 import '../../widgets/product/product_unique_instances_tab.dart';
 import '../../widgets/product/product_commercial_insights_tab.dart';
 import '../../widgets/product/product_label_print_dialog.dart';
+import '../../widgets/barcode_label/label_print_job_dialog.dart';
+import '../../widgets/barcode_label/label_excel_print_dialog.dart';
+import '../../widgets/barcode_label/label_serial_print_dialog.dart';
+import '../../services/marketplace_service.dart';
 import '../../models/warehouse_model.dart';
 import '../../widgets/attached_files/attached_files_widget.dart';
 import '../../services/business_storage_service.dart';
@@ -394,11 +398,120 @@ class _ProductsPageState extends State<ProductsPage> {
         SnackBarHelper.showError(context, message: t.generalBarcodeLabelsNoneSelected);
         return;
       }
-      await ProductLabelPrintDialog.show(
+      await ProductLabelPrintDialog.show(context, items: labels);
+    } catch (e) {
+      if (!mounted) return;
+      SnackBarHelper.showError(
         context,
-        items: labels,
-        initialShowSerialLine: false,
-        dialogTitle: t.generalBarcodeLabelsTitle,
+        message: '${t.error}: ${ErrorExtractor.forContext(e, context)}',
+      );
+    }
+  }
+
+  Future<bool> _isBarcodeLabelPluginActive() async {
+    try {
+      final plugins = await MarketplaceService().listBusinessPlugins(businessId: widget.businessId);
+      for (final p in plugins) {
+        if (p['plugin_code'] != 'barcode_label_studio') continue;
+        if (p['is_active'] == true || p['is_active'] == 1) return true;
+        if (p['is_trial'] == true && p['is_expired'] != true) return true;
+      }
+    } catch (_) {}
+    return false;
+  }
+
+  Future<void> _bulkPrintWithTemplate({required bool uniqueMode}) async {
+    final t = AppLocalizations.of(context);
+    final active = await _isBarcodeLabelPluginActive();
+    if (!mounted) return;
+    if (!active) {
+      SnackBarHelper.showError(context, message: t.barcodeLabelPluginNotActive);
+      return;
+    }
+    try {
+      final state = _tableKey.currentState as dynamic;
+      final items = (state?.getSelectedItems() as List<dynamic>?) ?? const <dynamic>[];
+      if (items.isEmpty) {
+        SnackBarHelper.showError(context, message: t.noRowsSelectedError);
+        return;
+      }
+      final rows = <LabelPrintJobRow>[];
+      if (uniqueMode) {
+        if (!widget.authStore.hasBusinessPermission('inventory', 'read')) {
+          SnackBarHelper.showError(context, message: 'برای چاپ برچسب واحدهای یونیک، دسترسی مشاهده انبار لازم است.');
+          return;
+        }
+        final ws = WarehouseService();
+        final whList = await ws.listWarehouses(businessId: widget.businessId);
+        final whMap = <int, String>{
+          for (final Warehouse w in whList)
+            if (w.id != null) w.id!: w.name,
+        };
+        for (final row in items) {
+          if (row is! Map<String, dynamic> || row['inventory_mode']?.toString() != 'unique') continue;
+          final rawId = row['id'];
+          final productId = rawId is int
+              ? rawId
+              : (rawId is num ? rawId.toInt() : int.tryParse(rawId?.toString() ?? ''));
+          if (productId == null) continue;
+          final name = row['name']?.toString() ?? '';
+          final code = row['code']?.toString() ?? '';
+          final res = await ws.searchProductInstances(
+            businessId: widget.businessId,
+            productId: productId,
+            allStatuses: true,
+          );
+          final instList = res['items'] as List<dynamic>? ?? const [];
+          for (final e in instList) {
+            final m = Map<String, dynamic>.from(e as Map);
+            final widRaw = m['warehouse_id'];
+            final wId = widRaw is int ? widRaw : int.tryParse(widRaw?.toString() ?? '');
+            final serial = m['serial_number']?.toString() ?? '';
+            final bc = m['barcode']?.toString() ?? serial;
+            rows.add(
+              LabelPrintJobRow(
+                key: 'inst-${m['id']}',
+                title: name,
+                subtitle: '$code · $serial',
+                context: {
+                  'product': {
+                    'name': name,
+                    'code': code,
+                    'general_barcode': bc,
+                    'price': row['price'],
+                    'sale_price': row['sale_price'] ?? row['price'],
+                  },
+                  'instance': {'serial': serial, 'barcode': bc},
+                  'warehouse': {'name': wId != null ? (whMap[wId] ?? '') : ''},
+                  'business': {'name': ''},
+                  'print': {'counter': 1, 'copy_index': 1},
+                },
+              ),
+            );
+          }
+        }
+      } else {
+        for (final row in items) {
+          if (row is! Map<String, dynamic>) continue;
+          final tokens = parseGeneralBarcodeTokens(row['general_barcodes']?.toString());
+          if (tokens.isEmpty) {
+            rows.add(LabelPrintJobDialog.fromProductMap(row));
+          } else {
+            for (final tok in tokens) {
+              rows.add(LabelPrintJobDialog.fromProductMap(row, barcodeOverride: tok));
+            }
+          }
+        }
+      }
+      if (!mounted) return;
+      if (rows.isEmpty) {
+        SnackBarHelper.showError(context, message: t.generalBarcodeLabelsNoneSelected);
+        return;
+      }
+      await LabelPrintJobDialog.show(
+        context,
+        businessId: widget.businessId,
+        rows: rows,
       );
     } catch (e) {
       if (!mounted) return;
@@ -1928,6 +2041,51 @@ class _ProductsPageState extends State<ProductsPage> {
                   onPressed: _bulkPrintGeneralBarcodeLabels,
                   icon: const Icon(Icons.label_outline),
                 ),
+              ),
+            if (widget.authStore.hasBusinessPermission('products', 'view') ||
+                widget.authStore.hasBusinessPermission('barcode_labels', 'print') ||
+                widget.authStore.hasBusinessPermission('barcode_labels', 'view'))
+              PopupMenuButton<String>(
+                tooltip: AppLocalizations.of(context).barcodeLabelAdvancedPrint,
+                icon: const Icon(Icons.dashboard_customize_outlined),
+                onSelected: (v) async {
+                  switch (v) {
+                    case 'template_general':
+                      await _bulkPrintWithTemplate(uniqueMode: false);
+                      break;
+                    case 'template_unique':
+                      await _bulkPrintWithTemplate(uniqueMode: true);
+                      break;
+                    case 'excel':
+                      if (!await _isBarcodeLabelPluginActive()) {
+                        if (!mounted) return;
+                        SnackBarHelper.showError(context, message: AppLocalizations.of(context).barcodeLabelPluginNotActive);
+                        return;
+                      }
+                      if (!mounted) return;
+                      await LabelExcelPrintDialog.show(context, businessId: widget.businessId);
+                      break;
+                    case 'serial':
+                      if (!await _isBarcodeLabelPluginActive()) {
+                        if (!mounted) return;
+                        SnackBarHelper.showError(context, message: AppLocalizations.of(context).barcodeLabelPluginNotActive);
+                        return;
+                      }
+                      if (!mounted) return;
+                      await LabelSerialPrintDialog.show(context, businessId: widget.businessId);
+                      break;
+                  }
+                },
+                itemBuilder: (ctx) {
+                  final tt = AppLocalizations.of(ctx);
+                  return [
+                    PopupMenuItem(value: 'template_general', child: Text(tt.barcodeLabelPrintWithTemplate)),
+                    PopupMenuItem(value: 'template_unique', child: Text(tt.barcodeLabelPrintUniqueWithTemplate)),
+                    const PopupMenuDivider(),
+                    PopupMenuItem(value: 'excel', child: Text(tt.barcodeLabelExcelPrintTitle)),
+                    PopupMenuItem(value: 'serial', child: Text(tt.barcodeLabelSerialPrintTitle)),
+                  ];
+                },
               ),
             if (widget.authStore.hasBusinessPermission('products', 'edit'))
               Tooltip(

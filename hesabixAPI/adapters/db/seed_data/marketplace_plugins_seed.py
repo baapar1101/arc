@@ -178,6 +178,21 @@ _DEFAULT_PLUGINS: Tuple[_PluginSeed, ...] = (
 		trial_allowed=True,
 		plans=(("monthly", 350_000), ("yearly", 3_500_000)),
 	),
+	_PluginSeed(
+		code="barcode_label_studio",
+		name="طراحی و چاپ برچسب بارکد",
+		description=(
+			"استودیوی حرفه‌ای طراحی برچسب کالا: Drag & Drop، چند طرح ذخیره‌شونده، "
+			"طرح پیش‌فرض، انواع بارکد استاندارد (Code128/39/93، EAN، QR، DataMatrix)، "
+			"چینش سطر و ستون، چاپ از لیست کالا و اکسل سریالی. "
+			"خروجی PDF دقیق با مقیاس میلی‌متر روی وب، ویندوز و اندروید."
+		),
+		category="product_management",
+		icon_url=None,
+		trial_days=14,
+		trial_allowed=True,
+		plans=(("monthly", 180_000), ("yearly", 1_800_000), ("lifetime", 7_200_000)),
+	),
 )
 
 

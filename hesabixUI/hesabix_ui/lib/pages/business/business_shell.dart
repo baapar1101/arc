@@ -1351,6 +1351,15 @@ class _BusinessShellState extends State<BusinessShell> {
             type: _MenuItemType.simple,
             hasAddButton: false,
           ),
+          _MenuItem(
+            key: 'barcode-labels',
+            label: t.barcodeLabelsMenu,
+            icon: Icons.qr_code_2_outlined,
+            selectedIcon: Icons.qr_code_2,
+            path: _bu('barcode-labels'),
+            type: _MenuItemType.simple,
+            hasAddButton: false,
+          ),
         ],
       ),
       _MenuItem(
@@ -3467,6 +3476,13 @@ class _BusinessShellState extends State<BusinessShell> {
       }
     }
 
+    // طراحی برچسب بارکد
+    if (section == 'barcode_labels') {
+      if (!_showPluginGatedMenu(_isPluginCodeLicensed('barcode_label_studio'))) {
+        return false;
+      }
+    }
+
     // مرکز تماس آستریکس/ایزابل
     if (section == 'telephony') {
       if (!_showPluginGatedMenu(_isTelephonyPluginActive())) {
@@ -3550,6 +3566,8 @@ class _BusinessShellState extends State<BusinessShell> {
         return 'reports';
       case 'payroll':
         return 'payroll';
+      case 'barcode-labels':
+        return 'barcode_labels';
       case 'telephony':
         return 'telephony';
       case 'customer-club':
@@ -3569,6 +3587,7 @@ class _BusinessShellState extends State<BusinessShell> {
     if (path != null) {
       if (path.contains('/hscript')) return 'reports';
       if (path.contains('/payroll')) return 'payroll';
+      if (path.contains('/barcode-labels')) return 'barcode_labels';
       if (path.contains('/telephony')) return 'telephony';
       if (path.contains('/customer-club')) return 'customer_club';
       if (path.contains('/repair-shop')) return 'repair_shop';

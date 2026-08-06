@@ -155,6 +155,10 @@ import 'pages/business/distribution/distribution_main_page.dart';
 import 'widgets/marketplace/distribution_plugin_gate.dart';
 import 'widgets/marketplace/payroll_plugin_gate.dart';
 import 'widgets/marketplace/telephony_plugin_gate.dart';
+import 'widgets/marketplace/barcode_label_plugin_gate.dart';
+import 'pages/business/barcode_labels/label_templates_page.dart';
+import 'pages/business/barcode_labels/label_studio_page.dart';
+import 'pages/business/barcode_labels/label_printers_page.dart';
 import 'pages/business/basalam/basalam_integration_page.dart';
 import 'pages/business/basalam/basalam_settings_page.dart';
 import 'pages/business/woocommerce/woocommerce_integration_page.dart';
@@ -4104,6 +4108,74 @@ class _MyAppState extends State<MyApp> {
                   ),
                 );
               },
+            ),
+            GoRoute(
+              path: 'barcode-labels',
+              pageBuilder: (context, state) {
+                final businessId = int.parse(state.pathParameters['business_id']!);
+                return hesabixNoTransitionPage(
+                  state,
+                  BarcodeLabelPluginGate(
+                    businessId: businessId,
+                    child: LabelTemplatesPage(
+                      businessId: businessId,
+                      authStore: _authStore!,
+                    ),
+                  ),
+                );
+              },
+              routes: [
+                GoRoute(
+                  path: 'studio/new',
+                  pageBuilder: (context, state) {
+                    final businessId = int.parse(state.pathParameters['business_id']!);
+                    return hesabixNoTransitionPage(
+                      state,
+                      BarcodeLabelPluginGate(
+                        businessId: businessId,
+                        child: LabelStudioPage(
+                          businessId: businessId,
+                          authStore: _authStore!,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+                GoRoute(
+                  path: 'studio/:template_id',
+                  pageBuilder: (context, state) {
+                    final businessId = int.parse(state.pathParameters['business_id']!);
+                    final templateId = int.parse(state.pathParameters['template_id']!);
+                    return hesabixNoTransitionPage(
+                      state,
+                      BarcodeLabelPluginGate(
+                        businessId: businessId,
+                        child: LabelStudioPage(
+                          businessId: businessId,
+                          authStore: _authStore!,
+                          templateId: templateId,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+                GoRoute(
+                  path: 'printers',
+                  pageBuilder: (context, state) {
+                    final businessId = int.parse(state.pathParameters['business_id']!);
+                    return hesabixNoTransitionPage(
+                      state,
+                      BarcodeLabelPluginGate(
+                        businessId: businessId,
+                        child: LabelPrintersPage(
+                          businessId: businessId,
+                          authStore: _authStore!,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ],
             ),
             GoRoute(
               path: 'price-lists',

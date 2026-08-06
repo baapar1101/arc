@@ -1259,6 +1259,11 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
         'delete': '${t.delete} ${t.warranty}',
         'manage': '${t.manage} ${t.warranty}',
       },
+      'barcode_labels': {
+        'view': '${t.view} ${t.barcodeLabelsMenu}',
+        'design': t.barcodeLabelPermissionDesign,
+        'print': t.barcodeLabelPermissionPrint,
+      },
       'customer_club': {
         'view': '${t.view} ${t.customerClubTitle}',
         'manage': t.customerClubPermissionManageSettings(t.customerClubTitle),
@@ -1859,6 +1864,11 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
         'sections': ['warranty'],
       },
       {
+        'title': t.barcodeLabelsMenu,
+        'icon': Icons.qr_code_2_outlined,
+        'sections': ['barcode_labels'],
+      },
+      {
         'title': t.customerClubMenu,
         'icon': Icons.card_giftcard,
         'sections': ['customer_club'],
@@ -2032,6 +2042,8 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
         return t.fiscalYears;
       case 'warranty':
         return t.warranty;
+      case 'barcode_labels':
+        return t.barcodeLabelsMenu;
       case 'customer_club':
         return t.customerClubMenu;
       case 'distribution':
@@ -2141,6 +2153,10 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
           return t.payrollPermissionManage;
         }
         return t.manage;
+      case 'design':
+        return sectionKey == 'barcode_labels' ? t.barcodeLabelPermissionDesign : action;
+      case 'print':
+        return sectionKey == 'barcode_labels' ? t.barcodeLabelPermissionPrint : (t.printDocuments);
       case 'adjust':
         return t.customerClubActionAdjust;
       case 'redeem':

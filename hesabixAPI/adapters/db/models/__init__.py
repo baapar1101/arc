@@ -64,6 +64,8 @@ from .product_supplier import ProductSupplier, ProductSupplierSocialContact  # n
 from .public_catalog_contact_message import PublicCatalogContactMessage  # noqa: F401
 from .product_general_barcode_alias import ProductGeneralBarcodeAlias  # noqa: F401
 from .product_instance import ProductInstance  # noqa: F401
+from .label_template import LabelTemplate, LabelTemplateRevision  # noqa: F401
+from .barcode_label_settings import BarcodeLabelSettings  # noqa: F401
 from .price_list import PriceList, PriceItem  # noqa: F401
 from .product_attribute_link import ProductAttributeLink  # noqa: F401
 from .tax_unit import TaxUnit  # noqa: F401

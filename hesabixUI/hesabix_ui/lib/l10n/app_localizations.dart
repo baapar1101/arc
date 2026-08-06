@@ -31445,6 +31445,594 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Failed to load plugins. Integrations and modules may be incomplete.'**
   String get businessSettingsPluginsLoadFailed;
+
+  /// No description provided for @barcodeLabelsMenu.
+  ///
+  /// In en, this message translates to:
+  /// **'Labels & barcodes'**
+  String get barcodeLabelsMenu;
+
+  /// No description provided for @barcodeLabelPluginNotActive.
+  ///
+  /// In en, this message translates to:
+  /// **'The barcode label studio add-on is not active for this business.'**
+  String get barcodeLabelPluginNotActive;
+
+  /// No description provided for @barcodeLabelPluginNotActiveHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Start a trial or purchase the add-on from the plugin marketplace.'**
+  String get barcodeLabelPluginNotActiveHint;
+
+  /// No description provided for @barcodeLabelCreateTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'New label template'**
+  String get barcodeLabelCreateTitle;
+
+  /// No description provided for @barcodeLabelCreateSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Start from a preset or a blank canvas.'**
+  String get barcodeLabelCreateSubtitle;
+
+  /// No description provided for @barcodeLabelBlankCanvas.
+  ///
+  /// In en, this message translates to:
+  /// **'Blank canvas'**
+  String get barcodeLabelBlankCanvas;
+
+  /// No description provided for @barcodeLabelBlankCanvasHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Start from scratch in the design studio'**
+  String get barcodeLabelBlankCanvasHint;
+
+  /// No description provided for @barcodeLabelNewTemplate.
+  ///
+  /// In en, this message translates to:
+  /// **'New template'**
+  String get barcodeLabelNewTemplate;
+
+  /// No description provided for @barcodeLabelSearchHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Search templates…'**
+  String get barcodeLabelSearchHint;
+
+  /// No description provided for @barcodeLabelFilterAll.
+  ///
+  /// In en, this message translates to:
+  /// **'All'**
+  String get barcodeLabelFilterAll;
+
+  /// No description provided for @barcodeLabelFilterPublished.
+  ///
+  /// In en, this message translates to:
+  /// **'Published'**
+  String get barcodeLabelFilterPublished;
+
+  /// No description provided for @barcodeLabelFilterDraft.
+  ///
+  /// In en, this message translates to:
+  /// **'Draft'**
+  String get barcodeLabelFilterDraft;
+
+  /// No description provided for @barcodeLabelFilterArchived.
+  ///
+  /// In en, this message translates to:
+  /// **'Archived'**
+  String get barcodeLabelFilterArchived;
+
+  /// No description provided for @barcodeLabelEmptyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'No templates yet'**
+  String get barcodeLabelEmptyTitle;
+
+  /// No description provided for @barcodeLabelEmptyBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Start with a preset and design scannable product labels.'**
+  String get barcodeLabelEmptyBody;
+
+  /// No description provided for @barcodeLabelStartWithPreset.
+  ///
+  /// In en, this message translates to:
+  /// **'Start with a preset'**
+  String get barcodeLabelStartWithPreset;
+
+  /// No description provided for @barcodeLabelDefaultBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'Default'**
+  String get barcodeLabelDefaultBadge;
+
+  /// No description provided for @barcodeLabelDefaultSet.
+  ///
+  /// In en, this message translates to:
+  /// **'Default template set'**
+  String get barcodeLabelDefaultSet;
+
+  /// No description provided for @barcodeLabelPublished.
+  ///
+  /// In en, this message translates to:
+  /// **'Template published'**
+  String get barcodeLabelPublished;
+
+  /// No description provided for @barcodeLabelSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Template saved'**
+  String get barcodeLabelSaved;
+
+  /// No description provided for @barcodeLabelPreviewPdf.
+  ///
+  /// In en, this message translates to:
+  /// **'Preview PDF'**
+  String get barcodeLabelPreviewPdf;
+
+  /// No description provided for @barcodeLabelPublish.
+  ///
+  /// In en, this message translates to:
+  /// **'Publish'**
+  String get barcodeLabelPublish;
+
+  /// No description provided for @barcodeLabelSetDefault.
+  ///
+  /// In en, this message translates to:
+  /// **'Set as default'**
+  String get barcodeLabelSetDefault;
+
+  /// No description provided for @barcodeLabelDuplicate.
+  ///
+  /// In en, this message translates to:
+  /// **'Duplicate'**
+  String get barcodeLabelDuplicate;
+
+  /// No description provided for @barcodeLabelStudioTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Label studio'**
+  String get barcodeLabelStudioTitle;
+
+  /// No description provided for @barcodeLabelUntitled.
+  ///
+  /// In en, this message translates to:
+  /// **'Untitled template'**
+  String get barcodeLabelUntitled;
+
+  /// No description provided for @barcodeLabelToolText.
+  ///
+  /// In en, this message translates to:
+  /// **'Text'**
+  String get barcodeLabelToolText;
+
+  /// No description provided for @barcodeLabelToolBarcode.
+  ///
+  /// In en, this message translates to:
+  /// **'Barcode'**
+  String get barcodeLabelToolBarcode;
+
+  /// No description provided for @barcodeLabelToolImage.
+  ///
+  /// In en, this message translates to:
+  /// **'Image'**
+  String get barcodeLabelToolImage;
+
+  /// No description provided for @barcodeLabelToolShape.
+  ///
+  /// In en, this message translates to:
+  /// **'Shape'**
+  String get barcodeLabelToolShape;
+
+  /// No description provided for @barcodeLabelToolLine.
+  ///
+  /// In en, this message translates to:
+  /// **'Line'**
+  String get barcodeLabelToolLine;
+
+  /// No description provided for @barcodeLabelLayers.
+  ///
+  /// In en, this message translates to:
+  /// **'Layers'**
+  String get barcodeLabelLayers;
+
+  /// No description provided for @barcodeLabelProperties.
+  ///
+  /// In en, this message translates to:
+  /// **'Properties'**
+  String get barcodeLabelProperties;
+
+  /// No description provided for @barcodeLabelNoSelection.
+  ///
+  /// In en, this message translates to:
+  /// **'No element selected'**
+  String get barcodeLabelNoSelection;
+
+  /// No description provided for @barcodeLabelBinding.
+  ///
+  /// In en, this message translates to:
+  /// **'Data field'**
+  String get barcodeLabelBinding;
+
+  /// No description provided for @barcodeLabelSymbology.
+  ///
+  /// In en, this message translates to:
+  /// **'Symbology'**
+  String get barcodeLabelSymbology;
+
+  /// No description provided for @barcodeLabelPermissionDesign.
+  ///
+  /// In en, this message translates to:
+  /// **'Design and manage label templates'**
+  String get barcodeLabelPermissionDesign;
+
+  /// No description provided for @barcodeLabelPermissionPrint.
+  ///
+  /// In en, this message translates to:
+  /// **'Print labels with templates'**
+  String get barcodeLabelPermissionPrint;
+
+  /// No description provided for @barcodeLabelPrintJobTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Print labels with template'**
+  String get barcodeLabelPrintJobTitle;
+
+  /// No description provided for @barcodeLabelSelectTemplate.
+  ///
+  /// In en, this message translates to:
+  /// **'Label template'**
+  String get barcodeLabelSelectTemplate;
+
+  /// No description provided for @barcodeLabelQtyAll.
+  ///
+  /// In en, this message translates to:
+  /// **'Qty for all'**
+  String get barcodeLabelQtyAll;
+
+  /// No description provided for @barcodeLabelApplyQty.
+  ///
+  /// In en, this message translates to:
+  /// **'Apply'**
+  String get barcodeLabelApplyQty;
+
+  /// No description provided for @barcodeLabelPrintItems.
+  ///
+  /// In en, this message translates to:
+  /// **'Print items'**
+  String get barcodeLabelPrintItems;
+
+  /// No description provided for @barcodeLabelSavePdf.
+  ///
+  /// In en, this message translates to:
+  /// **'Save PDF'**
+  String get barcodeLabelSavePdf;
+
+  /// No description provided for @barcodeLabelSystemPrint.
+  ///
+  /// In en, this message translates to:
+  /// **'Print'**
+  String get barcodeLabelSystemPrint;
+
+  /// No description provided for @barcodeLabelPrintWebHint.
+  ///
+  /// In en, this message translates to:
+  /// **'On web, the PDF is saved — print it from your browser.'**
+  String get barcodeLabelPrintWebHint;
+
+  /// No description provided for @barcodeLabelNoPublishedTemplates.
+  ///
+  /// In en, this message translates to:
+  /// **'No published templates. Create and publish one in the studio first.'**
+  String get barcodeLabelNoPublishedTemplates;
+
+  /// No description provided for @barcodeLabelPreviewEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'Preview unavailable'**
+  String get barcodeLabelPreviewEmpty;
+
+  /// No description provided for @barcodeLabelPrintTotal.
+  ///
+  /// In en, this message translates to:
+  /// **'Total labels: {count}'**
+  String barcodeLabelPrintTotal(int count);
+
+  /// No description provided for @barcodeLabelAdvancedPrint.
+  ///
+  /// In en, this message translates to:
+  /// **'Advanced label print'**
+  String get barcodeLabelAdvancedPrint;
+
+  /// No description provided for @barcodeLabelPrintWithTemplate.
+  ///
+  /// In en, this message translates to:
+  /// **'Print general barcodes with template…'**
+  String get barcodeLabelPrintWithTemplate;
+
+  /// No description provided for @barcodeLabelPrintUniqueWithTemplate.
+  ///
+  /// In en, this message translates to:
+  /// **'Print unique units with template…'**
+  String get barcodeLabelPrintUniqueWithTemplate;
+
+  /// No description provided for @barcodeLabelExcelPrintTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Print from Excel'**
+  String get barcodeLabelExcelPrintTitle;
+
+  /// No description provided for @barcodeLabelExcelPrintHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick a CSV/Excel file with columns code, barcode, name, qty.'**
+  String get barcodeLabelExcelPrintHint;
+
+  /// No description provided for @barcodeLabelPickExcel.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose file'**
+  String get barcodeLabelPickExcel;
+
+  /// No description provided for @barcodeLabelExcelReadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not read the file'**
+  String get barcodeLabelExcelReadFailed;
+
+  /// No description provided for @barcodeLabelExcelReady.
+  ///
+  /// In en, this message translates to:
+  /// **'{rows} valid rows · {labels} labels'**
+  String barcodeLabelExcelReady(int rows, int labels);
+
+  /// No description provided for @barcodeLabelExcelErrors.
+  ///
+  /// In en, this message translates to:
+  /// **'Row errors:'**
+  String get barcodeLabelExcelErrors;
+
+  /// No description provided for @barcodeLabelExcelRowError.
+  ///
+  /// In en, this message translates to:
+  /// **'Row {line}: missing {field}'**
+  String barcodeLabelExcelRowError(int line, String field);
+
+  /// No description provided for @barcodeLabelContinueToPrint.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue to print'**
+  String get barcodeLabelContinueToPrint;
+
+  /// No description provided for @barcodeLabelSerialPrintTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Serial print'**
+  String get barcodeLabelSerialPrintTitle;
+
+  /// No description provided for @barcodeLabelSerialPrintHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Define a number range to generate serial barcodes.'**
+  String get barcodeLabelSerialPrintHint;
+
+  /// No description provided for @barcodeLabelSerialPrefix.
+  ///
+  /// In en, this message translates to:
+  /// **'Prefix'**
+  String get barcodeLabelSerialPrefix;
+
+  /// No description provided for @barcodeLabelSerialSuffix.
+  ///
+  /// In en, this message translates to:
+  /// **'Suffix'**
+  String get barcodeLabelSerialSuffix;
+
+  /// No description provided for @barcodeLabelSerialStart.
+  ///
+  /// In en, this message translates to:
+  /// **'From'**
+  String get barcodeLabelSerialStart;
+
+  /// No description provided for @barcodeLabelSerialEnd.
+  ///
+  /// In en, this message translates to:
+  /// **'To'**
+  String get barcodeLabelSerialEnd;
+
+  /// No description provided for @barcodeLabelSerialPad.
+  ///
+  /// In en, this message translates to:
+  /// **'Pad length'**
+  String get barcodeLabelSerialPad;
+
+  /// No description provided for @barcodeLabelSerialQtyEach.
+  ///
+  /// In en, this message translates to:
+  /// **'Qty each'**
+  String get barcodeLabelSerialQtyEach;
+
+  /// No description provided for @barcodeLabelSerialPreview.
+  ///
+  /// In en, this message translates to:
+  /// **'Value count: {count}'**
+  String barcodeLabelSerialPreview(int count);
+
+  /// No description provided for @barcodeLabelSerialItem.
+  ///
+  /// In en, this message translates to:
+  /// **'Generated serial'**
+  String get barcodeLabelSerialItem;
+
+  /// No description provided for @barcodeLabelSerialInvalidRange.
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid start/end range'**
+  String get barcodeLabelSerialInvalidRange;
+
+  /// No description provided for @barcodeLabelSerialTooMany.
+  ///
+  /// In en, this message translates to:
+  /// **'Maximum 10000 labels per job'**
+  String get barcodeLabelSerialTooMany;
+
+  /// No description provided for @barcodeLabelPrintersTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Roll printer profiles'**
+  String get barcodeLabelPrintersTitle;
+
+  /// No description provided for @barcodeLabelPrinterAdd.
+  ///
+  /// In en, this message translates to:
+  /// **'Add profile'**
+  String get barcodeLabelPrinterAdd;
+
+  /// No description provided for @barcodeLabelPrinterEdit.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit profile'**
+  String get barcodeLabelPrinterEdit;
+
+  /// No description provided for @barcodeLabelPrinterName.
+  ///
+  /// In en, this message translates to:
+  /// **'Printer name'**
+  String get barcodeLabelPrinterName;
+
+  /// No description provided for @barcodeLabelPrinterMode.
+  ///
+  /// In en, this message translates to:
+  /// **'Print mode'**
+  String get barcodeLabelPrinterMode;
+
+  /// No description provided for @barcodeLabelPrinterConnection.
+  ///
+  /// In en, this message translates to:
+  /// **'Connection'**
+  String get barcodeLabelPrinterConnection;
+
+  /// No description provided for @barcodeLabelPrinterHost.
+  ///
+  /// In en, this message translates to:
+  /// **'Host / IP'**
+  String get barcodeLabelPrinterHost;
+
+  /// No description provided for @barcodeLabelPrinterPort.
+  ///
+  /// In en, this message translates to:
+  /// **'Port'**
+  String get barcodeLabelPrinterPort;
+
+  /// No description provided for @barcodeLabelPrinterWidthMm.
+  ///
+  /// In en, this message translates to:
+  /// **'Label width (mm)'**
+  String get barcodeLabelPrinterWidthMm;
+
+  /// No description provided for @barcodeLabelPrinterHeightMm.
+  ///
+  /// In en, this message translates to:
+  /// **'Label height (mm)'**
+  String get barcodeLabelPrinterHeightMm;
+
+  /// No description provided for @barcodeLabelPrinterDpi.
+  ///
+  /// In en, this message translates to:
+  /// **'DPI'**
+  String get barcodeLabelPrinterDpi;
+
+  /// No description provided for @barcodeLabelPrinterEnabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Enabled'**
+  String get barcodeLabelPrinterEnabled;
+
+  /// No description provided for @barcodeLabelPrinterDisabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Disabled'**
+  String get barcodeLabelPrinterDisabled;
+
+  /// No description provided for @barcodeLabelPrinterSetActive.
+  ///
+  /// In en, this message translates to:
+  /// **'Set active'**
+  String get barcodeLabelPrinterSetActive;
+
+  /// No description provided for @barcodeLabelPrintersSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Printer profiles saved'**
+  String get barcodeLabelPrintersSaved;
+
+  /// No description provided for @barcodeLabelPrintersEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No profiles yet. Add one for roll printing.'**
+  String get barcodeLabelPrintersEmpty;
+
+  /// No description provided for @barcodeLabelPrintersWebBanner.
+  ///
+  /// In en, this message translates to:
+  /// **'Raw roll/Zebra printing is limited on web; use Windows or Android for best results.'**
+  String get barcodeLabelPrintersWebBanner;
+
+  /// No description provided for @barcodeLabelPrintersSpikeNote.
+  ///
+  /// In en, this message translates to:
+  /// **'ZPL/ESC-POS is experimental and needs real-hardware validation. Stable path today: PDF spooler at label size.'**
+  String get barcodeLabelPrintersSpikeNote;
+
+  /// No description provided for @barcodeLabelSelectPrinter.
+  ///
+  /// In en, this message translates to:
+  /// **'Printer profile'**
+  String get barcodeLabelSelectPrinter;
+
+  /// No description provided for @barcodeLabelRollPrint.
+  ///
+  /// In en, this message translates to:
+  /// **'Roll print'**
+  String get barcodeLabelRollPrint;
+
+  /// No description provided for @barcodeLabelNoPrinterProfile.
+  ///
+  /// In en, this message translates to:
+  /// **'No active printer profile selected'**
+  String get barcodeLabelNoPrinterProfile;
+
+  /// No description provided for @barcodeLabelPrinterZplNeedsTcp.
+  ///
+  /// In en, this message translates to:
+  /// **'For ZPL, set TCP connection and Host in the profile'**
+  String get barcodeLabelPrinterZplNeedsTcp;
+
+  /// No description provided for @barcodeLabelPrinterZplSent.
+  ///
+  /// In en, this message translates to:
+  /// **'ZPL sent to printer'**
+  String get barcodeLabelPrinterZplSent;
+
+  /// No description provided for @barcodeLabelPrinterEscPosFallback.
+  ///
+  /// In en, this message translates to:
+  /// **'ESC/POS not spiked yet; printing via roll PDF'**
+  String get barcodeLabelPrinterEscPosFallback;
+
+  /// No description provided for @barcodeLabelPrinterUnsupportedMode.
+  ///
+  /// In en, this message translates to:
+  /// **'Unsupported printer mode'**
+  String get barcodeLabelPrinterUnsupportedMode;
+
+  /// No description provided for @barcodeLabelPrintFromProductForm.
+  ///
+  /// In en, this message translates to:
+  /// **'Print with label template'**
+  String get barcodeLabelPrintFromProductForm;
 }
 
 class _AppLocalizationsDelegate

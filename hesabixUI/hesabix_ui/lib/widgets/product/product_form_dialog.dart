@@ -9,6 +9,10 @@ import 'sections/product_supply_network_section.dart';
 import 'sections/product_bom_section.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../utils/responsive_helper.dart';
+import '../../utils/general_barcode_utils.dart';
+import '../../utils/error_extractor.dart';
+import '../../services/marketplace_service.dart';
+import '../barcode_label/label_print_job_dialog.dart';
 
 class ProductFormDialog extends StatefulWidget {
   final int businessId;
@@ -348,9 +352,21 @@ class _ProductFormDialogState extends State<ProductFormDialog> {
   }
 
   Widget _buildActions(AppLocalizations t, bool isMobile) {
+    final printBtn = _isEditMode
+        ? OutlinedButton.icon(
+            onPressed: _controller.isLoading ? null : _printWithTemplate,
+            icon: const Icon(Icons.qr_code_2_outlined),
+            label: Text(t.barcodeLabelPrintFromProductForm),
+          )
+        : null;
+
     if (isMobile) {
       return Column(
         children: [
+          if (printBtn != null) ...[
+            SizedBox(width: double.infinity, child: printBtn),
+            const SizedBox(height: 8),
+          ],
           SizedBox(
             width: double.infinity,
             child: FilledButton(
@@ -368,8 +384,8 @@ class _ProductFormDialogState extends State<ProductFormDialog> {
           SizedBox(
             width: double.infinity,
             child: TextButton(
-              onPressed: _controller.isLoading 
-                  ? null 
+              onPressed: _controller.isLoading
+                  ? null
                   : () {
                       _controller.resetForm();
                       if (mounted) {
@@ -383,11 +399,12 @@ class _ProductFormDialogState extends State<ProductFormDialog> {
       );
     }
     return Row(
-      mainAxisAlignment: MainAxisAlignment.end,
       children: [
+        if (printBtn != null) printBtn,
+        const Spacer(),
         TextButton(
-          onPressed: _controller.isLoading 
-              ? null 
+          onPressed: _controller.isLoading
+              ? null
               : () {
                   _controller.resetForm();
                   if (mounted) {
@@ -409,6 +426,64 @@ class _ProductFormDialogState extends State<ProductFormDialog> {
         ),
       ],
     );
+  }
+
+  Future<bool> _isBarcodeLabelPluginActive() async {
+    try {
+      final plugins = await MarketplaceService().listBusinessPlugins(businessId: widget.businessId);
+      for (final p in plugins) {
+        if (p['plugin_code'] != 'barcode_label_studio') continue;
+        if (p['is_active'] == true || p['is_active'] == 1) return true;
+        if (p['is_trial'] == true && p['is_expired'] != true) return true;
+      }
+    } catch (_) {}
+    return false;
+  }
+
+  Future<void> _printWithTemplate() async {
+    final t = AppLocalizations.of(context);
+    if (!widget.authStore.hasBusinessPermission('barcode_labels', 'print') &&
+        !widget.authStore.hasBusinessPermission('barcode_labels', 'view') &&
+        !widget.authStore.hasBusinessPermission('products', 'view')) {
+      SnackBarHelper.showError(context, message: t.error);
+      return;
+    }
+    if (!await _isBarcodeLabelPluginActive()) {
+      if (!mounted) return;
+      SnackBarHelper.showError(context, message: t.barcodeLabelPluginNotActive);
+      return;
+    }
+    final fd = _controller.formData;
+    final productId = widget.product?['id'];
+    final productMap = <String, dynamic>{
+      'id': productId,
+      'name': fd.name,
+      'code': fd.code ?? widget.product?['code'] ?? '',
+      'general_barcodes': fd.generalBarcodes ?? widget.product?['general_barcodes'] ?? '',
+      'price': fd.baseSalesPrice ?? widget.product?['price'],
+      'sale_price': fd.baseSalesPrice ?? widget.product?['sale_price'],
+      'buy_price': fd.basePurchasePrice ?? widget.product?['buy_price'],
+    };
+    final tokens = parseGeneralBarcodeTokens(productMap['general_barcodes']?.toString());
+    final rows = <LabelPrintJobRow>[];
+    if (tokens.isEmpty) {
+      rows.add(LabelPrintJobDialog.fromProductMap(productMap));
+    } else {
+      for (final tok in tokens) {
+        rows.add(LabelPrintJobDialog.fromProductMap(productMap, barcodeOverride: tok));
+      }
+    }
+    if (!mounted) return;
+    try {
+      await LabelPrintJobDialog.show(
+        context,
+        businessId: widget.businessId,
+        rows: rows,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
+    }
   }
 
   Future<void> _handleSubmit() async {
