@@ -3,7 +3,7 @@
 # استفاده: hesabix-pbx <command>
 set -euo pipefail
 
-VERSION="1.2.2"
+VERSION="1.3.0"
 INSTALL_DIR="${HESABIX_PBX_DIR:-/opt/HesabixTelephonyConnector}"
 ENV_FILE="${INSTALL_DIR}/.env"
 SERVICE_NAME="hesabix-telephony-connector"
@@ -29,12 +29,16 @@ IS_ISSABEL=0
 # فایل‌های ضروری کانکتور (برای حالت بدون git)
 CONNECTOR_FILES=(
   "app/main.py"
+  "app/media_audiosocket.py"
+  "app/media_tunnel.py"
   "bin/hesabix-pbx"
   "config.example.env"
+  "requirements-softphone.txt"
   "README.md"
   "VERSION"
   "systemd/hesabix-telephony-connector.service"
   "install.sh"
+  "dialplan/hesabix-softphone-relay.conf.sample"
 )
 
 # ─── helpers ────────────────────────────────────────────────────────────────
@@ -386,6 +390,156 @@ install_systemd() {
   ok "سرویس systemd ثبت شد: $SERVICE_NAME"
 }
 
+# ─── Softphone Media Relay helpers ───────────────────────────────────────────
+
+ensure_python_pip() {
+  have python3 || die "python3 نصب نیست."
+  if python3 -m pip --version >/dev/null 2>&1; then
+    return 0
+  fi
+  log "pip برای python3 پیدا نشد — تلاش برای نصب…"
+  detect_os
+  case "$PKG_MGR" in
+    apt-get)
+      pkg_install python3-pip || true
+      ;;
+    dnf|yum)
+      pkg_install python3-pip || pkg_install python-pip || true
+      ;;
+  esac
+  if ! python3 -m pip --version >/dev/null 2>&1; then
+    # آخرین تلاش: ensurepip
+    python3 -m ensurepip --upgrade >/dev/null 2>&1 || true
+  fi
+  python3 -m pip --version >/dev/null 2>&1 || die "pip نصب نشد. دستی: yum/apt install python3-pip"
+}
+
+ensure_softphone_python_deps() {
+  ensure_python_pip
+  local req="$INSTALL_DIR/requirements-softphone.txt"
+  log "نصب وابستگی Softphone (websocket-client)…"
+  if [[ -f "$req" ]]; then
+    python3 -m pip install -r "$req" \
+      || python3 -m pip install --break-system-packages -r "$req" \
+      || return 1
+  else
+    python3 -m pip install "websocket-client>=1.6.0" \
+      || python3 -m pip install --break-system-packages "websocket-client>=1.6.0" \
+      || return 1
+  fi
+  python3 -c "import websocket; print(websocket.__version__)" >/dev/null 2>&1 \
+    || return 1
+  return 0
+}
+
+ensure_softphone_env_keys() {
+  [[ -f "$ENV_FILE" ]] || die "فایل .env نیست. اول: hesabix-pbx configure"
+  log "همگام‌سازی کلیدهای Softphone در .env …"
+  python3 - "$ENV_FILE" <<'PY'
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+text = path.read_text(encoding="utf-8", errors="replace")
+defaults = {
+    "AUDIOSOCKET_HOST": "127.0.0.1",
+    "AUDIOSOCKET_PORT": "9092",
+    "MEDIA_TUNNEL_ENABLED": "1",
+}
+lines = text.splitlines()
+keys_present = set()
+out = []
+for line in lines:
+    raw = line.strip()
+    if raw and not raw.startswith("#") and "=" in raw:
+        k = raw.split("=", 1)[0].strip()
+        keys_present.add(k)
+        if k in defaults and (raw.split("=", 1)[1].strip().strip("'\"") == ""):
+            out.append(f"{k}={defaults[k]}")
+            continue
+    out.append(line)
+
+missing = [k for k in defaults if k not in keys_present]
+if missing:
+    if out and out[-1].strip() != "":
+        out.append("")
+    out.append("# Softphone Media Relay (auto by hesabix-pbx softphone-setup)")
+    for k in missing:
+        out.append(f"{k}={defaults[k]}")
+
+path.write_text("\n".join(out) + "\n", encoding="utf-8")
+print("env softphone keys ok")
+PY
+  chmod 600 "$ENV_FILE" 2>/dev/null || true
+  ok "کلیدهای Softphone در $ENV_FILE تنظیم شد."
+}
+
+verify_softphone_ready() {
+  log "بررسی آمادگی Softphone…"
+  if python3 -c "import websocket" >/dev/null 2>&1; then
+    local ver
+    ver="$(python3 -c "import websocket; print(getattr(websocket, '__version__', 'ok'))" 2>/dev/null || echo ok)"
+    ok "websocket-client نصب است (نسخه: $ver)"
+  else
+    err "websocket-client هنوز import نمی‌شود."
+    return 1
+  fi
+  if [[ -f "$ENV_FILE" ]]; then
+    grep -q '^MEDIA_TUNNEL_ENABLED=' "$ENV_FILE" && ok "MEDIA_TUNNEL_ENABLED در .env هست" || warn "MEDIA_TUNNEL_ENABLED در .env نیست"
+    grep -q '^AUDIOSOCKET_PORT=' "$ENV_FILE" && ok "AUDIOSOCKET_PORT در .env هست" || warn "AUDIOSOCKET_PORT در .env نیست"
+  fi
+  if [[ -f "$INSTALL_DIR/app/media_tunnel.py" && -f "$INSTALL_DIR/app/media_audiosocket.py" ]]; then
+    ok "ماژول‌های Softphone در $INSTALL_DIR/app موجودند."
+  else
+    warn "فایل‌های media_*.py پیدا نشد — ابتدا hesabix-pbx update بزنید."
+  fi
+  if [[ -f "$INSTALL_DIR/dialplan/hesabix-softphone-relay.conf.sample" ]]; then
+    ok "نمونه دیال‌پلن: $INSTALL_DIR/dialplan/hesabix-softphone-relay.conf.sample"
+  fi
+  return 0
+}
+
+cmd_softphone_setup() {
+  need_root softphone-setup
+  [[ -d "$INSTALL_DIR" ]] || die "نصب پیدا نشد. اول: hesabix-pbx install یا hesabix-pbx update"
+  ensure_prerequisites
+
+  log "راه‌اندازی خودکار Softphone Media Relay…"
+  # اگر فایل‌های softphone نیستند، یک sync سبک انجام بده
+  if [[ ! -f "$INSTALL_DIR/app/media_tunnel.py" ]]; then
+    warn "کد Softphone روی دیسک نیست — در حال به‌روزرسانی از مخزن…"
+    sync_connector
+    install_cli
+    install_systemd
+  fi
+
+  ensure_softphone_python_deps || die "نصب websocket-client ناموفق بود."
+  ok "websocket-client نصب شد."
+
+  if [[ -f "$ENV_FILE" ]]; then
+    ensure_softphone_env_keys
+  else
+    warn ".env نیست. اول configure را بزنید، بعد دوباره softphone-setup."
+    cmd_configure
+    ensure_softphone_env_keys
+  fi
+
+  systemctl restart "$SERVICE_NAME" || systemctl start "$SERVICE_NAME" || die "ری‌استارت سرویس ناموفق"
+  sleep 1
+  verify_softphone_ready || true
+
+  echo
+  ok "Softphone Relay آماده شد."
+  echo "  بعدی در حسابیکس:"
+  echo "    ۱) تنظیمات مرکز تماس → نگاشت کاربر → حالت Relay"
+  echo "    ۲) صفحه Softphone → آنلاین شدن"
+  echo "  لاگ:"
+  echo "    hesabix-pbx logs"
+  echo "    hesabix-pbx follow"
+  echo
+  cmd_status
+}
+
 # ─── Hesabix API helpers (ویزارد تعاملی) ─────────────────────────────────────
 
 api_request_json() {
@@ -714,6 +868,10 @@ AMI_HOST=$(qenv "$ami_host")
 AMI_PORT=$(qenv "$ami_port")
 AMI_USER=$(qenv "$ami_user")
 AMI_SECRET=$(qenv "$ami_secret")
+# Softphone Media Relay
+AUDIOSOCKET_HOST="127.0.0.1"
+AUDIOSOCKET_PORT="9092"
+MEDIA_TUNNEL_ENABLED="1"
 EOF
   chmod 600 "$ENV_FILE"
   ok "پیکربندی ذخیره شد: $ENV_FILE"
@@ -1123,7 +1281,14 @@ cmd_update() {
   sync_connector
   install_cli
   install_systemd
+  # Softphone deps را در update هم نصب کن (اگر شکست خورد فقط هشدار)
+  if ensure_softphone_python_deps; then
+    ok "وابستگی Softphone (websocket-client) آماده است."
+  else
+    warn "نصب websocket-client ناموفق بود. بعداً بزنید: hesabix-pbx softphone-setup"
+  fi
   if [[ -f "$ENV_FILE" ]]; then
+    ensure_softphone_env_keys
     systemctl restart "$SERVICE_NAME" || true
   fi
   ok "به‌روزرسانی انجام شد."
@@ -1171,7 +1336,8 @@ ${c_bold}نصب اول (با root):${c_reset}
 
 ${c_bold}دستورات:${c_reset}
   hesabix-pbx install       نصب کامل (پیش‌نیاز + دانلود + پیکربندی + سرویس)
-  hesabix-pbx update        به‌روزرسانی از مخزن حسابیکس
+  hesabix-pbx update        به‌روزرسانی از مخزن حسابیکس (+ وابستگی Softphone)
+  hesabix-pbx softphone-setup  نصب خودکار Softphone Relay (websocket-client + .env + restart)
   hesabix-pbx reinstall     نصب مجدد (حفظ .env)
   hesabix-pbx configure     ویزارد پیکربندی / تغییر توکن، AMI و آدرس API
   hesabix-pbx start         شروع سرویس
@@ -1209,6 +1375,8 @@ main() {
   case "$cmd" in
     install)    cmd_install "$@" ;;
     update)     cmd_update "$@" ;;
+    softphone-setup|softphone|media-setup)
+                cmd_softphone_setup "$@" ;;
     reinstall)  cmd_reinstall "$@" ;;
     configure|config|setup) cmd_configure "$@" ;;
     start)      cmd_start "$@" ;;

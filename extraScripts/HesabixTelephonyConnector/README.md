@@ -38,7 +38,8 @@ curl -fsSL https://source.hesabix.ir/hesabix/arc/raw/branch/master/extraScripts/
 ```bash
 hesabix-pbx status      # وضعیت سرویس، سیستم‌عامل و پیکربندی
 hesabix-pbx test        # تست AMI + اتصال به حسابیکس
-hesabix-pbx update      # به‌روزرسانی از مخزن
+hesabix-pbx update      # به‌روزرسانی از مخزن (+ تلاش برای نصب Softphone deps)
+hesabix-pbx softphone-setup  # نصب خودکار Softphone Relay
 hesabix-pbx restart     # ری‌استارت
 hesabix-pbx stop
 hesabix-pbx start
@@ -85,10 +86,29 @@ hesabix-pbx configure
 
 از نسخهٔ دارای Softphone، Connector علاوه بر AMI یک **تونل رسانه خروجی (WSS)** به حسابیکس و یک **AudioSocket محلی** (`127.0.0.1:9092`) دارد.
 
-نیازمندی اضافه:
+### نصب خودکار (پیشنهادی)
+
+روی سرور PBX با root:
 
 ```bash
-pip install websocket-client
+hesabix-pbx update
+hesabix-pbx softphone-setup
+```
+
+`softphone-setup` این کارها را خودش انجام می‌دهد:
+1. نصب `websocket-client` (pip)
+2. افزودن کلیدهای Softphone به `.env` (`MEDIA_TUNNEL_ENABLED`, `AUDIOSOCKET_*`)
+3. ری‌استارت سرویس
+4. بررسی آمادگی
+
+از نسخهٔ `1.3.0` به بعد، خودِ `hesabix-pbx update` هم تلاش می‌کند `websocket-client` را نصب کند.
+
+### نصب دستی (در صورت نیاز)
+
+```bash
+pip3 install -r /opt/HesabixTelephonyConnector/requirements-softphone.txt
+# یا:
+pip3 install websocket-client
 ```
 
 متغیرهای `.env`:
