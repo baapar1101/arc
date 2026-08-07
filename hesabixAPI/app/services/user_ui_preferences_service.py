@@ -36,8 +36,12 @@ def _normalize_tabs_payload(raw: Any) -> Dict[str, Any]:
 		paths_raw = entry.get("paths") or []
 		if not isinstance(paths_raw, list):
 			continue
-		paths: List[str] = []
-		for p in paths_raw[:_MAX_TABS_PER_BUSINESS]:
+		pinned_raw = entry.get("pinned")
+		if not isinstance(pinned_raw, list):
+			pinned_raw = []
+		# (path, pinned) — پین با ایندکس مسیر هم‌تراز می‌ماند حتی بعد از فیلتر/dedupe
+		paired: List[Tuple[str, bool]] = []
+		for i, p in enumerate(paths_raw[:_MAX_TABS_PER_BUSINESS]):
 			if not isinstance(p, str):
 				continue
 			p = p.strip()
@@ -46,15 +50,18 @@ def _normalize_tabs_payload(raw: Any) -> Dict[str, Any]:
 			ok, pbid, _ = _parse_business_path(p)
 			if not ok or pbid != bid:
 				continue
-			paths.append(p)
+			is_pinned = bool(pinned_raw[i]) if i < len(pinned_raw) else False
+			paired.append((p, is_pinned))
 		# حذف تکراری با حفظ ترتیب
 		seen = set()
 		uniq: List[str] = []
-		for p in paths:
+		uniq_pinned: List[bool] = []
+		for p, is_pinned in paired:
 			if p in seen:
 				continue
 			seen.add(p)
 			uniq.append(p)
+			uniq_pinned.append(bool(is_pinned))
 		active = entry.get("active_path")
 		active_str = str(active).strip() if active is not None else None
 		if active_str and not active_str.startswith("/"):
@@ -66,7 +73,11 @@ def _normalize_tabs_payload(raw: Any) -> Dict[str, Any]:
 		else:
 			active_str = uniq[-1] if uniq else None
 		if uniq:
-			out[str(bid)] = {"paths": uniq, "active_path": active_str}
+			out[str(bid)] = {
+				"paths": uniq,
+				"active_path": active_str,
+				"pinned": uniq_pinned,
+			}
 	return out
 
 

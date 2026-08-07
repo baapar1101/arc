@@ -260,6 +260,60 @@ class _BusinessShellState extends State<BusinessShell> {
     return locTail == menuTail || locTail.startsWith('$menuTail/');
   }
 
+  Future<bool> _confirmClosePinnedTab(BuildContext context) async {
+    final t = AppLocalizations.of(context)!;
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (ctx) {
+        final cs = Theme.of(ctx).colorScheme;
+        return AlertDialog(
+          icon: Icon(Icons.push_pin_rounded, color: cs.primary),
+          title: Text(t.businessPanelTabPinnedCloseTitle),
+          content: Text(t.businessPanelTabPinnedCloseMessage),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: Text(t.cancel),
+            ),
+            FilledButton(
+              style: FilledButton.styleFrom(
+                backgroundColor: cs.error,
+                foregroundColor: cs.onError,
+              ),
+              onPressed: () => Navigator.pop(ctx, true),
+              child: Text(t.businessPanelTabPinnedCloseConfirm),
+            ),
+          ],
+        );
+      },
+    );
+    return result == true;
+  }
+
+  void _showPinnedKeptSnackBar(BuildContext context, int count) {
+    if (count <= 0 || !context.mounted) return;
+    final t = AppLocalizations.of(context)!;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(t.businessPanelTabPinnedKeptSnackbar(count))),
+    );
+  }
+
+  Future<void> _requestCloseTab(
+    BuildContext context,
+    String path,
+    void Function(String location) go,
+  ) async {
+    final store = BusinessPanelUiStore.instance;
+    final bid = widget.businessId;
+    if (store.isTabPinned(bid, path)) {
+      final ok = await _confirmClosePinnedTab(context);
+      if (!ok || !context.mounted) return;
+      store.closeTab(bid, path, go, force: true);
+      return;
+    }
+    store.closeTab(bid, path, go);
+  }
+
   Future<void> _showDesktopTabActionDialog(
     BuildContext context,
     List<_MenuItem> menuRoot,
@@ -269,6 +323,7 @@ class _BusinessShellState extends State<BusinessShell> {
     final store = BusinessPanelUiStore.instance;
     final bid = widget.businessId;
     void go(String loc) => context.go(loc);
+    final pinned = session.isPathPinned(path);
 
     await showDialog<void>(
       context: context,
@@ -285,11 +340,20 @@ class _BusinessShellState extends State<BusinessShell> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               ListTile(
-                leading: const Icon(Icons.close),
-                title: Text(t.businessPanelTabCloseThisTab),
+                leading: Icon(pinned ? Icons.push_pin_rounded : Icons.push_pin_outlined),
+                title: Text(pinned ? t.businessPanelTabUnpin : t.businessPanelTabPin),
                 onTap: () {
                   Navigator.pop(ctx);
-                  store.closeTab(bid, path, go);
+                  store.toggleTabPinned(bid, path);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.close),
+                title: Text(t.businessPanelTabCloseThisTab),
+                onTap: () async {
+                  Navigator.pop(ctx);
+                  if (!context.mounted) return;
+                  await _requestCloseTab(context, path, go);
                 },
               ),
               ListTile(
@@ -297,7 +361,8 @@ class _BusinessShellState extends State<BusinessShell> {
                 title: Text(t.businessPanelTabCloseTabsToTheRight),
                 onTap: () {
                   Navigator.pop(ctx);
-                  store.closeTabsToTheRightOf(bid, path, go);
+                  final kept = store.closeTabsToTheRightOf(bid, path, go);
+                  if (context.mounted) _showPinnedKeptSnackBar(context, kept);
                 },
               ),
               ListTile(
@@ -305,7 +370,8 @@ class _BusinessShellState extends State<BusinessShell> {
                 title: Text(t.businessPanelTabCloseTabsToTheLeft),
                 onTap: () {
                   Navigator.pop(ctx);
-                  store.closeTabsToTheLeftOf(bid, path, go);
+                  final kept = store.closeTabsToTheLeftOf(bid, path, go);
+                  if (context.mounted) _showPinnedKeptSnackBar(context, kept);
                 },
               ),
             ],
@@ -322,53 +388,94 @@ class _BusinessShellState extends State<BusinessShell> {
     final store = BusinessPanelUiStore.instance;
     final bid = widget.businessId;
     void go(String loc) => context.go(loc);
-    final session = store.tabsForBusiness(bid);
-    if (session == null || session.paths.isEmpty) return;
+    if (store.tabsForBusiness(bid) == null) return;
 
     await showDialog<void>(
       context: context,
       builder: (ctx) {
-        final t = AppLocalizations.of(ctx)!;
-        return AlertDialog(
-          title: Text(t.businessPanelTabAllTabsTitle),
-          content: SizedBox(
-            width: double.maxFinite,
-            child: ListView.builder(
-              shrinkWrap: true,
-              itemCount: session.paths.length,
-              itemBuilder: (_, i) {
-                final p = session.paths[i];
-                final title = _tabTitleForBusinessPath(p, bid, menuRoot, t);
-                final sel = p == session.activePath;
-                return ListTile(
-                  dense: true,
-                  selected: sel,
-                  title: Text(title, maxLines: 2, overflow: TextOverflow.ellipsis),
-                  onTap: () {
-                    Navigator.pop(ctx);
-                    store.selectTab(bid, p, go);
+        return ListenableBuilder(
+          listenable: store,
+          builder: (ctx, _) {
+            final t = AppLocalizations.of(ctx)!;
+            final session = store.tabsForBusiness(bid);
+            if (session == null || session.paths.isEmpty) {
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (Navigator.of(ctx).canPop()) Navigator.pop(ctx);
+              });
+              return const SizedBox.shrink();
+            }
+            return AlertDialog(
+              title: Text(t.businessPanelTabAllTabsTitle),
+              content: SizedBox(
+                width: double.maxFinite,
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: session.paths.length,
+                  itemBuilder: (_, i) {
+                    final p = session.paths[i];
+                    final title = _tabTitleForBusinessPath(p, bid, menuRoot, t);
+                    final sel = p == session.activePath;
+                    final isPinned = session.isPinnedAt(i);
+                    return ListTile(
+                      dense: true,
+                      selected: sel,
+                      leading: Icon(
+                        isPinned ? Icons.push_pin_rounded : Icons.push_pin_outlined,
+                        size: 18,
+                        color: isPinned
+                            ? Theme.of(ctx).colorScheme.primary
+                            : Theme.of(ctx).colorScheme.onSurfaceVariant,
+                      ),
+                      title: Text(title, maxLines: 2, overflow: TextOverflow.ellipsis),
+                      onTap: () {
+                        Navigator.pop(ctx);
+                        store.selectTab(bid, p, go);
+                      },
+                      trailing: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          IconButton(
+                            tooltip: isPinned ? t.businessPanelTabUnpin : t.businessPanelTabPin,
+                            icon: Icon(
+                              isPinned ? Icons.push_pin_rounded : Icons.push_pin_outlined,
+                              size: 20,
+                            ),
+                            onPressed: () => store.toggleTabPinned(bid, p),
+                          ),
+                          IconButton(
+                            tooltip: isPinned
+                                ? t.businessPanelTabClosePinnedTooltip
+                                : MaterialLocalizations.of(ctx).closeButtonTooltip,
+                            icon: const Icon(Icons.close, size: 20),
+                            onPressed: () async {
+                              if (isPinned) {
+                                final ok = await _confirmClosePinnedTab(ctx);
+                                if (!ok || !ctx.mounted) return;
+                                store.closeTab(bid, p, go, force: true);
+                              } else {
+                                store.closeTab(bid, p, go);
+                              }
+                            },
+                          ),
+                        ],
+                      ),
+                    );
                   },
-                  trailing: IconButton(
-                    icon: const Icon(Icons.close, size: 20),
-                    onPressed: () {
-                      Navigator.pop(ctx);
-                      store.closeTab(bid, p, go);
-                    },
-                  ),
-                );
-              },
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.pop(ctx);
-                store.closeAllTabs(bid, go);
-              },
-              child: Text(t.businessPanelTabCloseAllTabs),
-            ),
-            TextButton(onPressed: () => Navigator.pop(ctx), child: Text(t.close)),
-          ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    final kept = store.closeAllTabs(bid, go);
+                    Navigator.pop(ctx);
+                    if (context.mounted) _showPinnedKeptSnackBar(context, kept);
+                  },
+                  child: Text(t.businessPanelTabCloseAllTabs),
+                ),
+                TextButton(onPressed: () => Navigator.pop(ctx), child: Text(t.close)),
+              ],
+            );
+          },
         );
       },
     );
@@ -383,6 +490,7 @@ class _BusinessShellState extends State<BusinessShell> {
     final store = BusinessPanelUiStore.instance;
     final bid = widget.businessId;
     final active = path == session.activePath;
+    final pinned = session.isPathPinned(path);
     final t = AppLocalizations.of(context)!;
     final label = _tabTitleForBusinessPath(path, bid, menuRoot, t);
     void goLoc(String loc) => context.go(loc);
@@ -392,6 +500,9 @@ class _BusinessShellState extends State<BusinessShell> {
     final chipFg = active ? cs.onSurface : cs.onSurfaceVariant.withValues(alpha: 0.92);
     final chipFgStrong = active ? cs.onSurface : cs.onSurfaceVariant;
     final chipClose = chipFg.withValues(alpha: active ? 0.72 : 0.62);
+    final chipPin = pinned
+        ? cs.primary.withValues(alpha: active ? 0.95 : 0.82)
+        : cs.outline.withValues(alpha: 0.55);
 
     final BorderRadius chipRadius = BorderRadius.circular(11);
 
@@ -404,15 +515,17 @@ class _BusinessShellState extends State<BusinessShell> {
 
     final Color chipBorder = active
         ? cs.primary.withValues(alpha: isDarkStrip ? 0.72 : 0.52)
-        : cs.outline.withValues(alpha: isDarkStrip ? 0.38 : 0.22);
+        : pinned
+            ? cs.primary.withValues(alpha: isDarkStrip ? 0.42 : 0.28)
+            : cs.outline.withValues(alpha: isDarkStrip ? 0.38 : 0.22);
 
     return Padding(
       padding: const EdgeInsetsDirectional.only(end: 8),
       child: ConstrainedBox(
         constraints: const BoxConstraints(minWidth: _kBizTabMinWidth, maxWidth: _kBizTabMaxWidth),
         child: Material(
-          elevation: active ? (isDarkStrip ? 5 : 4) : 0,
-          shadowColor: cs.shadow.withValues(alpha: active ? (isDarkStrip ? 0.45 : 0.28) : 0),
+          elevation: active ? (isDarkStrip ? 5 : 4) : (pinned ? 1 : 0),
+          shadowColor: cs.shadow.withValues(alpha: active ? (isDarkStrip ? 0.45 : 0.28) : 0.12),
           color: chipBg,
           shape: RoundedRectangleBorder(
             borderRadius: chipRadius,
@@ -431,15 +544,24 @@ class _BusinessShellState extends State<BusinessShell> {
                 padding: const EdgeInsetsDirectional.only(start: 12, end: 4),
                 child: Row(
                   children: [
-                    Container(
-                      width: 5,
-                      height: 5,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: active ? cs.primary : cs.outline.withValues(alpha: 0.55),
+                    if (pinned)
+                      Padding(
+                        padding: const EdgeInsetsDirectional.only(end: 8),
+                        child: Transform.rotate(
+                          angle: -0.6,
+                          child: Icon(Icons.push_pin_rounded, size: 13, color: chipPin),
+                        ),
+                      )
+                    else
+                      Container(
+                        width: 5,
+                        height: 5,
+                        margin: const EdgeInsetsDirectional.only(end: 10),
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: active ? cs.primary : cs.outline.withValues(alpha: 0.55),
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 10),
                     Expanded(
                       child: Text(
                         label,
@@ -460,9 +582,15 @@ class _BusinessShellState extends State<BusinessShell> {
                       child: IconButton(
                         visualDensity: VisualDensity.compact,
                         padding: EdgeInsets.zero,
-                        tooltip: MaterialLocalizations.of(context).closeButtonTooltip,
-                        icon: Icon(Icons.close_rounded, size: 16.5, color: chipClose),
-                        onPressed: () => store.closeTab(bid, path, goLoc),
+                        tooltip: pinned
+                            ? t.businessPanelTabClosePinnedTooltip
+                            : MaterialLocalizations.of(context).closeButtonTooltip,
+                        icon: Icon(
+                          Icons.close_rounded,
+                          size: 16.5,
+                          color: pinned ? cs.primary.withValues(alpha: 0.75) : chipClose,
+                        ),
+                        onPressed: () => _requestCloseTab(context, path, goLoc),
                       ),
                     ),
                   ],

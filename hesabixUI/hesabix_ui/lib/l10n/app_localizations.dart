@@ -30540,6 +30540,48 @@ abstract class AppLocalizations {
   /// **'List all tabs'**
   String get businessPanelTabListTooltip;
 
+  /// No description provided for @businessPanelTabPin.
+  ///
+  /// In en, this message translates to:
+  /// **'Pin tab'**
+  String get businessPanelTabPin;
+
+  /// No description provided for @businessPanelTabUnpin.
+  ///
+  /// In en, this message translates to:
+  /// **'Unpin tab'**
+  String get businessPanelTabUnpin;
+
+  /// No description provided for @businessPanelTabPinnedCloseTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Pinned tab'**
+  String get businessPanelTabPinnedCloseTitle;
+
+  /// No description provided for @businessPanelTabPinnedCloseMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'This tab is pinned. Closing it will remove it from the tab bar. Are you sure?'**
+  String get businessPanelTabPinnedCloseMessage;
+
+  /// No description provided for @businessPanelTabPinnedCloseConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Close tab'**
+  String get businessPanelTabPinnedCloseConfirm;
+
+  /// No description provided for @businessPanelTabClosePinnedTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Pinned tab — confirmation required to close'**
+  String get businessPanelTabClosePinnedTooltip;
+
+  /// No description provided for @businessPanelTabPinnedKeptSnackbar.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} pinned tab(s) kept'**
+  String businessPanelTabPinnedKeptSnackbar(int count);
+
   /// No description provided for @businessPanelTabRouteProjects.
   ///
   /// In en, this message translates to:

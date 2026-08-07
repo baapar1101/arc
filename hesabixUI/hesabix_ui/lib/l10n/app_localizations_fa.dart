@@ -16517,6 +16517,31 @@ class AppLocalizationsFa extends AppLocalizations {
   String get businessPanelTabListTooltip => 'لیست همهٔ تب‌ها';
 
   @override
+  String get businessPanelTabPin => 'پین کردن تب';
+
+  @override
+  String get businessPanelTabUnpin => 'برداشتن پین';
+
+  @override
+  String get businessPanelTabPinnedCloseTitle => 'تب پین‌شده';
+
+  @override
+  String get businessPanelTabPinnedCloseMessage =>
+      'این تب پین شده است. با بستن، از نوار تب‌ها حذف می‌شود. آیا مطمئن هستید؟';
+
+  @override
+  String get businessPanelTabPinnedCloseConfirm => 'بستن تب';
+
+  @override
+  String get businessPanelTabClosePinnedTooltip =>
+      'تب پین شده — برای بستن تأیید لازم است';
+
+  @override
+  String businessPanelTabPinnedKeptSnackbar(int count) {
+    return '$count تب پین حفظ شد';
+  }
+
+  @override
   String get businessPanelTabRouteProjects => 'مدیریت پروژه‌ها';
 
   @override

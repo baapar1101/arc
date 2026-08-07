@@ -6342,6 +6342,20 @@
   "businessPanelTabAllTabsTitle": "All tabs",
   "businessPanelTabCloseAllTabs": "Close all tabs",
   "businessPanelTabListTooltip": "List all tabs",
+  "businessPanelTabPin": "Pin tab",
+  "businessPanelTabUnpin": "Unpin tab",
+  "businessPanelTabPinnedCloseTitle": "Pinned tab",
+  "businessPanelTabPinnedCloseMessage": "This tab is pinned. Closing it will remove it from the tab bar. Are you sure?",
+  "businessPanelTabPinnedCloseConfirm": "Close tab",
+  "businessPanelTabClosePinnedTooltip": "Pinned tab — confirmation required to close",
+  "businessPanelTabPinnedKeptSnackbar": "{count} pinned tab(s) kept",
+  "@businessPanelTabPinnedKeptSnackbar": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "businessPanelTabRouteProjects": "Projects",
   "businessPanelTabRoutePriceListItems": "Price list items",
   "businessPanelTabRouteRepairTechnicians": "Repair technicians",

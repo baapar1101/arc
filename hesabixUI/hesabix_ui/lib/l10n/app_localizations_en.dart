@@ -16607,6 +16607,31 @@ class AppLocalizationsEn extends AppLocalizations {
   String get businessPanelTabListTooltip => 'List all tabs';
 
   @override
+  String get businessPanelTabPin => 'Pin tab';
+
+  @override
+  String get businessPanelTabUnpin => 'Unpin tab';
+
+  @override
+  String get businessPanelTabPinnedCloseTitle => 'Pinned tab';
+
+  @override
+  String get businessPanelTabPinnedCloseMessage =>
+      'This tab is pinned. Closing it will remove it from the tab bar. Are you sure?';
+
+  @override
+  String get businessPanelTabPinnedCloseConfirm => 'Close tab';
+
+  @override
+  String get businessPanelTabClosePinnedTooltip =>
+      'Pinned tab — confirmation required to close';
+
+  @override
+  String businessPanelTabPinnedKeptSnackbar(int count) {
+    return '$count pinned tab(s) kept';
+  }
+
+  @override
   String get businessPanelTabRouteProjects => 'Projects';
 
   @override

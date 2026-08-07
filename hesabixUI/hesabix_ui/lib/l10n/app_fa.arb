@@ -6384,6 +6384,20 @@
   "businessPanelTabAllTabsTitle": "همهٔ تب‌ها",
   "businessPanelTabCloseAllTabs": "بستن همهٔ تب‌ها",
   "businessPanelTabListTooltip": "لیست همهٔ تب‌ها",
+  "businessPanelTabPin": "پین کردن تب",
+  "businessPanelTabUnpin": "برداشتن پین",
+  "businessPanelTabPinnedCloseTitle": "تب پین‌شده",
+  "businessPanelTabPinnedCloseMessage": "این تب پین شده است. با بستن، از نوار تب‌ها حذف می‌شود. آیا مطمئن هستید؟",
+  "businessPanelTabPinnedCloseConfirm": "بستن تب",
+  "businessPanelTabClosePinnedTooltip": "تب پین شده — برای بستن تأیید لازم است",
+  "businessPanelTabPinnedKeptSnackbar": "{count} تب پین حفظ شد",
+  "@businessPanelTabPinnedKeptSnackbar": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
   "businessPanelTabRouteProjects": "مدیریت پروژه‌ها",
   "businessPanelTabRoutePriceListItems": "آیتم‌های لیست قیمت",
   "businessPanelTabRouteRepairTechnicians": "مدیریت تعمیرکاران",
