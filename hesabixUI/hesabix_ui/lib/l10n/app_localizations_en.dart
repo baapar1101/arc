@@ -2242,57 +2242,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get createFirstBusiness => 'Create your first business';
 
   @override
-  String get businessesHubSubtitle => 'Select a business or create a new one';
-
-  @override
   String get businessesHubSearchHint => 'Search businesses…';
 
   @override
-  String get businessesHubFilterAll => 'All';
-
-  @override
-  String get businessesHubFilterOwner => 'Owner';
-
-  @override
-  String get businessesHubFilterMember => 'Member';
-
-  @override
-  String get businessesHubFilterPendingDeletion => 'Pending deletion';
-
-  @override
-  String get businessesHubSortNewest => 'Newest';
-
-  @override
-  String get businessesHubSortOldest => 'Oldest';
-
-  @override
-  String get businessesHubSortNameAsc => 'Name (A–Z)';
-
-  @override
-  String get businessesHubSortNameDesc => 'Name (Z–A)';
-
-  @override
-  String get businessesHubRecentSection => 'Recently used';
-
-  @override
-  String get businessesHubAllSection => 'All businesses';
-
-  @override
-  String businessesHubCount(int count) {
-    return '$count businesses';
-  }
-
-  @override
-  String get businessesHubEnter => 'Enter';
-
-  @override
   String get businessesHubDeletionPending => 'Pending deletion';
-
-  @override
-  String get businessesHubMultiCurrency => 'Multi-currency';
-
-  @override
-  String get businessesHubEstablished => 'Established';
 
   @override
   String get businessesHubRestore => 'Restore';
@@ -2305,12 +2258,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get businessesHubDefaultCurrency => 'Default currency';
-
-  @override
-  String get businessesHubPin => 'Pin';
-
-  @override
-  String get businessesHubUnpin => 'Unpin';
 
   @override
   String get businessesHubNoSearchResults => 'No results found';
@@ -2328,23 +2275,7 @@ class AppLocalizationsEn extends AppLocalizations {
       'Create your first business to start cloud accounting.';
 
   @override
-  String get businessesHubEmptyBullet1 => 'Start free and scale anytime';
-
-  @override
-  String get businessesHubEmptyBullet2 => 'Multiple businesses in one account';
-
-  @override
-  String get businessesHubEmptyBullet3 =>
-      'Team access with owner and member roles';
-
-  @override
   String get businessesHubImportLegacy => 'Import from legacy version';
-
-  @override
-  String get businessesHubViewGrid => 'Grid view';
-
-  @override
-  String get businessesHubViewList => 'List view';
 
   @override
   String businessesHubDaysRemaining(int days) {
@@ -2392,40 +2323,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get businessesHubLoadMoreFailed => 'Failed to load more';
 
   @override
-  String get businessesHubStatsTitle => 'Quick stats';
-
-  @override
-  String get businessesHubStatsSales => 'Sales';
-
-  @override
-  String get businessesHubStatsPurchases => 'Purchases';
-
-  @override
-  String get businessesHubStatsMembers => 'Members';
-
-  @override
-  String get businessesHubStatsTransactions => 'Transactions';
-
-  @override
-  String get businessesHubStatsLoading => 'Loading stats…';
-
-  @override
-  String get businessesHubStatsUnavailable => 'Stats unavailable';
-
-  @override
   String get businessesHubSearchShortcut => 'Press / to search';
 
   @override
-  String get businessesHubPickSubtitle => 'Choose a business to continue';
+  String get businessesSwitcherContinue => 'Continue';
 
   @override
-  String get businessesHubShowTools => 'Search & filters';
-
-  @override
-  String get businessesHubHideTools => 'Hide tools';
-
-  @override
-  String get businessesHubStatsHint => 'Hover for quick stats';
+  String get businessesSwitcherSubtitle => 'Select a workspace to continue';
 
   @override
   String get accessDenied => 'Access denied';

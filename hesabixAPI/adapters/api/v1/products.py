@@ -328,7 +328,7 @@ async def create_product_endpoint(
     summary="ایجاد/ویرایش گروهی کالا (یکپارچه‌سازی)",
     description=(
         "بدنه: `{\"items\":[{\"client_ref?\":\"...\",\"product_id?\":null|int شناسه کالا در حسابیکس,"
-        '"payload\":{ ... فیلدهای ایجاد/ویرایش مانند endpoint تکی }}],'
+        '"payload\":{ ... فیلدهای ایجاد/ویرایش مانند endpoint تکی، از جمله opening_balance }}],'
         '\"create_if_update_missing\":true}`. حداکثر ۱۰۰۰ آیتم. خروجی: results با status در created|updated|failed.'
     ),
 )

@@ -4280,107 +4280,17 @@ abstract class AppLocalizations {
   /// **'Create your first business'**
   String get createFirstBusiness;
 
-  /// No description provided for @businessesHubSubtitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Select a business or create a new one'**
-  String get businessesHubSubtitle;
-
   /// No description provided for @businessesHubSearchHint.
   ///
   /// In en, this message translates to:
   /// **'Search businesses…'**
   String get businessesHubSearchHint;
 
-  /// No description provided for @businessesHubFilterAll.
-  ///
-  /// In en, this message translates to:
-  /// **'All'**
-  String get businessesHubFilterAll;
-
-  /// No description provided for @businessesHubFilterOwner.
-  ///
-  /// In en, this message translates to:
-  /// **'Owner'**
-  String get businessesHubFilterOwner;
-
-  /// No description provided for @businessesHubFilterMember.
-  ///
-  /// In en, this message translates to:
-  /// **'Member'**
-  String get businessesHubFilterMember;
-
-  /// No description provided for @businessesHubFilterPendingDeletion.
-  ///
-  /// In en, this message translates to:
-  /// **'Pending deletion'**
-  String get businessesHubFilterPendingDeletion;
-
-  /// No description provided for @businessesHubSortNewest.
-  ///
-  /// In en, this message translates to:
-  /// **'Newest'**
-  String get businessesHubSortNewest;
-
-  /// No description provided for @businessesHubSortOldest.
-  ///
-  /// In en, this message translates to:
-  /// **'Oldest'**
-  String get businessesHubSortOldest;
-
-  /// No description provided for @businessesHubSortNameAsc.
-  ///
-  /// In en, this message translates to:
-  /// **'Name (A–Z)'**
-  String get businessesHubSortNameAsc;
-
-  /// No description provided for @businessesHubSortNameDesc.
-  ///
-  /// In en, this message translates to:
-  /// **'Name (Z–A)'**
-  String get businessesHubSortNameDesc;
-
-  /// No description provided for @businessesHubRecentSection.
-  ///
-  /// In en, this message translates to:
-  /// **'Recently used'**
-  String get businessesHubRecentSection;
-
-  /// No description provided for @businessesHubAllSection.
-  ///
-  /// In en, this message translates to:
-  /// **'All businesses'**
-  String get businessesHubAllSection;
-
-  /// No description provided for @businessesHubCount.
-  ///
-  /// In en, this message translates to:
-  /// **'{count} businesses'**
-  String businessesHubCount(int count);
-
-  /// No description provided for @businessesHubEnter.
-  ///
-  /// In en, this message translates to:
-  /// **'Enter'**
-  String get businessesHubEnter;
-
   /// No description provided for @businessesHubDeletionPending.
   ///
   /// In en, this message translates to:
   /// **'Pending deletion'**
   String get businessesHubDeletionPending;
-
-  /// No description provided for @businessesHubMultiCurrency.
-  ///
-  /// In en, this message translates to:
-  /// **'Multi-currency'**
-  String get businessesHubMultiCurrency;
-
-  /// No description provided for @businessesHubEstablished.
-  ///
-  /// In en, this message translates to:
-  /// **'Established'**
-  String get businessesHubEstablished;
 
   /// No description provided for @businessesHubRestore.
   ///
@@ -4406,18 +4316,6 @@ abstract class AppLocalizations {
   /// **'Default currency'**
   String get businessesHubDefaultCurrency;
 
-  /// No description provided for @businessesHubPin.
-  ///
-  /// In en, this message translates to:
-  /// **'Pin'**
-  String get businessesHubPin;
-
-  /// No description provided for @businessesHubUnpin.
-  ///
-  /// In en, this message translates to:
-  /// **'Unpin'**
-  String get businessesHubUnpin;
-
   /// No description provided for @businessesHubNoSearchResults.
   ///
   /// In en, this message translates to:
@@ -4442,41 +4340,11 @@ abstract class AppLocalizations {
   /// **'Create your first business to start cloud accounting.'**
   String get businessesHubEmptySubtitle;
 
-  /// No description provided for @businessesHubEmptyBullet1.
-  ///
-  /// In en, this message translates to:
-  /// **'Start free and scale anytime'**
-  String get businessesHubEmptyBullet1;
-
-  /// No description provided for @businessesHubEmptyBullet2.
-  ///
-  /// In en, this message translates to:
-  /// **'Multiple businesses in one account'**
-  String get businessesHubEmptyBullet2;
-
-  /// No description provided for @businessesHubEmptyBullet3.
-  ///
-  /// In en, this message translates to:
-  /// **'Team access with owner and member roles'**
-  String get businessesHubEmptyBullet3;
-
   /// No description provided for @businessesHubImportLegacy.
   ///
   /// In en, this message translates to:
   /// **'Import from legacy version'**
   String get businessesHubImportLegacy;
-
-  /// No description provided for @businessesHubViewGrid.
-  ///
-  /// In en, this message translates to:
-  /// **'Grid view'**
-  String get businessesHubViewGrid;
-
-  /// No description provided for @businessesHubViewList.
-  ///
-  /// In en, this message translates to:
-  /// **'List view'**
-  String get businessesHubViewList;
 
   /// No description provided for @businessesHubDaysRemaining.
   ///
@@ -4544,77 +4412,23 @@ abstract class AppLocalizations {
   /// **'Failed to load more'**
   String get businessesHubLoadMoreFailed;
 
-  /// No description provided for @businessesHubStatsTitle.
-  ///
-  /// In en, this message translates to:
-  /// **'Quick stats'**
-  String get businessesHubStatsTitle;
-
-  /// No description provided for @businessesHubStatsSales.
-  ///
-  /// In en, this message translates to:
-  /// **'Sales'**
-  String get businessesHubStatsSales;
-
-  /// No description provided for @businessesHubStatsPurchases.
-  ///
-  /// In en, this message translates to:
-  /// **'Purchases'**
-  String get businessesHubStatsPurchases;
-
-  /// No description provided for @businessesHubStatsMembers.
-  ///
-  /// In en, this message translates to:
-  /// **'Members'**
-  String get businessesHubStatsMembers;
-
-  /// No description provided for @businessesHubStatsTransactions.
-  ///
-  /// In en, this message translates to:
-  /// **'Transactions'**
-  String get businessesHubStatsTransactions;
-
-  /// No description provided for @businessesHubStatsLoading.
-  ///
-  /// In en, this message translates to:
-  /// **'Loading stats…'**
-  String get businessesHubStatsLoading;
-
-  /// No description provided for @businessesHubStatsUnavailable.
-  ///
-  /// In en, this message translates to:
-  /// **'Stats unavailable'**
-  String get businessesHubStatsUnavailable;
-
   /// No description provided for @businessesHubSearchShortcut.
   ///
   /// In en, this message translates to:
   /// **'Press / to search'**
   String get businessesHubSearchShortcut;
 
-  /// No description provided for @businessesHubPickSubtitle.
+  /// No description provided for @businessesSwitcherContinue.
   ///
   /// In en, this message translates to:
-  /// **'Choose a business to continue'**
-  String get businessesHubPickSubtitle;
+  /// **'Continue'**
+  String get businessesSwitcherContinue;
 
-  /// No description provided for @businessesHubShowTools.
+  /// No description provided for @businessesSwitcherSubtitle.
   ///
   /// In en, this message translates to:
-  /// **'Search & filters'**
-  String get businessesHubShowTools;
-
-  /// No description provided for @businessesHubHideTools.
-  ///
-  /// In en, this message translates to:
-  /// **'Hide tools'**
-  String get businessesHubHideTools;
-
-  /// No description provided for @businessesHubStatsHint.
-  ///
-  /// In en, this message translates to:
-  /// **'Hover for quick stats'**
-  String get businessesHubStatsHint;
+  /// **'Select a workspace to continue'**
+  String get businessesSwitcherSubtitle;
 
   /// No description provided for @accessDenied.
   ///

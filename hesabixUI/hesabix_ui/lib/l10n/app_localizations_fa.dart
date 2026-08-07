@@ -2226,58 +2226,10 @@ class AppLocalizationsFa extends AppLocalizations {
   String get createFirstBusiness => 'اولین کسب و کار خود را ایجاد کنید';
 
   @override
-  String get businessesHubSubtitle =>
-      'کسب‌وکار خود را انتخاب کنید یا جدید بسازید';
-
-  @override
   String get businessesHubSearchHint => 'جستجو در نام کسب‌وکار…';
 
   @override
-  String get businessesHubFilterAll => 'همه';
-
-  @override
-  String get businessesHubFilterOwner => 'مالک';
-
-  @override
-  String get businessesHubFilterMember => 'عضو';
-
-  @override
-  String get businessesHubFilterPendingDeletion => 'در حال حذف';
-
-  @override
-  String get businessesHubSortNewest => 'جدیدترین';
-
-  @override
-  String get businessesHubSortOldest => 'قدیمی‌ترین';
-
-  @override
-  String get businessesHubSortNameAsc => 'نام (الف تا ی)';
-
-  @override
-  String get businessesHubSortNameDesc => 'نام (ی تا الف)';
-
-  @override
-  String get businessesHubRecentSection => 'اخیراً استفاده شده';
-
-  @override
-  String get businessesHubAllSection => 'همه کسب‌وکارها';
-
-  @override
-  String businessesHubCount(int count) {
-    return '$count کسب‌وکار';
-  }
-
-  @override
-  String get businessesHubEnter => 'ورود';
-
-  @override
   String get businessesHubDeletionPending => 'در حال حذف';
-
-  @override
-  String get businessesHubMultiCurrency => 'چندارزی';
-
-  @override
-  String get businessesHubEstablished => 'تأسیس';
 
   @override
   String get businessesHubRestore => 'بازیابی';
@@ -2290,12 +2242,6 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get businessesHubDefaultCurrency => 'ارز پیش‌فرض';
-
-  @override
-  String get businessesHubPin => 'سنجاق کردن';
-
-  @override
-  String get businessesHubUnpin => 'برداشتن سنجاق';
 
   @override
   String get businessesHubNoSearchResults => 'نتیجه‌ای یافت نشد';
@@ -2313,23 +2259,7 @@ class AppLocalizationsFa extends AppLocalizations {
       'با ساخت اولین کسب‌وکار، حسابداری ابری را شروع کنید.';
 
   @override
-  String get businessesHubEmptyBullet1 =>
-      'رایگان شروع کنید و هر زمان گسترش دهید';
-
-  @override
-  String get businessesHubEmptyBullet2 => 'چند کسب‌وکار در یک حساب کاربری';
-
-  @override
-  String get businessesHubEmptyBullet3 => 'دسترسی تیمی با نقش مالک و عضو';
-
-  @override
   String get businessesHubImportLegacy => 'وارد کردن از نسخه قدیم';
-
-  @override
-  String get businessesHubViewGrid => 'نمای شبکه‌ای';
-
-  @override
-  String get businessesHubViewList => 'نمای لیستی';
 
   @override
   String businessesHubDaysRemaining(int days) {
@@ -2377,40 +2307,13 @@ class AppLocalizationsFa extends AppLocalizations {
   String get businessesHubLoadMoreFailed => 'خطا در بارگذاری صفحات بعدی';
 
   @override
-  String get businessesHubStatsTitle => 'آمار سریع';
-
-  @override
-  String get businessesHubStatsSales => 'فروش';
-
-  @override
-  String get businessesHubStatsPurchases => 'خرید';
-
-  @override
-  String get businessesHubStatsMembers => 'اعضا';
-
-  @override
-  String get businessesHubStatsTransactions => 'تراکنش';
-
-  @override
-  String get businessesHubStatsLoading => 'در حال بارگذاری آمار…';
-
-  @override
-  String get businessesHubStatsUnavailable => 'آمار در دسترس نیست';
-
-  @override
   String get businessesHubSearchShortcut => 'برای جستجو / را بزنید';
 
   @override
-  String get businessesHubPickSubtitle => 'کسب‌وکار موردنظر را انتخاب کنید';
+  String get businessesSwitcherContinue => 'ادامه';
 
   @override
-  String get businessesHubShowTools => 'جستجو و فیلتر';
-
-  @override
-  String get businessesHubHideTools => 'بستن ابزارها';
-
-  @override
-  String get businessesHubStatsHint => 'نگه داشتن برای آمار سریع';
+  String get businessesSwitcherSubtitle => 'فضای کاری را انتخاب کنید';
 
   @override
   String get accessDenied => 'دسترسی غیرمجاز';

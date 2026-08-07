@@ -87,3 +87,29 @@ Friend Class LoginResult
     Public Property ApiKey As String
     Public Property User As HesabixUser
 End Class
+
+''' <summary>یک ردیف نتیجه bulk-upsert اشخاص/کالا.</summary>
+Friend Class BulkUpsertItemResult
+    Public Property Index As Integer
+    Public Property ClientRef As String
+    Public Property Status As String
+    Public Property EntityId As Integer
+    Public Property ErrorCode As String
+    Public Property Message As String
+
+    Public ReadOnly Property IsSuccess As Boolean
+        Get
+            Return String.Equals(Status, "created", StringComparison.OrdinalIgnoreCase) OrElse
+                   String.Equals(Status, "updated", StringComparison.OrdinalIgnoreCase) OrElse
+                   String.Equals(Status, "skipped", StringComparison.OrdinalIgnoreCase)
+        End Get
+    End Property
+End Class
+
+Friend Class BulkUpsertResult
+    Public Property Results As New List(Of BulkUpsertItemResult)
+    Public Property Created As Integer
+    Public Property Updated As Integer
+    Public Property Failed As Integer
+    Public Property Total As Integer
+End Class

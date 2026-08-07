@@ -176,7 +176,8 @@ async def bulk_delete_persons_endpoint(
     "/businesses/{business_id}/persons/bulk-upsert",
     summary="ایجاد/ویرایش گروهی اشخاص (یکپارچه‌سازی)",
     description=(
-        "بدنه شامل `items`: آرایه‌ای از {client_ref?, person_id?, payload}؛ payload همان فیلدهای ایجاد/ویرایش شخص؛ "
+        "بدنه شامل `items`: آرایه‌ای از {client_ref?, person_id?, payload}؛ payload همان فیلدهای ایجاد/ویرایش شخص "
+        "(از جمله `opening_balance` در صورت نیاز)؛ "
         "می‌توانید `create_if_update_missing` برای ایجاد پس از نبودن شخص ارسال کنید (پیش‌فرض true). "
         "حداکثر ۱۰۰۰ آیتم در هر درخواست. خروجی: results[{index, client_ref?, status, person_id?, ...}] و summary."
     ),

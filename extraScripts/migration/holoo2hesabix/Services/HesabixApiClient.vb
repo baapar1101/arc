@@ -32,7 +32,8 @@ Friend Class HesabixApiClient
         Dim handler As New HttpClientHandler()
         handler.AutomaticDecompression = DecompressionMethods.GZip Or DecompressionMethods.Deflate
         _http = New HttpClient(handler)
-        _http.Timeout = TimeSpan.FromSeconds(60)
+        ' انتقال گروهی (با مانده افتتاحیه) ممکن است چند دقیقه طول بکشد
+        _http.Timeout = TimeSpan.FromMinutes(5)
         _http.DefaultRequestHeaders.Accept.Clear()
         _http.DefaultRequestHeaders.Accept.Add(New MediaTypeWithQualityHeaderValue("application/json"))
         ' BaseAddress عمداً تنظیم نمی‌شود؛ بعد از اولین درخواست قابل تغییر نیست.
@@ -171,6 +172,30 @@ Friend Class HesabixApiClient
         Return GetInt(GetDataToken(root), "id")
     End Function
 
+    ''' <summary>
+    ''' ایجاد/به‌روزرسانی گروهی اشخاص. هر آیتم: { client_ref?, person_id?, payload }.
+    ''' حداکثر ۱۰۰۰ آیتم در هر درخواست (سمت سرور).
+    ''' </summary>
+    Public Async Function BulkUpsertPersonsAsync(
+        businessId As Integer,
+        items As JArray,
+        Optional createIfUpdateMissing As Boolean = True,
+        Optional ct As CancellationToken = Nothing
+    ) As Task(Of BulkUpsertResult)
+        Dim body As New JObject From {
+            {"items", items},
+            {"create_if_update_missing", createIfUpdateMissing}
+        }
+        Dim root = Await SendJsonAsync(
+            HttpMethod.Post,
+            "api/v1/persons/businesses/" & businessId.ToString() & "/persons/bulk-upsert",
+            body,
+            includeAuth:=True,
+            ct:=ct
+        ).ConfigureAwait(False)
+        Return ParseBulkUpsertResult(GetDataToken(root), "person_id")
+    End Function
+
     Public Async Function CreateWarehouseAsync(businessId As Integer, payload As JObject, Optional ct As CancellationToken = Nothing) As Task(Of Integer)
         Dim root = Await SendJsonAsync(HttpMethod.Post, "api/v1/warehouses/business/" & businessId.ToString(), payload, includeAuth:=True, ct:=ct).ConfigureAwait(False)
         Dim data = GetDataToken(root)
@@ -199,6 +224,30 @@ Friend Class HesabixApiClient
         Return GetInt(GetDataToken(root), "id")
     End Function
 
+    ''' <summary>
+    ''' ایجاد/به‌روزرسانی گروهی کالا. هر آیتم: { client_ref?, product_id?, payload }.
+    ''' حداکثر ۱۰۰۰ آیتم در هر درخواست (سمت سرور).
+    ''' </summary>
+    Public Async Function BulkUpsertProductsAsync(
+        businessId As Integer,
+        items As JArray,
+        Optional createIfUpdateMissing As Boolean = True,
+        Optional ct As CancellationToken = Nothing
+    ) As Task(Of BulkUpsertResult)
+        Dim body As New JObject From {
+            {"items", items},
+            {"create_if_update_missing", createIfUpdateMissing}
+        }
+        Dim root = Await SendJsonAsync(
+            HttpMethod.Post,
+            "api/v1/products/business/" & businessId.ToString() & "/bulk-upsert",
+            body,
+            includeAuth:=True,
+            ct:=ct
+        ).ConfigureAwait(False)
+        Return ParseBulkUpsertResult(GetDataToken(root), "product_id")
+    End Function
+
     Public Async Function ListWarehousesAsync(businessId As Integer, Optional ct As CancellationToken = Nothing) As Task(Of Dictionary(Of String, Integer))
         Dim root = Await GetJsonAsync("api/v1/warehouses/business/" & businessId.ToString(), ct).ConfigureAwait(False)
         Dim map As New Dictionary(Of String, Integer)(StringComparer.OrdinalIgnoreCase)
@@ -218,13 +267,42 @@ Friend Class HesabixApiClient
         Dim payload As New JObject From {
             {"search", code.ToString()},
             {"search_fields", New JArray From {"code"}},
-            {"pagination", New JObject From {{"page", 1}, {"per_page", 50}}}
+            {"take", 50},
+            {"skip", 0}
         }
         Dim root = Await SendJsonAsync(HttpMethod.Post, "api/v1/persons/businesses/" & businessId.ToString() & "/persons", payload, includeAuth:=True, ct:=ct).ConfigureAwait(False)
         For Each itemToken In GetItemsArray(GetDataToken(root))
             If itemToken Is Nothing OrElse itemToken.Type <> JTokenType.Object Then Continue For
             Dim item = DirectCast(itemToken, JObject)
             If GetInt(item, "code") = code Then
+                Return GetInt(item, "id")
+            End If
+        Next
+        Return 0
+    End Function
+
+    Public Async Function FindProductIdByCodeAsync(businessId As Integer, code As String, Optional ct As CancellationToken = Nothing) As Task(Of Integer)
+        If String.IsNullOrWhiteSpace(code) Then Return 0
+        Dim payload As New JObject From {
+            {"search", code.Trim()},
+            {"search_fields", New JArray From {"code"}},
+            {"take", 50},
+            {"skip", 0}
+        }
+        Dim root = Await SendJsonAsync(
+            HttpMethod.Post,
+            "api/v1/products/business/" & businessId.ToString() & "/search",
+            payload,
+            includeAuth:=True,
+            ct:=ct
+        ).ConfigureAwait(False)
+        Dim codeNorm = code.Trim()
+        For Each itemToken In GetItemsArray(GetDataToken(root))
+            If itemToken Is Nothing OrElse itemToken.Type <> JTokenType.Object Then Continue For
+            Dim item = DirectCast(itemToken, JObject)
+            Dim itemCode = GetString(item, "code")
+            If Not String.IsNullOrWhiteSpace(itemCode) AndAlso
+               String.Equals(itemCode.Trim(), codeNorm, StringComparison.OrdinalIgnoreCase) Then
                 Return GetInt(item, "id")
             End If
         Next
@@ -402,6 +480,45 @@ Friend Class HesabixApiClient
             Return DirectCast(items, JArray)
         End If
         Return New JArray()
+    End Function
+
+    Private Shared Function ParseBulkUpsertResult(data As JObject, entityIdField As String) As BulkUpsertResult
+        Dim result As New BulkUpsertResult()
+        Dim resultsToken = If(data Is Nothing, Nothing, data("results"))
+        If resultsToken IsNot Nothing AndAlso resultsToken.Type = JTokenType.Array Then
+            For Each itemToken As JToken In DirectCast(resultsToken, JArray)
+                If itemToken Is Nothing OrElse itemToken.Type <> JTokenType.Object Then Continue For
+                Dim item = DirectCast(itemToken, JObject)
+                result.Results.Add(New BulkUpsertItemResult With {
+                    .Index = GetInt(item, "index"),
+                    .ClientRef = GetString(item, "client_ref"),
+                    .Status = GetString(item, "status"),
+                    .EntityId = GetInt(item, entityIdField),
+                    .ErrorCode = GetString(item, "error_code"),
+                    .Message = GetString(item, "message")
+                })
+            Next
+        End If
+        Dim summary = If(data Is Nothing, Nothing, data("summary"))
+        If summary IsNot Nothing AndAlso summary.Type = JTokenType.Object Then
+            Dim s = DirectCast(summary, JObject)
+            result.Total = GetInt(s, "total")
+            result.Created = GetInt(s, "created")
+            result.Updated = GetInt(s, "updated")
+            result.Failed = GetInt(s, "failed")
+        Else
+            result.Total = result.Results.Count
+            For Each r In result.Results
+                If String.Equals(r.Status, "created", StringComparison.OrdinalIgnoreCase) Then
+                    result.Created += 1
+                ElseIf String.Equals(r.Status, "updated", StringComparison.OrdinalIgnoreCase) Then
+                    result.Updated += 1
+                ElseIf String.Equals(r.Status, "failed", StringComparison.OrdinalIgnoreCase) Then
+                    result.Failed += 1
+                End If
+            Next
+        End If
+        Return result
     End Function
 
     Private Shared Function GetString(token As JToken, name As String) As String

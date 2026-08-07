@@ -20,132 +20,76 @@ class BusinessesEmptyState extends StatelessWidget {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
     final isMobile = ResponsiveHelper.isMobile(context);
+    final padding = ResponsiveHelper.getPadding(context) * 2;
 
     if (noSearchResults) {
-      return _centered(
-        context,
-        icon: Icons.search_off_rounded,
-        iconColor: cs.onSurfaceVariant,
-        title: t.businessesHubNoSearchResults,
-        subtitle: searchQuery != null && searchQuery!.isNotEmpty
-            ? t.businessesHubNoSearchResultsFor(searchQuery!)
-            : null,
-        actions: [
-          OutlinedButton.icon(
-            onPressed: () => context.go('/user/profile/new-business'),
-            icon: const Icon(Icons.add_business_rounded),
-            label: Text(t.newBusiness),
+      return Center(
+        child: Padding(
+          padding: EdgeInsets.all(padding),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 400),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.search_off_rounded, size: 40, color: cs.onSurfaceVariant),
+                const SizedBox(height: 16),
+                Text(
+                  t.businessesHubNoSearchResults,
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w600),
+                ),
+                if (searchQuery != null && searchQuery!.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    t.businessesHubNoSearchResultsFor(searchQuery!),
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
+                  ),
+                ],
+              ],
+            ),
           ),
-        ],
+        ),
       );
     }
-
-    return _centered(
-      context,
-      icon: Icons.storefront_rounded,
-      iconColor: cs.primary,
-      title: t.businessesHubEmptyTitle,
-      subtitle: t.businessesHubEmptySubtitle,
-      actions: [
-        FilledButton.icon(
-          onPressed: () => context.go('/user/profile/new-business'),
-          icon: const Icon(Icons.add_rounded),
-          label: Text(t.createFirstBusiness),
-          style: FilledButton.styleFrom(
-            minimumSize: Size(isMobile ? double.infinity : 0, 48),
-          ),
-        ),
-        const SizedBox(height: 10),
-        OutlinedButton.icon(
-          onPressed: () => LegacyImportWizard.show(context),
-          icon: const Icon(Icons.upload_file_rounded),
-          label: Text(t.businessesHubImportLegacy),
-          style: OutlinedButton.styleFrom(
-            minimumSize: Size(isMobile ? double.infinity : 0, 44),
-          ),
-        ),
-      ],
-      bullets: [
-        t.businessesHubEmptyBullet1,
-        t.businessesHubEmptyBullet2,
-        t.businessesHubEmptyBullet3,
-      ],
-    );
-  }
-
-  Widget _centered(
-    BuildContext context, {
-    required IconData icon,
-    required Color iconColor,
-    required String title,
-    String? subtitle,
-    List<Widget>? actions,
-    List<String>? bullets,
-  }) {
-    final theme = Theme.of(context);
-    final padding = ResponsiveHelper.getPadding(context) * 2;
 
     return Center(
       child: SingleChildScrollView(
         padding: EdgeInsets.all(padding),
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 420),
+          constraints: const BoxConstraints(maxWidth: 400),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Container(
-                width: 96,
-                height: 96,
-                decoration: BoxDecoration(
-                  color: iconColor.withValues(alpha: 0.1),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(icon, size: 48, color: iconColor),
-              ),
-              const SizedBox(height: 24),
+              Icon(Icons.storefront_outlined, size: 48, color: cs.primary.withValues(alpha: 0.85)),
+              const SizedBox(height: 20),
               Text(
-                title,
+                t.businessesHubEmptyTitle,
                 textAlign: TextAlign.center,
                 style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700),
               ),
-              if (subtitle != null) ...[
-                const SizedBox(height: 10),
-                Text(
-                  subtitle,
-                  textAlign: TextAlign.center,
-                  style: theme.textTheme.bodyLarge?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                    height: 1.5,
-                  ),
+              const SizedBox(height: 10),
+              Text(
+                t.businessesHubEmptySubtitle,
+                textAlign: TextAlign.center,
+                style: theme.textTheme.bodyLarge?.copyWith(
+                  color: cs.onSurfaceVariant,
+                  height: 1.45,
                 ),
-              ],
-              if (bullets != null) ...[
-                const SizedBox(height: 20),
-                ...bullets.map(
-                  (b) => Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Icon(Icons.check_circle_outline_rounded, size: 18, color: theme.colorScheme.primary),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Text(
-                            b,
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              color: theme.colorScheme.onSurfaceVariant,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+              ),
+              const SizedBox(height: 28),
+              FilledButton(
+                onPressed: () => context.go('/user/profile/new-business'),
+                style: FilledButton.styleFrom(
+                  minimumSize: Size(isMobile ? double.infinity : 200, 48),
                 ),
-              ],
-              if (actions != null) ...[
-                const SizedBox(height: 28),
-                ...actions,
-              ],
+                child: Text(t.createFirstBusiness),
+              ),
+              const SizedBox(height: 8),
+              TextButton(
+                onPressed: () => LegacyImportWizard.show(context),
+                child: Text(t.businessesHubImportLegacy),
+              ),
             ],
           ),
         ),
