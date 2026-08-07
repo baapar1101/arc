@@ -201,10 +201,10 @@ Friend Class BaseDataTransferService
             End If
 
             Dim retryNoOb As New List(Of HolooPersonRow)()
-            Dim byRef = IndexBulkByClientRef(bulk)
+            Dim byClientRef = IndexBulkByClientRef(bulk)
             For i = 0 To chunkRows.Count - 1
                 Dim row = chunkRows(i)
-                Dim itemResult = ResolveBulkItem(byRef, bulk, i, row.Key)
+                Dim itemResult = ResolveBulkItem(byClientRef, bulk, i, row.Key)
                 processed += 1
                 modCp.LastKey = row.Key
 
@@ -551,10 +551,10 @@ Friend Class BaseDataTransferService
             End If
 
             Dim retryNoOb As New List(Of HolooProductRow)()
-            Dim byRef = IndexBulkByClientRef(bulk)
+            Dim byClientRef = IndexBulkByClientRef(bulk)
             For i = 0 To chunkRows.Count - 1
                 Dim row = chunkRows(i)
-                Dim itemResult = ResolveBulkItem(byRef, bulk, i, row.Key)
+                Dim itemResult = ResolveBulkItem(byClientRef, bulk, i, row.Key)
                 processed += 1
                 modCp.LastKey = row.Key
 
@@ -737,13 +737,13 @@ Friend Class BaseDataTransferService
     End Function
 
     Private Shared Function ResolveBulkItem(
-        byRef As Dictionary(Of String, BulkUpsertItemResult),
+        byClientRef As Dictionary(Of String, BulkUpsertItemResult),
         bulk As BulkUpsertResult,
         indexInChunk As Integer,
         clientRef As String
     ) As BulkUpsertItemResult
         Dim found As BulkUpsertItemResult = Nothing
-        If byRef IsNot Nothing AndAlso byRef.TryGetValue(clientRef, found) Then Return found
+        If byClientRef IsNot Nothing AndAlso byClientRef.TryGetValue(clientRef, found) Then Return found
         If bulk IsNot Nothing AndAlso bulk.Results IsNot Nothing Then
             For Each r In bulk.Results
                 If r.Index = indexInChunk Then Return r
