@@ -4280,6 +4280,318 @@ abstract class AppLocalizations {
   /// **'Create your first business'**
   String get createFirstBusiness;
 
+  /// No description provided for @businessesHubSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Select a business or create a new one'**
+  String get businessesHubSubtitle;
+
+  /// No description provided for @businessesHubSearchHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Search businesses…'**
+  String get businessesHubSearchHint;
+
+  /// No description provided for @businessesHubFilterAll.
+  ///
+  /// In en, this message translates to:
+  /// **'All'**
+  String get businessesHubFilterAll;
+
+  /// No description provided for @businessesHubFilterOwner.
+  ///
+  /// In en, this message translates to:
+  /// **'Owner'**
+  String get businessesHubFilterOwner;
+
+  /// No description provided for @businessesHubFilterMember.
+  ///
+  /// In en, this message translates to:
+  /// **'Member'**
+  String get businessesHubFilterMember;
+
+  /// No description provided for @businessesHubFilterPendingDeletion.
+  ///
+  /// In en, this message translates to:
+  /// **'Pending deletion'**
+  String get businessesHubFilterPendingDeletion;
+
+  /// No description provided for @businessesHubSortNewest.
+  ///
+  /// In en, this message translates to:
+  /// **'Newest'**
+  String get businessesHubSortNewest;
+
+  /// No description provided for @businessesHubSortOldest.
+  ///
+  /// In en, this message translates to:
+  /// **'Oldest'**
+  String get businessesHubSortOldest;
+
+  /// No description provided for @businessesHubSortNameAsc.
+  ///
+  /// In en, this message translates to:
+  /// **'Name (A–Z)'**
+  String get businessesHubSortNameAsc;
+
+  /// No description provided for @businessesHubSortNameDesc.
+  ///
+  /// In en, this message translates to:
+  /// **'Name (Z–A)'**
+  String get businessesHubSortNameDesc;
+
+  /// No description provided for @businessesHubRecentSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Recently used'**
+  String get businessesHubRecentSection;
+
+  /// No description provided for @businessesHubAllSection.
+  ///
+  /// In en, this message translates to:
+  /// **'All businesses'**
+  String get businessesHubAllSection;
+
+  /// No description provided for @businessesHubCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} businesses'**
+  String businessesHubCount(int count);
+
+  /// No description provided for @businessesHubEnter.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter'**
+  String get businessesHubEnter;
+
+  /// No description provided for @businessesHubDeletionPending.
+  ///
+  /// In en, this message translates to:
+  /// **'Pending deletion'**
+  String get businessesHubDeletionPending;
+
+  /// No description provided for @businessesHubMultiCurrency.
+  ///
+  /// In en, this message translates to:
+  /// **'Multi-currency'**
+  String get businessesHubMultiCurrency;
+
+  /// No description provided for @businessesHubEstablished.
+  ///
+  /// In en, this message translates to:
+  /// **'Established'**
+  String get businessesHubEstablished;
+
+  /// No description provided for @businessesHubRestore.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore'**
+  String get businessesHubRestore;
+
+  /// No description provided for @businessesHubRestoring.
+  ///
+  /// In en, this message translates to:
+  /// **'Restoring…'**
+  String get businessesHubRestoring;
+
+  /// No description provided for @businessesHubLeave.
+  ///
+  /// In en, this message translates to:
+  /// **'Leave'**
+  String get businessesHubLeave;
+
+  /// No description provided for @businessesHubDefaultCurrency.
+  ///
+  /// In en, this message translates to:
+  /// **'Default currency'**
+  String get businessesHubDefaultCurrency;
+
+  /// No description provided for @businessesHubPin.
+  ///
+  /// In en, this message translates to:
+  /// **'Pin'**
+  String get businessesHubPin;
+
+  /// No description provided for @businessesHubUnpin.
+  ///
+  /// In en, this message translates to:
+  /// **'Unpin'**
+  String get businessesHubUnpin;
+
+  /// No description provided for @businessesHubNoSearchResults.
+  ///
+  /// In en, this message translates to:
+  /// **'No results found'**
+  String get businessesHubNoSearchResults;
+
+  /// No description provided for @businessesHubNoSearchResultsFor.
+  ///
+  /// In en, this message translates to:
+  /// **'No results for \"{query}\"'**
+  String businessesHubNoSearchResultsFor(String query);
+
+  /// No description provided for @businessesHubEmptyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'No businesses yet'**
+  String get businessesHubEmptyTitle;
+
+  /// No description provided for @businessesHubEmptySubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Create your first business to start cloud accounting.'**
+  String get businessesHubEmptySubtitle;
+
+  /// No description provided for @businessesHubEmptyBullet1.
+  ///
+  /// In en, this message translates to:
+  /// **'Start free and scale anytime'**
+  String get businessesHubEmptyBullet1;
+
+  /// No description provided for @businessesHubEmptyBullet2.
+  ///
+  /// In en, this message translates to:
+  /// **'Multiple businesses in one account'**
+  String get businessesHubEmptyBullet2;
+
+  /// No description provided for @businessesHubEmptyBullet3.
+  ///
+  /// In en, this message translates to:
+  /// **'Team access with owner and member roles'**
+  String get businessesHubEmptyBullet3;
+
+  /// No description provided for @businessesHubImportLegacy.
+  ///
+  /// In en, this message translates to:
+  /// **'Import from legacy version'**
+  String get businessesHubImportLegacy;
+
+  /// No description provided for @businessesHubViewGrid.
+  ///
+  /// In en, this message translates to:
+  /// **'Grid view'**
+  String get businessesHubViewGrid;
+
+  /// No description provided for @businessesHubViewList.
+  ///
+  /// In en, this message translates to:
+  /// **'List view'**
+  String get businessesHubViewList;
+
+  /// No description provided for @businessesHubDaysRemaining.
+  ///
+  /// In en, this message translates to:
+  /// **'{days} days until permanent deletion'**
+  String businessesHubDaysRemaining(int days);
+
+  /// No description provided for @businessesHubHoursRemaining.
+  ///
+  /// In en, this message translates to:
+  /// **'{hours} hours until permanent deletion'**
+  String businessesHubHoursRemaining(int hours);
+
+  /// No description provided for @businessesHubDeadlineExpired.
+  ///
+  /// In en, this message translates to:
+  /// **'Recovery deadline has passed'**
+  String get businessesHubDeadlineExpired;
+
+  /// No description provided for @businessesHubRestoreConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore business'**
+  String get businessesHubRestoreConfirmTitle;
+
+  /// No description provided for @businessesHubRestoreConfirmMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Are you sure you want to restore \"{name}\"?\n\nYour access will be restored after recovery.'**
+  String businessesHubRestoreConfirmMessage(String name);
+
+  /// No description provided for @businessesHubRestoreSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Business restored successfully'**
+  String get businessesHubRestoreSuccess;
+
+  /// No description provided for @businessesHubRestoreFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore failed: {error}'**
+  String businessesHubRestoreFailed(String error);
+
+  /// No description provided for @businessesHubLeaveConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Leave business'**
+  String get businessesHubLeaveConfirmTitle;
+
+  /// No description provided for @businessesHubLeaveConfirmMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Are you sure you want to leave \"{name}\"?\n\nYour access will be removed.'**
+  String businessesHubLeaveConfirmMessage(String name);
+
+  /// No description provided for @businessesHubLeaveFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Leave failed: {error}'**
+  String businessesHubLeaveFailed(String error);
+
+  /// No description provided for @businessesHubLoadMoreFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to load more'**
+  String get businessesHubLoadMoreFailed;
+
+  /// No description provided for @businessesHubStatsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Quick stats'**
+  String get businessesHubStatsTitle;
+
+  /// No description provided for @businessesHubStatsSales.
+  ///
+  /// In en, this message translates to:
+  /// **'Sales'**
+  String get businessesHubStatsSales;
+
+  /// No description provided for @businessesHubStatsPurchases.
+  ///
+  /// In en, this message translates to:
+  /// **'Purchases'**
+  String get businessesHubStatsPurchases;
+
+  /// No description provided for @businessesHubStatsMembers.
+  ///
+  /// In en, this message translates to:
+  /// **'Members'**
+  String get businessesHubStatsMembers;
+
+  /// No description provided for @businessesHubStatsTransactions.
+  ///
+  /// In en, this message translates to:
+  /// **'Transactions'**
+  String get businessesHubStatsTransactions;
+
+  /// No description provided for @businessesHubStatsLoading.
+  ///
+  /// In en, this message translates to:
+  /// **'Loading stats…'**
+  String get businessesHubStatsLoading;
+
+  /// No description provided for @businessesHubStatsUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Stats unavailable'**
+  String get businessesHubStatsUnavailable;
+
+  /// No description provided for @businessesHubSearchShortcut.
+  ///
+  /// In en, this message translates to:
+  /// **'Press / to search'**
+  String get businessesHubSearchShortcut;
+
   /// No description provided for @accessDenied.
   ///
   /// In en, this message translates to:
@@ -32075,6 +32387,269 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Print with label template'**
   String get barcodeLabelPrintFromProductForm;
+
+  /// No description provided for @barcodeLabelCanvasSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Canvas & print'**
+  String get barcodeLabelCanvasSettings;
+
+  /// No description provided for @barcodeLabelCanvasWidth.
+  ///
+  /// In en, this message translates to:
+  /// **'Design width (mm)'**
+  String get barcodeLabelCanvasWidth;
+
+  /// No description provided for @barcodeLabelCanvasHeight.
+  ///
+  /// In en, this message translates to:
+  /// **'Design height (mm)'**
+  String get barcodeLabelCanvasHeight;
+
+  /// No description provided for @barcodeLabelPrintLayout.
+  ///
+  /// In en, this message translates to:
+  /// **'Print layout'**
+  String get barcodeLabelPrintLayout;
+
+  /// No description provided for @barcodeLabelPrintLayoutSheet.
+  ///
+  /// In en, this message translates to:
+  /// **'Sheet (A4, grid)'**
+  String get barcodeLabelPrintLayoutSheet;
+
+  /// No description provided for @barcodeLabelPrintLayoutRoll.
+  ///
+  /// In en, this message translates to:
+  /// **'Roll / thermal (one label per page)'**
+  String get barcodeLabelPrintLayoutRoll;
+
+  /// No description provided for @barcodeLabelPaperSize.
+  ///
+  /// In en, this message translates to:
+  /// **'Paper size'**
+  String get barcodeLabelPaperSize;
+
+  /// No description provided for @barcodeLabelPaperCustom.
+  ///
+  /// In en, this message translates to:
+  /// **'Custom size'**
+  String get barcodeLabelPaperCustom;
+
+  /// No description provided for @barcodeLabelPaperWidth.
+  ///
+  /// In en, this message translates to:
+  /// **'Paper width (mm)'**
+  String get barcodeLabelPaperWidth;
+
+  /// No description provided for @barcodeLabelPaperHeight.
+  ///
+  /// In en, this message translates to:
+  /// **'Paper height (mm)'**
+  String get barcodeLabelPaperHeight;
+
+  /// No description provided for @barcodeLabelOrientation.
+  ///
+  /// In en, this message translates to:
+  /// **'Orientation'**
+  String get barcodeLabelOrientation;
+
+  /// No description provided for @barcodeLabelPortrait.
+  ///
+  /// In en, this message translates to:
+  /// **'Portrait'**
+  String get barcodeLabelPortrait;
+
+  /// No description provided for @barcodeLabelLandscape.
+  ///
+  /// In en, this message translates to:
+  /// **'Landscape'**
+  String get barcodeLabelLandscape;
+
+  /// No description provided for @barcodeLabelSheetColumns.
+  ///
+  /// In en, this message translates to:
+  /// **'Columns'**
+  String get barcodeLabelSheetColumns;
+
+  /// No description provided for @barcodeLabelSheetRows.
+  ///
+  /// In en, this message translates to:
+  /// **'Rows'**
+  String get barcodeLabelSheetRows;
+
+  /// No description provided for @barcodeLabelRollModeHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Roll mode uses the design area size only; paper height is not fixed.'**
+  String get barcodeLabelRollModeHint;
+
+  /// No description provided for @barcodeLabelPreviewData.
+  ///
+  /// In en, this message translates to:
+  /// **'Preview test data'**
+  String get barcodeLabelPreviewData;
+
+  /// No description provided for @barcodeLabelPreviewDataHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Add elements with data bindings to edit preview values here.'**
+  String get barcodeLabelPreviewDataHint;
+
+  /// No description provided for @barcodeLabelRotation.
+  ///
+  /// In en, this message translates to:
+  /// **'Rotation (°)'**
+  String get barcodeLabelRotation;
+
+  /// No description provided for @barcodeLabelRotate90.
+  ///
+  /// In en, this message translates to:
+  /// **'Rotate 90°'**
+  String get barcodeLabelRotate90;
+
+  /// No description provided for @barcodeLabelContentMode.
+  ///
+  /// In en, this message translates to:
+  /// **'Content source'**
+  String get barcodeLabelContentMode;
+
+  /// No description provided for @barcodeLabelContentBinding.
+  ///
+  /// In en, this message translates to:
+  /// **'Data field'**
+  String get barcodeLabelContentBinding;
+
+  /// No description provided for @barcodeLabelContentFixed.
+  ///
+  /// In en, this message translates to:
+  /// **'Fixed text'**
+  String get barcodeLabelContentFixed;
+
+  /// No description provided for @barcodeLabelFixedValue.
+  ///
+  /// In en, this message translates to:
+  /// **'Text value'**
+  String get barcodeLabelFixedValue;
+
+  /// No description provided for @barcodeLabelShowBarcodeText.
+  ///
+  /// In en, this message translates to:
+  /// **'Show barcode text below'**
+  String get barcodeLabelShowBarcodeText;
+
+  /// No description provided for @barcodeLabelPrintSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Print settings'**
+  String get barcodeLabelPrintSettings;
+
+  /// No description provided for @barcodeLabelBlankCanvasDialogTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'New blank label'**
+  String get barcodeLabelBlankCanvasDialogTitle;
+
+  /// No description provided for @barcodeLabelBlankCanvasDialogHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Set the design area size. For thermal printers use roll mode — only width and label height matter.'**
+  String get barcodeLabelBlankCanvasDialogHint;
+
+  /// No description provided for @barcodeLabelStartDesign.
+  ///
+  /// In en, this message translates to:
+  /// **'Start designing'**
+  String get barcodeLabelStartDesign;
+
+  /// No description provided for @barcodeLabelPrinterSizeMatch.
+  ///
+  /// In en, this message translates to:
+  /// **'Printer profile matches design ({width}×{height} mm)'**
+  String barcodeLabelPrinterSizeMatch(String width, String height);
+
+  /// No description provided for @barcodeLabelPrinterSizeMismatch.
+  ///
+  /// In en, this message translates to:
+  /// **'Printer {pw}×{ph} mm · design {dw}×{dh} mm — output uses design size'**
+  String barcodeLabelPrinterSizeMismatch(
+    String pw,
+    String ph,
+    String dw,
+    String dh,
+  );
+
+  /// No description provided for @barcodeLabelLivePreview.
+  ///
+  /// In en, this message translates to:
+  /// **'Live PDF preview'**
+  String get barcodeLabelLivePreview;
+
+  /// No description provided for @barcodeLabelApplyPrinterSize.
+  ///
+  /// In en, this message translates to:
+  /// **'Match printer size ({width}×{height} mm)'**
+  String barcodeLabelApplyPrinterSize(String width, String height);
+
+  /// No description provided for @barcodeLabelImageSource.
+  ///
+  /// In en, this message translates to:
+  /// **'Image source'**
+  String get barcodeLabelImageSource;
+
+  /// No description provided for @barcodeLabelImageBusinessLogo.
+  ///
+  /// In en, this message translates to:
+  /// **'Business logo'**
+  String get barcodeLabelImageBusinessLogo;
+
+  /// No description provided for @barcodeLabelImageProduct.
+  ///
+  /// In en, this message translates to:
+  /// **'Product image'**
+  String get barcodeLabelImageProduct;
+
+  /// No description provided for @barcodeLabelImageUpload.
+  ///
+  /// In en, this message translates to:
+  /// **'Uploaded image'**
+  String get barcodeLabelImageUpload;
+
+  /// No description provided for @barcodeLabelPickImage.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose image file'**
+  String get barcodeLabelPickImage;
+
+  /// No description provided for @barcodeLabelImageFit.
+  ///
+  /// In en, this message translates to:
+  /// **'Image fit'**
+  String get barcodeLabelImageFit;
+
+  /// No description provided for @barcodeLabelImageFitContain.
+  ///
+  /// In en, this message translates to:
+  /// **'Contain'**
+  String get barcodeLabelImageFitContain;
+
+  /// No description provided for @barcodeLabelImageFitCover.
+  ///
+  /// In en, this message translates to:
+  /// **'Cover'**
+  String get barcodeLabelImageFitCover;
+
+  /// No description provided for @barcodeLabelImageFitFill.
+  ///
+  /// In en, this message translates to:
+  /// **'Fill'**
+  String get barcodeLabelImageFitFill;
+
+  /// No description provided for @barcodeLabelPrinterEscPosSent.
+  ///
+  /// In en, this message translates to:
+  /// **'ESC/POS sent to printer'**
+  String get barcodeLabelPrinterEscPosSent;
 }
 
 class _AppLocalizationsDelegate

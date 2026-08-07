@@ -6,6 +6,7 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 
 import '../../../models/barcode_label/label_design_v1.dart';
+import 'label_image_resolver.dart';
 import '../../product/product_label_pdf_text.dart';
 
 /// رزولور binding برای چاپ/پیش‌نمایش.
@@ -74,7 +75,17 @@ String _asciiForBarcode(String input) {
   return s.isEmpty ? input.replaceAll(RegExp(r'\s+'), '') : s;
 }
 
-PdfPageFormat _paperFormat(LabelSheet sheet) {
+PdfPageFormat _paperFormat(LabelSheet sheet, {double? labelW, double? labelH}) {
+  if (sheet.isRollMode && labelW != null && labelH != null) {
+    return PdfPageFormat(labelW, labelH, marginAll: 0);
+  }
+  if (sheet.paper == 'custom') {
+    final w = (sheet.customPaperMm?['width'] ?? 210) * PdfPageFormat.mm;
+    final h = (sheet.customPaperMm?['height'] ?? 297) * PdfPageFormat.mm;
+    var fmt = PdfPageFormat(w, h, marginAll: 0);
+    if (sheet.orientation == 'landscape') fmt = fmt.landscape;
+    return fmt;
+  }
   PdfPageFormat base;
   switch (sheet.paper) {
     case 'A5':
@@ -111,10 +122,17 @@ class LabelPdfRenderer {
     required List<Map<String, dynamic>> contexts, // one per label
     /// یک برچسب در هر صفحه با اندازه بوم — مناسب چاپگر رولی/pdf_spooler
     bool rollMode = false,
+    int? businessId,
   }) async {
     if (contexts.isEmpty) {
       throw ArgumentError('contexts must not be empty');
     }
+
+    final imageCache = await LabelImageResolver.preloadForDesign(
+      design: design,
+      businessId: businessId,
+      contexts: contexts,
+    );
 
     final fontRegular = await _loadFont('assets/fonts/YekanBakhFaNum-Regular.ttf') ??
         await _loadFont('assets/fonts/Vazirmatn-Regular.ttf');
@@ -130,10 +148,11 @@ class LabelPdfRenderer {
     final doc = pw.Document(theme: theme);
     final labelW = design.canvas.widthMm * PdfPageFormat.mm;
     final labelH = design.canvas.heightMm * PdfPageFormat.mm;
-    final format = rollMode
+    final useRoll = rollMode || sheet.isRollMode;
+    final format = useRoll
         ? PdfPageFormat(labelW, labelH, marginAll: 0)
-        : _paperFormat(sheet);
-    final margin = rollMode
+        : _paperFormat(sheet, labelW: labelW, labelH: labelH);
+    final margin = useRoll
         ? pw.EdgeInsets.zero
         : pw.EdgeInsets.only(
             top: (sheet.marginMm['top'] ?? 8) * PdfPageFormat.mm,
@@ -143,17 +162,18 @@ class LabelPdfRenderer {
           );
     final gapX = (sheet.gapMm['x'] ?? 2) * PdfPageFormat.mm;
     final gapY = (sheet.gapMm['y'] ?? 2) * PdfPageFormat.mm;
-    final cols = rollMode ? 1 : math.max<int>(1, sheet.columns);
-    final rows = rollMode ? 1 : math.max<int>(1, sheet.rows);
+    final cols = useRoll ? 1 : math.max<int>(1, sheet.columns);
+    final rows = useRoll ? 1 : math.max<int>(1, sheet.rows);
     final int slots = cols * rows;
 
-    pw.Widget buildLabel(Map<String, dynamic> ctx) {
+    pw.Widget buildLabel(Map<String, dynamic> ctx, int ctxIndex) {
       final children = <pw.Widget>[];
       final els = List<LabelElement>.from(design.elements)
         ..sort((a, b) => a.zIndex.compareTo(b.zIndex));
       for (final el in els) {
         if (!el.visible) continue;
-        final content = _buildElement(el, ctx, fontRegular, fontBold);
+        final imageBytes = imageCache['${el.id}:$ctxIndex'] ?? imageCache[el.id];
+        final content = _buildElement(el, ctx, fontRegular, fontBold, imageBytes);
         children.add(
           pw.Positioned(
             left: el.xMm * PdfPageFormat.mm,
@@ -165,6 +185,7 @@ class LabelPdfRenderer {
                   ? content
                   : pw.Transform.rotate(
                       angle: el.rotationDeg * math.pi / 180.0,
+                      alignment: pw.Alignment.center,
                       child: content,
                     ),
             ),
@@ -174,7 +195,7 @@ class LabelPdfRenderer {
       return pw.Container(
         width: labelW,
         height: labelH,
-        decoration: rollMode
+        decoration: useRoll
             ? null
             : pw.BoxDecoration(
                 border: pw.Border.all(width: 0.2, color: PdfColors.grey400),
@@ -198,7 +219,7 @@ class LabelPdfRenderer {
               for (var c = 0; c < cols; c++) {
                 final i = r * cols + c;
                 if (i < pageContexts.length) {
-                  cells.add(buildLabel(pageContexts[i]));
+                  cells.add(buildLabel(pageContexts[i], start + i));
                 } else {
                   cells.add(pw.SizedBox(width: labelW, height: labelH));
                 }
@@ -233,6 +254,7 @@ class LabelPdfRenderer {
     Map<String, dynamic> ctx,
     pw.Font? regular,
     pw.Font? bold,
+    Uint8List? imageBytes,
   ) {
     final props = el.props;
     switch (el.type) {
@@ -334,15 +356,26 @@ class LabelPdfRenderer {
           child: pw.Container(height: sw, color: stroke),
         );
       case LabelElementType.image:
-        // Phase A: placeholder box; image bytes wiring in later iteration.
-        return pw.Container(
-          decoration: pw.BoxDecoration(
-            border: pw.Border.all(color: PdfColors.grey400, width: 0.4),
-            color: PdfColors.grey200,
-          ),
-          alignment: pw.Alignment.center,
-          child: pw.Text('IMG', style: const pw.TextStyle(fontSize: 6, color: PdfColors.grey600)),
-        );
+        final bytes = imageBytes;
+        if (bytes == null || bytes.isEmpty) {
+          return pw.Container(
+            decoration: pw.BoxDecoration(
+              border: pw.Border.all(color: PdfColors.grey400, width: 0.4),
+              color: PdfColors.grey200,
+            ),
+            alignment: pw.Alignment.center,
+            child: pw.Text('IMG', style: const pw.TextStyle(fontSize: 6, color: PdfColors.grey600)),
+          );
+        }
+        final fit = switch (el.props['fit']?.toString()) {
+          'cover' => pw.BoxFit.cover,
+          'fill' => pw.BoxFit.fill,
+          _ => pw.BoxFit.contain,
+        };
+        final opacity = (el.props['opacity'] as num?)?.toDouble() ?? 1.0;
+        final image = pw.Image(pw.MemoryImage(bytes), fit: fit);
+        if (opacity >= 0.999) return image;
+        return pw.Opacity(opacity: opacity.clamp(0.0, 1.0), child: image);
     }
   }
 

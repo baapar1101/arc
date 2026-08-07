@@ -4129,6 +4129,10 @@ class _MyAppState extends State<MyApp> {
                   path: 'studio/new',
                   pageBuilder: (context, state) {
                     final businessId = int.parse(state.pathParameters['business_id']!);
+                    final q = state.uri.queryParameters;
+                    final w = double.tryParse(q['w'] ?? '');
+                    final h = double.tryParse(q['h'] ?? '');
+                    final roll = q['roll'] == '1' || q['roll'] == 'true';
                     return hesabixNoTransitionPage(
                       state,
                       BarcodeLabelPluginGate(
@@ -4136,6 +4140,9 @@ class _MyAppState extends State<MyApp> {
                         child: LabelStudioPage(
                           businessId: businessId,
                           authStore: _authStore!,
+                          initialWidthMm: w,
+                          initialHeightMm: h,
+                          initialRollMode: roll,
                         ),
                       ),
                     );

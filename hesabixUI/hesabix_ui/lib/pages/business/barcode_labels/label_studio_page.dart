@@ -1,20 +1,28 @@
 ﻿import 'dart:math' as math;
 
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 
 import '../../../core/auth_store.dart';
+import '../../../models/barcode_label/label_printer_profile.dart';
 import '../../../models/barcode_label/label_design_v1.dart';
 import '../../../services/barcode_label_service.dart';
 import '../../../services/bytes_export/bytes_export_service.dart';
 import '../../../utils/error_extractor.dart';
 import '../../../utils/snackbar_helper.dart';
+import '../../../widgets/barcode_label/render/label_image_resolver.dart';
 import '../../../widgets/barcode_label/render/label_pdf_renderer.dart';
+import '../../../widgets/barcode_label/studio/label_studio_barcode_painter.dart';
 import '../../../widgets/barcode_label/studio/label_element_handles.dart';
 import '../../../widgets/barcode_label/studio/label_rulers.dart';
 import '../../../widgets/barcode_label/studio/label_studio_history.dart';
+import '../../../widgets/barcode_label/studio/label_studio_image_view.dart';
+import '../../../widgets/barcode_label/studio/label_studio_live_preview.dart';
+import '../../../widgets/barcode_label/studio/label_studio_matrix_painter.dart';
 import '../../../widgets/business_subpage_back_leading.dart';
 
 /// Label design studio — Phase B (canvas mm, selection, toolbox, save).
@@ -22,12 +30,18 @@ class LabelStudioPage extends StatefulWidget {
   final int businessId;
   final AuthStore authStore;
   final int? templateId;
+  final double? initialWidthMm;
+  final double? initialHeightMm;
+  final bool initialRollMode;
 
   const LabelStudioPage({
     super.key,
     required this.businessId,
     required this.authStore,
     this.templateId,
+    this.initialWidthMm,
+    this.initialHeightMm,
+    this.initialRollMode = false,
   });
 
   @override
@@ -50,6 +64,7 @@ class _LabelStudioPageState extends State<LabelStudioPage> {
   LabelDesignDocument _design = LabelDesignDocument.empty();
   LabelSheet _sheet = const LabelSheet();
   Map<String, dynamic> _sample = const {};
+  final Map<String, String> _sampleOverrides = {};
   String? _selectedId;
   String _tool = 'select';
   bool _dirty = false;
@@ -57,6 +72,8 @@ class _LabelStudioPageState extends State<LabelStudioPage> {
   double _canvasZoom = 1.0;
   bool _handleDragCheckpointed = false;
   bool _draggingElement = false;
+  bool _showLivePreview = false;
+  LabelPrinterSettings? _printerSettings;
 
   static const double _pxPerMm = 3.7795275591; // ~96dpi
   static const double _canvasOffsetPx = 40.0;
@@ -76,6 +93,47 @@ class _LabelStudioPageState extends State<LabelStudioPage> {
     final g = _design.canvas.gridMm;
     if (g <= 0) return value;
     return (value / g).round() * g;
+  }
+
+  Map<String, dynamic> get _effectiveSample => _mergeSample(_sample, _sampleOverrides);
+
+  static Map<String, dynamic> _mergeSample(
+    Map<String, dynamic> base,
+    Map<String, String> overrides,
+  ) {
+    if (overrides.isEmpty) return base;
+    final out = Map<String, dynamic>.from(base);
+    for (final e in overrides.entries) {
+      final parts = e.key.split('.');
+      if (parts.length != 2) continue;
+      final section = out.putIfAbsent(parts[0], () => <String, dynamic>{});
+      if (section is Map<String, dynamic>) {
+        section[parts[1]] = e.value;
+      }
+    }
+    return out;
+  }
+
+  Set<String> _previewBindingKeys() {
+    const defaults = {
+      'product.name',
+      'product.code',
+      'product.general_barcode',
+      'product.price',
+      'product.sale_price',
+    };
+    return {...defaults, ..._usedBindings()};
+  }
+
+  Set<String> _usedBindings() {
+    final keys = <String>{};
+    for (final el in _design.elements) {
+      if ((el.props['content_mode'] ?? 'binding').toString() == 'binding') {
+        final b = el.props['binding']?.toString();
+        if (b != null && b.isNotEmpty) keys.add(b);
+      }
+    }
+    return keys;
   }
 
   bool get _canDesign =>
@@ -114,6 +172,11 @@ class _LabelStudioPageState extends State<LabelStudioPage> {
     });
     try {
       _sample = await _service.sampleContext(businessId: widget.businessId);
+      try {
+        _printerSettings = await _service.getPrinterSettings(businessId: widget.businessId);
+      } catch (_) {
+        _printerSettings = null;
+      }
       if (_templateId != null) {
         final detail = await _service.getTemplate(
           businessId: widget.businessId,
@@ -127,8 +190,12 @@ class _LabelStudioPageState extends State<LabelStudioPage> {
         _version = detail.version;
       } else {
         _nameCtrl.text = 'Untitled';
-        _design = LabelDesignDocument.empty();
-        _sheet = const LabelSheet();
+        final w = widget.initialWidthMm ?? 50;
+        final h = widget.initialHeightMm ?? 30;
+        _design = LabelDesignDocument.empty(widthMm: w, heightMm: h);
+        _sheet = widget.initialRollMode
+            ? const LabelSheet(printMode: 'roll')
+            : const LabelSheet();
       }
       _savedFingerprint = _fingerprint();
       _dirty = false;
@@ -277,7 +344,9 @@ class _LabelStudioPageState extends State<LabelStudioPage> {
       final bytes = await LabelPdfRenderer.render(
         design: _design,
         sheet: _sheet,
-        contexts: [_sample, _sample],
+        contexts: [_effectiveSample, _effectiveSample],
+        rollMode: _sheet.isRollMode,
+        businessId: widget.businessId,
       );
       if (!mounted) return;
       final result = await BytesExportService.export(
@@ -528,6 +597,11 @@ class _LabelStudioPageState extends State<LabelStudioPage> {
                   icon: const Icon(Icons.redo),
                 ),
               IconButton(
+                tooltip: t.barcodeLabelLivePreview,
+                onPressed: () => setState(() => _showLivePreview = !_showLivePreview),
+                icon: Icon(_showLivePreview ? Icons.visibility : Icons.visibility_outlined),
+              ),
+              IconButton(
                 tooltip: t.barcodeLabelPreviewPdf,
                 onPressed: _previewPdf,
                 icon: const Icon(Icons.picture_as_pdf_outlined),
@@ -547,30 +621,86 @@ class _LabelStudioPageState extends State<LabelStudioPage> {
                 ),
             ],
           ),
-          body: Row(
+          body: Column(
             children: [
-              _Toolbox(
-                tool: _tool,
-                onTool: (v) => setState(() => _tool = v),
-                onAdd: _addElement,
-                enabled: _canDesign,
-              ),
-              Expanded(child: _buildCanvas(cs)),
-              _Inspector(
-                element: _selected,
-                design: _design,
-                canDesign: _canDesign,
-                onChanged: (el) {
-                  _checkpoint();
-                  setState(() {
-                    _design = _design.copyWith(
-                      elements: _design.elements.map((e) => e.id == el.id ? el : e).toList(),
-                    );
-                  });
-                  _markDirty();
-                },
+              Expanded(
+                child: Row(
+                  children: [
+                    _Toolbox(
+                      tool: _tool,
+                      onTool: (v) => setState(() => _tool = v),
+                      onAdd: _addElement,
+                      enabled: _canDesign,
+                    ),
+                    Expanded(child: _buildEditorRow(cs)),
+                    _Inspector(
+                      element: _selected,
+                      design: _design,
+                      sheet: _sheet,
+                      canDesign: _canDesign,
+                      printerProfile: _printerSettings?.activeProfile,
+                      onApplyPrinterSize: _canDesign ? _applyPrinterSizeToCanvas : null,
+                      sampleBindings: _previewBindingKeys(),
+                      sampleOverrides: _sampleOverrides,
+                      sample: _effectiveSample,
+                      onSampleOverride: (key, value) {
+                        setState(() {
+                          if (value.trim().isEmpty) {
+                            _sampleOverrides.remove(key);
+                          } else {
+                            _sampleOverrides[key] = value;
+                          }
+                        });
+                      },
+                      onCanvasChanged: (canvas) {
+                        _checkpoint();
+                        setState(() => _design = _design.copyWith(canvas: canvas));
+                        _markDirty();
+                      },
+                      onSheetChanged: (sheet) {
+                        _checkpoint();
+                        setState(() => _sheet = sheet);
+                        _markDirty();
+                      },
+                      onChanged: (el) {
+                        _checkpoint();
+                        setState(() {
+                          _design = _design.copyWith(
+                            elements: _design.elements.map((e) => e.id == el.id ? el : e).toList(),
+                          );
+                        });
+                        _markDirty();
+                      },
                 onSelect: (id) => setState(() => _selectedId = id),
+                onReorderLayers: _reorderLayers,
               ),
+                  ],
+                ),
+              ),
+              if (_showLivePreview)
+                SizedBox(
+                  height: 280,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(12, 6, 12, 0),
+                        child: Text(
+                          t.barcodeLabelLivePreview,
+                          style: Theme.of(context).textTheme.labelLarge,
+                        ),
+                      ),
+                      Expanded(
+                        child: LabelStudioLivePreview(
+                          design: _design,
+                          sheet: _sheet,
+                          sampleContext: _effectiveSample,
+                          businessId: widget.businessId,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
             ],
           ),
           bottomNavigationBar: Material(
@@ -609,7 +739,43 @@ class _LabelStudioPageState extends State<LabelStudioPage> {
     );
   }
 
-  Widget _buildCanvas(ColorScheme cs) {
+  void _reorderLayers(int oldIndex, int newIndex) {
+    if (!_canDesign) return;
+    if (newIndex > oldIndex) newIndex -= 1;
+    _checkpoint();
+    final sorted = List<LabelElement>.from(_design.elements)
+      ..sort((a, b) => a.zIndex.compareTo(b.zIndex));
+    final visual = sorted.reversed.toList();
+    final item = visual.removeAt(oldIndex);
+    visual.insert(newIndex, item);
+    final reordered = visual.reversed.toList();
+    final updated = <LabelElement>[
+      for (var i = 0; i < reordered.length; i++)
+        reordered[i].copyWith(zIndex: i + 1),
+    ];
+    setState(() => _design = _design.copyWith(elements: updated));
+    _markDirty();
+  }
+
+  void _applyPrinterSizeToCanvas() {
+    final profile = _printerSettings?.activeProfile;
+    if (profile == null || !_canDesign) return;
+    _checkpoint();
+    setState(() {
+      _design = _design.copyWith(
+        canvas: _design.canvas.copyWith(
+          widthMm: profile.labelWidthMm,
+          heightMm: profile.labelHeightMm,
+        ),
+      );
+      if (!_sheet.isRollMode) {
+        _sheet = _sheet.copyWith(printMode: 'roll');
+      }
+    });
+    _markDirty();
+  }
+
+  Widget _buildEditorRow(ColorScheme cs) {
     final w = _design.canvas.widthMm * _pxPerMm;
     final h = _design.canvas.heightMm * _pxPerMm;
     final canvasArea = InteractiveViewer(
@@ -618,7 +784,7 @@ class _LabelStudioPageState extends State<LabelStudioPage> {
       maxScale: 4,
       constrained: false,
       // While dragging an element, keep the viewport still so pan doesn't fight move.
-      panEnabled: !_draggingElement,
+      panEnabled: _tool == 'hand' && !_draggingElement,
       scaleEnabled: !_draggingElement,
       boundaryMargin: const EdgeInsets.all(800),
       child: SizedBox(
@@ -670,7 +836,8 @@ class _LabelStudioPageState extends State<LabelStudioPage> {
                                     _ElementView(
                                       element: el,
                                       selected: el.id == _selectedId,
-                                      sample: _sample,
+                                      sample: _effectiveSample,
+                                      businessId: widget.businessId,
                                       onTap: () => setState(() => _selectedId = el.id),
                                       onDragStart: _canDesign && !el.locked
                                           ? () {
@@ -723,23 +890,37 @@ class _LabelStudioPageState extends State<LabelStudioPage> {
                                         element: el,
                                         pxPerMm: _pxPerMm,
                                         enabled: true,
-                                        onDrag: (kind, dxPx, dyPx) {
+                                        onDragStart: () {
                                           if (!_handleDragCheckpointed) {
                                             _checkpoint();
                                             _handleDragCheckpointed = true;
-                                            setState(() => _draggingElement = true);
                                           }
+                                          setState(() => _draggingElement = true);
+                                        },
+                                        onDrag: (kind, dxPx, dyPx) {
                                           final current = _design.elements
                                               .firstWhere((e) => e.id == el.id);
-                                          final d = _deltaPxToMm(dxPx, dyPx);
-                                          final updated = applyHandleDrag(
-                                            element: current,
-                                            kind: kind,
-                                            dxMm: d.dx,
-                                            dyMm: d.dy,
-                                            canvasW: _design.canvas.widthMm,
-                                            canvasH: _design.canvas.heightMm,
-                                          );
+                                          final LabelElement updated;
+                                          if (kind == LabelHandleKind.rotate) {
+                                            updated = applyHandleDrag(
+                                              element: current,
+                                              kind: kind,
+                                              dxMm: dxPx,
+                                              dyMm: 0,
+                                              canvasW: _design.canvas.widthMm,
+                                              canvasH: _design.canvas.heightMm,
+                                            );
+                                          } else {
+                                            final d = _deltaPxToMm(dxPx, dyPx);
+                                            updated = applyHandleDrag(
+                                              element: current,
+                                              kind: kind,
+                                              dxMm: d.dx,
+                                              dyMm: d.dy,
+                                              canvasW: _design.canvas.widthMm,
+                                              canvasH: _design.canvas.heightMm,
+                                            );
+                                          }
                                           setState(() {
                                             _design = _design.copyWith(
                                               elements: _design.elements
@@ -869,6 +1050,7 @@ class _Toolbox extends StatelessWidget {
           padding: const EdgeInsets.symmetric(vertical: 8),
           children: [
             btn(Icons.near_me, 'V', () => onTool('select'), selected: tool == 'select'),
+            btn(Icons.pan_tool_alt_outlined, 'H', () => onTool('hand'), selected: tool == 'hand'),
             const Divider(height: 16),
             btn(Icons.text_fields, 'T ${t.barcodeLabelToolText}', () => onAdd(LabelElementType.text)),
             btn(Icons.view_week, 'B ${t.barcodeLabelToolBarcode}', () => onAdd(LabelElementType.barcode)),
@@ -887,22 +1069,43 @@ class _Toolbox extends StatelessWidget {
 class _Inspector extends StatelessWidget {
   final LabelElement? element;
   final LabelDesignDocument design;
+  final LabelSheet sheet;
   final bool canDesign;
+  final LabelPrinterProfile? printerProfile;
+  final VoidCallback? onApplyPrinterSize;
+  final Set<String> sampleBindings;
+  final Map<String, String> sampleOverrides;
+  final Map<String, dynamic> sample;
+  final void Function(String key, String value) onSampleOverride;
+  final ValueChanged<LabelCanvas> onCanvasChanged;
+  final ValueChanged<LabelSheet> onSheetChanged;
   final ValueChanged<LabelElement> onChanged;
   final ValueChanged<String> onSelect;
+  final void Function(int oldIndex, int newIndex)? onReorderLayers;
 
   const _Inspector({
     required this.element,
     required this.design,
+    required this.sheet,
     required this.canDesign,
+    this.printerProfile,
+    this.onApplyPrinterSize,
+    required this.sampleBindings,
+    required this.sampleOverrides,
+    required this.sample,
+    required this.onSampleOverride,
+    required this.onCanvasChanged,
+    required this.onSheetChanged,
     required this.onChanged,
     required this.onSelect,
+    this.onReorderLayers,
   });
 
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
     final cs = Theme.of(context).colorScheme;
+    final isFa = Localizations.localeOf(context).languageCode == 'fa';
     return Material(
       elevation: 1,
       child: SizedBox(
@@ -910,19 +1113,194 @@ class _Inspector extends StatelessWidget {
         child: ListView(
           padding: const EdgeInsets.all(12),
           children: [
+            Text(t.barcodeLabelCanvasSettings, style: Theme.of(context).textTheme.titleSmall),
+            const SizedBox(height: 8),
+            _numField(context, t.barcodeLabelCanvasWidth, design.canvas.widthMm, canDesign, (v) {
+              onCanvasChanged(design.canvas.copyWith(widthMm: v.clamp(10, 500)));
+            }),
+            _numField(context, t.barcodeLabelCanvasHeight, design.canvas.heightMm, canDesign, (v) {
+              onCanvasChanged(design.canvas.copyWith(heightMm: v.clamp(5, 500)));
+            }),
+            const SizedBox(height: 8),
+            DropdownButtonFormField<String>(
+              value: sheet.printMode,
+              decoration: InputDecoration(labelText: t.barcodeLabelPrintLayout),
+              items: [
+                DropdownMenuItem(value: 'sheet', child: Text(t.barcodeLabelPrintLayoutSheet)),
+                DropdownMenuItem(value: 'roll', child: Text(t.barcodeLabelPrintLayoutRoll)),
+              ],
+              onChanged: canDesign
+                  ? (v) {
+                      if (v == null) return;
+                      onSheetChanged(sheet.copyWith(printMode: v));
+                    }
+                  : null,
+            ),
+            if (!sheet.isRollMode) ...[
+              const SizedBox(height: 8),
+              DropdownButtonFormField<String>(
+                value: sheet.paper,
+                decoration: InputDecoration(labelText: t.barcodeLabelPaperSize),
+                items: [
+                  DropdownMenuItem(value: 'A4', child: Text('A4')),
+                  DropdownMenuItem(value: 'A5', child: Text('A5')),
+                  DropdownMenuItem(value: 'Letter', child: Text('Letter')),
+                  DropdownMenuItem(value: 'custom', child: Text(t.barcodeLabelPaperCustom)),
+                ],
+                onChanged: canDesign
+                    ? (v) {
+                        if (v == null) return;
+                        onSheetChanged(sheet.copyWith(paper: v));
+                      }
+                    : null,
+              ),
+              if (sheet.paper == 'custom') ...[
+                const SizedBox(height: 8),
+                _numField(
+                  context,
+                  t.barcodeLabelPaperWidth,
+                  sheet.customPaperMm?['width'] ?? 210,
+                  canDesign,
+                  (v) => onSheetChanged(sheet.copyWith(
+                    customPaperMm: {
+                      'width': v,
+                      'height': sheet.customPaperMm?['height'] ?? 297,
+                    },
+                  )),
+                ),
+                _numField(
+                  context,
+                  t.barcodeLabelPaperHeight,
+                  sheet.customPaperMm?['height'] ?? 297,
+                  canDesign,
+                  (v) => onSheetChanged(sheet.copyWith(
+                    customPaperMm: {
+                      'width': sheet.customPaperMm?['width'] ?? 210,
+                      'height': v,
+                    },
+                  )),
+                ),
+              ],
+              const SizedBox(height: 8),
+              DropdownButtonFormField<String>(
+                value: sheet.orientation,
+                decoration: InputDecoration(labelText: t.barcodeLabelOrientation),
+                items: [
+                  DropdownMenuItem(value: 'portrait', child: Text(t.barcodeLabelPortrait)),
+                  DropdownMenuItem(value: 'landscape', child: Text(t.barcodeLabelLandscape)),
+                ],
+                onChanged: canDesign
+                    ? (v) {
+                        if (v == null) return;
+                        onSheetChanged(sheet.copyWith(orientation: v));
+                      }
+                    : null,
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: _numField(
+                      context,
+                      t.barcodeLabelSheetColumns,
+                      sheet.columns.toDouble(),
+                      canDesign,
+                      (v) => onSheetChanged(sheet.copyWith(columns: v.round().clamp(1, 20))),
+                      decimals: 0,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: _numField(
+                      context,
+                      t.barcodeLabelSheetRows,
+                      sheet.rows.toDouble(),
+                      canDesign,
+                      (v) => onSheetChanged(sheet.copyWith(rows: v.round().clamp(1, 40))),
+                      decimals: 0,
+                    ),
+                  ),
+                ],
+              ),
+            ] else
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Text(
+                  t.barcodeLabelRollModeHint,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                ),
+              ),
+            if (printerProfile != null && onApplyPrinterSize != null) ...[
+              const SizedBox(height: 8),
+              OutlinedButton.icon(
+                onPressed: onApplyPrinterSize,
+                icon: const Icon(Icons.sync, size: 18),
+                label: Text(
+                  t.barcodeLabelApplyPrinterSize(
+                    printerProfile!.labelWidthMm.toStringAsFixed(0),
+                    printerProfile!.labelHeightMm.toStringAsFixed(0),
+                  ),
+                ),
+              ),
+            ],
+            const Divider(height: 24),
+            Text(t.barcodeLabelPreviewData, style: Theme.of(context).textTheme.titleSmall),
+            const SizedBox(height: 8),
+            if (sampleBindings.isEmpty)
+              Text(
+                t.barcodeLabelPreviewDataHint,
+                style: TextStyle(color: cs.onSurfaceVariant, fontSize: 12),
+              )
+            else
+              for (final key in sampleBindings.toList()..sort())
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: TextFormField(
+                    key: ValueKey('sample-$key'),
+                    initialValue: sampleOverrides[key] ??
+                        resolveLabelBinding(key, sample),
+                    enabled: canDesign,
+                    decoration: InputDecoration(
+                      labelText: _bindingLabel(key, isFa),
+                      isDense: true,
+                    ),
+                    onChanged: (v) => onSampleOverride(key, v),
+                  ),
+                ),
+            const Divider(height: 24),
             Text(t.barcodeLabelLayers, style: Theme.of(context).textTheme.titleSmall),
             const SizedBox(height: 8),
-            ...[...design.elements].reversed.map((e) {
-              final selected = element?.id == e.id;
-              return ListTile(
-                dense: true,
-                selected: selected,
-                selectedTileColor: cs.primaryContainer.withValues(alpha: 0.35),
-                leading: Icon(_iconFor(e.type), size: 18),
-                title: Text(e.name, maxLines: 1, overflow: TextOverflow.ellipsis),
-                onTap: () => onSelect(e.id),
-              );
-            }),
+            if (onReorderLayers != null && canDesign)
+              ReorderableListView(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                onReorder: onReorderLayers!,
+                children: [
+                  for (final e in [...design.elements].reversed)
+                    ListTile(
+                      key: ValueKey('layer-${e.id}'),
+                      dense: true,
+                      selected: element?.id == e.id,
+                      selectedTileColor: cs.primaryContainer.withValues(alpha: 0.35),
+                      leading: Icon(_iconFor(e.type), size: 18),
+                      title: Text(e.name, maxLines: 1, overflow: TextOverflow.ellipsis),
+                      trailing: const Icon(Icons.drag_handle, size: 18),
+                      onTap: () => onSelect(e.id),
+                    ),
+                ],
+              )
+            else
+              ...[...design.elements].reversed.map((e) {
+                final selected = element?.id == e.id;
+                return ListTile(
+                  dense: true,
+                  selected: selected,
+                  selectedTileColor: cs.primaryContainer.withValues(alpha: 0.35),
+                  leading: Icon(_iconFor(e.type), size: 18),
+                  title: Text(e.name, maxLines: 1, overflow: TextOverflow.ellipsis),
+                  onTap: () => onSelect(e.id),
+                );
+              }),
             const Divider(height: 24),
             Text(t.barcodeLabelProperties, style: Theme.of(context).textTheme.titleSmall),
             const SizedBox(height: 8),
@@ -933,31 +1311,84 @@ class _Inspector extends StatelessWidget {
               _numField(context, 'Y mm', element!.yMm, canDesign, (v) => onChanged(element!.copyWith(yMm: v))),
               _numField(context, 'W mm', element!.wMm, canDesign, (v) => onChanged(element!.copyWith(wMm: v))),
               _numField(context, 'H mm', element!.hMm, canDesign, (v) => onChanged(element!.copyWith(hMm: v))),
+              _numField(
+                context,
+                t.barcodeLabelRotation,
+                element!.rotationDeg,
+                canDesign,
+                (v) => onChanged(element!.copyWith(rotationDeg: v % 360)),
+              ),
+              if (canDesign)
+                Align(
+                  alignment: AlignmentDirectional.centerEnd,
+                  child: TextButton.icon(
+                    onPressed: () => onChanged(
+                      element!.copyWith(rotationDeg: (element!.rotationDeg + 90) % 360),
+                    ),
+                    icon: const Icon(Icons.rotate_right, size: 18),
+                    label: Text(t.barcodeLabelRotate90),
+                  ),
+                ),
               if (element!.type == LabelElementType.barcode ||
                   element!.type == LabelElementType.text ||
                   element!.type == LabelElementType.qr ||
                   element!.type == LabelElementType.datamatrix) ...[
                 const SizedBox(height: 8),
                 DropdownButtonFormField<String>(
-                  value: (element!.props['binding'] ?? 'product.name').toString(),
-                  decoration: InputDecoration(labelText: t.barcodeLabelBinding),
+                  value: (element!.props['content_mode'] ?? 'binding').toString(),
+                  decoration: InputDecoration(labelText: t.barcodeLabelContentMode),
                   items: [
-                    for (final b in LabelBindingCatalog.entries)
-                      DropdownMenuItem(
-                        value: b['key'],
-                        child: Text(Localizations.localeOf(context).languageCode == 'fa' ? b['label_fa']! : b['label_en']!),
-                      ),
+                    DropdownMenuItem(value: 'binding', child: Text(t.barcodeLabelContentBinding)),
+                    DropdownMenuItem(value: 'fixed', child: Text(t.barcodeLabelContentFixed)),
                   ],
                   onChanged: canDesign
                       ? (v) {
                           if (v == null) return;
                           final props = Map<String, dynamic>.from(element!.props)
-                            ..['content_mode'] = 'binding'
-                            ..['binding'] = v;
+                            ..['content_mode'] = v;
                           onChanged(element!.copyWith(props: props));
                         }
                       : null,
                 ),
+                if ((element!.props['content_mode'] ?? 'binding').toString() == 'fixed') ...[
+                  const SizedBox(height: 8),
+                  TextFormField(
+                    key: ValueKey('fixed-${element!.id}-${element!.props['value']}'),
+                    initialValue: (element!.props['value'] ?? element!.props['text'] ?? '').toString(),
+                    enabled: canDesign,
+                    decoration: InputDecoration(labelText: t.barcodeLabelFixedValue, isDense: true),
+                    onChanged: canDesign
+                        ? (v) {
+                            final props = Map<String, dynamic>.from(element!.props)
+                              ..['content_mode'] = 'fixed'
+                              ..['value'] = v;
+                            onChanged(element!.copyWith(props: props));
+                          }
+                        : null,
+                  ),
+                ] else ...[
+                  const SizedBox(height: 8),
+                  DropdownButtonFormField<String>(
+                    value: (element!.props['binding'] ?? 'product.name').toString(),
+                    decoration: InputDecoration(labelText: t.barcodeLabelBinding),
+                    items: [
+                      for (final b in LabelBindingCatalog.entries)
+                        DropdownMenuItem(
+                          value: b['key'],
+                          child: Text(isFa ? b['label_fa']! : b['label_en']!),
+                        ),
+                    ],
+                    onChanged: canDesign
+                        ? (v) {
+                            if (v == null) return;
+                            final props = Map<String, dynamic>.from(element!.props)
+                              ..['content_mode'] = 'binding'
+                              ..['binding'] = v;
+                            onChanged(element!.copyWith(props: props));
+                          }
+                        : null,
+                  ),
+                ],
               ],
               if (element!.type == LabelElementType.barcode) ...[
                 const SizedBox(height: 8),
@@ -980,12 +1411,96 @@ class _Inspector extends StatelessWidget {
                         }
                       : null,
                 ),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(t.barcodeLabelShowBarcodeText),
+                  value: element!.props['show_text'] != false,
+                  onChanged: canDesign
+                      ? (v) {
+                          final props = Map<String, dynamic>.from(element!.props)..['show_text'] = v;
+                          onChanged(element!.copyWith(props: props));
+                        }
+                      : null,
+                ),
+              ],
+              if (element!.type == LabelElementType.image) ...[
+                const SizedBox(height: 8),
+                DropdownButtonFormField<String>(
+                  value: (element!.props['source'] ?? 'business.logo').toString(),
+                  decoration: InputDecoration(labelText: t.barcodeLabelImageSource),
+                  items: [
+                    DropdownMenuItem(value: 'business.logo', child: Text(t.barcodeLabelImageBusinessLogo)),
+                    DropdownMenuItem(value: 'product.image', child: Text(t.barcodeLabelImageProduct)),
+                    DropdownMenuItem(value: 'upload', child: Text(t.barcodeLabelImageUpload)),
+                  ],
+                  onChanged: canDesign
+                      ? (v) {
+                          if (v == null) return;
+                          final props = Map<String, dynamic>.from(element!.props)..['source'] = v;
+                          onChanged(element!.copyWith(props: props));
+                        }
+                      : null,
+                ),
+                if ((element!.props['source'] ?? 'business.logo').toString() == 'upload' && canDesign) ...[
+                  const SizedBox(height: 8),
+                  OutlinedButton.icon(
+                    onPressed: () => _pickUploadImage(context, element!, onChanged),
+                    icon: const Icon(Icons.upload_file, size: 18),
+                    label: Text(t.barcodeLabelPickImage),
+                  ),
+                ],
+                const SizedBox(height: 8),
+                DropdownButtonFormField<String>(
+                  value: (element!.props['fit'] ?? 'contain').toString(),
+                  decoration: InputDecoration(labelText: t.barcodeLabelImageFit),
+                  items: [
+                    DropdownMenuItem(value: 'contain', child: Text(t.barcodeLabelImageFitContain)),
+                    DropdownMenuItem(value: 'cover', child: Text(t.barcodeLabelImageFitCover)),
+                    DropdownMenuItem(value: 'fill', child: Text(t.barcodeLabelImageFitFill)),
+                  ],
+                  onChanged: canDesign
+                      ? (v) {
+                          if (v == null) return;
+                          final props = Map<String, dynamic>.from(element!.props)..['fit'] = v;
+                          onChanged(element!.copyWith(props: props));
+                        }
+                      : null,
+                ),
               ],
             ],
           ],
         ),
       ),
     );
+  }
+
+  String _bindingLabel(String key, bool isFa) {
+    for (final b in LabelBindingCatalog.entries) {
+      if (b['key'] == key) return isFa ? b['label_fa']! : b['label_en']!;
+    }
+    return key;
+  }
+
+  Future<void> _pickUploadImage(
+    BuildContext context,
+    LabelElement element,
+    ValueChanged<LabelElement> onChanged,
+  ) async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.image,
+      withData: true,
+    );
+    if (result == null || result.files.isEmpty) return;
+    final file = result.files.first;
+    final bytes = file.bytes;
+    if (bytes == null || bytes.isEmpty) return;
+    final ext = (file.extension ?? 'png').toLowerCase();
+    final mime = ext == 'jpg' || ext == 'jpeg' ? 'image/jpeg' : 'image/png';
+    final props = Map<String, dynamic>.from(element.props)
+      ..['source'] = 'upload'
+      ..['data_uri'] = bytesToDataUri(bytes, mime: mime);
+    LabelImageResolver.clearCache();
+    onChanged(element.copyWith(props: props));
   }
 
   IconData _iconFor(LabelElementType t) => switch (t) {
@@ -1003,19 +1518,23 @@ class _Inspector extends StatelessWidget {
     String label,
     double value,
     bool enabled,
-    ValueChanged<double> onChanged,
-  ) {
+    ValueChanged<double> onChanged, {
+    int decimals = 1,
+  }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: TextFormField(
         key: ValueKey('$label-$value'),
-        initialValue: value.toStringAsFixed(1),
+        initialValue: decimals == 0 ? value.round().toString() : value.toStringAsFixed(decimals),
         enabled: enabled,
         decoration: InputDecoration(labelText: label, isDense: true),
         keyboardType: const TextInputType.numberWithOptions(decimal: true),
         onFieldSubmitted: (s) {
           final v = double.tryParse(s.replaceAll(',', '.'));
           if (v != null) onChanged(v);
+        },
+        onEditingComplete: () {
+          FocusScope.of(context).unfocus();
         },
       ),
     );
@@ -1026,6 +1545,7 @@ class _ElementView extends StatelessWidget {
   final LabelElement element;
   final bool selected;
   final Map<String, dynamic> sample;
+  final int? businessId;
   final VoidCallback onTap;
   final VoidCallback? onDragStart;
   final void Function(double dx, double dy)? onDrag;
@@ -1035,6 +1555,7 @@ class _ElementView extends StatelessWidget {
     required this.element,
     required this.selected,
     required this.sample,
+    this.businessId,
     required this.onTap,
     this.onDragStart,
     this.onDrag,
@@ -1061,46 +1582,55 @@ class _ElementView extends StatelessWidget {
         );
         break;
       case LabelElementType.barcode:
+        final sym = (element.props['symbology'] ?? 'code128').toString();
+        final showText = element.props['show_text'] != false;
         child = Container(
           alignment: Alignment.center,
           padding: const EdgeInsets.all(2),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Expanded(
-                child: CustomPaint(
-                  painter: _BarsPainter(),
-                  child: const SizedBox.expand(),
-                ),
-              ),
-              if (element.props['show_text'] != false)
-                Text(
-                  value.isEmpty ? '—' : value,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontSize: 8, letterSpacing: 0.4),
-                ),
-            ],
+          color: Colors.white,
+          child: CustomPaint(
+            painter: LabelStudioBarcodePainter(
+              symbology: sym,
+              data: value,
+              showText: showText,
+            ),
+            child: const SizedBox.expand(),
           ),
         );
         break;
       case LabelElementType.qr:
-      case LabelElementType.datamatrix:
-        child = Container(
+        final qrData = value.trim().isEmpty ? 'SAMPLE-QR' : value.trim();
+        child = ColoredBox(
           color: Colors.white,
-          alignment: Alignment.center,
-          child: Icon(
-            element.type == LabelElementType.qr ? Icons.qr_code_2 : Icons.grid_on,
-            size: 28,
-            color: Colors.black87,
+          child: Padding(
+            padding: const EdgeInsets.all(2),
+            child: QrImageView(
+              data: qrData,
+              version: QrVersions.auto,
+              backgroundColor: Colors.white,
+              errorCorrectionLevel: QrErrorCorrectLevel.M,
+              errorStateBuilder: (_, __) => const Icon(Icons.qr_code_2, color: Colors.black54),
+            ),
+          ),
+        );
+        break;
+      case LabelElementType.datamatrix:
+        child = ColoredBox(
+          color: Colors.white,
+          child: Padding(
+            padding: const EdgeInsets.all(2),
+            child: CustomPaint(
+              painter: LabelStudioMatrixPainter(data: value),
+              child: const SizedBox.expand(),
+            ),
           ),
         );
         break;
       case LabelElementType.image:
-        child = Container(
-          color: Colors.grey.shade200,
-          alignment: Alignment.center,
-          child: const Icon(Icons.image_outlined, color: Colors.grey),
+        child = LabelStudioImageView(
+          element: element,
+          businessId: businessId,
+          context: sample,
         );
         break;
       case LabelElementType.shape:
@@ -1119,7 +1649,8 @@ class _ElementView extends StatelessWidget {
         break;
     }
 
-    return GestureDetector(
+    final body = GestureDetector(
+      behavior: HitTestBehavior.opaque,
       onTap: onTap,
       onPanStart: onDrag == null ? null : (_) => onDragStart?.call(),
       onPanUpdate: onDrag == null ? null : (d) => onDrag!(d.delta.dx, d.delta.dy),
@@ -1135,24 +1666,14 @@ class _ElementView extends StatelessWidget {
         child: child,
       ),
     );
-  }
-}
 
-class _BarsPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()..color = Colors.black87;
-    var x = 0.0;
-    final rnd = math.Random(7);
-    while (x < size.width) {
-      final w = 1.0 + rnd.nextInt(3);
-      canvas.drawRect(Rect.fromLTWH(x, 0, w, size.height), paint);
-      x += w + 1 + rnd.nextInt(2);
-    }
+    if (element.rotationDeg.abs() < 0.01) return body;
+    return Transform.rotate(
+      angle: element.rotationDeg * math.pi / 180.0,
+      alignment: Alignment.center,
+      child: body,
+    );
   }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
 class _GridPainter extends CustomPainter {

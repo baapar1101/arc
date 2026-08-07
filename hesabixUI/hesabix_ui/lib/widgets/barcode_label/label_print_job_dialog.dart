@@ -13,7 +13,10 @@ import '../../services/bytes_export/bytes_export_service.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 import '../product/label_pdf_preview_embed.dart';
+import 'render/label_escpos_generator.dart';
+import 'render/label_escpos_tcp.dart';
 import 'render/label_pdf_renderer.dart';
+import 'render/label_sheet_pdf_format.dart';
 import 'render/label_zpl_generator.dart';
 import 'render/label_zpl_tcp.dart';
 
@@ -89,6 +92,7 @@ class LabelPrintJobDialog extends StatefulWidget {
           'price': product['price'] ?? product['buy_price'],
           'sale_price': product['sale_price'] ?? product['price'],
           'general_barcode': firstBarcode,
+          'image_url': product['image_url'] ?? product['thumbnail_url'],
         },
         'instance': {'serial': '', 'barcode': ''},
         'warehouse': {'name': product['warehouse_name']?.toString() ?? ''},
@@ -109,6 +113,8 @@ class _LabelPrintJobDialogState extends State<LabelPrintJobDialog> {
   List<LabelTemplateSummary> _templates = const [];
   int? _templateId;
   LabelTemplateDetail? _detail;
+  LabelSheet? _printSheet;
+  LabelDesignDocument? _printDesignOverride;
   late List<LabelPrintJobRow> _rows;
   int _applyQty = 1;
   int _previewNonce = 0;
@@ -131,6 +137,8 @@ class _LabelPrintJobDialogState extends State<LabelPrintJobDialog> {
         .toList();
     _bootstrap();
   }
+
+  LabelDesignDocument? get _designForPrint => _printDesignOverride ?? _detail?.design;
 
   int get _totalLabels => _rows.fold<int>(0, (s, r) => s + r.qty);
 
@@ -168,6 +176,7 @@ class _LabelPrintJobDialogState extends State<LabelPrintJobDialog> {
         _templates = list;
         _templateId = selected;
         _detail = detail;
+        _printSheet = detail?.sheet;
         _printerSettings = printerSettings;
         _profileId = printerSettings.activeProfileId ??
             (printerSettings.enabledProfiles.isNotEmpty
@@ -193,6 +202,8 @@ class _LabelPrintJobDialogState extends State<LabelPrintJobDialog> {
       setState(() {
         _templateId = id;
         _detail = detail;
+        _printSheet = detail.sheet;
+        _printDesignOverride = null;
       });
       await _refreshPreview();
     } catch (e) {
@@ -217,7 +228,9 @@ class _LabelPrintJobDialogState extends State<LabelPrintJobDialog> {
 
   Future<Uint8List> _buildPdf({bool rollMode = false}) async {
     final detail = _detail;
-    if (detail == null) {
+    final design = _designForPrint;
+    final sheet = _printSheet ?? detail?.sheet;
+    if (detail == null || sheet == null || design == null) {
       throw StateError('No template');
     }
     final contexts = _expandContexts();
@@ -227,11 +240,13 @@ class _LabelPrintJobDialogState extends State<LabelPrintJobDialog> {
     if (contexts.length > 10000) {
       throw StateError('Too many labels (max 10000)');
     }
+    final useRoll = rollMode || sheet.isRollMode;
     return LabelPdfRenderer.render(
-      design: detail.design,
-      sheet: detail.sheet,
+      design: design,
+      sheet: sheet,
       contexts: contexts,
-      rollMode: rollMode,
+      rollMode: useRoll,
+      businessId: widget.businessId,
     );
   }
 
@@ -243,29 +258,29 @@ class _LabelPrintJobDialogState extends State<LabelPrintJobDialog> {
   }
 
   PdfPageFormat _previewFormat() {
-    final sheet = _detail?.sheet;
-    if (sheet == null) return PdfPageFormat.a4;
-    switch (sheet.paper) {
-      case 'A5':
-        return sheet.orientation == 'landscape' ? PdfPageFormat.a5.landscape : PdfPageFormat.a5;
-      case 'Letter':
-        return sheet.orientation == 'landscape' ? PdfPageFormat.letter.landscape : PdfPageFormat.letter;
-      default:
-        return sheet.orientation == 'landscape' ? PdfPageFormat.a4.landscape : PdfPageFormat.a4;
-    }
+    final design = _designForPrint;
+    final sheet = _printSheet ?? _detail?.sheet;
+    if (design == null || sheet == null) return PdfPageFormat.a4;
+    return pdfPageFormatForLabelSheet(
+      sheet,
+      labelWidthMm: design.canvas.widthMm,
+      labelHeightMm: design.canvas.heightMm,
+    );
   }
 
   Future<Uint8List> _buildPreviewPdf(PdfPageFormat format) async {
-    final detail = _detail;
-    if (detail == null) return Uint8List(0);
-    final sheet = detail.sheet;
-    final slots = (sheet.columns * sheet.rows).clamp(1, 24);
+    final design = _designForPrint;
+    final sheet = _printSheet ?? _detail?.sheet;
+    if (design == null || sheet == null) return Uint8List(0);
+    final slots = sheet.isRollMode ? 1 : (sheet.columns * sheet.rows).clamp(1, 24);
     final contexts = _expandContexts().take(slots).toList();
     if (contexts.isEmpty) return Uint8List(0);
     return LabelPdfRenderer.render(
-      design: detail.design,
-      sheet: detail.sheet,
+      design: design,
+      sheet: sheet,
       contexts: contexts,
+      rollMode: sheet.isRollMode,
+      businessId: widget.businessId,
     );
   }
 
@@ -319,11 +334,34 @@ class _LabelPrintJobDialogState extends State<LabelPrintJobDialog> {
     }
 
     try {
-      if (profile.isPdfSpooler || profile.mode == 'escpos') {
-        // escpos هنوز بدون اسپایک سخت‌افزاری: همان مسیر PDF رولی
-        if (profile.mode == 'escpos') {
-          SnackBarHelper.showInfo(context, message: t.barcodeLabelPrinterEscPosFallback);
+      if (profile.mode == 'escpos') {
+        if (kIsWeb) {
+          SnackBarHelper.showError(context, message: t.barcodeLabelPrintersWebBanner);
+          return;
         }
+        if (profile.connection == 'tcp' && (profile.host ?? '').isNotEmpty) {
+          final design = _designForPrint ?? detail.design;
+          final data = LabelEscPosGenerator.forContexts(
+            design: design,
+            contexts: _expandContexts(),
+            dpi: profile.dpi,
+          );
+          await sendEscPosOverTcp(
+            host: profile.host!,
+            port: profile.port ?? 9100,
+            data: data,
+          );
+          if (!mounted) return;
+          SnackBarHelper.show(context, message: t.barcodeLabelPrinterEscPosSent);
+          return;
+        }
+        SnackBarHelper.showInfo(context, message: t.barcodeLabelPrinterEscPosFallback);
+        final bytes = await _buildPdf(rollMode: true);
+        await Printing.layoutPdf(onLayout: (_) async => bytes);
+        return;
+      }
+
+      if (profile.isPdfSpooler) {
         final bytes = await _buildPdf(rollMode: true);
         if (kIsWeb) {
           SnackBarHelper.showInfo(context, message: t.barcodeLabelPrintWebHint);
@@ -350,10 +388,11 @@ class _LabelPrintJobDialogState extends State<LabelPrintJobDialog> {
           SnackBarHelper.showError(context, message: t.barcodeLabelPrinterZplNeedsTcp);
           return;
         }
-        final zpl = LabelZplGenerator.forContexts(
-          design: detail.design,
+        final zpl = await LabelZplGenerator.forContexts(
+          design: _designForPrint ?? detail.design,
           contexts: _expandContexts(),
           dpi: profile.dpi,
+          businessId: widget.businessId,
         );
         await sendZplOverTcp(
           host: profile.host!,
@@ -493,6 +532,35 @@ class _LabelPrintJobDialogState extends State<LabelPrintJobDialog> {
     );
   }
 
+  void _onProfileChanged(String? id) {
+    setState(() {
+      _profileId = id;
+      if (id != null && _printSheet != null) {
+        _printSheet = _printSheet!.copyWith(printMode: 'roll');
+      }
+      _printDesignOverride = null;
+    });
+    _refreshPreview();
+  }
+
+  void _applyPrinterSizeToPrint() {
+    final profile = _selectedProfile;
+    final detail = _detail;
+    if (profile == null || detail == null) return;
+    setState(() {
+      _printDesignOverride = detail.design.copyWith(
+        canvas: detail.design.canvas.copyWith(
+          widthMm: profile.labelWidthMm,
+          heightMm: profile.labelHeightMm,
+        ),
+      );
+      if (_printSheet != null && !_printSheet!.isRollMode) {
+        _printSheet = _printSheet!.copyWith(printMode: 'roll');
+      }
+    });
+    _refreshPreview();
+  }
+
   Widget _leftPane(AppLocalizations t, ColorScheme cs) {
     return ListView(
       padding: const EdgeInsets.all(16),
@@ -532,9 +600,11 @@ class _LabelPrintJobDialogState extends State<LabelPrintJobDialog> {
                   ),
                 ),
             ],
-            onChanged: (id) => setState(() => _profileId = id),
+            onChanged: _onProfileChanged,
           ),
         ],
+        const SizedBox(height: 12),
+        _buildPrintSettings(t),
         const SizedBox(height: 12),
         Row(
           children: [
@@ -585,6 +655,190 @@ class _LabelPrintJobDialogState extends State<LabelPrintJobDialog> {
     );
   }
 
+  Widget _buildPrintSettings(AppLocalizations t) {
+    final sheet = _printSheet;
+    if (sheet == null) return const SizedBox.shrink();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(t.barcodeLabelPrintSettings, style: Theme.of(context).textTheme.titleSmall),
+        const SizedBox(height: 8),
+        DropdownButtonFormField<String>(
+          initialValue: sheet.printMode,
+          decoration: InputDecoration(
+            labelText: t.barcodeLabelPrintLayout,
+            border: const OutlineInputBorder(),
+            isDense: true,
+          ),
+          items: [
+            DropdownMenuItem(value: 'sheet', child: Text(t.barcodeLabelPrintLayoutSheet)),
+            DropdownMenuItem(value: 'roll', child: Text(t.barcodeLabelPrintLayoutRoll)),
+          ],
+          onChanged: (v) {
+            if (v == null) return;
+            setState(() => _printSheet = sheet.copyWith(printMode: v));
+            _refreshPreview();
+          },
+        ),
+        if (!sheet.isRollMode) ...[
+          const SizedBox(height: 8),
+          DropdownButtonFormField<String>(
+            initialValue: sheet.paper,
+            decoration: InputDecoration(
+              labelText: t.barcodeLabelPaperSize,
+              border: const OutlineInputBorder(),
+              isDense: true,
+            ),
+            items: [
+              const DropdownMenuItem(value: 'A4', child: Text('A4')),
+              const DropdownMenuItem(value: 'A5', child: Text('A5')),
+              const DropdownMenuItem(value: 'Letter', child: Text('Letter')),
+              DropdownMenuItem(value: 'custom', child: Text(t.barcodeLabelPaperCustom)),
+            ],
+            onChanged: (v) {
+              if (v == null) return;
+              setState(() => _printSheet = sheet.copyWith(paper: v));
+              _refreshPreview();
+            },
+          ),
+          if (sheet.paper == 'custom') ...[
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: TextFormField(
+                    key: ValueKey('pw-${sheet.customPaperMm?['width']}'),
+                    initialValue: '${sheet.customPaperMm?['width'] ?? 210}',
+                    decoration: InputDecoration(
+                      labelText: t.barcodeLabelPaperWidth,
+                      border: const OutlineInputBorder(),
+                      isDense: true,
+                    ),
+                    keyboardType: TextInputType.number,
+                    onFieldSubmitted: (s) {
+                      final v = double.tryParse(s.replaceAll(',', '.'));
+                      if (v == null) return;
+                      setState(() => _printSheet = sheet.copyWith(
+                            customPaperMm: {
+                              'width': v,
+                              'height': sheet.customPaperMm?['height'] ?? 297,
+                            },
+                          ));
+                      _refreshPreview();
+                    },
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: TextFormField(
+                    key: ValueKey('ph-${sheet.customPaperMm?['height']}'),
+                    initialValue: '${sheet.customPaperMm?['height'] ?? 297}',
+                    decoration: InputDecoration(
+                      labelText: t.barcodeLabelPaperHeight,
+                      border: const OutlineInputBorder(),
+                      isDense: true,
+                    ),
+                    keyboardType: TextInputType.number,
+                    onFieldSubmitted: (s) {
+                      final v = double.tryParse(s.replaceAll(',', '.'));
+                      if (v == null) return;
+                      setState(() => _printSheet = sheet.copyWith(
+                            customPaperMm: {
+                              'width': sheet.customPaperMm?['width'] ?? 210,
+                              'height': v,
+                            },
+                          ));
+                      _refreshPreview();
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ],
+          const SizedBox(height: 8),
+          DropdownButtonFormField<String>(
+            initialValue: sheet.orientation,
+            decoration: InputDecoration(
+              labelText: t.barcodeLabelOrientation,
+              border: const OutlineInputBorder(),
+              isDense: true,
+            ),
+            items: [
+              DropdownMenuItem(value: 'portrait', child: Text(t.barcodeLabelPortrait)),
+              DropdownMenuItem(value: 'landscape', child: Text(t.barcodeLabelLandscape)),
+            ],
+            onChanged: (v) {
+              if (v == null) return;
+              setState(() => _printSheet = sheet.copyWith(orientation: v));
+              _refreshPreview();
+            },
+          ),
+        ] else
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Text(
+              t.barcodeLabelRollModeHint,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+            ),
+          ),
+        if (sheet.isRollMode && _selectedProfile != null && _detail != null) ...[
+          const SizedBox(height: 8),
+          _printerSizeBanner(t),
+        ],
+      ],
+    );
+  }
+
+  Widget _printerSizeBanner(AppLocalizations t) {
+    final profile = _selectedProfile!;
+    final canvas = _detail!.design.canvas;
+    final wDiff = (profile.labelWidthMm - canvas.widthMm).abs() > 0.5;
+    final hDiff = (profile.labelHeightMm - canvas.heightMm).abs() > 0.5;
+    if (!wDiff && !hDiff) {
+      return Text(
+        t.barcodeLabelPrinterSizeMatch(
+          profile.labelWidthMm.toStringAsFixed(0),
+          profile.labelHeightMm.toStringAsFixed(0),
+        ),
+        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: Theme.of(context).colorScheme.primary,
+            ),
+      );
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          t.barcodeLabelPrinterSizeMismatch(
+            profile.labelWidthMm.toStringAsFixed(0),
+            profile.labelHeightMm.toStringAsFixed(0),
+            canvas.widthMm.toStringAsFixed(0),
+            canvas.heightMm.toStringAsFixed(0),
+          ),
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Theme.of(context).colorScheme.tertiary,
+              ),
+        ),
+        const SizedBox(height: 6),
+        Align(
+          alignment: AlignmentDirectional.centerStart,
+          child: TextButton.icon(
+            onPressed: _applyPrinterSizeToPrint,
+            icon: const Icon(Icons.sync, size: 18),
+            label: Text(
+              t.barcodeLabelApplyPrinterSize(
+                profile.labelWidthMm.toStringAsFixed(0),
+                profile.labelHeightMm.toStringAsFixed(0),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _previewPane(AppLocalizations t) {
     return Padding(
       padding: const EdgeInsets.all(12),
@@ -612,7 +866,10 @@ class _LabelPrintJobDialogState extends State<LabelPrintJobDialog> {
               child: _detail == null
                   ? Center(child: Text(t.barcodeLabelPreviewEmpty))
                   : LabelPdfPreviewEmbed(
-                      key: ValueKey('preview-$_previewNonce-$_templateId'),
+                      key: ValueKey(
+                        'preview-$_previewNonce-$_templateId-${_printSheet?.printMode}-'
+                        '${_designForPrint?.canvas.widthMm}x${_designForPrint?.canvas.heightMm}',
+                      ),
                       pageFormat: _previewFormat(),
                       buildPdf: _buildPreviewPdf,
                     ),

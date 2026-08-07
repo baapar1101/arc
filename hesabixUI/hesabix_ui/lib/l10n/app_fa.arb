@@ -920,6 +920,114 @@
   "backToProfile": "بازگشت به پروفایل",
   "noBusinessesFound": "هیچ کسب و کاری یافت نشد",
   "createFirstBusiness": "اولین کسب و کار خود را ایجاد کنید",
+  "businessesHubSubtitle": "کسب‌وکار خود را انتخاب کنید یا جدید بسازید",
+  "businessesHubSearchHint": "جستجو در نام کسب‌وکار…",
+  "businessesHubFilterAll": "همه",
+  "businessesHubFilterOwner": "مالک",
+  "businessesHubFilterMember": "عضو",
+  "businessesHubFilterPendingDeletion": "در حال حذف",
+  "businessesHubSortNewest": "جدیدترین",
+  "businessesHubSortOldest": "قدیمی‌ترین",
+  "businessesHubSortNameAsc": "نام (الف تا ی)",
+  "businessesHubSortNameDesc": "نام (ی تا الف)",
+  "businessesHubRecentSection": "اخیراً استفاده شده",
+  "businessesHubAllSection": "همه کسب‌وکارها",
+  "businessesHubCount": "{count} کسب‌وکار",
+  "@businessesHubCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "businessesHubEnter": "ورود",
+  "businessesHubDeletionPending": "در حال حذف",
+  "businessesHubMultiCurrency": "چندارزی",
+  "businessesHubEstablished": "تأسیس",
+  "businessesHubRestore": "بازیابی",
+  "businessesHubRestoring": "در حال بازیابی…",
+  "businessesHubLeave": "خروج",
+  "businessesHubDefaultCurrency": "ارز پیش‌فرض",
+  "businessesHubPin": "سنجاق کردن",
+  "businessesHubUnpin": "برداشتن سنجاق",
+  "businessesHubNoSearchResults": "نتیجه‌ای یافت نشد",
+  "businessesHubNoSearchResultsFor": "برای «{query}» نتیجه‌ای پیدا نشد",
+  "@businessesHubNoSearchResultsFor": {
+    "placeholders": {
+      "query": {
+        "type": "String"
+      }
+    }
+  },
+  "businessesHubEmptyTitle": "هنوز کسب‌وکاری ندارید",
+  "businessesHubEmptySubtitle": "با ساخت اولین کسب‌وکار، حسابداری ابری را شروع کنید.",
+  "businessesHubEmptyBullet1": "رایگان شروع کنید و هر زمان گسترش دهید",
+  "businessesHubEmptyBullet2": "چند کسب‌وکار در یک حساب کاربری",
+  "businessesHubEmptyBullet3": "دسترسی تیمی با نقش مالک و عضو",
+  "businessesHubImportLegacy": "وارد کردن از نسخه قدیم",
+  "businessesHubViewGrid": "نمای شبکه‌ای",
+  "businessesHubViewList": "نمای لیستی",
+  "businessesHubDaysRemaining": "{days} روز تا حذف دائمی",
+  "@businessesHubDaysRemaining": {
+    "placeholders": {
+      "days": {
+        "type": "int"
+      }
+    }
+  },
+  "businessesHubHoursRemaining": "{hours} ساعت تا حذف دائمی",
+  "@businessesHubHoursRemaining": {
+    "placeholders": {
+      "hours": {
+        "type": "int"
+      }
+    }
+  },
+  "businessesHubDeadlineExpired": "مهلت بازیابی به پایان رسیده",
+  "businessesHubRestoreConfirmTitle": "بازیابی کسب‌وکار",
+  "businessesHubRestoreConfirmMessage": "آیا مطمئن هستید که می‌خواهید «{name}» را بازیابی کنید؟\n\nپس از بازیابی، دسترسی شما بازگردانده می‌شود.",
+  "@businessesHubRestoreConfirmMessage": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "businessesHubRestoreSuccess": "کسب‌وکار با موفقیت بازیابی شد",
+  "businessesHubRestoreFailed": "خطا در بازیابی: {error}",
+  "@businessesHubRestoreFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "businessesHubLeaveConfirmTitle": "خروج از کسب‌وکار",
+  "businessesHubLeaveConfirmMessage": "آیا مطمئن هستید که می‌خواهید از «{name}» خارج شوید؟\n\nپس از خروج، دسترسی شما حذف خواهد شد.",
+  "@businessesHubLeaveConfirmMessage": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "businessesHubLeaveFailed": "خطا در خروج: {error}",
+  "@businessesHubLeaveFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "businessesHubLoadMoreFailed": "خطا در بارگذاری صفحات بعدی",
+  "businessesHubStatsTitle": "آمار سریع",
+  "businessesHubStatsSales": "فروش",
+  "businessesHubStatsPurchases": "خرید",
+  "businessesHubStatsMembers": "اعضا",
+  "businessesHubStatsTransactions": "تراکنش",
+  "businessesHubStatsLoading": "در حال بارگذاری آمار…",
+  "businessesHubStatsUnavailable": "آمار در دسترس نیست",
+  "businessesHubSearchShortcut": "برای جستجو / را بزنید",
   "accessDenied": "دسترسی غیرمجاز",
   "basicTools": "ابزارهای پایه",
   "businessSettings": "تنظیمات کسب و کار",
@@ -6650,6 +6758,69 @@
   "barcodeLabelPrinterEscPosFallback": "ESC/POS هنوز اسپایک نشده؛ چاپ با PDF رولی انجام می‌شود",
   "barcodeLabelPrinterUnsupportedMode": "حالت چاپگر پشتیبانی نمی‌شود",
   "barcodeLabelPrintFromProductForm": "چاپ با طرح برچسب",
+  "barcodeLabelCanvasSettings": "بوم و چاپ",
+  "barcodeLabelCanvasWidth": "عرض ناحیه طراحی (mm)",
+  "barcodeLabelCanvasHeight": "ارتفاع ناحیه طراحی (mm)",
+  "barcodeLabelPrintLayout": "چیدمان چاپ",
+  "barcodeLabelPrintLayoutSheet": "برگه (A4 و شبکه)",
+  "barcodeLabelPrintLayoutRoll": "رول / حرارتی (هر برچسب یک صفحه)",
+  "barcodeLabelPaperSize": "اندازه کاغذ",
+  "barcodeLabelPaperCustom": "سفارشی",
+  "barcodeLabelPaperWidth": "عرض کاغذ (mm)",
+  "barcodeLabelPaperHeight": "ارتفاع کاغذ (mm)",
+  "barcodeLabelOrientation": "جهت",
+  "barcodeLabelPortrait": "عمودی",
+  "barcodeLabelLandscape": "افقی",
+  "barcodeLabelSheetColumns": "ستون‌ها",
+  "barcodeLabelSheetRows": "ردیف‌ها",
+  "barcodeLabelRollModeHint": "در حالت رول فقط اندازه ناحیه طراحی مهم است؛ ارتفاع کاغذ ثابت نیست.",
+  "barcodeLabelPreviewData": "داده آزمایشی پیش‌نمایش",
+  "barcodeLabelPreviewDataHint": "با افزودن المان‌های دارای فیلد داده، مقادیر آزمایشی را اینجا ویرایش کنید.",
+  "barcodeLabelRotation": "چرخش (°)",
+  "barcodeLabelRotate90": "چرخش ۹۰°",
+  "barcodeLabelContentMode": "منبع محتوا",
+  "barcodeLabelContentBinding": "فیلد داده",
+  "barcodeLabelContentFixed": "متن ثابت",
+  "barcodeLabelFixedValue": "مقدار متن",
+  "barcodeLabelShowBarcodeText": "نمایش متن زیر بارکد",
+  "barcodeLabelPrintSettings": "تنظیمات چاپ",
+  "barcodeLabelBlankCanvasDialogTitle": "برچسب خالی جدید",
+  "barcodeLabelBlankCanvasDialogHint": "اندازه ناحیه طراحی را مشخص کنید. برای چاپگر حرارتی حالت رول را فعال کنید — فقط عرض و ارتفاع برچسب مهم است.",
+  "barcodeLabelStartDesign": "شروع طراحی",
+  "barcodeLabelPrinterSizeMatch": "پروفایل چاپگر با طرح هم‌خوان است ({width}×{height} mm)",
+  "barcodeLabelPrinterSizeMismatch": "چاپگر {pw}×{ph} mm · طرح {dw}×{dh} mm — خروجی با اندازه طرح ساخته می‌شود",
+  "barcodeLabelLivePreview": "پیش‌نمایش زنده PDF",
+  "barcodeLabelApplyPrinterSize": "هم‌خوان با اندازه چاپگر ({width}×{height} mm)",
+  "barcodeLabelImageSource": "منبع تصویر",
+  "barcodeLabelImageBusinessLogo": "لوگوی کسب‌وکار",
+  "barcodeLabelImageProduct": "تصویر کالا",
+  "barcodeLabelImageUpload": "تصویر آپلودشده",
+  "barcodeLabelPickImage": "انتخاب فایل تصویر",
+  "barcodeLabelImageFit": "نحوه جاگیری",
+  "barcodeLabelImageFitContain": "جا شدن کامل",
+  "barcodeLabelImageFitCover": "پوشش",
+  "barcodeLabelImageFitFill": "کشیده",
+  "barcodeLabelPrinterEscPosSent": "دستور ESC/POS به چاپگر ارسال شد",
+  "@barcodeLabelApplyPrinterSize": {
+    "placeholders": {
+      "width": {"type": "String"},
+      "height": {"type": "String"}
+    }
+  },
+  "@barcodeLabelPrinterSizeMatch": {
+    "placeholders": {
+      "width": {"type": "String"},
+      "height": {"type": "String"}
+    }
+  },
+  "@barcodeLabelPrinterSizeMismatch": {
+    "placeholders": {
+      "pw": {"type": "String"},
+      "ph": {"type": "String"},
+      "dw": {"type": "String"},
+      "dh": {"type": "String"}
+    }
+  },
   "@barcodeLabelPrintTotal": {"placeholders": {"count": {"type": "int"}}},
   "@barcodeLabelExcelReady": {"placeholders": {"rows": {"type": "int"}, "labels": {"type": "int"}}},
   "@barcodeLabelExcelRowError": {"placeholders": {"line": {"type": "int"}, "field": {"type": "String"}}},

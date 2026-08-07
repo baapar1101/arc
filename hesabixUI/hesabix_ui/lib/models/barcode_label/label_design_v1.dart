@@ -67,8 +67,11 @@ class LabelCanvas {
 }
 
 class LabelSheet {
+  /// `sheet` = چیدمان روی کاغذ (A4/…)؛ `roll` = یک برچسب در هر صفحه (چاپگر حرارتی)
+  final String printMode;
   final String paper;
   final String orientation;
+  final Map<String, double>? customPaperMm;
   final Map<String, double> marginMm;
   final int columns;
   final int rows;
@@ -76,14 +79,18 @@ class LabelSheet {
   final bool labelFromCanvas;
 
   const LabelSheet({
+    this.printMode = 'sheet',
     this.paper = 'A4',
     this.orientation = 'portrait',
+    this.customPaperMm,
     this.marginMm = const {'top': 8, 'right': 8, 'bottom': 8, 'left': 8},
     this.columns = 3,
     this.rows = 8,
     this.gapMm = const {'x': 2, 'y': 2},
     this.labelFromCanvas = true,
   });
+
+  bool get isRollMode => printMode == 'roll';
 
   factory LabelSheet.fromJson(Map<String, dynamic>? json) {
     final j = json ?? const <String, dynamic>{};
@@ -94,9 +101,20 @@ class LabelSheet {
       };
     }
 
+    Map<String, double>? custom;
+    final rawCustom = j['custom_paper_mm'];
+    if (rawCustom is Map) {
+      custom = {
+        for (final e in rawCustom.entries)
+          e.key.toString(): (e.value as num?)?.toDouble() ?? 0,
+      };
+    }
+
     return LabelSheet(
+      printMode: (j['print_mode'] as String?) ?? 'sheet',
       paper: (j['paper'] as String?) ?? 'A4',
       orientation: (j['orientation'] as String?) ?? 'portrait',
+      customPaperMm: custom,
       marginMm: mmMap(j['margin_mm'], const {'top': 8, 'right': 8, 'bottom': 8, 'left': 8}),
       columns: (j['columns'] as num?)?.toInt() ?? 3,
       rows: (j['rows'] as num?)?.toInt() ?? 8,
@@ -106,9 +124,10 @@ class LabelSheet {
   }
 
   Map<String, dynamic> toJson() => {
+        'print_mode': printMode,
         'paper': paper,
         'orientation': orientation,
-        'custom_paper_mm': null,
+        'custom_paper_mm': customPaperMm,
         'margin_mm': marginMm,
         'columns': columns,
         'rows': rows,
@@ -117,8 +136,10 @@ class LabelSheet {
       };
 
   LabelSheet copyWith({
+    String? printMode,
     String? paper,
     String? orientation,
+    Map<String, double>? customPaperMm,
     Map<String, double>? marginMm,
     int? columns,
     int? rows,
@@ -126,8 +147,10 @@ class LabelSheet {
     bool? labelFromCanvas,
   }) {
     return LabelSheet(
+      printMode: printMode ?? this.printMode,
       paper: paper ?? this.paper,
       orientation: orientation ?? this.orientation,
+      customPaperMm: customPaperMm ?? this.customPaperMm,
       marginMm: marginMm ?? this.marginMm,
       columns: columns ?? this.columns,
       rows: rows ?? this.rows,

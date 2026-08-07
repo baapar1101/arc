@@ -37,6 +37,7 @@ def validate_sheet_json(sheet: Any) -> Dict[str, Any]:
 	margin = sheet.get("margin_mm") or {"top": 5, "right": 5, "bottom": 5, "left": 5}
 	gap = sheet.get("gap_mm") or {"x": 2, "y": 2}
 	return {
+		"print_mode": sheet.get("print_mode") or "sheet",
 		"paper": paper,
 		"orientation": orientation,
 		"custom_paper_mm": sheet.get("custom_paper_mm"),

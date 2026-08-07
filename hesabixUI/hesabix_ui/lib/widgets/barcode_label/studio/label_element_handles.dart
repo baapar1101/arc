@@ -5,11 +5,12 @@ import '../../../models/barcode_label/label_design_v1.dart';
 enum LabelHandleKind { nw, n, ne, e, se, s, sw, w, rotate }
 
 /// دستگیره‌های تغییر اندازه و چرخش روی المان انتخاب‌شده.
-class LabelElementTransformHandles extends StatelessWidget {
+class LabelElementTransformHandles extends StatefulWidget {
   final LabelElement element;
   final double pxPerMm;
   final bool enabled;
   final void Function(LabelHandleKind kind, double dxPx, double dyPx) onDrag;
+  final VoidCallback? onDragStart;
   final VoidCallback? onDragEnd;
 
   const LabelElementTransformHandles({
@@ -18,31 +19,65 @@ class LabelElementTransformHandles extends StatelessWidget {
     required this.pxPerMm,
     required this.enabled,
     required this.onDrag,
+    this.onDragStart,
     this.onDragEnd,
   });
 
   static const _handleSize = 10.0;
 
   @override
+  State<LabelElementTransformHandles> createState() => _LabelElementTransformHandlesState();
+}
+
+class _LabelElementTransformHandlesState extends State<LabelElementTransformHandles> {
+  double? _rotateStartDeg;
+  double _rotateAccumDx = 0;
+
+  @override
   Widget build(BuildContext context) {
-    if (!enabled) return const SizedBox.shrink();
+    if (!widget.enabled) return const SizedBox.shrink();
+    final element = widget.element;
+    final pxPerMm = widget.pxPerMm;
     final w = element.wMm * pxPerMm;
     final h = element.hMm * pxPerMm;
     final cs = Theme.of(context).colorScheme;
 
     Widget handle(LabelHandleKind kind, double left, double top, {IconData? icon}) {
       return Positioned(
-        left: left - _handleSize / 2,
-        top: top - _handleSize / 2,
+        left: left - LabelElementTransformHandles._handleSize / 2,
+        top: top - LabelElementTransformHandles._handleSize / 2,
         child: MouseRegion(
           cursor: _cursorFor(kind),
           child: GestureDetector(
             behavior: HitTestBehavior.opaque,
-            onPanUpdate: (d) => onDrag(kind, d.delta.dx, d.delta.dy),
-            onPanEnd: (_) => onDragEnd?.call(),
+            onPanStart: (_) {
+              widget.onDragStart?.call();
+              if (kind == LabelHandleKind.rotate) {
+                _rotateStartDeg = element.rotationDeg;
+                _rotateAccumDx = 0;
+              }
+            },
+            onPanUpdate: (d) {
+              if (kind == LabelHandleKind.rotate && _rotateStartDeg != null) {
+                _rotateAccumDx += d.delta.dx / pxPerMm;
+                var rot = (_rotateStartDeg! + _rotateAccumDx * 2.5) % 360;
+                if (rot < 0) rot += 360;
+                widget.onDrag(kind, rot, 0);
+              } else {
+                widget.onDrag(kind, d.delta.dx, d.delta.dy);
+              }
+            },
+            onPanEnd: (_) {
+              _rotateStartDeg = null;
+              widget.onDragEnd?.call();
+            },
+            onPanCancel: () {
+              _rotateStartDeg = null;
+              widget.onDragEnd?.call();
+            },
             child: Container(
-              width: _handleSize,
-              height: _handleSize,
+              width: LabelElementTransformHandles._handleSize,
+              height: LabelElementTransformHandles._handleSize,
               decoration: BoxDecoration(
                 color: cs.surface,
                 border: Border.all(color: cs.primary, width: 1.5),
@@ -77,11 +112,16 @@ class LabelElementTransformHandles extends StatelessWidget {
               ),
             ),
           ),
-          // rotate handle above top-center
           handle(LabelHandleKind.rotate, w / 2, -18, icon: Icons.rotate_right),
-          CustomPaint(
-            size: Size(w, 18),
-            painter: _RotateStemPainter(color: cs.primary, width: w),
+          Positioned(
+            left: w / 2,
+            top: -18,
+            child: IgnorePointer(
+              child: CustomPaint(
+                size: const Size(1, 18),
+                painter: _RotateStemPainter(color: cs.primary, anchorX: 0),
+              ),
+            ),
           ),
           handle(LabelHandleKind.nw, 0, 0),
           handle(LabelHandleKind.n, w / 2, 0),
@@ -118,16 +158,16 @@ class LabelElementTransformHandles extends StatelessWidget {
 
 class _RotateStemPainter extends CustomPainter {
   final Color color;
-  final double width;
+  final double anchorX;
 
-  _RotateStemPainter({required this.color, required this.width});
+  _RotateStemPainter({required this.color, required this.anchorX});
 
   @override
   void paint(Canvas canvas, Size size) {
     final p = Paint()
       ..color = color
       ..strokeWidth = 1;
-    canvas.drawLine(Offset(width / 2, 0), Offset(width / 2, 18), p);
+    canvas.drawLine(Offset(anchorX, 0), Offset(anchorX, size.height), p);
   }
 
   @override
@@ -149,12 +189,10 @@ LabelElement applyHandleDrag({
   var y = element.yMm;
   var w = element.wMm;
   var h = element.hMm;
-  var rot = element.rotationDeg;
 
   switch (kind) {
     case LabelHandleKind.rotate:
-      // تقریبی: حرکت افقی = چرخش
-      rot = (rot + dxMm * 8) % 360;
+      var rot = dxMm % 360;
       if (rot < 0) rot += 360;
       return element.copyWith(rotationDeg: rot);
     case LabelHandleKind.e:

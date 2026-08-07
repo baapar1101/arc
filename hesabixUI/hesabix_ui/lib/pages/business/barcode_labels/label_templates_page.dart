@@ -9,6 +9,7 @@ import '../../../services/barcode_label_service.dart';
 import '../../../services/bytes_export/bytes_export_service.dart';
 import '../../../utils/error_extractor.dart';
 import '../../../utils/snackbar_helper.dart';
+import '../../../widgets/barcode_label/label_blank_canvas_dialog.dart';
 import '../../../widgets/barcode_label/label_excel_print_dialog.dart';
 import '../../../widgets/barcode_label/label_serial_print_dialog.dart';
 import '../../../widgets/barcode_label/render/label_pdf_renderer.dart';
@@ -114,9 +115,19 @@ class _LabelTemplatesPageState extends State<LabelTemplatesPage> {
                   leading: const Icon(Icons.crop_square_outlined),
                   title: Text(t.barcodeLabelBlankCanvas),
                   subtitle: Text(t.barcodeLabelBlankCanvasHint),
-                  onTap: () {
+                  onTap: () async {
                     Navigator.pop(ctx);
-                    context.go(context.businessPanelUrl(widget.businessId, 'barcode-labels/studio/new'));
+                    final result = await LabelBlankCanvasDialog.show(context);
+                    if (!context.mounted || result == null) return;
+                    final q = <String, String>{
+                      'w': result.widthMm.toStringAsFixed(0),
+                      'h': result.heightMm.toStringAsFixed(0),
+                      if (result.rollMode) 'roll': '1',
+                    };
+                    final query = q.entries.map((e) => '${e.key}=${e.value}').join('&');
+                    context.go(
+                      '${context.businessPanelUrl(widget.businessId, 'barcode-labels/studio/new')}?$query',
+                    );
                   },
                 ),
                 const Divider(),
@@ -134,8 +145,8 @@ class _LabelTemplatesPageState extends State<LabelTemplatesPage> {
                             color: Theme.of(ctx).colorScheme.primary),
                         title: Text(p.name),
                         subtitle: Text(
-                          '${p.widthMm.toStringAsFixed(0)}Ã—${p.heightMm.toStringAsFixed(0)} mm'
-                          '${p.description != null ? ' â€” ${p.description}' : ''}',
+                          '${p.widthMm.toStringAsFixed(0)}×${p.heightMm.toStringAsFixed(0)} mm'
+                          '${p.description != null ? ' — ${p.description}' : ''}',
                         ),
                         onTap: () async {
                           Navigator.pop(ctx);
@@ -221,6 +232,7 @@ class _LabelTemplatesPageState extends State<LabelTemplatesPage> {
         design: detail.design,
         sheet: detail.sheet,
         contexts: [sample, sample, sample],
+        businessId: widget.businessId,
       );
       if (!mounted) return;
       final result = await BytesExportService.export(

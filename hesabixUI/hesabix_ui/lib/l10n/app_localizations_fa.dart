@@ -2226,6 +2226,181 @@ class AppLocalizationsFa extends AppLocalizations {
   String get createFirstBusiness => 'اولین کسب و کار خود را ایجاد کنید';
 
   @override
+  String get businessesHubSubtitle =>
+      'کسب‌وکار خود را انتخاب کنید یا جدید بسازید';
+
+  @override
+  String get businessesHubSearchHint => 'جستجو در نام کسب‌وکار…';
+
+  @override
+  String get businessesHubFilterAll => 'همه';
+
+  @override
+  String get businessesHubFilterOwner => 'مالک';
+
+  @override
+  String get businessesHubFilterMember => 'عضو';
+
+  @override
+  String get businessesHubFilterPendingDeletion => 'در حال حذف';
+
+  @override
+  String get businessesHubSortNewest => 'جدیدترین';
+
+  @override
+  String get businessesHubSortOldest => 'قدیمی‌ترین';
+
+  @override
+  String get businessesHubSortNameAsc => 'نام (الف تا ی)';
+
+  @override
+  String get businessesHubSortNameDesc => 'نام (ی تا الف)';
+
+  @override
+  String get businessesHubRecentSection => 'اخیراً استفاده شده';
+
+  @override
+  String get businessesHubAllSection => 'همه کسب‌وکارها';
+
+  @override
+  String businessesHubCount(int count) {
+    return '$count کسب‌وکار';
+  }
+
+  @override
+  String get businessesHubEnter => 'ورود';
+
+  @override
+  String get businessesHubDeletionPending => 'در حال حذف';
+
+  @override
+  String get businessesHubMultiCurrency => 'چندارزی';
+
+  @override
+  String get businessesHubEstablished => 'تأسیس';
+
+  @override
+  String get businessesHubRestore => 'بازیابی';
+
+  @override
+  String get businessesHubRestoring => 'در حال بازیابی…';
+
+  @override
+  String get businessesHubLeave => 'خروج';
+
+  @override
+  String get businessesHubDefaultCurrency => 'ارز پیش‌فرض';
+
+  @override
+  String get businessesHubPin => 'سنجاق کردن';
+
+  @override
+  String get businessesHubUnpin => 'برداشتن سنجاق';
+
+  @override
+  String get businessesHubNoSearchResults => 'نتیجه‌ای یافت نشد';
+
+  @override
+  String businessesHubNoSearchResultsFor(String query) {
+    return 'برای «$query» نتیجه‌ای پیدا نشد';
+  }
+
+  @override
+  String get businessesHubEmptyTitle => 'هنوز کسب‌وکاری ندارید';
+
+  @override
+  String get businessesHubEmptySubtitle =>
+      'با ساخت اولین کسب‌وکار، حسابداری ابری را شروع کنید.';
+
+  @override
+  String get businessesHubEmptyBullet1 =>
+      'رایگان شروع کنید و هر زمان گسترش دهید';
+
+  @override
+  String get businessesHubEmptyBullet2 => 'چند کسب‌وکار در یک حساب کاربری';
+
+  @override
+  String get businessesHubEmptyBullet3 => 'دسترسی تیمی با نقش مالک و عضو';
+
+  @override
+  String get businessesHubImportLegacy => 'وارد کردن از نسخه قدیم';
+
+  @override
+  String get businessesHubViewGrid => 'نمای شبکه‌ای';
+
+  @override
+  String get businessesHubViewList => 'نمای لیستی';
+
+  @override
+  String businessesHubDaysRemaining(int days) {
+    return '$days روز تا حذف دائمی';
+  }
+
+  @override
+  String businessesHubHoursRemaining(int hours) {
+    return '$hours ساعت تا حذف دائمی';
+  }
+
+  @override
+  String get businessesHubDeadlineExpired => 'مهلت بازیابی به پایان رسیده';
+
+  @override
+  String get businessesHubRestoreConfirmTitle => 'بازیابی کسب‌وکار';
+
+  @override
+  String businessesHubRestoreConfirmMessage(String name) {
+    return 'آیا مطمئن هستید که می‌خواهید «$name» را بازیابی کنید؟\n\nپس از بازیابی، دسترسی شما بازگردانده می‌شود.';
+  }
+
+  @override
+  String get businessesHubRestoreSuccess => 'کسب‌وکار با موفقیت بازیابی شد';
+
+  @override
+  String businessesHubRestoreFailed(String error) {
+    return 'خطا در بازیابی: $error';
+  }
+
+  @override
+  String get businessesHubLeaveConfirmTitle => 'خروج از کسب‌وکار';
+
+  @override
+  String businessesHubLeaveConfirmMessage(String name) {
+    return 'آیا مطمئن هستید که می‌خواهید از «$name» خارج شوید؟\n\nپس از خروج، دسترسی شما حذف خواهد شد.';
+  }
+
+  @override
+  String businessesHubLeaveFailed(String error) {
+    return 'خطا در خروج: $error';
+  }
+
+  @override
+  String get businessesHubLoadMoreFailed => 'خطا در بارگذاری صفحات بعدی';
+
+  @override
+  String get businessesHubStatsTitle => 'آمار سریع';
+
+  @override
+  String get businessesHubStatsSales => 'فروش';
+
+  @override
+  String get businessesHubStatsPurchases => 'خرید';
+
+  @override
+  String get businessesHubStatsMembers => 'اعضا';
+
+  @override
+  String get businessesHubStatsTransactions => 'تراکنش';
+
+  @override
+  String get businessesHubStatsLoading => 'در حال بارگذاری آمار…';
+
+  @override
+  String get businessesHubStatsUnavailable => 'آمار در دسترس نیست';
+
+  @override
+  String get businessesHubSearchShortcut => 'برای جستجو / را بزنید';
+
+  @override
   String get accessDenied => 'دسترسی غیرمجاز';
 
   @override
@@ -17369,4 +17544,147 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get barcodeLabelPrintFromProductForm => 'چاپ با طرح برچسب';
+
+  @override
+  String get barcodeLabelCanvasSettings => 'بوم و چاپ';
+
+  @override
+  String get barcodeLabelCanvasWidth => 'عرض ناحیه طراحی (mm)';
+
+  @override
+  String get barcodeLabelCanvasHeight => 'ارتفاع ناحیه طراحی (mm)';
+
+  @override
+  String get barcodeLabelPrintLayout => 'چیدمان چاپ';
+
+  @override
+  String get barcodeLabelPrintLayoutSheet => 'برگه (A4 و شبکه)';
+
+  @override
+  String get barcodeLabelPrintLayoutRoll => 'رول / حرارتی (هر برچسب یک صفحه)';
+
+  @override
+  String get barcodeLabelPaperSize => 'اندازه کاغذ';
+
+  @override
+  String get barcodeLabelPaperCustom => 'سفارشی';
+
+  @override
+  String get barcodeLabelPaperWidth => 'عرض کاغذ (mm)';
+
+  @override
+  String get barcodeLabelPaperHeight => 'ارتفاع کاغذ (mm)';
+
+  @override
+  String get barcodeLabelOrientation => 'جهت';
+
+  @override
+  String get barcodeLabelPortrait => 'عمودی';
+
+  @override
+  String get barcodeLabelLandscape => 'افقی';
+
+  @override
+  String get barcodeLabelSheetColumns => 'ستون‌ها';
+
+  @override
+  String get barcodeLabelSheetRows => 'ردیف‌ها';
+
+  @override
+  String get barcodeLabelRollModeHint =>
+      'در حالت رول فقط اندازه ناحیه طراحی مهم است؛ ارتفاع کاغذ ثابت نیست.';
+
+  @override
+  String get barcodeLabelPreviewData => 'داده آزمایشی پیش‌نمایش';
+
+  @override
+  String get barcodeLabelPreviewDataHint =>
+      'با افزودن المان‌های دارای فیلد داده، مقادیر آزمایشی را اینجا ویرایش کنید.';
+
+  @override
+  String get barcodeLabelRotation => 'چرخش (°)';
+
+  @override
+  String get barcodeLabelRotate90 => 'چرخش ۹۰°';
+
+  @override
+  String get barcodeLabelContentMode => 'منبع محتوا';
+
+  @override
+  String get barcodeLabelContentBinding => 'فیلد داده';
+
+  @override
+  String get barcodeLabelContentFixed => 'متن ثابت';
+
+  @override
+  String get barcodeLabelFixedValue => 'مقدار متن';
+
+  @override
+  String get barcodeLabelShowBarcodeText => 'نمایش متن زیر بارکد';
+
+  @override
+  String get barcodeLabelPrintSettings => 'تنظیمات چاپ';
+
+  @override
+  String get barcodeLabelBlankCanvasDialogTitle => 'برچسب خالی جدید';
+
+  @override
+  String get barcodeLabelBlankCanvasDialogHint =>
+      'اندازه ناحیه طراحی را مشخص کنید. برای چاپگر حرارتی حالت رول را فعال کنید — فقط عرض و ارتفاع برچسب مهم است.';
+
+  @override
+  String get barcodeLabelStartDesign => 'شروع طراحی';
+
+  @override
+  String barcodeLabelPrinterSizeMatch(String width, String height) {
+    return 'پروفایل چاپگر با طرح هم‌خوان است ($width×$height mm)';
+  }
+
+  @override
+  String barcodeLabelPrinterSizeMismatch(
+    String pw,
+    String ph,
+    String dw,
+    String dh,
+  ) {
+    return 'چاپگر $pw×$ph mm · طرح $dw×$dh mm — خروجی با اندازه طرح ساخته می‌شود';
+  }
+
+  @override
+  String get barcodeLabelLivePreview => 'پیش‌نمایش زنده PDF';
+
+  @override
+  String barcodeLabelApplyPrinterSize(String width, String height) {
+    return 'هم‌خوان با اندازه چاپگر ($width×$height mm)';
+  }
+
+  @override
+  String get barcodeLabelImageSource => 'منبع تصویر';
+
+  @override
+  String get barcodeLabelImageBusinessLogo => 'لوگوی کسب‌وکار';
+
+  @override
+  String get barcodeLabelImageProduct => 'تصویر کالا';
+
+  @override
+  String get barcodeLabelImageUpload => 'تصویر آپلودشده';
+
+  @override
+  String get barcodeLabelPickImage => 'انتخاب فایل تصویر';
+
+  @override
+  String get barcodeLabelImageFit => 'نحوه جاگیری';
+
+  @override
+  String get barcodeLabelImageFitContain => 'جا شدن کامل';
+
+  @override
+  String get barcodeLabelImageFitCover => 'پوشش';
+
+  @override
+  String get barcodeLabelImageFitFill => 'کشیده';
+
+  @override
+  String get barcodeLabelPrinterEscPosSent => 'دستور ESC/POS به چاپگر ارسال شد';
 }

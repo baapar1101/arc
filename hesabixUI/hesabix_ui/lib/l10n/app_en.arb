@@ -800,6 +800,114 @@
   "backToProfile": "Back to Profile",
   "noBusinessesFound": "No businesses found",
   "createFirstBusiness": "Create your first business",
+  "businessesHubSubtitle": "Select a business or create a new one",
+  "businessesHubSearchHint": "Search businesses…",
+  "businessesHubFilterAll": "All",
+  "businessesHubFilterOwner": "Owner",
+  "businessesHubFilterMember": "Member",
+  "businessesHubFilterPendingDeletion": "Pending deletion",
+  "businessesHubSortNewest": "Newest",
+  "businessesHubSortOldest": "Oldest",
+  "businessesHubSortNameAsc": "Name (A–Z)",
+  "businessesHubSortNameDesc": "Name (Z–A)",
+  "businessesHubRecentSection": "Recently used",
+  "businessesHubAllSection": "All businesses",
+  "businessesHubCount": "{count} businesses",
+  "@businessesHubCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "businessesHubEnter": "Enter",
+  "businessesHubDeletionPending": "Pending deletion",
+  "businessesHubMultiCurrency": "Multi-currency",
+  "businessesHubEstablished": "Established",
+  "businessesHubRestore": "Restore",
+  "businessesHubRestoring": "Restoring…",
+  "businessesHubLeave": "Leave",
+  "businessesHubDefaultCurrency": "Default currency",
+  "businessesHubPin": "Pin",
+  "businessesHubUnpin": "Unpin",
+  "businessesHubNoSearchResults": "No results found",
+  "businessesHubNoSearchResultsFor": "No results for \"{query}\"",
+  "@businessesHubNoSearchResultsFor": {
+    "placeholders": {
+      "query": {
+        "type": "String"
+      }
+    }
+  },
+  "businessesHubEmptyTitle": "No businesses yet",
+  "businessesHubEmptySubtitle": "Create your first business to start cloud accounting.",
+  "businessesHubEmptyBullet1": "Start free and scale anytime",
+  "businessesHubEmptyBullet2": "Multiple businesses in one account",
+  "businessesHubEmptyBullet3": "Team access with owner and member roles",
+  "businessesHubImportLegacy": "Import from legacy version",
+  "businessesHubViewGrid": "Grid view",
+  "businessesHubViewList": "List view",
+  "businessesHubDaysRemaining": "{days} days until permanent deletion",
+  "@businessesHubDaysRemaining": {
+    "placeholders": {
+      "days": {
+        "type": "int"
+      }
+    }
+  },
+  "businessesHubHoursRemaining": "{hours} hours until permanent deletion",
+  "@businessesHubHoursRemaining": {
+    "placeholders": {
+      "hours": {
+        "type": "int"
+      }
+    }
+  },
+  "businessesHubDeadlineExpired": "Recovery deadline has passed",
+  "businessesHubRestoreConfirmTitle": "Restore business",
+  "businessesHubRestoreConfirmMessage": "Are you sure you want to restore \"{name}\"?\n\nYour access will be restored after recovery.",
+  "@businessesHubRestoreConfirmMessage": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "businessesHubRestoreSuccess": "Business restored successfully",
+  "businessesHubRestoreFailed": "Restore failed: {error}",
+  "@businessesHubRestoreFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "businessesHubLeaveConfirmTitle": "Leave business",
+  "businessesHubLeaveConfirmMessage": "Are you sure you want to leave \"{name}\"?\n\nYour access will be removed.",
+  "@businessesHubLeaveConfirmMessage": {
+    "placeholders": {
+      "name": {
+        "type": "String"
+      }
+    }
+  },
+  "businessesHubLeaveFailed": "Leave failed: {error}",
+  "@businessesHubLeaveFailed": {
+    "placeholders": {
+      "error": {
+        "type": "String"
+      }
+    }
+  },
+  "businessesHubLoadMoreFailed": "Failed to load more",
+  "businessesHubStatsTitle": "Quick stats",
+  "businessesHubStatsSales": "Sales",
+  "businessesHubStatsPurchases": "Purchases",
+  "businessesHubStatsMembers": "Members",
+  "businessesHubStatsTransactions": "Transactions",
+  "businessesHubStatsLoading": "Loading stats…",
+  "businessesHubStatsUnavailable": "Stats unavailable",
+  "businessesHubSearchShortcut": "Press / to search",
   "accessDenied": "Access denied",
   "basicTools": "Basic Tools",
   "businessSettings": "Business Settings",
@@ -6608,6 +6716,69 @@
   "barcodeLabelPrinterEscPosFallback": "ESC/POS not spiked yet; printing via roll PDF",
   "barcodeLabelPrinterUnsupportedMode": "Unsupported printer mode",
   "barcodeLabelPrintFromProductForm": "Print with label template",
+  "barcodeLabelCanvasSettings": "Canvas & print",
+  "barcodeLabelCanvasWidth": "Design width (mm)",
+  "barcodeLabelCanvasHeight": "Design height (mm)",
+  "barcodeLabelPrintLayout": "Print layout",
+  "barcodeLabelPrintLayoutSheet": "Sheet (A4, grid)",
+  "barcodeLabelPrintLayoutRoll": "Roll / thermal (one label per page)",
+  "barcodeLabelPaperSize": "Paper size",
+  "barcodeLabelPaperCustom": "Custom size",
+  "barcodeLabelPaperWidth": "Paper width (mm)",
+  "barcodeLabelPaperHeight": "Paper height (mm)",
+  "barcodeLabelOrientation": "Orientation",
+  "barcodeLabelPortrait": "Portrait",
+  "barcodeLabelLandscape": "Landscape",
+  "barcodeLabelSheetColumns": "Columns",
+  "barcodeLabelSheetRows": "Rows",
+  "barcodeLabelRollModeHint": "Roll mode uses the design area size only; paper height is not fixed.",
+  "barcodeLabelPreviewData": "Preview test data",
+  "barcodeLabelPreviewDataHint": "Add elements with data bindings to edit preview values here.",
+  "barcodeLabelRotation": "Rotation (°)",
+  "barcodeLabelRotate90": "Rotate 90°",
+  "barcodeLabelContentMode": "Content source",
+  "barcodeLabelContentBinding": "Data field",
+  "barcodeLabelContentFixed": "Fixed text",
+  "barcodeLabelFixedValue": "Text value",
+  "barcodeLabelShowBarcodeText": "Show barcode text below",
+  "barcodeLabelPrintSettings": "Print settings",
+  "barcodeLabelBlankCanvasDialogTitle": "New blank label",
+  "barcodeLabelBlankCanvasDialogHint": "Set the design area size. For thermal printers use roll mode — only width and label height matter.",
+  "barcodeLabelStartDesign": "Start designing",
+  "barcodeLabelPrinterSizeMatch": "Printer profile matches design ({width}×{height} mm)",
+  "barcodeLabelPrinterSizeMismatch": "Printer {pw}×{ph} mm · design {dw}×{dh} mm — output uses design size",
+  "barcodeLabelLivePreview": "Live PDF preview",
+  "barcodeLabelApplyPrinterSize": "Match printer size ({width}×{height} mm)",
+  "barcodeLabelImageSource": "Image source",
+  "barcodeLabelImageBusinessLogo": "Business logo",
+  "barcodeLabelImageProduct": "Product image",
+  "barcodeLabelImageUpload": "Uploaded image",
+  "barcodeLabelPickImage": "Choose image file",
+  "barcodeLabelImageFit": "Image fit",
+  "barcodeLabelImageFitContain": "Contain",
+  "barcodeLabelImageFitCover": "Cover",
+  "barcodeLabelImageFitFill": "Fill",
+  "barcodeLabelPrinterEscPosSent": "ESC/POS sent to printer",
+  "@barcodeLabelApplyPrinterSize": {
+    "placeholders": {
+      "width": {"type": "String"},
+      "height": {"type": "String"}
+    }
+  },
+  "@barcodeLabelPrinterSizeMatch": {
+    "placeholders": {
+      "width": {"type": "String"},
+      "height": {"type": "String"}
+    }
+  },
+  "@barcodeLabelPrinterSizeMismatch": {
+    "placeholders": {
+      "pw": {"type": "String"},
+      "ph": {"type": "String"},
+      "dw": {"type": "String"},
+      "dh": {"type": "String"}
+    }
+  },
   "@barcodeLabelPrintTotal": {"placeholders": {"count": {"type": "int"}}},
   "@barcodeLabelExcelReady": {"placeholders": {"rows": {"type": "int"}, "labels": {"type": "int"}}},
   "@barcodeLabelExcelRowError": {"placeholders": {"line": {"type": "int"}, "field": {"type": "String"}}},

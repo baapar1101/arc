@@ -2242,6 +2242,180 @@ class AppLocalizationsEn extends AppLocalizations {
   String get createFirstBusiness => 'Create your first business';
 
   @override
+  String get businessesHubSubtitle => 'Select a business or create a new one';
+
+  @override
+  String get businessesHubSearchHint => 'Search businesses…';
+
+  @override
+  String get businessesHubFilterAll => 'All';
+
+  @override
+  String get businessesHubFilterOwner => 'Owner';
+
+  @override
+  String get businessesHubFilterMember => 'Member';
+
+  @override
+  String get businessesHubFilterPendingDeletion => 'Pending deletion';
+
+  @override
+  String get businessesHubSortNewest => 'Newest';
+
+  @override
+  String get businessesHubSortOldest => 'Oldest';
+
+  @override
+  String get businessesHubSortNameAsc => 'Name (A–Z)';
+
+  @override
+  String get businessesHubSortNameDesc => 'Name (Z–A)';
+
+  @override
+  String get businessesHubRecentSection => 'Recently used';
+
+  @override
+  String get businessesHubAllSection => 'All businesses';
+
+  @override
+  String businessesHubCount(int count) {
+    return '$count businesses';
+  }
+
+  @override
+  String get businessesHubEnter => 'Enter';
+
+  @override
+  String get businessesHubDeletionPending => 'Pending deletion';
+
+  @override
+  String get businessesHubMultiCurrency => 'Multi-currency';
+
+  @override
+  String get businessesHubEstablished => 'Established';
+
+  @override
+  String get businessesHubRestore => 'Restore';
+
+  @override
+  String get businessesHubRestoring => 'Restoring…';
+
+  @override
+  String get businessesHubLeave => 'Leave';
+
+  @override
+  String get businessesHubDefaultCurrency => 'Default currency';
+
+  @override
+  String get businessesHubPin => 'Pin';
+
+  @override
+  String get businessesHubUnpin => 'Unpin';
+
+  @override
+  String get businessesHubNoSearchResults => 'No results found';
+
+  @override
+  String businessesHubNoSearchResultsFor(String query) {
+    return 'No results for \"$query\"';
+  }
+
+  @override
+  String get businessesHubEmptyTitle => 'No businesses yet';
+
+  @override
+  String get businessesHubEmptySubtitle =>
+      'Create your first business to start cloud accounting.';
+
+  @override
+  String get businessesHubEmptyBullet1 => 'Start free and scale anytime';
+
+  @override
+  String get businessesHubEmptyBullet2 => 'Multiple businesses in one account';
+
+  @override
+  String get businessesHubEmptyBullet3 =>
+      'Team access with owner and member roles';
+
+  @override
+  String get businessesHubImportLegacy => 'Import from legacy version';
+
+  @override
+  String get businessesHubViewGrid => 'Grid view';
+
+  @override
+  String get businessesHubViewList => 'List view';
+
+  @override
+  String businessesHubDaysRemaining(int days) {
+    return '$days days until permanent deletion';
+  }
+
+  @override
+  String businessesHubHoursRemaining(int hours) {
+    return '$hours hours until permanent deletion';
+  }
+
+  @override
+  String get businessesHubDeadlineExpired => 'Recovery deadline has passed';
+
+  @override
+  String get businessesHubRestoreConfirmTitle => 'Restore business';
+
+  @override
+  String businessesHubRestoreConfirmMessage(String name) {
+    return 'Are you sure you want to restore \"$name\"?\n\nYour access will be restored after recovery.';
+  }
+
+  @override
+  String get businessesHubRestoreSuccess => 'Business restored successfully';
+
+  @override
+  String businessesHubRestoreFailed(String error) {
+    return 'Restore failed: $error';
+  }
+
+  @override
+  String get businessesHubLeaveConfirmTitle => 'Leave business';
+
+  @override
+  String businessesHubLeaveConfirmMessage(String name) {
+    return 'Are you sure you want to leave \"$name\"?\n\nYour access will be removed.';
+  }
+
+  @override
+  String businessesHubLeaveFailed(String error) {
+    return 'Leave failed: $error';
+  }
+
+  @override
+  String get businessesHubLoadMoreFailed => 'Failed to load more';
+
+  @override
+  String get businessesHubStatsTitle => 'Quick stats';
+
+  @override
+  String get businessesHubStatsSales => 'Sales';
+
+  @override
+  String get businessesHubStatsPurchases => 'Purchases';
+
+  @override
+  String get businessesHubStatsMembers => 'Members';
+
+  @override
+  String get businessesHubStatsTransactions => 'Transactions';
+
+  @override
+  String get businessesHubStatsLoading => 'Loading stats…';
+
+  @override
+  String get businessesHubStatsUnavailable => 'Stats unavailable';
+
+  @override
+  String get businessesHubSearchShortcut => 'Press / to search';
+
+  @override
   String get accessDenied => 'Access denied';
 
   @override
@@ -17468,4 +17642,148 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get barcodeLabelPrintFromProductForm => 'Print with label template';
+
+  @override
+  String get barcodeLabelCanvasSettings => 'Canvas & print';
+
+  @override
+  String get barcodeLabelCanvasWidth => 'Design width (mm)';
+
+  @override
+  String get barcodeLabelCanvasHeight => 'Design height (mm)';
+
+  @override
+  String get barcodeLabelPrintLayout => 'Print layout';
+
+  @override
+  String get barcodeLabelPrintLayoutSheet => 'Sheet (A4, grid)';
+
+  @override
+  String get barcodeLabelPrintLayoutRoll =>
+      'Roll / thermal (one label per page)';
+
+  @override
+  String get barcodeLabelPaperSize => 'Paper size';
+
+  @override
+  String get barcodeLabelPaperCustom => 'Custom size';
+
+  @override
+  String get barcodeLabelPaperWidth => 'Paper width (mm)';
+
+  @override
+  String get barcodeLabelPaperHeight => 'Paper height (mm)';
+
+  @override
+  String get barcodeLabelOrientation => 'Orientation';
+
+  @override
+  String get barcodeLabelPortrait => 'Portrait';
+
+  @override
+  String get barcodeLabelLandscape => 'Landscape';
+
+  @override
+  String get barcodeLabelSheetColumns => 'Columns';
+
+  @override
+  String get barcodeLabelSheetRows => 'Rows';
+
+  @override
+  String get barcodeLabelRollModeHint =>
+      'Roll mode uses the design area size only; paper height is not fixed.';
+
+  @override
+  String get barcodeLabelPreviewData => 'Preview test data';
+
+  @override
+  String get barcodeLabelPreviewDataHint =>
+      'Add elements with data bindings to edit preview values here.';
+
+  @override
+  String get barcodeLabelRotation => 'Rotation (°)';
+
+  @override
+  String get barcodeLabelRotate90 => 'Rotate 90°';
+
+  @override
+  String get barcodeLabelContentMode => 'Content source';
+
+  @override
+  String get barcodeLabelContentBinding => 'Data field';
+
+  @override
+  String get barcodeLabelContentFixed => 'Fixed text';
+
+  @override
+  String get barcodeLabelFixedValue => 'Text value';
+
+  @override
+  String get barcodeLabelShowBarcodeText => 'Show barcode text below';
+
+  @override
+  String get barcodeLabelPrintSettings => 'Print settings';
+
+  @override
+  String get barcodeLabelBlankCanvasDialogTitle => 'New blank label';
+
+  @override
+  String get barcodeLabelBlankCanvasDialogHint =>
+      'Set the design area size. For thermal printers use roll mode — only width and label height matter.';
+
+  @override
+  String get barcodeLabelStartDesign => 'Start designing';
+
+  @override
+  String barcodeLabelPrinterSizeMatch(String width, String height) {
+    return 'Printer profile matches design ($width×$height mm)';
+  }
+
+  @override
+  String barcodeLabelPrinterSizeMismatch(
+    String pw,
+    String ph,
+    String dw,
+    String dh,
+  ) {
+    return 'Printer $pw×$ph mm · design $dw×$dh mm — output uses design size';
+  }
+
+  @override
+  String get barcodeLabelLivePreview => 'Live PDF preview';
+
+  @override
+  String barcodeLabelApplyPrinterSize(String width, String height) {
+    return 'Match printer size ($width×$height mm)';
+  }
+
+  @override
+  String get barcodeLabelImageSource => 'Image source';
+
+  @override
+  String get barcodeLabelImageBusinessLogo => 'Business logo';
+
+  @override
+  String get barcodeLabelImageProduct => 'Product image';
+
+  @override
+  String get barcodeLabelImageUpload => 'Uploaded image';
+
+  @override
+  String get barcodeLabelPickImage => 'Choose image file';
+
+  @override
+  String get barcodeLabelImageFit => 'Image fit';
+
+  @override
+  String get barcodeLabelImageFitContain => 'Contain';
+
+  @override
+  String get barcodeLabelImageFitCover => 'Cover';
+
+  @override
+  String get barcodeLabelImageFitFill => 'Fill';
+
+  @override
+  String get barcodeLabelPrinterEscPosSent => 'ESC/POS sent to printer';
 }
