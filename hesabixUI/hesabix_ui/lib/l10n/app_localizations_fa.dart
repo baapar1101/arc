@@ -2401,6 +2401,18 @@ class AppLocalizationsFa extends AppLocalizations {
   String get businessesHubSearchShortcut => 'برای جستجو / را بزنید';
 
   @override
+  String get businessesHubPickSubtitle => 'کسب‌وکار موردنظر را انتخاب کنید';
+
+  @override
+  String get businessesHubShowTools => 'جستجو و فیلتر';
+
+  @override
+  String get businessesHubHideTools => 'بستن ابزارها';
+
+  @override
+  String get businessesHubStatsHint => 'نگه داشتن برای آمار سریع';
+
+  @override
   String get accessDenied => 'دسترسی غیرمجاز';
 
   @override

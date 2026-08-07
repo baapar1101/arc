@@ -9,12 +9,14 @@ class BusinessHubStatsPreview extends StatelessWidget {
   final BusinessStatistics? stats;
   final bool loading;
   final bool compact;
+  final bool floating;
 
   const BusinessHubStatsPreview({
     super.key,
     this.stats,
     this.loading = false,
     this.compact = false,
+    this.floating = false,
   });
 
   static String _fmt(num value) {
@@ -30,65 +32,45 @@ class BusinessHubStatsPreview extends StatelessWidget {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
 
+    Widget body;
     if (loading) {
-      return Padding(
-        padding: const EdgeInsets.only(top: 10),
-        child: Row(
-          children: [
-            SizedBox(
-              width: 16,
-              height: 16,
-              child: CircularProgressIndicator(strokeWidth: 2, color: cs.primary),
-            ),
-            const SizedBox(width: 10),
-            Text(
-              t.businessesHubStatsLoading,
-              style: theme.textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-            ),
-          ],
-        ),
+      body = Row(
+        mainAxisSize: floating ? MainAxisSize.min : MainAxisSize.max,
+        children: [
+          SizedBox(
+            width: 16,
+            height: 16,
+            child: CircularProgressIndicator(strokeWidth: 2, color: cs.primary),
+          ),
+          const SizedBox(width: 10),
+          Text(
+            t.businessesHubStatsLoading,
+            style: theme.textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+          ),
+        ],
       );
-    }
-
-    if (stats == null) {
-      return Padding(
-        padding: const EdgeInsets.only(top: 8),
-        child: Text(
-          t.businessesHubStatsUnavailable,
-          style: theme.textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-        ),
+    } else if (stats == null) {
+      body = Text(
+        t.businessesHubStatsUnavailable,
+        style: theme.textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
       );
-    }
+    } else {
+      final s = stats!;
+      final items = [
+        _StatItem(Icons.trending_up_rounded, t.businessesHubStatsSales, _fmt(s.totalSales), Colors.green),
+        _StatItem(Icons.shopping_cart_outlined, t.businessesHubStatsPurchases, _fmt(s.totalPurchases), Colors.blue),
+        _StatItem(Icons.people_outline_rounded, t.businessesHubStatsMembers, '${s.activeMembers}', Colors.purple),
+        _StatItem(Icons.receipt_long_outlined, t.businessesHubStatsTransactions, '${s.recentTransactions}', Colors.orange),
+      ];
 
-    final s = stats!;
-    final items = [
-      _StatItem(Icons.trending_up_rounded, t.businessesHubStatsSales, _fmt(s.totalSales), Colors.green),
-      _StatItem(Icons.shopping_cart_outlined, t.businessesHubStatsPurchases, _fmt(s.totalPurchases), Colors.blue),
-      _StatItem(Icons.people_outline_rounded, t.businessesHubStatsMembers, '${s.activeMembers}', Colors.purple),
-      _StatItem(Icons.receipt_long_outlined, t.businessesHubStatsTransactions, '${s.recentTransactions}', Colors.orange),
-    ];
-
-    if (compact) {
-      return Padding(
-        padding: const EdgeInsets.only(top: 10),
-        child: Wrap(
+      if (compact || floating) {
+        body = Wrap(
           spacing: 8,
           runSpacing: 6,
           children: items.map((e) => _compactChip(context, e)).toList(),
-        ),
-      );
-    }
-
-    return Padding(
-      padding: const EdgeInsets.only(top: 12),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-        decoration: BoxDecoration(
-          color: cs.primaryContainer.withValues(alpha: 0.35),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: cs.primary.withValues(alpha: 0.12)),
-        ),
-        child: Row(
+        );
+      } else {
+        body = Row(
           children: items
               .map(
                 (e) => Expanded(
@@ -96,6 +78,57 @@ class BusinessHubStatsPreview extends StatelessWidget {
                 ),
               )
               .toList(),
+        );
+      }
+    }
+
+    if (!floating) {
+      if (loading || stats == null) {
+        return Padding(padding: const EdgeInsets.only(top: 8), child: body);
+      }
+      if (compact) {
+        return Padding(padding: const EdgeInsets.only(top: 10), child: body);
+      }
+      return Padding(
+        padding: const EdgeInsets.only(top: 12),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+          decoration: BoxDecoration(
+            color: cs.primaryContainer.withValues(alpha: 0.35),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: cs.primary.withValues(alpha: 0.12)),
+          ),
+          child: body,
+        ),
+      );
+    }
+
+    return Material(
+      elevation: 10,
+      shadowColor: cs.shadow.withValues(alpha: 0.28),
+      color: cs.surfaceContainerHigh,
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        constraints: const BoxConstraints(minWidth: 220, maxWidth: 360),
+        padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.55)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              t.businessesHubStatsTitle,
+              style: theme.textTheme.labelLarge?.copyWith(
+                fontWeight: FontWeight.w700,
+                color: cs.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: 8),
+            body,
+          ],
         ),
       ),
     );

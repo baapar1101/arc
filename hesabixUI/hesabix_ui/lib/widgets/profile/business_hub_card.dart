@@ -20,6 +20,10 @@ class BusinessHubCard extends StatefulWidget {
   final bool isPinned;
   final bool compact;
   final bool listLayout;
+  /// حالت مینیمال: کمتر متادیتا، تمرکز روی ورود.
+  final bool simplified;
+  /// کارت برجسته‌تر وقتی فقط یک کسب‌وکار وجود دارد.
+  final bool prominent;
   final ValueChanged<bool>? onPinChanged;
   final BusinessHubRefreshCallback? onRefresh;
   final BusinessDashboardService? dashboardService;
@@ -33,6 +37,8 @@ class BusinessHubCard extends StatefulWidget {
     this.isPinned = false,
     this.compact = false,
     this.listLayout = true,
+    this.simplified = false,
+    this.prominent = false,
     this.onPinChanged,
     this.onRefresh,
     this.dashboardService,
@@ -50,6 +56,8 @@ class _BusinessHubCardState extends State<BusinessHubCard> {
   bool _statsLoading = false;
   BusinessStatistics? _stats;
   Timer? _hoverTimer;
+  final LayerLink _layerLink = LayerLink();
+  final OverlayPortalController _statsPortal = OverlayPortalController();
 
   BusinessWithPermission get b => widget.business;
   bool get _blocked => businessBlocksAccess(b.isDeleted, b.isDeletionPending);
@@ -59,6 +67,7 @@ class _BusinessHubCardState extends State<BusinessHubCard> {
   @override
   void dispose() {
     _hoverTimer?.cancel();
+    if (_statsPortal.isShowing) _statsPortal.hide();
     super.dispose();
   }
 
@@ -66,20 +75,26 @@ class _BusinessHubCardState extends State<BusinessHubCard> {
     setState(() => _hovered = true);
     if (!_canPreviewStats || !ResponsiveHelper.isDesktop(context)) return;
     _hoverTimer?.cancel();
-    _hoverTimer = Timer(const Duration(milliseconds: 380), _loadStats);
+    _hoverTimer = Timer(const Duration(milliseconds: 320), () {
+      if (!mounted || !_hovered) return;
+      _loadStats();
+      if (!_statsPortal.isShowing) _statsPortal.show();
+    });
   }
 
   void _onHoverExit() {
     _hoverTimer?.cancel();
+    if (_statsPortal.isShowing) _statsPortal.hide();
     setState(() {
       _hovered = false;
-      _stats = null;
+      // Keep cached stats in state for instant re-show; clear loading flag only.
       _statsLoading = false;
     });
   }
 
   Future<void> _loadStats() async {
     if (!_canPreviewStats || _statsLoading) return;
+    if (_stats != null) return;
     setState(() => _statsLoading = true);
     final stats = await BusinessHubStatsCache.load(b.id, widget.dashboardService!);
     if (!mounted) return;
@@ -101,53 +116,102 @@ class _BusinessHubCardState extends State<BusinessHubCard> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final cs = theme.colorScheme;
+    final cs = Theme.of(context).colorScheme;
     final t = AppLocalizations.of(context);
     final isDesktop = ResponsiveHelper.isDesktop(context);
-    final showHoverCta = isDesktop && _hovered && !_blocked;
 
-    final elevation = _pressed ? 0.0 : (_hovered ? 4.0 : 1.0);
+    final elevation = _pressed ? 0.0 : (_hovered ? 5.0 : (widget.prominent ? 2.0 : 1.0));
     final borderColor = widget.isPinned
         ? cs.primary.withValues(alpha: _hovered ? 0.55 : 0.35)
-        : cs.outlineVariant.withValues(alpha: _hovered ? 0.65 : 0.35);
+        : cs.outlineVariant.withValues(alpha: _hovered ? 0.7 : 0.32);
 
-    return MouseRegion(
-      onEnter: (_) => _onHoverEnter(),
-      onExit: (_) => _onHoverExit(),
-      child: AnimatedScale(
-        scale: _pressed ? 0.985 : 1.0,
-        duration: const Duration(milliseconds: 100),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 180),
-          curve: Curves.easeOut,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                color: cs.shadow.withValues(alpha: 0.06 + (elevation * 0.02)),
-                blurRadius: elevation * 3,
-                offset: Offset(0, elevation),
+    return OverlayPortal(
+      controller: _statsPortal,
+      overlayChildBuilder: (context) {
+        return UnconstrainedBox(
+          child: CompositedTransformFollower(
+            link: _layerLink,
+            showWhenUnlinked: false,
+            targetAnchor: Alignment.bottomCenter,
+            followerAnchor: Alignment.topCenter,
+            offset: const Offset(0, 8),
+            child: IgnorePointer(
+              child: TweenAnimationBuilder<double>(
+                tween: Tween(begin: 0.92, end: 1),
+                duration: const Duration(milliseconds: 160),
+                curve: Curves.easeOutCubic,
+                builder: (context, value, child) {
+                  return Opacity(
+                    opacity: value.clamp(0.0, 1.0),
+                    child: Transform.scale(scale: value, child: child),
+                  );
+                },
+                child: BusinessHubStatsPreview(
+                  stats: _stats,
+                  loading: _statsLoading && _stats == null,
+                  floating: true,
+                ),
               ),
-            ],
-          ),
-          child: Material(
-            color: cs.surfaceContainerLowest,
-            elevation: 0,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(16),
-              side: BorderSide(color: borderColor, width: widget.isPinned ? 1.5 : 1),
             ),
-            clipBehavior: Clip.antiAlias,
-            child: InkWell(
-              onTap: _blocked ? null : widget.onEnter,
-              onLongPress: ResponsiveHelper.isMobile(context) && _canPreviewStats ? _showStatsSheet : null,
-              onHighlightChanged: (v) => setState(() => _pressed = v),
-              child: Padding(
-                padding: EdgeInsets.all(widget.listLayout ? 14 : 16),
-                child: widget.listLayout
-                    ? _buildListBody(context, t, showHoverCta)
-                    : _buildGridBody(context, t, showHoverCta),
+          ),
+        );
+      },
+      child: CompositedTransformTarget(
+        link: _layerLink,
+        child: MouseRegion(
+          onEnter: (_) => _onHoverEnter(),
+          onExit: (_) => _onHoverExit(),
+          child: AnimatedScale(
+            scale: _pressed ? 0.985 : 1.0,
+            duration: const Duration(milliseconds: 100),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 180),
+              curve: Curves.easeOut,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(widget.prominent ? 18 : 16),
+                boxShadow: [
+                  BoxShadow(
+                    color: cs.shadow.withValues(alpha: 0.05 + (elevation * 0.018)),
+                    blurRadius: 4 + elevation * 2.5,
+                    offset: Offset(0, elevation * 0.7),
+                  ),
+                ],
+              ),
+              child: Material(
+                color: cs.surfaceContainerLowest,
+                elevation: 0,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(widget.prominent ? 18 : 16),
+                  side: BorderSide(color: borderColor, width: widget.isPinned ? 1.5 : 1),
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: Builder(
+                  builder: (context) {
+                    final ink = InkWell(
+                      onTap: _blocked ? null : widget.onEnter,
+                      onLongPress: ResponsiveHelper.isMobile(context) && _canPreviewStats
+                          ? _showStatsSheet
+                          : null,
+                      onHighlightChanged: (v) => setState(() => _pressed = v),
+                      child: Padding(
+                        padding: EdgeInsets.all(
+                          widget.listLayout
+                              ? (widget.prominent ? 18 : 14)
+                              : (widget.prominent ? 18 : 16),
+                        ),
+                        child: widget.listLayout
+                            ? _buildListBody(context, t)
+                            : _buildGridBody(context, t),
+                      ),
+                    );
+                    if (!isDesktop || !_canPreviewStats) return ink;
+                    return Tooltip(
+                      message: t.businessesHubStatsHint,
+                      waitDuration: const Duration(milliseconds: 900),
+                      child: ink,
+                    );
+                  },
+                ),
               ),
             ),
           ),
@@ -156,20 +220,20 @@ class _BusinessHubCardState extends State<BusinessHubCard> {
     );
   }
 
-  Widget _buildListBody(BuildContext context, AppLocalizations t, bool showHoverCta) {
+  Widget _buildListBody(BuildContext context, AppLocalizations t) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        _buildAvatar(context),
-        const SizedBox(width: 14),
-        Expanded(child: _buildMainInfo(context, t, showDate: !ResponsiveHelper.isMobile(context))),
-        const SizedBox(width: 8),
-        _buildTrailing(context, t, showHoverCta),
+        _buildAvatar(context, size: widget.prominent ? 56 : 48),
+        SizedBox(width: widget.prominent ? 16 : 14),
+        Expanded(child: _buildMainInfo(context, t)),
+        const SizedBox(width: 10),
+        _buildTrailing(context, t),
       ],
     );
   }
 
-  Widget _buildGridBody(BuildContext context, AppLocalizations t, bool showHoverCta) {
+  Widget _buildGridBody(BuildContext context, AppLocalizations t) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -180,39 +244,30 @@ class _BusinessHubCardState extends State<BusinessHubCard> {
             _buildMenuButton(context, t),
           ],
         ),
-        const SizedBox(height: 14),
+        const SizedBox(height: 12),
         _buildNameRow(context, t),
-        const SizedBox(height: 6),
+        const SizedBox(height: 4),
         _buildMetaLine(context, t),
-        const SizedBox(height: 8),
-        _buildChipsRow(context, t),
+        if (!widget.simplified) ...[
+          const SizedBox(height: 8),
+          _buildChipsRow(context, t),
+        ] else if (b.isDeletionPending || b.isMultiCurrency) ...[
+          const SizedBox(height: 8),
+          _buildChipsRow(context, t),
+        ],
         const Spacer(),
-        if (_canPreviewStats && _hovered)
-          BusinessHubStatsPreview(stats: _stats, loading: _statsLoading, compact: true),
         if (b.isDeletionPending && b.isOwner)
           _buildRestoreSection(context, t)
-        else ...[
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: AnimatedOpacity(
-                  opacity: showHoverCta ? 1 : 0.85,
-                  duration: const Duration(milliseconds: 150),
-                  child: FilledButton.tonalIcon(
-                    onPressed: _blocked ? null : widget.onEnter,
-                    icon: const Icon(Icons.login_rounded, size: 18),
-                    label: Text(t.businessesHubEnter),
-                    style: FilledButton.styleFrom(
-                      minimumSize: const Size(0, 40),
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
-                    ),
-                  ),
-                ),
-              ),
-            ],
+        else
+          FilledButton.tonalIcon(
+            onPressed: _blocked ? null : widget.onEnter,
+            icon: const Icon(Icons.login_rounded, size: 18),
+            label: Text(t.businessesHubEnter),
+            style: FilledButton.styleFrom(
+              minimumSize: const Size(0, 40),
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+            ),
           ),
-        ],
       ],
     );
   }
@@ -224,7 +279,8 @@ class _BusinessHubCardState extends State<BusinessHubCard> {
     return Stack(
       clipBehavior: Clip.none,
       children: [
-        Container(
+        AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
           width: size,
           height: size,
           decoration: BoxDecoration(
@@ -236,8 +292,8 @@ class _BusinessHubCardState extends State<BusinessHubCard> {
             borderRadius: BorderRadius.circular(size * 0.28),
             boxShadow: [
               BoxShadow(
-                color: bg.withValues(alpha: 0.35),
-                blurRadius: 8,
+                color: bg.withValues(alpha: _hovered ? 0.45 : 0.3),
+                blurRadius: _hovered ? 12 : 8,
                 offset: const Offset(0, 3),
               ),
             ],
@@ -274,16 +330,23 @@ class _BusinessHubCardState extends State<BusinessHubCard> {
     );
   }
 
-  Widget _buildMainInfo(BuildContext context, AppLocalizations t, {bool showDate = true}) {
+  Widget _buildMainInfo(BuildContext context, AppLocalizations t) {
+    final showDate = !widget.simplified &&
+        !ResponsiveHelper.isMobile(context) &&
+        b.createdAt.isNotEmpty;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
       children: [
         _buildNameRow(context, t),
         const SizedBox(height: 4),
         _buildMetaLine(context, t),
-        const SizedBox(height: 6),
-        _buildChipsRow(context, t),
-        if (showDate && b.createdAt.isNotEmpty) ...[
+        if (!widget.simplified || b.isDeletionPending || b.isMultiCurrency) ...[
+          const SizedBox(height: 6),
+          _buildChipsRow(context, t),
+        ],
+        if (showDate) ...[
           const SizedBox(height: 4),
           Text(
             '${t.businessesHubEstablished}: ${formatBusinessCreatedAt(b.createdAt)}',
@@ -296,12 +359,6 @@ class _BusinessHubCardState extends State<BusinessHubCard> {
           const SizedBox(height: 10),
           _buildRestoreSection(context, t),
         ],
-        if (_canPreviewStats && _hovered && ResponsiveHelper.isDesktop(context))
-          BusinessHubStatsPreview(
-            stats: _stats,
-            loading: _statsLoading,
-            compact: widget.listLayout && ResponsiveHelper.isTablet(context),
-          ),
       ],
     );
   }
@@ -313,7 +370,8 @@ class _BusinessHubCardState extends State<BusinessHubCard> {
         Expanded(
           child: Text(
             b.name,
-            style: theme.textTheme.titleMedium?.copyWith(
+            style: (widget.prominent ? theme.textTheme.titleLarge : theme.textTheme.titleMedium)
+                ?.copyWith(
               fontWeight: FontWeight.w700,
               decoration: b.isDeletionPending ? TextDecoration.lineThrough : null,
               color: b.isDeletionPending ? theme.colorScheme.onSurfaceVariant : null,
@@ -398,29 +456,44 @@ class _BusinessHubCardState extends State<BusinessHubCard> {
     );
   }
 
-  Widget _buildTrailing(BuildContext context, AppLocalizations t, bool showHoverCta) {
+  Widget _buildTrailing(BuildContext context, AppLocalizations t) {
+    // CTA همیشه ثابت و قابل کلیک — هاور فقط elevation/آمار شناور را تغییر می‌دهد.
+    final showEnter = !_blocked && !(b.isDeletionPending && b.isOwner);
+    final isMobile = ResponsiveHelper.isMobile(context);
+
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
-        AnimatedSwitcher(
-          duration: const Duration(milliseconds: 160),
-          child: showHoverCta
-              ? FilledButton.icon(
-                  key: const ValueKey('enter'),
-                  onPressed: widget.onEnter,
-                  icon: const Icon(Icons.login_rounded, size: 18),
-                  label: Text(t.businessesHubEnter),
-                  style: FilledButton.styleFrom(
-                    minimumSize: const Size(0, 40),
-                    padding: const EdgeInsets.symmetric(horizontal: 14),
+        if (showEnter)
+          AnimatedScale(
+            scale: _hovered && ResponsiveHelper.isDesktop(context) ? 1.03 : 1.0,
+            duration: const Duration(milliseconds: 150),
+            child: isMobile
+                ? FilledButton.tonalIcon(
+                    onPressed: widget.onEnter,
+                    icon: const Icon(Icons.login_rounded, size: 18),
+                    label: Text(t.businessesHubEnter),
+                    style: FilledButton.styleFrom(
+                      minimumSize: const Size(0, 40),
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      visualDensity: VisualDensity.compact,
+                    ),
+                  )
+                : FilledButton.icon(
+                    onPressed: widget.onEnter,
+                    icon: const Icon(Icons.login_rounded, size: 18),
+                    label: Text(t.businessesHubEnter),
+                    style: FilledButton.styleFrom(
+                      minimumSize: Size(widget.prominent ? 108 : 0, widget.prominent ? 44 : 40),
+                      padding: EdgeInsets.symmetric(horizontal: widget.prominent ? 18 : 14),
+                    ),
                   ),
-                )
-              : Icon(
-                  key: const ValueKey('arrow'),
-                  Icons.chevron_left_rounded,
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
-        ),
+          )
+        else if (isMobile)
+          Icon(
+            Icons.chevron_left_rounded,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
         _buildMenuButton(context, t),
       ],
     );
@@ -440,6 +513,18 @@ class _BusinessHubCardState extends State<BusinessHubCard> {
             child: ListTile(
               leading: const Icon(Icons.login_rounded),
               title: Text(t.businessesHubEnter),
+              contentPadding: EdgeInsets.zero,
+              dense: true,
+            ),
+          ));
+        }
+
+        if (_canPreviewStats) {
+          items.add(PopupMenuItem(
+            value: _HubMenuAction.stats,
+            child: ListTile(
+              leading: const Icon(Icons.insights_outlined),
+              title: Text(t.businessesHubStatsTitle),
               contentPadding: EdgeInsets.zero,
               dense: true,
             ),
@@ -538,6 +623,8 @@ class _BusinessHubCardState extends State<BusinessHubCard> {
     switch (action) {
       case _HubMenuAction.enter:
         widget.onEnter();
+      case _HubMenuAction.stats:
+        await _showStatsSheet();
       case _HubMenuAction.pin:
         widget.onPinChanged?.call(!widget.isPinned);
       case _HubMenuAction.restore:
@@ -641,4 +728,4 @@ class _BusinessHubCardState extends State<BusinessHubCard> {
   }
 }
 
-enum _HubMenuAction { enter, pin, restore, leave, currency }
+enum _HubMenuAction { enter, stats, pin, restore, leave, currency }

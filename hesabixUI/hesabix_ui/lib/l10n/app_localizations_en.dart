@@ -2416,6 +2416,18 @@ class AppLocalizationsEn extends AppLocalizations {
   String get businessesHubSearchShortcut => 'Press / to search';
 
   @override
+  String get businessesHubPickSubtitle => 'Choose a business to continue';
+
+  @override
+  String get businessesHubShowTools => 'Search & filters';
+
+  @override
+  String get businessesHubHideTools => 'Hide tools';
+
+  @override
+  String get businessesHubStatsHint => 'Hover for quick stats';
+
+  @override
   String get accessDenied => 'Access denied';
 
   @override

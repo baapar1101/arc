@@ -31,6 +31,9 @@ class BusinessesPage extends StatefulWidget {
 class _BusinessesPageState extends State<BusinessesPage> {
   static const int _pageSize = 12;
   static const double _contentMaxWidth = 1360;
+  static const double _pickerMaxWidth = 720;
+  /// زیر این تعداد، ابزارهای جستجو/فیلتر به‌صورت پیش‌فرض مخفی می‌مانند.
+  static const int _hubToolsThreshold = 3;
 
   final BusinessDashboardService _service = BusinessDashboardService(ApiClient());
   final AuthStore _authStore = AuthStore();
@@ -52,6 +55,7 @@ class _BusinessesPageState extends State<BusinessesPage> {
   BusinessesSortMode _sortMode = BusinessesSortMode.newest;
   BusinessesViewMode _viewMode = BusinessesViewMode.list;
   Timer? _searchDebounce;
+  bool _toolsForced = false;
 
   @override
   void initState() {
@@ -345,7 +349,30 @@ class _BusinessesPageState extends State<BusinessesPage> {
 
   bool get _useListLayout {
     if (ResponsiveHelper.isMobile(context)) return true;
+    if (!_showHubTools) return true;
     return _viewMode == BusinessesViewMode.list;
+  }
+
+  /// حالت هاب کامل فقط وقتی تعداد زیاد است یا کاربر ابزارها را باز کرده.
+  bool get _showHubTools =>
+      _toolsForced || _businesses.length >= _hubToolsThreshold;
+
+  double get _activeContentMaxWidth {
+    if (_showHubTools || _loading) return _contentMaxWidth;
+    return _businesses.length <= 1 ? _pickerMaxWidth : 880;
+  }
+
+  void _toggleTools() {
+    setState(() {
+      _toolsForced = !_toolsForced;
+      if (!_toolsForced) {
+        _searchController.clear();
+        _searchQuery = '';
+        _ownershipFilter = BusinessesOwnershipFilter.all;
+        _sortMode = BusinessesSortMode.newest;
+        _viewMode = BusinessesViewMode.list;
+      }
+    });
   }
 
   @override
@@ -353,10 +380,18 @@ class _BusinessesPageState extends State<BusinessesPage> {
     final t = AppLocalizations.of(context);
     final isMobile = ResponsiveHelper.isMobile(context);
     final padding = ResponsiveHelper.getPadding(context);
-    final horizontalPad = _horizontalPadding(context, padding);
+    final contentMax = _activeContentMaxWidth;
+    final horizontalPad = _horizontalPadding(context, padding, contentMax);
     final filtered = _applyFilters(_businesses);
     final hasActiveFilters = _searchQuery.isNotEmpty || _ownershipFilter != BusinessesOwnershipFilter.all;
-    final showRecent = !hasActiveFilters && _recentBusinesses.isNotEmpty && !_loading && _error == null;
+    final showHubChrome = _showHubTools;
+    final showRecent = showHubChrome &&
+        !hasActiveFilters &&
+        _recentBusinesses.isNotEmpty &&
+        !_loading &&
+        _error == null;
+    final simplifiedCards = !showHubChrome;
+    final prominentCard = simplifiedCards && _businesses.length == 1;
 
     return Scaffold(
       floatingActionButton: isMobile && !_loading && _error == null && _businesses.isNotEmpty
@@ -369,7 +404,7 @@ class _BusinessesPageState extends State<BusinessesPage> {
       body: CallbackShortcuts(
         bindings: {
           const SingleActivator(LogicalKeyboardKey.slash): () {
-            if (!_loading && _error == null && _businesses.isNotEmpty) {
+            if (!_loading && _error == null && _businesses.isNotEmpty && showHubChrome) {
               _searchFocusNode.requestFocus();
             }
           },
@@ -377,160 +412,184 @@ class _BusinessesPageState extends State<BusinessesPage> {
         child: Focus(
           autofocus: false,
           child: RefreshIndicator(
-        onRefresh: _refresh,
-        edgeOffset: 8,
-        child: CustomScrollView(
-          controller: _scrollController,
-          physics: const AlwaysScrollableScrollPhysics(),
-          slivers: [
-            SliverToBoxAdapter(
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: _contentMaxWidth),
-                  child: Padding(
-                    padding: EdgeInsets.fromLTRB(horizontalPad, padding, horizontalPad, 0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        _buildPageHeader(context, t, filtered.length, isMobile),
-                        SizedBox(height: padding),
-                        if (!_loading && _error == null && _businesses.isNotEmpty) ...[
-                          _buildToolbar(context, t, isMobile),
-                          SizedBox(height: padding),
-                        ],
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            if (_loading)
-              SliverToBoxAdapter(
-                child: Center(
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: _contentMaxWidth),
-                    child: Padding(
-                      padding: EdgeInsets.all(horizontalPad),
-                      child: BusinessesHubSkeleton(listMode: _useListLayout),
-                    ),
-                  ),
-                ),
-              )
-            else if (_error != null)
-              SliverFillRemaining(
-                hasScrollBody: false,
-                child: _buildErrorState(t, padding),
-              )
-            else if (_businesses.isEmpty)
-              SliverFillRemaining(
-                hasScrollBody: false,
-                child: const BusinessesEmptyState(),
-              )
-            else if (filtered.isEmpty)
-              SliverFillRemaining(
-                hasScrollBody: false,
-                child: BusinessesEmptyState(
-                  noSearchResults: true,
-                  searchQuery: _searchQuery,
-                ),
-              )
-            else ...[
-              if (showRecent)
+            onRefresh: _refresh,
+            edgeOffset: 8,
+            child: CustomScrollView(
+              controller: _scrollController,
+              physics: const AlwaysScrollableScrollPhysics(),
+              slivers: [
                 SliverToBoxAdapter(
                   child: Center(
                     child: ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: _contentMaxWidth),
+                      constraints: BoxConstraints(maxWidth: contentMax),
                       child: Padding(
-                        padding: EdgeInsets.fromLTRB(horizontalPad, 0, horizontalPad, padding),
-                        child: _buildRecentSection(context, t),
+                        padding: EdgeInsets.fromLTRB(horizontalPad, padding, horizontalPad, 0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            _buildPageHeader(context, t, filtered.length, isMobile, showHubChrome),
+                            SizedBox(height: padding),
+                            if (!_loading && _error == null && _businesses.isNotEmpty)
+                              AnimatedSize(
+                                duration: const Duration(milliseconds: 260),
+                                curve: Curves.easeOutCubic,
+                                alignment: Alignment.topCenter,
+                                child: showHubChrome
+                                    ? Column(
+                                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                                        children: [
+                                          _buildToolbar(context, t, isMobile),
+                                          SizedBox(height: padding),
+                                        ],
+                                      )
+                                    : _buildSimpleToolsToggle(context, t),
+                              ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
                 ),
-              SliverToBoxAdapter(
-                child: Center(
-                  child: ConstrainedBox(
-                    constraints: const BoxConstraints(maxWidth: _contentMaxWidth),
-                    child: Padding(
-                      padding: EdgeInsets.fromLTRB(horizontalPad, 0, horizontalPad, 8),
-                      child: Text(
-                        t.businessesHubAllSection,
-                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                              fontWeight: FontWeight.w700,
-                              color: Theme.of(context).colorScheme.onSurfaceVariant,
+                if (_loading)
+                  SliverToBoxAdapter(
+                    child: Center(
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(maxWidth: contentMax),
+                        child: Padding(
+                          padding: EdgeInsets.all(horizontalPad),
+                          child: BusinessesHubSkeleton(listMode: _useListLayout),
+                        ),
+                      ),
+                    ),
+                  )
+                else if (_error != null)
+                  SliverFillRemaining(
+                    hasScrollBody: false,
+                    child: _buildErrorState(t, padding),
+                  )
+                else if (_businesses.isEmpty)
+                  const SliverFillRemaining(
+                    hasScrollBody: false,
+                    child: BusinessesEmptyState(),
+                  )
+                else if (filtered.isEmpty)
+                  SliverFillRemaining(
+                    hasScrollBody: false,
+                    child: BusinessesEmptyState(
+                      noSearchResults: true,
+                      searchQuery: _searchQuery,
+                    ),
+                  )
+                else ...[
+                  if (showRecent)
+                    SliverToBoxAdapter(
+                      child: Center(
+                        child: ConstrainedBox(
+                          constraints: BoxConstraints(maxWidth: contentMax),
+                          child: Padding(
+                            padding: EdgeInsets.fromLTRB(horizontalPad, 0, horizontalPad, padding),
+                            child: _buildRecentSection(context, t),
+                          ),
+                        ),
+                      ),
+                    ),
+                  if (showHubChrome)
+                    SliverToBoxAdapter(
+                      child: Center(
+                        child: ConstrainedBox(
+                          constraints: BoxConstraints(maxWidth: contentMax),
+                          child: Padding(
+                            padding: EdgeInsets.fromLTRB(horizontalPad, 0, horizontalPad, 8),
+                            child: Text(
+                              t.businessesHubAllSection,
+                              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                                    fontWeight: FontWeight.w700,
+                                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                  ),
                             ),
+                          ),
+                        ),
                       ),
                     ),
-                  ),
-                ),
-              ),
-              if (_useListLayout)
-                SliverPadding(
-                  padding: EdgeInsets.fromLTRB(horizontalPad, 0, horizontalPad, padding + (isMobile ? 72 : 16)),
-                  sliver: SliverList(
-                    delegate: SliverChildBuilderDelegate(
-                      (context, index) {
-                        if (index >= filtered.length) {
-                          return const Padding(
-                            padding: EdgeInsets.all(24),
-                            child: Center(child: CircularProgressIndicator()),
-                          );
-                        }
-                        final business = filtered[index];
-                        return Padding(
-                          padding: EdgeInsets.only(bottom: index < filtered.length - 1 ? 10 : 0),
-                          child: _buildBusinessListItem(context, t, business, isMobile),
-                        );
-                      },
-                      childCount: filtered.length + (_isLoadingMore ? 1 : 0),
+                  if (_useListLayout)
+                    SliverPadding(
+                      padding: EdgeInsets.fromLTRB(
+                        horizontalPad,
+                        0,
+                        horizontalPad,
+                        padding + (isMobile ? 72 : 16),
+                      ),
+                      sliver: SliverList(
+                        delegate: SliverChildBuilderDelegate(
+                          (context, index) {
+                            if (index >= filtered.length) {
+                              return const Padding(
+                                padding: EdgeInsets.all(24),
+                                child: Center(child: CircularProgressIndicator()),
+                              );
+                            }
+                            final business = filtered[index];
+                            return Padding(
+                              padding: EdgeInsets.only(bottom: index < filtered.length - 1 ? 10 : 0),
+                              child: _buildBusinessListItem(
+                                context,
+                                t,
+                                business,
+                                isMobile,
+                                simplified: simplifiedCards,
+                                prominent: prominentCard,
+                              ),
+                            );
+                          },
+                          childCount: filtered.length + (_isLoadingMore ? 1 : 0),
+                        ),
+                      ),
+                    )
+                  else
+                    SliverPadding(
+                      padding: EdgeInsets.fromLTRB(horizontalPad, 0, horizontalPad, padding + 16),
+                      sliver: SliverGrid(
+                        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: _gridColumns(context),
+                          mainAxisSpacing: 12,
+                          crossAxisSpacing: 12,
+                          mainAxisExtent: 228,
+                        ),
+                        delegate: SliverChildBuilderDelegate(
+                          (context, index) {
+                            if (index >= filtered.length) {
+                              return const Center(child: CircularProgressIndicator());
+                            }
+                            final business = filtered[index];
+                            return BusinessHubCard(
+                              business: business,
+                              authStore: _authStore,
+                              isPinned: _pinnedIds.contains(business.id),
+                              listLayout: false,
+                              simplified: simplifiedCards,
+                              prominent: false,
+                              dashboardService: _service,
+                              onEnter: () => _navigateToBusiness(business.id),
+                              onPinChanged: (pinned) => _togglePin(business.id, pinned),
+                              onRefresh: _refresh,
+                            );
+                          },
+                          childCount: filtered.length + (_isLoadingMore ? _gridColumns(context) : 0),
+                        ),
+                      ),
                     ),
-                  ),
-                )
-              else
-                SliverPadding(
-                  padding: EdgeInsets.fromLTRB(horizontalPad, 0, horizontalPad, padding + 16),
-                  sliver: SliverGrid(
-                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: _gridColumns(context),
-                      mainAxisSpacing: 12,
-                      crossAxisSpacing: 12,
-                      mainAxisExtent: 220,
-                    ),
-                    delegate: SliverChildBuilderDelegate(
-                      (context, index) {
-                        if (index >= filtered.length) {
-                          return const Center(child: CircularProgressIndicator());
-                        }
-                        final business = filtered[index];
-                        return BusinessHubCard(
-                          business: business,
-                          authStore: _authStore,
-                          isPinned: _pinnedIds.contains(business.id),
-                          listLayout: false,
-                          dashboardService: _service,
-                          onEnter: () => _navigateToBusiness(business.id),
-                          onPinChanged: (pinned) => _togglePin(business.id, pinned),
-                          onRefresh: _refresh,
-                        );
-                      },
-                      childCount: filtered.length + (_isLoadingMore ? _gridColumns(context) : 0),
-                    ),
-                  ),
-                ),
-            ],
-          ],
-        ),
+                ],
+              ],
+            ),
           ),
         ),
       ),
     );
   }
 
-  double _horizontalPadding(BuildContext context, double basePadding) {
-    final width = MediaQuery.sizeOf(context).width;
-    final side = (width - _contentMaxWidth) / 2;
-    if (side <= basePadding) return basePadding;
-    return side;
+  double _horizontalPadding(BuildContext context, double basePadding, double contentMax) {
+    // Center + ConstrainedBox عرض را محدود و وسط‌چین می‌کند.
+    return basePadding;
   }
 
   int _gridColumns(BuildContext context) {
@@ -543,8 +602,20 @@ class _BusinessesPageState extends State<BusinessesPage> {
     };
   }
 
-  Widget _buildPageHeader(BuildContext context, AppLocalizations t, int count, bool isMobile) {
+  Widget _buildPageHeader(
+    BuildContext context,
+    AppLocalizations t,
+    int count,
+    bool isMobile,
+    bool showHubChrome,
+  ) {
     final theme = Theme.of(context);
+    final subtitle = _businesses.isEmpty
+        ? t.businessesHubSubtitle
+        : showHubChrome
+            ? t.businessesHubCount(count)
+            : t.businessesHubPickSubtitle;
+
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -556,12 +627,12 @@ class _BusinessesPageState extends State<BusinessesPage> {
                 t.businesses,
                 style: theme.textTheme.headlineMedium?.copyWith(
                   fontWeight: FontWeight.w800,
-                  fontSize: isMobile ? 24 : 28,
+                  fontSize: isMobile ? 24 : (showHubChrome ? 28 : 30),
                 ),
               ),
               const SizedBox(height: 4),
               Text(
-                _businesses.isEmpty ? t.businessesHubSubtitle : t.businessesHubCount(count),
+                subtitle,
                 style: theme.textTheme.bodyMedium?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
                 ),
@@ -571,6 +642,15 @@ class _BusinessesPageState extends State<BusinessesPage> {
         ),
         if (!isMobile) ...[
           const SizedBox(width: 12),
+          if (_businesses.isNotEmpty && _businesses.length < _hubToolsThreshold)
+            Padding(
+              padding: const EdgeInsetsDirectional.only(end: 8),
+              child: TextButton.icon(
+                onPressed: _toggleTools,
+                icon: Icon(showHubChrome ? Icons.tune_rounded : Icons.search_rounded, size: 18),
+                label: Text(showHubChrome ? t.businessesHubHideTools : t.businessesHubShowTools),
+              ),
+            ),
           FilledButton.icon(
             onPressed: () => context.go('/user/profile/new-business'),
             icon: const Icon(Icons.add_rounded),
@@ -581,11 +661,45 @@ class _BusinessesPageState extends State<BusinessesPage> {
     );
   }
 
+  Widget _buildSimpleToolsToggle(BuildContext context, AppLocalizations t) {
+    if (!ResponsiveHelper.isMobile(context)) {
+      return const SizedBox.shrink();
+    }
+    if (_businesses.length >= _hubToolsThreshold) {
+      return const SizedBox.shrink();
+    }
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Align(
+        alignment: AlignmentDirectional.centerStart,
+        child: TextButton.icon(
+          onPressed: _toggleTools,
+          icon: const Icon(Icons.search_rounded, size: 18),
+          label: Text(t.businessesHubShowTools),
+          style: TextButton.styleFrom(
+            visualDensity: VisualDensity.compact,
+            padding: EdgeInsets.zero,
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildToolbar(BuildContext context, AppLocalizations t, bool isMobile) {
     final cs = Theme.of(context).colorScheme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        if (_toolsForced && _businesses.length < _hubToolsThreshold && isMobile)
+          Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: TextButton.icon(
+              onPressed: _toggleTools,
+              icon: const Icon(Icons.close_rounded, size: 18),
+              label: Text(t.businessesHubHideTools),
+              style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
+            ),
+          ),
         TextField(
           controller: _searchController,
           focusNode: _searchFocusNode,
@@ -612,31 +726,36 @@ class _BusinessesPageState extends State<BusinessesPage> {
           ),
         ),
         const SizedBox(height: 10),
-        SingleChildScrollView(
-          scrollDirection: Axis.horizontal,
-          child: Row(
-            children: [
-              _filterChip(t.businessesHubFilterAll, BusinessesOwnershipFilter.all),
-              _filterChip(t.businessesHubFilterOwner, BusinessesOwnershipFilter.owner),
-              _filterChip(t.businessesHubFilterMember, BusinessesOwnershipFilter.member),
-              _filterChip(t.businessesHubFilterPendingDeletion, BusinessesOwnershipFilter.pendingDeletion),
-              const SizedBox(width: 8),
-              _sortMenu(context, t),
-              if (!isMobile) ...[
+        if (isMobile) ...[
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                _filterChip(t.businessesHubFilterAll, BusinessesOwnershipFilter.all),
+                _filterChip(t.businessesHubFilterOwner, BusinessesOwnershipFilter.owner),
+                _filterChip(t.businessesHubFilterMember, BusinessesOwnershipFilter.member),
+                _filterChip(t.businessesHubFilterPendingDeletion, BusinessesOwnershipFilter.pendingDeletion),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+          _sortMenu(context, t, expanded: true),
+        ] else
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                _filterChip(t.businessesHubFilterAll, BusinessesOwnershipFilter.all),
+                _filterChip(t.businessesHubFilterOwner, BusinessesOwnershipFilter.owner),
+                _filterChip(t.businessesHubFilterMember, BusinessesOwnershipFilter.member),
+                _filterChip(t.businessesHubFilterPendingDeletion, BusinessesOwnershipFilter.pendingDeletion),
+                const SizedBox(width: 8),
+                _sortMenu(context, t),
                 const SizedBox(width: 4),
                 _viewToggle(context, t),
               ],
-            ],
+            ),
           ),
-        ),
-        if (isMobile) ...[
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Expanded(child: _sortMenu(context, t, expanded: true)),
-            ],
-          ),
-        ],
       ],
     );
   }
@@ -787,13 +906,17 @@ class _BusinessesPageState extends State<BusinessesPage> {
     BuildContext context,
     AppLocalizations t,
     BusinessWithPermission business,
-    bool isMobile,
-  ) {
+    bool isMobile, {
+    bool simplified = false,
+    bool prominent = false,
+  }) {
     final card = BusinessHubCard(
       business: business,
       authStore: _authStore,
       isPinned: _pinnedIds.contains(business.id),
       listLayout: true,
+      simplified: simplified,
+      prominent: prominent,
       dashboardService: _service,
       onEnter: () => _navigateToBusiness(business.id),
       onPinChanged: (pinned) => _togglePin(business.id, pinned),

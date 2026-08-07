@@ -4592,6 +4592,30 @@ abstract class AppLocalizations {
   /// **'Press / to search'**
   String get businessesHubSearchShortcut;
 
+  /// No description provided for @businessesHubPickSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a business to continue'**
+  String get businessesHubPickSubtitle;
+
+  /// No description provided for @businessesHubShowTools.
+  ///
+  /// In en, this message translates to:
+  /// **'Search & filters'**
+  String get businessesHubShowTools;
+
+  /// No description provided for @businessesHubHideTools.
+  ///
+  /// In en, this message translates to:
+  /// **'Hide tools'**
+  String get businessesHubHideTools;
+
+  /// No description provided for @businessesHubStatsHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Hover for quick stats'**
+  String get businessesHubStatsHint;
+
   /// No description provided for @accessDenied.
   ///
   /// In en, this message translates to:
