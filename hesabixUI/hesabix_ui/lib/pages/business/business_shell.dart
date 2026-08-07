@@ -1949,15 +1949,26 @@ class _BusinessShellState extends State<BusinessShell> {
       }
     }
 
-    final pathOnly = Uri.tryParse(location)?.path ??
-        _bu('dashboard');
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) return;
       await BusinessPanelUiStore.instance.hydrateIfNeeded();
       if (!mounted) return;
+      // مسیر را در خود callback بخوان تا URL کهنه‌ی build قبلی
+      // (مثلاً بعد از بستن تب و قبل از go) جلسه تب را زنده نکند.
+      final ctx = context;
+      if (!ctx.mounted) return;
+      String syncPath;
+      try {
+        syncPath = GoRouterState.of(ctx).uri.path;
+      } catch (_) {
+        syncPath = Uri.tryParse(location)?.path ?? _bu('dashboard');
+      }
+      if (syncPath.isEmpty) {
+        syncPath = _bu('dashboard');
+      }
       BusinessPanelUiStore.instance.onBusinessRouteChanged(
         widget.businessId,
-        pathOnly,
+        syncPath,
         isDesktop: useRail,
       );
     });

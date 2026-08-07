@@ -35,6 +35,9 @@ class BusinessPanelUiStore extends ChangeNotifier {
   BusinessPanelSidebarTabBehavior _sidebarTabBehavior =
       BusinessPanelSidebarTabBehavior.reuseAcrossTabsOnTap;
   final Map<int, BusinessPanelTabSession> _tabsByBusiness = {};
+  /// پس از ناوبری از سمت store، تا رسیدن روتر به همین مسیر، sync کهنه را نادیده بگیر.
+  /// بدون این، `repack` + post-frame با URL قبلی تب بسته‌شده را زنده می‌کند.
+  final Map<int, String> _awaitingRouterPath = {};
   bool _hydrated = false;
   Future<void>? _hydrateFuture;
   Timer? _persistDebounce;
@@ -70,6 +73,7 @@ class BusinessPanelUiStore extends ChangeNotifier {
     _mode = BusinessPanelNavigationMode.single;
     _sidebarTabBehavior = BusinessPanelSidebarTabBehavior.reuseAcrossTabsOnTap;
     _tabsByBusiness.clear();
+    _awaitingRouterPath.clear();
     notifyListeners();
   }
 
@@ -87,6 +91,7 @@ class BusinessPanelUiStore extends ChangeNotifier {
       _sidebarTabBehavior = BusinessPanelSidebarTabBehavior.reuseAcrossTabsOnTap;
     }
     _tabsByBusiness.clear();
+    _awaitingRouterPath.clear();
     final tabsRaw = raw['business_panel_tabs'];
     if (tabsRaw is Map) {
       for (final e in tabsRaw.entries) {
@@ -205,6 +210,14 @@ class BusinessPanelUiStore extends ChangeNotifier {
     await persistImmediate();
   }
 
+  /// ناوبری از store: مسیر هدف را ثبت می‌کند تا sync کهنه قبل از اعمال go، جلسه تب را خراب نکند.
+  void _goAndAwaitRouter(int businessId, String location, void Function(String location) go) {
+    _awaitingRouterPath[businessId] = location.split('?').first;
+    go(location);
+  }
+
+  static String _pathKey(String path) => path.split('?').first;
+
   /// همگام‌سازی با مسیر فعلی روتر (فقط دسکتاپ + حالت تب).
   void onBusinessRouteChanged(int businessId, String pathOnly, {required bool isDesktop}) {
     final norm = pathOnly.split('?').first;
@@ -221,6 +234,16 @@ class BusinessPanelUiStore extends ChangeNotifier {
 
     final slot = BusinessRoutePaths.parseTabSlotFromPath(norm);
     if (slot == null) return;
+
+    final awaiting = _awaitingRouterPath[businessId];
+    if (awaiting != null) {
+      if (norm != awaiting) {
+        // URL کهنه (مثلاً تب بسته‌شده قبل از go) — جلسه را بازنویسی نکن.
+        // ناوبری بعدی از store (_goAndAwaitRouter) این قفل را عوض می‌کند.
+        return;
+      }
+      _awaitingRouterPath.remove(businessId);
+    }
 
     final existing = _tabsByBusiness[businessId];
     var paths = existing != null ? List<String>.from(existing.paths) : <String>[];
@@ -330,8 +353,8 @@ class BusinessPanelUiStore extends ChangeNotifier {
 
     paths[slot] = newFull;
     _tabsByBusiness[businessId] = BusinessPanelTabSession(paths: paths, activePath: newFull);
+    _goAndAwaitRouter(businessId, newFull, go);
     notifyListeners();
-    go(newFull);
     _schedulePersist();
     return true;
   }
@@ -356,8 +379,8 @@ class BusinessPanelUiStore extends ChangeNotifier {
       final newFull = _appendQueryFromMenuUri(newBase, menuUri);
       paths[i] = newFull;
       _tabsByBusiness[businessId] = BusinessPanelTabSession(paths: paths, activePath: newFull);
+      _goAndAwaitRouter(businessId, newFull, go);
       notifyListeners();
-      go(newFull);
       _schedulePersist();
       return;
     }
@@ -375,8 +398,8 @@ class BusinessPanelUiStore extends ChangeNotifier {
     paths.add(newFull);
 
     _tabsByBusiness[businessId] = BusinessPanelTabSession(paths: paths, activePath: newFull);
+    _goAndAwaitRouter(businessId, newFull, go);
     notifyListeners();
-    go(newFull);
     _schedulePersist();
   }
 
@@ -385,8 +408,8 @@ class BusinessPanelUiStore extends ChangeNotifier {
     if (s == null || !s.paths.contains(path)) return;
     if (s.activePath == path) return;
     _tabsByBusiness[businessId] = BusinessPanelTabSession(paths: s.paths, activePath: path);
+    _goAndAwaitRouter(businessId, path, go);
     notifyListeners();
-    go(path);
     _schedulePersist();
   }
 
@@ -394,20 +417,24 @@ class BusinessPanelUiStore extends ChangeNotifier {
     final s = _tabsByBusiness[businessId];
     if (s == null) return;
 
+    final pathKey = _pathKey(path);
     var paths = List<String>.from(s.paths);
-    paths.remove(path);
+    final removeIdx = paths.indexWhere((p) => _pathKey(p) == pathKey);
+    if (removeIdx < 0) return;
+    paths.removeAt(removeIdx);
     paths = BusinessRoutePaths.repackTabPathsAfterRemoval(businessId, paths);
     final dash = BusinessRoutePaths.uri(businessId, 0, 'dashboard');
 
     if (paths.isEmpty) {
       _tabsByBusiness[businessId] = BusinessPanelTabSession(paths: [dash], activePath: dash);
+      // اول go تا post-frame sync مسیر کهنه را نبیند؛ سپس UI را به‌روز کن.
+      _goAndAwaitRouter(businessId, dash, go);
       notifyListeners();
-      go(dash);
       _schedulePersist();
       return;
     }
 
-    final wasActive = s.activePath == path;
+    final wasActive = _pathKey(s.activePath) == pathKey;
     final String nextActive;
     if (wasActive) {
       nextActive = paths.last;
@@ -419,10 +446,9 @@ class BusinessPanelUiStore extends ChangeNotifier {
       );
     }
     _tabsByBusiness[businessId] = BusinessPanelTabSession(paths: paths, activePath: nextActive);
+    // همیشه go: حتی بستن تب غیرفعال اسلات‌ها را renumber می‌کند و روتر باید هم‌تراز شود.
+    _goAndAwaitRouter(businessId, nextActive, go);
     notifyListeners();
-    if (wasActive) {
-      go(nextActive);
-    }
     _schedulePersist();
   }
 
@@ -451,8 +477,8 @@ class BusinessPanelUiStore extends ChangeNotifier {
   void closeAllTabs(int businessId, void Function(String location) go) {
     final dash = BusinessRoutePaths.uri(businessId, 0, 'dashboard');
     _tabsByBusiness[businessId] = BusinessPanelTabSession(paths: [dash], activePath: dash);
+    _goAndAwaitRouter(businessId, dash, go);
     notifyListeners();
-    go(dash);
     _schedulePersist();
   }
 
@@ -473,8 +499,8 @@ class BusinessPanelUiStore extends ChangeNotifier {
       orElse: () => repacked.last,
     );
     _tabsByBusiness[businessId] = BusinessPanelTabSession(paths: repacked, activePath: nextActive);
+    _goAndAwaitRouter(businessId, nextActive, go);
     notifyListeners();
-    go(nextActive);
     _schedulePersist();
   }
 }
