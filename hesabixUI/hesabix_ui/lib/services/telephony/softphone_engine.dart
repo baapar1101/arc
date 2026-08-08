@@ -341,7 +341,7 @@ class SoftphoneEngine extends ChangeNotifier {
     notifyListeners();
   }
 
-  String? get incomingCallerDisplay {
+  String get incomingCallerDisplay {
     final from = '${activeCall?['from'] ?? ''}'.trim();
     if (from.isNotEmpty && from != 'null') return from;
     return 'شماره ناشناس';

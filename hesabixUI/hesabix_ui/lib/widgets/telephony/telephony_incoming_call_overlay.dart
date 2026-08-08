@@ -94,7 +94,7 @@ class _TelephonyIncomingCallOverlayState extends State<TelephonyIncomingCallOver
 
     final scheme = Theme.of(context).colorScheme;
     final wide = MediaQuery.sizeOf(context).width >= 720;
-    final caller = engine.incomingCallerDisplay;
+    final String caller = engine.incomingCallerDisplay;
     final canAnswer = engine.activeCallId != null;
 
     return Positioned.fill(
