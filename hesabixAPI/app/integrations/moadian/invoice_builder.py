@@ -63,14 +63,12 @@ def build_person_snapshot_from_person(person: Any) -> Dict[str, Any]:
 
 def ensure_person_snapshot_on_document_dict(db: Any, document_dict: Dict[str, Any]) -> Dict[str, Any]:
     """
-    اگر person_snapshot در extra_info نباشد، از person_id طرف‌حساب می‌سازد.
-    بدون این کار فاکتور همیشه به‌اشتباه به‌صورت نوع ۲ (بدون خریدار) می‌رود.
+    قبل از ارسال به مودیان، person_snapshot را از طرف‌حساب زنده می‌سازد/تازه‌سازی می‌کند.
+
+    snapshot قدیمی (مثلاً کد ملی «0» بعد از پاک‌شدن در کارت شخص) نباید نوع فاکتور
+    یا فیلدهای خریدار را منحرف کند. اگر هویت کامل نباشد، builder عمداً نوع ۲ می‌سازد.
     """
     extra = dict(document_dict.get("extra_info") or {})
-    snap = extra.get("person_snapshot") or extra.get("person_info")
-    if isinstance(snap, dict) and (snap.get("national_id") or snap.get("economic_code")):
-        return document_dict
-
     person_id = extra.get("person_id")
     if not person_id:
         return document_dict

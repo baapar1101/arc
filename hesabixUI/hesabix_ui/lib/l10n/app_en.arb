@@ -3146,7 +3146,7 @@
   "taxHelpNoteFailedInDLQ": "Failed invoices show actionable error details on this page",
   "taxHelpNoteTimeline": "Submission window is usually about 12 days from issue date; do not recreate old invoices unless the tax authority extends the window",
   "taxHelpNoteExport": "Each product VAT rate must match its stuffid code (e.g. 10%, not 0 unless exempt)",
-  "taxHelpNoteType1vs2": "Type 1 needs full buyer identity (economic/national ID); send end consumers as type 2",
+  "taxHelpNoteType1vs2": "Type 1 needs full buyer identity (valid economic code, or natural national ID plus postal code); otherwise the invoice is sent automatically as type 2 without buyer fields",
   "taxHelpNoteConnection": "If connection is down, check Moadian settings and run a connection test first",
   "taxKpiAll": "All",
   "taxKpiQueue": "Ready to send",

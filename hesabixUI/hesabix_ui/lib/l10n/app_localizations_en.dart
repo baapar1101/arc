@@ -7935,7 +7935,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get taxHelpNoteType1vs2 =>
-      'Type 1 needs full buyer identity (economic/national ID); send end consumers as type 2';
+      'Type 1 needs full buyer identity (valid economic code, or natural national ID plus postal code); otherwise the invoice is sent automatically as type 2 without buyer fields';
 
   @override
   String get taxHelpNoteConnection =>

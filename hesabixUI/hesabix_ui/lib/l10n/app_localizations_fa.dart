@@ -7885,7 +7885,7 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get taxHelpNoteType1vs2 =>
-      'نوع اول فقط با هویت کامل خریدار (کد اقتصادی/ملی)؛ مصرف‌کننده نهایی را نوع دوم بفرستید';
+      'نوع ۱ فقط با هویت کامل خریدار (کد اقتصادی معتبر، یا کد ملی حقیقی به‌همراه کد پستی)؛ بدون این‌ها فاکتور خودکار به‌صورت نوع ۲ بدون اطلاعات خریدار ارسال می‌شود';
 
   @override
   String get taxHelpNoteConnection =>

@@ -2246,8 +2246,7 @@ class _TaxWorkspacePageState extends State<TaxWorkspacePage> {
     final finalInvoiceId = _invoiceIdFromSendError(error, invoiceId);
 
     if (code == 'TAX_VALIDATION_FAILED') {
-      final issues = apiError.details?['issues'];
-      final List<dynamic> issueList = issues is List ? issues : const [];
+      final issueList = _extractTaxValidationIssues(apiError.details);
       _showValidationIssuesDialog(issueList, invoiceId: finalInvoiceId);
       return true;
     }
@@ -2264,7 +2263,7 @@ class _TaxWorkspacePageState extends State<TaxWorkspacePage> {
       _showTaxFailureDialog(
         title: AppLocalizations.of(context).taxSubmissionFailedTitle,
         message: apiError.message,
-        details: apiError.details,
+        details: _unwrapApiErrorDetailsMap(apiError.details),
         invoiceId: finalInvoiceId,
         errorCode: apiError.code,
       );
@@ -2272,6 +2271,32 @@ class _TaxWorkspacePageState extends State<TaxWorkspacePage> {
       return true;
     }
     return false;
+  }
+
+  /// Dio interceptor کل آبجکت `error` را در `details` می‌گذارد؛
+  /// payload واقعی ممکن است در `details.details` باشد.
+  Map<String, dynamic>? _unwrapApiErrorDetailsMap(Map<String, dynamic>? details) {
+    if (details == null) return null;
+    final nested = details['details'];
+    if (nested is Map<String, dynamic>) {
+      return Map<String, dynamic>.from(nested);
+    }
+    if (nested is Map) {
+      return Map<String, dynamic>.from(nested);
+    }
+    return details;
+  }
+
+  List<dynamic> _extractTaxValidationIssues(Map<String, dynamic>? details) {
+    if (details == null) return const [];
+    final direct = details['issues'];
+    if (direct is List) return direct;
+    final nested = details['details'];
+    if (nested is Map) {
+      final issues = nested['issues'];
+      if (issues is List) return issues;
+    }
+    return const [];
   }
 
   void _showBatchResultDialog(int successCount, List<dynamic> failedItems) {

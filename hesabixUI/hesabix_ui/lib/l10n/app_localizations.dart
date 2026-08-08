@@ -14685,7 +14685,7 @@ abstract class AppLocalizations {
   /// No description provided for @taxHelpNoteType1vs2.
   ///
   /// In en, this message translates to:
-  /// **'Type 1 needs full buyer identity (economic/national ID); send end consumers as type 2'**
+  /// **'Type 1 needs full buyer identity (valid economic code, or natural national ID plus postal code); otherwise the invoice is sent automatically as type 2 without buyer fields'**
   String get taxHelpNoteType1vs2;
 
   /// No description provided for @taxHelpNoteConnection.
