@@ -227,10 +227,15 @@ class TelephonyApi {
     int callId, {
     required String action,
     String? target,
+    Map<String, dynamic>? extra,
   }) async {
     final res = await _api.post<Map<String, dynamic>>(
       '/api/v1/telephony/business/$businessId/calls/$callId/control',
-      data: {'action': action, if (target != null) 'target': target},
+      data: {
+        'action': action,
+        if (target != null) 'target': target,
+        ...?extra,
+      },
     );
     return _data(res.data);
   }

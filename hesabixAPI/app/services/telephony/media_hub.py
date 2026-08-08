@@ -355,30 +355,88 @@ class TelephonyMediaHub:
 		if bridge_id:
 			await self.mark_bridge_active(bridge_id)
 
+	async def ensure_bridge_active(
+		self,
+		*,
+		session_id: str,
+		audiosocket_uuid: Optional[str] = None,
+		call_id: Optional[int] = None,
+		bridge_id: Optional[str] = None,
+		direction: str = "outbound",
+	) -> Optional[MediaBridge]:
+		"""اگر start_bridge روی worker اشتباه اجرا شده/نشده، از bridge.active کانکتور پل را اینجا بساز."""
+		link = self._clients.get(session_id)
+		if not link:
+			LOG.warning("ensure_bridge_active: softphone client missing session=%s", session_id)
+			return None
+
+		existing_id = self._bridges_by_session.get(session_id)
+		if existing_id and existing_id in self._bridges:
+			bridge = self._bridges[existing_id]
+			if audiosocket_uuid:
+				bridge.audiosocket_uuid = str(audiosocket_uuid)
+			if call_id is not None:
+				bridge.call_id = call_id
+				link.active_call_id = call_id
+			await self.mark_bridge_active(existing_id)
+			return bridge
+
+		new_id = str(bridge_id or uuid.uuid4())
+		as_uuid = str(audiosocket_uuid or new_id)
+		bridge = MediaBridge(
+			bridge_id=new_id,
+			session_id=session_id,
+			business_id=link.business_id,
+			pbx_id=link.pbx_id,
+			call_id=call_id if call_id is not None else link.active_call_id,
+			direction=direction,
+			audiosocket_uuid=as_uuid,
+			state="active",
+		)
+		async with self._lock:
+			self._bridges[new_id] = bridge
+			self._bridges_by_session[session_id] = new_id
+			link.bridge_id = new_id
+			if call_id is not None:
+				link.active_call_id = call_id
+		LOG.info(
+			"ensure_bridge_active created bridge=%s session=%s uuid=%s call_id=%s",
+			new_id,
+			session_id,
+			as_uuid,
+			bridge.call_id,
+		)
+		await self.send_to_client(
+			session_id,
+			{"type": "bridge.active", "bridge_id": new_id, "call_id": bridge.call_id},
+		)
+		return bridge
+
 	async def stop_bridge(self, session_id: str, *, reason: str = "hangup") -> None:
 		async with self._lock:
 			bridge_id = self._bridges_by_session.pop(session_id, None)
 			bridge = self._bridges.pop(bridge_id, None) if bridge_id else None
 			link = self._clients.get(session_id)
+			pbx_id = (bridge.pbx_id if bridge else None) or (link.pbx_id if link else None)
+			as_uuid = bridge.audiosocket_uuid if bridge else None
 			if link:
 				link.bridge_id = None
 				link.active_call_id = None
-		if not bridge:
-			return
-		bridge.state = "ended"
-		await self.send_to_tunnel(
-			bridge.pbx_id,
-			{
-				"type": "bridge.stop",
-				"bridge_id": bridge.bridge_id,
-				"session_id": session_id,
-				"audiosocket_uuid": bridge.audiosocket_uuid,
-				"reason": reason,
-			},
-		)
+		# حتی بدون bridge محلی، به Connector بگو AudioSocket را ببند (قطع واقعی تماس)
+		if pbx_id:
+			await self.send_to_tunnel(
+				pbx_id,
+				{
+					"type": "bridge.stop",
+					"bridge_id": bridge_id,
+					"session_id": session_id,
+					"audiosocket_uuid": as_uuid,
+					"reason": reason,
+				},
+			)
 		await self.send_to_client(
 			session_id,
-			{"type": "bridge.ended", "bridge_id": bridge.bridge_id, "reason": reason},
+			{"type": "bridge.ended", "bridge_id": bridge_id, "reason": reason},
 		)
 
 

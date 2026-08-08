@@ -328,13 +328,23 @@ async def _handle_tunnel_control(pbx_id: int, payload: dict[str, Any]) -> None:
 		return
 	if typ == "bridge.active":
 		bridge_id = str(payload.get("bridge_id") or "")
-		if bridge_id:
-			await media_hub.mark_bridge_active(bridge_id)
-			return
-		# fallback: بعضی Connectorها فقط session_id می‌فرستند
 		session_id = str(payload.get("session_id") or "")
+		as_uuid = str(payload.get("audiosocket_uuid") or "") or None
+		call_id_raw = payload.get("call_id")
+		try:
+			call_id = int(call_id_raw) if call_id_raw is not None else None
+		except (TypeError, ValueError):
+			call_id = None
 		if session_id:
-			await media_hub.mark_bridge_active_by_session(session_id)
+			# اگر start_bridge روی process دیگر fail شده، اینجا پل را روی Media Edge واقعی می‌سازیم
+			await media_hub.ensure_bridge_active(
+				session_id=session_id,
+				audiosocket_uuid=as_uuid,
+				call_id=call_id,
+				bridge_id=bridge_id or None,
+			)
+		elif bridge_id:
+			await media_hub.mark_bridge_active(bridge_id)
 		return
 	if typ == "bridge.failed":
 		session_id = str(payload.get("session_id") or "")

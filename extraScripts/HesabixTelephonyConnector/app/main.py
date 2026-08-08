@@ -356,6 +356,7 @@ def main() -> int:
 	as_uuid_to_session: Dict[str, str] = {}
 	session_to_as_uuid: Dict[str, str] = {}
 	session_to_bridge_id: Dict[str, str] = {}
+	session_to_call_id: Dict[str, Any] = {}
 	media_lock = threading.Lock()
 	tunnel_ref: Dict[str, Any] = {"client": None}
 
@@ -365,6 +366,8 @@ def main() -> int:
 			return
 		with media_lock:
 			bridge_id = session_to_bridge_id.get(session_id)
+			if call_id is None:
+				call_id = session_to_call_id.get(session_id)
 		payload: Dict[str, Any] = {
 			"type": "bridge.active",
 			"session_id": session_id,
@@ -435,6 +438,7 @@ def main() -> int:
 					as_uuid_to_session.pop(as_uuid, None)
 				if session_id:
 					session_to_bridge_id.pop(session_id, None)
+					session_to_call_id.pop(session_id, None)
 			if as_uuid:
 				audio_server.hangup(as_uuid)
 		elif typ == "agent.online":
@@ -512,6 +516,8 @@ def main() -> int:
 								if session_id:
 									as_uuid_to_session[as_uuid] = session_id
 									session_to_as_uuid[session_id] = as_uuid
+									if cmd.get("call_id") is not None:
+										session_to_call_id[session_id] = cmd.get("call_id")
 							# Asterisk AudioSocket(uuid,host:port) — ترتیب آرگومان مهم است.
 							# /n روی Local مانع channel optimization می‌شود تا AudioSocket قطع نشود.
 							ami.originate_to_application(
@@ -568,12 +574,24 @@ def main() -> int:
 							if channel:
 								ami.hangup(str(channel))
 							session_id = str(cmd.get("session_id") or "")
+							as_uuid = str(cmd.get("audiosocket_uuid") or "")
 							with media_lock:
-								as_uuid = session_to_as_uuid.pop(session_id, None) if session_id else None
+								if not as_uuid and session_id:
+									as_uuid = session_to_as_uuid.pop(session_id, "") or ""
+								elif as_uuid:
+									mapped_session = as_uuid_to_session.pop(as_uuid, "") or ""
+									session_id = session_id or mapped_session
+									if session_id:
+										session_to_as_uuid.pop(session_id, None)
 								if as_uuid:
 									as_uuid_to_session.pop(as_uuid, None)
+								if session_id:
+									session_to_bridge_id.pop(session_id, None)
 							if as_uuid:
+								LOG.info("hangup AudioSocket uuid=%s session=%s", as_uuid, session_id)
 								audio_server.hangup(as_uuid)
+							elif not channel:
+								LOG.warning("hangup without channel/session/uuid cmd=%s", cmd)
 						elif ctype == "transfer":
 							channel = cmd.get("channel")
 							target = cmd.get("target")

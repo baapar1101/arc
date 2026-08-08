@@ -304,10 +304,16 @@ class SoftphoneEngine extends ChangeNotifier {
 
   Future<void> hangup() async {
     final callId = int.tryParse('${activeCall?['id'] ?? ''}');
-    _ws?.sendJson({'type': 'hangup_media', 'reason': 'user_hangup'});
+    final sid = sessionId;
+    _ws?.sendJson({'type': 'hangup_media', 'reason': 'user_hangup', if (sid != null) 'session_id': sid});
     if (callId != null) {
       try {
-        await _api.controlCall(businessId, callId, action: 'hangup');
+        await _api.controlCall(
+          businessId,
+          callId,
+          action: 'hangup',
+          extra: sid != null ? {'session_id': sid} : null,
+        );
       } catch (_) {}
     }
     bridgeActive = false;

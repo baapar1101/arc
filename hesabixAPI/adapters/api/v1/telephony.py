@@ -637,6 +637,7 @@ def control_call(
 			command_type=str(payload.get("action") or payload.get("type") or ""),
 			call_id=call_id,
 			target=payload.get("target"),
+			session_id=str(payload.get("session_id") or "") or None,
 		),
 		request,
 	)
@@ -881,12 +882,8 @@ async def softphone_outbound_call(
 				audiosocket_uuid=as_uuid,
 			)
 		except Exception as e:
-			log.exception("start_bridge outbound failed session=%s: %s", session_id, e)
-			raise ApiError(
-				"SOFTPHONE_BRIDGE_START_FAILED",
-				f"پل رسانه شروع نشد: {e}",
-				http_status=503,
-			) from e
+			# Originate از طریق poll ادامه می‌یابد؛ ensure_bridge_active روی bridge.active کانکتور پل را می‌سازد.
+			log.warning("start_bridge outbound deferred session=%s: %s", session_id, e)
 	return _resp(result, request)
 
 
@@ -922,12 +919,7 @@ async def softphone_answer_call(
 				audiosocket_uuid=as_uuid,
 			)
 		except Exception as e:
-			log.exception("start_bridge inbound failed session=%s: %s", session_id, e)
-			raise ApiError(
-				"SOFTPHONE_BRIDGE_START_FAILED",
-				f"پل رسانه شروع نشد: {e}",
-				http_status=503,
-			) from e
+			log.warning("start_bridge inbound deferred session=%s: %s", session_id, e)
 	return _resp(result, request)
 
 

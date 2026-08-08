@@ -123,6 +123,7 @@ def enqueue_control_command(
 	extension: Optional[str] = None,
 	target: Optional[str] = None,
 	pbx_id: Optional[int] = None,
+	session_id: Optional[str] = None,
 ) -> Dict[str, Any]:
 	if command_type not in ("hangup", "transfer", "hold", "resume"):
 		raise ApiError("VALIDATION_ERROR", "نوع دستور نامعتبر است.", http_status=400)
@@ -165,11 +166,14 @@ def enqueue_control_command(
 		raise ApiError("PBX_OFFLINE", "مرکز تلفن در دسترس نیست.", http_status=400)
 
 	command_id = str(uuid.uuid4())
+	extra = dict(call.extra_info or {}) if call else {}
 	payload = {
 		"extension": extension,
 		"target": target,
 		"asterisk_uniqueid": call.asterisk_uniqueid if call else None,
-		"channel": (call.extra_info or {}).get("channel") if call else None,
+		"channel": extra.get("channel"),
+		"session_id": session_id or extra.get("session_id"),
+		"audiosocket_uuid": extra.get("audiosocket_uuid"),
 	}
 	cmd = TelephonyCommand(
 		business_id=business_id,

@@ -445,6 +445,7 @@ def start_outbound_relay_call(
 	timeout_ms = int(settings.get("originate_timeout_ms") or 30000)
 
 	uniqueid = f"hsx-sf-{uuid.uuid4().hex[:16]}"
+	as_uuid = str(uuid.uuid4())
 	call = TelephonyCall(
 		business_id=business_id,
 		pbx_id=row.pbx_id,
@@ -463,14 +464,13 @@ def start_outbound_relay_call(
 		lead_id=payload.get("lead_id"),
 		match_method="manual" if payload.get("person_id") or payload.get("lead_id") else None,
 		is_anonymous=False,
-		extra_info={"softphone": True, "session_id": session_id, "mode": "relay"},
+		extra_info={"softphone": True, "session_id": session_id, "mode": "relay", "audiosocket_uuid": as_uuid},
 		created_at=_now(),
 		updated_at=_now(),
 	)
 	db.add(call)
 	db.flush()
 
-	as_uuid = str(uuid.uuid4())
 	cmd = TelephonyCommand(
 		business_id=business_id,
 		pbx_id=row.pbx_id,
