@@ -354,7 +354,7 @@ Issabel PJSIP WebRTC endpoint (LAN/VPN/exposed WSS)
 [hesabix-softphone-relay]
 exten => _X.,1,NoOp(Hesabix Softphone Relay)
  same => n,Set(HSX_UUID=${UNIQUEID})
- same => n,AudioSocket(127.0.0.1:9092,${HSX_UUID})
+ same => n,AudioSocket(${HSX_UUID},127.0.0.1:9092)
  same => n,Hangup()
 ```
 

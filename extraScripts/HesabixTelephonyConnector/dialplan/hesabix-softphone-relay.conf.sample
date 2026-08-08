@@ -8,12 +8,18 @@
 [hesabix-softphone-relay]
 exten => _X.,1,NoOp(Hesabix Softphone Relay for ${EXTEN})
  same => n,Set(HSX_UUID=${IF($["${HSX_UUID}"=""]?${UNIQUEID}:${HSX_UUID})})
- same => n,AudioSocket(127.0.0.1:9092,${HSX_UUID})
+ ; Asterisk 18+: AudioSocket(uuid,host:port) — نه برعکس
+ same => n,AudioSocket(${HSX_UUID},127.0.0.1:9092)
+ same => n,Hangup()
+
+exten => s,1,NoOp(Hesabix Softphone Relay s HSX_UUID=${HSX_UUID})
+ same => n,Set(HSX_UUID=${IF($["${HSX_UUID}"=""]?${UNIQUEID}:${HSX_UUID})})
+ same => n,AudioSocket(${HSX_UUID},127.0.0.1:9092)
  same => n,Hangup()
 
 ; برای Originate خروجی Softphone، Connector معمولاً از Local channel
 ; به مقصد ترانک می‌زند و پای اپراتور را به AudioSocket پل می‌کند.
 ; مثال مفهومی (اجرا توسط AMI، نه کپی مستقیم):
-;   Channel: Local/{destination}@from-internal
+;   Channel: Local/{destination}@from-internal/n
 ;   Application: AudioSocket
-;   Data: 127.0.0.1:9092,{uuid}
+;   Data: {uuid},127.0.0.1:9092

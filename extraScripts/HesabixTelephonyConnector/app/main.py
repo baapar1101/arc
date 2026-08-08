@@ -463,15 +463,22 @@ def main() -> int:
 								if session_id:
 									as_uuid_to_session[as_uuid] = session_id
 									session_to_as_uuid[session_id] = as_uuid
-							# کانال مقصد را Originate کن و Application=AudioSocket برای پای اپراتور
-							# الگوی پایدار: Local/{dest}@context وارد شود و همزمان AudioSocket برای پل
+							# Asterisk AudioSocket(uuid,host:port) — ترتیب آرگومان مهم است.
+							# /n روی Local مانع channel optimization می‌شود تا AudioSocket قطع نشود.
 							ami.originate_to_application(
-								channel=f"Local/{destination}@{context}",
+								channel=f"Local/{destination}@{context}/n",
 								application="AudioSocket",
-								data=f"{host}:{port},{as_uuid}",
+								data=f"{as_uuid},{host}:{port}",
 								caller_id=str(cmd.get("extension") or ""),
 								timeout_ms=int(cmd.get("timeout_ms") or 30000),
 								variable=f"HSX_UUID={as_uuid}",
+							)
+							LOG.info(
+								"softphone_bridge_out dest=%s uuid=%s as=%s:%s",
+								destination,
+								as_uuid,
+								host,
+								port,
 							)
 							client = tunnel_ref.get("client")
 							if client:
@@ -500,9 +507,9 @@ def main() -> int:
 							else:
 								ext = str(cmd.get("extension") or "")
 								ami.originate_to_application(
-									channel=f"Local/{ext}@from-internal",
+									channel=f"Local/{ext}@from-internal/n",
 									application="AudioSocket",
-									data=f"{host}:{port},{as_uuid}",
+									data=f"{as_uuid},{host}:{port}",
 									caller_id=ext,
 									timeout_ms=30000,
 									variable=f"HSX_UUID={as_uuid}",
