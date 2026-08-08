@@ -195,6 +195,101 @@ def _ensure_products_pagination(result: Dict[str, Any], take: int, skip: int) ->
 		result["has_more"] = (skip + take) < total
 
 
+_PRODUCT_EXPORT_INVENTORY_KEYS = frozenset({
+	"inventory_stock_warehouse",
+	"inventory_stock_accounting",
+	"inventory_stock_physical",
+	"inventory_stock_financial",
+	"warehouse_recharge",
+})
+
+
+def _body_truthy(value: Any) -> bool:
+	if isinstance(value, bool):
+		return value
+	if value is None:
+		return False
+	if isinstance(value, (int, float)):
+		return value != 0
+	if isinstance(value, str):
+		return value.strip().lower() in {"1", "true", "yes", "on"}
+	return bool(value)
+
+
+def _export_columns_need_inventory(body: dict) -> bool:
+	"""اگر ستون‌های خروجی به موجودی وابسته‌اند، محاسبهٔ موجودی لازم است."""
+	export_columns = body.get("export_columns")
+	if not isinstance(export_columns, list):
+		return False
+	for col in export_columns:
+		if isinstance(col, dict) and col.get("key") in _PRODUCT_EXPORT_INVENTORY_KEYS:
+			return True
+	return False
+
+
+def _should_include_inventory_for_product_export(body: dict) -> bool:
+	if _body_truthy(body.get("include_inventory")):
+		return True
+	return _export_columns_need_inventory(body)
+
+
+def _enrich_product_export_items(items: List[dict], *, is_fa: bool = True) -> None:
+	"""پر کردن فیلدهای محاسباتی مخصوص خروجی (مثل نیاز به شارژ انبار) و نرمال‌سازی نمایش."""
+	yes_label = "بله" if is_fa else "Yes"
+	no_label = "خیر" if is_fa else "No"
+	dash = "-"
+
+	for it in items:
+		if not isinstance(it, dict):
+			continue
+
+		track = bool(it.get("track_inventory"))
+
+		# سازگاری با نام‌های قدیمی موجودی
+		if "inventory_stock_warehouse" not in it and "inventory_stock_physical" in it:
+			it["inventory_stock_warehouse"] = it.get("inventory_stock_physical")
+		if "inventory_stock_accounting" not in it and "inventory_stock_financial" in it:
+			it["inventory_stock_accounting"] = it.get("inventory_stock_financial")
+
+		wh_stock = it.get("inventory_stock_warehouse")
+		acc_stock = it.get("inventory_stock_accounting")
+		if not track:
+			it["inventory_stock_warehouse"] = dash
+			it["inventory_stock_accounting"] = dash
+			it["warehouse_recharge"] = dash
+		else:
+			if wh_stock is None:
+				it["inventory_stock_warehouse"] = dash
+			if acc_stock is None:
+				it["inventory_stock_accounting"] = dash
+
+			reorder_point = it.get("reorder_point")
+			stock_for_reorder = it.get("inventory_stock_accounting")
+			if stock_for_reorder == dash or reorder_point is None:
+				it["warehouse_recharge"] = no_label
+			else:
+				try:
+					stock_num = float(stock_for_reorder)
+					reorder_num = float(reorder_point)
+					it["warehouse_recharge"] = yes_label if stock_num < reorder_num else no_label
+				except (TypeError, ValueError):
+					it["warehouse_recharge"] = no_label
+
+		# نمایش خواناتر برای بولین کنترل موجودی
+		if "track_inventory" in it:
+			it["track_inventory"] = yes_label if track else no_label
+
+		# انبار پیش‌فرض: ترکیب کد و نام در صورت وجود
+		wh_name = it.get("default_warehouse_name")
+		wh_code = it.get("default_warehouse_code")
+		if wh_name and wh_code and not it.get("default_warehouse_display"):
+			it["default_warehouse_name"] = f"{wh_code} - {wh_name}"
+
+		# ستون UI با کلید image از thumbnail_url/image_url پر می‌شود
+		if it.get("image") in (None, ""):
+			it["image"] = it.get("thumbnail_url") or it.get("image_url") or ""
+
+
 @router.post(
     "/business/{business_id}",
     summary="ایجاد محصول جدید",
@@ -1305,9 +1400,30 @@ async def export_products_excel(
     from openpyxl import Workbook
     from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
 
+    # Apply selected rows filter if requested
+    selected_only = bool(body.get('selected_only', False))
+    selected_row_keys = body.get('selected_row_keys')
+    selected_indices = body.get('selected_indices')
+    has_selected_row_keys = (
+        selected_only
+        and isinstance(selected_row_keys, list)
+        and any(isinstance(k, dict) and k.get("id") is not None for k in selected_row_keys)
+    )
+
+    # خروجی کامل (یا انتخاب با id): کل نتایج فیلترشده؛ نه فقط صفحه UI.
+    # انتخاب فقط با ایندکس: همان صفحه فعلی (ایندکس‌ها نسبی به صفحه هستند).
+    max_export_records = 10000
+    if selected_only and not has_selected_row_keys:
+        take = max(1, min(int(body.get("take", 1000)), max_export_records))
+        skip = max(0, int(body.get("skip", 0)))
+    else:
+        take = max_export_records
+        skip = 0
+
+    include_inventory = _should_include_inventory_for_product_export(body)
     query_dict = {
-        "take": int(body.get("take", 1000)),
-        "skip": int(body.get("skip", 0)),
+        "take": take,
+        "skip": skip,
         "sort_by": body.get("sort_by"),
         "sort_desc": bool(body.get("sort_desc", False)),
         "sort": body.get("sort") if isinstance(body.get("sort"), list) else None,
@@ -1315,15 +1431,13 @@ async def export_products_excel(
         "search_fields": body.get("search_fields") or body.get("searchFields"),
         "filters": body.get("filters"),
         "category_ids": body.get("category_ids") or body.get("categoryIds"),
+        "include_inventory": include_inventory,
+        "inventory_as_of_date": body.get("inventory_as_of_date") or body.get("inventoryAsOfDate"),
     }
     result = list_products(db, business_id, query_dict)
     items = result.get("items", []) if isinstance(result, dict) else result.get("items", [])
     items = [format_datetime_fields(item, request) for item in items]
 
-    # Apply selected rows filter if requested
-    selected_only = bool(body.get('selected_only', False))
-    selected_row_keys = body.get('selected_row_keys')
-    selected_indices = body.get('selected_indices')
     if selected_only and isinstance(selected_row_keys, list):
         try:
             wanted_ids = set()
@@ -1485,6 +1599,7 @@ async def export_products_excel(
 
     # Locale and RTL/LTR handling for Excel
     locale = negotiate_locale(request.headers.get("Accept-Language"))
+    _enrich_product_export_items(items, is_fa=(locale == "fa"))
     if locale == 'fa':
         try:
             ws.sheet_view.rightToLeft = True
@@ -2828,9 +2943,29 @@ async def export_products_pdf(
     from weasyprint import HTML, CSS
     from weasyprint.text.fonts import FontConfiguration
 
+    # Apply selected rows filter if requested
+    selected_only = bool(body.get('selected_only', False))
+    selected_row_keys = body.get('selected_row_keys')
+    selected_indices = body.get('selected_indices')
+    has_selected_row_keys = (
+        selected_only
+        and isinstance(selected_row_keys, list)
+        and any(isinstance(k, dict) and k.get("id") is not None for k in selected_row_keys)
+    )
+
+    # خروجی کامل (یا انتخاب با id): کل نتایج فیلترشده؛ نه فقط صفحه UI.
+    max_export_records = 10000
+    if selected_only and not has_selected_row_keys:
+        take = max(1, min(int(body.get("take", 1000)), max_export_records))
+        skip = max(0, int(body.get("skip", 0)))
+    else:
+        take = max_export_records
+        skip = 0
+
+    include_inventory = _should_include_inventory_for_product_export(body)
     query_dict = {
-        "take": int(body.get("take", 100)),
-        "skip": int(body.get("skip", 0)),
+        "take": take,
+        "skip": skip,
         "sort_by": body.get("sort_by"),
         "sort_desc": bool(body.get("sort_desc", False)),
         "sort": body.get("sort") if isinstance(body.get("sort"), list) else None,
@@ -2838,15 +2973,13 @@ async def export_products_pdf(
         "search_fields": body.get("search_fields") or body.get("searchFields"),
         "filters": body.get("filters"),
         "category_ids": body.get("category_ids") or body.get("categoryIds"),
+        "include_inventory": include_inventory,
+        "inventory_as_of_date": body.get("inventory_as_of_date") or body.get("inventoryAsOfDate"),
     }
     result = list_products(db, business_id, query_dict)
     items = result.get("items", [])
     items = [format_datetime_fields(item, request) for item in items]
 
-    # Apply selected rows filter if requested
-    selected_only = bool(body.get('selected_only', False))
-    selected_row_keys = body.get('selected_row_keys')
-    selected_indices = body.get('selected_indices')
     if selected_only and isinstance(selected_row_keys, list):
         try:
             wanted_ids = set()
@@ -3006,6 +3139,7 @@ async def export_products_pdf(
     is_fa = (locale == 'fa')
     html_lang = 'fa' if is_fa else 'en'
     html_dir = 'rtl' if is_fa else 'ltr'
+    _enrich_product_export_items(items, is_fa=is_fa)
 
     # Load business info for header
     business_name = ""

@@ -162,7 +162,7 @@ class _ProfileDashboardPageState extends State<ProfileDashboardPage> with Widget
       context.go('/business/$businessId/dashboard');
       return;
     }
-    await showModalBottomSheet<void>(
+    final mode = await showModalBottomSheet<MobileBusinessEntryMode>(
       context: context,
       showDragHandle: true,
       builder: (sheetCtx) {
@@ -183,27 +183,16 @@ class _ProfileDashboardPageState extends State<ProfileDashboardPage> with Widget
                 ListTile(
                   leading: const Icon(Icons.dashboard_outlined),
                   title: Text(t.mobileLauncherModeStandard),
-                  onTap: () async {
-                    Navigator.of(sheetCtx).pop();
-                    await MobileLauncherPrefs.clearResumeLauncher(
-                      widget.authStore.currentUserId,
-                    );
-                    if (!mounted) return;
-                    context.go('/business/$businessId/dashboard');
-                  },
+                  onTap: () => Navigator.of(sheetCtx).pop(
+                    MobileBusinessEntryMode.standard,
+                  ),
                 ),
                 ListTile(
                   leading: const Icon(Icons.apps_outlined),
                   title: Text(t.mobileLauncherModeLauncher),
-                  onTap: () async {
-                    Navigator.of(sheetCtx).pop();
-                    await MobileLauncherPrefs.setResumeLauncher(
-                      widget.authStore.currentUserId,
-                      businessId,
-                    );
-                    if (!mounted) return;
-                    context.go(MobileLauncherPrefs.launcherHomePath(businessId));
-                  },
+                  onTap: () => Navigator.of(sheetCtx).pop(
+                    MobileBusinessEntryMode.launcher,
+                  ),
                 ),
               ],
             ),
@@ -211,6 +200,27 @@ class _ProfileDashboardPageState extends State<ProfileDashboardPage> with Widget
         );
       },
     );
+    if (!mounted || mode == null) return;
+    if (mode == MobileBusinessEntryMode.standard) {
+      await MobileLauncherPrefs.clearResumeLauncher(
+        widget.authStore.currentUserId,
+      );
+      if (!mounted) return;
+      context.go('/business/$businessId/dashboard');
+      return;
+    }
+    await MobileLauncherPrefs.setPreferredEntryMode(
+      widget.authStore.currentUserId,
+      MobileBusinessEntryMode.launcher,
+    );
+    await MobileLauncherPrefs.setResumeLauncher(
+      widget.authStore.currentUserId,
+      businessId,
+    );
+    if (!mounted) return;
+    await Future<void>.delayed(Duration.zero);
+    if (!mounted) return;
+    context.go(MobileLauncherPrefs.launcherHomePath(businessId));
   }
 
   Future<void> _openTicketDetail(int ticketId) async {

@@ -815,6 +815,21 @@
       }
     }
   },
+  "businessesHubClearSearch": "Clear search",
+  "businessesHubActiveBadge": "Current",
+  "businessesHubCount": "{count} businesses",
+  "@businessesHubCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "businessesHubSortTooltip": "Sort",
+  "businessesHubSortRecent": "Recently used",
+  "businessesHubSortName": "Name",
+  "businessesHubSortCreated": "Newest",
+  "businessesHubOpenSettings": "Settings",
   "businessesHubEmptyTitle": "No businesses yet",
   "businessesHubEmptySubtitle": "Create your first business to start cloud accounting.",
   "businessesHubImportLegacy": "Import from legacy version",
@@ -874,6 +889,7 @@
   "businessesHubSearchShortcut": "Press / to search",
   "businessesSwitcherContinue": "Continue",
   "businessesSwitcherSubtitle": "Select a workspace to continue",
+  "mobileLauncherChooseModeHint": "This choice is saved. Long-press a business to change it later.",
   "accessDenied": "Access denied",
   "basicTools": "Basic Tools",
   "businessSettings": "Business Settings",
@@ -3146,7 +3162,7 @@
   "taxHelpNoteFailedInDLQ": "Failed invoices show actionable error details on this page",
   "taxHelpNoteTimeline": "Submission window is usually about 12 days from issue date; do not recreate old invoices unless the tax authority extends the window",
   "taxHelpNoteExport": "Each product VAT rate must match its stuffid code (e.g. 10%, not 0 unless exempt)",
-  "taxHelpNoteType1vs2": "Type 1 needs full buyer identity (economic/national ID); send end consumers as type 2",
+  "taxHelpNoteType1vs2": "Type 1 needs full buyer identity (valid economic code, or natural national ID plus postal code); otherwise the invoice is sent automatically as type 2 without buyer fields",
   "taxHelpNoteConnection": "If connection is down, check Moadian settings and run a connection test first",
   "taxKpiAll": "All",
   "taxKpiQueue": "Ready to send",
@@ -6462,6 +6478,19 @@
   "mobileLauncherGridRows": "Rows",
   "mobileLauncherGridPreview": "Preview",
   "mobileLauncherQuickSalesTile": "Quick sales",
+  "mobileLauncherNewInvoiceTile": "New invoice",
+  "mobileLauncherSwitchBusiness": "Switch business",
+  "mobileLauncherTapToSwitchBusiness": "Tap to switch business",
+  "mobileLauncherSummarySales": "Total sales",
+  "mobileLauncherSummaryRecent": "Recent transactions",
+  "mobileLauncherNoTiles": "No shortcuts are available for your role. Open the full panel or ask an admin for access.",
+  "mobileLauncherLivePreview": "Live preview",
+  "mobileLauncherTileDensitySection": "Tile density",
+  "mobileLauncherTileDensityHint": "Choose how many shortcuts appear in each row.",
+  "mobileLauncherDensityComfortable": "Comfortable",
+  "mobileLauncherDensityCompact": "Compact",
+  "mobileLauncherBusinessesLoadError": "Could not load businesses.",
+  "mobileLauncherNoBusinesses": "No businesses found.",
   "dataTableHelpMenu": "Help",
   "dataTableHelpDialogTitle": "How to use this table",
   "dataTableHelpIntro": "These tips help you search, filter, sort, export, and move around large lists comfortably.",

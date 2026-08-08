@@ -2268,6 +2268,32 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get businessesHubClearSearch => 'Clear search';
+
+  @override
+  String get businessesHubActiveBadge => 'Current';
+
+  @override
+  String businessesHubCount(int count) {
+    return '$count businesses';
+  }
+
+  @override
+  String get businessesHubSortTooltip => 'Sort';
+
+  @override
+  String get businessesHubSortRecent => 'Recently used';
+
+  @override
+  String get businessesHubSortName => 'Name';
+
+  @override
+  String get businessesHubSortCreated => 'Newest';
+
+  @override
+  String get businessesHubOpenSettings => 'Settings';
+
+  @override
   String get businessesHubEmptyTitle => 'No businesses yet';
 
   @override
@@ -2330,6 +2356,10 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get businessesSwitcherSubtitle => 'Select a workspace to continue';
+
+  @override
+  String get mobileLauncherChooseModeHint =>
+      'This choice is saved. Long-press a business to change it later.';
 
   @override
   String get accessDenied => 'Access denied';
@@ -7935,7 +7965,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get taxHelpNoteType1vs2 =>
-      'Type 1 needs full buyer identity (economic/national ID); send end consumers as type 2';
+      'Type 1 needs full buyer identity (valid economic code, or natural national ID plus postal code); otherwise the invoice is sent automatically as type 2 without buyer fields';
 
   @override
   String get taxHelpNoteConnection =>
@@ -16825,6 +16855,47 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get mobileLauncherQuickSalesTile => 'Quick sales';
+
+  @override
+  String get mobileLauncherNewInvoiceTile => 'New invoice';
+
+  @override
+  String get mobileLauncherSwitchBusiness => 'Switch business';
+
+  @override
+  String get mobileLauncherTapToSwitchBusiness => 'Tap to switch business';
+
+  @override
+  String get mobileLauncherSummarySales => 'Total sales';
+
+  @override
+  String get mobileLauncherSummaryRecent => 'Recent transactions';
+
+  @override
+  String get mobileLauncherNoTiles =>
+      'No shortcuts are available for your role. Open the full panel or ask an admin for access.';
+
+  @override
+  String get mobileLauncherLivePreview => 'Live preview';
+
+  @override
+  String get mobileLauncherTileDensitySection => 'Tile density';
+
+  @override
+  String get mobileLauncherTileDensityHint =>
+      'Choose how many shortcuts appear in each row.';
+
+  @override
+  String get mobileLauncherDensityComfortable => 'Comfortable';
+
+  @override
+  String get mobileLauncherDensityCompact => 'Compact';
+
+  @override
+  String get mobileLauncherBusinessesLoadError => 'Could not load businesses.';
+
+  @override
+  String get mobileLauncherNoBusinesses => 'No businesses found.';
 
   @override
   String get dataTableHelpMenu => 'Help';

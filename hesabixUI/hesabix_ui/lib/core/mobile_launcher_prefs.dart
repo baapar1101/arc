@@ -1,10 +1,58 @@
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+/// حالت ورود به کسب‌وکار از صفحهٔ سوییچر موبایل.
+enum MobileBusinessEntryMode { standard, launcher }
 
 /// تنظیمات محلی لانچر موبایل؛ هر کلید به ازای شناسهٔ کاربر جدا می‌شود (از اشتراک داده بین حساب‌ها جلوگیری می‌شود).
 class MobileLauncherPrefs {
   static const defaultBackgroundArgb = 0xFF1565C0;
   static const int defaultGridColumns = 3;
   static const int defaultGridRows = 4;
+
+  /// برای به‌روزرسانی فوری UIهایی مثل [MobileLauncherBackScope] بعد از set/clear.
+  static final ValueNotifier<int> revision = ValueNotifier<int>(0);
+
+  static int? _cacheUserId;
+  static bool _cacheResumeEnabled = false;
+  static int? _cacheResumeBusinessId;
+
+  static void _bumpRevision() {
+    revision.value = revision.value + 1;
+  }
+
+  static void _setResumeCache({
+    required int? userId,
+    required bool enabled,
+    int? businessId,
+  }) {
+    final nextBiz = enabled ? businessId : null;
+    final changed = _cacheUserId != userId ||
+        _cacheResumeEnabled != enabled ||
+        _cacheResumeBusinessId != nextBiz;
+    _cacheUserId = userId;
+    _cacheResumeEnabled = enabled;
+    _cacheResumeBusinessId = nextBiz;
+    if (changed) _bumpRevision();
+  }
+
+  /// مسیر همزمان خانهٔ لانچر اگر resume برای همین کاربر/کسب‌وکار در کش فعال باشد.
+  static String? syncLauncherHomePath({
+    required int? userId,
+    required int businessId,
+  }) {
+    if (userId == null || userId <= 0) return null;
+    if (_cacheUserId != userId || !_cacheResumeEnabled) return null;
+    if (_cacheResumeBusinessId != businessId) return null;
+    return launcherHomePath(businessId);
+  }
+
+  /// وقتی userId در دسترس نیست؛ فقط با businessId از کش حافظه.
+  static String? syncLauncherHomePathForBusiness(int businessId) {
+    if (!_cacheResumeEnabled) return null;
+    if (_cacheResumeBusinessId != businessId) return null;
+    return launcherHomePath(businessId);
+  }
 
   static const _legacyResume = 'mobile_launcher_resume_enabled';
   static const _legacyBiz = 'mobile_launcher_business_id';
@@ -19,6 +67,8 @@ class MobileLauncherPrefs {
   static String _bgKey(int userId) => 'ml_bg_u$userId';
   static String _gridColumnsKey(int userId) => 'ml_grid_cols_u$userId';
   static String _gridRowsKey(int userId) => 'ml_grid_rows_u$userId';
+  static String _entryModeKey(int userId) => 'ml_entry_mode_u$userId';
+  static const _legacyEntryMode = 'mobile_business_entry_mode';
 
   static Future<void> _clearLegacy(SharedPreferences prefs) async {
     await prefs.remove(_legacyResume);
@@ -26,6 +76,47 @@ class MobileLauncherPrefs {
     await prefs.remove(_legacyBg);
     await prefs.remove(_legacyGridColumns);
     await prefs.remove(_legacyGridRows);
+    await prefs.remove(_legacyEntryMode);
+  }
+
+  static MobileBusinessEntryMode? _parseEntryMode(String? raw) {
+    switch (raw) {
+      case 'standard':
+        return MobileBusinessEntryMode.standard;
+      case 'launcher':
+        return MobileBusinessEntryMode.launcher;
+      default:
+        return null;
+    }
+  }
+
+  static String _encodeEntryMode(MobileBusinessEntryMode mode) => switch (mode) {
+        MobileBusinessEntryMode.standard => 'standard',
+        MobileBusinessEntryMode.launcher => 'launcher',
+      };
+
+  /// آخرین حالت ورود انتخاب‌شده از صفحهٔ لیست کسب‌وکارها (null = هنوز انتخاب نشده).
+  static Future<MobileBusinessEntryMode?> preferredEntryMode(int? userId) async {
+    final prefs = await SharedPreferences.getInstance();
+    if (userId != null && userId > 0) {
+      final scoped = _parseEntryMode(prefs.getString(_entryModeKey(userId)));
+      if (scoped != null) return scoped;
+    }
+    return _parseEntryMode(prefs.getString(_legacyEntryMode));
+  }
+
+  static Future<void> setPreferredEntryMode(
+    int? userId,
+    MobileBusinessEntryMode mode,
+  ) async {
+    final prefs = await SharedPreferences.getInstance();
+    final value = _encodeEntryMode(mode);
+    if (userId != null && userId > 0) {
+      await prefs.setString(_entryModeKey(userId), value);
+      await prefs.remove(_legacyEntryMode);
+      return;
+    }
+    await prefs.setString(_legacyEntryMode, value);
   }
 
   /// یکبار مهاجرت از کلیدهای قدیمی بدون suffix به کلیدهای per-user (فرض: دستگاه تک‌کاربر POS).
@@ -55,6 +146,7 @@ class MobileLauncherPrefs {
       await prefs.setInt(_gridRowsKey(userId), rows);
     }
     await _clearLegacy(prefs);
+    _setResumeCache(userId: userId, enabled: true, businessId: bid);
   }
 
   static Future<void> setResumeLauncher(int? userId, int businessId) async {
@@ -63,10 +155,12 @@ class MobileLauncherPrefs {
       await prefs.setBool(_resumeKey(userId), true);
       await prefs.setInt(_bizKey(userId), businessId);
       await _clearLegacy(prefs);
+      _setResumeCache(userId: userId, enabled: true, businessId: businessId);
       return;
     }
     await prefs.setBool(_legacyResume, true);
     await prefs.setInt(_legacyBiz, businessId);
+    _setResumeCache(userId: userId, enabled: true, businessId: businessId);
   }
 
   static Future<void> clearResumeLauncher(int? userId) async {
@@ -76,6 +170,7 @@ class MobileLauncherPrefs {
       await prefs.remove(_bizKey(userId));
     }
     await _clearLegacy(prefs);
+    _setResumeCache(userId: userId, enabled: false);
   }
 
   /// مسیر ثابت خانهٔ لانچر (شبکهٔ کاشی‌ها).
@@ -92,14 +187,28 @@ class MobileLauncherPrefs {
     await migrateLegacyIfNeeded(userId);
     final prefs = await SharedPreferences.getInstance();
     if (userId != null && userId > 0) {
-      if (prefs.getBool(_resumeKey(userId)) != true) return null;
+      if (prefs.getBool(_resumeKey(userId)) != true) {
+        _setResumeCache(userId: userId, enabled: false);
+        return null;
+      }
       final id = prefs.getInt(_bizKey(userId));
-      if (id == null || id <= 0) return null;
+      if (id == null || id <= 0) {
+        _setResumeCache(userId: userId, enabled: false);
+        return null;
+      }
+      _setResumeCache(userId: userId, enabled: true, businessId: id);
       return launcherHomePath(id);
     }
-    if (prefs.getBool(_legacyResume) != true) return null;
+    if (prefs.getBool(_legacyResume) != true) {
+      _setResumeCache(userId: userId, enabled: false);
+      return null;
+    }
     final id = prefs.getInt(_legacyBiz);
-    if (id == null || id <= 0) return null;
+    if (id == null || id <= 0) {
+      _setResumeCache(userId: userId, enabled: false);
+      return null;
+    }
+    _setResumeCache(userId: userId, enabled: true, businessId: id);
     return launcherHomePath(id);
   }
 
@@ -192,7 +301,9 @@ class MobileLauncherPrefs {
       await prefs.remove(_bgKey(userId));
       await prefs.remove(_gridColumnsKey(userId));
       await prefs.remove(_gridRowsKey(userId));
+      await prefs.remove(_entryModeKey(userId));
     }
     await _clearLegacy(prefs);
+    _setResumeCache(userId: userId, enabled: false);
   }
 }

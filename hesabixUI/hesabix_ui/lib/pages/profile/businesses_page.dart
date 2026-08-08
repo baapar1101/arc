@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import '../../core/api_client.dart';
 import '../../core/auth_store.dart';
+import '../../core/business_switcher_prefs.dart';
 import '../../core/mobile_launcher_prefs.dart';
 import '../../models/business_dashboard_models.dart';
 import '../../services/business_dashboard_service.dart';
@@ -27,7 +28,8 @@ class BusinessesPage extends StatefulWidget {
 class _BusinessesPageState extends State<BusinessesPage> {
   static const int _pageSize = 24;
   static const double _contentMaxWidth = 560;
-  static const int _searchThreshold = 5;
+  /// جست‌وجو از دو کسب‌وکار به بالا؛ با کوئری فعال همیشه نمایش داده می‌شود.
+  static const int _searchThreshold = 2;
 
   final BusinessDashboardService _service = BusinessDashboardService(ApiClient());
   final AuthStore _authStore = AuthStore();
@@ -37,25 +39,31 @@ class _BusinessesPageState extends State<BusinessesPage> {
 
   List<BusinessWithPermission> _businesses = [];
   bool _loading = true;
+  bool _softRefreshing = false;
   bool _isLoadingMore = false;
   String? _error;
   int _skip = 0;
   bool _hasMore = true;
+  int? _totalCount;
   String _searchQuery = '';
   Timer? _searchDebounce;
+  int _searchRequestId = 0;
+
+  BusinessSwitcherSort _sort = BusinessSwitcherSort.recent;
+  List<int> _lastUsedIds = const [];
 
   @override
   void initState() {
     super.initState();
     _scrollController.addListener(_onScroll);
-    _searchController.addListener(_onSearchChanged);
+    _searchController.addListener(_onSearchTextChanged);
     _init();
   }
 
   @override
   void dispose() {
     _searchDebounce?.cancel();
-    _searchController.removeListener(_onSearchChanged);
+    _searchController.removeListener(_onSearchTextChanged);
     _searchController.dispose();
     _searchFocusNode.dispose();
     _scrollController.removeListener(_onScroll);
@@ -63,16 +71,27 @@ class _BusinessesPageState extends State<BusinessesPage> {
     super.dispose();
   }
 
-  void _onSearchChanged() {
+  void _onSearchTextChanged() {
     _searchDebounce?.cancel();
-    _searchDebounce = Timer(const Duration(milliseconds: 280), () {
+    _searchDebounce = Timer(const Duration(milliseconds: 320), () {
       if (!mounted) return;
-      setState(() => _searchQuery = _searchController.text.trim());
+      final next = _searchController.text.trim();
+      if (next == _searchQuery) return;
+      setState(() => _searchQuery = next);
+      _loadBusinesses(reset: true, soft: _businesses.isNotEmpty || next.isNotEmpty);
     });
   }
 
+  void _clearSearch() {
+    _searchDebounce?.cancel();
+    _searchController.clear();
+    if (_searchQuery.isEmpty) return;
+    setState(() => _searchQuery = '');
+    _loadBusinesses(reset: true, soft: true);
+  }
+
   void _onScroll() {
-    if (_isLoadingMore || !_hasMore || _loading) return;
+    if (_isLoadingMore || !_hasMore || _loading || _softRefreshing) return;
     final pos = _scrollController.position;
     if (pos.pixels >= pos.maxScrollExtent - 240 && pos.maxScrollExtent > 0) {
       _loadMore();
@@ -82,30 +101,79 @@ class _BusinessesPageState extends State<BusinessesPage> {
   Future<void> _init() async {
     ApiClient.bindAuthStore(_authStore);
     await _authStore.load();
+    final uid = _authStore.currentUserId;
+    final sort = await BusinessSwitcherPrefs.sortMode(uid);
+    final lastUsed = await BusinessSwitcherPrefs.lastUsedIds(uid);
+    if (!mounted) return;
+    setState(() {
+      _sort = sort;
+      _lastUsedIds = lastUsed;
+    });
     await _loadBusinesses();
   }
 
-  Future<void> _loadBusinesses({bool reset = true}) async {
+  ({String sortBy, bool sortDesc}) get _apiSort {
+    switch (_sort) {
+      case BusinessSwitcherSort.name:
+        return (sortBy: 'name', sortDesc: false);
+      case BusinessSwitcherSort.created:
+        return (sortBy: 'created_at', sortDesc: true);
+      case BusinessSwitcherSort.recent:
+        return (sortBy: 'created_at', sortDesc: true);
+    }
+  }
+
+  List<BusinessWithPermission> _orderForDisplay(List<BusinessWithPermission> items) {
+    if (_sort != BusinessSwitcherSort.recent || items.length < 2) return items;
+
+    final activeId = _activeBusinessId;
+    final rank = <int, int>{};
+    for (var i = 0; i < _lastUsedIds.length; i++) {
+      rank[_lastUsedIds[i]] = i;
+    }
+
+    int score(BusinessWithPermission b) {
+      if (activeId != null && b.id == activeId) return -2;
+      final r = rank[b.id];
+      if (r != null) return r;
+      return 100000 + b.id;
+    }
+
+    final copy = List<BusinessWithPermission>.of(items);
+    copy.sort((a, b) => score(a).compareTo(score(b)));
+    return copy;
+  }
+
+  Future<void> _loadBusinesses({bool reset = true, bool soft = false}) async {
+    final requestId = ++_searchRequestId;
     try {
       setState(() {
         if (reset) {
-          _loading = true;
           _skip = 0;
           _hasMore = true;
-          _businesses = [];
+          if (soft && (_businesses.isNotEmpty || _searchQuery.isNotEmpty)) {
+            _softRefreshing = true;
+            _loading = false;
+          } else {
+            _loading = true;
+            _softRefreshing = false;
+            _businesses = [];
+          }
         }
         _error = null;
       });
 
       final currentSkip = reset ? 0 : _skip;
+      final apiSort = _apiSort;
       final result = await _service.getUserBusinessesPaginated(
         take: _pageSize,
         skip: currentSkip,
-        sortBy: 'created_at',
-        sortDesc: true,
+        sortBy: apiSort.sortBy,
+        sortDesc: apiSort.sortDesc,
+        search: _searchQuery.isEmpty ? null : _searchQuery,
       );
 
-      if (!mounted) return;
+      if (!mounted || requestId != _searchRequestId) return;
       final newBusinesses = (result['items'] as List<BusinessWithPermission>)
           .where((b) => !b.isDeleted || b.isDeletionPending)
           .toList();
@@ -113,24 +181,34 @@ class _BusinessesPageState extends State<BusinessesPage> {
 
       setState(() {
         if (reset) {
-          _businesses = newBusinesses;
+          _businesses = _orderForDisplay(newBusinesses);
           _skip = newBusinesses.length;
         } else {
-          _businesses.addAll(newBusinesses);
+          final merged = [..._businesses, ...newBusinesses];
+          _businesses = _orderForDisplay(merged);
           _skip += newBusinesses.length;
         }
         _loading = false;
+        _softRefreshing = false;
         if (pagination != null) {
           _hasMore = pagination['has_next'] as bool? ?? false;
+          final total = pagination['total'];
+          if (total is int) {
+            _totalCount = total;
+          } else if (total is num) {
+            _totalCount = total.toInt();
+          }
         } else {
           _hasMore = newBusinesses.length >= _pageSize;
+          if (reset) _totalCount = newBusinesses.length;
         }
       });
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted || requestId != _searchRequestId) return;
       final err = ErrorExtractor.forContext(e, context);
       setState(() {
         _loading = false;
+        _softRefreshing = false;
         _error = err;
       });
       SnackBarHelper.showError(
@@ -141,14 +219,16 @@ class _BusinessesPageState extends State<BusinessesPage> {
   }
 
   Future<void> _loadMore() async {
-    if (_isLoadingMore || !_hasMore || _loading) return;
+    if (_isLoadingMore || !_hasMore || _loading || _softRefreshing) return;
     setState(() => _isLoadingMore = true);
     try {
+      final apiSort = _apiSort;
       final result = await _service.getUserBusinessesPaginated(
         take: _pageSize,
         skip: _skip,
-        sortBy: 'created_at',
-        sortDesc: true,
+        sortBy: apiSort.sortBy,
+        sortDesc: apiSort.sortDesc,
+        search: _searchQuery.isEmpty ? null : _searchQuery,
       );
       if (!mounted) return;
       final newBusinesses = (result['items'] as List<BusinessWithPermission>)
@@ -157,11 +237,18 @@ class _BusinessesPageState extends State<BusinessesPage> {
       final pagination = result['pagination'] as Map<String, dynamic>?;
 
       setState(() {
-        _businesses.addAll(newBusinesses);
+        final merged = [..._businesses, ...newBusinesses];
+        _businesses = _orderForDisplay(merged);
         _skip += newBusinesses.length;
         _isLoadingMore = false;
         if (pagination != null) {
           _hasMore = pagination['has_next'] as bool? ?? false;
+          final total = pagination['total'];
+          if (total is int) {
+            _totalCount = total;
+          } else if (total is num) {
+            _totalCount = total.toInt();
+          }
         } else {
           _hasMore = newBusinesses.length >= _pageSize;
         }
@@ -177,23 +264,56 @@ class _BusinessesPageState extends State<BusinessesPage> {
   }
 
   Future<void> _refresh() async {
-    await _loadBusinesses();
+    final lastUsed = await BusinessSwitcherPrefs.lastUsedIds(_authStore.currentUserId);
+    if (mounted) setState(() => _lastUsedIds = lastUsed);
+    await _loadBusinesses(reset: true, soft: _businesses.isNotEmpty);
   }
 
-  List<BusinessWithPermission> get _visibleBusinesses {
-    if (_searchQuery.isEmpty) return _businesses;
-    final q = _searchQuery.toLowerCase();
-    return _businesses.where((b) => b.name.toLowerCase().contains(q)).toList();
+  Future<void> _changeSort(BusinessSwitcherSort next) async {
+    if (next == _sort) return;
+    setState(() => _sort = next);
+    await BusinessSwitcherPrefs.setSortMode(_authStore.currentUserId, next);
+    if (!mounted) return;
+    await _loadBusinesses(reset: true, soft: _businesses.isNotEmpty);
   }
 
-  bool get _useGateMode {
-    if (_searchQuery.isNotEmpty) return false;
-    return _businesses.length == 1;
+  bool get _isSearching => _searchQuery.isNotEmpty;
+
+  bool get _showSearch {
+    if (_isSearching) return true;
+    if (_loading && _businesses.isEmpty) return false;
+    final count = _totalCount ?? _businesses.length;
+    return count >= _searchThreshold;
   }
 
-  bool get _showSearch => _businesses.length >= _searchThreshold;
+  bool get _showSort {
+    if (_loading && _businesses.isEmpty) return false;
+    if (_error != null) return false;
+    final count = _totalCount ?? _businesses.length;
+    return count >= _searchThreshold || _isSearching;
+  }
 
-  Future<void> _navigateToBusiness(int businessId) async {
+  int? get _activeBusinessId => _authStore.currentBusiness?.id;
+
+  Future<void> _recordAndEnter(int businessId, Future<void> Function() enter) async {
+    try {
+      await BusinessSwitcherPrefs.recordLastUsed(_authStore.currentUserId, businessId);
+      final lastUsed = await BusinessSwitcherPrefs.lastUsedIds(_authStore.currentUserId);
+      if (mounted) setState(() => _lastUsedIds = lastUsed);
+    } catch (e, st) {
+      // ثبت محلی نباید جلوی ورود به کسب‌وکار را بگیرد.
+      assert(() {
+        debugPrint('BusinessSwitcherPrefs.recordLastUsed failed: $e\n$st');
+        return true;
+      }());
+    }
+    await enter();
+  }
+
+  Future<void> _navigateToBusiness(
+    int businessId, {
+    bool forceChooseMode = false,
+  }) async {
     final business = _businesses.cast<BusinessWithPermission?>().firstWhere(
           (b) => b?.id == businessId,
           orElse: () => null,
@@ -213,13 +333,58 @@ class _BusinessesPageState extends State<BusinessesPage> {
     if (!ResponsiveHelper.isMobile(context)) {
       await MobileLauncherPrefs.clearResumeLauncher(_authStore.currentUserId);
       if (!mounted) return;
-      context.go('/business/$businessId/dashboard');
+      await _recordAndEnter(businessId, () async {
+        if (!mounted) return;
+        context.go('/business/$businessId/dashboard');
+      });
       return;
     }
 
+    final preferred = forceChooseMode
+        ? null
+        : await MobileLauncherPrefs.preferredEntryMode(_authStore.currentUserId);
+    if (!mounted) return;
+
+    if (preferred == MobileBusinessEntryMode.standard) {
+      await _enterStandard(businessId);
+      return;
+    }
+    if (preferred == MobileBusinessEntryMode.launcher) {
+      await _enterLauncher(businessId);
+      return;
+    }
+
+    await _showEntryModeSheet(businessId);
+  }
+
+  Future<void> _enterStandard(int businessId) async {
+    await MobileLauncherPrefs.clearResumeLauncher(_authStore.currentUserId);
+    if (!mounted) return;
+    await _recordAndEnter(businessId, () async {
+      if (!mounted) return;
+      context.go('/business/$businessId/dashboard');
+    });
+  }
+
+  Future<void> _enterLauncher(int businessId) async {
+    await MobileLauncherPrefs.setResumeLauncher(
+      _authStore.currentUserId,
+      businessId,
+    );
+    if (!mounted) return;
+    await _recordAndEnter(businessId, () async {
+      if (!mounted) return;
+      // یک فریم صبر تا bottom sheet / route قبلی کاملاً بسته شود (رفع race روی اندروید).
+      await Future<void>.delayed(Duration.zero);
+      if (!mounted) return;
+      context.go(MobileLauncherPrefs.launcherHomePath(businessId));
+    });
+  }
+
+  Future<void> _showEntryModeSheet(int businessId) async {
     final t = AppLocalizations.of(context);
 
-    await showModalBottomSheet<void>(
+    final mode = await showModalBottomSheet<MobileBusinessEntryMode>(
       context: context,
       showDragHandle: true,
       builder: (sheetCtx) {
@@ -237,28 +402,28 @@ class _BusinessesPageState extends State<BusinessesPage> {
                     style: Theme.of(sheetCtx).textTheme.titleMedium,
                   ),
                 ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+                  child: Text(
+                    t.mobileLauncherChooseModeHint,
+                    style: Theme.of(sheetCtx).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(sheetCtx).colorScheme.onSurfaceVariant,
+                        ),
+                  ),
+                ),
                 ListTile(
                   leading: const Icon(Icons.dashboard_outlined),
                   title: Text(t.mobileLauncherModeStandard),
-                  onTap: () async {
-                    Navigator.of(sheetCtx).pop();
-                    await MobileLauncherPrefs.clearResumeLauncher(_authStore.currentUserId);
-                    if (!mounted) return;
-                    context.go('/business/$businessId/dashboard');
-                  },
+                  onTap: () => Navigator.of(sheetCtx).pop(
+                    MobileBusinessEntryMode.standard,
+                  ),
                 ),
                 ListTile(
                   leading: const Icon(Icons.apps_outlined),
                   title: Text(t.mobileLauncherModeLauncher),
-                  onTap: () async {
-                    Navigator.of(sheetCtx).pop();
-                    await MobileLauncherPrefs.setResumeLauncher(
-                      _authStore.currentUserId,
-                      businessId,
-                    );
-                    if (!mounted) return;
-                    context.go(MobileLauncherPrefs.launcherHomePath(businessId));
-                  },
+                  onTap: () => Navigator.of(sheetCtx).pop(
+                    MobileBusinessEntryMode.launcher,
+                  ),
                 ),
               ],
             ),
@@ -266,6 +431,18 @@ class _BusinessesPageState extends State<BusinessesPage> {
         );
       },
     );
+
+    if (!mounted || mode == null) return;
+    await MobileLauncherPrefs.setPreferredEntryMode(
+      _authStore.currentUserId,
+      mode,
+    );
+    if (!mounted) return;
+    if (mode == MobileBusinessEntryMode.standard) {
+      await _enterStandard(businessId);
+    } else {
+      await _enterLauncher(businessId);
+    }
   }
 
   void _goNewBusiness() => context.go('/user/profile/new-business');
@@ -274,8 +451,10 @@ class _BusinessesPageState extends State<BusinessesPage> {
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
     final padding = ResponsiveHelper.getPadding(context);
-    final visible = _visibleBusinesses;
-    final gateMode = !_loading && _error == null && _useGateMode;
+    final showToolsChrome = !_loading && _error == null && (_showSearch || _showSort);
+    final showInitialSkeleton = _loading && _businesses.isEmpty;
+    final noBusinessesAtAll = !_isSearching && _businesses.isEmpty;
+    final noSearchResults = _isSearching && _businesses.isEmpty;
 
     return Scaffold(
       body: CallbackShortcuts(
@@ -300,19 +479,38 @@ class _BusinessesPageState extends State<BusinessesPage> {
                       constraints: const BoxConstraints(maxWidth: _contentMaxWidth),
                       child: Padding(
                         padding: EdgeInsets.fromLTRB(padding, padding + 8, padding, 0),
-                        child: _buildHeader(context, t, gateMode),
+                        child: _buildHeader(context, t),
                       ),
                     ),
                   ),
                 ),
-                if (_loading)
+                if (showToolsChrome)
+                  SliverToBoxAdapter(
+                    child: Center(
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: _contentMaxWidth),
+                        child: Padding(
+                          padding: EdgeInsets.fromLTRB(padding, 12, padding, 4),
+                          child: _buildToolsRow(context, t),
+                        ),
+                      ),
+                    ),
+                  ),
+                if (showToolsChrome && _softRefreshing)
+                  const SliverToBoxAdapter(
+                    child: Padding(
+                      padding: EdgeInsets.only(top: 4),
+                      child: LinearProgressIndicator(minHeight: 2),
+                    ),
+                  ),
+                if (showInitialSkeleton)
                   SliverToBoxAdapter(
                     child: Center(
                       child: ConstrainedBox(
                         constraints: const BoxConstraints(maxWidth: _contentMaxWidth),
                         child: Padding(
                           padding: EdgeInsets.all(padding),
-                          child: BusinessSwitcherSkeleton(single: true),
+                          child: const BusinessSwitcherSkeleton(),
                         ),
                       ),
                     ),
@@ -322,65 +520,42 @@ class _BusinessesPageState extends State<BusinessesPage> {
                     hasScrollBody: false,
                     child: _buildErrorState(t, padding),
                   )
-                else if (_businesses.isEmpty)
+                else if (noBusinessesAtAll)
                   const SliverFillRemaining(
                     hasScrollBody: false,
                     child: BusinessesEmptyState(),
                   )
-                else if (visible.isEmpty)
+                else if (noSearchResults)
                   SliverFillRemaining(
                     hasScrollBody: false,
                     child: BusinessesEmptyState(
                       noSearchResults: true,
                       searchQuery: _searchQuery,
+                      onClearSearch: _clearSearch,
                     ),
                   )
-                else if (gateMode)
-                  SliverFillRemaining(
-                    hasScrollBody: false,
-                    child: Center(
-                      child: ConstrainedBox(
-                        constraints: const BoxConstraints(maxWidth: _contentMaxWidth),
-                        child: Padding(
-                          padding: EdgeInsets.fromLTRB(padding, 8, padding, padding + 24),
-                          child: BusinessSwitcherGate(
-                            business: _businesses.first,
-                            authStore: _authStore,
-                            onEnter: () => _navigateToBusiness(_businesses.first.id),
-                            onCreateNew: _goNewBusiness,
-                            onRefresh: _refresh,
-                          ),
-                        ),
-                      ),
-                    ),
-                  )
-                else ...[
-                  if (_showSearch)
-                    SliverToBoxAdapter(
-                      child: Center(
-                        child: ConstrainedBox(
-                          constraints: const BoxConstraints(maxWidth: _contentMaxWidth),
-                          child: Padding(
-                            padding: EdgeInsets.fromLTRB(padding, 4, padding, 8),
-                            child: _buildSearchField(context, t),
-                          ),
-                        ),
-                      ),
-                    ),
+                else
                   SliverPadding(
-                    padding: EdgeInsets.fromLTRB(padding, 0, padding, padding + 24),
+                    padding: EdgeInsets.fromLTRB(padding, 4, padding, padding + 24),
                     sliver: SliverToBoxAdapter(
                       child: Center(
                         child: ConstrainedBox(
                           constraints: const BoxConstraints(maxWidth: _contentMaxWidth),
                           child: Column(
                             children: [
-                              for (var i = 0; i < visible.length; i++)
+                              for (var i = 0; i < _businesses.length; i++)
                                 BusinessSwitcherRow(
-                                  business: visible[i],
+                                  business: _businesses[i],
                                   authStore: _authStore,
-                                  showDivider: i < visible.length - 1,
-                                  onEnter: () => _navigateToBusiness(visible[i].id),
+                                  isActive: _activeBusinessId == _businesses[i].id,
+                                  showDivider: i < _businesses.length - 1,
+                                  onEnter: () => _navigateToBusiness(_businesses[i].id),
+                                  onLongPress: ResponsiveHelper.isMobile(context)
+                                      ? () => _navigateToBusiness(
+                                            _businesses[i].id,
+                                            forceChooseMode: true,
+                                          )
+                                      : null,
                                   onRefresh: _refresh,
                                 ),
                               if (_isLoadingMore)
@@ -394,7 +569,6 @@ class _BusinessesPageState extends State<BusinessesPage> {
                       ),
                     ),
                   ),
-                ],
               ],
             ),
           ),
@@ -403,9 +577,22 @@ class _BusinessesPageState extends State<BusinessesPage> {
     );
   }
 
-  Widget _buildHeader(BuildContext context, AppLocalizations t, bool gateMode) {
+  Widget _buildHeader(BuildContext context, AppLocalizations t) {
     final theme = Theme.of(context);
-    final showAddInHeader = !_loading && _error == null && _businesses.isNotEmpty && !gateMode;
+    final canAdd = !_loading && _error == null && (_businesses.isNotEmpty || _isSearching);
+    final count = _totalCount ?? _businesses.length;
+    final String? subtitle;
+    if (_loading || _error != null) {
+      subtitle = null;
+    } else if (_businesses.isNotEmpty || _isSearching) {
+      if (count > 1 || _isSearching) {
+        subtitle = t.businessesHubCount(count);
+      } else {
+        subtitle = t.businessesSwitcherSubtitle;
+      }
+    } else {
+      subtitle = null;
+    }
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -422,10 +609,10 @@ class _BusinessesPageState extends State<BusinessesPage> {
                   letterSpacing: -0.3,
                 ),
               ),
-              if (!gateMode && _businesses.isNotEmpty && !_loading) ...[
+              if (subtitle != null) ...[
                 const SizedBox(height: 6),
                 Text(
-                  t.businessesSwitcherSubtitle,
+                  subtitle,
                   style: theme.textTheme.bodyMedium?.copyWith(
                     color: theme.colorScheme.onSurfaceVariant,
                   ),
@@ -434,7 +621,7 @@ class _BusinessesPageState extends State<BusinessesPage> {
             ],
           ),
         ),
-        if (showAddInHeader)
+        if (canAdd)
           TextButton.icon(
             onPressed: _goNewBusiness,
             icon: const Icon(Icons.add_rounded, size: 18),
@@ -447,23 +634,84 @@ class _BusinessesPageState extends State<BusinessesPage> {
     );
   }
 
+  Widget _buildToolsRow(BuildContext context, AppLocalizations t) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (_showSearch)
+          Expanded(child: _buildSearchField(context, t))
+        else
+          const Spacer(),
+        if (_showSort) ...[
+          if (_showSearch) const SizedBox(width: 4),
+          _buildSortButton(context, t),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildSortButton(BuildContext context, AppLocalizations t) {
+    final cs = Theme.of(context).colorScheme;
+    return PopupMenuButton<BusinessSwitcherSort>(
+      tooltip: t.businessesHubSortTooltip,
+      initialValue: _sort,
+      onSelected: _changeSort,
+      itemBuilder: (ctx) => [
+        CheckedPopupMenuItem(
+          value: BusinessSwitcherSort.recent,
+          checked: _sort == BusinessSwitcherSort.recent,
+          child: Text(t.businessesHubSortRecent),
+        ),
+        CheckedPopupMenuItem(
+          value: BusinessSwitcherSort.name,
+          checked: _sort == BusinessSwitcherSort.name,
+          child: Text(t.businessesHubSortName),
+        ),
+        CheckedPopupMenuItem(
+          value: BusinessSwitcherSort.created,
+          checked: _sort == BusinessSwitcherSort.created,
+          child: Text(t.businessesHubSortCreated),
+        ),
+      ],
+      child: Padding(
+        padding: const EdgeInsetsDirectional.only(start: 4, top: 2),
+        child: Material(
+          color: cs.surfaceContainerHighest.withValues(alpha: 0.45),
+          borderRadius: BorderRadius.circular(12),
+          child: SizedBox(
+            width: 44,
+            height: 44,
+            child: Icon(
+              Icons.sort_rounded,
+              size: 22,
+              color: cs.onSurfaceVariant,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildSearchField(BuildContext context, AppLocalizations t) {
     final cs = Theme.of(context).colorScheme;
     return TextField(
       controller: _searchController,
       focusNode: _searchFocusNode,
+      textInputAction: TextInputAction.search,
       decoration: InputDecoration(
         hintText: t.businessesHubSearchHint,
         prefixIcon: const Icon(Icons.search_rounded, size: 20),
-        suffixIcon: _searchQuery.isNotEmpty
-            ? IconButton(
-                icon: const Icon(Icons.close_rounded, size: 18),
-                onPressed: () {
-                  _searchController.clear();
-                  setState(() => _searchQuery = '');
-                },
-              )
-            : null,
+        suffixIcon: ListenableBuilder(
+          listenable: _searchController,
+          builder: (context, _) {
+            if (_searchController.text.isEmpty) return const SizedBox.shrink();
+            return IconButton(
+              tooltip: t.businessesHubClearSearch,
+              icon: const Icon(Icons.close_rounded, size: 18),
+              onPressed: _clearSearch,
+            );
+          },
+        ),
         filled: true,
         fillColor: cs.surfaceContainerHighest.withValues(alpha: 0.45),
         border: OutlineInputBorder(
@@ -489,7 +737,7 @@ class _BusinessesPageState extends State<BusinessesPage> {
             Text(_error!, textAlign: TextAlign.center),
             SizedBox(height: padding),
             FilledButton.icon(
-              onPressed: _loadBusinesses,
+              onPressed: () => _loadBusinesses(),
               icon: const Icon(Icons.refresh_rounded),
               label: Text(t.retry),
             ),

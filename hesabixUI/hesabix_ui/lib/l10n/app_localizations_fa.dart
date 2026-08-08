@@ -2252,6 +2252,32 @@ class AppLocalizationsFa extends AppLocalizations {
   }
 
   @override
+  String get businessesHubClearSearch => 'پاک کردن جست‌وجو';
+
+  @override
+  String get businessesHubActiveBadge => 'فعلی';
+
+  @override
+  String businessesHubCount(int count) {
+    return '$count کسب‌وکار';
+  }
+
+  @override
+  String get businessesHubSortTooltip => 'مرتب‌سازی';
+
+  @override
+  String get businessesHubSortRecent => 'آخرین استفاده‌شده';
+
+  @override
+  String get businessesHubSortName => 'نام';
+
+  @override
+  String get businessesHubSortCreated => 'جدیدترین';
+
+  @override
+  String get businessesHubOpenSettings => 'تنظیمات';
+
+  @override
   String get businessesHubEmptyTitle => 'هنوز کسب‌وکاری ندارید';
 
   @override
@@ -2314,6 +2340,10 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get businessesSwitcherSubtitle => 'فضای کاری را انتخاب کنید';
+
+  @override
+  String get mobileLauncherChooseModeHint =>
+      'این انتخاب ذخیره می‌شود. برای تغییر دوباره، روی کسب‌وکار لمس طولانی کنید.';
 
   @override
   String get accessDenied => 'دسترسی غیرمجاز';
@@ -7885,7 +7915,7 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get taxHelpNoteType1vs2 =>
-      'نوع اول فقط با هویت کامل خریدار (کد اقتصادی/ملی)؛ مصرف‌کننده نهایی را نوع دوم بفرستید';
+      'نوع ۱ فقط با هویت کامل خریدار (کد اقتصادی معتبر، یا کد ملی حقیقی به‌همراه کد پستی)؛ بدون این‌ها فاکتور خودکار به‌صورت نوع ۲ بدون اطلاعات خریدار ارسال می‌شود';
 
   @override
   String get taxHelpNoteConnection =>
@@ -16733,6 +16763,48 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get mobileLauncherQuickSalesTile => 'فروش سریع';
+
+  @override
+  String get mobileLauncherNewInvoiceTile => 'فاکتور جدید';
+
+  @override
+  String get mobileLauncherSwitchBusiness => 'تعویض کسب‌وکار';
+
+  @override
+  String get mobileLauncherTapToSwitchBusiness => 'برای تعویض کسب‌وکار بزنید';
+
+  @override
+  String get mobileLauncherSummarySales => 'مجموع فروش';
+
+  @override
+  String get mobileLauncherSummaryRecent => 'تراکنش‌های اخیر';
+
+  @override
+  String get mobileLauncherNoTiles =>
+      'برای نقش شما میانبری در دسترس نیست. پنل کامل را باز کنید یا از مدیر دسترسی بخواهید.';
+
+  @override
+  String get mobileLauncherLivePreview => 'پیش‌نمایش زنده';
+
+  @override
+  String get mobileLauncherTileDensitySection => 'تراکم کاشی‌ها';
+
+  @override
+  String get mobileLauncherTileDensityHint =>
+      'تعداد میانبر در هر ردیف را انتخاب کنید.';
+
+  @override
+  String get mobileLauncherDensityComfortable => 'راحت';
+
+  @override
+  String get mobileLauncherDensityCompact => 'فشرده';
+
+  @override
+  String get mobileLauncherBusinessesLoadError =>
+      'بارگذاری کسب‌وکارها ناموفق بود.';
+
+  @override
+  String get mobileLauncherNoBusinesses => 'کسب‌وکاری یافت نشد.';
 
   @override
   String get dataTableHelpMenu => 'راهنما';

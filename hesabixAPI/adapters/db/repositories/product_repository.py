@@ -1,13 +1,10 @@
 from __future__ import annotations
 
-import re
 from typing import Any, Dict, List, Optional
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import select, and_, or_, func, exists, text, case, literal
 from app.core.query_timeout import query_timeout
 
-from adapters.api.v1.schemas import QueryInfo
-from app.services.sort_resolution import effective_sort_specs
 from .base_repo import BaseRepository
 from ..models.product import Product
 from ..models.product_general_barcode_alias import ProductGeneralBarcodeAlias
@@ -17,34 +14,12 @@ from ..models.category import BusinessCategory
 
 from app.services.product_general_barcode_service import split_raw_general_barcodes
 from app.services.product_catalog_profile_service import catalog_profile_from_product
-
-# فاصله، خط جدید، انواع خط تیره (بدون نیم‌فاصلهٔ ZWNJ که در فارسی پیوند واژه است)
-_SEARCH_SPLIT_RE = re.compile(r"(?:\s+|(?:[\-‐‑–—])+)+")
-
-
-def _search_query_tokens(search: str) -> List[str]:
-    """جدا کردن عبارت جستجو به توکن‌های غیرخالی (فاصله، خط تیره و مشابه)."""
-    s = str(search).strip()
-    if not s:
-        return []
-    parts = [p for p in _SEARCH_SPLIT_RE.split(s) if p]
-    if parts:
-        return parts
-    return [s]
-
-
-def _like_escape(s: str) -> str:
-    """ایمن‌سازی متن ورودی برای الگوهای ILIKE (PostgreSQL با escape '\\')."""
-    return s.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
-
-
-def _column_contains_all_tokens(column, tokens: List[str]):
-    """هر توکن باید به‌صورت زیررشته‌ای در مقدار ستون باشد (AND بین توکن‌ها)."""
-    if not tokens:
-        return True
-    if len(tokens) == 1:
-        return column.ilike(f"%{tokens[0]}%")
-    return and_(*[column.ilike(f"%{t}%") for t in tokens])
+from adapters.db.repositories.product_list_filters import (
+    _apply_product_list_filters,
+    _column_contains_all_tokens,
+    _like_escape,
+    _search_query_tokens,
+)
 
 
 class ProductRepository(BaseRepository[Product]):
@@ -148,74 +123,8 @@ class ProductRepository(BaseRepository[Product]):
             if ors:
                 stmt = stmt.where(or_(*ors))
 
-        # Apply filters (supports minimal set used by clients)
-        if filters:
-            for f in filters:
-                # Support both dict and pydantic-like objects
-                if isinstance(f, dict):
-                    field = f.get("property")
-                    operator = f.get("operator")
-                    value = f.get("value")
-                else:
-                    field = getattr(f, "property", None)
-                    operator = getattr(f, "operator", None)
-                    value = getattr(f, "value", None)
-
-                if not field or not operator:
-                    continue
-
-                # Code filters
-                if field == "code":
-                    if operator == "=":
-                        stmt = stmt.where(Product.code == value)
-                    elif operator == "in" and isinstance(value, (list, tuple)):
-                        stmt = stmt.where(Product.code.in_(list(value)))
-                    continue
-
-                # Name contains
-                if field == "name":
-                    if operator in {"contains", "ilike"} and isinstance(value, str):
-                        nt = _search_query_tokens(value)
-                        if nt:
-                            stmt = stmt.where(_column_contains_all_tokens(Product.name, nt))
-                    elif operator == "=":
-                        stmt = stmt.where(Product.name == value)
-                    continue
-
-                if field == "item_type" and operator == "=" and value is not None:
-                    # مقدار رشته‌ای enum (مثلاً product / service)
-                    try:
-                        from adapters.db.models.product import ProductItemType
-                        iv = str(value).strip().lower()
-                        if iv in (ProductItemType.PRODUCT.value, "product"):
-                            stmt = stmt.where(Product.item_type == ProductItemType.PRODUCT)
-                        elif iv in (ProductItemType.SERVICE.value, "service"):
-                            stmt = stmt.where(Product.item_type == ProductItemType.SERVICE)
-                    except Exception:
-                        pass
-                    continue
-
-                # Category ID filter (supports "in" operator for multi-select)
-                if field == "category_id":
-                    if operator == "in" and isinstance(value, (list, tuple)):
-                        # Convert string IDs to integers with error handling
-                        category_ids = []
-                        for v in value:
-                            if v:
-                                try:
-                                    category_ids.append(int(v))
-                                except (ValueError, TypeError):
-                                    pass
-                        if category_ids:
-                            stmt = stmt.where(Product.category_id.in_(category_ids))
-                    elif operator == "=":
-                        try:
-                            category_id = int(value) if value else None
-                            if category_id:
-                                stmt = stmt.where(Product.category_id == category_id)
-                        except (ValueError, TypeError):
-                            pass
-                    continue
+        # فیلترهای ستونی DataTable (عملگرهای * / *? / ?* / = / in و فیلدهای شناخته‌شده)
+        stmt = _apply_product_list_filters(stmt, filters, business_id=business_id)
 
         if category_ids:
             stmt = stmt.where(Product.category_id.in_(list(category_ids)))
@@ -227,6 +136,9 @@ class ProductRepository(BaseRepository[Product]):
             # Sorting: آرایه sort در اولویت، وگرنه sort_by/sort_desc (سازگار با کلاینت قدیمی)
             _allowed_product_sort = frozenset({"name", "code", "created_at"})
             try:
+                from adapters.api.v1.schemas import QueryInfo
+                from app.services.sort_resolution import effective_sort_specs
+
                 qi = QueryInfo(sort_by=sort_by, sort_desc=sort_desc, sort=sort)  # type: ignore[arg-type]
                 specs = effective_sort_specs(qi, allowed=_allowed_product_sort, default_when_empty=None)
             except Exception:

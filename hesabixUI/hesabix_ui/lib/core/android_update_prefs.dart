@@ -8,6 +8,8 @@ class AndroidUpdatePrefs {
   static const _kLastCheckMs = 'android_update_last_check_ms';
   static const _kPendingTaskId = 'android_update_pending_task_id';
   static const _kPendingReleaseTag = 'android_update_pending_release_tag';
+  static const _kReadyInstallPath = 'android_update_ready_install_path';
+  static const _kReadyInstallTag = 'android_update_ready_install_tag';
 
   static Future<bool> isAutoCheckEnabled() async {
     final p = await SharedPreferences.getInstance();
@@ -80,5 +82,31 @@ class AndroidUpdatePrefs {
     final p = await SharedPreferences.getInstance();
     await p.remove(_kPendingTaskId);
     await p.remove(_kPendingReleaseTag);
+  }
+
+  /// APK downloaded and waiting for the package installer to be opened.
+  static Future<String?> getReadyInstallPath() async {
+    final p = await SharedPreferences.getInstance();
+    return p.getString(_kReadyInstallPath);
+  }
+
+  static Future<String?> getReadyInstallTag() async {
+    final p = await SharedPreferences.getInstance();
+    return p.getString(_kReadyInstallTag);
+  }
+
+  static Future<void> setReadyInstall({
+    required String filePath,
+    required String releaseTag,
+  }) async {
+    final p = await SharedPreferences.getInstance();
+    await p.setString(_kReadyInstallPath, filePath);
+    await p.setString(_kReadyInstallTag, releaseTag);
+  }
+
+  static Future<void> clearReadyInstall() async {
+    final p = await SharedPreferences.getInstance();
+    await p.remove(_kReadyInstallPath);
+    await p.remove(_kReadyInstallTag);
   }
 }

@@ -17,6 +17,11 @@ class BiometricLockController extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Skip the next resume lock (e.g. after handing off to the system package installer).
+  void suppressNextLock() {
+    _suppressNextLock = true;
+  }
+
   void unlock() {
     if (!_locked) return;
     _locked = false;

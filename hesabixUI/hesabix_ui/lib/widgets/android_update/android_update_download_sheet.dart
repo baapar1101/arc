@@ -4,11 +4,45 @@ import 'package:hesabix_ui/l10n/app_localizations.dart';
 import '../../services/android_update/android_apk_download_coordinator.dart';
 import '../../services/android_update/android_update_models.dart';
 
-enum AndroidUpdateDownloadSheetResult {
+enum AndroidUpdateDownloadSheetOutcome {
   completed,
   background,
   cancelled,
   failed,
+}
+
+/// Result of the download bottom sheet, including the APK path when completed.
+class AndroidUpdateDownloadSheetResult {
+  final AndroidUpdateDownloadSheetOutcome outcome;
+  final String? filePath;
+  final String? errorMessage;
+
+  const AndroidUpdateDownloadSheetResult._({
+    required this.outcome,
+    this.filePath,
+    this.errorMessage,
+  });
+
+  const AndroidUpdateDownloadSheetResult.completed(String path)
+      : this._(
+          outcome: AndroidUpdateDownloadSheetOutcome.completed,
+          filePath: path,
+        );
+
+  const AndroidUpdateDownloadSheetResult.background()
+      : this._(outcome: AndroidUpdateDownloadSheetOutcome.background);
+
+  const AndroidUpdateDownloadSheetResult.cancelled()
+      : this._(outcome: AndroidUpdateDownloadSheetOutcome.cancelled);
+
+  const AndroidUpdateDownloadSheetResult.failed([String? message])
+      : this._(
+          outcome: AndroidUpdateDownloadSheetOutcome.failed,
+          errorMessage: message,
+        );
+
+  bool get isCompleted =>
+      outcome == AndroidUpdateDownloadSheetOutcome.completed;
 }
 
 String formatAndroidUpdateBytes(int bytes) {
@@ -44,7 +78,9 @@ Future<AndroidUpdateDownloadSheetResult> showAndroidUpdateDownloadSheet({
       release: release,
       startDownload: startDownload,
     ),
-  ).then((value) => value ?? AndroidUpdateDownloadSheetResult.cancelled);
+  ).then(
+    (value) => value ?? const AndroidUpdateDownloadSheetResult.cancelled(),
+  );
 }
 
 class _AndroidUpdateDownloadSheet extends StatefulWidget {
@@ -64,7 +100,8 @@ class _AndroidUpdateDownloadSheet extends StatefulWidget {
       _AndroidUpdateDownloadSheetState();
 }
 
-class _AndroidUpdateDownloadSheetState extends State<_AndroidUpdateDownloadSheet> {
+class _AndroidUpdateDownloadSheetState
+    extends State<_AndroidUpdateDownloadSheet> {
   AndroidUpdateDownloadProgress? _progress;
   var _cancelled = false;
   var _backgroundRequested = false;
@@ -92,28 +129,36 @@ class _AndroidUpdateDownloadSheetState extends State<_AndroidUpdateDownloadSheet
 
       if (!mounted) return;
       if (_backgroundRequested) {
-        Navigator.of(context).pop(AndroidUpdateDownloadSheetResult.background);
+        Navigator.of(context).pop(
+          const AndroidUpdateDownloadSheetResult.background(),
+        );
         return;
       }
 
-      Navigator.of(context).pop(AndroidUpdateDownloadSheetResult.completed);
-      // Path is handled by caller via coordinator; keep for analyzer.
-      assert(path.isNotEmpty);
+      Navigator.of(context).pop(AndroidUpdateDownloadSheetResult.completed(path));
     } on AndroidUpdateCancelledException {
       if (!mounted) return;
       if (_backgroundRequested) {
-        Navigator.of(context).pop(AndroidUpdateDownloadSheetResult.background);
+        Navigator.of(context).pop(
+          const AndroidUpdateDownloadSheetResult.background(),
+        );
         return;
       }
-      Navigator.of(context).pop(AndroidUpdateDownloadSheetResult.cancelled);
+      Navigator.of(context).pop(
+        const AndroidUpdateDownloadSheetResult.cancelled(),
+      );
     } catch (e) {
       if (!mounted) return;
       if (_backgroundRequested) {
-        Navigator.of(context).pop(AndroidUpdateDownloadSheetResult.background);
+        Navigator.of(context).pop(
+          const AndroidUpdateDownloadSheetResult.background(),
+        );
         return;
       }
       setState(() => _failedMessage = e.toString());
-      Navigator.of(context).pop(AndroidUpdateDownloadSheetResult.failed);
+      Navigator.of(context).pop(
+        AndroidUpdateDownloadSheetResult.failed(e.toString()),
+      );
     }
   }
 
@@ -121,12 +166,16 @@ class _AndroidUpdateDownloadSheetState extends State<_AndroidUpdateDownloadSheet
     setState(() => _cancelled = true);
     await AndroidApkDownloadCoordinator.instance.cancelDownload();
     if (!mounted) return;
-    Navigator.of(context).pop(AndroidUpdateDownloadSheetResult.cancelled);
+    Navigator.of(context).pop(
+      const AndroidUpdateDownloadSheetResult.cancelled(),
+    );
   }
 
   void _onContinueInBackground() {
     setState(() => _backgroundRequested = true);
-    Navigator.of(context).pop(AndroidUpdateDownloadSheetResult.background);
+    Navigator.of(context).pop(
+      const AndroidUpdateDownloadSheetResult.background(),
+    );
   }
 
   @override

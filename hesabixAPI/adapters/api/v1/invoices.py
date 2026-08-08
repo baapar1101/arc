@@ -74,6 +74,7 @@ from app.services.tax_submission_service import (
     build_tax_status_fields_for_api,
     build_tax_failure_details,
     enrich_tax_timeline_event,
+    normalize_stored_tax_status,
 )
 from app.services.tax_reference_service import (
     link_reference_invoice,
@@ -3139,11 +3140,7 @@ async def search_tax_workspace_endpoint(
         in_workspace = bool(extra.get("tax_workspace"))
         if not in_workspace:
             continue
-        status = extra.get("tax_status")
-        if isinstance(status, str):
-            status = status.strip()
-        if not status:
-            status = "not_sent"
+        status = normalize_stored_tax_status(extra)
         status_counts["all"] += 1
         if status in status_counts:
             status_counts[status] += 1
@@ -3179,11 +3176,7 @@ async def search_tax_workspace_endpoint(
     list_dicts = invoice_documents_to_list_dicts(db, page_docs)
     for item in list_dicts:
         extra = item.get("extra_info") or {}
-        tax_status = extra.get("tax_status")
-        if isinstance(tax_status, str):
-            tax_status = tax_status.strip()
-        if not tax_status:
-            tax_status = "not_sent"
+        tax_status = normalize_stored_tax_status(extra)
         item["tax_status"] = tax_status
         item["tax_tracking_code"] = extra.get("tax_tracking_code")
         item["tax_last_send_at"] = extra.get("tax_last_send_at")
@@ -3471,7 +3464,10 @@ def send_invoice_to_tax_system(
             http_status=400,
         )
     status = (extra.get("tax_status") or "").strip() if isinstance(extra.get("tax_status"), str) else extra.get("tax_status")
-    if status in ("sent", "finalized"):
+    if status in ("sent", "finalized") or (
+        normalize_stored_tax_status(extra) in ("sent", "finalized", "pending")
+        and extra.get("tax_tracking_code")
+    ):
         raise ApiError(
             "TAX_ALREADY_SENT",
             "Invoice has already been sent to tax system",
@@ -3634,7 +3630,10 @@ def send_invoices_to_tax_system_batch(
             if not bool(extra.get("tax_workspace")):
                 raise ApiError("TAX_WORKSPACE_NOT_SET", "Invoice is not in tax workspace", http_status=400)
             status = (extra.get("tax_status") or "").strip() if isinstance(extra.get("tax_status"), str) else extra.get("tax_status")
-            if status in ("sent", "finalized"):
+            if status in ("sent", "finalized") or (
+                normalize_stored_tax_status(extra) in ("sent", "finalized", "pending")
+                and extra.get("tax_tracking_code")
+            ):
                 raise ApiError("TAX_ALREADY_SENT", "Invoice has already been sent to tax system", http_status=409)
 
             submission = send_document_to_tax_system(db, doc)

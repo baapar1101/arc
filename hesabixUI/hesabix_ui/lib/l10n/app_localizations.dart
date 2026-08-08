@@ -4328,6 +4328,54 @@ abstract class AppLocalizations {
   /// **'No results for \"{query}\"'**
   String businessesHubNoSearchResultsFor(String query);
 
+  /// No description provided for @businessesHubClearSearch.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear search'**
+  String get businessesHubClearSearch;
+
+  /// No description provided for @businessesHubActiveBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'Current'**
+  String get businessesHubActiveBadge;
+
+  /// No description provided for @businessesHubCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} businesses'**
+  String businessesHubCount(int count);
+
+  /// No description provided for @businessesHubSortTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Sort'**
+  String get businessesHubSortTooltip;
+
+  /// No description provided for @businessesHubSortRecent.
+  ///
+  /// In en, this message translates to:
+  /// **'Recently used'**
+  String get businessesHubSortRecent;
+
+  /// No description provided for @businessesHubSortName.
+  ///
+  /// In en, this message translates to:
+  /// **'Name'**
+  String get businessesHubSortName;
+
+  /// No description provided for @businessesHubSortCreated.
+  ///
+  /// In en, this message translates to:
+  /// **'Newest'**
+  String get businessesHubSortCreated;
+
+  /// No description provided for @businessesHubOpenSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Settings'**
+  String get businessesHubOpenSettings;
+
   /// No description provided for @businessesHubEmptyTitle.
   ///
   /// In en, this message translates to:
@@ -4429,6 +4477,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Select a workspace to continue'**
   String get businessesSwitcherSubtitle;
+
+  /// No description provided for @mobileLauncherChooseModeHint.
+  ///
+  /// In en, this message translates to:
+  /// **'This choice is saved. Long-press a business to change it later.'**
+  String get mobileLauncherChooseModeHint;
 
   /// No description provided for @accessDenied.
   ///
@@ -14685,7 +14739,7 @@ abstract class AppLocalizations {
   /// No description provided for @taxHelpNoteType1vs2.
   ///
   /// In en, this message translates to:
-  /// **'Type 1 needs full buyer identity (economic/national ID); send end consumers as type 2'**
+  /// **'Type 1 needs full buyer identity (valid economic code, or natural national ID plus postal code); otherwise the invoice is sent automatically as type 2 without buyer fields'**
   String get taxHelpNoteType1vs2;
 
   /// No description provided for @taxHelpNoteConnection.
@@ -30923,6 +30977,84 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Quick sales'**
   String get mobileLauncherQuickSalesTile;
+
+  /// No description provided for @mobileLauncherNewInvoiceTile.
+  ///
+  /// In en, this message translates to:
+  /// **'New invoice'**
+  String get mobileLauncherNewInvoiceTile;
+
+  /// No description provided for @mobileLauncherSwitchBusiness.
+  ///
+  /// In en, this message translates to:
+  /// **'Switch business'**
+  String get mobileLauncherSwitchBusiness;
+
+  /// No description provided for @mobileLauncherTapToSwitchBusiness.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap to switch business'**
+  String get mobileLauncherTapToSwitchBusiness;
+
+  /// No description provided for @mobileLauncherSummarySales.
+  ///
+  /// In en, this message translates to:
+  /// **'Total sales'**
+  String get mobileLauncherSummarySales;
+
+  /// No description provided for @mobileLauncherSummaryRecent.
+  ///
+  /// In en, this message translates to:
+  /// **'Recent transactions'**
+  String get mobileLauncherSummaryRecent;
+
+  /// No description provided for @mobileLauncherNoTiles.
+  ///
+  /// In en, this message translates to:
+  /// **'No shortcuts are available for your role. Open the full panel or ask an admin for access.'**
+  String get mobileLauncherNoTiles;
+
+  /// No description provided for @mobileLauncherLivePreview.
+  ///
+  /// In en, this message translates to:
+  /// **'Live preview'**
+  String get mobileLauncherLivePreview;
+
+  /// No description provided for @mobileLauncherTileDensitySection.
+  ///
+  /// In en, this message translates to:
+  /// **'Tile density'**
+  String get mobileLauncherTileDensitySection;
+
+  /// No description provided for @mobileLauncherTileDensityHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose how many shortcuts appear in each row.'**
+  String get mobileLauncherTileDensityHint;
+
+  /// No description provided for @mobileLauncherDensityComfortable.
+  ///
+  /// In en, this message translates to:
+  /// **'Comfortable'**
+  String get mobileLauncherDensityComfortable;
+
+  /// No description provided for @mobileLauncherDensityCompact.
+  ///
+  /// In en, this message translates to:
+  /// **'Compact'**
+  String get mobileLauncherDensityCompact;
+
+  /// No description provided for @mobileLauncherBusinessesLoadError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load businesses.'**
+  String get mobileLauncherBusinessesLoadError;
+
+  /// No description provided for @mobileLauncherNoBusinesses.
+  ///
+  /// In en, this message translates to:
+  /// **'No businesses found.'**
+  String get mobileLauncherNoBusinesses;
 
   /// No description provided for @dataTableHelpMenu.
   ///

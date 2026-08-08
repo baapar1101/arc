@@ -62,6 +62,7 @@ class TaxStatusChip extends StatelessWidget {
           const Color(0xFFFFF7ED),
         );
       case 'sent':
+      case 'not_found':
         return _StatusMeta(
           t.taxStatusSent,
           Icons.cloud_done_outlined,

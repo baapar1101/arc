@@ -370,6 +370,7 @@ adapters/db/repositories/ping_pong_repository.py
 adapters/db/repositories/price_list_repository.py
 adapters/db/repositories/product_attribute_repository.py
 adapters/db/repositories/product_bom_repository.py
+adapters/db/repositories/product_list_filters.py
 adapters/db/repositories/product_repository.py
 adapters/db/repositories/project_repository.py
 adapters/db/repositories/repair_shop_repository.py
@@ -1234,6 +1235,7 @@ tests/test_product_catalog_profile.py
 tests/test_product_excel_import_opening_balance.py
 tests/test_product_fx_and_period_end.py
 tests/test_product_inventory_tracking_sync.py
+tests/test_product_list_column_filters.py
 tests/test_product_opening_balance.py
 tests/test_product_price_partial_update.py
 tests/test_product_suppliers.py
@@ -1244,7 +1246,9 @@ tests/test_quick_sales_service.py
 tests/test_security_hardening.py
 tests/test_stock_count.py
 tests/test_sunway_sms_provider.py
+tests/test_tax_inquiry_not_found_status.py
 tests/test_tax_key_material_service.py
+tests/test_tax_validation_type2_buyer.py
 tests/test_telegram_link_token_expiry.py
 tests/test_telephony_media_edge.py
 tests/test_telephony_phone_normalizer.py

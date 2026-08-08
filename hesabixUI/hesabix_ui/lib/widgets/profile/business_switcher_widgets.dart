@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import '../../core/auth_store.dart';
 import '../../models/business_dashboard_models.dart';
@@ -54,16 +55,20 @@ class BusinessSwitcherRow extends StatefulWidget {
   final BusinessWithPermission business;
   final AuthStore authStore;
   final VoidCallback? onEnter;
+  final VoidCallback? onLongPress;
   final VoidCallback? onRefresh;
   final bool showDivider;
+  final bool isActive;
 
   const BusinessSwitcherRow({
     super.key,
     required this.business,
     required this.authStore,
     this.onEnter,
+    this.onLongPress,
     this.onRefresh,
     this.showDivider = true,
+    this.isActive = false,
   });
 
   @override
@@ -83,7 +88,7 @@ class _BusinessSwitcherRowState extends State<BusinessSwitcherRow> {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
     final t = AppLocalizations.of(context);
-    final highlight = _hovered || _menuOpen;
+    final highlight = _hovered || _menuOpen || widget.isActive;
 
     if (b.isDeletionPending && b.isOwner) {
       return _PendingDeletionRow(
@@ -100,11 +105,16 @@ class _BusinessSwitcherRowState extends State<BusinessSwitcherRow> {
       child: Column(
         children: [
           Material(
-            color: highlight ? cs.surfaceContainerHighest.withValues(alpha: 0.55) : Colors.transparent,
+            color: widget.isActive
+                ? cs.primaryContainer.withValues(alpha: 0.35)
+                : highlight
+                    ? cs.surfaceContainerHighest.withValues(alpha: 0.55)
+                    : Colors.transparent,
             borderRadius: BorderRadius.circular(12),
             child: InkWell(
               borderRadius: BorderRadius.circular(12),
               onTap: _blocked ? null : widget.onEnter,
+              onLongPress: _blocked ? null : widget.onLongPress,
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
                 child: Row(
@@ -115,15 +125,39 @@ class _BusinessSwitcherRowState extends State<BusinessSwitcherRow> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            b.name,
-                            style: theme.textTheme.titleMedium?.copyWith(
-                              fontWeight: FontWeight.w600,
-                              decoration: b.isDeletionPending ? TextDecoration.lineThrough : null,
-                              color: b.isDeletionPending ? cs.onSurfaceVariant : null,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
+                          Row(
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  b.name,
+                                  style: theme.textTheme.titleMedium?.copyWith(
+                                    fontWeight: FontWeight.w600,
+                                    decoration:
+                                        b.isDeletionPending ? TextDecoration.lineThrough : null,
+                                    color: b.isDeletionPending ? cs.onSurfaceVariant : null,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              if (widget.isActive) ...[
+                                const SizedBox(width: 8),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: cs.primary.withValues(alpha: 0.12),
+                                    borderRadius: BorderRadius.circular(999),
+                                  ),
+                                  child: Text(
+                                    t.businessesHubActiveBadge,
+                                    style: theme.textTheme.labelSmall?.copyWith(
+                                      color: cs.primary,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ],
                           ),
                           const SizedBox(height: 3),
                           Text(
@@ -284,193 +318,7 @@ class _PendingDeletionRow extends StatelessWidget {
   }
 }
 
-/// دروازه ادامه وقتی فقط یک کسب‌وکار فعال وجود دارد.
-class BusinessSwitcherGate extends StatefulWidget {
-  final BusinessWithPermission business;
-  final AuthStore authStore;
-  final VoidCallback onEnter;
-  final VoidCallback? onCreateNew;
-  final VoidCallback? onRefresh;
-
-  const BusinessSwitcherGate({
-    super.key,
-    required this.business,
-    required this.authStore,
-    required this.onEnter,
-    this.onCreateNew,
-    this.onRefresh,
-  });
-
-  @override
-  State<BusinessSwitcherGate> createState() => _BusinessSwitcherGateState();
-}
-
-class _BusinessSwitcherGateState extends State<BusinessSwitcherGate> {
-  bool _restoring = false;
-
-  BusinessWithPermission get b => widget.business;
-  bool get _blocked => businessBlocksAccess(b.isDeleted, b.isDeletionPending);
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final cs = theme.colorScheme;
-    final t = AppLocalizations.of(context);
-
-    if (b.isDeletionPending && b.isOwner) {
-      return _PendingGate(
-        business: b,
-        restoring: _restoring,
-        onRestore: _handleRestore,
-        onCreateNew: widget.onCreateNew,
-      );
-    }
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 24),
-      child: Column(
-        children: [
-          BusinessSwitcherAvatar(name: b.name, size: 72),
-          const SizedBox(height: 20),
-          Text(
-            b.name,
-            textAlign: TextAlign.center,
-            style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w700),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            businessSwitcherMetaLine(b, t),
-            textAlign: TextAlign.center,
-            style: theme.textTheme.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
-          ),
-          const SizedBox(height: 28),
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton(
-              onPressed: _blocked ? null : widget.onEnter,
-              style: FilledButton.styleFrom(
-                minimumSize: const Size(0, 48),
-                textStyle: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
-              ),
-              child: Text(t.businessesSwitcherContinue),
-            ),
-          ),
-          const SizedBox(height: 8),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              if (widget.onCreateNew != null)
-                TextButton.icon(
-                  onPressed: widget.onCreateNew,
-                  icon: const Icon(Icons.add_rounded, size: 18),
-                  label: Text(t.newBusiness),
-                ),
-              BusinessSwitcherMenu(
-                business: b,
-                authStore: widget.authStore,
-                visible: true,
-                alwaysVisibleOnTouch: true,
-                onRefresh: widget.onRefresh,
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Future<void> _handleRestore() async {
-    setState(() => _restoring = true);
-    try {
-      await BusinessHubActions.restore(
-        context,
-        business: b,
-        onRefresh: widget.onRefresh,
-      );
-    } finally {
-      if (mounted) setState(() => _restoring = false);
-    }
-  }
-}
-
-class _PendingGate extends StatelessWidget {
-  final BusinessWithPermission business;
-  final bool restoring;
-  final VoidCallback onRestore;
-  final VoidCallback? onCreateNew;
-
-  const _PendingGate({
-    required this.business,
-    required this.restoring,
-    required this.onRestore,
-    this.onCreateNew,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final cs = theme.colorScheme;
-    final t = AppLocalizations.of(context);
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 24),
-      child: Column(
-        children: [
-          Opacity(
-            opacity: 0.55,
-            child: BusinessSwitcherAvatar(name: business.name, size: 72),
-          ),
-          const SizedBox(height: 20),
-          Text(
-            business.name,
-            textAlign: TextAlign.center,
-            style: theme.textTheme.headlineSmall?.copyWith(
-              fontWeight: FontWeight.w700,
-              decoration: TextDecoration.lineThrough,
-              color: cs.onSurfaceVariant,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            t.businessesHubDeletionPending,
-            textAlign: TextAlign.center,
-            style: theme.textTheme.bodyMedium?.copyWith(color: Colors.orange.shade800),
-          ),
-          const SizedBox(height: 28),
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton.icon(
-              onPressed: restoring ? null : onRestore,
-              icon: restoring
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.restore_rounded),
-              label: Text(restoring ? t.businessesHubRestoring : t.businessesHubRestore),
-              style: FilledButton.styleFrom(
-                minimumSize: const Size(0, 48),
-                backgroundColor: Colors.green.shade600,
-                foregroundColor: Colors.white,
-              ),
-            ),
-          ),
-          if (onCreateNew != null) ...[
-            const SizedBox(height: 8),
-            TextButton.icon(
-              onPressed: onCreateNew,
-              icon: const Icon(Icons.add_rounded, size: 18),
-              label: Text(t.newBusiness),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-/// منوی اقدامات ثانویه (ارز / خروج).
+/// منوی اقدامات ثانویه (تنظیمات / ارز / خروج / حذف).
 class BusinessSwitcherMenu extends StatelessWidget {
   final BusinessWithPermission business;
   final AuthStore authStore;
@@ -497,10 +345,12 @@ class BusinessSwitcherMenu extends StatelessWidget {
     final touch = ResponsiveHelper.isMobile(context);
     final show = visible || (alwaysVisibleOnTouch && touch);
 
+    final hasSettings = !blocked;
     final hasCurrency = business.currencies.length > 1 && !blocked;
     final hasRestore = business.isDeletionPending && business.isOwner;
     final hasLeave = !business.isOwner && !business.isDeletionPending;
-    final hasAny = hasCurrency || hasRestore || hasLeave;
+    final hasDelete = business.isOwner && !business.isDeletionPending && !business.isDeleted;
+    final hasAny = hasSettings || hasCurrency || hasRestore || hasLeave || hasDelete;
     if (!hasAny) return const SizedBox.shrink();
 
     return AnimatedOpacity(
@@ -517,6 +367,14 @@ class BusinessSwitcherMenu extends StatelessWidget {
           onSelected: (action) async {
             onOpenChanged?.call(false);
             switch (action) {
+              case _SwitcherMenuAction.settings:
+                await authStore.setCurrentBusiness(business);
+                if (!context.mounted) return;
+                context.go('/business/${business.id}/settings');
+              case _SwitcherMenuAction.delete:
+                await authStore.setCurrentBusiness(business);
+                if (!context.mounted) return;
+                context.go('/business/${business.id}/settings/delete');
               case _SwitcherMenuAction.leave:
                 await BusinessHubActions.leave(
                   context,
@@ -537,7 +395,20 @@ class BusinessSwitcherMenu extends StatelessWidget {
           itemBuilder: (ctx) {
             final items = <PopupMenuEntry<_SwitcherMenuAction>>[];
 
+            if (hasSettings) {
+              items.add(PopupMenuItem(
+                value: _SwitcherMenuAction.settings,
+                child: ListTile(
+                  leading: const Icon(Icons.settings_outlined, size: 20),
+                  title: Text(t.businessesHubOpenSettings),
+                  contentPadding: EdgeInsets.zero,
+                  dense: true,
+                ),
+              ));
+            }
+
             if (hasCurrency) {
+              if (items.isNotEmpty) items.add(const PopupMenuDivider());
               items.add(PopupMenuItem(
                 enabled: false,
                 child: Text(
@@ -596,6 +467,22 @@ class BusinessSwitcherMenu extends StatelessWidget {
               ));
             }
 
+            if (hasDelete) {
+              if (items.isNotEmpty) items.add(const PopupMenuDivider());
+              items.add(PopupMenuItem(
+                value: _SwitcherMenuAction.delete,
+                child: ListTile(
+                  leading: Icon(Icons.delete_outline_rounded, color: Theme.of(ctx).colorScheme.error),
+                  title: Text(
+                    t.deleteBusiness,
+                    style: TextStyle(color: Theme.of(ctx).colorScheme.error),
+                  ),
+                  contentPadding: EdgeInsets.zero,
+                  dense: true,
+                ),
+              ));
+            }
+
             return items;
           },
         ),
@@ -612,7 +499,7 @@ class BusinessSwitcherMenu extends StatelessWidget {
   }
 }
 
-enum _SwitcherMenuAction { leave, restore, currency }
+enum _SwitcherMenuAction { settings, delete, leave, restore, currency }
 
 /// اسکلتون سبک برای سوییچر.
 class BusinessSwitcherSkeleton extends StatelessWidget {

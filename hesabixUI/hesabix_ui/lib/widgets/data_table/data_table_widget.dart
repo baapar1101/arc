@@ -23,6 +23,7 @@ import 'helpers/column_settings_service.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/responsive_helper.dart';
 import '../../utils/snackbar_helper.dart';
+import '../business_subpage_back_leading.dart';
 
 /// مقایسهٔ مقدارمحور [additionalParams] تا با rebuild والد که هر بار Map جدید می‌سازد،
 /// بارگذاری بی‌دلیل تکرار نشود؛ فقط وقتی محتوا عوض شده باشد refetch می‌شود.
@@ -1246,10 +1247,17 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
   }
 
   bool _columnHasActiveFilter(String columnKey) {
-    return _columnSearchValues.containsKey(columnKey) ||
+    if (_columnSearchValues.containsKey(columnKey) ||
         (_columnMultiSelectValues[columnKey]?.isNotEmpty ?? false) ||
         (_columnDateFromValues[columnKey] != null &&
-            _columnDateToValues[columnKey] != null);
+            _columnDateToValues[columnKey] != null)) {
+      return true;
+    }
+    // ستون category_name فیلتر درختی را زیر کلید category_id ذخیره می‌کند
+    if (columnKey == 'category_name') {
+      return _columnMultiSelectValues['category_id']?.isNotEmpty ?? false;
+    }
+    return false;
   }
 
   void _clearAllFilters() {
@@ -1538,11 +1546,18 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
         }
       });
 
+      // خروجی «همه»: کل نتایج فیلترشده (نه فقط صفحه فعلی جدول).
+      // خروجی «انتخاب‌شده»: همان صفحه فعلی — ایندکس‌های انتخاب نسبت به صفحه هستند.
+      const exportAllTake = 10000;
+      final includeInventory =
+          widget.config.additionalParams?['include_inventory'] == true;
+      final inventoryAsOfDate =
+          widget.config.additionalParams?['inventory_as_of_date'] as String?;
       final queryInfo = <String, dynamic>{
         'sort_by': _sortBy,
         'sort_desc': _sortDesc,
-        'take': _limit,
-        'skip': (_page - 1) * _limit,
+        'take': selectedOnly ? _limit : exportAllTake,
+        'skip': selectedOnly ? (_page - 1) * _limit : 0,
         'search': _searchCtrl.text.isNotEmpty ? _searchCtrl.text : null,
         'search_fields':
             _searchCtrl.text.isNotEmpty && widget.config.searchFields.isNotEmpty
@@ -1550,6 +1565,12 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
             : null,
         'filters': filters.isNotEmpty ? filters : null,
       };
+      if (includeInventory) {
+        queryInfo['include_inventory'] = true;
+        if (inventoryAsOfDate != null && inventoryAsOfDate.isNotEmpty) {
+          queryInfo['inventory_as_of_date'] = inventoryAsOfDate;
+        }
+      }
       if (_multiSort.isNotEmpty) {
         queryInfo['sort'] = _multiSort
             .map((s) => <String, dynamic>{'by': s.by, 'desc': s.desc})
@@ -2054,6 +2075,11 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
                   widget.config.onBack ??
                   () {
                     if (!mounted) return;
+                    final bid = widget.config.businessId;
+                    if (bid != null) {
+                      popBusinessOrLauncher(context, bid);
+                      return;
+                    }
                     if (context.canPop()) {
                       context.pop();
                     }

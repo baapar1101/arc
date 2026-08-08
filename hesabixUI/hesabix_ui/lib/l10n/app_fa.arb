@@ -935,6 +935,21 @@
       }
     }
   },
+  "businessesHubClearSearch": "پاک کردن جست‌وجو",
+  "businessesHubActiveBadge": "فعلی",
+  "businessesHubCount": "{count} کسب‌وکار",
+  "@businessesHubCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "businessesHubSortTooltip": "مرتب‌سازی",
+  "businessesHubSortRecent": "آخرین استفاده‌شده",
+  "businessesHubSortName": "نام",
+  "businessesHubSortCreated": "جدیدترین",
+  "businessesHubOpenSettings": "تنظیمات",
   "businessesHubEmptyTitle": "هنوز کسب‌وکاری ندارید",
   "businessesHubEmptySubtitle": "با ساخت اولین کسب‌وکار، حسابداری ابری را شروع کنید.",
   "businessesHubImportLegacy": "وارد کردن از نسخه قدیم",
@@ -994,6 +1009,7 @@
   "businessesHubSearchShortcut": "برای جستجو / را بزنید",
   "businessesSwitcherContinue": "ادامه",
   "businessesSwitcherSubtitle": "فضای کاری را انتخاب کنید",
+  "mobileLauncherChooseModeHint": "این انتخاب ذخیره می‌شود. برای تغییر دوباره، روی کسب‌وکار لمس طولانی کنید.",
   "accessDenied": "دسترسی غیرمجاز",
   "basicTools": "ابزارهای پایه",
   "businessSettings": "تنظیمات کسب و کار",
@@ -3188,7 +3204,7 @@
   "taxHelpNoteFailedInDLQ": "فاکتورهای ناموفق با جزئیات قابل‌فهم خطا در همین صفحه نمایش داده می‌شوند",
   "taxHelpNoteTimeline": "مهلت ارسال معمولاً حدود ۱۲ روز از تاریخ صدور است؛ فاکتور قدیمی را دوباره نسازید مگر طبق اطلاعیه سازمان",
   "taxHelpNoteExport": "نرخ مالیات هر کالا باید با شناسه stuffid یکی باشد (مثلاً ۱۰٪، نه صفر مگر معاف)",
-  "taxHelpNoteType1vs2": "نوع اول فقط با هویت کامل خریدار (کد اقتصادی/ملی)؛ مصرف‌کننده نهایی را نوع دوم بفرستید",
+  "taxHelpNoteType1vs2": "نوع ۱ فقط با هویت کامل خریدار (کد اقتصادی معتبر، یا کد ملی حقیقی به‌همراه کد پستی)؛ بدون این‌ها فاکتور خودکار به‌صورت نوع ۲ بدون اطلاعات خریدار ارسال می‌شود",
   "taxHelpNoteConnection": "اگر اتصال قطع است، ابتدا تنظیمات مودیان و تست اتصال را بررسی کنید",
   "taxKpiAll": "همه",
   "taxKpiQueue": "آماده ارسال",
@@ -6504,6 +6520,19 @@
   "mobileLauncherGridRows": "تعداد ردیف",
   "mobileLauncherGridPreview": "پیش‌نمایش",
   "mobileLauncherQuickSalesTile": "فروش سریع",
+  "mobileLauncherNewInvoiceTile": "فاکتور جدید",
+  "mobileLauncherSwitchBusiness": "تعویض کسب‌وکار",
+  "mobileLauncherTapToSwitchBusiness": "برای تعویض کسب‌وکار بزنید",
+  "mobileLauncherSummarySales": "مجموع فروش",
+  "mobileLauncherSummaryRecent": "تراکنش‌های اخیر",
+  "mobileLauncherNoTiles": "برای نقش شما میانبری در دسترس نیست. پنل کامل را باز کنید یا از مدیر دسترسی بخواهید.",
+  "mobileLauncherLivePreview": "پیش‌نمایش زنده",
+  "mobileLauncherTileDensitySection": "تراکم کاشی‌ها",
+  "mobileLauncherTileDensityHint": "تعداد میانبر در هر ردیف را انتخاب کنید.",
+  "mobileLauncherDensityComfortable": "راحت",
+  "mobileLauncherDensityCompact": "فشرده",
+  "mobileLauncherBusinessesLoadError": "بارگذاری کسب‌وکارها ناموفق بود.",
+  "mobileLauncherNoBusinesses": "کسب‌وکاری یافت نشد.",
   "dataTableHelpMenu": "راهنما",
   "dataTableHelpDialogTitle": "راهنمای کار با این جدول",
   "dataTableHelpIntro": "با این نکات می‌توانید در لیست‌های بزرگ راحت‌تر جست‌وجو، فیلتر، مرتب‌سازی، خروجی بگیرید و بین ستون‌ها جابه‌جا شوید.",
