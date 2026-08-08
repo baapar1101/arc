@@ -7,7 +7,6 @@ import '../../core/auth_store.dart';
 import '../../core/mobile_launcher_prefs.dart';
 import '../../services/business_dashboard_service.dart';
 import '../../utils/error_extractor.dart';
-import '../../utils/snackbar_helper.dart';
 
 /// بارگذاری زمینهٔ دسترسی کسب‌وکار برای مسیرهای داخل `/mobile-launcher/...`
 /// تا `hasBusinessPermission` مثل پنل اصلی درست عمل کند.
@@ -68,18 +67,33 @@ class _MobileLauncherShellState extends State<MobileLauncherShell> {
       future: _bootstrap,
       builder: (context, snap) {
         if (snap.connectionState != ConnectionState.done) {
-          return const Scaffold(body: Center(child: CircularProgressIndicator()));
+          return const Scaffold(
+            body: Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  CircularProgressIndicator(),
+                  SizedBox(height: 16),
+                ],
+              ),
+            ),
+          );
         }
         final r = snap.data ?? _MobileLauncherBootstrap.deniedAccess();
         if (r.needsRedirectNoAccess) {
           WidgetsBinding.instance.addPostFrameCallback((_) async {
             if (!context.mounted) return;
-            await MobileLauncherPrefs.clearResumeLauncher(widget.authStore.currentUserId);
-            SnackBarHelper.showError(
-              context,
-              message: AppLocalizations.of(context).mobileLauncherBusinessNoAccess,
+            final messenger = ScaffoldMessenger.maybeOf(context);
+            final l10n = AppLocalizations.of(context);
+            final router = GoRouter.of(context);
+            await MobileLauncherPrefs.clearResumeLauncher(
+              widget.authStore.currentUserId,
             );
-            context.go('/user/profile/businesses');
+            if (!context.mounted) return;
+            messenger?.showSnackBar(
+              SnackBar(content: Text(l10n.mobileLauncherBusinessNoAccess)),
+            );
+            router.go('/user/profile/businesses');
           });
           return const Scaffold(body: SizedBox.shrink());
         }
@@ -87,16 +101,32 @@ class _MobileLauncherShellState extends State<MobileLauncherShell> {
         if (loadErr != null) {
           final t = AppLocalizations.of(context);
           final msg = ErrorExtractor.extractErrorMessage(loadErr, t);
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (context.mounted) {
-              SnackBarHelper.showError(context, message: msg);
-            }
-          });
           return Scaffold(
             body: Center(
               child: Padding(
                 padding: const EdgeInsets.all(24),
-                child: Text(msg, textAlign: TextAlign.center),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.cloud_off_outlined,
+                      size: 48,
+                      color: Theme.of(context).colorScheme.error,
+                    ),
+                    const SizedBox(height: 16),
+                    Text(msg, textAlign: TextAlign.center),
+                    const SizedBox(height: 20),
+                    FilledButton.tonalIcon(
+                      onPressed: () {
+                        setState(() {
+                          _bootstrap = _runBootstrap();
+                        });
+                      },
+                      icon: const Icon(Icons.refresh_rounded),
+                      label: Text(t.retry),
+                    ),
+                  ],
+                ),
               ),
             ),
           );

@@ -30924,6 +30924,84 @@ abstract class AppLocalizations {
   /// **'Quick sales'**
   String get mobileLauncherQuickSalesTile;
 
+  /// No description provided for @mobileLauncherNewInvoiceTile.
+  ///
+  /// In en, this message translates to:
+  /// **'New invoice'**
+  String get mobileLauncherNewInvoiceTile;
+
+  /// No description provided for @mobileLauncherSwitchBusiness.
+  ///
+  /// In en, this message translates to:
+  /// **'Switch business'**
+  String get mobileLauncherSwitchBusiness;
+
+  /// No description provided for @mobileLauncherTapToSwitchBusiness.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap to switch business'**
+  String get mobileLauncherTapToSwitchBusiness;
+
+  /// No description provided for @mobileLauncherSummarySales.
+  ///
+  /// In en, this message translates to:
+  /// **'Total sales'**
+  String get mobileLauncherSummarySales;
+
+  /// No description provided for @mobileLauncherSummaryRecent.
+  ///
+  /// In en, this message translates to:
+  /// **'Recent transactions'**
+  String get mobileLauncherSummaryRecent;
+
+  /// No description provided for @mobileLauncherNoTiles.
+  ///
+  /// In en, this message translates to:
+  /// **'No shortcuts are available for your role. Open the full panel or ask an admin for access.'**
+  String get mobileLauncherNoTiles;
+
+  /// No description provided for @mobileLauncherLivePreview.
+  ///
+  /// In en, this message translates to:
+  /// **'Live preview'**
+  String get mobileLauncherLivePreview;
+
+  /// No description provided for @mobileLauncherTileDensitySection.
+  ///
+  /// In en, this message translates to:
+  /// **'Tile density'**
+  String get mobileLauncherTileDensitySection;
+
+  /// No description provided for @mobileLauncherTileDensityHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose how many shortcuts appear in each row.'**
+  String get mobileLauncherTileDensityHint;
+
+  /// No description provided for @mobileLauncherDensityComfortable.
+  ///
+  /// In en, this message translates to:
+  /// **'Comfortable'**
+  String get mobileLauncherDensityComfortable;
+
+  /// No description provided for @mobileLauncherDensityCompact.
+  ///
+  /// In en, this message translates to:
+  /// **'Compact'**
+  String get mobileLauncherDensityCompact;
+
+  /// No description provided for @mobileLauncherBusinessesLoadError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load businesses.'**
+  String get mobileLauncherBusinessesLoadError;
+
+  /// No description provided for @mobileLauncherNoBusinesses.
+  ///
+  /// In en, this message translates to:
+  /// **'No businesses found.'**
+  String get mobileLauncherNoBusinesses;
+
   /// No description provided for @dataTableHelpMenu.
   ///
   /// In en, this message translates to:

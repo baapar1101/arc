@@ -16827,6 +16827,47 @@ class AppLocalizationsEn extends AppLocalizations {
   String get mobileLauncherQuickSalesTile => 'Quick sales';
 
   @override
+  String get mobileLauncherNewInvoiceTile => 'New invoice';
+
+  @override
+  String get mobileLauncherSwitchBusiness => 'Switch business';
+
+  @override
+  String get mobileLauncherTapToSwitchBusiness => 'Tap to switch business';
+
+  @override
+  String get mobileLauncherSummarySales => 'Total sales';
+
+  @override
+  String get mobileLauncherSummaryRecent => 'Recent transactions';
+
+  @override
+  String get mobileLauncherNoTiles =>
+      'No shortcuts are available for your role. Open the full panel or ask an admin for access.';
+
+  @override
+  String get mobileLauncherLivePreview => 'Live preview';
+
+  @override
+  String get mobileLauncherTileDensitySection => 'Tile density';
+
+  @override
+  String get mobileLauncherTileDensityHint =>
+      'Choose how many shortcuts appear in each row.';
+
+  @override
+  String get mobileLauncherDensityComfortable => 'Comfortable';
+
+  @override
+  String get mobileLauncherDensityCompact => 'Compact';
+
+  @override
+  String get mobileLauncherBusinessesLoadError => 'Could not load businesses.';
+
+  @override
+  String get mobileLauncherNoBusinesses => 'No businesses found.';
+
+  @override
   String get dataTableHelpMenu => 'Help';
 
   @override

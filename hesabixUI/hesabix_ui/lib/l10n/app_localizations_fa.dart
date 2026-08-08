@@ -16735,6 +16735,48 @@ class AppLocalizationsFa extends AppLocalizations {
   String get mobileLauncherQuickSalesTile => 'فروش سریع';
 
   @override
+  String get mobileLauncherNewInvoiceTile => 'فاکتور جدید';
+
+  @override
+  String get mobileLauncherSwitchBusiness => 'تعویض کسب‌وکار';
+
+  @override
+  String get mobileLauncherTapToSwitchBusiness => 'برای تعویض کسب‌وکار بزنید';
+
+  @override
+  String get mobileLauncherSummarySales => 'مجموع فروش';
+
+  @override
+  String get mobileLauncherSummaryRecent => 'تراکنش‌های اخیر';
+
+  @override
+  String get mobileLauncherNoTiles =>
+      'برای نقش شما میانبری در دسترس نیست. پنل کامل را باز کنید یا از مدیر دسترسی بخواهید.';
+
+  @override
+  String get mobileLauncherLivePreview => 'پیش‌نمایش زنده';
+
+  @override
+  String get mobileLauncherTileDensitySection => 'تراکم کاشی‌ها';
+
+  @override
+  String get mobileLauncherTileDensityHint =>
+      'تعداد میانبر در هر ردیف را انتخاب کنید.';
+
+  @override
+  String get mobileLauncherDensityComfortable => 'راحت';
+
+  @override
+  String get mobileLauncherDensityCompact => 'فشرده';
+
+  @override
+  String get mobileLauncherBusinessesLoadError =>
+      'بارگذاری کسب‌وکارها ناموفق بود.';
+
+  @override
+  String get mobileLauncherNoBusinesses => 'کسب‌وکاری یافت نشد.';
+
+  @override
   String get dataTableHelpMenu => 'راهنما';
 
   @override
