@@ -273,10 +273,10 @@ class HesabixNotificationKeepAliveTaskHandler extends TaskHandler {
         if (_softphoneBusinessId != null) {
           FlutterForegroundTask.saveData(key: 'softphoneBusinessId', value: _softphoneBusinessId!);
         }
-        FlutterForegroundTask.saveData(key: 'softphoneSessionId', value: _softphoneSessionId);
-        FlutterForegroundTask.saveData(key: 'softphoneMediaTicket', value: _softphoneMediaTicket);
-        FlutterForegroundTask.saveData(key: 'softphoneExtension', value: _softphoneExtension);
-        FlutterForegroundTask.saveData(key: 'softphoneApiBaseUrl', value: _softphoneApiBaseUrl);
+        FlutterForegroundTask.saveData(key: 'softphoneSessionId', value: _softphoneSessionId ?? '');
+        FlutterForegroundTask.saveData(key: 'softphoneMediaTicket', value: _softphoneMediaTicket ?? '');
+        FlutterForegroundTask.saveData(key: 'softphoneExtension', value: _softphoneExtension ?? '');
+        FlutterForegroundTask.saveData(key: 'softphoneApiBaseUrl', value: _softphoneApiBaseUrl ?? '');
         unawaited(_refreshKeepAliveNotification());
         unawaited(_syncSoftphoneWs());
       } else if (type == 'softphoneUiHoldingWs') {

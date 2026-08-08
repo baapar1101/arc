@@ -165,7 +165,7 @@ class SoftphoneIncomingNotifications {
   Future<void> cancelIncomingCall() async {
     if (!supportsSoftphoneIncomingNotifications) return;
     try {
-      await _plugin.cancel(softphoneIncomingNotificationId);
+      await _plugin.cancel(id: softphoneIncomingNotificationId);
     } catch (_) {}
   }
 
