@@ -795,6 +795,42 @@ def _notify_users_sync(user_ids: List[int], message: Dict[str, Any]) -> None:
 			pass
 
 
+def _notify_softphone_incoming_sync(
+	*,
+	pbx_id: int,
+	extension: str,
+	call_id: int,
+	from_number: Optional[str] = None,
+	channel: Optional[str] = None,
+) -> None:
+	import anyio
+
+	async def _run() -> None:
+		from app.services.telephony.media_hub import media_hub
+
+		await media_hub.notify_softphone_incoming(
+			pbx_id=pbx_id,
+			extension=extension,
+			call_id=call_id,
+			from_number=from_number,
+			channel=channel,
+		)
+
+	try:
+		anyio.from_thread.run(_run)
+	except Exception:
+		try:
+			import asyncio
+
+			loop = asyncio.get_event_loop()
+			if loop.is_running():
+				asyncio.run_coroutine_threadsafe(_run(), loop)
+			else:
+				loop.run_until_complete(_run())
+		except Exception:
+			pass
+
+
 def process_connector_event(
 	db: Session,
 	pbx: TelephonyPbxConnection,
@@ -986,6 +1022,21 @@ def process_connector_event(
 
 	db.commit()
 	db.refresh(call)
+
+	# Softphone Relay: زنگ با call_id به کلاینت آنلاین همان داخلی
+	if (
+		payload.get("softphone_relay")
+		and event_type in ("call.ringing", "ringing")
+		and call.extension
+		and call.status == "ringing"
+	):
+		_notify_softphone_incoming_sync(
+			pbx_id=pbx.id,
+			extension=str(call.extension),
+			call_id=int(call.id),
+			from_number=call.from_number_normalized or call.from_number_raw,
+			channel=str(payload.get("channel") or "") or None,
+		)
 
 	# realtime
 	links = _users_for_extension(db, pbx.business_id, call.extension)

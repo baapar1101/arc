@@ -62,6 +62,15 @@ class _TelephonyPhoneBarHostState extends State<TelephonyPhoneBarHost> with Sing
 
   void _onSoftphone() {
     if (!mounted) return;
+    final ringing = _softphone?.state == SoftphoneConnectionState.ringing;
+    if (ringing && !_pulse.isAnimating) {
+      _pulse.repeat(reverse: true);
+    } else if (!ringing &&
+        _session.presenceLabel != 'ringing' &&
+        _pulse.isAnimating) {
+      _pulse.stop();
+      _pulse.value = 0;
+    }
     setState(() {});
   }
 
@@ -118,7 +127,10 @@ class _TelephonyPhoneBarHostState extends State<TelephonyPhoneBarHost> with Sing
     final sf = _softphone?.state;
     if (sf == SoftphoneConnectionState.connecting) return 'Softphone در حال اتصال';
     if (sf == SoftphoneConnectionState.registered) return 'Softphone آماده';
-    if (sf == SoftphoneConnectionState.ringing) return 'Softphone: زنگ';
+    if (sf == SoftphoneConnectionState.ringing) {
+      final from = _softphone?.incomingCallerDisplay;
+      return from == null || from.isEmpty ? 'Softphone: زنگ' : 'زنگ از $from';
+    }
     if (sf == SoftphoneConnectionState.inCall) return 'Softphone: مکالمه';
     if (sf == SoftphoneConnectionState.reconnecting) return 'Softphone: اتصال مجدد';
     if (sf == SoftphoneConnectionState.error) return 'Softphone: خطا';
@@ -236,28 +248,36 @@ class _TelephonyPhoneBarHostState extends State<TelephonyPhoneBarHost> with Sing
               ),
             ),
             if (inCall || ringing) ...[
-              if (ringing && int.tryParse('${_softphone?.activeCall?['id'] ?? ''}') != null)
+              if (ringing && _softphone?.activeCallId != null)
                 IconButton(
                   tooltip: 'پاسخ Softphone',
                   onPressed: () async {
-                    final id = int.parse('${_softphone!.activeCall!['id']}');
+                    final id = _softphone!.activeCallId!;
                     await _softphone!.answer(id);
                   },
                   icon: Icon(Icons.call_rounded, color: scheme.primary),
                 ),
-              IconButton(
-                tooltip: _softphone?.muted == true ? 'رفع بی‌صدایی' : 'بی‌صدا',
-                onPressed: softReady ? () => _softphone!.setMuted(!(_softphone!.muted)) : null,
-                icon: Icon(
-                  _softphone?.muted == true ? Icons.mic_off_rounded : Icons.mic_rounded,
-                  color: scheme.onSurfaceVariant,
+              if (ringing)
+                IconButton(
+                  tooltip: 'رد تماس',
+                  onPressed: () => _softphone?.rejectIncoming(),
+                  icon: Icon(Icons.call_end_rounded, color: scheme.error),
                 ),
-              ),
-              IconButton(
-                tooltip: 'قطع',
-                onPressed: softReady ? () => _softphone!.hangup() : () => _session.hangupActiveCall(),
-                icon: Icon(Icons.call_end_rounded, color: scheme.error),
-              ),
+              if (!ringing)
+                IconButton(
+                  tooltip: _softphone?.muted == true ? 'رفع بی‌صدایی' : 'بی‌صدا',
+                  onPressed: softReady ? () => _softphone!.setMuted(!(_softphone!.muted)) : null,
+                  icon: Icon(
+                    _softphone?.muted == true ? Icons.mic_off_rounded : Icons.mic_rounded,
+                    color: scheme.onSurfaceVariant,
+                  ),
+                ),
+              if (!ringing)
+                IconButton(
+                  tooltip: 'قطع',
+                  onPressed: softReady ? () => _softphone!.hangup() : () => _session.hangupActiveCall(),
+                  icon: Icon(Icons.call_end_rounded, color: scheme.error),
+                ),
             ] else ...[
               IconButton(
                 tooltip: softReady ? 'Softphone آنلاین است' : 'Softphone',

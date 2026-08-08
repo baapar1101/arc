@@ -5,6 +5,14 @@
 ;
 ; نیاز: AudioSocket در Asterisk فعال باشد و Connector روی 127.0.0.1:9092 گوش دهد.
 
+; نمونه دیال‌پلن Softphone Relay حسابیکس
+; مسیر پیشنهادی: /etc/asterisk/extensions_custom.conf یا فایل include سفارشی
+;
+; توجه: این فقط قالب است. قبل از production با dialplan مشتری ادغام شود.
+;
+; نیاز: AudioSocket در Asterisk فعال باشد و Connector روی 127.0.0.1:9092 گوش دهد.
+; Asterisk 18+/22 syntax: AudioSocket(uuid,host:port)
+
 [hesabix-softphone-relay]
 exten => _X.,1,NoOp(Hesabix Softphone Relay for ${EXTEN})
  same => n,Set(HSX_UUID=${IF($["${HSX_UUID}"=""]?${UNIQUEID}:${HSX_UUID})})
@@ -17,9 +25,21 @@ exten => s,1,NoOp(Hesabix Softphone Relay s HSX_UUID=${HSX_UUID})
  same => n,AudioSocket(${HSX_UUID},127.0.0.1:9092)
  same => n,Hangup()
 
-; برای Originate خروجی Softphone، Connector معمولاً از Local channel
-; به مقصد ترانک می‌زند و پای اپراتور را به AudioSocket پل می‌کند.
-; مثال مفهومی (اجرا توسط AMI، نه کپی مستقیم):
+; ورودی: به‌جای Dial(PJSIP/xxx) — صبر برای پاسخ Softphone وب
+[hesabix-softphone-inbound]
+exten => _X.,1,NoOp(Hesabix Softphone inbound ${EXTEN} from ${CALLERID(num)})
+ same => n,UserEvent(HesabixInboundSoftphone,Extension: ${EXTEN},Channel: ${CHANNEL},Uniqueid: ${UNIQUEID},Linkedid: ${LINKEDID},CallerID: ${CALLERID(num)})
+ same => n,Ringing()
+ same => n,Wait(1)
+ same => n,Answer()
+ same => n,MusicOnHold(default,45)
+ same => n,Playback(vm-nobodyavail)
+ same => n,Hangup()
+
+; مثال IVR:
+; exten => 500,1,Goto(hesabix-softphone-inbound,500,1)
+;
+; Originate خروجی Softphone (AMI):
 ;   Channel: Local/{destination}@from-internal/n
 ;   Application: AudioSocket
 ;   Data: {uuid},127.0.0.1:9092

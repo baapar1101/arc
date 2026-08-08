@@ -105,11 +105,14 @@ class HesabixClient:
 		except Exception as e:
 			LOG.warning("heartbeat failed: %s", e)
 
-	def send_event(self, event: Dict[str, Any]) -> None:
+	def send_event(self, event: Dict[str, Any]) -> Dict[str, Any]:
 		try:
-			self._post("/api/v1/telephony/connector/events", event)
+			data = self._post("/api/v1/telephony/connector/events", event)
+			payload = data.get("data") if isinstance(data, dict) else None
+			return payload if isinstance(payload, dict) else (data if isinstance(data, dict) else {})
 		except Exception as e:
 			LOG.warning("event failed: %s", e)
+			return {}
 
 	def poll_commands(self) -> list:
 		try:
@@ -283,6 +286,20 @@ class AmiClient:
 
 def map_ami_event(ev: Dict[str, str]) -> Optional[Dict[str, Any]]:
 	name = ev.get("Event")
+	if name == "UserEvent" and (ev.get("UserEvent") or "") == "HesabixInboundSoftphone":
+		extension = ev.get("Extension") or "500"
+		return {
+			"event_id": str(uuid.uuid4()),
+			"type": "call.ringing",
+			"uniqueid": ev.get("Uniqueid") or str(uuid.uuid4()),
+			"linkedid": ev.get("Linkedid"),
+			"direction": "inbound",
+			"from": ev.get("CallerID") or ev.get("CallerIDNum"),
+			"to": extension,
+			"extension": extension,
+			"channel": ev.get("Channel"),
+			"softphone_relay": True,
+		}
 	if name == "DialBegin":
 		return {
 			"event_id": str(uuid.uuid4()),
@@ -357,6 +374,7 @@ def main() -> int:
 	session_to_as_uuid: Dict[str, str] = {}
 	session_to_bridge_id: Dict[str, str] = {}
 	session_to_call_id: Dict[str, Any] = {}
+	online_agents_by_ext: Dict[str, str] = {}  # extension -> session_id
 	media_lock = threading.Lock()
 	tunnel_ref: Dict[str, Any] = {"client": None}
 
@@ -442,9 +460,23 @@ def main() -> int:
 			if as_uuid:
 				audio_server.hangup(as_uuid)
 		elif typ == "agent.online":
-			LOG.info("softphone agent online ext=%s session=%s", payload.get("extension"), payload.get("session_id"))
+			ext = str(payload.get("extension") or "").strip()
+			sid = str(payload.get("session_id") or "").strip()
+			if ext and sid:
+				with media_lock:
+					online_agents_by_ext[ext] = sid
+			LOG.info("softphone agent online ext=%s session=%s", ext, sid)
 		elif typ == "agent.offline":
-			LOG.info("softphone agent offline session=%s", payload.get("session_id"))
+			sid = str(payload.get("session_id") or "").strip()
+			ext = str(payload.get("extension") or "").strip()
+			with media_lock:
+				if ext and online_agents_by_ext.get(ext) == sid:
+					online_agents_by_ext.pop(ext, None)
+				elif sid:
+					for k, v in list(online_agents_by_ext.items()):
+						if v == sid:
+							online_agents_by_ext.pop(k, None)
+			LOG.info("softphone agent offline session=%s", sid)
 
 	audio_host = os.environ.get("AUDIOSOCKET_HOST", "127.0.0.1")
 	audio_port = int(os.environ.get("AUDIOSOCKET_PORT", "9092"))
@@ -610,7 +642,40 @@ def main() -> int:
 				last_poll = now
 			mapped = map_ami_event(ev)
 			if mapped:
-				api.send_event(mapped)
+				result = api.send_event(mapped)
+				call_obj = result.get("call") if isinstance(result, dict) else None
+				call_id = None
+				if isinstance(call_obj, dict):
+					call_id = call_obj.get("id")
+				elif isinstance(result, dict):
+					call_id = result.get("call_id")
+				# زنگ Softphone وب وقتی داخلی Relay آنلاین است
+				if mapped.get("softphone_relay"):
+					ext = str(mapped.get("extension") or "").strip()
+					with media_lock:
+						session_id = online_agents_by_ext.get(ext)
+					client = tunnel_ref.get("client")
+					if session_id and client:
+						LOG.info(
+							"inbound softphone ring ext=%s session=%s channel=%s from=%s call_id=%s",
+							ext,
+							session_id,
+							mapped.get("channel"),
+							mapped.get("from"),
+							call_id,
+						)
+						client.send_json(
+							{
+								"type": "incoming_softphone_ring",
+								"session_id": session_id,
+								"extension": ext,
+								"from": mapped.get("from"),
+								"channel": mapped.get("channel"),
+								"uniqueid": mapped.get("uniqueid"),
+								"linkedid": mapped.get("linkedid"),
+								"call_id": call_id,
+							}
+						)
 	except KeyboardInterrupt:
 		LOG.info("Stopping…")
 	except Exception as e:

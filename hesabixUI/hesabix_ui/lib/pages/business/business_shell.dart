@@ -40,6 +40,7 @@ import '../../widgets/ai/ai_chat_dialog.dart';
 import '../../widgets/calculator/calculator_dialog.dart';
 import '../../widgets/business/business_shell_glyphs.dart';
 import '../../widgets/telephony/telephony_phone_bar.dart';
+import '../../widgets/telephony/telephony_incoming_call_overlay.dart';
 import '../../core/date_utils.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/responsive_helper.dart';
@@ -2721,6 +2722,11 @@ class _BusinessShellState extends State<BusinessShell> {
               ],
             ),
             TelephonyScreenPopLayer(
+              businessId: widget.businessId,
+              authStore: widget.authStore,
+              pluginActive: _isTelephonyPluginActive(),
+            ),
+            TelephonyIncomingCallOverlay(
               businessId: widget.businessId,
               authStore: widget.authStore,
               pluginActive: _isTelephonyPluginActive(),

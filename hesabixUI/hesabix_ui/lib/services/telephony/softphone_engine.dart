@@ -6,6 +6,7 @@ import 'package:permission_handler/permission_handler.dart';
 
 import '../../core/auth_store.dart';
 import 'softphone_pcm_media.dart';
+import 'softphone_ringtone.dart';
 import 'softphone_ws_client.dart';
 import 'telephony_api.dart';
 
@@ -34,6 +35,7 @@ class SoftphoneEngine extends ChangeNotifier {
 
   SoftphoneWsClient? _ws;
   SoftphonePcmMedia? _media;
+  SoftphoneRingtone? _ringtone;
   Timer? _heartbeat;
   Timer? _silenceFallback;
   bool _micLive = false;
@@ -159,14 +161,24 @@ class SoftphoneEngine extends ChangeNotifier {
         break;
       case 'incoming_ring':
         state = SoftphoneConnectionState.ringing;
+        final incomingId = msg['call_id'];
         activeCall = {
-          'id': msg['call_id'],
-          'from': msg['from'],
+          ...?activeCall,
+          if (incomingId != null) 'id': incomingId,
+          'from': msg['from'] ?? activeCall?['from'],
+          'extension': msg['extension'] ?? activeCall?['extension'],
+          'channel': msg['channel'] ?? activeCall?['channel'],
           'status': 'ringing',
+          'direction': 'inbound',
         };
+        unawaited(_startRingtone());
+        if (int.tryParse('${activeCall?['id'] ?? ''}') == null) {
+          unawaited(_resolveIncomingCallId());
+        }
         notifyListeners();
         break;
       case 'bridge.starting':
+        unawaited(_stopRingtone());
         bridgeActive = false;
         state = SoftphoneConnectionState.inCall;
         if (msg['call_id'] != null) {
@@ -175,6 +187,7 @@ class SoftphoneEngine extends ChangeNotifier {
         notifyListeners();
         break;
       case 'bridge.active':
+        unawaited(_stopRingtone());
         bridgeActive = true;
         state = SoftphoneConnectionState.inCall;
         unawaited(_startLiveMedia());
@@ -182,6 +195,7 @@ class SoftphoneEngine extends ChangeNotifier {
         break;
       case 'bridge.ended':
       case 'bridge.failed':
+        unawaited(_stopRingtone());
         bridgeActive = false;
         unawaited(_stopLiveMedia());
         if (state == SoftphoneConnectionState.inCall || state == SoftphoneConnectionState.ringing) {
@@ -296,15 +310,19 @@ class SoftphoneEngine extends ChangeNotifier {
     if (_ws == null || !_ws!.isConnected) {
       throw StateError('کانال Softphone وصل نیست؛ دوباره آنلاین شوید');
     }
+    await _stopRingtone();
     final result = await _api.softphoneAnswerCall(businessId, callId, {'session_id': sid});
     activeCall = result['call'] is Map ? Map<String, dynamic>.from(result['call'] as Map) : {'id': callId};
     state = SoftphoneConnectionState.inCall;
     notifyListeners();
   }
 
+  Future<void> rejectIncoming() => hangup();
+
   Future<void> hangup() async {
     final callId = int.tryParse('${activeCall?['id'] ?? ''}');
     final sid = sessionId;
+    await _stopRingtone();
     _ws?.sendJson({'type': 'hangup_media', 'reason': 'user_hangup', if (sid != null) 'session_id': sid});
     if (callId != null) {
       try {
@@ -321,6 +339,63 @@ class SoftphoneEngine extends ChangeNotifier {
     activeCall = null;
     state = SoftphoneConnectionState.registered;
     notifyListeners();
+  }
+
+  String? get incomingCallerDisplay {
+    final from = '${activeCall?['from'] ?? ''}'.trim();
+    if (from.isNotEmpty && from != 'null') return from;
+    return 'شماره ناشناس';
+  }
+
+  int? get activeCallId => int.tryParse('${activeCall?['id'] ?? ''}');
+
+  Future<void> _startRingtone() async {
+    try {
+      _ringtone ??= createSoftphoneRingtone();
+      await _ringtone!.start();
+    } catch (_) {}
+  }
+
+  Future<void> _stopRingtone() async {
+    try {
+      await _ringtone?.stop();
+    } catch (_) {}
+  }
+
+  Future<void> _resolveIncomingCallId() async {
+    try {
+      final res = await _api.listCalls(
+        businessId,
+        direction: 'inbound',
+        status: 'ringing',
+        limit: 5,
+      );
+      final items = res['items'];
+      if (items is! List || items.isEmpty) return;
+      final ext = '${session?['extension'] ?? health?['extension'] ?? ''}'.trim();
+      Map<String, dynamic>? match;
+      for (final raw in items) {
+        if (raw is! Map) continue;
+        final m = Map<String, dynamic>.from(raw);
+        final callExt = '${m['extension'] ?? ''}'.trim();
+        if (ext.isEmpty || callExt == ext || callExt.isEmpty) {
+          match = m;
+          break;
+        }
+      }
+      match ??= Map<String, dynamic>.from(items.first as Map);
+      final id = match['id'];
+      if (id == null) return;
+      if (state != SoftphoneConnectionState.ringing) return;
+      activeCall = {
+        ...?activeCall,
+        'id': id,
+        'from': activeCall?['from'] ?? match['from_number'] ?? match['from_number_raw'],
+        'status': 'ringing',
+        'direction': 'inbound',
+      };
+      notifyListeners();
+    } catch (_) {}
   }
 
   Future<void> setMuted(bool value) async {
@@ -346,6 +421,7 @@ class SoftphoneEngine extends ChangeNotifier {
   Future<void> unregister() async {
     _heartbeat?.cancel();
     _heartbeat = null;
+    await _stopRingtone();
     await _stopLiveMedia();
     final sid = sessionId;
     _ws?.disconnect();
@@ -375,6 +451,7 @@ class SoftphoneEngine extends ChangeNotifier {
   void dispose() {
     _heartbeat?.cancel();
     _silenceFallback?.cancel();
+    unawaited(_stopRingtone());
     _ws?.disconnect();
     unawaited(_media?.stop() ?? Future.value());
     super.dispose();

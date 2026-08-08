@@ -151,6 +151,46 @@ class TelephonyMediaHub:
 		if t:
 			t.last_heartbeat_at = time.time()
 
+	async def notify_softphone_incoming(
+		self,
+		*,
+		pbx_id: int,
+		extension: str,
+		call_id: int,
+		from_number: Optional[str] = None,
+		channel: Optional[str] = None,
+	) -> int:
+		"""ارسال زنگ ورودی به Softphone clientهای آنلاین روی همان داخلی."""
+		ext = str(extension or "").strip()
+		sent = 0
+		for session_id, link in list(self._clients.items()):
+			if link.pbx_id != pbx_id:
+				continue
+			if str(link.extension or "").strip() != ext:
+				continue
+			ok = await self.send_to_client(
+				session_id,
+				{
+					"type": "incoming_ring",
+					"call_id": call_id,
+					"from": from_number,
+					"extension": ext,
+					"channel": channel,
+				},
+			)
+			if ok:
+				sent += 1
+				link.active_call_id = call_id
+		if sent:
+			LOG.info(
+				"softphone incoming_ring sent=%s pbx=%s ext=%s call_id=%s",
+				sent,
+				pbx_id,
+				ext,
+				call_id,
+			)
+		return sent
+
 	async def register_client(self, link: SoftphoneClientLink) -> None:
 		async with self._lock:
 			old = self._clients.get(link.session_id)
