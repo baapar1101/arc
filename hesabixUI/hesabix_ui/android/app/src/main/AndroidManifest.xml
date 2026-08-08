@@ -9,6 +9,8 @@
     <uses-permission android:name="android.permission.VIBRATE"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE"/>
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT"/>
     <uses-permission android:name="android.permission.RUN_USER_INITIATED_JOBS"/>
     <uses-permission android:name="android.permission.WAKE_LOCK"/>
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS"/>
@@ -79,10 +81,10 @@
         <meta-data
             android:name="com.hesabix.notificationIcon"
             android:resource="@drawable/ic_stat_hesabix" />
-        <!-- Keep-alive foreground service for in-app notification WebSocket (Android). -->
+        <!-- Keep-alive + Softphone presence (notifications WS / softphone WS when UI dead). -->
         <service
             android:name="com.pravera.flutter_foreground_task.service.ForegroundService"
-            android:foregroundServiceType="dataSync"
+            android:foregroundServiceType="dataSync|microphone"
             android:exported="false"
             android:stopWithTask="false" />
         <!-- APK background download (User Initiated Data Transfer on Android 14+). -->

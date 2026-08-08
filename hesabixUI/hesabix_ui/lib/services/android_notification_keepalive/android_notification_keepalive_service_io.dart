@@ -54,7 +54,21 @@ class AndroidNotificationKeepAliveService {
   void _onTaskData(Object data) {
     try {
       if (data is Map) {
-        _onMessage?.call(Map<String, dynamic>.from(data));
+        final map = Map<String, dynamic>.from(data);
+        final kind = '${map['kind'] ?? ''}';
+        final type = '${map['type'] ?? ''}';
+        if (kind == 'softphone' ||
+            type.startsWith('softphone') ||
+            map['softphone'] == true ||
+            type == 'incoming_ring' ||
+            type == 'auth_ok' ||
+            type.startsWith('bridge.') ||
+            type == 'softphone_ws_done' ||
+            type == 'softphone_ws_error') {
+          _onSoftphoneMessage?.call(map);
+          return;
+        }
+        _onMessage?.call(map);
       }
     } catch (e) {
       debugPrint('KeepAlive task data error: $e');
@@ -65,10 +79,106 @@ class AndroidNotificationKeepAliveService {
     _onMessage = handler;
   }
 
+  void setOnSoftphoneMessage(void Function(Map<String, dynamic> msg)? handler) {
+    _onSoftphoneMessage = handler;
+  }
+
+  void Function(Map<String, dynamic> msg)? _onSoftphoneMessage;
+
   Future<bool> isRunning() async {
     if (!supportsAndroidNotificationKeepAlive) return false;
     await ensureInitialized();
     return FlutterForegroundTask.isRunningService;
+  }
+
+  /// Softphone online: ensure FGS runs and can hold softphone WS when UI is backgrounded/killed.
+  Future<void> enableSoftphonePresence({
+    required String apiKey,
+    required int businessId,
+    required String sessionId,
+    required String mediaTicket,
+    required String extension,
+    required String apiBaseUrl,
+    bool appIsJalali = true,
+    bool uiHoldingWs = true,
+  }) async {
+    if (!supportsAndroidNotificationKeepAlive) return;
+    if (apiKey.isEmpty || sessionId.isEmpty || mediaTicket.isEmpty) return;
+    await ensureInitialized();
+
+    final notif = await Permission.notification.status;
+    if (!notif.isGranted) {
+      await Permission.notification.request();
+    }
+
+    await FlutterForegroundTask.saveData(key: 'apiKey', value: apiKey);
+    await FlutterForegroundTask.saveData(key: 'appIsJalali', value: appIsJalali);
+    await FlutterForegroundTask.saveData(key: 'softphoneDesired', value: true);
+    await FlutterForegroundTask.saveData(key: 'softphoneUiHoldingWs', value: uiHoldingWs);
+    await FlutterForegroundTask.saveData(key: 'softphoneBusinessId', value: businessId);
+    await FlutterForegroundTask.saveData(key: 'softphoneSessionId', value: sessionId);
+    await FlutterForegroundTask.saveData(key: 'softphoneMediaTicket', value: mediaTicket);
+    await FlutterForegroundTask.saveData(key: 'softphoneExtension', value: extension);
+    await FlutterForegroundTask.saveData(key: 'softphoneApiBaseUrl', value: apiBaseUrl);
+
+    if (!await FlutterForegroundTask.isRunningService) {
+      await FlutterForegroundTask.startService(
+        serviceTypes: const [
+          ForegroundServiceTypes.dataSync,
+          ForegroundServiceTypes.microphone,
+        ],
+        notificationTitle: 'Softphone آنلاین',
+        notificationText: extension.isEmpty ? 'آماده دریافت تماس' : 'داخلی $extension · آماده دریافت تماس',
+        notificationIcon: notificationIcon,
+        notificationInitialRoute: '/',
+        callback: hesabixNotificationKeepAliveCallback,
+      );
+    } else {
+      await FlutterForegroundTask.updateService(
+        notificationTitle: 'Softphone آنلاین',
+        notificationText: extension.isEmpty ? 'آماده دریافت تماس' : 'داخلی $extension · آماده دریافت تماس',
+        notificationIcon: notificationIcon,
+      );
+    }
+
+    FlutterForegroundTask.sendDataToTask(<String, dynamic>{
+      'type': 'softphoneEnable',
+      'apiKey': apiKey,
+      'businessId': businessId,
+      'sessionId': sessionId,
+      'mediaTicket': mediaTicket,
+      'extension': extension,
+      'apiBaseUrl': apiBaseUrl,
+      'uiHoldingWs': uiHoldingWs,
+    });
+  }
+
+  Future<void> setSoftphoneUiHoldingWs(bool holding) async {
+    if (!supportsAndroidNotificationKeepAlive) return;
+    await FlutterForegroundTask.saveData(key: 'softphoneUiHoldingWs', value: holding);
+    if (await isRunning()) {
+      FlutterForegroundTask.sendDataToTask(<String, dynamic>{
+        'type': 'softphoneUiHoldingWs',
+        'value': holding,
+      });
+    }
+  }
+
+  Future<void> disableSoftphonePresence({bool stopIfOnlySoftphone = false}) async {
+    if (!supportsAndroidNotificationKeepAlive) return;
+    await FlutterForegroundTask.saveData(key: 'softphoneDesired', value: false);
+    if (await isRunning()) {
+      FlutterForegroundTask.sendDataToTask(<String, dynamic>{'type': 'softphoneDisable'});
+    }
+    // Keep notification keep-alive if user enabled it; only softphone stops.
+    if (stopIfOnlySoftphone) {
+      final enabled = await AndroidNotificationPrefs.isKeepAliveEnabled();
+      if (!enabled && await isRunning()) {
+        await stop();
+      } else if (await isRunning()) {
+        await refreshStatusNotification();
+      }
+    }
   }
 
   Future<void> start({

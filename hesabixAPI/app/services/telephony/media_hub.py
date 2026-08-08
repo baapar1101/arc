@@ -218,13 +218,24 @@ class TelephonyMediaHub:
 				"extension": link.extension,
 			}
 
-	async def unregister_client(self, session_id: str, *, reason: str = "client_disconnect") -> None:
+	async def unregister_client(
+		self,
+		session_id: str,
+		*,
+		reason: str = "client_disconnect",
+		websocket: Any = None,
+	) -> Optional[SoftphoneClientLink]:
+		"""اگر websocket داده شود و کلاینت جدید جایگزین شده باشد، no-op (handoff امن)."""
 		async with self._lock:
-			link = self._clients.pop(session_id, None)
+			link = self._clients.get(session_id)
+			if not link:
+				return None
+			if websocket is not None and link.websocket is not websocket:
+				# اتصال جدید همین session را گرفته؛ سشن را قطع نکن
+				return None
+			self._clients.pop(session_id, None)
 			bridge_id = self._bridges_by_session.pop(session_id, None)
 			bridge = self._bridges.pop(bridge_id, None) if bridge_id else None
-		if not link:
-			return
 		tunnel = self._tunnels_by_pbx.get(link.pbx_id)
 		if tunnel:
 			tunnel.online_agents.pop(session_id, None)
@@ -248,6 +259,7 @@ class TelephonyMediaHub:
 					"reason": reason,
 				},
 			)
+		return link
 
 	def get_client(self, session_id: str) -> Optional[SoftphoneClientLink]:
 		return self._clients.get(session_id)

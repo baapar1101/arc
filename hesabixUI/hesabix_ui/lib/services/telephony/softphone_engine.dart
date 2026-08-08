@@ -2,9 +2,15 @@ import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 import 'package:permission_handler/permission_handler.dart';
 
+import '../../config/app_config.dart';
+import '../../core/android_notification_keepalive_platform.dart';
 import '../../core/auth_store.dart';
+import '../android_notification_keepalive/android_notification_keepalive_service.dart';
+import 'softphone_android_launch.dart';
+import 'softphone_incoming_notifications.dart';
 import 'softphone_pcm_media.dart';
 import 'softphone_ringtone.dart';
 import 'softphone_ws_client.dart';
@@ -22,23 +28,40 @@ enum SoftphoneConnectionState {
 }
 
 /// موتور Softphone Relay — کنترل‌پلن + PCM واقعی (میکروفون/پخش).
-class SoftphoneEngine extends ChangeNotifier {
+///
+/// اندروید: با Foreground Service زنده می‌ماند؛ در پس‌زمینه/بسته شدن UI
+/// اعلان تمام‌صفحه تماس ورودی نشان داده می‌شود و WS به FGS منتقل می‌شود.
+class SoftphoneEngine extends ChangeNotifier with WidgetsBindingObserver {
   SoftphoneEngine({
     required this.businessId,
     required this.authStore,
     TelephonyApi? api,
-  }) : _api = api ?? TelephonyApi();
+  }) : _api = api ?? TelephonyApi() {
+    WidgetsBinding.instance.addObserver(this);
+    if (supportsSoftphoneIncomingNotifications) {
+      unawaited(_incomingNotif.initialize(onAction: _onIncomingNotificationAction));
+    }
+    if (supportsAndroidNotificationKeepAlive) {
+      _keepAlive.setOnSoftphoneMessage(_onFgsSoftphoneMessage);
+    }
+  }
 
   final int businessId;
   final AuthStore authStore;
   final TelephonyApi _api;
+  final SoftphoneIncomingNotifications _incomingNotif = createSoftphoneIncomingNotifications();
+  final AndroidNotificationKeepAliveService _keepAlive = createAndroidNotificationKeepAliveService();
 
   SoftphoneWsClient? _ws;
   SoftphonePcmMedia? _media;
   SoftphoneRingtone? _ringtone;
   Timer? _heartbeat;
   Timer? _silenceFallback;
+  Timer? _reconnectTimer;
   bool _micLive = false;
+  bool _wantOnline = false;
+  bool _uiHoldingWs = true;
+  int _reconnectAttempt = 0;
 
   SoftphoneConnectionState state = SoftphoneConnectionState.idle;
   String? error;
@@ -115,6 +138,8 @@ class SoftphoneEngine extends ChangeNotifier {
 
       _ws?.disconnect();
       _ws = createSoftphoneWsClient();
+      _uiHoldingWs = true;
+      _wantOnline = true;
       _ws!.connect(
         apiKey: apiKey,
         businessId: businessId,
@@ -126,11 +151,15 @@ class SoftphoneEngine extends ChangeNotifier {
           error = '$e';
           state = SoftphoneConnectionState.reconnecting;
           notifyListeners();
+          _scheduleReconnect();
         },
         onDone: () {
           if (state != SoftphoneConnectionState.ended && state != SoftphoneConnectionState.idle) {
             state = SoftphoneConnectionState.reconnecting;
             notifyListeners();
+            if (_wantOnline && _uiHoldingWs) {
+              _scheduleReconnect();
+            }
           }
         },
       );
@@ -143,6 +172,9 @@ class SoftphoneEngine extends ChangeNotifier {
           session = await _api.softphoneHeartbeat(businessId, sid);
         } catch (_) {}
       });
+
+      await _enableAndroidPresence(uiHoldingWs: true);
+      unawaited(_consumePendingIncomingAction());
     } catch (e) {
       error = '$e';
       state = SoftphoneConnectionState.error;
@@ -172,6 +204,8 @@ class SoftphoneEngine extends ChangeNotifier {
           'direction': 'inbound',
         };
         unawaited(_startRingtone());
+        unawaited(_showAndroidIncomingNotification());
+        unawaited(softphoneLaunchAppToForeground());
         if (int.tryParse('${activeCall?['id'] ?? ''}') == null) {
           unawaited(_resolveIncomingCallId());
         }
@@ -196,6 +230,7 @@ class SoftphoneEngine extends ChangeNotifier {
       case 'bridge.ended':
       case 'bridge.failed':
         unawaited(_stopRingtone());
+        unawaited(_incomingNotif.cancelIncomingCall());
         bridgeActive = false;
         unawaited(_stopLiveMedia());
         if (state == SoftphoneConnectionState.inCall || state == SoftphoneConnectionState.ringing) {
@@ -308,9 +343,14 @@ class SoftphoneEngine extends ChangeNotifier {
     final sid = sessionId;
     if (sid == null) throw StateError('سشن Softphone نیست');
     if (_ws == null || !_ws!.isConnected) {
-      throw StateError('کانال Softphone وصل نیست؛ دوباره آنلاین شوید');
+      // ممکن است WS در FGS باشد — اول reclaim کن
+      await _reclaimSoftphoneWsFromFgs();
+      if (_ws == null || !_ws!.isConnected) {
+        throw StateError('کانال Softphone وصل نیست؛ دوباره آنلاین شوید');
+      }
     }
     await _stopRingtone();
+    await _incomingNotif.cancelIncomingCall();
     final result = await _api.softphoneAnswerCall(businessId, callId, {'session_id': sid});
     activeCall = result['call'] is Map ? Map<String, dynamic>.from(result['call'] as Map) : {'id': callId};
     state = SoftphoneConnectionState.inCall;
@@ -323,6 +363,7 @@ class SoftphoneEngine extends ChangeNotifier {
     final callId = int.tryParse('${activeCall?['id'] ?? ''}');
     final sid = sessionId;
     await _stopRingtone();
+    await _incomingNotif.cancelIncomingCall();
     _ws?.sendJson({'type': 'hangup_media', 'reason': 'user_hangup', if (sid != null) 'session_id': sid});
     if (callId != null) {
       try {
@@ -419,9 +460,13 @@ class SoftphoneEngine extends ChangeNotifier {
   }
 
   Future<void> unregister() async {
+    _wantOnline = false;
+    _reconnectTimer?.cancel();
+    _reconnectTimer = null;
     _heartbeat?.cancel();
     _heartbeat = null;
     await _stopRingtone();
+    await _incomingNotif.cancelIncomingCall();
     await _stopLiveMedia();
     final sid = sessionId;
     _ws?.disconnect();
@@ -431,6 +476,9 @@ class SoftphoneEngine extends ChangeNotifier {
     } catch (_) {}
     _media = null;
     mediaReady = false;
+    if (supportsAndroidNotificationKeepAlive) {
+      await _keepAlive.disableSoftphonePresence(stopIfOnlySoftphone: true);
+    }
     if (sid != null) {
       try {
         await _api.endSoftphoneSession(businessId, sid);
@@ -448,10 +496,208 @@ class SoftphoneEngine extends ChangeNotifier {
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (!_wantOnline) return;
+    switch (state) {
+      case AppLifecycleState.resumed:
+        unawaited(_onAppResumed());
+        break;
+      case AppLifecycleState.inactive:
+        break;
+      case AppLifecycleState.paused:
+        // فقط FGS را زنده نگه دار؛ WS را در UI نگه می‌داریم (جلوگیری از handoff روی نوتیفیکیشن شید)
+        unawaited(_enableAndroidPresence(uiHoldingWs: true));
+        break;
+      case AppLifecycleState.hidden:
+      case AppLifecycleState.detached:
+        unawaited(_onAppBackgrounded(forceHandoff: true));
+        break;
+    }
+  }
+
+  Future<void> _onAppResumed() async {
+    await _keepAlive.updateUiAttached(true);
+    await _reclaimSoftphoneWsFromFgs();
+    await _consumePendingIncomingAction();
+  }
+
+  Future<void> _onAppBackgrounded({bool forceHandoff = false}) async {
+    await _keepAlive.updateUiAttached(false);
+    // در حین مکالمه/زنگ WS را در UI نگه دار تا PCM قطع نشود
+    if (!forceHandoff &&
+        (state == SoftphoneConnectionState.inCall || state == SoftphoneConnectionState.ringing)) {
+      await _enableAndroidPresence(uiHoldingWs: true);
+      return;
+    }
+    // انتقال حضور Softphone به FGS تا بعد از بستن UI هم زنگ برسد
+    _uiHoldingWs = false;
+    await _enableAndroidPresence(uiHoldingWs: false);
+    // بستن WS لوکال تا FGS همان session را بگیرد (handoff)
+    try {
+      _ws?.disconnect();
+    } catch (_) {}
+    _ws = null;
+  }
+
+  Future<void> _enableAndroidPresence({required bool uiHoldingWs}) async {
+    if (!supportsAndroidNotificationKeepAlive) return;
+    final apiKey = authStore.apiKey;
+    final sid = sessionId;
+    final ticket = mediaTicket;
+    if (apiKey == null || sid == null || ticket == null) return;
+    final ext = '${session?['extension'] ?? health?['extension'] ?? ''}'.trim();
+    _uiHoldingWs = uiHoldingWs;
+    await _keepAlive.enableSoftphonePresence(
+      apiKey: apiKey,
+      businessId: businessId,
+      sessionId: sid,
+      mediaTicket: ticket,
+      extension: ext,
+      apiBaseUrl: AppConfig.apiBaseUrl,
+      uiHoldingWs: uiHoldingWs,
+    );
+  }
+
+  Future<void> _reclaimSoftphoneWsFromFgs() async {
+    if (!_wantOnline) return;
+    final apiKey = authStore.apiKey;
+    final sid = sessionId;
+    final ticket = mediaTicket;
+    if (apiKey == null || sid == null || ticket == null) return;
+    if (_ws?.isConnected == true) {
+      await _keepAlive.setSoftphoneUiHoldingWs(true);
+      _uiHoldingWs = true;
+      return;
+    }
+    _uiHoldingWs = true;
+    await _keepAlive.setSoftphoneUiHoldingWs(true);
+    _ws?.disconnect();
+    _ws = createSoftphoneWsClient();
+    _ws!.connect(
+      apiKey: apiKey,
+      businessId: businessId,
+      sessionId: sid,
+      mediaTicket: ticket,
+      onJson: _onWsJson,
+      onPcm: _onWsPcm,
+      onError: (e) {
+        error = '$e';
+        state = SoftphoneConnectionState.reconnecting;
+        notifyListeners();
+        _scheduleReconnect();
+      },
+      onDone: () {
+        if (_wantOnline && _uiHoldingWs && state != SoftphoneConnectionState.idle) {
+          state = SoftphoneConnectionState.reconnecting;
+          notifyListeners();
+          _scheduleReconnect();
+        }
+      },
+    );
+  }
+
+  void _scheduleReconnect() {
+    if (!_wantOnline || !_uiHoldingWs) return;
+    _reconnectTimer?.cancel();
+    final delaySec = (1 << _reconnectAttempt.clamp(0, 4)).clamp(1, 16);
+    _reconnectAttempt += 1;
+    _reconnectTimer = Timer(Duration(seconds: delaySec), () async {
+      if (!_wantOnline || !_uiHoldingWs) return;
+      try {
+        if (sessionId != null && mediaTicket != null && authStore.apiKey != null) {
+          await _reclaimSoftphoneWsFromFgs();
+          _reconnectAttempt = 0;
+        } else {
+          await register();
+          _reconnectAttempt = 0;
+        }
+      } catch (_) {
+        _scheduleReconnect();
+      }
+    });
+  }
+
+  Future<void> _showAndroidIncomingNotification() async {
+    if (!supportsSoftphoneIncomingNotifications) return;
+    final ext = '${activeCall?['extension'] ?? session?['extension'] ?? health?['extension'] ?? ''}'.trim();
+    await _incomingNotif.showIncomingCall(
+      caller: incomingCallerDisplay,
+      extension: ext.isEmpty ? '—' : ext,
+      callId: activeCallId,
+      sessionId: sessionId,
+    );
+  }
+
+  void _onIncomingNotificationAction(Map<String, dynamic> action) {
+    unawaited(_handleIncomingAction(action));
+  }
+
+  Future<void> _consumePendingIncomingAction() async {
+    final pending = await _incomingNotif.consumePendingAction();
+    if (pending != null) {
+      await _handleIncomingAction(pending);
+    }
+  }
+
+  Future<void> _handleIncomingAction(Map<String, dynamic> action) async {
+    final kind = '${action['kind'] ?? ''}';
+    if (kind != 'softphone_incoming') return;
+    final act = '${action['action'] ?? ''}';
+    final callId = int.tryParse('${action['call_id'] ?? activeCall?['id'] ?? ''}');
+    await softphoneLaunchAppToForeground();
+    await _reclaimSoftphoneWsFromFgs();
+    if (act == softphoneActionDecline) {
+      try {
+        await rejectIncoming();
+      } catch (_) {}
+      return;
+    }
+    // answer or notification body tap
+    if (callId != null) {
+      try {
+        if (state == SoftphoneConnectionState.ringing || act == softphoneActionAnswer) {
+          await answer(callId);
+        }
+      } catch (e) {
+        error = '$e';
+        notifyListeners();
+      }
+    } else {
+      unawaited(_resolveIncomingCallId().then((_) async {
+        final id = activeCallId;
+        if (id != null && act == softphoneActionAnswer) {
+          try {
+            await answer(id);
+          } catch (_) {}
+        }
+      }));
+    }
+  }
+
+  void _onFgsSoftphoneMessage(Map<String, dynamic> msg) {
+    final type = '${msg['type'] ?? ''}';
+    if (type == 'incoming_ring' || type.startsWith('bridge.') || type == 'auth_ok') {
+      // وقتی UI WS ندارد، رویدادهای FGS را اعمال کن
+      if (_ws == null || _ws?.isConnected != true) {
+        _onWsJson(msg);
+      } else if (type == 'incoming_ring') {
+        // UI هنوز WS دارد؛ فقط اگر هنوز ringing نشده
+        if (state != SoftphoneConnectionState.ringing) {
+          _onWsJson(msg);
+        }
+      }
+    }
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _wantOnline = false;
+    _reconnectTimer?.cancel();
     _heartbeat?.cancel();
     _silenceFallback?.cancel();
     unawaited(_stopRingtone());
+    unawaited(_incomingNotif.cancelIncomingCall());
     _ws?.disconnect();
     unawaited(_media?.stop() ?? Future.value());
     super.dispose();

@@ -45,6 +45,7 @@ DEFAULT_ALLOWED_SERVICES = [
 	"hesabix-api",
 	"hesabix-rq-worker",
 	"hesabix-notification-moderation",  # Worker بررسی قالب‌های نوتیفیکیشن
+	"hesabix-api-media",  # Softphone Media Edge (workers=1)
 ]
 
 

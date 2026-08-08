@@ -3943,7 +3943,8 @@ main() {
   echo "  sudo hesabix -services start"
   echo "  sudo hesabix -services stop"
   echo "  sudo hesabix -services restart"
-  echo "  sudo hesabix -services status"
+  echo "  sudo hesabix -services status   # alias: show"
+  echo "  # includes hesabix-api-media (Softphone Media Edge) when installed"
   echo
   log_info "To re-run deploy (resume from last step or full upgrade):"
   echo "  BRANCH=${BRANCH} API_DOMAIN=${API_DOMAIN} UI_DOMAIN=${UI_DOMAIN} sudo -E bash deploy.sh"

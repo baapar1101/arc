@@ -166,7 +166,14 @@ async def softphone_client_ws(websocket: WebSocket) -> None:
 	except Exception as e:
 		LOG.warning("softphone client ws error: %s", e)
 	finally:
-		await media_hub.unregister_client(session_id, reason="client_disconnect")
+		# فقط اگر همین سوکت هنوز کلاینت فعال است سشن را ببند (handoff UI↔FGS)
+		removed = await media_hub.unregister_client(
+			session_id,
+			reason="client_disconnect",
+			websocket=websocket,
+		)
+		if removed is None:
+			return
 		db2 = _db()
 		try:
 			try:

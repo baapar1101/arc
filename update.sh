@@ -260,7 +260,12 @@ if [[ -f "${ensure_secrets}" ]]; then
 fi
 chown -R www-data:www-data "${api_dir}"
 systemctl daemon-reload
-systemctl restart hesabix-api hesabix-rq-worker hesabix-notification-moderation
+# Softphone Media Edge holds media_hub in-memory (workers=1); restart with API when installed.
+_hesabix_restart_units=(hesabix-api hesabix-rq-worker hesabix-notification-moderation)
+if [[ "$(systemctl show hesabix-api-media.service -p LoadState --value 2>/dev/null)" == "loaded" ]]; then
+  _hesabix_restart_units+=(hesabix-api-media)
+fi
+systemctl restart "${_hesabix_restart_units[@]}"
 sleep 3
 for svc in hesabix-api; do
   if ! systemctl is-active --quiet "$svc"; then
@@ -268,6 +273,14 @@ for svc in hesabix-api; do
     exit 1
   fi
 done
+if [[ " ${_hesabix_restart_units[*]} " == *" hesabix-api-media "* ]]; then
+  if ! systemctl is-active --quiet hesabix-api-media; then
+    log_err "Service hesabix-api-media failed to start. Check: journalctl -u hesabix-api-media"
+    exit 1
+  fi
+  log_ok "hesabix-api-media (Softphone Media Edge) restarted."
+fi
+unset _hesabix_restart_units
 log_ok "Backend services restarted."
 
 # --- 3. Flutter: update SDK, build web, deploy (PATH دائمی: /etc/profile.d/hesabix-flutter.sh) ---

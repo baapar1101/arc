@@ -191,7 +191,7 @@ After a standard installation, a small CLI is available at `/usr/local/bin/hesab
 sudo hesabix -update
 ```
 
-This runs `update.sh` in the deployed app directory. It typically: pulls the latest code from the saved remote and branch, applies database migrations, restarts Hesabix systemd units (API, RQ worker, notification moderation—and pgAdmin4 if installed), rebuilds the Flutter web frontend, and reloads Nginx. Progress and errors are also written to `/opt/hesabix/update.log`.
+This runs `update.sh` in the deployed app directory. It typically: pulls the latest code from the saved remote and branch, applies database migrations, restarts Hesabix systemd units (API, RQ worker, notification moderation—and Softphone Media Edge / pgAdmin4 if installed), rebuilds the Flutter web frontend, and reloads Nginx. Progress and errors are also written to `/opt/hesabix/update.log`.
 
 Optional overrides (useful for forks or testing a branch):
 
@@ -203,7 +203,7 @@ sudo hesabix -update -source https://example.com/your/repo.git -branch develop
 
 Other `hesabix` commands:
 
-- `sudo hesabix -services {start|stop|restart|status}` — control Hesabix-related systemd units without updating code.
+- `sudo hesabix -services {start|stop|restart|status|show}` — control Hesabix-related systemd units (API, RQ, notification worker, and `hesabix-api-media` / pgAdmin4 when installed). `show` is an alias for `status`.
 - `sudo hesabix -domains show` — show configured API/UI/pgAdmin domains and URLs.
 - `sudo hesabix -domains set --api api.example.com --ui app.example.com [--ssl]` — change domain(s), update Nginx, rebuild frontend, optionally issue Let's Encrypt certs.
 - `sudo hesabix -domains apply` — regenerate Nginx from current `/opt/hesabix/.deploy_env` without changing domains.

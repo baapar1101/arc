@@ -31,7 +31,7 @@ usage() {
   cat <<'USAGE'
 Usage:
   hesabix -update [-source REPO_URL] [-branch BRANCH]
-  hesabix -services {start|stop|restart|status}
+  hesabix -services {start|stop|restart|status|show}
   hesabix -domains {show|set|apply} [options]
   hesabix -ssl {status|enable|renew} [options]
   hesabix -cli reload
@@ -39,7 +39,10 @@ Usage:
   -update           Run update (pull, migrate, restart, rebuild frontend, reload nginx)
   -source URL       Override repo URL (default: from initial deploy)
   -branch NAME      Override branch (default: from initial deploy)
-  -services ACTION  Control Hesabix systemd units (API, RQ worker, notification worker; pgadmin4 if installed)
+  -services ACTION  Control Hesabix systemd units:
+                      always: hesabix-api, hesabix-rq-worker, hesabix-notification-moderation
+                      if installed: hesabix-api-media (Softphone Media Edge), pgadmin4
+                      show is an alias for status
 
   -domains show     Show configured API/UI/pgAdmin domains and URLs
   -domains set      Change domain(s); updates .deploy_env, Nginx, and rebuilds frontend
@@ -110,53 +113,79 @@ EOF
   systemctl daemon-reload
 }
 
-run_hesabix_services() {
-  local action="$1"
+hesabix_unit_loaded() {
+  [[ "$(systemctl show "${1}.service" -p LoadState --value 2>/dev/null)" == "loaded" ]]
+}
+
+collect_hesabix_service_units() {
+  # stdout: space-separated unit names (without .service) in start/restart order
   local -a core=( hesabix-api hesabix-rq-worker hesabix-notification-moderation )
+  local -a extra=()
   local u
 
   for u in "${core[@]}"; do
-    if [[ "$(systemctl show "${u}.service" -p LoadState --value 2>/dev/null)" != "loaded" ]]; then
+    if ! hesabix_unit_loaded "${u}"; then
       echo "Expected systemd unit is missing or not loaded: ${u}.service (re-run deploy.sh backend step)" >&2
-      exit 1
+      return 1
     fi
   done
 
-  local -a extra=()
-  if [[ "$(systemctl show pgadmin4.service -p LoadState --value 2>/dev/null)" == "loaded" ]]; then
+  # Softphone Media Edge (workers=1, in-memory media_hub) — must restart with API after update
+  if hesabix_unit_loaded hesabix-api-media; then
+    extra+=( hesabix-api-media )
+  fi
+  if hesabix_unit_loaded pgadmin4; then
     extra+=( pgadmin4 )
   fi
 
+  printf '%s' "${core[*]}"
+  if [[ ${#extra[@]} -gt 0 ]]; then
+    printf ' %s' "${extra[*]}"
+  fi
+  printf '\n'
+}
+
+run_hesabix_services() {
+  local action="$1"
+  local units_line
+  local -a units=()
+  local u
+  local i
+
+  # show = status (common alias)
+  if [[ "${action}" == "show" ]]; then
+    action="status"
+  fi
+
+  units_line="$(collect_hesabix_service_units)" || exit 1
+  # shellcheck disable=SC2206
+  units=( ${units_line} )
+
+  echo "Hesabix units: ${units[*]}"
+
   case "${action}" in
     start)
-      for u in "${core[@]}"; do systemctl start "${u}.service"; done
-      for u in "${extra[@]}"; do systemctl start "${u}.service"; done
-      echo "Started Hesabix services."
+      for u in "${units[@]}"; do systemctl start "${u}.service"; done
+      echo "Started: ${units[*]}"
       ;;
     stop)
-      for (( i = ${#extra[@]} - 1; i >= 0; i-- )); do systemctl stop "${extra[i]}.service"; done
-      for (( i = ${#core[@]} - 1; i >= 0; i-- )); do systemctl stop "${core[i]}.service"; done
-      echo "Stopped Hesabix services."
+      for (( i = ${#units[@]} - 1; i >= 0; i-- )); do systemctl stop "${units[i]}.service"; done
+      echo "Stopped: ${units[*]}"
       ;;
     restart)
       ensure_api_journalctl_env
       systemctl daemon-reload
-      for u in "${core[@]}"; do systemctl restart "${u}.service"; done
-      for u in "${extra[@]}"; do systemctl restart "${u}.service"; done
-      echo "Restarted Hesabix services."
+      for u in "${units[@]}"; do systemctl restart "${u}.service"; done
+      echo "Restarted: ${units[*]}"
       ;;
     status)
-      for u in "${core[@]}"; do
-        echo "======== ${u}.service ========"
-        systemctl --no-pager -l status "${u}.service" || true
-      done
-      for u in "${extra[@]}"; do
+      for u in "${units[@]}"; do
         echo "======== ${u}.service ========"
         systemctl --no-pager -l status "${u}.service" || true
       done
       ;;
     *)
-      echo "Invalid action: ${action}. Use: start|stop|restart|status" >&2
+      echo "Invalid action: ${action}. Use: start|stop|restart|status|show" >&2
       exit 1
       ;;
   esac
@@ -236,7 +265,7 @@ while [[ $# -gt 0 ]]; do
       ;;
     -services)
       if [[ $# -lt 2 || -z "${2:-}" ]]; then
-        echo "hesabix -services requires an action: start|stop|restart|status" >&2
+        echo "hesabix -services requires an action: start|stop|restart|status|show" >&2
         exit 1
       fi
       SERVICES_ACTION="$2"
@@ -323,8 +352,8 @@ fi
 
 if [[ -n "${SERVICES_ACTION}" ]]; then
   case "${SERVICES_ACTION}" in
-    start|stop|restart|status) ;;
-    *) echo "Invalid -services action: ${SERVICES_ACTION}. Use: start|stop|restart|status" >&2; exit 1 ;;
+    start|stop|restart|status|show) ;;
+    *) echo "Invalid -services action: ${SERVICES_ACTION}. Use: start|stop|restart|status|show" >&2; exit 1 ;;
   esac
   run_hesabix_services "${SERVICES_ACTION}"
   exit 0

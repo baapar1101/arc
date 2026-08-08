@@ -19,6 +19,23 @@ class AndroidNotificationKeepAliveService {
   Future<void> refreshStatusNotification({bool appIsJalali = true}) async {}
 
   void setOnNotificationMessage(void Function(Map<String, dynamic> msg)? handler) {}
+
+  void setOnSoftphoneMessage(void Function(Map<String, dynamic> msg)? handler) {}
+
+  Future<void> enableSoftphonePresence({
+    required String apiKey,
+    required int businessId,
+    required String sessionId,
+    required String mediaTicket,
+    required String extension,
+    required String apiBaseUrl,
+    bool appIsJalali = true,
+    bool uiHoldingWs = true,
+  }) async {}
+
+  Future<void> setSoftphoneUiHoldingWs(bool holding) async {}
+
+  Future<void> disableSoftphonePresence({bool stopIfOnlySoftphone = false}) async {}
 }
 
 AndroidNotificationKeepAliveService createAndroidNotificationKeepAliveService() =>
