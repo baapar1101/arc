@@ -330,6 +330,11 @@ async def _handle_tunnel_control(pbx_id: int, payload: dict[str, Any]) -> None:
 		bridge_id = str(payload.get("bridge_id") or "")
 		if bridge_id:
 			await media_hub.mark_bridge_active(bridge_id)
+			return
+		# fallback: بعضی Connectorها فقط session_id می‌فرستند
+		session_id = str(payload.get("session_id") or "")
+		if session_id:
+			await media_hub.mark_bridge_active_by_session(session_id)
 		return
 	if typ == "bridge.failed":
 		session_id = str(payload.get("session_id") or "")

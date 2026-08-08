@@ -849,7 +849,7 @@ def softphone_end_session(
 
 
 @router.post("/business/{business_id}/softphone/calls")
-def softphone_outbound_call(
+async def softphone_outbound_call(
 	request: Request,
 	business_id: int,
 	payload: Dict[str, Any] = Body(...),
@@ -861,34 +861,37 @@ def softphone_outbound_call(
 	db: Session = Depends(get_db),
 	ctx: AuthContext = Depends(get_current_user),
 ) -> dict:
+	"""تماس خروجی Softphone — باید await start_bridge شود وگرنه Media Hub همه PCM را drop می‌کند."""
+	import logging
+
 	from app.services.telephony import softphone_service as soft_svc
 	from app.services.telephony.media_hub import media_hub
-	import asyncio
 
+	log = logging.getLogger("hesabix.telephony.api")
 	result = soft_svc.start_outbound_relay_call(db, business_id, ctx.get_user_id(), payload or {})
 	session_id = result.get("session_id")
 	call = result.get("call") or {}
 	as_uuid = result.get("audiosocket_uuid")
 	if session_id:
 		try:
-			loop = asyncio.get_event_loop()
-			coro = media_hub.start_bridge(
+			await media_hub.start_bridge(
 				session_id=session_id,
 				call_id=call.get("id"),
 				direction="outbound",
 				audiosocket_uuid=as_uuid,
 			)
-			if loop.is_running():
-				asyncio.create_task(coro)
-			else:
-				loop.run_until_complete(coro)
-		except Exception:
-			pass
+		except Exception as e:
+			log.exception("start_bridge outbound failed session=%s: %s", session_id, e)
+			raise ApiError(
+				"SOFTPHONE_BRIDGE_START_FAILED",
+				f"پل رسانه شروع نشد: {e}",
+				http_status=503,
+			) from e
 	return _resp(result, request)
 
 
 @router.post("/business/{business_id}/softphone/calls/{call_id}/answer")
-def softphone_answer_call(
+async def softphone_answer_call(
 	request: Request,
 	business_id: int,
 	call_id: int,
@@ -901,28 +904,30 @@ def softphone_answer_call(
 	db: Session = Depends(get_db),
 	ctx: AuthContext = Depends(get_current_user),
 ) -> dict:
+	import logging
+
 	from app.services.telephony import softphone_service as soft_svc
 	from app.services.telephony.media_hub import media_hub
-	import asyncio
 
+	log = logging.getLogger("hesabix.telephony.api")
 	result = soft_svc.enqueue_answer_inbound(db, business_id, ctx.get_user_id(), call_id, payload or {})
 	session_id = result.get("session_id")
 	as_uuid = result.get("audiosocket_uuid")
 	if session_id:
 		try:
-			loop = asyncio.get_event_loop()
-			coro = media_hub.start_bridge(
+			await media_hub.start_bridge(
 				session_id=session_id,
 				call_id=call_id,
 				direction="inbound",
 				audiosocket_uuid=as_uuid,
 			)
-			if loop.is_running():
-				asyncio.create_task(coro)
-			else:
-				loop.run_until_complete(coro)
-		except Exception:
-			pass
+		except Exception as e:
+			log.exception("start_bridge inbound failed session=%s: %s", session_id, e)
+			raise ApiError(
+				"SOFTPHONE_BRIDGE_START_FAILED",
+				f"پل رسانه شروع نشد: {e}",
+				http_status=503,
+			) from e
 	return _resp(result, request)
 
 

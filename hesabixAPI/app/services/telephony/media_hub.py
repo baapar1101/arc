@@ -73,6 +73,15 @@ class TelephonyMediaHub:
 		self._tunnels_by_pbx: Dict[int, ConnectorTunnelLink] = {}
 		self._bridges: Dict[str, MediaBridge] = {}
 		self._bridges_by_session: Dict[str, str] = {}
+		self._pcm_drop_log_at: Dict[str, float] = {}
+
+	def _log_pcm_drop(self, key: str, message: str, *args: Any) -> None:
+		now = time.time()
+		last = self._pcm_drop_log_at.get(key, 0.0)
+		if now - last < 5.0:
+			return
+		self._pcm_drop_log_at[key] = now
+		LOG.warning(message, *args)
 
 	def health(self) -> Dict[str, Any]:
 		return {
@@ -248,9 +257,11 @@ class TelephonyMediaHub:
 		if not link or link.muted:
 			return
 		if self._bridges_by_session.get(session_id) is None:
+			self._log_pcm_drop(f"c2t:{session_id}", "PCM client→tunnel dropped: no bridge for session=%s", session_id)
 			return
 		tunnel = self._tunnels_by_pbx.get(link.pbx_id)
 		if not tunnel:
+			self._log_pcm_drop(f"c2t-tun:{session_id}", "PCM client→tunnel dropped: no tunnel pbx=%s session=%s", link.pbx_id, session_id)
 			return
 		try:
 			await tunnel.websocket.send_bytes(self.pack_pcm_frame(session_id, data, direction_type=1))
@@ -262,6 +273,7 @@ class TelephonyMediaHub:
 		if not link:
 			return
 		if self._bridges_by_session.get(session_id) is None:
+			self._log_pcm_drop(f"t2c:{session_id}", "PCM tunnel→client dropped: no bridge for session=%s", session_id)
 			return
 		try:
 			await link.websocket.send_bytes(self.pack_pcm_frame(session_id, data, direction_type=2))
@@ -337,6 +349,11 @@ class TelephonyMediaHub:
 			bridge.session_id,
 			{"type": "bridge.active", "bridge_id": bridge_id, "call_id": bridge.call_id},
 		)
+
+	async def mark_bridge_active_by_session(self, session_id: str) -> None:
+		bridge_id = self._bridges_by_session.get(session_id)
+		if bridge_id:
+			await self.mark_bridge_active(bridge_id)
 
 	async def stop_bridge(self, session_id: str, *, reason: str = "hangup") -> None:
 		async with self._lock:

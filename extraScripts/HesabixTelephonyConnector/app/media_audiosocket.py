@@ -48,11 +48,13 @@ class AudioSocketServer:
 		port: int = 9092,
 		on_pcm: Optional[Callable[[str, bytes], None]] = None,
 		on_hangup: Optional[Callable[[str], None]] = None,
+		on_connect: Optional[Callable[[str], None]] = None,
 	) -> None:
 		self.host = host
 		self.port = port
 		self.on_pcm = on_pcm
 		self.on_hangup = on_hangup
+		self.on_connect = on_connect
 		self._sock: Optional[socket.socket] = None
 		self._thread: Optional[threading.Thread] = None
 		self._stop = threading.Event()
@@ -115,6 +117,10 @@ class AudioSocketServer:
 		except Exception:
 			pass
 
+	def has_connection(self, as_uuid: str) -> bool:
+		with self._lock:
+			return as_uuid in self._conns
+
 	def _accept_loop(self) -> None:
 		assert self._sock is not None
 		while not self._stop.is_set():
@@ -147,6 +153,11 @@ class AudioSocketServer:
 			with self._lock:
 				self._conns[as_uuid] = conn
 			LOG.info("AudioSocket connected uuid=%s from=%s", as_uuid, addr)
+			if self.on_connect:
+				try:
+					self.on_connect(as_uuid)
+				except Exception:
+					LOG.exception("AudioSocket on_connect failed uuid=%s", as_uuid)
 			while not self._stop.is_set():
 				ftype, payload = _read_frame(conn)
 				if ftype == AS_PCM:

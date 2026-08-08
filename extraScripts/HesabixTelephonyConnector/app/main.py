@@ -226,6 +226,16 @@ class AmiClient:
 	def hangup(self, channel: str) -> None:
 		self._send({"Action": "Hangup", "Channel": channel})
 
+	def set_var(self, channel: str, variable: str, value: str) -> None:
+		self._send(
+			{
+				"Action": "Setvar",
+				"Channel": channel,
+				"Variable": variable,
+				"Value": value,
+			}
+		)
+
 	def redirect(self, channel: str, exten: str, context: str = "from-internal") -> None:
 		self._send(
 			{
@@ -345,8 +355,26 @@ def main() -> int:
 	# Softphone media state
 	as_uuid_to_session: Dict[str, str] = {}
 	session_to_as_uuid: Dict[str, str] = {}
+	session_to_bridge_id: Dict[str, str] = {}
 	media_lock = threading.Lock()
 	tunnel_ref: Dict[str, Any] = {"client": None}
+
+	def _notify_bridge_active(session_id: str, as_uuid: str, *, call_id: Any = None) -> None:
+		client = tunnel_ref.get("client")
+		if not client or not session_id:
+			return
+		with media_lock:
+			bridge_id = session_to_bridge_id.get(session_id)
+		payload: Dict[str, Any] = {
+			"type": "bridge.active",
+			"session_id": session_id,
+			"audiosocket_uuid": as_uuid,
+		}
+		if bridge_id:
+			payload["bridge_id"] = bridge_id
+		if call_id is not None:
+			payload["call_id"] = call_id
+		client.send_json(payload)
 
 	def on_as_pcm(as_uuid: str, pcm: bytes) -> None:
 		with media_lock:
@@ -355,11 +383,19 @@ def main() -> int:
 		if session_id and client:
 			client.send_pcm(session_id, pcm)
 
+	def on_as_connect(as_uuid: str) -> None:
+		with media_lock:
+			session_id = as_uuid_to_session.get(as_uuid)
+		if session_id:
+			LOG.info("AudioSocket ready → bridge.active session=%s uuid=%s", session_id, as_uuid)
+			_notify_bridge_active(session_id, as_uuid)
+
 	def on_as_hangup(as_uuid: str) -> None:
 		with media_lock:
 			session_id = as_uuid_to_session.pop(as_uuid, None)
 			if session_id:
 				session_to_as_uuid.pop(session_id, None)
+				session_to_bridge_id.pop(session_id, None)
 		client = tunnel_ref.get("client")
 		if client and session_id:
 			client.send_json({"type": "bridge.failed", "session_id": session_id, "reason": "audiosocket_hangup", "audiosocket_uuid": as_uuid})
@@ -375,13 +411,18 @@ def main() -> int:
 		if typ == "bridge.start":
 			session_id = str(payload.get("session_id") or "")
 			as_uuid = str(payload.get("audiosocket_uuid") or "")
+			bridge_id = str(payload.get("bridge_id") or "")
 			if session_id and as_uuid:
 				with media_lock:
 					as_uuid_to_session[as_uuid] = session_id
 					session_to_as_uuid[session_id] = as_uuid
-				client = tunnel_ref.get("client")
-				if client:
-					client.send_json({"type": "bridge.active", "bridge_id": payload.get("bridge_id"), "session_id": session_id})
+					if bridge_id:
+						session_to_bridge_id[session_id] = bridge_id
+				# اگر AudioSocket از قبل وصل است (نادر)، فوری active کن؛ وگرنه بعد از TCP connect
+				if audio_server.has_connection(as_uuid):
+					_notify_bridge_active(session_id, as_uuid, call_id=payload.get("call_id"))
+				else:
+					LOG.info("bridge.start mapped session=%s uuid=%s (waiting AudioSocket)", session_id, as_uuid)
 		elif typ == "bridge.stop":
 			session_id = str(payload.get("session_id") or "")
 			as_uuid = str(payload.get("audiosocket_uuid") or "")
@@ -392,6 +433,8 @@ def main() -> int:
 					session_to_as_uuid.pop(session_id, None)
 				if as_uuid:
 					as_uuid_to_session.pop(as_uuid, None)
+				if session_id:
+					session_to_bridge_id.pop(session_id, None)
 			if as_uuid:
 				audio_server.hangup(as_uuid)
 		elif typ == "agent.online":
@@ -401,7 +444,13 @@ def main() -> int:
 
 	audio_host = os.environ.get("AUDIOSOCKET_HOST", "127.0.0.1")
 	audio_port = int(os.environ.get("AUDIOSOCKET_PORT", "9092"))
-	audio_server = AudioSocketServer(host=audio_host, port=audio_port, on_pcm=on_as_pcm, on_hangup=on_as_hangup)
+	audio_server = AudioSocketServer(
+		host=audio_host,
+		port=audio_port,
+		on_pcm=on_as_pcm,
+		on_hangup=on_as_hangup,
+		on_connect=on_as_connect,
+	)
 	try:
 		audio_server.start()
 	except Exception as e:
@@ -480,16 +529,9 @@ def main() -> int:
 								host,
 								port,
 							)
-							client = tunnel_ref.get("client")
-							if client:
-								client.send_json(
-									{
-										"type": "bridge.active",
-										"session_id": session_id,
-										"audiosocket_uuid": as_uuid,
-										"call_id": cmd.get("call_id"),
-									}
-								)
+							# bridge.active بعد از TCP AudioSocket (on_as_connect) تا میکروفون/سکوت به‌موقع برسد
+							if audio_server.has_connection(as_uuid):
+								_notify_bridge_active(session_id, as_uuid, call_id=cmd.get("call_id"))
 						elif ctype == "softphone_bridge_in":
 							as_uuid = str(cmd.get("audiosocket_uuid") or uuid.uuid4())
 							session_id = str(cmd.get("session_id") or "")
@@ -501,9 +543,9 @@ def main() -> int:
 									as_uuid_to_session[as_uuid] = session_id
 									session_to_as_uuid[session_id] = as_uuid
 							if channel:
-								# انتقال کانال زنگ‌خور به AudioSocket
+								# انتقال کانال زنگ‌خور به AudioSocket — UUID را روی کانال ست کن
+								ami.set_var(str(channel), "HSX_UUID", as_uuid)
 								ami.redirect(str(channel), "s", context="hesabix-softphone-relay")
-								# اگر redirect سفارشی ممکن نباشد، Originate موازی
 							else:
 								ext = str(cmd.get("extension") or "")
 								ami.originate_to_application(
@@ -514,16 +556,8 @@ def main() -> int:
 									timeout_ms=30000,
 									variable=f"HSX_UUID={as_uuid}",
 								)
-							client = tunnel_ref.get("client")
-							if client:
-								client.send_json(
-									{
-										"type": "bridge.active",
-										"session_id": session_id,
-										"audiosocket_uuid": as_uuid,
-										"call_id": cmd.get("call_id"),
-									}
-								)
+							if audio_server.has_connection(as_uuid):
+								_notify_bridge_active(session_id, as_uuid, call_id=cmd.get("call_id"))
 						elif ctype == "softphone_dtmf":
 							channel = cmd.get("channel")
 							digit = str(cmd.get("digit") or "")
