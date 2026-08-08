@@ -65,7 +65,7 @@ class BusinessSwitcherPrefs {
       raw = prefs.getStringList(_lastUsedKey(userId));
     }
     raw ??= prefs.getStringList(_legacyLastUsed);
-    if (raw == null || raw.isEmpty) return const [];
+    if (raw == null || raw.isEmpty) return <int>[];
     return raw.map(int.tryParse).whereType<int>().where((id) => id > 0).toList();
   }
 
@@ -73,7 +73,8 @@ class BusinessSwitcherPrefs {
   static Future<void> recordLastUsed(int? userId, int businessId) async {
     if (businessId <= 0) return;
     final prefs = await SharedPreferences.getInstance();
-    final current = await lastUsedIds(userId);
+    // همیشه کپی mutable؛ هرگز روی نتیجهٔ احتمالاً ثابت mutate نکن.
+    final current = List<int>.from(await lastUsedIds(userId));
     current.remove(businessId);
     current.insert(0, businessId);
     final trimmed = current.take(20).map((e) => e.toString()).toList();

@@ -296,9 +296,17 @@ class _BusinessesPageState extends State<BusinessesPage> {
   int? get _activeBusinessId => _authStore.currentBusiness?.id;
 
   Future<void> _recordAndEnter(int businessId, Future<void> Function() enter) async {
-    await BusinessSwitcherPrefs.recordLastUsed(_authStore.currentUserId, businessId);
-    final lastUsed = await BusinessSwitcherPrefs.lastUsedIds(_authStore.currentUserId);
-    if (mounted) setState(() => _lastUsedIds = lastUsed);
+    try {
+      await BusinessSwitcherPrefs.recordLastUsed(_authStore.currentUserId, businessId);
+      final lastUsed = await BusinessSwitcherPrefs.lastUsedIds(_authStore.currentUserId);
+      if (mounted) setState(() => _lastUsedIds = lastUsed);
+    } catch (e, st) {
+      // ثبت محلی نباید جلوی ورود به کسب‌وکار را بگیرد.
+      assert(() {
+        debugPrint('BusinessSwitcherPrefs.recordLastUsed failed: $e\n$st');
+        return true;
+      }());
+    }
     await enter();
   }
 
