@@ -77,21 +77,66 @@ def _extract_inquiry_error_message(item: Dict[str, Any]) -> str | None:
 
 def _apply_inquiry_result_to_document(doc: Document, item: Dict[str, Any], *, now: str) -> None:
     extra = dict(doc.extra_info or {})
+    current_status = str(extra.get("tax_status") or "").strip().lower()
     mapped_status = _map_inquiry_status(item.get("status"))
+    # NOT_FOUND / وضعیت‌های ناشناخته نباید ارسال موفق را به «ارسال نشده» برگردانند.
+    # استعلام فوری بعد از send اغلب NOT_FOUND است چون هنوز در صف پردازش مودیان است.
     if mapped_status:
-        extra["tax_status"] = mapped_status
+        if mapped_status == "failed" or current_status not in _NON_REGRESSIBLE_TAX_STATUSES:
+            extra["tax_status"] = mapped_status
+        elif mapped_status in _NON_REGRESSIBLE_TAX_STATUSES and _tax_status_rank(
+            mapped_status
+        ) >= _tax_status_rank(current_status):
+            extra["tax_status"] = mapped_status
+    elif current_status in ("not_found", "unknown", "") and extra.get("tax_tracking_code"):
+        # پاسخ استعلام بی‌اثر بود ولی کد رهگیری داریم → حداقل «ارسال شده»
+        extra["tax_status"] = "sent"
     error_message = _extract_inquiry_error_message(item)
     status_norm = str(item.get("status") or "").lower()
     if error_message:
         extra["tax_error_message"] = error_message
     elif status_norm in ("failed", "error"):
         extra["tax_error_message"] = extra.get("tax_error_message") or "رد شده توسط سامانه مودیان"
-    elif mapped_status not in ("failed",):
+    elif mapped_status not in ("failed",) and status_norm not in ("not_found", "unknown"):
         extra.pop("tax_error_message", None)
     extra["tax_last_inquiry_at"] = now
     if item.get("raw_data"):
         extra["tax_last_inquiry_response"] = item.get("raw_data")
     doc.extra_info = extra
+
+
+_NON_REGRESSIBLE_TAX_STATUSES = frozenset({"sent", "pending", "finalized", "accepted", "success"})
+
+
+def _tax_status_rank(status: str | None) -> int:
+    """رتبه پیشرفت وضعیت برای جلوگیری از پسرفت هنگام استعلام."""
+    s = str(status or "").strip().lower()
+    return {
+        "not_sent": 0,
+        "not_found": 0,
+        "unknown": 0,
+        "pending": 1,
+        "sent": 2,
+        "finalized": 3,
+        "accepted": 3,
+        "success": 3,
+        "failed": 4,
+    }.get(s, 0)
+
+
+def normalize_stored_tax_status(extra: dict | None) -> str:
+    """
+    وضعیت قابل نمایش/فیلتر در کارپوشه.
+    not_found بعد از دریافت کد رهگیری را به sent نگاشت می‌کند.
+    """
+    extra = extra or {}
+    status = str(extra.get("tax_status") or "").strip().lower()
+    tracking = str(extra.get("tax_tracking_code") or "").strip()
+    if status in ("not_found", "unknown") and tracking:
+        return "sent"
+    if not status:
+        return "sent" if tracking else "not_sent"
+    return status
 
 
 def _resolve_submission_mode(document: Document, submission_mode: str | None) -> str:
@@ -591,6 +636,7 @@ def build_tax_status_fields_for_api(extra: dict | None) -> Dict[str, Any]:
     """فیلدهای مالیاتی قابل نمایش در لیست/جزئیات."""
     extra = extra or {}
     fields: Dict[str, Any] = {
+        "tax_status": normalize_stored_tax_status(extra),
         "tax_error_message": extra.get("tax_error_message"),
         "tax_last_inquiry_at": extra.get("tax_last_inquiry_at"),
         "tax_moadian_taxid": extra.get("tax_moadian_taxid"),
@@ -656,15 +702,22 @@ def _enrich_inquiry_result_item(item: Dict[str, Any]) -> Dict[str, Any]:
 def _map_inquiry_status(status: Any) -> str | None:
     if not status:
         return None
-    normalized = str(status).lower()
+    normalized = str(status).strip().lower().replace("-", "_")
     mapping = {
         "sent": "sent",
         "pending": "pending",
+        "inprogress": "pending",
+        "in_progress": "pending",
+        "processing": "pending",
         "finalized": "finalized",
         "accepted": "finalized",
         "success": "finalized",
         "failed": "failed",
         "error": "failed",
+        "rejected": "failed",
+        # هنوز در سامانه قابل استعلام نیست — وضعیت قبلی (معمولاً sent) حفظ شود
+        "not_found": None,
+        "unknown": None,
     }
-    return mapping.get(normalized, normalized or None)
+    return mapping.get(normalized)
 

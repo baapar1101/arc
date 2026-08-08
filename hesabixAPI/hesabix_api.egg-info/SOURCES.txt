@@ -1245,6 +1245,7 @@ tests/test_security_hardening.py
 tests/test_stock_count.py
 tests/test_sunway_sms_provider.py
 tests/test_tax_key_material_service.py
+tests/test_tax_validation_type2_buyer.py
 tests/test_telegram_link_token_expiry.py
 tests/test_telephony_media_edge.py
 tests/test_telephony_phone_normalizer.py

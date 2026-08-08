@@ -2912,6 +2912,7 @@ class _TaxWorkspacePageState extends State<TaxWorkspacePage> {
       case 'pending':
         return t.taxStatusPending;
       case 'sent':
+      case 'not_found':
         return t.taxStatusSent;
       case 'finalized':
       case 'accepted':
