@@ -1549,6 +1549,10 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
       // خروجی «همه»: کل نتایج فیلترشده (نه فقط صفحه فعلی جدول).
       // خروجی «انتخاب‌شده»: همان صفحه فعلی — ایندکس‌های انتخاب نسبت به صفحه هستند.
       const exportAllTake = 10000;
+      final includeInventory =
+          widget.config.additionalParams?['include_inventory'] == true;
+      final inventoryAsOfDate =
+          widget.config.additionalParams?['inventory_as_of_date'] as String?;
       final queryInfo = <String, dynamic>{
         'sort_by': _sortBy,
         'sort_desc': _sortDesc,
@@ -1561,6 +1565,12 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
             : null,
         'filters': filters.isNotEmpty ? filters : null,
       };
+      if (includeInventory) {
+        queryInfo['include_inventory'] = true;
+        if (inventoryAsOfDate != null && inventoryAsOfDate.isNotEmpty) {
+          queryInfo['inventory_as_of_date'] = inventoryAsOfDate;
+        }
+      }
       if (_multiSort.isNotEmpty) {
         queryInfo['sort'] = _multiSort
             .map((s) => <String, dynamic>{'by': s.by, 'desc': s.desc})
