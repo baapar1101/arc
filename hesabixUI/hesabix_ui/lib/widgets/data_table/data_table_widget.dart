@@ -23,6 +23,7 @@ import 'helpers/column_settings_service.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/responsive_helper.dart';
 import '../../utils/snackbar_helper.dart';
+import '../business_subpage_back_leading.dart';
 
 /// مقایسهٔ مقدارمحور [additionalParams] تا با rebuild والد که هر بار Map جدید می‌سازد،
 /// بارگذاری بی‌دلیل تکرار نشود؛ فقط وقتی محتوا عوض شده باشد refetch می‌شود.
@@ -2064,6 +2065,11 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
                   widget.config.onBack ??
                   () {
                     if (!mounted) return;
+                    final bid = widget.config.businessId;
+                    if (bid != null) {
+                      popBusinessOrLauncher(context, bid);
+                      return;
+                    }
                     if (context.canPop()) {
                       context.pop();
                     }

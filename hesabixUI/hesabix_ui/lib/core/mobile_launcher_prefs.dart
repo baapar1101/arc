@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// حالت ورود به کسب‌وکار از صفحهٔ سوییچر موبایل.
@@ -8,6 +9,50 @@ class MobileLauncherPrefs {
   static const defaultBackgroundArgb = 0xFF1565C0;
   static const int defaultGridColumns = 3;
   static const int defaultGridRows = 4;
+
+  /// برای به‌روزرسانی فوری UIهایی مثل [MobileLauncherBackScope] بعد از set/clear.
+  static final ValueNotifier<int> revision = ValueNotifier<int>(0);
+
+  static int? _cacheUserId;
+  static bool _cacheResumeEnabled = false;
+  static int? _cacheResumeBusinessId;
+
+  static void _bumpRevision() {
+    revision.value = revision.value + 1;
+  }
+
+  static void _setResumeCache({
+    required int? userId,
+    required bool enabled,
+    int? businessId,
+  }) {
+    final nextBiz = enabled ? businessId : null;
+    final changed = _cacheUserId != userId ||
+        _cacheResumeEnabled != enabled ||
+        _cacheResumeBusinessId != nextBiz;
+    _cacheUserId = userId;
+    _cacheResumeEnabled = enabled;
+    _cacheResumeBusinessId = nextBiz;
+    if (changed) _bumpRevision();
+  }
+
+  /// مسیر همزمان خانهٔ لانچر اگر resume برای همین کاربر/کسب‌وکار در کش فعال باشد.
+  static String? syncLauncherHomePath({
+    required int? userId,
+    required int businessId,
+  }) {
+    if (userId == null || userId <= 0) return null;
+    if (_cacheUserId != userId || !_cacheResumeEnabled) return null;
+    if (_cacheResumeBusinessId != businessId) return null;
+    return launcherHomePath(businessId);
+  }
+
+  /// وقتی userId در دسترس نیست؛ فقط با businessId از کش حافظه.
+  static String? syncLauncherHomePathForBusiness(int businessId) {
+    if (!_cacheResumeEnabled) return null;
+    if (_cacheResumeBusinessId != businessId) return null;
+    return launcherHomePath(businessId);
+  }
 
   static const _legacyResume = 'mobile_launcher_resume_enabled';
   static const _legacyBiz = 'mobile_launcher_business_id';
@@ -101,6 +146,7 @@ class MobileLauncherPrefs {
       await prefs.setInt(_gridRowsKey(userId), rows);
     }
     await _clearLegacy(prefs);
+    _setResumeCache(userId: userId, enabled: true, businessId: bid);
   }
 
   static Future<void> setResumeLauncher(int? userId, int businessId) async {
@@ -109,10 +155,12 @@ class MobileLauncherPrefs {
       await prefs.setBool(_resumeKey(userId), true);
       await prefs.setInt(_bizKey(userId), businessId);
       await _clearLegacy(prefs);
+      _setResumeCache(userId: userId, enabled: true, businessId: businessId);
       return;
     }
     await prefs.setBool(_legacyResume, true);
     await prefs.setInt(_legacyBiz, businessId);
+    _setResumeCache(userId: userId, enabled: true, businessId: businessId);
   }
 
   static Future<void> clearResumeLauncher(int? userId) async {
@@ -122,6 +170,7 @@ class MobileLauncherPrefs {
       await prefs.remove(_bizKey(userId));
     }
     await _clearLegacy(prefs);
+    _setResumeCache(userId: userId, enabled: false);
   }
 
   /// مسیر ثابت خانهٔ لانچر (شبکهٔ کاشی‌ها).
@@ -138,14 +187,28 @@ class MobileLauncherPrefs {
     await migrateLegacyIfNeeded(userId);
     final prefs = await SharedPreferences.getInstance();
     if (userId != null && userId > 0) {
-      if (prefs.getBool(_resumeKey(userId)) != true) return null;
+      if (prefs.getBool(_resumeKey(userId)) != true) {
+        _setResumeCache(userId: userId, enabled: false);
+        return null;
+      }
       final id = prefs.getInt(_bizKey(userId));
-      if (id == null || id <= 0) return null;
+      if (id == null || id <= 0) {
+        _setResumeCache(userId: userId, enabled: false);
+        return null;
+      }
+      _setResumeCache(userId: userId, enabled: true, businessId: id);
       return launcherHomePath(id);
     }
-    if (prefs.getBool(_legacyResume) != true) return null;
+    if (prefs.getBool(_legacyResume) != true) {
+      _setResumeCache(userId: userId, enabled: false);
+      return null;
+    }
     final id = prefs.getInt(_legacyBiz);
-    if (id == null || id <= 0) return null;
+    if (id == null || id <= 0) {
+      _setResumeCache(userId: userId, enabled: false);
+      return null;
+    }
+    _setResumeCache(userId: userId, enabled: true, businessId: id);
     return launcherHomePath(id);
   }
 
@@ -241,5 +304,6 @@ class MobileLauncherPrefs {
       await prefs.remove(_entryModeKey(userId));
     }
     await _clearLegacy(prefs);
+    _setResumeCache(userId: userId, enabled: false);
   }
 }

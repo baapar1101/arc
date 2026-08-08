@@ -366,6 +366,9 @@ class _BusinessesPageState extends State<BusinessesPage> {
     if (!mounted) return;
     await _recordAndEnter(businessId, () async {
       if (!mounted) return;
+      // یک فریم صبر تا bottom sheet / route قبلی کاملاً بسته شود (رفع race روی اندروید).
+      await Future<void>.delayed(Duration.zero);
+      if (!mounted) return;
       context.go(MobileLauncherPrefs.launcherHomePath(businessId));
     });
   }
@@ -373,7 +376,7 @@ class _BusinessesPageState extends State<BusinessesPage> {
   Future<void> _showEntryModeSheet(int businessId) async {
     final t = AppLocalizations.of(context);
 
-    await showModalBottomSheet<void>(
+    final mode = await showModalBottomSheet<MobileBusinessEntryMode>(
       context: context,
       showDragHandle: true,
       builder: (sheetCtx) {
@@ -403,28 +406,16 @@ class _BusinessesPageState extends State<BusinessesPage> {
                 ListTile(
                   leading: const Icon(Icons.dashboard_outlined),
                   title: Text(t.mobileLauncherModeStandard),
-                  onTap: () async {
-                    Navigator.of(sheetCtx).pop();
-                    await MobileLauncherPrefs.setPreferredEntryMode(
-                      _authStore.currentUserId,
-                      MobileBusinessEntryMode.standard,
-                    );
-                    if (!mounted) return;
-                    await _enterStandard(businessId);
-                  },
+                  onTap: () => Navigator.of(sheetCtx).pop(
+                    MobileBusinessEntryMode.standard,
+                  ),
                 ),
                 ListTile(
                   leading: const Icon(Icons.apps_outlined),
                   title: Text(t.mobileLauncherModeLauncher),
-                  onTap: () async {
-                    Navigator.of(sheetCtx).pop();
-                    await MobileLauncherPrefs.setPreferredEntryMode(
-                      _authStore.currentUserId,
-                      MobileBusinessEntryMode.launcher,
-                    );
-                    if (!mounted) return;
-                    await _enterLauncher(businessId);
-                  },
+                  onTap: () => Navigator.of(sheetCtx).pop(
+                    MobileBusinessEntryMode.launcher,
+                  ),
                 ),
               ],
             ),
@@ -432,6 +423,18 @@ class _BusinessesPageState extends State<BusinessesPage> {
         );
       },
     );
+
+    if (!mounted || mode == null) return;
+    await MobileLauncherPrefs.setPreferredEntryMode(
+      _authStore.currentUserId,
+      mode,
+    );
+    if (!mounted) return;
+    if (mode == MobileBusinessEntryMode.standard) {
+      await _enterStandard(businessId);
+    } else {
+      await _enterLauncher(businessId);
+    }
   }
 
   void _goNewBusiness() => context.go('/user/profile/new-business');

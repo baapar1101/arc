@@ -23,6 +23,7 @@ import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../utils/bulk_delete_feedback.dart';
 import '../../services/marketplace_service.dart';
+import '../../widgets/business_subpage_back_leading.dart';
 
 class PersonsPage extends StatefulWidget {
   final int businessId;
@@ -243,9 +244,7 @@ class _PersonsPageState extends State<PersonsPage> {
       showBackButton: true,
       onBack: () {
         if (!mounted) return;
-        if (context.canPop()) {
-          context.pop();
-        }
+        popBusinessOrLauncher(context, widget.businessId);
       },
       showTableIcon: false,
       showRowNumbers: true,

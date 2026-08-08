@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:background_downloader/background_downloader.dart';
 import 'package:flutter/foundation.dart';
@@ -20,6 +21,11 @@ class AndroidApkDownloadCoordinator {
   final _states = StreamController<AndroidApkDownloadSession>.broadcast();
   Stream<AndroidApkDownloadSession> get sessions => _states.stream;
 
+  final _installPromptRequests = StreamController<void>.broadcast();
+  /// Fired when the user taps the completed-download notification (or UI
+  /// explicitly asks to re-show the install prompt).
+  Stream<void> get installPromptRequests => _installPromptRequests.stream;
+
   AndroidApkDownloadSession _current = const AndroidApkDownloadSession.idle();
   AndroidApkDownloadSession get current => _current;
 
@@ -29,11 +35,31 @@ class AndroidApkDownloadCoordinator {
   AndroidRemoteRelease? _activeRelease;
   bool _initialized = false;
 
+  /// While > 0, auto install prompts are suppressed so a foreground sheet can
+  /// own the completed path without racing the gate.
+  int _foregroundInstallFlowDepth = 0;
+
+  bool get isForegroundInstallFlowActive => _foregroundInstallFlowDepth > 0;
+
+  void beginForegroundInstallFlow() {
+    _foregroundInstallFlowDepth++;
+  }
+
+  void endForegroundInstallFlow() {
+    if (_foregroundInstallFlowDepth > 0) {
+      _foregroundInstallFlowDepth--;
+    }
+  }
+
   Future<void> initialize() async {
     if (_initialized) return;
     _initialized = true;
 
     await FileDownloader().start();
+    FileDownloader().registerCallbacks(
+      group: apkUpdateGroup,
+      taskNotificationTapCallback: _onNotificationTap,
+    );
     _updatesSub ??= FileDownloader().updates.listen(
       _onTaskUpdate,
       onError: (Object e, StackTrace st) {
@@ -42,6 +68,22 @@ class AndroidApkDownloadCoordinator {
     );
 
     await _recoverActiveSession();
+  }
+
+  void requestInstallPrompt() {
+    if (!_installPromptRequests.isClosed) {
+      _installPromptRequests.add(null);
+    }
+  }
+
+  void _onNotificationTap(Task task, NotificationType notificationType) {
+    if (task.group != apkUpdateGroup) return;
+    if (notificationType != NotificationType.complete) return;
+    debugPrint(
+      'AndroidApkDownloadCoordinator: complete notification tapped '
+      '(task=${task.taskId})',
+    );
+    requestInstallPrompt();
   }
 
   void configureNotifications({
@@ -64,6 +106,9 @@ class AndroidApkDownloadCoordinator {
       paused: TaskNotification(pausedTitle, pausedBody),
       canceled: TaskNotification(canceledTitle, canceledBody),
       progressBar: true,
+      // applicationDocuments cannot be opened via tapOpensFile; we handle taps
+      // ourselves and launch the package installer through MethodChannel.
+      tapOpensFile: false,
     );
   }
 
@@ -74,9 +119,11 @@ class AndroidApkDownloadCoordinator {
   }) async {
     await initialize();
     await cancelDownload();
+    await AndroidUpdatePrefs.clearReadyInstall();
 
     final safeName = _safeFilename(release.apk.name);
-    final taskId = 'hesabix_apk_${release.tagName.replaceAll(RegExp(r'[^\w.\-]+'), '_')}';
+    final taskId =
+        'hesabix_apk_${release.tagName.replaceAll(RegExp(r'[^\w.\-]+'), '_')}';
 
     final task = DownloadTask(
       taskId: taskId,
@@ -105,7 +152,10 @@ class AndroidApkDownloadCoordinator {
       AndroidApkDownloadSession(
         phase: AndroidApkDownloadPhase.downloading,
         release: release,
-        progress: AndroidUpdateDownloadProgress(received: 0, total: release.apk.size),
+        progress: AndroidUpdateDownloadProgress(
+          received: 0,
+          total: release.apk.size,
+        ),
       ),
     );
 
@@ -170,82 +220,177 @@ class AndroidApkDownloadCoordinator {
     }
 
     await AndroidUpdatePrefs.clearPendingDownload();
-    _completeActive(AndroidApkDownloadSession(
-      phase: AndroidApkDownloadPhase.cancelled,
-      release: _activeRelease,
-    ));
+    await AndroidUpdatePrefs.clearReadyInstall();
+    _completeActive(
+      AndroidApkDownloadSession(
+        phase: AndroidApkDownloadPhase.cancelled,
+        release: _activeRelease,
+      ),
+    );
   }
 
-  Future<AndroidApkDownloadSession?> consumeCompletedInstall() async {
+  /// Returns the completed session without clearing it.
+  AndroidApkDownloadSession? peekCompletedInstall() {
     final session = _current;
     if (session.phase == AndroidApkDownloadPhase.complete &&
         session.filePath != null) {
-      _emit(const AndroidApkDownloadSession.idle());
       return session;
     }
     return null;
+  }
+
+  /// Clears a completed install session after install was launched or discarded.
+  Future<void> clearCompletedInstall() async {
+    await AndroidUpdatePrefs.clearReadyInstall();
+    if (_current.phase == AndroidApkDownloadPhase.complete) {
+      _activeTask = null;
+      _activeRelease = null;
+      _emit(const AndroidApkDownloadSession.idle());
+    }
+  }
+
+  /// Prefer in-memory complete session; otherwise restore from prefs / DB.
+  Future<AndroidApkDownloadSession?> resolveCompletedInstall() async {
+    final current = peekCompletedInstall();
+    if (current != null) {
+      final path = current.filePath;
+      if (path != null && await File(path).exists()) {
+        return current;
+      }
+    }
+
+    final readyPath = await AndroidUpdatePrefs.getReadyInstallPath();
+    final readyTag = await AndroidUpdatePrefs.getReadyInstallTag();
+    if (readyPath != null && await File(readyPath).exists()) {
+      final session = AndroidApkDownloadSession(
+        phase: AndroidApkDownloadPhase.complete,
+        release: _activeRelease ??
+            (readyTag != null
+                ? AndroidRemoteRelease(
+                    tagName: readyTag,
+                    version: AndroidAppVersion.tryParse(readyTag) ??
+                        AndroidAppVersion(0, 0, 0),
+                    name: readyTag,
+                    body: '',
+                    draft: false,
+                    prerelease: false,
+                    publishedAt: null,
+                    apk: AndroidReleaseAsset(
+                      name: readyPath.split(Platform.pathSeparator).last,
+                      size: await File(readyPath).length(),
+                      downloadUrl: '',
+                    ),
+                  )
+                : null),
+        filePath: readyPath,
+      );
+      _emit(session);
+      return session;
+    }
+
+    await _recoverActiveSession();
+    return peekCompletedInstall();
   }
 
   Future<void> _recoverActiveSession() async {
     final records = await FileDownloader().database.allRecords(
       group: apkUpdateGroup,
     );
-    if (records.isEmpty) {
-      await AndroidUpdatePrefs.clearPendingDownload();
+
+    if (records.isNotEmpty) {
+      records.sort(
+        (a, b) => b.task.creationTime.compareTo(a.task.creationTime),
+      );
+      final record = records.first;
+      final task = record.task;
+
+      switch (record.status) {
+        case TaskStatus.complete:
+          final path = await task.filePath();
+          if (await File(path).exists()) {
+            _activeTask = task as DownloadTask?;
+            final release = _releaseFromTask(task);
+            await AndroidUpdatePrefs.setReadyInstall(
+              filePath: path,
+              releaseTag: release?.tagName ?? task.metaData,
+            );
+            _emit(
+              AndroidApkDownloadSession(
+                phase: AndroidApkDownloadPhase.complete,
+                release: release,
+                filePath: path,
+                progress: AndroidUpdateDownloadProgress(
+                  received: record.expectedFileSize,
+                  total: record.expectedFileSize,
+                ),
+              ),
+            );
+            return;
+          }
+        case TaskStatus.running:
+        case TaskStatus.enqueued:
+        case TaskStatus.paused:
+          _activeTask = task as DownloadTask?;
+          _emit(
+            AndroidApkDownloadSession(
+              phase: record.status == TaskStatus.paused
+                  ? AndroidApkDownloadPhase.paused
+                  : AndroidApkDownloadPhase.downloading,
+              release: _releaseFromTask(task),
+              progress: AndroidUpdateDownloadProgress(
+                received: (record.progress * record.expectedFileSize).round(),
+                total: record.expectedFileSize,
+              ),
+            ),
+          );
+          return;
+        default:
+          break;
+      }
+    }
+
+    final readyPath = await AndroidUpdatePrefs.getReadyInstallPath();
+    if (readyPath != null && await File(readyPath).exists()) {
+      final readyTag = await AndroidUpdatePrefs.getReadyInstallTag();
+      _emit(
+        AndroidApkDownloadSession(
+          phase: AndroidApkDownloadPhase.complete,
+          release: readyTag == null
+              ? null
+              : AndroidRemoteRelease(
+                  tagName: readyTag,
+                  version: AndroidAppVersion.tryParse(readyTag) ??
+                      AndroidAppVersion(0, 0, 0),
+                  name: readyTag,
+                  body: '',
+                  draft: false,
+                  prerelease: false,
+                  publishedAt: null,
+                  apk: AndroidReleaseAsset(
+                    name: readyPath.split(Platform.pathSeparator).last,
+                    size: await File(readyPath).length(),
+                    downloadUrl: '',
+                  ),
+                ),
+          filePath: readyPath,
+        ),
+      );
       return;
     }
 
-    records.sort((a, b) => b.task.creationTime.compareTo(a.task.creationTime));
-    final record = records.first;
-    final task = record.task;
-
-    switch (record.status) {
-      case TaskStatus.complete:
-        final path = await task.filePath();
-        _activeTask = task as DownloadTask?;
-        _emit(
-          AndroidApkDownloadSession(
-            phase: AndroidApkDownloadPhase.complete,
-            release: _releaseFromTask(task),
-            filePath: path,
-            progress: AndroidUpdateDownloadProgress(
-              received: record.expectedFileSize,
-              total: record.expectedFileSize,
-            ),
-          ),
-        );
-        return;
-      case TaskStatus.running:
-      case TaskStatus.enqueued:
-      case TaskStatus.paused:
-        _activeTask = task as DownloadTask?;
-        _emit(
-          AndroidApkDownloadSession(
-            phase: record.status == TaskStatus.paused
-                ? AndroidApkDownloadPhase.paused
-                : AndroidApkDownloadPhase.downloading,
-            release: _releaseFromTask(task),
-            progress: AndroidUpdateDownloadProgress(
-              received: (record.progress * record.expectedFileSize).round(),
-              total: record.expectedFileSize,
-            ),
-          ),
-        );
-        return;
-      default:
-        await AndroidUpdatePrefs.clearPendingDownload();
-        _emit(const AndroidApkDownloadSession.idle());
+    await AndroidUpdatePrefs.clearPendingDownload();
+    if (_current.phase != AndroidApkDownloadPhase.complete) {
+      _emit(const AndroidApkDownloadSession.idle());
     }
   }
 
   AndroidRemoteRelease? _releaseFromTask(Task task) {
     final tag = task.metaData;
     if (tag.isEmpty) return _activeRelease;
-        return _activeRelease ??
+    return _activeRelease ??
         AndroidRemoteRelease(
           tagName: tag,
-          version: AndroidAppVersion.tryParse(tag) ??
-              AndroidAppVersion(0, 0, 0),
+          version: AndroidAppVersion.tryParse(tag) ?? AndroidAppVersion(0, 0, 0),
           name: task.displayName,
           body: '',
           draft: false,
@@ -317,9 +462,21 @@ class AndroidApkDownloadCoordinator {
       case TaskStatus.complete:
         final path = await task.filePath();
         await AndroidUpdatePrefs.clearPendingDownload();
+        final release = _activeRelease ?? _releaseFromTask(task);
+        if (release != null) {
+          await AndroidUpdatePrefs.setReadyInstall(
+            filePath: path,
+            releaseTag: release.tagName,
+          );
+        } else {
+          await AndroidUpdatePrefs.setReadyInstall(
+            filePath: path,
+            releaseTag: task.metaData,
+          );
+        }
         final session = AndroidApkDownloadSession(
           phase: AndroidApkDownloadPhase.complete,
-          release: _activeRelease ?? _releaseFromTask(task),
+          release: release,
           filePath: path,
           progress: AndroidUpdateDownloadProgress(
             received: _current.progress?.total ?? 0,
@@ -330,6 +487,7 @@ class AndroidApkDownloadCoordinator {
         return;
       case TaskStatus.canceled:
         await AndroidUpdatePrefs.clearPendingDownload();
+        await AndroidUpdatePrefs.clearReadyInstall();
         _completeActive(
           AndroidApkDownloadSession(
             phase: AndroidApkDownloadPhase.cancelled,
@@ -341,6 +499,7 @@ class AndroidApkDownloadCoordinator {
       case TaskStatus.failed:
       case TaskStatus.notFound:
         await AndroidUpdatePrefs.clearPendingDownload();
+        await AndroidUpdatePrefs.clearReadyInstall();
         _completeActive(
           AndroidApkDownloadSession(
             phase: AndroidApkDownloadPhase.failed,
@@ -391,5 +550,6 @@ class AndroidApkDownloadCoordinator {
   Future<void> dispose() async {
     await _updatesSub?.cancel();
     await _states.close();
+    await _installPromptRequests.close();
   }
 }

@@ -20,4 +20,13 @@ class BiometricLockScope extends InheritedNotifier<BiometricLockController> {
         .dependOnInheritedWidgetOfExactType<BiometricLockScope>()
         ?.notifier;
   }
+
+  /// Non-listening lookup safe to call outside [build].
+  static BiometricLockController? maybeRead(BuildContext context) {
+    final element =
+        context.getElementForInheritedWidgetOfExactType<BiometricLockScope>();
+    final widget = element?.widget;
+    if (widget is! BiometricLockScope) return null;
+    return widget.notifier;
+  }
 }

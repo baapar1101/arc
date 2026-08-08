@@ -61,20 +61,48 @@ class _MobileLauncherShellState extends State<MobileLauncherShell> {
     }
   }
 
+  void _leaveLauncherShell() {
+    final rootNav = Navigator.of(context, rootNavigator: true);
+    if (rootNav.canPop()) {
+      rootNav.pop();
+      return;
+    }
+    final router = GoRouter.of(context);
+    if (router.canPop()) {
+      router.pop();
+      return;
+    }
+    router.go('/user/profile/businesses');
+  }
+
+  Widget _guardBack(Widget child) {
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+        if (!context.mounted) return;
+        _leaveLauncherShell();
+      },
+      child: child,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<_MobileLauncherBootstrap>(
       future: _bootstrap,
       builder: (context, snap) {
         if (snap.connectionState != ConnectionState.done) {
-          return const Scaffold(
-            body: Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  CircularProgressIndicator(),
-                  SizedBox(height: 16),
-                ],
+          return _guardBack(
+            const Scaffold(
+              body: Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    CircularProgressIndicator(),
+                    SizedBox(height: 16),
+                  ],
+                ),
               ),
             ),
           );
@@ -95,42 +123,50 @@ class _MobileLauncherShellState extends State<MobileLauncherShell> {
             );
             router.go('/user/profile/businesses');
           });
-          return const Scaffold(body: SizedBox.shrink());
+          return _guardBack(const Scaffold(body: SizedBox.shrink()));
         }
         final loadErr = r.loadError;
         if (loadErr != null) {
           final t = AppLocalizations.of(context);
           final msg = ErrorExtractor.extractErrorMessage(loadErr, t);
-          return Scaffold(
-            body: Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.cloud_off_outlined,
-                      size: 48,
-                      color: Theme.of(context).colorScheme.error,
-                    ),
-                    const SizedBox(height: 16),
-                    Text(msg, textAlign: TextAlign.center),
-                    const SizedBox(height: 20),
-                    FilledButton.tonalIcon(
-                      onPressed: () {
-                        setState(() {
-                          _bootstrap = _runBootstrap();
-                        });
-                      },
-                      icon: const Icon(Icons.refresh_rounded),
-                      label: Text(t.retry),
-                    ),
-                  ],
+          return _guardBack(
+            Scaffold(
+              body: Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.cloud_off_outlined,
+                        size: 48,
+                        color: Theme.of(context).colorScheme.error,
+                      ),
+                      const SizedBox(height: 16),
+                      Text(msg, textAlign: TextAlign.center),
+                      const SizedBox(height: 20),
+                      FilledButton.tonalIcon(
+                        onPressed: () {
+                          setState(() {
+                            _bootstrap = _runBootstrap();
+                          });
+                        },
+                        icon: const Icon(Icons.refresh_rounded),
+                        label: Text(t.retry),
+                      ),
+                      const SizedBox(height: 12),
+                      TextButton(
+                        onPressed: _leaveLauncherShell,
+                        child: Text(t.mobileLauncherBackToAccount),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
           );
         }
+        // خانهٔ لانچر خودش PopScope دارد؛ اینجا child را بدون قفل اضافه پاس می‌دهیم.
         return widget.child;
       },
     );

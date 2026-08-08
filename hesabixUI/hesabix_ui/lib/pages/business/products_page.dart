@@ -39,6 +39,7 @@ import 'price_lists_page.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../utils/bulk_delete_feedback.dart';
 import '../../utils/responsive_helper.dart';
+import '../../widgets/business_subpage_back_leading.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/general_barcode_utils.dart';
 import '../../core/date_utils.dart';
@@ -1573,9 +1574,7 @@ class _ProductsPageState extends State<ProductsPage> {
           showBackButton: true,
           onBack: () {
             if (!mounted) return;
-            if (context.canPop()) {
-              context.pop();
-            }
+            popBusinessOrLauncher(context, widget.businessId);
           },
           showTableIcon: false,
           showRowNumbers: true,

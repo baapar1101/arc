@@ -5,12 +5,14 @@ import 'package:hesabix_ui/l10n/app_localizations.dart';
 
 import '../../core/android_update_platform.dart';
 import '../../core/android_update_prefs.dart';
+import '../../main.dart' show navigatorKey;
 import '../../services/android_update/android_apk_download_coordinator.dart';
 import '../../services/android_update/android_update_bootstrap.dart';
 import '../../services/android_update/android_update_models.dart';
 import '../../services/android_update/android_update_service.dart';
 import '../../services/android_update/android_update_version.dart';
 import '../../utils/snackbar_helper.dart';
+import '../biometric/biometric_lock_scope.dart';
 import 'android_update_download_sheet.dart';
 
 /// Runs a single automatic update check after the app shell is ready (Android only).
@@ -26,7 +28,9 @@ class AndroidUpdateGate extends StatefulWidget {
 class _AndroidUpdateGateState extends State<AndroidUpdateGate>
     with WidgetsBindingObserver {
   bool _scheduled = false;
+  bool _installPromptOpen = false;
   StreamSubscription<AndroidApkDownloadSession>? _downloadSub;
+  StreamSubscription<void>? _installPromptSub;
 
   @override
   void initState() {
@@ -41,13 +45,14 @@ class _AndroidUpdateGateState extends State<AndroidUpdateGate>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _downloadSub?.cancel();
+    _installPromptSub?.cancel();
     super.dispose();
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      unawaited(_promptInstallIfReady());
+      unawaited(_promptInstallIfReady(force: false));
     }
   }
 
@@ -56,60 +61,99 @@ class _AndroidUpdateGateState extends State<AndroidUpdateGate>
     _downloadSub ??=
         AndroidApkDownloadCoordinator.instance.sessions.listen((session) {
       if (session.phase == AndroidApkDownloadPhase.complete) {
-        unawaited(_promptInstallIfReady());
+        unawaited(_promptInstallIfReady(force: false));
       }
     });
+    _installPromptSub ??= AndroidApkDownloadCoordinator
+        .instance.installPromptRequests
+        .listen((_) {
+      unawaited(_promptInstallIfReady(force: true));
+    });
     _schedule();
-    await _promptInstallIfReady();
+    await _promptInstallIfReady(force: false);
   }
 
   void _schedule() {
     if (_scheduled || !mounted) return;
     _scheduled = true;
     Future<void>.delayed(const Duration(seconds: 3), () async {
-      if (!mounted) return;
-      await AndroidUpdateFlow.runStartupCheck(context);
+      final ctx = _dialogContext;
+      if (ctx == null || !ctx.mounted) return;
+      await AndroidUpdateFlow.runStartupCheck(ctx);
     });
   }
 
-  Future<void> _promptInstallIfReady() async {
-    if (!mounted) return;
-    final session =
-        await AndroidApkDownloadCoordinator.instance.consumeCompletedInstall();
-    if (session == null || !mounted) return;
+  /// Prefer the navigator context — this gate sits above the Navigator in
+  /// MaterialApp.builder, so [context] alone cannot show dialogs.
+  BuildContext? get _dialogContext =>
+      navigatorKey.currentContext ?? (mounted ? context : null);
+
+  Future<void> _promptInstallIfReady({required bool force}) async {
+    if (_installPromptOpen) return;
+
+    final coordinator = AndroidApkDownloadCoordinator.instance;
+    if (!force && coordinator.isForegroundInstallFlowActive) {
+      return;
+    }
+
+    final session = await coordinator.resolveCompletedInstall();
+    if (session == null) return;
+
     final path = session.filePath;
     final release = session.release;
-    if (path == null || release == null) return;
+    if (path == null) return;
 
-    final t = AppLocalizations.of(context);
-    final install = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        icon: Icon(
-          Icons.download_done_rounded,
-          color: Theme.of(ctx).colorScheme.primary,
-          size: 36,
-        ),
-        title: Text(t.androidUpdateDownloadCompleteTitle),
-        content: Text(
-          t.androidUpdateDownloadCompleteMessage(release.version.toString()),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: Text(t.androidUpdateLater),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: Text(t.androidUpdateInstallNow),
-          ),
-        ],
-      ),
-    );
+    final dialogContext = _dialogContext;
+    if (dialogContext == null || !dialogContext.mounted) return;
 
-    if (!mounted) return;
-    if (install == true) {
-      await AndroidUpdateFlow.installDownloadedApk(context, path);
+    _installPromptOpen = true;
+    try {
+      final t = AppLocalizations.of(dialogContext);
+      final versionLabel = release?.version.toString() ??
+          (await AndroidUpdatePrefs.getReadyInstallTag()) ??
+          '—';
+
+      final promptContext = _dialogContext;
+      if (promptContext == null || !promptContext.mounted) return;
+
+      final install = await showDialog<bool>(
+        context: promptContext,
+        useRootNavigator: true,
+        builder: (ctx) => AlertDialog(
+          icon: Icon(
+            Icons.download_done_rounded,
+            color: Theme.of(ctx).colorScheme.primary,
+            size: 36,
+          ),
+          title: Text(t.androidUpdateDownloadCompleteTitle),
+          content: Text(
+            t.androidUpdateDownloadCompleteMessage(versionLabel),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: Text(t.androidUpdateLater),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: Text(t.androidUpdateInstallNow),
+            ),
+          ],
+        ),
+      );
+
+      final installContext = _dialogContext;
+      if (install == true &&
+          installContext != null &&
+          installContext.mounted) {
+        await AndroidUpdateFlow.installDownloadedApk(installContext, path);
+      }
+      // "Later" keeps the completed session / prefs so notification tap or
+      // resume can offer install again.
+    } catch (e, st) {
+      debugPrint('AndroidUpdateGate install prompt failed: $e\n$st');
+    } finally {
+      _installPromptOpen = false;
     }
   }
 
@@ -128,6 +172,11 @@ class AndroidUpdateFlow {
   static Future<void> runStartupCheck(BuildContext context) async {
     if (!supportsAndroidApkUpdate) return;
     if (!await AndroidUpdatePrefs.isAutoCheckEnabled()) return;
+
+    // If an APK is already ready, prefer install over another download prompt.
+    final ready =
+        await AndroidApkDownloadCoordinator.instance.resolveCompletedInstall();
+    if (ready?.filePath != null) return;
 
     final result = await _service.checkForUpdate();
     if (!context.mounted || !result.hasUpdate || result.remote == null) return;
@@ -177,6 +226,7 @@ class AndroidUpdateFlow {
     final action = await showDialog<bool>(
       context: context,
       barrierDismissible: false,
+      useRootNavigator: true,
       builder: (ctx) {
         return AlertDialog(
           icon: Icon(
@@ -270,60 +320,69 @@ class AndroidUpdateFlow {
     AndroidRemoteRelease remote,
   ) async {
     final t = AppLocalizations.of(context);
+    final coordinator = AndroidApkDownloadCoordinator.instance;
     await ensureAndroidApkDownloadPermissions();
     if (!context.mounted) return;
     configureAndroidApkDownloadNotifications(t);
 
-    final sheetResult = await showAndroidUpdateDownloadSheet(
-      context: context,
-      release: remote,
-      startDownload: ({
-        void Function(AndroidUpdateDownloadProgress progress)? onProgress,
-        bool Function()? isCancelled,
-      }) {
-        return _service.downloadApk(
-          remote,
-          onProgress: onProgress,
-          isCancelled: isCancelled,
-        );
-      },
-    );
+    coordinator.beginForegroundInstallFlow();
+    try {
+      final sheetResult = await showAndroidUpdateDownloadSheet(
+        context: context,
+        release: remote,
+        startDownload: ({
+          void Function(AndroidUpdateDownloadProgress progress)? onProgress,
+          bool Function()? isCancelled,
+        }) {
+          return _service.downloadApk(
+            remote,
+            onProgress: onProgress,
+            isCancelled: isCancelled,
+          );
+        },
+      );
 
-    switch (sheetResult) {
-      case AndroidUpdateDownloadSheetResult.background:
-        if (context.mounted) {
+      if (!context.mounted) return;
+
+      switch (sheetResult.outcome) {
+        case AndroidUpdateDownloadSheetOutcome.background:
           SnackBarHelper.show(
             context,
             message: t.androidUpdateDownloadingBackgroundHint,
           );
-        }
-        return;
-      case AndroidUpdateDownloadSheetResult.cancelled:
-        if (context.mounted) {
+          return;
+        case AndroidUpdateDownloadSheetOutcome.cancelled:
           SnackBarHelper.show(
             context,
             message: t.androidUpdateDownloadCancelled,
           );
-        }
-        return;
-      case AndroidUpdateDownloadSheetResult.failed:
-        if (context.mounted) {
+          return;
+        case AndroidUpdateDownloadSheetOutcome.failed:
           SnackBarHelper.showError(
             context,
             message: t.androidUpdateDownloadFailed(
-              AndroidApkDownloadCoordinator.instance.current.errorMessage ??
+              sheetResult.errorMessage ??
+                  coordinator.current.errorMessage ??
                   'unknown',
             ),
           );
-        }
-        return;
-      case AndroidUpdateDownloadSheetResult.completed:
-        final session = AndroidApkDownloadCoordinator.instance.current;
-        final path = session.filePath;
-        if (path == null) return;
-        await AndroidUpdatePrefs.clearSkippedVersion();
-        if (!context.mounted) return;
-        await installDownloadedApk(context, path);
+          return;
+        case AndroidUpdateDownloadSheetOutcome.completed:
+          final path = sheetResult.filePath ??
+              coordinator.peekCompletedInstall()?.filePath ??
+              (await coordinator.resolveCompletedInstall())?.filePath;
+          if (path == null || path.isEmpty) {
+            debugPrint(
+              'AndroidUpdateFlow: download completed but APK path is missing',
+            );
+            return;
+          }
+          await AndroidUpdatePrefs.clearSkippedVersion();
+          if (!context.mounted) return;
+          await installDownloadedApk(context, path);
+      }
+    } finally {
+      coordinator.endForegroundInstallFlow();
     }
   }
 
@@ -345,6 +404,7 @@ class AndroidUpdateFlow {
         if (!context.mounted) return;
         final openSettings = await showDialog<bool>(
           context: context,
+          useRootNavigator: true,
           builder: (ctx) => AlertDialog(
             title: Text(t.androidUpdatePermissionTitle),
             content: Text(t.androidUpdatePermissionMessage),
@@ -372,7 +432,14 @@ class AndroidUpdateFlow {
         return;
       }
 
+      // Opening the system installer backgrounds the app; avoid an immediate
+      // biometric re-lock that would hide follow-up UI if install is cancelled.
+      if (context.mounted) {
+        BiometricLockScope.maybeRead(context)?.suppressNextLock();
+      }
+
       await _service.installApk(path);
+      await AndroidApkDownloadCoordinator.instance.clearCompletedInstall();
       if (context.mounted) {
         SnackBarHelper.show(context, message: t.androidUpdateInstallStarted);
       }

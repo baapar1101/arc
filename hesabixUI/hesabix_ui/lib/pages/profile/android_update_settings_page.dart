@@ -129,6 +129,17 @@ class _AndroidUpdateSettingsPageState extends State<AndroidUpdateSettingsPage> {
     }
   }
 
+  Future<void> _installReadyApk() async {
+    final path = _downloadSession.filePath;
+    if (path == null || _busy) return;
+    setState(() => _busy = true);
+    try {
+      await AndroidUpdateFlow.installDownloadedApk(context, path);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
   Future<void> _openPermissionSettings() async {
     await AndroidUpdateFlow.service.openInstallPermissionSettings();
   }
@@ -287,6 +298,11 @@ class _AndroidUpdateSettingsPageState extends State<AndroidUpdateSettingsPage> {
                   const SizedBox(height: 12),
                   _buildActiveDownloadCard(theme, t),
                 ],
+                if (_downloadSession.phase == AndroidApkDownloadPhase.complete &&
+                    _downloadSession.filePath != null) ...[
+                  const SizedBox(height: 12),
+                  _buildReadyInstallCard(theme, t),
+                ],
                 const SizedBox(height: 12),
                 Card(
                   child: Column(
@@ -364,6 +380,58 @@ class _AndroidUpdateSettingsPageState extends State<AndroidUpdateSettingsPage> {
                 ),
               ],
             ),
+    );
+  }
+
+  Widget _buildReadyInstallCard(ThemeData theme, AppLocalizations t) {
+    final version =
+        _downloadSession.release?.version.toString() ?? '—';
+
+    return Card(
+      color: theme.colorScheme.primaryContainer.withValues(alpha: 0.35),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  Icons.download_done_rounded,
+                  color: theme.colorScheme.primary,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    t.androidUpdateDownloadCompleteTitle,
+                    style: theme.textTheme.titleSmall,
+                  ),
+                ),
+                Text(
+                  version,
+                  style: theme.textTheme.labelLarge?.copyWith(
+                    color: theme.colorScheme.primary,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              t.androidUpdateDownloadCompleteMessage(version),
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+                height: 1.4,
+              ),
+            ),
+            const SizedBox(height: 12),
+            FilledButton.icon(
+              onPressed: _busy ? null : _installReadyApk,
+              icon: const Icon(Icons.install_mobile),
+              label: Text(t.androidUpdateInstallNow),
+            ),
+          ],
+        ),
+      ),
     );
   }
 

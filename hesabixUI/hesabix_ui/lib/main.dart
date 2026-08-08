@@ -208,6 +208,7 @@ import 'theme/theme_controller.dart';
 import 'theme/app_theme.dart';
 import 'core/auth_store.dart';
 import 'core/mobile_launcher_prefs.dart';
+import 'core/mobile_launcher_nav.dart';
 import 'core/biometric_lock_controller.dart';
 import 'core/biometric_platform.dart';
 import 'core/android_update_platform.dart';
@@ -2138,13 +2139,17 @@ class _MyAppState extends State<MyApp> {
             StatefulShellRoute.indexedStack(
               builder: (context, state, navigationShell) {
                 final businessId = int.parse(state.pathParameters['business_id']!);
-                return BusinessShell(
+                return MobileLauncherBackScope(
                   businessId: businessId,
                   authStore: _authStore!,
-                  localeController: controller,
-                  calendarController: _calendarController!,
-                  themeController: themeController,
-                  child: navigationShell,
+                  child: BusinessShell(
+                    businessId: businessId,
+                    authStore: _authStore!,
+                    localeController: controller,
+                    calendarController: _calendarController!,
+                    themeController: themeController,
+                    child: navigationShell,
+                  ),
                 );
               },
               branches: [

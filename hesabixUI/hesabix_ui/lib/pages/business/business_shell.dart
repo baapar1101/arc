@@ -8,6 +8,7 @@ import '../../core/business_route_paths.dart';
 import '../../core/business_panel_ui_store.dart';
 import '../../core/locale_controller.dart';
 import '../../core/calendar_controller.dart';
+import '../../core/mobile_launcher_nav.dart';
 import '../../theme/theme_controller.dart';
 import '../../widgets/combined_user_menu_button.dart';
 import '../../widgets/fx/daily_fx_rates_toolbar_chip.dart';
@@ -2430,6 +2431,8 @@ class _BusinessShellState extends State<BusinessShell> {
     final Color appBarBg = shellColors.topBarBackground;
     final Color appBarFg = shellColors.topBarForeground;
 
+    final launcherHomePath = MobileLauncherBackInfo.maybeHomeOf(context);
+
     final appBar = AppBar(
       toolbarHeight: _kBizAppBarToolbarHeight,
       elevation: 0,
@@ -2439,7 +2442,7 @@ class _BusinessShellState extends State<BusinessShell> {
       foregroundColor: appBarFg,
       iconTheme: IconThemeData(color: appBarFg, size: 21),
       actionsIconTheme: IconThemeData(color: appBarFg, size: 21),
-      automaticallyImplyLeading: !useRail,
+      automaticallyImplyLeading: !useRail && launcherHomePath == null,
       titleSpacing: 0,
       title: Row(
         children: [
@@ -2474,19 +2477,43 @@ class _BusinessShellState extends State<BusinessShell> {
       ),
       leading: useRail
           ? null
-          : Builder(
-              builder: (ctx) => IconButton(
-                visualDensity: VisualDensity.compact,
-                style: IconButton.styleFrom(
-                  minimumSize: const Size(40, 40),
-                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          : launcherHomePath != null
+              ? IconButton(
+                  visualDensity: VisualDensity.compact,
+                  style: IconButton.styleFrom(
+                    minimumSize: const Size(40, 40),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  icon: Icon(Icons.arrow_back, color: appBarFg, size: 21),
+                  tooltip: MaterialLocalizations.of(context).backButtonTooltip,
+                  onPressed: () => context.go(launcherHomePath),
+                )
+              : Builder(
+                  builder: (ctx) => IconButton(
+                    visualDensity: VisualDensity.compact,
+                    style: IconButton.styleFrom(
+                      minimumSize: const Size(40, 40),
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    icon: BusinessShellMenuGlyph(color: appBarFg, size: 21, sidebarOpen: false),
+                    onPressed: () => Scaffold.of(ctx).openDrawer(),
+                    tooltip: t.menu,
+                  ),
                 ),
-                icon: BusinessShellMenuGlyph(color: appBarFg, size: 21, sidebarOpen: false),
-                onPressed: () => Scaffold.of(ctx).openDrawer(),
-                tooltip: t.menu,
-              ),
-      ),
       actions: [
+        if (!useRail && launcherHomePath != null)
+          Builder(
+            builder: (ctx) => IconButton(
+              visualDensity: VisualDensity.compact,
+              style: IconButton.styleFrom(
+                minimumSize: const Size(38, 38),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+              icon: BusinessShellMenuGlyph(color: appBarFg, size: 21, sidebarOpen: false),
+              onPressed: () => Scaffold.of(ctx).openDrawer(),
+              tooltip: t.menu,
+            ),
+          ),
         DailyFxRatesToolbarChip(
           businessId: widget.businessId,
           authStore: widget.authStore,
