@@ -815,6 +815,21 @@
       }
     }
   },
+  "businessesHubClearSearch": "Clear search",
+  "businessesHubActiveBadge": "Current",
+  "businessesHubCount": "{count} businesses",
+  "@businessesHubCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "businessesHubSortTooltip": "Sort",
+  "businessesHubSortRecent": "Recently used",
+  "businessesHubSortName": "Name",
+  "businessesHubSortCreated": "Newest",
+  "businessesHubOpenSettings": "Settings",
   "businessesHubEmptyTitle": "No businesses yet",
   "businessesHubEmptySubtitle": "Create your first business to start cloud accounting.",
   "businessesHubImportLegacy": "Import from legacy version",
@@ -874,6 +889,7 @@
   "businessesHubSearchShortcut": "Press / to search",
   "businessesSwitcherContinue": "Continue",
   "businessesSwitcherSubtitle": "Select a workspace to continue",
+  "mobileLauncherChooseModeHint": "This choice is saved. Long-press a business to change it later.",
   "accessDenied": "Access denied",
   "basicTools": "Basic Tools",
   "businessSettings": "Business Settings",

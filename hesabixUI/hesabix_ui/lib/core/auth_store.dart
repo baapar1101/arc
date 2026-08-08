@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 import 'api_client.dart';
 import 'business_panel_ui_store.dart';
+import 'business_switcher_prefs.dart';
 import 'mobile_launcher_prefs.dart';
 import 'biometric_lock_prefs.dart';
 import '../models/business_dashboard_models.dart';
@@ -256,6 +257,7 @@ class AuthStore with ChangeNotifier {
       }
       final uid = _currentUserId;
       await MobileLauncherPrefs.clearSession(userId: uid);
+      await BusinessSwitcherPrefs.clearSession(userId: uid);
       await BiometricLockPrefs.clearForUser(uid);
       // پاک کردن دسترسی‌ها و آخرین URL هنگام خروج
       await _clearAppPermissions();

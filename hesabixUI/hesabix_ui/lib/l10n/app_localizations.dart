@@ -4328,6 +4328,54 @@ abstract class AppLocalizations {
   /// **'No results for \"{query}\"'**
   String businessesHubNoSearchResultsFor(String query);
 
+  /// No description provided for @businessesHubClearSearch.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear search'**
+  String get businessesHubClearSearch;
+
+  /// No description provided for @businessesHubActiveBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'Current'**
+  String get businessesHubActiveBadge;
+
+  /// No description provided for @businessesHubCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} businesses'**
+  String businessesHubCount(int count);
+
+  /// No description provided for @businessesHubSortTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Sort'**
+  String get businessesHubSortTooltip;
+
+  /// No description provided for @businessesHubSortRecent.
+  ///
+  /// In en, this message translates to:
+  /// **'Recently used'**
+  String get businessesHubSortRecent;
+
+  /// No description provided for @businessesHubSortName.
+  ///
+  /// In en, this message translates to:
+  /// **'Name'**
+  String get businessesHubSortName;
+
+  /// No description provided for @businessesHubSortCreated.
+  ///
+  /// In en, this message translates to:
+  /// **'Newest'**
+  String get businessesHubSortCreated;
+
+  /// No description provided for @businessesHubOpenSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Settings'**
+  String get businessesHubOpenSettings;
+
   /// No description provided for @businessesHubEmptyTitle.
   ///
   /// In en, this message translates to:
@@ -4429,6 +4477,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Select a workspace to continue'**
   String get businessesSwitcherSubtitle;
+
+  /// No description provided for @mobileLauncherChooseModeHint.
+  ///
+  /// In en, this message translates to:
+  /// **'This choice is saved. Long-press a business to change it later.'**
+  String get mobileLauncherChooseModeHint;
 
   /// No description provided for @accessDenied.
   ///

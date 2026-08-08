@@ -2252,6 +2252,32 @@ class AppLocalizationsFa extends AppLocalizations {
   }
 
   @override
+  String get businessesHubClearSearch => 'پاک کردن جست‌وجو';
+
+  @override
+  String get businessesHubActiveBadge => 'فعلی';
+
+  @override
+  String businessesHubCount(int count) {
+    return '$count کسب‌وکار';
+  }
+
+  @override
+  String get businessesHubSortTooltip => 'مرتب‌سازی';
+
+  @override
+  String get businessesHubSortRecent => 'آخرین استفاده‌شده';
+
+  @override
+  String get businessesHubSortName => 'نام';
+
+  @override
+  String get businessesHubSortCreated => 'جدیدترین';
+
+  @override
+  String get businessesHubOpenSettings => 'تنظیمات';
+
+  @override
   String get businessesHubEmptyTitle => 'هنوز کسب‌وکاری ندارید';
 
   @override
@@ -2314,6 +2340,10 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get businessesSwitcherSubtitle => 'فضای کاری را انتخاب کنید';
+
+  @override
+  String get mobileLauncherChooseModeHint =>
+      'این انتخاب ذخیره می‌شود. برای تغییر دوباره، روی کسب‌وکار لمس طولانی کنید.';
 
   @override
   String get accessDenied => 'دسترسی غیرمجاز';

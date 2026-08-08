@@ -1305,9 +1305,29 @@ async def export_products_excel(
     from openpyxl import Workbook
     from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
 
+    # Apply selected rows filter if requested
+    selected_only = bool(body.get('selected_only', False))
+    selected_row_keys = body.get('selected_row_keys')
+    selected_indices = body.get('selected_indices')
+    has_selected_row_keys = (
+        selected_only
+        and isinstance(selected_row_keys, list)
+        and any(isinstance(k, dict) and k.get("id") is not None for k in selected_row_keys)
+    )
+
+    # خروجی کامل (یا انتخاب با id): کل نتایج فیلترشده؛ نه فقط صفحه UI.
+    # انتخاب فقط با ایندکس: همان صفحه فعلی (ایندکس‌ها نسبی به صفحه هستند).
+    max_export_records = 10000
+    if selected_only and not has_selected_row_keys:
+        take = max(1, min(int(body.get("take", 1000)), max_export_records))
+        skip = max(0, int(body.get("skip", 0)))
+    else:
+        take = max_export_records
+        skip = 0
+
     query_dict = {
-        "take": int(body.get("take", 1000)),
-        "skip": int(body.get("skip", 0)),
+        "take": take,
+        "skip": skip,
         "sort_by": body.get("sort_by"),
         "sort_desc": bool(body.get("sort_desc", False)),
         "sort": body.get("sort") if isinstance(body.get("sort"), list) else None,
@@ -1320,10 +1340,6 @@ async def export_products_excel(
     items = result.get("items", []) if isinstance(result, dict) else result.get("items", [])
     items = [format_datetime_fields(item, request) for item in items]
 
-    # Apply selected rows filter if requested
-    selected_only = bool(body.get('selected_only', False))
-    selected_row_keys = body.get('selected_row_keys')
-    selected_indices = body.get('selected_indices')
     if selected_only and isinstance(selected_row_keys, list):
         try:
             wanted_ids = set()
@@ -2828,9 +2844,28 @@ async def export_products_pdf(
     from weasyprint import HTML, CSS
     from weasyprint.text.fonts import FontConfiguration
 
+    # Apply selected rows filter if requested
+    selected_only = bool(body.get('selected_only', False))
+    selected_row_keys = body.get('selected_row_keys')
+    selected_indices = body.get('selected_indices')
+    has_selected_row_keys = (
+        selected_only
+        and isinstance(selected_row_keys, list)
+        and any(isinstance(k, dict) and k.get("id") is not None for k in selected_row_keys)
+    )
+
+    # خروجی کامل (یا انتخاب با id): کل نتایج فیلترشده؛ نه فقط صفحه UI.
+    max_export_records = 10000
+    if selected_only and not has_selected_row_keys:
+        take = max(1, min(int(body.get("take", 1000)), max_export_records))
+        skip = max(0, int(body.get("skip", 0)))
+    else:
+        take = max_export_records
+        skip = 0
+
     query_dict = {
-        "take": int(body.get("take", 100)),
-        "skip": int(body.get("skip", 0)),
+        "take": take,
+        "skip": skip,
         "sort_by": body.get("sort_by"),
         "sort_desc": bool(body.get("sort_desc", False)),
         "sort": body.get("sort") if isinstance(body.get("sort"), list) else None,
@@ -2843,10 +2878,6 @@ async def export_products_pdf(
     items = result.get("items", [])
     items = [format_datetime_fields(item, request) for item in items]
 
-    # Apply selected rows filter if requested
-    selected_only = bool(body.get('selected_only', False))
-    selected_row_keys = body.get('selected_row_keys')
-    selected_indices = body.get('selected_indices')
     if selected_only and isinstance(selected_row_keys, list):
         try:
             wanted_ids = set()

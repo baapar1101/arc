@@ -1246,10 +1246,17 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
   }
 
   bool _columnHasActiveFilter(String columnKey) {
-    return _columnSearchValues.containsKey(columnKey) ||
+    if (_columnSearchValues.containsKey(columnKey) ||
         (_columnMultiSelectValues[columnKey]?.isNotEmpty ?? false) ||
         (_columnDateFromValues[columnKey] != null &&
-            _columnDateToValues[columnKey] != null);
+            _columnDateToValues[columnKey] != null)) {
+      return true;
+    }
+    // ستون category_name فیلتر درختی را زیر کلید category_id ذخیره می‌کند
+    if (columnKey == 'category_name') {
+      return _columnMultiSelectValues['category_id']?.isNotEmpty ?? false;
+    }
+    return false;
   }
 
   void _clearAllFilters() {
@@ -1538,11 +1545,14 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
         }
       });
 
+      // خروجی «همه»: کل نتایج فیلترشده (نه فقط صفحه فعلی جدول).
+      // خروجی «انتخاب‌شده»: همان صفحه فعلی — ایندکس‌های انتخاب نسبت به صفحه هستند.
+      const exportAllTake = 10000;
       final queryInfo = <String, dynamic>{
         'sort_by': _sortBy,
         'sort_desc': _sortDesc,
-        'take': _limit,
-        'skip': (_page - 1) * _limit,
+        'take': selectedOnly ? _limit : exportAllTake,
+        'skip': selectedOnly ? (_page - 1) * _limit : 0,
         'search': _searchCtrl.text.isNotEmpty ? _searchCtrl.text : null,
         'search_fields':
             _searchCtrl.text.isNotEmpty && widget.config.searchFields.isNotEmpty

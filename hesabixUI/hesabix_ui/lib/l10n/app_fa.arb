@@ -935,6 +935,21 @@
       }
     }
   },
+  "businessesHubClearSearch": "پاک کردن جست‌وجو",
+  "businessesHubActiveBadge": "فعلی",
+  "businessesHubCount": "{count} کسب‌وکار",
+  "@businessesHubCount": {
+    "placeholders": {
+      "count": {
+        "type": "int"
+      }
+    }
+  },
+  "businessesHubSortTooltip": "مرتب‌سازی",
+  "businessesHubSortRecent": "آخرین استفاده‌شده",
+  "businessesHubSortName": "نام",
+  "businessesHubSortCreated": "جدیدترین",
+  "businessesHubOpenSettings": "تنظیمات",
   "businessesHubEmptyTitle": "هنوز کسب‌وکاری ندارید",
   "businessesHubEmptySubtitle": "با ساخت اولین کسب‌وکار، حسابداری ابری را شروع کنید.",
   "businessesHubImportLegacy": "وارد کردن از نسخه قدیم",
@@ -994,6 +1009,7 @@
   "businessesHubSearchShortcut": "برای جستجو / را بزنید",
   "businessesSwitcherContinue": "ادامه",
   "businessesSwitcherSubtitle": "فضای کاری را انتخاب کنید",
+  "mobileLauncherChooseModeHint": "این انتخاب ذخیره می‌شود. برای تغییر دوباره، روی کسب‌وکار لمس طولانی کنید.",
   "accessDenied": "دسترسی غیرمجاز",
   "basicTools": "ابزارهای پایه",
   "businessSettings": "تنظیمات کسب و کار",

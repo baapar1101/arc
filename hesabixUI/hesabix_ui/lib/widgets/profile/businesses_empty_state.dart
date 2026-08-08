@@ -7,11 +7,13 @@ import 'legacy_import_wizard.dart';
 class BusinessesEmptyState extends StatelessWidget {
   final bool noSearchResults;
   final String? searchQuery;
+  final VoidCallback? onClearSearch;
 
   const BusinessesEmptyState({
     super.key,
     this.noSearchResults = false,
     this.searchQuery,
+    this.onClearSearch,
   });
 
   @override
@@ -44,6 +46,14 @@ class BusinessesEmptyState extends StatelessWidget {
                     t.businessesHubNoSearchResultsFor(searchQuery!),
                     textAlign: TextAlign.center,
                     style: theme.textTheme.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
+                  ),
+                ],
+                if (onClearSearch != null) ...[
+                  const SizedBox(height: 20),
+                  TextButton.icon(
+                    onPressed: onClearSearch,
+                    icon: const Icon(Icons.close_rounded, size: 18),
+                    label: Text(t.businessesHubClearSearch),
                   ),
                 ],
               ],

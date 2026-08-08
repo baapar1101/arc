@@ -1,5 +1,8 @@
 import 'package:shared_preferences/shared_preferences.dart';
 
+/// حالت ورود به کسب‌وکار از صفحهٔ سوییچر موبایل.
+enum MobileBusinessEntryMode { standard, launcher }
+
 /// تنظیمات محلی لانچر موبایل؛ هر کلید به ازای شناسهٔ کاربر جدا می‌شود (از اشتراک داده بین حساب‌ها جلوگیری می‌شود).
 class MobileLauncherPrefs {
   static const defaultBackgroundArgb = 0xFF1565C0;
@@ -19,6 +22,8 @@ class MobileLauncherPrefs {
   static String _bgKey(int userId) => 'ml_bg_u$userId';
   static String _gridColumnsKey(int userId) => 'ml_grid_cols_u$userId';
   static String _gridRowsKey(int userId) => 'ml_grid_rows_u$userId';
+  static String _entryModeKey(int userId) => 'ml_entry_mode_u$userId';
+  static const _legacyEntryMode = 'mobile_business_entry_mode';
 
   static Future<void> _clearLegacy(SharedPreferences prefs) async {
     await prefs.remove(_legacyResume);
@@ -26,6 +31,47 @@ class MobileLauncherPrefs {
     await prefs.remove(_legacyBg);
     await prefs.remove(_legacyGridColumns);
     await prefs.remove(_legacyGridRows);
+    await prefs.remove(_legacyEntryMode);
+  }
+
+  static MobileBusinessEntryMode? _parseEntryMode(String? raw) {
+    switch (raw) {
+      case 'standard':
+        return MobileBusinessEntryMode.standard;
+      case 'launcher':
+        return MobileBusinessEntryMode.launcher;
+      default:
+        return null;
+    }
+  }
+
+  static String _encodeEntryMode(MobileBusinessEntryMode mode) => switch (mode) {
+        MobileBusinessEntryMode.standard => 'standard',
+        MobileBusinessEntryMode.launcher => 'launcher',
+      };
+
+  /// آخرین حالت ورود انتخاب‌شده از صفحهٔ لیست کسب‌وکارها (null = هنوز انتخاب نشده).
+  static Future<MobileBusinessEntryMode?> preferredEntryMode(int? userId) async {
+    final prefs = await SharedPreferences.getInstance();
+    if (userId != null && userId > 0) {
+      final scoped = _parseEntryMode(prefs.getString(_entryModeKey(userId)));
+      if (scoped != null) return scoped;
+    }
+    return _parseEntryMode(prefs.getString(_legacyEntryMode));
+  }
+
+  static Future<void> setPreferredEntryMode(
+    int? userId,
+    MobileBusinessEntryMode mode,
+  ) async {
+    final prefs = await SharedPreferences.getInstance();
+    final value = _encodeEntryMode(mode);
+    if (userId != null && userId > 0) {
+      await prefs.setString(_entryModeKey(userId), value);
+      await prefs.remove(_legacyEntryMode);
+      return;
+    }
+    await prefs.setString(_legacyEntryMode, value);
   }
 
   /// یکبار مهاجرت از کلیدهای قدیمی بدون suffix به کلیدهای per-user (فرض: دستگاه تک‌کاربر POS).
@@ -192,6 +238,7 @@ class MobileLauncherPrefs {
       await prefs.remove(_bgKey(userId));
       await prefs.remove(_gridColumnsKey(userId));
       await prefs.remove(_gridRowsKey(userId));
+      await prefs.remove(_entryModeKey(userId));
     }
     await _clearLegacy(prefs);
   }

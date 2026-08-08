@@ -2268,6 +2268,32 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get businessesHubClearSearch => 'Clear search';
+
+  @override
+  String get businessesHubActiveBadge => 'Current';
+
+  @override
+  String businessesHubCount(int count) {
+    return '$count businesses';
+  }
+
+  @override
+  String get businessesHubSortTooltip => 'Sort';
+
+  @override
+  String get businessesHubSortRecent => 'Recently used';
+
+  @override
+  String get businessesHubSortName => 'Name';
+
+  @override
+  String get businessesHubSortCreated => 'Newest';
+
+  @override
+  String get businessesHubOpenSettings => 'Settings';
+
+  @override
   String get businessesHubEmptyTitle => 'No businesses yet';
 
   @override
@@ -2330,6 +2356,10 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get businessesSwitcherSubtitle => 'Select a workspace to continue';
+
+  @override
+  String get mobileLauncherChooseModeHint =>
+      'This choice is saved. Long-press a business to change it later.';
 
   @override
   String get accessDenied => 'Access denied';
