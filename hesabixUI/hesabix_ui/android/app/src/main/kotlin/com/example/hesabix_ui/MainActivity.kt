@@ -81,10 +81,14 @@ class MainActivity : FlutterFragmentActivity() {
         if (!file.exists()) {
             throw IllegalArgumentException("APK file not found: $path")
         }
+        // APKs may live under Flutter's app_flutter documents dir, which is
+        // outside the default FileProvider roots (files/ / cache/). Prefer the
+        // original path when configured; otherwise stage into cache.
+        val shareFile = fileForProvider(file)
         val uri = FileProvider.getUriForFile(
             this,
             "$packageName.fileprovider",
-            file,
+            shareFile,
         )
         val intent = Intent(Intent.ACTION_VIEW).apply {
             setDataAndType(uri, "application/vnd.android.package-archive")
@@ -92,5 +96,17 @@ class MainActivity : FlutterFragmentActivity() {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
         startActivity(intent)
+    }
+
+    private fun fileForProvider(file: File): File {
+        return try {
+            FileProvider.getUriForFile(this, "$packageName.fileprovider", file)
+            file
+        } catch (_: IllegalArgumentException) {
+            val staged = File(cacheDir, "apk_install/${file.name}")
+            staged.parentFile?.mkdirs()
+            file.copyTo(staged, overwrite = true)
+            staged
+        }
     }
 }

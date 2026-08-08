@@ -106,8 +106,7 @@ class AndroidApkDownloadCoordinator {
       paused: TaskNotification(pausedTitle, pausedBody),
       canceled: TaskNotification(canceledTitle, canceledBody),
       progressBar: true,
-      // applicationDocuments cannot be opened via tapOpensFile; we handle taps
-      // ourselves and launch the package installer through MethodChannel.
+      // Install is launched via MethodChannel + FileProvider (not tapOpensFile).
       tapOpensFile: false,
     );
   }
@@ -125,12 +124,15 @@ class AndroidApkDownloadCoordinator {
     final taskId =
         'hesabix_apk_${release.tagName.replaceAll(RegExp(r'[^\w.\-]+'), '_')}';
 
+    // applicationSupport maps to Android getFilesDir() (…/files/), which
+    // FileProvider already exposes. applicationDocuments (…/app_flutter/) is
+    // not covered by default FileProvider roots and breaks APK install.
     final task = DownloadTask(
       taskId: taskId,
       url: release.apk.downloadUrl,
       filename: safeName,
       directory: apkUpdatesDirectory,
-      baseDirectory: BaseDirectory.applicationDocuments,
+      baseDirectory: BaseDirectory.applicationSupport,
       group: apkUpdateGroup,
       updates: Updates.statusAndProgress,
       allowPause: true,
