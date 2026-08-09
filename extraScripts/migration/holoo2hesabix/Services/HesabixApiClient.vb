@@ -319,6 +319,290 @@ Friend Class HesabixApiClient
         End Try
     End Function
 
+    Public Async Function ListFiscalYearsAsync(businessId As Integer, Optional ct As CancellationToken = Nothing) As Task(Of List(Of HesabixFiscalYear))
+        Dim root = Await GetJsonAsync("api/v1/business/" & businessId.ToString() & "/fiscal-years", ct).ConfigureAwait(False)
+        Dim list As New List(Of HesabixFiscalYear)
+        For Each itemToken In GetItemsArray(GetDataToken(root))
+            Dim obj = TryCast(itemToken, JObject)
+            If obj Is Nothing Then Continue For
+            list.Add(ParseFiscalYear(obj))
+        Next
+        Return list
+    End Function
+
+    Public Async Function EnsureFiscalYearsAsync(
+        businessId As Integer,
+        years As IEnumerable(Of HolooFiscalYearSlice),
+        Optional currentStartDate As Date? = Nothing,
+        Optional ct As CancellationToken = Nothing
+    ) As Task(Of EnsureFiscalYearsResult)
+        Dim arr As New JArray()
+        For Each y In years
+            arr.Add(New JObject From {
+                {"title", y.Title},
+                {"start_date", y.StartDate.ToString("yyyy-MM-dd")},
+                {"end_date", y.EndDate.ToString("yyyy-MM-dd")}
+            })
+        Next
+        Dim body As New JObject From {{"years", arr}}
+        If currentStartDate.HasValue Then
+            body("current_start_date") = currentStartDate.Value.ToString("yyyy-MM-dd")
+        End If
+        Dim root = Await SendJsonAsync(
+            HttpMethod.Post,
+            "api/v1/business/" & businessId.ToString() & "/fiscal-years/migration/ensure",
+            body,
+            includeAuth:=True,
+            ct:=ct
+        ).ConfigureAwait(False)
+        Dim data = GetDataToken(root)
+        Dim result As New EnsureFiscalYearsResult With {
+            .CreatedCount = GetInt(data, "created_count"),
+            .ReusedCount = GetInt(data, "reused_count")
+        }
+        Dim currentTok = data("current")
+        If currentTok IsNot Nothing AndAlso currentTok.Type = JTokenType.Object Then
+            result.Current = ParseFiscalYear(DirectCast(currentTok, JObject))
+        End If
+        For Each itemToken In GetItemsArray(data)
+            Dim obj = TryCast(itemToken, JObject)
+            If obj Is Nothing Then Continue For
+            result.Items.Add(ParseFiscalYear(obj))
+        Next
+        ' برخی پاسخ‌ها items را مستقیم در data.items دارند؛ GetItemsArray همان را می‌خواند.
+        If result.Items.Count = 0 Then
+            Dim itemsTok = data("items")
+            If itemsTok IsNot Nothing AndAlso itemsTok.Type = JTokenType.Array Then
+                For Each itemToken In DirectCast(itemsTok, JArray)
+                    Dim obj = TryCast(itemToken, JObject)
+                    If obj Is Nothing Then Continue For
+                    result.Items.Add(ParseFiscalYear(obj))
+                Next
+            End If
+        End If
+        Return result
+    End Function
+
+    Public Async Function SetCurrentFiscalYearAsync(businessId As Integer, fiscalYearId As Integer, Optional ct As CancellationToken = Nothing) As Task(Of HesabixFiscalYear)
+        Dim body As New JObject From {{"fiscal_year_id", fiscalYearId}}
+        Dim root = Await SendJsonAsync(
+            HttpMethod.Post,
+            "api/v1/business/" & businessId.ToString() & "/fiscal-years/migration/set-current",
+            body,
+            includeAuth:=True,
+            ct:=ct
+        ).ConfigureAwait(False)
+        Dim data = GetDataToken(root)
+        Dim currentTok = data("current")
+        If currentTok IsNot Nothing AndAlso currentTok.Type = JTokenType.Object Then
+            Return ParseFiscalYear(DirectCast(currentTok, JObject))
+        End If
+        Return New HesabixFiscalYear With {.Id = fiscalYearId, .IsCurrent = True}
+    End Function
+
+    Public Async Function BulkUpsertInvoicesAsync(
+        businessId As Integer,
+        items As JArray,
+        Optional ct As CancellationToken = Nothing
+    ) As Task(Of BulkUpsertResult)
+        Dim body As New JObject From {
+            {"items", items},
+            {"migration_mode", True}
+        }
+        Dim root = Await SendJsonAsync(
+            HttpMethod.Post,
+            "api/v1/invoices/business/" & businessId.ToString() & "/bulk-upsert",
+            body,
+            includeAuth:=True,
+            ct:=ct
+        ).ConfigureAwait(False)
+        Return ParseBulkUpsertResult(GetDataToken(root), "invoice_id")
+    End Function
+
+    Public Async Function BulkUpsertReceiptsPaymentsAsync(
+        businessId As Integer,
+        items As JArray,
+        Optional migrationMode As Boolean = True,
+        Optional ct As CancellationToken = Nothing
+    ) As Task(Of BulkUpsertResult)
+        Dim body As New JObject From {
+            {"items", items},
+            {"migration_mode", migrationMode}
+        }
+        Dim root = Await SendJsonAsync(
+            HttpMethod.Post,
+            "api/v1/businesses/" & businessId.ToString() & "/receipts-payments/bulk-upsert",
+            body,
+            includeAuth:=True,
+            ct:=ct
+        ).ConfigureAwait(False)
+        Return ParseBulkUpsertResult(GetDataToken(root), "document_id")
+    End Function
+
+    Public Async Function BulkUpsertExpenseIncomeAsync(
+        businessId As Integer,
+        items As JArray,
+        Optional migrationMode As Boolean = True,
+        Optional ct As CancellationToken = Nothing
+    ) As Task(Of BulkUpsertResult)
+        Dim body As New JObject From {
+            {"items", items},
+            {"migration_mode", migrationMode}
+        }
+        Dim root = Await SendJsonAsync(
+            HttpMethod.Post,
+            "api/v1/businesses/" & businessId.ToString() & "/expense-income/bulk-upsert",
+            body,
+            includeAuth:=True,
+            ct:=ct
+        ).ConfigureAwait(False)
+        Return ParseBulkUpsertResult(GetDataToken(root), "document_id")
+    End Function
+
+    Public Async Function CreateCheckAsync(businessId As Integer, payload As JObject, Optional ct As CancellationToken = Nothing) As Task(Of Integer)
+        Dim root = Await SendJsonAsync(
+            HttpMethod.Post,
+            "api/v1/businesses/" & businessId.ToString() & "/checks/create",
+            payload,
+            includeAuth:=True,
+            ct:=ct
+        ).ConfigureAwait(False)
+        Return GetInt(GetDataToken(root), "id")
+    End Function
+
+    Public Async Function CreateManualDocumentAsync(businessId As Integer, payload As JObject, Optional ct As CancellationToken = Nothing) As Task(Of Integer)
+        Dim root = Await SendJsonAsync(
+            HttpMethod.Post,
+            "api/v1/businesses/" & businessId.ToString() & "/documents/manual",
+            payload,
+            includeAuth:=True,
+            ct:=ct
+        ).ConfigureAwait(False)
+        Return GetInt(GetDataToken(root), "id")
+    End Function
+
+    Public Async Function ClearCheckAsync(checkId As Integer, bankAccountId As Integer, Optional documentDate As Date? = Nothing, Optional ct As CancellationToken = Nothing) As Task
+        Dim body As New JObject From {{"bank_account_id", bankAccountId}}
+        If documentDate.HasValue Then body("document_date") = documentDate.Value.ToString("yyyy-MM-dd")
+        Await SendJsonAsync(
+            HttpMethod.Post,
+            "api/v1/checks/" & checkId.ToString() & "/actions/clear",
+            body,
+            includeAuth:=True,
+            ct:=ct
+        ).ConfigureAwait(False)
+    End Function
+
+    Public Async Function ReturnCheckAsync(
+        checkId As Integer,
+        Optional returnType As String = "to_drawer",
+        Optional documentDate As Date? = Nothing,
+        Optional ct As CancellationToken = Nothing
+    ) As Task
+        Dim body As New JObject From {{"return_type", returnType}}
+        If documentDate.HasValue Then body("document_date") = documentDate.Value.ToString("yyyy-MM-dd")
+        Await SendJsonAsync(
+            HttpMethod.Post,
+            "api/v1/checks/" & checkId.ToString() & "/actions/return",
+            body,
+            includeAuth:=True,
+            ct:=ct
+        ).ConfigureAwait(False)
+    End Function
+
+    Public Async Function ListAccountCodeMapAsync(businessId As Integer, Optional ct As CancellationToken = Nothing) As Task(Of Dictionary(Of String, Integer))
+        Dim root = Await GetJsonAsync("api/v1/accounts/business/" & businessId.ToString(), ct).ConfigureAwait(False)
+        Dim map As New Dictionary(Of String, Integer)(StringComparer.OrdinalIgnoreCase)
+        For Each itemToken In GetItemsArray(GetDataToken(root))
+            Dim obj = TryCast(itemToken, JObject)
+            If obj Is Nothing Then Continue For
+            Dim code = GetString(obj, "code")
+            Dim id = GetInt(obj, "id")
+            If Not String.IsNullOrWhiteSpace(code) AndAlso id > 0 AndAlso Not map.ContainsKey(code.Trim()) Then
+                map(code.Trim()) = id
+            End If
+        Next
+        Return map
+    End Function
+
+    Public Async Function UpsertOpeningBalanceAsync(businessId As Integer, payload As JObject, Optional ct As CancellationToken = Nothing) As Task(Of JObject)
+        Dim root = Await SendJsonAsync(
+            HttpMethod.Put,
+            "api/v1/businesses/" & businessId.ToString() & "/opening-balance",
+            payload,
+            includeAuth:=True,
+            ct:=ct
+        ).ConfigureAwait(False)
+        Return GetDataToken(root)
+    End Function
+
+    Public Async Function PostOpeningBalanceAsync(businessId As Integer, fiscalYearId As Integer, Optional ct As CancellationToken = Nothing) As Task
+        Await SendJsonAsync(
+            HttpMethod.Post,
+            "api/v1/businesses/" & businessId.ToString() & "/opening-balance/post?fiscal_year_id=" & fiscalYearId.ToString(),
+            New JObject(),
+            includeAuth:=True,
+            ct:=ct
+        ).ConfigureAwait(False)
+    End Function
+
+    Public Async Function FindAccountIdByCodeAsync(businessId As Integer, code As String, Optional ct As CancellationToken = Nothing) As Task(Of Integer)
+        If String.IsNullOrWhiteSpace(code) Then Return 0
+        Dim root = Await GetJsonAsync("api/v1/accounts/business/" & businessId.ToString(), ct).ConfigureAwait(False)
+        Dim data = GetDataToken(root)
+        Dim items = GetItemsArray(data)
+        If items.Count = 0 Then
+            Dim dataTok = root("data")
+            If dataTok IsNot Nothing AndAlso dataTok.Type = JTokenType.Array Then
+                items = DirectCast(dataTok, JArray)
+            End If
+        End If
+        Dim codeNorm = code.Trim()
+        For Each itemToken In items
+            Dim obj = TryCast(itemToken, JObject)
+            If obj Is Nothing Then Continue For
+            Dim itemCode = GetString(obj, "code")
+            If String.Equals(If(itemCode, "").Trim(), codeNorm, StringComparison.OrdinalIgnoreCase) Then
+                Return GetInt(obj, "id")
+            End If
+        Next
+        Return 0
+    End Function
+
+    Public Async Function BulkWarehouseOperationsAsync(
+        businessId As Integer,
+        invoiceIds As IEnumerable(Of Integer),
+        operation As String,
+        Optional ct As CancellationToken = Nothing
+    ) As Task(Of JObject)
+        Dim ids As New JArray()
+        For Each id In invoiceIds
+            ids.Add(id)
+        Next
+        Dim body As New JObject From {
+            {"invoice_ids", ids},
+            {"operation", operation}
+        }
+        Dim root = Await SendJsonAsync(
+            HttpMethod.Post,
+            "api/v1/warehouse-docs/business/" & businessId.ToString() & "/invoices/bulk-warehouse-operations",
+            body,
+            includeAuth:=True,
+            ct:=ct
+        ).ConfigureAwait(False)
+        Return GetDataToken(root)
+    End Function
+
+    Private Shared Function ParseFiscalYear(obj As JObject) As HesabixFiscalYear
+        Return New HesabixFiscalYear With {
+            .Id = GetInt(obj, "id"),
+            .Title = GetString(obj, "title"),
+            .StartDate = GetString(obj, "start_date"),
+            .EndDate = GetString(obj, "end_date"),
+            .IsCurrent = GetBool(obj, "is_current", False)
+        }
+    End Function
+
     Private Shared Function ParseBusiness(data As JObject) As HesabixBusiness
         Dim biz As New HesabixBusiness With {
             .Id = GetInt(data, "id"),

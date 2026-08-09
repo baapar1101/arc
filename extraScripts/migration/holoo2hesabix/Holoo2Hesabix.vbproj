@@ -84,8 +84,12 @@
     <Compile Include="Services\AsyncUi.vb" />
     <Compile Include="Services\BaseDataTransferService.vb" />
     <Compile Include="Services\CheckpointStore.vb" />
+    <Compile Include="Services\DocumentTransferService.vb" />
     <Compile Include="Services\HesabixApiClient.vb" />
     <Compile Include="Services\HolooBaseDataReader.vb" />
+    <Compile Include="Services\HolooDiscoveryService.vb" />
+    <Compile Include="Services\HolooDocumentReader.vb" />
+    <Compile Include="Services\HolooSarfaslMapper.vb" />
     <Compile Include="Services\HolooSqlService.vb" />
     <Compile Include="Services\MigrationSession.vb" />
     <Compile Include="Services\PreflightService.vb" />

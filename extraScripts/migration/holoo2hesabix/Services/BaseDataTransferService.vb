@@ -17,6 +17,7 @@ Friend Class BaseDataTransferService
         selectedModules As IEnumerable(Of MigrationModule),
         currencyId As Integer,
         Optional resetCheckpoint As Boolean = False,
+        Optional skipOpeningBalances As Boolean = False,
         Optional ct As CancellationToken = Nothing
     ) As Task(Of String)
         Dim businessId = session.SelectedBusiness.Id
@@ -27,7 +28,7 @@ Friend Class BaseDataTransferService
         api.Configure(session.ApiBaseUrl, session.ApiKey)
 
         Dim warehouseMap = cp.EnsureModule(MigrationModule.Warehouses.ToString())
-        Dim modules = selectedModules.OrderBy(Function(m) CInt(m)).ToList()
+        Dim modules = selectedModules.Where(Function(m) MigrationModuleInfo.IsBaseModule(m)).OrderBy(Function(m) CInt(m)).ToList()
 
         For Each m In modules
             ct.ThrowIfCancellationRequested()
@@ -35,7 +36,7 @@ Friend Class BaseDataTransferService
                 Case MigrationModule.Warehouses
                     Await TransferWarehouses(session, api, businessId, cp, store, ct).ConfigureAwait(False)
                 Case MigrationModule.Persons
-                    Await TransferPersons(session, api, businessId, cp, store, ct).ConfigureAwait(False)
+                    Await TransferPersons(session, api, businessId, cp, store, skipOpeningBalances, ct).ConfigureAwait(False)
                 Case MigrationModule.BankAccounts
                     Await TransferBanks(session, api, businessId, currencyId, cp, store, ct).ConfigureAwait(False)
                 Case MigrationModule.CashRegisters
@@ -43,7 +44,7 @@ Friend Class BaseDataTransferService
                 Case MigrationModule.PettyCash
                     Await TransferCash(session, api, businessId, currencyId, False, cp, store, ct).ConfigureAwait(False)
                 Case MigrationModule.Products
-                    Await TransferProducts(session, api, businessId, warehouseMap, cp, store, ct).ConfigureAwait(False)
+                    Await TransferProducts(session, api, businessId, warehouseMap, cp, store, skipOpeningBalances, ct).ConfigureAwait(False)
             End Select
         Next
 
@@ -132,7 +133,7 @@ Friend Class BaseDataTransferService
         Return 0
     End Function
 
-    Private Async Function TransferPersons(session As MigrationSession, api As HesabixApiClient, businessId As Integer, cp As TransferCheckpoint, store As CheckpointStore, ct As CancellationToken) As Task
+    Private Async Function TransferPersons(session As MigrationSession, api As HesabixApiClient, businessId As Integer, cp As TransferCheckpoint, store As CheckpointStore, skipOpeningBalances As Boolean, ct As CancellationToken) As Task
         Dim key = MigrationModule.Persons.ToString()
         Dim modCp = cp.EnsureModule(key)
         If modCp.Completed Then
@@ -140,7 +141,10 @@ Friend Class BaseDataTransferService
             Return
         End If
         Dim hasFiscalYear = Await api.HasCurrentFiscalYearAsync(businessId, ct).ConfigureAwait(False)
-        If Not hasFiscalYear Then
+        Dim includeOb = hasFiscalYear AndAlso Not skipOpeningBalances
+        If skipOpeningBalances Then
+            RaiseProgress("اشخاص", 0, 0, "Full History: مانده افتتاحیه اشخاص ارسال نمی‌شود")
+        ElseIf Not hasFiscalYear Then
             RaiseProgress("اشخاص", 0, 0, "هشدار: سال مالی برای این کسب‌وکار تعریف نشده — مانده افتتاحیه ارسال نمی‌شود")
         End If
         Dim rows = Await Task.Run(Function() _reader.ReadPersons(session.SqlSettings), ct).ConfigureAwait(False)
@@ -168,11 +172,11 @@ Friend Class BaseDataTransferService
         Dim offset = 0
         While offset < pending.Count
             ct.ThrowIfCancellationRequested()
-            Dim chunkRows = TakePersonChunk(pending, offset, hasFiscalYear)
+            Dim chunkRows = TakePersonChunk(pending, offset, includeOb)
             Dim items = New JArray()
             Dim chunkHasOb = False
             For Each row In chunkRows
-                Dim payload = BuildPersonPayload(row, hasFiscalYear)
+                Dim payload = BuildPersonPayload(row, includeOb)
                 If payload("opening_balance") IsNot Nothing Then chunkHasOb = True
                 items.Add(New JObject From {
                     {"client_ref", row.Key},
@@ -218,7 +222,7 @@ Friend Class BaseDataTransferService
                 Dim errMsg = If(itemResult Is Nothing, "نتیجه bulk برای این ردیف برنگشت", If(itemResult.Message, itemResult.ErrorCode))
 
                 If String.Equals(errCode, "NO_CURRENT_FISCAL_YEAR", StringComparison.OrdinalIgnoreCase) Then
-                    hasFiscalYear = False
+                    includeOb = False
                     retryNoOb.Add(row)
                     processed -= 1
                     Continue For
@@ -484,7 +488,7 @@ Friend Class BaseDataTransferService
         store.Save(cp)
     End Function
 
-    Private Async Function TransferProducts(session As MigrationSession, api As HesabixApiClient, businessId As Integer, warehouseMap As ModuleCheckpoint, cp As TransferCheckpoint, store As CheckpointStore, ct As CancellationToken) As Task
+    Private Async Function TransferProducts(session As MigrationSession, api As HesabixApiClient, businessId As Integer, warehouseMap As ModuleCheckpoint, cp As TransferCheckpoint, store As CheckpointStore, skipOpeningBalances As Boolean, ct As CancellationToken) As Task
         Dim key = MigrationModule.Products.ToString()
         Dim modCp = cp.EnsureModule(key)
         If modCp.Completed Then
@@ -492,7 +496,10 @@ Friend Class BaseDataTransferService
             Return
         End If
         Dim hasFiscalYear = Await api.HasCurrentFiscalYearAsync(businessId, ct).ConfigureAwait(False)
-        If Not hasFiscalYear Then
+        Dim includeOb = hasFiscalYear AndAlso Not skipOpeningBalances
+        If skipOpeningBalances Then
+            RaiseProgress("کالا", 0, 0, "Full History: موجودی اولیه کالا ارسال نمی‌شود")
+        ElseIf Not hasFiscalYear Then
             RaiseProgress("کالا", 0, 0, "هشدار: سال مالی تعریف نشده — موجودی اولیه ارسال نمی‌شود")
         End If
         Dim rows = Await Task.Run(Function() _reader.ReadProducts(session.SqlSettings), ct).ConfigureAwait(False)
@@ -520,10 +527,10 @@ Friend Class BaseDataTransferService
         Dim offset = 0
         While offset < pending.Count
             ct.ThrowIfCancellationRequested()
-            Dim chunkRows = TakeProductChunk(pending, offset, hasFiscalYear)
+            Dim chunkRows = TakeProductChunk(pending, offset, includeOb)
             Dim items As New JArray()
             For Each row In chunkRows
-                Dim payload = BuildProductPayload(row, warehouseMap, hasFiscalYear)
+                Dim payload = BuildProductPayload(row, warehouseMap, includeOb)
                 items.Add(New JObject From {
                     {"client_ref", row.Key},
                     {"payload", payload}
@@ -568,7 +575,7 @@ Friend Class BaseDataTransferService
                 Dim errMsg = If(itemResult Is Nothing, "نتیجه bulk برای این ردیف برنگشت", If(itemResult.Message, itemResult.ErrorCode))
 
                 If String.Equals(errCode, "NO_CURRENT_FISCAL_YEAR", StringComparison.OrdinalIgnoreCase) Then
-                    hasFiscalYear = False
+                    includeOb = False
                     retryNoOb.Add(row)
                     processed -= 1
                     Continue For

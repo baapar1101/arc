@@ -152,6 +152,15 @@ Friend Class HolooBaseDataReader
         End Using
     End Function
 
+    Public Function CountSql(settings As SqlConnectionSettings, sql As String) As Long
+        Using conn = Open(settings)
+            Using cmd As New SqlCommand(sql, conn)
+                cmd.CommandTimeout = 180
+                Return Convert.ToInt64(cmd.ExecuteScalar())
+            End Using
+        End Using
+    End Function
+
     Public Function ReadWarehouses(settings As SqlConnectionSettings) As List(Of HolooWarehouseRow)
         Dim list As New List(Of HolooWarehouseRow)
         Using conn = Open(settings)
@@ -348,6 +357,25 @@ Friend Class HolooBaseDataReader
                 Return "SELECT COUNT(*) FROM Cash WHERE ISNULL(S_Type,0)=0;"
             Case MigrationModule.Products
                 Return "SELECT COUNT(*) FROM ARTICLE WHERE ISNULL([Delete],0)=0;"
+            Case MigrationModule.Invoices
+                Return "SELECT COUNT(*) FROM FACTURE WHERE ISNULL([Delete],0)=0 AND Fac_Type IN ('F','K','Y','X','Z');"
+            Case MigrationModule.Checks
+                Return "SELECT COUNT(*) FROM [Check] WHERE ISNULL([Delete],0)=0;"
+            Case MigrationModule.ReceiptsPayments
+                Return "SELECT COUNT(*) FROM SANAD s WHERE ISNULL(s.[Delete],0)=0 AND ISNULL(s.SaveFromFacture,0)=0 AND s.Sanad_Type=20 " &
+                       "AND NOT EXISTS (SELECT 1 FROM SND_LIST x WHERE x.Sanad_Code=s.Sanad_Code AND x.Col_Code IN ('601','702'));"
+            Case MigrationModule.ExpenseIncome
+                Return "SELECT COUNT(*) FROM SANAD s WHERE ISNULL(s.[Delete],0)=0 AND ISNULL(s.SaveFromFacture,0)=0 " &
+                       "AND EXISTS (SELECT 1 FROM SND_LIST x WHERE x.Sanad_Code=s.Sanad_Code AND x.Col_Code IN ('601','702'));"
+            Case MigrationModule.ManualJournals
+                Return "SELECT COUNT(*) FROM SANAD s WHERE ISNULL(s.[Delete],0)=0 AND ISNULL(s.SaveFromFacture,0)=0 " &
+                       "AND ISNULL(s.Sanad_Type,0) NOT IN (5,20) " &
+                       "AND NOT EXISTS (SELECT 1 FROM [Check] c WHERE c.Sanad_Code=s.Sanad_Code OR c.Sanad_Code2=s.Sanad_Code) " &
+                       "AND NOT EXISTS (SELECT 1 FROM SND_LIST x WHERE x.Sanad_Code=s.Sanad_Code AND x.Col_Code IN ('601','702'));"
+            Case MigrationModule.FiscalYearsAndOpening
+                Return "SELECT COUNT(*) FROM SANAD WHERE Sanad_Code=1;"
+            Case MigrationModule.WarehouseDocs
+                Return "SELECT COUNT(*) FROM FACTURE WHERE ISNULL([Delete],0)=0 AND Fac_Type IN ('F','K','Y','X','Z');"
             Case Else
                 Return "SELECT 0;"
         End Select

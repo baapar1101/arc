@@ -113,3 +113,24 @@ Friend Class BulkUpsertResult
     Public Property Failed As Integer
     Public Property Total As Integer
 End Class
+
+Friend Class HesabixFiscalYear
+    Public Property Id As Integer
+    Public Property Title As String
+    Public Property StartDate As String
+    Public Property EndDate As String
+    Public Property IsCurrent As Boolean
+End Class
+
+Friend Class HolooFiscalYearSlice
+    Public Property Title As String
+    Public Property StartDate As Date
+    Public Property EndDate As Date
+End Class
+
+Friend Class EnsureFiscalYearsResult
+    Public Property Items As New List(Of HesabixFiscalYear)
+    Public Property CreatedCount As Integer
+    Public Property ReusedCount As Integer
+    Public Property Current As HesabixFiscalYear
+End Class

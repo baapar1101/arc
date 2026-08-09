@@ -5,7 +5,8 @@ Friend Class TransferPanel
 
     Private ReadOnly _session As MigrationSession
     Private ReadOnly _api As HesabixApiClient
-    Private ReadOnly _transfer As New BaseDataTransferService()
+    Private ReadOnly _baseTransfer As New BaseDataTransferService()
+    Private ReadOnly _docTransfer As New DocumentTransferService()
 
     Private ReadOnly _progress As ProgressBar
     Private ReadOnly _lblModule As Label
@@ -28,7 +29,7 @@ Friend Class TransferPanel
         Padding = New Padding(28, 16, 28, 16)
 
         Dim title As New Label() With {
-            .Text = "انتقال اطلاعات پایه",
+            .Text = "انتقال اطلاعات",
             .Font = AppTheme.FontTitle,
             .ForeColor = AppTheme.TextPrimary,
             .AutoSize = True,
@@ -36,7 +37,7 @@ Friend Class TransferPanel
             .RightToLeft = RightToLeft.Yes
         }
         Dim subtitle As New Label() With {
-            .Text = "در صورت قطع یا خطا، اجرای بعدی از همان نقطه (checkpoint) ادامه می‌یابد.",
+            .Text = "پایه + اسناد سال‌به‌سال. در صورت قطع، از checkpoint ادامه می‌یابد.",
             .Font = AppTheme.FontSubtitle,
             .ForeColor = AppTheme.TextSecondary,
             .AutoSize = True,
@@ -104,7 +105,8 @@ Friend Class TransferPanel
         Controls.Add(_txtLog)
         Controls.Add(_lblCheckpoint)
 
-        AddHandler _transfer.ProgressChanged, AddressOf OnTransferProgress
+        AddHandler _baseTransfer.ProgressChanged, AddressOf OnTransferProgress
+        AddHandler _docTransfer.ProgressChanged, AddressOf OnTransferProgress
         AddHandler Resize, Sub(s, e)
                                _progress.Width = Math.Max(640, ClientSize.Width - 56)
                                _txtLog.Width = _progress.Width
@@ -119,7 +121,7 @@ Friend Class TransferPanel
         Dim store As New CheckpointStore(_session.SelectedBusiness.Id, _session.SelectedDatabase)
         _lblCheckpoint.Text = "مسیر checkpoint: " & store.FilePath
         If Not _running Then
-            AppendLog("آماده برای شروع یا ادامه انتقال اطلاعات پایه.")
+            AppendLog("آماده برای شروع یا ادامه انتقال.")
         End If
     End Sub
 
@@ -129,7 +131,7 @@ Friend Class TransferPanel
             MessageBox.Show(Me, "ابتدا حسابیکس و دیتابیس هلو را کامل کنید.", "شروع ممکن نیست", MessageBoxButtons.OK, MessageBoxIcon.Warning)
             Return
         End If
-        Dim modules = If(_session.SelectedModules, MigrationModuleInfo.GetBaseModules()).
+        Dim modules = If(_session.SelectedModules, MigrationModuleInfo.GetAllModules()).
             Where(Function(x) x.Selected AndAlso x.Enabled).
             Select(Function(x) x.ModuleKey).ToList()
         If modules.Count = 0 Then
@@ -142,6 +144,9 @@ Friend Class TransferPanel
             Return
         End If
 
+        Dim hasDocs = modules.Any(Function(m) MigrationModuleInfo.IsDocumentModule(m))
+        Dim skipOb = hasDocs
+
         _running = True
         _btnStart.Enabled = False
         _btnCancel.Enabled = True
@@ -149,13 +154,23 @@ Friend Class TransferPanel
         CancelPending()
         _cts = New CancellationTokenSource()
         AppendLog("=== شروع انتقال ===")
+        If skipOb Then AppendLog("حالت Full History: مانده افتتاحیه اشخاص/کالا جداگانه ارسال نمی‌شود.")
 
         Try
-            Dim path = Await _transfer.RunAsync(_session, _api, modules, currencyId, _chkReset.Checked, _cts.Token).ConfigureAwait(True)
-            AppendLog("پایان انتقال. Checkpoint: " & path)
+            Dim path = Await _baseTransfer.RunAsync(
+                _session, _api, modules, currencyId, _chkReset.Checked, skipOb, _cts.Token).ConfigureAwait(True)
+            AppendLog("پایان اطلاعات پایه. Checkpoint: " & path)
+
+            If hasDocs Then
+                AppendLog("=== شروع انتقال اسناد (سال‌به‌سال) ===")
+                path = Await _docTransfer.RunAsync(
+                    _session, _api, modules, currencyId, False, _cts.Token).ConfigureAwait(True)
+                AppendLog("پایان اسناد. Checkpoint: " & path)
+            End If
+
             _lblModule.Text = "پایان یافت"
             _lblModule.ForeColor = AppTheme.Success
-            MessageBox.Show(Me, "انتقال اطلاعات پایه به پایان رسید (موارد خطادار در لاگ و checkpoint ثبت شده‌اند).", "انتقال", MessageBoxButtons.OK, MessageBoxIcon.Information)
+            MessageBox.Show(Me, "انتقال به پایان رسید (موارد خطادار در لاگ و checkpoint ثبت شده‌اند).", "انتقال", MessageBoxButtons.OK, MessageBoxIcon.Information)
         Catch ex As OperationCanceledException
             AppendLog("انتقال توسط کاربر متوقف شد. اجرای بعدی از checkpoint ادامه می‌دهد.")
             _lblModule.Text = "متوقف شد"
@@ -182,19 +197,18 @@ Friend Class TransferPanel
             BeginInvoke(New Action(Of Object, TransferProgressEventArgs)(AddressOf OnTransferProgress), sender, e)
             Return
         End If
-        If e.Total > 0 Then
-            _progress.Maximum = Math.Max(1, e.Total)
-            _progress.Value = Math.Min(e.Current, _progress.Maximum)
-            _lblModule.Text = e.ModuleTitle & " — " & e.Current.ToString() & " / " & e.Total.ToString()
-        Else
-            _lblModule.Text = e.ModuleTitle & " — " & e.Message
-        End If
+        _lblModule.Text = e.ModuleTitle
         _lblModule.ForeColor = If(e.IsError, AppTheme.Danger, AppTheme.TextPrimary)
+        If e.Total > 0 Then
+            _progress.Maximum = Math.Max(e.Total, 1)
+            _progress.Value = Math.Min(e.Current, _progress.Maximum)
+        End If
         AppendLog("[" & e.ModuleTitle & "] " & e.Message)
     End Sub
 
     Private Sub AppendLog(text As String)
-        _txtLog.AppendText(DateTime.Now.ToString("HH:mm:ss") & "  " & text & Environment.NewLine)
+        If _txtLog.TextLength > 0 Then _txtLog.AppendText(Environment.NewLine)
+        _txtLog.AppendText(DateTime.Now.ToString("HH:mm:ss") & "  " & text)
     End Sub
 
     Private Sub CancelPending()
@@ -202,10 +216,5 @@ Friend Class TransferPanel
             _cts.Dispose()
             _cts = Nothing
         End If
-    End Sub
-
-    Protected Overrides Sub Dispose(disposing As Boolean)
-        If disposing Then CancelPending()
-        MyBase.Dispose(disposing)
     End Sub
 End Class

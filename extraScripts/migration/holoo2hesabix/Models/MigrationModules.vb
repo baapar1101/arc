@@ -5,6 +5,13 @@ Friend Enum MigrationModule
     CashRegisters = 4
     PettyCash = 5
     Products = 6
+    FiscalYearsAndOpening = 10
+    Invoices = 11
+    WarehouseDocs = 12
+    ReceiptsPayments = 13
+    Checks = 14
+    ExpenseIncome = 15
+    ManualJournals = 16
 End Enum
 
 Friend NotInheritable Class MigrationModuleInfo
@@ -22,6 +29,24 @@ Friend NotInheritable Class MigrationModuleInfo
         }
     End Function
 
+    Public Shared Function GetDocumentModules() As List(Of ModuleOption)
+        Return New List(Of ModuleOption) From {
+            New ModuleOption(MigrationModule.FiscalYearsAndOpening, "سال‌های مالی + افتتاحیه سال اول", "SANAD افتتاحیه", True, 100),
+            New ModuleOption(MigrationModule.Invoices, "فاکتورها (+ تسویه همزمان)", "FACTURE/FACTART", True, 110),
+            New ModuleOption(MigrationModule.WarehouseDocs, "اسناد انبار (از فاکتور)", "warehouse post", True, 120),
+            New ModuleOption(MigrationModule.ReceiptsPayments, "دریافت/پرداخت مستقل", "SANAD Type≈20", True, 130),
+            New ModuleOption(MigrationModule.Checks, "چک‌ها", "Check", True, 140),
+            New ModuleOption(MigrationModule.ExpenseIncome, "هزینه و درآمد", "SANAD هزینه/درآمد", True, 150),
+            New ModuleOption(MigrationModule.ManualJournals, "اسناد دستی/عمومی", "SANAD Type 13/14/…", True, 160)
+        }
+    End Function
+
+    Public Shared Function GetAllModules() As List(Of ModuleOption)
+        Dim list = GetBaseModules()
+        list.AddRange(GetDocumentModules())
+        Return list
+    End Function
+
     Public Shared Function TitleOf(m As MigrationModule) As String
         Select Case m
             Case MigrationModule.Warehouses : Return "انبارها"
@@ -30,8 +55,23 @@ Friend NotInheritable Class MigrationModuleInfo
             Case MigrationModule.CashRegisters : Return "صندوق‌ها"
             Case MigrationModule.PettyCash : Return "تنخواه"
             Case MigrationModule.Products : Return "کالا و خدمات"
+            Case MigrationModule.FiscalYearsAndOpening : Return "سال مالی و افتتاحیه"
+            Case MigrationModule.Invoices : Return "فاکتورها"
+            Case MigrationModule.WarehouseDocs : Return "اسناد انبار"
+            Case MigrationModule.ReceiptsPayments : Return "دریافت/پرداخت"
+            Case MigrationModule.Checks : Return "چک‌ها"
+            Case MigrationModule.ExpenseIncome : Return "هزینه/درآمد"
+            Case MigrationModule.ManualJournals : Return "اسناد دستی"
             Case Else : Return m.ToString()
         End Select
+    End Function
+
+    Public Shared Function IsDocumentModule(m As MigrationModule) As Boolean
+        Return CInt(m) >= 10
+    End Function
+
+    Public Shared Function IsBaseModule(m As MigrationModule) As Boolean
+        Return CInt(m) < 10
     End Function
 End Class
 
@@ -60,6 +100,25 @@ Friend Class PreflightIssue
     Public Property Detail As String
 End Class
 
+Friend Class DetectedFiscalYear
+    Public Property Title As String
+    Public Property StartDate As Date
+    Public Property EndDate As Date
+    Public Property DocumentCount As Long
+    Public Property InvoiceCount As Long
+    Public Property HesabixId As Integer
+End Class
+
+Friend Class CurrencyModeInfo
+    Public Property Mode As String ' MonoCurrency | MultiCurrency
+    Public Property BaseMoneyCode As Integer
+    Public Property BaseMoneyName As String
+    Public Property DefinedCount As Integer
+    Public Property InvoiceForeignUsage As Long
+    Public Property SanadForeignUsage As Long
+    Public Property CashArzUsage As Long
+End Class
+
 Friend Class PreflightReport
     Public Property HolooCompanyName As String
     Public Property HesabixBusinessName As String
@@ -71,6 +130,9 @@ Friend Class PreflightReport
     Public Property CanProceed As Boolean = True
     Public Property Issues As New List(Of PreflightIssue)
     Public Property ModuleCounts As New Dictionary(Of String, Long)
+    Public Property CurrencyMode As CurrencyModeInfo
+    Public Property FiscalYears As New List(Of DetectedFiscalYear)
+    Public Property FullHistorySelected As Boolean
 End Class
 
 Friend Class TransferProgressEventArgs

@@ -51,37 +51,37 @@
     <ROW Component="ProductInformation" Value="{4E98685A-A271-430F-A25E-6C9880DEC868}"/>
   </COMPONENT>
   <COMPONENT cid="caphyon.advinst.msicomp.MsiCompsComponent">
-    <ROW Component="AssetManifest.bin" ComponentId="{BDFD7F6E-509F-47B9-9EAC-560BCF4F7E76}" Directory_="flutter_assets_Dir" Attributes="0" KeyPath="AssetManifest.bin" Type="0"/>
-    <ROW Component="CupertinoIcons.ttf" ComponentId="{500AC836-60C9-45D9-AFB0-B04BB6E17F83}" Directory_="assets_1_Dir" Attributes="0" Type="0"/>
-    <ROW Component="MaterialIconsRegular.otf" ComponentId="{024B70F4-E3EB-4A3A-87DD-5B9A4E7F6E52}" Directory_="fonts_1_Dir" Attributes="0" KeyPath="MaterialIconsRegular.otf" Type="0"/>
+    <ROW Component="AssetManifest.bin" ComponentId="{85561CF9-AF01-46AB-9C9F-7352ADD3779F}" Directory_="flutter_assets_Dir" Attributes="0" KeyPath="AssetManifest.bin" Type="0"/>
+    <ROW Component="CupertinoIcons.ttf" ComponentId="{94DF94FE-CD35-4FB7-BE11-F8EBA6F75F1D}" Directory_="assets_1_Dir" Attributes="0" Type="0"/>
+    <ROW Component="MaterialIconsRegular.otf" ComponentId="{A3E90E51-F718-42FA-9B13-2050867388CB}" Directory_="fonts_1_Dir" Attributes="0" KeyPath="MaterialIconsRegular.otf" Type="0"/>
     <ROW Component="ProductInformation" ComponentId="{4E98685A-A271-430F-A25E-6C9880DEC868}" Directory_="APPDIR" Attributes="4" KeyPath="Version"/>
-    <ROW Component="RobotoBold.ttf" ComponentId="{0C0A706D-F529-46F2-814C-2629D267A38A}" Directory_="fonts_Dir" Attributes="0" Type="0"/>
-    <ROW Component="SHORTCUTDIR" ComponentId="{3E7693A0-AD54-4439-9F5F-0AAD79726429}" Directory_="SHORTCUTDIR" Attributes="0"/>
-    <ROW Component="app.so" ComponentId="{09A182EF-21DC-4F08-9955-AF84B3F4AA56}" Directory_="data_Dir" Attributes="0" KeyPath="app.so" Type="0"/>
-    <ROW Component="connectivity_plus_plugin.dll" ComponentId="{43B363CF-D271-4BDC-BBBA-DF8F15EA6794}" Directory_="APPDIR" Attributes="256" KeyPath="connectivity_plus_plugin.dll"/>
-    <ROW Component="dartjni.dll" ComponentId="{B903BC64-FC6A-4439-AC10-0C450B0CD6D8}" Directory_="APPDIR" Attributes="256" KeyPath="dartjni.dll"/>
-    <ROW Component="desktop_drop_plugin.dll" ComponentId="{A3FA396D-1FC3-4D05-A0B9-867FC046201D}" Directory_="APPDIR" Attributes="256" KeyPath="desktop_drop_plugin.dll"/>
-    <ROW Component="favicon.ico.backup" ComponentId="{420EE01F-F124-44C9-97BC-26AB10E5494A}" Directory_="images_Dir" Attributes="0" KeyPath="favicon.ico.backup" Type="0"/>
-    <ROW Component="file_saver_plugin.dll" ComponentId="{A5AB82C7-3B86-48DD-BFD0-D39E075C8999}" Directory_="APPDIR" Attributes="256" KeyPath="file_saver_plugin.dll"/>
-    <ROW Component="file_selector_windows_plugin.dll" ComponentId="{10D5FFBC-F583-4C7B-8E84-2460E861D0C1}" Directory_="APPDIR" Attributes="256" KeyPath="file_selector_windows_plugin.dll"/>
-    <ROW Component="flutter_local_notifications_windows.dll" ComponentId="{CD7BC6E4-B1B3-4308-A321-6CB8DFF91929}" Directory_="APPDIR" Attributes="256" KeyPath="flutter_local_notifications_windows.dll"/>
-    <ROW Component="flutter_map_logo.png" ComponentId="{C0865E8B-55C1-4331-92A9-53FF4DF933AD}" Directory_="assets_2_Dir" Attributes="0" KeyPath="flutter_map_logo.png" Type="0"/>
-    <ROW Component="flutter_secure_storage_windows_plugin.dll" ComponentId="{9D635E34-F10D-47B6-BB1B-6FECFCF1C85D}" Directory_="APPDIR" Attributes="256" KeyPath="flutter_secure_storage_windows_plugin.dll"/>
-    <ROW Component="flutter_sound.js" ComponentId="{E02826E6-1F08-4E9B-9A0C-784A22109227}" Directory_="src_Dir" Attributes="0" KeyPath="flutter_sound.js" Type="0"/>
-    <ROW Component="flutter_sound_plugin.dll" ComponentId="{DB818D41-AE32-4E69-91C8-3F2FCF44AD86}" Directory_="APPDIR" Attributes="256" KeyPath="flutter_sound_plugin.dll"/>
-    <ROW Component="flutter_windows.dll" ComponentId="{57695992-663F-4B83-8A4C-124E15A9AE87}" Directory_="APPDIR" Attributes="256" KeyPath="flutter_windows.dll"/>
-    <ROW Component="geolocator_windows_plugin.dll" ComponentId="{EC7B06B3-CD2A-4A6A-9D1F-3053885C3311}" Directory_="APPDIR" Attributes="256" KeyPath="geolocator_windows_plugin.dll"/>
-    <ROW Component="hesabix_ui.exe" ComponentId="{907B323F-089D-44AE-BBAA-4ACB444ED0D9}" Directory_="APPDIR" Attributes="256" KeyPath="hesabix_ui.exe"/>
-    <ROW Component="howler.js" ComponentId="{F2242A46-CEE9-444B-A478-A20A5C5EE8BF}" Directory_="howler_Dir" Attributes="0" KeyPath="howler.js" Type="0"/>
-    <ROW Component="ink_sparkle.frag" ComponentId="{B121A1D8-A16A-4849-96DC-665DBD8FBFA6}" Directory_="shaders_Dir" Attributes="0" KeyPath="ink_sparkle.frag" Type="0"/>
-    <ROW Component="local_auth_windows_plugin.dll" ComponentId="{375B5671-7EFC-48D7-BD82-73B1682A050B}" Directory_="APPDIR" Attributes="256" KeyPath="local_auth_windows_plugin.dll"/>
-    <ROW Component="native_assets.json" ComponentId="{ADD656E5-1F54-4399-A3FC-77BEC8F9D27C}" Directory_="APPDIR" Attributes="0" KeyPath="native_assets.json" Type="0"/>
-    <ROW Component="notifications_service_worker.js" ComponentId="{9F80B9C4-2121-45CD-A2A5-C78E55E48FFD}" Directory_="web_Dir" Attributes="0" KeyPath="notifications_service_worker.js" Type="0"/>
-    <ROW Component="pdfium.dll" ComponentId="{31B77DFC-A29B-44AB-8B16-19B2B4C8C853}" Directory_="APPDIR" Attributes="256" KeyPath="pdfium.dll"/>
-    <ROW Component="permission_handler_windows_plugin.dll" ComponentId="{3C8FFF17-B72E-4FBD-8A11-18951A22D742}" Directory_="APPDIR" Attributes="256" KeyPath="permission_handler_windows_plugin.dll"/>
-    <ROW Component="printing_plugin.dll" ComponentId="{92ABB4FD-F8BC-4ED0-97A8-E75CD894AC75}" Directory_="APPDIR" Attributes="256" KeyPath="printing_plugin.dll"/>
-    <ROW Component="share_plus_plugin.dll" ComponentId="{1185B7BD-7149-49C5-B62F-DABEF0CC8C6D}" Directory_="APPDIR" Attributes="256" KeyPath="share_plus_plugin.dll"/>
-    <ROW Component="url_launcher_windows_plugin.dll" ComponentId="{B5A0FA7F-98E6-4595-B32C-B5FA2CA20F67}" Directory_="APPDIR" Attributes="256" KeyPath="url_launcher_windows_plugin.dll"/>
+    <ROW Component="RobotoBold.ttf" ComponentId="{11583852-66D0-4407-B1D2-029962C7360C}" Directory_="fonts_Dir" Attributes="0" Type="0"/>
+    <ROW Component="SHORTCUTDIR" ComponentId="{B370BF54-81D9-482D-8A4E-6CB2138DA988}" Directory_="SHORTCUTDIR" Attributes="0"/>
+    <ROW Component="app.so" ComponentId="{F28A5791-C55E-445C-98F3-AF80DB14853F}" Directory_="data_Dir" Attributes="0" KeyPath="app.so" Type="0"/>
+    <ROW Component="connectivity_plus_plugin.dll" ComponentId="{81423CA0-7D9C-4481-B940-2E4798966ED8}" Directory_="APPDIR" Attributes="256" KeyPath="connectivity_plus_plugin.dll"/>
+    <ROW Component="dartjni.dll" ComponentId="{AC9D5193-3113-4BAE-83BA-F0EAC061534F}" Directory_="APPDIR" Attributes="256" KeyPath="dartjni.dll"/>
+    <ROW Component="desktop_drop_plugin.dll" ComponentId="{2C23DAEA-FCED-4688-8A4A-8C8A1AB05C9A}" Directory_="APPDIR" Attributes="256" KeyPath="desktop_drop_plugin.dll"/>
+    <ROW Component="favicon.ico.backup" ComponentId="{9B868EB3-4CA8-48F4-A865-CEBCDCE87768}" Directory_="images_Dir" Attributes="0" KeyPath="favicon.ico.backup" Type="0"/>
+    <ROW Component="file_saver_plugin.dll" ComponentId="{9A91E381-C494-491E-B689-6CF9D25EDA1E}" Directory_="APPDIR" Attributes="256" KeyPath="file_saver_plugin.dll"/>
+    <ROW Component="file_selector_windows_plugin.dll" ComponentId="{85EAAAB9-6CAB-4A08-B9D1-ED0A5025FC8A}" Directory_="APPDIR" Attributes="256" KeyPath="file_selector_windows_plugin.dll"/>
+    <ROW Component="flutter_local_notifications_windows.dll" ComponentId="{515E1236-B6F8-4982-98F3-7C3BC74CCAEF}" Directory_="APPDIR" Attributes="256" KeyPath="flutter_local_notifications_windows.dll"/>
+    <ROW Component="flutter_map_logo.png" ComponentId="{E3166F7A-BC39-4A4A-8579-DEEA917148EA}" Directory_="assets_2_Dir" Attributes="0" KeyPath="flutter_map_logo.png" Type="0"/>
+    <ROW Component="flutter_secure_storage_windows_plugin.dll" ComponentId="{D430E955-C74F-4F89-9313-7CB7A8E88A82}" Directory_="APPDIR" Attributes="256" KeyPath="flutter_secure_storage_windows_plugin.dll"/>
+    <ROW Component="flutter_sound.js" ComponentId="{8B7B26B4-561B-435A-83DE-50E546C40F6A}" Directory_="src_Dir" Attributes="0" KeyPath="flutter_sound.js" Type="0"/>
+    <ROW Component="flutter_sound_plugin.dll" ComponentId="{46ED770B-C9DA-47AC-82B3-4467E1149693}" Directory_="APPDIR" Attributes="256" KeyPath="flutter_sound_plugin.dll"/>
+    <ROW Component="flutter_windows.dll" ComponentId="{B23BE4F8-4D31-457E-AB8F-A219851091F2}" Directory_="APPDIR" Attributes="256" KeyPath="flutter_windows.dll"/>
+    <ROW Component="geolocator_windows_plugin.dll" ComponentId="{B0DE6FDA-4071-4FBA-B808-5A8AA741CF74}" Directory_="APPDIR" Attributes="256" KeyPath="geolocator_windows_plugin.dll"/>
+    <ROW Component="hesabix_ui.exe" ComponentId="{0E80D726-9F5E-4A37-A667-D2EBA77D75C4}" Directory_="APPDIR" Attributes="256" KeyPath="hesabix_ui.exe"/>
+    <ROW Component="howler.js" ComponentId="{BE62AED9-D9B3-4BA2-ABE9-943C6664710E}" Directory_="howler_Dir" Attributes="0" KeyPath="howler.js" Type="0"/>
+    <ROW Component="ink_sparkle.frag" ComponentId="{CD577660-FE68-4D06-A020-01FA1B48B2EE}" Directory_="shaders_Dir" Attributes="0" KeyPath="ink_sparkle.frag" Type="0"/>
+    <ROW Component="local_auth_windows_plugin.dll" ComponentId="{F68EC451-C330-4BBD-B2BF-6029DE287309}" Directory_="APPDIR" Attributes="256" KeyPath="local_auth_windows_plugin.dll"/>
+    <ROW Component="native_assets.json" ComponentId="{94BA78E5-7D03-471C-8306-4D60EEE3D921}" Directory_="APPDIR" Attributes="0" KeyPath="native_assets.json" Type="0"/>
+    <ROW Component="notifications_service_worker.js" ComponentId="{A3240955-802C-49B1-88B0-FD1B4A1D571E}" Directory_="web_Dir" Attributes="0" KeyPath="notifications_service_worker.js" Type="0"/>
+    <ROW Component="pdfium.dll" ComponentId="{E034C087-E7A8-45DD-95D5-C6AA1D34FD70}" Directory_="APPDIR" Attributes="256" KeyPath="pdfium.dll"/>
+    <ROW Component="permission_handler_windows_plugin.dll" ComponentId="{9377BA01-1A6F-4E0D-B078-B172C845D3D5}" Directory_="APPDIR" Attributes="256" KeyPath="permission_handler_windows_plugin.dll"/>
+    <ROW Component="printing_plugin.dll" ComponentId="{83490788-2F8F-4F6E-852A-2287990DB88E}" Directory_="APPDIR" Attributes="256" KeyPath="printing_plugin.dll"/>
+    <ROW Component="share_plus_plugin.dll" ComponentId="{90FE7DF1-4746-4030-B62A-45AD3F2BE92B}" Directory_="APPDIR" Attributes="256" KeyPath="share_plus_plugin.dll"/>
+    <ROW Component="url_launcher_windows_plugin.dll" ComponentId="{FC5AAD66-71CB-4EC1-80FF-BFA332F03CF2}" Directory_="APPDIR" Attributes="256" KeyPath="url_launcher_windows_plugin.dll"/>
   </COMPONENT>
   <COMPONENT cid="caphyon.advinst.msicomp.MsiFeatsComponent">
     <ROW Feature="MainFeature" Title="MainFeature" Description="Description" Display="1" Level="1" Directory_="APPDIR" Attributes="0"/>

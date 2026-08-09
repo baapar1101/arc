@@ -207,6 +207,34 @@ async def create_receipt_payment_endpoint(
     )
 
 
+@router.post(
+    "/businesses/{business_id}/receipts-payments/bulk-upsert",
+    summary="ایجاد/ویرایش گروهی دریافت و پرداخت",
+    description=(
+        "بدنه: `{ items:[{client_ref?, document_id?, payload}], migration_mode? }`؛ "
+        "حداکثر ۲۰۰ آیتم؛ payload همان بدنه ایجاد تکی است."
+    ),
+)
+@require_business_access("business_id")
+async def bulk_upsert_receipts_payments_endpoint(
+    request: Request,
+    business_id: int = Path(..., gt=0),
+    body: Dict[str, Any] = Body(...),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+):
+    from app.services.receipt_payment_bulk_upsert_service import (
+        bulk_upsert_receipts_payments_integration,
+    )
+
+    data = bulk_upsert_receipts_payments_integration(db, business_id, ctx, body)
+    return success_response(
+        data=data,
+        request=request,
+        message="BULK_RECEIPT_PAYMENT_UPSERT_COMPLETED",
+    )
+
+
 @router.get(
     "/receipts-payments/{document_id}",
     summary="جزئیات سند دریافت/پرداخت",

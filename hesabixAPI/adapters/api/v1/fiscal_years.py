@@ -343,6 +343,266 @@ class FiscalYearUpdateRequest(BaseModel):
     end_date: date = Field(..., description="تاریخ پایان سال مالی")
 
 
+class FiscalYearCreateRequest(BaseModel):
+    title: str = Field(..., min_length=1, max_length=255, description="عنوان سال مالی")
+    start_date: date = Field(..., description="تاریخ شروع سال مالی")
+    end_date: date = Field(..., description="تاریخ پایان سال مالی")
+    set_as_current: bool = Field(
+        default=False,
+        description="اگر true باشد این سال جاری می‌شود؛ در غیر این صورت بدون تغییر is_last سال‌های موجود ایجاد می‌شود",
+    )
+
+
+@router.post("/{business_id}/fiscal-years")
+@require_business_access("business_id")
+def create_fiscal_year_endpoint(
+    request: Request,
+    business_id: int,
+    payload: FiscalYearCreateRequest = Body(...),
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_dep("fiscal_years", "edit")),
+) -> Dict[str, Any]:
+    """ایجاد سال مالی جدید (برای مهاجرت چندساله بدون بستن حسابداری)."""
+    if payload.start_date >= payload.end_date:
+        raise ApiError("INVALID_DATE_RANGE", "تاریخ شروع باید قبل از تاریخ پایان باشد", http_status=400)
+
+    repo = FiscalYearRepository(db)
+    all_fiscal = repo.list_by_business(business_id)
+    for fy in all_fiscal:
+        if _date_ranges_overlap(payload.start_date, payload.end_date, fy.start_date, fy.end_date):
+            raise ApiError(
+                "FISCAL_YEAR_RANGE_OVERLAP",
+                f"بازهٔ انتخاب‌شده با سال مالی «{fy.title}» همپوشانی دارد.",
+                http_status=400,
+                details={
+                    "conflicting_fiscal_year_id": fy.id,
+                    "conflicting_start_date": fy.start_date.isoformat(),
+                    "conflicting_end_date": fy.end_date.isoformat(),
+                },
+            )
+
+    is_last = bool(payload.set_as_current) or len(all_fiscal) == 0
+    if is_last and all_fiscal:
+        for fy in all_fiscal:
+            if fy.is_last:
+                fy.is_last = False
+                db.add(fy)
+        db.flush()
+
+    fiscal_year = repo.create_fiscal_year(
+        business_id=business_id,
+        title=payload.title,
+        start_date=payload.start_date,
+        end_date=payload.end_date,
+        is_last=is_last,
+    )
+
+    cache = get_cache()
+    if cache.enabled:
+        cache.delete(f"fiscal_years:{business_id}")
+
+    data = {
+        "id": fiscal_year.id,
+        "title": fiscal_year.title,
+        "start_date": fiscal_year.start_date,
+        "end_date": fiscal_year.end_date,
+        "is_current": fiscal_year.is_last,
+    }
+    return success_response(
+        data=format_datetime_fields(data, request),
+        request=request,
+        message="FISCAL_YEAR_CREATED_SUCCESSFULLY",
+    )
+
+
+@router.post("/{business_id}/fiscal-years/{fiscal_year_id}/set-current")
+@require_business_access("business_id")
+def set_current_fiscal_year_endpoint(
+    request: Request,
+    business_id: int,
+    fiscal_year_id: int,
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_dep("fiscal_years", "edit")),
+) -> Dict[str, Any]:
+    """
+    تعویض نرم سال مالی جاری (فقط is_last) بدون بستن سود و زیان.
+    مناسب مهاجرت تاریخچه سال‌به‌سال (Holoo و مشابه).
+    """
+    repo = FiscalYearRepository(db)
+    fiscal_year = repo.set_current_for_business(business_id, fiscal_year_id)
+
+    cache = get_cache()
+    if cache.enabled:
+        cache.delete(f"fiscal_years:{business_id}")
+
+    data = {
+        "id": fiscal_year.id,
+        "title": fiscal_year.title,
+        "start_date": fiscal_year.start_date,
+        "end_date": fiscal_year.end_date,
+        "is_current": fiscal_year.is_last,
+    }
+    return success_response(
+        data=format_datetime_fields(data, request),
+        request=request,
+        message="FISCAL_YEAR_SET_CURRENT_SUCCESSFULLY",
+    )
+
+
+class MigrationEnsureYearsRequest(BaseModel):
+    years: List[FiscalYearCreateRequest] = Field(..., min_items=1)
+    current_start_date: Optional[date] = Field(
+        None,
+        description="اگر مشخص شود، سالی که start_date برابر این مقدار است جاری می‌شود",
+    )
+
+
+@router.post("/{business_id}/fiscal-years/migration/ensure")
+@require_business_access("business_id")
+def migration_ensure_fiscal_years(
+    request: Request,
+    business_id: int,
+    payload: MigrationEnsureYearsRequest = Body(...),
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_dep("fiscal_years", "edit")),
+) -> Dict[str, Any]:
+    """ایجاد/بازیابی دسته‌ای سال‌های مالی برای مهاجرت بدون بستن حسابداری."""
+    repo = FiscalYearRepository(db)
+    existing = repo.list_by_business(business_id)
+    by_start = {fy.start_date: fy for fy in existing}
+
+    created_count = 0
+    reused_count = 0
+    items_out: List[Dict[str, Any]] = []
+
+    for y in sorted(payload.years, key=lambda x: x.start_date):
+        if y.start_date >= y.end_date:
+            raise ApiError("INVALID_DATE_RANGE", "تاریخ شروع باید قبل از تاریخ پایان باشد", http_status=400)
+        found = by_start.get(y.start_date)
+        if found is not None:
+            reused_count += 1
+            items_out.append(
+                {
+                    "id": found.id,
+                    "title": found.title,
+                    "start_date": found.start_date,
+                    "end_date": found.end_date,
+                    "is_current": found.is_last,
+                }
+            )
+            continue
+
+        for fy in existing:
+            if _date_ranges_overlap(y.start_date, y.end_date, fy.start_date, fy.end_date):
+                raise ApiError(
+                    "FISCAL_YEAR_RANGE_OVERLAP",
+                    f"بازهٔ «{y.title}» با سال مالی «{fy.title}» همپوشانی دارد.",
+                    http_status=400,
+                )
+
+        is_first = len(existing) == 0 and created_count == 0
+        fy_new = repo.create_fiscal_year(
+            business_id=business_id,
+            title=y.title,
+            start_date=y.start_date,
+            end_date=y.end_date,
+            is_last=is_first,
+            commit=False,
+        )
+        existing.append(fy_new)
+        by_start[y.start_date] = fy_new
+        created_count += 1
+        items_out.append(
+            {
+                "id": fy_new.id,
+                "title": fy_new.title,
+                "start_date": fy_new.start_date,
+                "end_date": fy_new.end_date,
+                "is_current": fy_new.is_last,
+            }
+        )
+
+    db.commit()
+
+    current = repo.get_current_for_business(business_id)
+    if payload.current_start_date is not None:
+        target = by_start.get(payload.current_start_date)
+        if target is None:
+            raise ApiError(
+                "FISCAL_YEAR_NOT_FOUND",
+                "سال مالی با start_date درخواستی یافت نشد",
+                http_status=404,
+            )
+        current = repo.set_current_for_business(business_id, int(target.id))
+        for row in items_out:
+            row["is_current"] = int(row["id"]) == int(current.id)
+
+    cache = get_cache()
+    if cache.enabled:
+        cache.delete(f"fiscal_years:{business_id}")
+
+    current_data = None
+    if current is not None:
+        current_data = {
+            "id": current.id,
+            "title": current.title,
+            "start_date": current.start_date,
+            "end_date": current.end_date,
+            "is_current": current.is_last,
+        }
+
+    return success_response(
+        data=format_datetime_fields(
+            {
+                "items": items_out,
+                "created_count": created_count,
+                "reused_count": reused_count,
+                "current": current_data,
+            },
+            request,
+        ),
+        request=request,
+        message="FISCAL_YEARS_ENSURED_FOR_MIGRATION",
+    )
+
+
+class MigrationSetCurrentRequest(BaseModel):
+    fiscal_year_id: int = Field(..., gt=0)
+
+
+@router.post("/{business_id}/fiscal-years/migration/set-current")
+@require_business_access("business_id")
+def migration_set_current_fiscal_year(
+    request: Request,
+    business_id: int,
+    payload: MigrationSetCurrentRequest = Body(...),
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_dep("fiscal_years", "edit")),
+) -> Dict[str, Any]:
+    """تعویض نرم سال جاری برای مهاجرت (سازگار با کلاینت Holoo2Hesabix)."""
+    repo = FiscalYearRepository(db)
+    fiscal_year = repo.set_current_for_business(business_id, int(payload.fiscal_year_id))
+    cache = get_cache()
+    if cache.enabled:
+        cache.delete(f"fiscal_years:{business_id}")
+    current_data = {
+        "id": fiscal_year.id,
+        "title": fiscal_year.title,
+        "start_date": fiscal_year.start_date,
+        "end_date": fiscal_year.end_date,
+        "is_current": fiscal_year.is_last,
+    }
+    return success_response(
+        data=format_datetime_fields({"current": current_data}, request),
+        request=request,
+        message="FISCAL_YEAR_SET_CURRENT_SUCCESSFULLY",
+    )
+
+
 @router.put("/{business_id}/fiscal-years/current")
 @require_business_access("business_id")
 def update_current_fiscal_year(

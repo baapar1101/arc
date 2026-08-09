@@ -244,7 +244,8 @@ $uploadHeaders = @{
     Authorization = $headers.Authorization
     "Content-Type" = "application/octet-stream"
 }
-$uploaded = Invoke-RestMethod -Method POST -Uri $uploadUrl -Headers $uploadHeaders -InFile $MsiPath
+# Large MSIs often exceed the default WebRequest timeout on Forgejo.
+$uploaded = Invoke-RestMethod -Method POST -Uri $uploadUrl -Headers $uploadHeaders -InFile $MsiPath -TimeoutSec 900
 if (-not $uploaded.id) {
     throw "Upload failed: $($uploaded | ConvertTo-Json -Compress)"
 }

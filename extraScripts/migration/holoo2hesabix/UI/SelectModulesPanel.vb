@@ -21,7 +21,7 @@ Friend Class SelectModulesPanel
         Padding = New Padding(28, 16, 28, 16)
 
         Dim title As New Label() With {
-            .Text = "انتخاب بخش‌های اطلاعات پایه",
+            .Text = "انتخاب بخش‌های انتقال",
             .Font = AppTheme.FontTitle,
             .ForeColor = AppTheme.TextPrimary,
             .AutoSize = True,
@@ -29,7 +29,7 @@ Friend Class SelectModulesPanel
             .RightToLeft = RightToLeft.Yes
         }
         Dim subtitle As New Label() With {
-            .Text = "در این فاز فقط اطلاعات پایه منتقل می‌شود. اسناد و فاکتورها بعداً اضافه می‌شوند.",
+            .Text = "اطلاعات پایه و اسناد (Full History). برای تاریخچه کامل، ماژول‌های سند را هم انتخاب کنید.",
             .Font = AppTheme.FontSubtitle,
             .ForeColor = AppTheme.TextSecondary,
             .AutoSize = True,
@@ -53,7 +53,7 @@ Friend Class SelectModulesPanel
             .ForeColor = AppTheme.TextMuted,
             .Font = AppTheme.FontStep,
             .RightToLeft = RightToLeft.Yes,
-            .Text = "چک‌های عملیاتی، فاکتور، اسناد انبار/حسابداری و سرفصل در فاز بعد هستند."
+            .Text = "با انتخاب فاکتور/اسناد، انتقال سال‌به‌سال (Full History) فعال می‌شود و مانده افتتاحیه اشخاص/کالا جداگانه ارسال نمی‌شود."
         }
 
         Controls.Add(title)
@@ -75,7 +75,14 @@ Friend Class SelectModulesPanel
         _host.Controls.Clear()
         _chkList.Clear()
         If _session.SelectedModules Is Nothing OrElse _session.SelectedModules.Count = 0 Then
-            _session.SelectedModules = MigrationModuleInfo.GetBaseModules()
+            _session.SelectedModules = MigrationModuleInfo.GetAllModules()
+        Else
+            Dim existing = New HashSet(Of MigrationModule)(_session.SelectedModules.Select(Function(x) x.ModuleKey))
+            For Each opt In MigrationModuleInfo.GetAllModules()
+                If Not existing.Contains(opt.ModuleKey) Then
+                    _session.SelectedModules.Add(opt)
+                End If
+            Next
         End If
 
         Dim y = 16
@@ -115,7 +122,7 @@ Friend Class SelectModulesPanel
             .Location = New Point(20, y + 12),
             .ForeColor = AppTheme.TextMuted,
             .Font = AppTheme.FontUi,
-            .Text = "فاز بعد (غیرفعال): فاکتورها · اسناد انبار · اسناد حسابداری · سرفصل‌ها · چک‌های عملیاتی",
+            .Text = "نکته: اسناد Type=5 و Type=0 لینک‌شده به چک از مسیر «چک‌ها» منتقل می‌شوند (جلوگیری از GL دوبل).",
             .RightToLeft = RightToLeft.Yes
         }
         _host.Controls.Add(later)
