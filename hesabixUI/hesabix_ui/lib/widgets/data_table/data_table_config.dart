@@ -268,6 +268,8 @@ class DataTableConfig<T> {
   final bool showExportButtons;
   final bool showExcelExport;
   final bool showPdfExport;
+  /// برای خروجی‌های سنگین (مثل کالاها): export-all از جاب پس‌زمینه استفاده می‌کند.
+  final bool preferAsyncExcelExport;
   // Report templates scope (for PDF custom templates)
   final int? businessId; // needed to fetch templates
   final String? reportModuleKey;
@@ -409,6 +411,7 @@ class DataTableConfig<T> {
     this.showExportButtons = false,
     this.showExcelExport = true,
     this.showPdfExport = true,
+    this.preferAsyncExcelExport = false,
     this.businessId,
     this.reportModuleKey,
     this.reportSubtype,

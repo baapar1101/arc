@@ -236,28 +236,35 @@ class ErrorExtractor {
   }
 
   /// قطع/تایم‌اوت اتصال یا خطای سطح سوکت (بفراتر از صرف [DioException.message]).
+  /// توجه: receive/send/connection timeout را اینجا «قطع اینترنت» حساب نکن —
+  /// پیام‌های اختصاصی تایم‌اوت در [_dioExceptionMessage] نمایش داده می‌شوند.
   static bool _isNetworkConnectivityFailure(dio.DioException e) {
     final type = e.type;
-    if (type == dio.DioExceptionType.connectionTimeout ||
-        type == dio.DioExceptionType.receiveTimeout ||
-        type == dio.DioExceptionType.sendTimeout ||
-        type == dio.DioExceptionType.connectionError ||
+    if (type == dio.DioExceptionType.connectionError ||
         type == dio.DioExceptionType.badCertificate) {
       return true;
     }
-    if (type == dio.DioExceptionType.badResponse || type == dio.DioExceptionType.cancel) {
+    if (type == dio.DioExceptionType.badResponse ||
+        type == dio.DioExceptionType.cancel ||
+        type == dio.DioExceptionType.connectionTimeout ||
+        type == dio.DioExceptionType.receiveTimeout ||
+        type == dio.DioExceptionType.sendTimeout ||
+        type == dio.DioExceptionType.transformTimeout) {
       return false;
     }
     if (type == dio.DioExceptionType.unknown) {
       final m = (e.message ?? '').toLowerCase();
       final errStr = (e.error?.toString() ?? '').toLowerCase();
+      // تایم‌اوت‌ها → نه «قطع اینترنت»
+      if (m.contains('receive timeout') ||
+          m.contains('send timeout') ||
+          m.contains('connection timeout') ||
+          m.contains('took longer')) {
+        return false;
+      }
       if (m.contains('dioexception') &&
-          (m.contains('connection timeout') ||
-              m.contains('connection error') ||
-              m.contains('receive timeout') ||
-              m.contains('send timeout') ||
+          (m.contains('connection error') ||
               m.contains('aborted') ||
-              m.contains('took longer') ||
               m.contains('larger than') ||
               m.contains('requestoptions'))) {
         return true;

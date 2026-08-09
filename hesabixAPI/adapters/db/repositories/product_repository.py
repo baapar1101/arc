@@ -202,7 +202,7 @@ class ProductRepository(BaseRepository[Product]):
                 try:
                     from app.services.invoice_service import get_financial_stock_bulk
 
-                    with query_timeout(self.db, timeout_seconds=30):
+                    with query_timeout(self.db, timeout_seconds=120):
                         accounting_stocks = get_financial_stock_bulk(
                             db=self.db,
                             business_id=business_id,
@@ -221,7 +221,7 @@ class ProductRepository(BaseRepository[Product]):
                 try:
                     from app.services.warehouse_service import get_physical_stock_bulk
 
-                    with query_timeout(self.db, timeout_seconds=30):
+                    with query_timeout(self.db, timeout_seconds=120):
                         warehouse_stocks = get_physical_stock_bulk(
                             db=self.db,
                             business_id=business_id,
@@ -234,10 +234,23 @@ class ProductRepository(BaseRepository[Product]):
                 except Exception:
                     pass
 
+        # Bulk-load attribute links (avoid N+1 for large list/export)
+        attr_ids_by_product: dict[int, list[int]] = {}
+        if rows:
+            row_ids = [p.id for p in rows]
+            try:
+                link_rows = (
+                    self.db.query(ProductAttributeLink.product_id, ProductAttributeLink.attribute_id)
+                    .filter(ProductAttributeLink.product_id.in_(row_ids))
+                    .all()
+                )
+                for product_id, attribute_id in link_rows:
+                    attr_ids_by_product.setdefault(int(product_id), []).append(int(attribute_id))
+            except Exception:
+                attr_ids_by_product = {}
+
         def _to_dict(p: Product) -> dict[str, Any]:
-            # دریافت attribute_ids از ProductAttributeLink
-            links = self.db.query(ProductAttributeLink).filter(ProductAttributeLink.product_id == p.id).all()
-            attribute_ids = [link.attribute_id for link in links]
+            attribute_ids = attr_ids_by_product.get(p.id, [])
 
             gb_raw = getattr(p, "general_barcodes", None)
             gb_tokens = split_raw_general_barcodes(gb_raw) if gb_raw else []

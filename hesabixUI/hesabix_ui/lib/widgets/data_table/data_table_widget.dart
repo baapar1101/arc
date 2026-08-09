@@ -15,6 +15,8 @@ import 'package:hesabix_ui/core/calendar_controller.dart';
 import 'package:hesabix_ui/services/report_template_service.dart';
 import 'package:hesabix_ui/services/list_filter_preferences_service.dart';
 import 'package:hesabix_ui/services/bytes_export/bytes_export_service.dart';
+import 'package:hesabix_ui/services/business_storage_service.dart';
+import 'package:hesabix_ui/services/job_service.dart';
 import 'data_table_config.dart';
 import 'data_table_search_dialog.dart';
 import 'column_settings_dialog.dart';
@@ -1549,10 +1551,29 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
       // خروجی «همه»: کل نتایج فیلترشده (نه فقط صفحه فعلی جدول).
       // خروجی «انتخاب‌شده»: همان صفحه فعلی — ایندکس‌های انتخاب نسبت به صفحه هستند.
       const exportAllTake = 10000;
-      final includeInventory =
-          widget.config.additionalParams?['include_inventory'] == true;
       final inventoryAsOfDate =
           widget.config.additionalParams?['inventory_as_of_date'] as String?;
+
+      final columnsToShow =
+          widget.config.enableColumnSettings && _visibleColumns.isNotEmpty
+          ? _visibleColumns
+          : widget.config.columns;
+      final dataColumnsToShow = columnsToShow
+          .where((c) => c is! ActionColumn)
+          .toList();
+
+      // فقط وقتی ستون‌های موجودی در خروجی هستند، موجودی را محاسبه کن
+      const inventoryExportKeys = {
+        'inventory_stock_warehouse',
+        'inventory_stock_accounting',
+        'inventory_stock_physical',
+        'inventory_stock_financial',
+        'warehouse_recharge',
+      };
+      final needsInventory = dataColumnsToShow.any(
+        (c) => inventoryExportKeys.contains(c.key),
+      );
+
       final queryInfo = <String, dynamic>{
         'sort_by': _sortBy,
         'sort_desc': _sortDesc,
@@ -1565,7 +1586,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
             : null,
         'filters': filters.isNotEmpty ? filters : null,
       };
-      if (includeInventory) {
+      if (needsInventory) {
         queryInfo['include_inventory'] = true;
         if (inventoryAsOfDate != null && inventoryAsOfDate.isNotEmpty) {
           queryInfo['inventory_as_of_date'] = inventoryAsOfDate;
@@ -1596,13 +1617,6 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
         } catch (_) {}
       }
 
-      final columnsToShow =
-          widget.config.enableColumnSettings && _visibleColumns.isNotEmpty
-          ? _visibleColumns
-          : widget.config.columns;
-      final dataColumnsToShow = columnsToShow
-          .where((c) => c is! ActionColumn)
-          .toList();
       params['export_columns'] = dataColumnsToShow
           .map((c) => {'key': c.key, 'label': c.label})
           .toList();
@@ -1621,31 +1635,108 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
         params.addAll(mergedBodyParamsOverride);
       }
 
+      final exportHeaders = <String, dynamic>{
+        'X-Calendar-Type': (() {
+          final cc = widget.calendarController;
+          if (cc != null) {
+            return cc.isJalali ? 'jalali' : 'gregorian';
+          }
+          final pref = _exportCalendarType;
+          if (pref == 'jalali' || pref == 'gregorian') return pref;
+          final loc = Localizations.localeOf(context);
+          final lang = (loc.languageCode).toLowerCase();
+          return (lang == 'fa') ? 'jalali' : 'gregorian';
+        })(),
+        'Accept-Language': (() {
+          final loc = Localizations.localeOf(context);
+          final lang = loc.languageCode;
+          final country = loc.countryCode;
+          return (country != null && country.isNotEmpty)
+              ? '$lang-$country'
+              : lang;
+        })(),
+      };
+
+      // خروجی کامل Excel کالاها (و جداول مشابه): جاب پس‌زمینه
+      final useAsyncExcel = format == 'excel' &&
+          !selectedOnly &&
+          widget.config.preferAsyncExcelExport &&
+          (widget.config.businessId != null);
+
+      if (useAsyncExcel) {
+        params['async'] = true;
+        final enqueueRes = await api.post<Map<String, dynamic>>(
+          endpoint,
+          data: {...queryInfo, ...params},
+          options: Options(
+            headers: exportHeaders,
+            receiveTimeout: const Duration(minutes: 2),
+            sendTimeout: const Duration(minutes: 1),
+          ),
+          responseType: ResponseType.json,
+        );
+        final payload = enqueueRes.data;
+        Map<String, dynamic>? data;
+        if (payload is Map<String, dynamic>) {
+          final raw = payload['data'];
+          if (raw is Map<String, dynamic>) {
+            data = raw;
+          } else if (raw is Map) {
+            data = raw.cast<String, dynamic>();
+          } else if (payload['job_id'] != null) {
+            data = payload;
+          }
+        }
+        final jobId = data?['job_id']?.toString();
+        if (jobId == null || jobId.isEmpty) {
+          throw StateError(t.exportError);
+        }
+
+        final poll = await JobService(apiClient: api).pollUntilComplete(
+          jobId,
+          interval: const Duration(seconds: 1),
+          timeout: const Duration(minutes: 25),
+        );
+        if (!poll.isSuccess) {
+          throw StateError(poll.errorMessage ?? t.exportError);
+        }
+        final result = poll.result ?? const <String, dynamic>{};
+        final fileId = (result['file_id'] ??
+                (result['file'] is Map ? result['file']['file_id'] : null))
+            ?.toString();
+        if (fileId == null || fileId.isEmpty) {
+          throw StateError(t.exportError);
+        }
+        final filename = (result['filename'] as String?) ??
+            'export_${DateTime.now().millisecondsSinceEpoch}.xlsx';
+        final bizId = widget.config.businessId!;
+        final bytes = await BusinessStorageService(api).downloadFile(
+          businessId: bizId,
+          fileId: fileId,
+        );
+        if (bytes.isEmpty) {
+          throw StateError(t.exportError);
+        }
+        final exportResult = await BytesExportService.export(
+          bytes: bytes,
+          filename: filename,
+          mimeType:
+              'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        );
+        if (mounted) {
+          BytesExportService.showFeedback(context, exportResult);
+        }
+        return exportResult.isSuccess;
+      }
+
       final response = await api.post(
         endpoint,
         data: {...queryInfo, ...params},
         options: Options(
-          headers: {
-            'X-Calendar-Type': (() {
-              final cc = widget.calendarController;
-              if (cc != null) {
-                return cc.isJalali ? 'jalali' : 'gregorian';
-              }
-              final pref = _exportCalendarType;
-              if (pref == 'jalali' || pref == 'gregorian') return pref;
-              final loc = Localizations.localeOf(context);
-              final lang = (loc.languageCode).toLowerCase();
-              return (lang == 'fa') ? 'jalali' : 'gregorian';
-            })(),
-            'Accept-Language': (() {
-              final loc = Localizations.localeOf(context);
-              final lang = loc.languageCode;
-              final country = loc.countryCode;
-              return (country != null && country.isNotEmpty)
-                  ? '$lang-$country'
-                  : lang;
-            })(),
-          },
+          headers: exportHeaders,
+          // خروجی‌های سنگین (Excel/PDF) ممکن است چند دقیقه طول بکشند
+          receiveTimeout: const Duration(minutes: 5),
+          sendTimeout: const Duration(minutes: 2),
         ),
         responseType: ResponseType.bytes,
       );
