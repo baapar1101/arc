@@ -1568,6 +1568,7 @@ class _ProductsPageState extends State<ProductsPage> {
           excelEndpoint: '/api/v1/products/business/${widget.businessId}/export/excel',
           pdfEndpoint: '/api/v1/products/business/${widget.businessId}/export/pdf',
           showExportButtons: true,
+          preferAsyncExcelExport: true,
           businessId: widget.businessId,
           reportModuleKey: 'products',
           reportSubtype: 'list',
