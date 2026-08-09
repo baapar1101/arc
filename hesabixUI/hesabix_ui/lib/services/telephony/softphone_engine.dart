@@ -115,8 +115,14 @@ class SoftphoneEngine extends ChangeNotifier with WidgetsBindingObserver {
 
     try {
       _media ??= createSoftphonePcmMedia(sampleRate: 8000, numChannels: 1);
-      await _media!.start();
-      mediaReady = true;
+      try {
+        await _media!.start();
+        mediaReady = true;
+      } catch (e) {
+        // Signaling must still connect; live audio retries on bridge.active.
+        mediaReady = false;
+        error = 'مدیا آماده نشد: $e';
+      }
 
       final created = await _api.createSoftphoneSession(businessId, {
         if (mode != null) 'mode': mode,

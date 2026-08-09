@@ -192,19 +192,34 @@ if ($null -ne $existing -and $null -ne $existing.id -and "$($existing.id)" -ne "
     foreach ($a in $winAssets) {
         if ($a.name -eq $ASSET_NAME -or $ForceAsset) {
             Write-Host "WARN: Deleting existing asset $($a.name) (id=$($a.id))"
-            try {
-                Invoke-RestMethod -Method DELETE `
-                    -Uri "$ApiBase/repos/$Owner/$Repo/releases/assets/$($a.id)" `
-                    -Headers $headers | Out-Null
-            } catch {
-                Write-Host "WARN: Could not delete asset $($a.name); continuing upload ($($_.Exception.Message))"
+            $deleted = $false
+            foreach ($delUri in @(
+                    "$ApiBase/repos/$Owner/$Repo/releases/$releaseId/assets/$($a.id)",
+                    "$ApiBase/repos/$Owner/$Repo/releases/assets/$($a.id)"
+                )) {
+                try {
+                    $null = Invoke-WebRequest -Method DELETE -Uri $delUri -Headers $headers -UseBasicParsing
+                    $deleted = $true
+                    break
+                } catch {
+                    $code = $null
+                    if ($_.Exception.Response) { $code = [int]$_.Exception.Response.StatusCode }
+                    # Forgejo may return 404 even when the asset is gone; re-check below.
+                    Write-Host ("WARN: Delete via {0} failed ({1}); trying next." -f $delUri, $(if ($code) { $code } else { $_.Exception.Message }))
+                }
+            }
+            if (-not $deleted) {
+                Write-Host "WARN: Could not confirm delete for $($a.name); will re-check before upload."
             }
         }
     }
     $existing = Invoke-ForgejoJson -Method GET -Url $tagUrl
     $dup = @($existing.assets | Where-Object { $_.name -eq $ASSET_NAME })
     if ($dup.Count -gt 0) {
-        throw "Asset $ASSET_NAME already exists on release $VERSION. Use -ForceAsset to replace."
+        if (-not $ForceAsset) {
+            throw "Asset $ASSET_NAME already exists on release $VERSION. Use -ForceAsset to replace."
+        }
+        throw ("Asset {0} still present after delete attempts (id={1}). Delete it in the Forgejo UI, then re-run." -f $ASSET_NAME, $dup[0].id)
     }
 } else {
     Write-Host "INFO: Creating release $VERSION..."

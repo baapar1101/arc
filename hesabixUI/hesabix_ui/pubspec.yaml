@@ -62,6 +62,7 @@ dependencies:
   pdf: ^3.11.3
   barcode: ^2.2.9
   flutter_sound: ^9.2.13
+  ffi: ^2.1.4
   permission_handler: ^11.3.1
   geolocator: ^13.0.2
   flutter_map: ^7.0.2

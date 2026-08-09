@@ -1,10 +1,12 @@
 import 'dart:async';
+import 'dart:io' show Platform;
 import 'dart:typed_data';
 
 import 'package:flutter_sound/flutter_sound.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 import 'softphone_pcm_media_stub.dart';
+import 'softphone_pcm_media_windows.dart';
 
 export 'softphone_pcm_media_stub.dart';
 
@@ -114,5 +116,14 @@ class IoSoftphonePcmMedia implements SoftphonePcmMedia {
 SoftphonePcmMedia createSoftphonePcmMedia({
   int sampleRate = 8000,
   int numChannels = 1,
-}) =>
-    IoSoftphonePcmMedia(sampleRate: sampleRate, numChannels: numChannels);
+}) {
+  // flutter_sound's Windows plugin is a stub (channel "taudio" only) and
+  // throws MissingPluginException on openPlayer — use WinMM instead.
+  if (Platform.isWindows) {
+    return WindowsSoftphonePcmMedia(
+      sampleRate: sampleRate,
+      numChannels: numChannels,
+    );
+  }
+  return IoSoftphonePcmMedia(sampleRate: sampleRate, numChannels: numChannels);
+}
