@@ -19,9 +19,17 @@ Public Class MainForm
     Private _currentStep As WizardStep = WizardStep.Welcome
 
     Private Sub MainForm_Load(sender As Object, e As EventArgs) Handles Me.Load
-        ApplyWindowIcon()
-        BuildUi()
-        ShowStep(WizardStep.Welcome)
+        Try
+            ApplyWindowIcon()
+            BuildUi()
+            ShowStep(WizardStep.Welcome)
+        Catch ex As Exception
+            Dim path = IO.Path.Combine(IO.Path.GetTempPath(), "holoo2hesabix-crash.txt")
+            IO.File.WriteAllText(path, ex.ToString())
+            MessageBox.Show(ex.Message & Environment.NewLine & Environment.NewLine & ex.StackTrace,
+                            "خطا در راه‌اندازی", MessageBoxButtons.OK, MessageBoxIcon.Error,
+                            MessageBoxDefaultButton.Button1, AppTheme.MsgRtl)
+        End Try
     End Sub
 
     Private Sub ApplyWindowIcon()
@@ -52,18 +60,28 @@ Public Class MainForm
 
         _sidebar = New StepSidebar()
         _contentHost = New Panel() With {.Dock = DockStyle.Fill, .BackColor = AppTheme.BgApp, .RightToLeft = RightToLeft.Yes}
-        _footer = New Panel() With {.Dock = DockStyle.Bottom, .Height = 72, .BackColor = AppTheme.BgCard, .RightToLeft = RightToLeft.Yes}
+
+        _footer = New Panel() With {.Dock = DockStyle.Bottom, .Height = 78, .BackColor = AppTheme.BgCard, .RightToLeft = RightToLeft.Yes}
         AddHandler _footer.Paint, Sub(s, e)
+                                      e.Graphics.SmoothingMode = Drawing2D.SmoothingMode.AntiAlias
+                                      Using brush As New SolidBrush(Color.FromArgb(18, 15, 23, 42))
+                                          e.Graphics.FillRectangle(brush, 0, 0, _footer.Width, 4)
+                                      End Using
                                       Using pen As New Pen(AppTheme.Border)
                                           e.Graphics.DrawLine(pen, 0, 0, _footer.Width, 0)
                                       End Using
                                   End Sub
 
-        _lblFooterHint = New Label() With {.AutoSize = True, .ForeColor = AppTheme.TextMuted, .Font = AppTheme.FontStep, .RightToLeft = RightToLeft.Yes}
-        _btnBack = New Button() With {.Text = "بازگشت", .Size = New Size(110, 40), .RightToLeft = RightToLeft.Yes}
+        _lblFooterHint = New Label() With {
+            .AutoSize = True,
+            .ForeColor = AppTheme.TextMuted,
+            .Font = AppTheme.FontStep,
+            .RightToLeft = RightToLeft.Yes
+        }
+        _btnBack = New Button() With {.Text = "بازگشت", .Size = New Size(118, AppTheme.FieldHeight), .RightToLeft = RightToLeft.Yes}
         AppTheme.StyleSecondaryButton(_btnBack)
         AddHandler _btnBack.Click, AddressOf OnBackClick
-        _btnNext = New Button() With {.Text = "ادامه", .Size = New Size(130, 40), .RightToLeft = RightToLeft.Yes}
+        _btnNext = New Button() With {.Text = "ادامه", .Size = New Size(148, AppTheme.FieldHeight), .RightToLeft = RightToLeft.Yes}
         AppTheme.StylePrimaryButton(_btnNext)
         AddHandler _btnNext.Click, AddressOf OnNextClick
 
@@ -108,9 +126,10 @@ Public Class MainForm
     End Sub
 
     Private Sub LayoutFooterButtons(sender As Object, e As EventArgs)
-        _btnNext.Location = New Point(24, 16)
-        _btnBack.Location = New Point(_btnNext.Right + 10, 16)
-        _lblFooterHint.Location = New Point(Math.Max(24, _footer.Width - _lblFooterHint.PreferredWidth - 24), 28)
+        _btnNext.Location = New Point(28, 19)
+        _btnBack.Location = New Point(_btnNext.Right + 12, 19)
+        Dim hintW = Math.Max(_lblFooterHint.PreferredWidth, 40)
+        _lblFooterHint.Location = New Point(Math.Max(28, _footer.Width - hintW - 28), 30)
     End Sub
 
     Private Async Sub ShowStep(target As WizardStep)
@@ -149,14 +168,14 @@ Public Class MainForm
     Private Sub UpdateFooterState()
         Select Case _currentStep
             Case WizardStep.Welcome
-                _btnBack.Visible = False : _btnNext.Visible = True : _btnNext.Enabled = True : _btnNext.Text = "شروع"
-                _lblFooterHint.Text = "مرحله ۰ — معرفی"
+                _btnBack.Visible = False : _btnNext.Visible = True : _btnNext.Enabled = True : _btnNext.Text = "شروع کنید"
+                _lblFooterHint.Text = "آماده برای مهاجرت امن داده‌ها"
             Case WizardStep.HesabixConnect
                 _btnBack.Visible = True : _btnNext.Visible = True : _btnNext.Enabled = _session.CanProceedFromHesabix : _btnNext.Text = "ادامه"
                 If Not _session.IsHesabixConnected Then
                     _lblFooterHint.Text = "با حساب کاربری یا کلید API وارد شوید"
                 ElseIf _session.SelectedBusiness Is Nothing Then
-                    _lblFooterHint.Text = "یک کسب‌وکار را انتخاب کنید"
+                    _lblFooterHint.Text = "یک کسب‌وکار مقصد انتخاب کنید"
                 Else
                     _lblFooterHint.Text = "کسب‌وکار: " & _session.SelectedBusiness.Name
                 End If
@@ -169,16 +188,16 @@ Public Class MainForm
                 End If
             Case WizardStep.SelectModules
                 _btnBack.Visible = True : _btnNext.Visible = True : _btnNext.Enabled = _modulesPanel.HasSelection : _btnNext.Text = "ادامه به بازبینی"
-                _lblFooterHint.Text = "بخش‌های اطلاعات پایه را انتخاب کنید"
+                _lblFooterHint.Text = "بخش‌های مورد نیاز را علامت بزنید"
             Case WizardStep.Review
-                _btnBack.Visible = True : _btnNext.Visible = True : _btnNext.Enabled = _preflightPanel.CanProceed : _btnNext.Text = "شروع انتقال پایه"
+                _btnBack.Visible = True : _btnNext.Visible = True : _btnNext.Enabled = _preflightPanel.CanProceed : _btnNext.Text = "شروع انتقال"
                 _lblFooterHint.Text = If(_preflightPanel.CanProceed, "بازبینی تأیید شد", "ابتدا بررسی تطبیقی را کامل کنید")
             Case WizardStep.Transfer
                 _btnBack.Visible = True : _btnNext.Visible = False
-                _lblFooterHint.Text = "انتقال اطلاعات پایه — قابل ازسرگیری"
+                _lblFooterHint.Text = "انتقال قابل ازسرگیری است"
             Case Else
                 _btnBack.Visible = True : _btnNext.Enabled = False
-                _lblFooterHint.Text = "این مرحله هنوز پیاده‌سازی نشده است"
+                _lblFooterHint.Text = ""
         End Select
         LayoutFooterButtons(_footer, EventArgs.Empty)
     End Sub
@@ -209,7 +228,8 @@ Public Class MainForm
                 ShowStep(WizardStep.Review)
             Case WizardStep.Review
                 If Not _preflightPanel.CanProceed Then
-                    MessageBox.Show(Me, "بازبینی تطبیقی کامل نیست یا مغایرت ارز تأیید نشده است.", "ادامه ممکن نیست", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+                    MessageBox.Show(Me, "بازبینی تطبیقی کامل نیست یا مغایرت ارز تأیید نشده است.", "ادامه ممکن نیست",
+                                    MessageBoxButtons.OK, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button1, AppTheme.MsgRtl)
                     Return
                 End If
                 ShowStep(WizardStep.Transfer)

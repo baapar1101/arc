@@ -62,6 +62,7 @@ Friend Class AsyncUi
         Else
             message = ex.Message
         End If
-        MessageBox.Show(owner, message, title, MessageBoxButtons.OK, MessageBoxIcon.Error)
+        MessageBox.Show(owner, message, title, MessageBoxButtons.OK, MessageBoxIcon.Error,
+                        MessageBoxDefaultButton.Button1, AppTheme.MsgRtl)
     End Sub
 End Class

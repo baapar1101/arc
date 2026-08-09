@@ -6,14 +6,14 @@ Friend Class NewBusinessDialog
     Private ReadOnly _api As HesabixApiClient
     Private ReadOnly _session As MigrationSession
 
-    Private ReadOnly _txtName As TextBox
+    Private ReadOnly _fldName As ModernTextField
     Private ReadOnly _cmbType As ComboBox
     Private ReadOnly _cmbField As ComboBox
     Private ReadOnly _cmbCurrency As ComboBox
     Private ReadOnly _chkSample As CheckBox
     Private ReadOnly _btnCreate As Button
     Private ReadOnly _btnCancel As Button
-    Private ReadOnly _lblStatus As Label
+    Private ReadOnly _statusBanner As ContextBanner
     Private _cts As CancellationTokenSource
 
     Public Property CreatedBusiness As HesabixBusiness
@@ -32,7 +32,7 @@ Friend Class NewBusinessDialog
         RightToLeftLayout = False
         BackColor = AppTheme.BgApp
         Font = AppTheme.FontUi
-        ClientSize = New Size(460, 420)
+        ClientSize = New Size(480, 460)
         Padding = New Padding(24)
 
         Dim title As New Label() With {
@@ -40,64 +40,93 @@ Friend Class NewBusinessDialog
             .Font = AppTheme.FontUiBold,
             .ForeColor = AppTheme.TextPrimary,
             .AutoSize = True,
-            .Location = New Point(24, 20),
-            .RightToLeft = RightToLeft.Yes
+            .RightToLeft = RightToLeft.Yes,
+            .Name = "title"
         }
 
-        Dim lblName As New Label() With {.Text = "نام کسب‌وکار", .AutoSize = True, .Location = New Point(24, 60), .ForeColor = AppTheme.TextSecondary, .RightToLeft = RightToLeft.Yes}
-        _txtName = New TextBox() With {.Location = New Point(24, 82), .Width = 400, .RightToLeft = RightToLeft.Yes}
-        AppTheme.StyleTextBox(_txtName)
+        _fldName = New ModernTextField() With {
+            .FieldLabel = "نام کسب‌وکار",
+            .IsLtr = False,
+            .Width = 420,
+            .Name = "fldName"
+        }
 
-        Dim lblType As New Label() With {.Text = "نوع کسب‌وکار", .AutoSize = True, .Location = New Point(24, 120), .ForeColor = AppTheme.TextSecondary, .RightToLeft = RightToLeft.Yes}
+        Dim lblType As New Label() With {
+            .Text = "نوع کسب‌وکار",
+            .AutoSize = True,
+            .ForeColor = AppTheme.TextSecondary,
+            .Font = AppTheme.FontFieldLabel,
+            .RightToLeft = RightToLeft.Yes,
+            .Name = "lblType"
+        }
         _cmbType = New ComboBox() With {
-            .Location = New Point(24, 142),
-            .Width = 400,
-            .DropDownStyle = ComboBoxStyle.DropDownList
+            .Width = 420,
+            .DropDownStyle = ComboBoxStyle.DropDownList,
+            .Name = "cmbType"
         }
         AppTheme.StyleComboBox(_cmbType)
         _cmbType.Items.AddRange({"شرکت", "مغازه", "فروشگاه", "اتحادیه", "باشگاه", "موسسه", "شخصی"})
         _cmbType.SelectedIndex = 0
 
-        Dim lblField As New Label() With {.Text = "زمینه فعالیت", .AutoSize = True, .Location = New Point(24, 180), .ForeColor = AppTheme.TextSecondary, .RightToLeft = RightToLeft.Yes}
+        Dim lblField As New Label() With {
+            .Text = "زمینه فعالیت",
+            .AutoSize = True,
+            .ForeColor = AppTheme.TextSecondary,
+            .Font = AppTheme.FontFieldLabel,
+            .RightToLeft = RightToLeft.Yes,
+            .Name = "lblField"
+        }
         _cmbField = New ComboBox() With {
-            .Location = New Point(24, 202),
-            .Width = 400,
-            .DropDownStyle = ComboBoxStyle.DropDownList
+            .Width = 420,
+            .DropDownStyle = ComboBoxStyle.DropDownList,
+            .Name = "cmbField"
         }
         AppTheme.StyleComboBox(_cmbField)
         _cmbField.Items.AddRange({"تولیدی", "بازرگانی", "خدماتی", "سایر"})
         _cmbField.SelectedIndex = 1
 
-        Dim lblCurrency As New Label() With {.Text = "ارز پیش‌فرض", .AutoSize = True, .Location = New Point(24, 240), .ForeColor = AppTheme.TextSecondary, .RightToLeft = RightToLeft.Yes}
+        Dim lblCurrency As New Label() With {
+            .Text = "ارز پیش‌فرض",
+            .AutoSize = True,
+            .ForeColor = AppTheme.TextSecondary,
+            .Font = AppTheme.FontFieldLabel,
+            .RightToLeft = RightToLeft.Yes,
+            .Name = "lblCurrency"
+        }
         _cmbCurrency = New ComboBox() With {
-            .Location = New Point(24, 262),
-            .Width = 400,
-            .DropDownStyle = ComboBoxStyle.DropDownList
+            .Width = 420,
+            .DropDownStyle = ComboBoxStyle.DropDownList,
+            .Name = "cmbCurrency"
         }
         AppTheme.StyleComboBox(_cmbCurrency)
 
         _chkSample = New CheckBox() With {
             .Text = "درج داده نمونه (برای ایمپورت هلو معمولاً خاموش باشد)",
             .AutoSize = True,
-            .Location = New Point(24, 302),
             .Checked = False,
-            .ForeColor = AppTheme.TextSecondary,
-            .RightToLeft = RightToLeft.Yes
+            .Name = "chkSample"
         }
+        AppTheme.StyleCheckBox(_chkSample)
+        _chkSample.ForeColor = AppTheme.TextSecondary
 
-        _lblStatus = New Label() With {
-            .AutoSize = True,
-            .Location = New Point(24, 336),
-            .ForeColor = AppTheme.TextMuted,
-            .Text = "",
-            .RightToLeft = RightToLeft.Yes
+        _statusBanner = New ContextBanner() With {.Width = 420, .Name = "statusBanner"}
+        _statusBanner.SetStatus("", ContextBanner.BannerTone.Neutral)
+
+        _btnCreate = New Button() With {
+            .Text = "ایجاد",
+            .Size = New Size(110, AppTheme.FieldHeight),
+            .RightToLeft = RightToLeft.Yes,
+            .Name = "btnCreate"
         }
-
-        _btnCreate = New Button() With {.Text = "ایجاد", .Size = New Size(110, 40), .Location = New Point(200, 360), .RightToLeft = RightToLeft.Yes}
         AppTheme.StylePrimaryButton(_btnCreate)
         AddHandler _btnCreate.Click, AddressOf OnCreateClick
 
-        _btnCancel = New Button() With {.Text = "انصراف", .Size = New Size(110, 40), .Location = New Point(314, 360), .RightToLeft = RightToLeft.Yes}
+        _btnCancel = New Button() With {
+            .Text = "انصراف",
+            .Size = New Size(110, AppTheme.FieldHeight),
+            .RightToLeft = RightToLeft.Yes,
+            .Name = "btnCancel"
+        }
         AppTheme.StyleSecondaryButton(_btnCancel)
         AddHandler _btnCancel.Click, Sub(s, e)
                                          DialogResult = DialogResult.Cancel
@@ -105,8 +134,7 @@ Friend Class NewBusinessDialog
                                      End Sub
 
         Controls.Add(title)
-        Controls.Add(lblName)
-        Controls.Add(_txtName)
+        Controls.Add(_fldName)
         Controls.Add(lblType)
         Controls.Add(_cmbType)
         Controls.Add(lblField)
@@ -114,17 +142,50 @@ Friend Class NewBusinessDialog
         Controls.Add(lblCurrency)
         Controls.Add(_cmbCurrency)
         Controls.Add(_chkSample)
-        Controls.Add(_lblStatus)
+        Controls.Add(_statusBanner)
         Controls.Add(_btnCreate)
         Controls.Add(_btnCancel)
 
+        LayoutDialog()
         AppTheme.ApplyRtlTree(Me, False)
+        LayoutDialog()
         AddHandler Shown, AddressOf OnShownLoadCurrencies
+    End Sub
+
+    Private Sub LayoutDialog()
+        Dim w = ClientSize.Width
+        Const m As Integer = 28
+        Const fieldW As Integer = 420
+
+        AppTheme.PlaceFromRight(Controls("title"), w, m, 20)
+
+        _fldName.Width = fieldW
+        AppTheme.PlaceFromRight(_fldName, w, m, 52)
+
+        AppTheme.PlaceFromRight(Controls("lblType"), w, m, 126)
+        _cmbType.Width = fieldW
+        AppTheme.PlaceFromRight(_cmbType, w, m, 146)
+
+        AppTheme.PlaceFromRight(Controls("lblField"), w, m, 196)
+        _cmbField.Width = fieldW
+        AppTheme.PlaceFromRight(_cmbField, w, m, 216)
+
+        AppTheme.PlaceFromRight(Controls("lblCurrency"), w, m, 266)
+        _cmbCurrency.Width = fieldW
+        AppTheme.PlaceFromRight(_cmbCurrency, w, m, 286)
+
+        AppTheme.PlaceFromRight(_chkSample, w, m, 338)
+
+        _statusBanner.Width = fieldW
+        AppTheme.PlaceFromRight(_statusBanner, w, m, 372)
+
+        AppTheme.PlaceFromRight(_btnCreate, w, m, 416)
+        AppTheme.PlaceFromRight(_btnCancel, w, m + _btnCreate.Width + 12, 416)
     End Sub
 
     Private Async Sub OnShownLoadCurrencies(sender As Object, e As EventArgs)
         _btnCreate.Enabled = False
-        _lblStatus.Text = "در حال دریافت ارزها..."
+        _statusBanner.SetStatus("در حال دریافت ارزها...", ContextBanner.BannerTone.Info)
         _cts = New CancellationTokenSource()
         Try
             Dim currencies = Await Task.Run(Async Function()
@@ -145,31 +206,38 @@ Friend Class NewBusinessDialog
                 _cmbCurrency.SelectedIndex = 0
             End If
 
-            _lblStatus.Text = If(_cmbCurrency.Items.Count = 0, "ارزی یافت نشد.", "")
+            If _cmbCurrency.Items.Count = 0 Then
+                _statusBanner.SetStatus("ارزی یافت نشد.", ContextBanner.BannerTone.Warning)
+            Else
+                _statusBanner.SetStatus("", ContextBanner.BannerTone.Neutral)
+            End If
             _btnCreate.Enabled = _cmbCurrency.Items.Count > 0
+            LayoutDialog()
         Catch ex As Exception
-            _lblStatus.ForeColor = AppTheme.Danger
-            _lblStatus.Text = ex.Message
+            _statusBanner.SetStatus(ex.Message, ContextBanner.BannerTone.Danger)
             AsyncUi.ShowError(Me, "خطا در دریافت ارزها", ex)
         End Try
     End Sub
 
     Private Async Sub OnCreateClick(sender As Object, e As EventArgs)
-        Dim name = _txtName.Text.Trim()
+        Dim name = _fldName.Text.Trim()
         If String.IsNullOrWhiteSpace(name) Then
-            MessageBox.Show(Me, "نام کسب‌وکار را وارد کنید.", "ورودی ناقص", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+            _fldName.HasError = True
+            MessageBox.Show(Me, "نام کسب‌وکار را وارد کنید.", "ورودی ناقص",
+                            MessageBoxButtons.OK, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button1, AppTheme.MsgRtl)
             Return
         End If
+        _fldName.HasError = False
         Dim currency = TryCast(_cmbCurrency.SelectedItem, CurrencyInfo)
         If currency Is Nothing Then
-            MessageBox.Show(Me, "ارز پیش‌فرض را انتخاب کنید.", "ورودی ناقص", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+            MessageBox.Show(Me, "ارز پیش‌فرض را انتخاب کنید.", "ورودی ناقص",
+                            MessageBoxButtons.OK, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button1, AppTheme.MsgRtl)
             Return
         End If
 
         _btnCreate.Enabled = False
         _btnCancel.Enabled = False
-        _lblStatus.ForeColor = AppTheme.TextMuted
-        _lblStatus.Text = "در حال ایجاد کسب‌وکار..."
+        _statusBanner.SetStatus("در حال ایجاد کسب‌وکار...", ContextBanner.BannerTone.Info)
 
         If _cts IsNot Nothing Then
             _cts.Cancel()
@@ -194,8 +262,7 @@ Friend Class NewBusinessDialog
             DialogResult = DialogResult.OK
             Close()
         Catch ex As Exception
-            _lblStatus.ForeColor = AppTheme.Danger
-            _lblStatus.Text = ex.Message
+            _statusBanner.SetStatus(ex.Message, ContextBanner.BannerTone.Danger)
             _btnCreate.Enabled = True
             _btnCancel.Enabled = True
             AsyncUi.ShowError(Me, "خطا در ایجاد کسب‌وکار", ex)

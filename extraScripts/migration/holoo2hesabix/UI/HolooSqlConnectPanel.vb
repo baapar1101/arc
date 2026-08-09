@@ -8,24 +8,24 @@ Friend Class HolooSqlConnectPanel
     Private ReadOnly _session As MigrationSession
     Private ReadOnly _sql As HolooSqlService
 
-    Private _txtServer As TextBox
+    Private _fldServer As ModernTextField
     Private _rbWindows As RadioButton
     Private _rbSql As RadioButton
-    Private _txtUser As TextBox
-    Private _txtPassword As TextBox
+    Private _fldUser As ModernTextField
+    Private _fldPassword As ModernTextField
     Private _chkTrust As CheckBox
     Private _btnTest As Button
     Private _btnLoadDb As Button
     Private _lstDatabases As ListBox
     Private _txtSummary As TextBox
-    Private _lblStatus As Label
-    Private _formCard As Panel
-    Private _pnlBusy As Panel
-    Private _lblBusy As Label
-    Private _progress As ProgressBar
+    Private _statusBanner As ContextBanner
+    Private _formCard As RoundedCard
+    Private _dbCard As RoundedCard
+    Private _summaryCard As RoundedCard
+    Private ReadOnly _busy As BusyOverlay
 
     Private _cts As CancellationTokenSource
-    Private _busy As Boolean
+    Private _isBusy As Boolean
 
     Public Sub New(session As MigrationSession, sql As HolooSqlService)
         _session = session
@@ -35,197 +35,218 @@ Friend Class HolooSqlConnectPanel
         BackColor = AppTheme.BgApp
         RightToLeft = RightToLeft.Yes
         Dock = DockStyle.Fill
-        Padding = New Padding(28, 16, 28, 16)
 
-        Dim title As New Label() With {
-            .AutoSize = True,
-            .Text = "اتصال به SQL Server هلو",
-            .Font = AppTheme.FontTitle,
-            .ForeColor = AppTheme.TextPrimary,
-            .Location = New Point(28, 12),
-            .RightToLeft = RightToLeft.Yes
-        }
-        Dim subtitle As New Label() With {
-            .AutoSize = True,
-            .Text = "اتصال را تست کنید، دیتابیس هلو را انتخاب کنید. در این مرحله هنوز انتقالی انجام نمی‌شود.",
-            .Font = AppTheme.FontSubtitle,
-            .ForeColor = AppTheme.TextSecondary,
-            .Location = New Point(28, 50),
-            .RightToLeft = RightToLeft.Yes
-        }
+        Dim header = PageHeader.Create(
+            "اتصال به SQL Server هلو",
+            "اتصال را تست کنید، دیتابیس هلو را انتخاب کنید. در این مرحله هنوز انتقالی انجام نمی‌شود.")
 
         _formCard = CreateFormCard()
-        _formCard.Location = New Point(28, 88)
 
         Dim lblDb As New Label() With {
             .AutoSize = True,
             .Text = "دیتابیس‌ها",
             .Font = AppTheme.FontUiBold,
             .ForeColor = AppTheme.TextPrimary,
-            .RightToLeft = RightToLeft.Yes
+            .RightToLeft = RightToLeft.Yes,
+            .Name = "lblDb"
         }
 
+        _dbCard = New RoundedCard() With {.Padding = New Padding(10), .Name = "dbCard"}
         _lstDatabases = New ListBox() With {
             .IntegralHeight = False,
             .Font = AppTheme.FontUi,
             .RightToLeft = RightToLeft.Yes,
             .BackColor = AppTheme.BgCard,
             .ForeColor = AppTheme.TextPrimary,
-            .BorderStyle = BorderStyle.FixedSingle
+            .BorderStyle = BorderStyle.None,
+            .Dock = DockStyle.Fill
         }
         AddHandler _lstDatabases.SelectedIndexChanged, AddressOf OnDatabaseSelected
+        _dbCard.Controls.Add(_lstDatabases)
 
         Dim lblSummary As New Label() With {
             .AutoSize = True,
             .Text = "خلاصه ساختار",
             .Font = AppTheme.FontUiBold,
             .ForeColor = AppTheme.TextPrimary,
-            .RightToLeft = RightToLeft.Yes
+            .RightToLeft = RightToLeft.Yes,
+            .Name = "lblSummary"
         }
+
+        _summaryCard = New RoundedCard() With {.Padding = New Padding(12), .Name = "summaryCard"}
         _txtSummary = New TextBox() With {
             .Multiline = True,
             .ReadOnly = True,
             .ScrollBars = ScrollBars.Vertical,
             .Font = AppTheme.FontStep,
             .BackColor = AppTheme.BgMuted,
-            .RightToLeft = RightToLeft.Yes
-        }
-
-        _pnlBusy = New Panel() With {
-            .Visible = False,
-            .BackColor = Color.FromArgb(180, 255, 255, 255),
+            .ForeColor = AppTheme.TextPrimary,
+            .BorderStyle = BorderStyle.None,
             .Dock = DockStyle.Fill,
             .RightToLeft = RightToLeft.Yes
         }
-        _lblBusy = New Label() With {
-            .AutoSize = True,
-            .Text = "در حال ارتباط با SQL Server...",
-            .Font = AppTheme.FontUiBold,
-            .ForeColor = AppTheme.TextPrimary,
-            .RightToLeft = RightToLeft.Yes
-        }
-        _progress = New ProgressBar() With {
-            .Style = ProgressBarStyle.Marquee,
-            .MarqueeAnimationSpeed = 30,
-            .Size = New Size(220, 8)
-        }
-        _pnlBusy.Controls.Add(_lblBusy)
-        _pnlBusy.Controls.Add(_progress)
+        _summaryCard.Controls.Add(_txtSummary)
 
-        Controls.Add(title)
-        Controls.Add(subtitle)
+        _busy = New BusyOverlay()
+
+        Controls.Add(header.Item1)
+        Controls.Add(header.Item2)
         Controls.Add(_formCard)
         Controls.Add(lblDb)
-        Controls.Add(_lstDatabases)
+        Controls.Add(_dbCard)
         Controls.Add(lblSummary)
-        Controls.Add(_txtSummary)
-        Controls.Add(_pnlBusy)
-        _pnlBusy.BringToFront()
+        Controls.Add(_summaryCard)
+        Controls.Add(_busy)
 
-        lblDb.Name = "lblDb"
-        lblSummary.Name = "lblSummary"
-        AddHandler Resize, Sub(s, e)
-                               LayoutChildren(lblDb, lblSummary)
-                           End Sub
-        LayoutChildren(lblDb, lblSummary)
+        AddHandler Resize, AddressOf OnPanelResize
+        OnPanelResize(Me, EventArgs.Empty)
         LoadFromSession()
         AppTheme.ApplyRtlTree(Me, False)
+        OnPanelResize(Me, EventArgs.Empty)
     End Sub
 
-    Private Function CreateFormCard() As Panel
-        Dim card As New Panel() With {
-            .BackColor = AppTheme.BgCard,
-            .Height = 210,
-            .RightToLeft = RightToLeft.Yes
+    Private Function CreateFormCard() As RoundedCard
+        Dim card As New RoundedCard() With {.Height = 268, .Padding = New Padding(22)}
+
+        _fldServer = New ModernTextField() With {
+            .FieldLabel = "سرور / Instance",
+            .IsLtr = True,
+            .Width = 280,
+            .Name = "fldServer"
         }
-        AddHandler card.Paint, Sub(s, e)
-                                   Dim r = New Rectangle(0, 0, card.Width - 1, card.Height - 1)
-                                   AppTheme.DrawRoundedRect(e.Graphics, r, 12, AppTheme.BgCard, AppTheme.Border)
-                               End Sub
 
-        Dim lblServer As New Label() With {.Text = "سرور / Instance", .AutoSize = True, .Location = New Point(16, 14), .ForeColor = AppTheme.TextSecondary, .RightToLeft = RightToLeft.Yes}
-        _txtServer = New TextBox() With {.Location = New Point(16, 36), .Width = 280, .RightToLeft = RightToLeft.No}
-        AppTheme.StyleTextBox(_txtServer)
+        _rbSql = New RadioButton() With {
+            .Text = "احراز هویت SQL Server",
+            .AutoSize = True,
+            .Checked = True,
+            .Name = "rbSql"
+        }
+        AppTheme.StyleRadioButton(_rbSql)
 
-        _rbSql = New RadioButton() With {.Text = "احراز هویت SQL Server", .AutoSize = True, .Location = New Point(320, 18), .Checked = True, .RightToLeft = RightToLeft.Yes, .ForeColor = AppTheme.TextPrimary, .Font = AppTheme.FontUi}
-        _rbWindows = New RadioButton() With {.Text = "احراز هویت ویندوز", .AutoSize = True, .Location = New Point(320, 44), .RightToLeft = RightToLeft.Yes, .ForeColor = AppTheme.TextPrimary, .Font = AppTheme.FontUi}
+        _rbWindows = New RadioButton() With {
+            .Text = "احراز هویت ویندوز",
+            .AutoSize = True,
+            .Name = "rbWindows"
+        }
+        AppTheme.StyleRadioButton(_rbWindows)
         AddHandler _rbSql.CheckedChanged, AddressOf OnAuthModeChanged
         AddHandler _rbWindows.CheckedChanged, AddressOf OnAuthModeChanged
 
-        Dim lblUser As New Label() With {.Text = "نام کاربری", .AutoSize = True, .Location = New Point(16, 72), .ForeColor = AppTheme.TextSecondary, .RightToLeft = RightToLeft.Yes}
-        _txtUser = New TextBox() With {.Location = New Point(16, 94), .Width = 180, .RightToLeft = RightToLeft.No}
-        AppTheme.StyleTextBox(_txtUser)
-
-        Dim lblPass As New Label() With {.Text = "رمز عبور", .AutoSize = True, .Location = New Point(210, 72), .ForeColor = AppTheme.TextSecondary, .RightToLeft = RightToLeft.Yes}
-        _txtPassword = New TextBox() With {.Location = New Point(210, 94), .Width = 180, .UseSystemPasswordChar = True, .RightToLeft = RightToLeft.No}
-        AppTheme.StyleTextBox(_txtPassword)
+        _fldUser = New ModernTextField() With {
+            .FieldLabel = "نام کاربری",
+            .IsLtr = True,
+            .Width = 200,
+            .Name = "fldUser"
+        }
+        _fldPassword = New ModernTextField() With {
+            .FieldLabel = "رمز عبور",
+            .IsLtr = True,
+            .UseSystemPasswordChar = True,
+            .Width = 200,
+            .Name = "fldPassword"
+        }
 
         _chkTrust = New CheckBox() With {
             .Text = "اعتماد به گواهی سرور (برای اتصال محلی)",
             .AutoSize = True,
             .Checked = True,
-            .Location = New Point(16, 130),
-            .RightToLeft = RightToLeft.Yes,
-            .ForeColor = AppTheme.TextSecondary,
-            .Font = AppTheme.FontStep
+            .Name = "chkTrust"
         }
+        AppTheme.StyleCheckBox(_chkTrust)
+        _chkTrust.Font = AppTheme.FontStep
+        _chkTrust.ForeColor = AppTheme.TextSecondary
 
-        _btnTest = New Button() With {.Text = "تست اتصال", .Size = New Size(120, 36), .Location = New Point(16, 162), .RightToLeft = RightToLeft.Yes}
+        _btnTest = New Button() With {
+            .Text = "تست اتصال",
+            .Size = New Size(120, AppTheme.FieldHeight),
+            .RightToLeft = RightToLeft.Yes,
+            .Name = "btnTest"
+        }
         AppTheme.StyleSecondaryButton(_btnTest)
-        _btnTest.Height = 36
         AddHandler _btnTest.Click, AddressOf OnTestClick
 
-        _btnLoadDb = New Button() With {.Text = "دریافت لیست دیتابیس‌ها", .Size = New Size(200, 36), .Location = New Point(150, 162), .RightToLeft = RightToLeft.Yes}
+        _btnLoadDb = New Button() With {
+            .Text = "دریافت لیست دیتابیس‌ها",
+            .Size = New Size(200, AppTheme.FieldHeight),
+            .RightToLeft = RightToLeft.Yes,
+            .Name = "btnLoadDb"
+        }
         AppTheme.StylePrimaryButton(_btnLoadDb)
-        _btnLoadDb.Height = 36
         AddHandler _btnLoadDb.Click, AddressOf OnLoadDatabasesClick
 
-        _lblStatus = New Label() With {
-            .AutoSize = True,
-            .Text = "هنوز اتصال برقرار نشده",
-            .ForeColor = AppTheme.TextMuted,
-            .Font = AppTheme.FontStep,
-            .Location = New Point(350, 170),
-            .RightToLeft = RightToLeft.Yes
-        }
+        _statusBanner = New ContextBanner() With {.Width = 420, .Name = "statusBanner"}
+        _statusBanner.SetStatus("هنوز اتصال برقرار نشده", ContextBanner.BannerTone.Neutral)
 
-        card.Controls.Add(lblServer)
-        card.Controls.Add(_txtServer)
+        card.Controls.Add(_fldServer)
         card.Controls.Add(_rbSql)
         card.Controls.Add(_rbWindows)
-        card.Controls.Add(lblUser)
-        card.Controls.Add(_txtUser)
-        card.Controls.Add(lblPass)
-        card.Controls.Add(_txtPassword)
+        card.Controls.Add(_fldUser)
+        card.Controls.Add(_fldPassword)
         card.Controls.Add(_chkTrust)
-        card.Controls.Add(_btnTest)
         card.Controls.Add(_btnLoadDb)
-        card.Controls.Add(_lblStatus)
+        card.Controls.Add(_btnTest)
+        card.Controls.Add(_statusBanner)
 
-        AddHandler card.Resize, Sub(s, e)
-                                    _lblStatus.Left = Math.Min(card.Width - 40, Math.Max(350, _btnLoadDb.Right + 16))
-                                End Sub
+        AddHandler card.Resize, AddressOf LayoutFormCard
         Return card
     End Function
 
-    Private Sub LayoutChildren(lblDb As Label, lblSummary As Label)
-        If _formCard Is Nothing Then Return
-        _formCard.Width = Math.Max(640, ClientSize.Width - 56)
+    Private Sub LayoutFormCard(sender As Object, e As EventArgs)
+        If _formCard Is Nothing OrElse _fldServer Is Nothing Then Return
+        Dim w = _formCard.ClientSize.Width
+        Const m As Integer = 22
+        Const gap As Integer = 16
 
-        lblDb.Location = New Point(28, _formCard.Bottom + 14)
-        _lstDatabases.Location = New Point(28, lblDb.Bottom + 6)
-        _lstDatabases.Size = New Size(Math.Max(260, (ClientSize.Width - 72) \ 2), Math.Max(160, ClientSize.Height - _lstDatabases.Top - 24))
+        AppTheme.PlaceFromRight(_fldServer, w, m, 16)
 
-        lblSummary.Location = New Point(_lstDatabases.Right + 16, lblDb.Top)
-        _txtSummary.Location = New Point(_lstDatabases.Right + 16, _lstDatabases.Top)
-        _txtSummary.Size = New Size(Math.Max(260, ClientSize.Width - _txtSummary.Left - 28), _lstDatabases.Height)
+        Dim serverRight = m + _fldServer.Width + gap
+        AppTheme.PlaceFromRight(_rbSql, w, serverRight, 28)
+        AppTheme.PlaceFromRight(_rbWindows, w, serverRight, 54)
 
-        If _pnlBusy.Visible Then CenterBusy()
+        AppTheme.PlaceFromRight(_fldUser, w, m, 90)
+        Dim userRight = m + _fldUser.Width + gap
+        AppTheme.PlaceFromRight(_fldPassword, w, userRight, 90)
+
+        AppTheme.PlaceFromRight(_chkTrust, w, m, 162)
+
+        AppTheme.PlaceFromRight(_btnLoadDb, w, m, 198)
+        AppTheme.PlaceFromRight(_btnTest, w, m + _btnLoadDb.Width + 12, 198)
+
+        Dim bannerRight = m + _btnLoadDb.Width + 12 + _btnTest.Width + 16
+        _statusBanner.Width = Math.Max(180, w - bannerRight - m)
+        AppTheme.PlaceFromRight(_statusBanner, w, bannerRight, 202)
     End Sub
 
-    Private Sub CenterBusy()
-        _lblBusy.Location = New Point((_pnlBusy.Width - _lblBusy.PreferredWidth) \ 2, (_pnlBusy.Height \ 2) - 24)
-        _progress.Location = New Point((_pnlBusy.Width - _progress.Width) \ 2, _lblBusy.Bottom + 12)
+    Private Sub OnPanelResize(sender As Object, e As EventArgs)
+        If _formCard Is Nothing Then Return
+        Dim w = ClientSize.Width
+        Dim m = AppTheme.PageMargin
+        Dim title = Controls("title")
+        Dim subtitle = Controls("subtitle")
+        Dim lblDb = Controls("lblDb")
+        Dim lblSummary = Controls("lblSummary")
+
+        If title IsNot Nothing Then AppTheme.PlaceFromRight(title, w, m, 18)
+        If subtitle IsNot Nothing Then AppTheme.PlaceFromRight(subtitle, w, m, 52)
+
+        _formCard.Width = Math.Max(640, w - m * 2)
+        AppTheme.PlaceFromRight(_formCard, w, m, 92)
+        LayoutFormCard(_formCard, EventArgs.Empty)
+
+        If lblDb IsNot Nothing Then AppTheme.PlaceFromRight(lblDb, w, m, _formCard.Bottom + 18)
+
+        Dim colW = Math.Max(260, (w - m * 2 - 16) \ 2)
+        Dim listTop = If(lblDb IsNot Nothing, lblDb.Bottom + 8, _formCard.Bottom + 40)
+        Dim listH = Math.Max(160, ClientSize.Height - listTop - 16)
+
+        _dbCard.Size = New Size(colW, listH)
+        AppTheme.PlaceFromRight(_dbCard, w, m, listTop)
+
+        If lblSummary IsNot Nothing Then
+            AppTheme.PlaceFromRight(lblSummary, w, m + colW + 16, If(lblDb IsNot Nothing, lblDb.Top, _formCard.Bottom + 18))
+        End If
+        _summaryCard.Size = New Size(colW, listH)
+        AppTheme.PlaceFromRight(_summaryCard, w, m + colW + 16, listTop)
     End Sub
 
     Public Sub LoadFromSession()
@@ -234,11 +255,11 @@ Friend Class HolooSqlConnectPanel
             s = New SqlConnectionSettings()
             _session.SqlSettings = s
         End If
-        _txtServer.Text = If(String.IsNullOrWhiteSpace(s.Server), "localhost", s.Server)
+        _fldServer.Text = If(String.IsNullOrWhiteSpace(s.Server), "localhost", s.Server)
         _rbWindows.Checked = s.UseWindowsAuth
         _rbSql.Checked = Not s.UseWindowsAuth
-        _txtUser.Text = If(s.UserName, "sa")
-        _txtPassword.Text = If(s.Password, "")
+        _fldUser.Text = If(s.UserName, "sa")
+        _fldPassword.Text = If(s.Password, "")
         _chkTrust.Checked = s.TrustServerCertificate
         OnAuthModeChanged(Nothing, EventArgs.Empty)
 
@@ -265,47 +286,44 @@ Friend Class HolooSqlConnectPanel
         End If
 
         If _session.IsSqlConnected Then
-            _lblStatus.Text = "متصل — دیتابیس‌ها دریافت شد"
-            _lblStatus.ForeColor = AppTheme.Success
+            _statusBanner.SetStatus("متصل — دیتابیس‌ها دریافت شد", ContextBanner.BannerTone.Success)
         Else
-            _lblStatus.Text = "هنوز اتصال برقرار نشده"
-            _lblStatus.ForeColor = AppTheme.TextMuted
+            _statusBanner.SetStatus("هنوز اتصال برقرار نشده", ContextBanner.BannerTone.Neutral)
         End If
     End Sub
 
     Private Sub OnAuthModeChanged(sender As Object, e As EventArgs)
         Dim sqlAuth = _rbSql.Checked
-        _txtUser.Enabled = sqlAuth
-        _txtPassword.Enabled = sqlAuth
+        _fldUser.Enabled = sqlAuth AndAlso Not _isBusy
+        _fldPassword.Enabled = sqlAuth AndAlso Not _isBusy
     End Sub
 
     Private Sub ApplySettingsFromUi()
         If _session.SqlSettings Is Nothing Then _session.SqlSettings = New SqlConnectionSettings()
         Dim s = _session.SqlSettings
-        s.Server = _txtServer.Text.Trim()
+        s.Server = _fldServer.Text.Trim()
         s.UseWindowsAuth = _rbWindows.Checked
-        s.UserName = _txtUser.Text.Trim()
-        s.Password = _txtPassword.Text
+        s.UserName = _fldUser.Text.Trim()
+        s.Password = _fldPassword.Text
         s.TrustServerCertificate = _chkTrust.Checked
         s.Database = If(_session.SelectedDatabase, "")
     End Sub
 
     Private Sub SetBusy(busy As Boolean, Optional message As String = Nothing)
-        _busy = busy
-        _pnlBusy.Visible = busy
+        _isBusy = busy
+        If busy Then
+            _busy.ShowBusy(message)
+        Else
+            _busy.HideBusy()
+        End If
         _btnTest.Enabled = Not busy
         _btnLoadDb.Enabled = Not busy
         _lstDatabases.Enabled = Not busy
-        _txtServer.Enabled = Not busy
+        _fldServer.Enabled = Not busy
         _rbSql.Enabled = Not busy
         _rbWindows.Enabled = Not busy
         _chkTrust.Enabled = Not busy
         OnAuthModeChanged(Nothing, EventArgs.Empty)
-        If busy Then
-            _lblBusy.Text = If(String.IsNullOrWhiteSpace(message), "در حال ارتباط با SQL Server...", message)
-            CenterBusy()
-            _pnlBusy.BringToFront()
-        End If
     End Sub
 
     Private Sub CancelPending()
@@ -317,10 +335,11 @@ Friend Class HolooSqlConnectPanel
     End Sub
 
     Private Async Sub OnTestClick(sender As Object, e As EventArgs)
-        If _busy Then Return
+        If _isBusy Then Return
         ApplySettingsFromUi()
         If String.IsNullOrWhiteSpace(_session.SqlSettings.Server) Then
-            MessageBox.Show(Me, "نام سرور را وارد کنید.", "ورودی ناقص", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+            MessageBox.Show(Me, "نام سرور را وارد کنید.", "ورودی ناقص",
+                            MessageBoxButtons.OK, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button1, AppTheme.MsgRtl)
             Return
         End If
 
@@ -331,20 +350,19 @@ Friend Class HolooSqlConnectPanel
                 Function(ct) _sql.TestConnectionAsync(_session.SqlSettings, ct),
                 Sub(b) SetBusy(b, "در حال تست اتصال..."),
                 _cts.Token).ConfigureAwait(True)
-            _lblStatus.Text = msg
-            _lblStatus.ForeColor = AppTheme.Success
+            _statusBanner.SetStatus(msg, ContextBanner.BannerTone.Success)
         Catch ex As Exception
-            _lblStatus.Text = "اتصال ناموفق"
-            _lblStatus.ForeColor = AppTheme.Danger
+            _statusBanner.SetStatus("اتصال ناموفق", ContextBanner.BannerTone.Danger)
             AsyncUi.ShowError(Me, "خطا در تست اتصال", ex)
         End Try
     End Sub
 
     Private Async Sub OnLoadDatabasesClick(sender As Object, e As EventArgs)
-        If _busy Then Return
+        If _isBusy Then Return
         ApplySettingsFromUi()
         If String.IsNullOrWhiteSpace(_session.SqlSettings.Server) Then
-            MessageBox.Show(Me, "نام سرور را وارد کنید.", "ورودی ناقص", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+            MessageBox.Show(Me, "نام سرور را وارد کنید.", "ورودی ناقص",
+                            MessageBoxButtons.OK, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button1, AppTheme.MsgRtl)
             Return
         End If
 
@@ -368,8 +386,7 @@ Friend Class HolooSqlConnectPanel
             Next
 
             _txtSummary.Text = "دیتابیس مورد نظر (ترجیحاً با علامت ★ هلو) را انتخاب کنید."
-            _lblStatus.Text = "متصل — " & databases.Count.ToString() & " دیتابیس یافت شد"
-            _lblStatus.ForeColor = AppTheme.Success
+            _statusBanner.SetStatus("متصل — " & databases.Count.ToString() & " دیتابیس یافت شد", ContextBanner.BannerTone.Success)
 
             Dim holooFirst = databases.FirstOrDefault(Function(x) x.LooksLikeHoloo)
             If holooFirst IsNot Nothing Then
@@ -383,15 +400,14 @@ Friend Class HolooSqlConnectPanel
             _session.SelectedDatabase = Nothing
             _session.HolooProbe = Nothing
             _lstDatabases.Items.Clear()
-            _lblStatus.Text = "دریافت دیتابیس ناموفق"
-            _lblStatus.ForeColor = AppTheme.Danger
+            _statusBanner.SetStatus("دریافت دیتابیس ناموفق", ContextBanner.BannerTone.Danger)
             RaiseEvent SelectionChanged(Me, EventArgs.Empty)
             AsyncUi.ShowError(Me, "خطا در دریافت دیتابیس‌ها", ex)
         End Try
     End Sub
 
     Private Async Sub OnDatabaseSelected(sender As Object, e As EventArgs)
-        If _busy Then Return
+        If _isBusy Then Return
         Dim info = TryCast(_lstDatabases.SelectedItem, HolooDatabaseInfo)
         If info Is Nothing Then
             _session.SelectedDatabase = Nothing
@@ -415,11 +431,9 @@ Friend Class HolooSqlConnectPanel
             _session.HolooProbe = probe
             _txtSummary.Text = probe.SummaryText
             If probe.LooksLikeHoloo Then
-                _lblStatus.Text = "دیتابیس هلو انتخاب شد: " & info.Name
-                _lblStatus.ForeColor = AppTheme.Success
+                _statusBanner.SetStatus("دیتابیس هلو انتخاب شد: " & info.Name, ContextBanner.BannerTone.Success)
             Else
-                _lblStatus.Text = "دیتابیس انتخاب شد (ساختار هلو قطعی نیست): " & info.Name
-                _lblStatus.ForeColor = AppTheme.Warning
+                _statusBanner.SetStatus("دیتابیس انتخاب شد (ساختار هلو قطعی نیست): " & info.Name, ContextBanner.BannerTone.Warning)
             End If
             RaiseEvent SelectionChanged(Me, EventArgs.Empty)
         Catch ex As Exception

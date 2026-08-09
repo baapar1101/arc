@@ -10,9 +10,10 @@ Friend Class PreflightPanel
     Private ReadOnly _preflight As New PreflightService()
 
     Private ReadOnly _txtReport As TextBox
+    Private ReadOnly _reportCard As RoundedCard
     Private ReadOnly _chkOverrideCurrency As CheckBox
     Private ReadOnly _btnRefresh As Button
-    Private ReadOnly _lblStatus As Label
+    Private ReadOnly _statusBanner As ContextBanner
     Private _cts As CancellationTokenSource
     Private _busy As Boolean
 
@@ -24,56 +25,47 @@ Friend Class PreflightPanel
         BackColor = AppTheme.BgApp
         RightToLeft = RightToLeft.Yes
         Dock = DockStyle.Fill
-        Padding = New Padding(28, 16, 28, 16)
 
-        Dim title As New Label() With {
-            .Text = "بازبینی تطبیقی قبل از انتقال",
-            .Font = AppTheme.FontTitle,
-            .ForeColor = AppTheme.TextPrimary,
-            .AutoSize = True,
-            .Location = New Point(28, 12),
-            .RightToLeft = RightToLeft.Yes
-        }
-        Dim subtitle As New Label() With {
-            .Text = "ارز پایه، نام شرکت و تعداد رکوردها بررسی می‌شوند. در صورت مغایرت ارز، انتقال متوقف می‌شود مگر تأیید دستی بدهید.",
-            .Font = AppTheme.FontSubtitle,
-            .ForeColor = AppTheme.TextSecondary,
-            .AutoSize = True,
-            .Location = New Point(28, 52),
-            .RightToLeft = RightToLeft.Yes
-        }
+        Dim header = PageHeader.Create(
+            "بازبینی تطبیقی قبل از انتقال",
+            "ارز پایه، نام شرکت و تعداد رکوردها بررسی می‌شوند. در صورت مغایرت ارز، انتقال متوقف می‌شود مگر تأیید دستی بدهید.")
 
-        _btnRefresh = New Button() With {.Text = "اجرای بررسی مجدد", .Size = New Size(160, 36), .Location = New Point(28, 90), .RightToLeft = RightToLeft.Yes}
+        _btnRefresh = New Button() With {
+            .Text = "اجرای بررسی مجدد",
+            .Size = New Size(170, AppTheme.FieldHeight),
+            .RightToLeft = RightToLeft.Yes,
+            .Name = "btnRefresh"
+        }
         AppTheme.StyleSecondaryButton(_btnRefresh)
         AddHandler _btnRefresh.Click, AddressOf OnRefreshClick
 
-        _lblStatus = New Label() With {
-            .AutoSize = True,
-            .Location = New Point(200, 98),
-            .ForeColor = AppTheme.TextMuted,
-            .Font = AppTheme.FontStep,
-            .RightToLeft = RightToLeft.Yes,
-            .Text = ""
-        }
+        _statusBanner = New ContextBanner() With {.Width = 420, .Name = "statusBanner"}
+        _statusBanner.SetStatus("برای شروع، بررسی را اجرا کنید", ContextBanner.BannerTone.Neutral)
 
+        _reportCard = New RoundedCard() With {.Padding = New Padding(16), .Name = "reportCard"}
         _txtReport = New TextBox() With {
             .Multiline = True,
             .ReadOnly = True,
             .ScrollBars = ScrollBars.Vertical,
-            .Location = New Point(28, 140),
             .Font = AppTheme.FontUi,
             .BackColor = AppTheme.BgMuted,
-            .RightToLeft = RightToLeft.Yes
+            .ForeColor = AppTheme.TextPrimary,
+            .BorderStyle = BorderStyle.None,
+            .Dock = DockStyle.Fill,
+            .RightToLeft = RightToLeft.Yes,
+            .Name = "txtReport"
         }
+        _reportCard.Controls.Add(_txtReport)
 
         _chkOverrideCurrency = New CheckBox() With {
             .Text = "عدم تطابق ارز را می‌پذیرم و ادامه می‌دهم",
             .AutoSize = True,
             .Visible = False,
-            .RightToLeft = RightToLeft.Yes,
-            .ForeColor = AppTheme.Warning,
-            .Font = AppTheme.FontUiBold
+            .Name = "chkOverride"
         }
+        AppTheme.StyleCheckBox(_chkOverrideCurrency)
+        _chkOverrideCurrency.Font = AppTheme.FontUiBold
+        _chkOverrideCurrency.ForeColor = AppTheme.Warning
         AddHandler _chkOverrideCurrency.CheckedChanged, Sub(s, e)
                                                             If _session.Preflight IsNot Nothing Then
                                                                 _session.AllowCurrencyMismatch = _chkOverrideCurrency.Checked
@@ -81,20 +73,35 @@ Friend Class PreflightPanel
                                                             RaiseEvent SelectionChanged(Me, EventArgs.Empty)
                                                         End Sub
 
-        Controls.Add(title)
-        Controls.Add(subtitle)
+        Controls.Add(header.Item1)
+        Controls.Add(header.Item2)
         Controls.Add(_btnRefresh)
-        Controls.Add(_lblStatus)
-        Controls.Add(_txtReport)
+        Controls.Add(_statusBanner)
+        Controls.Add(_reportCard)
         Controls.Add(_chkOverrideCurrency)
 
-        AddHandler Resize, Sub(s, e)
-                               _txtReport.Width = Math.Max(640, ClientSize.Width - 56)
-                               _txtReport.Height = Math.Max(220, ClientSize.Height - 230)
-                               _chkOverrideCurrency.Location = New Point(28, _txtReport.Bottom + 12)
-                           End Sub
-        OnResize(EventArgs.Empty)
+        AddHandler Resize, AddressOf OnPanelResize
+        OnPanelResize(Me, EventArgs.Empty)
         AppTheme.ApplyRtlTree(Me, False)
+        OnPanelResize(Me, EventArgs.Empty)
+    End Sub
+
+    Private Sub OnPanelResize(sender As Object, e As EventArgs)
+        Dim w = ClientSize.Width
+        Dim m = AppTheme.PageMargin
+        Dim title = Controls("title")
+        Dim subtitle = Controls("subtitle")
+        If title IsNot Nothing Then AppTheme.PlaceFromRight(title, w, m, 18)
+        If subtitle IsNot Nothing Then AppTheme.PlaceFromRight(subtitle, w, m, 52)
+
+        AppTheme.PlaceFromRight(_btnRefresh, w, m, 92)
+        _statusBanner.Width = Math.Min(480, Math.Max(220, w - m * 2 - _btnRefresh.Width - 16))
+        AppTheme.PlaceFromRight(_statusBanner, w, m + _btnRefresh.Width + 16, 98)
+
+        _reportCard.Width = Math.Max(640, w - m * 2)
+        _reportCard.Height = Math.Max(220, ClientSize.Height - 230)
+        AppTheme.PlaceFromRight(_reportCard, w, m, 148)
+        AppTheme.PlaceFromRight(_chkOverrideCurrency, w, m, _reportCard.Bottom + 14)
     End Sub
 
     Public Async Function RunPreflightAsync() As Task
@@ -103,8 +110,8 @@ Friend Class PreflightPanel
         _cts = New CancellationTokenSource()
         _busy = True
         _btnRefresh.Enabled = False
-        _lblStatus.Text = "در حال بررسی..."
-        _lblStatus.ForeColor = AppTheme.TextMuted
+        _statusBanner.SetStatus("در حال بررسی...", ContextBanner.BannerTone.Info)
+        OnPanelResize(Me, EventArgs.Empty)
         Try
             Dim report = Await _preflight.BuildReportAsync(_session, _api, _cts.Token).ConfigureAwait(True)
             _session.Preflight = report
@@ -113,16 +120,14 @@ Friend Class PreflightPanel
             _chkOverrideCurrency.Visible = Not report.CurrencyMatched
             _txtReport.Text = FormatReport(report)
             If report.CanProceed Then
-                _lblStatus.Text = "بررسی انجام شد — می‌توانید ادامه دهید"
-                _lblStatus.ForeColor = AppTheme.Success
+                _statusBanner.SetStatus("بررسی انجام شد — می‌توانید ادامه دهید", ContextBanner.BannerTone.Success)
             Else
-                _lblStatus.Text = "مغایرت بحرانی وجود دارد"
-                _lblStatus.ForeColor = AppTheme.Danger
+                _statusBanner.SetStatus("مغایرت بحرانی وجود دارد", ContextBanner.BannerTone.Danger)
             End If
+            OnPanelResize(Me, EventArgs.Empty)
             RaiseEvent SelectionChanged(Me, EventArgs.Empty)
         Catch ex As Exception
-            _lblStatus.Text = "بررسی ناموفق"
-            _lblStatus.ForeColor = AppTheme.Danger
+            _statusBanner.SetStatus("بررسی ناموفق", ContextBanner.BannerTone.Danger)
             AsyncUi.ShowError(Me, "خطا در بازبینی", ex)
         Finally
             _busy = False

@@ -94,6 +94,7 @@
     <Compile Include="Services\MigrationSession.vb" />
     <Compile Include="Services\PreflightService.vb" />
     <Compile Include="UI\AppTheme.vb" />
+    <Compile Include="UI\UiPrimitives.vb" />
     <Compile Include="UI\HesabixConnectPanel.vb">
       <SubType>UserControl</SubType>
     </Compile>

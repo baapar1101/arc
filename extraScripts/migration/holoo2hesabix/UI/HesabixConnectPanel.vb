@@ -9,29 +9,29 @@ Friend Class HesabixConnectPanel
     Private ReadOnly _session As MigrationSession
     Private ReadOnly _api As HesabixApiClient
 
-    Private _txtBaseUrl As TextBox
-    Private _tabs As TabControl
-    Private _txtIdentifier As TextBox
-    Private _txtPassword As TextBox
-    Private _txtCaptcha As TextBox
+    Private _fldBaseUrl As ModernTextField
+    Private _segments As SegmentedControl
+    Private _pnlLogin As Panel
+    Private _pnlApiKey As Panel
+    Private _fldIdentifier As ModernTextField
+    Private _fldPassword As ModernTextField
+    Private _fldCaptcha As ModernTextField
     Private _picCaptcha As PictureBox
     Private _btnRefreshCaptcha As Button
     Private _btnLogin As Button
-    Private _txtApiKey As TextBox
+    Private _fldApiKey As ModernTextField
     Private _btnConnectKey As Button
     Private _btnDisconnect As Button
-    Private _lblStatus As Label
-    Private _lblUser As Label
-    Private _formCard As Panel
+    Private _statusBanner As ContextBanner
+    Private _formCard As RoundedCard
     Private _listHeader As Label
-    Private ReadOnly _businessHost As FlowLayoutPanel
+    Private ReadOnly _businessHost As Panel
     Private ReadOnly _btnNewBusiness As Button
-    Private ReadOnly _pnlBusy As Panel
-    Private ReadOnly _lblBusy As Label
-    Private ReadOnly _progress As ProgressBar
+    Private ReadOnly _busy As BusyOverlay
+    Private ReadOnly _empty As EmptyStateView
 
     Private _cts As CancellationTokenSource
-    Private _busy As Boolean
+    Private _isBusy As Boolean
     Private _currentCaptchaId As String = ""
 
     Public Sub New(session As MigrationSession, api As HesabixApiClient)
@@ -42,25 +42,12 @@ Friend Class HesabixConnectPanel
         BackColor = AppTheme.BgApp
         RightToLeft = RightToLeft.Yes
         Dock = DockStyle.Fill
-        Padding = New Padding(28, 16, 28, 16)
 
-        Dim title As New Label() With {
-            .AutoSize = True,
-            .Text = "اتصال به حسابیکس",
-            .Font = AppTheme.FontTitle,
-            .ForeColor = AppTheme.TextPrimary,
-            .RightToLeft = RightToLeft.Yes
-        }
-        Dim subtitle As New Label() With {
-            .AutoSize = True,
-            .Text = "با ایمیل/موبایل وارد شوید یا کلید API را وارد کنید، سپس کسب‌وکار مقصد را انتخاب کنید.",
-            .Font = AppTheme.FontSubtitle,
-            .ForeColor = AppTheme.TextSecondary,
-            .RightToLeft = RightToLeft.Yes
-        }
+        Dim header = PageHeader.Create(
+            "اتصال به حسابیکس",
+            "وارد شوید، سپس کسب‌وکار مقصد را برای مهاجرت انتخاب کنید.")
 
         _formCard = CreateFormCard()
-
         _listHeader = New Label() With {
             .AutoSize = True,
             .Text = "کسب‌وکارها",
@@ -71,202 +58,120 @@ Friend Class HesabixConnectPanel
 
         _btnNewBusiness = New Button() With {
             .Text = "+ کسب‌وکار جدید",
-            .Size = New Size(150, 36),
+            .Size = New Size(150, AppTheme.FieldHeight),
             .Enabled = False,
             .RightToLeft = RightToLeft.Yes
         }
         AppTheme.StyleSecondaryButton(_btnNewBusiness)
         AddHandler _btnNewBusiness.Click, Sub(s, e) RaiseEvent RequestCreateBusiness(Me, EventArgs.Empty)
 
-        _businessHost = New FlowLayoutPanel() With {
+        _businessHost = New Panel() With {
             .AutoScroll = True,
-            .WrapContents = True,
-            .FlowDirection = FlowDirection.RightToLeft,
-            .RightToLeft = RightToLeft.Yes,
-            .BackColor = AppTheme.BgMuted,
-            .Padding = New Padding(12)
+            .BackColor = Color.Transparent,
+            .RightToLeft = RightToLeft.Yes
         }
         AddHandler _businessHost.Paint, Sub(s, e)
-                                            Dim r = New Rectangle(0, 0, _businessHost.Width - 1, _businessHost.Height - 1)
-                                            AppTheme.DrawRoundedRect(e.Graphics, r, 12, AppTheme.BgMuted, AppTheme.Border)
+                                            Dim r As New Rectangle(0, 0, _businessHost.Width - 1, _businessHost.Height - 1)
+                                            AppTheme.DrawRoundedRect(e.Graphics, r, 14, AppTheme.BgMuted, AppTheme.Border)
                                         End Sub
 
-        _pnlBusy = New Panel() With {
-            .Visible = False,
-            .BackColor = Color.FromArgb(180, 255, 255, 255),
-            .Dock = DockStyle.Fill,
-            .RightToLeft = RightToLeft.Yes
-        }
-        _lblBusy = New Label() With {
-            .AutoSize = True,
-            .Text = "در حال ارتباط با سرور...",
-            .Font = AppTheme.FontUiBold,
-            .ForeColor = AppTheme.TextPrimary,
-            .RightToLeft = RightToLeft.Yes
-        }
-        _progress = New ProgressBar() With {
-            .Style = ProgressBarStyle.Marquee,
-            .MarqueeAnimationSpeed = 30,
-            .Size = New Size(220, 8)
-        }
-        _pnlBusy.Controls.Add(_lblBusy)
-        _pnlBusy.Controls.Add(_progress)
+        _empty = New EmptyStateView() With {.Dock = DockStyle.Fill}
+        AddHandler _empty.ActionClick, Sub(s, e) RaiseEvent RequestCreateBusiness(Me, EventArgs.Empty)
+        _businessHost.Controls.Add(_empty)
 
-        Controls.Add(title)
-        Controls.Add(subtitle)
+        _busy = New BusyOverlay()
+
+        Controls.Add(header.Item1)
+        Controls.Add(header.Item2)
         Controls.Add(_formCard)
         Controls.Add(_listHeader)
         Controls.Add(_btnNewBusiness)
         Controls.Add(_businessHost)
-        Controls.Add(_pnlBusy)
-        _pnlBusy.BringToFront()
-
-        title.Location = New Point(28, 12)
-        subtitle.Location = New Point(28, 50)
-        title.Name = "title"
-        subtitle.Name = "subtitle"
+        Controls.Add(_busy)
 
         AddHandler Resize, AddressOf OnPanelResize
         OnPanelResize(Me, EventArgs.Empty)
         LoadFromSession()
         AppTheme.ApplyRtlTree(Me, False)
+        OnPanelResize(Me, EventArgs.Empty)
     End Sub
 
-    Private Function CreateFormCard() As Panel
-        Dim card As New Panel() With {
-            .BackColor = AppTheme.BgCard,
-            .Height = 310,
-            .RightToLeft = RightToLeft.Yes,
-            .Padding = New Padding(16)
-        }
-        AddHandler card.Paint, Sub(s, e)
-                                   Dim r = New Rectangle(0, 0, card.Width - 1, card.Height - 1)
-                                   AppTheme.DrawRoundedRect(e.Graphics, r, 12, AppTheme.BgCard, AppTheme.Border)
-                               End Sub
+    Private Function CreateFormCard() As RoundedCard
+        Dim card As New RoundedCard() With {.Height = 348, .Padding = New Padding(22)}
 
-        Dim lblUrl As New Label() With {
-            .Text = "آدرس سرور API",
-            .AutoSize = True,
-            .Location = New Point(16, 14),
-            .ForeColor = AppTheme.TextSecondary,
-            .Font = AppTheme.FontStep,
-            .RightToLeft = RightToLeft.Yes
-        }
-        _txtBaseUrl = New TextBox() With {
-            .Location = New Point(16, 36),
+        _fldBaseUrl = New ModernTextField() With {
+            .FieldLabel = "آدرس سرور API",
+            .IsLtr = True,
             .Width = 520,
-            .RightToLeft = RightToLeft.No,
-            .TextAlign = HorizontalAlignment.Left,
-            .Anchor = AnchorStyles.Top Or AnchorStyles.Left Or AnchorStyles.Right
+            .Name = "fldBaseUrl"
         }
-        AppTheme.StyleTextBox(_txtBaseUrl)
 
-        _lblStatus = New Label() With {
-            .AutoSize = True,
-            .Location = New Point(16, 66),
-            .ForeColor = AppTheme.TextMuted,
-            .Font = AppTheme.FontStep,
-            .Text = "هنوز متصل نشده‌اید",
-            .RightToLeft = RightToLeft.Yes
-        }
-        _lblUser = New Label() With {
-            .AutoSize = True,
-            .Location = New Point(180, 66),
-            .ForeColor = AppTheme.AccentDark,
-            .Font = AppTheme.FontUiBold,
-            .Text = "",
-            .RightToLeft = RightToLeft.Yes
-        }
+        _statusBanner = New ContextBanner() With {.Width = 420, .Name = "statusBanner"}
+        _statusBanner.SetStatus("هنوز متصل نشده‌اید", ContextBanner.BannerTone.Neutral)
 
         _btnDisconnect = New Button() With {
             .Text = "قطع اتصال",
-            .Size = New Size(100, 32),
-            .Location = New Point(560, 32),
+            .Size = New Size(110, 32),
             .Visible = False,
-            .Anchor = AnchorStyles.Top Or AnchorStyles.Right,
-            .RightToLeft = RightToLeft.Yes
+            .Name = "btnDisconnect"
         }
-        AppTheme.StyleSecondaryButton(_btnDisconnect)
-        _btnDisconnect.Height = 32
+        AppTheme.StyleDangerGhostButton(_btnDisconnect)
         AddHandler _btnDisconnect.Click, AddressOf OnDisconnectClick
 
-        _tabs = New TabControl() With {
-            .Location = New Point(16, 92),
-            .Size = New Size(700, 200),
-            .RightToLeft = RightToLeft.Yes,
-            .RightToLeftLayout = False,
-            .Anchor = AnchorStyles.Top Or AnchorStyles.Left Or AnchorStyles.Right,
-            .Font = AppTheme.FontUi
-        }
+        _segments = New SegmentedControl() With {.Width = 360, .Name = "segments"}
+        _segments.SetItems("ورود با حساب", "کلید API")
+        AddHandler _segments.SelectedIndexChanged, AddressOf OnSegmentChanged
 
-        Dim tabLogin As New TabPage("ورود با حساب کاربری") With {
-            .RightToLeft = RightToLeft.Yes,
-            .BackColor = AppTheme.BgCard,
-            .Padding = New Padding(12),
-            .UseVisualStyleBackColor = False
-        }
-        Dim tabKey As New TabPage("ورود با کلید API") With {
-            .RightToLeft = RightToLeft.Yes,
-            .BackColor = AppTheme.BgCard,
-            .Padding = New Padding(12),
-            .UseVisualStyleBackColor = False
-        }
+        _pnlLogin = BuildLoginPane()
+        _pnlApiKey = BuildApiKeyPane()
+        _pnlApiKey.Visible = False
 
-        ' --- Login tab ---
-        Dim lblId As New Label() With {.Text = "ایمیل یا موبایل", .AutoSize = True, .Location = New Point(12, 12), .ForeColor = AppTheme.TextSecondary, .Font = AppTheme.FontStep, .RightToLeft = RightToLeft.Yes}
-        _txtIdentifier = New TextBox() With {.Location = New Point(12, 34), .Width = 260, .RightToLeft = RightToLeft.No}
-        AppTheme.StyleTextBox(_txtIdentifier)
+        card.Controls.Add(_fldBaseUrl)
+        card.Controls.Add(_statusBanner)
+        card.Controls.Add(_btnDisconnect)
+        card.Controls.Add(_segments)
+        card.Controls.Add(_pnlLogin)
+        card.Controls.Add(_pnlApiKey)
+        AddHandler card.Resize, AddressOf LayoutFormCard
+        Return card
+    End Function
 
-        Dim lblPass As New Label() With {.Text = "رمز عبور", .AutoSize = True, .Location = New Point(290, 12), .ForeColor = AppTheme.TextSecondary, .Font = AppTheme.FontStep, .RightToLeft = RightToLeft.Yes}
-        _txtPassword = New TextBox() With {.Location = New Point(290, 34), .Width = 220, .UseSystemPasswordChar = True, .RightToLeft = RightToLeft.No}
-        AppTheme.StyleTextBox(_txtPassword)
+    Private Function BuildLoginPane() As Panel
+        Dim pane As New Panel() With {.BackColor = Color.Transparent, .RightToLeft = RightToLeft.Yes, .Height = 168}
 
-        Dim lblCap As New Label() With {.Text = "کد تصویر امنیتی", .AutoSize = True, .Location = New Point(12, 72), .ForeColor = AppTheme.TextSecondary, .Font = AppTheme.FontStep, .RightToLeft = RightToLeft.Yes}
-        _txtCaptcha = New TextBox() With {.Location = New Point(12, 94), .Width = 120, .RightToLeft = RightToLeft.No, .MaxLength = 8}
-        AppTheme.StyleTextBox(_txtCaptcha)
+        _fldIdentifier = New ModernTextField() With {.FieldLabel = "ایمیل یا موبایل", .IsLtr = True, .Width = 260}
+        _fldPassword = New ModernTextField() With {.FieldLabel = "رمز عبور", .IsLtr = True, .UseSystemPasswordChar = True, .Width = 220}
+        _fldCaptcha = New ModernTextField() With {.FieldLabel = "کد تصویر امنیتی", .IsLtr = True, .Width = 130, .MaxLength = 8}
 
         _picCaptcha = New PictureBox() With {
-            .Location = New Point(148, 78),
-            .Size = New Size(160, 48),
+            .Size = New Size(150, 44),
             .SizeMode = PictureBoxSizeMode.Zoom,
-            .BorderStyle = BorderStyle.FixedSingle,
-            .BackColor = Color.White
+            .BackColor = Color.White,
+            .BorderStyle = BorderStyle.FixedSingle
         }
-        _btnRefreshCaptcha = New Button() With {
-            .Text = "تازه‌سازی تصویر",
-            .Size = New Size(130, 36),
-            .Location = New Point(320, 84),
-            .RightToLeft = RightToLeft.Yes
-        }
+        _btnRefreshCaptcha = New Button() With {.Text = "تازه‌سازی", .Size = New Size(100, 36)}
         AppTheme.StyleSecondaryButton(_btnRefreshCaptcha)
         _btnRefreshCaptcha.Height = 36
-        _btnRefreshCaptcha.Width = 130
         AddHandler _btnRefreshCaptcha.Click, AddressOf OnRefreshCaptchaClick
 
-        _btnLogin = New Button() With {
-            .Text = "ورود و دریافت کسب‌وکارها",
-            .Size = New Size(200, 40),
-            .Location = New Point(460, 82),
-            .RightToLeft = RightToLeft.Yes
-        }
+        _btnLogin = New Button() With {.Text = "ورود", .Size = New Size(120, AppTheme.FieldHeight)}
         AppTheme.StylePrimaryButton(_btnLogin)
         AddHandler _btnLogin.Click, AddressOf OnLoginClick
 
-        tabLogin.Controls.Add(lblId)
-        tabLogin.Controls.Add(_txtIdentifier)
-        tabLogin.Controls.Add(lblPass)
-        tabLogin.Controls.Add(_txtPassword)
-        tabLogin.Controls.Add(lblCap)
-        tabLogin.Controls.Add(_txtCaptcha)
-        tabLogin.Controls.Add(_picCaptcha)
-        tabLogin.Controls.Add(_btnRefreshCaptcha)
-        tabLogin.Controls.Add(_btnLogin)
+        pane.Controls.Add(_fldIdentifier)
+        pane.Controls.Add(_fldPassword)
+        pane.Controls.Add(_fldCaptcha)
+        pane.Controls.Add(_picCaptcha)
+        pane.Controls.Add(_btnRefreshCaptcha)
+        pane.Controls.Add(_btnLogin)
+        AddHandler pane.Resize, AddressOf LayoutLoginPane
+        Return pane
+    End Function
 
-        ' --- API key tab ---
-        Dim lblKey As New Label() With {.Text = "کلید API", .AutoSize = True, .Location = New Point(12, 20), .ForeColor = AppTheme.TextSecondary, .RightToLeft = RightToLeft.Yes}
-        _txtApiKey = New TextBox() With {.Location = New Point(12, 44), .Width = 420, .UseSystemPasswordChar = True, .RightToLeft = RightToLeft.No}
-        AppTheme.StyleTextBox(_txtApiKey)
-        _btnConnectKey = New Button() With {.Text = "اتصال با کلید API", .Size = New Size(170, 40), .Location = New Point(450, 40), .RightToLeft = RightToLeft.Yes}
+    Private Function BuildApiKeyPane() As Panel
+        Dim pane As New Panel() With {.BackColor = Color.Transparent, .RightToLeft = RightToLeft.Yes, .Height = 168}
+        _fldApiKey = New ModernTextField() With {.FieldLabel = "کلید API", .IsLtr = True, .UseSystemPasswordChar = True, .Width = 420}
+        _btnConnectKey = New Button() With {.Text = "اتصال", .Size = New Size(120, AppTheme.FieldHeight)}
         AppTheme.StylePrimaryButton(_btnConnectKey)
         AddHandler _btnConnectKey.Click, AddressOf OnConnectKeyClick
 
@@ -275,58 +180,99 @@ Friend Class HesabixConnectPanel
             .Text = "کلید را از بخش کلیدهای API در پروفایل حسابیکس کپی کنید.",
             .ForeColor = AppTheme.TextMuted,
             .Font = AppTheme.FontStep,
-            .Location = New Point(12, 96),
-            .RightToLeft = RightToLeft.Yes
+            .RightToLeft = RightToLeft.Yes,
+            .Name = "hintApiKey"
         }
-        tabKey.Controls.Add(lblKey)
-        tabKey.Controls.Add(_txtApiKey)
-        tabKey.Controls.Add(_btnConnectKey)
-        tabKey.Controls.Add(hint)
-
-        _tabs.TabPages.Add(tabLogin)
-        _tabs.TabPages.Add(tabKey)
-
-        card.Controls.Add(lblUrl)
-        card.Controls.Add(_txtBaseUrl)
-        card.Controls.Add(_lblStatus)
-        card.Controls.Add(_lblUser)
-        card.Controls.Add(_btnDisconnect)
-        card.Controls.Add(_tabs)
-
-        AddHandler card.Resize, Sub(s, e)
-                                    _txtBaseUrl.Width = Math.Max(280, card.Width - 150)
-                                    _btnDisconnect.Left = Math.Max(16, card.Width - _btnDisconnect.Width - 16)
-                                    _tabs.Width = Math.Max(400, card.Width - 32)
-                                End Sub
-
-        Return card
+        pane.Controls.Add(_fldApiKey)
+        pane.Controls.Add(_btnConnectKey)
+        pane.Controls.Add(hint)
+        AddHandler pane.Resize, AddressOf LayoutApiKeyPane
+        Return pane
     End Function
+
+    Private Sub OnSegmentChanged(sender As Object, e As EventArgs)
+        _pnlLogin.Visible = (_segments.SelectedIndex = 0)
+        _pnlApiKey.Visible = (_segments.SelectedIndex = 1)
+        LayoutFormCard(_formCard, EventArgs.Empty)
+    End Sub
+
+    Private Sub LayoutFormCard(sender As Object, e As EventArgs)
+        If _formCard Is Nothing OrElse _fldBaseUrl Is Nothing Then Return
+        Dim w = _formCard.ClientSize.Width
+        Const m As Integer = 22
+
+        Dim urlW = Math.Max(280, w - m * 2 - If(_btnDisconnect.Visible, 130, 0))
+        _fldBaseUrl.Width = urlW
+        AppTheme.PlaceFromRight(_fldBaseUrl, w, m, 18)
+        If _btnDisconnect.Visible Then
+            _btnDisconnect.Location = New Point(m, 40)
+        End If
+
+        _statusBanner.Width = Math.Min(480, w - m * 2)
+        AppTheme.PlaceFromRight(_statusBanner, w, m, 88)
+
+        _segments.Width = Math.Min(360, w - m * 2)
+        AppTheme.PlaceFromRight(_segments, w, m, 132)
+
+        Dim paneTop = 184
+        _pnlLogin.SetBounds(m, paneTop, Math.Max(200, w - m * 2), 168)
+        _pnlApiKey.SetBounds(m, paneTop, Math.Max(200, w - m * 2), 168)
+        LayoutLoginPane(_pnlLogin, EventArgs.Empty)
+        LayoutApiKeyPane(_pnlApiKey, EventArgs.Empty)
+    End Sub
+
+    Private Sub LayoutLoginPane(sender As Object, e As EventArgs)
+        If _pnlLogin Is Nothing OrElse _fldIdentifier Is Nothing Then Return
+        Dim w = _pnlLogin.ClientSize.Width
+        Const gap As Integer = 14
+
+        AppTheme.PlaceFromRight(_fldIdentifier, w, 0, 0)
+        AppTheme.PlaceFromRight(_fldPassword, w, _fldIdentifier.Width + gap, 0)
+
+        AppTheme.PlaceFromRight(_fldCaptcha, w, 0, 72)
+        Dim capRight = _fldCaptcha.Width + gap
+        _picCaptcha.Location = New Point(AppTheme.RtlLeft(w, capRight, _picCaptcha.Width), 88)
+        Dim picRight = capRight + _picCaptcha.Width + gap
+        AppTheme.PlaceFromRight(_btnRefreshCaptcha, w, picRight, 92)
+        AppTheme.PlaceFromRight(_btnLogin, w, picRight + _btnRefreshCaptcha.Width + gap, 88)
+    End Sub
+
+    Private Sub LayoutApiKeyPane(sender As Object, e As EventArgs)
+        If _pnlApiKey Is Nothing OrElse _fldApiKey Is Nothing Then Return
+        Dim w = _pnlApiKey.ClientSize.Width
+        Dim keyW = Math.Max(200, w - _btnConnectKey.Width - 14)
+        _fldApiKey.Width = keyW
+        AppTheme.PlaceFromRight(_fldApiKey, w, 0, 0)
+        AppTheme.PlaceFromRight(_btnConnectKey, w, keyW + 14, 22)
+        Dim hint = _pnlApiKey.Controls("hintApiKey")
+        If hint IsNot Nothing Then AppTheme.PlaceFromRight(hint, w, 0, 78)
+    End Sub
 
     Private Sub OnPanelResize(sender As Object, e As EventArgs)
         If _formCard Is Nothing Then Return
-        _formCard.Location = New Point(28, 88)
-        _formCard.Width = Math.Max(640, ClientSize.Width - 56)
+        Dim w = ClientSize.Width
+        Dim m = AppTheme.PageMargin
+        Dim title = Controls("title")
+        Dim subtitle = Controls("subtitle")
+        If title IsNot Nothing Then AppTheme.PlaceFromRight(title, w, m, 18)
+        If subtitle IsNot Nothing Then AppTheme.PlaceFromRight(subtitle, w, m, 52)
 
-        _listHeader.Location = New Point(28, _formCard.Bottom + 16)
-        _btnNewBusiness.Location = New Point(Math.Max(28, _formCard.Right - _btnNewBusiness.Width), _formCard.Bottom + 10)
+        _formCard.Width = Math.Max(640, w - m * 2)
+        AppTheme.PlaceFromRight(_formCard, w, m, 92)
+        LayoutFormCard(_formCard, EventArgs.Empty)
 
-        _businessHost.Location = New Point(28, _listHeader.Bottom + 10)
-        _businessHost.Width = Math.Max(640, ClientSize.Width - 56)
+        AppTheme.PlaceFromRight(_listHeader, w, m, _formCard.Bottom + 18)
+        _btnNewBusiness.Location = New Point(m, _formCard.Bottom + 12)
+
+        _businessHost.Width = Math.Max(640, w - m * 2)
+        AppTheme.PlaceFromRight(_businessHost, w, m, _listHeader.Bottom + 10)
         _businessHost.Height = Math.Max(120, ClientSize.Height - _businessHost.Top - 16)
-
-        If _pnlBusy.Visible Then
-            CenterBusy()
-        End If
-    End Sub
-
-    Private Sub CenterBusy()
-        _lblBusy.Location = New Point((_pnlBusy.Width - _lblBusy.PreferredWidth) \ 2, (_pnlBusy.Height \ 2) - 24)
-        _progress.Location = New Point((_pnlBusy.Width - _progress.Width) \ 2, _lblBusy.Bottom + 12)
+        LayoutBusinessCards()
     End Sub
 
     Public Sub LoadFromSession()
-        _txtBaseUrl.Text = If(String.IsNullOrWhiteSpace(_session.ApiBaseUrl), MigrationSession.DefaultApiBaseUrl, _session.ApiBaseUrl)
-        _txtApiKey.Text = If(_session.ApiKey, "")
+        _fldBaseUrl.Text = If(String.IsNullOrWhiteSpace(_session.ApiBaseUrl), MigrationSession.DefaultApiBaseUrl, _session.ApiBaseUrl)
+        _fldApiKey.Text = If(_session.ApiKey, "")
         RefreshAuthUi()
         RenderBusinesses()
         If Not _session.IsHesabixConnected Then
@@ -335,24 +281,23 @@ Friend Class HesabixConnectPanel
     End Sub
 
     Private Sub SetBusy(busy As Boolean, Optional message As String = Nothing)
-        _busy = busy
-        _pnlBusy.Visible = busy
+        _isBusy = busy
+        If busy Then
+            _busy.ShowBusy(message)
+        Else
+            _busy.HideBusy()
+        End If
         _btnLogin.Enabled = Not busy
         _btnConnectKey.Enabled = Not busy
         _btnRefreshCaptcha.Enabled = Not busy
         _btnDisconnect.Enabled = Not busy
         _btnNewBusiness.Enabled = (Not busy) AndAlso _session.IsHesabixConnected
-        _txtBaseUrl.Enabled = Not busy AndAlso Not _session.IsHesabixConnected
-        _txtApiKey.Enabled = Not busy AndAlso Not _session.IsHesabixConnected
-        _txtIdentifier.Enabled = Not busy AndAlso Not _session.IsHesabixConnected
-        _txtPassword.Enabled = Not busy AndAlso Not _session.IsHesabixConnected
-        _txtCaptcha.Enabled = Not busy AndAlso Not _session.IsHesabixConnected
-        _tabs.Enabled = Not busy AndAlso Not _session.IsHesabixConnected
-        If busy Then
-            _lblBusy.Text = If(String.IsNullOrWhiteSpace(message), "در حال ارتباط با سرور...", message)
-            CenterBusy()
-            _pnlBusy.BringToFront()
-        End If
+        _fldBaseUrl.Enabled = Not busy AndAlso Not _session.IsHesabixConnected
+        _fldApiKey.Enabled = Not busy AndAlso Not _session.IsHesabixConnected
+        _fldIdentifier.Enabled = Not busy AndAlso Not _session.IsHesabixConnected
+        _fldPassword.Enabled = Not busy AndAlso Not _session.IsHesabixConnected
+        _fldCaptcha.Enabled = Not busy AndAlso Not _session.IsHesabixConnected
+        _segments.Enabled = Not busy AndAlso Not _session.IsHesabixConnected
     End Sub
 
     Private Sub BeginLoadCaptcha()
@@ -360,8 +305,8 @@ Friend Class HesabixConnectPanel
     End Sub
 
     Private Async Function LoadCaptchaAsync() As Task
-        If _busy OrElse _session.IsHesabixConnected Then Return
-        Dim baseUrl = _txtBaseUrl.Text.Trim()
+        If _isBusy OrElse _session.IsHesabixConnected Then Return
+        Dim baseUrl = _fldBaseUrl.Text.Trim()
         If String.IsNullOrWhiteSpace(baseUrl) Then Return
 
         CancelPending()
@@ -372,19 +317,17 @@ Friend Class HesabixConnectPanel
                     _api.SetBaseUrl(baseUrl)
                     Return Await _api.GetCaptchaAsync(ct).ConfigureAwait(False)
                 End Function,
-                Sub(b) SetBusy(b, "در حال دریافت تصویر امنیتی..."),
+                Sub(b) SetBusy(b, "دریافت تصویر امنیتی..."),
                 _cts.Token).ConfigureAwait(True)
-
             ApplyCaptcha(captcha)
         Catch ex As Exception
-            _lblStatus.Text = "دریافت کپچا ناموفق بود — می‌توانید دوباره تلاش کنید"
-            _lblStatus.ForeColor = AppTheme.Warning
+            _statusBanner.SetStatus("دریافت کپچا ناموفق بود — دوباره تلاش کنید", ContextBanner.BannerTone.Warning)
         End Try
     End Function
 
     Private Sub ApplyCaptcha(captcha As CaptchaChallenge)
         _currentCaptchaId = If(captcha.CaptchaId, "")
-        _txtCaptcha.Text = ""
+        _fldCaptcha.Text = ""
         If _picCaptcha.Image IsNot Nothing Then
             _picCaptcha.Image.Dispose()
             _picCaptcha.Image = Nothing
@@ -401,19 +344,24 @@ Friend Class HesabixConnectPanel
     End Sub
 
     Private Async Sub OnLoginClick(sender As Object, e As EventArgs)
-        If _busy Then Return
-        Dim baseUrl = _txtBaseUrl.Text.Trim()
-        Dim identifier = _txtIdentifier.Text.Trim()
-        Dim password = _txtPassword.Text
-        Dim captchaCode = _txtCaptcha.Text.Trim()
+        If _isBusy Then Return
+        ClearFieldErrors()
+        Dim baseUrl = _fldBaseUrl.Text.Trim()
+        Dim identifier = _fldIdentifier.Text.Trim()
+        Dim password = _fldPassword.Text
+        Dim captchaCode = _fldCaptcha.Text.Trim()
 
-        If String.IsNullOrWhiteSpace(baseUrl) OrElse String.IsNullOrWhiteSpace(identifier) OrElse String.IsNullOrWhiteSpace(password) Then
-            MessageBox.Show(Me, "آدرس سرور، ایمیل/موبایل و رمز عبور را وارد کنید.", "ورودی ناقص", MessageBoxButtons.OK, MessageBoxIcon.Warning)
-            Return
+        Dim ok = True
+        If String.IsNullOrWhiteSpace(baseUrl) Then _fldBaseUrl.HasError = True : ok = False
+        If String.IsNullOrWhiteSpace(identifier) Then _fldIdentifier.HasError = True : ok = False
+        If String.IsNullOrWhiteSpace(password) Then _fldPassword.HasError = True : ok = False
+        If String.IsNullOrWhiteSpace(captchaCode) OrElse String.IsNullOrWhiteSpace(_currentCaptchaId) Then
+            _fldCaptcha.HasError = True
+            ok = False
         End If
-        If String.IsNullOrWhiteSpace(_currentCaptchaId) OrElse String.IsNullOrWhiteSpace(captchaCode) Then
-            MessageBox.Show(Me, "کد تصویر امنیتی را وارد کنید.", "ورودی ناقص", MessageBoxButtons.OK, MessageBoxIcon.Warning)
-            Await LoadCaptchaAsync().ConfigureAwait(True)
+        If Not ok Then
+            _statusBanner.SetStatus("لطفاً فیلدهای مشخص‌شده را کامل کنید", ContextBanner.BannerTone.Warning)
+            If String.IsNullOrWhiteSpace(_currentCaptchaId) Then Await LoadCaptchaAsync().ConfigureAwait(True)
             Return
         End If
 
@@ -435,7 +383,7 @@ Friend Class HesabixConnectPanel
                     _session.Businesses = businesses
                     _session.ResetHesabixSelection()
                 End Function,
-                Sub(b) SetBusy(b, "در حال ورود و دریافت کسب‌وکارها..."),
+                Sub(b) SetBusy(b, "در حال ورود..."),
                 _cts.Token).ConfigureAwait(True)
 
             RefreshAuthUi()
@@ -447,6 +395,7 @@ Friend Class HesabixConnectPanel
             RefreshAuthUi()
             RenderBusinesses()
             RaiseEvent SelectionChanged(Me, EventArgs.Empty)
+            _statusBanner.SetStatus(ex.Message, ContextBanner.BannerTone.Danger)
             AsyncUi.ShowError(Me, "خطا در ورود", ex)
         End Try
 
@@ -456,12 +405,15 @@ Friend Class HesabixConnectPanel
     End Sub
 
     Private Async Sub OnConnectKeyClick(sender As Object, e As EventArgs)
-        If _busy Then Return
-
-        Dim baseUrl = _txtBaseUrl.Text.Trim()
-        Dim apiKey = _txtApiKey.Text.Trim()
-        If String.IsNullOrWhiteSpace(baseUrl) OrElse String.IsNullOrWhiteSpace(apiKey) Then
-            MessageBox.Show(Me, "آدرس سرور و کلید API را وارد کنید.", "ورودی ناقص", MessageBoxButtons.OK, MessageBoxIcon.Warning)
+        If _isBusy Then Return
+        ClearFieldErrors()
+        Dim baseUrl = _fldBaseUrl.Text.Trim()
+        Dim apiKey = _fldApiKey.Text.Trim()
+        Dim ok = True
+        If String.IsNullOrWhiteSpace(baseUrl) Then _fldBaseUrl.HasError = True : ok = False
+        If String.IsNullOrWhiteSpace(apiKey) Then _fldApiKey.HasError = True : ok = False
+        If Not ok Then
+            _statusBanner.SetStatus("آدرس سرور و کلید API را وارد کنید", ContextBanner.BannerTone.Warning)
             Return
         End If
 
@@ -479,7 +431,7 @@ Friend Class HesabixConnectPanel
                     _session.Businesses = businesses
                     _session.ResetHesabixSelection()
                 End Function,
-                Sub(b) SetBusy(b, "در حال احراز هویت و دریافت کسب‌وکارها..."),
+                Sub(b) SetBusy(b, "در حال احراز هویت..."),
                 _cts.Token).ConfigureAwait(True)
 
             RefreshAuthUi()
@@ -491,6 +443,7 @@ Friend Class HesabixConnectPanel
             RefreshAuthUi()
             RenderBusinesses()
             RaiseEvent SelectionChanged(Me, EventArgs.Empty)
+            _statusBanner.SetStatus(ex.Message, ContextBanner.BannerTone.Danger)
             AsyncUi.ShowError(Me, "خطا در اتصال", ex)
         End Try
     End Sub
@@ -499,12 +452,20 @@ Friend Class HesabixConnectPanel
         CancelPending()
         _session.ClearHesabixAuth()
         _api.ClearApiKey()
-        _txtApiKey.Text = ""
-        _txtPassword.Text = ""
+        _fldApiKey.Text = ""
+        _fldPassword.Text = ""
         RefreshAuthUi()
         RenderBusinesses()
         RaiseEvent SelectionChanged(Me, EventArgs.Empty)
         BeginLoadCaptcha()
+    End Sub
+
+    Private Sub ClearFieldErrors()
+        _fldBaseUrl.HasError = False
+        _fldIdentifier.HasError = False
+        _fldPassword.HasError = False
+        _fldCaptcha.HasError = False
+        _fldApiKey.HasError = False
     End Sub
 
     Private Sub CancelPending()
@@ -517,72 +478,95 @@ Friend Class HesabixConnectPanel
 
     Private Sub RefreshAuthUi()
         Dim connected = _session.IsHesabixConnected
-        _txtBaseUrl.Enabled = Not connected AndAlso Not _busy
-        _tabs.Enabled = Not connected AndAlso Not _busy
+        _fldBaseUrl.Enabled = Not connected AndAlso Not _isBusy
+        _segments.Enabled = Not connected AndAlso Not _isBusy
         _btnDisconnect.Visible = connected
-        _btnNewBusiness.Enabled = connected AndAlso Not _busy
+        _btnNewBusiness.Enabled = connected AndAlso Not _isBusy
+        _pnlLogin.Enabled = Not connected
+        _pnlApiKey.Enabled = Not connected
 
         If connected Then
-            _lblStatus.Text = "متصل شدید"
-            _lblStatus.ForeColor = AppTheme.Success
-            _lblUser.Text = _session.CurrentUser.DisplayName
+            _statusBanner.SetStatus("متصل شدید — " & _session.CurrentUser.DisplayName, ContextBanner.BannerTone.Success)
         Else
-            _lblStatus.Text = "هنوز متصل نشده‌اید"
-            _lblStatus.ForeColor = AppTheme.TextMuted
-            _lblUser.Text = ""
+            _statusBanner.SetStatus("هنوز متصل نشده‌اید", ContextBanner.BannerTone.Neutral)
         End If
+        LayoutFormCard(_formCard, EventArgs.Empty)
     End Sub
 
     Private Sub RenderBusinesses()
-        _businessHost.SuspendLayout()
-        _businessHost.Controls.Clear()
+        For i = _businessHost.Controls.Count - 1 To 0 Step -1
+            Dim c = _businessHost.Controls(i)
+            If Not Object.ReferenceEquals(c, _empty) Then
+                _businessHost.Controls.RemoveAt(i)
+                c.Dispose()
+            End If
+        Next
 
         If Not _session.IsHesabixConnected Then
-            AddEmptyBusinessLabel("پس از ورود، لیست کسب‌وکارها اینجا نمایش داده می‌شود.")
-            _businessHost.ResumeLayout()
+            _empty.Configure("پس از ورود", "لیست کسب‌وکارها اینجا نمایش داده می‌شود.")
+            _empty.Visible = True
+            _empty.BringToFront()
             Return
         End If
 
         If _session.Businesses Is Nothing OrElse _session.Businesses.Count = 0 Then
-            AddEmptyBusinessLabel("کسب‌وکاری یافت نشد. یک کسب‌وکار جدید بسازید.")
-            _businessHost.ResumeLayout()
+            _empty.Configure("کسب‌وکاری یافت نشد", "یک کسب‌وکار جدید بسازید تا مهاجرت را شروع کنید.", "+ ایجاد کسب‌وکار")
+            _empty.Visible = True
+            _empty.BringToFront()
             Return
         End If
 
+        _empty.Visible = False
         For Each biz In _session.Businesses
             _businessHost.Controls.Add(CreateBusinessCard(biz))
         Next
-        _businessHost.ResumeLayout()
+        LayoutBusinessCards()
     End Sub
 
-    Private Sub AddEmptyBusinessLabel(text As String)
-        Dim empty As New Label() With {
-            .AutoSize = True,
-            .Text = text,
-            .ForeColor = AppTheme.TextMuted,
-            .Font = AppTheme.FontUi,
-            .Margin = New Padding(8),
-            .RightToLeft = RightToLeft.Yes
-        }
-        _businessHost.Controls.Add(empty)
+    Private Sub LayoutBusinessCards()
+        Const pad As Integer = 14
+        Const gap As Integer = 12
+        Dim cardW = 250
+        Dim cardH = 104
+        Dim x = _businessHost.ClientSize.Width - pad - cardW
+        Dim y = pad
+        Dim rowH = 0
+        For Each ctrl As Control In _businessHost.Controls
+            If Object.ReferenceEquals(ctrl, _empty) Then Continue For
+            If x < pad Then
+                x = _businessHost.ClientSize.Width - pad - cardW
+                y += rowH + gap
+                rowH = 0
+            End If
+            ctrl.SetBounds(x, y, cardW, cardH)
+            x -= cardW + gap
+            rowH = Math.Max(rowH, cardH)
+        Next
     End Sub
 
     Private Function CreateBusinessCard(biz As HesabixBusiness) As Panel
         Dim selected = _session.SelectedBusiness IsNot Nothing AndAlso _session.SelectedBusiness.Id = biz.Id
         Dim card As New Panel() With {
-            .Width = 260,
-            .Height = 96,
-            .Margin = New Padding(8),
+            .Size = New Size(250, 104),
             .Cursor = Cursors.Hand,
             .Tag = biz,
-            .RightToLeft = RightToLeft.Yes
+            .RightToLeft = RightToLeft.Yes,
+            .BackColor = Color.Transparent
         }
         Dim fill = If(selected, AppTheme.AccentSoft, AppTheme.BgCard)
         Dim border = If(selected, AppTheme.Accent, AppTheme.Border)
+        Dim bw = If(selected, 2.0F, 1.0F)
 
         AddHandler card.Paint, Sub(s, e)
-                                   Dim r = New Rectangle(0, 0, card.Width - 1, card.Height - 1)
-                                   AppTheme.DrawRoundedRect(e.Graphics, r, 10, fill, border, If(selected, 2.0F, 1.0F))
+                                   Dim g = e.Graphics
+                                   g.SmoothingMode = Drawing2D.SmoothingMode.AntiAlias
+                                   Dim r As New Rectangle(0, 0, card.Width - 1, card.Height - 1)
+                                   AppTheme.DrawRoundedRect(g, r, 12, fill, border, bw)
+                                   If selected Then
+                                       Using brush As New SolidBrush(AppTheme.Accent)
+                                           g.FillRectangle(brush, New Rectangle(card.Width - 4, 18, 3, 68))
+                                       End Using
+                                   End If
                                End Sub
 
         Dim name As New Label() With {
@@ -590,29 +574,36 @@ Friend Class HesabixConnectPanel
             .Text = biz.Name,
             .Font = AppTheme.FontUiBold,
             .ForeColor = AppTheme.TextPrimary,
-            .Location = New Point(14, 14),
-            .Size = New Size(230, 24),
+            .Location = New Point(14, 16),
+            .Size = New Size(220, 24),
             .Cursor = Cursors.Hand,
-            .RightToLeft = RightToLeft.Yes
+            .RightToLeft = RightToLeft.Yes,
+            .TextAlign = ContentAlignment.MiddleRight,
+            .BackColor = Color.Transparent
         }
         Dim meta As New Label() With {
             .AutoSize = False,
             .Text = If(String.IsNullOrWhiteSpace(biz.Subtitle), "شناسه " & biz.Id.ToString(), biz.Subtitle),
             .Font = AppTheme.FontStep,
             .ForeColor = AppTheme.TextSecondary,
-            .Location = New Point(14, 42),
-            .Size = New Size(230, 20),
+            .Location = New Point(14, 44),
+            .Size = New Size(220, 20),
             .Cursor = Cursors.Hand,
-            .RightToLeft = RightToLeft.Yes
+            .RightToLeft = RightToLeft.Yes,
+            .TextAlign = ContentAlignment.MiddleRight,
+            .BackColor = Color.Transparent
         }
         Dim idLbl As New Label() With {
-            .AutoSize = True,
-            .Text = "#" & biz.Id.ToString(),
+            .AutoSize = False,
+            .Text = If(selected, "انتخاب‌شده  ·  #" & biz.Id.ToString(), "#" & biz.Id.ToString()),
             .Font = AppTheme.FontStep,
-            .ForeColor = AppTheme.TextMuted,
-            .Location = New Point(14, 68),
+            .ForeColor = If(selected, AppTheme.AccentDark, AppTheme.TextMuted),
+            .Location = New Point(14, 70),
+            .Size = New Size(220, 18),
             .Cursor = Cursors.Hand,
-            .RightToLeft = RightToLeft.Yes
+            .RightToLeft = RightToLeft.Yes,
+            .TextAlign = ContentAlignment.MiddleRight,
+            .BackColor = Color.Transparent
         }
 
         Dim pick =
@@ -643,7 +634,7 @@ Friend Class HesabixConnectPanel
                     Dim businesses = Await _api.ListBusinessesAsync(100, ct).ConfigureAwait(False)
                     _session.Businesses = businesses
                 End Function,
-                Sub(b) SetBusy(b, "در حال به‌روزرسانی لیست کسب‌وکارها..."),
+                Sub(b) SetBusy(b, "به‌روزرسانی لیست کسب‌وکارها..."),
                 _cts.Token).ConfigureAwait(True)
             RenderBusinesses()
             RaiseEvent SelectionChanged(Me, EventArgs.Empty)
