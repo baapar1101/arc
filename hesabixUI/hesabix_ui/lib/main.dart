@@ -535,7 +535,7 @@ class _MyAppState extends State<MyApp> {
       );
       const AnnouncementsPage();
       NewBusinessPage(calendarController: calendarController);
-      const BusinessesPage();
+      BusinessesPage(authStore: authStore);
       MobileLauncherHomePage(businessId: 1, authStore: authStore);
       MobileLauncherAppearancePage(businessId: 1, authStore: authStore);
       SupportPage(calendarController: calendarController);
@@ -1280,7 +1280,7 @@ class _MyAppState extends State<MyApp> {
             GoRoute(
               path: '/user/profile/businesses',
               name: 'profile_businesses',
-              builder: (context, state) => const BusinessesPage(),
+              builder: (context, state) => BusinessesPage(authStore: _authStore!),
             ),
             GoRoute(
               path: '/user/profile/support',

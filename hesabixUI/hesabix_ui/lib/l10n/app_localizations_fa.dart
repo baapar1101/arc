@@ -4339,6 +4339,12 @@ class AppLocalizationsFa extends AppLocalizations {
   String get codeMustBeNumeric => 'کد باید عددی باشد';
 
   @override
+  String get codeMinLength => 'کد باید حداقل ۳ رقم باشد';
+
+  @override
+  String get codeRequired => 'کد الزامی است';
+
+  @override
   String get integerNoDecimal => 'عدد صحیح بدون اعشار';
 
   @override

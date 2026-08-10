@@ -1809,6 +1809,8 @@
   "manual": "دستی",
   "personCodeRequired": "کد شخص الزامی است",
   "codeMustBeNumeric": "کد باید عددی باشد",
+  "codeMinLength": "کد باید حداقل ۳ رقم باشد",
+  "codeRequired": "کد الزامی است",
   "integerNoDecimal": "عدد صحیح بدون اعشار",
   "shareholderShareCountRequired": "برای سهامدار، تعداد سهام الزامی است",
   "noBankAccountsAdded": "هیچ حساب بانکی اضافه نشده است",

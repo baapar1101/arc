@@ -326,10 +326,10 @@ class _BankAccountFormDialogState extends State<BankAccountFormDialog> {
                 validator: (value) {
                   if (!_autoGenerateCode) {
                     if (value == null || value.trim().isEmpty) {
-                      return t.personCodeRequired;
+                      return t.codeRequired;
                     }
                     if (value.trim().length < 3) {
-                      return t.passwordMinLength; // fallback generic
+                      return t.codeMinLength;
                     }
                     if (!RegExp(r'^\d+$').hasMatch(value.trim())) {
                       return t.codeMustBeNumeric;

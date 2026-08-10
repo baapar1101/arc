@@ -1704,6 +1704,8 @@
   "manual": "Manual",
   "personCodeRequired": "Person code is required",
   "codeMustBeNumeric": "Code must be numeric",
+  "codeMinLength": "Code must be at least 3 digits",
+  "codeRequired": "Code is required",
   "integerNoDecimal": "Integer number (no decimals)",
   "shareholderShareCountRequired": "For shareholder, share count is required",
   "noBankAccountsAdded": "No bank accounts added",

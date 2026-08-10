@@ -8244,6 +8244,18 @@ abstract class AppLocalizations {
   /// **'Code must be numeric'**
   String get codeMustBeNumeric;
 
+  /// No description provided for @codeMinLength.
+  ///
+  /// In en, this message translates to:
+  /// **'Code must be at least 3 digits'**
+  String get codeMinLength;
+
+  /// No description provided for @codeRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Code is required'**
+  String get codeRequired;
+
   /// No description provided for @integerNoDecimal.
   ///
   /// In en, this message translates to:

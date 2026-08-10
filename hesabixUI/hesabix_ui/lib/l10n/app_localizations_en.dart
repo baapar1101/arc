@@ -4365,6 +4365,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get codeMustBeNumeric => 'Code must be numeric';
 
   @override
+  String get codeMinLength => 'Code must be at least 3 digits';
+
+  @override
+  String get codeRequired => 'Code is required';
+
+  @override
   String get integerNoDecimal => 'Integer number (no decimals)';
 
   @override
