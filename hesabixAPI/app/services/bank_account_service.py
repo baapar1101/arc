@@ -494,6 +494,18 @@ def get_bank_accounts_turnover_report(
             'pagination': اطلاعات pagination
         }
     """
+    # Without a currency filter, every aggregate is expressed in the business
+    # base currency.  This prevents mixed native-currency totals.
+    amounts_in_base = currency_id is None
+    debit_amount = (
+        func.coalesce(DocumentLine.debit_base, DocumentLine.debit)
+        if amounts_in_base else DocumentLine.debit
+    )
+    credit_amount = (
+        func.coalesce(DocumentLine.credit_base, DocumentLine.credit)
+        if amounts_in_base else DocumentLine.credit
+    )
+
     # Query پایه: DocumentLine join Document و BankAccount
     query = db.query(
         DocumentLine,
@@ -570,7 +582,11 @@ def get_bank_accounts_turnover_report(
                 'total_pages': 0,
                 'has_next': False,
                 'has_prev': False,
-            }
+            },
+            'meta': {
+                'currency_id': currency_id,
+                'amounts_in_base': amounts_in_base,
+            },
         }
     
     # تابع برای تبدیل document_type به نام فارسی
@@ -619,8 +635,8 @@ def get_bank_accounts_turnover_report(
             for ba_id in unique_bank_account_ids:
                 # محاسبه مجموع واریز (debit) و برداشت (credit) تا date_before_from
                 opening_query = db.query(
-                    func.coalesce(func.sum(DocumentLine.debit), 0).label('total_deposit'),
-                    func.coalesce(func.sum(DocumentLine.credit), 0).label('total_withdrawal')
+                    func.coalesce(func.sum(debit_amount), 0).label('total_deposit'),
+                    func.coalesce(func.sum(credit_amount), 0).label('total_withdrawal')
                 ).join(
                     Document, DocumentLine.document_id == Document.id
                 ).filter(
@@ -659,8 +675,14 @@ def get_bank_accounts_turnover_report(
         if ba_id not in balance_by_account:
             balance_by_account[ba_id] = Decimal(0)
         
-        deposit = Decimal(str(line.debit or 0))
-        withdrawal = Decimal(str(line.credit or 0))
+        deposit = Decimal(str(
+            (line.debit_base if line.debit_base is not None else line.debit)
+            if amounts_in_base else line.debit
+        ) or 0)
+        withdrawal = Decimal(str(
+            (line.credit_base if line.credit_base is not None else line.credit)
+            if amounts_in_base else line.credit
+        ) or 0)
         
         # به‌روزرسانی مانده: واریز (debit) اضافه می‌کند، برداشت (credit) کم می‌کند
         balance_by_account[ba_id] += deposit - withdrawal
@@ -726,7 +748,11 @@ def get_bank_accounts_turnover_report(
             'total_pages': total_pages,
             'has_next': current_page < total_pages,
             'has_prev': current_page > 1,
-        }
+        },
+        'meta': {
+            'currency_id': currency_id,
+            'amounts_in_base': amounts_in_base,
+        },
 	}
 
 

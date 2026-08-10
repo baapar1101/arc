@@ -297,6 +297,8 @@ def _build_statement_lines(
                     "amount": node.get("amount", 0),
                     "level": depth,
                 }
+                if node.get("amount_base") is not None:
+                    row["amount_base"] = node.get("amount_base")
                 if has_compare and node.get("prior_amount") is not None:
                     row["prior_amount"] = node.get("prior_amount")
                     row["variance"] = node.get("variance")
@@ -308,14 +310,18 @@ def _build_statement_lines(
         walk(items)
 
     def add_subtotal(subsection: str, summary_key: str, label_fa: str, label_en: str, *, highlight: bool = False) -> None:
-        lines.append(add_compare({
+        row = {
             "type": "subtotal",
             "section": subsection,
             "label_fa": label_fa,
             "label_en": label_en,
             "amount": summary.get(summary_key, 0),
             "highlight": highlight,
-        }, summary_key))
+        }
+        base_key = f"{summary_key}_base"
+        if base_key in summary:
+            row["amount_base"] = summary.get(base_key)
+        lines.append(add_compare(row, summary_key))
 
     add_accounts("current_assets", grouped.get("current_assets") or [])
     add_subtotal("current_assets", "total_current_assets", "جمع دارایی‌های جاری", "Total Current Assets")
@@ -343,6 +349,8 @@ def _build_statement_lines(
             "account_name": BS_SECTION_LABELS_FA["current_period_profit"],
             "amount": summary.get("current_period_profit", 0),
         }
+        if summary.get("current_period_profit_base") is not None:
+            cpp_row["amount_base"] = summary.get("current_period_profit_base")
         if has_compare:
             cpp_row["prior_amount"] = prior_val("current_period_profit") or 0.0
             cpp_row["variance"] = round(float(summary.get("current_period_profit", 0)) - float(cpp_row["prior_amount"]), 2)
@@ -352,14 +360,17 @@ def _build_statement_lines(
         lines.append(cpp_row)
 
     add_subtotal("equity", "total_equity", "جمع حقوق صاحبان سهام", "Total Equity", highlight=True)
-    lines.append(add_compare({
+    grand = {
         "type": "grand_total",
         "section": "liabilities_and_equity",
         "label_fa": "جمع بدهی‌ها و حقوق صاحبان سهام",
         "label_en": "Total Liabilities & Equity",
         "amount": summary.get("total_liabilities_and_equity", 0),
         "highlight": True,
-    }, "total_liabilities_and_equity"))
+    }
+    if "total_liabilities_and_equity_base" in summary:
+        grand["amount_base"] = summary.get("total_liabilities_and_equity_base")
+    lines.append(add_compare(grand, "total_liabilities_and_equity"))
 
     equation_ok = abs(float(summary.get("balance_difference", 0))) <= float(BALANCE_TOLERANCE)
     lines.append({
@@ -399,6 +410,39 @@ def _compute_current_period_profit(
     return float(summary.get("net_profit_after_tax", summary.get("net_profit_loss", 0)) or 0)
 
 
+def _annotate_bs_amount_base(
+    grouped: Dict[str, List[Dict[str, Any]]],
+    base_grouped: Dict[str, List[Dict[str, Any]]],
+) -> Dict[str, List[Dict[str, Any]]]:
+    """افزودن amount_base به درخت ترازنامه از روی درخت معادل پایه."""
+    base_by_id: Dict[int, float] = {}
+
+    def index(nodes: List[Dict[str, Any]]) -> None:
+        for n in nodes:
+            aid = n.get("account_id")
+            if aid is not None:
+                base_by_id[int(aid)] = float(n.get("amount", 0) or 0)
+            if n.get("children"):
+                index(n["children"])
+
+    for items in base_grouped.values():
+        index(items or [])
+
+    def walk(nodes: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        out: List[Dict[str, Any]] = []
+        for n in nodes:
+            row = dict(n)
+            aid = n.get("account_id")
+            if aid is not None and int(aid) in base_by_id:
+                row["amount_base"] = base_by_id[int(aid)]
+            if n.get("children"):
+                row["children"] = walk(n["children"])
+            out.append(row)
+        return out
+
+    return {k: walk(v or []) for k, v in grouped.items()}
+
+
 def _build_balance_sheet_report(
     db: Session,
     business_id: int,
@@ -414,7 +458,9 @@ def _build_balance_sheet_report(
     prior_grouped: Optional[Dict[str, List[Dict[str, Any]]]] = None,
     prior_summary: Optional[Dict[str, float]] = None,
     has_compare: bool = False,
+    include_base_equivalent: bool = False,
 ) -> Dict[str, Any]:
+    want_dual = bool(include_base_equivalent and currency_id is not None)
     accounts = fetch_business_accounts(db, business_id)
     permanent_accounts = [a for a in accounts if is_permanent_account(a.code)]
     if not permanent_accounts:
@@ -431,6 +477,7 @@ def _build_balance_sheet_report(
             "summary": summary,
             "statement_lines": _build_statement_lines(grouped, summary),
             "current_period_profit_item": None,
+            "want_dual": want_dual,
         }
 
     account_tree = build_account_tree(permanent_accounts)
@@ -444,6 +491,7 @@ def _build_balance_sheet_report(
         fy_id,
         currency_id,
         project_id,
+        amounts_in_base=False if want_dual else None,
     )
 
     prior_amounts_by_code: Optional[Dict[str, float]] = None
@@ -460,6 +508,26 @@ def _build_balance_sheet_report(
         max_depth=max_depth,
         prior_amounts_by_code=prior_amounts_by_code,
     )
+
+    if want_dual:
+        base_leaves = compute_leaf_balances(
+            db,
+            business_id,
+            account_ids,
+            date_from_obj,
+            date_to_obj,
+            fy_id,
+            currency_id,
+            project_id,
+            amounts_in_base=True,
+        )
+        base_grouped = _build_permanent_account_tree(
+            account_tree,
+            base_leaves,
+            include_zero_balance=True,
+            max_depth=max_depth,
+        )
+        grouped = _annotate_bs_amount_base(grouped, base_grouped)
 
     total_current_assets = _sum_section_amount(grouped["current_assets"])
     total_non_current_assets = _sum_section_amount(grouped["non_current_assets"])
@@ -481,6 +549,25 @@ def _build_balance_sheet_report(
             )
         )
     )
+    current_period_profit_base: Optional[float] = None
+    if want_dual:
+        # سود دوره به ارز بومی فیلتر؛ معادل پایه از PnL با تبدیل به پایه برای همان ارز
+        pnl_only_base = get_pnl_period_report(
+            db=db,
+            business_id=business_id,
+            fiscal_year_id=fy_id,
+            currency_id=currency_id,
+            date_from=fy_start.isoformat(),
+            date_to=date_to_obj.isoformat(),
+            project_id=project_id,
+            include_zero_balance=True,
+            include_base_equivalent=False,
+            skip=0,
+            take=1,
+        )
+        s = pnl_only_base.get("summary") or {}
+        current_period_profit_base = float(s.get("net_profit_after_tax", s.get("net_profit_loss", 0)) or 0)
+
     total_equity = total_equity_accounts + current_period_profit
     total_liabilities_and_equity = total_liabilities + total_equity
     balance_difference = total_assets - total_liabilities_and_equity
@@ -499,6 +586,35 @@ def _build_balance_sheet_report(
         "balance_difference": float(balance_difference),
         "equation_balanced": abs(balance_difference) <= BALANCE_TOLERANCE,
     }
+    if want_dual and current_period_profit_base is not None:
+        summary["current_period_profit_base"] = float(current_period_profit_base)
+        # جمع‌های پایه سطح بخش
+        for key, section_key in (
+            ("total_current_assets_base", "current_assets"),
+            ("total_non_current_assets_base", "non_current_assets"),
+            ("total_current_liabilities_base", "current_liabilities"),
+            ("total_non_current_liabilities_base", "non_current_liabilities"),
+            ("total_equity_accounts_base", "equity"),
+        ):
+            summary[key] = float(
+                sum(Decimal(str(it.get("amount_base", 0) or 0)) for it in (grouped.get(section_key) or []))
+            )
+        summary["total_assets_base"] = float(
+            Decimal(str(summary["total_current_assets_base"]))
+            + Decimal(str(summary["total_non_current_assets_base"]))
+        )
+        summary["total_liabilities_base"] = float(
+            Decimal(str(summary["total_current_liabilities_base"]))
+            + Decimal(str(summary["total_non_current_liabilities_base"]))
+        )
+        summary["total_equity_base"] = float(
+            Decimal(str(summary["total_equity_accounts_base"]))
+            + Decimal(str(current_period_profit_base))
+        )
+        summary["total_liabilities_and_equity_base"] = float(
+            Decimal(str(summary["total_liabilities_base"]))
+            + Decimal(str(summary["total_equity_base"]))
+        )
 
     current_period_profit_item = {
         "account_code": CURRENT_PERIOD_PROFIT_ACCOUNT_CODE,
@@ -507,6 +623,8 @@ def _build_balance_sheet_report(
         "subsection": "current_period_profit",
         "amount": float(current_period_profit),
     }
+    if want_dual and current_period_profit_base is not None:
+        current_period_profit_item["amount_base"] = float(current_period_profit_base)
     if has_compare and prior_summary is not None:
         pri = float(prior_summary.get("current_period_profit", 0))
         current_period_profit_item["prior_amount"] = pri
@@ -527,6 +645,7 @@ def _build_balance_sheet_report(
         "summary": summary,
         "statement_lines": statement_lines,
         "current_period_profit_item": current_period_profit_item,
+        "want_dual": want_dual,
     }
 
 
@@ -542,6 +661,7 @@ def get_balance_sheet_report(
     account_level: int = 4,
     compare_prior_period: bool = False,
     compare_mode: Optional[str] = None,
+    include_base_equivalent: bool = False,
 ) -> Dict[str, Any]:
     """
     گزارش ترازنامه (صورت وضعیت مالی).
@@ -549,9 +669,12 @@ def get_balance_sheet_report(
     - مانده حساب‌های دائم (گروه ۱، ۲، ۳) در تاریخ پایان
     - سود (زیان) دوره جاری از محاسبه سود و زیان
     - اعتبارسنجی معادله: دارایی = بدهی + حقوق صاحبان سهام
+    - با ارز مشخص + include_base_equivalent: ستون بومی و معادل پایه
     """
     if account_level not in ACCOUNT_LEVELS:
         account_level = 4
+
+    want_dual = bool(include_base_equivalent and currency_id is not None)
 
     fy_id, date_from_obj, date_to_obj = resolve_date_range(
         db, business_id, fiscal_year_id, date_from, date_to
@@ -577,6 +700,7 @@ def get_balance_sheet_report(
         include_zero_balance=include_zero_balance,
         account_level=account_level,
         has_compare=bool(resolved_compare),
+        include_base_equivalent=include_base_equivalent,
     )
 
     result: Dict[str, Any] = {
@@ -593,6 +717,13 @@ def get_balance_sheet_report(
             "currency_id": currency_id,
             "project_id": project_id,
             "compare_mode": resolved_compare,
+            "amounts_in_base": currency_id is None and not want_dual,
+            "include_base_equivalent": want_dual,
+            "dual_column_note": (
+                "مبالغ اصلی به ارز فیلترشده؛ فیلدهای amount_base معادل ارز پایه همان اسناد هستند."
+                if want_dual
+                else None
+            ),
         },
         "section_labels_fa": BS_SECTION_LABELS_FA,
         "section_labels_en": BS_SECTION_LABELS_EN,
@@ -630,6 +761,7 @@ def get_balance_sheet_report(
             project_id=project_id,
             include_zero_balance=include_zero_balance,
             account_level=account_level,
+            include_base_equivalent=include_base_equivalent,
         )
         prior_summary = prior_report["summary"]
 
@@ -647,11 +779,13 @@ def get_balance_sheet_report(
             prior_grouped=prior_report["grouped"],
             prior_summary=prior_summary,
             has_compare=True,
+            include_base_equivalent=include_base_equivalent,
         )
         result["grouped"] = report["grouped"]
         result["summary"] = report["summary"]
         result["statement_lines"] = report["statement_lines"]
         result["current_period_profit_item"] = report["current_period_profit_item"]
+        result["meta"]["include_base_equivalent"] = bool(report.get("want_dual"))
         result["prior_summary"] = prior_summary
         result["prior_period"] = {
             "date_from": prior_from.isoformat(),
@@ -661,5 +795,19 @@ def get_balance_sheet_report(
             {k: float(v) for k, v in result["summary"].items() if k in BS_SUMMARY_COMPARE_KEYS},
             {k: float(v) for k, v in prior_summary.items() if k in BS_SUMMARY_COMPARE_KEYS},
         )
+
+    try:
+        from app.services.fx_data_quality_service import get_missing_base_amount_warnings
+
+        result["meta"]["fx_data_quality"] = get_missing_base_amount_warnings(
+            db,
+            business_id,
+            fiscal_year_id=fy_id,
+            date_from=date_from_obj.isoformat(),
+            date_to=date_to_obj.isoformat(),
+            sample_limit=5,
+        )
+    except Exception:
+        pass
 
     return result

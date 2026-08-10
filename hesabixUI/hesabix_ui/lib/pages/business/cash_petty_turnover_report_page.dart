@@ -80,14 +80,8 @@ class _CashPettyTurnoverReportPageState extends State<CashPettyTurnoverReportPag
       if (!mounted) return;
       setState(() {
         _currencies = items;
-        // انتخاب ارز پیش‌فرض
-        if (items.isNotEmpty) {
-          final defaultCurrency = items.firstWhere(
-            (c) => c['is_default'] == true,
-            orElse: () => items.first,
-          );
-          _selectedCurrencyId = defaultCurrency['id'] as int?;
-        }
+        // قرارداد چندارزی: null = همه ارزها → معادل پایه
+        _selectedCurrencyId = null;
       });
     } catch (_) {
       // ignore errors
@@ -313,7 +307,7 @@ class _CashPettyTurnoverReportPageState extends State<CashPettyTurnoverReportPag
                   ),
                   SizedBox(
                     width: 220,
-                    child: DropdownButtonFormField<int>(
+                    child: DropdownButtonFormField<int?>(
                       value: _selectedCurrencyId,
                       decoration: InputDecoration(
                         labelText: t.currency,
@@ -321,11 +315,16 @@ class _CashPettyTurnoverReportPageState extends State<CashPettyTurnoverReportPag
                         isDense: true,
                         contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
                       ),
-                      items: _currencies.map<DropdownMenuItem<int>>((c) {
+                      items: [
+                        const DropdownMenuItem<int?>(
+                          value: null,
+                          child: Text('همه ارزها (معادل پایه)'),
+                        ),
+                        ..._currencies.map<DropdownMenuItem<int?>>((c) {
                         final id = c['id'] as int?;
                         final code = (c['code'] ?? '').toString();
                         final title = (c['title'] ?? code).toString();
-                        return DropdownMenuItem<int>(
+                        return DropdownMenuItem<int?>(
                           value: id,
                           child: Text(
                             '$code - $title',
@@ -333,7 +332,8 @@ class _CashPettyTurnoverReportPageState extends State<CashPettyTurnoverReportPag
                             maxLines: 1,
                           ),
                         );
-                      }).toList(),
+                      }),
+                      ],
                       menuMaxHeight: 300,
                       onChanged: (val) {
                         setState(() {

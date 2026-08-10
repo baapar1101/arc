@@ -80,13 +80,8 @@ class _MaterialsConsumptionReportPageState extends State<MaterialsConsumptionRep
       setState(() {
         _currencies = items;
         // انتخاب ارز پیش‌فرض
-        if (items.isNotEmpty) {
-          final defaultCurrency = items.firstWhere(
-            (c) => c['is_default'] == true,
-            orElse: () => items.first,
-          );
-          _selectedCurrencyId = defaultCurrency['id'] as int?;
-        }
+        // قرارداد چندارزی: null = همه ارزها → معادل پایه
+        _selectedCurrencyId = null;
       });
     } catch (_) {
       // ignore errors
@@ -331,7 +326,7 @@ class _MaterialsConsumptionReportPageState extends State<MaterialsConsumptionRep
                       items: [
                         const DropdownMenuItem<int>(
                           value: null,
-                          child: Text('همه ارزها'),
+                          child: Text('همه ارزها (معادل پایه)'),
                         ),
                         ..._currencies.map<DropdownMenuItem<int>>((c) {
                           final id = c['id'] as int?;

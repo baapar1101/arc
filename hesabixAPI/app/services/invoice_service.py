@@ -7457,6 +7457,9 @@ def _build_grouped_installment_invoices(items: List[Dict[str, Any]]) -> List[Dic
             "person_name": first.get("person_name"),
             "person_mobile": first.get("person_mobile"),
             "document_date": first.get("document_date"),
+            "currency_id": first.get("currency_id"),
+            "currency_code": first.get("currency_code"),
+            "amounts_in_base": first.get("amounts_in_base", False),
             "installment_count": len(rows),
             "paid_installment_count": paid_count,
             "overdue_installment_count": od_count,
@@ -7665,6 +7668,7 @@ def search_installments(
       - group_by: invoice برای صفحه‌بندی و خروجی خلاصه به ازای هر فاکتور
       - person_id: فیلتر بر اساس شخص
       - invoice_id: فاکتور خاص
+      - currency_id: ارز سند؛ در نبود آن همهٔ مبالغ معادل ارز پایه هستند
       - take/skip: صفحه‌بندی روی ردیف اقساط یا روی فاکتورها وقتی group_by=invoice
     """
     # تاریخ امروز برای تشخیص overdue
@@ -7688,6 +7692,13 @@ def search_installments(
     group_by_invoice = (query.get("group_by") or "").strip().lower() == "invoice"
     person_id_filter = query.get("person_id")
     invoice_id_filter = query.get("invoice_id")
+    currency_id_filter: int | None = None
+    try:
+        raw_currency_id = query.get("currency_id")
+        if raw_currency_id is not None and str(raw_currency_id).strip() != "":
+            currency_id_filter = int(raw_currency_id)
+    except (TypeError, ValueError):
+        currency_id_filter = None
     try:
         take = int(query.get("take", 200))
     except Exception:
@@ -7753,8 +7764,24 @@ def search_installments(
             docs_q = docs_q.filter(Document.id == int(invoice_id_filter))
         except Exception:
             pass
+    if currency_id_filter is not None:
+        docs_q = docs_q.filter(Document.currency_id == currency_id_filter)
 
     docs = docs_q.order_by(Document.id.desc()).all()
+    business = db.get(Business, int(business_id))
+    base_currency_id = (
+        int(business.default_currency_id)
+        if business and business.default_currency_id is not None
+        else None
+    )
+    base_currency = db.get(Currency, base_currency_id) if base_currency_id is not None else None
+    amounts_in_base = currency_id_filter is None
+    rate_cache: Dict[int, Decimal] = {}
+    base_currency_by_business: Dict[int, Optional[int]] = {
+        int(business_id): base_currency_id,
+    }
+    if amounts_in_base:
+        from app.services.person_service import amount_in_document_currency_to_base
 
     items: List[Dict[str, Any]] = []
     sum_principal = Decimal(0)
@@ -7765,6 +7792,8 @@ def search_installments(
     sum_late_fee = Decimal(0)
     status_counts: Dict[str, int] = {"pending": 0, "partial": 0, "paid": 0, "overdue": 0}
     for doc in docs:
+        document_currency_id = int(doc.currency_id)
+        document_currency_code = getattr(doc.currency, "code", None)
         extra = doc.extra_info or {}
         plan = extra.get("installment_plan") if isinstance(extra, dict) else None
         if not isinstance(plan, dict):
@@ -7857,6 +7886,31 @@ def search_installments(
                         )
                     except Exception:
                         late_fee_amount = Decimal(0)
+            if amounts_in_base:
+                principal = amount_in_document_currency_to_base(
+                    db, doc, principal, rate_cache=rate_cache,
+                    base_currency_by_business=base_currency_by_business,
+                )
+                interest = amount_in_document_currency_to_base(
+                    db, doc, interest, rate_cache=rate_cache,
+                    base_currency_by_business=base_currency_by_business,
+                )
+                total = amount_in_document_currency_to_base(
+                    db, doc, total, rate_cache=rate_cache,
+                    base_currency_by_business=base_currency_by_business,
+                )
+                paid = amount_in_document_currency_to_base(
+                    db, doc, paid, rate_cache=rate_cache,
+                    base_currency_by_business=base_currency_by_business,
+                )
+                remaining = amount_in_document_currency_to_base(
+                    db, doc, remaining, rate_cache=rate_cache,
+                    base_currency_by_business=base_currency_by_business,
+                )
+                late_fee_amount = amount_in_document_currency_to_base(
+                    db, doc, late_fee_amount, rate_cache=rate_cache,
+                    base_currency_by_business=base_currency_by_business,
+                )
             sum_principal += principal
             sum_interest += interest
             sum_total += total
@@ -7871,6 +7925,9 @@ def search_installments(
                 "person_name": person_name,
                 "person_mobile": person_mobile,
                 "document_date": doc.document_date,
+                "currency_id": document_currency_id,
+                "currency_code": document_currency_code,
+                "amounts_in_base": amounts_in_base,
                 "seq": int(it.get("seq") or 0),
                 "due_date": due,
                 "principal": float(principal),
@@ -7932,6 +7989,12 @@ def search_installments(
             "has_next": has_next,
         },
         "stats": stats,
+        "meta": {
+            "currency_id": currency_id_filter,
+            "amounts_in_base": amounts_in_base,
+            "base_currency_id": base_currency_id,
+            "base_currency_code": getattr(base_currency, "code", None),
+        },
         "filters": {
             "fiscal_year_id": fiscal_year_id,
             "due_from": due_from,
@@ -7943,6 +8006,7 @@ def search_installments(
             "group_by": "invoice" if group_by_invoice else None,
             "person_id": person_id_filter,
             "invoice_id": invoice_id_filter,
+            "currency_id": currency_id_filter,
         },
     }
 
@@ -8086,6 +8150,30 @@ def export_installments_xlsx(
         return content, "text/csv; charset=utf-8", "csv"
 
 
+def _invoice_amount_for_aggregate(
+    db: Session,
+    document: Document,
+    amount: Any,
+    *,
+    currency_id: Optional[int],
+    rate_cache: Dict[int, Decimal],
+    base_currency_by_business: Dict[int, Optional[int]],
+) -> Decimal:
+    """برای تجمیع گزارش‌ها: بدون فیلتر ارز → معادل پایه؛ با فیلتر → مبلغ بومی."""
+    native = Decimal(str(amount or 0))
+    if currency_id is not None:
+        return native
+    from app.services.person_service import amount_in_document_currency_to_base
+
+    return amount_in_document_currency_to_base(
+        db,
+        document,
+        native,
+        rate_cache=rate_cache,
+        base_currency_by_business=base_currency_by_business,
+    )
+
+
 def get_daily_sales_report(
     db: Session,
     business_id: int,
@@ -8103,7 +8191,7 @@ def get_daily_sales_report(
         db: نشست پایگاه داده
         business_id: شناسه کسب‌وکار
         fiscal_year_id: شناسه سال مالی (اختیاری)
-        currency_id: شناسه ارز (اختیاری)
+        currency_id: شناسه ارز (اختیاری؛ خالی = جمع معادل ارز پایه)
         date_from: از تاریخ (اختیاری، فرمت YYYY-MM-DD)
         date_to: تا تاریخ (اختیاری، فرمت YYYY-MM-DD)
         skip: تعداد رکوردهای رد شده برای pagination
@@ -8161,12 +8249,8 @@ def get_daily_sales_report(
     if date_from_obj is None:
         date_from_obj = date.today()
     
-    # Query فاکتورهای فروش
-    sales_query = db.query(
-        Document.document_date,
-        Document.extra_info,
-        Document.currency_id,
-    ).filter(
+    # Query فاکتورهای فروش (کل Document برای تبدیل FX)
+    sales_query = db.query(Document).filter(
         and_(
             Document.business_id == business_id,
             Document.document_type == INVOICE_SALES,
@@ -8183,6 +8267,9 @@ def get_daily_sales_report(
         sales_query = sales_query.filter(Document.fiscal_year_id == fiscal_year_id)
     
     sales_documents = sales_query.order_by(Document.document_date.asc()).all()
+    rate_cache: Dict[int, Decimal] = {}
+    base_currency_by_business: Dict[int, Optional[int]] = {}
+    amounts_in_base = currency_id is None
     
     # گروه‌بندی بر اساس روز
     daily_stats: Dict[str, Dict[str, Any]] = defaultdict(lambda: {
@@ -8205,10 +8292,22 @@ def get_daily_sales_report(
         
         daily_stats[date_key]['date'] = doc_date.isoformat()
         daily_stats[date_key]['invoice_count'] += 1
-        daily_stats[date_key]['total_gross'] += Decimal(str(totals.get('gross', 0) or 0))
-        daily_stats[date_key]['total_discount'] += Decimal(str(totals.get('discount', 0) or 0))
-        daily_stats[date_key]['total_tax'] += Decimal(str(totals.get('tax', 0) or 0))
-        daily_stats[date_key]['total_net'] += Decimal(str(totals.get('net', 0) or 0))
+        daily_stats[date_key]['total_gross'] += _invoice_amount_for_aggregate(
+            db, doc, totals.get('gross', 0), currency_id=currency_id,
+            rate_cache=rate_cache, base_currency_by_business=base_currency_by_business,
+        )
+        daily_stats[date_key]['total_discount'] += _invoice_amount_for_aggregate(
+            db, doc, totals.get('discount', 0), currency_id=currency_id,
+            rate_cache=rate_cache, base_currency_by_business=base_currency_by_business,
+        )
+        daily_stats[date_key]['total_tax'] += _invoice_amount_for_aggregate(
+            db, doc, totals.get('tax', 0), currency_id=currency_id,
+            rate_cache=rate_cache, base_currency_by_business=base_currency_by_business,
+        )
+        daily_stats[date_key]['total_net'] += _invoice_amount_for_aggregate(
+            db, doc, totals.get('net', 0), currency_id=currency_id,
+            rate_cache=rate_cache, base_currency_by_business=base_currency_by_business,
+        )
     
     # تبدیل به لیست و مرتب‌سازی (ترتیب نزولی)
     items = []
@@ -8251,7 +8350,11 @@ def get_daily_sales_report(
             'total_pages': total_pages,
             'has_next': current_page < total_pages,
             'has_prev': current_page > 1,
-        }
+        },
+        'meta': {
+            'currency_id': currency_id,
+            'amounts_in_base': amounts_in_base,
+        },
     }
 
 
@@ -8330,12 +8433,8 @@ def get_daily_purchases_report(
     if date_from_obj is None:
         date_from_obj = date.today()
     
-    # Query فاکتورهای خرید
-    purchases_query = db.query(
-        Document.document_date,
-        Document.extra_info,
-        Document.currency_id,
-    ).filter(
+    # Query فاکتورهای خرید (کل Document برای تبدیل FX)
+    purchases_query = db.query(Document).filter(
         and_(
             Document.business_id == business_id,
             Document.document_type == INVOICE_PURCHASE,
@@ -8352,6 +8451,9 @@ def get_daily_purchases_report(
         purchases_query = purchases_query.filter(Document.fiscal_year_id == fiscal_year_id)
     
     purchases_documents = purchases_query.order_by(Document.document_date.asc()).all()
+    rate_cache: Dict[int, Decimal] = {}
+    base_currency_by_business: Dict[int, Optional[int]] = {}
+    amounts_in_base = currency_id is None
     
     # گروه‌بندی بر اساس روز
     daily_stats: Dict[str, Dict[str, Any]] = defaultdict(lambda: {
@@ -8374,10 +8476,22 @@ def get_daily_purchases_report(
         
         daily_stats[date_key]['date'] = doc_date.isoformat()
         daily_stats[date_key]['invoice_count'] += 1
-        daily_stats[date_key]['total_gross'] += Decimal(str(totals.get('gross', 0) or 0))
-        daily_stats[date_key]['total_discount'] += Decimal(str(totals.get('discount', 0) or 0))
-        daily_stats[date_key]['total_tax'] += Decimal(str(totals.get('tax', 0) or 0))
-        daily_stats[date_key]['total_net'] += Decimal(str(totals.get('net', 0) or 0))
+        daily_stats[date_key]['total_gross'] += _invoice_amount_for_aggregate(
+            db, doc, totals.get('gross', 0), currency_id=currency_id,
+            rate_cache=rate_cache, base_currency_by_business=base_currency_by_business,
+        )
+        daily_stats[date_key]['total_discount'] += _invoice_amount_for_aggregate(
+            db, doc, totals.get('discount', 0), currency_id=currency_id,
+            rate_cache=rate_cache, base_currency_by_business=base_currency_by_business,
+        )
+        daily_stats[date_key]['total_tax'] += _invoice_amount_for_aggregate(
+            db, doc, totals.get('tax', 0), currency_id=currency_id,
+            rate_cache=rate_cache, base_currency_by_business=base_currency_by_business,
+        )
+        daily_stats[date_key]['total_net'] += _invoice_amount_for_aggregate(
+            db, doc, totals.get('net', 0), currency_id=currency_id,
+            rate_cache=rate_cache, base_currency_by_business=base_currency_by_business,
+        )
     
     # تبدیل به لیست و مرتب‌سازی (ترتیب نزولی)
     items = []
@@ -8420,7 +8534,11 @@ def get_daily_purchases_report(
             'total_pages': total_pages,
             'has_next': current_page < total_pages,
             'has_prev': current_page > 1,
-        }
+        },
+        'meta': {
+            'currency_id': currency_id,
+            'amounts_in_base': amounts_in_base,
+        },
     }
 
 
@@ -8499,12 +8617,8 @@ def get_monthly_sales_report(
     if date_from_obj is None:
         date_from_obj = date.today()
     
-    # Query فاکتورهای فروش
-    sales_query = db.query(
-        Document.document_date,
-        Document.extra_info,
-        Document.currency_id,
-    ).filter(
+    # Query فاکتورهای فروش (کل Document برای تبدیل FX)
+    sales_query = db.query(Document).filter(
         and_(
             Document.business_id == business_id,
             Document.document_type == INVOICE_SALES,
@@ -8521,6 +8635,9 @@ def get_monthly_sales_report(
         sales_query = sales_query.filter(Document.fiscal_year_id == fiscal_year_id)
     
     sales_documents = sales_query.order_by(Document.document_date.asc()).all()
+    rate_cache: Dict[int, Decimal] = {}
+    base_currency_by_business: Dict[int, Optional[int]] = {}
+    amounts_in_base = currency_id is None
     
     # گروه‌بندی بر اساس ماه
     monthly_stats: Dict[str, Dict[str, Any]] = defaultdict(lambda: {
@@ -8548,10 +8665,22 @@ def get_monthly_sales_report(
         monthly_stats[month_key]['month'] = doc_date.month
         monthly_stats[month_key]['month_key'] = month_key
         monthly_stats[month_key]['invoice_count'] += 1
-        monthly_stats[month_key]['total_gross'] += Decimal(str(totals.get('gross', 0) or 0))
-        monthly_stats[month_key]['total_discount'] += Decimal(str(totals.get('discount', 0) or 0))
-        monthly_stats[month_key]['total_tax'] += Decimal(str(totals.get('tax', 0) or 0))
-        monthly_stats[month_key]['total_net'] += Decimal(str(totals.get('net', 0) or 0))
+        monthly_stats[month_key]['total_gross'] += _invoice_amount_for_aggregate(
+            db, doc, totals.get('gross', 0), currency_id=currency_id,
+            rate_cache=rate_cache, base_currency_by_business=base_currency_by_business,
+        )
+        monthly_stats[month_key]['total_discount'] += _invoice_amount_for_aggregate(
+            db, doc, totals.get('discount', 0), currency_id=currency_id,
+            rate_cache=rate_cache, base_currency_by_business=base_currency_by_business,
+        )
+        monthly_stats[month_key]['total_tax'] += _invoice_amount_for_aggregate(
+            db, doc, totals.get('tax', 0), currency_id=currency_id,
+            rate_cache=rate_cache, base_currency_by_business=base_currency_by_business,
+        )
+        monthly_stats[month_key]['total_net'] += _invoice_amount_for_aggregate(
+            db, doc, totals.get('net', 0), currency_id=currency_id,
+            rate_cache=rate_cache, base_currency_by_business=base_currency_by_business,
+        )
     
     # تبدیل به لیست و مرتب‌سازی (ترتیب نزولی)
     items = []
@@ -8605,7 +8734,11 @@ def get_monthly_sales_report(
             'total_pages': total_pages,
             'has_next': current_page < total_pages,
             'has_prev': current_page > 1,
-        }
+        },
+        'meta': {
+            'currency_id': currency_id,
+            'amounts_in_base': amounts_in_base,
+        },
     }
 
 
@@ -9260,7 +9393,10 @@ def get_materials_consumption_report(
     production_documents = production_query.order_by(Document.document_date.asc()).all()
     
     doc_ids = [doc.id for doc in production_documents]
-    
+    rate_cache: Dict[int, Decimal] = {}
+    base_currency_by_business: Dict[int, Optional[int]] = {}
+    amounts_in_base = currency_id is None
+
     if not doc_ids:
         return {
             'items': [],
@@ -9319,11 +9455,20 @@ def get_materials_consumption_report(
         if line_warehouse_id:
             warehouse_ids_set.add(line_warehouse_id)
         
-        # محاسبه مبلغ
+        # محاسبه مبلغ (بدون فیلتر ارز → معادل پایه)
         unit_price = Decimal(str(line_info.get('unit_price', 0) or 0))
         quantity = Decimal(str(line.quantity or 0))
         amount = unit_price * quantity
-        
+        amount = _invoice_amount_for_aggregate(
+            db,
+            doc,
+            amount,
+            currency_id=currency_id,
+            rate_cache=rate_cache,
+            base_currency_by_business=base_currency_by_business,
+        )
+        unit_price_out = float(amount / quantity) if quantity != 0 else float(unit_price)
+
         items.append({
             'document_id': doc.id,
             'document_code': doc.code,
@@ -9331,9 +9476,11 @@ def get_materials_consumption_report(
             'product_id': line.product_id,
             'warehouse_id': line_warehouse_id,
             'quantity': float(quantity),
-            'unit_price': float(unit_price),
+            'unit_price': unit_price_out,
             'amount': float(amount),
             'description': line.description,
+            'document_currency_id': doc.currency_id,
+            'amounts_in_base': amounts_in_base,
         })
     
     # دریافت اطلاعات محصولات
@@ -9414,7 +9561,11 @@ def get_materials_consumption_report(
             'total_pages': total_pages,
             'has_next': current_page < total_pages,
             'has_prev': current_page > 1,
-        }
+        },
+        'meta': {
+            'currency_id': currency_id,
+            'amounts_in_base': amounts_in_base,
+        },
     }
 
 
@@ -9522,7 +9673,10 @@ def get_production_report(
     production_documents = production_query.order_by(Document.document_date.asc()).all()
     
     doc_ids = [doc.id for doc in production_documents]
-    
+    rate_cache: Dict[int, Decimal] = {}
+    base_currency_by_business: Dict[int, Optional[int]] = {}
+    amounts_in_base = currency_id is None
+
     if not doc_ids:
         return {
             'items': [],
@@ -9581,11 +9735,20 @@ def get_production_report(
         if line_warehouse_id:
             warehouse_ids_set.add(line_warehouse_id)
         
-        # محاسبه مبلغ
+        # محاسبه مبلغ (بدون فیلتر ارز → معادل پایه)
         unit_price = Decimal(str(line_info.get('unit_price', 0) or 0))
         quantity = Decimal(str(line.quantity or 0))
         amount = unit_price * quantity
-        
+        amount = _invoice_amount_for_aggregate(
+            db,
+            doc,
+            amount,
+            currency_id=currency_id,
+            rate_cache=rate_cache,
+            base_currency_by_business=base_currency_by_business,
+        )
+        unit_price_out = float(amount / quantity) if quantity != 0 else float(unit_price)
+
         items.append({
             'document_id': doc.id,
             'document_code': doc.code,
@@ -9593,9 +9756,11 @@ def get_production_report(
             'product_id': line.product_id,
             'warehouse_id': line_warehouse_id,
             'quantity': float(quantity),
-            'unit_price': float(unit_price),
+            'unit_price': unit_price_out,
             'amount': float(amount),
             'description': line.description,
+            'document_currency_id': doc.currency_id,
+            'amounts_in_base': amounts_in_base,
         })
     
     # دریافت اطلاعات محصولات
@@ -9676,7 +9841,11 @@ def get_production_report(
             'total_pages': total_pages,
             'has_next': current_page < total_pages,
             'has_prev': current_page > 1,
-        }
+        },
+        'meta': {
+            'currency_id': currency_id,
+            'amounts_in_base': amounts_in_base,
+        },
     }
 
 

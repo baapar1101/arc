@@ -41,7 +41,8 @@ abstract final class BusinessNamedRoutes {
     'business_distribution': 'distribution',
     'business_notification_templates': 'notification-templates',
     'business_notification_template_new': 'notification-templates/new',
-    'business_notification_template_edit': 'notification-templates/:template_id/edit',
+    'business_notification_template_edit':
+        'notification-templates/:template_id/edit',
     'business_workflows': 'workflows',
     'business_workflow_marketplace': 'workflows/marketplace',
     'business_crm_dashboard': 'crm',
@@ -66,19 +67,28 @@ abstract final class BusinessNamedRoutes {
     'business_reports_kardex': 'reports/kardex',
     'business_reports_debtors': 'reports/debtors',
     'business_reports_creditors': 'reports/creditors',
+    'business_reports_ar_aging': 'reports/ar-aging',
+    'business_reports_ap_aging': 'reports/ap-aging',
+    'business_reports_person_balances_by_currency':
+        'reports/person-balances-by-currency',
+    'business_reports_cash_flow': 'reports/cash-flow',
+    'business_reports_fx_revaluation': 'reports/fx-revaluation',
     'business_reports_people_transactions': 'reports/people-transactions',
     'business_reports_item_movements': 'reports/item-movements',
     'business_reports_sales_by_product': 'reports/sales-by-product',
     'business_reports_inventory_kardex': 'reports/inventory-kardex',
     'business_reports_inventory_stock': 'reports/inventory-stock',
     'business_reports_stock_count': 'reports/stock-count',
-    'business_reports_warehouse_documents_summary': 'reports/warehouse-documents-summary',
+    'business_reports_warehouse_documents_summary':
+        'reports/warehouse-documents-summary',
     'business_reports_slow_moving_items': 'reports/slow-moving-items',
     'business_reports_critical_stock': 'reports/critical-stock',
-    'business_reports_inter_warehouse_transfers': 'reports/inter-warehouse-transfers',
+    'business_reports_inter_warehouse_transfers':
+        'reports/inter-warehouse-transfers',
     'business_reports_adjustment_documents': 'reports/adjustment-documents',
     'business_reports_warehouse_performance': 'reports/warehouse-performance',
-    'business_reports_product_movement_history': 'reports/product-movement-history',
+    'business_reports_product_movement_history':
+        'reports/product-movement-history',
     'business_reports_inventory_valuation': 'reports/inventory-valuation',
     'business_reports_pending_documents': 'reports/pending-documents',
     'business_reports_inventory_turnover': 'reports/inventory-turnover',
@@ -102,13 +112,17 @@ abstract final class BusinessNamedRoutes {
     'business_reports_accounts_review': 'reports/accounts-review',
     'business_reports_activity_logs': 'reports/activity-logs',
     'business_reports_basalam_overview': 'reports/basalam/overview',
-    'business_reports_basalam_synced_invoices': 'reports/basalam/synced-invoices',
+    'business_reports_basalam_synced_invoices':
+        'reports/basalam/synced-invoices',
     'business_reports_basalam_dead_letter': 'reports/basalam/dead-letter',
-    'business_reports_basalam_product_conflicts': 'reports/basalam/product-conflicts',
+    'business_reports_basalam_product_conflicts':
+        'reports/basalam/product-conflicts',
     'business_reports_woocommerce_overview': 'reports/woocommerce/overview',
-    'business_reports_woocommerce_recent_orders': 'reports/woocommerce/recent-orders',
+    'business_reports_woocommerce_recent_orders':
+        'reports/woocommerce/recent-orders',
     'business_reports_woocommerce_catalog': 'reports/woocommerce/catalog',
-    'business_reports_woocommerce_bridge_health': 'reports/woocommerce/bridge-health',
+    'business_reports_woocommerce_bridge_health':
+        'reports/woocommerce/bridge-health',
     'business_basalam': 'basalam',
     'business_woocommerce': 'woocommerce',
     'business_woocommerce_opening_inventory': 'woocommerce/opening-inventory',
@@ -164,9 +178,11 @@ abstract final class BusinessNamedRoutes {
     'business_storage_file_manager': 'storage-files/file-manager',
     'business_report_templates': 'report-templates',
     'business_report_template_studio_new': 'report-templates/studio/new',
-    'business_report_template_studio_edit': 'report-templates/studio/:template_id',
+    'business_report_template_studio_edit':
+        'report-templates/studio/:template_id',
     'business_report_template_html_new': 'report-templates/html/new',
-    'business_report_template_html_edit': 'report-templates/html/:template_id/edit',
+    'business_report_template_html_edit':
+        'report-templates/html/:template_id/edit',
     'business_hscript_reports': 'hscript',
     'business_hscript_studio_new': 'hscript/studio/new',
     'business_hscript_studio_edit': 'hscript/studio/:report_id',
@@ -175,7 +191,7 @@ abstract final class BusinessNamedRoutes {
     'business_checks': 'checks',
     'business_new_check': 'checks/new',
     'business_edit_check': 'checks/:check_id/edit',
-    'business_checks_reconciliation': 'checks/reconciliation'
+    'business_checks_reconciliation': 'checks/reconciliation',
   };
 
   static String fillTemplate(String template, Map<String, String> params) {
@@ -196,14 +212,20 @@ abstract final class BusinessNamedRoutes {
   }) {
     final tpl = _suffixByName[routeName];
     if (tpl == null) {
-      throw ArgumentError.value(routeName, 'routeName', 'Unknown business route name');
+      throw ArgumentError.value(
+        routeName,
+        'routeName',
+        'Unknown business route name',
+      );
     }
     final filled = fillTemplate(tpl, pathParameters);
     final path = BusinessRoutePaths.uri(businessId, tabSlot, filled);
     final q = queryParameters == null
         ? null
         : Map<String, String>.fromEntries(
-            queryParameters.entries.map((e) => MapEntry(e.key.toString(), e.value?.toString() ?? '')),
+            queryParameters.entries.map(
+              (e) => MapEntry(e.key.toString(), e.value?.toString() ?? ''),
+            ),
           );
     return Uri(path: path, queryParameters: q);
   }

@@ -400,6 +400,7 @@ def search_installments_endpoint(
       "group_by": "invoice"?,
       "person_id": int?,
       "invoice_id": int?,
+      "currency_id": int?, // null/absent: base-equivalent amounts; set: native document currency
       "take": 200,
       "skip": 0
     }

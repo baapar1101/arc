@@ -24,6 +24,7 @@ def get_financial_package_report(
     column_mode: int = 8,
     compare_prior_period: bool = False,
     compare_mode: Optional[str] = None,
+    include_base_equivalent: bool = False,
 ) -> Dict[str, Any]:
     """
     جمع‌آوری سه گزارش مالی با پارامترهای یکسان.
@@ -33,6 +34,8 @@ def get_financial_package_report(
     ۲. صورت سود و زیان (عملکرد دوره)
     ۳. ترازنامه (وضعیت مالی در پایان دوره)
     """
+    want_dual = bool(include_base_equivalent and currency_id is not None)
+
     trial_balance = get_trial_balance_report(
         db=db,
         business_id=business_id,
@@ -45,6 +48,7 @@ def get_financial_package_report(
         column_mode=column_mode,
         display_mode="flat",
         account_level=account_level,
+        include_base_equivalent=include_base_equivalent,
         skip=0,
         take=10000,
     )
@@ -60,6 +64,7 @@ def get_financial_package_report(
         include_zero_balance=include_zero_balance,
         compare_prior_period=compare_prior_period,
         compare_mode=compare_mode,
+        include_base_equivalent=include_base_equivalent,
         skip=0,
         take=10000,
     )
@@ -76,6 +81,7 @@ def get_financial_package_report(
         account_level=account_level,
         compare_prior_period=compare_prior_period,
         compare_mode=compare_mode,
+        include_base_equivalent=include_base_equivalent,
     )
 
     tb_summary = trial_balance.get("summary") or {}
@@ -99,19 +105,29 @@ def get_financial_package_report(
         "operating_profit": float(pnl_summary.get("operating_profit", 0) or 0),
     }
 
+    meta: Dict[str, Any] = {
+        "fiscal_year_id": fiscal_year_id,
+        "currency_id": currency_id,
+        "date_from": date_from,
+        "date_to": date_to,
+        "project_id": project_id,
+        "account_level": account_level,
+        "column_mode": column_mode,
+        "compare_mode": compare_mode if compare_prior_period or compare_mode else None,
+        "amounts_in_base": currency_id is None and not want_dual,
+        "include_base_equivalent": want_dual,
+    }
+    # یک هشدار کیفیت داده از ترازنامه (یا تراز آزمایشی) کافی است
+    for src in (balance_sheet, trial_balance):
+        fq = (src.get("meta") or {}).get("fx_data_quality")
+        if fq:
+            meta["fx_data_quality"] = fq
+            break
+
     return {
         "trial_balance": trial_balance,
         "balance_sheet": balance_sheet,
         "pnl_period": pnl_period,
         "package_summary": package_summary,
-        "meta": {
-            "fiscal_year_id": fiscal_year_id,
-            "currency_id": currency_id,
-            "date_from": date_from,
-            "date_to": date_to,
-            "project_id": project_id,
-            "account_level": account_level,
-            "column_mode": column_mode,
-            "compare_mode": compare_mode if compare_prior_period or compare_mode else None,
-        },
+        "meta": meta,
     }

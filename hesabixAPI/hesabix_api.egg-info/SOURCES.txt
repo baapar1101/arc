@@ -548,6 +548,7 @@ app/services/document_share_link_service.py
 app/services/email_service.py
 app/services/email_verification_service.py
 app/services/encryption_service.py
+app/services/expense_income_bulk_upsert_service.py
 app/services/expense_income_service.py
 app/services/file_dependency_service.py
 app/services/file_storage_service.py
@@ -619,6 +620,7 @@ app/services/product_attribute_service.py
 app/services/product_bulk_upsert_service.py
 app/services/product_catalog_profile_service.py
 app/services/product_commercial_insights_service.py
+app/services/product_excel_export_service.py
 app/services/product_excel_import_opening_balance.py
 app/services/product_fx_price_service.py
 app/services/product_general_barcode_service.py
@@ -635,6 +637,7 @@ app/services/purchase_accounting_service.py
 app/services/query_service.py
 app/services/quick_sales_service.py
 app/services/realtime.py
+app/services/receipt_payment_bulk_upsert_service.py
 app/services/receipt_payment_service.py
 app/services/received_loan_facility_accounting.py
 app/services/received_loan_facility_service.py

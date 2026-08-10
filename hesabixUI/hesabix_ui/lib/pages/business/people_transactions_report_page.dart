@@ -96,14 +96,8 @@ class _PeopleTransactionsReportPageState extends State<PeopleTransactionsReportP
       if (!mounted) return;
       setState(() {
         _currencies = items;
-        // انتخاب ارز پیش‌فرض
-        if (items.isNotEmpty) {
-          final defaultCurrency = items.firstWhere(
-            (c) => c['is_default'] == true,
-            orElse: () => items.first,
-          );
-          _selectedCurrencyId = defaultCurrency['id'] as int?;
-        }
+        // قرارداد چندارزی: null = همه ارزها → معادل پایه
+        _selectedCurrencyId = null;
       });
     } catch (_) {
       // ignore errors
@@ -351,18 +345,23 @@ class _PeopleTransactionsReportPageState extends State<PeopleTransactionsReportP
                   // Currency
                   SizedBox(
                     width: 200,
-                    child: DropdownButtonFormField<int>(
+                    child: DropdownButtonFormField<int?>(
                       value: _selectedCurrencyId,
                       decoration: InputDecoration(
                         labelText: 'واحد پول',
                         border: const OutlineInputBorder(),
                         contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
                       ),
-                      items: _currencies.map((curr) {
+                      items: [
+                        const DropdownMenuItem<int?>(
+                          value: null,
+                          child: Text('همه ارزها (معادل پایه)'),
+                        ),
+                        ..._currencies.map((curr) {
                         final code = curr['code']?.toString() ?? '';
                         final name = curr['name']?.toString() ?? '';
                         final displayText = code.isNotEmpty ? '$code - $name' : name;
-                        return DropdownMenuItem<int>(
+                        return DropdownMenuItem<int?>(
                           value: curr['id'] as int?,
                           child: Text(
                             displayText,
@@ -370,7 +369,8 @@ class _PeopleTransactionsReportPageState extends State<PeopleTransactionsReportP
                             maxLines: 1,
                           ),
                         );
-                      }).toList(),
+                      }),
+                      ],
                       onChanged: (value) {
                         setState(() {
                           _selectedCurrencyId = value;

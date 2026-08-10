@@ -20,6 +20,7 @@ class PnlReportFilters extends StatelessWidget {
   final int businessId;
   final CalendarController calendarController;
   final bool includeZeroBalance;
+  final bool includeBaseEquivalent;
   final String? compareMode;
   final ValueChanged<int?> onFiscalYearChanged;
   final ValueChanged<DateTime?> onFromDateChanged;
@@ -27,6 +28,7 @@ class PnlReportFilters extends StatelessWidget {
   final ValueChanged<int?> onCurrencyChanged;
   final ValueChanged<int?> onProjectChanged;
   final ValueChanged<bool> onIncludeZeroBalanceChanged;
+  final ValueChanged<bool>? onIncludeBaseEquivalentChanged;
   final ValueChanged<String?> onCompareModeChanged;
 
   const PnlReportFilters({
@@ -43,6 +45,7 @@ class PnlReportFilters extends StatelessWidget {
     required this.businessId,
     required this.calendarController,
     required this.includeZeroBalance,
+    this.includeBaseEquivalent = false,
     required this.compareMode,
     required this.onFiscalYearChanged,
     required this.onFromDateChanged,
@@ -50,15 +53,16 @@ class PnlReportFilters extends StatelessWidget {
     required this.onCurrencyChanged,
     required this.onProjectChanged,
     required this.onIncludeZeroBalanceChanged,
+    this.onIncludeBaseEquivalentChanged,
     required this.onCompareModeChanged,
   });
 
   InputDecoration _decoration(String label) => InputDecoration(
-        labelText: label,
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-        isDense: true,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-      );
+    labelText: label,
+    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+    isDense: true,
+    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -79,7 +83,9 @@ class PnlReportFilters extends StatelessWidget {
                 const SizedBox(width: 8),
                 Text(
                   'فیلترها',
-                  style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
                 ),
               ],
             ),
@@ -132,11 +138,16 @@ class PnlReportFilters extends StatelessWidget {
                   SizedBox(
                     width: isMobile ? double.infinity : 280,
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 10,
+                      ),
                       decoration: BoxDecoration(
                         color: cs.primaryContainer.withValues(alpha: 0.35),
                         borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: cs.primary.withValues(alpha: 0.2)),
+                        border: Border.all(
+                          color: cs.primary.withValues(alpha: 0.2),
+                        ),
                       ),
                       child: Row(
                         children: [
@@ -145,7 +156,10 @@ class PnlReportFilters extends StatelessWidget {
                           Expanded(
                             child: Text(
                               'شروع: ابتدای سال مالی',
-                              style: TextStyle(fontSize: 12, color: cs.onSurface.withValues(alpha: 0.75)),
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: cs.onSurface.withValues(alpha: 0.75),
+                              ),
                             ),
                           ),
                         ],
@@ -160,20 +174,45 @@ class PnlReportFilters extends StatelessWidget {
                       isExpanded: true,
                       decoration: _decoration('ارز'),
                       items: [
-                        const DropdownMenuItem<int>(value: null, child: Text('همه ارزها')),
+                        const DropdownMenuItem<int>(
+                          value: null,
+                          child: Text('همه ارزها (معادل پایه)'),
+                        ),
                         ...currencies.map((c) {
                           final id = c['id'] as int?;
                           final code = (c['code'] ?? '').toString();
                           final name = (c['name'] ?? '').toString();
-                          final displayName = code.isNotEmpty ? '$code - $name' : name;
+                          final displayName = code.isNotEmpty
+                              ? '$code - $name'
+                              : name;
                           return DropdownMenuItem<int>(
                             key: ValueKey('currency_$id'),
                             value: id,
-                            child: Text(displayName, overflow: TextOverflow.ellipsis, maxLines: 1),
+                            child: Text(
+                              displayName,
+                              overflow: TextOverflow.ellipsis,
+                              maxLines: 1,
+                            ),
                           );
                         }),
                       ],
                       onChanged: onCurrencyChanged,
+                    ),
+                  ),
+                if (selectedCurrencyId != null &&
+                    onIncludeBaseEquivalentChanged != null)
+                  SizedBox(
+                    width: isMobile ? double.infinity : 220,
+                    child: FilterChip(
+                      label: const Text('نمایش معادل پایه'),
+                      selected: includeBaseEquivalent,
+                      onSelected: onIncludeBaseEquivalentChanged,
+                      avatar: Icon(
+                        includeBaseEquivalent
+                            ? Icons.check_circle
+                            : Icons.currency_exchange_outlined,
+                        size: 18,
+                      ),
                     ),
                   ),
                 SizedBox(
@@ -196,7 +235,9 @@ class PnlReportFilters extends StatelessWidget {
                     selected: includeZeroBalance,
                     onSelected: onIncludeZeroBalanceChanged,
                     avatar: Icon(
-                      includeZeroBalance ? Icons.check_circle : Icons.circle_outlined,
+                      includeZeroBalance
+                          ? Icons.check_circle
+                          : Icons.circle_outlined,
                       size: 18,
                     ),
                   ),
@@ -208,7 +249,10 @@ class PnlReportFilters extends StatelessWidget {
                     isExpanded: true,
                     decoration: _decoration('مقایسه دوره‌ای'),
                     items: [
-                      const DropdownMenuItem<String?>(value: null, child: Text('بدون مقایسه')),
+                      const DropdownMenuItem<String?>(
+                        value: null,
+                        child: Text('بدون مقایسه'),
+                      ),
                       if (!isCumulative)
                         const DropdownMenuItem<String?>(
                           value: 'prior_period',
@@ -217,7 +261,9 @@ class PnlReportFilters extends StatelessWidget {
                       DropdownMenuItem<String?>(
                         value: 'prior_year',
                         child: Text(
-                          isCumulative ? 'مقایسه با سال مالی قبل' : 'مقایسه با همان بازه سال قبل',
+                          isCumulative
+                              ? 'مقایسه با سال مالی قبل'
+                              : 'مقایسه با همان بازه سال قبل',
                         ),
                       ),
                     ],
@@ -297,13 +343,20 @@ class PnlSummaryMetric extends StatelessWidget {
                 const SizedBox(height: 3),
                 Text(
                   value,
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: color),
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                    color: color,
+                  ),
                 ),
                 if (hasCompare) ...[
                   const SizedBox(height: 4),
                   Text(
                     'دوره قبل: ${_fmt(priorValue)} · تغییر: ${_fmt(variance)}',
-                    style: TextStyle(fontSize: 10, color: color.withValues(alpha: 0.75)),
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: color.withValues(alpha: 0.75),
+                    ),
                   ),
                 ],
               ],
@@ -331,7 +384,9 @@ class PnlSummaryPanel extends StatelessWidget {
 
   String _fmt(dynamic value) {
     if (value == null) return '0';
-    final n = value is num ? value.toDouble() : double.tryParse(value.toString()) ?? 0.0;
+    final n = value is num
+        ? value.toDouble()
+        : double.tryParse(value.toString()) ?? 0.0;
     return DataTableUtils.formatNumber(n);
   }
 
@@ -346,7 +401,9 @@ class PnlSummaryPanel extends StatelessWidget {
     if (summary == null) return const SizedBox.shrink();
 
     final suffix = isCumulative ? ' (تجمعی)' : '';
-    final net = _dbl(summary!['net_profit_after_tax'] ?? summary!['net_profit_loss']);
+    final net = _dbl(
+      summary!['net_profit_after_tax'] ?? summary!['net_profit_loss'],
+    );
     final cards = [
       PnlSummaryMetric(
         label: 'جمع درآمد$suffix',
@@ -377,10 +434,14 @@ class PnlSummaryPanel extends StatelessWidget {
       ),
       PnlSummaryMetric(
         label: 'سود خالص پس از مالیات$suffix',
-        value: _fmt(summary!['net_profit_after_tax'] ?? summary!['net_profit_loss']),
+        value: _fmt(
+          summary!['net_profit_after_tax'] ?? summary!['net_profit_loss'],
+        ),
         icon: net >= 0 ? Icons.insights_rounded : Icons.warning_amber_rounded,
         color: net >= 0 ? const Color(0xFF1D4ED8) : const Color(0xFFC2410C),
-        background: net >= 0 ? const Color(0xFFEFF6FF) : const Color(0xFFFFF7ED),
+        background: net >= 0
+            ? const Color(0xFFEFF6FF)
+            : const Color(0xFFFFF7ED),
         priorValue: comparison?['net_profit_after_tax']?['prior'],
         variance: comparison?['net_profit_after_tax']?['variance'],
       ),
@@ -388,7 +449,12 @@ class PnlSummaryPanel extends StatelessWidget {
 
     if (isMobile) {
       return Column(
-        children: [for (var i = 0; i < cards.length; i++) ...[if (i > 0) const SizedBox(height: 8), cards[i]]],
+        children: [
+          for (var i = 0; i < cards.length; i++) ...[
+            if (i > 0) const SizedBox(height: 8),
+            cards[i],
+          ],
+        ],
       );
     }
 
@@ -404,16 +470,20 @@ class PnlSummaryPanel extends StatelessWidget {
 class PnlStatementView extends StatelessWidget {
   final List<Map<String, dynamic>> statementLines;
   final void Function(Map<String, dynamic> accountLine)? onAccountTap;
+  final bool includeBaseEquivalent;
 
   const PnlStatementView({
     super.key,
     required this.statementLines,
     this.onAccountTap,
+    this.includeBaseEquivalent = false,
   });
 
   String _fmt(dynamic value) {
     if (value == null) return '0';
-    final n = value is num ? value.toDouble() : double.tryParse(value.toString()) ?? 0.0;
+    final n = value is num
+        ? value.toDouble()
+        : double.tryParse(value.toString()) ?? 0.0;
     return DataTableUtils.formatNumber(n);
   }
 
@@ -438,15 +508,25 @@ class PnlStatementView extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: BoxDecoration(
               color: cs.primaryContainer.withValues(alpha: 0.25),
-              border: Border(bottom: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.6))),
+              border: Border(
+                bottom: BorderSide(
+                  color: cs.outlineVariant.withValues(alpha: 0.6),
+                ),
+              ),
             ),
             child: Row(
               children: [
-                Icon(Icons.account_balance_wallet_outlined, size: 18, color: cs.primary),
+                Icon(
+                  Icons.account_balance_wallet_outlined,
+                  size: 18,
+                  color: cs.primary,
+                ),
                 const SizedBox(width: 8),
                 Text(
                   'صورت سود و زیان',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ],
             ),
@@ -462,6 +542,7 @@ class PnlStatementView extends StatelessWidget {
     final type = line['type']?.toString() ?? '';
     final label = line['label_fa']?.toString() ?? '';
     final amount = _fmt(line['amount']);
+    final amountBase = _fmt(line['amount_base']);
     final isHighlight = line['highlight'] == true;
 
     if (type == 'section_header') {
@@ -469,13 +550,17 @@ class PnlStatementView extends StatelessWidget {
         width: double.infinity,
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         color: cs.surfaceContainerHighest.withValues(alpha: 0.5),
-        child: Text(label, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13)),
+        child: Text(
+          label,
+          style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 13),
+        ),
       );
     }
 
     if (type == 'account') {
       final hasCompare = line['prior_amount'] != null;
-      final canDrill = onAccountTap != null &&
+      final canDrill =
+          onAccountTap != null &&
           line['account_code'] != null &&
           line['account_code'].toString().isNotEmpty;
       return InkWell(
@@ -488,26 +573,46 @@ class PnlStatementView extends StatelessWidget {
                 width: 72,
                 child: Text(
                   line['account_code']?.toString() ?? '',
-                  style: TextStyle(fontSize: 12, color: cs.onSurface.withValues(alpha: 0.65)),
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: cs.onSurface.withValues(alpha: 0.65),
+                  ),
                 ),
               ),
               Expanded(
                 child: Row(
                   children: [
-                    Expanded(child: Text(line['account_name']?.toString() ?? '')),
+                    Expanded(
+                      child: Text(line['account_name']?.toString() ?? ''),
+                    ),
                     if (canDrill)
-                      Icon(Icons.menu_book_outlined, size: 16, color: cs.primary.withValues(alpha: 0.7)),
+                      Icon(
+                        Icons.menu_book_outlined,
+                        size: 16,
+                        color: cs.primary.withValues(alpha: 0.7),
+                      ),
                   ],
                 ),
               ),
-              SizedBox(width: 100, child: Text(amount, textAlign: TextAlign.end, style: const TextStyle(fontWeight: FontWeight.w500))),
+              SizedBox(
+                width: 100,
+                child: Text(
+                  includeBaseEquivalent && line['amount_base'] != null
+                      ? '$amount\nپایه: $amountBase'
+                      : amount,
+                  textAlign: TextAlign.end,
+                  style: const TextStyle(fontWeight: FontWeight.w500),
+                ),
+              ),
               if (hasCompare) ...[
                 SizedBox(
                   width: 100,
                   child: Text(
                     _fmt(line['prior_amount']),
                     textAlign: TextAlign.end,
-                    style: TextStyle(color: cs.onSurface.withValues(alpha: 0.7)),
+                    style: TextStyle(
+                      color: cs.onSurface.withValues(alpha: 0.7),
+                    ),
                   ),
                 ),
                 SizedBox(
@@ -545,22 +650,34 @@ class PnlStatementView extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         decoration: BoxDecoration(
           color: bg,
-          border: Border(top: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.5))),
+          border: Border(
+            top: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.5)),
+          ),
         ),
         child: Row(
           children: [
             Expanded(
               child: Text(
                 label,
-                style: TextStyle(fontWeight: FontWeight.w800, color: color, fontSize: isGrand ? 15 : 13),
+                style: TextStyle(
+                  fontWeight: FontWeight.w800,
+                  color: color,
+                  fontSize: isGrand ? 15 : 13,
+                ),
               ),
             ),
             SizedBox(
               width: 100,
               child: Text(
-                amount,
+                includeBaseEquivalent && line['amount_base'] != null
+                    ? '$amount\nپایه: $amountBase'
+                    : amount,
                 textAlign: TextAlign.end,
-                style: TextStyle(fontWeight: FontWeight.w800, color: color, fontSize: isGrand ? 16 : 14),
+                style: TextStyle(
+                  fontWeight: FontWeight.w800,
+                  color: color,
+                  fontSize: isGrand ? 16 : 14,
+                ),
               ),
             ),
             if (hasCompare) ...[
@@ -569,7 +686,10 @@ class PnlStatementView extends StatelessWidget {
                 child: Text(
                   _fmt(line['prior_amount']),
                   textAlign: TextAlign.end,
-                  style: TextStyle(fontWeight: FontWeight.w600, color: color.withValues(alpha: 0.85)),
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    color: color.withValues(alpha: 0.85),
+                  ),
                 ),
               ),
               SizedBox(
@@ -630,10 +750,17 @@ class PnlDetailSection extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Container(
-            padding: EdgeInsets.symmetric(horizontal: isMobile ? 12 : 16, vertical: 12),
+            padding: EdgeInsets.symmetric(
+              horizontal: isMobile ? 12 : 16,
+              vertical: 12,
+            ),
             decoration: BoxDecoration(
               color: accent.withValues(alpha: 0.08),
-              border: Border(bottom: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.6))),
+              border: Border(
+                bottom: BorderSide(
+                  color: cs.outlineVariant.withValues(alpha: 0.6),
+                ),
+              ),
             ),
             child: Row(
               children: [
@@ -650,17 +777,25 @@ class PnlDetailSection extends StatelessWidget {
                 Expanded(
                   child: Text(
                     title,
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: cs.surface,
                     borderRadius: BorderRadius.circular(999),
                     border: Border.all(color: cs.outlineVariant),
                   ),
-                  child: Text('$count مورد', style: Theme.of(context).textTheme.labelMedium),
+                  child: Text(
+                    '$count مورد',
+                    style: Theme.of(context).textTheme.labelMedium,
+                  ),
                 ),
               ],
             ),
@@ -669,7 +804,10 @@ class PnlDetailSection extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 16),
               child: Center(
-                child: Text(emptyText, style: TextStyle(color: cs.onSurface.withValues(alpha: 0.6))),
+                child: Text(
+                  emptyText,
+                  style: TextStyle(color: cs.onSurface.withValues(alpha: 0.6)),
+                ),
               ),
             )
           else
@@ -681,11 +819,16 @@ class PnlDetailSection extends StatelessWidget {
                   dataRowMaxHeight: 50,
                   columnSpacing: isMobile ? 14 : 24,
                   horizontalMargin: isMobile ? 10 : 14,
-                  headingRowColor: WidgetStatePropertyAll(cs.surfaceContainerHighest.withValues(alpha: 0.45)),
+                  headingRowColor: WidgetStatePropertyAll(
+                    cs.surfaceContainerHighest.withValues(alpha: 0.45),
+                  ),
                   columns: [
                     for (final h in headers)
                       DataColumn(
-                        label: Text(h, style: const TextStyle(fontWeight: FontWeight.w700)),
+                        label: Text(
+                          h,
+                          style: const TextStyle(fontWeight: FontWeight.w700),
+                        ),
                       ),
                   ],
                   rows: [
@@ -696,29 +839,47 @@ class PnlDetailSection extends StatelessWidget {
                             DataCell(
                               Text(
                                 row[i],
-                                textAlign: i >= 2 ? TextAlign.center : TextAlign.start,
+                                textAlign: i >= 2
+                                    ? TextAlign.center
+                                    : TextAlign.start,
                                 style: i == row.length - 1
-                                    ? const TextStyle(fontWeight: FontWeight.w600)
+                                    ? const TextStyle(
+                                        fontWeight: FontWeight.w600,
+                                      )
                                     : null,
                               ),
                             ),
                         ],
                       ),
                     DataRow(
-                      color: WidgetStatePropertyAll(cs.surfaceContainerHighest.withValues(alpha: 0.55)),
-                      cells: [
-                        const DataCell(SizedBox.shrink()),
-                        DataCell(Text(totalLabel, style: const TextStyle(fontWeight: FontWeight.w800))),
-                        const DataCell(SizedBox.shrink()),
-                        const DataCell(SizedBox.shrink()),
-                        DataCell(
-                          Text(
-                            totalValue,
-                            textAlign: TextAlign.center,
-                            style: TextStyle(fontWeight: FontWeight.w800, color: accent),
-                          ),
-                        ),
-                      ],
+                      color: WidgetStatePropertyAll(
+                        cs.surfaceContainerHighest.withValues(alpha: 0.55),
+                      ),
+                      cells: List.generate(headers.length, (index) {
+                        if (index == 1) {
+                          return DataCell(
+                            Text(
+                              totalLabel,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          );
+                        }
+                        if (index == headers.length - 1) {
+                          return DataCell(
+                            Text(
+                              totalValue,
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontWeight: FontWeight.w800,
+                                color: accent,
+                              ),
+                            ),
+                          );
+                        }
+                        return const DataCell(SizedBox.shrink());
+                      }),
                     ),
                   ],
                 );
@@ -745,11 +906,16 @@ class PnlDetailSection extends StatelessWidget {
 class PnlTableRows {
   static String fmt(dynamic value) {
     if (value == null) return '0';
-    final n = value is num ? value.toDouble() : double.tryParse(value.toString()) ?? 0.0;
+    final n = value is num
+        ? value.toDouble()
+        : double.tryParse(value.toString()) ?? 0.0;
     return DataTableUtils.formatNumber(n);
   }
 
-  static List<List<String>> revenueRows(List<Map<String, dynamic>> items) => items
+  static List<List<String>> revenueRows(
+    List<Map<String, dynamic>> items, {
+    bool includeBaseEquivalent = false,
+  }) => items
       .map(
         (item) => [
           item['account_code']?.toString() ?? '',
@@ -757,11 +923,15 @@ class PnlTableRows {
           fmt(item['credit']),
           fmt(item['debit']),
           fmt(item['revenue'] ?? item['amount']),
+          if (includeBaseEquivalent) fmt(item['amount_base']),
         ],
       )
       .toList();
 
-  static List<List<String>> expenseRows(List<Map<String, dynamic>> items) => items
+  static List<List<String>> expenseRows(
+    List<Map<String, dynamic>> items, {
+    bool includeBaseEquivalent = false,
+  }) => items
       .map(
         (item) => [
           item['account_code']?.toString() ?? '',
@@ -769,6 +939,7 @@ class PnlTableRows {
           fmt(item['debit']),
           fmt(item['credit']),
           fmt(item['expense'] ?? item['amount']),
+          if (includeBaseEquivalent) fmt(item['amount_base']),
         ],
       )
       .toList();

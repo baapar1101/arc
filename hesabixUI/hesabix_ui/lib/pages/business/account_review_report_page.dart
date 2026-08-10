@@ -158,13 +158,8 @@ class _AccountReviewReportPageState extends State<AccountReviewReportPage> {
       if (!mounted) return;
       setState(() {
         _currencies = items;
-        if (items.isNotEmpty) {
-          final defaultCurrency = items.firstWhere(
-            (c) => c['is_default'] == true,
-            orElse: () => items.first,
-          );
-          _selectedCurrencyId = defaultCurrency['id'] as int?;
-        }
+        // قرارداد چندارزی: null = همه ارزها → معادل پایه (هم‌تراز با تراز آزمایشی)
+        _selectedCurrencyId = null;
       });
       // Check if both filters are loaded
       if (!mounted) return;
@@ -695,7 +690,7 @@ class _AccountReviewReportPageState extends State<AccountReviewReportPage> {
                             const DropdownMenuItem<int>(
                               value: null,
                               child: Text(
-                                'همه ارزها',
+                                'همه ارزها (معادل پایه)',
                                 overflow: TextOverflow.ellipsis,
                                 maxLines: 1,
                               ),

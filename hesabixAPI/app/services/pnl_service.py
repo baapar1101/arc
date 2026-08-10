@@ -136,6 +136,55 @@ def _turnover_by_account_in_base_currency(
     return turnover_by_account
 
 
+def _turnover_by_account_native(
+    db: Session,
+    business_id: int,
+    account_ids: List[int],
+    date_from_obj: date,
+    date_to_obj: date,
+    currency_id: Optional[int],
+    project_id: Optional[int],
+    fiscal_year_id: Optional[int] = None,
+) -> Dict[int, Dict[str, Decimal]]:
+    """گردش بومی debit/credit (بدون تبدیل) — برای ستون ارز فیلترشده."""
+    from sqlalchemy import func
+
+    q = (
+        db.query(
+            DocumentLine.account_id,
+            func.coalesce(func.sum(DocumentLine.debit), 0).label("debit"),
+            func.coalesce(func.sum(DocumentLine.credit), 0).label("credit"),
+        )
+        .join(Document, DocumentLine.document_id == Document.id)
+        .filter(
+            and_(
+                Document.business_id == business_id,
+                Document.is_proforma == False,  # noqa: E712
+                DocumentLine.account_id.isnot(None),
+                DocumentLine.account_id.in_(account_ids),
+                Document.document_date >= date_from_obj,
+                Document.document_date <= date_to_obj,
+            )
+        )
+    )
+    if project_id:
+        q = q.filter(Document.project_id == project_id)
+    if currency_id:
+        q = q.filter(Document.currency_id == currency_id)
+    if fiscal_year_id:
+        q = q.filter(Document.fiscal_year_id == fiscal_year_id)
+
+    out: Dict[int, Dict[str, Decimal]] = {}
+    for row in q.group_by(DocumentLine.account_id).all():
+        if row.account_id is None:
+            continue
+        out[int(row.account_id)] = {
+            "debit": Decimal(str(row.debit or 0)),
+            "credit": Decimal(str(row.credit or 0)),
+        }
+    return out
+
+
 def _has_nonzero_turnover(turnover: Dict[str, Decimal]) -> bool:
     return turnover["debit"] != Decimal(0) or turnover["credit"] != Decimal(0)
 
@@ -482,8 +531,10 @@ def _build_pnl_report(
     extra_summary: Optional[Dict[str, Any]] = None,
     prior_summary: Optional[Dict[str, float]] = None,
     prior_items_by_section: Optional[Dict[str, List[Dict[str, Any]]]] = None,
+    include_base_equivalent: bool = False,
 ) -> Dict[str, Any]:
     fy_id, _fy_start, _fy_end = _ensure_fiscal_year(db, business_id, fiscal_year_id)
+    want_dual = bool(include_base_equivalent and currency_id is not None)
 
     all_accounts = (
         db.query(Account)
@@ -542,9 +593,20 @@ def _build_pnl_report(
             "pagination": {"total": 0, "page": 1, "per_page": take, "total_pages": 1, "has_next": False, "has_prev": False},
         }
 
-    turnover_by_account = _turnover_by_account_in_base_currency(
-        db, business_id, account_ids, date_from_obj, date_to_obj, currency_id, project_id, fiscal_year_id=fy_id,
+    turnover_by_account = (
+        _turnover_by_account_native(
+            db, business_id, account_ids, date_from_obj, date_to_obj, currency_id, project_id, fiscal_year_id=fy_id,
+        )
+        if want_dual
+        else _turnover_by_account_in_base_currency(
+            db, business_id, account_ids, date_from_obj, date_to_obj, currency_id, project_id, fiscal_year_id=fy_id,
+        )
     )
+    base_turnover_by_account: Optional[Dict[int, Dict[str, Decimal]]] = None
+    if want_dual:
+        base_turnover_by_account = _turnover_by_account_in_base_currency(
+            db, business_id, account_ids, date_from_obj, date_to_obj, currency_id, project_id, fiscal_year_id=fy_id,
+        )
 
     def collect_items(accounts: List[Account], section: str) -> List[Dict[str, Any]]:
         items: List[Dict[str, Any]] = []
@@ -557,6 +619,12 @@ def _build_pnl_report(
                 if not pri or float(pri.get("amount", 0)) == 0:
                     continue
             item = _account_item(account, turnover, section)
+            if base_turnover_by_account is not None:
+                bt = base_turnover_by_account.get(account.id, {"debit": Decimal(0), "credit": Decimal(0)})
+                base_item = _account_item(account, bt, section)
+                item["debit_base"] = float(bt["debit"])
+                item["credit_base"] = float(bt["credit"])
+                item["amount_base"] = float(base_item.get("amount", 0) or 0)
             if prior_items_by_section is not None:
                 pri_amt = float(prior_by_code.get(account.code, {}).get("amount", 0))
                 item["prior_amount"] = pri_amt
@@ -718,6 +786,7 @@ def get_pnl_period_report(
     compare_mode: Optional[str] = None,
     skip: int = 0,
     take: int = 100,
+    include_base_equivalent: bool = False,
 ) -> Dict[str, Any]:
     fy_id, fy_start_date, _fy_end = _ensure_fiscal_year(db, business_id, fiscal_year_id)
 
@@ -740,6 +809,7 @@ def get_pnl_period_report(
         fiscal_year = db.query(FiscalYear).filter(FiscalYear.id == fy_id).first()
         date_to_obj = fiscal_year.end_date if fiscal_year and fiscal_year.end_date else date.today()
 
+    want_dual = bool(include_base_equivalent and currency_id is not None)
     result = _build_pnl_report(
         db=db,
         business_id=business_id,
@@ -751,11 +821,23 @@ def get_pnl_period_report(
         include_zero_balance=include_zero_balance,
         skip=skip,
         take=take,
+        include_base_equivalent=include_base_equivalent,
         extra_summary={
             "date_from": date_from_obj.isoformat(),
             "date_to": date_to_obj.isoformat(),
         },
     )
+    result["meta"] = {
+        "currency_id": currency_id,
+        "amounts_in_base": currency_id is None and not want_dual,
+        "include_base_equivalent": want_dual,
+        "fiscal_year_id": fy_id,
+        "dual_column_note": (
+            "مبالغ اصلی به ارز فیلترشده؛ amount_base معادل ارز پایه است."
+            if want_dual
+            else None
+        ),
+    }
 
     mode = _resolve_compare_mode(compare_prior_period, compare_mode, is_cumulative=False)
     if mode:

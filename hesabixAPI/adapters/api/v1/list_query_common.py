@@ -75,6 +75,8 @@ KARDEX_EXTRA_FIELDS: tuple[str, ...] = (
 	"match_mode",
 	"result_scope",
 	"include_running_balance",
+	"currency_id",
+	"amounts_in_base",
 )
 
 WAREHOUSE_DOC_EXTRA_FIELDS: tuple[str, ...] = (
