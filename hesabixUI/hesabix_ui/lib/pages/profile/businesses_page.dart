@@ -535,7 +535,7 @@ class _BusinessesPageState extends State<BusinessesPage> {
                   )
                 else if (noBusinessesAtAll)
                   const SliverFillRemaining(
-                    hasScrollBody: false,
+                    hasScrollBody: true,
                     child: BusinessesEmptyState(),
                   )
                 else if (noSearchResults)

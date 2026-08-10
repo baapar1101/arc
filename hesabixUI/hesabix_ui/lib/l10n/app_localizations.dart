@@ -2648,6 +2648,294 @@ abstract class AppLocalizations {
   /// **'1234567890'**
   String get nationalIdExample;
 
+  /// No description provided for @newBusinessIntentTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'How would you like to start?'**
+  String get newBusinessIntentTitle;
+
+  /// No description provided for @newBusinessIntentSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Create a new business in a few steps, or bring your data from a backup or the previous Hesabix.'**
+  String get newBusinessIntentSubtitle;
+
+  /// No description provided for @newBusinessCreateManuallyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Create new business'**
+  String get newBusinessCreateManuallyTitle;
+
+  /// No description provided for @newBusinessCreateManuallySubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Set up name, type, currency, and fiscal year — you can add the rest later.'**
+  String get newBusinessCreateManuallySubtitle;
+
+  /// No description provided for @newBusinessImportBackupTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore from backup'**
+  String get newBusinessImportBackupTitle;
+
+  /// No description provided for @newBusinessImportBackupSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Upload a .hbx file to recreate a business from backup.'**
+  String get newBusinessImportBackupSubtitle;
+
+  /// No description provided for @newBusinessImportLegacyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Transfer from previous Hesabix'**
+  String get newBusinessImportLegacyTitle;
+
+  /// No description provided for @newBusinessImportLegacySubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Connect to the previous version and migrate with live progress.'**
+  String get newBusinessImportLegacySubtitle;
+
+  /// No description provided for @newBusinessIdentityStepTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Business identity'**
+  String get newBusinessIdentityStepTitle;
+
+  /// No description provided for @newBusinessIdentityStepSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a name and what kind of business this is.'**
+  String get newBusinessIdentityStepSubtitle;
+
+  /// No description provided for @newBusinessFinancialStepTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Currency & fiscal year'**
+  String get newBusinessFinancialStepTitle;
+
+  /// No description provided for @newBusinessFinancialStepSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Set the default currency and your first fiscal year.'**
+  String get newBusinessFinancialStepSubtitle;
+
+  /// No description provided for @newBusinessReviewStepTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Review & create'**
+  String get newBusinessReviewStepTitle;
+
+  /// No description provided for @newBusinessReviewStepSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm the details. Optional contact and legal info can be completed later in settings.'**
+  String get newBusinessReviewStepSubtitle;
+
+  /// No description provided for @newBusinessCurrencyAndFiscal.
+  ///
+  /// In en, this message translates to:
+  /// **'Currency & fiscal year'**
+  String get newBusinessCurrencyAndFiscal;
+
+  /// No description provided for @defaultCurrency.
+  ///
+  /// In en, this message translates to:
+  /// **'Default currency'**
+  String get defaultCurrency;
+
+  /// No description provided for @extraCurrencies.
+  ///
+  /// In en, this message translates to:
+  /// **'Additional currencies'**
+  String get extraCurrencies;
+
+  /// No description provided for @selectCurrencies.
+  ///
+  /// In en, this message translates to:
+  /// **'Select currencies…'**
+  String get selectCurrencies;
+
+  /// No description provided for @searchCurrencyHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Search by name or code…'**
+  String get searchCurrencyHint;
+
+  /// No description provided for @fiscalYearTitleLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Fiscal year title'**
+  String get fiscalYearTitleLabel;
+
+  /// No description provided for @fiscalStartDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Start date'**
+  String get fiscalStartDate;
+
+  /// No description provided for @fiscalEndDate.
+  ///
+  /// In en, this message translates to:
+  /// **'End date'**
+  String get fiscalEndDate;
+
+  /// No description provided for @fiscalYearRequiredHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Title, start date, and end date are required.'**
+  String get fiscalYearRequiredHint;
+
+  /// No description provided for @fiscalYearEndingTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Fiscal year ending {date}'**
+  String fiscalYearEndingTitle(String date);
+
+  /// No description provided for @newBusinessNameHint.
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. Aria Trading Co.'**
+  String get newBusinessNameHint;
+
+  /// No description provided for @newBusinessOptionalDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'Optional details'**
+  String get newBusinessOptionalDetails;
+
+  /// No description provided for @newBusinessOptionalDetailsHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Contact, location, and legal IDs — you can skip these for now.'**
+  String get newBusinessOptionalDetailsHint;
+
+  /// No description provided for @newBusinessCompleteLaterHint.
+  ///
+  /// In en, this message translates to:
+  /// **'You can finish contact and legal details anytime from business settings.'**
+  String get newBusinessCompleteLaterHint;
+
+  /// No description provided for @newBusinessEditSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit'**
+  String get newBusinessEditSection;
+
+  /// No description provided for @newBusinessBackToOptions.
+  ///
+  /// In en, this message translates to:
+  /// **'Back to options'**
+  String get newBusinessBackToOptions;
+
+  /// No description provided for @newBusinessReadyToCreate.
+  ///
+  /// In en, this message translates to:
+  /// **'Everything looks good. Create your business when you are ready.'**
+  String get newBusinessReadyToCreate;
+
+  /// No description provided for @newBusinessLivePreview.
+  ///
+  /// In en, this message translates to:
+  /// **'Preview'**
+  String get newBusinessLivePreview;
+
+  /// No description provided for @newBusinessSampleDataShort.
+  ///
+  /// In en, this message translates to:
+  /// **'Include sample data'**
+  String get newBusinessSampleDataShort;
+
+  /// No description provided for @newBusinessAllOptions.
+  ///
+  /// In en, this message translates to:
+  /// **'All start options'**
+  String get newBusinessAllOptions;
+
+  /// No description provided for @verificationRequiredTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Verification required'**
+  String get verificationRequiredTitle;
+
+  /// No description provided for @verificationRequiredBody.
+  ///
+  /// In en, this message translates to:
+  /// **'To verify your email and mobile number, go to account settings.'**
+  String get verificationRequiredBody;
+
+  /// No description provided for @verificationLater.
+  ///
+  /// In en, this message translates to:
+  /// **'Later'**
+  String get verificationLater;
+
+  /// No description provided for @verificationGo.
+  ///
+  /// In en, this message translates to:
+  /// **'Go to verification'**
+  String get verificationGo;
+
+  /// No description provided for @importBackupEmptyFile.
+  ///
+  /// In en, this message translates to:
+  /// **'The selected file is empty'**
+  String get importBackupEmptyFile;
+
+  /// No description provided for @importBackupHs60Unsupported.
+  ///
+  /// In en, this message translates to:
+  /// **'The .hs60 format is not supported yet. This will be added later.'**
+  String get importBackupHs60Unsupported;
+
+  /// No description provided for @importBackupProcessing.
+  ///
+  /// In en, this message translates to:
+  /// **'Processing…'**
+  String get importBackupProcessing;
+
+  /// No description provided for @importBackupSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Business created successfully from backup'**
+  String get importBackupSuccess;
+
+  /// No description provided for @importBackupPartialSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Import finished; some documents were skipped ({count})'**
+  String importBackupPartialSuccess(int count);
+
+  /// No description provided for @importBackupFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to import backup file'**
+  String get importBackupFailed;
+
+  /// No description provided for @importBackupSelectFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to select file'**
+  String get importBackupSelectFailed;
+
+  /// No description provided for @importBackupStatusFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to check import status'**
+  String get importBackupStatusFailed;
+
+  /// No description provided for @importBackupPleaseWait.
+  ///
+  /// In en, this message translates to:
+  /// **'Please wait'**
+  String get importBackupPleaseWait;
+
+  /// No description provided for @importBackupInProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'Importing from backup…'**
+  String get importBackupInProgress;
+
   /// No description provided for @company.
   ///
   /// In en, this message translates to:
@@ -4385,7 +4673,7 @@ abstract class AppLocalizations {
   /// No description provided for @businessesHubEmptySubtitle.
   ///
   /// In en, this message translates to:
-  /// **'Create your first business to start cloud accounting.'**
+  /// **'Create a new business, restore a .hbx backup, or transfer from the previous Hesabix.'**
   String get businessesHubEmptySubtitle;
 
   /// No description provided for @businessesHubImportLegacy.

@@ -469,6 +469,7 @@ app/services/alert_service.py
 app/services/announcement_retention_jobs.py
 app/services/announcement_service.py
 app/services/api_key_service.py
+app/services/ar_ap_aging_service.py
 app/services/async_isolated.py
 app/services/auth_dynamic_rate_limit.py
 app/services/auth_security_event_service.py
@@ -508,6 +509,8 @@ app/services/business_service.py
 app/services/business_timezone_service.py
 app/services/cache_invalidation_subscriber.py
 app/services/captcha_service.py
+app/services/cash_flow_classification.py
+app/services/cash_flow_report_service.py
 app/services/cash_register_service.py
 app/services/catalog_spec_field_service.py
 app/services/check_reconciliation_service.py
@@ -559,6 +562,7 @@ app/services/firewall_service.py
 app/services/fiscal_year_rollback_service.py
 app/services/fx_auto_sync_background_jobs.py
 app/services/fx_data_health_service.py
+app/services/fx_data_quality_service.py
 app/services/fx_rate_background_jobs.py
 app/services/fx_rate_provider_service.py
 app/services/general_ledger_electronic_export_service.py
@@ -602,6 +606,7 @@ app/services/payroll_reports.py
 app/services/payroll_service.py
 app/services/payroll_statutory.py
 app/services/period_end_fx_revaluation_service.py
+app/services/person_balances_by_currency_report_service.py
 app/services/person_bulk_upsert_service.py
 app/services/person_excel_import.py
 app/services/person_group_service.py
@@ -1246,6 +1251,8 @@ tests/test_product_tax_update.py
 tests/test_product_update_inventory_import.py
 tests/test_public_catalog_utils.py
 tests/test_quick_sales_service.py
+tests/test_reports_multi_currency_phase2.py
+tests/test_reports_multi_currency_phase3.py
 tests/test_security_hardening.py
 tests/test_stock_count.py
 tests/test_sunway_sms_provider.py

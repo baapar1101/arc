@@ -1386,6 +1386,167 @@ class AppLocalizationsEn extends AppLocalizations {
   String get nationalIdExample => '1234567890';
 
   @override
+  String get newBusinessIntentTitle => 'How would you like to start?';
+
+  @override
+  String get newBusinessIntentSubtitle =>
+      'Create a new business in a few steps, or bring your data from a backup or the previous Hesabix.';
+
+  @override
+  String get newBusinessCreateManuallyTitle => 'Create new business';
+
+  @override
+  String get newBusinessCreateManuallySubtitle =>
+      'Set up name, type, currency, and fiscal year — you can add the rest later.';
+
+  @override
+  String get newBusinessImportBackupTitle => 'Restore from backup';
+
+  @override
+  String get newBusinessImportBackupSubtitle =>
+      'Upload a .hbx file to recreate a business from backup.';
+
+  @override
+  String get newBusinessImportLegacyTitle => 'Transfer from previous Hesabix';
+
+  @override
+  String get newBusinessImportLegacySubtitle =>
+      'Connect to the previous version and migrate with live progress.';
+
+  @override
+  String get newBusinessIdentityStepTitle => 'Business identity';
+
+  @override
+  String get newBusinessIdentityStepSubtitle =>
+      'Choose a name and what kind of business this is.';
+
+  @override
+  String get newBusinessFinancialStepTitle => 'Currency & fiscal year';
+
+  @override
+  String get newBusinessFinancialStepSubtitle =>
+      'Set the default currency and your first fiscal year.';
+
+  @override
+  String get newBusinessReviewStepTitle => 'Review & create';
+
+  @override
+  String get newBusinessReviewStepSubtitle =>
+      'Confirm the details. Optional contact and legal info can be completed later in settings.';
+
+  @override
+  String get newBusinessCurrencyAndFiscal => 'Currency & fiscal year';
+
+  @override
+  String get defaultCurrency => 'Default currency';
+
+  @override
+  String get extraCurrencies => 'Additional currencies';
+
+  @override
+  String get selectCurrencies => 'Select currencies…';
+
+  @override
+  String get searchCurrencyHint => 'Search by name or code…';
+
+  @override
+  String get fiscalYearTitleLabel => 'Fiscal year title';
+
+  @override
+  String get fiscalStartDate => 'Start date';
+
+  @override
+  String get fiscalEndDate => 'End date';
+
+  @override
+  String get fiscalYearRequiredHint =>
+      'Title, start date, and end date are required.';
+
+  @override
+  String fiscalYearEndingTitle(String date) {
+    return 'Fiscal year ending $date';
+  }
+
+  @override
+  String get newBusinessNameHint => 'e.g. Aria Trading Co.';
+
+  @override
+  String get newBusinessOptionalDetails => 'Optional details';
+
+  @override
+  String get newBusinessOptionalDetailsHint =>
+      'Contact, location, and legal IDs — you can skip these for now.';
+
+  @override
+  String get newBusinessCompleteLaterHint =>
+      'You can finish contact and legal details anytime from business settings.';
+
+  @override
+  String get newBusinessEditSection => 'Edit';
+
+  @override
+  String get newBusinessBackToOptions => 'Back to options';
+
+  @override
+  String get newBusinessReadyToCreate =>
+      'Everything looks good. Create your business when you are ready.';
+
+  @override
+  String get newBusinessLivePreview => 'Preview';
+
+  @override
+  String get newBusinessSampleDataShort => 'Include sample data';
+
+  @override
+  String get newBusinessAllOptions => 'All start options';
+
+  @override
+  String get verificationRequiredTitle => 'Verification required';
+
+  @override
+  String get verificationRequiredBody =>
+      'To verify your email and mobile number, go to account settings.';
+
+  @override
+  String get verificationLater => 'Later';
+
+  @override
+  String get verificationGo => 'Go to verification';
+
+  @override
+  String get importBackupEmptyFile => 'The selected file is empty';
+
+  @override
+  String get importBackupHs60Unsupported =>
+      'The .hs60 format is not supported yet. This will be added later.';
+
+  @override
+  String get importBackupProcessing => 'Processing…';
+
+  @override
+  String get importBackupSuccess => 'Business created successfully from backup';
+
+  @override
+  String importBackupPartialSuccess(int count) {
+    return 'Import finished; some documents were skipped ($count)';
+  }
+
+  @override
+  String get importBackupFailed => 'Failed to import backup file';
+
+  @override
+  String get importBackupSelectFailed => 'Failed to select file';
+
+  @override
+  String get importBackupStatusFailed => 'Failed to check import status';
+
+  @override
+  String get importBackupPleaseWait => 'Please wait';
+
+  @override
+  String get importBackupInProgress => 'Importing from backup…';
+
+  @override
   String get company => 'Company';
 
   @override
@@ -2298,7 +2459,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get businessesHubEmptySubtitle =>
-      'Create your first business to start cloud accounting.';
+      'Create a new business, restore a .hbx backup, or transfer from the previous Hesabix.';
 
   @override
   String get businessesHubImportLegacy => 'Import from legacy version';

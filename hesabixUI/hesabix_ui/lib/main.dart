@@ -1274,8 +1274,10 @@ class _MyAppState extends State<MyApp> {
             GoRoute(
               path: '/user/profile/new-business',
               name: 'profile_new_business',
-              builder: (context, state) =>
-                  NewBusinessPage(calendarController: _calendarController!),
+              builder: (context, state) => NewBusinessPage(
+                calendarController: _calendarController!,
+                initialFlow: state.uri.queryParameters['flow'],
+              ),
             ),
             GoRoute(
               path: '/user/profile/businesses',
