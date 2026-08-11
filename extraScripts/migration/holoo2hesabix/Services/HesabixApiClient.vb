@@ -32,8 +32,8 @@ Friend Class HesabixApiClient
         Dim handler As New HttpClientHandler()
         handler.AutomaticDecompression = DecompressionMethods.GZip Or DecompressionMethods.Deflate
         _http = New HttpClient(handler)
-        ' انتقال گروهی (با مانده افتتاحیه) ممکن است چند دقیقه طول بکشد
-        _http.Timeout = TimeSpan.FromMinutes(5)
+        ' فاکتور گروهی و افتتاحیه روی سرور ممکن است بیش از ۵ دقیقه طول بکشد
+        _http.Timeout = TimeSpan.FromMinutes(60)
         _http.DefaultRequestHeaders.Accept.Clear()
         _http.DefaultRequestHeaders.Accept.Add(New MediaTypeWithQualityHeaderValue("application/json"))
         ' BaseAddress عمداً تنظیم نمی‌شود؛ بعد از اولین درخواست قابل تغییر نیست.
@@ -328,6 +328,29 @@ Friend Class HesabixApiClient
             list.Add(ParseFiscalYear(obj))
         Next
         Return list
+    End Function
+
+    Public Async Function UpdateCurrentFiscalYearAsync(
+        businessId As Integer,
+        title As String,
+        startDate As Date,
+        endDate As Date,
+        Optional ct As CancellationToken = Nothing
+    ) As Task(Of HesabixFiscalYear)
+        Dim body As New JObject From {
+            {"title", title},
+            {"start_date", ApiDateFormat.ToIsoDate(startDate)},
+            {"end_date", ApiDateFormat.ToIsoDate(endDate)}
+        }
+        Dim root = Await SendJsonAsync(
+            HttpMethod.Put,
+            "api/v1/business/" & businessId.ToString() & "/fiscal-years/current",
+            body,
+            includeAuth:=True,
+            ct:=ct
+        ).ConfigureAwait(False)
+        Dim data = GetDataToken(root)
+        Return ParseFiscalYear(data)
     End Function
 
     Public Async Function EnsureFiscalYearsAsync(

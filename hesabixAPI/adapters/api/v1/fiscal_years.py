@@ -464,11 +464,50 @@ def migration_ensure_fiscal_years(
 
         for fy in existing:
             if _date_ranges_overlap(y.start_date, y.end_date, fy.start_date, fy.end_date):
-                raise ApiError(
-                    "FISCAL_YEAR_RANGE_OVERLAP",
-                    f"بازهٔ «{y.title}» با سال مالی «{fy.title}» همپوشانی دارد.",
-                    http_status=400,
+                # سال پیش‌فرض کسب‌وکار جدید معمولاً با آخرین سال هلو همپوشانی دارد.
+                # اگر هنوز سندی روی آن نیست، همان رکورد را به بازهٔ درخواستی مهاجرت تغییر می‌دهیم.
+                from adapters.db.models.document import Document
+
+                has_docs = (
+                    db.query(Document.id)
+                    .filter(
+                        Document.business_id == int(business_id),
+                        Document.fiscal_year_id == int(fy.id),
+                    )
+                    .limit(1)
+                    .first()
+                    is not None
                 )
+                if has_docs:
+                    raise ApiError(
+                        "FISCAL_YEAR_RANGE_OVERLAP",
+                        f"بازهٔ «{y.title}» با سال مالی «{fy.title}» همپوشانی دارد.",
+                        http_status=400,
+                    )
+
+                old_start = fy.start_date
+                fy.title = y.title
+                fy.start_date = y.start_date
+                fy.end_date = y.end_date
+                db.add(fy)
+                if old_start in by_start and by_start[old_start].id == fy.id:
+                    del by_start[old_start]
+                by_start[y.start_date] = fy
+                reused_count += 1
+                items_out.append(
+                    {
+                        "id": fy.id,
+                        "title": fy.title,
+                        "start_date": fy.start_date,
+                        "end_date": fy.end_date,
+                        "is_current": fy.is_last,
+                    }
+                )
+                found = fy
+                break
+
+        if found is not None:
+            continue
 
         is_first = len(existing) == 0 and created_count == 0
         fy_new = repo.create_fiscal_year(

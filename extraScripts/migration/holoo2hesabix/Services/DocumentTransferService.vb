@@ -7,7 +7,7 @@ Imports Newtonsoft.Json.Linq
 ''' </summary>
 Friend Class DocumentTransferService
     Private ReadOnly _docs As New HolooDocumentReader()
-    Private Const InvoiceChunk As Integer = 50
+    Private Const InvoiceChunk As Integer = 15
     Private Const WarehouseChunk As Integer = 100
     Private Const ReceiptChunk As Integer = 50
     Private Const ExpenseChunk As Integer = 40
@@ -175,6 +175,9 @@ Friend Class DocumentTransferService
         years As List(Of DetectedFiscalYear),
         ct As CancellationToken
     ) As Task
+        ' سال پیش‌فرض کسب‌وکار جدید اغلب با آخرین سال هلو همپوشانی دارد؛ قبل از ensure جابه‌جا می‌کنیم.
+        Await AlignDefaultFiscalYearForMigration(api, businessId, years, ct).ConfigureAwait(False)
+
         Dim slices = years.Select(Function(y) New HolooFiscalYearSlice With {
             .Title = y.Title,
             .StartDate = y.StartDate,
@@ -199,6 +202,43 @@ Friend Class DocumentTransferService
                           "آماده: ایجاد " & ensured.CreatedCount.ToString() & " / موجود " & ensured.ReusedCount.ToString() &
                           " — همه " & years.Count.ToString() & " سال نگاشت شد")
         End If
+    End Function
+
+    Private Async Function AlignDefaultFiscalYearForMigration(
+        api As HesabixApiClient,
+        businessId As Integer,
+        years As List(Of DetectedFiscalYear),
+        ct As CancellationToken
+    ) As Task
+        If years Is Nothing OrElse years.Count = 0 Then Return
+        Dim listed As List(Of HesabixFiscalYear) = Nothing
+        Try
+            listed = Await api.ListFiscalYearsAsync(businessId, ct).ConfigureAwait(False)
+        Catch
+            Return
+        End Try
+        If listed Is Nothing OrElse listed.Count <> 1 Then Return
+
+        Dim only = listed(0)
+        Dim existingStart As Date
+        Dim existingEnd As Date
+        If Not TryParseApiDate(If(Not String.IsNullOrWhiteSpace(only.StartDate), only.StartDate, ""), existingStart) Then Return
+        ' end از raw ترجیح دارد؛ اگر نبود از Start+1year تقریبی کافی نیست — فقط با start چک همپوشانی
+        Dim endRawOk = TryParseApiDate(If(only.EndDate, ""), existingEnd)
+        If Not endRawOk Then existingEnd = existingStart.AddYears(1).AddDays(-1)
+
+        Dim overlaps = years.Any(Function(y) y.StartDate <= existingEnd AndAlso y.EndDate >= existingStart)
+        If Not overlaps Then Return
+
+        Dim first = years.OrderBy(Function(y) y.StartDate).First()
+        RaiseProgress("سال مالی", 0, years.Count,
+                      "سال پیش‌فرض همپوشان یافت شد — تنظیم به «" & first.Title & "»...")
+        Try
+            Await api.UpdateCurrentFiscalYearAsync(businessId, first.Title, first.StartDate, first.EndDate, ct).ConfigureAwait(False)
+            first.HesabixId = only.Id
+        Catch ex As Exception
+            RaiseProgress("سال مالی", 0, years.Count, "هشدار تنظیم سال پیش‌فرض: " & ex.Message, True)
+        End Try
     End Function
 
     Private Shared Sub ApplyFiscalYearIds(years As List(Of DetectedFiscalYear), items As IEnumerable(Of HesabixFiscalYear))
@@ -485,6 +525,37 @@ Friend Class DocumentTransferService
             Return
         End If
 
+        ' بستن اختلاف ریالی در کلاینت تا به وابستگی نسخه سرور (تلرانس 0.01) نباشد
+        If equityId > 0 AndAlso accountLines.Count > 0 Then
+            Dim sumDebit As Double = 0
+            Dim sumCredit As Double = 0
+            For Each lnTok As JToken In accountLines
+                Dim ln = TryCast(lnTok, JObject)
+                If ln Is Nothing Then Continue For
+                sumDebit += CDbl(If(ln("debit"), 0))
+                sumCredit += CDbl(If(ln("credit"), 0))
+            Next
+            Dim balDiff = ApiDateFormat.RoundMoney(sumDebit - sumCredit)
+            If Math.Abs(balDiff) >= 0.01 Then
+                If balDiff > 0 Then
+                    accountLines.Add(New JObject From {
+                        {"account_id", equityId},
+                        {"debit", 0},
+                        {"credit", balDiff},
+                        {"description", "بستن اختلاف تراز افتتاحیه (مهاجرت)"}
+                    })
+                Else
+                    accountLines.Add(New JObject From {
+                        {"account_id", equityId},
+                        {"debit", Math.Abs(balDiff)},
+                        {"credit", 0},
+                        {"description", "بستن اختلاف تراز افتتاحیه (مهاجرت)"}
+                    })
+                End If
+                RaiseProgress("افتتاحیه", 0, 0, "اختلاف " & balDiff.ToString("0.00") & " به حقوق صاحبان سهام بسته شد")
+            End If
+        End If
+
         Dim payload As New JObject From {
             {"fiscal_year_id", fy.HesabixId},
             {"document_date", ApiDateFormat.ToIsoDate(fy.StartDate)},
@@ -611,44 +682,117 @@ Friend Class DocumentTransferService
                 Continue While
             End If
 
-            Dim bulk As BulkUpsertResult = Nothing
-            Try
-                bulk = Await api.BulkUpsertInvoicesAsync(businessId, items, ct).ConfigureAwait(False)
-            Catch ex As Exception
-                For Each k In chunkKeys
-                    invoiceMap.Failed(k) = ex.Message
-                    processed += 1
-                    RaiseProgress("فاکتور " & fy.Title, processed, rows.Count, "خطای bulk: " & k & " — " & ex.Message, True)
-                Next
-                store.Save(cp)
-                offset += take
-                Continue While
-            End Try
-
-            Dim byClientRef = IndexByClientRef(bulk)
-            For i = 0 To chunkKeys.Count - 1
-                Dim k = chunkKeys(i)
-                processed += 1
-                Dim r = ResolveItem(byClientRef, bulk, i, k)
-                If r IsNot Nothing AndAlso r.IsSuccess AndAlso r.EntityId > 0 Then
-                    invoiceMap.Done(k) = r.EntityId
-                    invoiceMap.Failed.Remove(k)
-                    createdIds.Add(r.EntityId)
-                Else
-                    Dim msg = If(r Is Nothing, "نتیجه برنگشت", If(r.Message, r.ErrorCode))
-                    invoiceMap.Failed(k) = If(msg, "خطا")
-                    RaiseProgress("فاکتور " & fy.Title, processed, rows.Count, "خطا: " & k & " — " & invoiceMap.Failed(k), True)
-                End If
-            Next
-            RaiseProgress("فاکتور " & fy.Title, processed, rows.Count,
-                          "دسته: ایجاد " & If(bulk Is Nothing, 0, bulk.Created).ToString() &
-                          " / شکست " & If(bulk Is Nothing, 0, bulk.Failed).ToString())
+            Dim processedHolder As New IntHolder With {.Value = processed}
+            Await SendInvoiceChunkWithRetry(api, businessId, fy, items, chunkKeys, invoiceMap, createdIds, processedHolder, rows.Count, store, cp, ct).ConfigureAwait(False)
+            processed = processedHolder.Value
             store.Save(cp)
             offset += take
         End While
 
         Return createdIds
     End Function
+
+    Private Shared Function IsTransientTimeout(ex As Exception) As Boolean
+        If ex Is Nothing Then Return False
+        If TypeOf ex Is TaskCanceledException Then Return True
+        If TypeOf ex.InnerException Is TaskCanceledException Then Return True
+        If TypeOf ex Is TimeoutException Then Return True
+        Dim msg = If(ex.Message, "")
+        Return msg.IndexOf("canceled", StringComparison.OrdinalIgnoreCase) >= 0 OrElse
+               msg.IndexOf("timeout", StringComparison.OrdinalIgnoreCase) >= 0 OrElse
+               msg.IndexOf("زمان", StringComparison.OrdinalIgnoreCase) >= 0
+    End Function
+
+    Private Async Function SendInvoiceChunkWithRetry(
+        api As HesabixApiClient,
+        businessId As Integer,
+        fy As DetectedFiscalYear,
+        items As JArray,
+        chunkKeys As List(Of String),
+        invoiceMap As ModuleCheckpoint,
+        createdIds As List(Of Integer),
+        processedHolder As IntHolder,
+        totalRows As Integer,
+        store As CheckpointStore,
+        cp As TransferCheckpoint,
+        ct As CancellationToken
+    ) As Task
+        If items Is Nothing OrElse items.Count = 0 Then Return
+
+        Dim attempt = 0
+        While attempt < 3
+            attempt += 1
+            Dim bulk As BulkUpsertResult = Nothing
+            Dim sendErr As Exception = Nothing
+            Try
+                bulk = Await api.BulkUpsertInvoicesAsync(businessId, items, ct).ConfigureAwait(False)
+            Catch ex As Exception
+                sendErr = ex
+            End Try
+
+            If sendErr Is Nothing AndAlso bulk IsNot Nothing Then
+                Dim byClientRef = IndexByClientRef(bulk)
+                For i = 0 To chunkKeys.Count - 1
+                    Dim k = chunkKeys(i)
+                    processedHolder.Value += 1
+                    Dim r = ResolveItem(byClientRef, bulk, i, k)
+                    If r IsNot Nothing AndAlso r.IsSuccess AndAlso r.EntityId > 0 Then
+                        invoiceMap.Done(k) = r.EntityId
+                        invoiceMap.Failed.Remove(k)
+                        createdIds.Add(r.EntityId)
+                    Else
+                        Dim msg = If(r Is Nothing, "نتیجه برنگشت", If(r.Message, r.ErrorCode))
+                        invoiceMap.Failed(k) = If(msg, "خطا")
+                        RaiseProgress("فاکتور " & fy.Title, processedHolder.Value, totalRows, "خطا: " & k & " — " & invoiceMap.Failed(k), True)
+                    End If
+                Next
+                RaiseProgress("فاکتور " & fy.Title, processedHolder.Value, totalRows,
+                              "دسته: ایجاد " & bulk.Created.ToString() & " / شکست " & bulk.Failed.ToString())
+                store.Save(cp)
+                Return
+            End If
+
+            If IsTransientTimeout(sendErr) AndAlso items.Count > 1 Then
+                Dim half = Math.Max(1, items.Count \ 2)
+                RaiseProgress("فاکتور " & fy.Title, processedHolder.Value, totalRows,
+                              "timeout — شکستن دسته به " & half.ToString() & " + " & (items.Count - half).ToString() & "...", True)
+                Dim a As New JArray()
+                Dim b As New JArray()
+                Dim ak As New List(Of String)
+                Dim bk As New List(Of String)
+                For i = 0 To items.Count - 1
+                    If i < half Then
+                        a.Add(items(i)) : ak.Add(chunkKeys(i))
+                    Else
+                        b.Add(items(i)) : bk.Add(chunkKeys(i))
+                    End If
+                Next
+                Await SendInvoiceChunkWithRetry(api, businessId, fy, a, ak, invoiceMap, createdIds, processedHolder, totalRows, store, cp, ct).ConfigureAwait(False)
+                Await SendInvoiceChunkWithRetry(api, businessId, fy, b, bk, invoiceMap, createdIds, processedHolder, totalRows, store, cp, ct).ConfigureAwait(False)
+                Return
+            End If
+
+            If IsTransientTimeout(sendErr) AndAlso attempt < 3 Then
+                RaiseProgress("فاکتور " & fy.Title, processedHolder.Value, totalRows,
+                              "timeout — تلاش مجدد " & (attempt + 1).ToString() & "...", True)
+                Await Task.Delay(2000, ct).ConfigureAwait(False)
+                Continue While
+            End If
+
+            Dim errMsg = If(sendErr Is Nothing, "خطای ناشناخته", sendErr.Message)
+            For Each k In chunkKeys
+                invoiceMap.Failed(k) = errMsg
+                processedHolder.Value += 1
+                RaiseProgress("فاکتور " & fy.Title, processedHolder.Value, totalRows, "خطای bulk: " & k & " — " & errMsg, True)
+            Next
+            store.Save(cp)
+            Return
+        End While
+    End Function
+
+    Private Class IntHolder
+        Public Property Value As Integer
+    End Class
 
     Private Shared Function BuildInvoicePayload(
         inv As HolooInvoiceHeader,

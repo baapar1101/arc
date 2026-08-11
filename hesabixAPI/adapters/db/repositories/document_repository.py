@@ -635,14 +635,15 @@ class DocumentRepository:
         if not lines_data or len(lines_data) < 2:
             return False, "سند باید حداقل 2 سطر داشته باشد"
         
-        total_debit = sum(float(line.get("debit", 0)) for line in lines_data)
-        total_credit = sum(float(line.get("credit", 0)) for line in lines_data)
-        
-        # تلرانس برای خطاهای اعشاری
-        tolerance = 0.01
-        if abs(total_debit - total_credit) > tolerance:
-            diff = total_debit - total_credit
-            return False, f"سند متوازن نیست. تفاوت: {diff:,.2f}"
+        # مقایسه با دقت ریالی تا خطای float مثل 0.0100000002 سند سالم را رد نکند
+        from decimal import Decimal
+
+        debit_d = sum(Decimal(str(line.get("debit", 0) or 0)) for line in lines_data)
+        credit_d = sum(Decimal(str(line.get("credit", 0) or 0)) for line in lines_data)
+        diff_d = (debit_d - credit_d).quantize(Decimal("0.01"))
+        tolerance = Decimal("0.01")
+        if abs(diff_d) > tolerance:
+            return False, f"سند متوازن نیست. تفاوت: {float(diff_d):,.2f}"
         
         # حداقل یک سطر باید بدهکار و یک سطر بستانکار داشته باشد
         has_debit = any(float(line.get("debit", 0)) > 0 for line in lines_data)
