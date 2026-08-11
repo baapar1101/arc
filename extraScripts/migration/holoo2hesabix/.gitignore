@@ -5,3 +5,7 @@ nuget.exe
 *.user
 *.xml
 *.pdb
+installer/output/
+installer/_aip-commands.txt
+installer/Holoo2Hesabix-SetupFiles/
+installer/Holoo2Hesabix-cache/

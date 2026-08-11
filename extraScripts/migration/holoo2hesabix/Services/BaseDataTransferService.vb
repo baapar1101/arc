@@ -558,6 +558,7 @@ Friend Class BaseDataTransferService
             End If
 
             Dim retryNoOb As New List(Of HolooProductRow)()
+            Dim retryNoBarcode As New List(Of HolooProductRow)()
             Dim byClientRef = IndexBulkByClientRef(bulk)
             For i = 0 To chunkRows.Count - 1
                 Dim row = chunkRows(i)
@@ -595,6 +596,12 @@ Friend Class BaseDataTransferService
                         modCp.Failed(row.Key) = If(errMsg, "کد کالا تکراری است")
                         RaiseProgress("کالا", processed, rows.Count, "خطا: " & row.Code & " — " & modCp.Failed(row.Key), True)
                     End If
+                    Continue For
+                End If
+
+                If IsBarcodeConflict(errCode, errMsg) Then
+                    retryNoBarcode.Add(row)
+                    processed -= 1
                     Continue For
                 End If
 
@@ -650,6 +657,68 @@ Friend Class BaseDataTransferService
                                 modCp.Failed(row.Key) = If(itemResult.Message, "کد کالا تکراری است")
                                 RaiseProgress("کالا", processed, rows.Count, "خطا: " & row.Code & " — " & modCp.Failed(row.Key), True)
                             End If
+                        ElseIf itemResult IsNot Nothing AndAlso IsBarcodeConflict(itemResult.ErrorCode, itemResult.Message) Then
+                            processed -= 1
+                            retryNoBarcode.Add(row)
+                        Else
+                            Dim msg = If(itemResult Is Nothing, "نتیجه bulk برنگشت", If(itemResult.Message, itemResult.ErrorCode))
+                            modCp.Failed(row.Key) = If(msg, "خطای ناشناخته")
+                            RaiseProgress("کالا", processed, rows.Count, "خطا: " & row.Code & " — " & modCp.Failed(row.Key), True)
+                        End If
+                    Next
+                End If
+            End If
+
+            If retryNoBarcode.Count > 0 Then
+                RaiseProgress("کالا", processed, rows.Count, "تلاش مجدد بدون بارکد برای " & retryNoBarcode.Count.ToString() & " کالا...")
+                Dim retryBcItems As New JArray()
+                For Each row In retryNoBarcode
+                    Dim payload = BuildProductPayload(row, warehouseMap, includeOb, omitBarcode:=True)
+                    retryBcItems.Add(New JObject From {
+                        {"client_ref", row.Key},
+                        {"payload", payload}
+                    })
+                Next
+                Dim retryBcBulk As BulkUpsertResult = Nothing
+                Dim retryBcErr As Exception = Nothing
+                Try
+                    retryBcBulk = Await api.BulkUpsertProductsAsync(businessId, retryBcItems, True, ct).ConfigureAwait(False)
+                Catch ex As Exception
+                    retryBcErr = ex
+                End Try
+                If retryBcErr IsNot Nothing Then
+                    For Each row In retryNoBarcode
+                        processed += 1
+                        modCp.Failed(row.Key) = retryBcErr.Message
+                        modCp.LastKey = row.Key
+                        RaiseProgress("کالا", processed, rows.Count, "خطا: " & row.Code & " — " & retryBcErr.Message, True)
+                    Next
+                Else
+                    Dim retryBcByRef = IndexBulkByClientRef(retryBcBulk)
+                    For i = 0 To retryNoBarcode.Count - 1
+                        Dim row = retryNoBarcode(i)
+                        processed += 1
+                        modCp.LastKey = row.Key
+                        Dim itemResult = ResolveBulkItem(retryBcByRef, retryBcBulk, i, row.Key)
+                        If itemResult IsNot Nothing AndAlso itemResult.IsSuccess AndAlso itemResult.EntityId > 0 Then
+                            modCp.Done(row.Key) = itemResult.EntityId
+                            modCp.Failed.Remove(row.Key)
+                            RaiseProgress("کالا", processed, rows.Count, "بدون بارکد ایجاد شد: " & row.Code)
+                        ElseIf itemResult IsNot Nothing AndAlso
+                               String.Equals(itemResult.ErrorCode, "DUPLICATE_PRODUCT_CODE", StringComparison.OrdinalIgnoreCase) Then
+                            Dim linked = 0
+                            Try
+                                linked = Await api.FindProductIdByCodeAsync(businessId, row.Code, ct).ConfigureAwait(False)
+                            Catch
+                            End Try
+                            If linked > 0 Then
+                                modCp.Done(row.Key) = linked
+                                modCp.Failed.Remove(row.Key)
+                                RaiseProgress("کالا", processed, rows.Count, "کد تکراری — لینک شد: " & row.Code)
+                            Else
+                                modCp.Failed(row.Key) = If(itemResult.Message, "کد کالا تکراری است")
+                                RaiseProgress("کالا", processed, rows.Count, "خطا: " & row.Code & " — " & modCp.Failed(row.Key), True)
+                            End If
                         Else
                             Dim msg = If(itemResult Is Nothing, "نتیجه bulk برنگشت", If(itemResult.Message, itemResult.ErrorCode))
                             modCp.Failed(row.Key) = If(msg, "خطای ناشناخته")
@@ -687,7 +756,19 @@ Friend Class BaseDataTransferService
         Return pending.GetRange(offset, take)
     End Function
 
-    Private Shared Function BuildProductPayload(row As HolooProductRow, warehouseMap As ModuleCheckpoint, includeOpeningBalance As Boolean) As JObject
+    Private Shared Function IsBarcodeConflict(errCode As String, errMsg As String) As Boolean
+        If String.Equals(errCode, "DUPLICATE_GENERAL_BARCODE", StringComparison.OrdinalIgnoreCase) Then Return True
+        If String.Equals(errCode, "DUPLICATE_BARCODE", StringComparison.OrdinalIgnoreCase) Then Return True
+        If Not String.IsNullOrWhiteSpace(errMsg) AndAlso errMsg.IndexOf("بارکد", StringComparison.OrdinalIgnoreCase) >= 0 Then Return True
+        Return False
+    End Function
+
+    Private Shared Function BuildProductPayload(
+        row As HolooProductRow,
+        warehouseMap As ModuleCheckpoint,
+        includeOpeningBalance As Boolean,
+        Optional omitBarcode As Boolean = False
+    ) As JObject
         Dim unitName = If(String.IsNullOrWhiteSpace(row.UnitName), "عدد", row.UnitName.Trim())
         If unitName.Length > 32 Then unitName = unitName.Substring(0, 32)
 
@@ -711,7 +792,7 @@ Friend Class BaseDataTransferService
         If row.IncludeTax AndAlso row.PurchaseTaxRate > 0 Then
             payload("purchase_tax_rate") = row.PurchaseTaxRate
         End If
-        If Not String.IsNullOrWhiteSpace(row.Barcode) AndAlso row.Barcode <> "." Then
+        If Not omitBarcode AndAlso Not String.IsNullOrWhiteSpace(row.Barcode) AndAlso row.Barcode <> "." Then
             Dim bc = row.Barcode.Trim()
             If bc.Length <= 50 Then
                 payload("barcode") = bc

@@ -86,7 +86,7 @@ Friend Class PreflightService
             })
         Else
             Dim fyText = String.Join(" | ", report.FiscalYears.Select(
-                Function(f) f.Title & " (" & f.StartDate.ToString("yyyy-MM-dd") & "→" & f.EndDate.ToString("yyyy-MM-dd") &
+                Function(f) f.Title & " (" & ApiDateFormat.ToIsoDate(f.StartDate) & "→" & ApiDateFormat.ToIsoDate(f.EndDate) &
                             "، فاکتور " & f.InvoiceCount.ToString("N0") & ")"))
             report.Issues.Add(New PreflightIssue With {
                 .Severity = "info",

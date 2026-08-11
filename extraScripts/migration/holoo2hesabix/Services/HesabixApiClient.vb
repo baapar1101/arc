@@ -340,13 +340,13 @@ Friend Class HesabixApiClient
         For Each y In years
             arr.Add(New JObject From {
                 {"title", y.Title},
-                {"start_date", y.StartDate.ToString("yyyy-MM-dd")},
-                {"end_date", y.EndDate.ToString("yyyy-MM-dd")}
+                {"start_date", ApiDateFormat.ToIsoDate(y.StartDate)},
+                {"end_date", ApiDateFormat.ToIsoDate(y.EndDate)}
             })
         Next
         Dim body As New JObject From {{"years", arr}}
         If currentStartDate.HasValue Then
-            body("current_start_date") = currentStartDate.Value.ToString("yyyy-MM-dd")
+            body("current_start_date") = ApiDateFormat.ToIsoDate(currentStartDate.Value)
         End If
         Dim root = Await SendJsonAsync(
             HttpMethod.Post,
@@ -384,20 +384,17 @@ Friend Class HesabixApiClient
     End Function
 
     Public Async Function SetCurrentFiscalYearAsync(businessId As Integer, fiscalYearId As Integer, Optional ct As CancellationToken = Nothing) As Task(Of HesabixFiscalYear)
-        Dim body As New JObject From {{"fiscal_year_id", fiscalYearId}}
+        ' مهم: از مسیر .../fiscal-years/{id}/set-current استفاده می‌کنیم.
+        ' مسیر .../migration/set-current با پارامتر {fiscal_year_id} تداخل داشت و "migration" به‌عنوان int پارس می‌شد.
         Dim root = Await SendJsonAsync(
             HttpMethod.Post,
-            "api/v1/business/" & businessId.ToString() & "/fiscal-years/migration/set-current",
-            body,
+            "api/v1/business/" & businessId.ToString() & "/fiscal-years/" & fiscalYearId.ToString() & "/set-current",
+            New JObject(),
             includeAuth:=True,
             ct:=ct
         ).ConfigureAwait(False)
         Dim data = GetDataToken(root)
-        Dim currentTok = data("current")
-        If currentTok IsNot Nothing AndAlso currentTok.Type = JTokenType.Object Then
-            Return ParseFiscalYear(DirectCast(currentTok, JObject))
-        End If
-        Return New HesabixFiscalYear With {.Id = fiscalYearId, .IsCurrent = True}
+        Return ParseFiscalYear(data)
     End Function
 
     Public Async Function BulkUpsertInvoicesAsync(
@@ -483,7 +480,7 @@ Friend Class HesabixApiClient
 
     Public Async Function ClearCheckAsync(checkId As Integer, bankAccountId As Integer, Optional documentDate As Date? = Nothing, Optional ct As CancellationToken = Nothing) As Task
         Dim body As New JObject From {{"bank_account_id", bankAccountId}}
-        If documentDate.HasValue Then body("document_date") = documentDate.Value.ToString("yyyy-MM-dd")
+        If documentDate.HasValue Then body("document_date") = ApiDateFormat.ToIsoDate(documentDate.Value)
         Await SendJsonAsync(
             HttpMethod.Post,
             "api/v1/checks/" & checkId.ToString() & "/actions/clear",
@@ -500,7 +497,7 @@ Friend Class HesabixApiClient
         Optional ct As CancellationToken = Nothing
     ) As Task
         Dim body As New JObject From {{"return_type", returnType}}
-        If documentDate.HasValue Then body("document_date") = documentDate.Value.ToString("yyyy-MM-dd")
+        If documentDate.HasValue Then body("document_date") = ApiDateFormat.ToIsoDate(documentDate.Value)
         Await SendJsonAsync(
             HttpMethod.Post,
             "api/v1/checks/" & checkId.ToString() & "/actions/return",
@@ -594,11 +591,14 @@ Friend Class HesabixApiClient
     End Function
 
     Private Shared Function ParseFiscalYear(obj As JObject) As HesabixFiscalYear
+        ' start_date ممکن است جلالی فرمت‌شده باشد؛ برای پارس ماشینی start_date_raw ارجح است
+        Dim startRaw = GetString(obj, "start_date_raw")
+        Dim endRaw = GetString(obj, "end_date_raw")
         Return New HesabixFiscalYear With {
             .Id = GetInt(obj, "id"),
             .Title = GetString(obj, "title"),
-            .StartDate = GetString(obj, "start_date"),
-            .EndDate = GetString(obj, "end_date"),
+            .StartDate = If(Not String.IsNullOrWhiteSpace(startRaw), startRaw, GetString(obj, "start_date")),
+            .EndDate = If(Not String.IsNullOrWhiteSpace(endRaw), endRaw, GetString(obj, "end_date")),
             .IsCurrent = GetBool(obj, "is_current", False)
         }
     End Function

@@ -82,6 +82,7 @@
       <DependentUpon>MainForm.vb</DependentUpon>
     </Compile>
     <Compile Include="Services\AsyncUi.vb" />
+    <Compile Include="Services\ApiDateFormat.vb" />
     <Compile Include="Services\BaseDataTransferService.vb" />
     <Compile Include="Services\CheckpointStore.vb" />
     <Compile Include="Services\DocumentTransferService.vb" />

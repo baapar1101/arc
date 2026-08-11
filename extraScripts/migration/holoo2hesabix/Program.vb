@@ -5,10 +5,14 @@ Friend Module Program
 
     <STAThread()>
     Friend Sub Main()
+        ' UI فارسی؛ اما تقویم اجرایی باید میلادی بماند.
+        ' اگر Calendar=Persian باشد، Date.ToString("yyyy-MM-dd") جلالی می‌سازد و API آن را میلادی می‌خواند.
         Dim fa = CultureInfo.GetCultureInfo("fa-IR")
-        CultureInfo.DefaultThreadCurrentCulture = fa
+        Dim faGregorian = DirectCast(fa.Clone(), CultureInfo)
+        faGregorian.DateTimeFormat.Calendar = New GregorianCalendar()
+        CultureInfo.DefaultThreadCurrentCulture = faGregorian
         CultureInfo.DefaultThreadCurrentUICulture = fa
-        Thread.CurrentThread.CurrentCulture = fa
+        Thread.CurrentThread.CurrentCulture = faGregorian
         Thread.CurrentThread.CurrentUICulture = fa
 
         Application.EnableVisualStyles()

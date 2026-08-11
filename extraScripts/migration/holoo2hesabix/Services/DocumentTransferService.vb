@@ -182,24 +182,82 @@ Friend Class DocumentTransferService
         }).ToList()
         RaiseProgress("سال مالی", 0, years.Count, "ایجاد/بازیابی سال‌های مالی...")
         Dim ensured = Await api.EnsureFiscalYearsAsync(businessId, slices, years.First().StartDate, ct).ConfigureAwait(False)
-        For Each item In ensured.Items
-            Dim startParsed As Date
-            If Not Date.TryParse(item.StartDate, startParsed) Then Continue For
-            Dim match = years.FirstOrDefault(Function(y) y.StartDate = startParsed.Date)
-            If match IsNot Nothing Then match.HesabixId = item.Id
-        Next
-        ' اگر items خالی بود از list بخوان
+        ApplyFiscalYearIds(years, ensured.Items)
+
         If years.Any(Function(y) y.HesabixId <= 0) Then
             Dim listed = Await api.ListFiscalYearsAsync(businessId, ct).ConfigureAwait(False)
-            For Each item In listed
-                Dim startParsed As Date
-                If Not Date.TryParse(item.StartDate, startParsed) Then Continue For
-                Dim match = years.FirstOrDefault(Function(y) y.StartDate = startParsed.Date)
-                If match IsNot Nothing Then match.HesabixId = item.Id
-            Next
+            ApplyFiscalYearIds(years, listed)
         End If
-        RaiseProgress("سال مالی", years.Count, years.Count,
-                      "آماده: ایجاد " & ensured.CreatedCount.ToString() & " / موجود " & ensured.ReusedCount.ToString())
+
+        Dim unresolved = years.Where(Function(y) y.HesabixId <= 0).Select(Function(y) y.Title).ToList()
+        If unresolved.Count > 0 Then
+            RaiseProgress("سال مالی", years.Count, years.Count,
+                          "آماده: ایجاد " & ensured.CreatedCount.ToString() & " / موجود " & ensured.ReusedCount.ToString() &
+                          " — بدون شناسه: " & String.Join("، ", unresolved), True)
+        Else
+            RaiseProgress("سال مالی", years.Count, years.Count,
+                          "آماده: ایجاد " & ensured.CreatedCount.ToString() & " / موجود " & ensured.ReusedCount.ToString() &
+                          " — همه " & years.Count.ToString() & " سال نگاشت شد")
+        End If
+    End Function
+
+    Private Shared Sub ApplyFiscalYearIds(years As List(Of DetectedFiscalYear), items As IEnumerable(Of HesabixFiscalYear))
+        If items Is Nothing Then Return
+        For Each item In items
+            If item Is Nothing OrElse item.Id <= 0 Then Continue For
+            Dim match = MatchDetectedFiscalYear(years, item)
+            If match IsNot Nothing AndAlso match.HesabixId <= 0 Then
+                match.HesabixId = item.Id
+            End If
+        Next
+    End Sub
+
+    Private Shared Function MatchDetectedFiscalYear(years As List(Of DetectedFiscalYear), item As HesabixFiscalYear) As DetectedFiscalYear
+        Dim startParsed As Date
+        If TryParseApiDate(item.StartDate, startParsed) Then
+            Dim byDate = years.FirstOrDefault(Function(y) y.HesabixId <= 0 AndAlso y.StartDate = startParsed.Date)
+            If byDate IsNot Nothing Then Return byDate
+            ' تحمل یک روز اختلاف به‌خاطر timezone/جلالی
+            byDate = years.FirstOrDefault(Function(y) y.HesabixId <= 0 AndAlso Math.Abs((y.StartDate - startParsed.Date).TotalDays) <= 1)
+            If byDate IsNot Nothing Then Return byDate
+        End If
+        If Not String.IsNullOrWhiteSpace(item.Title) Then
+            Dim byTitle = years.FirstOrDefault(Function(y) y.HesabixId <= 0 AndAlso
+                String.Equals(y.Title.Trim(), item.Title.Trim(), StringComparison.OrdinalIgnoreCase))
+            If byTitle IsNot Nothing Then Return byTitle
+        End If
+        Return Nothing
+    End Function
+
+    Private Shared Function TryParseApiDate(value As String, ByRef parsed As Date) As Boolean
+        parsed = Date.MinValue
+        If String.IsNullOrWhiteSpace(value) Then Return False
+        Dim s = value.Trim()
+        ' ترجیح ISO گریگوری: yyyy-MM-dd
+        Dim exact As Date
+        If Date.TryParseExact(s, "yyyy-MM-dd", Globalization.CultureInfo.InvariantCulture,
+                              Globalization.DateTimeStyles.None, exact) Then
+            parsed = exact.Date
+            Return True
+        End If
+        If Date.TryParseExact(s, "yyyy-MM-ddTHH:mm:ss", Globalization.CultureInfo.InvariantCulture,
+                              Globalization.DateTimeStyles.AssumeUniversal Or Globalization.DateTimeStyles.AdjustToUniversal, exact) Then
+            parsed = exact.Date
+            Return True
+        End If
+        ' جلالی نمایشی مثل 1402/01/01 را عمداً رد می‌کنیم تا با سال میلادی اشتباه نشود
+        If s.Contains("/"c) AndAlso s.Length >= 8 Then
+            Dim parts = s.Split("/"c)
+            Dim yPart As Integer
+            If parts.Length >= 1 AndAlso Integer.TryParse(parts(0), yPart) AndAlso yPart > 1300 AndAlso yPart < 1600 Then
+                Return False
+            End If
+        End If
+        If Date.TryParse(s, Globalization.CultureInfo.InvariantCulture, Globalization.DateTimeStyles.AssumeLocal, exact) Then
+            parsed = exact.Date
+            Return True
+        End If
+        Return False
     End Function
 
     Private Async Function TransferOpeningBalance(
@@ -346,14 +404,14 @@ Friend Class DocumentTransferService
         Dim accountLines As New JArray()
         For Each kv In merged
             Dim b = kv.Value
-            Dim debit = Math.Round(b.Debit, 2)
-            Dim credit = Math.Round(b.Credit, 2)
+            Dim debit = ApiDateFormat.RoundMoney(b.Debit)
+            Dim credit = ApiDateFormat.RoundMoney(b.Credit)
             If debit > 0 AndAlso credit > 0 Then
                 If debit >= credit Then
-                    debit = Math.Round(debit - credit, 2)
+                    debit = ApiDateFormat.RoundMoney(debit - credit)
                     credit = 0
                 Else
-                    credit = Math.Round(credit - debit, 2)
+                    credit = ApiDateFormat.RoundMoney(credit - debit)
                     debit = 0
                 End If
             End If
@@ -429,7 +487,7 @@ Friend Class DocumentTransferService
 
         Dim payload As New JObject From {
             {"fiscal_year_id", fy.HesabixId},
-            {"document_date", fy.StartDate.ToString("yyyy-MM-dd")},
+            {"document_date", ApiDateFormat.ToIsoDate(fy.StartDate)},
             {"currency_id", currencyId},
             {"account_lines", accountLines},
             {"inventory_lines", inventoryLines},
@@ -688,14 +746,14 @@ Friend Class DocumentTransferService
                     {"amount", Math.Round(inv.FNaghd, 2)},
                     {"transaction_type", "petty_cash"},
                     {"petty_cash_id", If(cashId > 0, cashId, defaultPettyId)},
-                    {"transaction_date", inv.FacDate.ToString("yyyy-MM-dd")}
+                    {"transaction_date", ApiDateFormat.ToIsoDate(inv.FacDate)}
                 })
             Else
                 payments.Add(New JObject From {
                     {"amount", Math.Round(inv.FNaghd, 2)},
                     {"transaction_type", "cash_register"},
                     {"cash_register_id", cashId},
-                    {"transaction_date", inv.FacDate.ToString("yyyy-MM-dd")}
+                    {"transaction_date", ApiDateFormat.ToIsoDate(inv.FacDate)}
                 })
             End If
         End If
@@ -705,7 +763,7 @@ Friend Class DocumentTransferService
                 {"amount", Math.Round(cardOrHaval, 2)},
                 {"transaction_type", "bank"},
                 {"bank_id", bankId},
-                {"transaction_date", inv.FacDate.ToString("yyyy-MM-dd")}
+                {"transaction_date", ApiDateFormat.ToIsoDate(inv.FacDate)}
             })
         End If
         ' FCheck: مانده به‌صورت نسیه (AR/AP) می‌ماند؛ ماژول چک با ایجاد چک، AR→اسناد دریافتنی را می‌بندد
@@ -733,7 +791,7 @@ Friend Class DocumentTransferService
 
         Dim payload As New JObject From {
             {"invoice_type", invType},
-            {"document_date", inv.FacDate.ToString("yyyy-MM-dd")},
+            {"document_date", ApiDateFormat.ToIsoDate(inv.FacDate)},
             {"currency_id", invCurrencyId},
             {"description", If(String.IsNullOrWhiteSpace(inv.Comment), "Holoo " & inv.Key, inv.Comment)},
             {"lines", lines},
@@ -873,14 +931,14 @@ Friend Class DocumentTransferService
                     {"amount", amount},
                     {"transaction_type", "petty_cash"},
                     {"petty_cash_id", cashId},
-                    {"transaction_date", row.SanadDate.ToString("yyyy-MM-dd")}
+                    {"transaction_date", ApiDateFormat.ToIsoDate(row.SanadDate)}
                 }
             Else
                 accountLine = New JObject From {
                     {"amount", amount},
                     {"transaction_type", "cash_register"},
                     {"cash_register_id", cashId},
-                    {"transaction_date", row.SanadDate.ToString("yyyy-MM-dd")}
+                    {"transaction_date", ApiDateFormat.ToIsoDate(row.SanadDate)}
                 }
             End If
         Else
@@ -891,13 +949,13 @@ Friend Class DocumentTransferService
                 {"amount", amount},
                 {"transaction_type", "bank"},
                 {"bank_id", bankId},
-                {"transaction_date", row.SanadDate.ToString("yyyy-MM-dd")}
+                {"transaction_date", ApiDateFormat.ToIsoDate(row.SanadDate)}
             }
         End If
 
         Return New JObject From {
             {"document_type", If(row.IsReceipt, "receipt", "payment")},
-            {"document_date", row.SanadDate.ToString("yyyy-MM-dd")},
+            {"document_date", ApiDateFormat.ToIsoDate(row.SanadDate)},
             {"currency_id", currencyId},
             {"description", If(String.IsNullOrWhiteSpace(row.Comment), "Holoo " & row.Key, row.Comment)},
             {"person_lines", New JArray From {
@@ -965,12 +1023,12 @@ Friend Class DocumentTransferService
             Dim payload As New JObject From {
                 {"type", If(row.IsPayable, "transferred", "received")},
                 {"person_id", personId},
-                {"issue_date", issue.ToString("yyyy-MM-dd")},
-                {"due_date", due.ToString("yyyy-MM-dd")},
+                {"issue_date", ApiDateFormat.ToIsoDate(issue)},
+                {"due_date", ApiDateFormat.ToIsoDate(due)},
                 {"check_number", checkNumber},
                 {"amount", Math.Round(row.Amount, 2)},
                 {"currency_id", currencyId},
-                {"document_date", issue.ToString("yyyy-MM-dd")},
+                {"document_date", ApiDateFormat.ToIsoDate(issue)},
                 {"document_description", If(String.IsNullOrWhiteSpace(row.Comment), "Holoo " & row.Key, row.Comment)}
             }
             If Not String.IsNullOrWhiteSpace(row.BankName) Then payload("bank_name") = row.BankName
@@ -1208,7 +1266,7 @@ Friend Class DocumentTransferService
                     {"transaction_type", "person"},
                     {"person_id", personId},
                     {"amount", amt},
-                    {"transaction_date", row.SanadDate.ToString("yyyy-MM-dd")},
+                    {"transaction_date", ApiDateFormat.ToIsoDate(row.SanadDate)},
                     {"description", cpLine.Name}
                 }
             ElseIf col = "101" Then
@@ -1221,7 +1279,7 @@ Friend Class DocumentTransferService
                         {"transaction_type", "petty_cash"},
                         {"petty_cash_id", cashId},
                         {"amount", amt},
-                        {"transaction_date", row.SanadDate.ToString("yyyy-MM-dd")},
+                        {"transaction_date", ApiDateFormat.ToIsoDate(row.SanadDate)},
                         {"description", cpLine.Name}
                     }
                 Else
@@ -1229,7 +1287,7 @@ Friend Class DocumentTransferService
                         {"transaction_type", "cash_register"},
                         {"cash_register_id", cashId},
                         {"amount", amt},
-                        {"transaction_date", row.SanadDate.ToString("yyyy-MM-dd")},
+                        {"transaction_date", ApiDateFormat.ToIsoDate(row.SanadDate)},
                         {"description", cpLine.Name}
                     }
                 End If
@@ -1241,7 +1299,7 @@ Friend Class DocumentTransferService
                     {"transaction_type", "bank"},
                     {"bank_id", bankId},
                     {"amount", amt},
-                    {"transaction_date", row.SanadDate.ToString("yyyy-MM-dd")},
+                    {"transaction_date", ApiDateFormat.ToIsoDate(row.SanadDate)},
                     {"description", cpLine.Name}
                 }
             Else
@@ -1256,7 +1314,7 @@ Friend Class DocumentTransferService
 
         Return New JObject From {
             {"document_type", If(row.IsIncome, "income", "expense")},
-            {"document_date", row.SanadDate.ToString("yyyy-MM-dd")},
+            {"document_date", ApiDateFormat.ToIsoDate(row.SanadDate)},
             {"currency_id", currencyId},
             {"description", If(String.IsNullOrWhiteSpace(row.Comment), "Holoo " & row.Key, row.Comment)},
             {"item_lines", itemLines},
@@ -1409,7 +1467,7 @@ Friend Class DocumentTransferService
         If Math.Abs(bed - bes) > 0.02 Then Return Nothing
 
         Return New JObject From {
-            {"document_date", row.SanadDate.ToString("yyyy-MM-dd")},
+            {"document_date", ApiDateFormat.ToIsoDate(row.SanadDate)},
             {"currency_id", currencyId},
             {"description", If(String.IsNullOrWhiteSpace(row.Comment), "Holoo " & row.Key, row.Comment)},
             {"lines", lines},

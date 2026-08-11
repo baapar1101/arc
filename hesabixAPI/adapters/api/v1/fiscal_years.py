@@ -416,41 +416,6 @@ def create_fiscal_year_endpoint(
     )
 
 
-@router.post("/{business_id}/fiscal-years/{fiscal_year_id}/set-current")
-@require_business_access("business_id")
-def set_current_fiscal_year_endpoint(
-    request: Request,
-    business_id: int,
-    fiscal_year_id: int,
-    ctx: AuthContext = Depends(get_current_user),
-    db: Session = Depends(get_db),
-    _: None = Depends(require_business_permission_dep("fiscal_years", "edit")),
-) -> Dict[str, Any]:
-    """
-    تعویض نرم سال مالی جاری (فقط is_last) بدون بستن سود و زیان.
-    مناسب مهاجرت تاریخچه سال‌به‌سال (Holoo و مشابه).
-    """
-    repo = FiscalYearRepository(db)
-    fiscal_year = repo.set_current_for_business(business_id, fiscal_year_id)
-
-    cache = get_cache()
-    if cache.enabled:
-        cache.delete(f"fiscal_years:{business_id}")
-
-    data = {
-        "id": fiscal_year.id,
-        "title": fiscal_year.title,
-        "start_date": fiscal_year.start_date,
-        "end_date": fiscal_year.end_date,
-        "is_current": fiscal_year.is_last,
-    }
-    return success_response(
-        data=format_datetime_fields(data, request),
-        request=request,
-        message="FISCAL_YEAR_SET_CURRENT_SUCCESSFULLY",
-    )
-
-
 class MigrationEnsureYearsRequest(BaseModel):
     years: List[FiscalYearCreateRequest] = Field(..., min_items=1)
     current_start_date: Optional[date] = Field(
@@ -459,6 +424,8 @@ class MigrationEnsureYearsRequest(BaseModel):
     )
 
 
+# مسیرهای migration باید قبل از .../{fiscal_year_id}/set-current ثبت شوند؛
+# وگرنه FastAPI مقدار "migration" را به‌عنوان fiscal_year_id می‌گیرد.
 @router.post("/{business_id}/fiscal-years/migration/ensure")
 @require_business_access("business_id")
 def migration_ensure_fiscal_years(
@@ -598,6 +565,41 @@ def migration_set_current_fiscal_year(
     }
     return success_response(
         data=format_datetime_fields({"current": current_data}, request),
+        request=request,
+        message="FISCAL_YEAR_SET_CURRENT_SUCCESSFULLY",
+    )
+
+
+@router.post("/{business_id}/fiscal-years/{fiscal_year_id}/set-current")
+@require_business_access("business_id")
+def set_current_fiscal_year_endpoint(
+    request: Request,
+    business_id: int,
+    fiscal_year_id: int,
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_dep("fiscal_years", "edit")),
+) -> Dict[str, Any]:
+    """
+    تعویض نرم سال مالی جاری (فقط is_last) بدون بستن سود و زیان.
+    مناسب مهاجرت تاریخچه سال‌به‌سال (Holoo و مشابه).
+    """
+    repo = FiscalYearRepository(db)
+    fiscal_year = repo.set_current_for_business(business_id, fiscal_year_id)
+
+    cache = get_cache()
+    if cache.enabled:
+        cache.delete(f"fiscal_years:{business_id}")
+
+    data = {
+        "id": fiscal_year.id,
+        "title": fiscal_year.title,
+        "start_date": fiscal_year.start_date,
+        "end_date": fiscal_year.end_date,
+        "is_current": fiscal_year.is_last,
+    }
+    return success_response(
+        data=format_datetime_fields(data, request),
         request=request,
         message="FISCAL_YEAR_SET_CURRENT_SUCCESSFULLY",
     )
