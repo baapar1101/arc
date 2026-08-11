@@ -17,6 +17,8 @@ import 'package:hesabix_ui/utils/responsive_helper.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 import 'package:hesabix_ui/services/bytes_export/bytes_export_service.dart';
+import 'package:hesabix_ui/widgets/fx/fx_data_quality_banner.dart';
+import 'package:hesabix_ui/widgets/fx/report_currency_filter_dropdown.dart';
 
 /// بسته یکپارچه گزارش‌های مالی: تراز آزمایشی، ترازنامه و سود و زیان با فیلتر مشترک.
 class FinancialReportsPackagePage extends StatefulWidget {
@@ -43,6 +45,7 @@ class _FinancialReportsPackagePageState extends State<FinancialReportsPackagePag
   int? _selectedCurrencyId;
   int? _selectedProjectId;
   bool _includeZeroBalance = false;
+  bool _includeBaseEquivalent = true;
   int _accountLevel = 4;
   String? _compareMode;
 
@@ -51,6 +54,7 @@ class _FinancialReportsPackagePageState extends State<FinancialReportsPackagePag
 
   bool _loading = false;
   String? _error;
+  Map<String, dynamic>? _fxDataQuality;
 
   // Trial balance
   List<Map<String, dynamic>> _trialBalanceAccounts = [];
@@ -127,6 +131,8 @@ class _FinancialReportsPackagePageState extends State<FinancialReportsPackagePag
         if (_toDate != null) 'date_to': _toDate!.toIso8601String().split('T').first,
         if (_selectedFiscalYearId != null) 'fiscal_year_id': _selectedFiscalYearId,
         if (_selectedCurrencyId != null) 'currency_id': _selectedCurrencyId,
+        if (_selectedCurrencyId != null && _includeBaseEquivalent)
+          'include_base_equivalent': true,
         if (_selectedProjectId != null) 'project_id': _selectedProjectId,
         'include_zero_balance': _includeZeroBalance,
         'account_level': _accountLevel,
@@ -138,6 +144,7 @@ class _FinancialReportsPackagePageState extends State<FinancialReportsPackagePag
     setState(() {
       _loading = true;
       _error = null;
+      _fxDataQuality = null;
     });
     try {
       final api = ApiClient();
@@ -178,6 +185,11 @@ class _FinancialReportsPackagePageState extends State<FinancialReportsPackagePag
     final data = body!['data'] as Map<String, dynamic>;
     _trialBalanceAccounts = List<Map<String, dynamic>>.from(data['accounts'] ?? []);
     _trialBalanceSummary = data['summary'] is Map ? Map<String, dynamic>.from(data['summary'] as Map) : null;
+    final meta = data['meta'] is Map ? Map<String, dynamic>.from(data['meta'] as Map) : null;
+    final fq = meta?['fx_data_quality'];
+    if (fq is Map) {
+      _fxDataQuality = Map<String, dynamic>.from(fq);
+    }
   }
 
   void _applyBalanceSheet(Map<String, dynamic>? body) {
@@ -186,6 +198,11 @@ class _FinancialReportsPackagePageState extends State<FinancialReportsPackagePag
     _balanceSheetLines = List<Map<String, dynamic>>.from(data['statement_lines'] ?? []);
     _balanceSheetSummary = data['summary'] is Map ? Map<String, dynamic>.from(data['summary'] as Map) : null;
     _balanceSheetComparison = data['comparison'] is Map ? Map<String, dynamic>.from(data['comparison'] as Map) : null;
+    final meta = data['meta'] is Map ? Map<String, dynamic>.from(data['meta'] as Map) : null;
+    final fq = meta?['fx_data_quality'];
+    if (fq is Map && _fxDataQuality == null) {
+      _fxDataQuality = Map<String, dynamic>.from(fq);
+    }
   }
 
   void _applyPnl(Map<String, dynamic>? body) {
@@ -433,29 +450,27 @@ class _FinancialReportsPackagePageState extends State<FinancialReportsPackagePag
                             ),
                           ),
                           if (_currencies.length > 1)
-                            SizedBox(
+                            ReportCurrencyFilterDropdown(
+                              businessId: widget.businessId,
+                              isMultiCurrency: true,
+                              selectedCurrencyId: _selectedCurrencyId,
                               width: fieldWidth,
-                              child: DropdownButtonFormField<int>(
-                                value: _selectedCurrencyId,
-                                isExpanded: true,
-                                decoration: _decoration('ارز'),
-                                items: [
-                                  const DropdownMenuItem<int>(
-                                    value: null,
-                                    child: Text('همه ارزها'),
-                                  ),
-                                  ..._currencies.map(
-                                    (c) => DropdownMenuItem<int>(
-                                      value: c['id'] as int?,
-                                      child: Text(c['code']?.toString() ?? ''),
-                                    ),
-                                  ),
-                                ],
-                                onChanged: (v) {
-                                  setState(() => _selectedCurrencyId = v);
-                                  _fetchAll();
-                                },
-                              ),
+                              onChanged: (v) {
+                                setState(() {
+                                  _selectedCurrencyId = v;
+                                  if (v == null) _includeBaseEquivalent = false;
+                                });
+                                _fetchAll();
+                              },
+                            ),
+                          if (_selectedCurrencyId != null)
+                            FilterChip(
+                              label: const Text('نمایش معادل پایه'),
+                              selected: _includeBaseEquivalent,
+                              onSelected: (value) {
+                                setState(() => _includeBaseEquivalent = value);
+                                _fetchAll();
+                              },
                             ),
                           SizedBox(
                             width: fieldWidth,
@@ -508,7 +523,14 @@ class _FinancialReportsPackagePageState extends State<FinancialReportsPackagePag
                     ),
                   ),
                 ),
-                if (!_loading && _error == null) Padding(padding: EdgeInsets.symmetric(horizontal: pagePadding), child: _overviewCards()),
+                if (!_loading && _error == null) ...[
+                  if (_fxDataQuality != null)
+                    Padding(
+                      padding: EdgeInsets.fromLTRB(pagePadding, 0, pagePadding, 8),
+                      child: FxDataQualityBanner(quality: _fxDataQuality),
+                    ),
+                  Padding(padding: EdgeInsets.symmetric(horizontal: pagePadding), child: _overviewCards()),
+                ],
                 const SizedBox(height: 8),
                 Expanded(
                   child: _loading
@@ -541,6 +563,8 @@ class _FinancialReportsPackagePageState extends State<FinancialReportsPackagePag
                                       BalanceSheetStatementView(
                                         statementLines: _balanceSheetLines,
                                         hasCompare: _balanceSheetComparison != null && _balanceSheetComparison!.isNotEmpty,
+                                        showBaseEquivalent:
+                                            _selectedCurrencyId != null && _includeBaseEquivalent,
                                         onAccountTap: _openLedger,
                                       ),
                                     ],

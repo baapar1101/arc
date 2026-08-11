@@ -10,6 +10,8 @@ import 'package:hesabix_ui/widgets/project/project_selector_widget.dart';
 import 'package:hesabix_ui/services/business_dashboard_service.dart';
 import 'package:hesabix_ui/services/currency_service.dart';
 import 'package:hesabix_ui/services/bytes_export/bytes_export_service.dart';
+import 'package:hesabix_ui/widgets/fx/fx_data_quality_banner.dart';
+import 'package:hesabix_ui/widgets/fx/report_currency_filter_dropdown.dart';
 import 'package:hesabix_ui/widgets/reports/balance_sheet_report_shared.dart';
 import 'package:hesabix_ui/utils/responsive_helper.dart';
 import '../../utils/error_extractor.dart';
@@ -36,6 +38,7 @@ class _BalanceSheetReportPageState extends State<BalanceSheetReportPage> {
   int? _selectedCurrencyId;
   int? _selectedProjectId;
   bool _includeZeroBalance = false;
+  bool _includeBaseEquivalent = true;
   int _accountLevel = 4;
   String? _compareMode;
 
@@ -44,6 +47,7 @@ class _BalanceSheetReportPageState extends State<BalanceSheetReportPage> {
   List<Map<String, dynamic>> _statementLines = [];
   Map<String, dynamic>? _summary;
   Map<String, dynamic>? _comparison;
+  Map<String, dynamic>? _fxDataQuality;
   bool _loading = false;
   bool _exporting = false;
   String? _error;
@@ -94,6 +98,8 @@ class _BalanceSheetReportPageState extends State<BalanceSheetReportPage> {
         if (_toDate != null) 'date_to': _toDate!.toIso8601String().split('T').first,
         if (_selectedFiscalYearId != null) 'fiscal_year_id': _selectedFiscalYearId,
         if (_selectedCurrencyId != null) 'currency_id': _selectedCurrencyId,
+        if (_selectedCurrencyId != null && _includeBaseEquivalent)
+          'include_base_equivalent': true,
         if (_selectedProjectId != null) 'project_id': _selectedProjectId,
         'include_zero_balance': _includeZeroBalance,
         'account_level': _accountLevel,
@@ -119,6 +125,9 @@ class _BalanceSheetReportPageState extends State<BalanceSheetReportPage> {
           _statementLines = List<Map<String, dynamic>>.from(data['statement_lines'] ?? []);
           _summary = data['summary'] is Map ? Map<String, dynamic>.from(data['summary'] as Map) : null;
           _comparison = data['comparison'] is Map ? Map<String, dynamic>.from(data['comparison'] as Map) : null;
+          final meta = data['meta'] is Map ? Map<String, dynamic>.from(data['meta'] as Map) : null;
+          final fq = meta?['fx_data_quality'];
+          _fxDataQuality = fq is Map ? Map<String, dynamic>.from(fq) : null;
           _loading = false;
         });
       } else if (mounted) {
@@ -276,33 +285,27 @@ class _BalanceSheetReportPageState extends State<BalanceSheetReportPage> {
                                   ),
                                 ),
                                 if (_currencies.length > 1)
-                                  SizedBox(
+                                  ReportCurrencyFilterDropdown(
+                                    businessId: widget.businessId,
+                                    isMultiCurrency: true,
+                                    selectedCurrencyId: _selectedCurrencyId,
                                     width: fieldWidth,
-                                    child: DropdownButtonFormField<int>(
-                                      value: _selectedCurrencyId,
-                                      isExpanded: true,
-                                      decoration: _decoration('ارز'),
-                                      items: [
-                                        const DropdownMenuItem<int>(
-                                          value: null,
-                                          child: Text('همه ارزها'),
-                                        ),
-                                        ..._currencies.map(
-                                          (c) => DropdownMenuItem<int>(
-                                            value: c['id'] as int?,
-                                            child: Text(
-                                              c['code']?.toString() ??
-                                                  c['name']?.toString() ??
-                                                  '',
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                      onChanged: (v) {
-                                        setState(() => _selectedCurrencyId = v);
-                                        _fetchData();
-                                      },
-                                    ),
+                                    onChanged: (v) {
+                                      setState(() {
+                                        _selectedCurrencyId = v;
+                                        if (v == null) _includeBaseEquivalent = false;
+                                      });
+                                      _fetchData();
+                                    },
+                                  ),
+                                if (_selectedCurrencyId != null)
+                                  FilterChip(
+                                    label: const Text('نمایش معادل پایه'),
+                                    selected: _includeBaseEquivalent,
+                                    onSelected: (value) {
+                                      setState(() => _includeBaseEquivalent = value);
+                                      _fetchData();
+                                    },
                                   ),
                                 SizedBox(
                                   width: fieldWidth,
@@ -368,6 +371,10 @@ class _BalanceSheetReportPageState extends State<BalanceSheetReportPage> {
                           ),
                         ),
                         const SizedBox(height: 16),
+                        if (_fxDataQuality != null) ...[
+                          FxDataQualityBanner(quality: _fxDataQuality),
+                          const SizedBox(height: 12),
+                        ],
                         if (_summary != null) ...[
                           BalanceSheetSummaryPanel(summary: _summary, isMobile: isMobile),
                           const SizedBox(height: 16),
@@ -383,6 +390,8 @@ class _BalanceSheetReportPageState extends State<BalanceSheetReportPage> {
                           BalanceSheetStatementView(
                             statementLines: _statementLines,
                             hasCompare: _comparison != null && _comparison!.isNotEmpty,
+                            showBaseEquivalent:
+                                _selectedCurrencyId != null && _includeBaseEquivalent,
                             onAccountTap: _openGeneralLedger,
                           ),
                       ],

@@ -1110,6 +1110,86 @@ async def update_manual_document_endpoint(
 
 
 @router.post(
+    "/businesses/{business_id}/reports/cash-flow",
+    summary="صورت جریان وجوه نقد",
+    description="گردش حساب‌های نقدی/بانک/تنخواه با قرارداد چندارزی (بدون فیلتر = معادل پایه)",
+)
+@require_business_access("business_id")
+async def cash_flow_report_endpoint(
+    request: Request,
+    business_id: int,
+    body: Dict[str, Any] = Body(default={}),
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    if not ctx.can_read_section("reports"):
+        raise ApiError("FORBIDDEN", "Missing business permission: reports.read", http_status=403)
+
+    from app.services.cash_flow_report_service import get_cash_flow_report
+
+    fiscal_year_id = body.get("fiscal_year_id")
+    if fiscal_year_id is not None:
+        try:
+            fiscal_year_id = int(fiscal_year_id)
+        except (ValueError, TypeError):
+            fiscal_year_id = None
+    currency_id = body.get("currency_id")
+    if currency_id is not None:
+        try:
+            currency_id = int(currency_id)
+        except (ValueError, TypeError):
+            currency_id = None
+
+    result = get_cash_flow_report(
+        db,
+        business_id,
+        fiscal_year_id=fiscal_year_id,
+        currency_id=currency_id,
+        date_from=body.get("date_from"),
+        date_to=body.get("date_to"),
+        include_indirect=bool(body.get("include_indirect", True)),
+    )
+    return success_response(data=result, request=request, message="گزارش جریان وجوه دریافت شد")
+
+
+@router.post(
+    "/businesses/{business_id}/reports/fx-revaluation",
+    summary="گزارش تسعیر ارز",
+    description="اسناد تسعیر پایان‌دوره و پیش‌نمایش موقعیت‌های ارزی باز",
+)
+@require_business_access("business_id")
+async def fx_revaluation_report_endpoint(
+    request: Request,
+    business_id: int,
+    body: Dict[str, Any] = Body(default={}),
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    if not ctx.can_read_section("reports"):
+        raise ApiError("FORBIDDEN", "Missing business permission: reports.read", http_status=403)
+
+    from app.services.cash_flow_report_service import get_fx_revaluation_report
+
+    fiscal_year_id = body.get("fiscal_year_id")
+    if fiscal_year_id is not None:
+        try:
+            fiscal_year_id = int(fiscal_year_id)
+        except (ValueError, TypeError):
+            fiscal_year_id = None
+
+    result = get_fx_revaluation_report(
+        db,
+        business_id,
+        fiscal_year_id=fiscal_year_id,
+        date_from=body.get("date_from"),
+        date_to=body.get("date_to"),
+        skip=int(body.get("skip", 0) or 0),
+        take=int(body.get("take", 50) or 50),
+    )
+    return success_response(data=result, request=request, message="گزارش تسعیر ارز دریافت شد")
+
+
+@router.post(
     "/businesses/{business_id}/reports/daily-sales",
     summary="گزارش فروش روزانه",
     description="گزارش فروش روزانه با گروه‌بندی بر اساس تاریخ",
@@ -2859,6 +2939,7 @@ def _parse_balance_sheet_body(request: Request, body: Dict[str, Any]) -> Dict[st
         "account_level": account_level,
         "compare_prior_period": bool(body.get("compare_prior_period", False)),
         "compare_mode": compare_mode,
+        "include_base_equivalent": bool(body.get("include_base_equivalent", False)),
     }
 
 
@@ -2989,6 +3070,7 @@ async def trial_balance_report_endpoint(
         account_level=account_level,
         skip=skip,
         take=take,
+        include_base_equivalent=bool(body.get("include_base_equivalent", False)),
     )
     
     items = result.get('items', [])
@@ -5044,6 +5126,7 @@ async def pnl_period_report_endpoint(
         compare_mode=compare_mode,
         skip=skip,
         take=take,
+        include_base_equivalent=bool(body.get("include_base_equivalent", False)),
     )
     
     locale = negotiate_locale(request.headers.get("Accept-Language"))
@@ -5224,6 +5307,7 @@ async def balance_sheet_report_endpoint(
         account_level=params["account_level"],
         compare_prior_period=params["compare_prior_period"],
         compare_mode=params["compare_mode"],
+        include_base_equivalent=params["include_base_equivalent"],
     )
 
     locale = negotiate_locale(request.headers.get("Accept-Language"))
@@ -5263,6 +5347,7 @@ async def export_balance_sheet_report_excel(
         account_level=params["account_level"],
         compare_prior_period=params["compare_prior_period"],
         compare_mode=params["compare_mode"],
+        include_base_equivalent=params["include_base_equivalent"],
     )
     locale = negotiate_locale(request.headers.get("Accept-Language"))
     return balance_sheet_excel_response(
@@ -5304,6 +5389,7 @@ async def export_balance_sheet_report_pdf(
         account_level=params["account_level"],
         compare_prior_period=params["compare_prior_period"],
         compare_mode=params["compare_mode"],
+        include_base_equivalent=params["include_base_equivalent"],
     )
     locale = negotiate_locale(request.headers.get("Accept-Language"))
     calendar_type = resolve_calendar_type_for_request(request)
@@ -5359,6 +5445,7 @@ async def export_financial_package_report_pdf(
         column_mode=params["column_mode"],
         compare_prior_period=params["compare_prior_period"],
         compare_mode=params["compare_mode"],
+        include_base_equivalent=params.get("include_base_equivalent", False),
     )
     locale = negotiate_locale(request.headers.get("Accept-Language"))
     calendar_type = resolve_calendar_type_for_request(request)
@@ -5412,6 +5499,7 @@ async def export_financial_package_report_excel(
         column_mode=params["column_mode"],
         compare_prior_period=params["compare_prior_period"],
         compare_mode=params["compare_mode"],
+        include_base_equivalent=params.get("include_base_equivalent", False),
     )
     locale = negotiate_locale(request.headers.get("Accept-Language"))
     return financial_package_excel_response(

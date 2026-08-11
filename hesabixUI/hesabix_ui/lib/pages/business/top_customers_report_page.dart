@@ -271,7 +271,7 @@ class _TopCustomersReportPageState extends State<TopCustomersReportPage> {
                       items: [
                         const DropdownMenuItem<int>(
                           value: null,
-                          child: Text('همه ارزها'),
+                          child: Text('همه ارزها (معادل پایه)'),
                         ),
                         ..._currencies.map((curr) {
                           final id = curr['id'] as int?;

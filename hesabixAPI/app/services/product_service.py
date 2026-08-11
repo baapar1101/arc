@@ -1843,6 +1843,10 @@ def get_sales_by_product_report(
     
     sales_invoices = sales_invoice_query.all()
     invoice_ids = [inv.id for inv in sales_invoices]
+    invoices_by_id = {inv.id: inv for inv in sales_invoices}
+    rate_cache: Dict[int, Decimal] = {}
+    base_currency_by_business: Dict[int, Optional[int]] = {}
+    amounts_in_base = currency_id is None
     
     if not invoice_ids:
         # اگر هیچ فاکتور فروشی وجود ندارد، فقط لیست کالاها را برگردان
@@ -1936,12 +1940,23 @@ def get_sales_by_product_report(
                 line_total = (unit_price * qty) - line_discount + tax_amount
         
         product_sales[line.product_id]['total_quantity'] += qty
+        invoice = invoices_by_id.get(line.document_id)
+        if invoice is not None and currency_id is None:
+            from app.services.invoice_service import _invoice_amount_for_aggregate
+
+            line_total = _invoice_amount_for_aggregate(
+                db,
+                invoice,
+                line_total,
+                currency_id=currency_id,
+                rate_cache=rate_cache,
+                base_currency_by_business=base_currency_by_business,
+            )
         product_sales[line.product_id]['total_amount'] += line_total
         
         # پیدا کردن تاریخ آخرین فروش
         try:
-            invoice = next((inv for inv in sales_invoices if inv.id == line.document_id), None)
-            if invoice:
+            if invoice is not None:
                 product_sales[line.product_id]['invoice_dates'].append(invoice.document_date)
         except Exception:
             pass
@@ -2025,7 +2040,11 @@ def get_sales_by_product_report(
             'total_pages': total_pages,
             'has_next': current_page < total_pages,
             'has_prev': current_page > 1,
-        }
+        },
+        'meta': {
+            'currency_id': currency_id,
+            'amounts_in_base': amounts_in_base,
+        },
     }
 
 

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
+import '../../core/api_client.dart';
 import '../../services/business_api_service.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
@@ -307,6 +308,10 @@ class _DeleteBusinessPageState extends State<DeleteBusinessPage> {
         businessId: widget.businessId,
         skipRestorePeriod: _skipRestorePeriod,
       );
+      final authStore = ApiClient.getAuthStore();
+      if (authStore?.currentBusiness?.id == widget.businessId) {
+        await authStore!.clearCurrentBusiness();
+      }
       if (mounted) {
         SnackBarHelper.show(
           context,

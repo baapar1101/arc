@@ -1643,6 +1643,134 @@ async def debtors_report_endpoint(
     )
 
 
+@router.post(
+    "/businesses/{business_id}/reports/ar-aging",
+    summary="گزارش سن بدهی مشتریان (AR Aging)",
+)
+@router.post(
+    "/businesses/{business_id}/reports/ap-aging",
+    summary="گزارش سن بستانکاری تامین‌کنندگان (AP Aging)",
+)
+async def ar_ap_aging_report_endpoint(
+    request: Request,
+    business_id: int,
+    body: Dict[str, Any] = Body(default={}),
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """گزارش سن بدهی/بستانکاری با قرارداد چندارزی (بدون فیلتر = معادل پایه)."""
+    if not ctx.can_read_section("reports"):
+        raise ApiError("FORBIDDEN", "Missing business permission: reports.read", http_status=403)
+
+    from app.services.ar_ap_aging_service import get_ar_ap_aging_report
+
+    path = request.url.path
+    mode = "ap" if path.rstrip("/").endswith("ap-aging") else "ar"
+
+    fiscal_year_id = None
+    fy_header = request.headers.get("X-Fiscal-Year-ID")
+    if fy_header:
+        try:
+            fiscal_year_id = int(fy_header)
+        except (ValueError, TypeError):
+            pass
+    if body.get("fiscal_year_id"):
+        try:
+            fiscal_year_id = int(body["fiscal_year_id"])
+        except (ValueError, TypeError):
+            pass
+
+    currency_id = body.get("currency_id")
+    if currency_id is not None:
+        try:
+            currency_id = int(currency_id)
+        except (ValueError, TypeError):
+            currency_id = None
+
+    min_balance = body.get("min_balance")
+    if min_balance is not None:
+        try:
+            min_balance = float(min_balance)
+        except (ValueError, TypeError):
+            min_balance = None
+
+    person_ids = body.get("person_ids")
+    if person_ids is not None and not isinstance(person_ids, list):
+        person_ids = None
+
+    result = get_ar_ap_aging_report(
+        db,
+        business_id,
+        mode=mode,  # type: ignore[arg-type]
+        fiscal_year_id=fiscal_year_id,
+        currency_id=currency_id,
+        as_of=body.get("as_of") or body.get("date_to"),
+        person_ids=person_ids,
+        search=body.get("search"),
+        min_balance=min_balance,
+        skip=int(body.get("skip", 0) or 0),
+        take=int(body.get("take", 50) or 50),
+    )
+    result["items"] = [format_datetime_fields(item, request) for item in result["items"]]
+    label = "سن بستانکاری" if mode == "ap" else "سن بدهی"
+    return success_response(
+        data=result,
+        request=request,
+        message=f"گزارش {label} با موفقیت دریافت شد",
+    )
+
+
+@router.post(
+    "/businesses/{business_id}/reports/person-balances-by-currency",
+    summary="مانده اشخاص به تفکیک ارز",
+    description="مانده بومی هر شخص در هر ارز سند + معادل ارز پایه (با رعایت تسویه بین‌ارزی و تسعیر)",
+)
+async def person_balances_by_currency_report_endpoint(
+    request: Request,
+    business_id: int,
+    body: Dict[str, Any] = Body(default={}),
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    if not ctx.can_read_section("reports"):
+        raise ApiError("FORBIDDEN", "Missing business permission: reports.read", http_status=403)
+
+    from app.services.person_balances_by_currency_report_service import (
+        get_person_balances_by_currency_report,
+    )
+
+    fiscal_year_id = body.get("fiscal_year_id")
+    if fiscal_year_id is not None:
+        try:
+            fiscal_year_id = int(fiscal_year_id)
+        except (ValueError, TypeError):
+            fiscal_year_id = None
+
+    person_ids = body.get("person_ids")
+    if person_ids is not None and not isinstance(person_ids, list):
+        person_ids = None
+
+    only_with_balance = body.get("only_with_balance", True)
+    if isinstance(only_with_balance, str):
+        only_with_balance = only_with_balance.lower() not in ("0", "false", "no")
+
+    result = get_person_balances_by_currency_report(
+        db,
+        business_id,
+        fiscal_year_id=fiscal_year_id,
+        person_ids=person_ids,
+        search=body.get("search"),
+        only_with_balance=bool(only_with_balance),
+        skip=int(body.get("skip", 0) or 0),
+        take=int(body.get("take", 50) or 50),
+    )
+    return success_response(
+        data=result,
+        request=request,
+        message="گزارش مانده اشخاص به تفکیک ارز دریافت شد",
+    )
+
+
 @router.post("/businesses/{business_id}/reports/creditors",
     summary="گزارش بستانکاران",
     description="گزارش لیست بستانکاران با امکان فیلتر بر اساس سال مالی، تاریخ، حداقل بستانکاری و جستجو",

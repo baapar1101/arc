@@ -34,6 +34,7 @@ class _PnlPeriodReportPageState extends State<PnlPeriodReportPage> {
   int? _selectedCurrencyId;
   int? _selectedProjectId;
   bool _includeZeroBalance = false;
+  bool _includeBaseEquivalent = false;
   String? _compareMode;
 
   List<Map<String, dynamic>> _fiscalYears = [];
@@ -87,7 +88,9 @@ class _PnlPeriodReportPageState extends State<PnlPeriodReportPage> {
   Future<void> _loadCurrencies() async {
     try {
       final svc = CurrencyService(ApiClient());
-      final items = await svc.listBusinessCurrencies(businessId: widget.businessId);
+      final items = await svc.listBusinessCurrencies(
+        businessId: widget.businessId,
+      );
       if (!mounted) return;
       setState(() {
         _currencies = items;
@@ -98,27 +101,46 @@ class _PnlPeriodReportPageState extends State<PnlPeriodReportPage> {
   }
 
   Map<String, dynamic> _requestBody() => {
-        if (_fromDate != null) 'date_from': _fromDate!.toIso8601String().split('T').first,
-        if (_toDate != null) 'date_to': _toDate!.toIso8601String().split('T').first,
-        if (_selectedFiscalYearId != null) 'fiscal_year_id': _selectedFiscalYearId,
-        if (_selectedCurrencyId != null) 'currency_id': _selectedCurrencyId,
-        if (_selectedProjectId != null) 'project_id': _selectedProjectId,
-        'include_zero_balance': _includeZeroBalance,
-        if (_compareMode != null) 'compare_mode': _compareMode,
-        'compare_prior_period': _compareMode != null,
-      };
+    if (_fromDate != null)
+      'date_from': _fromDate!.toIso8601String().split('T').first,
+    if (_toDate != null) 'date_to': _toDate!.toIso8601String().split('T').first,
+    if (_selectedFiscalYearId != null) 'fiscal_year_id': _selectedFiscalYearId,
+    if (_selectedCurrencyId != null) 'currency_id': _selectedCurrencyId,
+    if (_selectedCurrencyId != null && _includeBaseEquivalent)
+      'include_base_equivalent': true,
+    if (_selectedProjectId != null) 'project_id': _selectedProjectId,
+    'include_zero_balance': _includeZeroBalance,
+    if (_compareMode != null) 'compare_mode': _compareMode,
+    'compare_prior_period': _compareMode != null,
+  };
 
   void _applyData(Map<String, dynamic> data) {
     _salesItems = List<Map<String, dynamic>>.from(data['sales_items'] ?? []);
-    _otherIncomeItems = List<Map<String, dynamic>>.from(data['other_income_items'] ?? []);
+    _otherIncomeItems = List<Map<String, dynamic>>.from(
+      data['other_income_items'] ?? [],
+    );
     _cogsItems = List<Map<String, dynamic>>.from(data['cogs_items'] ?? []);
-    _operatingItems = List<Map<String, dynamic>>.from(data['operating_expense_items'] ?? []);
-    _nonOperatingIncomeItems = List<Map<String, dynamic>>.from(data['non_operating_income_items'] ?? []);
-    _nonOperatingExpenseItems = List<Map<String, dynamic>>.from(data['non_operating_expense_items'] ?? []);
-    _taxItems = List<Map<String, dynamic>>.from(data['tax_expense_items'] ?? []);
-    _statementLines = List<Map<String, dynamic>>.from(data['statement_lines'] ?? []);
-    _summary = data['summary'] is Map ? Map<String, dynamic>.from(data['summary'] as Map) : null;
-    _comparison = data['comparison'] is Map ? Map<String, dynamic>.from(data['comparison'] as Map) : null;
+    _operatingItems = List<Map<String, dynamic>>.from(
+      data['operating_expense_items'] ?? [],
+    );
+    _nonOperatingIncomeItems = List<Map<String, dynamic>>.from(
+      data['non_operating_income_items'] ?? [],
+    );
+    _nonOperatingExpenseItems = List<Map<String, dynamic>>.from(
+      data['non_operating_expense_items'] ?? [],
+    );
+    _taxItems = List<Map<String, dynamic>>.from(
+      data['tax_expense_items'] ?? [],
+    );
+    _statementLines = List<Map<String, dynamic>>.from(
+      data['statement_lines'] ?? [],
+    );
+    _summary = data['summary'] is Map
+        ? Map<String, dynamic>.from(data['summary'] as Map)
+        : null;
+    _comparison = data['comparison'] is Map
+        ? Map<String, dynamic>.from(data['comparison'] as Map)
+        : null;
   }
 
   Future<void> _fetchData() async {
@@ -133,7 +155,8 @@ class _PnlPeriodReportPageState extends State<PnlPeriodReportPage> {
         data: _requestBody(),
       );
       final body = res.data;
-      if (body is Map<String, dynamic> && body['data'] is Map<String, dynamic>) {
+      if (body is Map<String, dynamic> &&
+          body['data'] is Map<String, dynamic>) {
         if (!mounted) return;
         setState(() {
           _applyData(body['data'] as Map<String, dynamic>);
@@ -182,7 +205,11 @@ class _PnlPeriodReportPageState extends State<PnlPeriodReportPage> {
         '/api/v1/businesses/${widget.businessId}/reports/pnl-period/export/$type',
         data: _requestBody(),
         responseType: ResponseType.bytes,
-        options: Options(headers: {'Accept': isPdf ? 'application/pdf' : 'application/octet-stream'}),
+        options: Options(
+          headers: {
+            'Accept': isPdf ? 'application/pdf' : 'application/octet-stream',
+          },
+        ),
       );
       final data = bytes.data ?? <int>[];
       final result = await BytesExportService.export(
@@ -193,7 +220,10 @@ class _PnlPeriodReportPageState extends State<PnlPeriodReportPage> {
       if (mounted) BytesExportService.showFeedback(context, result);
     } catch (e) {
       if (!mounted) return;
-      SnackBarHelper.showError(context, message: 'Export error: ${ErrorExtractor.forContext(e, context)}');
+      SnackBarHelper.showError(
+        context,
+        message: 'Export error: ${ErrorExtractor.forContext(e, context)}',
+      );
     } finally {
       if (mounted) setState(() => _exporting = false);
     }
@@ -209,7 +239,10 @@ class _PnlPeriodReportPageState extends State<PnlPeriodReportPage> {
     return Scaffold(
       backgroundColor: cs.surface,
       appBar: AppBar(
-        leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop()),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => context.pop(),
+        ),
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -230,7 +263,10 @@ class _PnlPeriodReportPageState extends State<PnlPeriodReportPage> {
                 ? SizedBox(
                     width: 20,
                     height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2, color: cs.onSurface),
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: cs.onSurface,
+                    ),
                   )
                 : const Icon(Icons.download_outlined),
             tooltip: t.export,
@@ -272,7 +308,12 @@ class _PnlPeriodReportPageState extends State<PnlPeriodReportPage> {
               onRefresh: _fetchData,
               child: SingleChildScrollView(
                 physics: const AlwaysScrollableScrollPhysics(),
-                padding: EdgeInsets.fromLTRB(pagePadding, pagePadding, pagePadding, pagePadding + 24),
+                padding: EdgeInsets.fromLTRB(
+                  pagePadding,
+                  pagePadding,
+                  pagePadding,
+                  pagePadding + 24,
+                ),
                 child: Align(
                   alignment: Alignment.topCenter,
                   child: ConstrainedBox(
@@ -293,6 +334,7 @@ class _PnlPeriodReportPageState extends State<PnlPeriodReportPage> {
                           businessId: widget.businessId,
                           calendarController: widget.calendarController,
                           includeZeroBalance: _includeZeroBalance,
+                          includeBaseEquivalent: _includeBaseEquivalent,
                           compareMode: _compareMode,
                           onFiscalYearChanged: (v) {
                             setState(() => _selectedFiscalYearId = v);
@@ -307,7 +349,14 @@ class _PnlPeriodReportPageState extends State<PnlPeriodReportPage> {
                             _fetchData();
                           },
                           onCurrencyChanged: (v) {
-                            setState(() => _selectedCurrencyId = v);
+                            setState(() {
+                              _selectedCurrencyId = v;
+                              if (v == null) _includeBaseEquivalent = false;
+                            });
+                            _fetchData();
+                          },
+                          onIncludeBaseEquivalentChanged: (v) {
+                            setState(() => _includeBaseEquivalent = v);
                             _fetchData();
                           },
                           onProjectChanged: (v) {
@@ -325,7 +374,11 @@ class _PnlPeriodReportPageState extends State<PnlPeriodReportPage> {
                         ),
                         const SizedBox(height: 16),
                         if (_summary != null) ...[
-                          PnlSummaryPanel(summary: _summary, comparison: _comparison, isMobile: isMobile),
+                          PnlSummaryPanel(
+                            summary: _summary,
+                            comparison: _comparison,
+                            isMobile: isMobile,
+                          ),
                           const SizedBox(height: 16),
                         ],
                         if (_loading)
@@ -339,6 +392,7 @@ class _PnlPeriodReportPageState extends State<PnlPeriodReportPage> {
                           PnlStatementView(
                             statementLines: _statementLines,
                             onAccountTap: _openGeneralLedger,
+                            includeBaseEquivalent: _includeBaseEquivalent,
                           ),
                           const SizedBox(height: 16),
                           if (_salesItems.isNotEmpty) ...[
@@ -348,10 +402,21 @@ class _PnlPeriodReportPageState extends State<PnlPeriodReportPage> {
                               icon: Icons.storefront_outlined,
                               accent: const Color(0xFF15803D),
                               emptyText: 'موردی یافت نشد',
-                              headers: const ['کد حساب', 'نام حساب', 'بستانکار', 'بدهکار', 'درآمد خالص'],
-                              rows: PnlTableRows.revenueRows(_salesItems),
+                              headers: _detailHeaders(const [
+                                'کد حساب',
+                                'نام حساب',
+                                'بستانکار',
+                                'بدهکار',
+                                'درآمد خالص',
+                              ]),
+                              rows: PnlTableRows.revenueRows(
+                                _salesItems,
+                                includeBaseEquivalent: _includeBaseEquivalent,
+                              ),
                               totalLabel: 'جمع فروش',
-                              totalValue: PnlTableRows.fmt(_summary?['total_sales']),
+                              totalValue: PnlTableRows.fmt(
+                                _summary?['total_sales'],
+                              ),
                             ),
                             const SizedBox(height: 16),
                           ],
@@ -362,10 +427,21 @@ class _PnlPeriodReportPageState extends State<PnlPeriodReportPage> {
                               icon: Icons.trending_up_rounded,
                               accent: const Color(0xFF059669),
                               emptyText: 'موردی یافت نشد',
-                              headers: const ['کد حساب', 'نام حساب', 'بستانکار', 'بدهکار', 'درآمد خالص'],
-                              rows: PnlTableRows.revenueRows(_otherIncomeItems),
+                              headers: _detailHeaders(const [
+                                'کد حساب',
+                                'نام حساب',
+                                'بستانکار',
+                                'بدهکار',
+                                'درآمد خالص',
+                              ]),
+                              rows: PnlTableRows.revenueRows(
+                                _otherIncomeItems,
+                                includeBaseEquivalent: _includeBaseEquivalent,
+                              ),
                               totalLabel: 'جمع درآمد عملیاتی',
-                              totalValue: PnlTableRows.fmt(_summary?['total_other_income']),
+                              totalValue: PnlTableRows.fmt(
+                                _summary?['total_other_income'],
+                              ),
                             ),
                             const SizedBox(height: 16),
                           ],
@@ -376,10 +452,21 @@ class _PnlPeriodReportPageState extends State<PnlPeriodReportPage> {
                               icon: Icons.inventory_2_outlined,
                               accent: const Color(0xFFB45309),
                               emptyText: 'موردی یافت نشد',
-                              headers: const ['کد حساب', 'نام حساب', 'بدهکار', 'بستانکار', 'هزینه خالص'],
-                              rows: PnlTableRows.expenseRows(_cogsItems),
+                              headers: _detailHeaders(const [
+                                'کد حساب',
+                                'نام حساب',
+                                'بدهکار',
+                                'بستانکار',
+                                'هزینه خالص',
+                              ]),
+                              rows: PnlTableRows.expenseRows(
+                                _cogsItems,
+                                includeBaseEquivalent: _includeBaseEquivalent,
+                              ),
                               totalLabel: 'جمع بهای تمام‌شده',
-                              totalValue: PnlTableRows.fmt(_summary?['total_cogs']),
+                              totalValue: PnlTableRows.fmt(
+                                _summary?['total_cogs'],
+                              ),
                             ),
                             const SizedBox(height: 16),
                           ],
@@ -390,10 +477,21 @@ class _PnlPeriodReportPageState extends State<PnlPeriodReportPage> {
                               icon: Icons.trending_down_rounded,
                               accent: const Color(0xFFB91C1C),
                               emptyText: 'موردی یافت نشد',
-                              headers: const ['کد حساب', 'نام حساب', 'بدهکار', 'بستانکار', 'هزینه خالص'],
-                              rows: PnlTableRows.expenseRows(_operatingItems),
+                              headers: _detailHeaders(const [
+                                'کد حساب',
+                                'نام حساب',
+                                'بدهکار',
+                                'بستانکار',
+                                'هزینه خالص',
+                              ]),
+                              rows: PnlTableRows.expenseRows(
+                                _operatingItems,
+                                includeBaseEquivalent: _includeBaseEquivalent,
+                              ),
                               totalLabel: 'جمع هزینه عملیاتی',
-                              totalValue: PnlTableRows.fmt(_summary?['total_operating_expense']),
+                              totalValue: PnlTableRows.fmt(
+                                _summary?['total_operating_expense'],
+                              ),
                             ),
                             const SizedBox(height: 16),
                           ],
@@ -404,10 +502,21 @@ class _PnlPeriodReportPageState extends State<PnlPeriodReportPage> {
                               icon: Icons.savings_outlined,
                               accent: const Color(0xFF047857),
                               emptyText: 'موردی یافت نشد',
-                              headers: const ['کد حساب', 'نام حساب', 'بستانکار', 'بدهکار', 'درآمد خالص'],
-                              rows: PnlTableRows.revenueRows(_nonOperatingIncomeItems),
+                              headers: _detailHeaders(const [
+                                'کد حساب',
+                                'نام حساب',
+                                'بستانکار',
+                                'بدهکار',
+                                'درآمد خالص',
+                              ]),
+                              rows: PnlTableRows.revenueRows(
+                                _nonOperatingIncomeItems,
+                                includeBaseEquivalent: _includeBaseEquivalent,
+                              ),
                               totalLabel: 'جمع درآمد غیرعملیاتی',
-                              totalValue: PnlTableRows.fmt(_summary?['total_non_operating_income']),
+                              totalValue: PnlTableRows.fmt(
+                                _summary?['total_non_operating_income'],
+                              ),
                             ),
                             const SizedBox(height: 16),
                           ],
@@ -418,10 +527,21 @@ class _PnlPeriodReportPageState extends State<PnlPeriodReportPage> {
                               icon: Icons.money_off_csred_outlined,
                               accent: const Color(0xFF9F1239),
                               emptyText: 'موردی یافت نشد',
-                              headers: const ['کد حساب', 'نام حساب', 'بدهکار', 'بستانکار', 'هزینه خالص'],
-                              rows: PnlTableRows.expenseRows(_nonOperatingExpenseItems),
+                              headers: _detailHeaders(const [
+                                'کد حساب',
+                                'نام حساب',
+                                'بدهکار',
+                                'بستانکار',
+                                'هزینه خالص',
+                              ]),
+                              rows: PnlTableRows.expenseRows(
+                                _nonOperatingExpenseItems,
+                                includeBaseEquivalent: _includeBaseEquivalent,
+                              ),
                               totalLabel: 'جمع هزینه غیرعملیاتی',
-                              totalValue: PnlTableRows.fmt(_summary?['total_non_operating_expense']),
+                              totalValue: PnlTableRows.fmt(
+                                _summary?['total_non_operating_expense'],
+                              ),
                             ),
                             const SizedBox(height: 16),
                           ],
@@ -432,10 +552,21 @@ class _PnlPeriodReportPageState extends State<PnlPeriodReportPage> {
                               icon: Icons.receipt_long_outlined,
                               accent: const Color(0xFF9A3412),
                               emptyText: 'موردی یافت نشد',
-                              headers: const ['کد حساب', 'نام حساب', 'بدهکار', 'بستانکار', 'هزینه خالص'],
-                              rows: PnlTableRows.expenseRows(_taxItems),
+                              headers: _detailHeaders(const [
+                                'کد حساب',
+                                'نام حساب',
+                                'بدهکار',
+                                'بستانکار',
+                                'هزینه خالص',
+                              ]),
+                              rows: PnlTableRows.expenseRows(
+                                _taxItems,
+                                includeBaseEquivalent: _includeBaseEquivalent,
+                              ),
                               totalLabel: 'جمع مالیات',
-                              totalValue: PnlTableRows.fmt(_summary?['total_tax_expense']),
+                              totalValue: PnlTableRows.fmt(
+                                _summary?['total_tax_expense'],
+                              ),
                             ),
                         ],
                       ],
@@ -446,6 +577,11 @@ class _PnlPeriodReportPageState extends State<PnlPeriodReportPage> {
             ),
     );
   }
+
+  List<String> _detailHeaders(List<String> nativeHeaders) => [
+    ...nativeHeaders,
+    if (_includeBaseEquivalent) 'معادل پایه',
+  ];
 
   Widget _buildErrorState(ColorScheme cs) {
     return Container(
@@ -460,11 +596,17 @@ class _PnlPeriodReportPageState extends State<PnlPeriodReportPage> {
         children: [
           Icon(Icons.error_outline, color: cs.error, size: 36),
           const SizedBox(height: 12),
-          Text('خطا در دریافت گزارش', style: TextStyle(fontWeight: FontWeight.w700, color: cs.error)),
+          Text(
+            'خطا در دریافت گزارش',
+            style: TextStyle(fontWeight: FontWeight.w700, color: cs.error),
+          ),
           const SizedBox(height: 8),
           Text(_error ?? '', textAlign: TextAlign.center),
           const SizedBox(height: 16),
-          FilledButton.tonal(onPressed: _fetchData, child: const Text('تلاش مجدد')),
+          FilledButton.tonal(
+            onPressed: _fetchData,
+            child: const Text('تلاش مجدد'),
+          ),
         ],
       ),
     );

@@ -342,6 +342,14 @@ class KardexListQuery(QueryInfo):
 	match_mode: Optional[str] = Field(default="any", description="any | all")
 	result_scope: Optional[str] = Field(default="lines_matching", description="دامنه نتیجه کاردکس")
 	include_running_balance: Optional[bool] = False
+	currency_id: Optional[int] = Field(
+		default=None,
+		description="فیلتر ارز سند؛ خالی = همه ارزها (مبالغ می‌توانند معادل پایه باشند)",
+	)
+	amounts_in_base: Optional[bool] = Field(
+		default=None,
+		description="اگر true (یا ارز خالی) مبالغ از debit_base/credit_base نمایش داده شوند",
+	)
 
 
 class WarehouseDocListQuery(QueryInfo):

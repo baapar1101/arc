@@ -60,8 +60,17 @@ class ApiClient {
 
   ApiClient._(this._dio);
 
+  /// آیا درخواست واقعاً با ApiKey ارسال شده؟
+  /// اگر نه، 401 یعنی race/باگ کلاینت است نه سشن نامعتبر — نباید logout کنیم.
+  static bool _requestHadApiKey(RequestOptions options) {
+    final headers = options.headers;
+    final raw = (headers['Authorization'] ?? headers['authorization'])?.toString();
+    return raw != null && raw.startsWith('ApiKey ') && raw.length > 'ApiKey '.length;
+  }
+
   /// مدیریت خطاهای نامعتبر بودن سشن یا API key
-  static void _handleUnauthorizedError() {
+  static void _handleUnauthorizedError({bool requestHadApiKey = true}) {
+    if (!requestHadApiKey) return;
     if (_authStore == null || _handlingUnauthorized) return;
 
     final currentKey = _authStore!.apiKey;
@@ -209,8 +218,10 @@ class ApiClient {
                                        errorCode == 'INVALID_SESSION';
                   
                   if (isUnauthorized && _authStore != null) {
-                    // حذف اطلاعات ورود و هدایت به صفحه ورود
-                    _handleUnauthorizedError();
+                    // فقط وقتی خود درخواست ApiKey داشته؛ 401 بدون هدر = race کلاینت
+                    _handleUnauthorizedError(
+                      requestHadApiKey: _requestHadApiKey(error.requestOptions),
+                    );
                   }
                   
                   handler.reject(DioException(
@@ -228,8 +239,12 @@ class ApiClient {
           }
           
           // بررسی status code 401 حتی اگر ساختار خطا متفاوت باشد
-          if (response != null && response.statusCode == 401 && _authStore != null) {
-            _handleUnauthorizedError();
+          if (response != null &&
+              response.statusCode == 401 &&
+              _authStore != null) {
+            _handleUnauthorizedError(
+              requestHadApiKey: _requestHadApiKey(error.requestOptions),
+            );
           }
           
           if (kDebugMode) {

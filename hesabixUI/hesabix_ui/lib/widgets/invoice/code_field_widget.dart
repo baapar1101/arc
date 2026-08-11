@@ -136,7 +136,7 @@ class _CodeFieldWidgetState extends State<CodeFieldWidget> {
             }
           } else {
             if (trimmed.length < 3) {
-              return t.passwordMinLength;
+              return t.codeMinLength;
             }
             if (!RegExp(r'^\d+$').hasMatch(trimmed)) {
               return t.codeMustBeNumeric;

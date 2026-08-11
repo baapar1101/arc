@@ -1379,6 +1379,168 @@ class AppLocalizationsFa extends AppLocalizations {
   String get nationalIdExample => '1234567890';
 
   @override
+  String get newBusinessIntentTitle => 'چطور می‌خواهید شروع کنید؟';
+
+  @override
+  String get newBusinessIntentSubtitle =>
+      'کسب‌وکار جدید را در چند مرحله بسازید، یا داده‌ها را از پشتیبان یا حسابیکس قبلی بیاورید.';
+
+  @override
+  String get newBusinessCreateManuallyTitle => 'ایجاد کسب‌وکار جدید';
+
+  @override
+  String get newBusinessCreateManuallySubtitle =>
+      'نام، نوع، ارز و سال مالی را تنظیم کنید — بقیه را بعداً کامل می‌کنید.';
+
+  @override
+  String get newBusinessImportBackupTitle => 'بازیابی از فایل پشتیبان';
+
+  @override
+  String get newBusinessImportBackupSubtitle =>
+      'فایل .hbx را آپلود کنید تا کسب‌وکار از پشتیبان ساخته شود.';
+
+  @override
+  String get newBusinessImportLegacyTitle => 'انتقال از حسابیکس قبلی';
+
+  @override
+  String get newBusinessImportLegacySubtitle =>
+      'به نسخه قبلی وصل شوید و با پیشرفت زنده مهاجرت کنید.';
+
+  @override
+  String get newBusinessIdentityStepTitle => 'هویت کسب‌وکار';
+
+  @override
+  String get newBusinessIdentityStepSubtitle =>
+      'نام و نوع کسب‌وکار را مشخص کنید.';
+
+  @override
+  String get newBusinessFinancialStepTitle => 'ارز و سال مالی';
+
+  @override
+  String get newBusinessFinancialStepSubtitle =>
+      'ارز پیش‌فرض و اولین سال مالی را تنظیم کنید.';
+
+  @override
+  String get newBusinessReviewStepTitle => 'بازبینی و ایجاد';
+
+  @override
+  String get newBusinessReviewStepSubtitle =>
+      'اطلاعات را تأیید کنید. تماس و اطلاعات قانونی را می‌توانید بعداً در تنظیمات کامل کنید.';
+
+  @override
+  String get newBusinessCurrencyAndFiscal => 'ارز و سال مالی';
+
+  @override
+  String get defaultCurrency => 'ارز پیش‌فرض';
+
+  @override
+  String get extraCurrencies => 'ارزهای جانبی';
+
+  @override
+  String get selectCurrencies => 'انتخاب کنید…';
+
+  @override
+  String get searchCurrencyHint => 'جستجو بر اساس نام یا کد…';
+
+  @override
+  String get fiscalYearTitleLabel => 'عنوان سال مالی';
+
+  @override
+  String get fiscalStartDate => 'تاریخ شروع';
+
+  @override
+  String get fiscalEndDate => 'تاریخ پایان';
+
+  @override
+  String get fiscalYearRequiredHint =>
+      'پرکردن عنوان، تاریخ شروع و پایان الزامی است.';
+
+  @override
+  String fiscalYearEndingTitle(String date) {
+    return 'سال مالی منتهی به $date';
+  }
+
+  @override
+  String get newBusinessNameHint => 'مثلاً شرکت بازرگانی آریا';
+
+  @override
+  String get newBusinessOptionalDetails => 'جزئیات اختیاری';
+
+  @override
+  String get newBusinessOptionalDetailsHint =>
+      'تماس، موقعیت و شناسه‌های قانونی — فعلاً می‌توانید رد شوید.';
+
+  @override
+  String get newBusinessCompleteLaterHint =>
+      'اطلاعات تماس و قانونی را هر زمان از تنظیمات کسب‌وکار کامل کنید.';
+
+  @override
+  String get newBusinessEditSection => 'ویرایش';
+
+  @override
+  String get newBusinessBackToOptions => 'بازگشت به گزینه‌ها';
+
+  @override
+  String get newBusinessReadyToCreate =>
+      'همه‌چیز آماده است. هر وقت خواستید کسب‌وکار را ایجاد کنید.';
+
+  @override
+  String get newBusinessLivePreview => 'پیش‌نمایش';
+
+  @override
+  String get newBusinessSampleDataShort => 'افزودن دادهٔ نمونه';
+
+  @override
+  String get newBusinessAllOptions => 'همه روش‌های شروع';
+
+  @override
+  String get verificationRequiredTitle => 'تأیید مورد نیاز';
+
+  @override
+  String get verificationRequiredBody =>
+      'برای تأیید ایمیل و شماره موبایل، به بخش تنظیمات حساب کاربری بروید.';
+
+  @override
+  String get verificationLater => 'بعداً';
+
+  @override
+  String get verificationGo => 'رفتن به تأیید';
+
+  @override
+  String get importBackupEmptyFile => 'فایل انتخاب‌شده خالی است';
+
+  @override
+  String get importBackupHs60Unsupported =>
+      'فرمت فایل .hs60 در حال حاضر پشتیبانی نمی‌شود. این قابلیت در آینده اضافه خواهد شد.';
+
+  @override
+  String get importBackupProcessing => 'در حال پردازش…';
+
+  @override
+  String get importBackupSuccess =>
+      'کسب‌وکار با موفقیت از فایل پشتیبان ایجاد شد';
+
+  @override
+  String importBackupPartialSuccess(int count) {
+    return 'ایمپورت انجام شد؛ برخی اسناد منتقل نشدند ($count مورد)';
+  }
+
+  @override
+  String get importBackupFailed => 'خطا در ایمپورت فایل پشتیبان';
+
+  @override
+  String get importBackupSelectFailed => 'خطا در انتخاب فایل';
+
+  @override
+  String get importBackupStatusFailed => 'خطا در بررسی وضعیت';
+
+  @override
+  String get importBackupPleaseWait => 'لطفاً صبر کنید';
+
+  @override
+  String get importBackupInProgress => 'در حال ایمپورت از فایل پشتیبان…';
+
+  @override
   String get company => 'شرکت';
 
   @override
@@ -2282,7 +2444,7 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get businessesHubEmptySubtitle =>
-      'با ساخت اولین کسب‌وکار، حسابداری ابری را شروع کنید.';
+      'کسب‌وکار جدید بسازید، از فایل .hbx بازیابی کنید، یا از حسابیکس قبلی منتقل شوید.';
 
   @override
   String get businessesHubImportLegacy => 'وارد کردن از نسخه قدیم';
@@ -4337,6 +4499,12 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get codeMustBeNumeric => 'کد باید عددی باشد';
+
+  @override
+  String get codeMinLength => 'کد باید حداقل ۳ رقم باشد';
+
+  @override
+  String get codeRequired => 'کد الزامی است';
 
   @override
   String get integerNoDecimal => 'عدد صحیح بدون اعشار';

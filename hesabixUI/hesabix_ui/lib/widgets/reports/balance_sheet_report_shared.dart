@@ -5,12 +5,14 @@ import 'package:hesabix_ui/widgets/data_table/helpers/data_table_utils.dart';
 class BalanceSheetStatementView extends StatelessWidget {
   final List<Map<String, dynamic>> statementLines;
   final bool hasCompare;
+  final bool showBaseEquivalent;
   final void Function(Map<String, dynamic> accountLine)? onAccountTap;
 
   const BalanceSheetStatementView({
     super.key,
     required this.statementLines,
     this.hasCompare = false,
+    this.showBaseEquivalent = false,
     this.onAccountTap,
   });
 
@@ -47,10 +49,21 @@ class BalanceSheetStatementView extends StatelessWidget {
               children: [
                 Icon(Icons.account_balance_outlined, size: 18, color: cs.primary),
                 const SizedBox(width: 8),
-                Text(
-                  'صورت وضعیت مالی (ترازنامه)',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+                Expanded(
+                  child: Text(
+                    'صورت وضعیت مالی (ترازنامه)',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+                  ),
                 ),
+                if (showBaseEquivalent)
+                  SizedBox(
+                    width: 110,
+                    child: Text(
+                      'معادل پایه',
+                      textAlign: TextAlign.end,
+                      style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant, fontWeight: FontWeight.w600),
+                    ),
+                  ),
               ],
             ),
           ),
@@ -105,6 +118,15 @@ class BalanceSheetStatementView extends StatelessWidget {
                 SizedBox(width: 80, child: Text(_fmt(line['variance']), textAlign: TextAlign.center)),
               ],
               SizedBox(width: 120, child: Text(amount, textAlign: TextAlign.end, style: const TextStyle(fontWeight: FontWeight.w600))),
+              if (showBaseEquivalent)
+                SizedBox(
+                  width: 110,
+                  child: Text(
+                    line['amount_base'] != null ? _fmt(line['amount_base']) : '—',
+                    textAlign: TextAlign.end,
+                    style: TextStyle(color: cs.onSurfaceVariant, fontSize: 12),
+                  ),
+                ),
             ],
           ),
         ),
@@ -132,6 +154,15 @@ class BalanceSheetStatementView extends StatelessWidget {
               width: 120,
               child: Text(amount, textAlign: TextAlign.end, style: TextStyle(fontWeight: isGrand ? FontWeight.w800 : FontWeight.w700)),
             ),
+            if (showBaseEquivalent)
+              SizedBox(
+                width: 110,
+                child: Text(
+                  line['amount_base'] != null ? _fmt(line['amount_base']) : '—',
+                  textAlign: TextAlign.end,
+                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: 12),
+                ),
+              ),
           ],
         ),
       );

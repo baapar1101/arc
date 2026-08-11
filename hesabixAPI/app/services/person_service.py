@@ -2115,6 +2115,8 @@ def _expand_people_tx_with_invoice_items(
     db: Session,
     business_id: int,
     base_items: List[Dict[str, Any]],
+    *,
+    amounts_in_base: bool,
 ) -> List[Dict[str, Any]]:
     """
     گسترش ردیف‌های فاکتور خرید/فروش به ریز اقلام کالا.
@@ -2187,10 +2189,17 @@ def _expand_people_tx_with_invoice_items(
 
         doc_id_int = int(doc_id)
         expanded_docs.add(doc_id_int)
-        person_debit = float(item.get("debit") or 0)
-        person_credit = float(item.get("credit") or 0)
-        use_debit_side = person_debit >= person_credit
-        person_amount = person_debit if use_debit_side else person_credit
+        person_debit_native = float(item.get("debit_native") or 0)
+        person_credit_native = float(item.get("credit_native") or 0)
+        person_debit_base = float(item.get("debit_base") or 0)
+        person_credit_base = float(item.get("credit_base") or 0)
+        use_debit_side = person_debit_native >= person_credit_native
+        person_native_amount = (
+            person_debit_native if use_debit_side else person_credit_native
+        )
+        person_base_amount = (
+            person_debit_base if use_debit_side else person_credit_base
+        )
 
         item_amounts: List[float] = []
         for inv_line in lines_by_doc[doc_id_int]:
@@ -2231,8 +2240,17 @@ def _expand_people_tx_with_invoice_items(
                 desc_parts.append(str(inv_line.description))
             description = " — ".join(desc_parts) if desc_parts else (item.get("description") or "")
 
-            debit = float(amount) if use_debit_side else 0.0
-            credit = 0.0 if use_debit_side else float(amount)
+            # Invoice item amounts are native amounts. Allocate their base
+            # counterpart from the already persisted base person-line amount so
+            # the expanded rows retain the report's aggregate balance exactly.
+            base_amount = (
+                float(amount) * person_base_amount / items_sum
+                if items_sum else 0.0
+            )
+            debit_native = float(amount) if use_debit_side else 0.0
+            credit_native = 0.0 if use_debit_side else float(amount)
+            debit_base = base_amount if use_debit_side else 0.0
+            credit_base = 0.0 if use_debit_side else base_amount
             row = dict(item)
             row.update({
                 "row_kind": "invoice_item",
@@ -2246,21 +2264,36 @@ def _expand_people_tx_with_invoice_items(
                 "unit_price": unit_price,
                 "line_discount": line_discount,
                 "tax_amount": tax_amount,
-                "line_amount": float(amount),
-                "debit": debit,
-                "credit": credit,
+                "line_amount": base_amount if amounts_in_base else float(amount),
+                "debit_native": debit_native,
+                "credit_native": credit_native,
+                "debit_base": debit_base,
+                "credit_base": credit_base,
+                "debit": debit_base if amounts_in_base else debit_native,
+                "credit": credit_base if amounts_in_base else credit_native,
                 "description": description,
             })
             expanded.append(row)
 
-        remainder = float(Decimal(str(person_amount)) - Decimal(str(items_sum)))
-        if abs(remainder) >= 0.01:
+        native_remainder = float(
+            Decimal(str(person_native_amount)) - Decimal(str(items_sum))
+        )
+        base_items_sum = sum(
+            float(amount) * person_base_amount / items_sum if items_sum else 0.0
+            for amount in item_amounts
+        )
+        base_remainder = person_base_amount - base_items_sum
+        if abs(native_remainder) >= 0.01 or abs(base_remainder) >= 0.01:
             if use_debit_side:
-                debit = remainder if remainder > 0 else 0.0
-                credit = (-remainder) if remainder < 0 else 0.0
+                debit_native = native_remainder if native_remainder > 0 else 0.0
+                credit_native = -native_remainder if native_remainder < 0 else 0.0
+                debit_base = base_remainder if base_remainder > 0 else 0.0
+                credit_base = -base_remainder if base_remainder < 0 else 0.0
             else:
-                credit = remainder if remainder > 0 else 0.0
-                debit = (-remainder) if remainder < 0 else 0.0
+                credit_native = native_remainder if native_remainder > 0 else 0.0
+                debit_native = -native_remainder if native_remainder < 0 else 0.0
+                credit_base = base_remainder if base_remainder > 0 else 0.0
+                debit_base = -base_remainder if base_remainder < 0 else 0.0
             row = dict(item)
             row.update({
                 "row_kind": "invoice_remainder",
@@ -2274,9 +2307,13 @@ def _expand_people_tx_with_invoice_items(
                 "unit_price": None,
                 "line_discount": None,
                 "tax_amount": None,
-                "line_amount": remainder,
-                "debit": debit,
-                "credit": credit,
+                "line_amount": base_remainder if amounts_in_base else native_remainder,
+                "debit_native": debit_native,
+                "credit_native": credit_native,
+                "debit_base": debit_base,
+                "credit_base": credit_base,
+                "debit": debit_base if amounts_in_base else debit_native,
+                "credit": credit_base if amounts_in_base else credit_native,
                 "description": "سایر / مالیات و تعدیلات فاکتور",
             })
             expanded.append(row)
@@ -2308,6 +2345,7 @@ def get_people_transactions_report(
     from datetime import datetime
 
     detail_level_norm = _normalize_people_tx_detail_level(detail_level)
+    amounts_in_base = currency_id is None
 
     # Query پایه: DocumentLine join Document و Person
     query = db.query(
@@ -2391,13 +2429,25 @@ def get_people_transactions_report(
                 'total_pages': 0,
                 'has_next': False,
                 'has_prev': False,
-            }
+            },
+            'meta': {
+                'currency_id': currency_id,
+                'amounts_in_base': amounts_in_base,
+            },
         }
 
     base_items: List[Dict[str, Any]] = []
     for line, doc, person in all_results:
-        debit = float(line.debit or 0)
-        credit = float(line.credit or 0)
+        debit_native = float(line.debit or 0)
+        credit_native = float(line.credit or 0)
+        debit_base = float(
+            line.debit_base if line.debit_base is not None else line.debit or 0
+        )
+        credit_base = float(
+            line.credit_base if line.credit_base is not None else line.credit or 0
+        )
+        debit = debit_base if amounts_in_base else debit_native
+        credit = credit_base if amounts_in_base else credit_native
 
         person_name = None
         if person:
@@ -2422,6 +2472,14 @@ def get_people_transactions_report(
             'person_name': person_name,
             'debit': debit,
             'credit': credit,
+            'debit_native': debit_native,
+            'credit_native': credit_native,
+            'debit_base': debit_base,
+            'credit_base': credit_base,
+            'exchange_rate': (
+                float(line.exchange_rate) if line.exchange_rate is not None else None
+            ),
+            'document_currency_id': doc.currency_id,
             'description': line.description,
             'line_extra_info': line.extra_info or {},
             'product_id': None,
@@ -2438,7 +2496,9 @@ def get_people_transactions_report(
         base_items.append(item_dict)
 
     if detail_level_norm == "comprehensive":
-        items = _expand_people_tx_with_invoice_items(db, business_id, base_items)
+        items = _expand_people_tx_with_invoice_items(
+            db, business_id, base_items, amounts_in_base=amounts_in_base
+        )
     else:
         items = base_items
 
@@ -2478,5 +2538,9 @@ def get_people_transactions_report(
             'total_pages': total_pages,
             'has_next': current_page < total_pages,
             'has_prev': current_page > 1,
-        }
+        },
+        'meta': {
+            'currency_id': currency_id,
+            'amounts_in_base': amounts_in_base,
+        },
     }

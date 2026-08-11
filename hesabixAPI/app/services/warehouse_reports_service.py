@@ -14,6 +14,8 @@ from adapters.db.models.warehouse_document import WarehouseDocument
 from adapters.db.models.warehouse_document_line import WarehouseDocumentLine
 from adapters.db.models.product import Product
 from adapters.db.models.warehouse import Warehouse
+from adapters.db.models.business import Business
+from adapters.db.models.currency import Currency
 from app.core.responses import ApiError
 from app.services.invoice_service import _compute_available_stock
 
@@ -748,21 +750,105 @@ def get_inventory_valuation_report(
     as_of_date: Optional[str] = None,
     warehouse_ids: Optional[List[int]] = None,
     category_ids: Optional[List[int]] = None,
+    currency_id: Optional[int] = None,
     skip: int = 0,
     take: int = 50,
 ) -> Dict[str, Any]:
     """
-    گزارش ارزش موجودی انبار
+    گزارش ارزش موجودی انبار، همواره معادل ارز پایهٔ کسب‌وکار.
+
+    currency_id پذیرفته می‌شود تا قرارداد گزارش‌ها یکسان باشد، اما فیلتر
+    معناداری برای آن وجود ندارد: ارزش تمام اقلام به ارز پایه محاسبه می‌شود.
     """
     from app.services.transfer_service import _parse_iso_date as _parse_date
-    
+    from app.services.business_currency_rate_service import resolve_rate_to_base
+
     as_of_date_obj = date.today()
     if as_of_date:
         try:
             as_of_date_obj = _parse_date(as_of_date) if isinstance(as_of_date, str) else as_of_date
         except Exception:
             pass
-    
+
+    business = db.get(Business, int(business_id))
+    base_currency_id = (
+        int(business.default_currency_id)
+        if business and business.default_currency_id is not None
+        else None
+    )
+    base_currency = db.get(Currency, base_currency_id) if base_currency_id is not None else None
+    currency_codes: Dict[int, Optional[str]] = {}
+    rate_cache: Dict[int, Decimal] = {}
+    missing_fx_rate_product_ids: List[int] = []
+
+    def _currency_code(currency_pk: Optional[int]) -> Optional[str]:
+        if currency_pk is None:
+            return None
+        if currency_pk not in currency_codes:
+            currency = db.get(Currency, int(currency_pk))
+            currency_codes[currency_pk] = getattr(currency, "code", None)
+        return currency_codes[currency_pk]
+
+    def _as_decimal(value: Any) -> Decimal:
+        try:
+            return Decimal(str(value or 0))
+        except Exception:
+            return Decimal(0)
+
+    def _cost_in_base(product: Product) -> tuple[Decimal, Decimal, Optional[int], str]:
+        """
+        اولویت با قیمت خرید ارزی است تا هزینهٔ منبع با نرخ گزارش به ارز پایه
+        تبدیل شود؛ در غیر این صورت قیمت خرید پایه (یا نام‌های legacy) پایه است.
+        """
+        fx_cost = getattr(product, "purchase_price_fx", None)
+        fx_currency_id = getattr(product, "price_fx_currency_id", None)
+        if fx_cost is not None and fx_currency_id is not None:
+            source_cost = _as_decimal(fx_cost)
+            source_currency_id = int(fx_currency_id)
+            if base_currency_id is None or source_currency_id == base_currency_id:
+                return source_cost, source_cost, source_currency_id, "purchase_price_fx"
+            if source_currency_id not in rate_cache:
+                try:
+                    result = resolve_rate_to_base(
+                        db,
+                        int(business_id),
+                        source_currency_id,
+                        datetime.combine(as_of_date_obj, datetime.max.time()),
+                    )
+                    rate_cache[source_currency_id] = _as_decimal(result.get("rate"))
+                except Exception:
+                    rate_cache[source_currency_id] = Decimal(0)
+            rate = rate_cache[source_currency_id]
+            if rate > 0:
+                return (
+                    source_cost * rate,
+                    source_cost,
+                    source_currency_id,
+                    "purchase_price_fx",
+                )
+            missing_fx_rate_product_ids.append(int(product.id))
+
+        base_cost = _as_decimal(
+            getattr(product, "base_purchase_price", None)
+            or getattr(product, "cost_price", None)
+            or getattr(product, "purchase_price", None)
+        )
+        return base_cost, base_cost, base_currency_id, "base_purchase_price"
+
+    meta = {
+        "currency_id": currency_id,
+        "amounts_in_base": True,
+        "base_currency_id": base_currency_id,
+        "base_currency_code": getattr(base_currency, "code", None),
+        "currency_code": getattr(base_currency, "code", None),
+        "cost_price_note": (
+            "cost_price and value are reported in the business base currency; "
+            "purchase_price_fx is converted using the rate as of the report date."
+        ),
+        "currency_filter_applied": False,
+        "currency_filter_note": "Inventory valuation is always reported in the business base currency.",
+    }
+
     # Query محصولات
     query = db.query(Product).filter(Product.business_id == business_id)
     
@@ -777,6 +863,7 @@ def get_inventory_valuation_report(
             "total": 0,
             "total_value": 0.0,
             "as_of_date": as_of_date_obj.isoformat(),
+            "meta": {**meta, "products_with_missing_fx_rate": []},
         }
     
     # Query انبارها
@@ -800,11 +887,10 @@ def get_inventory_valuation_report(
             for warehouse in warehouses:
                 stock = _compute_available_stock(db, business_id, product.id, warehouse.id, as_of_date_obj)
                 if stock > 0:
-                    # استفاده از قیمت تمام شده یا قیمت خرید
-                    cost_price = float(product.cost_price or product.purchase_price or 0)
-                    value = Decimal(str(stock)) * Decimal(str(cost_price))
+                    cost_price, source_cost_price, cost_currency_id, cost_source = _cost_in_base(product)
+                    value = Decimal(str(stock)) * cost_price
                     total_value += value
-                    
+
                     items.append({
                         "product_id": product.id,
                         "product_code": product.code or "",
@@ -815,16 +901,23 @@ def get_inventory_valuation_report(
                         "warehouse_name": warehouse.name,
                         "quantity": float(stock),
                         "unit": product.main_unit or "",
-                        "cost_price": cost_price,
+                        "cost_price": float(cost_price),
+                        "currency_id": base_currency_id,
+                        "currency_code": getattr(base_currency, "code", None),
+                        "source_cost_price": float(source_cost_price),
+                        "cost_currency_id": cost_currency_id,
+                        "cost_currency_code": _currency_code(cost_currency_id),
+                        "cost_source": cost_source,
                         "value": float(value),
+                        "amounts_in_base": True,
                     })
         else:
             stock = _compute_available_stock(db, business_id, product.id, None, as_of_date_obj)
             if stock > 0:
-                cost_price = float(product.cost_price or product.purchase_price or 0)
-                value = Decimal(str(stock)) * Decimal(str(cost_price))
+                cost_price, source_cost_price, cost_currency_id, cost_source = _cost_in_base(product)
+                value = Decimal(str(stock)) * cost_price
                 total_value += value
-                
+
                 items.append({
                     "product_id": product.id,
                     "product_code": product.code or "",
@@ -835,8 +928,15 @@ def get_inventory_valuation_report(
                     "warehouse_name": "کل",
                     "quantity": float(stock),
                     "unit": product.main_unit or "",
-                    "cost_price": cost_price,
+                    "cost_price": float(cost_price),
+                    "currency_id": base_currency_id,
+                    "currency_code": getattr(base_currency, "code", None),
+                    "source_cost_price": float(source_cost_price),
+                    "cost_currency_id": cost_currency_id,
+                    "cost_currency_code": _currency_code(cost_currency_id),
+                    "cost_source": cost_source,
                     "value": float(value),
+                    "amounts_in_base": True,
                 })
     
     # مرتب‌سازی بر اساس ارزش
@@ -847,6 +947,10 @@ def get_inventory_valuation_report(
         "total": len(items),
         "total_value": float(total_value),
         "as_of_date": as_of_date_obj.isoformat(),
+        "meta": {
+            **meta,
+            "products_with_missing_fx_rate": sorted(set(missing_fx_rate_product_ids)),
+        },
     }
 
 

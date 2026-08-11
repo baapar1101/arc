@@ -10,6 +10,7 @@ class TrialBalanceTreeView extends StatefulWidget {
   final int columnMode;
   final FinancialReportLedgerContext ledgerContext;
   final Map<String, dynamic>? summary;
+  final bool includeBaseEquivalent;
 
   const TrialBalanceTreeView({
     super.key,
@@ -18,6 +19,7 @@ class TrialBalanceTreeView extends StatefulWidget {
     required this.columnMode,
     required this.ledgerContext,
     this.summary,
+    this.includeBaseEquivalent = false,
   });
 
   @override
@@ -29,7 +31,9 @@ class _TrialBalanceTreeViewState extends State<TrialBalanceTreeView> {
 
   String _fmt(dynamic value) {
     if (value == null) return '0';
-    final n = value is num ? value.toDouble() : double.tryParse(value.toString()) ?? 0.0;
+    final n = value is num
+        ? value.toDouble()
+        : double.tryParse(value.toString()) ?? 0.0;
     return DataTableUtils.formatNumber(n);
   }
 
@@ -50,28 +54,36 @@ class _TrialBalanceTreeViewState extends State<TrialBalanceTreeView> {
     final cells = <Widget>[];
     if (widget.columnMode >= 6) {
       cells.addAll([
-        _amountCell(_fmt(account['opening_debit'])),
-        _amountCell(_fmt(account['opening_credit'])),
+        _amountCell(_amountText(account, 'opening_debit')),
+        _amountCell(_amountText(account, 'opening_credit')),
       ]);
     }
     if (widget.columnMode >= 4) {
       cells.addAll([
-        _amountCell(_fmt(account['period_debit'])),
-        _amountCell(_fmt(account['period_credit'])),
+        _amountCell(_amountText(account, 'period_debit')),
+        _amountCell(_amountText(account, 'period_credit')),
       ]);
     }
     cells.addAll([
-      _amountCell(_fmt(account['closing_debit'])),
-      _amountCell(_fmt(account['closing_credit'])),
+      _amountCell(_amountText(account, 'closing_debit')),
+      _amountCell(_amountText(account, 'closing_credit')),
     ]);
     return cells;
+  }
+
+  String _amountText(Map<String, dynamic> account, String field) {
+    final nativeAmount = _fmt(account[field]);
+    final baseAmount = account['${field}_base'];
+    if (!widget.includeBaseEquivalent || baseAmount == null)
+      return nativeAmount;
+    return '$nativeAmount\nپایه: ${_fmt(baseAmount)}';
   }
 
   Widget _amountCell(String text) {
     return SizedBox(
       width: 110,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
         child: Text(text, textAlign: TextAlign.end),
       ),
     );
@@ -89,16 +101,33 @@ class _TrialBalanceTreeViewState extends State<TrialBalanceTreeView> {
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
+      color: Theme.of(
+        context,
+      ).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
       child: Row(
         children: [
           const SizedBox(width: 28),
-          const SizedBox(width: 90, child: Text('کد', style: TextStyle(fontWeight: FontWeight.w700))),
-          const Expanded(child: Text('نام حساب', style: TextStyle(fontWeight: FontWeight.w700))),
+          const SizedBox(
+            width: 90,
+            child: Text('کد', style: TextStyle(fontWeight: FontWeight.w700)),
+          ),
+          const Expanded(
+            child: Text(
+              'نام حساب',
+              style: TextStyle(fontWeight: FontWeight.w700),
+            ),
+          ),
           ...labels.map(
             (l) => SizedBox(
               width: 110,
-              child: Text(l, textAlign: TextAlign.end, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 11)),
+              child: Text(
+                l,
+                textAlign: TextAlign.end,
+                style: const TextStyle(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 11,
+                ),
+              ),
             ),
           ),
           const SizedBox(width: 36),
@@ -130,7 +159,12 @@ class _TrialBalanceTreeViewState extends State<TrialBalanceTreeView> {
             },
             onLongPress: () => _openLedger(account),
             child: Padding(
-              padding: EdgeInsets.only(right: level * 16.0, left: 8, top: 6, bottom: 6),
+              padding: EdgeInsets.only(
+                right: level * 16.0,
+                left: 8,
+                top: 6,
+                bottom: 6,
+              ),
               child: Row(
                 children: [
                   SizedBox(
@@ -140,18 +174,27 @@ class _TrialBalanceTreeViewState extends State<TrialBalanceTreeView> {
                             padding: EdgeInsets.zero,
                             iconSize: 20,
                             onPressed: () => _toggle(key),
-                            icon: Icon(expanded ? Icons.expand_more : Icons.chevron_left),
+                            icon: Icon(
+                              expanded ? Icons.expand_more : Icons.chevron_left,
+                            ),
                           )
                         : const SizedBox.shrink(),
                   ),
                   SizedBox(
                     width: 90,
-                    child: Text(account['account_code']?.toString() ?? '', style: const TextStyle(fontFeatures: [])),
+                    child: Text(
+                      account['account_code']?.toString() ?? '',
+                      style: const TextStyle(fontFeatures: []),
+                    ),
                   ),
                   Expanded(
                     child: Text(
                       account['account_name']?.toString() ?? '',
-                      style: TextStyle(fontWeight: hasChildren ? FontWeight.w700 : FontWeight.normal),
+                      style: TextStyle(
+                        fontWeight: hasChildren
+                            ? FontWeight.w700
+                            : FontWeight.normal,
+                      ),
                     ),
                   ),
                   ..._amountCells(account),
@@ -187,8 +230,12 @@ class _TrialBalanceTreeViewState extends State<TrialBalanceTreeView> {
               child: Row(
                 children: [
                   Icon(
-                    balanceValid ? Icons.check_circle_outline : Icons.warning_amber_outlined,
-                    color: balanceValid ? Colors.green[700] : Colors.orange[800],
+                    balanceValid
+                        ? Icons.check_circle_outline
+                        : Icons.warning_amber_outlined,
+                    color: balanceValid
+                        ? Colors.green[700]
+                        : Colors.orange[800],
                     size: 20,
                   ),
                   const SizedBox(width: 8),
@@ -196,16 +243,22 @@ class _TrialBalanceTreeViewState extends State<TrialBalanceTreeView> {
                     child: Text(
                       balanceValid
                           ? 'تراز آزمایشی متوازن است'
-                          : (summary['balance_error']?.toString() ?? 'تراز آزمایشی نامتوازن'),
+                          : (summary['balance_error']?.toString() ??
+                                'تراز آزمایشی نامتوازن'),
                       style: TextStyle(
-                        color: balanceValid ? Colors.green[800] : Colors.orange[900],
+                        color: balanceValid
+                            ? Colors.green[800]
+                            : Colors.orange[900],
                         fontWeight: FontWeight.w600,
                       ),
                     ),
                   ),
                   Text(
                     'برای مشاهده دفتر کل روی حساب بزنید',
-                    style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
                   ),
                 ],
               ),

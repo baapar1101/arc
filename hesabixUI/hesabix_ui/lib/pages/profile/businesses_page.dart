@@ -19,7 +19,9 @@ import '../../widgets/profile/businesses_hub_utils.dart';
 
 /// صفحه انتخاب فضای کاری — سوییچر خلوت، نه هاب مدیریت.
 class BusinessesPage extends StatefulWidget {
-  const BusinessesPage({super.key});
+  final AuthStore authStore;
+
+  const BusinessesPage({super.key, required this.authStore});
 
   @override
   State<BusinessesPage> createState() => _BusinessesPageState();
@@ -32,7 +34,6 @@ class _BusinessesPageState extends State<BusinessesPage> {
   static const int _searchThreshold = 2;
 
   final BusinessDashboardService _service = BusinessDashboardService(ApiClient());
-  final AuthStore _authStore = AuthStore();
   final ScrollController _scrollController = ScrollController();
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
@@ -52,16 +53,24 @@ class _BusinessesPageState extends State<BusinessesPage> {
   BusinessSwitcherSort _sort = BusinessSwitcherSort.recent;
   List<int> _lastUsedIds = const [];
 
+  AuthStore get _authStore => widget.authStore;
+
   @override
   void initState() {
     super.initState();
     _scrollController.addListener(_onScroll);
     _searchController.addListener(_onSearchTextChanged);
+    _authStore.addListener(_onAuthChanged);
     _init();
+  }
+
+  void _onAuthChanged() {
+    if (mounted) setState(() {});
   }
 
   @override
   void dispose() {
+    _authStore.removeListener(_onAuthChanged);
     _searchDebounce?.cancel();
     _searchController.removeListener(_onSearchTextChanged);
     _searchController.dispose();
@@ -99,8 +108,12 @@ class _BusinessesPageState extends State<BusinessesPage> {
   }
 
   Future<void> _init() async {
-    ApiClient.bindAuthStore(_authStore);
-    await _authStore.load();
+    // از AuthStore مشترک اپ استفاده می‌کنیم؛ نباید store خالی جدید bind شود
+    // (باعث race روی Authorization و پاک شدن سشن می‌شود).
+    final bound = ApiClient.getAuthStore();
+    if (bound != _authStore) {
+      ApiClient.bindAuthStore(_authStore);
+    }
     final uid = _authStore.currentUserId;
     final sort = await BusinessSwitcherPrefs.sortMode(uid);
     final lastUsed = await BusinessSwitcherPrefs.lastUsedIds(uid);
@@ -522,7 +535,7 @@ class _BusinessesPageState extends State<BusinessesPage> {
                   )
                 else if (noBusinessesAtAll)
                   const SliverFillRemaining(
-                    hasScrollBody: false,
+                    hasScrollBody: true,
                     child: BusinessesEmptyState(),
                   )
                 else if (noSearchResults)
