@@ -1,10 +1,18 @@
 ﻿Imports System.Globalization
+Imports System.Net
 Imports System.Threading
 
 Friend Module Program
 
     <STAThread()>
     Friend Sub Main()
+        Try
+            ServicePointManager.DefaultConnectionLimit = 32
+            ServicePointManager.Expect100Continue = False
+            ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls12
+        Catch
+        End Try
+
         ' UI فارسی؛ اما تقویم اجرایی باید میلادی بماند.
         ' اگر Calendar=Persian باشد، Date.ToString("yyyy-MM-dd") جلالی می‌سازد و API آن را میلادی می‌خواند.
         Dim fa = CultureInfo.GetCultureInfo("fa-IR")

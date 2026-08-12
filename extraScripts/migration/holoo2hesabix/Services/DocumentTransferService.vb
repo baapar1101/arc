@@ -1,3 +1,5 @@
+Imports System.Collections.Concurrent
+Imports System.Net
 Imports System.Threading
 Imports Newtonsoft.Json.Linq
 
@@ -7,7 +9,9 @@ Imports Newtonsoft.Json.Linq
 ''' </summary>
 Friend Class DocumentTransferService
     Private ReadOnly _docs As New HolooDocumentReader()
-    Private Const InvoiceChunk As Integer = 15
+    ' هر درخواست = ۱ فاکتور؛ سرعت از موازی‌سازی می‌آید (bulk روی سرور هم سریال است)
+    Private Const InvoiceChunk As Integer = 1
+    Private Const InvoiceParallelism As Integer = 8
     Private Const WarehouseChunk As Integer = 100
     Private Const ReceiptChunk As Integer = 50
     Private Const ExpenseChunk As Integer = 40
@@ -645,51 +649,148 @@ Friend Class DocumentTransferService
             ct).ConfigureAwait(False)
         Dim pending = rows.Where(Function(r) Not invoiceMap.Done.ContainsKey(r.Key)).ToList()
         RaiseProgress("فاکتور " & fy.Title, invoiceMap.Done.Count, rows.Count,
-                      "ارسال " & pending.Count.ToString() & " فاکتور (از " & rows.Count.ToString() & ")...")
+                      "آماده‌سازی " & pending.Count.ToString() & " فاکتور (از " & rows.Count.ToString() & ")...")
 
-        Dim offset = 0
+        Dim queue As New ConcurrentQueue(Of PreparedInvoiceItem)()
         Dim processed = rows.Count - pending.Count
-        While offset < pending.Count
+        For Each inv In pending
             ct.ThrowIfCancellationRequested()
-            Dim take = Math.Min(InvoiceChunk, pending.Count - offset)
-            Dim chunk = pending.GetRange(offset, take)
-            Dim items As New JArray()
-            Dim chunkKeys As New List(Of String)
+            Dim hint As HolooInvoiceSettlementHint = Nothing
+            If inv.SanadCode > 0 Then settleMap.TryGetValue(inv.SanadCode, hint)
+            Dim payload = BuildInvoicePayload(
+                inv, currencyId, personMap, productMap, mapper, hint,
+                defaultCashId, defaultBankId, defaultPettyId,
+                moneyToCurrency, isMultiCurrency)
+            If payload Is Nothing Then
+                invoiceMap.Failed(inv.Key) = "نگاشت شخص/کالا ناقص یا نوع نامعتبر"
+                processed += 1
+                RaiseProgress("فاکتور " & fy.Title, processed, rows.Count, "رد: " & inv.Key, True)
+                Continue For
+            End If
+            queue.Enqueue(New PreparedInvoiceItem With {
+                .Key = inv.Key,
+                .Payload = payload
+            })
+        Next
 
-            For Each inv In chunk
-                Dim hint As HolooInvoiceSettlementHint = Nothing
-                If inv.SanadCode > 0 Then settleMap.TryGetValue(inv.SanadCode, hint)
-                Dim payload = BuildInvoicePayload(
-                    inv, currencyId, personMap, productMap, mapper, hint,
-                    defaultCashId, defaultBankId, defaultPettyId,
-                    moneyToCurrency, isMultiCurrency)
-                If payload Is Nothing Then
-                    invoiceMap.Failed(inv.Key) = "نگاشت شخص/کالا ناقص یا نوع نامعتبر"
-                    processed += 1
-                    RaiseProgress("فاکتور " & fy.Title, processed, rows.Count, "رد: " & inv.Key, True)
-                    Continue For
-                End If
-                items.Add(New JObject From {
-                    {"client_ref", inv.Key},
-                    {"payload", payload}
-                })
-                chunkKeys.Add(inv.Key)
-            Next
+        Dim workerCount = Math.Max(1, Math.Min(InvoiceParallelism, Math.Max(1, queue.Count)))
+        RaiseProgress("فاکتور " & fy.Title, processed, rows.Count,
+                      "ارسال موازی " & queue.Count.ToString() & " فاکتور با " & workerCount.ToString() & " کارگر...")
 
-            If items.Count = 0 Then
-                offset += take
-                store.Save(cp)
-                Continue While
+        Dim state As New InvoiceParallelState With {
+            .Processed = processed,
+            .TotalRows = rows.Count,
+            .ModuleTitle = "فاکتور " & fy.Title,
+            .Gate = New Object(),
+            .CreatedIds = createdIds,
+            .SuccessSinceSave = 0
+        }
+
+        Dim workers As New List(Of Task)()
+        For i = 1 To workerCount
+            workers.Add(InvoiceWorkerLoopAsync(api, businessId, fy, queue, invoiceMap, store, cp, state, ct))
+        Next
+        Await Task.WhenAll(workers.ToArray()).ConfigureAwait(False)
+
+        SyncLock state.Gate
+            store.Save(cp)
+        End SyncLock
+        RaiseProgress(state.ModuleTitle, state.Processed, state.TotalRows,
+                      "پایان فاکتور سال: موفق " & invoiceMap.Done.Count.ToString() &
+                      " / شکست " & invoiceMap.Failed.Count.ToString())
+        Return createdIds
+    End Function
+
+    Private Class PreparedInvoiceItem
+        Public Property Key As String
+        Public Property Payload As JObject
+    End Class
+
+    Private Class InvoiceParallelState
+        Public Property Processed As Integer
+        Public Property TotalRows As Integer
+        Public Property ModuleTitle As String
+        Public Property Gate As Object
+        Public Property CreatedIds As List(Of Integer)
+        Public Property SuccessSinceSave As Integer
+    End Class
+
+    Private Async Function InvoiceWorkerLoopAsync(
+        api As HesabixApiClient,
+        businessId As Integer,
+        fy As DetectedFiscalYear,
+        queue As ConcurrentQueue(Of PreparedInvoiceItem),
+        invoiceMap As ModuleCheckpoint,
+        store As CheckpointStore,
+        cp As TransferCheckpoint,
+        state As InvoiceParallelState,
+        ct As CancellationToken
+    ) As Task
+        Dim item As PreparedInvoiceItem = Nothing
+        While queue.TryDequeue(item)
+            ct.ThrowIfCancellationRequested()
+            Dim items As New JArray From {
+                New JObject From {
+                    {"client_ref", item.Key},
+                    {"payload", item.Payload}
+                }
+            }
+            Dim keys As New List(Of String) From {item.Key}
+            Dim localProcessed As New IntHolder With {.Value = 0}
+            Dim localCreated As New List(Of Integer)()
+            Dim localMap As New ModuleCheckpoint()
+
+            Await SendInvoiceChunkWithRetry(
+                api, businessId, fy, items, keys, localMap, localCreated, localProcessed, state.TotalRows, store, cp, ct,
+                skipCheckpointSave:=True, suppressProgress:=True).ConfigureAwait(False)
+
+            Dim doneId As Integer = 0
+            Dim failMsg As String = Nothing
+            If localMap.Done.TryGetValue(item.Key, doneId) AndAlso doneId > 0 Then
+                ' ok
+            ElseIf localMap.Failed.TryGetValue(item.Key, failMsg) Then
+                ' keep failMsg
+            ElseIf localCreated.Count > 0 Then
+                doneId = localCreated(0)
+            Else
+                failMsg = "نتیجه نامشخص"
             End If
 
-            Dim processedHolder As New IntHolder With {.Value = processed}
-            Await SendInvoiceChunkWithRetry(api, businessId, fy, items, chunkKeys, invoiceMap, createdIds, processedHolder, rows.Count, store, cp, ct).ConfigureAwait(False)
-            processed = processedHolder.Value
-            store.Save(cp)
-            offset += take
-        End While
+            Dim showProgress As Boolean = False
+            Dim progressCurrent As Integer = 0
+            Dim progressMsg As String = Nothing
+            Dim progressIsError As Boolean = False
 
-        Return createdIds
+            SyncLock state.Gate
+                state.Processed += 1
+                progressCurrent = state.Processed
+                If doneId > 0 Then
+                    invoiceMap.Done(item.Key) = doneId
+                    invoiceMap.Failed.Remove(item.Key)
+                    state.CreatedIds.Add(doneId)
+                    state.SuccessSinceSave += 1
+                    If state.SuccessSinceSave >= 20 OrElse (state.Processed Mod 25 = 0) Then
+                        store.Save(cp)
+                        state.SuccessSinceSave = 0
+                    End If
+                    If state.Processed Mod 10 = 0 OrElse state.Processed >= state.TotalRows Then
+                        showProgress = True
+                        progressMsg = "موازی: " & invoiceMap.Done.Count.ToString() & " موفق / صف ~" & queue.Count.ToString()
+                    End If
+                Else
+                    invoiceMap.Failed(item.Key) = If(failMsg, "خطا")
+                    showProgress = True
+                    progressIsError = True
+                    progressMsg = "خطا: " & item.Key & " — " & invoiceMap.Failed(item.Key)
+                    store.Save(cp)
+                    state.SuccessSinceSave = 0
+                End If
+            End SyncLock
+
+            If showProgress Then
+                RaiseProgress(state.ModuleTitle, progressCurrent, state.TotalRows, progressMsg, progressIsError)
+            End If
+        End While
     End Function
 
     Private Shared Function IsTransientTimeout(ex As Exception) As Boolean
@@ -697,10 +798,21 @@ Friend Class DocumentTransferService
         If TypeOf ex Is TaskCanceledException Then Return True
         If TypeOf ex.InnerException Is TaskCanceledException Then Return True
         If TypeOf ex Is TimeoutException Then Return True
+        Dim apiEx = TryCast(ex, HesabixApiException)
+        If apiEx IsNot Nothing Then
+            ' 504/502/503 معمولاً timeout گیت‌وی (nginx) است؛ سرور ممکن است هنوز در حال کار باشد
+            If apiEx.StatusCode = 408 OrElse apiEx.StatusCode = 429 OrElse
+               apiEx.StatusCode = 502 OrElse apiEx.StatusCode = 503 OrElse apiEx.StatusCode = 504 Then
+                Return True
+            End If
+        End If
         Dim msg = If(ex.Message, "")
         Return msg.IndexOf("canceled", StringComparison.OrdinalIgnoreCase) >= 0 OrElse
                msg.IndexOf("timeout", StringComparison.OrdinalIgnoreCase) >= 0 OrElse
-               msg.IndexOf("زمان", StringComparison.OrdinalIgnoreCase) >= 0
+               msg.IndexOf("زمان", StringComparison.OrdinalIgnoreCase) >= 0 OrElse
+               msg.IndexOf("504", StringComparison.OrdinalIgnoreCase) >= 0 OrElse
+               msg.IndexOf("502", StringComparison.OrdinalIgnoreCase) >= 0 OrElse
+               msg.IndexOf("503", StringComparison.OrdinalIgnoreCase) >= 0
     End Function
 
     Private Async Function SendInvoiceChunkWithRetry(
@@ -715,7 +827,9 @@ Friend Class DocumentTransferService
         totalRows As Integer,
         store As CheckpointStore,
         cp As TransferCheckpoint,
-        ct As CancellationToken
+        ct As CancellationToken,
+        Optional skipCheckpointSave As Boolean = False,
+        Optional suppressProgress As Boolean = False
     ) As Task
         If items Is Nothing OrElse items.Count = 0 Then Return
 
@@ -743,19 +857,25 @@ Friend Class DocumentTransferService
                     Else
                         Dim msg = If(r Is Nothing, "نتیجه برنگشت", If(r.Message, r.ErrorCode))
                         invoiceMap.Failed(k) = If(msg, "خطا")
-                        RaiseProgress("فاکتور " & fy.Title, processedHolder.Value, totalRows, "خطا: " & k & " — " & invoiceMap.Failed(k), True)
+                        If Not suppressProgress Then
+                            RaiseProgress("فاکتور " & fy.Title, processedHolder.Value, totalRows, "خطا: " & k & " — " & invoiceMap.Failed(k), True)
+                        End If
                     End If
                 Next
-                RaiseProgress("فاکتور " & fy.Title, processedHolder.Value, totalRows,
-                              "دسته: ایجاد " & bulk.Created.ToString() & " / شکست " & bulk.Failed.ToString())
-                store.Save(cp)
+                If Not suppressProgress Then
+                    RaiseProgress("فاکتور " & fy.Title, processedHolder.Value, totalRows,
+                                  "دسته: ایجاد " & bulk.Created.ToString() & " / شکست " & bulk.Failed.ToString())
+                End If
+                If Not skipCheckpointSave Then store.Save(cp)
                 Return
             End If
 
             If IsTransientTimeout(sendErr) AndAlso items.Count > 1 Then
                 Dim half = Math.Max(1, items.Count \ 2)
-                RaiseProgress("فاکتور " & fy.Title, processedHolder.Value, totalRows,
-                              "timeout — شکستن دسته به " & half.ToString() & " + " & (items.Count - half).ToString() & "...", True)
+                If Not suppressProgress Then
+                    RaiseProgress("فاکتور " & fy.Title, processedHolder.Value, totalRows,
+                                  "timeout — شکستن دسته به " & half.ToString() & " + " & (items.Count - half).ToString() & "...", True)
+                End If
                 Dim a As New JArray()
                 Dim b As New JArray()
                 Dim ak As New List(Of String)
@@ -767,15 +887,18 @@ Friend Class DocumentTransferService
                         b.Add(items(i)) : bk.Add(chunkKeys(i))
                     End If
                 Next
-                Await SendInvoiceChunkWithRetry(api, businessId, fy, a, ak, invoiceMap, createdIds, processedHolder, totalRows, store, cp, ct).ConfigureAwait(False)
-                Await SendInvoiceChunkWithRetry(api, businessId, fy, b, bk, invoiceMap, createdIds, processedHolder, totalRows, store, cp, ct).ConfigureAwait(False)
+                Await SendInvoiceChunkWithRetry(api, businessId, fy, a, ak, invoiceMap, createdIds, processedHolder, totalRows, store, cp, ct, skipCheckpointSave, suppressProgress).ConfigureAwait(False)
+                Await SendInvoiceChunkWithRetry(api, businessId, fy, b, bk, invoiceMap, createdIds, processedHolder, totalRows, store, cp, ct, skipCheckpointSave, suppressProgress).ConfigureAwait(False)
                 Return
             End If
 
             If IsTransientTimeout(sendErr) AndAlso attempt < 3 Then
-                RaiseProgress("فاکتور " & fy.Title, processedHolder.Value, totalRows,
-                              "timeout — تلاش مجدد " & (attempt + 1).ToString() & "...", True)
-                Await Task.Delay(2000, ct).ConfigureAwait(False)
+                Dim delayMs = 3000 * attempt
+                If Not suppressProgress Then
+                    RaiseProgress("فاکتور " & fy.Title, processedHolder.Value, totalRows,
+                                  "timeout/504 — صبر " & (delayMs \ 1000).ToString() & "ث و تلاش " & (attempt + 1).ToString() & "...", True)
+                End If
+                Await Task.Delay(delayMs, ct).ConfigureAwait(False)
                 Continue While
             End If
 
@@ -783,9 +906,11 @@ Friend Class DocumentTransferService
             For Each k In chunkKeys
                 invoiceMap.Failed(k) = errMsg
                 processedHolder.Value += 1
-                RaiseProgress("فاکتور " & fy.Title, processedHolder.Value, totalRows, "خطای bulk: " & k & " — " & errMsg, True)
+                If Not suppressProgress Then
+                    RaiseProgress("فاکتور " & fy.Title, processedHolder.Value, totalRows, "خطای bulk: " & k & " — " & errMsg, True)
+                End If
             Next
-            store.Save(cp)
+            If Not skipCheckpointSave Then store.Save(cp)
             Return
         End While
     End Function

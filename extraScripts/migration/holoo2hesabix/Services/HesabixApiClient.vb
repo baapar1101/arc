@@ -31,9 +31,14 @@ Friend Class HesabixApiClient
     Public Sub New()
         Dim handler As New HttpClientHandler()
         handler.AutomaticDecompression = DecompressionMethods.GZip Or DecompressionMethods.Deflate
+        Try
+            ServicePointManager.DefaultConnectionLimit = Math.Max(ServicePointManager.DefaultConnectionLimit, 32)
+            ServicePointManager.Expect100Continue = False
+        Catch
+        End Try
         _http = New HttpClient(handler)
-        ' فاکتور گروهی و افتتاحیه روی سرور ممکن است بیش از ۵ دقیقه طول بکشد
-        _http.Timeout = TimeSpan.FromMinutes(60)
+        ' هر فاکتور جداگانه؛ ۱۰ دقیقه برای یک سند کافی است
+        _http.Timeout = TimeSpan.FromMinutes(10)
         _http.DefaultRequestHeaders.Accept.Clear()
         _http.DefaultRequestHeaders.Accept.Add(New MediaTypeWithQualityHeaderValue("application/json"))
         ' BaseAddress عمداً تنظیم نمی‌شود؛ بعد از اولین درخواست قابل تغییر نیست.
@@ -45,6 +50,11 @@ Friend Class HesabixApiClient
         End If
         SyncLock _sync
             _baseUrl = baseUrl.Trim().TrimEnd("/"c)
+            Try
+                Dim sp = ServicePointManager.FindServicePoint(New Uri(_baseUrl & "/"))
+                If sp IsNot Nothing Then sp.ConnectionLimit = Math.Max(sp.ConnectionLimit, 32)
+            Catch
+            End Try
         End SyncLock
     End Sub
 
