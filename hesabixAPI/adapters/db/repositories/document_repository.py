@@ -231,16 +231,9 @@ class DocumentRepository:
         total_count = query.count()
 
         # مرتب‌سازی (چندستونه sort یا تک‌ستونه sort_by)
-        from adapters.api.v1.schemas import QueryInfo
         from app.services.document_list_sort import apply_document_accounting_list_ordering
-
-        _qi = QueryInfo.model_validate({
-            "take": int(filters.get("take", 50) or 50),
-            "skip": int(filters.get("skip", 0) or 0),
-            "sort_by": filters.get("sort_by"),
-            "sort_desc": bool(filters.get("sort_desc", True)),
-            "sort": filters.get("sort") if isinstance(filters.get("sort"), list) else None,
-        })
+        from app.services.sort_resolution import query_info_for_sort
+        _qi = query_info_for_sort(filters, default_sort_desc=True)
         query = apply_document_accounting_list_ordering(query, _qi)
 
         # صفحه‌بندی

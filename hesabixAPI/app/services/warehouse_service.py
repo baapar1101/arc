@@ -329,7 +329,7 @@ def warehouse_documents_filtered_query(db: Session, business_id: int, body: Dict
 
 def apply_warehouse_documents_sort(q, body: Dict[str, Any]):
 	"""همان مرتب‌سازی جستجوی حواله انبار."""
-	from app.services.sort_resolution import effective_sort_specs
+	from app.services.sort_resolution import effective_sort_specs, query_info_for_sort
 
 	_wh_sort_allowed = frozenset({"code", "doc_type", "status", "created_at", "document_date"})
 
@@ -344,13 +344,7 @@ def apply_warehouse_documents_sort(q, body: Dict[str, Any]):
 			return WarehouseDocument.created_at
 		return WarehouseDocument.document_date
 
-	_qi = QueryInfo.model_validate({
-		"take": int(body.get("take", 20) or 20),
-		"skip": int(body.get("skip", 0) or 0),
-		"sort_by": body.get("sort_by"),
-		"sort_desc": bool(body.get("sort_desc", True)),
-		"sort": body.get("sort") if isinstance(body.get("sort"), list) else None,
-	})
+	_qi = query_info_for_sort(body, default_sort_desc=True)
 	_specs = effective_sort_specs(_qi, allowed=_wh_sort_allowed, default_when_empty=("document_date", True))
 	_order_parts = []
 	for _n, _d in _specs:

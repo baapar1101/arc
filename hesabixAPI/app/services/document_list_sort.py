@@ -9,7 +9,7 @@ from sqlalchemy.orm import Query
 from adapters.api.v1.schemas import QueryInfo
 from adapters.db.models.document import Document
 from adapters.db.models.person import Person
-from app.services.sort_resolution import effective_sort_specs
+from app.services.sort_resolution import effective_sort_specs, query_info_for_sort
 
 # فیلدهای مجاز برای لیست/جستجوی فاکتورها (UI: طرف حساب / مبلغ کل و ستون‌های سند)
 INVOICE_DOCUMENT_SORT_ALLOWED = frozenset(
@@ -81,13 +81,7 @@ def apply_invoice_search_ordering(q: Query, query_info: QueryInfo) -> Query:
 
 def query_info_from_body_for_sort(body: Dict[str, Any]) -> QueryInfo:
 	"""برای اندپوینت‌هایی که فقط dict بدنه دارند (مثلاً خروجی)."""
-	return QueryInfo.model_validate({
-		"take": body.get("take", 20),
-		"skip": body.get("skip", 0),
-		"sort_by": body.get("sort_by"),
-		"sort_desc": body.get("sort_desc", True),
-		"sort": body.get("sort"),
-	})
+	return query_info_for_sort(body, default_sort_desc=True)
 
 
 def apply_invoice_search_ordering_from_body(q: Query, body: Dict[str, Any]) -> Query:
@@ -117,14 +111,7 @@ def apply_document_dynamic_ordering(q: Query, query_info: QueryInfo) -> Query:
 
 
 def apply_document_dynamic_ordering_from_dict(q: Query, d: Dict[str, Any]) -> Query:
-	qi = QueryInfo.model_validate({
-		"take": d.get("take", 20),
-		"skip": d.get("skip", 0),
-		"sort_by": d.get("sort_by"),
-		"sort_desc": d.get("sort_desc", True),
-		"sort": d.get("sort"),
-	})
-	return apply_document_dynamic_ordering(q, qi)
+	return apply_document_dynamic_ordering(q, query_info_for_sort(d, default_sort_desc=True))
 
 
 # لیست اسناد حسابداری (documents list) — شامل document_type

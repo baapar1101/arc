@@ -519,17 +519,11 @@ def get_persons_by_business(
     sort_desc = query_info.get('sort_desc', True)
     
     if not needs_balance_before_pagination:
-        from adapters.api.v1.schemas import QueryInfo as _PersonQI
         from app.services.sort_resolution import effective_sort_specs as _eff_specs
+        from app.services.sort_resolution import query_info_for_sort as _qi_for_sort
 
         _sql_allowed = frozenset({"code", "alias_name", "first_name", "last_name", "created_at", "updated_at"})
-        _qi = _PersonQI.model_validate({
-            "take": int(query_info.get("take", 20) or 20),
-            "skip": int(query_info.get("skip", 0) or 0),
-            "sort_by": query_info.get("sort_by"),
-            "sort_desc": bool(sort_desc),
-            "sort": query_info.get("sort") if isinstance(query_info.get("sort"), list) else None,
-        })
+        _qi = _qi_for_sort(query_info, default_sort_desc=bool(sort_desc))
         _specs = _eff_specs(_qi, allowed=_sql_allowed, default_when_empty=("created_at", True))
         _parts = []
         for _n, _d in _specs:
@@ -542,8 +536,9 @@ def get_persons_by_business(
         else:
             query = query.order_by(Person.created_at.desc())
     
-    skip = query_info.get('skip', 0)
-    take = query_info.get('take', 20)
+    skip = max(int(query_info.get('skip', 0) or 0), 0)
+    take = int(query_info.get('take', 20) or 20)
+    take = min(max(take, 1), 10000)
     
     # اگر نیاز به محاسبه تراز قبل از pagination است
     if needs_balance_before_pagination:

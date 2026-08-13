@@ -407,9 +407,11 @@ async def export_persons_excel(
             fiscal_year_id = fiscal_year.id
     
     # Build query dict similar to list endpoint from flat body
+    take_value = min(int(body.get("take", 1000) or 1000), 10000)
+    skip_value = max(int(body.get("skip", 0) or 0), 0)
     query_dict = {
-        "take": int(body.get("take", 20)),
-        "skip": int(body.get("skip", 0)),
+        "take": take_value,
+        "skip": skip_value,
         "sort_by": body.get("sort_by"),
         "sort_desc": bool(body.get("sort_desc", False)),
         "sort": body.get("sort") if isinstance(body.get("sort"), list) else None,
@@ -577,9 +579,11 @@ async def export_persons_pdf(
             fiscal_year_id = fiscal_year.id
     
     # Build query dict from flat body
+    take_value = min(int(body.get("take", 1000) or 1000), 10000)
+    skip_value = max(int(body.get("skip", 0) or 0), 0)
     query_dict = {
-        "take": int(body.get("take", 20)),
-        "skip": int(body.get("skip", 0)),
+        "take": take_value,
+        "skip": skip_value,
         "sort_by": body.get("sort_by"),
         "sort_desc": bool(body.get("sort_desc", False)),
         "sort": body.get("sort") if isinstance(body.get("sort"), list) else None,

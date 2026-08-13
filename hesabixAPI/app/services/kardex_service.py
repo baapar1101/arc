@@ -50,17 +50,9 @@ def _kardex_sort_column(sort_key: str):
 
 
 def _apply_kardex_sort(q, query: Dict[str, Any]):
-    from adapters.api.v1.schemas import QueryInfo
-    from app.services.sort_resolution import effective_sort_specs
+    from app.services.sort_resolution import effective_sort_specs, query_info_for_sort
 
-    # take/skip are irrelevant for sort resolution; keep defaults to satisfy QueryInfo.
-    qi = QueryInfo.model_validate({
-        "take": 20,
-        "skip": 0,
-        "sort_by": query.get("sort_by"),
-        "sort_desc": bool(query.get("sort_desc", True)),
-        "sort": query.get("sort") if isinstance(query.get("sort"), list) else None,
-    })
+    qi = query_info_for_sort(query, default_sort_desc=True)
     specs = effective_sort_specs(qi, allowed=KARDEX_SORT_ALLOWED, default_when_empty=("document_date", True))
     parts = []
     for name, desc in specs:
