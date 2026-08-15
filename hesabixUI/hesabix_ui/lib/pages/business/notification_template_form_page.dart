@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../core/api_client.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../utils/error_extractor.dart';
+import '../../widgets/business_subpage_back_leading.dart';
 
 
 /// صفحه فرم ایجاد/ویرایش قالب نوتیفیکیشن
@@ -429,6 +430,7 @@ class _NotificationTemplateFormPageState extends State<NotificationTemplateFormP
       return Scaffold(
         appBar: AppBar(
           title: Text(widget.templateId == null ? 'قالب جدید' : 'ویرایش قالب'),
+          leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
         ),
         body: const Center(child: CircularProgressIndicator()),
       );
@@ -437,6 +439,7 @@ class _NotificationTemplateFormPageState extends State<NotificationTemplateFormP
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.templateId == null ? 'قالب جدید' : 'ویرایش قالب'),
+        leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
         actions: [
           if (!_isSaving)
             IconButton(

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/auth_store.dart';
 import '../../../services/telephony/telephony_api.dart';
+import '../../../widgets/business_subpage_back_leading.dart';
 
 /// داشبورد لحظه‌ای مرکز تماس (BLF + تماس‌های فعال).
 class TelephonyLiveDashboardPage extends StatefulWidget {
@@ -100,6 +101,7 @@ class _TelephonyLiveDashboardPageState extends State<TelephonyLiveDashboardPage>
     return Scaffold(
       appBar: AppBar(
         title: const Text('داشبورد زنده تماس'),
+        leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
         actions: [
           IconButton(onPressed: _load, icon: const Icon(Icons.refresh_rounded)),
         ],

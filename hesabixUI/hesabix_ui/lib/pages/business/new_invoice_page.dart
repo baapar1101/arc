@@ -48,6 +48,7 @@ import '../../services/account_service.dart';
 import '../../utils/invoice_form_prefill.dart';
 import '../../utils/invoice_adjustments_account_filter.dart';
 import 'business_shell_side_nav_scope.dart';
+import '../../widgets/business_subpage_back_leading.dart';
 import 'package:hesabix_ui/services/bytes_export/bytes_export_service.dart';
 
 
@@ -2053,6 +2054,7 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
       return Scaffold(
         appBar: AppBar(
           title: Text(t.invoiceCopyOpenNew),
+          leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
         ),
         body: Center(
           child: Column(
@@ -2077,6 +2079,7 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
       appBar: AppBar(
         title: Text(t.addInvoice),
         toolbarHeight: 56,
+        leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
         actions: [
           Tooltip(
             message: t.saveInvoice,

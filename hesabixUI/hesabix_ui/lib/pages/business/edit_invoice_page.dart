@@ -35,6 +35,7 @@ import '../../widgets/invoice/invoice_adjustments_form.dart';
 import '../../models/account_model.dart';
 import '../../services/account_service.dart';
 import 'business_shell_side_nav_scope.dart';
+import '../../widgets/business_subpage_back_leading.dart';
 
 
 class EditInvoicePage extends StatefulWidget {
@@ -797,6 +798,7 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
     return Scaffold(
       appBar: AppBar(
         title: Text(t.editInvoiceTitle),
+        leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
         actions: [
           IconButton(
             tooltip: t.saveChangesTooltip,

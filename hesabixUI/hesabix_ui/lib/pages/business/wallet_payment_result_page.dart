@@ -5,6 +5,7 @@ import '../../core/auth_store.dart';
 import '../../services/wallet_service.dart';
 import '../../core/api_client.dart';
 import '../../utils/error_extractor.dart';
+import '../../widgets/business_subpage_back_leading.dart';
 
 class WalletPaymentResultPage extends StatefulWidget {
   final AuthStore authStore;
@@ -108,6 +109,15 @@ class _WalletPaymentResultPageState extends State<WalletPaymentResultPage> {
     }
   }
 
+  void _goBackToWallet() {
+    final bid = widget.authStore.currentBusiness?.id;
+    if (bid != null) {
+      context.go('/business/$bid/wallet');
+    } else {
+      context.go('/user/profile/dashboard');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
@@ -121,7 +131,10 @@ class _WalletPaymentResultPageState extends State<WalletPaymentResultPage> {
     final color = isSuccess ? Colors.green : Colors.red;
 
     return Scaffold(
-      appBar: AppBar(title: Text(t.walletPaymentResultTitle)),
+      appBar: AppBar(
+        title: Text(t.walletPaymentResultTitle),
+        leading: HesabixBackButton(onPressed: _goBackToWallet),
+      ),
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -146,14 +159,7 @@ class _WalletPaymentResultPageState extends State<WalletPaymentResultPage> {
             if (_tx != null) Text('${t.status}: ${_tx!['status']} - ${t.moneyAmount}: ${_tx!['amount']}'),
             const Spacer(),
             FilledButton.icon(
-              onPressed: () {
-                final bid = widget.authStore.currentBusiness?.id;
-                if (bid != null) {
-                  context.go('/business/$bid/wallet');
-                } else {
-                  context.go('/user/profile/dashboard');
-                }
-              },
+              onPressed: _goBackToWallet,
               icon: const Icon(Icons.account_balance_wallet),
               label: Text(t.walletBackToWallet),
             ),

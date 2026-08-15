@@ -11,6 +11,7 @@ import '../../../widgets/distribution/distribution_map_marker.dart';
 import '../../../widgets/distribution/distribution_memaps_map.dart';
 import '../../../widgets/distribution/distribution_person_location_sheet.dart';
 import '../../../widgets/jalali_date_picker.dart';
+import '../../../widgets/business_subpage_back_leading.dart';
 
 /// نقشهٔ تیم — تایل می‌مپس + لیست ویزیت‌ها.
 class DistributionTeamMapPage extends StatefulWidget {
@@ -109,7 +110,10 @@ class _DistributionTeamMapPageState extends State<DistributionTeamMapPage> {
     final jalali = widget.calendarController.isJalali;
 
     return Scaffold(
-      appBar: AppBar(title: Text(t.distributionTabTeamMap)),
+      appBar: AppBar(
+        title: Text(t.distributionTabTeamMap),
+        leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
+      ),
       body: Column(
         children: [
           Padding(

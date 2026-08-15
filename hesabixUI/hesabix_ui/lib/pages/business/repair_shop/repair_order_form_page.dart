@@ -8,6 +8,7 @@ import '../../../widgets/invoice/person_combobox_widget.dart';
 import '../../../widgets/date_input_field.dart';
 import '../../../utils/error_extractor.dart';
 import '../../../utils/snackbar_helper.dart';
+import '../../../widgets/business_subpage_back_leading.dart';
 
 
 /// صفحه فرم ثبت/ویرایش سفارش تعمیر
@@ -131,6 +132,7 @@ class _RepairOrderFormPageState extends State<RepairOrderFormPage> {
         return Scaffold(
           appBar: AppBar(
             title: Text(widget.orderId == null ? 'سفارش تعمیر جدید' : 'ویرایش سفارش'),
+            leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
             actions: [
               if (_isSaving)
                 const Padding(

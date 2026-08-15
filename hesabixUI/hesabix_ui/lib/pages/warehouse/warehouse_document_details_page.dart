@@ -7,6 +7,7 @@ import '../../widgets/document/document_details_dialog.dart';
 import '../../core/calendar_controller.dart';
 import '../../core/date_utils.dart' show HesabixDateUtils;
 import '../../utils/error_extractor.dart';
+import '../../widgets/business_subpage_back_leading.dart';
 import 'package:hesabix_ui/services/bytes_export/bytes_export_service.dart';
 
 class WarehouseDocumentDetailsPage extends StatefulWidget {
@@ -382,19 +383,28 @@ class _WarehouseDocumentDetailsPageState extends State<WarehouseDocumentDetailsP
   Widget build(BuildContext context) {
     if (_loading) {
       return Scaffold(
-        appBar: AppBar(title: const Text('جزئیات حواله')),
+        appBar: AppBar(
+          title: const Text('جزئیات حواله'),
+          leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
+        ),
         body: const Center(child: CircularProgressIndicator()),
       );
     }
     if (_error != null) {
       return Scaffold(
-        appBar: AppBar(title: const Text('جزئیات حواله')),
+        appBar: AppBar(
+          title: const Text('جزئیات حواله'),
+          leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
+        ),
         body: Center(child: Text('خطا: $_error')),
       );
     }
     if (_doc == null) {
       return Scaffold(
-        appBar: AppBar(title: const Text('جزئیات حواله')),
+        appBar: AppBar(
+          title: const Text('جزئیات حواله'),
+          leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
+        ),
         body: const Center(child: Text('حواله یافت نشد')),
       );
     }
@@ -409,6 +419,7 @@ class _WarehouseDocumentDetailsPageState extends State<WarehouseDocumentDetailsP
     return Scaffold(
       appBar: AppBar(
         title: const Text('جزئیات حواله'),
+        leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
         actions: [
           IconButton(
             icon: const Icon(Icons.print),

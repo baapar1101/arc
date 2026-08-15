@@ -10,6 +10,7 @@ import '../../../services/customer_club_service.dart';
 import '../../../utils/error_extractor.dart';
 import '../../../utils/snackbar_helper.dart';
 import '../../../widgets/invoice/person_combobox_widget.dart';
+import '../../../widgets/business_subpage_back_leading.dart';
 import 'customer_club_analytics_tab.dart';
 
 /// صفحهٔ اصلی باشگاه مشتریان (تراکنش‌ها و در صورت مجوز اصلاح دستی). تنظیمات در مسیر جدا است.
@@ -263,6 +264,7 @@ class _CustomerClubMainPageState extends State<CustomerClubMainPage> with Single
     return Scaffold(
       appBar: AppBar(
         title: Text(t.customerClubTitle),
+        leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
         bottom: TabBar(
           controller: _tabController,
           tabs: [

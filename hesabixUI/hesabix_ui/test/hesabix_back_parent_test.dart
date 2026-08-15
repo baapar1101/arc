@@ -38,6 +38,7 @@ void main() {
       expect(logicalBusinessBackParent('document-monetization'), 'settings');
       expect(logicalBusinessBackParent('notification-templates'), 'settings');
       expect(logicalBusinessBackParent('notification-templates/new'), 'notification-templates');
+      expect(logicalBusinessBackParent('installments-report'), 'reports');
     });
 
     test('hyphenated module siblings', () {

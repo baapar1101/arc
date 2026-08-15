@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/auth_store.dart';
 import '../../../services/telephony/telephony_api.dart';
+import '../../../widgets/business_subpage_back_leading.dart';
 
 class TelephonyReportsPage extends StatefulWidget {
   final int businessId;
@@ -64,6 +65,7 @@ class _TelephonyReportsPageState extends State<TelephonyReportsPage> with Single
     return Scaffold(
       appBar: AppBar(
         title: const Text('گزارش تماس‌ها'),
+        leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
         bottom: TabBar(
           controller: _tabs,
           tabs: const [Tab(text: 'خلاصه'), Tab(text: 'اپراتورها')],

@@ -6,6 +6,7 @@ import 'package:hesabix_ui/services/distribution_service.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
 import 'package:hesabix_ui/utils/snackbar_helper.dart';
 import 'package:hesabix_ui/widgets/jalali_date_picker.dart';
+import 'package:hesabix_ui/widgets/business_subpage_back_leading.dart';
 
 /// گزارش خلاصهٔ ویزیت و مرجوعی (مرکز گزارشات).
 class DistributionReportsDashboardPage extends StatefulWidget {
@@ -108,7 +109,10 @@ class _DistributionReportsDashboardPageState extends State<DistributionReportsDa
     final byOutcome = visits?['by_outcome'] is Map ? visits!['by_outcome'] as Map<String, dynamic> : null;
 
     return Scaffold(
-      appBar: AppBar(title: Text(t.reportsDistributionDashboardTitle)),
+      appBar: AppBar(
+        title: Text(t.reportsDistributionDashboardTitle),
+        leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
+      ),
       body: RefreshIndicator(
         onRefresh: _load,
         child: ListView(

@@ -8,6 +8,7 @@ import '../../../services/telephony/telephony_api.dart';
 import '../../../widgets/telephony/telephony_dialer_sheet.dart';
 import '../../../widgets/telephony/telephony_recording_player.dart';
 import '../../../services/telephony/telephony_session_controller.dart';
+import '../../../widgets/business_subpage_back_leading.dart';
 
 class TelephonyHubPage extends StatefulWidget {
   final int businessId;
@@ -94,6 +95,7 @@ class _TelephonyHubPageState extends State<TelephonyHubPage> {
                   children: [
                     Row(
                       children: [
+                        HesabixBackButton(businessId: widget.businessId),
                         Icon(Icons.phone_in_talk_rounded, color: scheme.primary, size: 28),
                         const SizedBox(width: 10),
                         Expanded(
@@ -374,7 +376,10 @@ class _TelephonyCallsPageState extends State<TelephonyCallsPage> {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     return Scaffold(
-      appBar: AppBar(title: const Text('تاریخچه تماس‌ها')),
+      appBar: AppBar(
+        title: const Text('تاریخچه تماس‌ها'),
+        leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
+      ),
       body: Column(
         children: [
           Padding(
@@ -819,7 +824,10 @@ class _TelephonySettingsPageState extends State<TelephonySettingsPage> {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     return Scaffold(
-      appBar: AppBar(title: const Text('تنظیمات مرکز تماس')),
+      appBar: AppBar(
+        title: const Text('تنظیمات مرکز تماس'),
+        leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
+      ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _addPbx,
         icon: const Icon(Icons.add_rounded),

@@ -8,6 +8,7 @@ import '../../../core/calendar_controller.dart';
 import '../../../core/date_utils.dart';
 import '../../../utils/error_extractor.dart';
 import '../../../widgets/date_input_field.dart';
+import '../../../widgets/business_subpage_back_leading.dart';
 import 'repair_shop_calendar_utils.dart';
 
 /// صفحه لیست سفارشات تعمیر
@@ -207,6 +208,7 @@ class _RepairOrdersListPageState extends State<RepairOrdersListPage> {
         return Scaffold(
           appBar: AppBar(
             title: const Text('مدیریت تعمیرگاه'),
+            leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
             actions: [
               IconButton(
                 icon: Icon(

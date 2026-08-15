@@ -7,6 +7,7 @@ import '../../../core/api_client.dart';
 import '../../../core/calendar_controller.dart';
 import '../../../utils/snackbar_helper.dart';
 import '../../../utils/error_extractor.dart';
+import '../../../widgets/business_subpage_back_leading.dart';
 import 'repair_shop_calendar_utils.dart';
 
 
@@ -320,6 +321,7 @@ class _RepairOrderDetailPageState extends State<RepairOrderDetailPage> {
         return Scaffold(
           appBar: AppBar(
             title: Text(_order?.code ?? 'جزئیات سفارش'),
+            leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
             actions: [
               if (_order != null)
                 PopupMenuButton<String>(

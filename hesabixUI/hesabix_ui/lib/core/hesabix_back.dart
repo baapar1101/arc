@@ -419,4 +419,5 @@ const Map<String, String> _explicitParentByTail = {
   'notification-templates': 'settings',
   'repair-shop-settings': 'repair-shop',
   'repair-shop-technicians': 'repair-shop',
+  'installments-report': 'reports',
 };

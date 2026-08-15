@@ -11,6 +11,7 @@ import '../../../utils/error_extractor.dart';
 import '../../../utils/snackbar_helper.dart';
 import '../../../widgets/date_input_field.dart';
 import '../../../widgets/invoice/invoice_pdf_print_flow.dart';
+import '../../../widgets/business_subpage_back_leading.dart';
 import 'payroll_calendar_utils.dart';
 import 'payroll_post_payment_dialog.dart';
 import 'payroll_run_import_dialog.dart';
@@ -514,6 +515,7 @@ class _PayrollRunEditPageState extends State<PayrollRunEditPage> {
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.isNew ? t.payrollNewRun : t.payrollEditRun),
+        leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
         actions: [
           if (!widget.isNew && _canOperate)
             IconButton(

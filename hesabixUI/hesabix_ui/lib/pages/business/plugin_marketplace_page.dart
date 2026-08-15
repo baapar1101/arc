@@ -18,6 +18,7 @@ import '../../widgets/marketplace/plugin_detail_sheet.dart';
 import '../../widgets/marketplace/plugin_marketplace_empty_state.dart';
 import '../../widgets/marketplace/plugin_marketplace_hero.dart';
 import '../../widgets/marketplace/plugin_marketplace_skeleton.dart';
+import '../../widgets/business_subpage_back_leading.dart';
 import '../../widgets/marketplace/plugin_marketplace_utils.dart';
 import '../../widgets/marketplace/plugin_purchase_confirm_dialog.dart';
 import '../../widgets/marketplace/plugin_wallet_banner.dart';
@@ -385,7 +386,10 @@ class _PluginMarketplacePageState extends State<PluginMarketplacePage> with Sing
 
     if (!widget.authStore.hasBusinessPermission('marketplace', 'view')) {
       return Scaffold(
-        appBar: AppBar(title: Text(t.pluginMarketplace)),
+        appBar: AppBar(
+          title: Text(t.pluginMarketplace),
+          leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
+        ),
         body: Center(
           child: Padding(
             padding: const EdgeInsets.all(24),
@@ -398,6 +402,7 @@ class _PluginMarketplacePageState extends State<PluginMarketplacePage> with Sing
     return Scaffold(
       appBar: AppBar(
         title: Text(t.pluginMarketplace),
+        leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
         bottom: TabBar(
           controller: _tabController,
           tabs: [

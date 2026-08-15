@@ -17,6 +17,7 @@ import 'package:hesabix_ui/widgets/date_input_field.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
 import 'package:hesabix_ui/utils/snackbar_helper.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
+import 'package:hesabix_ui/widgets/business_subpage_back_leading.dart';
 
 class YearEndClosingPage extends StatefulWidget {
   final int businessId;
@@ -746,6 +747,7 @@ class _YearEndClosingPageState extends State<YearEndClosingPage> {
     return Scaffold(
         appBar: AppBar(
           title: const Text('بستن سال مالی'),
+          leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
         ),
         body: _loading
             ? const Center(child: CircularProgressIndicator())

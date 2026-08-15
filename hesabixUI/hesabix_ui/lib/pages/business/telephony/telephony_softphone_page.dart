@@ -6,6 +6,7 @@ import '../../../core/business_nav.dart';
 import '../../../services/telephony/softphone_engine.dart';
 import '../../../services/telephony/telephony_session_controller.dart';
 import '../../../widgets/telephony/telephony_dialer_sheet.dart';
+import '../../../widgets/business_subpage_back_leading.dart';
 
 /// Softphone سازمانی — حالت Relay از طریق Connector (بدون expose کردن PBX).
 class TelephonySoftphonePage extends StatefulWidget {
@@ -126,6 +127,7 @@ class _TelephonySoftphonePageState extends State<TelephonySoftphonePage> {
             children: [
               Row(
                 children: [
+                  HesabixBackButton(businessId: widget.businessId),
                   Container(
                     width: 72,
                     height: 72,

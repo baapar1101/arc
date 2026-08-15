@@ -9,6 +9,7 @@ import '../../utils/snackbar_helper.dart';
 import '../../utils/number_formatters.dart' show formatWithThousands;
 import '../../widgets/zohal/identity_inquiry_dialog.dart';
 import '../../widgets/zohal/zohal_service_widget_factory.dart';
+import '../../widgets/business_subpage_back_leading.dart';
 
 class ZohalInquiriesPage extends StatefulWidget {
   final int businessId;
@@ -294,6 +295,7 @@ class _ZohalInquiriesPageState extends State<ZohalInquiriesPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('استعلامات'),
+        leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),

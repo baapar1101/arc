@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 
 import '../../core/auth_store.dart';
@@ -14,6 +13,7 @@ import '../../utils/number_normalizer.dart'
 import '../../utils/snackbar_helper.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/api_datetime_display.dart';
+import '../../widgets/business_subpage_back_leading.dart';
 import 'package:hesabix_ui/services/bytes_export/bytes_export_service.dart';
 
 /// ویرایش گسترده قیمت پایه و (اختیاری) قیمت‌های لیست قیمت، با صفحه‌بندی.
@@ -1196,7 +1196,10 @@ class _ProductBulkPricesSheetPageState extends State<ProductBulkPricesSheetPage>
 
     if (!widget.authStore.hasBusinessPermission('products', 'view')) {
       return Scaffold(
-        appBar: AppBar(title: Text(t.bulkProductPricesSheetTitle)),
+        appBar: AppBar(
+          title: Text(t.bulkProductPricesSheetTitle),
+          leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
+        ),
         body: Center(
           child: Padding(
             padding: const EdgeInsets.all(24),
@@ -1227,10 +1230,7 @@ class _ProductBulkPricesSheetPageState extends State<ProductBulkPricesSheetPage>
         elevation: 0,
         scrolledUnderElevation: 1,
         title: Text(t.bulkProductPricesSheetTitle),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_rounded),
-          onPressed: () => context.pop(),
-        ),
+        leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
         actions: _buildAppBarActions(t, canEdit, compactToolbar),
       ),
       body: Column(

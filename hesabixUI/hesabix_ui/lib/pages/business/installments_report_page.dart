@@ -12,6 +12,7 @@ import 'package:hesabix_ui/services/invoice_service.dart';
 import 'package:hesabix_ui/services/currency_service.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
+import 'package:hesabix_ui/widgets/business_subpage_back_leading.dart';
 import 'package:hesabix_ui/services/bytes_export/bytes_export_service.dart';
 
 class InstallmentsReportPage extends StatefulWidget {
@@ -1192,6 +1193,7 @@ class _InstallmentsReportPageState extends State<InstallmentsReportPage> {
     return Scaffold(
       appBar: AppBar(
         title: Text(t.installmentsReportTitle),
+        leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
         actions: [
           IconButton(
             onPressed: _loading ? null : () => _fetch(),

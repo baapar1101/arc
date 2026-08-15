@@ -9,6 +9,7 @@ import '../../utils/number_normalizer.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../utils/api_datetime_display.dart';
+import '../../widgets/business_subpage_back_leading.dart';
 
 class PriceListItemsPage extends StatefulWidget {
   final int businessId;
@@ -61,6 +62,7 @@ class _PriceListItemsPageState extends State<PriceListItemsPage> {
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.priceListName ?? t.priceLists),
+        leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
         actions: [
           IconButton(onPressed: _load, icon: const Icon(Icons.refresh)),
           IconButton(

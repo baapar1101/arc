@@ -10,6 +10,7 @@ import '../../services/sms_bank/sms_bank_seed_patterns.dart';
 import '../../services/system_notifications/system_notifications_service.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../widgets/invoice/bank_account_combobox_widget.dart';
+import '../../widgets/business_subpage_back_leading.dart';
 
 /// Android-only settings for SMS bank assistant.
 class SmsBankAssistantSettingsPage extends StatefulWidget {
@@ -238,7 +239,10 @@ class _SmsBankAssistantSettingsPageState extends State<SmsBankAssistantSettingsP
 
     if (!supportsAndroidSmsBankAssistant) {
       return Scaffold(
-        appBar: AppBar(title: const Text('دستیار پیامک بانکی')),
+        appBar: AppBar(
+          title: const Text('دستیار پیامک بانکی'),
+          leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
+        ),
         body: const Center(
           child: Padding(
             padding: EdgeInsets.all(24),
@@ -254,6 +258,7 @@ class _SmsBankAssistantSettingsPageState extends State<SmsBankAssistantSettingsP
     return Scaffold(
       appBar: AppBar(
         title: const Text('دستیار پیامک بانکی'),
+        leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
         actions: [
           if (_saving)
             const Padding(

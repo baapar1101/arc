@@ -15,6 +15,7 @@ import 'package:hesabix_ui/widgets/date_input_field.dart';
 import 'package:hesabix_ui/widgets/project/project_selector_widget.dart';
 import 'package:hesabix_ui/widgets/invoice/person_combobox_widget.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
+import 'package:hesabix_ui/widgets/business_subpage_back_leading.dart';
 
 /// نمای موبایل برای لیست اسناد (نمایش کارت‌ها + فیلتر BottomSheet + سرچ + Load more)
 class DocumentsMobileView extends StatefulWidget {
@@ -762,6 +763,7 @@ class _DocumentsMobileViewState extends State<DocumentsMobileView> {
       backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
         title: Text(_selectionMode ? '${_selectedIds.length} انتخاب شد' : 'اسناد حسابداری'),
+        leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
         actions: _selectionMode
             ? [
                 IconButton(

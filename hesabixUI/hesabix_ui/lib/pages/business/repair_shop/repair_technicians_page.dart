@@ -7,6 +7,7 @@ import '../../../core/api_client.dart';
 import '../../../core/calendar_controller.dart';
 import '../../../utils/snackbar_helper.dart';
 import '../../../utils/error_extractor.dart';
+import '../../../widgets/business_subpage_back_leading.dart';
 
 
 /// صفحه مدیریت تعمیرکاران
@@ -145,6 +146,7 @@ class _RepairTechniciansPageState extends State<RepairTechniciansPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('مدیریت تعمیرکاران'),
+        leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
         actions: [
           IconButton(
             icon: Icon(_showInactive
@@ -440,6 +442,7 @@ class _TechnicianFormDialogState extends State<_TechnicianFormDialog> {
       appBar: AppBar(
         title: Text(
             widget.technician == null ? 'تعمیرکار جدید' : 'ویرایش تعمیرکار'),
+        leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
         actions: [
           if (_isSaving)
             const Padding(

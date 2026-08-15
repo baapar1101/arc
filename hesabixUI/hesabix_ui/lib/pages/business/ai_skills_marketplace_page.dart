@@ -10,6 +10,7 @@ import 'package:hesabix_ui/widgets/ai/ai_chat_design.dart';
 import 'package:hesabix_ui/widgets/ai/ai_empty_state.dart';
 import 'package:hesabix_ui/widgets/ai/ai_skill_marketplace_card.dart';
 import 'package:hesabix_ui/widgets/ai/ai_skill_purchase_confirm_dialog.dart';
+import 'package:hesabix_ui/widgets/business_subpage_back_leading.dart';
 
 /// مارکت‌پلیس مهارت‌های AI
 class AISkillsMarketplacePage extends StatefulWidget {
@@ -277,6 +278,7 @@ class _AISkillsMarketplacePageState extends State<AISkillsMarketplacePage>
     return Scaffold(
       appBar: AppBar(
         title: const Text('مارکت‌پلیس مهارت‌های AI'),
+        leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
         bottom: TabBar(
           controller: _tabController,
           tabs: const [
