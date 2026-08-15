@@ -20874,6 +20874,78 @@ abstract class AppLocalizations {
   /// **'30 days'**
   String get quickSalesSettingsShareExpiry30Days;
 
+  /// No description provided for @quickSalesParkedNewSale.
+  ///
+  /// In en, this message translates to:
+  /// **'New sale'**
+  String get quickSalesParkedNewSale;
+
+  /// No description provided for @quickSalesParkedNewSaleTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Hold the current cart and start another sale (Ctrl+N)'**
+  String get quickSalesParkedNewSaleTooltip;
+
+  /// No description provided for @quickSalesParkedNewSaleAlreadyEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'The current cart is already empty. Add items or choose a customer first.'**
+  String get quickSalesParkedNewSaleAlreadyEmpty;
+
+  /// No description provided for @quickSalesParkedMaxReached.
+  ///
+  /// In en, this message translates to:
+  /// **'You can keep at most {count} open sales. Finish or discard one first.'**
+  String quickSalesParkedMaxReached(int count);
+
+  /// No description provided for @quickSalesParkedSaleFallback.
+  ///
+  /// In en, this message translates to:
+  /// **'Sale {index}'**
+  String quickSalesParkedSaleFallback(int index);
+
+  /// No description provided for @quickSalesParkedSaleEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'Empty'**
+  String get quickSalesParkedSaleEmpty;
+
+  /// No description provided for @quickSalesParkedSaleSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} items · {amount}'**
+  String quickSalesParkedSaleSubtitle(int count, String amount);
+
+  /// No description provided for @quickSalesParkedDiscardTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Discard this sale'**
+  String get quickSalesParkedDiscardTooltip;
+
+  /// No description provided for @quickSalesParkedDiscardTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Discard this sale?'**
+  String get quickSalesParkedDiscardTitle;
+
+  /// No description provided for @quickSalesParkedDiscardBody.
+  ///
+  /// In en, this message translates to:
+  /// **'This held sale and its items will be removed. This cannot be undone.'**
+  String get quickSalesParkedDiscardBody;
+
+  /// No description provided for @quickSalesParkedDiscardConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Discard'**
+  String get quickSalesParkedDiscardConfirm;
+
+  /// No description provided for @quickSalesParkedAnonymousCustomer.
+  ///
+  /// In en, this message translates to:
+  /// **'Walk-in customer'**
+  String get quickSalesParkedAnonymousCustomer;
+
   /// No description provided for @settingsRedisCache.
   ///
   /// In en, this message translates to:

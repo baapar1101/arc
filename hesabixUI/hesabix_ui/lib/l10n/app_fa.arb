@@ -4427,6 +4427,26 @@
   "quickSalesSettingsShareExpiry7Days": "۷ روز",
   "quickSalesSettingsShareExpiry14Days": "۱۴ روز",
   "quickSalesSettingsShareExpiry30Days": "۳۰ روز",
+  "quickSalesParkedNewSale": "فروش جدید",
+  "quickSalesParkedNewSaleTooltip": "سبد فعلی را نگه می‌دارد و فروش دیگری شروع می‌کند (Ctrl+N)",
+  "quickSalesParkedNewSaleAlreadyEmpty": "سبد فعلی خالی است. ابتدا کالا اضافه کنید یا مشتری را انتخاب کنید.",
+  "quickSalesParkedMaxReached": "حداکثر {count} فروش باز می‌توانید داشته باشید. ابتدا یکی را ثبت یا حذف کنید.",
+  "@quickSalesParkedMaxReached": {"placeholders": {"count": {"type": "int"}}},
+  "quickSalesParkedSaleFallback": "فروش {index}",
+  "@quickSalesParkedSaleFallback": {"placeholders": {"index": {"type": "int"}}},
+  "quickSalesParkedSaleEmpty": "خالی",
+  "quickSalesParkedSaleSubtitle": "{count} قلم · {amount}",
+  "@quickSalesParkedSaleSubtitle": {
+    "placeholders": {
+      "count": {"type": "int"},
+      "amount": {"type": "String"}
+    }
+  },
+  "quickSalesParkedDiscardTooltip": "حذف این فروش",
+  "quickSalesParkedDiscardTitle": "این فروش حذف شود؟",
+  "quickSalesParkedDiscardBody": "این فروش نگه‌داشته‌شده و اقلام آن حذف می‌شوند و قابل بازگشت نیست.",
+  "quickSalesParkedDiscardConfirm": "حذف",
+  "quickSalesParkedAnonymousCustomer": "مشتری ناشناس",
   "settingsRedisCache": "تنظیمات Redis Cache",
   "settingsRedisCacheDescription": "پیکربندی Redis برای بهبود عملکرد و کاهش بار دیتابیس",
   "settingsFirewall": "فایروال نرم‌افزار",

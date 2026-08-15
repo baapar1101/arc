@@ -4385,6 +4385,26 @@
   "quickSalesSettingsShareExpiry7Days": "7 days",
   "quickSalesSettingsShareExpiry14Days": "14 days",
   "quickSalesSettingsShareExpiry30Days": "30 days",
+  "quickSalesParkedNewSale": "New sale",
+  "quickSalesParkedNewSaleTooltip": "Hold the current cart and start another sale (Ctrl+N)",
+  "quickSalesParkedNewSaleAlreadyEmpty": "The current cart is already empty. Add items or choose a customer first.",
+  "quickSalesParkedMaxReached": "You can keep at most {count} open sales. Finish or discard one first.",
+  "@quickSalesParkedMaxReached": {"placeholders": {"count": {"type": "int"}}},
+  "quickSalesParkedSaleFallback": "Sale {index}",
+  "@quickSalesParkedSaleFallback": {"placeholders": {"index": {"type": "int"}}},
+  "quickSalesParkedSaleEmpty": "Empty",
+  "quickSalesParkedSaleSubtitle": "{count} items · {amount}",
+  "@quickSalesParkedSaleSubtitle": {
+    "placeholders": {
+      "count": {"type": "int"},
+      "amount": {"type": "String"}
+    }
+  },
+  "quickSalesParkedDiscardTooltip": "Discard this sale",
+  "quickSalesParkedDiscardTitle": "Discard this sale?",
+  "quickSalesParkedDiscardBody": "This held sale and its items will be removed. This cannot be undone.",
+  "quickSalesParkedDiscardConfirm": "Discard",
+  "quickSalesParkedAnonymousCustomer": "Walk-in customer",
   "settingsRedisCache": "Redis Cache",
   "settingsRedisCacheDescription": "Configure Redis cache for improved performance",
   "settingsFirewall": "Application firewall",

@@ -25,7 +25,9 @@ import '../../services/business_api_service.dart';
 import '../../services/currency_service.dart';
 import '../../models/invoice_line_item.dart';
 import '../../models/invoice_transaction.dart';
+import '../../models/quick_sales_parked_sale.dart';
 import '../../widgets/invoice/customer_combobox_widget.dart';
+import '../../widgets/quick_sales/quick_sales_parked_sales_bar.dart';
 import '../../widgets/invoice/cash_register_combobox_widget.dart';
 import '../../widgets/invoice/warehouse_combobox_widget.dart';
 import '../../widgets/permission/access_denied_page.dart';
@@ -211,6 +213,25 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
 
   VoidCallback? _restoreDesktopRailAfterQuit;
 
+  /// پیش‌فرض تنظیمات (نه مقدار فعلی فروش باز) برای فروش جدید.
+  int? _settingsDefaultWarehouseId;
+  String? _settingsDefaultCashRegisterId;
+  bool _settingsAutoCreatePaymentDocument = true;
+
+  static const int _maxParkedSales = 12;
+  final List<QuickSalesParkedSale> _sales = [];
+  String _activeSaleId = '';
+  bool _parkedHydrated = false;
+  Timer? _parkedPersistDebounce;
+
+  @override
+  void setState(VoidCallback fn) {
+    super.setState(fn);
+    if (_parkedHydrated && mounted) {
+      _schedulePersistParkedSales();
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -223,6 +244,7 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
         if (mounted) setState(() {});
       });
     });
+    _documentDescriptionController.addListener(_onParkedSaleDescriptionChanged);
     _loadSettings();
     _loadRecentProducts();
     _barcodeFocus.addListener(_onBarcodeFocusChanged);
@@ -350,12 +372,23 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
   @override
   void dispose() {
     _restoreDesktopRailAfterQuit?.call();
+    _parkedPersistDebounce?.cancel();
+    if (_parkedHydrated && _activeSaleId.isNotEmpty) {
+      _captureActiveSaleIntoList();
+      unawaited(
+        QuickSalesParkedSalesStorage.save(
+          widget.businessId,
+          QuickSalesParkedSalesBundle(activeId: _activeSaleId, sales: List.of(_sales)),
+        ),
+      );
+    }
     _searchDebounce?.cancel();
     _globalDiscountDebounce?.cancel();
     _stockBatchTimer?.cancel();
     _removeBarcodeOverlay();
     _mobileTabController.dispose();
     _barcodeController.dispose();
+    _documentDescriptionController.removeListener(_onParkedSaleDescriptionChanged);
     _documentDescriptionController.dispose();
     _globalDiscountValueController.dispose();
     _barcodeOverlayScrollController.removeListener(_onBarcodeOverlayScroll);
@@ -397,8 +430,6 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
       final settings = Map<String, dynamic>.from(results[0] as Map);
       final customer = Map<String, dynamic>.from(results[1] as Map);
 
-      final previousShowInventory = _showInventory;
-
       if (!mounted) return;
       setState(() {
         _settings = settings;
@@ -419,15 +450,30 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
             widget.authStore.canViewPurchasePrice();
         _printTemplateId = settings['print_template_id'];
         _autoCreatePaymentDocument = settings['auto_create_payment_document'] ?? true;
+        _settingsDefaultWarehouseId = _defaultWarehouseId;
+        _settingsDefaultCashRegisterId = _selectedCashRegisterId;
+        _settingsAutoCreatePaymentDocument = _autoCreatePaymentDocument;
         _applyShareDefaultsFromSettings(settings);
         _priceListCache.clear();
+      });
+
+      try {
+        await _hydrateParkedSalesIntoFields();
+      } catch (_) {
+        _activeSaleId = QuickSalesParkedSale.newId();
+        _sales.clear();
+        _captureActiveSaleIntoList();
+      }
+      if (!mounted) return;
+      setState(() {
         _loading = false;
+        _parkedHydrated = true;
       });
 
       unawaited(_loadShareGatewaysAndDefaults());
       unawaited(_loadBusinessMetadata());
 
-      if (_showInventory && !previousShowInventory && _cartItems.isNotEmpty) {
+      if (_showInventory && _cartItems.isNotEmpty) {
         _refreshAllStocks();
       }
     } catch (e) {
@@ -458,6 +504,332 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
         _applyCurrencyMetaFromCache();
       });
     } catch (_) {}
+  }
+
+  void _onParkedSaleDescriptionChanged() {
+    if (_parkedHydrated) _schedulePersistParkedSales();
+  }
+
+  bool get _isActiveSaleBlank {
+    final isAnon = _selectedCustomer == null ||
+        (_anonymousCustomer != null && _selectedCustomer!.id == _anonymousCustomer!.id);
+    return _cartItems.isEmpty &&
+        isAnon &&
+        _documentDescriptionController.text.trim().isEmpty &&
+        _globalDiscountValueController.text.trim().isEmpty &&
+        _payment == null;
+  }
+
+  bool get _shouldShowParkedSalesBar => _parkedHydrated && _sales.length > 1;
+
+  void _schedulePersistParkedSales() {
+    _parkedPersistDebounce?.cancel();
+    _parkedPersistDebounce = Timer(const Duration(milliseconds: 400), () {
+      unawaited(_persistParkedSalesNow());
+    });
+  }
+
+  Future<void> _persistParkedSalesNow() async {
+    if (!_parkedHydrated || _activeSaleId.isEmpty) return;
+    _captureActiveSaleIntoList();
+    await QuickSalesParkedSalesStorage.save(
+      widget.businessId,
+      QuickSalesParkedSalesBundle(activeId: _activeSaleId, sales: List.of(_sales)),
+    );
+  }
+
+  void _captureActiveSaleIntoList() {
+    if (_activeSaleId.isEmpty) return;
+    final existingIndex = _sales.indexWhere((s) => s.id == _activeSaleId);
+    final createdAt = existingIndex >= 0 ? _sales[existingIndex].createdAt : DateTime.now();
+    final snap = _snapshotActiveSale(createdAt: createdAt);
+    if (existingIndex >= 0) {
+      _sales[existingIndex] = snap;
+    } else {
+      _sales.add(snap);
+    }
+    final anonId = _anonymousCustomer?.id;
+    _sales.removeWhere((s) => s.id != _activeSaleId && s.isBlank(anonymousCustomerId: anonId));
+  }
+
+  QuickSalesParkedSale _snapshotActiveSale({DateTime? createdAt}) {
+    final now = DateTime.now();
+    return QuickSalesParkedSale(
+      id: _activeSaleId,
+      createdAt: createdAt ?? now,
+      updatedAt: now,
+      customer: _selectedCustomer,
+      cartItems: _cartItems.map(QuickSalesParkedSale.cloneLine).toList(),
+      payment: _payment,
+      cashRegisterId: _selectedCashRegisterId,
+      warehouseId: _defaultWarehouseId,
+      documentDate: _documentDate,
+      documentDescription: _documentDescriptionController.text,
+      globalDiscountType: _globalDiscountType,
+      globalDiscountValue: _globalDiscountValueController.text,
+      autoCreatePaymentDocument: _autoCreatePaymentDocument,
+      shareOnlinePaymentEnabled: _shareOnlinePaymentEnabled,
+      shareGatewayId: _shareGatewayId,
+      shareSendSms: _shareSendSms,
+      shareSendEmail: _shareSendEmail,
+      shareViaNativeShare: _shareViaNativeShare,
+      shareExpiryHours: _shareExpiryHours,
+      itemCount: _cartItems.length,
+      totalAmount: _totalAmount,
+    );
+  }
+
+  void _applySaleState(QuickSalesParkedSale sale) {
+    _activeSaleId = sale.id;
+    var customer = sale.customer ?? _anonymousCustomer;
+    if (_anonymousCustomer != null &&
+        customer != null &&
+        customer.id == _anonymousCustomer!.id) {
+      customer = _anonymousCustomer;
+    }
+    _selectedCustomer = customer;
+    _cartItems = sale.cartItems.map(QuickSalesParkedSale.cloneLine).toList();
+    _payment = sale.payment;
+    _selectedCashRegisterId = sale.cashRegisterId ?? _settingsDefaultCashRegisterId;
+    _defaultWarehouseId = sale.warehouseId ?? _settingsDefaultWarehouseId;
+    _documentDate = sale.documentDate;
+    _documentDescriptionController.text = sale.documentDescription;
+    _globalDiscountType = sale.globalDiscountType;
+    _globalDiscountValueController.text = sale.globalDiscountValue;
+    _autoCreatePaymentDocument = sale.autoCreatePaymentDocument;
+    _shareOnlinePaymentEnabled = sale.shareOnlinePaymentEnabled;
+    _shareGatewayId = sale.shareGatewayId;
+    _shareSendSms = sale.shareSendSms;
+    _shareSendEmail = sale.shareSendEmail;
+    _shareViaNativeShare = sale.shareViaNativeShare;
+    _shareExpiryHours = sale.shareExpiryHours;
+    _productStocks.clear();
+    _pendingStockProductIds.clear();
+    _loadingStockProductIds.clear();
+    _syncShareChannelDefaults();
+  }
+
+  void _applyBlankSaleState() {
+    _selectedCustomer = _anonymousCustomer;
+    _cartItems = [];
+    _payment = null;
+    _selectedCashRegisterId = _settingsDefaultCashRegisterId;
+    _defaultWarehouseId = _settingsDefaultWarehouseId;
+    _documentDate = DateTime.now();
+    _documentDescriptionController.clear();
+    _globalDiscountType = 'percent';
+    _globalDiscountValueController.clear();
+    _autoCreatePaymentDocument = _settingsAutoCreatePaymentDocument;
+    _productStocks.clear();
+    _pendingStockProductIds.clear();
+    _loadingStockProductIds.clear();
+    if (_settings != null) {
+      _applyShareDefaultsFromSettings(_settings!);
+    } else {
+      _syncShareChannelDefaults();
+    }
+  }
+
+  Future<void> _hydrateParkedSalesIntoFields() async {
+    final bundle = await QuickSalesParkedSalesStorage.load(widget.businessId);
+    if (!mounted) return;
+    if (bundle == null || bundle.sales.isEmpty) {
+      _activeSaleId = QuickSalesParkedSale.newId();
+      _sales.clear();
+      _captureActiveSaleIntoList();
+      return;
+    }
+    _sales
+      ..clear()
+      ..addAll(bundle.sales);
+    _activeSaleId = bundle.activeId;
+    final active = _sales.firstWhere((s) => s.id == _activeSaleId);
+    _applySaleState(active);
+  }
+
+  void _afterSaleSwitchUi() {
+    _removeBarcodeOverlay();
+    _barcodeController.clear();
+    _lastFailedSearchQuery = null;
+    if (_mobileTabController.index != 0) {
+      _mobileTabController.animateTo(0);
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _barcodeFocus.requestFocus();
+      _keyboardListenerFocus.requestFocus();
+    });
+    if (_showInventory && _cartItems.isNotEmpty) {
+      _refreshAllStocks();
+    }
+  }
+
+  void _startNewSale() {
+    if (_isSaving) return;
+    final t = AppLocalizations.of(context);
+    if (_isActiveSaleBlank) {
+      SnackBarHelper.show(context, message: t.quickSalesParkedNewSaleAlreadyEmpty);
+      return;
+    }
+    _captureActiveSaleIntoList();
+    if (_sales.length >= _maxParkedSales) {
+      SnackBarHelper.show(
+        context,
+        message: t.quickSalesParkedMaxReached(_maxParkedSales),
+        isError: true,
+      );
+      return;
+    }
+    setState(() {
+      _activeSaleId = QuickSalesParkedSale.newId();
+      _applyBlankSaleState();
+    });
+    unawaited(_persistParkedSalesNow());
+    _afterSaleSwitchUi();
+  }
+
+  void _selectParkedSale(String id) {
+    if (_isSaving || id == _activeSaleId) return;
+    QuickSalesParkedSale? target;
+    for (final sale in _sales) {
+      if (sale.id == id) {
+        target = sale;
+        break;
+      }
+    }
+    if (target == null) return;
+    final selected = target;
+    setState(() {
+      _captureActiveSaleIntoList();
+      _applySaleState(selected);
+    });
+    unawaited(_persistParkedSalesNow());
+    _afterSaleSwitchUi();
+  }
+
+  Future<void> _discardParkedSale(String id) async {
+    if (_isSaving) return;
+    if (id == _activeSaleId) {
+      _captureActiveSaleIntoList();
+    }
+    final index = _sales.indexWhere((s) => s.id == id);
+    if (index < 0) return;
+    final sale = _sales[index];
+    final isBlank = id == _activeSaleId
+        ? _isActiveSaleBlank
+        : sale.isBlank(anonymousCustomerId: _anonymousCustomer?.id);
+    if (!isBlank) {
+      final t = AppLocalizations.of(context);
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Text(t.quickSalesParkedDiscardTitle),
+          content: Text(t.quickSalesParkedDiscardBody),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('انصراف'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Theme.of(context).colorScheme.error,
+                foregroundColor: Theme.of(context).colorScheme.onError,
+              ),
+              child: Text(t.quickSalesParkedDiscardConfirm),
+            ),
+          ],
+        ),
+      );
+      if (confirmed != true || !mounted) return;
+    }
+
+    final wasActive = id == _activeSaleId;
+    setState(() {
+      _sales.removeWhere((s) => s.id == id);
+      if (_sales.isEmpty) {
+        if (_activeSaleId.isEmpty) {
+          _activeSaleId = QuickSalesParkedSale.newId();
+        }
+        _applyBlankSaleState();
+        _captureActiveSaleIntoList();
+      } else if (wasActive) {
+        final nextIndex = index < _sales.length ? index : _sales.length - 1;
+        _applySaleState(_sales[nextIndex]);
+      }
+    });
+    unawaited(_persistParkedSalesNow());
+    if (wasActive) _afterSaleSwitchUi();
+  }
+
+  List<QuickSalesParkedSaleChipData> _parkedSaleChipData(AppLocalizations t) {
+    return [
+      for (var i = 0; i < _sales.length; i++) _chipForSale(_sales[i], index: i, t: t),
+    ];
+  }
+
+  QuickSalesParkedSaleChipData _chipForSale(
+    QuickSalesParkedSale sale, {
+    required int index,
+    required AppLocalizations t,
+  }) {
+    final isActive = sale.id == _activeSaleId;
+    final customer = isActive ? _selectedCustomer : sale.customer;
+    final customerName = customer?.name.trim() ?? '';
+    final itemCount = isActive ? _cartItems.length : sale.itemCount;
+    final total = isActive ? _totalAmount : sale.totalAmount;
+    final isAnon = customer == null ||
+        (_anonymousCustomer != null && customer.id == _anonymousCustomer!.id);
+    final isBlank = isActive
+        ? _isActiveSaleBlank
+        : sale.isBlank(anonymousCustomerId: _anonymousCustomer?.id);
+    final String title;
+    if (!isAnon && customerName.isNotEmpty) {
+      title = customerName;
+    } else if (itemCount > 0) {
+      title = t.quickSalesParkedSaleFallback(index + 1);
+    } else if (isAnon) {
+      title = isBlank ? t.quickSalesParkedNewSale : t.quickSalesParkedAnonymousCustomer;
+    } else {
+      title = t.quickSalesParkedSaleFallback(index + 1);
+    }
+    final subtitle = itemCount <= 0
+        ? t.quickSalesParkedSaleEmpty
+        : t.quickSalesParkedSaleSubtitle(itemCount, _formatNumber(total));
+    return QuickSalesParkedSaleChipData(
+      id: sale.id,
+      title: title,
+      subtitle: subtitle,
+      isActive: isActive,
+      isBlank: isBlank,
+      showDiscard: _sales.length > 1 || !isBlank,
+      customerInitial: (!isAnon && customerName.isNotEmpty) ? customerName : null,
+    );
+  }
+
+  Widget _withParkedSalesBar(Widget child, {required bool compact}) {
+    if (!_shouldShowParkedSalesBar) return child;
+    final t = AppLocalizations.of(context);
+    return Column(
+      children: [
+        QuickSalesParkedSalesBar(
+          sales: _parkedSaleChipData(t),
+          compact: compact,
+          enabled: !_isSaving,
+          newSaleEnabled: !_isActiveSaleBlank && _sales.length < _maxParkedSales,
+          newSaleLabel: t.quickSalesParkedNewSale,
+          newSaleTooltip: _isActiveSaleBlank
+              ? t.quickSalesParkedNewSaleAlreadyEmpty
+              : t.quickSalesParkedNewSaleTooltip,
+          discardTooltip: t.quickSalesParkedDiscardTooltip,
+          onNewSale: _startNewSale,
+          onSelect: _selectParkedSale,
+          onDiscard: (id) => unawaited(_discardParkedSale(id)),
+        ),
+        const Divider(height: 1),
+        Expanded(child: child),
+      ],
+    );
   }
 
   String? get _selectedCustomerPhone {
@@ -505,8 +877,11 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
       final gateways = await _paymentGatewayService.listBusinessGateways(widget.businessId);
       if (!mounted) return;
 
+      final preserveShareChoices = _parkedHydrated;
+
       // اگر در تنظیمات فروش سریع درگاه تعریف نشده، از تنظیمات عمومی اشتراک فاکتور استفاده کن
-      if (_shareGatewayId == null || _settings?['default_share_gateway_id'] == null) {
+      if (!preserveShareChoices &&
+          (_shareGatewayId == null || _settings?['default_share_gateway_id'] == null)) {
         try {
           final shareSettings = await BusinessApiService.getInvoiceShareSettings(widget.businessId);
           if (_settings?['default_share_gateway_id'] == null) {
@@ -536,13 +911,16 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
         if (_shareGatewayId != null && !gatewayIds.contains(_shareGatewayId)) {
           _shareGatewayId = null;
         }
-        if (_shareOnlinePaymentEnabled &&
+        if (!preserveShareChoices &&
+            _shareOnlinePaymentEnabled &&
             _shareGatewayId == null &&
             gateways.length == 1) {
           _shareGatewayId = (gateways.first['id'] as num?)?.toInt();
         }
         if (gateways.isEmpty) _shareOnlinePaymentEnabled = false;
-        _syncShareChannelDefaults();
+        if (!preserveShareChoices) {
+          _syncShareChannelDefaults();
+        }
       });
     } catch (_) {
       if (mounted) {
@@ -2432,6 +2810,13 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
         }
       }
       
+      // Ctrl/Cmd + N: فروش جدید (نگه داشتن سبد فعلی)
+      if ((isControlPressed || isMetaPressed) &&
+          event.logicalKey == LogicalKeyboardKey.keyN) {
+        _startNewSale();
+        return true;
+      }
+
       // Ctrl/Cmd + K: پاک کردن همه سبد
       if ((isControlPressed || isMetaPressed) &&
           event.logicalKey == LogicalKeyboardKey.keyK) {
@@ -2772,6 +3157,11 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
         backgroundColor: cs.surface,
         foregroundColor: cs.onSurface,
         actions: [
+          IconButton(
+            icon: const Icon(Icons.add),
+            tooltip: AppLocalizations.of(context).quickSalesParkedNewSaleTooltip,
+            onPressed: _isSaving ? null : _startNewSale,
+          ),
           if (_cartItems.isNotEmpty)
             IconButton(
               icon: const Icon(Icons.clear_all),
@@ -2792,7 +3182,10 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
         builder: (context, constraints) {
           final isCompact = constraints.maxWidth < _compactBreakpoint;
           if (isMobile) {
-            return _buildMobileTabbedLayout(cs, isCompact: isCompact);
+            return _withParkedSalesBar(
+              _buildMobileTabbedLayout(cs, isCompact: isCompact),
+              compact: true,
+            );
           }
           final cartColumn = Column(
             children: [
@@ -3135,13 +3528,16 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
               ],
             );
 
-          return Row(
-            children: [
-              // ستون چپ: سبد خرید
-              Expanded(flex: 7, child: cartColumn),
-              // ستون راست: خلاصه و پرداخت
-              _buildDesktopCheckoutPanel(cs),
-            ],
+          return _withParkedSalesBar(
+            Row(
+              children: [
+                // ستون چپ: سبد خرید
+                Expanded(flex: 7, child: cartColumn),
+                // ستون راست: خلاصه و پرداخت
+                _buildDesktopCheckoutPanel(cs),
+              ],
+            ),
+            compact: isCompact,
           );
         },
       ),

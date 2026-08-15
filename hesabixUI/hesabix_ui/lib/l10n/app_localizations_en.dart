@@ -11247,6 +11247,51 @@ class AppLocalizationsEn extends AppLocalizations {
   String get quickSalesSettingsShareExpiry30Days => '30 days';
 
   @override
+  String get quickSalesParkedNewSale => 'New sale';
+
+  @override
+  String get quickSalesParkedNewSaleTooltip =>
+      'Hold the current cart and start another sale (Ctrl+N)';
+
+  @override
+  String get quickSalesParkedNewSaleAlreadyEmpty =>
+      'The current cart is already empty. Add items or choose a customer first.';
+
+  @override
+  String quickSalesParkedMaxReached(int count) {
+    return 'You can keep at most $count open sales. Finish or discard one first.';
+  }
+
+  @override
+  String quickSalesParkedSaleFallback(int index) {
+    return 'Sale $index';
+  }
+
+  @override
+  String get quickSalesParkedSaleEmpty => 'Empty';
+
+  @override
+  String quickSalesParkedSaleSubtitle(int count, String amount) {
+    return '$count items · $amount';
+  }
+
+  @override
+  String get quickSalesParkedDiscardTooltip => 'Discard this sale';
+
+  @override
+  String get quickSalesParkedDiscardTitle => 'Discard this sale?';
+
+  @override
+  String get quickSalesParkedDiscardBody =>
+      'This held sale and its items will be removed. This cannot be undone.';
+
+  @override
+  String get quickSalesParkedDiscardConfirm => 'Discard';
+
+  @override
+  String get quickSalesParkedAnonymousCustomer => 'Walk-in customer';
+
+  @override
   String get settingsRedisCache => 'Redis Cache';
 
   @override

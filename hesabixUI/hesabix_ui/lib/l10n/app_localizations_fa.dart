@@ -11186,6 +11186,51 @@ class AppLocalizationsFa extends AppLocalizations {
   String get quickSalesSettingsShareExpiry30Days => '۳۰ روز';
 
   @override
+  String get quickSalesParkedNewSale => 'فروش جدید';
+
+  @override
+  String get quickSalesParkedNewSaleTooltip =>
+      'سبد فعلی را نگه می‌دارد و فروش دیگری شروع می‌کند (Ctrl+N)';
+
+  @override
+  String get quickSalesParkedNewSaleAlreadyEmpty =>
+      'سبد فعلی خالی است. ابتدا کالا اضافه کنید یا مشتری را انتخاب کنید.';
+
+  @override
+  String quickSalesParkedMaxReached(int count) {
+    return 'حداکثر $count فروش باز می‌توانید داشته باشید. ابتدا یکی را ثبت یا حذف کنید.';
+  }
+
+  @override
+  String quickSalesParkedSaleFallback(int index) {
+    return 'فروش $index';
+  }
+
+  @override
+  String get quickSalesParkedSaleEmpty => 'خالی';
+
+  @override
+  String quickSalesParkedSaleSubtitle(int count, String amount) {
+    return '$count قلم · $amount';
+  }
+
+  @override
+  String get quickSalesParkedDiscardTooltip => 'حذف این فروش';
+
+  @override
+  String get quickSalesParkedDiscardTitle => 'این فروش حذف شود؟';
+
+  @override
+  String get quickSalesParkedDiscardBody =>
+      'این فروش نگه‌داشته‌شده و اقلام آن حذف می‌شوند و قابل بازگشت نیست.';
+
+  @override
+  String get quickSalesParkedDiscardConfirm => 'حذف';
+
+  @override
+  String get quickSalesParkedAnonymousCustomer => 'مشتری ناشناس';
+
+  @override
   String get settingsRedisCache => 'تنظیمات Redis Cache';
 
   @override
