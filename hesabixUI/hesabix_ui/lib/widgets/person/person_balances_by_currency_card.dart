@@ -49,7 +49,6 @@ class PersonBalancesByCurrencyCard extends StatelessWidget {
     }
 
     final totalBase = (payload?['total_base'] as num?)?.toDouble() ?? 0;
-    final status = personBalanceStatusLabel(payload?['status']?.toString());
     final baseUnit = () {
       for (final raw in balances) {
         final b = Map<String, dynamic>.from(raw as Map);
@@ -150,8 +149,7 @@ class PersonBalancesByCurrencyCard extends StatelessWidget {
               }),
               const Divider(height: 18),
               Text(
-                'جمع معادل پایه: ${formatAmountWithCurrencyUnit(totalBase, unit: baseUnit, decimalPlaces: 0)}'
-                '${status.isNotEmpty ? ' — $status' : ''}',
+                'جمع معادل پایه: ${formatPersonNetBalanceDisplay(balance: totalBase, status: payload?['status']?.toString(), unit: baseUnit)}',
                 style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w700),
               ),
               const SizedBox(height: 2),

@@ -14,12 +14,13 @@ from adapters.db.models.business import Business
 from adapters.db.models.currency import Currency
 from adapters.db.models.document import Document
 from adapters.db.models.document_line import DocumentLine
+from adapters.db.models.fiscal_year import FiscalYear
 from adapters.db.models.person import Person
 from adapters.db.models.person_share_link import PersonShareLink
 from app.core.responses import ApiError
 from app.core.settings import get_settings
 from app.services.invoice_service import SUPPORTED_INVOICE_TYPES, invoice_document_to_dict
-from app.services.person_service import calculate_person_balance
+from app.services.person_service import calculate_person_balance_breakdown
 from app.services.system_settings_service import resolve_share_url_http_origin
 
 
@@ -367,25 +368,13 @@ def record_share_link_view(db: Session, link: PersonShareLink) -> PersonShareLin
     return link
 
 
-def _fetch_summary_totals(
-    db: Session, business_id: int, person_id: int
-) -> Dict[str, float]:
-    row = (
-        db.query(
-            func.coalesce(func.sum(DocumentLine.debit), 0).label("total_debit"),
-            func.coalesce(func.sum(DocumentLine.credit), 0).label("total_credit"),
-        )
-        .join(Document, Document.id == DocumentLine.document_id)
-        .filter(
-            Document.business_id == business_id,
-            DocumentLine.person_id == person_id,
-            Document.is_proforma == False,  # noqa: E712
-        )
+def _current_fiscal_year_id(db: Session, business_id: int) -> Optional[int]:
+    fy = (
+        db.query(FiscalYear)
+        .filter(and_(FiscalYear.business_id == business_id, FiscalYear.is_last == True))  # noqa: E712
         .first()
     )
-    total_debit = float(getattr(row, "total_debit", 0) or 0)
-    total_credit = float(getattr(row, "total_credit", 0) or 0)
-    return {"total_debit": total_debit, "total_credit": total_credit}
+    return int(fy.id) if fy else None
 
 
 def _fetch_ledger_items(
@@ -395,6 +384,7 @@ def _fetch_ledger_items(
     limit: int,
     *,
     include_invoice_lines: bool = True,
+    fiscal_year_id: Optional[int] = None,
 ) -> list[Dict[str, Any]]:
     from app.services.person_service import get_people_transactions_report
 
@@ -402,6 +392,7 @@ def _fetch_ledger_items(
     result = get_people_transactions_report(
         db=db,
         business_id=business_id,
+        fiscal_year_id=fiscal_year_id,
         person_ids=[person_id],
         skip=0,
         take=10000,
@@ -434,7 +425,8 @@ def _fetch_ledger_items(
                 "quantity": item.get("quantity"),
                 "unit_price": item.get("unit_price"),
                 "line_amount": item.get("line_amount"),
-                "currency_code": item.get("currency_code"),
+                # مبالغ ledger معادل ارز پایه است؛ کد ارز سند را نمی‌چسبانیم تا با مبلغ پایه قاطی نشود
+                "currency_code": None,
                 "extra_info": {},
             }
         )
@@ -446,8 +438,10 @@ def _fetch_invoice_items(
     business_id: int,
     person_id: int,
     limit: int,
+    *,
+    fiscal_year_id: Optional[int] = None,
 ) -> list[Dict[str, Any]]:
-    rows = (
+    query = (
         db.query(
             Document.id.label("document_id"),
             Document.code.label("document_code"),
@@ -467,6 +461,11 @@ def _fetch_invoice_items(
             Document.document_type.in_(tuple(SUPPORTED_INVOICE_TYPES)),
             DocumentLine.person_id == person_id,
         )
+    )
+    if fiscal_year_id:
+        query = query.filter(Document.fiscal_year_id == fiscal_year_id)
+    rows = (
+        query
         # GROUP BY فقط id و currency: در PostgreSQL ستون‌های دیگر سند تابع id هستند.
         # قرار دادن extra_info (نوع json) در GROUP BY در PostgreSQL خطای عدم وجود عملگر برابری می‌دهد.
         .group_by(Document.id, Currency.code)
@@ -518,8 +517,10 @@ def build_public_payload(
         )
 
     options = _normalize_options(link.options or {})
-    balance, status = calculate_person_balance(db, person.id)
-    totals = _fetch_summary_totals(db, link.business_id, link.person_id)
+    fy_id = _current_fiscal_year_id(db, int(link.business_id))
+    breakdown = calculate_person_balance_breakdown(
+        db, person.id, fiscal_year_id=fy_id
+    )
 
     ledger_items = (
         _fetch_ledger_items(
@@ -528,6 +529,7 @@ def build_public_payload(
             link.person_id,
             options["documents_limit"],
             include_invoice_lines=bool(options.get("include_invoice_lines", True)),
+            fiscal_year_id=fy_id,
         )
         if options["include_ledger"]
         else []
@@ -538,6 +540,7 @@ def build_public_payload(
             link.business_id,
             link.person_id,
             options["documents_limit"],
+            fiscal_year_id=fy_id,
         )
         if options["include_invoices"]
         else []
@@ -567,10 +570,11 @@ def build_public_payload(
             "has_logo": bool(getattr(business, "logo_file_id", None)),
         },
         "summary": {
-            "balance": balance,
-            "status": status,
-            "total_credit": totals["total_credit"],
-            "total_debit": totals["total_debit"],
+            "balance": breakdown["balance"],
+            "status": breakdown["status"],
+            "total_credit": breakdown["total_credit"],
+            "total_debit": breakdown["total_debit"],
+            "amounts_in_base": True,
         },
         "ledger": ledger_items,
         "invoices": invoice_items,

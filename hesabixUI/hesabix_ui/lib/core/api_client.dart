@@ -58,6 +58,8 @@ class ApiClient {
     _fiscalYearId = fiscalYearId;
   }
 
+  static int? get boundFiscalYearId => _fiscalYearId?.value;
+
   ApiClient._(this._dio);
 
   /// آیا درخواست واقعاً با ApiKey ارسال شده؟

@@ -18,6 +18,7 @@ import '../../services/person_group_service.dart';
 import '../../services/list_filter_preferences_service.dart';
 import '../../services/person_service.dart';
 import '../../core/auth_store.dart';
+import '../../utils/currency_display_utils.dart';
 import 'person_details_dialog.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
@@ -472,12 +473,12 @@ class _PersonsPageState extends State<PersonsPage> {
           formatter: (person) {
             final balance = person.balance ?? 0.0;
             final formatter = NumberFormat('#,##0', 'en_US');
-            return formatter.format(balance);
+            return formatter.format(balance.abs());
           },
           builder: (person, index) {
             final balance = person.balance ?? 0.0;
             final formatter = NumberFormat('#,##0', 'en_US');
-            final formattedBalance = formatter.format(balance);
+            final formattedBalance = formatter.format(balance.abs());
             
             Color balanceColor;
             if (balance > 0) {
@@ -545,21 +546,24 @@ class _PersonsPageState extends State<PersonsPage> {
           filterOptions: [
             FilterOption(value: 'بستانکار', label: 'بستانکار'),
             FilterOption(value: 'بدهکار', label: 'بدهکار'),
-            FilterOption(value: 'بالانس', label: 'بالانس'),
+            FilterOption(value: 'بالانس', label: 'تسویه'),
             FilterOption(value: 'بدون تراکنش', label: 'بدون تراکنش'),
           ],
-          formatter: (person) => person.status ?? '-',
+          formatter: (person) => personBalanceStatusLabel(person.status).isEmpty
+              ? '-'
+              : personBalanceStatusLabel(person.status),
           builder: (person, index) {
-            final status = person.status ?? '-';
+            final status = personBalanceStatusLabel(person.status);
+            final raw = status.isEmpty ? '-' : status;
             Color statusColor;
-            switch (status) {
+            switch (raw) {
               case 'بستانکار':
                 statusColor = Colors.green;
                 break;
               case 'بدهکار':
                 statusColor = Colors.red;
                 break;
-              case 'بالانس':
+              case 'تسویه':
                 statusColor = Colors.blue;
                 break;
               case 'بدون تراکنش':
@@ -576,7 +580,7 @@ class _PersonsPageState extends State<PersonsPage> {
                 border: Border.all(color: statusColor.withValues(alpha: 0.3)),
               ),
               child: Text(
-                status,
+                raw,
                 style: TextStyle(
                   color: statusColor,
                   fontWeight: FontWeight.bold,

@@ -287,9 +287,11 @@ def get_person_by_id(
         ).first()
         fy_id = fiscal_year.id if fiscal_year else None
 
-    balance, status = calculate_person_balance(db, person_id, fiscal_year_id=fy_id)
-    data["balance"] = balance
-    data["status"] = status
+    breakdown = calculate_person_balance_breakdown(db, person_id, fiscal_year_id=fy_id)
+    data["balance"] = breakdown["balance"]
+    data["status"] = breakdown["status"]
+    data["total_debit"] = breakdown["total_debit"]
+    data["total_credit"] = breakdown["total_credit"]
     return data
 
 
@@ -1466,41 +1468,38 @@ def calculate_person_balances_by_currency(
         "base_currency_id": base_currency_id,
         "balances": balances_out,
         "total_base": float(total_base),
+        "total_debit_base": float(total_debit_base),
+        "total_credit_base": float(total_credit_base),
         "status": overall_status,
     }
 
 
-def calculate_person_balance(
-    db: Session, 
-    person_id: int, 
-    fiscal_year_id: Optional[int] = None
-) -> tuple[float, str]:
+def calculate_person_balance_breakdown(
+    db: Session,
+    person_id: int,
+    fiscal_year_id: Optional[int] = None,
+) -> Dict[str, Any]:
     """
-    محاسبه تراز و وضعیت مالی یک شخص (به ارز پایهٔ کسب‌وکار).
+    مانده شخص به ارز پایه: جمع بدهکار، جمع بستانکار، تراز و وضعیت.
 
-    مبالغ خطوط سند که به ارز غیر پایه هستند با نرخ ذخیره‌شده در extra_info.fx
-    (در صورت وجود) یا نرخ تاریخ همان سند به ارز پایه تبدیل می‌شوند.
-    
-    Args:
-        db: نشست پایگاه داده
-        person_id: شناسه شخص
-        fiscal_year_id: شناسه سال مالی (اختیاری)
-    
-    Returns:
-        tuple: (تراز, وضعیت)
-        - تراز: بستانکار - بدهکار به ارز پایه
-        - وضعیت: "بستانکار" | "بدهکار" | "بالانس" | "بدون تراکنش"
+    تراز = بستانکار − بدهکار (منفی = بدهکار، مثبت = بستانکار).
     """
+    empty = {
+        "balance": 0.0,
+        "status": "بدون تراکنش",
+        "total_debit": 0.0,
+        "total_credit": 0.0,
+    }
     pers = db.query(Person).filter(Person.id == person_id).first()
     if not pers:
-        return 0.0, "بدون تراکنش"
+        return empty
 
     line_query = (
         db.query(DocumentLine, Document)
         .join(Document, DocumentLine.document_id == Document.id)
         .filter(
             DocumentLine.person_id == person_id,
-            Document.is_proforma == False,
+            Document.is_proforma == False,  # noqa: E712
         )
     )
     if fiscal_year_id:
@@ -1508,7 +1507,7 @@ def calculate_person_balance(
     rows = line_query.all()
 
     if not rows:
-        return 0.0, "بدون تراکنش"
+        return empty
 
     rate_cache: Dict[int, Decimal] = {}
     base_currency_by_business: Dict[int, Optional[int]] = {}
@@ -1536,7 +1535,34 @@ def calculate_person_balance(
 
     balance = total_credit_base - total_debit_base
     status = _person_balance_status_from_totals(total_credit_base, total_debit_base, balance)
-    return float(balance), status
+    return {
+        "balance": float(balance),
+        "status": status,
+        "total_debit": float(total_debit_base),
+        "total_credit": float(total_credit_base),
+    }
+
+
+def calculate_person_balance(
+    db: Session,
+    person_id: int,
+    fiscal_year_id: Optional[int] = None,
+) -> tuple[float, str]:
+    """
+    محاسبه تراز و وضعیت مالی یک شخص (به ارز پایهٔ کسب‌وکار).
+
+    مبالغ خطوط سند که به ارز غیر پایه هستند با نرخ ذخیره‌شده در extra_info.fx
+    (در صورت وجود) یا نرخ تاریخ همان سند به ارز پایه تبدیل می‌شوند.
+
+    Returns:
+        tuple: (تراز, وضعیت)
+        - تراز: بستانکار - بدهکار به ارز پایه
+        - وضعیت: "بستانکار" | "بدهکار" | "بالانس" | "بدون تراکنش"
+    """
+    breakdown = calculate_person_balance_breakdown(
+        db, person_id, fiscal_year_id=fiscal_year_id
+    )
+    return breakdown["balance"], breakdown["status"]
 
 
 def calculate_persons_balances_bulk(
@@ -2431,15 +2457,49 @@ def get_people_transactions_report(
             },
         }
 
+    from adapters.db.models.currency import Currency
+
+    currency_ids = {
+        int(doc.currency_id)
+        for _, doc, _ in all_results
+        if getattr(doc, "currency_id", None)
+    }
+    currencies_by_id: Dict[int, Any] = {}
+    if currency_ids:
+        currencies_by_id = {
+            int(c.id): c
+            for c in db.query(Currency).filter(Currency.id.in_(list(currency_ids))).all()
+        }
+
+    rate_cache: Dict[int, Decimal] = {}
+    base_currency_by_business: Dict[int, Optional[int]] = {}
+
     base_items: List[Dict[str, Any]] = []
     for line, doc, person in all_results:
         debit_native = float(line.debit or 0)
         credit_native = float(line.credit or 0)
+        # همان منطق مانده شخص: debit_base ذخیره‌شده، وگرنه تبدیل نرخ (نه مبلغ بومی خام)
         debit_base = float(
-            line.debit_base if line.debit_base is not None else line.debit or 0
+            _person_line_amount_to_base(
+                db,
+                doc,
+                line.debit,
+                rate_cache=rate_cache,
+                base_currency_by_business=base_currency_by_business,
+                line=line,
+                side="debit",
+            )
         )
         credit_base = float(
-            line.credit_base if line.credit_base is not None else line.credit or 0
+            _person_line_amount_to_base(
+                db,
+                doc,
+                line.credit,
+                rate_cache=rate_cache,
+                base_currency_by_business=base_currency_by_business,
+                line=line,
+                side="credit",
+            )
         )
         debit = debit_base if amounts_in_base else debit_native
         credit = credit_base if amounts_in_base else credit_native
@@ -2453,6 +2513,7 @@ def get_people_transactions_report(
             )
 
         document_type_name = _people_tx_document_type_name(doc.document_type)
+        cur = currencies_by_id.get(int(doc.currency_id)) if doc.currency_id else None
 
         item_dict = _person_to_dict(person) if person else {}
         item_dict.update({
@@ -2475,6 +2536,11 @@ def get_people_transactions_report(
                 float(line.exchange_rate) if line.exchange_rate is not None else None
             ),
             'document_currency_id': doc.currency_id,
+            'currency_code': getattr(cur, "code", None) if cur else None,
+            'currency_symbol': getattr(cur, "symbol", None) if cur else None,
+            'currency_decimal_places': (
+                int(getattr(cur, "decimal_places", 2) or 2) if cur else 2
+            ),
             'description': line.description,
             'line_extra_info': line.extra_info or {},
             'product_id': None,

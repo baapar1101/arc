@@ -280,9 +280,11 @@ class Person {
   final bool commissionExcludeAdditionsDeductions;
   final bool commissionPostInInvoiceDocument;
   
-  // تراز و وضعیت مالی
+  // تراز و وضعیت مالی (مبالغ به ارز پایه؛ تراز = بستانکار − بدهکار)
   final double? balance;
   final String? status;
+  final double? totalDebit;
+  final double? totalCredit;
 
   /// گروه اشخاص (دسته‌بندی)
   final int? personGroupId;
@@ -333,6 +335,8 @@ class Person {
     this.commissionPostInInvoiceDocument = false,
     this.balance,
     this.status,
+    this.totalDebit,
+    this.totalCredit,
     this.personGroupId,
     this.personGroupName,
     this.foreignCurrencyCodes = const [],
@@ -392,6 +396,8 @@ class Person {
       commissionPostInInvoiceDocument: _fromJsonBool(json['commission_post_in_invoice_document'], false),
       balance: (json['balance'] as num?)?.toDouble(),
       status: json['status'] as String?,
+      totalDebit: (json['total_debit'] as num?)?.toDouble(),
+      totalCredit: (json['total_credit'] as num?)?.toDouble(),
       personGroupId: json['person_group_id'] as int?,
       personGroupName: json['person_group_name'] as String?,
       foreignCurrencyCodes: (json['foreign_currency_codes'] as List?)
@@ -445,6 +451,8 @@ class Person {
       'commission_post_in_invoice_document': commissionPostInInvoiceDocument,
       'balance': balance,
       'status': status,
+      'total_debit': totalDebit,
+      'total_credit': totalCredit,
       'person_group_id': personGroupId,
       'person_group_name': personGroupName,
       'foreign_currency_codes': foreignCurrencyCodes,
@@ -527,6 +535,8 @@ class Person {
       commissionPostInInvoiceDocument: commissionPostInInvoiceDocument,
       balance: balance,
       status: status,
+      totalDebit: totalDebit,
+      totalCredit: totalCredit,
       personGroupId: personGroupId ?? this.personGroupId,
       personGroupName: personGroupName ?? this.personGroupName,
       foreignCurrencyCodes: foreignCurrencyCodes ?? this.foreignCurrencyCodes,

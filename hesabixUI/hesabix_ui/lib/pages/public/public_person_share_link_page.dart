@@ -9,6 +9,7 @@ import '../../core/date_utils.dart';
 import '../../models/public_person_share_payload.dart';
 import '../../models/public_invoice_details.dart';
 import '../../services/public_person_share_service.dart';
+import '../../utils/currency_display_utils.dart';
 import '../../utils/error_extractor.dart';
 
 class PublicPersonShareLinkPage extends StatefulWidget {
@@ -304,13 +305,17 @@ class _PublicPersonShareLinkPageState extends State<PublicPersonShareLinkPage> {
   Widget _buildSummaryCards(ThemeData theme, PublicPersonSharePayload data, NumberFormat formatter) {
     final summary = data.summary;
     final balance = summary.balance ?? 0;
+    final statusText = personBalanceStatusLabel(summary.status);
     Color balanceColor;
-        if (balance > 0) {
-      balanceColor = Colors.green[700] ?? Colors.green;
-    } else if (balance < 0) {
-      balanceColor = theme.colorScheme.error;
-    } else {
-      balanceColor = theme.colorScheme.primary;
+    switch (statusText) {
+      case 'بستانکار':
+        balanceColor = Colors.green[700] ?? Colors.green;
+        break;
+      case 'بدهکار':
+        balanceColor = theme.colorScheme.error;
+        break;
+      default:
+        balanceColor = theme.colorScheme.primary;
     }
 
     return Wrap(
@@ -319,14 +324,14 @@ class _PublicPersonShareLinkPageState extends State<PublicPersonShareLinkPage> {
       children: [
         _summaryCard(
           theme: theme,
-          title: 'تراز جاری',
-          value: formatter.format(balance),
+          title: 'مانده',
+          value: formatPersonNetBalanceDisplay(balance: balance, status: summary.status),
           color: balanceColor,
         ),
         _summaryCard(
           theme: theme,
           title: 'وضعیت حساب',
-          value: summary.status ?? 'نامشخص',
+          value: statusText.isEmpty ? 'نامشخص' : statusText,
           color: theme.colorScheme.onSurface,
         ),
         _summaryCard(

@@ -131,12 +131,66 @@ String personBalanceStatusLabel(String? status) {
     case 'بستانکار':
       return 'بستانکار';
     case 'settled':
+    case 'balanced':
     case 'صفر':
     case 'تسویه':
+    case 'بالانس':
       return 'تسویه';
+    case 'no_transaction':
+    case 'بدون تراکنش':
+      return 'بدون تراکنش';
     default:
       return s;
   }
+}
+
+num? tryParseAmount(dynamic value) {
+  if (value == null) return null;
+  if (value is num) return value;
+  return num.tryParse(value.toString().replaceAll(',', ''));
+}
+
+num absAmount(dynamic value) => (tryParseAmount(value) ?? 0).abs();
+
+String personBalanceStatusFromSignedAmount(dynamic balance) {
+  final n = tryParseAmount(balance) ?? 0;
+  if (n > 0) return 'بستانکار';
+  if (n < 0) return 'بدهکار';
+  return 'تسویه';
+}
+
+/// مانده شخص برای هدر/کارت: قدر مطلق + واحد + وضعیت.
+/// نمونه: `۱۲,۰۰۰,۰۰۰ ریال — بدهکار`
+String formatPersonNetBalanceDisplay({
+  required dynamic balance,
+  String? status,
+  String unit = '',
+  int decimalPlaces = 0,
+}) {
+  final st = personBalanceStatusLabel(status);
+  if (st == 'بدون تراکنش') return st;
+  final amount = formatAmountWithCurrencyUnit(
+    absAmount(balance),
+    unit: unit,
+    decimalPlaces: decimalPlaces,
+  );
+  final label = st.isNotEmpty ? st : personBalanceStatusFromSignedAmount(balance);
+  if (label.isEmpty || label == 'بدون تراکنش') return amount;
+  return '$amount — $label';
+}
+
+/// تراز متحرک کارت حساب: قدر مطلق + بدهکار/بستانکار/تسویه.
+String formatPersonRunningBalanceDisplay({
+  required dynamic runningBalance,
+  String unit = '',
+  int decimalPlaces = 0,
+}) {
+  return formatPersonNetBalanceDisplay(
+    balance: runningBalance,
+    status: personBalanceStatusFromSignedAmount(runningBalance),
+    unit: unit,
+    decimalPlaces: decimalPlaces,
+  );
 }
 
 /// مبلغ ستون گزارش وقتی «همه ارزها» انتخاب شده:
@@ -213,8 +267,9 @@ String formatPersonCurrencyBalanceLine({
   int baseDecimalPlaces = 0,
 }) {
   final st = personBalanceStatusLabel(status);
+  final nativeAbs = absAmount(balance);
   final native = formatAmountWithCurrencyUnit(
-    balance,
+    nativeAbs,
     unit: currencyUnit,
     decimalPlaces: balanceDecimalPlaces,
   );
@@ -224,9 +279,9 @@ String formatPersonCurrencyBalanceLine({
   }
 
   final dual = formatDualCurrencyAmount(
-    baseAmount: baseEquivalent,
+    baseAmount: absAmount(baseEquivalent),
     baseUnit: baseUnit!,
-    originalAmount: balance,
+    originalAmount: nativeAbs,
     originalUnit: currencyUnit,
     baseDecimalPlaces: baseDecimalPlaces,
     originalDecimalPlaces: balanceDecimalPlaces,
