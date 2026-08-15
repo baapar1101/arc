@@ -35,15 +35,16 @@ class _AndroidUpdateGateState extends State<AndroidUpdateGate>
   @override
   void initState() {
     super.initState();
+    if (!supportsAndroidApkUpdate) return;
     WidgetsBinding.instance.addObserver(this);
-    if (supportsAndroidApkUpdate) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => _bootstrap());
-    }
+    WidgetsBinding.instance.addPostFrameCallback((_) => _bootstrap());
   }
 
   @override
   void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
+    if (supportsAndroidApkUpdate) {
+      WidgetsBinding.instance.removeObserver(this);
+    }
     _downloadSub?.cancel();
     _installPromptSub?.cancel();
     super.dispose();
@@ -51,12 +52,14 @@ class _AndroidUpdateGateState extends State<AndroidUpdateGate>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (!supportsAndroidApkUpdate) return;
     if (state == AppLifecycleState.resumed) {
       unawaited(_promptInstallIfReady(force: false));
     }
   }
 
   Future<void> _bootstrap() async {
+    if (!supportsAndroidApkUpdate) return;
     await initAndroidApkUpdateInfrastructure();
     _downloadSub ??=
         AndroidApkDownloadCoordinator.instance.sessions.listen((session) {
@@ -89,6 +92,7 @@ class _AndroidUpdateGateState extends State<AndroidUpdateGate>
       navigatorKey.currentContext ?? (mounted ? context : null);
 
   Future<void> _promptInstallIfReady({required bool force}) async {
+    if (!supportsAndroidApkUpdate) return;
     if (_installPromptOpen) return;
 
     final coordinator = AndroidApkDownloadCoordinator.instance;
@@ -96,18 +100,17 @@ class _AndroidUpdateGateState extends State<AndroidUpdateGate>
       return;
     }
 
-    final session = await coordinator.resolveCompletedInstall();
-    if (session == null) return;
-
-    final path = session.filePath;
-    final release = session.release;
-    if (path == null) return;
-
-    final dialogContext = _dialogContext;
-    if (dialogContext == null || !dialogContext.mounted) return;
-
     _installPromptOpen = true;
     try {
+      final session = await coordinator.resolveCompletedInstall();
+      if (session == null) return;
+
+      final path = session.filePath;
+      final release = session.release;
+      if (path == null) return;
+
+      final dialogContext = _dialogContext;
+      if (dialogContext == null || !dialogContext.mounted) return;
       final t = AppLocalizations.of(dialogContext);
       final versionLabel = release?.version.toString() ??
           (await AndroidUpdatePrefs.getReadyInstallTag()) ??
