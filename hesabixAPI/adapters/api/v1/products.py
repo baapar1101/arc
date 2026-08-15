@@ -53,16 +53,39 @@ from app.services.product_opening_balance_service import (
     update_product_with_opening_balance,
 )
 from app.services.product_excel_import_opening_balance import (
-    OPENING_BALANCE_COST_KEY,
-    OPENING_BALANCE_QUANTITY_KEY,
     WAREHOUSE_CODE_KEY,
     WAREHOUSE_NAME_KEY,
     WarehouseImportIndex,
     opening_balance_columns_mapped,
-    pop_excel_only_keys,
     prepare_opening_balance_for_import_row,
     resolve_import_default_warehouse,
     warehouse_columns_mapped,
+)
+from app.services.product_excel_import_spec import (
+    ALL_COLUMN_KEYS,
+    BOOLEAN_KEYS,
+    DECIMAL_KEYS,
+    INT_KEYS,
+    MAX_PRODUCT_IMPORT_DATA_ROWS,
+    MAX_PRODUCT_IMPORT_FILE_BYTES,
+)
+from app.services.product_excel_import_normalize import (
+    api_error_message,
+    build_create_payload,
+    build_update_payload,
+    find_existing_product,
+    format_pydantic_errors,
+    is_sample_import_row,
+    map_headers,
+    parse_bool_strict,
+    parse_inventory_mode,
+    provided_keys_from_raw,
+    resolve_fx_currency,
+    select_products_import_worksheet,
+)
+from app.services.product_excel_import_template_service import (
+    build_products_import_template,
+    category_full_path,
 )
 from app.services.product_commercial_insights_service import get_product_commercial_insights
 from app.services.bulk_price_update_service import (
@@ -1538,114 +1561,12 @@ async def download_products_import_template(
     db: Session = Depends(get_db),
     _: None = Depends(require_business_permission_dep("products", "edit")),
 ):
-    import io
-    import datetime
     from fastapi.responses import Response
-    from openpyxl import Workbook
-    from openpyxl.styles import Font, Alignment
-
-    wb = Workbook()
-    ws = wb.active
-    ws.title = "Template"
 
     locale = negotiate_locale(request.headers.get("Accept-Language"))
-    if locale == 'fa':
-        try:
-            ws.sheet_view.rightToLeft = True
-        except Exception:
-            pass
-
-    # Template headers should be user-friendly and localized.
-    # Import endpoint will map these localized headers back to internal keys.
-    #
-    # NOTE: For reference fields (category, tax, attributes), we provide both ID columns
-    # and human-friendly columns (name/code). Users can fill either; import will resolve.
-    columns = [
-        ("code", {"fa": "کد", "en": "Code"}),
-        ("name", {"fa": "نام", "en": "Name"}),
-        ("item_type", {"fa": "نوع", "en": "Type"}),
-        ("description", {"fa": "توضیحات", "en": "Description"}),
-        ("category_id", {"fa": "شناسه دسته‌بندی", "en": "Category ID"}),
-        ("category_path", {"fa": "مسیر دسته‌بندی", "en": "Category Path"}),
-        ("main_unit", {"fa": "واحد اصلی", "en": "Main Unit"}),
-        ("secondary_unit", {"fa": "واحد فرعی", "en": "Secondary Unit"}),
-        ("unit_conversion_factor", {"fa": "ضریب تبدیل", "en": "Unit Conversion Factor"}),
-        ("base_sales_price", {"fa": "قیمت فروش", "en": "Sales Price"}),
-        ("base_purchase_price", {"fa": "قیمت خرید", "en": "Purchase Price"}),
-        ("track_inventory", {"fa": "کنترل موجودی", "en": "Track Inventory"}),
-        ("default_warehouse_id", {"fa": "شناسه انبار پیش‌فرض", "en": "Default Warehouse ID"}),
-        ("warehouse_code", {"fa": "کد انبار", "en": "Warehouse Code"}),
-        ("warehouse_name", {"fa": "نام انبار", "en": "Warehouse Name"}),
-        ("opening_balance_quantity", {"fa": "تعداد اولیه", "en": "Opening Balance Qty"}),
-        ("opening_balance_cost_price", {"fa": "بهای تمام‌شده (هر واحد)", "en": "Opening Balance Cost"}),
-        ("reorder_point", {"fa": "نقطه سفارش مجدد", "en": "Reorder Point"}),
-        ("min_order_qty", {"fa": "حداقل مقدار سفارش", "en": "Min Order Qty"}),
-        ("lead_time_days", {"fa": "زمان تامین (روز)", "en": "Lead Time (Days)"}),
-        ("is_sales_taxable", {"fa": "مشمول مالیات فروش", "en": "Sales Taxable"}),
-        ("is_purchase_taxable", {"fa": "مشمول مالیات خرید", "en": "Purchase Taxable"}),
-        ("sales_tax_rate", {"fa": "نرخ مالیات فروش (%)", "en": "Sales Tax Rate (%)"}),
-        ("purchase_tax_rate", {"fa": "نرخ مالیات خرید (%)", "en": "Purchase Tax Rate (%)"}),
-        ("tax_type_id", {"fa": "شناسه نوع مالیات", "en": "Tax Type ID"}),
-        ("tax_type_code", {"fa": "کد نوع مالیات", "en": "Tax Type Code"}),
-        ("tax_type_title", {"fa": "عنوان نوع مالیات", "en": "Tax Type Title"}),
-        ("tax_code", {"fa": "کد مالیاتی", "en": "Tax Code"}),
-        ("tax_unit_id", {"fa": "شناسه واحد مالیاتی", "en": "Tax Unit ID"}),
-        ("tax_unit_code", {"fa": "کد واحد مالیاتی", "en": "Tax Unit Code"}),
-        ("tax_unit_name", {"fa": "نام واحد مالیاتی", "en": "Tax Unit Name"}),
-        ("attribute_ids", {"fa": "شناسه ویژگی‌ها", "en": "Attribute IDs"}),
-        ("attribute_titles", {"fa": "نام ویژگی‌ها", "en": "Attribute Titles"}),
-    ]
-
-    headers = [labels.get(locale, labels.get("en", key)) for key, labels in columns]
-    for col, header in enumerate(headers, 1):
-        cell = ws.cell(row=1, column=col, value=header)
-        cell.font = Font(bold=True)
-        cell.alignment = Alignment(horizontal="center")
-
-    # Sample data row (row 2) — only basic fields; no category/attribute refs that fail validation
-    if locale == 'fa':
-        sample = [
-            "P1001", "نمونه کالا", "کالا",
-            "ردیف نمونه — قبل از ایمپورت واقعی ویرایش یا حذف کنید",
-            "", "", "عدد", "", "",
-            "150000", "120000", "TRUE",
-            "", "", "", "", "",
-            "", "", "",
-            "FALSE", "FALSE", "", "",
-            "", "", "", "", "", "", "",
-            "", "",
-        ]
-    else:
-        sample = [
-            "P1001", "Sample product", "product",
-            "Sample row — edit or delete before real import",
-            "", "", "unit", "", "",
-            "150000", "120000", "TRUE",
-            "", "", "", "", "",
-            "", "", "",
-            "FALSE", "FALSE", "", "",
-            "", "", "", "", "", "", "",
-            "", "",
-        ]
-    for col, val in enumerate(sample, 1):
-        ws.cell(row=2, column=col, value=val)
-
-    # Auto width
-    for column in ws.columns:
-        try:
-            letter = column[0].column_letter
-            max_len = max(len(str(c.value)) if c.value is not None else 0 for c in column)
-            ws.column_dimensions[letter].width = min(max_len + 2, 50)
-        except Exception:
-            pass
-
-    buf = io.BytesIO()
-    wb.save(buf)
-    buf.seek(0)
-
-    filename = f"products_import_template_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+    content, filename = build_products_import_template(db, business_id, locale=locale)
     return Response(
-        content=buf.getvalue(),
+        content=content,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={
             "Content-Disposition": f"attachment; filename={filename}",
@@ -1730,7 +1651,6 @@ async def import_products_excel(
     _: None = Depends(require_business_permission_dep("products", "edit")),
 ):
     import io
-    import json
     import logging
     import re
     import zipfile
@@ -1773,6 +1693,7 @@ async def import_products_excel(
                 "tax_unit": 0,
                 "attributes": 0,
                 "warehouse": 0,
+                "currency": 0,
             },
             "would_create": {
                 "categories": 0,
@@ -1797,6 +1718,8 @@ async def import_products_excel(
 
         content = await file.read()
         logger.info(f"[IMPORT] File received - filename={file.filename}, size={len(content)} bytes")
+        if len(content) > MAX_PRODUCT_IMPORT_FILE_BYTES:
+            raise ApiError("FILE_TOO_LARGE", "حجم فایل بیش از حد مجاز است (حداکثر ۱۵ مگابایت)", http_status=413)
         if len(content) < 100 or not _validate_excel_signature(content):
             raise ApiError("INVALID_FILE", "فایل Excel معتبر نیست یا خالی است", http_status=400)
 
@@ -1805,151 +1728,43 @@ async def import_products_excel(
         except zipfile.BadZipFile:
             raise ApiError("INVALID_FILE", "فایل Excel خراب است یا فرمت آن معتبر نیست", http_status=400)
 
-        ws = wb.active
+        ws = select_products_import_worksheet(wb)
         rows = list(ws.iter_rows(values_only=True))
-        logger.info(f"[IMPORT] Excel file loaded - total rows={len(rows)}")
+        logger.info(f"[IMPORT] Excel file loaded - sheet={ws.title}, total rows={len(rows)}")
         if not rows:
             return success_response(data={"summary": {"total": 0}}, request=request, message="EMPTY_FILE")
 
-        # Headers may be localized (fa/en). Normalize them to internal keys.
         raw_headers = [str(h).strip() if h is not None else "" for h in rows[0]]
-
-        def _normalize_header(v: object) -> str:
-            s = "" if v is None else str(v)
-            s = s.replace("\u200c", " ")  # ZWNJ -> space
-            s = re.sub(r"\s+", " ", s).strip()
-            return s.lower()
-
-        # Aliases for headers (localized labels -> internal keys)
-        header_aliases: dict[str, str] = {}
-        internal_keys = [
-            "code","name","item_type","description","category_id",
-            "category_path","category",
-            "main_unit","secondary_unit","unit_conversion_factor",
-            "base_sales_price","base_purchase_price","track_inventory",
-            "default_warehouse_id","warehouse_code","warehouse_name",
-            "opening_balance_quantity","opening_balance_cost_price",
-            "reorder_point","min_order_qty","lead_time_days",
-            "is_sales_taxable","is_purchase_taxable","sales_tax_rate","purchase_tax_rate",
-            "tax_type_id","tax_type_code","tax_type_title","tax_code",
-            "tax_unit_id","tax_unit_code","tax_unit_name",
-            "attribute_ids","attribute_titles",
-        ]
-        for k in internal_keys:
-            header_aliases[_normalize_header(k)] = k
-
-        # Persian labels
-        header_aliases.update({
-            _normalize_header("کد"): "code",
-            _normalize_header("نام"): "name",
-            _normalize_header("نوع"): "item_type",
-            _normalize_header("توضیحات"): "description",
-            _normalize_header("شناسه دسته‌بندی"): "category_id",
-            _normalize_header("شناسه دسته بندی"): "category_id",
-            _normalize_header("مسیر دسته‌بندی"): "category_path",
-            _normalize_header("مسیر دسته بندی"): "category_path",
-            _normalize_header("دسته‌بندی"): "category",
-            _normalize_header("دسته بندی"): "category",
-            _normalize_header("واحد اصلی"): "main_unit",
-            _normalize_header("واحد فرعی"): "secondary_unit",
-            _normalize_header("ضریب تبدیل"): "unit_conversion_factor",
-            _normalize_header("قیمت فروش"): "base_sales_price",
-            _normalize_header("قیمت خرید"): "base_purchase_price",
-            _normalize_header("کنترل موجودی"): "track_inventory",
-            _normalize_header("شناسه انبار پیش‌فرض"): "default_warehouse_id",
-            _normalize_header("شناسه انبار پیش فرض"): "default_warehouse_id",
-            _normalize_header("کد انبار"): "warehouse_code",
-            _normalize_header("نام انبار"): "warehouse_name",
-            _normalize_header("تعداد اولیه"): "opening_balance_quantity",
-            _normalize_header("بهای تمام‌شده (هر واحد)"): "opening_balance_cost_price",
-            _normalize_header("بهای تمام شده (هر واحد)"): "opening_balance_cost_price",
-            _normalize_header("قیمت تمام شده"): "opening_balance_cost_price",
-            _normalize_header("نقطه سفارش مجدد"): "reorder_point",
-            _normalize_header("حداقل مقدار سفارش"): "min_order_qty",
-            _normalize_header("زمان تامین (روز)"): "lead_time_days",
-            _normalize_header("زمان تأمین (روز)"): "lead_time_days",
-            _normalize_header("مشمول مالیات فروش"): "is_sales_taxable",
-            _normalize_header("مشمول مالیات خرید"): "is_purchase_taxable",
-            _normalize_header("نرخ مالیات فروش (%)"): "sales_tax_rate",
-            _normalize_header("نرخ مالیات خرید (%)"): "purchase_tax_rate",
-            _normalize_header("شناسه نوع مالیات"): "tax_type_id",
-            _normalize_header("کد نوع مالیات"): "tax_type_code",
-            _normalize_header("عنوان نوع مالیات"): "tax_type_title",
-            _normalize_header("کد مالیاتی"): "tax_code",
-            _normalize_header("شناسه واحد مالیاتی"): "tax_unit_id",
-            _normalize_header("کد واحد مالیاتی"): "tax_unit_code",
-            _normalize_header("نام واحد مالیاتی"): "tax_unit_name",
-            _normalize_header("شناسه ویژگی‌ها"): "attribute_ids",
-            _normalize_header("شناسه ویژگی ها"): "attribute_ids",
-            _normalize_header("نام ویژگی‌ها"): "attribute_titles",
-            _normalize_header("نام ویژگی ها"): "attribute_titles",
-        })
-
-        # English labels
-        header_aliases.update({
-            _normalize_header("code"): "code",
-            _normalize_header("name"): "name",
-            _normalize_header("type"): "item_type",
-            _normalize_header("description"): "description",
-            _normalize_header("category id"): "category_id",
-            _normalize_header("category path"): "category_path",
-            _normalize_header("category"): "category",
-            _normalize_header("main unit"): "main_unit",
-            _normalize_header("secondary unit"): "secondary_unit",
-            _normalize_header("unit conversion factor"): "unit_conversion_factor",
-            _normalize_header("sales price"): "base_sales_price",
-            _normalize_header("purchase price"): "base_purchase_price",
-            _normalize_header("track inventory"): "track_inventory",
-            _normalize_header("default warehouse id"): "default_warehouse_id",
-            _normalize_header("warehouse code"): "warehouse_code",
-            _normalize_header("warehouse name"): "warehouse_name",
-            _normalize_header("opening balance qty"): "opening_balance_quantity",
-            _normalize_header("opening balance quantity"): "opening_balance_quantity",
-            _normalize_header("opening balance cost"): "opening_balance_cost_price",
-            _normalize_header("reorder point"): "reorder_point",
-            _normalize_header("min order qty"): "min_order_qty",
-            _normalize_header("lead time (days)"): "lead_time_days",
-            _normalize_header("sales taxable"): "is_sales_taxable",
-            _normalize_header("purchase taxable"): "is_purchase_taxable",
-            _normalize_header("sales tax rate (%)"): "sales_tax_rate",
-            _normalize_header("purchase tax rate (%)"): "purchase_tax_rate",
-            _normalize_header("tax type id"): "tax_type_id",
-            _normalize_header("tax type code"): "tax_type_code",
-            _normalize_header("tax type title"): "tax_type_title",
-            _normalize_header("tax code"): "tax_code",
-            _normalize_header("tax unit id"): "tax_unit_id",
-            _normalize_header("tax unit code"): "tax_unit_code",
-            _normalize_header("tax unit name"): "tax_unit_name",
-            _normalize_header("attribute ids"): "attribute_ids",
-            _normalize_header("attribute titles"): "attribute_titles",
-        })
-
-        headers = [header_aliases.get(_normalize_header(h), h) for h in raw_headers]
+        headers = map_headers(raw_headers)
         data_rows = rows[1:]
-        mapped_keys = {h for h in headers if h in internal_keys}
+        if len(data_rows) > MAX_PRODUCT_IMPORT_DATA_ROWS:
+            raise ApiError(
+                "TOO_MANY_ROWS",
+                f"تعداد ردیف‌ها بیشتر از حد مجاز است (حداکثر {MAX_PRODUCT_IMPORT_DATA_ROWS})",
+                http_status=400,
+            )
+        mapped_keys = {h for h in headers if h in ALL_COLUMN_KEYS}
         can_edit_opening_balance = has_business_permission_for_business(
             ctx, db, business_id, "opening_balance", "edit"
         )
         warehouse_rows = db.query(Warehouse).filter(Warehouse.business_id == business_id).all()
         warehouse_index = WarehouseImportIndex(warehouse_rows)
         if "name" not in mapped_keys:
-            unmapped = [raw_headers[i] for i, h in enumerate(headers) if h not in internal_keys]
+            unmapped = [raw_headers[i] for i, h in enumerate(headers) if h not in ALL_COLUMN_KEYS]
             raise ApiError(
                 "MISSING_COLUMNS",
-                f"ستون الزامی «نام» در ردیف اول یافت نشد. از تمپلیت رسمی استفاده کنید."
+                "ستون الزامی «نام» در شیت کالاها یافت نشد. از تمپلیت رسمی استفاده کنید."
                 + (f" (ستون‌های ناشناخته: {', '.join(unmapped[:5])})" if unmapped else ""),
                 http_status=400,
             )
         logger.info(f"[IMPORT] Headers parsed: {headers}, data rows count: {len(data_rows)}")
 
-        def _parse_bool(v: object) -> Optional[bool]:
-            if v is None: return None
-            s = str(v).strip().lower()
-            if s in ("true","1","yes","on","بله","هست"):
-                return True
-            if s in ("false","0","no","off","خیر","نیست"):
-                return False
-            return None
+        match_by = str(match_by or "code").strip().lower()
+        if match_by not in ("code", "name"):
+            match_by = "code"
+        conflict_policy = str(conflict_policy or "upsert").strip().lower()
+        if conflict_policy not in ("insert", "update", "upsert"):
+            conflict_policy = "upsert"
 
         def _normalize_number_text(v: object) -> str:
             if v is None:
@@ -1996,13 +1811,18 @@ async def import_products_excel(
                 return None
 
         def _normalize_item_type(v: object) -> Optional[str]:
-            if v is None: return None
+            if v is None:
+                return None
             s = str(v).strip()
+            if s == "":
+                return None
             mapping = {"product": "کالا", "service": "خدمت"}
             low = s.lower()
-            if low in mapping: return mapping[low]
-            if s in ("کالا","خدمت"): return s
-            return None
+            if low in mapping:
+                return mapping[low]
+            if s in ("کالا", "خدمت"):
+                return s
+            raise ValueError("نوع باید کالا یا خدمت باشد")
 
         def _norm_text(v: object) -> str:
             if v is None:
@@ -2127,8 +1947,11 @@ async def import_products_excel(
                     parent_id = current_id
                     continue
                 if len(candidates) > 1:
-                    opts = [f"{c.id}:{(_get_category_titles(c)[0] if _get_category_titles(c) else '')}" for c in candidates[:5]]
-                    return None, f"دسته‌بندی مبهم است: '{seg}' (گزینه‌ها: {', '.join(opts)})", created_paths
+                    by_id = {c.id: c for c in cats}
+                    opts = [category_full_path(c, by_id, "fa") or _get_category_titles(c)[0] for c in candidates[:5]]
+                    return None, (
+                        f"دسته‌بندی «{seg}» مبهم است. مسیر کامل را بنویسید، مثلاً: {opts[0]}"
+                    ), created_paths
 
                 # no match
                 if on_missing_category == "create" and is_dry_run:
@@ -2281,29 +2104,8 @@ async def import_products_excel(
             return out
 
         def _find_existing_product_row(data: dict) -> Optional[Product]:
-            if match_by == "code" and data.get("code"):
-                return (
-                    db.query(Product)
-                    .filter(
-                        _and(
-                            Product.business_id == business_id,
-                            Product.code == str(data["code"]).strip(),
-                        )
-                    )
-                    .first()
-                )
-            if match_by == "name" and data.get("name"):
-                return (
-                    db.query(Product)
-                    .filter(
-                        _and(
-                            Product.business_id == business_id,
-                            Product.name == str(data["name"]).strip(),
-                        )
-                    )
-                    .first()
-                )
-            return None
+            found, _err = find_existing_product(db, business_id, match_by, data)
+            return found
 
         errors: list[dict] = []
         valid_items: list[dict] = []
@@ -2325,34 +2127,80 @@ async def import_products_excel(
             if not any(v not in (None, "") for v in item.values()):
                 continue
 
-            # normalize & cast
-            if 'item_type' in item:
-                item['item_type'] = _normalize_item_type(item.get('item_type')) or 'کالا'
-            for k in ['base_sales_price','base_purchase_price','sales_tax_rate','purchase_tax_rate','unit_conversion_factor',
-                      'opening_balance_quantity','opening_balance_cost_price']:
-                if k in item:
-                    item[k] = _parse_decimal(item.get(k))
-            for k in ['reorder_point','min_order_qty','lead_time_days','category_id','tax_type_id','tax_unit_id',
-                      'default_warehouse_id']:
-                if k in item:
-                    item[k] = _parse_int(item.get(k))
-            # Handle boolean fields - always set them, default to False if not provided or invalid
-            for k in ['track_inventory','is_sales_taxable','is_purchase_taxable']:
-                if k in item:
-                    parsed = _parse_bool(item.get(k))
-                    # For boolean fields, if None or invalid, use False as default
-                    item[k] = parsed if parsed is not None else False
-                else:
-                    # If field doesn't exist in item, set default to False
-                    item[k] = False
+            if is_sample_import_row(item):
+                row_warnings.append("ردیف نمونه نادیده گرفته شد")
+                row_preview["warnings"] = row_warnings
+                preview_rows.append(row_preview)
+                continue
 
-            # attribute_ids: comma-separated
-            if 'attribute_ids' in item and item['attribute_ids']:
+            item["_row"] = idx
+            item["_provided_keys"] = provided_keys_from_raw(item)
+
+            if "item_type" in item:
                 try:
-                    parts = [p.strip() for p in str(item['attribute_ids']).split(',') if p and p.strip()]
-                    item['attribute_ids'] = [int(p) for p in parts if p.isdigit()]
+                    normalized_type = _normalize_item_type(item.get("item_type"))
+                except ValueError as exc:
+                    row_errors.append(str(exc))
+                    normalized_type = None
+                if normalized_type is None:
+                    item.pop("item_type", None)
+                else:
+                    item["item_type"] = normalized_type
+
+            for k in DECIMAL_KEYS:
+                if k in item:
+                    raw = item.get(k)
+                    if raw in (None, ""):
+                        item[k] = None
+                    else:
+                        parsed_dec = _parse_decimal(raw)
+                        if parsed_dec is None:
+                            row_errors.append(f"مقدار عددی نامعتبر در ستون {k}")
+                        item[k] = parsed_dec
+            for k in INT_KEYS:
+                if k in item:
+                    raw = item.get(k)
+                    if raw in (None, ""):
+                        item[k] = None
+                    else:
+                        parsed_int = _parse_int(raw)
+                        if parsed_int is None:
+                            row_errors.append(f"مقدار عددی نامعتبر در ستون {k}")
+                        item[k] = parsed_int
+            for k in BOOLEAN_KEYS:
+                if k not in item:
+                    continue
+                try:
+                    parsed_bool = parse_bool_strict(item.get(k))
+                except ValueError:
+                    row_errors.append(f"مقدار بله/خیر نامعتبر در ستون {k}")
+                    item.pop(k, None)
+                    continue
+                if parsed_bool is None:
+                    item.pop(k, None)
+                else:
+                    item[k] = parsed_bool
+
+            if "inventory_mode" in item:
+                try:
+                    mode = parse_inventory_mode(item.get("inventory_mode"))
+                except ValueError as exc:
+                    row_errors.append(str(exc))
+                    item.pop("inventory_mode", None)
+                else:
+                    if mode is None:
+                        item.pop("inventory_mode", None)
+                    else:
+                        item["inventory_mode"] = mode
+
+            if "attribute_ids" in item and item["attribute_ids"]:
+                try:
+                    parts = [p.strip() for p in str(item["attribute_ids"]).split(",") if p and p.strip()]
+                    item["attribute_ids"] = [int(p) for p in parts if p.isdigit()]
                 except Exception:
-                    item['attribute_ids'] = []
+                    item["attribute_ids"] = []
+            elif "attribute_ids" in item:
+                item.pop("attribute_ids", None)
 
             # Resolve references: category, tax, attributes
             # Category: accept category_id, or resolve from category_path/category (name), optionally create
@@ -2417,14 +2265,17 @@ async def import_products_excel(
                     reference_summary["would_create"]["attributes"] += len(would_titles)
                     row_warnings.append("برخی ویژگی‌ها وجود ندارند و در حالت create ساخته خواهند شد")
 
-            if "_would_create_attribute_titles" in item:
-                would_titles = item.get("_would_create_attribute_titles") or []
-                if isinstance(would_titles, list) and would_titles:
-                    row_preview["would_create"]["attributes"] = would_titles
-                    reference_summary["would_create"]["attributes"] += len(would_titles)
-                    row_warnings.append("برخی ویژگی‌ها وجود ندارند و در حالت create ساخته خواهند شد")
+            resolve_fx_currency(item, db, business_id, row_errors)
+            if item.get("price_fx_currency_id") is not None and "price_fx_currency_code" in (item.get("_provided_keys") or set()):
+                row_preview["resolved"]["currency"] = {"price_fx_currency_id": item.get("price_fx_currency_id")}
+                reference_summary["resolved"]["currency"] += 1
 
-            if str(item.get("item_type") or "کالا").strip() == "خدمت":
+            existing_for_type = _find_existing_product_row(item)
+            effective_item_type = item.get("item_type")
+            if not effective_item_type and existing_for_type is not None:
+                existing_type = existing_for_type.item_type
+                effective_item_type = existing_type.value if hasattr(existing_type, "value") else str(existing_type)
+            if str(effective_item_type or "کالا").strip() == "خدمت":
                 if warehouse_columns_mapped(mapped_keys) and (
                     item.get("default_warehouse_id") is not None
                     or item.get(WAREHOUSE_CODE_KEY)
@@ -2445,8 +2296,17 @@ async def import_products_excel(
             existing_for_ob = None
             if opening_balance_columns_mapped(mapped_keys):
                 existing_for_ob = _find_existing_product_row(item)
+                ob_item = dict(item)
+                if existing_for_ob is not None:
+                    if "track_inventory" not in item:
+                        ob_item["track_inventory"] = existing_for_ob.track_inventory
+                    if "item_type" not in item:
+                        existing_type = existing_for_ob.item_type
+                        ob_item["item_type"] = existing_type.value if hasattr(existing_type, "value") else str(existing_type)
+                    if item.get("default_warehouse_id") is None:
+                        ob_item["default_warehouse_id"] = existing_for_ob.default_warehouse_id
                 ob_input, ob_errors, ob_warnings, ob_preview = prepare_opening_balance_for_import_row(
-                    item=item,
+                    item=ob_item,
                     mapped_keys=mapped_keys,
                     business_id=business_id,
                     db=db,
@@ -2455,6 +2315,8 @@ async def import_products_excel(
                     existing_product=existing_for_ob,
                     warehouse_index=warehouse_index,
                 )
+                if ob_item.get("default_warehouse_id") is not None:
+                    item["default_warehouse_id"] = ob_item.get("default_warehouse_id")
                 row_errors.extend(ob_errors)
                 row_warnings.extend(ob_warnings)
                 if ob_preview:
@@ -2466,20 +2328,24 @@ async def import_products_excel(
                 if ob_input is not None:
                     item["opening_balance"] = ob_input.model_dump()
 
-            # validations
-            name = item.get('name')
+            name = item.get("name")
             if not name or str(name).strip() == "":
-                row_errors.append('name الزامی است')
+                row_errors.append("نام الزامی است")
 
-            # if code is empty, it will be auto-generated in service
-            code = item.get('code')
+            code = item.get("code")
             if code is not None:
                 code_str = str(code).strip()
-                # Handle string "None" or empty string
                 if code_str == "" or code_str.lower() == "none":
-                    item['code'] = None
+                    item["code"] = None
+                    provided = item.get("_provided_keys")
+                    if isinstance(provided, set):
+                        provided.discard("code")
                 else:
-                    item['code'] = code_str
+                    item["code"] = code_str
+
+            _, match_err = find_existing_product(db, business_id, match_by, item)
+            if match_err:
+                row_errors.append(match_err)
 
             if row_errors:
                 errors.append({"row": idx, "errors": row_errors})
@@ -2489,23 +2355,8 @@ async def import_products_excel(
                     preview_rows.append(row_preview)
                 continue
 
-            # Remove helper keys not part of schema
-            if "_created_attribute_titles" in item:
-                item.pop("_created_attribute_titles", None)
-            if "_would_create_attribute_titles" in item:
-                item.pop("_would_create_attribute_titles", None)
-
-            # Excel-only columns used for resolve; not part of ProductCreateRequest
-            for k in (
-                "category_path", "category", "attribute_titles",
-                "tax_type_code", "tax_type_title", "tax_unit_code", "tax_unit_name",
-                WAREHOUSE_CODE_KEY, WAREHOUSE_NAME_KEY,
-                OPENING_BALANCE_QUANTITY_KEY, OPENING_BALANCE_COST_KEY,
-            ):
-                item.pop(k, None)
-            for k, v in list(item.items()):
-                if isinstance(v, str) and v.strip() == "":
-                    item[k] = None
+            item.pop("_created_attribute_titles", None)
+            item.pop("_would_create_attribute_titles", None)
 
             valid_items.append(item)
             logger.debug(f"[IMPORT] Row {idx} validated successfully - name={item.get('name')}, code={item.get('code')}")
@@ -2516,62 +2367,54 @@ async def import_products_excel(
         inserted = 0
         updated = 0
         skipped = 0
+        skipped_apply = 0
+        would_insert = 0
+        would_update = 0
+        would_skip_conflict = 0
 
         logger.info(f"[IMPORT] Processing summary - total_rows={len(data_rows)}, valid_items={len(valid_items)}, errors={len(errors)}, is_dry_run={is_dry_run}")
 
+        from adapters.api.v1.schema_models.product import ProductCreateRequest, ProductUpdateRequest
+        from app.services.product_service import create_product, update_product
+        from pydantic import ValidationError
+
+        user_id = ctx.get_user_id()
+
+        for data in valid_items:
+            existing, _match_err = find_existing_product(db, business_id, match_by, data)
+            if existing is None:
+                if conflict_policy == "update":
+                    would_skip_conflict += 1
+                else:
+                    would_insert += 1
+            elif conflict_policy == "insert":
+                would_skip_conflict += 1
+            else:
+                would_update += 1
+
         if not is_dry_run and valid_items:
             logger.info(f"[IMPORT] Starting REAL import (not dry-run) for {len(valid_items)} items")
-            from sqlalchemy import and_ as _and
-            from adapters.db.models.product import Product
-            from adapters.api.v1.schema_models.product import ProductCreateRequest, ProductUpdateRequest
-            from app.services.product_service import create_product, update_product
+            for data in valid_items:
+                row_idx = data.get("_row")
+                item_name = data.get("name", "N/A")
+                provided = data.get("_provided_keys") if isinstance(data.get("_provided_keys"), set) else provided_keys_from_raw(data)
+                existing, _match_err = find_existing_product(db, business_id, match_by, data)
 
-            user_id = ctx.get_user_id()
-
-            def _find_existing(session: Session, data: dict) -> Optional[Product]:
-                if match_by == 'code' and data.get('code'):
-                    result = session.query(Product).filter(_and(Product.business_id == business_id, Product.code == str(data['code']).strip())).first()
-                    logger.debug(f"[IMPORT] Searching by code='{data.get('code')}' - found: {result is not None}")
-                    return result
-                if match_by == 'name' and data.get('name'):
-                    result = session.query(Product).filter(_and(Product.business_id == business_id, Product.name == str(data['name']).strip())).first()
-                    logger.debug(f"[IMPORT] Searching by name='{data.get('name')}' - found: {result is not None}")
-                    return result
-                logger.debug(f"[IMPORT] No match criteria - match_by={match_by}, code={data.get('code')}, name={data.get('name')}")
-                return None
-
-            for idx, data in enumerate(valid_items, start=1):
-                item_name = data.get('name', 'N/A')
-                item_code = data.get('code', 'N/A')
-                logger.info(f"[IMPORT] Processing item {idx}/{len(valid_items)}: name='{item_name}', code='{item_code}'")
-                logger.debug(f"[IMPORT] Full item data: {data}")
-                
-                existing = _find_existing(db, data)
                 if existing is None:
-                    logger.info(f"[IMPORT] Item '{item_name}' not found - will CREATE new product")
+                    if conflict_policy == "update":
+                        skipped += 1
+                        errors.append({"row": row_idx, "errors": ["کالای منطبق یافت نشد؛ سیاست فقط به‌روزرسانی است"]})
+                        continue
                     try:
-                        logger.debug(f"[IMPORT] Calling create_product with business_id={business_id}, data keys: {list(data.keys())}")
-                        # Log data before creating ProductCreateRequest to see what's being passed
-                        logger.debug(f"[IMPORT] Data to create ProductCreateRequest: {json.dumps({k: str(v) for k, v in data.items()}, ensure_ascii=False, default=str)}")
+                        create_payload = build_create_payload(data)
                         try:
-                            product_request = ProductCreateRequest(**data)
-                            logger.debug(f"[IMPORT] ProductCreateRequest created successfully")
-                        except Exception as validation_error:
-                            logger.error(f"[IMPORT] ❌ ValidationError creating ProductCreateRequest for '{item_name}': {validation_error}")
-                            # Try to get detailed validation errors
-                            try:
-                                if hasattr(validation_error, 'errors'):
-                                    errors_list = validation_error.errors()
-                                    logger.error(f"[IMPORT] Validation errors details: {json.dumps(errors_list, ensure_ascii=False, indent=2)}")
-                                elif hasattr(validation_error, 'error_dict'):
-                                    logger.error(f"[IMPORT] Validation error_dict: {json.dumps(validation_error.error_dict(), ensure_ascii=False, indent=2)}")
-                                # Log the string representation as fallback
-                                logger.error(f"[IMPORT] Full validation error: {str(validation_error)}")
-                            except Exception as log_error:
-                                logger.error(f"[IMPORT] Could not serialize validation error: {log_error}")
-                            raise
+                            product_request = ProductCreateRequest(**create_payload)
+                        except ValidationError as validation_error:
+                            errors.append({"row": row_idx, "errors": format_pydantic_errors(validation_error)})
+                            skipped_apply += 1
+                            continue
                         if product_request.opening_balance is not None:
-                            result = create_product_with_opening_balance(
+                            create_product_with_opening_balance(
                                 db,
                                 business_id,
                                 user_id,
@@ -2580,55 +2423,56 @@ async def import_products_excel(
                                 delete_product_fn=delete_product,
                             )
                         else:
-                            result = create_product(db, business_id, product_request)
-                        logger.info(f"[IMPORT] ✅ Successfully CREATED product '{item_name}' - result: {result.get('message', 'N/A')}")
-                        if result.get('data', {}).get('id'):
-                            logger.info(f"[IMPORT] Created product ID: {result['data']['id']}")
+                            create_product(db, business_id, product_request)
                         inserted += 1
-                        logger.info(f"[IMPORT] Insert counter: {inserted}")
+                    except ApiError as e:
+                        logger.warning("product import create failed business_id=%s row=%s: %s", business_id, row_idx, api_error_message(e))
+                        errors.append({"row": row_idx, "errors": [api_error_message(e)]})
+                        skipped_apply += 1
                     except Exception as e:
-                        logger.error(f"[IMPORT] ❌ Create product failed for '{item_name}': {e}", exc_info=True)
-                        logger.error(f"[IMPORT] Exception type: {type(e).__name__}, args: {e.args}")
-                        if hasattr(e, 'errors'):
-                            logger.error(f"[IMPORT] Validation errors: {json.dumps(e.errors(), ensure_ascii=False, indent=2)}")
-                        skipped += 1
+                        logger.error("product import create failed for '%s': %s", item_name, e, exc_info=True)
+                        errors.append({"row": row_idx, "errors": ["خطای غیرمنتظره در ایجاد کالا"]})
+                        skipped_apply += 1
+                elif conflict_policy == "insert":
+                    skipped += 1
                 else:
-                    logger.info(f"[IMPORT] Item '{item_name}' EXISTS (id={existing.id}) - conflict_policy={conflict_policy}")
-                    if conflict_policy == 'insert':
-                        logger.info(f"[IMPORT] Skipping existing item due to conflict_policy='insert'")
-                        skipped += 1
-                    elif conflict_policy in ('update','upsert'):
-                        logger.info(f"[IMPORT] Will UPDATE existing product id={existing.id}")
+                    try:
+                        update_payload = build_update_payload(data, provided)
                         try:
-                            logger.debug(f"[IMPORT] Calling update_product with id={existing.id}, business_id={business_id}")
-                            update_request = ProductUpdateRequest(**data)
-                            previous_warehouse_id = existing.default_warehouse_id
-                            if update_request.opening_balance is not None:
-                                result = update_product_with_opening_balance(
-                                    db,
-                                    business_id,
-                                    user_id,
-                                    existing.id,
-                                    update_request,
-                                    update_product_fn=update_product,
-                                    previous_warehouse_id=previous_warehouse_id,
-                                )
-                            else:
-                                result = update_product(
-                                    db, existing.id, business_id, update_request, user_id=user_id
-                                )
-                            logger.info(f"[IMPORT] ✅ Successfully UPDATED product '{item_name}' (id={existing.id})")
-                            updated += 1
-                            logger.info(f"[IMPORT] Update counter: {updated}")
-                        except Exception as e:
-                            logger.error(f"[IMPORT] ❌ Update product failed for '{item_name}' (id={existing.id}): {e}", exc_info=True)
-                            logger.error(f"[IMPORT] Exception type: {type(e).__name__}, args: {e.args}")
-                            skipped += 1
+                            update_request = ProductUpdateRequest(**update_payload)
+                        except ValidationError as validation_error:
+                            errors.append({"row": row_idx, "errors": format_pydantic_errors(validation_error)})
+                            skipped_apply += 1
+                            continue
+                        previous_warehouse_id = existing.default_warehouse_id
+                        if update_request.opening_balance is not None:
+                            update_product_with_opening_balance(
+                                db,
+                                business_id,
+                                user_id,
+                                existing.id,
+                                update_request,
+                                update_product_fn=update_product,
+                                previous_warehouse_id=previous_warehouse_id,
+                            )
+                        else:
+                            update_product(
+                                db, existing.id, business_id, update_request, user_id=user_id
+                            )
+                        updated += 1
+                    except ApiError as e:
+                        logger.warning("product import update failed business_id=%s row=%s: %s", business_id, row_idx, api_error_message(e))
+                        errors.append({"row": row_idx, "errors": [api_error_message(e)]})
+                        skipped_apply += 1
+                    except Exception as e:
+                        logger.error("product import update failed for '%s': %s", item_name, e, exc_info=True)
+                        errors.append({"row": row_idx, "errors": ["خطای غیرمنتظره در به‌روزرسانی کالا"]})
+                        skipped_apply += 1
         else:
             if is_dry_run:
-                logger.info(f"[IMPORT] DRY-RUN mode - skipping actual database operations")
+                logger.info("[IMPORT] DRY-RUN mode - skipping actual database operations")
             else:
-                logger.warning(f"[IMPORT] No valid items to process (valid_items is empty)")
+                logger.warning("[IMPORT] No valid items to process (valid_items is empty)")
 
         summary = {
             "total": len(data_rows),
@@ -2637,7 +2481,11 @@ async def import_products_excel(
             "inserted": inserted,
             "updated": updated,
             "skipped": skipped,
+            "skipped_apply": skipped_apply,
             "dry_run": is_dry_run,
+            "would_insert": would_insert,
+            "would_update": would_update,
+            "would_skip_conflict": would_skip_conflict,
         }
 
         logger.info(f"[IMPORT] Final summary: {summary}")

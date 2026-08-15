@@ -4474,6 +4474,36 @@ class AppLocalizationsEn extends AppLocalizations {
   String get importWarningsTitle => 'Warnings';
 
   @override
+  String get productImportHint =>
+      'Internal IDs are not required. Copy a category path like "Raw materials > Plastics" from the template\'s Categories sheet. An empty cell on update means do not change that field.';
+
+  @override
+  String get productImportHowToTitle => 'How do I fill the file?';
+
+  @override
+  String get productImportHowToBody =>
+      '1) Download the template.\n2) Fill only the Products sheet; other sheets list existing values.\n3) Edit or delete the sample row.\n4) Run a dry-run review, then import for real.';
+
+  @override
+  String get productImportEmptyCellHint =>
+      'On update, an empty cell keeps the current value. Write No explicitly to turn a flag off.';
+
+  @override
+  String get productImportMissingCategory => 'If a category is missing';
+
+  @override
+  String get productImportMissingAttribute => 'If an attribute is missing';
+
+  @override
+  String get productImportPolicyInsert => 'New products only';
+
+  @override
+  String get productImportPolicyUpdate => 'Update existing only';
+
+  @override
+  String get productImportPolicyUpsert => 'Create new and update existing';
+
+  @override
   String get personImportSuccess => 'Import completed';
 
   @override

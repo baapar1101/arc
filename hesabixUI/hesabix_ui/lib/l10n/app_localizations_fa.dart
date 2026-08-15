@@ -4449,6 +4449,36 @@ class AppLocalizationsFa extends AppLocalizations {
   String get importWarningsTitle => 'هشدارها';
 
   @override
+  String get productImportHint =>
+      'شناسه داخلی لازم نیست. مسیر دسته را مثل «مواد اولیه > پلاستیک» از شیت دسته‌بندی‌های قالب کپی کنید. سلول خالی هنگام به‌روزرسانی یعنی این فیلد را تغییر نده.';
+
+  @override
+  String get productImportHowToTitle => 'چطور فایل را پر کنم؟';
+
+  @override
+  String get productImportHowToBody =>
+      '۱) قالب را دانلود کنید.\n۲) فقط شیت «کالاها» را پر کنید؛ شیت‌های دیگر فهرست مقادیر موجود هستند.\n۳) ردیف نمونه را ویرایش یا حذف کنید.\n۴) ابتدا بررسی آزمایشی بزنید، بعد ایمپورت واقعی.';
+
+  @override
+  String get productImportEmptyCellHint =>
+      'سلول خالی در به‌روزرسانی مقدار قبلی را حفظ می‌کند. برای خاموش کردن یک گزینه صریحاً «خیر» بنویسید.';
+
+  @override
+  String get productImportMissingCategory => 'اگر دسته در فایل نباشد';
+
+  @override
+  String get productImportMissingAttribute => 'اگر ویژگی در فایل نباشد';
+
+  @override
+  String get productImportPolicyInsert => 'فقط کالای جدید';
+
+  @override
+  String get productImportPolicyUpdate => 'فقط به‌روزرسانی موجود';
+
+  @override
+  String get productImportPolicyUpsert => 'ایجاد جدید و به‌روزرسانی موجود';
+
+  @override
   String get personImportSuccess => 'ایمپورت با موفقیت انجام شد';
 
   @override

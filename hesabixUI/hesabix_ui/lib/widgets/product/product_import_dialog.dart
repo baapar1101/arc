@@ -171,6 +171,7 @@ class _ProductImportDialogState extends State<ProductImportDialog> {
 
     return ExcelImportDialogShell(
       title: t.importFromExcel,
+      maxWidth: 720,
       onClose: _loading ? null : () => Navigator.of(context).pop(false),
       actions: [
         TextButton(
@@ -227,9 +228,9 @@ class _ProductImportDialogState extends State<ProductImportDialog> {
                 label: t.conflictPolicy,
                 value: _conflictPolicy,
                 items: [
-                  DropdownMenuItem(value: 'insert', child: Text(t.policyInsertOnly)),
-                  DropdownMenuItem(value: 'update', child: Text(t.policyUpdateExisting)),
-                  DropdownMenuItem(value: 'upsert', child: Text(t.policyUpsert)),
+                  DropdownMenuItem(value: 'upsert', child: Text(t.productImportPolicyUpsert)),
+                  DropdownMenuItem(value: 'insert', child: Text(t.productImportPolicyInsert)),
+                  DropdownMenuItem(value: 'update', child: Text(t.productImportPolicyUpdate)),
                 ],
                 onChanged: _loading ? null : (v) => setState(() => _conflictPolicy = v ?? 'upsert'),
               ),
@@ -239,31 +240,31 @@ class _ProductImportDialogState extends State<ProductImportDialog> {
           ExcelImportResponsiveGroup(
             children: [
               ExcelImportDropdownField(
-                label: isFa ? 'دسته‌بندی ناموجود' : 'Missing category',
+                label: t.productImportMissingCategory,
                 value: _onMissingCategory,
                 items: [
                   DropdownMenuItem(
                     value: 'error',
-                    child: Text(isFa ? 'خطا' : 'Error'),
+                    child: Text(isFa ? 'خطا (ایمپورت ردیف متوقف شود)' : 'Error (skip the row)'),
                   ),
                   DropdownMenuItem(
                     value: 'create',
-                    child: Text(isFa ? 'ایجاد خودکار' : 'Auto-create'),
+                    child: Text(isFa ? 'ایجاد خودکار دسته' : 'Auto-create category'),
                   ),
                 ],
                 onChanged: _loading ? null : (v) => setState(() => _onMissingCategory = v ?? 'error'),
               ),
               ExcelImportDropdownField(
-                label: isFa ? 'ویژگی ناموجود' : 'Missing attribute',
+                label: t.productImportMissingAttribute,
                 value: _onMissingAttributes,
                 items: [
                   DropdownMenuItem(
                     value: 'error',
-                    child: Text(isFa ? 'خطا' : 'Error'),
+                    child: Text(isFa ? 'خطا (ایمپورت ردیف متوقف شود)' : 'Error (skip the row)'),
                   ),
                   DropdownMenuItem(
                     value: 'create',
-                    child: Text(isFa ? 'ایجاد خودکار' : 'Auto-create'),
+                    child: Text(isFa ? 'ایجاد خودکار ویژگی' : 'Auto-create attribute'),
                   ),
                 ],
                 onChanged: _loading ? null : (v) => setState(() => _onMissingAttributes = v ?? 'error'),
@@ -271,14 +272,26 @@ class _ProductImportDialogState extends State<ProductImportDialog> {
             ],
           ),
           const SizedBox(height: 12),
-          ExcelImportInfoBanner(
-            message: isFa
-                ? 'برای دسته‌بندی می‌توانید «مسیر دسته‌بندی» مثل «مواد اولیه > پلاستیک» وارد کنید. '
-                    'تعداد اولیه و بهای تمام‌شده فقط برای کالا با کنترل موجودی فعال و در سند تراز افتتاحیه ثبت می‌شوند؛ '
-                    'انبار را با شناسه، کد یا نام مشخص کنید.'
-                : 'Tip: Use Category Path like "Raw materials > Plastics". '
-                    'Opening balance qty/cost apply only to tracked products and are stored in the opening balance document; '
-                    'specify warehouse by ID, code, or name.',
+          ExcelImportInfoBanner(message: t.productImportHint),
+          const SizedBox(height: 8),
+          ExpansionTile(
+            tilePadding: EdgeInsets.zero,
+            childrenPadding: const EdgeInsets.only(bottom: 8),
+            title: Text(t.productImportHowToTitle),
+            children: [
+              Align(
+                alignment: AlignmentDirectional.centerStart,
+                child: Text(
+                  t.productImportHowToBody,
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                t.productImportEmptyCellHint,
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ],
           ),
           const SizedBox(height: 8),
           SwitchListTile(
@@ -390,9 +403,16 @@ class _ResultSummaryBodyState extends State<_ResultSummaryBody> {
             _chip(t.total, summary['total']),
             _chip(t.valid, summary['valid']),
             _chip(t.invalid, summary['invalid']),
-            _chip(t.inserted, summary['inserted']),
-            _chip(t.updated, summary['updated']),
-            _chip(t.skipped, summary['skipped']),
+            if (summary['dry_run'] == true) ...[
+              _chip(t.importPreviewInsert, summary['would_insert']),
+              _chip(t.importPreviewUpdate, summary['would_update']),
+              _chip(t.importPreviewSkipConflict, summary['would_skip_conflict']),
+            ] else ...[
+              _chip(t.inserted, summary['inserted']),
+              _chip(t.updated, summary['updated']),
+              _chip(t.skipped, summary['skipped']),
+              _chip(t.importSkippedApply, summary['skipped_apply']),
+            ],
             _chip(t.dryRun, summary['dry_run'] == true ? t.yes : t.no),
           ],
         ),
@@ -407,10 +427,10 @@ class _ResultSummaryBodyState extends State<_ResultSummaryBody> {
               _chip(isFa ? 'Resolve نوع مالیات' : 'Resolved tax type', (refSummary['resolved'] as Map?)?['tax_type']),
               _chip(isFa ? 'Resolve واحد مالیاتی' : 'Resolved tax unit', (refSummary['resolved'] as Map?)?['tax_unit']),
               _chip(isFa ? 'Resolve ویژگی‌ها' : 'Resolved attributes', (refSummary['resolved'] as Map?)?['attributes']),
+              _chip(isFa ? 'Resolve ارز' : 'Resolved currency', (refSummary['resolved'] as Map?)?['currency']),
               _chip(isFa ? 'ایجادشدنی دسته‌بندی' : 'Would create categories', (refSummary['would_create'] as Map?)?['categories']),
               _chip(isFa ? 'ایجادشدنی ویژگی' : 'Would create attributes', (refSummary['would_create'] as Map?)?['attributes']),
               _chip(isFa ? 'ردیف با تعداد اولیه' : 'Rows with opening balance', (refSummary['opening_balance'] as Map?)?['rows_with_opening_balance']),
-              _chip(isFa ? 'حذف تعداد اولیه' : 'Opening balance cleared', (refSummary['opening_balance'] as Map?)?['rows_cleared']),
             ],
           ),
         ],

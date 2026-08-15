@@ -8430,6 +8430,60 @@ abstract class AppLocalizations {
   /// **'Warnings'**
   String get importWarningsTitle;
 
+  /// No description provided for @productImportHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Internal IDs are not required. Copy a category path like "Raw materials > Plastics" from the template\'s Categories sheet. An empty cell on update means do not change that field.'**
+  String get productImportHint;
+
+  /// No description provided for @productImportHowToTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'How do I fill the file?'**
+  String get productImportHowToTitle;
+
+  /// No description provided for @productImportHowToBody.
+  ///
+  /// In en, this message translates to:
+  /// **'1) Download the template.\n2) Fill only the Products sheet; other sheets list existing values.\n3) Edit or delete the sample row.\n4) Run a dry-run review, then import for real.'**
+  String get productImportHowToBody;
+
+  /// No description provided for @productImportEmptyCellHint.
+  ///
+  /// In en, this message translates to:
+  /// **'On update, an empty cell keeps the current value. Write No explicitly to turn a flag off.'**
+  String get productImportEmptyCellHint;
+
+  /// No description provided for @productImportMissingCategory.
+  ///
+  /// In en, this message translates to:
+  /// **'If a category is missing'**
+  String get productImportMissingCategory;
+
+  /// No description provided for @productImportMissingAttribute.
+  ///
+  /// In en, this message translates to:
+  /// **'If an attribute is missing'**
+  String get productImportMissingAttribute;
+
+  /// No description provided for @productImportPolicyInsert.
+  ///
+  /// In en, this message translates to:
+  /// **'New products only'**
+  String get productImportPolicyInsert;
+
+  /// No description provided for @productImportPolicyUpdate.
+  ///
+  /// In en, this message translates to:
+  /// **'Update existing only'**
+  String get productImportPolicyUpdate;
+
+  /// No description provided for @productImportPolicyUpsert.
+  ///
+  /// In en, this message translates to:
+  /// **'Create new and update existing'**
+  String get productImportPolicyUpsert;
+
   /// No description provided for @personImportSuccess.
   ///
   /// In en, this message translates to:

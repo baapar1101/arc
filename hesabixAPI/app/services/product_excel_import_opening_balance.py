@@ -6,7 +6,6 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 
 from sqlalchemy.orm import Session
 
-from adapters.api.v1.schema_models.product import ProductOpeningBalanceInput
 from adapters.db.models.product import Product
 from adapters.db.models.warehouse import Warehouse
 from app.core.responses import ApiError
@@ -173,6 +172,7 @@ def prepare_opening_balance_for_import_row(
     errors: List[str] = []
     warnings: List[str] = []
     preview: Dict[str, Any] = {}
+    from adapters.api.v1.schema_models.product import ProductOpeningBalanceInput
 
     if not opening_balance_columns_mapped(mapped_keys):
         return None, errors, warnings, preview
@@ -186,35 +186,7 @@ def prepare_opening_balance_for_import_row(
     cost_specified = _cost_specified(item)
 
     if not qty_specified and not cost_specified:
-        if is_update and existing_product is not None:
-            eligibility = get_product_opening_balance_eligibility(
-                db,
-                business_id,
-                None,
-                can_edit_opening_balance=can_edit_opening_balance,
-                product_id=int(existing_product.id),
-                warehouse_id=item.get("default_warehouse_id") or existing_product.default_warehouse_id,
-            )
-            if eligibility.get("has_opening_balance_line"):
-                if not can_edit_opening_balance:
-                    errors.append(
-                        eligibility.get("message")
-                        or "برای حذف تعداد اولیه به دسترسی ویرایش تراز افتتاحیه نیاز است"
-                    )
-                    return None, errors, warnings, preview
-                if not eligibility.get("editable"):
-                    errors.append(
-                        eligibility.get("message")
-                        or "تعداد اولیه در این شرایط قابل تغییر نیست"
-                    )
-                    return None, errors, warnings, preview
-                preview["action"] = "clear"
-                return (
-                    ProductOpeningBalanceInput(clear=True),
-                    errors,
-                    warnings,
-                    preview,
-                )
+        # سلول خالی یعنی تعداد اولیه را تغییر نده (حتی اگر ستون در تمپلیت باشد).
         return None, errors, warnings, preview
 
     if cost_specified and not qty_specified:
