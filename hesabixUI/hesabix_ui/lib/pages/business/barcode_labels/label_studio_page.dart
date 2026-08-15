@@ -270,23 +270,10 @@ class _LabelStudioPageState extends State<LabelStudioPage> {
     return result ?? false;
   }
 
-  Future<void> _handleBack() async {
-    if (!await _confirmLeave() || !mounted) return;
-    if (context.canPop()) {
-      context.pop();
-    } else {
-      context.go('/business/${widget.businessId}/settings');
-    }
-  }
-
   void _popAfterLeaveConfirmed() {
     _dirty = false;
     if (!mounted) return;
-    if (context.canPop()) {
-      context.pop();
-    } else {
-      context.go('/business/${widget.businessId}/settings');
-    }
+    hesabixNavigateBack(context, businessId: widget.businessId);
   }
 
   Future<void> _save({bool publish = false}) async {
@@ -525,12 +512,10 @@ class _LabelStudioPageState extends State<LabelStudioPage> {
       );
     }
 
-    return PopScope(
-      canPop: !_dirty,
-      onPopInvokedWithResult: (didPop, _) async {
-        if (didPop || !_dirty) return;
-        final leave = await _confirmLeave();
-        if (leave && mounted) _popAfterLeaveConfirmed();
+    return HesabixBackInterceptor(
+      onWillPop: () async {
+        if (!_dirty) return true;
+        return _confirmLeave();
       },
       child: CallbackShortcuts(
       bindings: <ShortcutActivator, VoidCallback>{
@@ -554,10 +539,7 @@ class _LabelStudioPageState extends State<LabelStudioPage> {
         child: Scaffold(
           appBar: AppBar(
             titleSpacing: 0,
-            leading: IconButton(
-              icon: const Icon(Icons.arrow_back),
-              onPressed: _handleBack,
-            ),
+            leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
             title: Row(
               children: [
                 Flexible(

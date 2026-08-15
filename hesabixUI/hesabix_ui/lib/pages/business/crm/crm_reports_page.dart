@@ -10,6 +10,7 @@ import 'package:hesabix_ui/widgets/jalali_date_picker.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
 import 'package:hesabix_ui/utils/snackbar_helper.dart';
 import 'package:hesabix_ui/widgets/permission/permission_widgets.dart';
+import 'package:hesabix_ui/core/hesabix_back.dart';
 import 'package:intl/intl.dart';
 import 'package:fl_chart/fl_chart.dart';
 
@@ -158,10 +159,7 @@ class _CrmReportsPageState extends State<CrmReportsPage> with SingleTickerProvid
     return Scaffold(
       appBar: AppBar(
         title: const Text('گزارشات CRM'),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.canPop() ? context.pop() : null,
-        ),
+        leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),

@@ -11,6 +11,7 @@ import '../../../utils/snackbar_helper.dart';
 import '../../../widgets/invoice/account_tree_combobox_widget.dart';
 import '../../../widgets/data_table/data_table_widget.dart';
 import '../../../core/permission_guard.dart';
+import '../../../core/hesabix_back.dart';
 import 'payroll_item_edit_dialog.dart';
 import 'payroll_table_configs.dart';
 import 'payroll_ui.dart';
@@ -229,10 +230,7 @@ class _PayrollSettingsPageState extends State<PayrollSettingsPage> {
 
     return Scaffold(
       appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.go(context.businessPanelUrl(widget.businessId, 'settings')),
-        ),
+        leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
         title: Text(t.businessSettingsPayroll),
         actions: [
           IconButton(icon: const Icon(Icons.refresh), onPressed: _load),

@@ -9,6 +9,7 @@ import 'package:hesabix_ui/utils/number_formatters.dart';
 import 'package:hesabix_ui/widgets/date_input_field.dart';
 import 'package:hesabix_ui/widgets/fx/fx_data_quality_banner.dart';
 import 'package:hesabix_ui/widgets/fx/report_currency_filter_dropdown.dart';
+import 'package:hesabix_ui/core/hesabix_back.dart';
 
 class CashFlowReportPage extends StatefulWidget {
   const CashFlowReportPage({
@@ -119,10 +120,7 @@ class _CashFlowReportPageState extends State<CashFlowReportPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: context.pop,
-        ),
+        leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
         title: const Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [

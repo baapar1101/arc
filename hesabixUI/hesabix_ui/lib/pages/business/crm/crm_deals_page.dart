@@ -16,6 +16,7 @@ import 'package:hesabix_ui/widgets/permission/permission_widgets.dart';
 import 'package:intl/intl.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
 import 'package:hesabix_ui/services/bytes_export/bytes_export_service.dart';
+import 'package:hesabix_ui/core/hesabix_back.dart';
 
 /// صفحه لیست فرصت‌های فروش CRM
 class CrmDealsPage extends StatefulWidget {
@@ -248,12 +249,7 @@ class _CrmDealsPageState extends State<CrmDealsPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('فرصت‌های فروش'),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () {
-            if (context.canPop()) context.pop();
-          },
-        ),
+        leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
         actions: [
           SegmentedButton<bool>(
             segments: const [

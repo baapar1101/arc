@@ -16,6 +16,7 @@ import 'package:hesabix_ui/widgets/crm/crm_follow_up_field.dart';
 import 'package:hesabix_ui/widgets/crm/crm_lead_form_dialog.dart';
 import 'package:hesabix_ui/widgets/crm/crm_section_card.dart';
 import 'package:hesabix_ui/widgets/permission/permission_widgets.dart';
+import 'package:hesabix_ui/core/hesabix_back.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -359,16 +360,7 @@ class _CrmLeadRecordPageState extends State<CrmLeadRecordPage> {
     return Scaffold(
       appBar: AppBar(
         title: Text(_lead?['name']?.toString() ?? 'سرنخ'),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () {
-            if (context.canPop()) {
-              context.pop();
-            } else {
-              context.go('/business/${widget.businessId}/crm/leads');
-            }
-          },
-        ),
+        leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
         actions: [
           IconButton(icon: const Icon(Icons.refresh), onPressed: _loading ? null : _load, tooltip: 'بروزرسانی'),
           if (_canWrite)

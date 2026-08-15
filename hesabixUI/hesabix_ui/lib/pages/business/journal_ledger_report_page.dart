@@ -16,6 +16,7 @@ import 'package:hesabix_ui/core/date_utils.dart';
 import 'package:hesabix_ui/utils/snackbar_helper.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
 import 'package:hesabix_ui/utils/currency_display_utils.dart';
+import 'package:hesabix_ui/core/hesabix_back.dart';
 
 class JournalLedgerReportPage extends StatefulWidget {
   final int businessId;
@@ -420,10 +421,7 @@ class _JournalLedgerReportPageState extends State<JournalLedgerReportPage> {
     return Scaffold(
       backgroundColor: cs.surface,
       appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.pop(),
-        ),
+        leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
         title: Text(t.reportsJournalLedgerTitle),
         actions: [
           IconButton(

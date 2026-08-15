@@ -7,6 +7,7 @@ import 'package:hesabix_ui/utils/error_extractor.dart';
 import 'package:hesabix_ui/utils/snackbar_helper.dart';
 import 'package:hesabix_ui/widgets/permission/permission_widgets.dart';
 import 'package:intl/intl.dart';
+import 'package:hesabix_ui/core/hesabix_back.dart';
 
 /// صف کار فروشنده: تسک‌های باز، پیگیری‌های سررسید و نقض SLA
 class CrmTasksPage extends StatefulWidget {
@@ -195,12 +196,7 @@ class _CrmTasksPageState extends State<CrmTasksPage> with SingleTickerProviderSt
     return Scaffold(
       appBar: AppBar(
         title: const Text('صف کار'),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () {
-            if (context.canPop()) context.pop();
-          },
-        ),
+        leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),

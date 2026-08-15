@@ -331,7 +331,7 @@ class _UsersPermissionsPageState extends State<UsersPermissionsPage> {
               ),
               child: Row(
                 children: [
-                  businessSubpageBackLeading(context, int.parse(widget.businessId)),
+                  HesabixBackButton(businessId: int.parse(widget.businessId)),
                   const SizedBox(width: 8),
                   Container(
                     padding: const EdgeInsets.all(12),

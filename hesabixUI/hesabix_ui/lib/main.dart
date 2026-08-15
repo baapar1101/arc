@@ -214,6 +214,7 @@ import 'theme/app_theme.dart';
 import 'core/auth_store.dart';
 import 'core/mobile_launcher_prefs.dart';
 import 'core/mobile_launcher_nav.dart';
+import 'core/hesabix_back.dart';
 import 'core/biometric_lock_controller.dart';
 import 'core/biometric_platform.dart';
 import 'core/android_update_platform.dart';
@@ -2244,13 +2245,16 @@ class _MyAppState extends State<MyApp> {
                 return MobileLauncherBackScope(
                   businessId: businessId,
                   authStore: _authStore!,
-                  child: BusinessShell(
+                  child: HesabixBackScope(
                     businessId: businessId,
-                    authStore: _authStore!,
-                    localeController: controller,
-                    calendarController: _calendarController!,
-                    themeController: themeController,
-                    child: navigationShell,
+                    child: BusinessShell(
+                      businessId: businessId,
+                      authStore: _authStore!,
+                      localeController: controller,
+                      calendarController: _calendarController!,
+                      themeController: themeController,
+                      child: navigationShell,
+                    ),
                   ),
                 );
               },

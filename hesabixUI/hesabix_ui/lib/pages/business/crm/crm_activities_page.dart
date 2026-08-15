@@ -19,6 +19,7 @@ import 'package:hesabix_ui/widgets/invoice/person_combobox_widget.dart';
 import 'package:hesabix_ui/widgets/permission/permission_widgets.dart';
 import 'package:intl/intl.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
+import 'package:hesabix_ui/core/hesabix_back.dart';
 
 /// صفحه لیست فعالیت‌های CRM
 class CrmActivitiesPage extends StatefulWidget {
@@ -183,12 +184,7 @@ class _CrmActivitiesPageState extends State<CrmActivitiesPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('فعالیت‌ها'),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () {
-            if (context.canPop()) context.pop();
-          },
-        ),
+        leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
         actions: [
           if (widget.authStore.hasBusinessPermission('crm', 'write'))
             IconButton(

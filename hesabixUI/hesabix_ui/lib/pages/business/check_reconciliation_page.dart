@@ -12,6 +12,7 @@ import '../../widgets/date_input_field.dart';
 import '../../services/check_service.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
+import '../../core/hesabix_back.dart';
 
 class CheckReconciliationPage extends StatefulWidget {
   final int businessId;
@@ -74,16 +75,7 @@ class _CheckReconciliationPageState extends State<CheckReconciliationPage> with 
       return Scaffold(
         appBar: AppBar(
           title: const Text('راس‌گیری چک‌ها'),
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back),
-            onPressed: () {
-              if (context.canPop()) {
-                context.pop();
-              } else {
-                context.go('/business/${widget.businessId}/dashboard');
-              }
-            },
-          ),
+          leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
         ),
         body: const Center(child: Text('دسترسی ندارید')),
       );
@@ -92,16 +84,7 @@ class _CheckReconciliationPageState extends State<CheckReconciliationPage> with 
     return Scaffold(
       appBar: AppBar(
         title: const Text('راس‌گیری چک‌ها'),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () {
-            if (context.canPop()) {
-              context.pop();
-            } else {
-              context.go('/business/${widget.businessId}/dashboard');
-            }
-          },
-        ),
+        leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
         bottom: TabBar(
           controller: _tabController,
           tabs: const [

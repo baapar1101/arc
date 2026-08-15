@@ -9,6 +9,7 @@ import 'package:hesabix_ui/services/list_filter_preferences_service.dart';
 import 'package:hesabix_ui/widgets/invoice/product_combobox_widget.dart';
 import 'package:hesabix_ui/widgets/invoice/warehouse_combobox_widget.dart';
 import 'package:hesabix_ui/widgets/data_table/helpers/data_table_utils.dart';
+import 'package:hesabix_ui/core/hesabix_back.dart';
 
 class ProductMovementHistoryReportPage extends StatefulWidget {
   final int businessId;
@@ -159,10 +160,7 @@ class _ProductMovementHistoryReportPageState extends State<ProductMovementHistor
       backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
         title: const Text('گزارش تاریخچه حرکات یک کالا'),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.pop(),
-        ),
+        leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
       ),
       body: SafeArea(
         child: Column(

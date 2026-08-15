@@ -8,6 +8,7 @@ import 'package:hesabix_ui/utils/error_extractor.dart';
 import 'package:hesabix_ui/widgets/ai/ai_chat_dialog.dart';
 import 'package:hesabix_ui/widgets/permission/permission_widgets.dart';
 import 'package:intl/intl.dart';
+import 'package:hesabix_ui/core/hesabix_back.dart';
 
 /// داشبورد خلاصه CRM
 class CrmDashboardPage extends StatefulWidget {
@@ -76,12 +77,7 @@ class _CrmDashboardPageState extends State<CrmDashboardPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('داشبورد CRM'),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () {
-            if (context.canPop()) context.pop();
-          },
-        ),
+        leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
         actions: [
           IconButton(
             tooltip: 'چت با دستیار هوشمند',

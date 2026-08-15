@@ -10,6 +10,7 @@ import 'package:hesabix_ui/widgets/invoice/person_combobox_widget.dart';
 import 'package:hesabix_ui/widgets/permission/permission_widgets.dart';
 import 'package:hesabix_ui/services/telephony/telephony_session_controller.dart';
 import 'package:intl/intl.dart';
+import 'package:hesabix_ui/core/hesabix_back.dart';
 
 /// نمای ۳۶۰ درجه مشتری: خلاصه، ارتباطات، معاملات، برچسب‌ها و تایم‌لاین
 class CrmCustomer360Page extends StatefulWidget {
@@ -99,12 +100,7 @@ class _CrmCustomer360PageState extends State<CrmCustomer360Page> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('نمای ۳۶۰ مشتری'),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () {
-            if (context.canPop()) context.pop();
-          },
-        ),
+        leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
         actions: [
           if (_personId != null)
             IconButton(

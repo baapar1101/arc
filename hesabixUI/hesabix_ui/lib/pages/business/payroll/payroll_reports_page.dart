@@ -12,6 +12,7 @@ import '../../../widgets/data_table/data_table_widget.dart';
 import 'payroll_calendar_utils.dart';
 import 'payroll_table_configs.dart';
 import 'payroll_ui.dart';
+import '../../../core/hesabix_back.dart';
 
 /// گزارش‌های پیشرفته حقوق و دستمزد (فاز ۴).
 class PayrollReportsPage extends StatefulWidget {
@@ -170,10 +171,7 @@ class _PayrollReportsPageState extends State<PayrollReportsPage> {
     final t = AppLocalizations.of(context);
     return Scaffold(
       appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.go(context.businessPanelUrl(widget.businessId, 'payroll')),
-        ),
+        leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
         title: Text(t.payrollReportsTitle),
         actions: [
           IconButton(icon: const Icon(Icons.refresh), onPressed: _loadPeriods),

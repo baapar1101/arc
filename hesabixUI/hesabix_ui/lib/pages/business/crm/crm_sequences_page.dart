@@ -9,6 +9,7 @@ import 'package:hesabix_ui/widgets/crm/crm_delete_confirm_dialog.dart';
 import 'package:hesabix_ui/widgets/crm/crm_responsive_dialog.dart';
 import 'package:hesabix_ui/widgets/crm/crm_section_card.dart';
 import 'package:hesabix_ui/widgets/permission/permission_widgets.dart';
+import 'package:hesabix_ui/core/hesabix_back.dart';
 
 /// عناوین اقدام‌های توالی خودکار
 const Map<String, String> kSequenceActionLabels = {
@@ -78,12 +79,7 @@ class _CrmSequencesPageState extends State<CrmSequencesPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('توالی‌های خودکار'),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () {
-            if (context.canPop()) context.pop();
-          },
-        ),
+        leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
         actions: [
           if (canWrite)
             IconButton(

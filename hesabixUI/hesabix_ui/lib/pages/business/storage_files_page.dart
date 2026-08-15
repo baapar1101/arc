@@ -12,6 +12,7 @@ import 'package:dio/dio.dart';
 import '../../utils/snackbar_helper.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
 import 'package:hesabix_ui/services/bytes_export/bytes_export_service.dart';
+import 'package:hesabix_ui/core/hesabix_back.dart';
 
 /// صفحه مدیریت فایل‌های کسب‌وکار
 class StorageFilesPage extends StatefulWidget {
@@ -720,10 +721,7 @@ class _StorageFilesPageState extends State<StorageFilesPage> with SingleTickerPr
         backgroundColor: theme.colorScheme.primary,
         foregroundColor: theme.colorScheme.onPrimary,
         elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.go('/business/${widget.businessId}/dashboard'),
-        ),
+        leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
         actions: [
           if (isMobile && _tabController.index == 0)
             IconButton(

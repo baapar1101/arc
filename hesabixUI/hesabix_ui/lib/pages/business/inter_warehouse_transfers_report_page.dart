@@ -8,6 +8,7 @@ import 'package:hesabix_ui/widgets/data_table/data_table_config.dart';
 import 'package:hesabix_ui/widgets/invoice/warehouse_combobox_widget.dart';
 import 'package:hesabix_ui/widgets/data_table/helpers/data_table_utils.dart';
 import 'package:hesabix_ui/services/list_filter_preferences_service.dart';
+import 'package:hesabix_ui/core/hesabix_back.dart';
 
 class InterWarehouseTransfersReportPage extends StatefulWidget {
   final int businessId;
@@ -129,10 +130,7 @@ class _InterWarehouseTransfersReportPageState extends State<InterWarehouseTransf
       backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
         title: const Text('گزارش انتقالات بین انبارها'),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.pop(),
-        ),
+        leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
       ),
       body: SafeArea(
         child: Column(

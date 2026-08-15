@@ -17,6 +17,7 @@ import 'package:hesabix_ui/widgets/invoice/warehouse_combobox_widget.dart';
 import 'package:hesabix_ui/widgets/category/category_picker_field.dart';
 import 'package:hesabix_ui/core/date_utils.dart';
 import 'package:hesabix_ui/utils/responsive_helper.dart';
+import 'package:hesabix_ui/core/hesabix_back.dart';
 
 class InventoryStockReportPage extends StatefulWidget {
   final int businessId;
@@ -1473,10 +1474,7 @@ class _InventoryStockReportPageState extends State<InventoryStockReportPage> {
       backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
         title: Text(t.reportsInventoryStockTitle),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.pop(),
-        ),
+        leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
         actions: [
           if (isMobile)
             IconButton(

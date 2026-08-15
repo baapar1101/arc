@@ -926,6 +926,7 @@ class _ReceiptsPaymentsListPageState extends State<ReceiptsPaymentsListPage> {
       persistTableFiltersPageId: ListFilterPageIds.receiptsPaymentsTable,
       reportModuleKey: 'receipts_payments',
       reportSubtype: 'list',
+      showBackButton: true,
       // دکمه حذف گروهی در هدر جدول
       customHeaderActions: [
         Tooltip(

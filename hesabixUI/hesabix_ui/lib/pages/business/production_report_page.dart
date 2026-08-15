@@ -14,6 +14,7 @@ import 'package:hesabix_ui/widgets/data_table/helpers/data_table_utils.dart';
 import 'package:hesabix_ui/widgets/invoice/product_combobox_widget.dart';
 import 'package:hesabix_ui/models/warehouse_model.dart';
 import 'package:hesabix_ui/core/date_utils.dart';
+import 'package:hesabix_ui/core/hesabix_back.dart';
 
 class ProductionReportPage extends StatefulWidget {
   final int businessId;
@@ -230,10 +231,7 @@ class _ProductionReportPageState extends State<ProductionReportPage> {
     return Scaffold(
       backgroundColor: cs.surface,
       appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.pop(),
-        ),
+        leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
         title: Text(t.reportsProductionTitle),
         actions: [
           IconButton(

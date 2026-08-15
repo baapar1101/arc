@@ -202,6 +202,7 @@ class DataTableConfig<T> {
   final String? subtitle;
   // Header controls
   final bool showBackButton;
+  /// Optional. Data tables ignore this and always use [hesabixNavigateBack].
   final VoidCallback? onBack;
   final bool showTableIcon;
   final bool showSearch;

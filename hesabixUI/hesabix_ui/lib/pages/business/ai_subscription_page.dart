@@ -11,6 +11,7 @@ import 'package:hesabix_ui/utils/number_formatters.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
 import 'package:hesabix_ui/utils/snackbar_helper.dart';
+import 'package:hesabix_ui/core/hesabix_back.dart';
 
 class AISubscriptionPage extends StatefulWidget {
   final int? businessId;
@@ -318,12 +319,7 @@ class _AISubscriptionPageState extends State<AISubscriptionPage> {
       return Scaffold(
         appBar: AppBar(
           title: const Text('اشتراک هوش مصنوعی'),
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back_ios_new),
-            onPressed: () {
-              if (context.canPop()) context.pop();
-            },
-          ),
+          leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
         ),
         body: Center(
           child: Padding(
@@ -362,15 +358,7 @@ class _AISubscriptionPageState extends State<AISubscriptionPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('اشتراک هوش مصنوعی'),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new),
-          onPressed: () {
-            if (!mounted) return;
-            if (context.canPop()) {
-              context.pop();
-            }
-          },
-        ),
+        leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
         actions: [
           if (widget.businessId != null)
             IconButton(

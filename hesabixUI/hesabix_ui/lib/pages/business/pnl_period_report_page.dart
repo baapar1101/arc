@@ -12,6 +12,7 @@ import 'package:hesabix_ui/utils/financial_report_navigation.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 import 'package:hesabix_ui/services/bytes_export/bytes_export_service.dart';
+import 'package:hesabix_ui/core/hesabix_back.dart';
 
 class PnlPeriodReportPage extends StatefulWidget {
   final int businessId;
@@ -239,10 +240,7 @@ class _PnlPeriodReportPageState extends State<PnlPeriodReportPage> {
     return Scaffold(
       backgroundColor: cs.surface,
       appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.pop(),
-        ),
+        leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [

@@ -16,6 +16,7 @@ import 'package:hesabix_ui/utils/snackbar_helper.dart';
 import 'package:hesabix_ui/widgets/crm/crm_section_card.dart';
 import 'package:hesabix_ui/widgets/crm/crm_web_chat_widget_form_dialog.dart';
 import 'package:hesabix_ui/widgets/permission/permission_widgets.dart';
+import 'package:hesabix_ui/core/hesabix_back.dart';
 
 /// تنظیمات CRM سطح کسب‌وکار (مثلاً ارسال فایل در چت وب و ویجت‌های چت).
 class BusinessCrmSettingsPage extends StatefulWidget {
@@ -528,10 +529,7 @@ class _BusinessCrmSettingsPageState extends State<BusinessCrmSettingsPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('تنظیمات CRM'),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.go('/business/${widget.businessId}/settings'),
-        ),
+        leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())

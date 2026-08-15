@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 
 import '../../core/api_client.dart';
 import '../../core/auth_store.dart';
@@ -10,6 +9,7 @@ import '../../utils/error_extractor.dart';
 import '../../utils/number_formatters.dart' show formatWithThousands;
 import '../../utils/snackbar_helper.dart';
 import '../../widgets/data_table/data_table.dart';
+import '../../core/hesabix_back.dart';
 import 'goods_expense_income_form_dialog.dart';
 
 const String _kSection = 'goods_expense_income';
@@ -529,12 +529,7 @@ class _GoodsExpenseIncomeListPageState extends State<GoodsExpenseIncomeListPage>
     return Scaffold(
       appBar: AppBar(
         title: const Text('کالای هزینه‌شده / کالای درآمدشده'),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () {
-            if (context.canPop()) context.pop();
-          },
-        ),
+        leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
       ),
       body: CustomScrollView(
         slivers: [

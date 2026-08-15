@@ -8,7 +8,6 @@ import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:data_table_2/data_table_2.dart';
 import 'package:dio/dio.dart';
-import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
@@ -25,7 +24,7 @@ import 'helpers/column_settings_service.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/responsive_helper.dart';
 import '../../utils/snackbar_helper.dart';
-import '../business_subpage_back_leading.dart';
+import '../../core/hesabix_back.dart';
 
 /// مقایسهٔ مقدارمحور [additionalParams] تا با rebuild والد که هر بار Map جدید می‌سازد،
 /// بارگذاری بی‌دلیل تکرار نشود؛ فقط وقتی محتوا عوض شده باشد refetch می‌شود.
@@ -2158,25 +2157,9 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
 
     return Row(
       children: [
-        if (widget.config.showBackButton) ...[
-          Tooltip(
-            message: MaterialLocalizations.of(context).backButtonTooltip,
-            child: IconButton(
-              onPressed:
-                  widget.config.onBack ??
-                  () {
-                    if (!mounted) return;
-                    final bid = widget.config.businessId;
-                    if (bid != null) {
-                      popBusinessOrLauncher(context, bid);
-                      return;
-                    }
-                    if (context.canPop()) {
-                      context.pop();
-                    }
-                  },
-              icon: const Icon(Icons.arrow_back),
-            ),
+        if (widget.config.showBackButton && shouldShowHesabixBackButton()) ...[
+          HesabixBackButton(
+            businessId: widget.config.businessId,
           ),
           const SizedBox(width: 8),
         ],

@@ -14,6 +14,7 @@ import '../../services/price_list_service.dart';
 import '../../services/category_service.dart';
 import '../../core/api_client.dart';
 import '../../core/auth_store.dart';
+import '../../core/hesabix_back.dart';
 import '../../core/calendar_controller.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
@@ -3064,14 +3065,8 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
     
     final scaffold = Scaffold(
       appBar: AppBar(
-        automaticallyImplyLeading: widget.mobileLauncherHomePath == null,
-        leading: widget.mobileLauncherHomePath != null
-            ? IconButton(
-                icon: const Icon(Icons.arrow_back),
-                tooltip: MaterialLocalizations.of(context).backButtonTooltip,
-                onPressed: () => context.go(widget.mobileLauncherHomePath!),
-              )
-            : null,
+        automaticallyImplyLeading: shouldShowHesabixBackButton(),
+        leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
         title: isMobile
             ? (isCompactHeader
                 ? Row(
@@ -3538,21 +3533,10 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
       ),
     );
 
-    final launcherHome = widget.mobileLauncherHomePath;
-    final guarded = launcherHome != null
-        ? PopScope(
-            canPop: false,
-            onPopInvoked: (didPop) {
-              if (!didPop) context.go(launcherHome);
-            },
-            child: scaffold,
-          )
-        : scaffold;
-
     return KeyboardListener(
       focusNode: _keyboardListenerFocus,
       onKeyEvent: _handleKeyEvent,
-      child: guarded,
+      child: scaffold,
     );
   }
 

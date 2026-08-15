@@ -16,6 +16,7 @@ import 'package:hesabix_ui/widgets/reports/balance_sheet_report_shared.dart';
 import 'package:hesabix_ui/utils/responsive_helper.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
+import 'package:hesabix_ui/core/hesabix_back.dart';
 
 class BalanceSheetReportPage extends StatefulWidget {
   final int businessId;
@@ -208,7 +209,7 @@ class _BalanceSheetReportPageState extends State<BalanceSheetReportPage> {
     return Scaffold(
       backgroundColor: cs.surface,
       appBar: AppBar(
-        leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop()),
+        leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [

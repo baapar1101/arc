@@ -15,6 +15,7 @@ import 'package:hesabix_ui/core/calendar_controller.dart';
 import 'package:hesabix_ui/widgets/permission/permission_widgets.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
 import 'package:hesabix_ui/services/bytes_export/bytes_export_service.dart';
+import 'package:hesabix_ui/core/hesabix_back.dart';
 
 /// صفحه لیست سرنخ‌های CRM
 class CrmLeadsPage extends StatefulWidget {
@@ -262,12 +263,7 @@ class _CrmLeadsPageState extends State<CrmLeadsPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('سرنخ‌ها'),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () {
-            if (context.canPop()) context.pop();
-          },
-        ),
+        leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
         actions: [
           SegmentedButton<bool>(
             segments: const [

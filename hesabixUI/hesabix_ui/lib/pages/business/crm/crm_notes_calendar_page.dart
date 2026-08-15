@@ -12,6 +12,7 @@ import 'package:hesabix_ui/widgets/crm/crm_note_editor_dialog.dart';
 import 'package:hesabix_ui/widgets/jalali_date_picker.dart';
 import 'package:hesabix_ui/widgets/permission/permission_widgets.dart';
 import 'package:shamsi_date/shamsi_date.dart';
+import 'package:hesabix_ui/core/hesabix_back.dart';
 
 enum _CalViewMode { week, month }
 
@@ -802,12 +803,7 @@ class _CrmNotesCalendarPageState extends State<CrmNotesCalendarPage> {
     return Scaffold(
       appBar: AppBar(
         title: Text(t.crmNotesCalendarTitle),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () {
-            if (context.canPop()) context.pop();
-          },
-        ),
+        leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
         actions: [
           IconButton(onPressed: _goToday, tooltip: t.crmNotesToday, icon: const Icon(Icons.today_outlined)),
           IconButton(onPressed: _loadMonth, tooltip: t.crmNotesRefresh, icon: const Icon(Icons.refresh)),

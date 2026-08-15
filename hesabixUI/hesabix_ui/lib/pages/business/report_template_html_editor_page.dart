@@ -16,6 +16,7 @@ import '../../utils/snackbar_helper.dart';
 import '../../widgets/loading_indicator.dart';
 import '../../widgets/permission/permission_widgets.dart';
 import '../../widgets/report_template/embedded_pdf_iframe.dart';
+import '../../core/hesabix_back.dart';
 
 /// Pre-filled content when opening the HTML editor from Studio (advanced mode).
 class ReportTemplateHtmlEditorSeed {
@@ -422,21 +423,12 @@ class _ReportTemplateHtmlEditorPageState extends State<ReportTemplateHtmlEditorP
     final t = AppLocalizations.of(context);
     final title = widget.isNew ? t.reportTemplateNewHtml : t.reportTemplateEdit;
 
-    return PopScope(
-      canPop: false,
-      onPopInvokedWithResult: (didPop, result) async {
-        if (didPop) return;
-        if (await _confirmDiscard() && context.mounted) context.pop();
-      },
+    return HesabixBackInterceptor(
+      onWillPop: _confirmDiscard,
       child: Scaffold(
         appBar: AppBar(
           title: Text(title),
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back_ios_new),
-            onPressed: () async {
-              if (await _confirmDiscard() && mounted) context.pop();
-            },
-          ),
+          leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
           actions: [
             if (_convertFromStudio)
               const Padding(

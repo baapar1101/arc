@@ -178,33 +178,9 @@ class _MobileLauncherBackScopeState extends State<MobileLauncherBackScope> {
   @override
   Widget build(BuildContext context) {
     final home = _effectiveHome(context);
-    final guarded = home == null
-        ? widget.child
-        : PopScope(
-            canPop: false,
-            onPopInvokedWithResult: (didPop, _) async {
-              if (didPop) return;
-              if (!context.mounted) return;
-              // دیالوگ/شیت روی root navigator را اول ببند؛ نرو به لانچر.
-              final rootNav = Navigator.of(context, rootNavigator: true);
-              if (rootNav.canPop()) {
-                rootNav.pop();
-                return;
-              }
-              final router = GoRouter.of(context);
-              if (router.canPop()) {
-                router.pop();
-                return;
-              }
-              if (!context.mounted) return;
-              context.go(home);
-            },
-            child: widget.child,
-          );
-
     return MobileLauncherBackInfo(
       launcherHomePath: home,
-      child: guarded,
+      child: widget.child,
     );
   }
 }

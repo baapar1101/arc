@@ -8,6 +8,7 @@ import 'package:hesabix_ui/utils/number_formatters.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table_config.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table_widget.dart';
 import 'package:hesabix_ui/widgets/date_input_field.dart';
+import 'package:hesabix_ui/core/hesabix_back.dart';
 
 class FxRevaluationReportPage extends StatefulWidget {
   const FxRevaluationReportPage({
@@ -132,10 +133,7 @@ class _FxRevaluationReportPageState extends State<FxRevaluationReportPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: context.pop,
-        ),
+        leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
         title: const Text('گزارش تسعیر ارز'),
         actions: [
           IconButton(

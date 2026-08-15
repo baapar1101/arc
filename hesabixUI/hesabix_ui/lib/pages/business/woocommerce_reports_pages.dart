@@ -9,6 +9,7 @@ import 'package:hesabix_ui/services/woocommerce_integration_service.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table_config.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table_widget.dart';
+import 'package:hesabix_ui/core/hesabix_back.dart';
 
 Widget _reportsWooSettingsPromoCard(BuildContext context, int businessId) {
   final t = AppLocalizations.of(context);
@@ -113,7 +114,7 @@ class _WooCommerceReportsOverviewPageState extends State<WooCommerceReportsOverv
     return Scaffold(
       appBar: AppBar(
         title: Text(t.reportsWooOverviewTitle),
-        leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop()),
+        leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
         actions: _reportsWooAppBarActions(context, t, widget.businessId, _load),
       ),
       body: SafeArea(
@@ -383,7 +384,7 @@ class _WooCommerceRecentOrdersReportPageState extends State<WooCommerceRecentOrd
     return Scaffold(
       appBar: AppBar(
         title: Text(t.reportsWooRecentOrdersTitle),
-        leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop()),
+        leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
         actions: _reportsWooAppBarActions(context, t, widget.businessId, _load),
       ),
       body: SafeArea(
@@ -539,7 +540,7 @@ class _WooCommerceCatalogReportPageState extends State<WooCommerceCatalogReportP
     return Scaffold(
       appBar: AppBar(
         title: Text(t.reportsWooCatalogTitle),
-        leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop()),
+        leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
         actions: _reportsWooAppBarActions(context, t, widget.businessId, _load),
       ),
       body: SafeArea(
@@ -636,7 +637,7 @@ class _WooCommerceBridgeHealthReportPageState extends State<WooCommerceBridgeHea
     return Scaffold(
       appBar: AppBar(
         title: Text(t.reportsWooBridgeTitle),
-        leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop()),
+        leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
         actions: _reportsWooAppBarActions(context, t, widget.businessId, _load),
       ),
       body: SafeArea(

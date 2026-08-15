@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/auth_store.dart';
+import '../../core/hesabix_back.dart';
 import '../../core/business_named_route_locations.dart';
 import '../../l10n/app_localizations.dart';
 import '../../models/workflow_editor_models.dart';
@@ -268,12 +269,10 @@ class _WorkflowVisualEditorPageState extends State<WorkflowVisualEditorPage> {
         ? screenSize.width * 0.85
         : (ResponsiveHelper.isTablet(context) ? 350.0 : 300.0);
 
-    return PopScope(
-      canPop: false,
-      onPopInvoked: (didPop) async {
-        if (didPop) return;
-        // بازگشت به صفحه لیست ورکفلوها
+    return HesabixBackInterceptor(
+      onWillPop: () async {
         _goBackToWorkflowsList();
+        return false;
       },
       child: Scaffold(
         onEndDrawerChanged: (isOpened) {
@@ -298,10 +297,7 @@ class _WorkflowVisualEditorPageState extends State<WorkflowVisualEditorPage> {
                   ),
                 )
               : null,
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back_ios_new),
-            onPressed: _goBackToWorkflowsList,
-          ),
+          leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
           actions: [
             IconButton(
               icon: _refreshBasalamBusy

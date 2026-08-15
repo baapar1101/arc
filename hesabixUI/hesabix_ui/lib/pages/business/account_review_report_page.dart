@@ -13,6 +13,7 @@ import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 
 import 'package:hesabix_ui/services/bytes_export/bytes_export_service.dart';
+import 'package:hesabix_ui/core/hesabix_back.dart';
 
 class AccountReviewReportPage extends StatefulWidget {
   final int businessId;
@@ -555,10 +556,7 @@ class _AccountReviewReportPageState extends State<AccountReviewReportPage> {
     return Scaffold(
       backgroundColor: cs.surface,
       appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.pop(),
-        ),
+        leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
         title: const Text('گزارش مرور حساب‌ها'),
         actions: [
           PopupMenuButton<String>(

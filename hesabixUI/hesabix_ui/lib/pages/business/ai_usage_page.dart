@@ -8,6 +8,7 @@ import 'package:hesabix_ui/widgets/data_table/data_table_config.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table_widget.dart';
 import 'package:intl/intl.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
+import 'package:hesabix_ui/core/hesabix_back.dart';
 
 class AIUsagePage extends StatefulWidget {
   final int? businessId;
@@ -127,16 +128,7 @@ class _AIUsagePageState extends State<AIUsagePage> {
       return Scaffold(
         appBar: AppBar(
           title: const Text('آمار استفاده از AI'),
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back),
-            onPressed: () {
-              if (context.canPop()) {
-                context.pop();
-              } else if (widget.businessId != null) {
-                context.go('/business/${widget.businessId}/dashboard');
-              }
-            },
-          ),
+          leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
         ),
         body: const Center(child: CircularProgressIndicator()),
       );
@@ -145,16 +137,7 @@ class _AIUsagePageState extends State<AIUsagePage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('آمار استفاده از AI'),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () {
-            if (context.canPop()) {
-              context.pop();
-            } else if (widget.businessId != null) {
-              context.go('/business/${widget.businessId}/dashboard');
-            }
-          },
-        ),
+        leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),

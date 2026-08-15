@@ -19,6 +19,7 @@ import '../../utils/snackbar_helper.dart';
 import 'package:hesabix_ui/services/bytes_export/bytes_export_service.dart';
 import 'package:hesabix_ui/widgets/fx/fx_data_quality_banner.dart';
 import 'package:hesabix_ui/widgets/fx/report_currency_filter_dropdown.dart';
+import 'package:hesabix_ui/core/hesabix_back.dart';
 
 /// بسته یکپارچه گزارش‌های مالی: تراز آزمایشی، ترازنامه و سود و زیان با فیلتر مشترک.
 class FinancialReportsPackagePage extends StatefulWidget {
@@ -358,7 +359,7 @@ class _FinancialReportsPackagePageState extends State<FinancialReportsPackagePag
     return Scaffold(
       backgroundColor: cs.surface,
       appBar: AppBar(
-        leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop()),
+        leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [

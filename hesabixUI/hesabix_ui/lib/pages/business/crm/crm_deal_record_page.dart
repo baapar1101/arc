@@ -17,6 +17,7 @@ import 'package:hesabix_ui/widgets/crm/crm_delete_confirm_dialog.dart';
 import 'package:hesabix_ui/widgets/crm/crm_follow_up_field.dart';
 import 'package:hesabix_ui/widgets/crm/crm_section_card.dart';
 import 'package:hesabix_ui/widgets/permission/permission_widgets.dart';
+import 'package:hesabix_ui/core/hesabix_back.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:intl/intl.dart';
 
@@ -331,16 +332,7 @@ class _CrmDealRecordPageState extends State<CrmDealRecordPage> {
     return Scaffold(
       appBar: AppBar(
         title: Text(_deal?['title']?.toString() ?? 'فرصت فروش'),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () {
-            if (context.canPop()) {
-              context.pop();
-            } else {
-              context.go('/business/${widget.businessId}/crm/deals');
-            }
-          },
-        ),
+        leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
         actions: [
           IconButton(icon: const Icon(Icons.refresh), onPressed: _loading ? null : _load, tooltip: 'بروزرسانی'),
           if (_canWrite)

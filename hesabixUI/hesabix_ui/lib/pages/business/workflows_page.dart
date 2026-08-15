@@ -9,6 +9,7 @@ import 'package:go_router/go_router.dart';
 import '../../core/auth_store.dart';
 import '../../core/business_named_route_locations.dart';
 import '../../core/business_nav.dart';
+import '../../core/hesabix_back.dart';
 import '../../core/calendar_controller.dart';
 import '../../core/date_utils.dart';
 import '../../l10n/app_localizations.dart';
@@ -167,15 +168,7 @@ class _WorkflowsPageState extends State<WorkflowsPage> {
     return Scaffold(
       appBar: AppBar(
         title: Text(title),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new),
-          onPressed: () {
-            if (!mounted) return;
-            if (Navigator.of(context).canPop()) {
-              Navigator.of(context).pop();
-            }
-          },
-        ),
+        leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
         actions: [
           IconButton(
             tooltip: 'آمار و تحلیل',

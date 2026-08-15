@@ -17,6 +17,7 @@ import '../../widgets/permission/permission_widgets.dart';
 import '../../widgets/report_template/studio/report_template_studio_customize_panel.dart';
 import '../../widgets/report_template/studio/report_template_studio_gallery.dart';
 import '../../widgets/report_template/studio/report_template_studio_preview_panel.dart';
+import '../../core/hesabix_back.dart';
 import 'report_template_html_editor_page.dart';
 
 enum _StudioStep { gallery, customize }
@@ -617,21 +618,12 @@ class _ReportTemplateStudioPageState extends State<ReportTemplateStudioPage> {
     final isNew = widget.isNew;
     final title = isNew ? 'استودیو قالب — جدید' : 'استودیو قالب — ویرایش';
 
-    return PopScope(
-      canPop: false,
-      onPopInvokedWithResult: (didPop, result) async {
-        if (didPop) return;
-        if (await _confirmDiscard() && context.mounted) context.pop();
-      },
+    return HesabixBackInterceptor(
+      onWillPop: _confirmDiscard,
       child: Scaffold(
         appBar: AppBar(
           title: Text(title),
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back_ios_new),
-            onPressed: () async {
-              if (await _confirmDiscard() && mounted) context.pop();
-            },
-          ),
+          leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
           actions: [
             if (_step == _StudioStep.customize && isNew)
               TextButton.icon(

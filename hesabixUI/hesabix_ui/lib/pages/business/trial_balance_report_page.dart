@@ -15,6 +15,7 @@ import 'package:hesabix_ui/widgets/reports/trial_balance_tree_view.dart';
 import 'package:hesabix_ui/utils/financial_report_navigation.dart';
 import 'package:hesabix_ui/utils/responsive_helper.dart';
 import '../../utils/error_extractor.dart';
+import 'package:hesabix_ui/core/hesabix_back.dart';
 
 class TrialBalanceReportPage extends StatefulWidget {
   final int businessId;
@@ -732,10 +733,7 @@ class _TrialBalanceReportPageState extends State<TrialBalanceReportPage> {
     return Scaffold(
       backgroundColor: cs.surface,
       appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.pop(),
-        ),
+        leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [

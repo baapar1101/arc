@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/core/hesabix_back.dart';
 import 'package:flutter/material.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table_widget.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table_config.dart';
@@ -1015,6 +1016,8 @@ class _KardexPageState extends State<KardexPage> {
           runSpacing: 8,
           crossAxisAlignment: WrapCrossAlignment.center,
           children: [
+            if (shouldShowHesabixBackButton())
+              HesabixBackButton(businessId: widget.businessId),
             Row(
               mainAxisSize: MainAxisSize.min,
               children: [

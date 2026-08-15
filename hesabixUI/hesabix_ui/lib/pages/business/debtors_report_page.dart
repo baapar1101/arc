@@ -13,6 +13,7 @@ import 'package:hesabix_ui/services/currency_service.dart';
 import 'package:hesabix_ui/utils/number_formatters.dart';
 import 'package:hesabix_ui/utils/number_normalizer.dart';
 import 'package:hesabix_ui/core/date_utils.dart';
+import 'package:hesabix_ui/core/hesabix_back.dart';
 
 class DebtorsReportPage extends StatefulWidget {
   final int businessId;
@@ -240,10 +241,7 @@ class _DebtorsReportPageState extends State<DebtorsReportPage> {
     return Scaffold(
       backgroundColor: cs.surface,
       appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.pop(),
-        ),
+        leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
         title: Text(t.reportsDebtorsTitle),
         actions: [
           IconButton(

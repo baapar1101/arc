@@ -12,6 +12,7 @@ import 'package:hesabix_ui/services/currency_service.dart';
 import 'package:hesabix_ui/services/bank_account_service.dart';
 import 'package:hesabix_ui/widgets/data_table/helpers/data_table_utils.dart';
 import 'package:hesabix_ui/core/date_utils.dart';
+import 'package:hesabix_ui/core/hesabix_back.dart';
 
 class BankAccountsTurnoverReportPage extends StatefulWidget {
   final int businessId;
@@ -212,10 +213,7 @@ class _BankAccountsTurnoverReportPageState extends State<BankAccountsTurnoverRep
     return Scaffold(
       backgroundColor: cs.surface,
       appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.pop(),
-        ),
+        leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
         title: Text(t.reportsBankAccountsTurnoverTitle),
         actions: [
           IconButton(
