@@ -4475,7 +4475,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get productImportHint =>
-      'Internal IDs are not required. Copy a category path like "Raw materials > Plastics" from the template\'s Categories sheet. An empty cell on update means do not change that field.';
+      'Internal IDs are not required. Copy a category path like \"Raw materials > Plastics\" from the template\'s Categories sheet. An empty cell on update means do not change that field.';
 
   @override
   String get productImportHowToTitle => 'How do I fill the file?';

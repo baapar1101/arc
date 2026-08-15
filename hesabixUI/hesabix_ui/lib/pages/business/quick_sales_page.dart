@@ -794,7 +794,7 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
       title = t.quickSalesParkedSaleFallback(index + 1);
     }
     final subtitle = itemCount <= 0
-        ? t.quickSalesParkedSaleEmpty
+        ? ''
         : t.quickSalesParkedSaleSubtitle(itemCount, _formatNumber(total));
     return QuickSalesParkedSaleChipData(
       id: sale.id,
@@ -826,7 +826,6 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
           onSelect: _selectParkedSale,
           onDiscard: (id) => unawaited(_discardParkedSale(id)),
         ),
-        const Divider(height: 1),
         Expanded(child: child),
       ],
     );
@@ -2400,37 +2399,32 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
   }
 
   Widget _buildBarcodeOverlay(BuildContext overlayContext) {
-    return Stack(
-      children: [
-        Positioned.fill(
-          child: GestureDetector(
-            behavior: HitTestBehavior.translucent,
-            onTap: () {
-              _barcodeFocus.unfocus();
-              _removeBarcodeOverlay();
-            },
-          ),
-        ),
-        CompositedTransformFollower(
-          link: _barcodeFieldLayerLink,
-          showWhenUnlinked: false,
-          targetAnchor: Alignment.bottomLeft,
-          followerAnchor: Alignment.topLeft,
-          offset: const Offset(0, 6),
-          child: Material(
-            elevation: 10,
-            borderRadius: BorderRadius.circular(10),
-            child: SizedBox(
-              width: 620,
-              height: _barcodeOverlayHeight(),
+    return Positioned.fill(
+      child: CompositedTransformFollower(
+        link: _barcodeFieldLayerLink,
+        showWhenUnlinked: false,
+        targetAnchor: Alignment.bottomLeft,
+        followerAnchor: Alignment.topLeft,
+        offset: const Offset(0, 6),
+        child: Align(
+          alignment: Alignment.topLeft,
+          child: TextFieldTapRegion(
+            child: Material(
+              elevation: 10,
+              borderRadius: BorderRadius.circular(10),
+              clipBehavior: Clip.antiAlias,
               child: ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 620, minWidth: 300),
-                child: _buildBarcodeSuggestionList(overlayContext),
+                child: SizedBox(
+                  width: 620,
+                  height: _barcodeOverlayHeight(),
+                  child: _buildBarcodeSuggestionList(overlayContext),
+                ),
               ),
             ),
           ),
         ),
-      ],
+      ),
     );
   }
 
@@ -2458,7 +2452,7 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
             controller: _barcodeOverlayScrollController,
             padding: const EdgeInsets.symmetric(vertical: 4),
             itemCount: _barcodeSuggestions.length + (_barcodeSuggestionsLoadingMore ? 1 : 0),
-            separatorBuilder: (_, __) => Divider(height: 1, color: cs.outline.withOpacity(0.2)),
+            separatorBuilder: (context, _) => Divider(height: 1, color: cs.outline.withValues(alpha: 0.2)),
             itemBuilder: (context, index) {
               if (_barcodeSuggestionsLoadingMore && index == _barcodeSuggestions.length) {
                 return const Padding(
@@ -2478,9 +2472,10 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
                 color: cs.onSurface.withOpacity(0.72),
               );
               return Material(
-                color: selected ? cs.primary.withOpacity(0.10) : Colors.transparent,
+                color: selected ? cs.primary.withValues(alpha: 0.10) : Colors.transparent,
                 child: ListTile(
                   dense: true,
+                  mouseCursor: SystemMouseCursors.click,
                   leading: const Icon(Icons.inventory_2_outlined),
                   title: Text(name, maxLines: 1, overflow: TextOverflow.ellipsis),
                   subtitle: (code.isNotEmpty || gb != null)

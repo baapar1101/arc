@@ -8433,7 +8433,7 @@ abstract class AppLocalizations {
   /// No description provided for @productImportHint.
   ///
   /// In en, this message translates to:
-  /// **'Internal IDs are not required. Copy a category path like "Raw materials > Plastics" from the template\'s Categories sheet. An empty cell on update means do not change that field.'**
+  /// **'Internal IDs are not required. Copy a category path like \"Raw materials > Plastics\" from the template\'\'s Categories sheet. An empty cell on update means do not change that field.'**
   String get productImportHint;
 
   /// No description provided for @productImportHowToTitle.

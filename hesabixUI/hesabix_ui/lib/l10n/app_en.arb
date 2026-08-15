@@ -1745,7 +1745,7 @@
   "importPreviewUpdate": "Would update (preview)",
   "importPreviewSkipConflict": "Would skip existing (preview)",
   "importWarningsTitle": "Warnings",
-  "productImportHint": "Internal IDs are not required. Copy a category path like \"Raw materials > Plastics\" from the template's Categories sheet. An empty cell on update means do not change that field.",
+  "productImportHint": "Internal IDs are not required. Copy a category path like \"Raw materials > Plastics\" from the template''s Categories sheet. An empty cell on update means do not change that field.",
   "productImportHowToTitle": "How do I fill the file?",
   "productImportHowToBody": "1) Download the template.\n2) Fill only the Products sheet; other sheets list existing values.\n3) Edit or delete the sample row.\n4) Run a dry-run review, then import for real.",
   "productImportEmptyCellHint": "On update, an empty cell keeps the current value. Write No explicitly to turn a flag off.",

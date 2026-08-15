@@ -626,7 +626,10 @@ app/services/product_bulk_upsert_service.py
 app/services/product_catalog_profile_service.py
 app/services/product_commercial_insights_service.py
 app/services/product_excel_export_service.py
+app/services/product_excel_import_normalize.py
 app/services/product_excel_import_opening_balance.py
+app/services/product_excel_import_spec.py
+app/services/product_excel_import_template_service.py
 app/services/product_fx_price_service.py
 app/services/product_general_barcode_service.py
 app/services/product_inventory_tracking_sync.py
@@ -1233,6 +1236,7 @@ tests/test_payroll_plugin_license_gate.py
 tests/test_payroll_run_calculations.py
 tests/test_payroll_statutory.py
 tests/test_permissions.py
+tests/test_person_balance_status.py
 tests/test_person_opening_balance.py
 tests/test_phase3_optimization.py
 tests/test_phase4_background_jobs.py
@@ -1240,6 +1244,7 @@ tests/test_physical_stock.py
 tests/test_pnl_service.py
 tests/test_print_tax_discount_display.py
 tests/test_product_catalog_profile.py
+tests/test_product_excel_import.py
 tests/test_product_excel_import_opening_balance.py
 tests/test_product_fx_and_period_end.py
 tests/test_product_inventory_tracking_sync.py
