@@ -377,16 +377,7 @@ def _get_next_number(
     return f"{next_num:0{padding}d}"
 
 
-def generate_document_code(
-    db: Session,
-    business_id: int,
-    document_type: str,
-    document_date: date,
-) -> str:
-    """
-    تولید شماره سند بر اساس تنظیمات کسب و کار یا پیش‌فرض
-    """
-    # دریافت تنظیمات از دیتابیس
+def _numbering_layout(db: Session, business_id: int, document_type: str) -> dict:
     setting = (
         db.query(BusinessDocumentNumberingSetting)
         .filter(
@@ -398,50 +389,152 @@ def generate_document_code(
         )
         .first()
     )
-
-    # اگر تنظیمات وجود نداشت، از پیش‌فرض استفاده کن
     if not setting:
         default_dict = _get_default_setting_for_type(document_type)
-        prefix = default_dict.get("prefix", "DOC")
-        separator = default_dict.get("separator", "-")
-        include_date = default_dict.get("include_date", True)
-        date_format = default_dict.get("date_format", "YYYYMMDD")
-        calendar_type = default_dict.get("calendar_type", "gregorian")
-        start_number = default_dict.get("start_number", 1)
-        number_padding = default_dict.get("number_padding", 4)
-        reset_period = default_dict.get("reset_period", "never")
-    else:
-        prefix = setting.prefix or "DOC"
-        separator = setting.separator or "-"
-        include_date = setting.include_date
-        date_format = setting.date_format or "YYYYMMDD"
-        calendar_type = setting.calendar_type or "gregorian"
-        start_number = setting.start_number or 1
-        number_padding = setting.number_padding or 4
-        reset_period = setting.reset_period
+        return {
+            "prefix": default_dict.get("prefix", "DOC"),
+            "separator": default_dict.get("separator", "-"),
+            "include_date": default_dict.get("include_date", True),
+            "date_format": default_dict.get("date_format", "YYYYMMDD"),
+            "calendar_type": default_dict.get("calendar_type", "gregorian"),
+            "start_number": default_dict.get("start_number", 1),
+            "number_padding": default_dict.get("number_padding", 4),
+            "reset_period": default_dict.get("reset_period", "never"),
+        }
+    return {
+        "prefix": setting.prefix or "DOC",
+        "separator": setting.separator or "-",
+        "include_date": setting.include_date,
+        "date_format": setting.date_format or "YYYYMMDD",
+        "calendar_type": setting.calendar_type or "gregorian",
+        "start_number": setting.start_number or 1,
+        "number_padding": setting.number_padding or 4,
+        "reset_period": setting.reset_period,
+    }
 
-    # بخش تاریخ
+
+def _compose_document_code(layout: dict, document_date: date, sequence_number: int) -> str:
+    prefix = layout.get("prefix", "DOC")
+    separator = layout.get("separator", "-")
+    include_date = layout.get("include_date", True)
+    date_format = layout.get("date_format", "YYYYMMDD")
+    calendar_type = layout.get("calendar_type", "gregorian")
+    number_padding = int(layout.get("number_padding") or 4)
     date_part = ""
     if include_date:
         date_part = _format_date(document_date, date_format, calendar_type)
+    number_part = f"{sequence_number:0{number_padding}d}"
+    if date_part:
+        return f"{prefix}{separator}{date_part}{separator}{number_part}"
+    return f"{prefix}{separator}{number_part}"
 
-    # بخش شماره
+
+def _code_is_committed(db: Session, business_id: int, code: str) -> bool:
+    """شماره وقتی مصرف‌شده است که سند ثبت‌شده یا رزرو فعال/استفاده‌شده داشته باشد."""
+    from adapters.db.models.document import Document
+    from adapters.db.models.document_numbering import DocumentCodeReservation
+
+    if (
+        db.query(Document.id)
+        .filter(and_(Document.business_id == business_id, Document.code == code))
+        .first()
+        is not None
+    ):
+        return True
+    reservation = (
+        db.query(DocumentCodeReservation.id)
+        .filter(
+            and_(
+                DocumentCodeReservation.business_id == business_id,
+                DocumentCodeReservation.code == code,
+                DocumentCodeReservation.status.in_(("active", "used")),
+            )
+        )
+        .first()
+    )
+    return reservation is not None
+
+
+def reclaim_trailing_unused_document_codes(
+    db: Session,
+    *,
+    business_id: int,
+    document_type: str,
+    document_date: date,
+) -> int:
+    """اگر آخرین شماره‌(های) دنباله سند/رزرو معتبر نداشته باشند، شمارنده را عقب می‌کشد.
+
+    برای انصراف از فرم ایجاد فاکتور: شماره رزرو‌شده دوباره قابل استفاده می‌شود،
+    بدون دست زدن به شماره‌ای که سند ثبت‌شده یا رزرو فعال دیگری دارد.
+    """
+    layout = _numbering_layout(db, business_id, document_type)
+    try:
+        start_number = int(layout.get("start_number") or 1)
+    except (TypeError, ValueError):
+        start_number = 1
+    calendar_type = layout.get("calendar_type") or "gregorian"
+    if not isinstance(calendar_type, str):
+        calendar_type = "gregorian"
+    reset_period = layout.get("reset_period")
+    bucket_key = _build_bucket_key(document_date, calendar_type, reset_period)
+
+    counter = (
+        db.query(DocumentNumberCounter)
+        .filter(
+            and_(
+                DocumentNumberCounter.business_id == business_id,
+                DocumentNumberCounter.document_type == document_type,
+                DocumentNumberCounter.date_bucket == bucket_key,
+            )
+        )
+        .with_for_update()
+        .first()
+    )
+    if not isinstance(counter, DocumentNumberCounter):
+        return 0
+
+    try:
+        last_number = int(counter.last_number)
+    except (TypeError, ValueError):
+        return 0
+
+    floor = start_number - 1
+    reclaimed = 0
+    while last_number > floor:
+        code = _compose_document_code(layout, document_date, last_number)
+        if _code_is_committed(db, business_id, code):
+            break
+        last_number -= 1
+        reclaimed += 1
+    if reclaimed:
+        counter.last_number = last_number
+        counter.updated_at = datetime.utcnow()
+        db.flush()
+    return reclaimed
+
+
+def generate_document_code(
+    db: Session,
+    business_id: int,
+    document_type: str,
+    document_date: date,
+) -> str:
+    """
+    تولید شماره سند بر اساس تنظیمات کسب و کار یا پیش‌فرض
+    """
+    layout = _numbering_layout(db, business_id, document_type)
     number_part = _get_next_number(
         db,
         business_id,
         document_type,
-        start_number,
-        number_padding,
-        reset_period,
+        int(layout.get("start_number") or 1),
+        int(layout.get("number_padding") or 4),
+        layout.get("reset_period"),
         document_date,
-        calendar_type,
+        layout.get("calendar_type") or "gregorian",
     )
-
-    # ترکیب نهایی
-    if date_part:
-        return f"{prefix}{separator}{date_part}{separator}{number_part}"
-    else:
-        return f"{prefix}{separator}{number_part}"
+    sequence_number = int(number_part)
+    return _compose_document_code(layout, document_date, sequence_number)
 
 
 def generate_warehouse_location_code(

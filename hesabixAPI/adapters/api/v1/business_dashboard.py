@@ -60,10 +60,18 @@ router = APIRouter(prefix="/business", tags=["business-dashboard"])
                                 "member_count": 5
                             },
                             "statistics": {
-                                "total_sales": 1000000.0,
+                                "total_sales": 14900000.0,
                                 "total_purchases": 500000.0,
                                 "active_members": 5,
-                                "recent_transactions": 25
+                                "recent_transactions": 12,
+                                "fiscal_year_id": 1,
+                                "currency": {
+                                    "id": 1,
+                                    "code": "IRR",
+                                    "title": "ریال",
+                                    "symbol": "ریال",
+                                    "decimal_places": 0
+                                }
                             },
                             "recent_activities": [
                                 {

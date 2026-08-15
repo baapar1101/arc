@@ -61,3 +61,15 @@ class AppReleaseVersion implements Comparable<AppReleaseVersion> {
   @override
   String toString() => '$major.$minor.$patch';
 }
+
+/// Whether a downloaded package should still be offered for install.
+///
+/// If either side cannot be parsed, returns true so a real update is not
+/// discarded by accident. Equal versions are not newer (already installed).
+bool isNewerReleaseThanInstalled({
+  required AppReleaseVersion? release,
+  required AppReleaseVersion? installed,
+}) {
+  if (release == null || installed == null) return true;
+  return release > installed;
+}

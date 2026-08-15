@@ -1725,6 +1725,7 @@ def _business_to_dict(business: Business) -> Dict[str, Any]:
             "code": c.code,
             "title": c.title,
             "symbol": c.symbol,
+            "decimal_places": int(getattr(c, "decimal_places", None) or 0),
         }
     else:
         data["default_currency"] = None
@@ -1732,7 +1733,7 @@ def _business_to_dict(business: Business) -> Dict[str, Any]:
     # ارزهای فعال کسب‌وکار
     if getattr(business, "currencies", None):
         data["currencies"] = [
-            {"id": c.id, "code": c.code, "title": c.title, "symbol": c.symbol}
+            {"id": c.id, "code": c.code, "title": c.title, "symbol": c.symbol, "decimal_places": int(getattr(c, "decimal_places", None) or 0)}
             for c in business.currencies
         ]
     else:

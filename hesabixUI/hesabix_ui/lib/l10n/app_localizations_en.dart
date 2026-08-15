@@ -5127,7 +5127,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get bulkProductPricesSheetSubtitle =>
-      'Edit base prices in a table; each page is saved separately.';
+      'Edit base and list prices in a spreadsheet. Product columns stay pinned; save applies to this page only.';
 
   @override
   String get bulkProductPricesSheetSave => 'Save this page';
@@ -5194,6 +5194,28 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get bulkProductPricesSheetPriceListPrices => 'List prices';
+
+  @override
+  String get bulkProductPricesSheetUnsavedTitle => 'Unsaved price changes';
+
+  @override
+  String get bulkProductPricesSheetUnsavedMessage =>
+      'This page has edits that are not saved yet. Discard them and continue?';
+
+  @override
+  String get bulkProductPricesSheetDiscardChanges => 'Discard';
+
+  @override
+  String bulkProductPricesSheetDirtyCount(int count) {
+    return '$count unsaved';
+  }
+
+  @override
+  String get bulkProductPricesSheetNoPriceLists => 'No price lists yet';
+
+  @override
+  String get bulkProductPricesSheetHelpTooltip =>
+      'Excel import and export help';
 
   @override
   String get preview => 'Preview';

@@ -2982,31 +2982,28 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
     final taxAmount = e.taxAmount;
     final lineTotal = e.total;
     
-    // ساختن extra_info با ترکیب اطلاعات موجود و extra_info از InvoiceLineItem
-    final extraInfo = <String, dynamic>{
+    // extra_info مبدأ (کپی فاکتور) ممکن است unit_price قدیمی داشته باشد؛
+    // مثل صفحه ویرایش، مقادیر زندهٔ فرم باید آخر نوشته شوند.
+    final extraInfo = <String, dynamic>{};
+    if (e.extraInfo != null) {
+      extraInfo.addAll(_stripLocalExtraInfo(e.extraInfo!));
+    }
+    extraInfo.addAll({
       'unit_price': e.unitPrice,
       'line_discount': lineDiscount,
       'tax_amount': taxAmount,
       'line_total': lineTotal,
-      // اطلاعات اضافی برای ردیابی
       'unit': e.selectedUnit ?? e.mainUnit,
       'unit_price_source': e.unitPriceSource,
       'discount_type': e.discountType,
       'discount_value': e.discountValue,
       'tax_rate': e.taxRate,
-    };
-    
-    // اضافه کردن movement اگر وجود دارد
+    });
+
     if (movement != null) {
       extraInfo['movement'] = movement;
     }
-    
-    // اضافه کردن اطلاعات از extra_info InvoiceLineItem (مانند bom_id)
-    if (e.extraInfo != null) {
-      extraInfo.addAll(_stripLocalExtraInfo(e.extraInfo!));
-    }
-    
-    // اضافه کردن warehouse_id به extra_info اگر وجود دارد
+
     if (e.warehouseId != null) {
       extraInfo['warehouse_id'] = e.warehouseId;
     }

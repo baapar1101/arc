@@ -5098,7 +5098,7 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get bulkProductPricesSheetSubtitle =>
-      'قیمت پایه را در جدول ویرایش کنید؛ هر صفحه جدا ذخیره می‌شود.';
+      'قیمت پایه و قیمت لیست‌ها را مثل صفحه گسترده ویرایش کنید. ستون کالا ثابت می‌ماند؛ ذخیره فقط برای همین صفحه است.';
 
   @override
   String get bulkProductPricesSheetSave => 'ذخیره این صفحه';
@@ -5165,6 +5165,27 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get bulkProductPricesSheetPriceListPrices => 'قیمت‌های لیست';
+
+  @override
+  String get bulkProductPricesSheetUnsavedTitle => 'تغییرات ذخیره‌نشده';
+
+  @override
+  String get bulkProductPricesSheetUnsavedMessage =>
+      'در این صفحه قیمت‌هایی ویرایش شده‌اند و هنوز ذخیره نشده‌اند. تغییرات دور ریخته شود؟';
+
+  @override
+  String get bulkProductPricesSheetDiscardChanges => 'نادیده گرفتن';
+
+  @override
+  String bulkProductPricesSheetDirtyCount(int count) {
+    return '$count ذخیره‌نشده';
+  }
+
+  @override
+  String get bulkProductPricesSheetNoPriceLists => 'هنوز لیست قیمتی نیست';
+
+  @override
+  String get bulkProductPricesSheetHelpTooltip => 'راهنمای ورود و خروج اکسل';
 
   @override
   String get preview => 'پیش‌نمایش';

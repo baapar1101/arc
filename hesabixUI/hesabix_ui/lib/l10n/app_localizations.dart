@@ -9657,7 +9657,7 @@ abstract class AppLocalizations {
   /// No description provided for @bulkProductPricesSheetSubtitle.
   ///
   /// In en, this message translates to:
-  /// **'Edit base prices in a table; each page is saved separately.'**
+  /// **'Edit base and list prices in a spreadsheet. Product columns stay pinned; save applies to this page only.'**
   String get bulkProductPricesSheetSubtitle;
 
   /// No description provided for @bulkProductPricesSheetSave.
@@ -9785,6 +9785,42 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'List prices'**
   String get bulkProductPricesSheetPriceListPrices;
+
+  /// No description provided for @bulkProductPricesSheetUnsavedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Unsaved price changes'**
+  String get bulkProductPricesSheetUnsavedTitle;
+
+  /// No description provided for @bulkProductPricesSheetUnsavedMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'This page has edits that are not saved yet. Discard them and continue?'**
+  String get bulkProductPricesSheetUnsavedMessage;
+
+  /// No description provided for @bulkProductPricesSheetDiscardChanges.
+  ///
+  /// In en, this message translates to:
+  /// **'Discard'**
+  String get bulkProductPricesSheetDiscardChanges;
+
+  /// No description provided for @bulkProductPricesSheetDirtyCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} unsaved'**
+  String bulkProductPricesSheetDirtyCount(int count);
+
+  /// No description provided for @bulkProductPricesSheetNoPriceLists.
+  ///
+  /// In en, this message translates to:
+  /// **'No price lists yet'**
+  String get bulkProductPricesSheetNoPriceLists;
+
+  /// No description provided for @bulkProductPricesSheetHelpTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Excel import and export help'**
+  String get bulkProductPricesSheetHelpTooltip;
 
   /// No description provided for @preview.
   ///

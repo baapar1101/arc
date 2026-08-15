@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from adapters.db.models.document_numbering import DocumentCodeReservation
 from app.core.datetime_utils import utc_now_aware
 from app.core.responses import ApiError
-from app.services.document_numbering_service import generate_document_code
+from app.services.document_numbering_service import generate_document_code, reclaim_trailing_unused_document_codes
 
 RESERVABLE_INVOICE_DOCUMENT_TYPES = frozenset(
     {
@@ -51,12 +51,23 @@ def expire_stale_reservations(db: Session, *, business_id: Optional[int] = None)
     )
     if business_id is not None:
         query = query.filter(DocumentCodeReservation.business_id == business_id)
-    rows = query.all()
+    rows = query.with_for_update().all()
+    if not isinstance(rows, (list, tuple)):
+        return 0
+    reclaim_keys: set[tuple[int, str, date]] = set()
     for row in rows:
         row.status = _STATUS_EXPIRED
         row.cancelled_at = now
+        reclaim_keys.add((row.business_id, row.document_type, row.document_date))
     if rows:
         db.flush()
+        for bid, doc_type, doc_date in reclaim_keys:
+            reclaim_trailing_unused_document_codes(
+                db,
+                business_id=bid,
+                document_type=doc_type,
+                document_date=doc_date,
+            )
     return len(rows)
 
 
@@ -141,6 +152,12 @@ def cancel_document_code_reservation(
     reservation.status = _STATUS_CANCELLED
     reservation.cancelled_at = utc_now_aware()
     db.flush()
+    reclaim_trailing_unused_document_codes(
+        db,
+        business_id=business_id,
+        document_type=reservation.document_type,
+        document_date=reservation.document_date,
+    )
     return True
 
 

@@ -30,8 +30,42 @@ void main() {
       expect(a.compareTo(a), 0);
     });
 
-    test('suggestedVersionCode encoding', () {
-      expect(const AppReleaseVersion(70, 9, 911).suggestedVersionCode, 70009911);
+    group('isNewerReleaseThanInstalled', () {
+      const installed = AppReleaseVersion(70, 14, 911);
+      test('false when APK is the same as installed', () {
+        expect(
+          isNewerReleaseThanInstalled(release: installed, installed: installed),
+          isFalse,
+        );
+      });
+      test('false when APK is older than installed', () {
+        expect(
+          isNewerReleaseThanInstalled(
+            release: const AppReleaseVersion(70, 13, 0),
+            installed: installed,
+          ),
+          isFalse,
+        );
+      });
+      test('true when APK is newer than installed', () {
+        expect(
+          isNewerReleaseThanInstalled(
+            release: const AppReleaseVersion(70, 15, 0),
+            installed: installed,
+          ),
+          isTrue,
+        );
+      });
+      test('true when a side cannot be parsed (do not drop a real update)', () {
+        expect(
+          isNewerReleaseThanInstalled(release: null, installed: installed),
+          isTrue,
+        );
+        expect(
+          isNewerReleaseThanInstalled(release: installed, installed: null),
+          isTrue,
+        );
+      });
     });
   });
 

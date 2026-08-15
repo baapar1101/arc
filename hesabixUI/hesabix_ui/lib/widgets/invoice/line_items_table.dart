@@ -762,19 +762,48 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
     super.dispose();
   }
   
-  /// بارگذاری اطلاعات کامل کالاها (شامل attribute_ids) برای نمایش یونیک و ویژگی خط
+  /// بارگذاری اطلاعات کامل کالاها (شامل attribute_ids) برای نمایش یونیک و ویژگی خط.
+  /// فی ذخیره‌شدهٔ فاکتور (کپی/ویرایش، منبع manual) حفظ می‌شود.
   Future<void> _loadProductInfosForInitialRows() async {
     final ids = _rows.map((e) => e.productId).whereType<int>().toSet();
     _invoiceLineAttrsLog('loadProductInfosForInitialRows productIds=$ids rowCount=${_rows.length}');
     for (final pid in ids) {
       await _loadProductInfo(pid, force: true);
     }
-    await _coerceRowsIfUnitPriceLocked();
+    _hydrateProductMetadataWithoutChangingUnitPrice();
     if (mounted) {
       setState(() {});
       _syncAllDescriptionControllersFromRows();
     }
     _invoiceLineAttrsLog('loadProductInfosForInitialRows done');
+  }
+
+  /// واحد، ضریب تبدیل و قیمت پایه را از کالا پر می‌کند؛ [InvoiceLineItem.unitPrice] را عوض نمی‌کند.
+  void _hydrateProductMetadataWithoutChangingUnitPrice() {
+    for (var i = 0; i < _rows.length; i++) {
+      final item = _rows[i];
+      final pid = item.productId;
+      if (pid == null) continue;
+      final p = _productCache[pid];
+      if (p == null) continue;
+      _rows[i] = item.copyWith(
+        productCode: item.productCode ?? p['code']?.toString(),
+        productName: item.productName ?? p['name']?.toString(),
+        mainUnit: item.mainUnit ?? p['main_unit']?.toString(),
+        secondaryUnit: item.secondaryUnit ?? p['secondary_unit']?.toString(),
+        unitConversionFactor:
+            item.unitConversionFactor ?? _toNum(p['unit_conversion_factor'], fallback: 1),
+        baseSalesPriceMainUnit:
+            item.baseSalesPriceMainUnit ?? _toNum(p['base_sales_price']),
+        basePurchasePriceMainUnit: item.basePurchasePriceMainUnit ??
+            (p['base_purchase_price'] != null ? _toNum(p['base_purchase_price']) : null),
+        salesPriceFxMainUnit: item.salesPriceFxMainUnit ??
+            (p['sales_price_fx'] != null ? _toNum(p['sales_price_fx']) : null),
+        purchasePriceFxMainUnit: item.purchasePriceFxMainUnit ??
+            (p['purchase_price_fx'] != null ? _toNum(p['purchase_price_fx']) : null),
+        priceFxCurrencyId: item.priceFxCurrencyId ?? _toInt(p['price_fx_currency_id']),
+      );
+    }
   }
 
   @override
@@ -788,7 +817,7 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
       _lineAddQiPendingSince = null;
     }
     if (oldWidget.selectedCurrencyId != widget.selectedCurrencyId) {
-      // ارز تغییر کرده: لازم است قیمت‌های بر اساس لیست قیمت مجدد ارزیابی شوند
+      // ارز تغییر کرده: قیمت‌های لیست/پایه را دوباره بگیر؛ فی دستی (از جمله کپی فاکتور) حفظ می‌شود.
       _recalculateAllUnitPrices();
       // invalidate inline price list cache if currency changed
       _inlinePriceList = null;
@@ -837,10 +866,12 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
   // لیست قیمت سراسری حذف شده است؛ انتخاب قیمت از داخل سلول انجام می‌شود
 
   Future<void> _recalculateAllUnitPrices() async {
-    // برای هر ردیف، اگر منبع قیمت «priceList» است سعی کن قیمت مناسب را بارگذاری/تبدیل کنی
+    // فقط ردیف‌هایی که منبع‌شان لیست قیمت یا قیمت پایه است؛ فی دستی دست‌نخورده می‌ماند.
     for (int i = 0; i < _rows.length; i++) {
       final it = _rows[i];
+      if (it.unitPriceSource == 'manual') continue;
       final updated = await _resolveUnitPrice(it, preferManual: false);
+      if (!mounted) return;
       setState(() => _rows[i] = updated);
     }
     _notify();
@@ -935,9 +966,27 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
     // انتخاب قیمت پایه متناسب با نوع فاکتور: فروش/خرید
     // قیمت‌های پایه فرضاً بر واحد اصلی هستند
     if (widget.invoiceType == 'purchase' || widget.invoiceType == 'purchase_return') {
-      return item.basePurchasePriceMainUnit ?? 0;
+      final fromItem = item.basePurchasePriceMainUnit;
+      if (fromItem != null) return fromItem;
+      final pid = item.productId;
+      if (pid != null) {
+        final p = _productCache[pid];
+        if (p != null && p['base_purchase_price'] != null) {
+          return _toNum(p['base_purchase_price']);
+        }
+      }
+      return 0;
     }
-    return item.baseSalesPriceMainUnit ?? 0;
+    final fromItem = item.baseSalesPriceMainUnit;
+    if (fromItem != null) return fromItem;
+    final pid = item.productId;
+    if (pid != null) {
+      final p = _productCache[pid];
+      if (p != null && p['base_sales_price'] != null) {
+        return _toNum(p['base_sales_price']);
+      }
+    }
+    return 0;
   }
 
   String? _noteForInvoiceType(String invoiceType, {String? salesNote, String? purchaseNote}) {

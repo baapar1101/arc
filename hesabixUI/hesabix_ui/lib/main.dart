@@ -1148,11 +1148,13 @@ class _MyAppState extends State<MyApp> {
                     }
                     registerRoutePage(
                       () => MobileLauncherHomePage(
+                        key: ValueKey('launcher-home-$businessId'),
                         businessId: businessId,
                         authStore: _authStore!,
                       ),
                     );
                     return MobileLauncherHomePage(
+                      key: ValueKey('launcher-home-$businessId'),
                       businessId: businessId,
                       authStore: _authStore!,
                     );

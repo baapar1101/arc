@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:background_downloader/background_downloader.dart';
 import 'package:flutter/foundation.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 import '../../core/android_update_platform.dart';
 import '../../core/android_update_prefs.dart';
@@ -251,6 +252,10 @@ class AndroidApkDownloadCoordinator {
   }
 
   /// Clears a completed install session after install was launched or discarded.
+  ///
+  /// The APK file is kept so a cancelled system installer can retry, until
+  /// [resolveCompletedInstall] sees that the installed app is already as new
+  /// as the downloaded package.
   Future<void> clearCompletedInstall() async {
     await AndroidUpdatePrefs.clearReadyInstall();
     if (_current.phase == AndroidApkDownloadPhase.complete) {
@@ -267,7 +272,7 @@ class AndroidApkDownloadCoordinator {
     if (current != null) {
       final path = current.filePath;
       if (path != null && await File(path).exists()) {
-        return current;
+        return _keepCompletedIfNewerThanInstalled(current);
       }
     }
 
@@ -296,12 +301,112 @@ class AndroidApkDownloadCoordinator {
                 : null),
         filePath: readyPath,
       );
-      _emit(session);
-      return session;
+      final kept = await _keepCompletedIfNewerThanInstalled(session);
+      if (kept != null) {
+        _emit(kept);
+      }
+      return kept;
     }
 
     await _recoverActiveSession();
-    return peekCompletedInstall();
+    final recovered = peekCompletedInstall();
+    if (recovered == null) return null;
+    return _keepCompletedIfNewerThanInstalled(recovered);
+  }
+
+  Future<AndroidAppVersion?> _installedAppVersion() async {
+    try {
+      final info = await PackageInfo.fromPlatform();
+      return AndroidAppVersion.tryParse(info.version);
+    } catch (e, st) {
+      debugPrint('AndroidApkDownloadCoordinator installed version failed: $e\n$st');
+      return null;
+    }
+  }
+
+  AndroidAppVersion? _sessionApkVersion(AndroidApkDownloadSession session) {
+    final fromRelease = session.release?.version;
+    if (fromRelease != null && fromRelease != const AndroidAppVersion(0, 0, 0)) {
+      return fromRelease;
+    }
+    return AndroidAppVersion.tryParse(session.release?.tagName);
+  }
+
+  /// Drops a leftover APK that is not newer than the currently installed app.
+  Future<AndroidApkDownloadSession?> _keepCompletedIfNewerThanInstalled(
+    AndroidApkDownloadSession session,
+  ) async {
+    final path = session.filePath;
+    if (path == null || !await File(path).exists()) {
+      await _discardStaleCompletedInstall(filePath: path);
+      return null;
+    }
+    final apkVersion = _sessionApkVersion(session);
+    final installed = await _installedAppVersion();
+    if (!isNewerReleaseThanInstalled(
+      release: apkVersion,
+      installed: installed,
+    )) {
+      debugPrint(
+        'AndroidApkDownloadCoordinator: discarding APK '
+        '${session.release?.tagName} (installed $installed)',
+      );
+      await _discardStaleCompletedInstall(filePath: path);
+      return null;
+    }
+    return session;
+  }
+
+  Future<void> _discardStaleCompletedInstall({String? filePath}) async {
+    await AndroidUpdatePrefs.clearReadyInstall();
+    await _purgeCompletedDownloadArtifacts(filePath: filePath);
+    _activeTask = null;
+    _activeRelease = null;
+    if (_current.phase == AndroidApkDownloadPhase.complete) {
+      _emit(const AndroidApkDownloadSession.idle());
+    }
+  }
+
+  Future<void> _purgeCompletedDownloadArtifacts({String? filePath}) async {
+    if (filePath != null && filePath.isNotEmpty) {
+      try {
+        final file = File(filePath);
+        if (await file.exists()) {
+          await file.delete();
+        }
+      } catch (e, st) {
+        debugPrint(
+          'AndroidApkDownloadCoordinator: failed to delete APK $filePath: $e\n$st',
+        );
+      }
+    }
+
+    try {
+      final records = await FileDownloader().database.allRecords(
+        group: apkUpdateGroup,
+      );
+      final ids = <String>{};
+      for (final record in records) {
+        if (record.status != TaskStatus.complete) continue;
+        ids.add(record.taskId);
+        try {
+          final recordPath = await record.task.filePath();
+          if (recordPath != filePath) {
+            final leftover = File(recordPath);
+            if (await leftover.exists()) {
+              await leftover.delete();
+            }
+          }
+        } catch (_) {}
+      }
+      if (ids.isNotEmpty) {
+        await FileDownloader().database.deleteRecordsWithIds(ids);
+      }
+    } catch (e, st) {
+      debugPrint(
+        'AndroidApkDownloadCoordinator: failed to purge download records: $e\n$st',
+      );
+    }
   }
 
   Future<void> _recoverActiveSession() async {
@@ -321,25 +426,29 @@ class AndroidApkDownloadCoordinator {
         case TaskStatus.complete:
           final path = await task.filePath();
           if (await File(path).exists()) {
-            _activeTask = task as DownloadTask?;
             final release = _releaseFromTask(task);
+            final recovered = AndroidApkDownloadSession(
+              phase: AndroidApkDownloadPhase.complete,
+              release: release,
+              filePath: path,
+              progress: AndroidUpdateDownloadProgress(
+                received: record.expectedFileSize,
+                total: record.expectedFileSize,
+              ),
+            );
+            final kept = await _keepCompletedIfNewerThanInstalled(recovered);
+            if (kept == null) {
+              break;
+            }
+            _activeTask = task as DownloadTask?;
             await AndroidUpdatePrefs.setReadyInstall(
               filePath: path,
               releaseTag: release?.tagName ?? task.metaData,
             );
-            _emit(
-              AndroidApkDownloadSession(
-                phase: AndroidApkDownloadPhase.complete,
-                release: release,
-                filePath: path,
-                progress: AndroidUpdateDownloadProgress(
-                  received: record.expectedFileSize,
-                  total: record.expectedFileSize,
-                ),
-              ),
-            );
+            _emit(kept);
             return;
           }
+          break;
         case TaskStatus.running:
         case TaskStatus.enqueued:
         case TaskStatus.paused:
@@ -365,30 +474,32 @@ class AndroidApkDownloadCoordinator {
     final readyPath = await AndroidUpdatePrefs.getReadyInstallPath();
     if (readyPath != null && await File(readyPath).exists()) {
       final readyTag = await AndroidUpdatePrefs.getReadyInstallTag();
-      _emit(
-        AndroidApkDownloadSession(
-          phase: AndroidApkDownloadPhase.complete,
-          release: readyTag == null
-              ? null
-              : AndroidRemoteRelease(
-                  tagName: readyTag,
-                  version: AndroidAppVersion.tryParse(readyTag) ??
-                      AndroidAppVersion(0, 0, 0),
-                  name: readyTag,
-                  body: '',
-                  draft: false,
-                  prerelease: false,
-                  publishedAt: null,
-                  apk: AndroidReleaseAsset(
-                    name: readyPath.split(Platform.pathSeparator).last,
-                    size: await File(readyPath).length(),
-                    downloadUrl: '',
-                  ),
+      final recovered = AndroidApkDownloadSession(
+        phase: AndroidApkDownloadPhase.complete,
+        release: readyTag == null
+            ? null
+            : AndroidRemoteRelease(
+                tagName: readyTag,
+                version: AndroidAppVersion.tryParse(readyTag) ??
+                    AndroidAppVersion(0, 0, 0),
+                name: readyTag,
+                body: '',
+                draft: false,
+                prerelease: false,
+                publishedAt: null,
+                apk: AndroidReleaseAsset(
+                  name: readyPath.split(Platform.pathSeparator).last,
+                  size: await File(readyPath).length(),
+                  downloadUrl: '',
                 ),
-          filePath: readyPath,
-        ),
+              ),
+        filePath: readyPath,
       );
-      return;
+      final kept = await _keepCompletedIfNewerThanInstalled(recovered);
+      if (kept != null) {
+        _emit(kept);
+        return;
+      }
     }
 
     await AndroidUpdatePrefs.clearPendingDownload();

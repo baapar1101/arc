@@ -116,13 +116,15 @@ def test_validate_reservation_for_invoice_create_success():
     assert result.code == "INV-20260714-0001"
 
 
-def test_cancel_document_code_reservation_marks_cancelled():
+@patch("app.services.document_code_reservation_service.reclaim_trailing_unused_document_codes")
+def test_cancel_document_code_reservation_marks_cancelled(mock_reclaim):
     db = MagicMock()
     reservation = _active_reservation()
     query = MagicMock()
     query.filter.return_value = query
     query.with_for_update.return_value = query
     query.first.return_value = reservation
+    query.all.return_value = []
     db.query.return_value = query
 
     cancelled = cancel_document_code_reservation(
@@ -134,6 +136,7 @@ def test_cancel_document_code_reservation_marks_cancelled():
     assert cancelled is True
     assert reservation.status == "cancelled"
     assert reservation.cancelled_at is not None
+    mock_reclaim.assert_called_once()
 
 
 def test_mark_reservation_used():
@@ -221,4 +224,52 @@ def test_reserve_assigns_unique_codes_sequentially():
                 user_id=1,
                 reservation_id=rid,
             )
+        db.commit()
+
+
+def test_cancel_last_reservation_reuses_same_code():
+    from datetime import date
+
+    from adapters.db.session import get_db_session
+    from app.services.document_code_reservation_service import (
+        cancel_document_code_reservation,
+        reserve_document_code,
+    )
+
+    with get_db_session() as db:
+        first = reserve_document_code(
+            db,
+            business_id=1,
+            user_id=1,
+            document_type="invoice_waste",
+            document_date=date(2026, 8, 15),
+        )
+        db.commit()
+        first_code = first["code"]
+
+        cancelled = cancel_document_code_reservation(
+            db,
+            business_id=1,
+            user_id=1,
+            reservation_id=first["reservation_id"],
+        )
+        db.commit()
+        assert cancelled is True
+
+        second = reserve_document_code(
+            db,
+            business_id=1,
+            user_id=1,
+            document_type="invoice_waste",
+            document_date=date(2026, 8, 15),
+        )
+        db.commit()
+        assert second["code"] == first_code
+
+        cancel_document_code_reservation(
+            db,
+            business_id=1,
+            user_id=1,
+            reservation_id=second["reservation_id"],
+        )
         db.commit()

@@ -58,6 +58,7 @@ List<InvoiceLineItem> invoiceLineItemsFromProductLinesForCopy(
         selectedInstanceIds: null,
         extraInfo: info.isNotEmpty ? info : null,
         productId: toInt(r['product_id']),
+        productCode: r['product_code']?.toString(),
         productName: r['product_name']?.toString(),
         selectedUnit: info['unit']?.toString(),
       ),

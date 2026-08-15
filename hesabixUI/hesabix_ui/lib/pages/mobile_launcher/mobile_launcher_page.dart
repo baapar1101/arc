@@ -11,6 +11,7 @@ import '../../core/business_nav.dart';
 import '../../core/mobile_launcher_prefs.dart';
 import '../../models/business_dashboard_models.dart';
 import '../../services/business_dashboard_service.dart';
+import '../../utils/currency_display_utils.dart';
 import '../../utils/responsive_helper.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../widgets/profile/business_switcher_widgets.dart';
@@ -58,6 +59,32 @@ class _MobileLauncherHomePageState extends State<MobileLauncherHomePage> {
   void initState() {
     super.initState();
     _loadStats();
+  }
+
+  @override
+  void didUpdateWidget(covariant MobileLauncherHomePage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.businessId != widget.businessId) {
+      _loadStats();
+    }
+  }
+
+  String _formatSalesValue(BusinessStatistics stats) {
+    final currency = stats.currency ??
+        (widget.authStore.currentBusiness?.id == widget.businessId
+            ? widget.authStore.currentBusiness?.defaultCurrency
+            : null);
+    final unit = currency == null
+        ? ''
+        : currencyUnitLabelFromBusinessCurrencyMap(
+            currency.toUnitMap(),
+            fallback: '',
+          );
+    return formatAmountWithCurrencyUnit(
+      stats.totalSales,
+      unit: unit,
+      decimalPlaces: currency?.decimalPlaces ?? 0,
+    );
   }
 
   Future<void> _loadStats() async {
@@ -455,6 +482,9 @@ class _MobileLauncherHomePageState extends State<MobileLauncherHomePage> {
                                   child: _LauncherSummaryStrip(
                                     loading: _statsLoading,
                                     stats: _stats,
+                                    salesValue: _stats == null
+                                        ? null
+                                        : _formatSalesValue(_stats!),
                                     cardBg: cardBg,
                                     borderColor: cardBorder,
                                     onBg: onBg,
@@ -707,6 +737,7 @@ class _LauncherSummaryStrip extends StatelessWidget {
   const _LauncherSummaryStrip({
     required this.loading,
     required this.stats,
+    this.salesValue,
     required this.cardBg,
     required this.borderColor,
     required this.onBg,
@@ -717,6 +748,7 @@ class _LauncherSummaryStrip extends StatelessWidget {
 
   final bool loading;
   final BusinessStatistics? stats;
+  final String? salesValue;
   final Color cardBg;
   final Color borderColor;
   final Color onBg;
@@ -758,7 +790,8 @@ class _LauncherSummaryStrip extends StatelessWidget {
                 Expanded(
                   child: _SummaryMetric(
                     label: salesLabel,
-                    value: formatter.format(stats!.totalSales.round()),
+                    value: salesValue ??
+                        formatter.format(stats!.totalSales.round()),
                     icon: Icons.trending_up_rounded,
                     onBg: onBg,
                     onBgMuted: onBgMuted,
