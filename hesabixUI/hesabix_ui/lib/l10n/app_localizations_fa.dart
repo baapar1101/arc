@@ -17071,6 +17071,24 @@ class AppLocalizationsFa extends AppLocalizations {
   String get mobileLauncherNoBusinesses => 'کسب‌وکاری یافت نشد.';
 
   @override
+  String get businessShellMoreToolsTooltip => 'ابزارهای بیشتر';
+
+  @override
+  String get businessShellAiChatTooltip => 'چت سریع با AI';
+
+  @override
+  String get businessShellCalculatorTooltip => 'ماشین حساب';
+
+  @override
+  String get businessShellBackToLauncher => 'بازگشت به لانچر';
+
+  @override
+  String get businessShellHideSidebarTooltip => 'پنهان کردن منوی کناری';
+
+  @override
+  String get businessShellShowSidebarTooltip => 'نمایش منوی کناری';
+
+  @override
   String get dataTableHelpMenu => 'راهنما';
 
   @override

@@ -17162,6 +17162,24 @@ class AppLocalizationsEn extends AppLocalizations {
   String get mobileLauncherNoBusinesses => 'No businesses found.';
 
   @override
+  String get businessShellMoreToolsTooltip => 'More tools';
+
+  @override
+  String get businessShellAiChatTooltip => 'Quick AI chat';
+
+  @override
+  String get businessShellCalculatorTooltip => 'Calculator';
+
+  @override
+  String get businessShellBackToLauncher => 'Back to launcher';
+
+  @override
+  String get businessShellHideSidebarTooltip => 'Hide sidebar';
+
+  @override
+  String get businessShellShowSidebarTooltip => 'Show sidebar';
+
+  @override
   String get dataTableHelpMenu => 'Help';
 
   @override

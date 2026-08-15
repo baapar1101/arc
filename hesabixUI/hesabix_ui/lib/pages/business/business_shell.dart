@@ -1317,6 +1317,38 @@ class _BusinessShellState extends State<BusinessShell> {
     }
   }
 
+  void _openQuickAiChat(BuildContext context) {
+    AIChatDialog.show(
+      context,
+      authStore: widget.authStore,
+      businessId: widget.businessId,
+      calendarController: widget.calendarController,
+    );
+  }
+
+  void _openCalculator(BuildContext context) {
+    CalculatorDialog.show(context);
+  }
+
+  static ButtonStyle get _bizToolbarIconStyle => IconButton.styleFrom(
+        minimumSize: const Size(38, 38),
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      );
+
+  Widget _bizToolbarIconButton({
+    required String tooltip,
+    required Widget icon,
+    required VoidCallback onPressed,
+  }) {
+    return IconButton(
+      tooltip: tooltip,
+      visualDensity: VisualDensity.compact,
+      style: _bizToolbarIconStyle,
+      onPressed: onPressed,
+      icon: icon,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
@@ -2433,6 +2465,13 @@ class _BusinessShellState extends State<BusinessShell> {
     final Color appBarFg = shellColors.topBarForeground;
 
     final launcherHomePath = MobileLauncherBackInfo.maybeHomeOf(context);
+    final bool isMobile = !useRail;
+    final String businessName = currentBusiness?.name ?? '';
+    final TextStyle? appBarTitleStyle = Theme.of(context).textTheme.titleSmall?.copyWith(
+          color: appBarFg,
+          fontWeight: FontWeight.w700,
+          height: 1.1,
+        );
 
     final appBar = AppBar(
       toolbarHeight: _kBizAppBarToolbarHeight,
@@ -2443,14 +2482,17 @@ class _BusinessShellState extends State<BusinessShell> {
       foregroundColor: appBarFg,
       iconTheme: IconThemeData(color: appBarFg, size: 21),
       actionsIconTheme: IconThemeData(color: appBarFg, size: 21),
-      automaticallyImplyLeading: !useRail && launcherHomePath == null,
+      automaticallyImplyLeading: false,
+      leadingWidth: isMobile ? 44 : null,
       titleSpacing: 0,
       title: Row(
         children: [
-          SizedBox(width: useRail ? 2 : 8),
+          SizedBox(width: useRail ? 2 : 4),
           if (useRail)
             IconButton(
-              tooltip: _desktopRailVisible ? 'پنهان کردن منوی کناری' : 'نمایش منوی کناری',
+              tooltip: _desktopRailVisible
+                  ? t.businessShellHideSidebarTooltip
+                  : t.businessShellShowSidebarTooltip,
               visualDensity: VisualDensity.compact,
               style: IconButton.styleFrom(
                 minimumSize: const Size(36, 36),
@@ -2463,93 +2505,74 @@ class _BusinessShellState extends State<BusinessShell> {
                 sidebarOpen: _desktopRailVisible,
               ),
             ),
-          if (!useRail) const SizedBox(width: 2),
-          Image.asset(logoAsset, height: 22),
-          const SizedBox(width: 10),
-          Text(
-            t.appTitle,
-            style: Theme.of(context).textTheme.titleSmall?.copyWith(
-              color: appBarFg,
-              fontWeight: FontWeight.w700,
-              height: 1.1,
+          ConstrainedBox(
+            constraints: BoxConstraints(
+              maxHeight: 22,
+              maxWidth: isMobile ? 72 : 160,
             ),
+            child: Image.asset(logoAsset, height: 22, fit: BoxFit.contain),
           ),
+          if (!isMobile) ...[
+            const SizedBox(width: 10),
+            Flexible(
+              child: Text(
+                t.appTitle,
+                style: appBarTitleStyle,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ] else if (businessName.isNotEmpty) ...[
+            const SizedBox(width: 8),
+            Flexible(
+              child: Text(
+                businessName,
+                style: appBarTitleStyle,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
         ],
       ),
       leading: useRail
           ? null
-          : launcherHomePath != null
-              ? IconButton(
-                  visualDensity: VisualDensity.compact,
-                  style: IconButton.styleFrom(
-                    minimumSize: const Size(40, 40),
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  ),
-                  icon: Icon(Icons.arrow_back, color: appBarFg, size: 21),
-                  tooltip: MaterialLocalizations.of(context).backButtonTooltip,
-                  onPressed: () => context.go(launcherHomePath),
-                )
-              : Builder(
-                  builder: (ctx) => IconButton(
-                    visualDensity: VisualDensity.compact,
-                    style: IconButton.styleFrom(
-                      minimumSize: const Size(40, 40),
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    ),
-                    icon: BusinessShellMenuGlyph(color: appBarFg, size: 21, sidebarOpen: false),
-                    onPressed: () => Scaffold.of(ctx).openDrawer(),
-                    tooltip: t.menu,
-                  ),
+          : Builder(
+              builder: (ctx) => IconButton(
+                visualDensity: VisualDensity.compact,
+                style: IconButton.styleFrom(
+                  minimumSize: const Size(40, 40),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 ),
-      actions: [
-        if (!useRail && launcherHomePath != null)
-          Builder(
-            builder: (ctx) => IconButton(
-              visualDensity: VisualDensity.compact,
-              style: IconButton.styleFrom(
-                minimumSize: const Size(38, 38),
-                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                icon: BusinessShellMenuGlyph(color: appBarFg, size: 21, sidebarOpen: false),
+                onPressed: () => Scaffold.of(ctx).openDrawer(),
+                tooltip: t.menu,
               ),
-              icon: BusinessShellMenuGlyph(color: appBarFg, size: 21, sidebarOpen: false),
-              onPressed: () => Scaffold.of(ctx).openDrawer(),
-              tooltip: t.menu,
             ),
-          ),
+      actions: [
         DailyFxRatesToolbarChip(
           businessId: widget.businessId,
           authStore: widget.authStore,
           iconColor: appBarFg,
+          iconOnly: isMobile,
         ),
-        NotificationBellButton(authStore: widget.authStore, iconColor: appBarFg),
-        IconButton(
-          tooltip: 'چت سریع با AI',
-          visualDensity: VisualDensity.compact,
-          style: IconButton.styleFrom(
-            minimumSize: const Size(38, 38),
-            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        NotificationBellButton(
+          authStore: widget.authStore,
+          iconColor: appBarFg,
+          denseToolbar: true,
+        ),
+        if (!isMobile) ...[
+          _bizToolbarIconButton(
+            tooltip: t.businessShellAiChatTooltip,
+            icon: Icon(Icons.smart_toy_outlined, color: appBarFg, size: 21),
+            onPressed: () => _openQuickAiChat(context),
           ),
-          onPressed: () {
-            AIChatDialog.show(
-              context,
-              authStore: widget.authStore,
-              businessId: widget.businessId,
-              calendarController: widget.calendarController,
-            );
-          },
-          icon: Icon(Icons.smart_toy_outlined, color: appBarFg, size: 21),
-        ),
-        IconButton(
-          tooltip: 'ماشین حساب',
-          visualDensity: VisualDensity.compact,
-          style: IconButton.styleFrom(
-            minimumSize: const Size(38, 38),
-            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          _bizToolbarIconButton(
+            tooltip: t.businessShellCalculatorTooltip,
+            icon: Icon(Icons.calculate_outlined, color: appBarFg, size: 21),
+            onPressed: () => _openCalculator(context),
           ),
-          onPressed: () {
-            CalculatorDialog.show(context);
-          },
-          icon: Icon(Icons.calculate_outlined, color: appBarFg, size: 21),
-        ),
+        ],
         CombinedUserMenuButton(
           authStore: widget.authStore,
           localeController: widget.localeController,
@@ -2557,13 +2580,50 @@ class _BusinessShellState extends State<BusinessShell> {
           themeController: widget.themeController,
           denseToolbar: true,
         ),
+        if (isMobile)
+          PopupMenuButton<String>(
+            tooltip: t.businessShellMoreToolsTooltip,
+            padding: EdgeInsets.zero,
+            iconSize: 21,
+            offset: const Offset(0, 8),
+            icon: Icon(Icons.more_vert_rounded, color: appBarFg, size: 21),
+            style: _bizToolbarIconStyle,
+            onSelected: (value) {
+              switch (value) {
+                case 'ai':
+                  _openQuickAiChat(context);
+                case 'calculator':
+                  _openCalculator(context);
+              }
+            },
+            itemBuilder: (ctx) => [
+              PopupMenuItem(
+                value: 'ai',
+                child: Row(
+                  children: [
+                    const Icon(Icons.smart_toy_outlined, size: 20),
+                    const SizedBox(width: 12),
+                    Text(t.businessShellAiChatTooltip),
+                  ],
+                ),
+              ),
+              PopupMenuItem(
+                value: 'calculator',
+                child: Row(
+                  children: [
+                    const Icon(Icons.calculate_outlined, size: 20),
+                    const SizedBox(width: 12),
+                    Text(t.businessShellCalculatorTooltip),
+                  ],
+                ),
+              ),
+            ],
+          ),
         const SizedBox(width: 2),
       ],
     );
 
-    // نوار دوم: تب‌ها یا نام کسب‌وکار / تاریخ
-    final bool isMobile = ResponsiveHelper.isShellCompactWidth(context);
-    final String businessName = currentBusiness?.name ?? '';
+    // نوار دوم: تب‌ها یا نام کسب‌وکار / تاریخ (فقط دسکتاپ)
     final bool isJalali = widget.calendarController?.isJalali ?? true;
     final String dateTimeStr = HesabixDateUtils.formatDateTimeWithWeekday(
       DateTime.now(),
@@ -2682,7 +2742,7 @@ class _BusinessShellState extends State<BusinessShell> {
     final bool showBizTabs =
         useRail && uiStore.shouldShowTabStrip(widget.businessId, isDesktop: true);
     final Widget shellMainChild = widget.child;
-    final double topStripHeight = _kUnifiedBizTabBarHeight;
+    final double topStripHeight = isMobile ? 0 : _kUnifiedBizTabBarHeight;
 
     final PreferredSizeWidget preferredAppBar = PreferredSize(
       preferredSize: Size.fromHeight(topStripHeight + _kBizAppBarToolbarHeight),
@@ -2700,7 +2760,7 @@ class _BusinessShellState extends State<BusinessShell> {
               dateTimeStr: dateTimeStr,
               isMobile: isMobile,
             )
-          else
+          else if (!isMobile)
             businessTopBar,
         ],
       ),
@@ -3174,6 +3234,20 @@ class _BusinessShellState extends State<BusinessShell> {
           child: ListView(
             padding: const EdgeInsets.symmetric(vertical: 8),
             children: [
+              if (launcherHomePath != null) ...[
+                ListTile(
+                  leading: Icon(Icons.apps_rounded, color: sideFg),
+                  title: Text(
+                    t.businessShellBackToLauncher,
+                    style: TextStyle(color: sideFg, fontWeight: FontWeight.w600),
+                  ),
+                  onTap: () {
+                    context.pop();
+                    context.go(launcherHomePath);
+                  },
+                ),
+                const Divider(),
+              ],
               // آیتم‌های منو
               for (int i = 0; i < menuItems.length; i++) ...[
                 Builder(builder: (ctx) {

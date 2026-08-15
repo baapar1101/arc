@@ -31518,6 +31518,42 @@ abstract class AppLocalizations {
   /// **'No businesses found.'**
   String get mobileLauncherNoBusinesses;
 
+  /// No description provided for @businessShellMoreToolsTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'More tools'**
+  String get businessShellMoreToolsTooltip;
+
+  /// No description provided for @businessShellAiChatTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Quick AI chat'**
+  String get businessShellAiChatTooltip;
+
+  /// No description provided for @businessShellCalculatorTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Calculator'**
+  String get businessShellCalculatorTooltip;
+
+  /// No description provided for @businessShellBackToLauncher.
+  ///
+  /// In en, this message translates to:
+  /// **'Back to launcher'**
+  String get businessShellBackToLauncher;
+
+  /// No description provided for @businessShellHideSidebarTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Hide sidebar'**
+  String get businessShellHideSidebarTooltip;
+
+  /// No description provided for @businessShellShowSidebarTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Show sidebar'**
+  String get businessShellShowSidebarTooltip;
+
   /// No description provided for @dataTableHelpMenu.
   ///
   /// In en, this message translates to:

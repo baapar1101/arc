@@ -21,11 +21,15 @@ class DailyFxRatesToolbarChip extends StatefulWidget {
     required this.businessId,
     required this.authStore,
     this.iconColor,
+    this.iconOnly = false,
   });
 
   final int businessId;
   final AuthStore authStore;
   final Color? iconColor;
+
+  /// در نوار فشردهٔ موبایل فقط آیکن + نقطهٔ تازگی، بدون متن نرخ.
+  final bool iconOnly;
 
   @override
   State<DailyFxRatesToolbarChip> createState() => _DailyFxRatesToolbarChipState();
@@ -196,13 +200,69 @@ class _DailyFxRatesToolbarChipState extends State<DailyFxRatesToolbarChip> {
           final fg = widget.iconColor ?? theme.colorScheme.onSurface;
           final dot = _freshnessColor(theme);
           final missing = _items.where((e) => e['missing'] == true).length;
+          final tooltip = missing > 0
+              ? 'نرخ روز — $missing ارز بدون نرخ'
+              : widget.iconOnly
+                  ? '${_summaryLabel()} — نرخ روز ارزهای فرعی'
+                  : 'نرخ روز ارزهای فرعی';
+
+          Widget freshnessDot({double size = 7}) {
+            return Container(
+              width: size,
+              height: size,
+              decoration: BoxDecoration(
+                color: dot,
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: dot.withValues(alpha: 0.45),
+                    blurRadius: 4,
+                  ),
+                ],
+              ),
+            );
+          }
+
+          if (widget.iconOnly) {
+            return IconButton(
+              tooltip: tooltip,
+              visualDensity: VisualDensity.compact,
+              style: IconButton.styleFrom(
+                minimumSize: const Size(38, 38),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+              onPressed: _openSheet,
+              icon: SizedBox(
+                width: 22,
+                height: 22,
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    Icon(Icons.currency_exchange, size: 21, color: fg.withValues(alpha: 0.95)),
+                    PositionedDirectional(
+                      top: -1,
+                      end: -1,
+                      child: _loading
+                          ? SizedBox(
+                              width: 8,
+                              height: 8,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 1.4,
+                                color: fg.withValues(alpha: 0.7),
+                              ),
+                            )
+                          : freshnessDot(size: 7),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }
 
           return Padding(
             padding: const EdgeInsets.symmetric(horizontal: 2),
             child: Tooltip(
-              message: missing > 0
-                  ? 'نرخ روز — $missing ارز بدون نرخ'
-                  : 'نرخ روز ارزهای فرعی',
+              message: tooltip,
               child: Material(
                 color: Colors.transparent,
                 child: InkWell(
@@ -219,20 +279,7 @@ class _DailyFxRatesToolbarChipState extends State<DailyFxRatesToolbarChip> {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Container(
-                          width: 7,
-                          height: 7,
-                          decoration: BoxDecoration(
-                            color: dot,
-                            shape: BoxShape.circle,
-                            boxShadow: [
-                              BoxShadow(
-                                color: dot.withValues(alpha: 0.45),
-                                blurRadius: 4,
-                              ),
-                            ],
-                          ),
-                        ),
+                        freshnessDot(),
                         const SizedBox(width: 7),
                         Icon(Icons.currency_exchange, size: 16, color: fg.withValues(alpha: 0.9)),
                         const SizedBox(width: 6),
