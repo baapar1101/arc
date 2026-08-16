@@ -6,9 +6,17 @@ from app.services.payment_service import (
 )
 
 
-def test_bitpay_defaults_to_toman_wire_amount() -> None:
+def test_bitpay_defaults_to_rial_wire_amount() -> None:
 	cfg: dict = {}
+	assert _bitpay_amount_unit(cfg) == "rial"
+	assert _bitpay_wire_amount(1_450_000, cfg) == 1_450_000
+	assert _bitpay_wire_amount(121_000_000, cfg) == 121_000_000
+
+
+def test_bitpay_toman_mode_divides_by_ten() -> None:
+	cfg = {"amount_unit": "toman"}
 	assert _bitpay_amount_unit(cfg) == "toman"
+	assert _bitpay_wire_amount(1_450_000, cfg) == 145_000
 	assert _bitpay_wire_amount(121_000_000, cfg) == 12_100_000
 
 
@@ -21,6 +29,12 @@ def test_bitpay_rial_mode_keeps_amount() -> None:
 def test_bitpay_currency_alias_r() -> None:
 	cfg = {"currency": "R"}
 	assert _bitpay_amount_unit(cfg) == "rial"
+
+
+def test_bitpay_currency_alias_t() -> None:
+	cfg = {"currency": "T"}
+	assert _bitpay_amount_unit(cfg) == "toman"
+	assert _bitpay_wire_amount(1_450_000, cfg) == 145_000
 
 
 def test_bitpay_wire_limits() -> None:

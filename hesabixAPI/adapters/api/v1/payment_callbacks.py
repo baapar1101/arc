@@ -105,16 +105,42 @@ def zarinpal_callback(
 	"/parsian",
 	summary="بازگشت از پارسیان",
 )
-def parsian_callback(
+@router.post(
+	"/parsian",
+	summary="بازگشت از پارسیان (POST)",
+)
+async def parsian_callback(
 	request: Request,
 	tx_id: int = Query(0, description="شناسه تراکنش داخلی"),
 	Token: str | None = Query(None),
 	status: str | None = Query(None),
+	OrderId: str | None = Query(None),
+	Amount: str | None = Query(None),
+	RRN: str | None = Query(None),
 	source: str | None = Query(None, description="منبع درخواست (app/mobile_web/desktop)"),
 	db: Session = Depends(get_db),
 ):
-	params = {"tx_id": tx_id, "Token": Token, "status": status}
+	params: Dict[str, Any] = {
+		"tx_id": tx_id,
+		"Token": Token,
+		"status": status,
+		"OrderId": OrderId,
+		"Amount": Amount,
+		"RRN": RRN,
+	}
+	if request.method == "POST":
+		try:
+			form = await request.form()
+			for k, v in form.items():
+				params[str(k)] = v
+		except Exception:
+			pass
+	try:
+		params["tx_id"] = int(params.get("tx_id") or tx_id or 0)
+	except (TypeError, ValueError):
+		params["tx_id"] = int(tx_id or 0)
 	data = verify_payment_callback(db, "parsian", params)
+	tx_id = int(data.get("transaction_id") or params.get("tx_id") or tx_id or 0)
 
 	redir = maybe_redirect_public_invoice_share_payment_return(db, tx_id=tx_id, verify_data=data)
 	if redir is not None:

@@ -15,6 +15,18 @@ from adapters.db.models.payment_gateway import PaymentGateway
 from adapters.db.models.support.billing import SupportPaymentSession
 from app.core.responses import ApiError
 from app.core.settings import get_settings
+from app.services.parsian_gateway import (
+	build_startpay_url,
+	callback_paid,
+	confirm_payment,
+	is_test_token,
+	make_order_id,
+	parse_amount,
+	resolve_login_account,
+	resolve_startpay_base,
+	sale_error_message,
+	sale_payment_request,
+)
 from app.services.payment_service import (
 	_BITPAY_WIRE_MAX,
 	_BITPAY_WIRE_MIN,
@@ -184,11 +196,18 @@ def initiate_support_gateway_payment(
 
 	session.external_ref = result.external_ref
 	session.status = "redirected"
-	session.provider_payload = {
+	payload: Dict[str, Any] = {
 		"payment_url": result.payment_url,
 		"external_ref": result.external_ref,
 		"provider": provider,
+		"internal_amount": amount,
 	}
+	if provider == "bitpay":
+		payload["bitpay_amount_unit"] = _bitpay_amount_unit(cfg)
+		payload["bitpay_wire_amount"] = _bitpay_wire_amount(amount, cfg)
+	if provider == "parsian":
+		payload["parsian_order_id"] = make_order_id("support", session.id)
+	session.provider_payload = payload
 	db.flush()
 	return result
 
@@ -358,57 +377,30 @@ def _initiate_parsian(
 	amount: float,
 	source: str,
 ) -> InitiateResult:
-	terminal_id = str(cfg.get("terminal_id") or "").strip()
-	if not terminal_id:
-		raise ApiError("INVALID_CONFIG", "terminal_id الزامی است", http_status=400)
+	login_account = resolve_login_account(cfg)
+	if not login_account:
+		raise ApiError("INVALID_CONFIG", "شناسه پذیرنده (PIN) الزامی است", http_status=400)
 	cb_url = _build_callback_from_gateway_cfg(cfg, "parsian", session.id, source)
-	api_base = str(
-		cfg.get("api_base")
-		or ("https://sandbox.banktest.ir/parsian" if gw.is_sandbox else "https://pec.shaparak.ir")
+	order_id = make_order_id("support", int(session.id))
+	wire_amount = parse_amount(amount)
+	sale = sale_payment_request(
+		cfg,
+		is_sandbox=bool(gw.is_sandbox),
+		order_id=order_id,
+		amount=wire_amount,
+		callback_url=cb_url,
 	)
-	startpay_base = str(
-		cfg.get("startpay_base")
-		or (
-			"https://sandbox.banktest.ir/parsian/NewIPG/?Token="
-			if gw.is_sandbox
-			else "https://pec.shaparak.ir/NewIPG/?Token="
-		)
-	)
-	# SOAP-like REST used elsewhere; keep compatible minimal JSON/form if configured
 	token: Optional[str] = None
-	try:
-		if gw.is_sandbox:
-			token = f"TEST-PARSIAN-{session.id}"
-		else:
-			token_url = str(cfg.get("token_url") or "")
-			if not token_url:
-				# سازگار با پیکربندی wallet: ساخت مسیر تقریبی
-				token_url = f"{api_base.rstrip('/')}/NewIPGServices/Sale/SaleService.asmx"
-			with httpx.Client(timeout=15.0) as client:
-				resp = client.post(
-					token_url,
-					json={
-						"LoginAccount": terminal_id,
-						"Amount": int(round(float(amount))),
-						"OrderId": int(session.id),
-						"CallBackUrl": cb_url,
-					},
-				)
-				data = resp.json() if resp.content else {}
-				token = str((data or {}).get("Token") or (data or {}).get("token") or "") or None
-	except Exception as ex:
-		logger.warning("support_parsian_initiate_failed session=%s err=%s", session.id, ex)
-		token = None
-
-	if not token and gw.is_sandbox:
+	if sale.ok and sale.token:
+		token = str(sale.token)
+	elif gw.is_sandbox:
+		logger.warning("support_parsian_sandbox_fallback session=%s status=%s", session.id, sale.status)
 		token = f"TEST-PARSIAN-{session.id}"
-	if not token:
-		raise ApiError("GATEWAY_INIT_FAILED", "ایجاد درخواست پرداخت پارسیان ناموفق بود", http_status=502)
-
-	if "Token=" in startpay_base or startpay_base.endswith("="):
-		payment_url = f"{startpay_base}{token}"
 	else:
-		payment_url = f"{startpay_base}?Token={token}"
+		raise ApiError("GATEWAY_INIT_FAILED", sale_error_message(sale), http_status=502)
+
+	startpay_base = resolve_startpay_base(cfg, is_sandbox=bool(gw.is_sandbox))
+	payment_url = build_startpay_url(startpay_base, token)
 	return InitiateResult(payment_url=payment_url, external_ref=token)
 
 
@@ -419,18 +411,34 @@ def _verify_parsian(
 	params: Dict[str, Any],
 ) -> Tuple[bool, Optional[str], Optional[Any], Dict[str, Any]]:
 	token = str(params.get("Token") or params.get("token") or session.external_ref or "").strip()
-	status = params.get("status") or params.get("Status") or params.get("statusCode")
-	payload = {"token": token, "raw": {k: str(v) for k, v in params.items() if k != "db"}}
+	cb_status = params.get("status") if params.get("status") is not None else params.get("Status")
+	payload: Dict[str, Any] = {"token": token, "raw": {k: str(v) for k, v in params.items() if k != "db"}}
 	success = False
 	ref_id = params.get("RRN") or params.get("rrn") or params.get("RefNum")
-	if gw.is_sandbox and token.startswith("TEST-PARSIAN-"):
+	stored = session.provider_payload if isinstance(session.provider_payload, dict) else {}
+	if gw.is_sandbox and is_test_token(token):
 		success = True
-	else:
-		# Accept positive status codes commonly used
-		try:
-			success = int(status) == 0
-		except Exception:
-			success = str(status).lower() in ("0", "ok", "success")
+	elif callback_paid(cb_status) and token:
+		order_id = parse_amount(
+			params.get("OrderId") or stored.get("parsian_order_id") or make_order_id("support", session.id)
+		)
+		cb_amount = parse_amount(params.get("Amount"))
+		amount = cb_amount if cb_amount > 0 else parse_amount(session.amount)
+		confirm = confirm_payment(
+			cfg,
+			is_sandbox=bool(gw.is_sandbox),
+			token=token,
+			order_id=order_id,
+			amount=amount,
+		)
+		payload["confirm"] = {
+			"status": confirm.status,
+			"rrn": confirm.rrn,
+			"message": confirm.message,
+		}
+		success = bool(confirm.ok)
+		if confirm.rrn:
+			ref_id = confirm.rrn
 	return success, token or None, ref_id, payload
 
 

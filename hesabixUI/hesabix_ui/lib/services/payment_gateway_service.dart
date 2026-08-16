@@ -15,6 +15,16 @@ class PaymentGatewayService {
     return const <Map<String, dynamic>>[];
   }
 
+  Future<Map<String, dynamic>> getAdmin(int gatewayId) async {
+    final res = await _api.get<Map<String, dynamic>>('/admin/payment-gateways/$gatewayId');
+    final body = res.data;
+    final data = (body is Map<String, dynamic>) ? body['data'] : body;
+    if (data is Map<String, dynamic>) {
+      return Map<String, dynamic>.from(data);
+    }
+    return const <String, dynamic>{};
+  }
+
   Future<Map<String, dynamic>> createAdmin({
     required String provider,
     required String displayName,

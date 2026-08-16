@@ -135,10 +135,19 @@ async def parsian_callback(
 	session_id: int = Query(0),
 	Token: Optional[str] = Query(None),
 	status: Optional[str] = Query(None),
+	OrderId: Optional[str] = Query(None),
+	Amount: Optional[str] = Query(None),
+	RRN: Optional[str] = Query(None),
 	source: Optional[str] = Query(None),
 	db: Session = Depends(get_db),
 ):
-	params: dict[str, Any] = {"Token": Token, "status": status}
+	params: dict[str, Any] = {
+		"Token": Token,
+		"status": status,
+		"OrderId": OrderId,
+		"Amount": Amount,
+		"RRN": RRN,
+	}
 	if request.method == "POST":
 		try:
 			form = await request.form()
@@ -146,6 +155,14 @@ async def parsian_callback(
 				params[str(k)] = v
 			if not session_id:
 				session_id = int(params.get("session_id") or 0)
+		except Exception:
+			pass
+	if not session_id:
+		try:
+			from app.services.parsian_gateway import decode_order_id, parse_amount
+			scope, decoded = decode_order_id(parse_amount(params.get("OrderId") or 0))
+			if scope == "support" and decoded > 0:
+				session_id = decoded
 		except Exception:
 			pass
 	return _handle_callback(request, "parsian", db, session_id, params, source)

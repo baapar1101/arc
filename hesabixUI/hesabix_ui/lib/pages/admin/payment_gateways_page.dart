@@ -86,7 +86,12 @@ class _PaymentGatewaysPageState extends State<PaymentGatewaysPage> {
     _failureRedirectCtrl.clear();
     final cfg = (it['config'] is Map<String, dynamic>) ? it['config'] as Map<String, dynamic> : <String, dynamic>{};
     if (cfg['merchant_id'] != null) _merchantIdCtrl.text = '${cfg['merchant_id']}';
-    if (_provider == 'parsian' && cfg['terminal_id'] != null) _terminalIdCtrl.text = '${cfg['terminal_id']}';
+    if (_provider == 'parsian') {
+      final pin = cfg['pin'] ?? cfg['login_account'] ?? cfg['merchant_id'] ?? cfg['terminal_id'];
+      if (pin != null && '$pin'.trim().isNotEmpty) {
+        _terminalIdCtrl.text = '$pin';
+      }
+    }
     if (_provider == 'bitpay' && cfg['api'] != null) _apiCtrl.text = '${cfg['api']}';
     if (cfg['callback_url'] != null) _callbackUrlCtrl.text = '${cfg['callback_url']}';
     if (cfg['success_redirect'] != null) _successRedirectCtrl.text = '${cfg['success_redirect']}';
@@ -100,8 +105,11 @@ class _PaymentGatewaysPageState extends State<PaymentGatewaysPage> {
       cfg['merchant_id'] = _merchantIdCtrl.text.trim();
       cfg['callback_url'] = _callbackUrlCtrl.text.trim();
     } else if (_provider == 'parsian') {
-      cfg['merchant_id'] = _merchantIdCtrl.text.trim();
-      cfg['terminal_id'] = _terminalIdCtrl.text.trim();
+      final pin = _terminalIdCtrl.text.trim();
+      cfg['pin'] = pin;
+      cfg['login_account'] = pin;
+      cfg['terminal_id'] = pin;
+      cfg['merchant_id'] = pin;
       cfg['callback_url'] = _callbackUrlCtrl.text.trim();
     } else if (_provider == 'bitpay') {
       cfg['merchant_id'] = _merchantIdCtrl.text.trim();
@@ -431,38 +439,17 @@ class _PaymentGatewaysPageState extends State<PaymentGatewaysPage> {
                               ),
                             if (_provider == 'parsian') ...[
                               TextFormField(
-                                controller: _merchantIdCtrl,
-                                decoration: InputDecoration(
-                                  labelText: 'Merchant ID',
-                                  hintText: 'کد پذیرنده از پنل پارسیان',
-                                  prefixIcon: const Icon(Icons.badge),
-                                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                                  filled: true,
-                                  helperText: 'کد پذیرنده (Merchant ID) از بانک پارسیان',
-                                ),
-                                validator: (v) => (v == null || v.isEmpty) ? AppLocalizations.of(context).requiredField : null,
-                              ),
-                              const SizedBox(height: 12),
-                              TextFormField(
                                 controller: _terminalIdCtrl,
                                 decoration: InputDecoration(
-                                  labelText: 'Terminal ID',
-                                  hintText: 'شماره ترمینال از پنل پارسیان',
-                                  prefixIcon: const Icon(Icons.point_of_sale),
+                                  labelText: 'شناسه پذیرنده (PIN)',
+                                  hintText: 'رمز پذیرنده دریافتی از پارسیان',
+                                  prefixIcon: const Icon(Icons.vpn_key),
                                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                                   filled: true,
-                                  helperText: 'شماره ترمینال عددی که از بانک پارسیان دریافت کرده‌اید',
+                                  helperText: 'همان LoginAccount وب‌سرویس پارسیان — PIN را از شرکت پارسیان دریافت کرده‌اید',
+                                  helperMaxLines: 3,
                                 ),
-                                validator: (v) {
-                                  if (v == null || v.isEmpty) {
-                                    return AppLocalizations.of(context).requiredField;
-                                  }
-                                  // بررسی عددی بودن
-                                  if (!RegExp(r'^\d+$').hasMatch(v.trim())) {
-                                    return 'شماره ترمینال باید عدد باشد';
-                                  }
-                                  return null;
-                                },
+                                validator: (v) => (v == null || v.trim().isEmpty) ? AppLocalizations.of(context).requiredField : null,
                               ),
                             ],
                             if (_provider == 'bitpay') ...[
@@ -655,11 +642,26 @@ class _PaymentGatewaysPageState extends State<PaymentGatewaysPage> {
     }
   }
 
-  void _openEditDialog(Map<String, dynamic> item) {
+  Future<void> _openEditDialog(Map<String, dynamic> item) async {
     print('🔧 [EDIT DIALOG] Opening edit dialog for gateway: ${item['id']}');
-    // پیش‌پر کردن فرم برای ویرایش
+    final id = int.tryParse('${item['id']}');
+    Map<String, dynamic> detail = item;
+    if (id != null && id > 0) {
+      try {
+        detail = await _service.getAdmin(id);
+      } catch (e) {
+        print('❌ [EDIT DIALOG] Failed to load gateway details: $e');
+        if (!mounted) return;
+        SnackBarHelper.showError(
+          context,
+          message: ErrorExtractor.forContext(e, context),
+        );
+        return;
+      }
+    }
+    if (!mounted) return;
     setState(() {
-      _prefillForEdit(item);
+      _prefillForEdit(detail);
     });
     print('🔧 [EDIT DIALOG] State after prefill - isActive: $_isActive, isSandbox: $_isSandbox');
     
@@ -885,38 +887,17 @@ class _PaymentGatewaysPageState extends State<PaymentGatewaysPage> {
                             ),
                           if (_provider == 'parsian') ...[
                             TextFormField(
-                              controller: _merchantIdCtrl,
-                              decoration: InputDecoration(
-                                labelText: 'Merchant ID',
-                                hintText: 'کد پذیرنده از پنل پارسیان',
-                                prefixIcon: const Icon(Icons.badge),
-                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                                filled: true,
-                                helperText: 'کد پذیرنده (Merchant ID) از بانک پارسیان',
-                              ),
-                              validator: (v) => (v == null || v.isEmpty) ? AppLocalizations.of(context).requiredField : null,
-                            ),
-                            const SizedBox(height: 12),
-                            TextFormField(
                               controller: _terminalIdCtrl,
                               decoration: InputDecoration(
-                                labelText: 'Terminal ID',
-                                hintText: 'شماره ترمینال از پنل پارسیان',
-                                prefixIcon: const Icon(Icons.point_of_sale),
+                                labelText: 'شناسه پذیرنده (PIN)',
+                                hintText: 'رمز پذیرنده دریافتی از پارسیان',
+                                prefixIcon: const Icon(Icons.vpn_key),
                                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                                 filled: true,
-                                helperText: 'شماره ترمینال عددی که از بانک پارسیان دریافت کرده‌اید',
+                                helperText: 'همان LoginAccount وب‌سرویس پارسیان — PIN را از شرکت پارسیان دریافت کرده‌اید',
+                                helperMaxLines: 3,
                               ),
-                              validator: (v) {
-                                if (v == null || v.isEmpty) {
-                                  return AppLocalizations.of(context).requiredField;
-                                }
-                                // بررسی عددی بودن
-                                if (!RegExp(r'^\d+$').hasMatch(v.trim())) {
-                                  return 'شماره ترمینال باید عدد باشد';
-                                }
-                                return null;
-                              },
+                              validator: (v) => (v == null || v.trim().isEmpty) ? AppLocalizations.of(context).requiredField : null,
                             ),
                           ],
                           if (_provider == 'bitpay') ...[
