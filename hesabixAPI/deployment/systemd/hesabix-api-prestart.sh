@@ -70,32 +70,33 @@ set_pip_env_for_url() {
   fi
 }
 
-# فقط میرور Hesabix (مطابق deploy.sh). اگر PIP_INDEX_URL در محیط سرویس تنظیم شده، همان استفاده می‌شود.
+# میرور اصلی + آینه‌های چین (بدون تحریم) به‌عنوان fallback.
+CHINA_EXTRA="https://mirrors.aliyun.com/pypi/simple"
 MIRRORS=()
 if [[ -n "${PIP_INDEX_URL:-}" ]]; then
   MIRRORS+=("${PIP_INDEX_URL}")
 else
   MIRRORS+=("https://p.mirror.hesabix.ir/simple")
 fi
+MIRRORS+=("${CHINA_EXTRA}")
+MIRRORS+=("https://mirrors.cloud.tencent.com/pypi/simple")
 
+seen_mirrors=" "
 for url in "${MIRRORS[@]}"; do
   [[ -z "$url" ]] && continue
+  case "${seen_mirrors}" in *" ${url} "*) continue ;; esac
+  seen_mirrors+="${url} "
   log "trying PyPI: $url"
   set_pip_env_for_url "$url"
+  extra="${CHINA_EXTRA}"
+  [[ "$url" == "${CHINA_EXTRA}" ]] && extra="https://mirrors.cloud.tencent.com/pypi/simple"
+  pip_env=(env PIP_INDEX_URL="${PIP_INDEX_URL}" PIP_EXTRA_INDEX_URL="${extra}")
   if [[ -n "${PIP_TRUSTED_HOST:-}" ]]; then
-    if ! run_as_www env PIP_INDEX_URL="${PIP_INDEX_URL}" PIP_TRUSTED_HOST="${PIP_TRUSTED_HOST}" \
-        "$PIP" install --upgrade pip setuptools wheel \
-        && run_as_www env PIP_INDEX_URL="${PIP_INDEX_URL}" PIP_TRUSTED_HOST="${PIP_TRUSTED_HOST}" \
-        "$PIP" install -e "${API_DIR}"; then
-      continue
-    fi
-  else
-    if ! run_as_www env PIP_INDEX_URL="${PIP_INDEX_URL}" \
-        "$PIP" install --upgrade pip setuptools wheel \
-        && run_as_www env PIP_INDEX_URL="${PIP_INDEX_URL}" \
-        "$PIP" install -e "${API_DIR}"; then
-      continue
-    fi
+    pip_env+=(PIP_TRUSTED_HOST="${PIP_TRUSTED_HOST}")
+  fi
+  if ! run_as_www "${pip_env[@]}" "$PIP" install --upgrade pip setuptools wheel \
+      || ! run_as_www "${pip_env[@]}" "$PIP" install -e "${API_DIR}"; then
+    continue
   fi
   if run_as_www env PYTHONPATH="${API_DIR}" "$VENV_PY" -c "import app.main"; then
     log "OK after install from $url"

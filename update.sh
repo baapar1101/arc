@@ -90,8 +90,9 @@ configure_pip_hesabix_mirror() {
   fi
   python3 -m pip config --user set global.index "https://p.mirror.hesabix.ir/simple" 2>/dev/null || true
   python3 -m pip config --user set global.index-url "https://p.mirror.hesabix.ir/simple" 2>/dev/null || true
+  python3 -m pip config --user set global.extra-index-url "https://mirrors.aliyun.com/pypi/simple" 2>/dev/null || true
   python3 -m pip config --user set global.trusted-host "p.mirror.hesabix.ir" 2>/dev/null || true
-  log_info "pip user config: Hesabix PyPI (p.mirror.hesabix.ir/simple)"
+  log_info "pip user config: Hesabix PyPI (p.mirror.hesabix.ir/simple) + Aliyun extra-index"
 }
 
 ensure_api_journalctl_env() {
@@ -198,10 +199,16 @@ if declare -F hesabix_apply_pip_mirror_env >/dev/null 2>&1; then
 else
   export PIP_INDEX_URL="${PIP_INDEX_URL:-https://p.mirror.hesabix.ir/simple}"
   export PIP_TRUSTED_HOST="${PIP_TRUSTED_HOST:-p.mirror.hesabix.ir}"
+  export PIP_EXTRA_INDEX_URL="${PIP_EXTRA_INDEX_URL:-https://mirrors.aliyun.com/pypi/simple}"
 fi
 log_info "Installing backend deps from PyPI: ${PIP_INDEX_URL}"
-pip install --upgrade pip setuptools wheel -q
-pip install -e . -q
+if declare -F hesabix_pip_cmd_with_fallback >/dev/null 2>&1; then
+  hesabix_pip_cmd_with_fallback pip install --upgrade pip setuptools wheel -q
+  hesabix_pip_cmd_with_fallback pip install -e . -q
+else
+  pip install --upgrade pip setuptools wheel -q
+  pip install -e . -q
+fi
 ensure_voice="${APP_ROOT}/app/scripts/ensure_voice_chat.sh"
 if [[ -f "${ensure_voice}" ]]; then
   chmod +x "${ensure_voice}" 2>/dev/null || true
