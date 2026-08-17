@@ -134,6 +134,31 @@ def test_stop_when_evidence_and_composed_answer_text():
     assert result.goal_reached is True
 
 
+def test_stop_when_prior_goal_reached_with_evidence():
+    store = ObservationStore()
+    store.add_thought(
+        ThoughtRecord(
+            thought_id="t1",
+            bundle_id="b1",
+            iteration=1,
+            body_markdown="### یافته‌ها",
+            confidence="medium",
+            open_questions=["جزئیات بیشتر"],
+        )
+    )
+    result = assess_text_round_evidence(
+        round_text="",
+        user_query="فاکتورهای فروش را بررسی کن",
+        observation_store=store,
+        needs_tools=True,
+        prior_goal_reached=True,
+        prior_should_continue=False,
+    )
+    assert result.should_continue is False
+    assert result.goal_reached is True
+    assert "نوبت قبلی" in (result.reason_fa or "")
+
+
 def test_continue_when_evidence_but_status_narrative():
     """با evidence اگر هنوز «در حال…» می‌گوید → continue."""
     store = ObservationStore()

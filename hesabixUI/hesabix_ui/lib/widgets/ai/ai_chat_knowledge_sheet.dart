@@ -187,6 +187,21 @@ class _AIChatKnowledgeSheetState extends State<_AIChatKnowledgeSheet> {
     }
   }
 
+  String _indexStatusLabel(Map<String, dynamic> doc) {
+    final status = doc['index_status'] as String? ?? 'keyword';
+    final chunks = doc['chunk_count'] as int? ?? 0;
+    switch (status) {
+      case 'semantic':
+        return chunks > 0 ? 'جستجوی معنایی ($chunks تکه)' : 'جستجوی معنایی';
+      case 'error':
+        return 'ایندکس ناموفق — جستجوی واژه‌ای';
+      default:
+        return chunks > 0
+            ? 'جستجوی واژه‌ای ($chunks تکه)'
+            : 'جستجوی واژه‌ای';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final bottom = MediaQuery.viewInsetsOf(context).bottom;
@@ -257,7 +272,9 @@ class _AIChatKnowledgeSheetState extends State<_AIChatKnowledgeSheet> {
                   return ListTile(
                     contentPadding: EdgeInsets.zero,
                     title: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis),
-                    subtitle: Text('$chars کاراکتر'),
+                    subtitle: Text(
+                      '$chars کاراکتر · ${_indexStatusLabel(doc)}',
+                    ),
                     trailing: IconButton(
                       icon: const Icon(Icons.delete_outline),
                       onPressed: () => _deleteDoc(id),

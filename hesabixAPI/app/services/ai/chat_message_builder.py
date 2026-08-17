@@ -86,10 +86,9 @@ def build_llm_messages_from_history(db_messages: List[Any]) -> List[Dict[str, An
                 result = results.get(tc_id, results.get(fname, {}))
                 if isinstance(result, dict) and "result" in result and "name" in result:
                     result = result.get("result")
-                if isinstance(result, (dict, list)):
-                    serialized = json_dumps_safe(result)
-                else:
-                    serialized = str(result) if result is not None else "{}"
+                from app.services.ai.ai_tool_result import compact_tool_result_for_llm
+
+                serialized = compact_tool_result_for_llm(fname, result)
                 llm_messages.append(
                     {
                         "role": "tool",

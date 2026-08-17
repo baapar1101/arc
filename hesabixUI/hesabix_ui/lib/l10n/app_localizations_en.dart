@@ -10602,6 +10602,19 @@ class AppLocalizationsEn extends AppLocalizations {
       'Text input is disabled during an active voice session.';
 
   @override
+  String get aiChatApprovalNeedsOpenSession =>
+      'To approve this action, open the same conversation where the assistant asked for confirmation.';
+
+  @override
+  String get aiChatWriteApprovalNotFound =>
+      'No active conversation or pending write was found. Open the conversation where the assistant requested approval.';
+
+  @override
+  String aiChatSendFailed(String error) {
+    return 'Could not send the message: $error';
+  }
+
+  @override
   String get aiVoiceDummyTtsWarning =>
       'Server TTS is in test mode; you may not hear spoken responses.';
 
@@ -10948,6 +10961,16 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get aiErrorRecoveryDismiss => 'Dismiss';
+
+  @override
+  String get aiContinueAnalysis => 'Continue analysis';
+
+  @override
+  String get aiContinueAnalysisHint =>
+      'The analysis stopped early. Continue from the same run without repeating completed tools.';
+
+  @override
+  String get aiContinueAnalysisDismiss => 'Not now';
 
   @override
   String aiConversationNavTitle(int count) {
@@ -14313,6 +14336,10 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get crmDealFormSubtitle =>
       'Customer, pipeline stage, and financial details.';
+
+  @override
+  String get crmDealProbabilityUnavailable =>
+      'The assistant could not extract a valid probability. The field was left unchanged.';
 
   @override
   String get crmConvertLeadTitle => 'Convert to customer';

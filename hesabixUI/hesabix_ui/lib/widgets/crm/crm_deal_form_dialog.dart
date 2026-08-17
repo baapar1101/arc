@@ -342,7 +342,15 @@ class _CrmDealFormDialogState extends State<CrmDealFormDialog> {
       final prob = (data is Map && data['probability_percent'] != null) ? (data['probability_percent'] as num).toInt() : null;
       setState(() {
         _loadingProbability = false;
-        if (prob != null) _probabilityPercent = prob;
+        if (prob != null) {
+          _probabilityPercent = prob;
+        } else {
+          SnackBarHelper.show(
+            context,
+            message: AppLocalizations.of(context).crmDealProbabilityUnavailable,
+            isError: true,
+          );
+        }
       });
     } catch (e) {
       if (!mounted) return;

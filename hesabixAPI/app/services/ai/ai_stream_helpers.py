@@ -7,12 +7,139 @@ import asyncio
 import time
 from typing import Any, AsyncGenerator, Callable, Dict, List, Optional
 
+from app.core.json_safe import json_dumps_safe
+from app.services.ai.ai_sse_event_buffer import append_sse_event
+
 HEARTBEAT_INTERVAL_SEC = 3.0
+SSE_NGINX_PAD = ":" + (" " * 2048) + "\n"
+
+
+def format_sse_payload(
+    data: Dict[str, Any],
+    *,
+    event_id: Optional[int] = None,
+) -> str:
+    """قالب SSE با pad پروکسی و شناسهٔ رویداد اختیاری."""
+    parts = [SSE_NGINX_PAD]
+    if event_id is not None:
+        parts.append(f"id: {event_id}\n")
+    parts.append(f"data: {json_dumps_safe(data)}\n\n")
+    return "".join(parts)
+
+
+class SseEventSequencer:
+    """شمارندهٔ id رویداد + بافر per-run برای Last-Event-ID."""
+
+    def __init__(self, run_id: Optional[str] = None, start_id: int = 0) -> None:
+        self.run_id = run_id
+        self.last_id = int(start_id)
+
+    def bind_run(self, run_id: Optional[str]) -> None:
+        if run_id:
+            self.run_id = str(run_id)
+
+    def format(self, data: Dict[str, Any]) -> str:
+        self.last_id += 1
+        payload = dict(data)
+        payload["sse_id"] = self.last_id
+        if self.run_id and "run_id" not in payload:
+            payload["run_id"] = self.run_id
+        if self.run_id:
+            append_sse_event(self.run_id, self.last_id, payload)
+        return format_sse_payload(payload, event_id=self.last_id)
+
+
+# فیلدهایی که باید از chunk پایانی سرویس به رویداد done کلاینت برسند.
+STREAM_DONE_OPTIONAL_KEYS = (
+    "agent_trace",
+    "agent_budget",
+    "agent_run",
+    "awaiting_approval",
+    "citations_context",
+    "citations",
+    "activated_skills",
+    "requested_model",
+    "resolved_model",
+    "execution_mode",
+    "can_continue",
+    "run_id",
+    "final_content",
+    "stop_reason",
+    "stop_message_fa",
+)
+
+
+def attach_stream_done_metadata(
+    payload: Dict[str, Any],
+    source: Optional[Dict[str, Any]],
+) -> Dict[str, Any]:
+    """کپی فیلدهای متادیتای پایان استریم بدون حذف مقدار False/0."""
+    if not source:
+        return payload
+    for key in STREAM_DONE_OPTIONAL_KEYS:
+        if key not in source:
+            continue
+        value = source.get(key)
+        if key in ("awaiting_approval", "can_continue"):
+            payload[key] = bool(value)
+            continue
+        if value is not None:
+            payload[key] = value
+    return payload
+
+
+def build_chat_done_sse_data(
+    *,
+    message_id: Optional[int],
+    usage: Optional[Dict[str, Any]],
+    function_calls: Any = None,
+    function_results: Any = None,
+    extra: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """رویداد یکتای done پس از persist — شامل متادیتای کامل حلقهٔ agent."""
+    data: Dict[str, Any] = {
+        "content": "",
+        "done": True,
+        "usage": usage,
+        "message_id": message_id,
+        "function_calls": function_calls,
+        "function_results": function_results,
+    }
+    attach_stream_done_metadata(data, extra)
+    if not usage:
+        data["warning"] = "Usage information not available"
+    return data
 
 
 def chunk_to_sse_data(chunk: Dict[str, Any]) -> List[Dict[str, Any]]:
     """تبدیل chunk داخلی AIService به یک یا چند payload SSE."""
     event_type = chunk.get("event")
+    if event_type == "agent_run":
+        data = {
+            "type": "agent_run",
+            "run_id": chunk.get("run_id"),
+            "phase": chunk.get("phase"),
+            "iteration": chunk.get("iteration"),
+            "needs_tools": bool(chunk.get("needs_tools")),
+            "status": chunk.get("status"),
+            "can_continue": bool(chunk.get("can_continue")),
+            "done": False,
+        }
+        if chunk.get("stop_reason") is not None:
+            data["stop_reason"] = chunk.get("stop_reason")
+        return [data]
+
+    if event_type == "run_resumed":
+        return [
+            {
+                "type": "run_resumed",
+                "run_id": chunk.get("run_id"),
+                "phase": chunk.get("phase"),
+                "iteration": chunk.get("iteration"),
+                "done": False,
+            }
+        ]
+
     if event_type == "status":
         data: Dict[str, Any] = {
             "type": "status",
@@ -39,12 +166,15 @@ def chunk_to_sse_data(chunk: Dict[str, Any]) -> List[Dict[str, Any]]:
         for key in (
             "iteration",
             "max_iterations",
+            "base_max_iterations",
             "tokens_used",
             "max_total_tokens",
             "elapsed_sec",
             "wall_clock_sec",
             "unproductive_rounds",
             "max_unproductive_rounds",
+            "extensions_granted",
+            "max_extensions",
             "reasoning_effort",
             "stop_reason",
             "stop_message_fa",
@@ -152,16 +282,7 @@ def chunk_to_sse_data(chunk: Dict[str, Any]) -> List[Dict[str, Any]]:
             "function_calls": chunk.get("function_calls"),
             "function_results": chunk.get("function_results"),
         }
-        if chunk.get("agent_trace"):
-            done_payload["agent_trace"] = chunk.get("agent_trace")
-        if chunk.get("agent_budget"):
-            done_payload["agent_budget"] = chunk.get("agent_budget")
-        if chunk.get("agent_run"):
-            done_payload["agent_run"] = chunk.get("agent_run")
-        if chunk.get("requested_model"):
-            done_payload["requested_model"] = chunk.get("requested_model")
-        if chunk.get("resolved_model"):
-            done_payload["resolved_model"] = chunk.get("resolved_model")
+        attach_stream_done_metadata(done_payload, chunk)
         payloads.append(done_payload)
     elif not content_chunk and not event_type:
         pass

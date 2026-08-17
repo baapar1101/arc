@@ -15,7 +15,10 @@ from app.services.ai.ai_agent_continuation import (
     assess_text_round_evidence,
     resolve_needs_tools,
 )
-from app.services.ai.ai_constants import AGENT_MAX_IDENTICAL_TOOL_REPEATS
+from app.services.ai.ai_constants import (
+    AGENT_MAX_IDENTICAL_TOOL_FAILURES,
+    AGENT_MAX_IDENTICAL_TOOL_REPEATS,
+)
 from app.services.ai.ai_budget import AgentBudget, BudgetStatus, STOP_REASON_ITERATIONS, STOP_REASON_UNPRODUCTIVE
 from app.services.ai.ai_exploration_service import (
     ExplorationBundle,
@@ -29,6 +32,35 @@ from app.services.ai.ai_exploration_service import (
 
 if TYPE_CHECKING:
     from app.services.ai.ai_session_todo_service import SessionTodoGoalState
+
+
+def classify_tool_result_outcome(result: Any) -> str:
+    """ok / error / empty / approval — برای معافیت تکرار پس از شکست (AGT-08)."""
+    if result is None:
+        return "empty"
+    if isinstance(result, str) and not result.strip():
+        return "empty"
+    if isinstance(result, list):
+        return "ok" if result else "empty"
+    if not isinstance(result, dict):
+        return "ok"
+
+    err = result.get("error")
+    if err == "APPROVAL_REQUIRED":
+        return "approval"
+    if err:
+        return "error"
+
+    from app.services.ai.ai_tool_result import extract_record_list
+
+    records, _ = extract_record_list(result)
+    if records:
+        return "ok"
+    for key in ("message", "summary", "total", "ok", "success", "note"):
+        val = result.get(key)
+        if val not in (None, "", [], {}):
+            return "ok"
+    return "empty"
 
 
 @dataclass
@@ -48,6 +80,7 @@ class ToolCallTracker:
 
     def __init__(self) -> None:
         self._counts: Dict[str, int] = {}
+        self._failures: Dict[str, int] = {}
 
     @staticmethod
     def fingerprint(tool_name: str, arguments: Any) -> str:
@@ -59,21 +92,43 @@ class ToolCallTracker:
         )
         return hashlib.sha256(canonical.encode()).hexdigest()[:16]
 
-    def record(self, function_calls: List[Dict[str, Any]]) -> int:
+    def record(
+        self,
+        function_calls: List[Dict[str, Any]],
+        *,
+        function_results: Optional[Dict[str, Any]] = None,
+        lookup_result: Optional[Callable[[Dict[str, Any], Dict[str, Any]], Any]] = None,
+    ) -> int:
         over_limit = 0
         for call in function_calls:
             fp = self.fingerprint(
                 call.get("name", "unknown"),
                 call.get("arguments", {}),
             )
+            outcome = "ok"
+            if lookup_result is not None and function_results is not None:
+                outcome = classify_tool_result_outcome(
+                    lookup_result(function_results, call)
+                )
+            if outcome in ("error", "empty", "approval"):
+                self._failures[fp] = self._failures.get(fp, 0) + 1
+                if self._failures[fp] > AGENT_MAX_IDENTICAL_TOOL_FAILURES:
+                    over_limit += 1
+                continue
             self._counts[fp] = self._counts.get(fp, 0) + 1
             if self._counts[fp] > AGENT_MAX_IDENTICAL_TOOL_REPEATS:
                 over_limit += 1
         return over_limit
 
     def has_loop(self) -> bool:
+        if any(
+            count > AGENT_MAX_IDENTICAL_TOOL_REPEATS
+            for count in self._counts.values()
+        ):
+            return True
         return any(
-            count > AGENT_MAX_IDENTICAL_TOOL_REPEATS for count in self._counts.values()
+            count > AGENT_MAX_IDENTICAL_TOOL_FAILURES
+            for count in self._failures.values()
         )
 
 
@@ -95,7 +150,11 @@ class AgentGoalTracker:
         session_todo_state: Optional["SessionTodoGoalState"] = None,
     ) -> RoundAssessment:
         self.last_session_todo_state = session_todo_state
-        self.tool_tracker.record(function_calls)
+        self.tool_tracker.record(
+            function_calls,
+            function_results=function_results,
+            lookup_result=lookup_result,
+        )
         loop_detected = self.tool_tracker.has_loop()
         productive = assess_tool_round_productivity(
             function_calls, function_results, lookup_result

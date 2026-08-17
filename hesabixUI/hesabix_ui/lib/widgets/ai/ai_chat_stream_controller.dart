@@ -21,6 +21,7 @@ class AIChatStreamController extends ChangeNotifier {
   double? contextUsagePercent;
   bool contextHistorySummarized = false;
   AIStreamAgentBudget? agentBudget;
+  String? runId;
   DateTime? startedAt;
   DateTime? timestamp;
   bool pendingWriteApproval = false;
@@ -50,6 +51,7 @@ class AIChatStreamController extends ChangeNotifier {
     pendingWriteApproval = false;
     pendingApprovalOps = [];
     agentBudget = null;
+    runId = null;
     _lastUiUpdate = null;
     notifyListeners();
   }
@@ -114,6 +116,13 @@ class AIChatStreamController extends ChangeNotifier {
     if (todoSnapshot != null && !todoSnapshot!.isEmpty) {
       map[kAgentTodosStorageKey] = todoSnapshot!.toJson();
     }
+    if (runId != null && runId!.isNotEmpty) {
+      map[kAgentRunStorageKey] = {
+        'run_id': runId,
+        if (agentBudget?.stopReason != null) 'stop_reason': agentBudget!.stopReason,
+        'can_continue': true,
+      };
+    }
     if (map.isEmpty) return functionResults;
     return map;
   }
@@ -122,6 +131,9 @@ class AIChatStreamController extends ChangeNotifier {
     AIStreamChunk chunk, {
     required AIChatToolLabelResolver resolveToolLabel,
   }) {
+    if (chunk.runId != null && chunk.runId!.isNotEmpty) {
+      runId = chunk.runId;
+    }
     if (chunk.contextUsage != null) {
       contextUsageRatio = chunk.contextUsage!.usageRatio;
       contextUsagePercent = chunk.contextUsage!.usagePercent;
@@ -226,6 +238,24 @@ class AIChatStreamController extends ChangeNotifier {
     content = sanitizeAssistantContent(accumulated);
     notifyListeners();
     return true;
+  }
+
+  void applyDoneMetadata(AIStreamChunk chunk) {
+    var changed = false;
+    if (chunk.agentBudget != null) {
+      agentBudget = chunk.agentBudget;
+      changed = true;
+    }
+    if (chunk.runId != null && chunk.runId!.isNotEmpty) {
+      runId = chunk.runId;
+      changed = true;
+    }
+    if (chunk.awaitingApproval == true) {
+      pendingWriteApproval = true;
+      statusPhase = 'awaiting_approval';
+      changed = true;
+    }
+    if (changed) notifyListeners();
   }
 
   void mergeAgentTraceFromDone(List<AIAgentTraceStep>? agentTrace) {

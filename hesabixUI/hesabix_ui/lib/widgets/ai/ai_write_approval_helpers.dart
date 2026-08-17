@@ -46,3 +46,23 @@ List<Map<String, dynamic>> extractPendingApprovalOpsFromMessages(
 bool messagesHavePendingWriteApproval(List<AIChatMessage> messages) {
   return extractPendingApprovalOpsFromMessages(messages).isNotEmpty;
 }
+
+/// عملیات در انتظار تأیید از پیام‌ها یا استریم جاری همان جلسه.
+List<Map<String, dynamic>> collectPendingApprovalOps({
+  required List<AIChatMessage> messages,
+  required int? sessionId,
+  required bool streamPending,
+  required int? pendingApprovalSessionId,
+  required List<Map<String, dynamic>> streamOps,
+}) {
+  if (sessionId == null) return [];
+  final fromMessages = extractPendingApprovalOpsFromMessages(messages);
+  if (fromMessages.isNotEmpty) return fromMessages;
+  if (streamPending &&
+      (pendingApprovalSessionId == null ||
+          pendingApprovalSessionId == sessionId) &&
+      streamOps.isNotEmpty) {
+    return List<Map<String, dynamic>>.from(streamOps);
+  }
+  return [];
+}

@@ -8,6 +8,13 @@ from app.core.responses import success_response, ApiError
 from app.core.permissions import require_app_permission
 from app.services.ai.ai_service import AIService
 from app.services.ai.prompt_service import get_prompt_by_key
+from app.services.ai.ai_channel_policy import (
+    CHANNEL_TICKET,
+    CHANNEL_TICKET_READ_TOOLS,
+    CHANNEL_ITERATION_CAP,
+    filter_tools_by_allowlist,
+)
+from app.services.ai.ai_untrusted import wrap_untrusted_block
 from adapters.db.repositories.support.ticket_repository import TicketRepository
 from adapters.db.repositories.support.message_repository import MessageRepository
 from adapters.api.v1.schemas import QueryInfo
@@ -46,15 +53,25 @@ async def suggest_ai_reply(
     # استفاده از messages از طریق relationship در ticket (که قبلاً load شده)
     ticket_messages = ticket.messages if ticket.messages else []
     
-    # ساخت context برای AI
+    # ساخت context برای AI (متن تیکت دادهٔ غیرقابل‌اعتماد است)
     context_messages = []
     if options.use_ticket_history:
         for msg in ticket_messages:
-            # تبدیل sender_type به string اگر enum باشد
-            sender_type_str = msg.sender_type.value if hasattr(msg.sender_type, 'value') else str(msg.sender_type)
+            sender_type_str = (
+                msg.sender_type.value
+                if hasattr(msg.sender_type, "value")
+                else str(msg.sender_type)
+            )
+            wrapped = wrap_untrusted_block(
+                "ticket",
+                msg.content or "",
+                title=f"ticket-{ticket_id}-{sender_type_str}",
+            )
+            if not wrapped:
+                continue
             context_messages.append({
                 "role": "user" if sender_type_str == "user" else "assistant",
-                "content": msg.content
+                "content": wrapped,
             })
     
     # دریافت اطلاعات کسب‌وکار کاربر (اگر نیاز باشد)
@@ -98,23 +115,39 @@ async def suggest_ai_reply(
         },
     )
     
-    # ارسال به AI
+    ticket_user_prompt = get_prompt_by_key(
+        db,
+        "support.ticket_suggest.user",
+        {
+            "ticket_description": wrap_untrusted_block(
+                "ticket",
+                ticket.description or "",
+                title=f"ticket-{ticket_id}-description",
+            )
+        },
+    )
     ai_messages = [
         {"role": "system", "content": system_prompt},
         *context_messages,
-        {
-            "role": "user",
-            "content": get_prompt_by_key(
-                db,
-                "support.ticket_suggest.user",
-                {"ticket_description": ticket.description},
-            ),
-        },
+        {"role": "user", "content": ticket_user_prompt},
     ]
-    
-    # بدون tools: بسیاری از gatewayهای OpenAI-compatible (مثلاً vLLM) بدون
-    # --enable-auto-tool-choice خطا می‌دهند؛ پیشنهاد پاسخ تیکت فقط متن است.
-    response = await ai_service.chat_completion(ai_messages, use_function_calling=False)
+
+    catalog = ai_service.get_available_functions(
+        session_business_id=ai_service.business_id,
+        user_query=ticket.title or ticket.description or "",
+        execution_mode="analyzer",
+    )
+    tools = filter_tools_by_allowlist(catalog, CHANNEL_TICKET_READ_TOOLS)
+    response = await ai_service.chat_completion(
+        ai_messages,
+        tools=tools,
+        use_function_calling=True,
+        execution_mode="analyzer",
+        approve_writes=False,
+        user_query=ticket.title or "",
+        session_business_id=ai_service.business_id,
+        iteration_cap=CHANNEL_ITERATION_CAP[CHANNEL_TICKET],
+    )
     
     # بررسی سهمیه و شارژ
     usage = response.get("usage", {})
@@ -137,9 +170,18 @@ async def suggest_ai_reply(
     )
     
     suggested_reply = response["message"]["content"]
-    
+    tools_used = []
+    for item in response.get("_function_calls") or []:
+        if isinstance(item, dict) and item.get("name"):
+            tools_used.append(str(item["name"]))
+    citations = response.get("citations") or []
+    if not isinstance(citations, list):
+        citations = []
+
     return success_response({
         "suggested_reply": suggested_reply,
+        "tools_used": tools_used,
+        "citations": citations,
         "usage": {
             "input_tokens": input_tokens,
             "output_tokens": output_tokens,

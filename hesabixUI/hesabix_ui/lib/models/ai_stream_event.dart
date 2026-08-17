@@ -4,6 +4,9 @@ import 'package:hesabix_ui/utils/ai_content_sanitize.dart';
 const kAgentTraceStorageKey = '_agent_trace';
 const kAgentBudgetStorageKey = '_agent_budget';
 const kAgentTodosStorageKey = '_agent_todos';
+const kAgentRunStorageKey = '_agent_run';
+const kAgentCitationsStorageKey = '_citations';
+const kActivatedSkillsStorageKey = '_activated_skills';
 
 /// استخراج trace از function_results پیام ذخیره‌شده.
 List<AIAgentTraceStep> extractAgentTraceFromResults(Object? functionResults) {
@@ -57,6 +60,38 @@ AISessionTodoSnapshot? extractAgentTodosFromResults(Object? functionResults) {
   return AISessionTodoSnapshot.fromJson(Map<String, dynamic>.from(raw));
 }
 
+/// checkpoint اجرای agent از function_results پیام ذخیره‌شده.
+Map<String, dynamic>? extractAgentRunFromResults(Object? functionResults) {
+  if (functionResults is! Map) return null;
+  final raw = functionResults[kAgentRunStorageKey];
+  if (raw is! Map) return null;
+  final runId = raw['run_id']?.toString();
+  if (runId == null || runId.isEmpty) return null;
+  return Map<String, dynamic>.from(raw);
+}
+
+bool agentRunCanContinue(Object? functionResults) {
+  final run = extractAgentRunFromResults(functionResults);
+  if (run == null) return false;
+  if (run['can_continue'] == true) return true;
+  final status = run['status']?.toString();
+  return status == 'interrupted' || status == 'budget_exhausted';
+}
+
+/// دلیل توقف بودجه برای بنر ادامه (اگر در checkpoint ذخیره شده باشد).
+String? extractContinueStopMessage(Object? functionResults) {
+  final budget = extractAgentBudgetFromResults(functionResults);
+  final msg = budget?.stopMessageFa?.trim();
+  if (msg != null && msg.isNotEmpty) return msg;
+  return null;
+}
+
+/// نشانگر Last-Event-ID / run_id برای reconnect و ادامه.
+class AISseCursor {
+  int? lastEventId;
+  String? runId;
+}
+
 /// رویدادهای استریم SSE چت AI
 class AIStreamChunk {
   final String? contentDelta;
@@ -79,6 +114,13 @@ class AIStreamChunk {
   final String? suggestedAction;
   final String? requestedModel;
   final String? resolvedModel;
+  final bool? awaitingApproval;
+  final String? citationsContext;
+  final String? executionMode;
+  final String? runId;
+  final int? sseId;
+  final bool? canContinue;
+  final String? finalContent;
 
   const AIStreamChunk({
     this.contentDelta,
@@ -101,7 +143,50 @@ class AIStreamChunk {
     this.suggestedAction,
     this.requestedModel,
     this.resolvedModel,
+    this.awaitingApproval,
+    this.citationsContext,
+    this.executionMode,
+    this.runId,
+    this.sseId,
+    this.canContinue,
+    this.finalContent,
   });
+
+  AIStreamChunk withStreamMeta({
+    String? runId,
+    int? sseId,
+    bool? canContinue,
+  }) {
+    return AIStreamChunk(
+      contentDelta: contentDelta,
+      toolEvent: toolEvent,
+      statusEvent: statusEvent,
+      traceStep: traceStep,
+      traceStepUpdate: traceStepUpdate,
+      contextUsage: contextUsage,
+      agentBudget: agentBudget,
+      heartbeatElapsedMs: heartbeatElapsedMs,
+      todoSnapshot: todoSnapshot,
+      done: done,
+      usage: usage,
+      messageId: messageId,
+      functionCalls: functionCalls,
+      functionResults: functionResults,
+      agentTrace: agentTrace,
+      error: error,
+      recoverable: recoverable,
+      suggestedAction: suggestedAction,
+      requestedModel: requestedModel,
+      resolvedModel: resolvedModel,
+      awaitingApproval: awaitingApproval,
+      citationsContext: citationsContext,
+      executionMode: executionMode,
+      runId: runId ?? this.runId,
+      sseId: sseId ?? this.sseId,
+      canContinue: canContinue ?? this.canContinue,
+      finalContent: finalContent,
+    );
+  }
 }
 
 /// یک گام در زنجیرهٔ agent (نمایش تایم‌لاین).
@@ -311,6 +396,9 @@ class AIStreamAgentBudget {
   final String? reasoningEffort;
   final String? stopReason;
   final String? stopMessageFa;
+  final int? extensionsGranted;
+  final int? maxExtensions;
+  final int? baseMaxIterations;
 
   const AIStreamAgentBudget({
     this.iteration,
@@ -324,6 +412,9 @@ class AIStreamAgentBudget {
     this.reasoningEffort,
     this.stopReason,
     this.stopMessageFa,
+    this.extensionsGranted,
+    this.maxExtensions,
+    this.baseMaxIterations,
   });
 
   factory AIStreamAgentBudget.fromJson(Map<String, dynamic> json) {
@@ -339,6 +430,9 @@ class AIStreamAgentBudget {
       reasoningEffort: json['reasoning_effort'] as String?,
       stopReason: json['stop_reason'] as String?,
       stopMessageFa: json['stop_message_fa'] as String?,
+      extensionsGranted: json['extensions_granted'] as int?,
+      maxExtensions: json['max_extensions'] as int?,
+      baseMaxIterations: json['base_max_iterations'] as int?,
     );
   }
 
@@ -356,6 +450,9 @@ class AIStreamAgentBudget {
         if (reasoningEffort != null) 'reasoning_effort': reasoningEffort,
         if (stopReason != null) 'stop_reason': stopReason,
         if (stopMessageFa != null) 'stop_message_fa': stopMessageFa,
+        if (extensionsGranted != null) 'extensions_granted': extensionsGranted,
+        if (maxExtensions != null) 'max_extensions': maxExtensions,
+        if (baseMaxIterations != null) 'base_max_iterations': baseMaxIterations,
       };
 }
 
@@ -458,6 +555,7 @@ class AISessionTodoItem {
   bool get isSkipped => status == 'skipped';
   bool get isError => status == 'error';
   bool get isTerminal => isDone || isSkipped || isError;
+  bool get canUserDecide => isPending || isInProgress;
 
   factory AISessionTodoItem.fromJson(Map<String, dynamic> json) {
     return AISessionTodoItem(

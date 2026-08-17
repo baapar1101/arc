@@ -9,12 +9,14 @@ class AIAgentTodoList extends StatefulWidget {
   final AISessionTodoSnapshot snapshot;
   final bool compact;
   final bool initiallyExpanded;
+  final void Function(AISessionTodoItem item, String status)? onUserStatus;
 
   const AIAgentTodoList({
     super.key,
     required this.snapshot,
     this.compact = false,
     this.initiallyExpanded = false,
+    this.onUserStatus,
   });
 
   @override
@@ -167,6 +169,7 @@ class _AIAgentTodoListState extends State<AIAgentTodoList>
                   l10n: l10n,
                   theme: theme,
                   scheme: scheme,
+                  onUserStatus: widget.onUserStatus,
                 ),
               ),
             ],
@@ -183,6 +186,7 @@ class _TodoItemRow extends StatelessWidget {
   final AppLocalizations l10n;
   final ThemeData theme;
   final ColorScheme scheme;
+  final void Function(AISessionTodoItem item, String status)? onUserStatus;
 
   const _TodoItemRow({
     required this.item,
@@ -190,6 +194,7 @@ class _TodoItemRow extends StatelessWidget {
     required this.l10n,
     required this.theme,
     required this.scheme,
+    this.onUserStatus,
   });
 
   @override
@@ -269,6 +274,32 @@ class _TodoItemRow extends StatelessWidget {
               ],
             ),
           ),
+          if (onUserStatus != null && item.canUserDecide) ...[
+            IconButton(
+              tooltip: aiSessionPlanConfirmLabel(l10n),
+              visualDensity: VisualDensity.compact,
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+              icon: Icon(
+                Icons.check_rounded,
+                size: 18,
+                color: scheme.tertiary,
+              ),
+              onPressed: () => onUserStatus!(item, 'done'),
+            ),
+            IconButton(
+              tooltip: aiSessionPlanSkipLabel(l10n),
+              visualDensity: VisualDensity.compact,
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+              icon: Icon(
+                Icons.close_rounded,
+                size: 18,
+                color: scheme.onSurfaceVariant,
+              ),
+              onPressed: () => onUserStatus!(item, 'skipped'),
+            ),
+          ],
         ],
       ),
     );

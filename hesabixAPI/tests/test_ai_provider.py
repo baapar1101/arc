@@ -6,6 +6,7 @@ from types import SimpleNamespace
 from app.services.ai.ai_provider import (
     OpenAIProvider,
     _anthropic_blocks_to_openai_result,
+    map_tool_choice_for_anthropic,
 )
 
 
@@ -61,6 +62,26 @@ def test_openai_build_request_kwargs_applies_tool_choice_when_tools_present():
     assert kwargs.get("tool_choice") == "required"
 
 
+def test_openai_build_request_kwargs_forwards_function_tool_choice():
+    provider = _make_openai_provider()
+    tools = [
+        {"type": "function", "function": {"name": "create_session_plan"}},
+        {"type": "function", "function": {"name": "search_invoices"}},
+    ]
+    choice = {"type": "function", "function": {"name": "create_session_plan"}}
+    kwargs = provider._build_request_kwargs(
+        messages=[{"role": "user", "content": "گزارش ترکیبی بساز"}],
+        model="gpt-4o",
+        max_tokens=1000,
+        temperature=0.2,
+        tools=tools,
+        reasoning_effort=None,
+        provider_extra=None,
+        tool_choice=choice,
+    )
+    assert kwargs.get("tool_choice") == choice
+
+
 def test_openai_build_request_kwargs_ignores_tool_choice_without_tools():
     """اگر tools خالی باشد، tool_choice نباید ارسال شود (وگرنه provider خطا می‌دهد)."""
     provider = _make_openai_provider()
@@ -90,3 +111,17 @@ def test_openai_build_request_kwargs_no_tool_choice_by_default():
         provider_extra=None,
     )
     assert "tool_choice" not in kwargs
+
+
+def test_map_tool_choice_for_anthropic_required_and_function():
+    assert map_tool_choice_for_anthropic("required", has_tools=True) == {
+        "type": "any"
+    }
+    assert map_tool_choice_for_anthropic("required", has_tools=False) is None
+    assert map_tool_choice_for_anthropic(
+        {"type": "function", "function": {"name": "create_session_plan"}},
+        has_tools=True,
+    ) == {"type": "tool", "name": "create_session_plan"}
+    assert map_tool_choice_for_anthropic("auto", has_tools=True) == {
+        "type": "auto"
+    }

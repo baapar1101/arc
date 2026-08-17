@@ -565,8 +565,25 @@ String aiSessionPlanProgressLabel(
         ? '$completed از $total مرحله انجام شد'
         : '$completed of $total steps done';
 
+String aiSessionPlanSkipLabel(AppLocalizations l10n) =>
+    _isFaLocale(l10n) ? 'رد کردن' : 'Skip';
+
+String aiSessionPlanConfirmLabel(AppLocalizations l10n) =>
+    _isFaLocale(l10n) ? 'انجام شد' : 'Done';
+
 String aiSessionPlanLinkedToolLabel(AppLocalizations l10n, String tool) =>
     _isFaLocale(l10n) ? 'ابزار: $tool' : 'Tool: $tool';
 
 String aiStatusLoadingSessionPlan(AppLocalizations l10n) =>
     _isFaLocale(l10n) ? 'بارگذاری برنامهٔ کاری…' : 'Loading work plan…';
+
+String aiCitationSourcesLabel(AppLocalizations l10n) =>
+    _isFaLocale(l10n) ? 'منابع' : 'Sources';
+
+String aiCitationUngroundedWarning(AppLocalizations l10n) =>
+    _isFaLocale(l10n)
+        ? 'اعداد این پاسخ به رکورد منبع در نتایج ابزار وصل نشد.'
+        : 'Numbers in this answer are not linked to a source record.';
+
+String aiActivatedSkillsLabel(AppLocalizations l10n) =>
+    _isFaLocale(l10n) ? 'مهارت فعال' : 'Active skill';

@@ -30,6 +30,29 @@ def test_connector_url_blocks_private_resolved_ip(monkeypatch):
         _validate_connector_url("https://api.example.com/data")
 
 
+def test_connector_url_blocks_ipv6_link_local(monkeypatch):
+    monkeypatch.setattr(
+        "app.services.ai.ai_connector_service.socket.getaddrinfo",
+        lambda *args, **kwargs: [(None, None, None, "", ("fe80::1", 443))],
+    )
+    with pytest.raises(ApiError):
+        _validate_connector_url("https://api.example.com/data")
+
+
+def test_connector_url_blocks_ipv4_mapped_private(monkeypatch):
+    monkeypatch.setattr(
+        "app.services.ai.ai_connector_service.socket.getaddrinfo",
+        lambda *args, **kwargs: [(None, None, None, "", ("::ffff:10.1.2.3", 443))],
+    )
+    with pytest.raises(ApiError):
+        _validate_connector_url("https://api.example.com/data")
+
+
+def test_connector_url_blocks_metadata_ip():
+    with pytest.raises(ApiError):
+        _validate_connector_url("http://169.254.169.254/latest/meta-data")
+
+
 def test_connector_url_rejects_templated_host():
     with pytest.raises(ApiError):
         _validate_connector_url("https://{{host}}/data")

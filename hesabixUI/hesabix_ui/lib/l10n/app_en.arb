@@ -4139,6 +4139,14 @@
   "aiVoiceStatusProcessing": "Processing speech…",
   "aiVoiceStatusSpeaking": "Playing response…",
   "aiVoiceTextBlockedWhileActive": "Text input is disabled during an active voice session.",
+  "aiChatApprovalNeedsOpenSession": "To approve this action, open the same conversation where the assistant asked for confirmation.",
+  "aiChatWriteApprovalNotFound": "No active conversation or pending write was found. Open the conversation where the assistant requested approval.",
+  "aiChatSendFailed": "Could not send the message: {error}",
+  "@aiChatSendFailed": {
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
   "aiVoiceDummyTtsWarning": "Server TTS is in test mode; you may not hear spoken responses.",
   "aiVoiceActiveHint": "Voice chat active",
   "aiVoiceInputHint": "Voice input",
@@ -4274,6 +4282,9 @@
   "aiErrorRecoveryTitle": "Could not complete the response",
   "aiErrorRecoveryRetry": "Try again",
   "aiErrorRecoveryDismiss": "Dismiss",
+  "aiContinueAnalysis": "Continue analysis",
+  "aiContinueAnalysisHint": "The analysis stopped early. Continue from the same run without repeating completed tools.",
+  "aiContinueAnalysisDismiss": "Not now",
   "aiConversationNavTitle": "Messages ({count})",
   "@aiConversationNavTitle": {
     "placeholders": {
@@ -5563,6 +5574,7 @@
   "crmLeadFormSubtitle": "Contact details, funnel stage, and follow-up.",
   "crmActivityFormSubtitle": "Link to a customer or a lead, then describe the interaction.",
   "crmDealFormSubtitle": "Customer, pipeline stage, and financial details.",
+  "crmDealProbabilityUnavailable": "The assistant could not extract a valid probability. The field was left unchanged.",
   "crmConvertLeadTitle": "Convert to customer",
   "crmConvertLeadSubtitle": "Creates a new person in contacts.",
   "crmConvertLeadIntro": "The lead will be converted and a new person record will be created in contacts.",

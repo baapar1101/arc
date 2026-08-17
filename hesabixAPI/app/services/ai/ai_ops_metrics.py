@@ -1,10 +1,13 @@
-"""لاگ متریک‌های عملیاتی AI."""
+"""لاگ و شمارندهٔ درون‌پردازه‌ای متریک‌های عملیاتی AI (OBS-02)."""
 from __future__ import annotations
 
 import logging
+from collections import defaultdict
 from typing import Any, Dict, Optional
 
 logger = logging.getLogger(__name__)
+
+_counters: Dict[str, int] = defaultdict(int)
 
 
 def log_ai_event(
@@ -15,6 +18,7 @@ def log_ai_event(
     session_id: Optional[int] = None,
     extra: Optional[Dict[str, Any]] = None,
 ) -> None:
+    _counters[str(event)] += 1
     payload: Dict[str, Any] = {"ai_event": event}
     if business_id is not None:
         payload["business_id"] = business_id
@@ -25,3 +29,12 @@ def log_ai_event(
     if extra:
         payload.update(extra)
     logger.info("AI_METRIC %s", payload)
+
+
+def metric_snapshot() -> Dict[str, int]:
+    """نسخهٔ فعلی شمارنده‌های این فرآیند — نه Prometheus."""
+    return dict(_counters)
+
+
+def reset_metrics_for_tests() -> None:
+    _counters.clear()

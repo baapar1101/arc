@@ -85,6 +85,13 @@ def assess_text_round_evidence(
             reason_fa="پاسخ فهرست ابزارها هنوز کامل نشده.",
         )
 
+    if had_evidence and prior_goal_reached and not prior_should_continue:
+        return EvidenceContinuation(
+            should_continue=False,
+            goal_reached=True,
+            reason_fa="هدف در نوبت قبلی محقق شده بود.",
+        )
+
     if had_evidence and observation_store and observation_store.thoughts:
         last = observation_store.thoughts[-1]
         if last.confidence == "high" and not last.open_questions:
@@ -129,13 +136,6 @@ def assess_text_round_evidence(
             should_continue=True,
             goal_reached=False,
             reason_fa="شواهد ابزار موجود است؛ پاسخ نهایی هنوز سنتز نشده.",
-        )
-
-    if had_evidence and prior_goal_reached and not prior_should_continue:
-        return EvidenceContinuation(
-            should_continue=False,
-            goal_reached=True,
-            reason_fa="هدف در نوبت قبلی محقق شده بود.",
         )
 
     if not had_evidence:

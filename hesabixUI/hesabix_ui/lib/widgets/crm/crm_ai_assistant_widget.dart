@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:hesabix_ui/l10n/app_localizations.dart';
+import 'package:hesabix_ui/models/ai_stream_event.dart';
 import 'package:hesabix_ui/services/crm_service.dart';
 import 'package:hesabix_ui/utils/snackbar_helper.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
+import 'package:hesabix_ui/widgets/ai/ai_chat_l10n.dart';
+import 'package:hesabix_ui/widgets/ai/ai_citation_chips.dart';
 
 /// ویجت دستیار AI برای خلاصه سرنخ یا فرصت فروش
 class CrmAIAssistantWidget extends StatefulWidget {
@@ -25,6 +29,8 @@ class CrmAIAssistantWidget extends StatefulWidget {
 class _CrmAIAssistantWidgetState extends State<CrmAIAssistantWidget> {
   bool _loading = false;
   String? _summary;
+  List<String> _toolsUsed = const [];
+  List<Map<String, dynamic>> _citations = const [];
   bool _expanded = false;
 
   Future<void> _fetchSummary() async {
@@ -32,6 +38,8 @@ class _CrmAIAssistantWidgetState extends State<CrmAIAssistantWidget> {
     setState(() {
       _loading = true;
       _summary = null;
+      _toolsUsed = const [];
+      _citations = const [];
     });
     try {
       dynamic data;
@@ -49,8 +57,19 @@ class _CrmAIAssistantWidgetState extends State<CrmAIAssistantWidget> {
       if (!mounted) return;
       final map = data is Map ? Map<String, dynamic>.from(data) : <String, dynamic>{};
       final summary = map['summary']?.toString();
+      final toolsRaw = map['tools_used'];
+      final citesRaw = map['citations'];
       setState(() {
         _summary = summary;
+        _toolsUsed = toolsRaw is List
+            ? toolsRaw.map((e) => e.toString()).where((s) => s.isNotEmpty).toList()
+            : const [];
+        _citations = citesRaw is List
+            ? citesRaw
+                .whereType<Map>()
+                .map((e) => Map<String, dynamic>.from(e))
+                .toList()
+            : const [];
         _loading = false;
         _expanded = true;
       });
@@ -64,6 +83,7 @@ class _CrmAIAssistantWidgetState extends State<CrmAIAssistantWidget> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context);
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 8),
       child: Column(
@@ -124,12 +144,51 @@ class _CrmAIAssistantWidgetState extends State<CrmAIAssistantWidget> {
               child: Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.5),
+                  color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: Text(
-                  _summary!,
-                  style: theme.textTheme.bodyMedium,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _summary!,
+                      style: theme.textTheme.bodyMedium,
+                    ),
+                    if (_toolsUsed.isNotEmpty) ...[
+                      const SizedBox(height: 10),
+                      Text(
+                        l10n.aiReasoningToolsUsedTitle,
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 6,
+                        children: _toolsUsed
+                            .take(8)
+                            .map(
+                              (name) => Chip(
+                                visualDensity: VisualDensity.compact,
+                                label: Text(
+                                  aiToolLabel(l10n, name),
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            )
+                            .toList(),
+                      ),
+                    ],
+                    AICitationChips(
+                      businessId: widget.businessId,
+                      functionResults: {
+                        kAgentCitationsStorageKey: _citations,
+                      },
+                      assistantContent: _summary!,
+                    ),
+                  ],
                 ),
               ),
             ),

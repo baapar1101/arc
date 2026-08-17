@@ -7,8 +7,28 @@ Plan C+: goal_reached و persist فقط وقتی مجاز است که متن و�
 from __future__ import annotations
 
 import re
+from typing import Any, Dict, List, Optional
 
 from app.services.ai.ai_premature_answer import looks_like_status_narrative
+from app.services.ai.ai_tool_intent import query_expects_tool_use
+
+# وقتی سوال داده‌محور است ولی هیچ ابزاری اجرا نشده، ادعای کسب‌وکار persist نمی‌شود.
+UNGROUNDED_TOOL_REQUIRED_MESSAGE_FA = (
+    "برای پاسخ دقیق به این سوال باید داده‌های کسب‌وکار را از سیستم بخوانم، "
+    "اما هنوز ابزاری اجرا نشده است. لطفاً سوال را دوباره بفرستید "
+    "یا بازهٔ زمانی و موجودیت موردنظر را دقیق‌تر مشخص کنید."
+)
+
+# ادعای نبود/وجود دادهٔ کسب‌وکار بدون اجرای ابزار
+_ABSENCE_OR_ENTITY_CLAIM = re.compile(
+    r"(فاکتور|رسید|پرداخت|سند|سفارش|سرنخ|فرصت|چک|موجودی|بدهکار|بستانکار|"
+    r"فروش|خرید|انبار|مشتری|کالا|تراکنش|هزینه|درآمد).{0,48}"
+    r"(نیست|نیستند|وجود\s*ندارد|یافت\s*نشد|پیدا\s*نشد|نداریم|"
+    r"صفر(?:\s*است)?|ثبت\s*نشده|ندارد)|"
+    r"(هیچ|بدون).{0,24}(فاکتور|رکورد|نتیجه|مورد|سند)|"
+    r"(no\s+(?:invoices?|records?|results?)|not\s+found)",
+    re.IGNORECASE,
+)
 
 # برنامهٔ چندمرحله‌ای: «ابتدا … سپس …»
 _PLANNING_MULTI_STEP = re.compile(
@@ -87,6 +107,30 @@ def has_substantive_answer_markers(text: str) -> bool:
     return False
 
 
+def looks_like_ungrounded_business_claim(text: str) -> bool:
+    """آیا متن بدون ابزار، دادهٔ کسب‌وکار (نبود رکورد / عدد / جدول) ادعا می‌کند؟"""
+    stripped = (text or "").strip()
+    if not stripped:
+        return False
+    if _ABSENCE_OR_ENTITY_CLAIM.search(stripped):
+        return True
+    if has_substantive_answer_markers(stripped):
+        return True
+    return False
+
+
+def has_real_tool_evidence(
+    function_calls: Optional[List[Any]] = None,
+    function_results: Optional[Dict[str, Any]] = None,
+) -> bool:
+    """شواهد ابزار واقعی — کلیدهای متادیتا (_agent_run و مشابه) شمرده نمی‌شوند."""
+    if function_calls:
+        return True
+    if not isinstance(function_results, dict):
+        return False
+    return any(not str(key).startswith("_") for key in function_results)
+
+
 def is_deliverable_answer(
     text: str,
     *,
@@ -103,4 +147,34 @@ def is_deliverable_answer(
         return False
     if needs_tools and has_tool_evidence:
         return has_substantive_answer_markers(stripped)
+    if needs_tools and not has_tool_evidence:
+        # سلام / سوال شفاف‌سازی مجاز است؛ ادعای دادهٔ کسب‌وکار بدون tool خیر.
+        if looks_like_ungrounded_business_claim(stripped):
+            return False
+        return len(stripped) >= 8
     return len(stripped) >= 8
+
+
+def gate_ungrounded_assistant_content(
+    content: str,
+    *,
+    user_query: str,
+    history_messages: Optional[List[Dict[str, Any]]] = None,
+    function_calls: Optional[List[Any]] = None,
+    function_results: Optional[Dict[str, Any]] = None,
+) -> str:
+    """اگر سوال ابزار می‌خواهد و evidence نیست، ادعای کسب‌وکار را با شفاف‌سازی عوض کن."""
+    if not query_expects_tool_use(user_query, history_messages):
+        return content
+    if has_real_tool_evidence(function_calls, function_results):
+        return content
+    stripped = (content or "").strip()
+    if not stripped:
+        return content
+    if is_deliverable_answer(
+        stripped,
+        needs_tools=True,
+        has_tool_evidence=False,
+    ):
+        return content
+    return UNGROUNDED_TOOL_REQUIRED_MESSAGE_FA

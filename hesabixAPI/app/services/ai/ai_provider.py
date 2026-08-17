@@ -68,7 +68,7 @@ class AIProviderBase(ABC):
         temperature: float,
         tools: Optional[List[Dict[str, Any]]] = None,
         reasoning_effort: Optional[str] = None,
-        tool_choice: Optional[str] = None,
+        tool_choice: Optional[Any] = None,
     ) -> AsyncGenerator[Dict[str, Any], None]:
         """
         ارسال درخواست chat completion به صورت streaming
@@ -170,7 +170,7 @@ class OpenAIProvider(AIProviderBase):
         provider_extra: Optional[Dict[str, Any]] = None,
         *,
         stream: bool = False,
-        tool_choice: Optional[str] = None,
+        tool_choice: Optional[Any] = None,
     ) -> Dict[str, Any]:
         """ساخت پارامترهای درخواست با پشتیبانی از مدل‌های reasoning.
 
@@ -179,8 +179,8 @@ class OpenAIProvider(AIProviderBase):
         پارامتر `reasoning_effort` را قبول دارند.
 
         tool_choice: برای نوبت اول وقتی سوال قطعاً به ابزار نیاز دارد
-        ("required") تا مدل بدون tool_call متن ننویسد (Phase 2). فقط وقتی
-        tools موجود باشد اعمال می‌شود.
+        ("required" یا object تابع خاص مثل create_session_plan) تا مدل بدون
+        tool_call متن ننویسد. فقط وقتی tools موجود باشد اعمال می‌شود.
         """
         if max_tokens > _MAX_SAFE_CHAT_OUTPUT_TOKENS:
             max_tokens = _MAX_SAFE_CHAT_OUTPUT_TOKENS
@@ -294,7 +294,7 @@ class OpenAIProvider(AIProviderBase):
         tools: Optional[List[Dict[str, Any]]] = None,
         reasoning_effort: Optional[str] = None,
         provider_extra: Optional[Dict[str, Any]] = None,
-        tool_choice: Optional[str] = None,
+        tool_choice: Optional[Any] = None,
     ) -> AsyncGenerator[Dict[str, Any], None]:
         """ارسال درخواست به OpenAI به صورت streaming با async client"""
         try:
@@ -440,6 +440,33 @@ class OpenAIProvider(AIProviderBase):
         except Exception as e:
             logger.error(f"OpenAI streaming API error: {e}", exc_info=True)
             self._raise_mapped_api_error(e, model=model)
+
+
+def map_tool_choice_for_anthropic(
+    tool_choice: Any, *, has_tools: bool
+) -> Optional[Dict[str, Any]]:
+    """تبدیل tool_choice سبک OpenAI به Messages API آنتروپیک."""
+    if not has_tools or not tool_choice:
+        return None
+    if tool_choice == "required":
+        return {"type": "any"}
+    if tool_choice == "auto":
+        return {"type": "auto"}
+    if tool_choice == "none":
+        return {"type": "none"}
+    if isinstance(tool_choice, dict):
+        kind = (tool_choice.get("type") or "").strip().lower()
+        if kind == "function":
+            name = ((tool_choice.get("function") or {}).get("name") or "").strip()
+            if name:
+                return {"type": "tool", "name": name}
+        if kind in ("auto", "any", "tool", "none"):
+            mapped = {"type": kind}
+            name = (tool_choice.get("name") or "").strip()
+            if kind == "tool" and name:
+                mapped["name"] = name
+            return mapped
+    return None
 
 
 def _openai_tools_to_anthropic(tools: Optional[List[Dict[str, Any]]]) -> Optional[List[Dict[str, Any]]]:
@@ -606,6 +633,8 @@ class AnthropicProvider(AIProviderBase):
         tools: Optional[List[Dict[str, Any]]],
         provider_extra: Optional[Dict[str, Any]] = None,
         reasoning_effort: Optional[str] = None,
+        *,
+        tool_choice: Optional[Any] = None,
     ) -> Dict[str, Any]:
         if max_tokens > _MAX_SAFE_CHAT_OUTPUT_TOKENS:
             max_tokens = _MAX_SAFE_CHAT_OUTPUT_TOKENS
@@ -646,6 +675,11 @@ class AnthropicProvider(AIProviderBase):
             kwargs["system"] = system_message
         if anthropic_tools:
             kwargs["tools"] = anthropic_tools
+            mapped_choice = map_tool_choice_for_anthropic(
+                tool_choice, has_tools=True
+            )
+            if mapped_choice:
+                kwargs["tool_choice"] = mapped_choice
         auto_ctrl = anthropic_request_cache_control(
             cache_policy,
             has_conversation=bool(anthropic_messages),
@@ -702,11 +736,8 @@ class AnthropicProvider(AIProviderBase):
         tools: Optional[List[Dict[str, Any]]] = None,
         provider_extra: Optional[Dict[str, Any]] = None,
         reasoning_effort: Optional[str] = None,
-        tool_choice: Optional[str] = None,
+        tool_choice: Optional[Any] = None,
     ) -> AsyncGenerator[Dict[str, Any], None]:
-        # یادداشت Phase 2: tool_choice="required" فعلاً فقط برای OpenAI اعمال
-        # می‌شود (ریسک کمتر)؛ Anthropic فرمت متفاوتی دارد
-        # (tool_choice={"type": "any"}) و عمداً اینجا نادیده گرفته می‌شود.
         kwargs = self._build_request_kwargs(
             messages,
             model,
@@ -715,6 +746,7 @@ class AnthropicProvider(AIProviderBase):
             tools,
             provider_extra,
             reasoning_effort,
+            tool_choice=tool_choice,
         )
         try:
             accumulated_text = ""
@@ -864,7 +896,7 @@ class LocalProvider(AIProviderBase):
         temperature: float,
         tools: Optional[List[Dict[str, Any]]] = None,
         reasoning_effort: Optional[str] = None,
-        tool_choice: Optional[str] = None,
+        tool_choice: Optional[Any] = None,
     ) -> AsyncGenerator[Dict[str, Any], None]:
         """ارسال درخواست به مدل محلی به صورت streaming (tool_choice پشتیبانی نمی‌شود)"""
         import httpx

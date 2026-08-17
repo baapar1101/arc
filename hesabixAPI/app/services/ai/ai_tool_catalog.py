@@ -39,6 +39,7 @@ _CATEGORY_LABELS_FA: dict[str, str] = {
     "reports_meta": "گزارش‌ها",
     "report_templates": "قالب گزارش",
     "marketplace": "بازار افزونه",
+    "hscript": "HScript",
 }
 
 _TOOL_NAME_TO_CATEGORY: dict[str, str] = {}

@@ -4181,6 +4181,14 @@
   "aiVoiceStatusProcessing": "در حال پردازش گفتار…",
   "aiVoiceStatusSpeaking": "در حال پخش پاسخ…",
   "aiVoiceTextBlockedWhileActive": "در حین مکالمه صوتی، ارسال متن غیرفعال است.",
+  "aiChatApprovalNeedsOpenSession": "برای تأیید عملیات، ابتدا همان گفت‌وگویی را باز کنید که دستیار در آن درخواست تأیید کرده است.",
+  "aiChatWriteApprovalNotFound": "گفت‌وگوی فعال یا عملیات در انتظار تأیید یافت نشد. همان گفت‌وگویی را باز کنید که دستیار در آن درخواست تأیید کرده است.",
+  "aiChatSendFailed": "ارسال پیام ناموفق بود: {error}",
+  "@aiChatSendFailed": {
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
   "aiVoiceDummyTtsWarning": "موتور TTS سرور روی حالت آزمایشی است؛ ممکن است صدای پاسخ شنیده نشود.",
   "aiVoiceActiveHint": "مکالمه صوتی فعال",
   "aiVoiceInputHint": "ورودی صوتی",
@@ -4316,6 +4324,9 @@
   "aiErrorRecoveryTitle": "خطا در دریافت پاسخ",
   "aiErrorRecoveryRetry": "تلاش مجدد",
   "aiErrorRecoveryDismiss": "بستن",
+  "aiContinueAnalysis": "ادامهٔ تحلیل",
+  "aiContinueAnalysisHint": "تحلیل ناقص ماند. می‌توانید از همان نقطه ادامه دهید؛ ابزارهای قبلی تکرار نمی‌شوند.",
+  "aiContinueAnalysisDismiss": "فعلاً نه",
   "aiConversationNavTitle": "فهرست پیام‌ها ({count})",
   "@aiConversationNavTitle": {
     "placeholders": {
@@ -5605,6 +5616,7 @@
   "crmLeadFormSubtitle": "اطلاعات تماس، فانل و پیگیری را مشخص کنید.",
   "crmActivityFormSubtitle": "فعالیت را به مشتری یا سرنخ وصل کنید و نتیجه را بنویسید.",
   "crmDealFormSubtitle": "مشتری، مرحلهٔ پایپلاین و مبالغ را ثبت کنید.",
+  "crmDealProbabilityUnavailable": "دستیار نتوانست احتمال معتبری استخراج کند. فیلد تغییر نکرد.",
   "crmConvertLeadTitle": "تبدیل به مشتری",
   "crmConvertLeadSubtitle": "یک شخص جدید در بخش اشخاص ایجاد می‌شود.",
   "crmConvertLeadIntro": "سرنخ تبدیل می‌شود و رکورد شخص جدید در اشخاص ثبت می‌شود.",

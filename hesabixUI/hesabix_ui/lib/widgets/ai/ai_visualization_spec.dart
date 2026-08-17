@@ -228,6 +228,43 @@ class AITableSpec {
     return null;
   }
 
+  /// جدول از رکوردهای envelope ابزار (نه markdown).
+  static AITableSpec? tryFromRecords(
+    List<Map<String, dynamic>> records, {
+    String? title,
+    int maxColumns = 6,
+    int minRows = 2,
+  }) {
+    if (records.length < minRows) return null;
+    final keyCount = <String, int>{};
+    for (final row in records) {
+      for (final entry in row.entries) {
+        final value = entry.value;
+        if (value is Map || value is List) continue;
+        if (entry.key.startsWith('_')) continue;
+        keyCount[entry.key] = (keyCount[entry.key] ?? 0) + 1;
+      }
+    }
+    final keys = keyCount.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+    final columns = keys
+        .take(maxColumns)
+        .map(
+          (e) => AITableColumn(
+            key: e.key,
+            label: e.key,
+            align: 'right',
+          ),
+        )
+        .toList();
+    if (columns.length < 2) return null;
+    return AITableSpec(
+      title: title,
+      columns: columns,
+      rows: records,
+    );
+  }
+
   String cellText(AITableColumn col, Map<String, dynamic> row) {
     final v = row[col.key];
     if (v == null) return '—';

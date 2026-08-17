@@ -590,6 +590,7 @@ class AIService {
     void Function(Map<String, dynamic>? usage, int? messageId)? onComplete,
     void Function(String error)? onError,
     CancelToken? cancelToken,
+    AISseCursor? sseCursor,
   }) async* {
     try {
       final query = <String, dynamic>{'stream': true};
@@ -614,8 +615,14 @@ class AIService {
           headers: headers,
           body: jsonEncode(payload),
           cancelToken: cancelToken,
+          onEventId: (id) => sseCursor?.lastEventId = id,
         )) {
-          final chunk = _parseSsePayload(eventPayload, onError, onComplete);
+          final chunk = _parseSsePayload(
+            eventPayload,
+            onError,
+            onComplete,
+            cursor: sseCursor,
+          );
           if (chunk != null) yield chunk;
         }
         return;
@@ -654,9 +661,15 @@ class AIService {
             eventBuffer.join('\n'),
             onError,
             onComplete,
+            cursor: sseCursor,
           );
           eventBuffer.clear();
           if (chunk != null) yield chunk;
+          continue;
+        }
+        if (line.startsWith('id:')) {
+          final id = int.tryParse(line.substring(3).trim());
+          if (id != null) sseCursor?.lastEventId = id;
           continue;
         }
         if (line.startsWith('data:')) {
@@ -672,6 +685,7 @@ class AIService {
           eventBuffer.join('\n'),
           onError,
           onComplete,
+          cursor: sseCursor,
         );
         if (chunk != null) yield chunk;
       }
@@ -686,8 +700,9 @@ class AIService {
   AIStreamChunk? _parseSsePayload(
     String payload,
     void Function(String error)? onError,
-    void Function(Map<String, dynamic>? usage, int? messageId)? onComplete,
-  ) {
+    void Function(Map<String, dynamic>? usage, int? messageId)? onComplete, {
+    AISseCursor? cursor,
+  }) {
     Map<String, dynamic> data;
     try {
       data = jsonDecode(payload) as Map<String, dynamic>;
@@ -696,16 +711,34 @@ class AIService {
     }
 
     final eventType = data['type'] as String?;
+    final runId = data['run_id'] as String?;
+    final sseId = (data['sse_id'] as num?)?.toInt();
+    final canContinue = data['can_continue'] as bool?;
+    if (cursor != null) {
+      if (sseId != null) cursor.lastEventId = sseId;
+      if (runId != null && runId.isNotEmpty) cursor.runId = runId;
+    }
 
     if (data.containsKey('error') &&
         ((data['done'] as bool? ?? false) || eventType == 'error')) {
       final errorMessage = data['error'] as String? ?? 'خطای نامشخص';
-      onError?.call(errorMessage);
+      // خطا به‌صورت chunk به UI می‌رسد تا یک مسیر بازیابی واحد باشد؛
+      // onError فقط برای شکست شبکه/پارس در لایهٔ استریم است.
       return AIStreamChunk(
         error: errorMessage,
         done: data['done'] as bool? ?? true,
         recoverable: data['recoverable'] as bool? ?? false,
         suggestedAction: data['suggested_action'] as String?,
+        runId: runId,
+        sseId: sseId,
+        canContinue: canContinue,
+      );
+    }
+    if (eventType == 'agent_run' || eventType == 'run_resumed') {
+      return AIStreamChunk(
+        runId: runId,
+        sseId: sseId,
+        canContinue: canContinue,
       );
     }
     if (eventType == 'status') {
@@ -797,11 +830,36 @@ class AIService {
         done: true,
         messageId: data['message_id'] as int?,
         functionCalls: data['function_calls'],
-        functionResults: data['function_results'],
+        functionResults: () {
+          final fr = data['function_results'];
+          final cites = data['citations'];
+          final skills = data['activated_skills'];
+          if ((cites is List && cites.isNotEmpty) ||
+              (skills is List && skills.isNotEmpty)) {
+            final map = fr is Map
+                ? Map<String, dynamic>.from(fr)
+                : <String, dynamic>{};
+            if (cites is List && cites.isNotEmpty) {
+              map.putIfAbsent(kAgentCitationsStorageKey, () => cites);
+            }
+            if (skills is List && skills.isNotEmpty) {
+              map.putIfAbsent(kActivatedSkillsStorageKey, () => skills);
+            }
+            return map;
+          }
+          return fr;
+        }(),
         agentTrace: agentTrace,
         agentBudget: agentBudget,
         requestedModel: data['requested_model'] as String?,
         resolvedModel: data['resolved_model'] as String?,
+        awaitingApproval: data['awaiting_approval'] as bool?,
+        citationsContext: data['citations_context'] as String?,
+        executionMode: data['execution_mode'] as String?,
+        runId: runId,
+        sseId: sseId,
+        canContinue: canContinue,
+        finalContent: data['final_content'] as String?,
       );
     }
 
@@ -809,6 +867,39 @@ class AIService {
       return AIStreamChunk(contentDelta: content);
     }
     return null;
+  }
+
+  /// ادامهٔ همان run پس از قطع استریم یا سقف بودجه
+  Stream<AIStreamChunk> continueAgentRunStream({
+    required int sessionId,
+    required String runId,
+    bool approveWrites = false,
+    String? executionMode,
+    String? model,
+    AISseCursor? sseCursor,
+    void Function(Map<String, dynamic>? usage, int? messageId)? onComplete,
+    void Function(String error)? onError,
+    CancelToken? cancelToken,
+  }) {
+    final headers = <String, dynamic>{};
+    if (sseCursor?.lastEventId != null) {
+      headers['Last-Event-ID'] = '${sseCursor!.lastEventId}';
+    }
+    return _postSseStream(
+      '/api/v1/ai/chat/sessions/$sessionId/runs/$runId/continue?stream=true',
+      data: {
+        'approve_writes': approveWrites,
+        if (executionMode != null && executionMode.isNotEmpty)
+          'execution_mode': executionMode,
+        if (model != null && model.isNotEmpty) 'model': model,
+        if (sseCursor?.lastEventId != null) 'last_event_id': sseCursor!.lastEventId,
+      },
+      onComplete: onComplete,
+      onError: onError,
+      cancelToken: cancelToken,
+      logLabel: 'ContinueRun',
+      sseCursor: sseCursor,
+    );
   }
 
   /// تولید مجدد آخرین پاسخ (همان قرارداد استریم sendMessageStream)
@@ -1365,18 +1456,28 @@ class AIService {
     void Function(String error)? onError,
     CancelToken? cancelToken,
     String logLabel = 'SSE',
+    AISseCursor? sseCursor,
   }) async* {
     try {
       if (kIsWeb) {
         final uri = _api.resolveUri(path, query: query);
         final headers = _api.streamingHeadersFor(uri);
+        if (sseCursor?.lastEventId != null) {
+          headers['Last-Event-ID'] = '${sseCursor!.lastEventId}';
+        }
         await for (final eventPayload in postSsePayloads(
           uri: uri,
           headers: headers,
           body: jsonEncode(data ?? const <String, dynamic>{}),
           cancelToken: cancelToken,
+          onEventId: (id) => sseCursor?.lastEventId = id,
         )) {
-          final chunk = _parseSsePayload(eventPayload, onError, onComplete);
+          final chunk = _parseSsePayload(
+            eventPayload,
+            onError,
+            onComplete,
+            cursor: sseCursor,
+          );
           if (chunk != null) yield chunk;
         }
         return;
@@ -1389,7 +1490,12 @@ class AIService {
         options: Options(
           receiveTimeout: const Duration(minutes: 10),
           sendTimeout: const Duration(seconds: 60),
-          headers: {'Accept': 'text/event-stream', 'Cache-Control': 'no-cache'},
+          headers: {
+            'Accept': 'text/event-stream',
+            'Cache-Control': 'no-cache',
+            if (sseCursor?.lastEventId != null)
+              'Last-Event-ID': '${sseCursor!.lastEventId}',
+          },
         ),
         cancelToken: cancelToken,
       );
@@ -1414,9 +1520,15 @@ class AIService {
             eventBuffer.join('\n'),
             onError,
             onComplete,
+            cursor: sseCursor,
           );
           eventBuffer.clear();
           if (chunk != null) yield chunk;
+          continue;
+        }
+        if (line.startsWith('id:')) {
+          final id = int.tryParse(line.substring(3).trim());
+          if (id != null) sseCursor?.lastEventId = id;
           continue;
         }
         if (line.startsWith('data:')) {
@@ -1431,6 +1543,7 @@ class AIService {
           eventBuffer.join('\n'),
           onError,
           onComplete,
+          cursor: sseCursor,
         );
         if (chunk != null) yield chunk;
       }
@@ -1444,6 +1557,26 @@ class AIService {
 
   Future<void> deleteChatSession(int sessionId) async {
     await _api.delete('/api/v1/ai/chat/sessions/$sessionId');
+  }
+
+  Future<AISessionTodoSnapshot> updateSessionTodo({
+    required int sessionId,
+    required String todoId,
+    required String status,
+  }) async {
+    final res = await _api.patch<Map<String, dynamic>>(
+      '/api/v1/ai/chat/sessions/$sessionId/todos/$todoId',
+      data: {'status': status},
+    );
+    final body = res.data as Map<String, dynamic>;
+    final data = body['data'];
+    if (data is! Map) {
+      return const AISessionTodoSnapshot(
+        items: [],
+        summary: AISessionTodoSummary(total: 0, completed: 0),
+      );
+    }
+    return AISessionTodoSnapshot.fromJson(Map<String, dynamic>.from(data));
   }
 
   // ========== Voice: Feedback ==========

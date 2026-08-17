@@ -69,6 +69,10 @@ class AIChatThreadView extends StatelessWidget {
   final bool streamErrorRecoverable;
   final VoidCallback? onRetryStreamError;
   final VoidCallback? onDismissStreamError;
+  final String? continueRunId;
+  final VoidCallback? onContinueRun;
+  final VoidCallback? onDismissContinueRun;
+  final String? continueRunHint;
   final bool showWriteApproval;
   final List<Map<String, dynamic>> writeApprovalOps;
   final bool writeApprovalLoading;
@@ -80,6 +84,7 @@ class AIChatThreadView extends StatelessWidget {
   final VoidCallback? onCreditUpgrade;
   final String executionMode;
   final ValueChanged<String>? onExecutionModeChanged;
+  final void Function(AISessionTodoItem item, String status)? onTodoStatus;
 
   const AIChatThreadView({
     super.key,
@@ -135,6 +140,10 @@ class AIChatThreadView extends StatelessWidget {
     this.streamErrorRecoverable = false,
     this.onRetryStreamError,
     this.onDismissStreamError,
+    this.continueRunId,
+    this.onContinueRun,
+    this.onDismissContinueRun,
+    this.continueRunHint,
     this.showWriteApproval = false,
     this.writeApprovalOps = const [],
     this.writeApprovalLoading = false,
@@ -146,6 +155,7 @@ class AIChatThreadView extends StatelessWidget {
     this.onCreditUpgrade,
     this.executionMode = AIExecutionMode.analyzer,
     this.onExecutionModeChanged,
+    this.onTodoStatus,
   });
 
   Widget _buildMessageList(BuildContext context) {
@@ -196,6 +206,11 @@ class AIChatThreadView extends StatelessWidget {
                           message.role == MessageRole.assistant
                       ? onRegenerateLast
                       : null,
+                  onTodoStatus: message.role == MessageRole.assistant &&
+                          message.id != null &&
+                          message.id == lastAssistantMessageId
+                      ? onTodoStatus
+                      : null,
                 ),
               ),
             ),
@@ -224,6 +239,7 @@ class AIChatThreadView extends StatelessWidget {
               elapsedSeconds: streamingElapsedSeconds,
               agentBudget: streamingAgentBudget,
               formatTime: formatTime(streamingTimestamp),
+              onTodoStatus: onTodoStatus,
             ),
           ),
         );
@@ -265,6 +281,13 @@ class AIChatThreadView extends StatelessWidget {
             recoverable: streamErrorRecoverable,
             onRetry: onRetryStreamError,
             onDismiss: onDismissStreamError,
+          ),
+        if (continueRunId != null && onContinueRun != null)
+          AIContinueRunBanner(
+            onContinue: onContinueRun!,
+            onDismiss: onDismissContinueRun,
+            loading: sending,
+            hint: continueRunHint,
           ),
         if (showWriteApproval &&
             onConfirmWriteApproval != null &&
@@ -370,6 +393,7 @@ class _MessageRow extends StatelessWidget {
   final ValueChanged<int>? onFeedback;
   final int? feedbackRating;
   final VoidCallback? onRegenerate;
+  final void Function(AISessionTodoItem item, String status)? onTodoStatus;
 
   const _MessageRow({
     this.businessId,
@@ -382,6 +406,7 @@ class _MessageRow extends StatelessWidget {
     this.onFeedback,
     this.feedbackRating,
     this.onRegenerate,
+    this.onTodoStatus,
   });
 
   @override
@@ -454,6 +479,7 @@ class _MessageRow extends StatelessWidget {
                     functionCalls: message.functionCalls,
                     functionResults: message.functionResults,
                     suppressApprovalToolChips: suppressApprovalToolChips,
+                    onTodoStatus: onTodoStatus,
                   ),
                   Row(
                     children: [
@@ -502,6 +528,7 @@ class _StreamingRow extends StatelessWidget {
   final int? elapsedSeconds;
   final AIStreamAgentBudget? agentBudget;
   final String formatTime;
+  final void Function(AISessionTodoItem item, String status)? onTodoStatus;
 
   const _StreamingRow({
     this.businessId,
@@ -518,6 +545,7 @@ class _StreamingRow extends StatelessWidget {
     this.elapsedSeconds,
     this.agentBudget,
     required this.formatTime,
+    this.onTodoStatus,
   });
 
   @override
@@ -568,6 +596,7 @@ class _StreamingRow extends StatelessWidget {
                     compact: true,
                     keepExpanded: true,
                     initiallyExpanded: true,
+                    onTodoStatus: onTodoStatus,
                   ),
                 if (hasReasoningPanel && showStatusLine)
                   const SizedBox(height: 8),

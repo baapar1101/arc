@@ -59,7 +59,19 @@ def _is_blocked_ip(host: str) -> bool:
         addr = ipaddress.ip_address(host)
     except ValueError:
         return False
+    mapped = getattr(addr, "ipv4_mapped", None)
+    if mapped is not None:
+        addr = mapped
     if str(addr) in METADATA_IPS:
+        return True
+    if (
+        addr.is_loopback
+        or addr.is_private
+        or addr.is_link_local
+        or addr.is_multicast
+        or addr.is_reserved
+        or addr.is_unspecified
+    ):
         return True
     return not addr.is_global
 
@@ -257,7 +269,11 @@ def invoke_connector(
     url = _validate_connector_url(_render_template(row.url, params) or row.url)
 
     try:
-        with httpx.Client(timeout=REQUEST_TIMEOUT, follow_redirects=False) as client:
+        with httpx.Client(
+            timeout=REQUEST_TIMEOUT,
+            follow_redirects=False,
+            trust_env=False,
+        ) as client:
             if method == "GET":
                 resp = client.get(url, headers=headers, params=params)
             else:
@@ -284,6 +300,15 @@ def invoke_connector(
         method,
         resp.status_code,
     )
+
+    if 300 <= int(resp.status_code) < 400:
+        return {
+            "connector": name,
+            "status_code": resp.status_code,
+            "ok": False,
+            "error": "CONNECTOR_REDIRECT_BLOCKED",
+            "message": "ریدایرکت کانکتور مسدود شد",
+        }
 
     text = resp.text[:MAX_RESPONSE_CHARS]
     parsed: Any = text

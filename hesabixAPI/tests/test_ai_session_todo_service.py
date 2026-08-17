@@ -12,7 +12,11 @@ from app.services.ai.ai_session_todo_service import (
     create_session_plan,
     format_session_todos_for_prompt,
     list_session_todos,
+    apply_user_todo_status,
+    required_plan_tool_choice,
+    session_plan_tools_prompt_block,
     should_expose_session_plan_tools,
+    tools_include_name,
     update_session_todo,
 )
 
@@ -82,6 +86,91 @@ def test_should_expose_session_plan_tools_complex_query() -> None:
     assert not should_expose_session_plan_tools("سلام")
 
 
+def test_required_plan_tool_choice_only_complex_openai_first_round() -> None:
+    choice = required_plan_tool_choice(
+        complexity="complex",
+        iteration=1,
+        has_open_todos=False,
+        plan_tool_available=True,
+        provider_type="openai",
+    )
+    assert choice == {
+        "type": "function",
+        "function": {"name": "create_session_plan"},
+    }
+    assert (
+        required_plan_tool_choice(
+            complexity="medium",
+            iteration=1,
+            has_open_todos=False,
+            plan_tool_available=True,
+            provider_type="openai",
+        )
+        is None
+    )
+    assert (
+        required_plan_tool_choice(
+            complexity="complex",
+            iteration=1,
+            has_open_todos=True,
+            plan_tool_available=True,
+            provider_type="openai",
+        )
+        is None
+    )
+    assert (
+        required_plan_tool_choice(
+            complexity="complex",
+            iteration=2,
+            has_open_todos=False,
+            plan_tool_available=True,
+            provider_type="openai",
+        )
+        is None
+    )
+    assert (
+        required_plan_tool_choice(
+            complexity="complex",
+            iteration=1,
+            has_open_todos=False,
+            plan_tool_available=True,
+            provider_type="anthropic",
+        )
+        == {
+            "type": "function",
+            "function": {"name": "create_session_plan"},
+        }
+    )
+    assert (
+        required_plan_tool_choice(
+            complexity="complex",
+            iteration=1,
+            has_open_todos=False,
+            plan_tool_available=True,
+            provider_type="local",
+        )
+        is None
+    )
+
+
+def test_session_plan_prompt_require_first() -> None:
+    optional = session_plan_tools_prompt_block()
+    required = session_plan_tools_prompt_block(require_first=True)
+    assert "می‌توانی از create_session_plan استفاده کنی" in optional
+    assert "اولین فراخوانی ابزار باید create_session_plan باشد" in required
+    assert "الزامی" in required
+
+
+def test_tools_include_name_finds_openai_function() -> None:
+    tools = [
+        {"type": "function", "function": {"name": "search_invoices"}},
+        {"type": "function", "function": {"name": "create_session_plan"}},
+    ]
+    assert tools_include_name(tools, "create_session_plan")
+    assert not tools_include_name(tools, "update_session_todo")
+    assert not tools_include_name(None, "create_session_plan")
+
+
 def test_replace_existing_plan_clears_open_items(db: Session) -> None:
     create_session_plan(db, 10, [{"title": "قدیمی"}])
     db.commit()
@@ -95,3 +184,23 @@ def test_replace_existing_plan_clears_open_items(db: Session) -> None:
     rows = list_session_todos(db, 10)
     assert len(rows) == 1
     assert rows[0].title == "جدید"
+
+
+def test_apply_user_todo_status_skip_and_reject_closed(db: Session) -> None:
+    rows = create_session_plan(db, 10, [{"title": "جمع‌آوری"}, {"title": "تحلیل"}])
+    db.commit()
+    skipped = apply_user_todo_status(db, 10, rows[0].public_id, "skipped")
+    db.commit()
+    assert skipped[0].status == "skipped"
+    try:
+        apply_user_todo_status(db, 10, rows[0].public_id, "done")
+        raise AssertionError("closed item should reject")
+    except ValueError:
+        pass
+    try:
+        apply_user_todo_status(db, 10, rows[1].public_id, "in_progress")
+        raise AssertionError("in_progress is not a user decision")
+    except ValueError:
+        pass
+    done_rows = apply_user_todo_status(db, 10, rows[1].public_id, "done")
+    assert done_rows[1].status == "done"

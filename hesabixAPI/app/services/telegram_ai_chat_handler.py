@@ -156,6 +156,19 @@ async def handle_telegram_callback_query(
 					send=_crm_send,
 				)
 			)
+		if parts[0] == "ai":
+			action = parts[1] if len(parts) > 1 else ""
+			approval_id = parts[2] if len(parts) > 2 else ""
+			if action == "approve":
+				return await service.confirm_pending_write(
+					approval_id, user_context, approved=True
+				)
+			if action == "reject":
+				return await service.confirm_pending_write(
+					approval_id, user_context, approved=False
+				)
+			logger.warning(f"Unknown ai callback_data: {callback_data}")
+			return False
 		if parts[0] == "menu":
 			return await handle_menu_callback(service, user_context, parts[1:])
 		elif parts[0] == "chat":

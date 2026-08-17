@@ -168,43 +168,9 @@ def format_planned_tools(function_calls: List[Dict[str, Any]]) -> str:
 
 def summarize_tool_result_for_llm(function_name: str, result: Any) -> str:
     """خلاصهٔ فشرده برای قرار دادن در پیام role=tool (کاهش توکن)."""
-    if result is None:
-        return "نتیجه‌ای برنگشت."
-    if isinstance(result, dict):
-        if result.get("error") == "APPROVAL_REQUIRED":
-            return json.dumps(result, ensure_ascii=False)
-        if "error" in result:
-            return json.dumps({"error": result.get("error"), "message": result.get("message")}, ensure_ascii=False)
-        compact: Dict[str, Any] = {}
-        for key in ("message", "summary", "description", "total", "pagination"):
-            if key in result:
-                compact[key] = result[key]
-        for key in ("items", "data", "results", "invoices", "products", "persons"):
-            items = result.get(key)
-            if isinstance(items, list):
-                compact[key] = items[:15]
-                compact[f"{key}_total"] = (
-                    (result.get("pagination") or {}).get("total")
-                    if isinstance(result.get("pagination"), dict)
-                    else len(items)
-                )
-                if len(items) > 15:
-                    compact[f"{key}_truncated"] = True
-                break
-        if compact:
-            return json.dumps(compact, ensure_ascii=False)
-        text = json.dumps(result, ensure_ascii=False)
-        if len(text) > 4000:
-            return text[:4000] + "…"
-        return text
-    if isinstance(result, list):
-        preview = result[:15]
-        payload: Dict[str, Any] = {"items": preview, "total": len(result)}
-        if len(result) > 15:
-            payload["truncated"] = True
-        return json.dumps(payload, ensure_ascii=False)
-    text = str(result)
-    return text[:4000] + ("…" if len(text) > 4000 else "")
+    from app.services.ai.ai_tool_result import compact_tool_result_for_llm
+
+    return compact_tool_result_for_llm(function_name, result)
 
 
 def summarize_tool_result(function_name: str, result: Any) -> str:
@@ -346,23 +312,23 @@ def extract_result_count(result: Any) -> Optional[int]:
 
 
 def extract_citations_from_result(result: Any) -> List[str]:
-    """استخراج منابع/citation از نتیجه tool برای explainability."""
-    citations: List[str] = []
-    if not isinstance(result, dict):
-        return citations
+    """استخراج منابع/citation از نتیجه tool برای trace UI."""
+    from app.services.ai.ai_citation_service import format_citation_lines
+    from app.services.ai.ai_tool_result import (
+        extract_record_citations,
+        extract_record_list,
+        unwrap_registry_result,
+    )
 
-    for item in (result.get("items") or result.get("data") or []):
-        if not isinstance(item, dict):
-            continue
-        ref = item.get("code") or item.get("number") or item.get("id")
-        name = item.get("name") or item.get("title") or ""
-        if ref and name:
-            citations.append(f"{name} (#{ref})")
-        elif ref:
-            citations.append(f"#{ref}")
-        if len(citations) >= 5:
-            break
-    return citations
+    payload = unwrap_registry_result(result)
+    refs: List[Dict[str, Any]] = []
+    if isinstance(payload, dict) and isinstance(payload.get("citations"), list):
+        refs = [dict(x) for x in payload["citations"] if isinstance(x, dict)]
+    if not refs:
+        records, _ = extract_record_list(payload)
+        refs = extract_record_citations(records, limit=5)
+    lines = format_citation_lines(refs[:5])
+    return [line.lstrip("- ").strip() for line in lines if line.strip()]
 
 
 def split_trace_layers(

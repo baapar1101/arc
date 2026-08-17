@@ -30,6 +30,24 @@ def test_tool_call_tracker_detects_repeat():
     assert tracker.has_loop() is True
 
 
+def test_tool_call_tracker_allows_retry_after_error():
+    tracker = ToolCallTracker()
+    call = [{"id": "call_1", "name": "search_invoices", "arguments": {"q": "x"}}]
+    results_err = {"call_1": {"error": "NOT_FOUND"}}
+    tracker.record(call, function_results=results_err, lookup_result=_lookup)
+    tracker.record(call, function_results=results_err, lookup_result=_lookup)
+    assert tracker.has_loop() is False
+    tracker.record(call, function_results=results_err, lookup_result=_lookup)
+    assert tracker.has_loop() is True
+
+
+def test_tool_call_tracker_different_offset_is_not_loop():
+    tracker = ToolCallTracker()
+    tracker.record([{"name": "search_invoices", "arguments": {"offset": 0}}])
+    tracker.record([{"name": "search_invoices", "arguments": {"offset": 20}}])
+    assert tracker.has_loop() is False
+
+
 def test_assess_after_productive_round():
     tracker = AgentGoalTracker()
     calls = [{"name": "search_invoices", "arguments": {}}]
@@ -103,8 +121,9 @@ def test_try_extend_blocked_on_loop():
     budget = build_agent_budget("simple", max_iterations=3)
     tracker = AgentGoalTracker()
     call = [{"name": "search_invoices", "arguments": {"q": "x"}}]
-    tracker.assess_after_tool_round(call, {"call_1": {"error": "x"}}, _lookup)
-    tracker.assess_after_tool_round(call, {"call_1": {"error": "x"}}, _lookup)
+    results = {"call_1": {"items": [{"id": 1}]}}
+    tracker.assess_after_tool_round(call, results, _lookup)
+    tracker.assess_after_tool_round(call, results, _lookup)
     assert tracker.last_assessment is not None
     assert tracker.last_assessment.loop_detected is True
     assert try_extend_budget_for_goal(budget, tracker.last_assessment) is False

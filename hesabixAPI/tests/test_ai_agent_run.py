@@ -58,3 +58,27 @@ def test_resume_prompt_includes_run_id():
     assert "deadbeefcafebabe" in prompt
     assert "4" in prompt
     assert "[agent_resume]" in prompt
+
+
+def test_resume_prompt_lists_prior_tools():
+    prompt = build_resume_continue_prompt(
+        {"run_id": "deadbeefcafebabe", "iteration": 2, "stop_reason": "max_iterations"},
+        tools_called=["search_invoices", "get_sales_report"],
+    )
+    assert "search_invoices" in prompt
+    assert "max_iterations" in prompt
+
+
+def test_snapshot_can_continue_on_budget_stop():
+    from app.services.ai.ai_agent_run import (
+        AGENT_RUN_STATUS_BUDGET_EXHAUSTED,
+        is_resumable_stop_reason,
+        status_for_stop,
+    )
+
+    assert is_resumable_stop_reason("max_iterations") is True
+    assert is_resumable_stop_reason("disconnect") is True
+    assert is_resumable_stop_reason(None) is False
+    assert status_for_stop(stop_reason="token_budget") == AGENT_RUN_STATUS_BUDGET_EXHAUSTED
+    run = AgentRunState(status=AGENT_RUN_STATUS_BUDGET_EXHAUSTED, stop_reason="wall_clock")
+    assert run.snapshot()["can_continue"] is True

@@ -8,7 +8,8 @@
 from __future__ import annotations
 
 import json
-from typing import Any, Callable, Dict, Iterable, List, Optional, Set
+import uuid
+from typing import Any, Callable, Dict, Iterable, List, Optional, Set, Tuple
 
 from app.services.ai.ai_tool_keys import TOOL_LABELS_FA
 
@@ -49,14 +50,17 @@ WRITE_FUNCTION_LABELS_FA: Dict[str, str] = {
 
 def is_write_function(name: str, registry=None) -> bool:
     """
-    بررسی اینکه آیا function نیاز به تأیید دارد.
-    اگر registry داده شود از AIFunction.requires_approval استفاده می‌کند؛
-    در غیر این صورت به WRITE_FUNCTIONS static برمی‌گردد.
+    آیا function نیاز به تأیید دارد.
+
+    اگر registry داده شود منبع حقیقت همان است؛ نام ناشناخته fail-closed
+    است (write فرض می‌شود) تا مسیر MCP/ورک‌فلو ابزار جدید را بی‌تأیید اجرا نکند.
+    بدون registry به WRITE_FUNCTIONS برمی‌گردد.
     """
     if registry is not None:
         fn = registry.get_function(name)
         if fn is not None:
             return bool(getattr(fn, "requires_approval", False))
+        return True
     return name in WRITE_FUNCTIONS
 
 
@@ -77,6 +81,7 @@ def is_readonly_function(name: str, registry=None) -> bool:
         fn = registry.get_function(name)
         if fn is not None:
             return bool(getattr(fn, "is_readonly", True))
+        return False
     return name not in WRITE_FUNCTIONS
 
 
@@ -93,18 +98,63 @@ def _canonical_json(value: Any) -> str:
     return json.dumps(value or {}, ensure_ascii=False, sort_keys=True, separators=(",", ":"), default=str)
 
 
+def write_function_label(function_name: str) -> str:
+    return TOOL_LABELS_FA.get(function_name) or WRITE_FUNCTION_LABELS_FA.get(
+        function_name, function_name
+    )
+
+
+def argument_diff(approved: Dict[str, Any], requested: Dict[str, Any]) -> Dict[str, Any]:
+    """کلیدهایی که بین کارت تأیید و درخواست جدید فرق دارند."""
+    keys = set(approved or ()) | set(requested or ())
+    changed: Dict[str, Any] = {}
+    for key in keys:
+        left = (approved or {}).get(key)
+        right = (requested or {}).get(key)
+        if _canonical_json(left) != _canonical_json(right):
+            changed[key] = {"approved": left, "requested": right}
+    return changed
+
+
+def resolve_approved_write(
+    function_name: str,
+    arguments: Dict[str, Any],
+    approved_write_calls: Iterable[Dict[str, Any]] | None,
+) -> Tuple[bool, Dict[str, Any], Optional[Dict[str, Any]]]:
+    """تأیید روی approval_id / کارت واحد؛ آرگومان ذخیره‌شده اجرا می‌شود (SEC-01).
+
+    خروجی: (ok, args_to_execute, mismatch_meta)
+    """
+    same_fn = [
+        dict(item)
+        for item in (approved_write_calls or [])
+        if isinstance(item, dict) and item.get("function") == function_name
+    ]
+    requested = arguments or {}
+    for approved in same_fn:
+        stored = approved.get("arguments") if isinstance(approved.get("arguments"), dict) else {}
+        if _canonical_json(stored) == _canonical_json(requested):
+            return True, dict(stored), None
+    if len(same_fn) == 1:
+        stored = (
+            same_fn[0].get("arguments")
+            if isinstance(same_fn[0].get("arguments"), dict)
+            else {}
+        )
+        aid = same_fn[0].get("approval_id")
+        if aid or stored:
+            diff = argument_diff(stored, requested)
+            return True, dict(stored), ({"approval_id": aid, "arg_diff": diff} if diff else None)
+    return False, dict(requested), None
+
+
 def write_call_is_approved(
     function_name: str,
     arguments: Dict[str, Any],
     approved_write_calls: Iterable[Dict[str, Any]] | None,
 ) -> bool:
-    target_args = _canonical_json(arguments)
-    for approved in approved_write_calls or []:
-        if approved.get("function") != function_name:
-            continue
-        if _canonical_json(approved.get("arguments")) == target_args:
-            return True
-    return False
+    ok, _, _ = resolve_approved_write(function_name, arguments, approved_write_calls)
+    return ok
 
 
 def is_approval_required_result(result: Any) -> bool:
@@ -147,10 +197,11 @@ def build_approval_pause_content(
 
 
 def build_approval_required_result(function_name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
-    label = WRITE_FUNCTION_LABELS_FA.get(function_name, function_name)
+    label = write_function_label(function_name)
     return {
         "error": "APPROVAL_REQUIRED",
         "status": "pending_approval",
+        "approval_id": uuid.uuid4().hex[:16],
         "function": function_name,
         "label": label,
         "arguments": arguments,
@@ -167,6 +218,44 @@ def is_approval_block_result(result: Any) -> bool:
         "APPROVAL_REQUIRED",
         "APPROVAL_MISMATCH",
     )
+
+
+def extract_pending_approval_ops(function_results: Any) -> List[Dict[str, Any]]:
+    """کارت‌های APPROVAL_REQUIRED از function_results (کانال چت/تلگرام)."""
+    ops: List[Dict[str, Any]] = []
+    if isinstance(function_results, dict):
+        values = function_results.values()
+    elif isinstance(function_results, list):
+        values = function_results
+    else:
+        return ops
+    for value in values:
+        payload = approval_payload_from_result_entry(value)
+        if payload:
+            ops.append(payload)
+    return ops
+
+
+def approval_payload_from_result_entry(entry: Any) -> Optional[Dict[str, Any]]:
+    raw = entry
+    if isinstance(raw, dict) and isinstance(raw.get("result"), dict):
+        nested = raw["result"]
+        if nested.get("error") == "APPROVAL_REQUIRED":
+            raw = nested
+    if not isinstance(raw, dict) or raw.get("error") != "APPROVAL_REQUIRED":
+        return None
+    function_name = raw.get("function") or raw.get("name")
+    arguments = raw.get("arguments")
+    if not isinstance(function_name, str) or not isinstance(arguments, dict):
+        return None
+    payload: Dict[str, Any] = {"function": function_name, "arguments": arguments}
+    aid = raw.get("approval_id")
+    if isinstance(aid, str) and aid.strip():
+        payload["approval_id"] = aid.strip()
+    label = raw.get("label")
+    if isinstance(label, str) and label.strip():
+        payload["label"] = label.strip()
+    return payload
 
 
 def resolve_tool_result(function_results: Dict[str, Any], call: Dict[str, Any]) -> Any:
@@ -273,7 +362,7 @@ def build_approval_pause_message(
 
 
 def build_read_only_mode_result(function_name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
-    label = WRITE_FUNCTION_LABELS_FA.get(function_name, function_name)
+    label = write_function_label(function_name)
     return {
         "error": "READ_ONLY_MODE",
         "status": "blocked",
@@ -293,9 +382,14 @@ def is_read_only_mode_result(result: Any) -> bool:
     return isinstance(result, dict) and result.get("error") == "READ_ONLY_MODE"
 
 
-def build_approval_mismatch_result(function_name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
-    label = WRITE_FUNCTION_LABELS_FA.get(function_name, function_name)
-    return {
+def build_approval_mismatch_result(
+    function_name: str,
+    arguments: Dict[str, Any],
+    *,
+    arg_diff: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    label = write_function_label(function_name)
+    payload: Dict[str, Any] = {
         "error": "APPROVAL_MISMATCH",
         "status": "rejected",
         "function": function_name,
@@ -306,3 +400,6 @@ def build_approval_mismatch_result(function_name: str, arguments: Dict[str, Any]
             "برای امنیت، لطفاً خلاصه عملیات جدید را دوباره به کاربر نشان دهید و تأیید بگیرید."
         ),
     }
+    if arg_diff:
+        payload["arg_diff"] = arg_diff
+    return payload

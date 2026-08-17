@@ -35,10 +35,22 @@ QUERY_COMPLEXITY_ITERATIONS: dict[str, int] = {
 # حداکثر ابزار ارسالی به مدل در هر درخواست (پس از intent filter)
 MAX_TOOLS_PER_REQUEST = 48
 
+# سقف همزمانی ابزارهای read-only در یک نوبت (writeها همیشه سریال‌اند)
+MAX_PARALLEL_READ_TOOLS = 4
+# providerهایی که tool_choice اجباری را به API می‌فرستند
+PROVIDERS_WITH_FORCED_TOOLS = frozenset({"openai", "anthropic"})
+
+# بافر SSE درون‌پردازه‌ای برای Last-Event-ID (بدون Redis)
+SSE_EVENT_BUFFER_MAX = 400
+SSE_EVENT_BUFFER_TTL_SEC = 15 * 60
+
 # محدودیت پیام‌ها برای context
 MAX_HISTORY_MESSAGES = 40
 MAX_SINGLE_MESSAGE_CHARS = 12_000
 MAX_SYSTEM_PROMPT_CHARS = 32_000
+
+# دروازهٔ CI برای suite طلایی آفلاین (بدون فراخوانی مدل زنده)
+MIN_OFFLINE_EVAL_PASS_RATE = 100
 
 # بودجهٔ تخمینی توکن ورودی (قبل از ارسال به مدل)
 CONTEXT_INPUT_TOKEN_BUDGET = 28_000
@@ -53,6 +65,8 @@ MAX_LLM_SUMMARIZE_PER_USER_DAY = 24
 
 # حداکثر طول JSON نتیجه tool در پیام role=tool
 MAX_TOOL_RESULT_JSON_CHARS = 6_000
+# سقف ردیف در envelope ارسالی به مدل (بقیه در summary.total)
+MAX_TOOL_RESULT_RECORDS = 15
 
 # کش بینش کسب‌وکار در prompt (ثانیه)
 INSIGHTS_CACHE_TTL_SEC = 300
@@ -112,8 +126,10 @@ MAX_UNPRODUCTIVE_ROUNDS = 2
 AGENT_BUDGET_EXTENSIONS_MAX = 2
 AGENT_BUDGET_EXTENSION_ITERATIONS = 2
 AGENT_BUDGET_ABSOLUTE_MAX_ITERATIONS = 15
-# بیش از این تکرار همان tool+args → تشخیص loop و توقف تمدید
+# بیش از این تکرار همان tool+args با نتیجهٔ موفق → تشخیص loop و توقف تمدید
 AGENT_MAX_IDENTICAL_TOOL_REPEATS = 1
+# تکرار همان فراخوانی وقتی نتیجه خطا/خالی است؛ سومی حلقه محسوب می‌شود
+AGENT_MAX_IDENTICAL_TOOL_FAILURES = 2
 
 # ---- کنترل استدلال درون‌مدلی (reasoning effort) ----
 # سطوح مجاز تلاش استدلال برای مدل‌های reasoning (OpenAI o-series/gpt-5 و Anthropic).

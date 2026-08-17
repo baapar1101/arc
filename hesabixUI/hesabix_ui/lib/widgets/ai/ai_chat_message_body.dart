@@ -12,6 +12,9 @@ import 'ai_copyable_code_block.dart';
 import 'ai_markdown_table_parser.dart';
 import 'ai_visualization_spec.dart';
 import 'ai_workflow_chat_actions.dart';
+import 'ai_tool_envelope.dart';
+import 'ai_citation_chips.dart';
+import 'ai_activated_skill_chips.dart';
 
 class AIChatMessageBody extends StatelessWidget {
   final String content;
@@ -20,6 +23,7 @@ class AIChatMessageBody extends StatelessWidget {
   final Object? functionCalls;
   final Object? functionResults;
   final bool suppressApprovalToolChips;
+  final void Function(AISessionTodoItem item, String status)? onTodoStatus;
 
   const AIChatMessageBody({
     super.key,
@@ -29,6 +33,7 @@ class AIChatMessageBody extends StatelessWidget {
     this.functionCalls,
     this.functionResults,
     this.suppressApprovalToolChips = false,
+    this.onTodoStatus,
   });
 
   @override
@@ -54,6 +59,9 @@ class AIChatMessageBody extends StatelessWidget {
       final fromTrace = extractContentFromAgentTraceResults(functionResults);
       if (fromTrace.isNotEmpty) displayContent = fromTrace;
     }
+    final extraTables = (!isUser && !markdownLooksLikeTable(displayContent))
+        ? extractToolTableSpecsFromResults(functionResults)
+        : const <AITableSpec>[];
 
     return Column(
       crossAxisAlignment:
@@ -71,6 +79,7 @@ class AIChatMessageBody extends StatelessWidget {
             todoSnapshot: agentTodos,
             compact: true,
             initiallyExpanded: agentTodos?.hasActiveItem ?? false,
+            onTodoStatus: onTodoStatus,
           ),
           const SizedBox(height: 8),
         ],
@@ -89,6 +98,16 @@ class AIChatMessageBody extends StatelessWidget {
                       scheme: scheme,
                       businessId: businessId,
                     ),
+                    for (final spec in extraTables)
+                      AIChatTableWidget(spec: spec),
+                    if (!isUser)
+                      AICitationChips(
+                        businessId: businessId,
+                        functionResults: functionResults,
+                        assistantContent: displayContent,
+                      ),
+                    if (!isUser)
+                      AIActivatedSkillChips(functionResults: functionResults),
                     if (!isUser)
                       AIWorkflowChatActions(
                         businessId: businessId,
@@ -97,6 +116,14 @@ class AIChatMessageBody extends StatelessWidget {
                       ),
                   ],
                 ),
+        ] else if (extraTables.isNotEmpty) ...[
+          for (final spec in extraTables) AIChatTableWidget(spec: spec),
+          if (!isUser)
+            AICitationChips(
+              businessId: businessId,
+              functionResults: functionResults,
+              assistantContent: displayContent,
+            ),
         ],
       ],
     );

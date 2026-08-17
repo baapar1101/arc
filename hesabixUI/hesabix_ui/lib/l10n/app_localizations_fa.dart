@@ -10540,6 +10540,19 @@ class AppLocalizationsFa extends AppLocalizations {
       'در حین مکالمه صوتی، ارسال متن غیرفعال است.';
 
   @override
+  String get aiChatApprovalNeedsOpenSession =>
+      'برای تأیید عملیات، ابتدا همان گفت‌وگویی را باز کنید که دستیار در آن درخواست تأیید کرده است.';
+
+  @override
+  String get aiChatWriteApprovalNotFound =>
+      'گفت‌وگوی فعال یا عملیات در انتظار تأیید یافت نشد. همان گفت‌وگویی را باز کنید که دستیار در آن درخواست تأیید کرده است.';
+
+  @override
+  String aiChatSendFailed(String error) {
+    return 'ارسال پیام ناموفق بود: $error';
+  }
+
+  @override
   String get aiVoiceDummyTtsWarning =>
       'موتور TTS سرور روی حالت آزمایشی است؛ ممکن است صدای پاسخ شنیده نشود.';
 
@@ -10886,6 +10899,16 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get aiErrorRecoveryDismiss => 'بستن';
+
+  @override
+  String get aiContinueAnalysis => 'ادامهٔ تحلیل';
+
+  @override
+  String get aiContinueAnalysisHint =>
+      'تحلیل ناقص ماند. می‌توانید از همان نقطه ادامه دهید؛ ابزارهای قبلی تکرار نمی‌شوند.';
+
+  @override
+  String get aiContinueAnalysisDismiss => 'فعلاً نه';
 
   @override
   String aiConversationNavTitle(int count) {
@@ -14240,6 +14263,10 @@ class AppLocalizationsFa extends AppLocalizations {
   @override
   String get crmDealFormSubtitle =>
       'مشتری، مرحلهٔ پایپلاین و مبالغ را ثبت کنید.';
+
+  @override
+  String get crmDealProbabilityUnavailable =>
+      'دستیار نتوانست احتمال معتبری استخراج کند. فیلد تغییر نکرد.';
 
   @override
   String get crmConvertLeadTitle => 'تبدیل به مشتری';

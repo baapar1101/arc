@@ -10,6 +10,7 @@ Stream<String> postSsePayloads({
   required Map<String, String> headers,
   required String body,
   CancelToken? cancelToken,
+  void Function(int id)? onEventId,
 }) {
   final controller = StreamController<String>();
   final request = html.HttpRequest();
@@ -43,6 +44,11 @@ Stream<String> postSsePayloads({
         continue;
       }
       if (line.startsWith(':')) {
+        continue;
+      }
+      if (line.startsWith('id:')) {
+        final id = int.tryParse(line.substring(3).trim());
+        if (id != null) onEventId?.call(id);
         continue;
       }
       if (line.startsWith('data:')) {

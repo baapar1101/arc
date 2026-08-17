@@ -2,6 +2,7 @@
 from app.services.ai.ai_tool_intent import (
     detect_categories,
     estimate_query_complexity,
+    merge_tool_allowlists,
     query_expects_tool_use,
     query_needs_knowledge,
     query_targets_tool_domain,
@@ -73,10 +74,16 @@ def test_estimate_query_complexity_greeting():
 # ---- Phase 0: routing باید حتی سوال‌های «ساده» اما داده‌محور را tools بدهد ----
 
 def test_query_expects_tool_use_simple_complexity_but_data_domain():
-    query = "یه گزارش از هزینه ها بهم بگو"
-    # علت اصلی باگ: این سوال complexity=simple است اما باید tools بگیرد.
-    assert estimate_query_complexity(query) == "simple"
+    query = "موجودی کالای الف چقدر است؟"
+    # سوال داده‌محور کوتاه بدون کلیدواژهٔ گزارش هنوز می‌تواند simple باشد
+    # اما باید tools بگیرد.
     assert query_expects_tool_use(query) is True
+
+
+def test_estimate_query_complexity_short_report_is_not_simple():
+    assert estimate_query_complexity("تراز آزمایشی فروردین") == "medium"
+    assert estimate_query_complexity("یه گزارش از هزینه ها بهم بگو") == "medium"
+    assert estimate_query_complexity("سلام") == "simple"
 
 
 def test_query_targets_tool_domain_strips_leading_greeting():
@@ -96,3 +103,24 @@ def test_query_expects_tool_use_short_followup_with_history():
         {"role": "user", "content": "بررسی مالی از ۳ ماه گذشته انجام بده"},
     ]
     assert query_expects_tool_use("انجامش بده", history) is True
+
+
+def test_plan_tools_union_survives_intent_without_plan_keywords():
+    from app.services.ai.ai_session_todo_service import SESSION_TODO_TOOL_NAMES
+
+    all_names = {
+        "query_business_data",
+        "search_invoices",
+        "get_sales_report",
+        "create_session_plan",
+        "list_session_todos",
+        "update_session_todo",
+    }
+    selected = select_tool_names(all_names, "فروش این ماه چقدر بوده؟")
+    assert "create_session_plan" not in selected
+    allowed = merge_tool_allowlists(
+        selected,
+        forced_names=SESSION_TODO_TOOL_NAMES & all_names,
+    )
+    assert "create_session_plan" in allowed
+    assert "update_session_todo" in allowed

@@ -19686,6 +19686,24 @@ abstract class AppLocalizations {
   /// **'Text input is disabled during an active voice session.'**
   String get aiVoiceTextBlockedWhileActive;
 
+  /// No description provided for @aiChatApprovalNeedsOpenSession.
+  ///
+  /// In en, this message translates to:
+  /// **'To approve this action, open the same conversation where the assistant asked for confirmation.'**
+  String get aiChatApprovalNeedsOpenSession;
+
+  /// No description provided for @aiChatWriteApprovalNotFound.
+  ///
+  /// In en, this message translates to:
+  /// **'No active conversation or pending write was found. Open the conversation where the assistant requested approval.'**
+  String get aiChatWriteApprovalNotFound;
+
+  /// No description provided for @aiChatSendFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not send the message: {error}'**
+  String aiChatSendFailed(String error);
+
   /// No description provided for @aiVoiceDummyTtsWarning.
   ///
   /// In en, this message translates to:
@@ -20357,6 +20375,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Dismiss'**
   String get aiErrorRecoveryDismiss;
+
+  /// No description provided for @aiContinueAnalysis.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue analysis'**
+  String get aiContinueAnalysis;
+
+  /// No description provided for @aiContinueAnalysisHint.
+  ///
+  /// In en, this message translates to:
+  /// **'The analysis stopped early. Continue from the same run without repeating completed tools.'**
+  String get aiContinueAnalysisHint;
+
+  /// No description provided for @aiContinueAnalysisDismiss.
+  ///
+  /// In en, this message translates to:
+  /// **'Not now'**
+  String get aiContinueAnalysisDismiss;
 
   /// No description provided for @aiConversationNavTitle.
   ///
@@ -26443,6 +26479,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Customer, pipeline stage, and financial details.'**
   String get crmDealFormSubtitle;
+
+  /// No description provided for @crmDealProbabilityUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'The assistant could not extract a valid probability. The field was left unchanged.'**
+  String get crmDealProbabilityUnavailable;
 
   /// No description provided for @crmConvertLeadTitle.
   ///
