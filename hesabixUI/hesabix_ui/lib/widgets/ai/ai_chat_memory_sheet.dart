@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/services/ai_service.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
 import 'package:hesabix_ui/utils/snackbar_helper.dart' show SnackBarHelper;
@@ -100,7 +101,9 @@ class _AIChatMemorySheetState extends State<_AIChatMemorySheet> {
         setState(() => _loading = false);
         SnackBarHelper.show(
           context,
-          message: 'خطا در بارگذاری حافظه: ${ErrorExtractor.forContext(e, context)}',
+          message: AppLocalizations.of(context).aiMemoryLoadFailed(
+            ErrorExtractor.forContext(e, context),
+          ),
           isError: true,
         );
       }
@@ -120,12 +123,14 @@ class _AIChatMemorySheetState extends State<_AIChatMemorySheet> {
           '';
       _instructionsCtrl.text = instructions;
       _updatedAt = data['updated_at'] as String?;
-      SnackBarHelper.show(context, message: 'دستورات ذخیره شد');
+      SnackBarHelper.show(context, message: AppLocalizations.of(context).aiMemorySaved);
     } catch (e) {
       if (!mounted) return;
       SnackBarHelper.show(
         context,
-        message: 'خطا: ${ErrorExtractor.forContext(e, context)}',
+        message: AppLocalizations.of(context).aiMemoryError(
+          ErrorExtractor.forContext(e, context),
+        ),
         isError: true,
       );
     } finally {
@@ -134,16 +139,15 @@ class _AIChatMemorySheetState extends State<_AIChatMemorySheet> {
   }
 
   Future<void> _clearAll() async {
+    final l10n = AppLocalizations.of(context);
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('پاک کردن حافظه'),
-        content: const Text(
-          'دستورات همیشگی و تمام چیزهایی که دستیار یاد گرفته حذف می‌شوند. ادامه می‌دهید؟',
-        ),
+        title: Text(l10n.aiMemoryClearTitle),
+        content: Text(l10n.aiMemoryClearBody),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('انصراف')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('پاک کردن')),
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(l10n.cancel)),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: Text(l10n.aiMemoryClearConfirm)),
         ],
       ),
     );
@@ -158,12 +162,14 @@ class _AIChatMemorySheetState extends State<_AIChatMemorySheet> {
         _items = [];
         _updatedAt = null;
       });
-      SnackBarHelper.show(context, message: 'حافظه پاک شد');
+      SnackBarHelper.show(context, message: AppLocalizations.of(context).aiMemoryCleared);
     } catch (e) {
       if (!mounted) return;
       SnackBarHelper.show(
         context,
-        message: 'خطا: ${ErrorExtractor.forContext(e, context)}',
+        message: AppLocalizations.of(context).aiMemoryError(
+          ErrorExtractor.forContext(e, context),
+        ),
         isError: true,
       );
     } finally {
@@ -172,25 +178,26 @@ class _AIChatMemorySheetState extends State<_AIChatMemorySheet> {
   }
 
   Future<void> _editItem(_LearnedItem item) async {
+    final l10n = AppLocalizations.of(context);
     final ctrl = TextEditingController(text: item.content);
     final saved = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('ویرایش حافظه'),
+        title: Text(l10n.aiMemoryEditTitle),
         content: TextField(
           controller: ctrl,
           maxLines: 4,
           minLines: 2,
-          decoration: const InputDecoration(
-            border: OutlineInputBorder(),
-            hintText: 'متن حقیقت یادگرفته‌شده',
+          decoration: InputDecoration(
+            border: const OutlineInputBorder(),
+            hintText: l10n.aiMemoryEditHint,
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('انصراف')),
+          TextButton(onPressed: () => Navigator.pop(ctx), child: Text(l10n.cancel)),
           FilledButton(
             onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),
-            child: const Text('ذخیره'),
+            child: Text(l10n.save),
           ),
         ],
       ),
@@ -214,26 +221,29 @@ class _AIChatMemorySheetState extends State<_AIChatMemorySheet> {
               it,
         ];
       });
-      SnackBarHelper.show(context, message: 'آیتم به‌روز شد');
+      SnackBarHelper.show(context, message: AppLocalizations.of(context).aiMemoryItemUpdated);
     } catch (e) {
       if (!mounted) return;
       SnackBarHelper.show(
         context,
-        message: 'خطا: ${ErrorExtractor.forContext(e, context)}',
+        message: AppLocalizations.of(context).aiMemoryError(
+          ErrorExtractor.forContext(e, context),
+        ),
         isError: true,
       );
     }
   }
 
   Future<void> _deleteItem(_LearnedItem item) async {
+    final l10n = AppLocalizations.of(context);
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('حذف این مورد؟'),
+        title: Text(l10n.aiMemoryDeleteItemTitle),
         content: Text(item.content),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('انصراف')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('حذف')),
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(l10n.cancel)),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: Text(l10n.delete)),
         ],
       ),
     );
@@ -246,12 +256,14 @@ class _AIChatMemorySheetState extends State<_AIChatMemorySheet> {
       );
       if (!mounted) return;
       setState(() => _items = _items.where((e) => e.id != item.id).toList());
-      SnackBarHelper.show(context, message: 'حذف شد');
+      SnackBarHelper.show(context, message: AppLocalizations.of(context).aiMemoryDeleted);
     } catch (e) {
       if (!mounted) return;
       SnackBarHelper.show(
         context,
-        message: 'خطا: ${ErrorExtractor.forContext(e, context)}',
+        message: AppLocalizations.of(context).aiMemoryError(
+          ErrorExtractor.forContext(e, context),
+        ),
         isError: true,
       );
     }
@@ -260,6 +272,7 @@ class _AIChatMemorySheetState extends State<_AIChatMemorySheet> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context);
     final bottom = MediaQuery.viewInsetsOf(context).bottom;
     final overLimit = _charCount > _maxChars;
 
@@ -268,12 +281,12 @@ class _AIChatMemorySheetState extends State<_AIChatMemorySheet> {
       child: ListView(
         children: [
           Text(
-            'حافظه دستیار',
+            l10n.aiMemoryTitle,
             style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
           ),
           const SizedBox(height: 8),
           Text(
-            'دستورات همیشگی را خودتان می‌نویسید؛ حقایق پایدار را دستیار بی‌صدا از گفتگوها یاد می‌گیرد.',
+            l10n.aiMemoryIntro,
             style: theme.textTheme.bodySmall?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
             ),
@@ -281,7 +294,7 @@ class _AIChatMemorySheetState extends State<_AIChatMemorySheet> {
           if (_updatedAt != null) ...[
             const SizedBox(height: 6),
             Text(
-              'آخرین به‌روزرسانی: ${_formatUpdatedAt(_updatedAt!)}',
+              l10n.aiMemoryUpdatedAt(_formatUpdatedAt(_updatedAt!)),
               style: theme.textTheme.labelSmall?.copyWith(
                 color: theme.colorScheme.outline,
               ),
@@ -294,10 +307,10 @@ class _AIChatMemorySheetState extends State<_AIChatMemorySheet> {
               child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
             )
           else ...[
-            Text('دستورات همیشگی', style: theme.textTheme.titleSmall),
+            Text(l10n.aiMemoryInstructionsTitle, style: theme.textTheme.titleSmall),
             const SizedBox(height: 6),
             Text(
-              'چیزهایی که دستیار باید همیشه مد نظر داشته باشد.',
+              l10n.aiMemoryInstructionsHint,
               style: theme.textTheme.labelSmall?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
               ),
@@ -308,9 +321,9 @@ class _AIChatMemorySheetState extends State<_AIChatMemorySheet> {
               maxLines: 5,
               minLines: 3,
               decoration: InputDecoration(
-                hintText: 'مثال: مبالغ را به تومان بگو؛ گزارش‌ها را خلاصه و جدولی بنویس…',
+                hintText: l10n.aiMemoryInstructionsExample,
                 border: const OutlineInputBorder(),
-                errorText: overLimit ? 'حداکثر $_maxChars کاراکتر' : null,
+                errorText: overLimit ? l10n.aiMemoryMaxChars(_maxChars) : null,
               ),
             ),
             const SizedBox(height: 6),
@@ -336,15 +349,15 @@ class _AIChatMemorySheetState extends State<_AIChatMemorySheet> {
                             color: Colors.white,
                           ),
                         )
-                      : const Text('ذخیره دستورات'),
+                      : Text(l10n.aiMemorySaveInstructions),
                 ),
               ],
             ),
             const SizedBox(height: 24),
-            Text('آنچه یاد گرفته‌ام', style: theme.textTheme.titleSmall),
+            Text(l10n.aiMemoryLearnedTitle, style: theme.textTheme.titleSmall),
             const SizedBox(height: 6),
             Text(
-              'از گفتگوها به‌صورت خودکار جمع می‌شود. می‌توانید ویرایش یا حذف کنید.',
+              l10n.aiMemoryLearnedIntro,
               style: theme.textTheme.labelSmall?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
               ),
@@ -354,7 +367,7 @@ class _AIChatMemorySheetState extends State<_AIChatMemorySheet> {
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 12),
                 child: Text(
-                  'هنوز چیزی از گفتگوها یاد نگرفته‌ام. با ادامهٔ مکالمه، حقایق پایدار اینجا ظاهر می‌شوند.',
+                  l10n.aiMemoryLearnedEmpty,
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: theme.colorScheme.outline,
                   ),
@@ -390,12 +403,12 @@ class _AIChatMemorySheetState extends State<_AIChatMemorySheet> {
                             ),
                           ),
                           IconButton(
-                            tooltip: 'ویرایش',
+                            tooltip: l10n.edit,
                             onPressed: _clearing ? null : () => _editItem(item),
                             icon: const Icon(Icons.edit_outlined, size: 20),
                           ),
                           IconButton(
-                            tooltip: 'حذف',
+                            tooltip: l10n.delete,
                             onPressed: _clearing ? null : () => _deleteItem(item),
                             icon: const Icon(Icons.delete_outline, size: 20),
                           ),
@@ -416,7 +429,7 @@ class _AIChatMemorySheetState extends State<_AIChatMemorySheet> {
                         height: 18,
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
-                    : const Text('پاک کردن همه'),
+                    : Text(l10n.aiMemoryClearAll),
               ),
             ),
           ],
@@ -426,15 +439,16 @@ class _AIChatMemorySheetState extends State<_AIChatMemorySheet> {
   }
 
   String _sourceLabel(String source) {
+    final l10n = AppLocalizations.of(context);
     switch (source) {
       case 'auto':
-        return 'یادگیری خودکار';
+        return l10n.aiMemorySourceAuto;
       case 'assistant':
-        return 'ذخیره‌شده توسط دستیار';
+        return l10n.aiMemorySourceAssistant;
       case 'feedback':
-        return 'از بازخورد شما';
+        return l10n.aiMemorySourceFeedback;
       case 'user':
-        return 'ویرایش‌شده توسط شما';
+        return l10n.aiMemorySourceUser;
       default:
         return source;
     }

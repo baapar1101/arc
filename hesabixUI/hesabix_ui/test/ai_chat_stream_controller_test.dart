@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hesabix_ui/models/ai_stream_event.dart';
 import 'package:hesabix_ui/widgets/ai/ai_chat_stream_controller.dart';
+import 'package:hesabix_ui/widgets/ai/ai_chat_stream_turn.dart';
 
 void main() {
   String label(String tool, String? key) => key ?? tool;
@@ -130,6 +131,119 @@ void main() {
       expect(c.traceSteps, hasLength(2));
       expect(c.traceSteps.first.state, 'done');
       expect(c.traceSteps.last.stepId, 'answer_1');
+    });
+  });
+
+  group('AIChatStreamController.consume', () {
+    test('accumulates deltas then commits done content', () async {
+      final c = AIChatStreamController();
+      c.begin();
+      final outcome = await c.consume(
+        Stream.fromIterable(const [
+          AIStreamChunk(contentDelta: 'سلام '),
+          AIStreamChunk(contentDelta: 'دنیا', done: true, messageId: 42),
+        ]),
+        resolveToolLabel: label,
+      );
+      expect(outcome.status, AIChatStreamTurnStatus.success);
+      expect(outcome.resolvedContent, 'سلام دنیا');
+      expect(outcome.assistantMessageId, 42);
+      expect(outcome.hasVisibleOutput, isTrue);
+      expect(c.content, isNotNull);
+    });
+
+    test('finalContent replaces accumulated deltas', () async {
+      final c = AIChatStreamController();
+      c.begin();
+      final outcome = await c.consume(
+        Stream.fromIterable(const [
+          AIStreamChunk(contentDelta: 'پیش‌نویس'),
+          AIStreamChunk(done: true, finalContent: 'متن نهایی ذخیره‌شده'),
+        ]),
+        resolveToolLabel: label,
+      );
+      expect(outcome.resolvedContent, 'متن نهایی ذخیره‌شده');
+      expect(outcome.status, AIChatStreamTurnStatus.success);
+    });
+
+    test('done without visible output is empty', () async {
+      final c = AIChatStreamController();
+      c.begin();
+      final outcome = await c.consume(
+        Stream.fromIterable(const [AIStreamChunk(done: true)]),
+        resolveToolLabel: label,
+      );
+      expect(outcome.status, AIChatStreamTurnStatus.empty);
+      expect(outcome.hasVisibleOutput, isFalse);
+      expect(outcome.resolvedContent, isEmpty);
+    });
+
+    test('chunk error keeps resume id and partial content', () async {
+      final c = AIChatStreamController();
+      c.begin();
+      final outcome = await c.consume(
+        Stream.fromIterable(const [
+          AIStreamChunk(contentDelta: 'نیمه'),
+          AIStreamChunk(
+            error: 'قطع شد',
+            recoverable: true,
+            runId: 'run-resume',
+            canContinue: true,
+            agentBudget: AIStreamAgentBudget(stopMessageFa: 'ادامه دهید'),
+          ),
+        ]),
+        resolveToolLabel: label,
+        sseCursorRunId: 'cursor-run',
+      );
+      expect(outcome.status, AIChatStreamTurnStatus.chunkError);
+      expect(outcome.errorMessage, 'قطع شد');
+      expect(outcome.errorRecoverable, isTrue);
+      expect(outcome.applyContinue, isTrue);
+      expect(outcome.continueRunId, 'run-resume');
+      expect(outcome.continueStopMessage, 'ادامه دهید');
+      expect(outcome.hasPartialAssistant, isTrue);
+      expect(outcome.partialContent, 'نیمه');
+    });
+
+    test('canContinue from function_results when chunk flag is absent', () async {
+      final c = AIChatStreamController();
+      c.begin();
+      final outcome = await c.consume(
+        Stream.fromIterable([
+          const AIStreamChunk(contentDelta: 'گزارش'),
+          AIStreamChunk(
+            done: true,
+            runId: 'run-budget',
+            functionResults: {
+              kAgentRunStorageKey: {
+                'run_id': 'run-budget',
+                'can_continue': true,
+              },
+              kAgentBudgetStorageKey: {
+                'stop_message_fa': 'بودجه تمام شد',
+              },
+            },
+          ),
+        ]),
+        resolveToolLabel: label,
+      );
+      expect(outcome.status, AIChatStreamTurnStatus.success);
+      expect(outcome.continueRunId, 'run-budget');
+      expect(outcome.continueStopMessage, 'بودجه تمام شد');
+    });
+
+    test('stream without done still completes from accumulated deltas', () async {
+      final c = AIChatStreamController();
+      c.begin();
+      final outcome = await c.consume(
+        Stream.fromIterable(const [
+          AIStreamChunk(contentDelta: 'فقط دلتا'),
+        ]),
+        resolveToolLabel: label,
+      );
+      expect(outcome.status, AIChatStreamTurnStatus.success);
+      expect(outcome.resolvedContent, 'فقط دلتا');
+      expect(outcome.continueRunId, isNull);
     });
   });
 }

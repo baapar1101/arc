@@ -4147,6 +4147,242 @@
       "error": { "type": "String" }
     }
   },
+  "aiChatComposerHint": "Message the assistant…",
+  "aiChatComposerHintDesktop": "Message the assistant… (Enter to send, Shift+Enter for a new line)",
+  "aiChatComposerSemanticsLabel": "Assistant message field",
+  "aiChatStopGenerating": "Stop generating",
+  "aiChatAttachFile": "Attach file",
+  "aiChatSendMessage": "Send message",
+  "aiChatSendingMessage": "Sending message",
+  "aiChatSendDisabledHint": "Write a message first",
+  "aiChatAssistantTitle": "AI assistant",
+  "aiChatConversationFallbackTitle": "Chat",
+  "aiChatHistoryTooltip": "Conversations",
+  "aiChatNewConversation": "New chat",
+  "aiChatStop": "Stop",
+  "aiChatResponding": "Responding…",
+  "aiChatClose": "Close",
+  "aiChatEmptyAssistantReply": "No reply was received from the assistant. This is often an AI service or account-credit issue.",
+  "aiChatCopied": "Copied",
+  "aiChatGenerationStopped": "Response generation stopped",
+  "aiChatFeedbackSaved": "Feedback saved",
+  "aiChatFeedbackThanks": "Thanks for the positive feedback",
+  "aiChatFeedbackFailed": "Could not save feedback: {error}",
+  "@aiChatFeedbackFailed": {
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+  "aiChatSessionsLoadFailed": "Could not load conversations: {error}",
+  "@aiChatSessionsLoadFailed": {
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+  "aiChatStartConversationFailed": "Could not start the conversation: {error}",
+  "@aiChatStartConversationFailed": {
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+  "aiChatMessagesLoadFailed": "Could not load messages: {error}",
+  "@aiChatMessagesLoadFailed": {
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+  "aiChatEmptyFile": "The file is empty or could not be read",
+  "aiChatAttachmentAdded": "Attachment added",
+  "aiChatAttachmentUploadFailed": "Could not upload the attachment: {error}",
+  "@aiChatAttachmentUploadFailed": {
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+  "aiChatConversationDeleted": "Conversation deleted",
+  "aiChatDeleteConversationFailed": "Could not delete the conversation: {error}",
+  "@aiChatDeleteConversationFailed": {
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+  "aiChatMessageUpdated": "Message updated",
+  "aiChatEditFailed": "Could not edit: {error}",
+  "@aiChatEditFailed": {
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+  "aiChatForkOpened": "Conversation branch opened",
+  "aiChatForkFailed": "Could not branch the conversation: {error}",
+  "@aiChatForkFailed": {
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+  "aiChatExportEmpty": "The conversation is empty",
+  "aiChatExportFailed": "Could not export: {error}",
+  "@aiChatExportFailed": {
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+  "aiChatRegenerateNeedsAssistant": "The last message must be from the assistant",
+  "aiChatRegenerateFailed": "Could not regenerate: {error}",
+  "@aiChatRegenerateFailed": {
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+  "aiChatActionFailed": "{label} failed: {error}",
+  "@aiChatActionFailed": {
+    "placeholders": {
+      "label": { "type": "String" },
+      "error": { "type": "String" }
+    }
+  },
+  "aiChatErrorLabelReply": "Reply",
+  "aiChatErrorLabelEdit": "Edit",
+  "aiChatErrorLabelRegenerate": "Regenerate",
+  "aiChatErrorLabelSend": "Send message",
+  "aiChatUnknownError": "Unknown error",
+  "aiChatVoiceStartFailed": "Could not start voice chat: {error}",
+  "@aiChatVoiceStartFailed": {
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+  "aiChatVoiceTimeout": "The voice session closed after a timeout. Please try again.",
+  "aiChatVoiceSttFailed": "Speech recognition failed: {error}",
+  "@aiChatVoiceSttFailed": {
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+  "aiChatVoiceEmptyTranscript": "No speech was recognized. Please try again.",
+  "aiChatVoiceForbidden": "You do not have access to this business.",
+  "aiChatVoiceError": "Error: {error}",
+  "@aiChatVoiceError": {
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+  "aiVoiceFeedbackTitle": "AI voice quality",
+  "aiVoiceFeedbackBody": "Rate the quality of the spoken reply so it can improve over time.",
+  "aiVoiceFeedbackCommentLabel": "Comment (optional)",
+  "aiVoiceFeedbackLater": "Later",
+  "aiVoiceFeedbackSubmit": "Submit",
+  "aiVoiceSettingsTitle": "Settings",
+  "aiVoiceImproveQualityTitle": "Improve voice quality",
+  "aiVoiceImproveQualitySubtitle": "Help improve the voice experience by sending anonymous data.",
+  "aiMemoryTitle": "Assistant memory",
+  "aiMemoryIntro": "You write standing instructions; the assistant quietly learns lasting facts from conversations.",
+  "aiMemoryUpdatedAt": "Last updated: {when}",
+  "@aiMemoryUpdatedAt": {
+    "placeholders": {
+      "when": { "type": "String" }
+    }
+  },
+  "aiMemoryInstructionsTitle": "Standing instructions",
+  "aiMemoryInstructionsHint": "Things the assistant should always keep in mind.",
+  "aiMemoryInstructionsExample": "Example: speak amounts in toman; keep reports short and tabular…",
+  "aiMemoryMaxChars": "Maximum {count} characters",
+  "@aiMemoryMaxChars": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "aiMemorySaveInstructions": "Save instructions",
+  "aiMemoryLearnedTitle": "What I have learned",
+  "aiMemoryLearnedIntro": "Collected automatically from conversations. You can edit or delete items.",
+  "aiMemoryLearnedEmpty": "Nothing has been learned from conversations yet. Lasting facts will appear here as you keep chatting.",
+  "aiMemoryClearAll": "Clear all",
+  "aiMemoryLoadFailed": "Could not load memory: {error}",
+  "@aiMemoryLoadFailed": {
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+  "aiMemorySaved": "Instructions saved",
+  "aiMemoryCleared": "Memory cleared",
+  "aiMemoryItemUpdated": "Item updated",
+  "aiMemoryDeleted": "Deleted",
+  "aiMemoryError": "Error: {error}",
+  "@aiMemoryError": {
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+  "aiMemoryClearTitle": "Clear memory",
+  "aiMemoryClearBody": "Standing instructions and everything the assistant has learned will be removed. Continue?",
+  "aiMemoryClearConfirm": "Clear",
+  "aiMemoryEditTitle": "Edit memory",
+  "aiMemoryEditHint": "Learned fact text",
+  "aiMemoryDeleteItemTitle": "Delete this item?",
+  "aiMemorySourceAuto": "Automatic learning",
+  "aiMemorySourceAssistant": "Saved by the assistant",
+  "aiMemorySourceFeedback": "From your feedback",
+  "aiMemorySourceUser": "Edited by you",
+  "aiKnowledgeTitle": "Business knowledge base",
+  "aiKnowledgeIntro": "Related documents are searched and added to context when answering your question.",
+  "aiKnowledgeNewDocument": "New document",
+  "aiKnowledgeTitleLabel": "Title",
+  "aiKnowledgeBodyLabel": "Body",
+  "aiKnowledgeUntitled": "Untitled",
+  "aiKnowledgeAdded": "Document added",
+  "aiKnowledgeUploaded": "File uploaded",
+  "aiKnowledgeReindexResult": "Reindexed: {documents} documents, {chunks} chunks",
+  "@aiKnowledgeReindexResult": {
+    "placeholders": {
+      "documents": { "type": "Object" },
+      "chunks": { "type": "Object" }
+    }
+  },
+  "aiKnowledgeEmpty": "No documents have been added yet.",
+  "aiKnowledgeText": "Text",
+  "aiKnowledgeFile": "File",
+  "aiKnowledgeReindex": "Reindex",
+  "aiKnowledgeDocSubtitle": "{chars} characters · {status}",
+  "@aiKnowledgeDocSubtitle": {
+    "placeholders": {
+      "chars": { "type": "int" },
+      "status": { "type": "String" }
+    }
+  },
+  "aiKnowledgeSemantic": "Semantic search",
+  "aiKnowledgeSemanticChunks": "Semantic search ({chunks} chunks)",
+  "@aiKnowledgeSemanticChunks": {
+    "placeholders": {
+      "chunks": { "type": "int" }
+    }
+  },
+  "aiKnowledgeIndexFailed": "Index failed — keyword search",
+  "aiKnowledgeKeyword": "Keyword search",
+  "aiKnowledgeKeywordChunks": "Keyword search ({chunks} chunks)",
+  "@aiKnowledgeKeywordChunks": {
+    "placeholders": {
+      "chunks": { "type": "int" }
+    }
+  },
+  "aiKnowledgeLoadFailed": "Error: {error}",
+  "@aiKnowledgeLoadFailed": {
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+  "aiChatApprovalTitle": "Confirm action",
+  "aiChatApprovalDismiss": "Reject",
+  "aiChatApprovalConfirm": "Approve and run",
+  "aiChatApprovalSending": "Sending…",
+  "aiChatApprovalBannerLabel": "Write approval required",
+  "aiChatApprovalSecurityNote": "Only the operations listed here will run; parameters cannot change without another confirmation.",
+  "aiChatApprovalBodySingle": "The assistant wants to change business data.",
+  "aiChatApprovalBodyMultiple": "{count} operations are waiting for your approval.",
+  "@aiChatApprovalBodyMultiple": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
   "aiVoiceDummyTtsWarning": "Server TTS is in test mode; you may not hear spoken responses.",
   "aiVoiceActiveHint": "Voice chat active",
   "aiVoiceInputHint": "Voice input",
@@ -4253,6 +4489,12 @@
   "aiActionRegenerate": "Regenerate",
   "aiActionThumbsUp": "Helpful",
   "aiActionThumbsDown": "Not helpful",
+  "aiActionShare": "Share",
+  "aiActionApplyHScript": "Apply to HScript studio",
+  "aiActionEditResend": "Edit and resend",
+  "aiActionEditAssistantText": "Edit reply text",
+  "aiActionEditAndRegenerate": "Edit and regenerate",
+  "aiActionFork": "Branch from here",
   "aiStatusAgentProgress": "Step {iteration} of {max}",
   "@aiStatusAgentProgress": {
     "placeholders": {

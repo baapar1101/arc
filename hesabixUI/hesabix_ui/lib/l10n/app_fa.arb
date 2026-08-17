@@ -4189,6 +4189,242 @@
       "error": { "type": "String" }
     }
   },
+  "aiChatComposerHint": "پیام خود را بنویسید…",
+  "aiChatComposerHintDesktop": "پیام خود را بنویسید… (Enter ارسال، Shift+Enter خط جدید)",
+  "aiChatComposerSemanticsLabel": "متن پیام دستیار هوشمند",
+  "aiChatStopGenerating": "توقف تولید پاسخ",
+  "aiChatAttachFile": "پیوست فایل",
+  "aiChatSendMessage": "ارسال پیام",
+  "aiChatSendingMessage": "در حال ارسال پیام",
+  "aiChatSendDisabledHint": "ابتدا پیام را بنویسید",
+  "aiChatAssistantTitle": "دستیار هوشمند",
+  "aiChatConversationFallbackTitle": "گفت‌وگو",
+  "aiChatHistoryTooltip": "گفت‌وگوها",
+  "aiChatNewConversation": "گفتگوی جدید",
+  "aiChatStop": "توقف",
+  "aiChatResponding": "در حال پاسخ…",
+  "aiChatClose": "بستن",
+  "aiChatEmptyAssistantReply": "پاسخی از دستیار دریافت نشد. احتمالاً مشکل از سرویس AI یا اعتبار حساب است.",
+  "aiChatCopied": "کپی شد",
+  "aiChatGenerationStopped": "تولید پاسخ متوقف شد",
+  "aiChatFeedbackSaved": "بازخورد ثبت شد",
+  "aiChatFeedbackThanks": "ممنون از بازخورد مثبت",
+  "aiChatFeedbackFailed": "ثبت بازخورد ناموفق: {error}",
+  "@aiChatFeedbackFailed": {
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+  "aiChatSessionsLoadFailed": "خطا در بارگذاری گفت‌وگوها: {error}",
+  "@aiChatSessionsLoadFailed": {
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+  "aiChatStartConversationFailed": "خطا در آغاز گفت‌وگو: {error}",
+  "@aiChatStartConversationFailed": {
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+  "aiChatMessagesLoadFailed": "خطا در دریافت پیام‌ها: {error}",
+  "@aiChatMessagesLoadFailed": {
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+  "aiChatEmptyFile": "فایل خالی است یا قابل خواندن نیست",
+  "aiChatAttachmentAdded": "پیوست اضافه شد",
+  "aiChatAttachmentUploadFailed": "آپلود پیوست ناموفق: {error}",
+  "@aiChatAttachmentUploadFailed": {
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+  "aiChatConversationDeleted": "گفت‌وگو حذف شد",
+  "aiChatDeleteConversationFailed": "حذف گفت‌وگو با خطا مواجه شد: {error}",
+  "@aiChatDeleteConversationFailed": {
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+  "aiChatMessageUpdated": "پیام به‌روزرسانی شد",
+  "aiChatEditFailed": "ویرایش ناموفق: {error}",
+  "@aiChatEditFailed": {
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+  "aiChatForkOpened": "شاخهٔ گفت‌وگو باز شد",
+  "aiChatForkFailed": "شاخه‌سازی ناموفق: {error}",
+  "@aiChatForkFailed": {
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+  "aiChatExportEmpty": "گفت‌وگو خالی است",
+  "aiChatExportFailed": "خروجی ناموفق: {error}",
+  "@aiChatExportFailed": {
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+  "aiChatRegenerateNeedsAssistant": "آخرین پیام باید از دستیار باشد",
+  "aiChatRegenerateFailed": "تولید مجدد ناموفق: {error}",
+  "@aiChatRegenerateFailed": {
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+  "aiChatActionFailed": "{label} ناموفق: {error}",
+  "@aiChatActionFailed": {
+    "placeholders": {
+      "label": { "type": "String" },
+      "error": { "type": "String" }
+    }
+  },
+  "aiChatErrorLabelReply": "پاسخ",
+  "aiChatErrorLabelEdit": "ویرایش",
+  "aiChatErrorLabelRegenerate": "تولید مجدد",
+  "aiChatErrorLabelSend": "ارسال پیام",
+  "aiChatUnknownError": "خطای نامشخص",
+  "aiChatVoiceStartFailed": "خطا در شروع مکالمه صوتی: {error}",
+  "@aiChatVoiceStartFailed": {
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+  "aiChatVoiceTimeout": "جلسه صوتی به دلیل timeout بسته شد. لطفاً دوباره تلاش کنید.",
+  "aiChatVoiceSttFailed": "خطا در تشخیص گفتار: {error}",
+  "@aiChatVoiceSttFailed": {
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+  "aiChatVoiceEmptyTranscript": "متن قابل تشخیص نیست. لطفاً دوباره تلاش کنید.",
+  "aiChatVoiceForbidden": "شما به این کسب‌وکار دسترسی ندارید.",
+  "aiChatVoiceError": "خطا: {error}",
+  "@aiChatVoiceError": {
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+  "aiVoiceFeedbackTitle": "کیفیت صدای AI",
+  "aiVoiceFeedbackBody": "به کیفیت صدای پاسخ AI امتیاز دهید تا در آینده بهتر شود.",
+  "aiVoiceFeedbackCommentLabel": "نظر (اختیاری)",
+  "aiVoiceFeedbackLater": "بعداً",
+  "aiVoiceFeedbackSubmit": "ثبت",
+  "aiVoiceSettingsTitle": "تنظیمات",
+  "aiVoiceImproveQualityTitle": "بهبود کیفیت صدا",
+  "aiVoiceImproveQualitySubtitle": "با ارسال داده‌های ناشناس به بهبود تجربه صوتی کمک کنید.",
+  "aiMemoryTitle": "حافظه دستیار",
+  "aiMemoryIntro": "دستورات همیشگی را خودتان می‌نویسید؛ حقایق پایدار را دستیار بی‌صدا از گفتگوها یاد می‌گیرد.",
+  "aiMemoryUpdatedAt": "آخرین به‌روزرسانی: {when}",
+  "@aiMemoryUpdatedAt": {
+    "placeholders": {
+      "when": { "type": "String" }
+    }
+  },
+  "aiMemoryInstructionsTitle": "دستورات همیشگی",
+  "aiMemoryInstructionsHint": "چیزهایی که دستیار باید همیشه مد نظر داشته باشد.",
+  "aiMemoryInstructionsExample": "مثال: مبالغ را به تومان بگو؛ گزارش‌ها را خلاصه و جدولی بنویس…",
+  "aiMemoryMaxChars": "حداکثر {count} کاراکتر",
+  "@aiMemoryMaxChars": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "aiMemorySaveInstructions": "ذخیره دستورات",
+  "aiMemoryLearnedTitle": "آنچه یاد گرفته‌ام",
+  "aiMemoryLearnedIntro": "از گفتگوها به‌صورت خودکار جمع می‌شود. می‌توانید ویرایش یا حذف کنید.",
+  "aiMemoryLearnedEmpty": "هنوز چیزی از گفتگوها یاد نگرفته‌ام. با ادامهٔ مکالمه، حقایق پایدار اینجا ظاهر می‌شوند.",
+  "aiMemoryClearAll": "پاک کردن همه",
+  "aiMemoryLoadFailed": "خطا در بارگذاری حافظه: {error}",
+  "@aiMemoryLoadFailed": {
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+  "aiMemorySaved": "دستورات ذخیره شد",
+  "aiMemoryCleared": "حافظه پاک شد",
+  "aiMemoryItemUpdated": "آیتم به‌روز شد",
+  "aiMemoryDeleted": "حذف شد",
+  "aiMemoryError": "خطا: {error}",
+  "@aiMemoryError": {
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+  "aiMemoryClearTitle": "پاک کردن حافظه",
+  "aiMemoryClearBody": "دستورات همیشگی و تمام چیزهایی که دستیار یاد گرفته حذف می‌شوند. ادامه می‌دهید؟",
+  "aiMemoryClearConfirm": "پاک کردن",
+  "aiMemoryEditTitle": "ویرایش حافظه",
+  "aiMemoryEditHint": "متن حقیقت یادگرفته‌شده",
+  "aiMemoryDeleteItemTitle": "حذف این مورد؟",
+  "aiMemorySourceAuto": "یادگیری خودکار",
+  "aiMemorySourceAssistant": "ذخیره‌شده توسط دستیار",
+  "aiMemorySourceFeedback": "از بازخورد شما",
+  "aiMemorySourceUser": "ویرایش‌شده توسط شما",
+  "aiKnowledgeTitle": "دانشنامه کسب‌وکار",
+  "aiKnowledgeIntro": "اسناد مرتبط هنگام پاسخ‌دهی به پرسش شما جستجو و به context اضافه می‌شوند.",
+  "aiKnowledgeNewDocument": "سند جدید",
+  "aiKnowledgeTitleLabel": "عنوان",
+  "aiKnowledgeBodyLabel": "متن",
+  "aiKnowledgeUntitled": "بدون عنوان",
+  "aiKnowledgeAdded": "سند اضافه شد",
+  "aiKnowledgeUploaded": "فایل آپلود شد",
+  "aiKnowledgeReindexResult": "بازنمایه‌سازی: {documents} سند، {chunks} بخش",
+  "@aiKnowledgeReindexResult": {
+    "placeholders": {
+      "documents": { "type": "Object" },
+      "chunks": { "type": "Object" }
+    }
+  },
+  "aiKnowledgeEmpty": "هنوز سندی ثبت نشده است.",
+  "aiKnowledgeText": "متن",
+  "aiKnowledgeFile": "فایل",
+  "aiKnowledgeReindex": "بازنمایه",
+  "aiKnowledgeDocSubtitle": "{chars} کاراکتر · {status}",
+  "@aiKnowledgeDocSubtitle": {
+    "placeholders": {
+      "chars": { "type": "int" },
+      "status": { "type": "String" }
+    }
+  },
+  "aiKnowledgeSemantic": "جستجوی معنایی",
+  "aiKnowledgeSemanticChunks": "جستجوی معنایی ({chunks} تکه)",
+  "@aiKnowledgeSemanticChunks": {
+    "placeholders": {
+      "chunks": { "type": "int" }
+    }
+  },
+  "aiKnowledgeIndexFailed": "ایندکس ناموفق — جستجوی واژه‌ای",
+  "aiKnowledgeKeyword": "جستجوی واژه‌ای",
+  "aiKnowledgeKeywordChunks": "جستجوی واژه‌ای ({chunks} تکه)",
+  "@aiKnowledgeKeywordChunks": {
+    "placeholders": {
+      "chunks": { "type": "int" }
+    }
+  },
+  "aiKnowledgeLoadFailed": "خطا: {error}",
+  "@aiKnowledgeLoadFailed": {
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+  "aiChatApprovalTitle": "تأیید عملیات",
+  "aiChatApprovalDismiss": "رد کردن",
+  "aiChatApprovalConfirm": "تأیید و اجرا",
+  "aiChatApprovalSending": "در حال ارسال…",
+  "aiChatApprovalBannerLabel": "تأیید عملیات نوشتنی لازم است",
+  "aiChatApprovalSecurityNote": "فقط همان عملیاتی اجرا می‌شود که در این پیشنهاد آمده؛ تغییر پارامترها بدون تأیید مجدد ممکن نیست.",
+  "aiChatApprovalBodySingle": "دستیار می‌خواهد تغییری در داده‌های کسب‌وکار ثبت کند.",
+  "aiChatApprovalBodyMultiple": "{count} عملیات منتظر تأیید شماست.",
+  "@aiChatApprovalBodyMultiple": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
   "aiVoiceDummyTtsWarning": "موتور TTS سرور روی حالت آزمایشی است؛ ممکن است صدای پاسخ شنیده نشود.",
   "aiVoiceActiveHint": "مکالمه صوتی فعال",
   "aiVoiceInputHint": "ورودی صوتی",
@@ -4295,6 +4531,12 @@
   "aiActionRegenerate": "تولید مجدد",
   "aiActionThumbsUp": "مفید بود",
   "aiActionThumbsDown": "مفید نبود",
+  "aiActionShare": "اشتراک‌گذاری",
+  "aiActionApplyHScript": "اعمال به استودیو HScript",
+  "aiActionEditResend": "ویرایش و ارسال مجدد",
+  "aiActionEditAssistantText": "ویرایش متن پاسخ",
+  "aiActionEditAndRegenerate": "ویرایش و تولید مجدد",
+  "aiActionFork": "شاخه از اینجا",
   "aiStatusAgentProgress": "مرحله {iteration} از {max}",
   "@aiStatusAgentProgress": {
     "placeholders": {

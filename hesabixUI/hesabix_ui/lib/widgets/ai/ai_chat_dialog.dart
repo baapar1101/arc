@@ -15,7 +15,6 @@ import 'package:hesabix_ui/models/ai_stream_event.dart';
 import 'package:hesabix_ui/services/ai_service.dart';
 import 'package:hesabix_ui/services/voice/voice_chat_controller.dart';
 import 'package:hesabix_ui/services/voice/voice_phase.dart';
-import 'package:hesabix_ui/utils/ai_content_sanitize.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
 import 'package:hesabix_ui/utils/hscript_code_extract.dart';
 import 'package:hesabix_ui/utils/number_formatters.dart';
@@ -31,9 +30,13 @@ import 'package:hesabix_ui/widgets/ai/ai_chat_skills_sheet.dart';
 import 'package:hesabix_ui/widgets/ai/ai_chat_thread_view.dart';
 import 'package:hesabix_ui/widgets/ai/ai_chat_onboarding_banner.dart';
 import 'package:hesabix_ui/widgets/ai/ai_chat_stream_controller.dart';
+import 'package:hesabix_ui/widgets/ai/ai_chat_stream_turn.dart';
 import 'package:hesabix_ui/widgets/ai/ai_chat_resume.dart';
 import 'package:hesabix_ui/widgets/ai/ai_write_approval_helpers.dart';
 import 'package:hesabix_ui/widgets/ai/ai_chat_turn.dart';
+import 'package:hesabix_ui/widgets/ai/ai_chat_session_controller.dart';
+import 'package:hesabix_ui/widgets/ai/ai_chat_voice_session.dart';
+import 'package:hesabix_ui/widgets/ai/ai_chat_message_sheet.dart';
 import 'package:hesabix_ui/widgets/ai/ai_execution_mode.dart';
 import 'package:hesabix_ui/widgets/ai/ai_chat_execution_mode_store.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
@@ -115,27 +118,31 @@ class AIChatDialog extends StatefulWidget {
 class _AIChatDialogState extends State<AIChatDialog> {
   late final AIService _aiService;
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
-  List<AIChatSession> _sessions = [];
-  AIChatSession? _currentSession;
-  List<AIChatMessage> _messages = [];
+  final AIChatSessionController _thread = AIChatSessionController();
+  List<AIChatSession> get _sessions => _thread.sessions;
+  AIChatSession? get _currentSession => _thread.current;
+  List<AIChatMessage> get _messages => _thread.messages;
+  set _messages(List<AIChatMessage> value) => _thread.messages = value;
+  bool get _sessionsLoading => _thread.sessionsLoading;
+  bool get _messagesLoading => _thread.messagesLoading;
   final AIChatStreamController _stream = AIChatStreamController();
   bool _pendingWriteApproval = false;
   int? _pendingApprovalSessionId;
   final TextEditingController _messageCtrl = TextEditingController();
   final FocusNode _focusNode = FocusNode();
   final ScrollController _scrollController = ScrollController();
-  bool _sessionsLoading = true;
-  bool _messagesLoading = false;
   bool _sending = false;
   Map<String, dynamic>? _availabilityInfo;
   DateTime? _availabilityCheckedAt;
   bool _showCreditWarning = false;
-  bool _voiceCollectData = false;
-  VoiceChatController? _voice;
-  bool _voiceStarting = false;
-  VoicePhase _voicePhase = VoicePhase.idle;
-  Map<String, dynamic>? _voiceStatusEvent;
-  int? _lastVoiceInteractionId;
+  final AIChatVoiceSessionController _voiceSession =
+      AIChatVoiceSessionController();
+  VoiceChatController? get _voice => _voiceSession.engine;
+  bool get _voiceStarting => _voiceSession.starting;
+  VoicePhase get _voicePhase => _voiceSession.phase;
+  Map<String, dynamic>? get _voiceStatusEvent => _voiceSession.statusEvent;
+  bool get _voiceCollectData => _voiceSession.collectData;
+  set _voiceCollectData(bool value) => _voiceSession.collectData = value;
   CancelToken? _streamCancelToken;
   bool _autoScrollEnabled = true;
   List<AIChatSuggestion> _suggestions = kDefaultAIChatSuggestions;
@@ -182,8 +189,10 @@ class _AIChatDialogState extends State<AIChatDialog> {
       !_sending &&
       _currentSession?.id != null &&
       messagesHavePendingWriteApproval(_messages);
-  bool get _isHomeMode =>
-      !_messagesLoading && _messages.isEmpty && !_stream.isActive && !_sending;
+  bool get _isHomeMode => _thread.isHomeMode(
+        streamActive: _stream.isActive,
+        sending: _sending,
+      );
 
   bool get _canUseAi => _availabilityInfo?['can_use'] as bool? ?? true;
 
@@ -327,12 +336,7 @@ class _AIChatDialogState extends State<AIChatDialog> {
           executionMode: next,
         );
         if (!mounted) return;
-        setState(() {
-          _currentSession = updated;
-          _sessions = _sessions
-              .map((s) => s.id == updated.id ? updated : s)
-              .toList();
-        });
+        setState(() => _thread.patchSession(updated));
       } catch (e) {
         debugPrint('[AIChatDialog] update execution mode failed: $e');
       }
@@ -434,6 +438,7 @@ class _AIChatDialogState extends State<AIChatDialog> {
   void dispose() {
     _stream.removeListener(_onStreamStateChanged);
     _stream.dispose();
+    _thread.dispose();
     _streamCancelToken?.cancel('disposed');
     _sessionSearchDebounce?.cancel();
     _scrollController.removeListener(_onScrollChanged);
@@ -471,119 +476,37 @@ class _AIChatDialogState extends State<AIChatDialog> {
     return HesabixDateUtils.formatDateTime(local, _isJalali);
   }
 
-  Future<void> _showMessageActions(AIChatMessage msg) async {
-    await showModalBottomSheet<void>(
+  Future<void> _showMessageActions(AIChatMessage msg) {
+    return showAIChatMessageActionSheet(
       context: context,
-      showDragHandle: true,
-      builder: (context) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(12, 8, 12, 12),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                ListTile(
-                  leading: const Icon(Icons.copy_rounded),
-                  title: const Text('کپی'),
-                  onTap: () {
-                    Navigator.of(context).pop();
-                    _copyToClipboard(msg.content);
-                  },
-                ),
-                if (widget.onApplyHScriptCode != null &&
-                    HScriptCodeExtract.extract(msg.content) != null)
-                  ListTile(
-                    leading: const Icon(Icons.code_rounded),
-                    title: const Text('اعمال به استودیو HScript'),
-                    onTap: () {
-                      final code = HScriptCodeExtract.extract(msg.content);
-                      Navigator.of(context).pop();
-                      if (code == null || code.isEmpty) return;
-                      widget.onApplyHScriptCode!(code);
-                      Navigator.of(this.context).pop();
-                    },
-                  ),
-                ListTile(
-                  leading: const Icon(Icons.share_outlined),
-                  title: const Text('اشتراک‌گذاری'),
-                  onTap: () async {
-                    Navigator.of(context).pop();
-                    await Share.share(msg.content);
-                  },
-                ),
-                if (msg.role == MessageRole.user)
-                  ListTile(
-                    leading: const Icon(Icons.edit_outlined),
-                    title: const Text('ویرایش و ارسال مجدد'),
-                    onTap: () {
-                      Navigator.of(context).pop();
-                      _editMessage(msg, regenerateAfter: true);
-                    },
-                  ),
-                if (msg.role == MessageRole.assistant) ...[
-                  ListTile(
-                    leading: const Icon(Icons.edit_note_outlined),
-                    title: const Text('ویرایش متن پاسخ'),
-                    onTap: () {
-                      Navigator.of(context).pop();
-                      _editMessage(msg, regenerateAfter: false);
-                    },
-                  ),
-                  ListTile(
-                    leading: const Icon(Icons.refresh_rounded),
-                    title: const Text('ویرایش و تولید مجدد'),
-                    onTap: () {
-                      Navigator.of(context).pop();
-                      _editMessage(msg, regenerateAfter: true);
-                    },
-                  ),
-                ],
-                if (msg.id != null)
-                  ListTile(
-                    leading: const Icon(Icons.call_split_rounded),
-                    title: const Text('شاخه از اینجا'),
-                    onTap: () {
-                      Navigator.of(context).pop();
-                      _forkFromMessage(msg.id!);
-                    },
-                  ),
-                if (msg.role == MessageRole.assistant && msg.id != null) ...[
-                  ListTile(
-                    leading: const Icon(Icons.thumb_up_outlined),
-                    title: const Text('پاسخ مفید بود'),
-                    onTap: () {
-                      Navigator.of(context).pop();
-                      _submitFeedback(msg, 1);
-                    },
-                  ),
-                  ListTile(
-                    leading: const Icon(Icons.thumb_down_outlined),
-                    title: const Text('پاسخ مفید نبود'),
-                    onTap: () {
-                      Navigator.of(context).pop();
-                      _submitFeedback(msg, -1);
-                    },
-                  ),
-                  ListTile(
-                    leading: const Icon(Icons.refresh_rounded),
-                    title: const Text('تولید مجدد پاسخ'),
-                    onTap: () {
-                      Navigator.of(context).pop();
-                      _regenerateLastResponse();
-                    },
-                  ),
-                ],
-              ],
-            ),
-          ),
-        );
+      message: msg,
+      canApplyHScript: widget.onApplyHScriptCode != null,
+      onCopy: () => _copyToClipboard(msg.content),
+      onShare: () {
+        Share.share(msg.content);
       },
+      onApplyHScript: widget.onApplyHScriptCode == null
+          ? null
+          : () {
+              final code = HScriptCodeExtract.extract(msg.content);
+              if (code == null || code.isEmpty) return;
+              widget.onApplyHScriptCode!(code);
+              Navigator.of(context).pop();
+            },
+      onEditUserResend: () => _editMessage(msg, regenerateAfter: true),
+      onEditAssistantText: () => _editMessage(msg, regenerateAfter: false),
+      onEditAssistantRegenerate: () =>
+          _editMessage(msg, regenerateAfter: true),
+      onFork: msg.id == null ? null : () => _forkFromMessage(msg.id!),
+      onFeedbackUp: () => _submitFeedback(msg, 1),
+      onFeedbackDown: () => _submitFeedback(msg, -1),
+      onRegenerate: _regenerateLastResponse,
     );
   }
 
   void _copyToClipboard(String text) {
     Clipboard.setData(ClipboardData(text: text));
-    _showSnackbar('کپی شد');
+    _showSnackbar(AppLocalizations.of(context).aiChatCopied);
   }
 
   void _stopGenerating({bool showNotice = true}) {
@@ -610,47 +533,36 @@ class _AIChatDialogState extends State<AIChatDialog> {
       _stream.clear();
     });
     if (showNotice) {
-      _showSnackbar('تولید پاسخ متوقف شد');
+      _showSnackbar(AppLocalizations.of(context).aiChatGenerationStopped);
     }
   }
 
   Future<void> _stopVoiceSession() async {
     if (_voice == null) return;
-    setState(() {
-      _voiceStarting = true;
-      _voicePhase = VoicePhase.idle;
-      _voiceStatusEvent = null;
-    });
+    setState(_voiceSession.beginStopping);
     try {
       await _voice!.dispose();
     } catch (_) {}
     if (!mounted) return;
-    setState(() {
-      _voice = null;
-      _voiceStarting = false;
-      _voicePhase = VoicePhase.idle;
-      _voiceStatusEvent = null;
-    });
+    setState(_voiceSession.finishStopped);
   }
 
   Future<void> _promptVoiceFeedback(int interactionId) async {
-    if (_lastVoiceInteractionId == interactionId) return;
-    _lastVoiceInteractionId = interactionId;
+    if (!_voiceSession.shouldPromptFeedback(interactionId)) return;
 
     int rating = 4;
     final ctrl = TextEditingController();
+    final l10n = AppLocalizations.of(context);
     final ok =
         await showDialog<bool>(
           context: context,
           builder: (context) {
             return AlertDialog(
-              title: const Text('کیفیت صدای AI'),
+              title: Text(l10n.aiVoiceFeedbackTitle),
               content: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Text(
-                    'به کیفیت صدای پاسخ AI امتیاز دهید تا در آینده بهتر شود.',
-                  ),
+                  Text(l10n.aiVoiceFeedbackBody),
                   const SizedBox(height: 12),
                   StatefulBuilder(
                     builder: (context, setLocal) => Row(
@@ -672,9 +584,9 @@ class _AIChatDialogState extends State<AIChatDialog> {
                   TextField(
                     controller: ctrl,
                     maxLines: 3,
-                    decoration: const InputDecoration(
-                      labelText: 'نظر (اختیاری)',
-                      border: OutlineInputBorder(),
+                    decoration: InputDecoration(
+                      labelText: l10n.aiVoiceFeedbackCommentLabel,
+                      border: const OutlineInputBorder(),
                     ),
                   ),
                 ],
@@ -682,11 +594,11 @@ class _AIChatDialogState extends State<AIChatDialog> {
               actions: [
                 TextButton(
                   onPressed: () => Navigator.pop(context, false),
-                  child: const Text('بعداً'),
+                  child: Text(l10n.aiVoiceFeedbackLater),
                 ),
                 FilledButton(
                   onPressed: () => Navigator.pop(context, true),
-                  child: const Text('ثبت'),
+                  child: Text(l10n.aiVoiceFeedbackSubmit),
                 ),
               ],
             );
@@ -706,11 +618,13 @@ class _AIChatDialogState extends State<AIChatDialog> {
         feedbackText: ctrl.text,
       );
       if (!mounted) return;
-      _showSnackbar('بازخورد ثبت شد');
+      _showSnackbar(AppLocalizations.of(context).aiChatFeedbackSaved);
     } catch (e) {
       if (!mounted) return;
       _showError(
-        'خطا در ثبت بازخورد: ${ErrorExtractor.forContext(e, context)}',
+        AppLocalizations.of(context).aiChatFeedbackFailed(
+          ErrorExtractor.forContext(e, context),
+        ),
       );
     } finally {
       ctrl.dispose();
@@ -754,34 +668,22 @@ class _AIChatDialogState extends State<AIChatDialog> {
   }
 
   Future<void> _loadSessions() async {
-    setState(() => _sessionsLoading = true);
+    setState(_thread.markSessionsLoading);
     try {
       final list = await _aiService.listChatSessions(
         businessId: widget.businessId,
         search: _sessionSearch.isNotEmpty ? _sessionSearch : null,
       );
       if (!mounted) return;
-      setState(() {
-        list.sort((a, b) {
-          final aDate =
-              a.updatedAt ??
-              a.createdAt ??
-              DateTime.fromMillisecondsSinceEpoch(0);
-          final bDate =
-              b.updatedAt ??
-              b.createdAt ??
-              DateTime.fromMillisecondsSinceEpoch(0);
-          return bDate.compareTo(aDate);
-        });
-        _sessions = list;
-        _sessionsLoading = false;
-      });
+      setState(() => _thread.replaceSessions(list));
       await _checkAvailability();
     } catch (e) {
       if (!mounted) return;
-      setState(() => _sessionsLoading = false);
+      setState(_thread.failSessionsLoad);
       _showError(
-        'خطا در بارگذاری گفت‌وگوها: ${ErrorExtractor.forContext(e, context)}',
+        AppLocalizations.of(context).aiChatSessionsLoadFailed(
+          ErrorExtractor.forContext(e, context),
+        ),
       );
     }
   }
@@ -795,7 +697,7 @@ class _AIChatDialogState extends State<AIChatDialog> {
       );
       if (!mounted) return false;
       setState(() {
-        _currentSession = session;
+        _thread.adoptCreatedSession(session);
         _clearWriteApprovalState();
       });
       unawaited(_loadSessions());
@@ -803,7 +705,9 @@ class _AIChatDialogState extends State<AIChatDialog> {
     } catch (e) {
       if (!mounted) return false;
       _showError(
-        'خطا در آغاز گفت‌وگو: ${ErrorExtractor.forContext(e, context)}',
+        AppLocalizations.of(context).aiChatStartConversationFailed(
+          ErrorExtractor.forContext(e, context),
+        ),
       );
       return false;
     }
@@ -818,9 +722,7 @@ class _AIChatDialogState extends State<AIChatDialog> {
       await _stopVoiceSession();
     }
     setState(() {
-      _currentSession = session;
-      _messages = [];
-      _messagesLoading = true;
+      _thread.beginSelectSession(session);
       _executionMode = AIExecutionMode.normalize(session.executionMode);
       _clearWriteApprovalState();
     });
@@ -828,8 +730,7 @@ class _AIChatDialogState extends State<AIChatDialog> {
       final msgs = await _aiService.getSessionMessages(sessionId: session.id!);
       if (!mounted) return;
       setState(() {
-        _messages = msgs;
-        _messagesLoading = false;
+        _thread.finishSelectSession(msgs);
         _syncMessageKeys();
         _syncPendingWriteApprovalFromMessages();
         _syncContinueRunFromMessages();
@@ -842,9 +743,11 @@ class _AIChatDialogState extends State<AIChatDialog> {
       }
     } catch (e) {
       if (!mounted) return;
-      setState(() => _messagesLoading = false);
+      setState(_thread.failSelectSession);
       _showError(
-        'خطا در دریافت پیام‌ها: ${ErrorExtractor.forContext(e, context)}',
+        AppLocalizations.of(context).aiChatMessagesLoadFailed(
+          ErrorExtractor.forContext(e, context),
+        ),
       );
     }
   }
@@ -882,7 +785,7 @@ class _AIChatDialogState extends State<AIChatDialog> {
     final file = result.files.first;
     final bytes = file.bytes;
     if (bytes == null || bytes.isEmpty) {
-      _showError('فایل خالی است یا قابل خواندن نیست');
+      _showError(AppLocalizations.of(context).aiChatEmptyFile);
       return;
     }
     try {
@@ -892,12 +795,14 @@ class _AIChatDialogState extends State<AIChatDialog> {
         bytes: bytes,
       );
       if (!mounted) return;
-      _showSnackbar('پیوست اضافه شد');
+      _showSnackbar(AppLocalizations.of(context).aiChatAttachmentAdded);
       await _loadAttachments();
     } catch (e) {
       if (!mounted) return;
       _showError(
-        'آپلود پیوست ناموفق: ${ErrorExtractor.forContext(e, context)}',
+        AppLocalizations.of(context).aiChatAttachmentUploadFailed(
+          ErrorExtractor.forContext(e, context),
+        ),
       );
     }
   }
@@ -1091,9 +996,9 @@ class _AIChatDialogState extends State<AIChatDialog> {
       });
       await _loadSessions();
       if (!mounted) return;
-      final updated = _sessions.where((s) => s.id == sessionId).firstOrNull;
+      final updated = _thread.sessionById(sessionId);
       if (updated != null) {
-        setState(() => _currentSession = updated);
+        setState(() => _thread.adoptCreatedSession(updated));
       }
     } catch (e) {
       debugPrint('[AIChatDialog] sync after response failed: $e');
@@ -1105,9 +1010,7 @@ class _AIChatDialogState extends State<AIChatDialog> {
     if (_voice != null) await _stopVoiceSession();
     if (!mounted) return;
     setState(() {
-      _currentSession = null;
-      _messages = [];
-      _messagesLoading = false;
+      _thread.goHome();
       _stream.clear();
       _attachments = [];
       _clearWriteApprovalState();
@@ -1145,7 +1048,7 @@ class _AIChatDialogState extends State<AIChatDialog> {
     try {
       await _aiService.deleteChatSession(session.id!);
       if (!mounted) return;
-      _showSnackbar('گفت‌وگو حذف شد');
+      _showSnackbar(AppLocalizations.of(context).aiChatConversationDeleted);
       final wasCurrent = _currentSession?.id == session.id;
       await _loadSessions();
       if (!mounted) return;
@@ -1155,7 +1058,9 @@ class _AIChatDialogState extends State<AIChatDialog> {
     } catch (e) {
       if (!mounted) return;
       _showError(
-        'حذف گفت‌وگو با خطا مواجه شد: ${ErrorExtractor.forContext(e, context)}',
+        AppLocalizations.of(context).aiChatDeleteConversationFailed(
+          ErrorExtractor.forContext(e, context),
+        ),
       );
     }
   }
@@ -1222,10 +1127,14 @@ class _AIChatDialogState extends State<AIChatDialog> {
             functionResults: msg.functionResults,
           );
         });
-        _showSnackbar('پیام به‌روزرسانی شد');
+        _showSnackbar(AppLocalizations.of(context).aiChatMessageUpdated);
       } catch (e) {
         if (!mounted) return;
-        _showError('ویرایش ناموفق: ${ErrorExtractor.forContext(e, context)}');
+        _showError(
+          AppLocalizations.of(context).aiChatEditFailed(
+            ErrorExtractor.forContext(e, context),
+          ),
+        );
       }
       return;
     }
@@ -1263,11 +1172,13 @@ class _AIChatDialogState extends State<AIChatDialog> {
             _stream.clear();
           });
           _showError(
-            'ویرایش ناموفق: ${ErrorExtractor.forContext(error, context)}',
+            AppLocalizations.of(context).aiChatEditFailed(
+              ErrorExtractor.forContext(error, context),
+            ),
           );
         },
       ),
-      errorLabel: 'ویرایش',
+      errorLabel: AppLocalizations.of(context).aiChatErrorLabelEdit,
     );
   }
 
@@ -1286,11 +1197,15 @@ class _AIChatDialogState extends State<AIChatDialog> {
       final matches = _sessions.where((s) => s.id == newId);
       if (matches.isNotEmpty) {
         await _selectSession(matches.first);
-        _showSnackbar('شاخهٔ گفت‌وگو باز شد');
+        _showSnackbar(AppLocalizations.of(context).aiChatForkOpened);
       }
     } catch (e) {
       if (!mounted) return;
-      _showError('شاخه‌سازی ناموفق: ${ErrorExtractor.forContext(e, context)}');
+      _showError(
+        AppLocalizations.of(context).aiChatForkFailed(
+          ErrorExtractor.forContext(e, context),
+        ),
+      );
     }
   }
 
@@ -1300,13 +1215,17 @@ class _AIChatDialogState extends State<AIChatDialog> {
       final data = await _aiService.exportChatSession(_currentSession!.id!);
       final md = data['markdown'] as String? ?? '';
       if (md.isEmpty) {
-        _showSnackbar('گفت‌وگو خالی است');
+        _showSnackbar(AppLocalizations.of(context).aiChatExportEmpty);
         return;
       }
       await Share.share(md, subject: data['title'] as String?);
     } catch (e) {
       if (!mounted) return;
-      _showError('خروجی ناموفق: ${ErrorExtractor.forContext(e, context)}');
+      _showError(
+        AppLocalizations.of(context).aiChatExportFailed(
+          ErrorExtractor.forContext(e, context),
+        ),
+      );
     }
   }
 
@@ -1359,18 +1278,101 @@ class _AIChatDialogState extends State<AIChatDialog> {
       );
       if (!mounted) return;
       setState(() => _messageFeedbackRatings[msg.id!] = rating);
-      _showSnackbar(rating > 0 ? 'ممنون از بازخورد مثبت' : 'بازخورد ثبت شد');
+      _showSnackbar(
+        rating > 0
+            ? AppLocalizations.of(context).aiChatFeedbackThanks
+            : AppLocalizations.of(context).aiChatFeedbackSaved,
+      );
     } catch (e) {
       if (!mounted) return;
       _showError(
-        'ثبت بازخورد ناموفق: ${ErrorExtractor.forContext(e, context)}',
+        AppLocalizations.of(context).aiChatFeedbackFailed(
+          ErrorExtractor.forContext(e, context),
+        ),
       );
     }
   }
 
+  String _labelForResolvedModel(String? code) {
+    final resolvedCode = code?.trim();
+    if (resolvedCode == null || resolvedCode.isEmpty) return '';
+    final match = _availableModels.where((m) => m.code == resolvedCode);
+    return match.isNotEmpty ? match.first.displayName : resolvedCode;
+  }
+
+  void _applyStreamOutcome(AIChatStreamTurnOutcome outcome) {
+    if (outcome.status == AIChatStreamTurnStatus.chunkError) {
+      setState(() {
+        if (outcome.hasPartialAssistant && _currentSession?.id != null) {
+          _messages = List<AIChatMessage>.from(_messages)
+            ..add(
+              AIChatMessage(
+                sessionId: _currentSession!.id!,
+                role: MessageRole.assistant,
+                content: outcome.partialContent!,
+                functionResults: outcome.partialFunctionResults,
+                createdAt: outcome.partialCreatedAt,
+              ),
+            );
+        }
+        _streamErrorMessage = outcome.errorMessage;
+        _streamErrorRecoverable = outcome.errorRecoverable;
+        if (outcome.applyContinue) {
+          _continueRunId = outcome.continueRunId;
+          _continueStopMessage = outcome.continueStopMessage;
+        }
+        _sending = false;
+        _stream.clear();
+        _syncMessageKeys();
+      });
+      return;
+    }
+
+    final modelLabel = _labelForResolvedModel(outcome.resolvedModelCode);
+    setState(() {
+      if (modelLabel.isNotEmpty) {
+        _lastResolvedModelLabel = modelLabel;
+      }
+      if (outcome.hasVisibleOutput) {
+        _messages = List<AIChatMessage>.from(_messages)
+          ..add(
+            AIChatMessage(
+              id: outcome.assistantMessageId,
+              sessionId: _currentSession!.id!,
+              role: MessageRole.assistant,
+              content: outcome.sanitizedResolvedContent,
+              functionCalls: outcome.functionCalls,
+              functionResults: outcome.functionResults,
+              createdAt: outcome.createdAt,
+            ),
+          );
+        _streamErrorMessage = null;
+        _streamErrorRecoverable = false;
+        _continueRunId = outcome.continueRunId;
+        _continueStopMessage = outcome.continueStopMessage;
+      } else {
+        _streamErrorMessage =
+            AppLocalizations.of(context).aiChatEmptyAssistantReply;
+        _streamErrorRecoverable = true;
+      }
+      _syncPendingWriteApprovalFromMessages();
+      if (!_pendingWriteApproval &&
+          (_stream.pendingWriteApproval ||
+              _stream.pendingApprovalOps.isNotEmpty)) {
+        _pendingWriteApproval = true;
+        _pendingApprovalSessionId = _currentSession?.id;
+      }
+      _stream.clear();
+      _sending = false;
+      _syncMessageKeys();
+    });
+    _scrollToBottom(force: true);
+    _scheduleSessionsRefreshForTitle();
+  }
+
   Future<void> _runAssistantStream(
     Stream<AIStreamChunk> Function(CancelToken cancelToken) streamFactory, {
-    String errorLabel = 'پاسخ',
+    String? errorLabel,
   }) async {
     _pendingStreamRetry = () {
       unawaited(_runAssistantStream(streamFactory, errorLabel: errorLabel));
@@ -1379,129 +1381,14 @@ class _AIChatDialogState extends State<AIChatDialog> {
     final cancelToken = CancelToken();
     _streamCancelToken = cancelToken;
     try {
-      var accumulatedContent = '';
-      Object? finalFunctionCalls;
-      Object? finalFunctionResults;
-      int? assistantMessageId;
-      var finishedCanContinue = false;
-      String? finishedRunId;
-      String? finishedStopMessage;
-
-      await for (final chunk in streamFactory(cancelToken)) {
-        if (chunk.error != null) {
-          if (!mounted) return;
-          final snap = _stream.snapshotForCancel();
-          final resumeId =
-              chunk.runId ?? _stream.runId ?? _sseCursor.runId;
-          setState(() {
-            if (snap != null && _currentSession?.id != null) {
-              _messages = List<AIChatMessage>.from(_messages)
-                ..add(
-                  AIChatMessage(
-                    sessionId: _currentSession!.id!,
-                    role: MessageRole.assistant,
-                    content: snap.partialContent,
-                    functionResults: _stream.functionResultsWithTrace(null),
-                    createdAt: snap.createdAt,
-                  ),
-                );
-            }
-            _streamErrorMessage = chunk.error;
-            _streamErrorRecoverable = chunk.recoverable;
-            if (chunk.canContinue == true || resumeId != null) {
-              _continueRunId = resumeId;
-              _continueStopMessage =
-                  chunk.agentBudget?.stopMessageFa ??
-                  _stream.agentBudget?.stopMessageFa;
-            }
-            _sending = false;
-            _stream.clear();
-            _syncMessageKeys();
-          });
-          return;
-        }
-        _stream.applyChunk(chunk, resolveToolLabel: _resolveToolLabel);
-        if (chunk.contentDelta != null && chunk.contentDelta!.isNotEmpty) {
-          accumulatedContent += chunk.contentDelta!;
-        }
-        if (chunk.done) {
-          finalFunctionCalls = chunk.functionCalls;
-          finalFunctionResults = chunk.functionResults;
-          assistantMessageId = chunk.messageId;
-          finishedCanContinue = chunk.canContinue == true ||
-              agentRunCanContinue(chunk.functionResults);
-          finishedRunId = chunk.runId ?? _stream.runId ?? _sseCursor.runId;
-          final persisted = chunk.finalContent?.trim();
-          if (persisted != null && persisted.isNotEmpty) {
-            accumulatedContent = persisted;
-          }
-          finishedStopMessage =
-              chunk.agentBudget?.stopMessageFa ??
-              extractContinueStopMessage(chunk.functionResults);
-          _stream.applyDoneMetadata(chunk);
-          _stream.mergeAgentTraceFromDone(chunk.agentTrace);
-          if (chunk.resolvedModel != null && chunk.resolvedModel!.isNotEmpty) {
-            final resolvedCode = chunk.resolvedModel!;
-            final match = _availableModels.where((m) => m.code == resolvedCode);
-            _lastResolvedModelLabel = match.isNotEmpty
-                ? match.first.displayName
-                : resolvedCode;
-          }
-          break;
-        }
-        if (_stream.updateAccumulatedContent(accumulatedContent, chunk)) {
-          _scrollToBottom();
-        }
-      }
-
+      final outcome = await _stream.consume(
+        streamFactory(cancelToken),
+        resolveToolLabel: _resolveToolLabel,
+        sseCursorRunId: _sseCursor.runId,
+        onContentTick: _scrollToBottom,
+      );
       if (!mounted) return;
-      var resolvedContent = sanitizeAssistantContent(accumulatedContent);
-      if (resolvedContent.trim().isEmpty && _stream.traceSteps.isNotEmpty) {
-        resolvedContent = extractContentFromTraceSteps(_stream.traceSteps);
-      }
-      final hasVisibleOutput =
-          resolvedContent.isNotEmpty ||
-          _stream.toolActivities.isNotEmpty ||
-          _stream.traceSteps.isNotEmpty;
-      setState(() {
-        if (hasVisibleOutput) {
-          _messages = List<AIChatMessage>.from(_messages)
-            ..add(
-              AIChatMessage(
-                id: assistantMessageId,
-                sessionId: _currentSession!.id!,
-                role: MessageRole.assistant,
-                content: resolvedContent,
-                functionCalls: finalFunctionCalls,
-                functionResults: _stream.functionResultsWithTrace(
-                  finalFunctionResults,
-                ),
-                createdAt: _stream.timestamp,
-              ),
-            );
-          _streamErrorMessage = null;
-          _streamErrorRecoverable = false;
-          _continueRunId = finishedCanContinue ? finishedRunId : null;
-          _continueStopMessage =
-              finishedCanContinue ? finishedStopMessage : null;
-        } else {
-          _streamErrorMessage =
-              'پاسخی از دستیار دریافت نشد. احتمالاً مشکل از سرویس AI یا اعتبار حساب است.';
-          _streamErrorRecoverable = true;
-        }
-        _syncPendingWriteApprovalFromMessages();
-        if (!_pendingWriteApproval &&
-            (_stream.pendingWriteApproval ||
-                _stream.pendingApprovalOps.isNotEmpty)) {
-          _pendingWriteApproval = true;
-          _pendingApprovalSessionId = _currentSession?.id;
-        }
-        _stream.clear();
-        _sending = false;
-        _syncMessageKeys();
-      });
-      _scrollToBottom(force: true);
-      _scheduleSessionsRefreshForTitle();
+      _applyStreamOutcome(outcome);
     } catch (e) {
       if (e is DioException && CancelToken.isCancel(e)) {
         return;
@@ -1514,7 +1401,10 @@ class _AIChatDialogState extends State<AIChatDialog> {
         _stream.clear();
       });
       _showError(
-        '$errorLabel ناموفق: ${ErrorExtractor.forContext(e, context)}',
+        AppLocalizations.of(context).aiChatActionFailed(
+          errorLabel ?? AppLocalizations.of(context).aiChatErrorLabelReply,
+          ErrorExtractor.forContext(e, context),
+        ),
       );
     } finally {
       if (_streamCancelToken == cancelToken) {
@@ -1550,7 +1440,10 @@ class _AIChatDialogState extends State<AIChatDialog> {
             _stream.clear();
           });
           _showError(
-            '${AppLocalizations.of(context).aiContinueAnalysis}: ${ErrorExtractor.forContext(error, context)}',
+            AppLocalizations.of(context).aiChatActionFailed(
+              AppLocalizations.of(context).aiContinueAnalysis,
+              ErrorExtractor.forContext(error, context),
+            ),
           );
         },
       ),
@@ -1563,12 +1456,12 @@ class _AIChatDialogState extends State<AIChatDialog> {
     if (_messages.isEmpty) return;
     final last = _messages.last;
     if (last.role != MessageRole.assistant) {
-      _showSnackbar('آخرین پیام باید از دستیار باشد');
+      _showSnackbar(AppLocalizations.of(context).aiChatRegenerateNeedsAssistant);
       return;
     }
 
     setState(() {
-      _messages = List<AIChatMessage>.from(_messages)..removeLast();
+      _thread.removeLastMessage();
       _clearWriteApprovalState();
       _stream.begin(phase: 'connecting');
       _sending = true;
@@ -1586,11 +1479,13 @@ class _AIChatDialogState extends State<AIChatDialog> {
             _stream.clear();
           });
           _showError(
-            'تولید مجدد ناموفق: ${ErrorExtractor.forContext(error, context)}',
+            AppLocalizations.of(context).aiChatRegenerateFailed(
+              ErrorExtractor.forContext(error, context),
+            ),
           );
         },
       ),
-      errorLabel: 'تولید مجدد',
+      errorLabel: AppLocalizations.of(context).aiChatErrorLabelRegenerate,
     );
   }
 
@@ -1673,25 +1568,25 @@ class _AIChatDialogState extends State<AIChatDialog> {
     bool requireExistingSession = false,
   }) async {
     final l10n = AppLocalizations.of(context);
-    final block = sendBlockReason(
+    final plan = planChatSend(
       voiceActive: _voice != null,
       sending: _sending,
-      content: (contentOverride ?? _messageCtrl.text),
+      rawContent: contentOverride ?? _messageCtrl.text,
       approveWrites: approveWrites,
       requireExistingSession: requireExistingSession,
       sessionId: _currentSession?.id,
     );
-    if (block == 'voiceActive') {
+    if (plan.blockKey == 'voiceActive') {
       _showSnackbar(l10n.aiVoiceTextBlockedWhileActive);
       return;
     }
-    if (block == 'sending' || block == 'emptyContent') return;
-    if (block == 'approvalNeedsSession') {
+    if (plan.blockKey == 'sending' || plan.blockKey == 'emptyContent') return;
+    if (plan.blockKey == 'approvalNeedsSession') {
       _showSnackbar(l10n.aiChatApprovalNeedsOpenSession);
       return;
     }
 
-    final content = (contentOverride ?? _messageCtrl.text).trim();
+    final content = plan.content;
 
     if (!skipUserBubble) {
       _messageCtrl.clear();
@@ -1720,15 +1615,9 @@ class _AIChatDialogState extends State<AIChatDialog> {
     }
 
     if (!skipUserBubble) {
-      final userMessage = AIChatMessage(
-        sessionId: _currentSession!.id!,
-        role: MessageRole.user,
-        content: content,
-        createdAt: DateTime.now(),
-      );
       if (!mounted) return;
       setState(() {
-        _messages = List<AIChatMessage>.from(_messages)..add(userMessage);
+        _thread.appendOptimisticUser(content);
         _syncMessageKeys();
       });
     }
@@ -1763,41 +1652,110 @@ class _AIChatDialogState extends State<AIChatDialog> {
         },
         cancelToken: cancelToken,
       ),
-      errorLabel: 'ارسال پیام',
+      errorLabel: l10n.aiChatErrorLabelSend,
     );
     if (!mounted) return;
-    if (finalUsage != null && _messages.isNotEmpty) {
-      final patched = patchLastAssistantUsage(_messages, finalUsage);
-      if (!identical(patched, _messages)) {
-        setState(() => _messages = patched);
-      }
+    if (finalUsage != null) {
+      setState(() => _thread.applyUsageToLastAssistant(finalUsage));
     }
   }
 
   void _setVoicePhase(VoicePhase phase, {Map<String, dynamic>? statusEvent}) {
     if (!mounted) return;
-    setState(() {
-      _voicePhase = phase;
-      if (statusEvent != null) {
-        _voiceStatusEvent = statusEvent;
-      }
-    });
+    setState(() => _voiceSession.applyPhase(phase, event: statusEvent));
   }
 
-  void _handleVoiceServerEvent(Map<String, dynamic> event) {
-    final type = event['type'] as String?;
-    String? statusPhase;
-    if (type == 'voice_status') {
-      statusPhase = event['phase'] as String?;
+  String _voiceErrorText(AIChatVoiceEventEffect effect) {
+    final l10n = AppLocalizations.of(context);
+    final server = effect.errorServerMessage ?? l10n.aiChatUnknownError;
+    switch (effect.errorKind) {
+      case AIChatVoiceErrorMessageKind.timeout:
+        return l10n.aiChatVoiceTimeout;
+      case AIChatVoiceErrorMessageKind.serverRaw:
+        return server;
+      case AIChatVoiceErrorMessageKind.sttFailed:
+        return l10n.aiChatVoiceSttFailed(server);
+      case AIChatVoiceErrorMessageKind.emptyTranscript:
+        return l10n.aiChatVoiceEmptyTranscript;
+      case AIChatVoiceErrorMessageKind.forbidden:
+        return l10n.aiChatVoiceForbidden;
+      case AIChatVoiceErrorMessageKind.generic:
+        return l10n.aiChatVoiceError(server);
+      case null:
+        return server;
     }
-    final mapped = voicePhaseFromServerEvent(type, statusPhase: statusPhase);
-    if (mapped != null) {
-      _setVoicePhase(mapped, statusEvent: event);
-      if (type == 'started') {
-        final tts = event['tts'] as Map<String, dynamic>?;
-        if (tts?['dummy_warning'] == true) {
-          _showSnackbar(AppLocalizations.of(context).aiVoiceDummyTtsWarning);
+  }
+
+  void _applyVoiceEventEffect(AIChatVoiceEventEffect effect) {
+    if (!mounted) return;
+    if (effect.phase != null) {
+      _setVoicePhase(effect.phase!, statusEvent: effect.statusEventForPhase);
+    }
+    if (effect.showDummyTtsWarning) {
+      _showSnackbar(AppLocalizations.of(context).aiVoiceDummyTtsWarning);
+    }
+    final sessionId = _currentSession?.id;
+    if (effect.userTranscript != null && sessionId != null) {
+      setState(() {
+        _messages = List<AIChatMessage>.from(_messages)
+          ..add(
+            AIChatMessage(
+              sessionId: sessionId,
+              role: MessageRole.user,
+              content: effect.userTranscript!,
+              createdAt: DateTime.now(),
+            ),
+          );
+        _syncMessageKeys();
+      });
+      _scrollToBottom();
+    }
+    if (effect.assistantDelta != null) {
+      setState(() {
+        _stream.content = (_stream.content ?? '') + effect.assistantDelta!;
+        _stream.timestamp ??= DateTime.now();
+      });
+      _scrollToBottom();
+    }
+    if (effect.assistantCommit != null || effect.clearStream) {
+      final commit = effect.assistantCommit;
+      setState(() {
+        if (commit != null &&
+            commit.text.trim().isNotEmpty &&
+            sessionId != null) {
+          _messages = List<AIChatMessage>.from(_messages)
+            ..add(
+              AIChatMessage(
+                sessionId: sessionId,
+                role: MessageRole.assistant,
+                content: commit.text,
+                tokensUsed: commit.tokensUsed,
+                createdAt: _stream.timestamp ?? DateTime.now(),
+              ),
+            );
+          _syncMessageKeys();
         }
+        if (effect.clearStream) {
+          _stream.clear();
+        }
+      });
+      _scrollToBottom();
+      final interactionId = commit?.interactionId;
+      if (interactionId != null) {
+        unawaited(_promptVoiceFeedback(interactionId));
+      }
+    }
+    if (effect.errorKind != null) {
+      _showError(_voiceErrorText(effect));
+      switch (effect.errorFollowUp) {
+        case AIChatVoiceErrorFollowUp.stopSession:
+          unawaited(_stopVoiceSession());
+          break;
+        case AIChatVoiceErrorFollowUp.listen:
+          _setVoicePhase(VoicePhase.listening);
+          break;
+        case AIChatVoiceErrorFollowUp.none:
+          break;
       }
     }
   }
@@ -1806,116 +1764,23 @@ class _AIChatDialogState extends State<AIChatDialog> {
     if (!await _ensureSession()) return;
     if (_voiceStarting || _voice != null) return;
 
-    setState(() {
-      _voiceStarting = true;
-      _voicePhase = VoicePhase.connecting;
-      _voiceStatusEvent = null;
-    });
+    setState(_voiceSession.beginConnecting);
     final ready = Completer<void>();
-    bool gotReady = false;
+    var gotReady = false;
     final controller = VoiceChatController(
       sessionId: _currentSession!.id!,
       collectDataOptIn: _voiceCollectData,
       onEvent: (event) {
-        final type = event['type'] as String?;
-        _handleVoiceServerEvent(event);
-        if (type == 'ready' || type == 'started') {
-          if (!gotReady) {
-            gotReady = true;
-            if (!ready.isCompleted) ready.complete();
-          }
-          return;
+        final effect = interpretVoiceServerEvent(event, gotReady: gotReady);
+        _applyVoiceEventEffect(effect);
+        if (effect.completeReady && !gotReady) {
+          gotReady = true;
+          if (!ready.isCompleted) ready.complete();
         }
-        if (type == 'transcript_final') {
-          final text = (event['text'] as String?)?.trim() ?? '';
-          if (text.isEmpty) return;
-          final userMsg = AIChatMessage(
-            sessionId: _currentSession!.id!,
-            role: MessageRole.user,
-            content: text,
-            createdAt: DateTime.now(),
-          );
-          setState(() {
-            _messages = List<AIChatMessage>.from(_messages)..add(userMsg);
-            _syncMessageKeys();
-          });
-          _scrollToBottom();
-          return;
-        }
-        if (type == 'assistant_text_delta') {
-          final delta = event['text'] as String? ?? '';
-          if (delta.isEmpty) return;
-          setState(() {
-            _stream.content = (_stream.content ?? '') + delta;
-            _stream.timestamp ??= DateTime.now();
-          });
-          _scrollToBottom();
-          return;
-        }
-        if (type == 'assistant_done') {
-          final text = (event['text'] as String?) ?? '';
-          final usage = event['usage'] as Map<String, dynamic>?;
-          final interactionId = event['interaction_id'] as int?;
-          final inputTokens = usage?['input_tokens'] as int? ?? 0;
-          final outputTokens = usage?['output_tokens'] as int? ?? 0;
-          final totalTokens =
-              usage?['total_tokens'] as int? ?? (inputTokens + outputTokens);
-          setState(() {
-            if (text.trim().isNotEmpty) {
-              _messages = List<AIChatMessage>.from(_messages)
-                ..add(
-                  AIChatMessage(
-                    sessionId: _currentSession!.id!,
-                    role: MessageRole.assistant,
-                    content: text,
-                    tokensUsed: totalTokens,
-                    createdAt: _stream.timestamp ?? DateTime.now(),
-                  ),
-                );
-              _syncMessageKeys();
-            }
-            _stream.clear();
-          });
-          _scrollToBottom();
-          if (interactionId != null) {
-            _promptVoiceFeedback(interactionId);
-          }
-          return;
-        }
-        if (type == 'error') {
-          final errorCode = event['error'] as String?;
-          final errorMessage = event['message'] as String? ?? 'خطای نامشخص';
-          if (!gotReady && !ready.isCompleted) {
-            ready.completeError(errorMessage);
-          }
-          if (errorCode == 'SESSION_TIMEOUT' ||
-              errorCode == 'INACTIVITY_TIMEOUT') {
-            _showError(
-              'جلسه صوتی به دلیل timeout بسته شد. لطفاً دوباره تلاش کنید.',
-            );
-            _stopVoiceSession();
-          } else if (errorCode == 'VOICE_DEPS_MISSING' ||
-              errorCode == 'WEBM_NOT_SUPPORTED') {
-            _showError(errorMessage);
-            _stopVoiceSession();
-          } else if (errorCode == 'STT_FAILED') {
-            _showError('خطا در تشخیص گفتار: $errorMessage');
-            _setVoicePhase(VoicePhase.listening);
-          } else if (errorCode == 'EMPTY_TRANSCRIPT') {
-            _setVoicePhase(VoicePhase.listening);
-            _showError('متن قابل تشخیص نیست. لطفاً دوباره تلاش کنید.');
-          } else if (errorCode == 'NO_ACTIVE_SUBSCRIPTION' ||
-              errorCode == 'QUOTA_EXCEEDED' ||
-              errorCode == 'INSUFFICIENT_FUNDS' ||
-              errorCode == 'AVAILABILITY_CHECK_FAILED') {
-            _showError(errorMessage);
-            _stopVoiceSession();
-          } else if (errorCode == 'FORBIDDEN') {
-            _showError('شما به این کسب‌وکار دسترسی ندارید.');
-            _stopVoiceSession();
-          } else {
-            _showError('خطا: $errorMessage');
-          }
+        if (effect.completeReadyError != null &&
+            !gotReady &&
+            !ready.isCompleted) {
+          ready.completeError(effect.completeReadyError!);
         }
       },
       onError: (msg) {
@@ -1927,10 +1792,7 @@ class _AIChatDialogState extends State<AIChatDialog> {
     try {
       await controller.start();
       if (!mounted) return;
-      setState(() {
-        _voice = controller;
-        _voiceStarting = false;
-      });
+      setState(() => _voiceSession.attachEngine(controller));
       try {
         await ready.future.timeout(const Duration(seconds: 2));
       } on TimeoutException {
@@ -1939,15 +1801,14 @@ class _AIChatDialogState extends State<AIChatDialog> {
       if (!mounted) return;
       await _voice!.startRecording();
       if (!mounted) return;
-      setState(() => _voicePhase = VoicePhase.listening);
+      setState(_voiceSession.markListening);
     } catch (e) {
       if (!mounted) return;
-      setState(() {
-        _voiceStarting = false;
-        _voicePhase = VoicePhase.idle;
-      });
+      setState(_voiceSession.failStart);
       _showError(
-        'خطا در شروع مکالمه صوتی: ${ErrorExtractor.forContext(e, context)}',
+        AppLocalizations.of(context).aiChatVoiceStartFailed(
+          ErrorExtractor.forContext(e, context),
+        ),
       );
     }
   }
@@ -2113,13 +1974,18 @@ class _AIChatDialogState extends State<AIChatDialog> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Text('تنظیمات', style: Theme.of(context).textTheme.titleMedium),
+                Text(
+                  AppLocalizations.of(context).aiVoiceSettingsTitle,
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
                 const SizedBox(height: 8),
                 SwitchListTile(
                   contentPadding: EdgeInsets.zero,
-                  title: const Text('بهبود کیفیت صدا'),
-                  subtitle: const Text(
-                    'با ارسال داده‌های ناشناس به بهبود تجربه صوتی کمک کنید.',
+                  title: Text(
+                    AppLocalizations.of(context).aiVoiceImproveQualityTitle,
+                  ),
+                  subtitle: Text(
+                    AppLocalizations.of(context).aiVoiceImproveQualitySubtitle,
                   ),
                   value: _voiceCollectData,
                   onChanged: (v) => setState(() => _voiceCollectData = v),
@@ -2364,12 +2230,13 @@ class _AIChatDialogState extends State<AIChatDialog> {
     final scheme = theme.colorScheme;
     final compact = AIChatDesign.isCompactWidth(context);
     final embedded = widget.embeddedInShell;
+    final l10n = AppLocalizations.of(context);
     final showHistoryBtn =
         !AIChatDesign.showPersistentSidebar(context) || _focusChatMode;
     final showSubtitle = _isGenerating;
     final title = _isHomeMode
-        ? 'دستیار هوشمند'
-        : (_currentSession?.title ?? 'گفت‌وگو');
+        ? l10n.aiChatAssistantTitle
+        : (_currentSession?.title ?? l10n.aiChatConversationFallbackTitle);
 
     return Material(
       color: Colors.transparent,
@@ -2384,7 +2251,7 @@ class _AIChatDialogState extends State<AIChatDialog> {
           children: [
             if (showHistoryBtn)
               IconButton(
-                tooltip: 'گفت‌وگوها',
+                tooltip: l10n.aiChatHistoryTooltip,
                 onPressed: _openHistory,
                 icon: const Icon(Icons.menu_rounded),
                 visualDensity: VisualDensity.compact,
@@ -2420,10 +2287,14 @@ class _AIChatDialogState extends State<AIChatDialog> {
             if (showSubtitle)
               Padding(
                 padding: const EdgeInsets.only(right: 8),
-                child: Text(
-                  'در حال پاسخ...',
-                  style: theme.textTheme.labelSmall?.copyWith(
-                    color: scheme.onSurfaceVariant,
+                child: Semantics(
+                  liveRegion: true,
+                  label: l10n.aiChatResponding,
+                  child: Text(
+                    l10n.aiChatResponding,
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: scheme.onSurfaceVariant,
+                    ),
                   ),
                 ),
               ),
@@ -2431,7 +2302,7 @@ class _AIChatDialogState extends State<AIChatDialog> {
               const SizedBox(width: 4),
               compact
                   ? IconButton(
-                      tooltip: 'توقف',
+                      tooltip: l10n.aiChatStop,
                       onPressed: _stopGenerating,
                       icon: Icon(
                         Icons.stop_circle_outlined,
@@ -2444,7 +2315,7 @@ class _AIChatDialogState extends State<AIChatDialog> {
                         Icons.stop_circle_outlined,
                         color: scheme.error,
                       ),
-                      label: const Text('توقف'),
+                      label: Text(l10n.aiChatStop),
                       style: FilledButton.styleFrom(
                         visualDensity: VisualDensity.compact,
                         foregroundColor: scheme.error,
@@ -2453,13 +2324,13 @@ class _AIChatDialogState extends State<AIChatDialog> {
             ],
             if (!compact)
               IconButton(
-                tooltip: 'گفتگوی جدید',
+                tooltip: l10n.aiChatNewConversation,
                 onPressed: _startNewConversation,
                 icon: const Icon(Icons.edit_outlined, size: 20),
               )
             else
               IconButton(
-                tooltip: 'گفتگوی جدید',
+                tooltip: l10n.aiChatNewConversation,
                 onPressed: _startNewConversation,
                 icon: const Icon(Icons.edit_outlined),
               ),
@@ -2481,7 +2352,7 @@ class _AIChatDialogState extends State<AIChatDialog> {
             ),
             if (!embedded)
               IconButton(
-                tooltip: 'بستن',
+                tooltip: l10n.aiChatClose,
                 onPressed: () => Navigator.of(context).pop(),
                 icon: const Icon(Icons.close_rounded),
               ),

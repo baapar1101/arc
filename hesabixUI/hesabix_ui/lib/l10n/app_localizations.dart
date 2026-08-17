@@ -19704,6 +19704,684 @@ abstract class AppLocalizations {
   /// **'Could not send the message: {error}'**
   String aiChatSendFailed(String error);
 
+  /// No description provided for @aiChatComposerHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Message the assistant…'**
+  String get aiChatComposerHint;
+
+  /// No description provided for @aiChatComposerHintDesktop.
+  ///
+  /// In en, this message translates to:
+  /// **'Message the assistant… (Enter to send, Shift+Enter for a new line)'**
+  String get aiChatComposerHintDesktop;
+
+  /// No description provided for @aiChatComposerSemanticsLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Assistant message field'**
+  String get aiChatComposerSemanticsLabel;
+
+  /// No description provided for @aiChatStopGenerating.
+  ///
+  /// In en, this message translates to:
+  /// **'Stop generating'**
+  String get aiChatStopGenerating;
+
+  /// No description provided for @aiChatAttachFile.
+  ///
+  /// In en, this message translates to:
+  /// **'Attach file'**
+  String get aiChatAttachFile;
+
+  /// No description provided for @aiChatSendMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Send message'**
+  String get aiChatSendMessage;
+
+  /// No description provided for @aiChatSendingMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Sending message'**
+  String get aiChatSendingMessage;
+
+  /// No description provided for @aiChatSendDisabledHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Write a message first'**
+  String get aiChatSendDisabledHint;
+
+  /// No description provided for @aiChatAssistantTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'AI assistant'**
+  String get aiChatAssistantTitle;
+
+  /// No description provided for @aiChatConversationFallbackTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Chat'**
+  String get aiChatConversationFallbackTitle;
+
+  /// No description provided for @aiChatHistoryTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Conversations'**
+  String get aiChatHistoryTooltip;
+
+  /// No description provided for @aiChatNewConversation.
+  ///
+  /// In en, this message translates to:
+  /// **'New chat'**
+  String get aiChatNewConversation;
+
+  /// No description provided for @aiChatStop.
+  ///
+  /// In en, this message translates to:
+  /// **'Stop'**
+  String get aiChatStop;
+
+  /// No description provided for @aiChatResponding.
+  ///
+  /// In en, this message translates to:
+  /// **'Responding…'**
+  String get aiChatResponding;
+
+  /// No description provided for @aiChatClose.
+  ///
+  /// In en, this message translates to:
+  /// **'Close'**
+  String get aiChatClose;
+
+  /// No description provided for @aiChatEmptyAssistantReply.
+  ///
+  /// In en, this message translates to:
+  /// **'No reply was received from the assistant. This is often an AI service or account-credit issue.'**
+  String get aiChatEmptyAssistantReply;
+
+  /// No description provided for @aiChatCopied.
+  ///
+  /// In en, this message translates to:
+  /// **'Copied'**
+  String get aiChatCopied;
+
+  /// No description provided for @aiChatGenerationStopped.
+  ///
+  /// In en, this message translates to:
+  /// **'Response generation stopped'**
+  String get aiChatGenerationStopped;
+
+  /// No description provided for @aiChatFeedbackSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Feedback saved'**
+  String get aiChatFeedbackSaved;
+
+  /// No description provided for @aiChatFeedbackThanks.
+  ///
+  /// In en, this message translates to:
+  /// **'Thanks for the positive feedback'**
+  String get aiChatFeedbackThanks;
+
+  /// No description provided for @aiChatFeedbackFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not save feedback: {error}'**
+  String aiChatFeedbackFailed(String error);
+
+  /// No description provided for @aiChatSessionsLoadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load conversations: {error}'**
+  String aiChatSessionsLoadFailed(String error);
+
+  /// No description provided for @aiChatStartConversationFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not start the conversation: {error}'**
+  String aiChatStartConversationFailed(String error);
+
+  /// No description provided for @aiChatMessagesLoadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load messages: {error}'**
+  String aiChatMessagesLoadFailed(String error);
+
+  /// No description provided for @aiChatEmptyFile.
+  ///
+  /// In en, this message translates to:
+  /// **'The file is empty or could not be read'**
+  String get aiChatEmptyFile;
+
+  /// No description provided for @aiChatAttachmentAdded.
+  ///
+  /// In en, this message translates to:
+  /// **'Attachment added'**
+  String get aiChatAttachmentAdded;
+
+  /// No description provided for @aiChatAttachmentUploadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not upload the attachment: {error}'**
+  String aiChatAttachmentUploadFailed(String error);
+
+  /// No description provided for @aiChatConversationDeleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Conversation deleted'**
+  String get aiChatConversationDeleted;
+
+  /// No description provided for @aiChatDeleteConversationFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not delete the conversation: {error}'**
+  String aiChatDeleteConversationFailed(String error);
+
+  /// No description provided for @aiChatMessageUpdated.
+  ///
+  /// In en, this message translates to:
+  /// **'Message updated'**
+  String get aiChatMessageUpdated;
+
+  /// No description provided for @aiChatEditFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not edit: {error}'**
+  String aiChatEditFailed(String error);
+
+  /// No description provided for @aiChatForkOpened.
+  ///
+  /// In en, this message translates to:
+  /// **'Conversation branch opened'**
+  String get aiChatForkOpened;
+
+  /// No description provided for @aiChatForkFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not branch the conversation: {error}'**
+  String aiChatForkFailed(String error);
+
+  /// No description provided for @aiChatExportEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'The conversation is empty'**
+  String get aiChatExportEmpty;
+
+  /// No description provided for @aiChatExportFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not export: {error}'**
+  String aiChatExportFailed(String error);
+
+  /// No description provided for @aiChatRegenerateNeedsAssistant.
+  ///
+  /// In en, this message translates to:
+  /// **'The last message must be from the assistant'**
+  String get aiChatRegenerateNeedsAssistant;
+
+  /// No description provided for @aiChatRegenerateFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not regenerate: {error}'**
+  String aiChatRegenerateFailed(String error);
+
+  /// No description provided for @aiChatActionFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'{label} failed: {error}'**
+  String aiChatActionFailed(String label, String error);
+
+  /// No description provided for @aiChatErrorLabelReply.
+  ///
+  /// In en, this message translates to:
+  /// **'Reply'**
+  String get aiChatErrorLabelReply;
+
+  /// No description provided for @aiChatErrorLabelEdit.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit'**
+  String get aiChatErrorLabelEdit;
+
+  /// No description provided for @aiChatErrorLabelRegenerate.
+  ///
+  /// In en, this message translates to:
+  /// **'Regenerate'**
+  String get aiChatErrorLabelRegenerate;
+
+  /// No description provided for @aiChatErrorLabelSend.
+  ///
+  /// In en, this message translates to:
+  /// **'Send message'**
+  String get aiChatErrorLabelSend;
+
+  /// No description provided for @aiChatUnknownError.
+  ///
+  /// In en, this message translates to:
+  /// **'Unknown error'**
+  String get aiChatUnknownError;
+
+  /// No description provided for @aiChatVoiceStartFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not start voice chat: {error}'**
+  String aiChatVoiceStartFailed(String error);
+
+  /// No description provided for @aiChatVoiceTimeout.
+  ///
+  /// In en, this message translates to:
+  /// **'The voice session closed after a timeout. Please try again.'**
+  String get aiChatVoiceTimeout;
+
+  /// No description provided for @aiChatVoiceSttFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Speech recognition failed: {error}'**
+  String aiChatVoiceSttFailed(String error);
+
+  /// No description provided for @aiChatVoiceEmptyTranscript.
+  ///
+  /// In en, this message translates to:
+  /// **'No speech was recognized. Please try again.'**
+  String get aiChatVoiceEmptyTranscript;
+
+  /// No description provided for @aiChatVoiceForbidden.
+  ///
+  /// In en, this message translates to:
+  /// **'You do not have access to this business.'**
+  String get aiChatVoiceForbidden;
+
+  /// No description provided for @aiChatVoiceError.
+  ///
+  /// In en, this message translates to:
+  /// **'Error: {error}'**
+  String aiChatVoiceError(String error);
+
+  /// No description provided for @aiVoiceFeedbackTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'AI voice quality'**
+  String get aiVoiceFeedbackTitle;
+
+  /// No description provided for @aiVoiceFeedbackBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Rate the quality of the spoken reply so it can improve over time.'**
+  String get aiVoiceFeedbackBody;
+
+  /// No description provided for @aiVoiceFeedbackCommentLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Comment (optional)'**
+  String get aiVoiceFeedbackCommentLabel;
+
+  /// No description provided for @aiVoiceFeedbackLater.
+  ///
+  /// In en, this message translates to:
+  /// **'Later'**
+  String get aiVoiceFeedbackLater;
+
+  /// No description provided for @aiVoiceFeedbackSubmit.
+  ///
+  /// In en, this message translates to:
+  /// **'Submit'**
+  String get aiVoiceFeedbackSubmit;
+
+  /// No description provided for @aiVoiceSettingsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Settings'**
+  String get aiVoiceSettingsTitle;
+
+  /// No description provided for @aiVoiceImproveQualityTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Improve voice quality'**
+  String get aiVoiceImproveQualityTitle;
+
+  /// No description provided for @aiVoiceImproveQualitySubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Help improve the voice experience by sending anonymous data.'**
+  String get aiVoiceImproveQualitySubtitle;
+
+  /// No description provided for @aiMemoryTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Assistant memory'**
+  String get aiMemoryTitle;
+
+  /// No description provided for @aiMemoryIntro.
+  ///
+  /// In en, this message translates to:
+  /// **'You write standing instructions; the assistant quietly learns lasting facts from conversations.'**
+  String get aiMemoryIntro;
+
+  /// No description provided for @aiMemoryUpdatedAt.
+  ///
+  /// In en, this message translates to:
+  /// **'Last updated: {when}'**
+  String aiMemoryUpdatedAt(String when);
+
+  /// No description provided for @aiMemoryInstructionsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Standing instructions'**
+  String get aiMemoryInstructionsTitle;
+
+  /// No description provided for @aiMemoryInstructionsHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Things the assistant should always keep in mind.'**
+  String get aiMemoryInstructionsHint;
+
+  /// No description provided for @aiMemoryInstructionsExample.
+  ///
+  /// In en, this message translates to:
+  /// **'Example: speak amounts in toman; keep reports short and tabular…'**
+  String get aiMemoryInstructionsExample;
+
+  /// No description provided for @aiMemoryMaxChars.
+  ///
+  /// In en, this message translates to:
+  /// **'Maximum {count} characters'**
+  String aiMemoryMaxChars(int count);
+
+  /// No description provided for @aiMemorySaveInstructions.
+  ///
+  /// In en, this message translates to:
+  /// **'Save instructions'**
+  String get aiMemorySaveInstructions;
+
+  /// No description provided for @aiMemoryLearnedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'What I have learned'**
+  String get aiMemoryLearnedTitle;
+
+  /// No description provided for @aiMemoryLearnedIntro.
+  ///
+  /// In en, this message translates to:
+  /// **'Collected automatically from conversations. You can edit or delete items.'**
+  String get aiMemoryLearnedIntro;
+
+  /// No description provided for @aiMemoryLearnedEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing has been learned from conversations yet. Lasting facts will appear here as you keep chatting.'**
+  String get aiMemoryLearnedEmpty;
+
+  /// No description provided for @aiMemoryClearAll.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear all'**
+  String get aiMemoryClearAll;
+
+  /// No description provided for @aiMemoryLoadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load memory: {error}'**
+  String aiMemoryLoadFailed(String error);
+
+  /// No description provided for @aiMemorySaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Instructions saved'**
+  String get aiMemorySaved;
+
+  /// No description provided for @aiMemoryCleared.
+  ///
+  /// In en, this message translates to:
+  /// **'Memory cleared'**
+  String get aiMemoryCleared;
+
+  /// No description provided for @aiMemoryItemUpdated.
+  ///
+  /// In en, this message translates to:
+  /// **'Item updated'**
+  String get aiMemoryItemUpdated;
+
+  /// No description provided for @aiMemoryDeleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Deleted'**
+  String get aiMemoryDeleted;
+
+  /// No description provided for @aiMemoryError.
+  ///
+  /// In en, this message translates to:
+  /// **'Error: {error}'**
+  String aiMemoryError(String error);
+
+  /// No description provided for @aiMemoryClearTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear memory'**
+  String get aiMemoryClearTitle;
+
+  /// No description provided for @aiMemoryClearBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Standing instructions and everything the assistant has learned will be removed. Continue?'**
+  String get aiMemoryClearBody;
+
+  /// No description provided for @aiMemoryClearConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear'**
+  String get aiMemoryClearConfirm;
+
+  /// No description provided for @aiMemoryEditTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit memory'**
+  String get aiMemoryEditTitle;
+
+  /// No description provided for @aiMemoryEditHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Learned fact text'**
+  String get aiMemoryEditHint;
+
+  /// No description provided for @aiMemoryDeleteItemTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete this item?'**
+  String get aiMemoryDeleteItemTitle;
+
+  /// No description provided for @aiMemorySourceAuto.
+  ///
+  /// In en, this message translates to:
+  /// **'Automatic learning'**
+  String get aiMemorySourceAuto;
+
+  /// No description provided for @aiMemorySourceAssistant.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved by the assistant'**
+  String get aiMemorySourceAssistant;
+
+  /// No description provided for @aiMemorySourceFeedback.
+  ///
+  /// In en, this message translates to:
+  /// **'From your feedback'**
+  String get aiMemorySourceFeedback;
+
+  /// No description provided for @aiMemorySourceUser.
+  ///
+  /// In en, this message translates to:
+  /// **'Edited by you'**
+  String get aiMemorySourceUser;
+
+  /// No description provided for @aiKnowledgeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Business knowledge base'**
+  String get aiKnowledgeTitle;
+
+  /// No description provided for @aiKnowledgeIntro.
+  ///
+  /// In en, this message translates to:
+  /// **'Related documents are searched and added to context when answering your question.'**
+  String get aiKnowledgeIntro;
+
+  /// No description provided for @aiKnowledgeNewDocument.
+  ///
+  /// In en, this message translates to:
+  /// **'New document'**
+  String get aiKnowledgeNewDocument;
+
+  /// No description provided for @aiKnowledgeTitleLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Title'**
+  String get aiKnowledgeTitleLabel;
+
+  /// No description provided for @aiKnowledgeBodyLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Body'**
+  String get aiKnowledgeBodyLabel;
+
+  /// No description provided for @aiKnowledgeUntitled.
+  ///
+  /// In en, this message translates to:
+  /// **'Untitled'**
+  String get aiKnowledgeUntitled;
+
+  /// No description provided for @aiKnowledgeAdded.
+  ///
+  /// In en, this message translates to:
+  /// **'Document added'**
+  String get aiKnowledgeAdded;
+
+  /// No description provided for @aiKnowledgeUploaded.
+  ///
+  /// In en, this message translates to:
+  /// **'File uploaded'**
+  String get aiKnowledgeUploaded;
+
+  /// No description provided for @aiKnowledgeReindexResult.
+  ///
+  /// In en, this message translates to:
+  /// **'Reindexed: {documents} documents, {chunks} chunks'**
+  String aiKnowledgeReindexResult(Object documents, Object chunks);
+
+  /// No description provided for @aiKnowledgeEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No documents have been added yet.'**
+  String get aiKnowledgeEmpty;
+
+  /// No description provided for @aiKnowledgeText.
+  ///
+  /// In en, this message translates to:
+  /// **'Text'**
+  String get aiKnowledgeText;
+
+  /// No description provided for @aiKnowledgeFile.
+  ///
+  /// In en, this message translates to:
+  /// **'File'**
+  String get aiKnowledgeFile;
+
+  /// No description provided for @aiKnowledgeReindex.
+  ///
+  /// In en, this message translates to:
+  /// **'Reindex'**
+  String get aiKnowledgeReindex;
+
+  /// No description provided for @aiKnowledgeDocSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'{chars} characters · {status}'**
+  String aiKnowledgeDocSubtitle(int chars, String status);
+
+  /// No description provided for @aiKnowledgeSemantic.
+  ///
+  /// In en, this message translates to:
+  /// **'Semantic search'**
+  String get aiKnowledgeSemantic;
+
+  /// No description provided for @aiKnowledgeSemanticChunks.
+  ///
+  /// In en, this message translates to:
+  /// **'Semantic search ({chunks} chunks)'**
+  String aiKnowledgeSemanticChunks(int chunks);
+
+  /// No description provided for @aiKnowledgeIndexFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Index failed — keyword search'**
+  String get aiKnowledgeIndexFailed;
+
+  /// No description provided for @aiKnowledgeKeyword.
+  ///
+  /// In en, this message translates to:
+  /// **'Keyword search'**
+  String get aiKnowledgeKeyword;
+
+  /// No description provided for @aiKnowledgeKeywordChunks.
+  ///
+  /// In en, this message translates to:
+  /// **'Keyword search ({chunks} chunks)'**
+  String aiKnowledgeKeywordChunks(int chunks);
+
+  /// No description provided for @aiKnowledgeLoadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Error: {error}'**
+  String aiKnowledgeLoadFailed(String error);
+
+  /// No description provided for @aiChatApprovalTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm action'**
+  String get aiChatApprovalTitle;
+
+  /// No description provided for @aiChatApprovalDismiss.
+  ///
+  /// In en, this message translates to:
+  /// **'Reject'**
+  String get aiChatApprovalDismiss;
+
+  /// No description provided for @aiChatApprovalConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Approve and run'**
+  String get aiChatApprovalConfirm;
+
+  /// No description provided for @aiChatApprovalSending.
+  ///
+  /// In en, this message translates to:
+  /// **'Sending…'**
+  String get aiChatApprovalSending;
+
+  /// No description provided for @aiChatApprovalBannerLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Write approval required'**
+  String get aiChatApprovalBannerLabel;
+
+  /// No description provided for @aiChatApprovalSecurityNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Only the operations listed here will run; parameters cannot change without another confirmation.'**
+  String get aiChatApprovalSecurityNote;
+
+  /// No description provided for @aiChatApprovalBodySingle.
+  ///
+  /// In en, this message translates to:
+  /// **'The assistant wants to change business data.'**
+  String get aiChatApprovalBodySingle;
+
+  /// No description provided for @aiChatApprovalBodyMultiple.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} operations are waiting for your approval.'**
+  String aiChatApprovalBodyMultiple(int count);
+
   /// No description provided for @aiVoiceDummyTtsWarning.
   ///
   /// In en, this message translates to:
@@ -20273,6 +20951,42 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Not helpful'**
   String get aiActionThumbsDown;
+
+  /// No description provided for @aiActionShare.
+  ///
+  /// In en, this message translates to:
+  /// **'Share'**
+  String get aiActionShare;
+
+  /// No description provided for @aiActionApplyHScript.
+  ///
+  /// In en, this message translates to:
+  /// **'Apply to HScript studio'**
+  String get aiActionApplyHScript;
+
+  /// No description provided for @aiActionEditResend.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit and resend'**
+  String get aiActionEditResend;
+
+  /// No description provided for @aiActionEditAssistantText.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit reply text'**
+  String get aiActionEditAssistantText;
+
+  /// No description provided for @aiActionEditAndRegenerate.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit and regenerate'**
+  String get aiActionEditAndRegenerate;
+
+  /// No description provided for @aiActionFork.
+  ///
+  /// In en, this message translates to:
+  /// **'Branch from here'**
+  String get aiActionFork;
 
   /// No description provided for @aiStatusAgentProgress.
   ///

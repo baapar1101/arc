@@ -10615,6 +10615,409 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get aiChatComposerHint => 'Message the assistant…';
+
+  @override
+  String get aiChatComposerHintDesktop =>
+      'Message the assistant… (Enter to send, Shift+Enter for a new line)';
+
+  @override
+  String get aiChatComposerSemanticsLabel => 'Assistant message field';
+
+  @override
+  String get aiChatStopGenerating => 'Stop generating';
+
+  @override
+  String get aiChatAttachFile => 'Attach file';
+
+  @override
+  String get aiChatSendMessage => 'Send message';
+
+  @override
+  String get aiChatSendingMessage => 'Sending message';
+
+  @override
+  String get aiChatSendDisabledHint => 'Write a message first';
+
+  @override
+  String get aiChatAssistantTitle => 'AI assistant';
+
+  @override
+  String get aiChatConversationFallbackTitle => 'Chat';
+
+  @override
+  String get aiChatHistoryTooltip => 'Conversations';
+
+  @override
+  String get aiChatNewConversation => 'New chat';
+
+  @override
+  String get aiChatStop => 'Stop';
+
+  @override
+  String get aiChatResponding => 'Responding…';
+
+  @override
+  String get aiChatClose => 'Close';
+
+  @override
+  String get aiChatEmptyAssistantReply =>
+      'No reply was received from the assistant. This is often an AI service or account-credit issue.';
+
+  @override
+  String get aiChatCopied => 'Copied';
+
+  @override
+  String get aiChatGenerationStopped => 'Response generation stopped';
+
+  @override
+  String get aiChatFeedbackSaved => 'Feedback saved';
+
+  @override
+  String get aiChatFeedbackThanks => 'Thanks for the positive feedback';
+
+  @override
+  String aiChatFeedbackFailed(String error) {
+    return 'Could not save feedback: $error';
+  }
+
+  @override
+  String aiChatSessionsLoadFailed(String error) {
+    return 'Could not load conversations: $error';
+  }
+
+  @override
+  String aiChatStartConversationFailed(String error) {
+    return 'Could not start the conversation: $error';
+  }
+
+  @override
+  String aiChatMessagesLoadFailed(String error) {
+    return 'Could not load messages: $error';
+  }
+
+  @override
+  String get aiChatEmptyFile => 'The file is empty or could not be read';
+
+  @override
+  String get aiChatAttachmentAdded => 'Attachment added';
+
+  @override
+  String aiChatAttachmentUploadFailed(String error) {
+    return 'Could not upload the attachment: $error';
+  }
+
+  @override
+  String get aiChatConversationDeleted => 'Conversation deleted';
+
+  @override
+  String aiChatDeleteConversationFailed(String error) {
+    return 'Could not delete the conversation: $error';
+  }
+
+  @override
+  String get aiChatMessageUpdated => 'Message updated';
+
+  @override
+  String aiChatEditFailed(String error) {
+    return 'Could not edit: $error';
+  }
+
+  @override
+  String get aiChatForkOpened => 'Conversation branch opened';
+
+  @override
+  String aiChatForkFailed(String error) {
+    return 'Could not branch the conversation: $error';
+  }
+
+  @override
+  String get aiChatExportEmpty => 'The conversation is empty';
+
+  @override
+  String aiChatExportFailed(String error) {
+    return 'Could not export: $error';
+  }
+
+  @override
+  String get aiChatRegenerateNeedsAssistant =>
+      'The last message must be from the assistant';
+
+  @override
+  String aiChatRegenerateFailed(String error) {
+    return 'Could not regenerate: $error';
+  }
+
+  @override
+  String aiChatActionFailed(String label, String error) {
+    return '$label failed: $error';
+  }
+
+  @override
+  String get aiChatErrorLabelReply => 'Reply';
+
+  @override
+  String get aiChatErrorLabelEdit => 'Edit';
+
+  @override
+  String get aiChatErrorLabelRegenerate => 'Regenerate';
+
+  @override
+  String get aiChatErrorLabelSend => 'Send message';
+
+  @override
+  String get aiChatUnknownError => 'Unknown error';
+
+  @override
+  String aiChatVoiceStartFailed(String error) {
+    return 'Could not start voice chat: $error';
+  }
+
+  @override
+  String get aiChatVoiceTimeout =>
+      'The voice session closed after a timeout. Please try again.';
+
+  @override
+  String aiChatVoiceSttFailed(String error) {
+    return 'Speech recognition failed: $error';
+  }
+
+  @override
+  String get aiChatVoiceEmptyTranscript =>
+      'No speech was recognized. Please try again.';
+
+  @override
+  String get aiChatVoiceForbidden => 'You do not have access to this business.';
+
+  @override
+  String aiChatVoiceError(String error) {
+    return 'Error: $error';
+  }
+
+  @override
+  String get aiVoiceFeedbackTitle => 'AI voice quality';
+
+  @override
+  String get aiVoiceFeedbackBody =>
+      'Rate the quality of the spoken reply so it can improve over time.';
+
+  @override
+  String get aiVoiceFeedbackCommentLabel => 'Comment (optional)';
+
+  @override
+  String get aiVoiceFeedbackLater => 'Later';
+
+  @override
+  String get aiVoiceFeedbackSubmit => 'Submit';
+
+  @override
+  String get aiVoiceSettingsTitle => 'Settings';
+
+  @override
+  String get aiVoiceImproveQualityTitle => 'Improve voice quality';
+
+  @override
+  String get aiVoiceImproveQualitySubtitle =>
+      'Help improve the voice experience by sending anonymous data.';
+
+  @override
+  String get aiMemoryTitle => 'Assistant memory';
+
+  @override
+  String get aiMemoryIntro =>
+      'You write standing instructions; the assistant quietly learns lasting facts from conversations.';
+
+  @override
+  String aiMemoryUpdatedAt(String when) {
+    return 'Last updated: $when';
+  }
+
+  @override
+  String get aiMemoryInstructionsTitle => 'Standing instructions';
+
+  @override
+  String get aiMemoryInstructionsHint =>
+      'Things the assistant should always keep in mind.';
+
+  @override
+  String get aiMemoryInstructionsExample =>
+      'Example: speak amounts in toman; keep reports short and tabular…';
+
+  @override
+  String aiMemoryMaxChars(int count) {
+    return 'Maximum $count characters';
+  }
+
+  @override
+  String get aiMemorySaveInstructions => 'Save instructions';
+
+  @override
+  String get aiMemoryLearnedTitle => 'What I have learned';
+
+  @override
+  String get aiMemoryLearnedIntro =>
+      'Collected automatically from conversations. You can edit or delete items.';
+
+  @override
+  String get aiMemoryLearnedEmpty =>
+      'Nothing has been learned from conversations yet. Lasting facts will appear here as you keep chatting.';
+
+  @override
+  String get aiMemoryClearAll => 'Clear all';
+
+  @override
+  String aiMemoryLoadFailed(String error) {
+    return 'Could not load memory: $error';
+  }
+
+  @override
+  String get aiMemorySaved => 'Instructions saved';
+
+  @override
+  String get aiMemoryCleared => 'Memory cleared';
+
+  @override
+  String get aiMemoryItemUpdated => 'Item updated';
+
+  @override
+  String get aiMemoryDeleted => 'Deleted';
+
+  @override
+  String aiMemoryError(String error) {
+    return 'Error: $error';
+  }
+
+  @override
+  String get aiMemoryClearTitle => 'Clear memory';
+
+  @override
+  String get aiMemoryClearBody =>
+      'Standing instructions and everything the assistant has learned will be removed. Continue?';
+
+  @override
+  String get aiMemoryClearConfirm => 'Clear';
+
+  @override
+  String get aiMemoryEditTitle => 'Edit memory';
+
+  @override
+  String get aiMemoryEditHint => 'Learned fact text';
+
+  @override
+  String get aiMemoryDeleteItemTitle => 'Delete this item?';
+
+  @override
+  String get aiMemorySourceAuto => 'Automatic learning';
+
+  @override
+  String get aiMemorySourceAssistant => 'Saved by the assistant';
+
+  @override
+  String get aiMemorySourceFeedback => 'From your feedback';
+
+  @override
+  String get aiMemorySourceUser => 'Edited by you';
+
+  @override
+  String get aiKnowledgeTitle => 'Business knowledge base';
+
+  @override
+  String get aiKnowledgeIntro =>
+      'Related documents are searched and added to context when answering your question.';
+
+  @override
+  String get aiKnowledgeNewDocument => 'New document';
+
+  @override
+  String get aiKnowledgeTitleLabel => 'Title';
+
+  @override
+  String get aiKnowledgeBodyLabel => 'Body';
+
+  @override
+  String get aiKnowledgeUntitled => 'Untitled';
+
+  @override
+  String get aiKnowledgeAdded => 'Document added';
+
+  @override
+  String get aiKnowledgeUploaded => 'File uploaded';
+
+  @override
+  String aiKnowledgeReindexResult(Object documents, Object chunks) {
+    return 'Reindexed: $documents documents, $chunks chunks';
+  }
+
+  @override
+  String get aiKnowledgeEmpty => 'No documents have been added yet.';
+
+  @override
+  String get aiKnowledgeText => 'Text';
+
+  @override
+  String get aiKnowledgeFile => 'File';
+
+  @override
+  String get aiKnowledgeReindex => 'Reindex';
+
+  @override
+  String aiKnowledgeDocSubtitle(int chars, String status) {
+    return '$chars characters · $status';
+  }
+
+  @override
+  String get aiKnowledgeSemantic => 'Semantic search';
+
+  @override
+  String aiKnowledgeSemanticChunks(int chunks) {
+    return 'Semantic search ($chunks chunks)';
+  }
+
+  @override
+  String get aiKnowledgeIndexFailed => 'Index failed — keyword search';
+
+  @override
+  String get aiKnowledgeKeyword => 'Keyword search';
+
+  @override
+  String aiKnowledgeKeywordChunks(int chunks) {
+    return 'Keyword search ($chunks chunks)';
+  }
+
+  @override
+  String aiKnowledgeLoadFailed(String error) {
+    return 'Error: $error';
+  }
+
+  @override
+  String get aiChatApprovalTitle => 'Confirm action';
+
+  @override
+  String get aiChatApprovalDismiss => 'Reject';
+
+  @override
+  String get aiChatApprovalConfirm => 'Approve and run';
+
+  @override
+  String get aiChatApprovalSending => 'Sending…';
+
+  @override
+  String get aiChatApprovalBannerLabel => 'Write approval required';
+
+  @override
+  String get aiChatApprovalSecurityNote =>
+      'Only the operations listed here will run; parameters cannot change without another confirmation.';
+
+  @override
+  String get aiChatApprovalBodySingle =>
+      'The assistant wants to change business data.';
+
+  @override
+  String aiChatApprovalBodyMultiple(int count) {
+    return '$count operations are waiting for your approval.';
+  }
+
+  @override
   String get aiVoiceDummyTtsWarning =>
       'Server TTS is in test mode; you may not hear spoken responses.';
 
@@ -10905,6 +11308,24 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get aiActionThumbsDown => 'Not helpful';
+
+  @override
+  String get aiActionShare => 'Share';
+
+  @override
+  String get aiActionApplyHScript => 'Apply to HScript studio';
+
+  @override
+  String get aiActionEditResend => 'Edit and resend';
+
+  @override
+  String get aiActionEditAssistantText => 'Edit reply text';
+
+  @override
+  String get aiActionEditAndRegenerate => 'Edit and regenerate';
+
+  @override
+  String get aiActionFork => 'Branch from here';
 
   @override
   String aiStatusAgentProgress(int iteration, int max) {

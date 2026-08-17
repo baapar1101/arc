@@ -1,7 +1,7 @@
 # ممیزی سیستم چت و ایجنت هوش مصنوعی حسابیکس
 
-**نسخه سند:** 2.2  
-**تاریخ ممیزی:** ۱۴۰۵/۰۵/۲۶ (۱۷ اوت ۲۰۲۶) — بازبینی همان روز با یافته‌های خط‌به‌خط هسته، UI و زیرسیستم‌ها  
+**نسخه سند:** 2.6  
+**تاریخ ممیزی:** ۱۴۰۵/۰۵/۲۸ (۱۸ اوت ۲۰۲۶) — بازبینی همان روز با یافته‌های خط‌به‌خط هسته، UI و زیرسیستم‌ها  
 **وضعیت:** زنده — پس از هر اصلاح، وضعیت آیتم را عوض کنید و در [تاریخچهٔ به‌روزرسانی](#تاریخچه-بهروزرسانی) ثبت کنید.  
 **دامنه:** چت درون‌برنامه، حلقهٔ ایجنت، ابزارها، حافظه، دانش، مهارت، صوت، تلگرام، CRM AI، تیکت، ورک‌فلو، MCP، مشاهده‌پذیری، UX.
 
@@ -36,7 +36,7 @@
 |------|-------------|-----------|
 | حلقهٔ ایجنت | حلقهٔ واحد (استریم + aggregator)؛ run persist و ادامه؛ plan اجباری برای سوال complex (OpenAI و Anthropic)؛ worker پس‌زمینه هنوز نیست | run بادوام، checkpoint، ادامه پس از قطع، subagent |
 | انتخاب ابزار | فیلتر کلیدواژه‌ای + سقف ۴۸ + envelope برش نتیجه | progressive disclosure / router معنایی / skill-first |
-| UX چت | SSE با event id و بنر ادامه؛ God Widget هنوز بزرگ است | streaming-first، بازیابی اتصال، Canvas/Artifact |
+| UX چت | SSE با event id و بنر ادامه؛ Enter-to-send در دسکتاپ؛ حلقهٔ استریم در `consume`؛ جلسهٔ صوت در کنترلر جدا؛ God Widget هنوز کروم UI را نگه داشته | streaming-first، بازیابی اتصال، Canvas/Artifact |
 | دانش و استناد | RAG ترکیبی با fallback واژه‌ای؛ chip منبع از envelope ابزار (فاکتور/شخص/سرنخ/فرصت) | retrieval با نمره، منبع کلیک‌پذیر، ضد hallucination |
 | ارزیابی | substring روی چند کیس پیش‌فرض | LLM-as-judge + tool-call assertion + eval در CI |
 | مشاهده‌پذیری | `logger.info` با برچسب `AI_METRIC` | trace کامل (Langfuse/Phoenix)، هزینه، latency، کیفیت |
@@ -61,7 +61,7 @@
 | حافظه | MEM | 3.0 | 4.0 | 4.5 |
 | دانش / RAG / استناد | RAG | 3.5 | 4.0 | 4.5 |
 | مهارت و مارکت | SKL | 3.0 | 3.5 | 4.5 |
-| UX چت Flutter | UX | 3.7 | 4.0 | 4.5 |
+| UX چت Flutter | UX | 4.2 | 4.0 | 4.5 |
 | صوت | VOI | 3.0 | 3.5 | 4.0 |
 | تلگرام / CRM / تیکت | CHN | 3.6 | 3.0 | 4.0 |
 | ورک‌فلو ایجنت | WFA | 3.3 | 3.5 | 4.0 |
@@ -76,8 +76,11 @@
 
 ```
 کاربر (وب/دسکتاپ/موبایل Flutter)
-  ├─ AIChatDialog  (~2700 خط، state متمرکز)
-  │    ├─ AIChatStreamController  (SSE state)
+  ├─ AIChatDialog  (~2586 خط، state متمرکز)
+  │    ├─ AIChatStreamController  (SSE state + consume نوبت)
+  │    ├─ AIChatStreamTurn  (انباشتگر نوبت)
+  │    ├─ AIChatSessionController  (جلسه / پیام / ارسال)
+  │    ├─ AIChatVoiceSessionController  (فاز صوت + تفسیر رویداد WS)
   │    ├─ AIChatTurn helpers  (send guard / voice phase / usage patch)
   │    ├─ AIService (Dart, ~1700 خط)
   │    └─ VoiceChatController → WS /ws/ai/voice
@@ -117,7 +120,7 @@
 | `hesabixAPI/app/services/ai/ai_model_router.py` | ~370 | mixin مسیریابی مدل |
 | `hesabixAPI/app/services/ai/ai_usage_meter.py` | ~370 | mixin سهمیه و لاگ مصرف |
 | `hesabixAPI/adapters/api/v1/ai/chat.py` | ~2500 | API چت |
-| `hesabixUI/.../ai_chat_dialog.dart` | ~2700 | UI و state |
+| `hesabixUI/.../ai_chat_dialog.dart` | ~2586 | UI و state |
 | `hesabixAPI/app/services/ai/function_registry.py` | ~1900 | ثبت ابزار |
 | `hesabixUI/.../ai_service.dart` | ~1700 | کلاینت API |
 | بستهٔ `app/services/ai/` | ۱۰۷ فایل | زیرسیستم‌ها |
@@ -546,21 +549,21 @@
 - وضعیت: در حال اصلاح
 - اولویت: P0
 - مالک: flutter
-- فایل‌ها: `ai_chat_dialog.dart` (~2715)، `ai_chat_turn.dart`، `ai_service.dart` (~1736)، `ai_chat_resume.dart`، `ai_chat_stream_controller.dart`
+- فایل‌ها: `ai_chat_dialog.dart` (~2586)، `ai_chat_session_controller.dart`، `ai_chat_stream_turn.dart`، `ai_chat_voice_session.dart`، `ai_chat_turn.dart`، `ai_chat_message_sheet.dart`، `ai_service.dart` (~1736)، `ai_chat_resume.dart`، `ai_chat_stream_controller.dart`
 - مشکل: جلسه، استریم، صوت، پیوست، مدل، execution mode، فیدبک، سایدبار، تأیید نوشتن همه در یک State. در `AI_CHAT_ISSUES.md` هم Riverpod/Bloc پیشنهاد شده. تست UI قبلاً فقط `ai_markdown_table_parser_test.dart` بود.
 - معیار پذیرش: dialog نازک؛ کنترلرها جدا (session, stream, composer, voice)؛ پوشش تست برای ارسال، لغو، تأیید write، reconnect.
 - پیشنهاد: استخراج `AIChatSessionController`؛ golden test برای empty/streaming/error.
-- یادداشت اصلاح: ۱۴۰۵/۰۵/۲۶ — برش اول: `AIChatResumeHint` / `resumeHintFromMessages` از dialog جدا شد؛ برنامهٔ جلسه بالای پنل استدلال پین شد. برش دوم: `collectPendingApprovalOps` و رد/تأیید todo از dialog نازک شد. برش سوم: `sendBlockReason` / `voicePhaseFromServerEvent` / `patchLastAssistantUsage` در `ai_chat_turn.dart` با تست واحد. خود God Widget هنوز شکسته نشده.
+- یادداشت اصلاح: ۱۴۰۵/۰۵/۲۶ — برش اول تا سوم: resume / approval / turn helpers. برش چهارم: شیت اقدامات پیام. برش پنجم: `AIChatSessionController` مالک جلسه/پیام‌ها و `planChatSend`. برش ششم (۱۴۰۵/۰۵/۲۸): حلقهٔ SSE به `AIChatStreamController.consume` و `AIChatStreamTurn`. برش هفتم: `AIChatVoiceSessionController` و `interpretVoiceServerEvent`؛ ساخت `VoiceChatController` هنوز در dialog است.
 
 ### UX-02 — i18n ناقص در سطح چت
 - وضعیت: در حال اصلاح
 - اولویت: P1
 - مالک: flutter
-- فایل‌ها: `ai_chat_dialog.dart`، `ai_chat_l10n.dart`، `app_en.arb` / `app_fa.arb`
+- فایل‌ها: `ai_chat_dialog.dart`، `ai_chat_composer.dart`، `ai_write_approval_banner.dart`، `ai_chat_l10n.dart`، `app_en.arb` / `app_fa.arb`
 - مشکل: بخشی از برچسب ابزار l10n شده؛ snackbar و tooltip و لیبل حالت اجرا هنوز فارسی hardcoded. محصول چندزبانه است.
 - معیار پذیرش: صفر رشتهٔ کاربرنما در Dart/Python بدون کلید l10n برای سطح چت.
 - پیشنهاد: اسکریپت grep رشته‌های فارسی در `lib/widgets/ai`.
-- یادداشت اصلاح: ۱۴۰۵/۰۵/۲۶ — کلیدهای `aiChatApprovalNeedsOpenSession` / `aiChatWriteApprovalNotFound` / `aiChatSendFailed` جایگزین رشته‌های فارسی ارسال/تأیید شدند. snackbar حذف جلسه و لیبل حالت اجرا هنوز hardcoded است.
+- یادداشت اصلاح: ۱۴۰۵/۰۵/۲۶ — کلیدهای ارسال/تأیید جلسه. ۱۴۰۵/۰۵/۲۸ — کروم composer، app bar، بنر تأیید نوشتن و شیت اقدامات پیام به arb رفت. پاسخ خالی دستیار: `aiChatEmptyAssistantReply`. snackbarهای چت، شیت حافظه، شیت دانشنامه، خطاهای صوت و تنظیمات صدا l10n شدند. منوی بیشتر، دیالوگ سهمیه، حالت اجرا و slash هنوز hardcoded است.
 
 ### UX-03 — تجربهٔ سطح ChatGPT هست؛ Canvas / Artifact نیست
 - وضعیت: باز
@@ -583,13 +586,13 @@
 - یادداشت اصلاح:
 
 ### UX-05 — دسترسی‌پذیری و موبایل
-- وضعیت: باز
+- وضعیت: در حال اصلاح
 - اولویت: P2
 - مالک: flutter
 - مشکل: RTL رعایت شده. composer در مرکز/پایین حالت ChatGPT دارد. Voice چت متنی را قفل می‌کند. Focus و screen reader برای trace/approval مشخص نیست. صفحهٔ چت در موبایل با سایدبار و شیت‌های زیاد شلوغ است.
 - معیار پذیرش: تأیید نوشتن با کیبورد؛ announce وضعیت استریم برای TalkBack/VoiceOver؛ composer در موبایل همیشه قابل‌مشاهده.
 - پیشنهاد: ممیزی a11y جدا روی `AIChatComposer` و `AIWriteApprovalBanner`.
-- یادداشت اصلاح:
+- یادداشت اصلاح: ۱۴۰۵/۰۵/۲۸ — `Semantics(liveRegion)` روی بنر تأیید و برچسب «در حال پاسخ»؛ دکمهٔ ارسال label دارد. کیبورد Enter برای تأیید بنر هنوز نیست.
 
 ### UX-06 — Slash commandها ثابت و فارسی‌اند
 - وضعیت: باز
@@ -617,15 +620,16 @@
 - فایل‌ها: `ai_chat_toolbar.dart`، `ai_conversation_rail.dart`، `ai_conversation_nav_sheet.dart`؛ `updateChatSession(title:)` بدون UI
 - مشکل: ریل/ناوبری/تولبار ساخته شده‌اند ولی flag طراحی خاموش است — نشانهٔ نیمه‌کاره ماندن بازطراحی. تغییر عنوان جلسه API دارد و در UI نیست. پین فقط SharedPreferences محلی است و بین دستگاه‌ها همگام نیست. Enter در دسکتاپ newline است نه ارسال.
 - معیار پذیرش: یا ویجت مرده حذف شود یا در محصول روشن شود؛ rename در سایدبار؛ پین سمت سرور یا صریحاً «فقط این دستگاه».
-- یادداشت اصلاح:
+- پیشنهاد: بعد از پایدار شدن استریم.
+- یادداشت اصلاح: ۱۴۰۵/۰۵/۲۸ — Enter-to-send دسکتاپ در UX-09 انجام شد؛ بقیهٔ این آیتم (ریل خاموش، rename، پین) باز است.
 
 ### UX-09 — بدون mention موجودیت و بدون Enter-to-send
-- وضعیت: باز
+- وضعیت: در حال اصلاح
 - اولویت: P2
 - مالک: flutter
 - مشکل: Cursor/ChatGPT با `@` فایل یا موجودیت را به context می‌آورند. اینجا مهارت و دانش در منوی بیشتر دفن شده‌اند. دسکتاپ بدون میانبر ارسال است.
 - معیار پذیرش: `@مشتری` / `@کالا` / `@فاکتور` با جستجوی زنده؛ Enter ارسال و Shift+Enter خط جدید (قابل تنظیم).
-- یادداشت اصلاح:
+- یادداشت اصلاح: ۱۴۰۵/۰۵/۲۸ — در عرض غیر فشرده Enter ارسال می‌کند و Shift+Enter خط جدید می‌گذارد؛ موبایل newline می‌ماند. Enter روی overlay دستور slash همان دستور را اعمال می‌کند. mention موجودیت هنوز باز است.
 
 ---
 
@@ -639,7 +643,7 @@
 - مشکل: STT/VAD/TTS روی سرور خودتان (Piper فارسی) تمایز حریم خصوصی است. کیفیت TTS/STT از ابر پایین‌تر است. چت متنی هنگام صوت قفل می‌شود. رویدادهای `voice_status` با trace متنی یکی نیستند.
 - معیار پذیرش: کاربر بتواند وسط صوت به متن سوییچ کند بدون از دست رفتن context؛ latency perceived < ۱.۵s برای عبارت کوتاه.
 - پیشنهاد: barge-in؛ نمایش transcript زنده در همان thread؛ متریک WER روی نمونهٔ فارسی حسابداری.
-- یادداشت اصلاح:
+- یادداشت اصلاح: کیفیت TTS/STT و هم‌ترازی با متن باز است. ۱۴۰۵/۰۵/۲۸ — تفسیر رویداد WS و state جلسه از dialog به `interpretVoiceServerEvent` / `AIChatVoiceSessionController` منتقل شد؛ خطاهای timeout/STT/forbidden l10n شدند. کیفیت TTS/STT و هم‌ترازی با متن باز است. ۱۴۰۵/۰۵/۲۸ — تفسیر رویداد WS و state جلسه از dialog به `interpretVoiceServerEvent` / `AIChatVoiceSessionController` منتقل شد؛ خطاهای timeout/STT/forbidden l10n شدند.
 
 ### VOI-02 — احراز هویت WS با api_key در اولین فریم
 - وضعیت: باز
@@ -814,7 +818,7 @@
 - مالک: flutter
 - مشکل: یک تست پارسر جدول. استریم، تأیید، لغو، مدل chip بدون تست.
 - معیار پذیرش: تست واحد برای `AIChatStreamController` (بدون UI) پوشش eventهای SSE؛ ویجت تست برای approval banner.
-- یادداشت اصلاح: ۱۴۰۵/۰۵/۲۶ — تست واحد برای stream controller (begin/clear، delta، tool+approval، heartbeat، done، cancel snapshot، merge trace)، `extractPendingApprovalOpsFromResults`، و `AIChatResumeHint`. ویجت‌تست بنر تأیید هنوز نیست.
+- یادداشت اصلاح: ۱۴۰۵/۰۵/۲۶ — تست واحد برای stream controller (begin/clear، delta، tool+approval، heartbeat، done، cancel snapshot، merge trace)، `extractPendingApprovalOpsFromResults`، و `AIChatResumeHint`. ۱۴۰۵/۰۵/۲۸ — `consume` نوبت استریم؛ `interpretVoiceServerEvent` (ready/dummy TTS/transcript/delta/done/timeout/empty). ویجت‌تست بنر تأیید هنوز نیست.
 
 ### ARC-05 — مسیر dual chat_completion با ThreadPoolExecutor موقت
 - وضعیت: انجام‌شده
@@ -863,7 +867,7 @@
 | ۵–۶ | ابزار درست | TOOL-01✓، TOOL-06✓، AGT-05✓، TOOL-04✓، TOOL-07✓ |
 | ۷–۸ | اعتماد پاسخ | RAG-02✓، AGT-08✓، OBS-01 (assertion + gold CI)، ARC-06 (شروع) |
 | ۹–۱۰ | کانال‌ها | CHN-01✓، CHN-02 حلقه+allowlist (استریم ویجت مانده)، WFA-01✓، WFA-02 شروع ماتریس، SEC-01✓، SEC-05✓، PRM-02✓، SKL-01 (chip) |
-| ۱۱–۱۲ | مهارت، امنیت، مشاهده | SKL-01 chip، SEC-03/۰۴ (شروع)، OBS-01 CI✓، OBS-02 شمارنده، PRM-01 سیاست استاتیک، VOI-01 سوییچ متن |
+| ۱۱–۱۲ | چت و مشاهده | UX-09 Enter-to-send، UX-01 شیت پیام + SessionController + consume استریم + VoiceSession، UX-02 snackbar/حافظه/دانش، UX-۰۵ کروم l10n+Semantics، SKL-01 chip، SEC-03/۰۴ (شروع)، OBS-01 CI✓، OBS-02 شمارنده، PRM-01 سیاست استاتیک |
 
 فاز ۹ ابزار دامنه (`TOOL-03`) می‌تواند موازی با هفتهٔ ۵–۸ جلو برود اگر مالک محصول جدا باشد.
 
@@ -897,7 +901,7 @@
 `telegram_ai_chat_service.py` · `telegram_ai_chat_handler.py` · `telegram_ai_chat_text.py` · `ai_channel_policy.py` · `adapters/api/v1/ai/crm_ai.py` · `adapters/api/v1/support/ai_tickets.py` · `adapters/api/v1/ai/voice_ws.py`
 
 **فرانت**  
-`ai_chat_dialog.dart` · `ai_chat_stream_controller.dart` · `ai_chat_turn.dart` · `ai_chat_composer.dart` · `ai_chat_message_body.dart` · `ai_chat_resume.dart` · `ai_citation_chips.dart` · `ai_tool_envelope.dart` · `ai_write_approval_banner.dart` · `crm_ai_assistant_widget.dart` · `lib/services/ai_service.dart`
+`ai_chat_dialog.dart` · `ai_chat_stream_controller.dart` · `ai_chat_stream_turn.dart` · `ai_chat_voice_session.dart` · `ai_chat_session_controller.dart` · `ai_chat_turn.dart` · `ai_chat_composer.dart` · `ai_chat_composer_keys.dart` · `ai_chat_message_sheet.dart` · `ai_chat_memory_sheet.dart` · `ai_chat_knowledge_sheet.dart` · `ai_chat_message_body.dart` · `ai_chat_resume.dart` · `ai_citation_chips.dart` · `ai_tool_envelope.dart` · `ai_write_approval_banner.dart` · `crm_ai_assistant_widget.dart` · `lib/services/ai_service.dart`
 
 **ثابت‌ها**  
 `ai_constants.py` — هر تغییر سقف اینجا باید در این سند منعکس شود.
@@ -921,6 +925,10 @@
 | ۱۴۰۵/۰۵/۲۶ | 2.0 | موج نهم: SEC-01 approval_id؛ SEC-05 fail-closed؛ WFA-01 بدون write پیش‌فرض؛ PRM-02 گزارش کوتاه medium؛ CHN-01 صفحه‌بندی+persist؛ SKL-01 chip مهارت |
 | ۱۴۰۵/۰۵/۲۶ | 2.1 | موج دهم: ARC-01 mixin مسیریابی/سهمیه؛ UX-01 turn helpers؛ OBS-01 دروازه CI + fluency + قفل زمان‌بندی؛ SEC-03/۰۴ SSRF و untrusted؛ PRM-01 سیاست استاتیک؛ OBS-02 شمارنده |
 | ۱۴۰۵/۰۵/۲۶ | 2.2 | موج یازدهم: حفظ tools کالر؛ سیاست کانال CRM/تیکت؛ تأیید inline تلگرام + typing؛ chip ابزار/استناد CRM |
+| ۱۴۰۵/۰۵/۲۸ | 2.3 | موج دوازدهم (چت): Enter-to-send دسکتاپ؛ شیت اقدامات پیام جدا؛ l10n کروم composer/app bar/بنر تأیید؛ liveRegion دسترسی‌پذیری |
+| ۱۴۰۵/۰۵/۲۸ | 2.4 | موج سیزدهم (چت): `AIChatSessionController` برای جلسه/پیام؛ `planChatSend`؛ بدون جابه‌جایی حلقهٔ استریم |
+| ۱۴۰۵/۰۵/۲۸ | 2.5 | موج چهاردهم (چت): حلقهٔ SSE در `AIChatStreamController.consume`؛ `AIChatStreamTurn`؛ l10n پاسخ خالی؛ تست نوبت استریم |
+| ۱۴۰۵/۰۵/۲۸ | 2.6 | موج پانزدهم (چت): `AIChatVoiceSessionController` + تفسیر رویداد صوت؛ l10n snackbar چت و شیت حافظه/دانش |
 
 <!-- الگو:
 | ۱۴۰۵/۰۶/۰۱ | 1.1 | STR-01 انجام‌شده — reconnect SSE با Last-Event-ID |

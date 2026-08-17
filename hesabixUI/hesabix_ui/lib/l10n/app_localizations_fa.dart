@@ -10553,6 +10553,408 @@ class AppLocalizationsFa extends AppLocalizations {
   }
 
   @override
+  String get aiChatComposerHint => 'پیام خود را بنویسید…';
+
+  @override
+  String get aiChatComposerHintDesktop =>
+      'پیام خود را بنویسید… (Enter ارسال، Shift+Enter خط جدید)';
+
+  @override
+  String get aiChatComposerSemanticsLabel => 'متن پیام دستیار هوشمند';
+
+  @override
+  String get aiChatStopGenerating => 'توقف تولید پاسخ';
+
+  @override
+  String get aiChatAttachFile => 'پیوست فایل';
+
+  @override
+  String get aiChatSendMessage => 'ارسال پیام';
+
+  @override
+  String get aiChatSendingMessage => 'در حال ارسال پیام';
+
+  @override
+  String get aiChatSendDisabledHint => 'ابتدا پیام را بنویسید';
+
+  @override
+  String get aiChatAssistantTitle => 'دستیار هوشمند';
+
+  @override
+  String get aiChatConversationFallbackTitle => 'گفت‌وگو';
+
+  @override
+  String get aiChatHistoryTooltip => 'گفت‌وگوها';
+
+  @override
+  String get aiChatNewConversation => 'گفتگوی جدید';
+
+  @override
+  String get aiChatStop => 'توقف';
+
+  @override
+  String get aiChatResponding => 'در حال پاسخ…';
+
+  @override
+  String get aiChatClose => 'بستن';
+
+  @override
+  String get aiChatEmptyAssistantReply =>
+      'پاسخی از دستیار دریافت نشد. احتمالاً مشکل از سرویس AI یا اعتبار حساب است.';
+
+  @override
+  String get aiChatCopied => 'کپی شد';
+
+  @override
+  String get aiChatGenerationStopped => 'تولید پاسخ متوقف شد';
+
+  @override
+  String get aiChatFeedbackSaved => 'بازخورد ثبت شد';
+
+  @override
+  String get aiChatFeedbackThanks => 'ممنون از بازخورد مثبت';
+
+  @override
+  String aiChatFeedbackFailed(String error) {
+    return 'ثبت بازخورد ناموفق: $error';
+  }
+
+  @override
+  String aiChatSessionsLoadFailed(String error) {
+    return 'خطا در بارگذاری گفت‌وگوها: $error';
+  }
+
+  @override
+  String aiChatStartConversationFailed(String error) {
+    return 'خطا در آغاز گفت‌وگو: $error';
+  }
+
+  @override
+  String aiChatMessagesLoadFailed(String error) {
+    return 'خطا در دریافت پیام‌ها: $error';
+  }
+
+  @override
+  String get aiChatEmptyFile => 'فایل خالی است یا قابل خواندن نیست';
+
+  @override
+  String get aiChatAttachmentAdded => 'پیوست اضافه شد';
+
+  @override
+  String aiChatAttachmentUploadFailed(String error) {
+    return 'آپلود پیوست ناموفق: $error';
+  }
+
+  @override
+  String get aiChatConversationDeleted => 'گفت‌وگو حذف شد';
+
+  @override
+  String aiChatDeleteConversationFailed(String error) {
+    return 'حذف گفت‌وگو با خطا مواجه شد: $error';
+  }
+
+  @override
+  String get aiChatMessageUpdated => 'پیام به‌روزرسانی شد';
+
+  @override
+  String aiChatEditFailed(String error) {
+    return 'ویرایش ناموفق: $error';
+  }
+
+  @override
+  String get aiChatForkOpened => 'شاخهٔ گفت‌وگو باز شد';
+
+  @override
+  String aiChatForkFailed(String error) {
+    return 'شاخه‌سازی ناموفق: $error';
+  }
+
+  @override
+  String get aiChatExportEmpty => 'گفت‌وگو خالی است';
+
+  @override
+  String aiChatExportFailed(String error) {
+    return 'خروجی ناموفق: $error';
+  }
+
+  @override
+  String get aiChatRegenerateNeedsAssistant => 'آخرین پیام باید از دستیار باشد';
+
+  @override
+  String aiChatRegenerateFailed(String error) {
+    return 'تولید مجدد ناموفق: $error';
+  }
+
+  @override
+  String aiChatActionFailed(String label, String error) {
+    return '$label ناموفق: $error';
+  }
+
+  @override
+  String get aiChatErrorLabelReply => 'پاسخ';
+
+  @override
+  String get aiChatErrorLabelEdit => 'ویرایش';
+
+  @override
+  String get aiChatErrorLabelRegenerate => 'تولید مجدد';
+
+  @override
+  String get aiChatErrorLabelSend => 'ارسال پیام';
+
+  @override
+  String get aiChatUnknownError => 'خطای نامشخص';
+
+  @override
+  String aiChatVoiceStartFailed(String error) {
+    return 'خطا در شروع مکالمه صوتی: $error';
+  }
+
+  @override
+  String get aiChatVoiceTimeout =>
+      'جلسه صوتی به دلیل timeout بسته شد. لطفاً دوباره تلاش کنید.';
+
+  @override
+  String aiChatVoiceSttFailed(String error) {
+    return 'خطا در تشخیص گفتار: $error';
+  }
+
+  @override
+  String get aiChatVoiceEmptyTranscript =>
+      'متن قابل تشخیص نیست. لطفاً دوباره تلاش کنید.';
+
+  @override
+  String get aiChatVoiceForbidden => 'شما به این کسب‌وکار دسترسی ندارید.';
+
+  @override
+  String aiChatVoiceError(String error) {
+    return 'خطا: $error';
+  }
+
+  @override
+  String get aiVoiceFeedbackTitle => 'کیفیت صدای AI';
+
+  @override
+  String get aiVoiceFeedbackBody =>
+      'به کیفیت صدای پاسخ AI امتیاز دهید تا در آینده بهتر شود.';
+
+  @override
+  String get aiVoiceFeedbackCommentLabel => 'نظر (اختیاری)';
+
+  @override
+  String get aiVoiceFeedbackLater => 'بعداً';
+
+  @override
+  String get aiVoiceFeedbackSubmit => 'ثبت';
+
+  @override
+  String get aiVoiceSettingsTitle => 'تنظیمات';
+
+  @override
+  String get aiVoiceImproveQualityTitle => 'بهبود کیفیت صدا';
+
+  @override
+  String get aiVoiceImproveQualitySubtitle =>
+      'با ارسال داده‌های ناشناس به بهبود تجربه صوتی کمک کنید.';
+
+  @override
+  String get aiMemoryTitle => 'حافظه دستیار';
+
+  @override
+  String get aiMemoryIntro =>
+      'دستورات همیشگی را خودتان می‌نویسید؛ حقایق پایدار را دستیار بی‌صدا از گفتگوها یاد می‌گیرد.';
+
+  @override
+  String aiMemoryUpdatedAt(String when) {
+    return 'آخرین به‌روزرسانی: $when';
+  }
+
+  @override
+  String get aiMemoryInstructionsTitle => 'دستورات همیشگی';
+
+  @override
+  String get aiMemoryInstructionsHint =>
+      'چیزهایی که دستیار باید همیشه مد نظر داشته باشد.';
+
+  @override
+  String get aiMemoryInstructionsExample =>
+      'مثال: مبالغ را به تومان بگو؛ گزارش‌ها را خلاصه و جدولی بنویس…';
+
+  @override
+  String aiMemoryMaxChars(int count) {
+    return 'حداکثر $count کاراکتر';
+  }
+
+  @override
+  String get aiMemorySaveInstructions => 'ذخیره دستورات';
+
+  @override
+  String get aiMemoryLearnedTitle => 'آنچه یاد گرفته‌ام';
+
+  @override
+  String get aiMemoryLearnedIntro =>
+      'از گفتگوها به‌صورت خودکار جمع می‌شود. می‌توانید ویرایش یا حذف کنید.';
+
+  @override
+  String get aiMemoryLearnedEmpty =>
+      'هنوز چیزی از گفتگوها یاد نگرفته‌ام. با ادامهٔ مکالمه، حقایق پایدار اینجا ظاهر می‌شوند.';
+
+  @override
+  String get aiMemoryClearAll => 'پاک کردن همه';
+
+  @override
+  String aiMemoryLoadFailed(String error) {
+    return 'خطا در بارگذاری حافظه: $error';
+  }
+
+  @override
+  String get aiMemorySaved => 'دستورات ذخیره شد';
+
+  @override
+  String get aiMemoryCleared => 'حافظه پاک شد';
+
+  @override
+  String get aiMemoryItemUpdated => 'آیتم به‌روز شد';
+
+  @override
+  String get aiMemoryDeleted => 'حذف شد';
+
+  @override
+  String aiMemoryError(String error) {
+    return 'خطا: $error';
+  }
+
+  @override
+  String get aiMemoryClearTitle => 'پاک کردن حافظه';
+
+  @override
+  String get aiMemoryClearBody =>
+      'دستورات همیشگی و تمام چیزهایی که دستیار یاد گرفته حذف می‌شوند. ادامه می‌دهید؟';
+
+  @override
+  String get aiMemoryClearConfirm => 'پاک کردن';
+
+  @override
+  String get aiMemoryEditTitle => 'ویرایش حافظه';
+
+  @override
+  String get aiMemoryEditHint => 'متن حقیقت یادگرفته‌شده';
+
+  @override
+  String get aiMemoryDeleteItemTitle => 'حذف این مورد؟';
+
+  @override
+  String get aiMemorySourceAuto => 'یادگیری خودکار';
+
+  @override
+  String get aiMemorySourceAssistant => 'ذخیره‌شده توسط دستیار';
+
+  @override
+  String get aiMemorySourceFeedback => 'از بازخورد شما';
+
+  @override
+  String get aiMemorySourceUser => 'ویرایش‌شده توسط شما';
+
+  @override
+  String get aiKnowledgeTitle => 'دانشنامه کسب‌وکار';
+
+  @override
+  String get aiKnowledgeIntro =>
+      'اسناد مرتبط هنگام پاسخ‌دهی به پرسش شما جستجو و به context اضافه می‌شوند.';
+
+  @override
+  String get aiKnowledgeNewDocument => 'سند جدید';
+
+  @override
+  String get aiKnowledgeTitleLabel => 'عنوان';
+
+  @override
+  String get aiKnowledgeBodyLabel => 'متن';
+
+  @override
+  String get aiKnowledgeUntitled => 'بدون عنوان';
+
+  @override
+  String get aiKnowledgeAdded => 'سند اضافه شد';
+
+  @override
+  String get aiKnowledgeUploaded => 'فایل آپلود شد';
+
+  @override
+  String aiKnowledgeReindexResult(Object documents, Object chunks) {
+    return 'بازنمایه‌سازی: $documents سند، $chunks بخش';
+  }
+
+  @override
+  String get aiKnowledgeEmpty => 'هنوز سندی ثبت نشده است.';
+
+  @override
+  String get aiKnowledgeText => 'متن';
+
+  @override
+  String get aiKnowledgeFile => 'فایل';
+
+  @override
+  String get aiKnowledgeReindex => 'بازنمایه';
+
+  @override
+  String aiKnowledgeDocSubtitle(int chars, String status) {
+    return '$chars کاراکتر · $status';
+  }
+
+  @override
+  String get aiKnowledgeSemantic => 'جستجوی معنایی';
+
+  @override
+  String aiKnowledgeSemanticChunks(int chunks) {
+    return 'جستجوی معنایی ($chunks تکه)';
+  }
+
+  @override
+  String get aiKnowledgeIndexFailed => 'ایندکس ناموفق — جستجوی واژه‌ای';
+
+  @override
+  String get aiKnowledgeKeyword => 'جستجوی واژه‌ای';
+
+  @override
+  String aiKnowledgeKeywordChunks(int chunks) {
+    return 'جستجوی واژه‌ای ($chunks تکه)';
+  }
+
+  @override
+  String aiKnowledgeLoadFailed(String error) {
+    return 'خطا: $error';
+  }
+
+  @override
+  String get aiChatApprovalTitle => 'تأیید عملیات';
+
+  @override
+  String get aiChatApprovalDismiss => 'رد کردن';
+
+  @override
+  String get aiChatApprovalConfirm => 'تأیید و اجرا';
+
+  @override
+  String get aiChatApprovalSending => 'در حال ارسال…';
+
+  @override
+  String get aiChatApprovalBannerLabel => 'تأیید عملیات نوشتنی لازم است';
+
+  @override
+  String get aiChatApprovalSecurityNote =>
+      'فقط همان عملیاتی اجرا می‌شود که در این پیشنهاد آمده؛ تغییر پارامترها بدون تأیید مجدد ممکن نیست.';
+
+  @override
+  String get aiChatApprovalBodySingle =>
+      'دستیار می‌خواهد تغییری در داده‌های کسب‌وکار ثبت کند.';
+
+  @override
+  String aiChatApprovalBodyMultiple(int count) {
+    return '$count عملیات منتظر تأیید شماست.';
+  }
+
+  @override
   String get aiVoiceDummyTtsWarning =>
       'موتور TTS سرور روی حالت آزمایشی است؛ ممکن است صدای پاسخ شنیده نشود.';
 
@@ -10843,6 +11245,24 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get aiActionThumbsDown => 'مفید نبود';
+
+  @override
+  String get aiActionShare => 'اشتراک‌گذاری';
+
+  @override
+  String get aiActionApplyHScript => 'اعمال به استودیو HScript';
+
+  @override
+  String get aiActionEditResend => 'ویرایش و ارسال مجدد';
+
+  @override
+  String get aiActionEditAssistantText => 'ویرایش متن پاسخ';
+
+  @override
+  String get aiActionEditAndRegenerate => 'ویرایش و تولید مجدد';
+
+  @override
+  String get aiActionFork => 'شاخه از اینجا';
 
   @override
   String aiStatusAgentProgress(int iteration, int max) {

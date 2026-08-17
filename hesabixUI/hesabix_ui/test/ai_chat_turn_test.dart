@@ -51,6 +51,30 @@ void main() {
     );
   });
 
+  test('planChatSend trims content and surfaces block key', () {
+    final blocked = planChatSend(
+      voiceActive: false,
+      sending: false,
+      rawContent: '   ',
+      approveWrites: false,
+      requireExistingSession: false,
+      sessionId: 1,
+    );
+    expect(blocked.canSend, isFalse);
+    expect(blocked.blockKey, 'emptyContent');
+
+    final ready = planChatSend(
+      voiceActive: false,
+      sending: false,
+      rawContent: '  فروش  ',
+      approveWrites: false,
+      requireExistingSession: false,
+      sessionId: 1,
+    );
+    expect(ready.canSend, isTrue);
+    expect(ready.content, 'فروش');
+  });
+
   test('voicePhaseFromServerEvent maps known types', () {
     expect(voicePhaseFromServerEvent('ready'), VoicePhase.listening);
     expect(voicePhaseFromServerEvent('stt_started'), VoicePhase.processing);

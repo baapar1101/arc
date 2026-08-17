@@ -22,6 +22,38 @@ String? sendBlockReason({
   return null;
 }
 
+/// نتیجهٔ آماده‌سازی یک نوبت ارسال — بدون setState.
+class AIChatSendPlan {
+  final String content;
+  final String? blockKey;
+
+  const AIChatSendPlan({required this.content, this.blockKey});
+
+  bool get canSend => blockKey == null;
+}
+
+AIChatSendPlan planChatSend({
+  required bool voiceActive,
+  required bool sending,
+  required String rawContent,
+  required bool approveWrites,
+  required bool requireExistingSession,
+  required int? sessionId,
+}) {
+  final content = rawContent.trim();
+  return AIChatSendPlan(
+    content: content,
+    blockKey: sendBlockReason(
+      voiceActive: voiceActive,
+      sending: sending,
+      content: content,
+      approveWrites: approveWrites,
+      requireExistingSession: requireExistingSession,
+      sessionId: sessionId,
+    ),
+  );
+}
+
 /// نگاشت رویداد سرور صوت به فاز UI — بدون setState.
 VoicePhase? voicePhaseFromServerEvent(
   String? type, {

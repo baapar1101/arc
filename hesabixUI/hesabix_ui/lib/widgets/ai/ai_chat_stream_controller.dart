@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:hesabix_ui/models/ai_stream_event.dart';
 import 'package:hesabix_ui/utils/ai_content_sanitize.dart';
+import 'package:hesabix_ui/widgets/ai/ai_chat_stream_turn.dart';
 
 /// برچسب ابزار برای رویدادهای استریم (معمولاً از l10n).
 typedef AIChatToolLabelResolver =
@@ -375,5 +376,103 @@ class AIChatStreamController extends ChangeNotifier {
         }
       }
     }
+  }
+
+  AIChatLiveChunkAction ingestLiveChunk(
+    AIStreamChunk chunk,
+    AIChatStreamTurn turn, {
+    required AIChatToolLabelResolver resolveToolLabel,
+    String? sseCursorRunId,
+    void Function()? onContentTick,
+  }) {
+    applyChunk(chunk, resolveToolLabel: resolveToolLabel);
+    turn.addDelta(chunk.contentDelta);
+    if (chunk.done) {
+      turn.applyDone(
+        chunk,
+        streamRunId: runId,
+        sseCursorRunId: sseCursorRunId,
+      );
+      applyDoneMetadata(chunk);
+      mergeAgentTraceFromDone(chunk.agentTrace);
+      return AIChatLiveChunkAction.completed;
+    }
+    if (updateAccumulatedContent(turn.accumulated, chunk)) {
+      onContentTick?.call();
+    }
+    return AIChatLiveChunkAction.keepListening;
+  }
+
+  AIChatStreamTurnOutcome completeSuccessTurn(AIChatStreamTurn turn) {
+    var resolved = sanitizeAssistantContent(turn.accumulated);
+    if (resolved.trim().isEmpty && traceSteps.isNotEmpty) {
+      resolved = extractContentFromTraceSteps(traceSteps);
+    }
+    final visible = resolved.isNotEmpty ||
+        toolActivities.isNotEmpty ||
+        traceSteps.isNotEmpty;
+    return AIChatStreamTurnOutcome(
+      status: visible
+          ? AIChatStreamTurnStatus.success
+          : AIChatStreamTurnStatus.empty,
+      resolvedContent: resolved,
+      hasVisibleOutput: visible,
+      assistantMessageId: turn.assistantMessageId,
+      functionCalls: turn.functionCalls,
+      functionResults: functionResultsWithTrace(turn.functionResults),
+      createdAt: timestamp,
+      continueRunId: turn.canContinue ? turn.finishedRunId : null,
+      continueStopMessage: turn.canContinue ? turn.finishedStopMessage : null,
+      resolvedModelCode: turn.resolvedModelCode,
+    );
+  }
+
+  AIChatStreamTurnOutcome completeErrorTurn(
+    AIStreamChunk chunk, {
+    String? sseCursorRunId,
+  }) {
+    final snap = snapshotForCancel();
+    final resumeId = chunk.runId ?? runId ?? sseCursorRunId;
+    final offerContinue = chunk.canContinue == true || resumeId != null;
+    return AIChatStreamTurnOutcome(
+      status: AIChatStreamTurnStatus.chunkError,
+      hasVisibleOutput: snap != null,
+      applyContinue: offerContinue,
+      errorMessage: chunk.error,
+      errorRecoverable: chunk.recoverable,
+      continueRunId: offerContinue ? resumeId : null,
+      continueStopMessage: offerContinue
+          ? (chunk.agentBudget?.stopMessageFa ?? agentBudget?.stopMessageFa)
+          : null,
+      partialContent: snap?.partialContent,
+      partialCreatedAt: snap?.createdAt,
+      partialFunctionResults: functionResultsWithTrace(null),
+    );
+  }
+
+  /// حلقهٔ نوبت استریم بدون BuildContext — dialog فقط نتیجه را به UI می‌زند.
+  Future<AIChatStreamTurnOutcome> consume(
+    Stream<AIStreamChunk> chunks, {
+    required AIChatToolLabelResolver resolveToolLabel,
+    String? sseCursorRunId,
+    void Function()? onContentTick,
+  }) async {
+    final turn = AIChatStreamTurn();
+    await for (final chunk in chunks) {
+      if (chunk.error != null) {
+        return completeErrorTurn(chunk, sseCursorRunId: sseCursorRunId);
+      }
+      final action = ingestLiveChunk(
+        chunk,
+        turn,
+        resolveToolLabel: resolveToolLabel,
+        sseCursorRunId: sseCursorRunId,
+        onContentTick: onContentTick,
+      );
+      if (action == AIChatLiveChunkAction.completed) {
+        break;
+      }
+    }
+    return completeSuccessTurn(turn);
   }
 }
