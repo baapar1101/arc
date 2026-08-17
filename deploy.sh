@@ -50,6 +50,7 @@ IFS=$'\n\t'
 #   China mirrors, pub-azs.ir, or custom URL. Non-interactive: PIP_MIRROR=hesabix|official|tuna|aliyun|custom
 #   and FLUTTER_MIRROR=hesabix|pub_azs|flutter_io_cn|tuna|sjtu|official|custom. Saved in .deploy_saved_vars and .deploy_env.
 #   Direct URL override: PIP_INDEX_URL, PUB_HOSTED_URL, FLUTTER_STORAGE_BASE_URL.
+#   Aliyun (China) is always attached as pip extra-index unless PIP_DISABLE_CHINA_FALLBACK=1.
 # - Flutter SDK tarball: shell.hesabix.ir (internal); pub packages use selected FLUTTER_MIRROR.
 # - Flutter SDK git clone: official (GitHub) is tried first; if it fails, alternatives are tried (FLUTTER_SDK_GIT_URL if set, then Tsinghua, Gitee).
 # - Flutter SDK: first try internal tarball (FLUTTER_SDK_TARBALL_URL_INTERNAL = shell.hesabix.ir/...), then snap, then git clone; pub packages via PUB_HOSTED_URL.
@@ -223,6 +224,9 @@ hesabix_load_mirror_config() {
   source /dev/stdin <<'HESABIX_MIRROR_CONFIG_INLINE'
 HESABIX_PIP_INDEX_URL="https://p.mirror.hesabix.ir/simple"
 HESABIX_PIP_TRUSTED_HOST="p.mirror.hesabix.ir"
+HESABIX_PIP_CHINA_INDEX_URL="https://mirrors.aliyun.com/pypi/simple"
+HESABIX_PIP_CHINA_TRUSTED_HOST="mirrors.aliyun.com"
+HESABIX_PIP_CHINA_SECONDARY_INDEX_URL="https://mirrors.cloud.tencent.com/pypi/simple"
 HESABIX_PUB_HOSTED_URL="https://f.mirror.hesabix.ir/pub"
 HESABIX_FLUTTER_STORAGE_BASE_URL="https://f.mirror.hesabix.ir/gcs"
 hesabix_mirror_log_info() {
@@ -249,6 +253,58 @@ hesabix_set_pip_mirror_for_url() {
   if [[ "${index_url}" != *"pypi.org"* ]]; then
     export PIP_TRUSTED_HOST="$(hesabix_pip_trusted_host_from_url "${index_url}")"
   else unset PIP_TRUSTED_HOST; fi
+}
+hesabix_pip_append_trusted_host() {
+  local host="$1"; [[ -n "${host}" ]] || return 0
+  case " ${PIP_TRUSTED_HOST:-} " in *" ${host} "*) return 0 ;; esac
+  if [[ -n "${PIP_TRUSTED_HOST:-}" ]]; then export PIP_TRUSTED_HOST="${PIP_TRUSTED_HOST} ${host}"
+  else export PIP_TRUSTED_HOST="${host}"; fi
+}
+hesabix_apply_pip_china_fallback() {
+  [[ "${PIP_DISABLE_CHINA_FALLBACK:-0}" == "1" ]] && return 0
+  local china="${HESABIX_PIP_CHINA_INDEX_URL}" primary="${PIP_INDEX_URL:-}"
+  if [[ -z "${PIP_EXTRA_INDEX_URL:-}" ]]; then
+    if [[ "${primary}" == "${china}" ]]; then
+      export PIP_EXTRA_INDEX_URL="${HESABIX_PIP_CHINA_SECONDARY_INDEX_URL}"
+      hesabix_pip_append_trusted_host "mirrors.cloud.tencent.com"
+    else
+      export PIP_EXTRA_INDEX_URL="${china}"
+      hesabix_pip_append_trusted_host "${HESABIX_PIP_CHINA_TRUSTED_HOST}"
+    fi
+  else
+    local extra_host; extra_host="$(hesabix_pip_trusted_host_from_url "${PIP_EXTRA_INDEX_URL%% *}")"
+    [[ -n "${extra_host}" ]] && hesabix_pip_append_trusted_host "${extra_host}"
+  fi
+  hesabix_mirror_log_info "PyPI extra index (China fallback): ${PIP_EXTRA_INDEX_URL}"
+}
+hesabix_pip_index_fallback_urls() {
+  local -a urls=(); local u
+  [[ -n "${PIP_INDEX_URL:-}" ]] && urls+=("${PIP_INDEX_URL}")
+  [[ -n "${PIP_EXTRA_INDEX_URL:-}" ]] && urls+=("${PIP_EXTRA_INDEX_URL%% *}")
+  urls+=("${HESABIX_PIP_CHINA_INDEX_URL}" "${HESABIX_PIP_CHINA_SECONDARY_INDEX_URL}" "${HESABIX_PIP_INDEX_URL}")
+  local -A seen=()
+  for u in "${urls[@]}"; do
+    u="${u%/}"; [[ -n "$u" && -z "${seen[$u]:-}" ]] || continue
+    seen[$u]=1; printf '%s\n' "$u"
+  done
+}
+hesabix_pip_cmd_with_fallback() {
+  local pip_bin="$1"; shift
+  if [[ "${PIP_DISABLE_CHINA_FALLBACK:-0}" == "1" ]]; then "${pip_bin}" "$@"; return $?; fi
+  "${pip_bin}" "$@" && return 0
+  local url orig_index orig_extra orig_trust
+  orig_index="${PIP_INDEX_URL:-}"; orig_extra="${PIP_EXTRA_INDEX_URL:-}"; orig_trust="${PIP_TRUSTED_HOST:-}"
+  while IFS= read -r url; do
+    [[ -n "$url" && "$url" != "${orig_index}" ]] || continue
+    hesabix_mirror_log_warning "pip failed on ${orig_index:-<unset>}; retrying ${url}"
+    hesabix_set_pip_mirror_for_url "$url"
+    if [[ "$url" == "${HESABIX_PIP_CHINA_INDEX_URL}" ]]; then export PIP_EXTRA_INDEX_URL="${HESABIX_PIP_CHINA_SECONDARY_INDEX_URL}"
+    else export PIP_EXTRA_INDEX_URL="${HESABIX_PIP_CHINA_INDEX_URL}"; fi
+    hesabix_pip_append_trusted_host "$(hesabix_pip_trusted_host_from_url "${PIP_EXTRA_INDEX_URL}")"
+    if "${pip_bin}" "$@"; then hesabix_mirror_log_info "pip succeeded from ${url}"; return 0; fi
+  done < <(hesabix_pip_index_fallback_urls)
+  export PIP_INDEX_URL="${orig_index}" PIP_EXTRA_INDEX_URL="${orig_extra}" PIP_TRUSTED_HOST="${orig_trust}"
+  return 1
 }
 hesabix_resolve_pip_mirror_from_preset() {
   local preset="${1:-hesabix}"; preset="${preset,,}"
@@ -309,10 +365,12 @@ hesabix_resolve_flutter_mirror_from_preset() {
 hesabix_apply_pip_mirror_env() {
   if [[ -n "${PIP_INDEX_URL:-}" ]]; then
     hesabix_mirror_log_info "Using PyPI index from environment: PIP_INDEX_URL=${PIP_INDEX_URL}"
-    hesabix_set_pip_mirror_for_url "${PIP_INDEX_URL}"; return 0
+    hesabix_set_pip_mirror_for_url "${PIP_INDEX_URL}"
+    hesabix_apply_pip_china_fallback; return 0
   fi
   PIP_MIRROR="${PIP_MIRROR:-hesabix}"; export PIP_MIRROR
   hesabix_resolve_pip_mirror_from_preset "${PIP_MIRROR}"
+  hesabix_apply_pip_china_fallback
   hesabix_mirror_log_info "Using PyPI mirror (${PIP_MIRROR}): ${PIP_INDEX_URL}"
 }
 hesabix_apply_flutter_mirror_env() {
@@ -329,7 +387,9 @@ hesabix_configure_pip_mirror() {
   hesabix_apply_pip_mirror_env
   python3 -m pip config --user set global.index "${PIP_INDEX_URL}" 2>/dev/null || true
   python3 -m pip config --user set global.index-url "${PIP_INDEX_URL}" 2>/dev/null || true
-  [[ -n "${PIP_TRUSTED_HOST:-}" ]] && python3 -m pip config --user set global.trusted-host "${PIP_TRUSTED_HOST}" 2>/dev/null || true
+  local primary_host; primary_host="$(hesabix_pip_trusted_host_from_url "${PIP_INDEX_URL}")"
+  [[ -n "${primary_host}" ]] && python3 -m pip config --user set global.trusted-host "${primary_host}" 2>/dev/null || true
+  [[ -n "${PIP_EXTRA_INDEX_URL:-}" ]] && python3 -m pip config --user set global.extra-index-url "${PIP_EXTRA_INDEX_URL%% *}" 2>/dev/null || true
   hesabix_mirror_log_info "pip user config: ${PIP_INDEX_URL}"
 }
 hesabix_prompt_pip_mirror() {
@@ -385,6 +445,8 @@ hesabix_mirror_summary_pip() {
   if [[ "${PIP_MIRROR:-}" == "custom" ]]; then
     echo "  • PyPI (pip):     custom — ${PIP_INDEX_URL:-}"
   else echo "  • PyPI (pip):     ${PIP_MIRROR:-hesabix} — ${PIP_INDEX_URL:-}"; fi
+  if [[ -n "${PIP_EXTRA_INDEX_URL:-}" && "${PIP_DISABLE_CHINA_FALLBACK:-0}" != "1" ]]; then
+    echo "  • PyPI extra:     ${PIP_EXTRA_INDEX_URL}"; fi
 }
 hesabix_mirror_summary_flutter() {
   hesabix_apply_flutter_mirror_env >/dev/null 2>&1 || true
@@ -939,6 +1001,7 @@ save_deploy_saved_vars() {
     echo "PIP_MIRROR=${PIP_MIRROR:-hesabix}"
     echo "FLUTTER_MIRROR=${FLUTTER_MIRROR:-hesabix}"
     echo "PIP_INDEX_URL=${PIP_INDEX_URL:-}"
+    echo "PIP_EXTRA_INDEX_URL=${PIP_EXTRA_INDEX_URL:-}"
     echo "PIP_TRUSTED_HOST=${PIP_TRUSTED_HOST:-}"
     echo "PUB_HOSTED_URL=${PUB_HOSTED_URL:-}"
     echo "FLUTTER_STORAGE_BASE_URL=${FLUTTER_STORAGE_BASE_URL:-}"
@@ -1142,6 +1205,7 @@ INSTALL_VOICE=${INSTALL_VOICE:-N}
 PIP_MIRROR=${PIP_MIRROR:-hesabix}
 FLUTTER_MIRROR=${FLUTTER_MIRROR:-hesabix}
 PIP_INDEX_URL=${PIP_INDEX_URL:-}
+PIP_EXTRA_INDEX_URL=${PIP_EXTRA_INDEX_URL:-}
 PIP_TRUSTED_HOST=${PIP_TRUSTED_HOST:-}
 PUB_HOSTED_URL=${PUB_HOSTED_URL:-}
 FLUTTER_STORAGE_BASE_URL=${FLUTTER_STORAGE_BASE_URL:-}
@@ -1383,7 +1447,7 @@ prompt_vars() {
   fi
   
   save_deploy_saved_vars
-  export API_DOMAIN UI_DOMAIN BRANCH DB_PASSWORD UVICORN_WORKERS FLUTTER_VERSION INSTALL_PGADMIN4 PGADMIN4_DOMAIN PGADMIN4_EMAIL PGADMIN4_PASSWORD INSTALL_VOICE DB_POOL_SIZE DB_MAX_OVERFLOW PIP_MIRROR FLUTTER_MIRROR PIP_INDEX_URL PIP_TRUSTED_HOST PUB_HOSTED_URL FLUTTER_STORAGE_BASE_URL
+  export API_DOMAIN UI_DOMAIN BRANCH DB_PASSWORD UVICORN_WORKERS FLUTTER_VERSION INSTALL_PGADMIN4 PGADMIN4_DOMAIN PGADMIN4_EMAIL PGADMIN4_PASSWORD INSTALL_VOICE DB_POOL_SIZE DB_MAX_OVERFLOW PIP_MIRROR FLUTTER_MIRROR PIP_INDEX_URL PIP_EXTRA_INDEX_URL PIP_TRUSTED_HOST PUB_HOSTED_URL FLUTTER_STORAGE_BASE_URL
 }
 
 # Show configuration summary and ask for confirmation
@@ -2166,7 +2230,16 @@ deploy_backend() {
   # shellcheck disable=SC1091
   source .venv/bin/activate
   log_info "Installing backend deps from PyPI: ${PIP_INDEX_URL}"
-  if pip install --upgrade pip setuptools wheel && pip install -e .; then
+  local backend_pip_ok=0
+  if declare -F hesabix_pip_cmd_with_fallback >/dev/null 2>&1; then
+    if hesabix_pip_cmd_with_fallback pip install --upgrade pip setuptools wheel \
+      && hesabix_pip_cmd_with_fallback pip install -e .; then
+      backend_pip_ok=1
+    fi
+  elif pip install --upgrade pip setuptools wheel && pip install -e .; then
+    backend_pip_ok=1
+  fi
+  if [[ "${backend_pip_ok}" == "1" ]]; then
     log_success "Backend dependencies installed from ${PIP_INDEX_URL}"
   else
     log_error "Failed to install backend dependencies from ${PIP_INDEX_URL}. Check mirror reachability or PIP_INDEX_URL override."
@@ -3504,7 +3577,16 @@ install_pgadmin4() {
     echo "Creating Python venv for pgAdmin4..."
     python3 -m venv "${pgadmin_venv}"
     log_info "Installing pgAdmin4 from PyPI: ${PIP_INDEX_URL}"
-    if "${pgadmin_venv}/bin/pip" install -U pip -q && "${pgadmin_venv}/bin/pip" install pgadmin4 gunicorn -q; then
+    local pgadmin_pip_ok=0
+    if declare -F hesabix_pip_cmd_with_fallback >/dev/null 2>&1; then
+      if hesabix_pip_cmd_with_fallback "${pgadmin_venv}/bin/pip" install -U pip -q \
+        && hesabix_pip_cmd_with_fallback "${pgadmin_venv}/bin/pip" install pgadmin4 gunicorn -q; then
+        pgadmin_pip_ok=1
+      fi
+    elif "${pgadmin_venv}/bin/pip" install -U pip -q && "${pgadmin_venv}/bin/pip" install pgadmin4 gunicorn -q; then
+      pgadmin_pip_ok=1
+    fi
+    if [[ "${pgadmin_pip_ok}" == "1" ]]; then
       log_success "pgAdmin4 installed from ${PIP_INDEX_URL}"
     else
       log_error "Failed to install pgAdmin4 from ${PIP_INDEX_URL}. Check mirror reachability or PIP_INDEX_URL override."
