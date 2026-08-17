@@ -598,6 +598,7 @@ app/services/notification_processor.py
 app/services/notification_service.py
 app/services/opening_balance_service.py
 app/services/otp_login_service.py
+app/services/parsian_gateway.py
 app/services/password_reset_otp_service.py
 app/services/payment_service.py
 app/services/payroll_accounting.py
@@ -887,6 +888,7 @@ app/services/messenger_operator/dispatch.py
 app/services/messenger_operator/session_store.py
 app/services/pdf/__init__.py
 app/services/pdf/base_pdf_service.py
+app/services/pdf/page_size.py
 app/services/pdf/template_renderer.py
 app/services/pdf/modules/__init__.py
 app/services/pdf/modules/marketing/__init__.py
@@ -1130,6 +1132,7 @@ migrations/versions/20260803_000002_telephony_phase2_ops_tables.py
 migrations/versions/20260806_000001_barcode_label_studio.py
 migrations/versions/20260806_000002_barcode_label_printer_settings.py
 migrations/versions/20260806_000003_telephony_softphone_media_relay.py
+migrations/versions/20260817_000001_quick_sales_print_paper_size.py
 tests/__init__.py
 tests/test_account_balance_core.py
 tests/test_account_tree_roots.py
@@ -1218,6 +1221,7 @@ tests/test_invoice_payable_total.py
 tests/test_invoice_payment_documents.py
 tests/test_invoice_payment_remaining.py
 tests/test_invoice_profit_costing.py
+tests/test_invoice_receipt_pdf_template.py
 tests/test_invoice_tag_service.py
 tests/test_invoice_tax_snapshot_refresh.py
 tests/test_invoice_tax_type_change_guard.py
@@ -1232,10 +1236,12 @@ tests/test_moadian_api_version_selection.py
 tests/test_moadian_plugin_license_gate.py
 tests/test_moadian_v2_client.py
 tests/test_notification_event_type_defaults.py
+tests/test_parsian_gateway.py
 tests/test_payroll_accounting_lines.py
 tests/test_payroll_plugin_license_gate.py
 tests/test_payroll_run_calculations.py
 tests/test_payroll_statutory.py
+tests/test_pdf_page_size.py
 tests/test_permissions.py
 tests/test_person_balance_status.py
 tests/test_person_opening_balance.py
