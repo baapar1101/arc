@@ -86,6 +86,7 @@ class _ReportTemplateStudioPageState extends State<ReportTemplateStudioPage> {
     _service = ReportTemplateService(ApiClient());
     _moduleKey = widget.moduleKey ?? 'invoices';
     _subtype = widget.subtype ?? 'detail';
+    _applyReceiptPageDefaultsIfNeeded();
     _bootstrap();
   }
 
@@ -247,6 +248,16 @@ class _ReportTemplateStudioPageState extends State<ReportTemplateStudioPage> {
       _step = _StudioStep.gallery;
       _design = null;
       _previewPdfBytes = null;
+      if (_moduleKey == 'invoices' && _subtype == 'receipt') {
+        _applyReceiptPageDefaultsIfNeeded();
+      } else if (kInvoiceReceiptPaperSizeOptions.contains(_paperSize)) {
+        _paperSize = 'A4';
+        _orientation = 'portrait';
+        _marginTopCtrl.text = '10';
+        _marginRightCtrl.text = '10';
+        _marginBottomCtrl.text = '10';
+        _marginLeftCtrl.text = '10';
+      }
     });
     Future.wait([_loadGallery(), _loadSampleContext()]);
   }
@@ -257,6 +268,7 @@ class _ReportTemplateStudioPageState extends State<ReportTemplateStudioPage> {
     setState(() {
       _design = Map<String, dynamic>.from(design);
       _step = _StudioStep.customize;
+      _applyReceiptPageDefaultsIfNeeded();
     });
     _schedulePreview();
   }
@@ -531,6 +543,30 @@ class _ReportTemplateStudioPageState extends State<ReportTemplateStudioPage> {
 
   String _currentScopeId() => '${_moduleKey ?? ''}:${_subtype ?? ''}';
 
+  bool get _isReceiptScope => _moduleKey == 'invoices' && _subtype == 'receipt';
+
+  List<String> get _paperChoices {
+    if (_isReceiptScope) return kInvoiceReceiptPaperSizeOptions;
+    return kReportTemplatePaperSizeOptions;
+  }
+
+  void _applyReceiptPageDefaultsIfNeeded() {
+    if (!_isReceiptScope) return;
+    if (_paperSize == null || !_paperChoices.contains(_paperSize)) {
+      _paperSize = '80mm';
+    }
+    _orientation = 'portrait';
+    if (_marginTopCtrl.text.trim() == '10' &&
+        _marginRightCtrl.text.trim() == '10' &&
+        _marginBottomCtrl.text.trim() == '10' &&
+        _marginLeftCtrl.text.trim() == '10') {
+      _marginTopCtrl.text = '3';
+      _marginRightCtrl.text = '2';
+      _marginBottomCtrl.text = '4';
+      _marginLeftCtrl.text = '2';
+    }
+  }
+
   String _scopeLabel() {
     for (final s in _scopeCatalog) {
       final id = '${(s['module_key'] ?? '').toString()}:${(s['subtype'] ?? '').toString()}';
@@ -550,22 +586,33 @@ class _ReportTemplateStudioPageState extends State<ReportTemplateStudioPage> {
             mainAxisSize: MainAxisSize.min,
             children: [
               DropdownButtonFormField<String>(
-                value: _paperSize,
-                decoration: const InputDecoration(labelText: 'سایز کاغذ', border: OutlineInputBorder()),
-                items: kReportTemplatePaperSizeOptions
-                    .map((e) => DropdownMenuItem(value: e, child: Text(e)))
+                value: _paperChoices.contains(_paperSize) ? _paperSize : _paperChoices.first,
+                decoration: InputDecoration(
+                  labelText: 'سایز کاغذ',
+                  border: const OutlineInputBorder(),
+                  helperText: _isReceiptScope ? 'عرض فیش؛ ارتفاع هر صفحه ۲۹۷ میلی‌متر است' : null,
+                ),
+                items: _paperChoices
+                    .map((e) => DropdownMenuItem(value: e, child: Text(reportTemplatePaperSizeLabel(e))))
                     .toList(),
-                onChanged: (v) => setState(() => _paperSize = v),
+                onChanged: (v) => setState(() {
+                  _paperSize = v;
+                  if (_isReceiptScope) _orientation = 'portrait';
+                }),
               ),
               const SizedBox(height: 12),
               DropdownButtonFormField<String>(
                 value: _orientation,
-                decoration: const InputDecoration(labelText: 'جهت', border: OutlineInputBorder()),
+                decoration: InputDecoration(
+                  labelText: 'جهت',
+                  border: const OutlineInputBorder(),
+                  helperText: _isReceiptScope ? 'فیش پرینتر همیشه عمودی است' : null,
+                ),
                 items: const [
                   DropdownMenuItem(value: 'portrait', child: Text('عمودی')),
                   DropdownMenuItem(value: 'landscape', child: Text('افقی')),
                 ],
-                onChanged: (v) => setState(() => _orientation = v),
+                onChanged: _isReceiptScope ? null : (v) => setState(() => _orientation = v),
               ),
               const SizedBox(height: 12),
               Row(

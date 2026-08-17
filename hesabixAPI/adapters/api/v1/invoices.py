@@ -1323,8 +1323,9 @@ def recalculate_invoice_profits_endpoint(
     "/business/{business_id}/{invoice_id}/pdf",
     summary="PDF یک فاکتور",
     description=(
-        "دریافت فایل PDF تک‌فاکتور. اولویت قالب: `template_id` منتشرشده، سپس قالب پیش‌فرض ماژول `invoices/detail`، "
-        "در نهایت HTML پیش‌فرض. پارامترهای query مانند `show_stamp` می‌توانند چاپ را کنترل کنند."
+        "دریافت فایل PDF تک‌فاکتور. اولویت قالب: `template_id` منتشرشده، سپس قالب پیش‌فرض همان scope "
+        "(`invoices/detail` یا `invoices/receipt` برای سایز فیش)، در نهایت HTML پیش‌فرض. "
+        "پارامترهای query مانند `paper_size` (A4/A5/A6 یا 60mm/80mm/100mm)، `orientation` و `show_stamp` چاپ را کنترل می‌کنند."
     ),
 )
 @require_business_access("business_id")
@@ -1342,9 +1343,10 @@ async def export_single_invoice_pdf(
 ):
     """
     خروجی PDF تک‌سند فاکتور با پشتیبانی از قالب سفارشی:
-    - اگر template_id داده شود و منتشرشده باشد، همان استفاده می‌شود.
-    - در غیر این صورت اگر قالب پیش‌فرض منتشرشده برای invoices/detail موجود باشد، استفاده می‌شود.
-    - در نبود قالب، خروجی HTML پیش‌فرض تولید می‌شود.
+    - اگر template_id داده شود و منتشرشده و هم‌خوان با scope باشد، همان استفاده می‌شود.
+    - سایزهای فیش (60mm/80mm/100mm) از قالب invoices/receipt و HTML فیش استفاده می‌کنند.
+    - در غیر این صورت اگر قالب پیش‌فرض منتشرشده برای همان scope موجود باشد، استفاده می‌شود.
+    - در نبود قالب، خروجی HTML پیش‌فرض (جزئیات یا فیش) تولید می‌شود.
     """
     from weasyprint import HTML
     from weasyprint.text.fonts import FontConfiguration
@@ -2424,29 +2426,7 @@ async def export_single_invoice_pdf(
         fx_t = item.get("fx_totals") if isinstance(item.get("fx_totals"), dict) else {}
         template_context["is_multi_currency"] = bool(fx_t.get("show_dual"))
 
-    # تلاش برای رندر با قالب سفارشی
-    resolved_html = None
-    try:
-        from app.services.report_template_service import ReportTemplateService
-        explicit_template_id = None
-        try:
-            if template_id is not None:
-                explicit_template_id = int(template_id)
-        except Exception:
-            explicit_template_id = None
-        resolved_html = ReportTemplateService.try_render_resolved(
-            db=db,
-            business_id=business_id,
-            module_key="invoices",
-            subtype="detail",
-            context=template_context,
-            explicit_template_id=explicit_template_id,
-        )
-    except Exception:
-        resolved_html = None
-
-    # HTML پیش‌فرض در نبود قالب: استفاده از قالب فایل
-    # پارامترهای صفحه از کوئری (اختیاری)
+    # پارامترهای صفحه از کوئری (اختیاری) — قبل از رزولوشن قالب، چون فیش scope جدا دارد
     show_stamp_override = None
     try:
         qp = request.query_params
@@ -2460,9 +2440,42 @@ async def export_single_invoice_pdf(
         disposition = "attachment"
         show_stamp_override = None
 
-    # حالت پیش‌فرض صفحه برای فاکتور: افقی (landscape)، مگر این‌که صراحتاً چیز دیگری ارسال شده باشد
-    if not orientation:
+    from app.services.pdf.page_size import (
+        RECEIPT_SUBTYPE,
+        build_page_size_css,
+        is_receipt_paper,
+    )
+
+    explicit_template_id = None
+    try:
+        if template_id is not None:
+            explicit_template_id = int(template_id)
+    except Exception:
+        explicit_template_id = None
+
+    receipt_mode = is_receipt_paper(paper_size)
+    if not receipt_mode and explicit_template_id is not None:
+        try:
+            from app.services.report_template_service import ReportTemplateService as _RTS
+
+            _tpl = _RTS.get_template(db, explicit_template_id, business_id)
+            if _tpl and _tpl.module_key == "invoices" and (_tpl.subtype or "") == RECEIPT_SUBTYPE:
+                receipt_mode = True
+                if not (paper_size or "").strip():
+                    paper_size = (_tpl.paper_size or "80mm")
+        except Exception:
+            pass
+
+    if receipt_mode:
+        orientation = "portrait"
+        if not (paper_size or "").strip():
+            paper_size = "80mm"
+    elif not orientation:
+        # حالت پیش‌فرض صفحه برای فاکتور A4: افقی
         orientation = "landscape"
+
+    invoice_template_subtype = RECEIPT_SUBTYPE if receipt_mode else "detail"
+
     # متن فوتر با زمان چاپ (timezone کسب‌وکار + تقویم کاربر) و نام تهیه‌کنندهٔ سند
     try:
         from app.core.datetime_utils import (
@@ -2494,14 +2507,35 @@ async def export_single_invoice_pdf(
         if template_context.get("generated_at") is None:
             template_context["generated_at"] = datetime.datetime.now()
 
+    # تلاش برای رندر با قالب سفارشی (بعد از پر شدن generated_at)
+    resolved_html = None
+    try:
+        from app.services.report_template_service import ReportTemplateService
+        resolved_html = ReportTemplateService.try_render_resolved(
+            db=db,
+            business_id=business_id,
+            module_key="invoices",
+            subtype=invoice_template_subtype,
+            context=template_context,
+            explicit_template_id=explicit_template_id,
+            page_paper_size=paper_size,
+            page_orientation=orientation,
+        )
+    except Exception:
+        resolved_html = None
+
     default_ctx = {
         **template_context,
         "title_text": item.get("title") or ("فاکتور" if is_fa else "Invoice"),
         "paper_size": paper_size,
         "orientation": orientation,
+        "page_size_css": build_page_size_css(paper_size, orientation),
+        "hide_page_numbers": receipt_mode,
+        "is_receipt_paper": receipt_mode,
         "footer_text": footer_text,
     }
-    html_content = resolved_html or render_template("pdf/invoices/detail.html", default_ctx)
+    fallback_template = "pdf/invoices/receipt.html" if receipt_mode else "pdf/invoices/detail.html"
+    html_content = resolved_html or render_template(fallback_template, default_ctx)
 
     font_config = FontConfiguration()
     pdf_bytes = HTML(string=html_content).write_pdf(font_config=font_config)

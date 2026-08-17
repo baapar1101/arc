@@ -107,6 +107,14 @@ class _ReportTemplateHtmlEditorPageState extends State<ReportTemplateHtmlEditorP
     _moduleKey = widget.moduleKey ?? widget.seed?.moduleKey ?? 'invoices';
     _subtype = widget.subtype ?? widget.seed?.subtype ?? 'list';
     _convertFromStudio = widget.seed?.convertFromStudio ?? false;
+    if (_moduleKey == 'invoices' && _subtype == 'receipt') {
+      _paperSize = '80mm';
+      _orientation = 'portrait';
+      _marginTopCtrl.text = '3';
+      _marginRightCtrl.text = '2';
+      _marginBottomCtrl.text = '4';
+      _marginLeftCtrl.text = '2';
+    }
     _bootstrap();
   }
 
@@ -232,11 +240,17 @@ class _ReportTemplateHtmlEditorPageState extends State<ReportTemplateHtmlEditorP
   }
 
   List<DropdownMenuItem<String>> _paperSizeDropdownItems(String? current) {
-    final items = List<String>.from(kReportTemplatePaperSizeOptions);
+    final items = List<String>.from(
+      (_moduleKey == 'invoices' && _subtype == 'receipt')
+          ? kInvoiceReceiptPaperSizeOptions
+          : kReportTemplatePaperSizeOptions,
+    );
     if (current != null && current.isNotEmpty && !items.contains(current)) {
       items.insert(0, current);
     }
-    return items.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList();
+    return items
+        .map((e) => DropdownMenuItem(value: e, child: Text(reportTemplatePaperSizeLabel(e))))
+        .toList();
   }
 
   Future<bool> _confirmDiscard() async {

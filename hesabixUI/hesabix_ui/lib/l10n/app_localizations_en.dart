@@ -5504,6 +5504,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get presetInvoicesDetail => 'Invoices/Detail';
 
   @override
+  String get presetInvoicesReceipt => 'Invoices/Receipt printer';
+
+  @override
   String get presetReceiptsPaymentsList => 'ReceiptsPayments/List';
 
   @override

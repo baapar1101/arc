@@ -4,6 +4,7 @@
   "reload": "بارگذاری مجدد",
   "presetInvoicesList": "فاکتورها / لیست",
   "presetInvoicesDetail": "فاکتورها / جزئیات",
+  "presetInvoicesReceipt": "فاکتورها / فیش پرینتر",
   "presetReceiptsPaymentsList": "دریافت و پرداخت / لیست",
   "presetReceiptsPaymentsDetail": "دریافت و پرداخت / جزئیات",
   "presetExpenseIncomeList": "هزینه و درآمد / لیست",

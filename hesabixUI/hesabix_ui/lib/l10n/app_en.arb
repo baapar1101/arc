@@ -2126,6 +2126,7 @@
   "reload": "Reload",
   "presetInvoicesList": "Invoices/List",
   "presetInvoicesDetail": "Invoices/Detail",
+  "presetInvoicesReceipt": "Invoices/Receipt printer",
   "presetReceiptsPaymentsList": "ReceiptsPayments/List",
   "presetReceiptsPaymentsDetail": "ReceiptsPayments/Detail",
   "presetExpenseIncomeList": "ExpenseIncome/List",

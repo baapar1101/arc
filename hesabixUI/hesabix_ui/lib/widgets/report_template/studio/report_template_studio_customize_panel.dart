@@ -167,6 +167,23 @@ class ReportTemplateStudioCustomizePanel extends StatelessWidget {
 
   List<Widget> _layoutSections(BuildContext context, Map<String, dynamic> sections) {
     switch (_layout) {
+      case 'invoice_receipt':
+        return [
+          _sectionTitle(context, 'بخش‌های فیش'),
+          _switchSection(sections, 'show_buyer_info', 'نام خریدار'),
+          _switchSection(sections, 'show_seller_info', 'نام فروشنده'),
+          _switchSection(sections, 'show_unit_price', 'فی زیر نام کالا'),
+          _switchSection(sections, 'show_payments', 'لیست پرداخت‌ها'),
+          _switchSection(sections, 'show_footer_note', 'یادداشت پاورقی'),
+          _switchSection(sections, 'show_qr', 'QR تأیید فاکتور'),
+          _switchSection(sections, 'show_print_time', 'زمان چاپ'),
+          _switchSection(sections, 'show_preparer', 'نام صادرکننده'),
+          const SizedBox(height: 16),
+          ..._tableSection(context),
+          const SizedBox(height: 16),
+          _sectionTitle(context, 'جمع‌بندی مالی'),
+          ..._buildTotalsToggles(context),
+        ];
       case 'invoice_detail':
         return [
           _sectionTitle(context, 'بخش‌های فاکتور'),

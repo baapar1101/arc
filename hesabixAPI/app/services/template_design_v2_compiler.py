@@ -756,6 +756,202 @@ def _compile_invoice_list(design: Dict[str, Any]) -> Tuple[str, str, str, str]:
 	return _compile_generic_list(design)
 
 
+def _compile_invoice_receipt(design: Dict[str, Any]) -> Tuple[str, str, str, str]:
+	family_id = str(design.get("family_id") or "invoice_receipt_simple")
+	sections = design.get("sections") or {}
+	table_cfg = design.get("table") or {}
+	totals_cfg = design.get("totals") or {}
+	items_var = str(table_cfg.get("items_var") or "lines")
+	columns = _visible_columns(list(table_cfg.get("columns") or []))
+	css = _theme_css(design, family_id)
+	css += """
+@font-face {
+  font-family: 'YekanBakhFaNum';
+  src: url("{{ fa_font_url_regular|default('') }}") format('truetype');
+  font-weight: 400;
+  font-style: normal;
+}
+@font-face {
+  font-family: 'YekanBakhFaNum';
+  src: url("{{ fa_font_url_bold|default('') }}") format('truetype');
+  font-weight: 700;
+  font-style: normal;
+}
+.rt-layout {
+  font-family: 'YekanBakhFaNum', Vazirmatn, Tahoma, Arial, sans-serif;
+  font-size: 9px;
+  line-height: 1.35;
+}
+.rt-receipt { text-align: center; }
+.rt-receipt-biz { font-size: 11px; font-weight: 700; margin: 0 0 2px 0; }
+.rt-receipt-title { font-size: 10px; font-weight: 700; margin: 0 0 2px 0; }
+.rt-receipt-meta { color: #555; font-size: 8.5px; }
+.rt-rule { border: none; border-top: 1px dashed #222; margin: 5px 0; }
+.rt-rule-solid { border: none; border-top: 1px solid #111; margin: 5px 0; }
+.rt-layout table.rt-receipt-items {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  box-shadow: none;
+  font-size: 8.5px;
+}
+.rt-layout table.rt-receipt-items thead { background: #111; color: #fff; }
+.rt-layout table.rt-receipt-items th,
+.rt-layout table.rt-receipt-items td {
+  border: none;
+  border-bottom: 1px dotted #bbb;
+  padding: 3px 2px;
+  vertical-align: top;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+.rt-layout table.rt-receipt-items tbody tr { page-break-inside: avoid; break-inside: avoid; }
+.rt-item-name { font-weight: 700; text-align: start; }
+.rt-item-meta { font-size: 7.5px; color: #444; margin-top: 1px; text-align: start; }
+.rt-layout table.rt-totals { width: 100%; box-shadow: none; margin-top: 4px; }
+.rt-layout table.rt-totals td { border: none; padding: 2px 0; font-size: 9px; }
+.rt-layout table.rt-totals tr.emphasis td { font-size: 11px; border-top: 1px solid #111; padding-top: 5px; font-weight: 700; }
+.rt-buyer { text-align: start; font-size: 9px; margin: 2px 0; }
+.rt-logo { display: block; margin: 0 auto 4px auto; max-height: 28px; max-width: 72px; object-fit: contain; }
+.rt-qr-wrap { text-align: center; margin-top: 6px; }
+.rt-qr-wrap img { width: 64px; height: 64px; }
+""".strip()
+	logo_html = _logo_html(design, style="max-height:28px;max-width:72px;")
+	business_name = _business_name_expr(design)
+
+	header_html = f"""
+<div class="rt-receipt">
+  {logo_html}
+  {f'<div class="rt-receipt-biz">{business_name}</div>' if business_name else ''}
+  <div class="rt-receipt-title">{{{{ title_text | default('فاکتور') }}}}</div>
+  <div class="rt-receipt-meta"><strong>{{{{ invoice.code | default('-') }}}}</strong> — {_jinja_first_of("invoice.issue_date", "invoice_date_jalali")}</div>
+</div>
+<hr class="rt-rule" />
+""".strip()
+
+	body_parts: List[str] = []
+	if sections.get("show_buyer_info", True):
+		body_parts.append(
+			"""
+<div class="rt-buyer"><strong>خریدار:</strong> {{ buyer.name | default('-') }}</div>
+""".strip()
+		)
+	if sections.get("show_seller_info", False):
+		body_parts.append(
+			f"""
+<div class="rt-buyer"><strong>فروشنده:</strong> {_jinja_first_of("seller.name", "business_name")}</div>
+""".strip()
+		)
+
+	if columns:
+		headers = "".join(
+			_wrap_if_flag(
+				_column_display_flag(col),
+				f"<th style='width:{_esc(col.get('width') or 'auto')};'>{_esc(col.get('title') or col.get('key') or '')}</th>",
+			)
+			for col in columns
+		)
+
+		def _receipt_cell(col: Dict[str, Any]) -> str:
+			key = str(col.get("key") or "").strip()
+			if key == "product_name":
+				inner = (
+					"<div class='rt-item-name'>"
+					"{% if row.product_code %}{{ row.product_code }} — {% endif %}{{ row.product_name | default('-') }}"
+					"</div>"
+					"{% if row.description %}<div class='rt-item-meta'>{{ row.description }}</div>{% endif %}"
+				)
+				if sections.get("show_unit_price", True):
+					inner += (
+						"{% if row.unit_price %}<div class='rt-item-meta'>{{ row.unit_price | money }}"
+						"{% if row.unit_display %} / {{ row.unit_display }}{% endif %}</div>{% endif %}"
+					)
+				return inner
+			if key in ("quantity", "quantity_display"):
+				return "{{ row.quantity_display | default(row.quantity, true) }}"
+			return _cell_expr(col)
+
+		cells = "".join(
+			_wrap_if_flag(_column_display_flag(col), f"<td>{_receipt_cell(col)}</td>")
+			for col in columns
+		)
+		body_parts.append(
+			f"""
+<table class="rt-receipt-items">
+  <thead><tr>{headers}</tr></thead>
+  <tbody>
+  {{% for row in {items_var} %}}
+    <tr>{cells}</tr>
+  {{% endfor %}}
+  </tbody>
+</table>
+""".strip()
+		)
+
+	total_rows = [r for r in (totals_cfg.get("rows") or []) if isinstance(r, dict) and r.get("visible", True) is not False]
+	if total_rows:
+		rows_html = []
+		for row in total_rows:
+			emphasis = " class='emphasis'" if row.get("emphasis") else ""
+			title = _esc(row.get("title") or "")
+			val = _total_expr(row)
+			row_html = f"<tr{emphasis}><td>{title}</td><td style='text-align:end;font-weight:700;'>{val}</td></tr>"
+			rows_html.append(_wrap_if_flag(_total_display_flag(row), row_html))
+		body_parts.append(
+			f"<hr class='rt-rule-solid' /><table class='rt-totals'><tbody>{''.join(rows_html)}</tbody></table>"
+		)
+
+	if sections.get("show_payments", True):
+		body_parts.append(
+			"""
+{% if payments is defined and payments %}
+<hr class="rt-rule" />
+{% for p in payments %}
+<div class="rt-receipt-meta">{{ p.method_name | default('-') }} — {{ p.amount | money }}</div>
+{% endfor %}
+{% endif %}
+""".strip()
+		)
+
+	if sections.get("show_footer_note", True):
+		body_parts.append(
+			"""
+{% if invoice_footer_note is defined and invoice_footer_note %}
+<hr class="rt-rule" />
+<div class="rt-receipt-meta">{{ invoice_footer_note }}</div>
+{% endif %}
+""".strip()
+		)
+
+	if sections.get("show_qr", False):
+		body_parts.append(
+			"""
+{% if show_invoice_verify_qr is defined and show_invoice_verify_qr and invoice_verify_qr_data_uri is defined and invoice_verify_qr_data_uri %}
+<div class="rt-qr-wrap">
+  <img src="{{ invoice_verify_qr_data_uri }}" width="64" height="64" alt="QR" />
+</div>
+{% endif %}
+""".strip()
+		)
+
+	footer_bits: List[str] = []
+	if sections.get("show_print_time", True):
+		footer_bits.append("{{ generated_at }}")
+	if sections.get("show_preparer", False):
+		footer_bits.append("{{ issuer_name | default('') }}")
+	footer_html = ""
+	if footer_bits:
+		footer_html = (
+			'<div style="font-size:7.5px;color:#555;text-align:center;margin-top:6px;">'
+			+ " · ".join(footer_bits)
+			+ "</div>"
+		)
+
+	body_html = f'<div class="rt-layout">{"".join(body_parts)}</div>'
+	html_doc = f"<!doctype html><html><head></head><body>{body_html}</body></html>"
+	return html_doc, css, header_html, footer_html
+
+
 def compile_v2_design_to_jinja_html(design: Dict[str, Any]) -> Tuple[str, str, str, str]:
 	if not is_v2_design(design):
 		raise ValueError("Not a v2 design schema")
@@ -766,6 +962,7 @@ def compile_v2_design_to_jinja_html(design: Dict[str, Any]) -> Tuple[str, str, s
 	layout = str(design.get("layout") or family.layout or "").strip()
 	compilers = {
 		"invoice_detail": _compile_invoice_detail,
+		"invoice_receipt": _compile_invoice_receipt,
 		"generic_list": _compile_generic_list,
 		"document_detail": _compile_document_detail,
 		"receipt_detail": _compile_receipt_detail,

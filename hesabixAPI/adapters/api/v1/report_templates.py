@@ -705,7 +705,7 @@ async def report_template_schema(
 				"is_fa": True,
 			}
 		)
-	elif module_key == "invoices" and (subtype or "") == "detail":
+	elif module_key == "invoices" and (subtype or "") in ("detail", "receipt"):
 		data["keys"] += [
 			{"name": "invoice", "desc": "شیء فاکتور"},
 			{"name": "lines", "desc": "آیتم‌های فاکتور"},
@@ -733,13 +733,19 @@ async def report_template_schema(
 				"lines": [
 					{
 						"product_name": "کالای نمونه ۱",
+						"product_code": "P-1",
 						"quantity": 2,
+						"quantity_display": "2",
+						"unit_display": "عدد",
 						"unit_price": 250000,
 						"line_total": 500000,
 					},
 					{
 						"product_name": "کالای نمونه ۲",
+						"product_code": "P-2",
 						"quantity": 1,
+						"quantity_display": "1",
+						"unit_display": "عدد",
 						"unit_price": 500000,
 						"line_total": 500000,
 					},

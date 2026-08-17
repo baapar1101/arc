@@ -10362,6 +10362,12 @@ abstract class AppLocalizations {
   /// **'Invoices/Detail'**
   String get presetInvoicesDetail;
 
+  /// No description provided for @presetInvoicesReceipt.
+  ///
+  /// In en, this message translates to:
+  /// **'Invoices/Receipt printer'**
+  String get presetInvoicesReceipt;
+
   /// No description provided for @presetReceiptsPaymentsList.
   ///
   /// In en, this message translates to:

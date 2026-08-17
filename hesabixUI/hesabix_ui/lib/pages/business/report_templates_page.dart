@@ -64,6 +64,10 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
           _moduleCtrl.text = 'invoices';
           _subtypeCtrl.text = 'detail';
           break;
+        case 'invoices_receipt':
+          _moduleCtrl.text = 'invoices';
+          _subtypeCtrl.text = 'receipt';
+          break;
         case 'receipts_payments_list':
           _moduleCtrl.text = 'receipts_payments';
           _subtypeCtrl.text = 'list';
@@ -108,6 +112,7 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
       DropdownMenuItem(value: 'all', child: Text(t.reportTemplatesScopeAll)),
       DropdownMenuItem(value: 'invoices_list', child: Text(t.presetInvoicesList)),
       DropdownMenuItem(value: 'invoices_detail', child: Text(t.presetInvoicesDetail)),
+      DropdownMenuItem(value: 'invoices_receipt', child: Text(t.presetInvoicesReceipt)),
       DropdownMenuItem(value: 'receipts_payments_list', child: Text(t.presetReceiptsPaymentsList)),
       DropdownMenuItem(value: 'receipts_payments_detail', child: Text(t.presetReceiptsPaymentsDetail)),
       DropdownMenuItem(value: 'expense_income_list', child: Text(t.presetExpenseIncomeList)),
@@ -143,6 +148,7 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
     final st = (subtype ?? '').trim();
     if (moduleKey == 'invoices' && st == 'list') return t.presetInvoicesList;
     if (moduleKey == 'invoices' && st == 'detail') return t.presetInvoicesDetail;
+    if (moduleKey == 'invoices' && st == 'receipt') return t.presetInvoicesReceipt;
     if (moduleKey == 'receipts_payments' && st == 'list') return t.presetReceiptsPaymentsList;
     if (moduleKey == 'receipts_payments' && st == 'detail') return t.presetReceiptsPaymentsDetail;
     if (moduleKey == 'expense_income' && st == 'list') return t.presetExpenseIncomeList;
@@ -1691,6 +1697,10 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
                   ActionChip(
                     label: Text(t.presetInvoicesDetail),
                     onPressed: () => _applyScopePreset('invoices_detail'),
+                  ),
+                  ActionChip(
+                    label: Text(t.presetInvoicesReceipt),
+                    onPressed: () => _applyScopePreset('invoices_receipt'),
                   ),
                   ActionChip(
                     label: Text(t.presetReceiptsPaymentsList),

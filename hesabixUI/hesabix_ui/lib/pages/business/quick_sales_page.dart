@@ -13,6 +13,7 @@ import '../../services/warehouse_service.dart';
 import '../../services/price_list_service.dart';
 import '../../services/category_service.dart';
 import '../../core/api_client.dart';
+import '../../constants/invoice_print_paper.dart';
 import '../../core/auth_store.dart';
 import '../../core/hesabix_back.dart';
 import '../../core/calendar_controller.dart';
@@ -170,6 +171,7 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
   bool _showInventory = true;
   bool _showPurchasePrice = false;
   int? _printTemplateId;
+  String? _printPaperSize = '80mm';
   
   // تاریخ و شرح سند فاکتور
   DateTime _documentDate = DateTime.now();
@@ -450,6 +452,7 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
         _showPurchasePrice = (settings['show_purchase_price'] ?? false) &&
             widget.authStore.canViewPurchasePrice();
         _printTemplateId = settings['print_template_id'];
+        _printPaperSize = (settings['print_paper_size'] ?? '80mm')?.toString();
         _autoCreatePaymentDocument = settings['auto_create_payment_document'] ?? true;
         _settingsDefaultWarehouseId = _defaultWarehouseId;
         _settingsDefaultCashRegisterId = _selectedCashRegisterId;
@@ -2264,6 +2267,11 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
       if (_printTemplateId != null) {
         query['template_id'] = _printTemplateId;
       }
+      final paperSize = (_printPaperSize ?? '80mm').trim();
+      if (paperSize.isNotEmpty) {
+        query['paper_size'] = paperSize;
+      }
+      query['orientation'] = isInvoiceReceiptPaper(paperSize) ? 'portrait' : 'landscape';
       
       final bytes = await _invoiceService.downloadInvoicePdf(
         businessId: widget.businessId,

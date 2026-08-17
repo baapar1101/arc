@@ -75,7 +75,7 @@ def validate_v2_design(
 		if not key:
 			errors.append(f"Column {idx} is missing key")
 
-	if module_key == "invoices" and (subtype or "") == "detail":
+	if module_key == "invoices" and (subtype or "") in ("detail", "receipt"):
 		totals = (design.get("totals") or {}).get("rows") or []
 		visible_totals = [r for r in totals if isinstance(r, dict) and r.get("visible", True) is not False]
 		if not visible_totals:

@@ -12,12 +12,14 @@ import 'package:hesabix_ui/services/bytes_export/bytes_export_service.dart';
 /// دادهٔ اولیه برای برگهٔ چاپ PDF (هم‌سو با بارگذاری در دیالوگ جزئیات فاکتور).
 class InvoicePdfPrintPreflight {
   final List<Map<String, dynamic>> templates;
+  final List<Map<String, dynamic>> receiptTemplates;
   final bool initialShowStamp;
   final bool allowShareQr;
   final bool initialShowShareQr;
 
   const InvoicePdfPrintPreflight({
     required this.templates,
+    this.receiptTemplates = const [],
     required this.initialShowStamp,
     required this.allowShareQr,
     required this.initialShowShareQr,
@@ -29,15 +31,27 @@ class InvoicePdfPrintPreflight {
   }) async {
     final templateService = ReportTemplateService(ApiClient());
     List<Map<String, dynamic>> templates = [];
+    List<Map<String, dynamic>> receiptTemplates = [];
     try {
-      templates = await templateService.listTemplates(
-        businessId: businessId,
-        moduleKey: 'invoices',
-        subtype: 'detail',
-        status: 'published',
-      );
+      final results = await Future.wait([
+        templateService.listTemplates(
+          businessId: businessId,
+          moduleKey: 'invoices',
+          subtype: 'detail',
+          status: 'published',
+        ),
+        templateService.listTemplates(
+          businessId: businessId,
+          moduleKey: 'invoices',
+          subtype: 'receipt',
+          status: 'published',
+        ),
+      ]);
+      templates = results[0];
+      receiptTemplates = results[1];
     } catch (_) {
       templates = const [];
+      receiptTemplates = const [];
     }
 
     var initialShowStamp = true;
@@ -62,6 +76,7 @@ class InvoicePdfPrintPreflight {
 
     return InvoicePdfPrintPreflight(
       templates: templates,
+      receiptTemplates: receiptTemplates,
       initialShowStamp: initialShowStamp,
       allowShareQr: allowShareQr,
       initialShowShareQr: initialShowShareQr,
@@ -139,6 +154,7 @@ class InvoicePdfPrintFlow {
     final result = await showInvoicePrintOptionsBottomSheet(
       context: context,
       templates: preflight.templates,
+      receiptTemplates: preflight.receiptTemplates,
       loadingTemplates: false,
       initialPaperSize: initialPaperSize,
       initialOrientation: initialOrientation,

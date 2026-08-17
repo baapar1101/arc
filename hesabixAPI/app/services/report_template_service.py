@@ -205,12 +205,12 @@ class ReportTemplateService:
 						)
 					except TemplateSyntaxError as ex:
 						errors.append(f"Invalid totals expression in row {idx}: {ex.message}")
-		if module_key == "invoices" and (subtype or "") == "detail":
+		if module_key == "invoices" and (subtype or "") in ("detail", "receipt"):
 			found_types = {str((b.get("type") or "")).strip().lower() for b in all_blocks}
 			if "table" not in found_types:
-				warnings.append("Invoice detail template usually needs an items table block")
+				warnings.append("Invoice template usually needs an items table block")
 			if "totals" not in found_types:
-				warnings.append("Invoice detail template usually needs a totals block")
+				warnings.append("Invoice template usually needs a totals block")
 		return {"errors": errors, "warnings": warnings}
 
 	@staticmethod
@@ -738,17 +738,25 @@ class ReportTemplateService:
 
 		# تنظیمات صفحه (@page) از روی ویژگی‌های قالب (با امکان override از چاپ/PDF)
 		try:
+			from app.services.pdf.page_size import (
+				build_page_size_css,
+				default_receipt_margins,
+				is_receipt_paper,
+				receipt_page_chrome_css,
+			)
+
 			page_css_parts = []
-			size_parts = []
 			ps_eff = (page_paper_size or "").strip() or (getattr(template, "paper_size", None) or "").strip()
 			ori_eff = (page_orientation or "").strip().lower() or (getattr(template, "orientation", None) or "").strip().lower()
+			if is_receipt_paper(ps_eff) and ori_eff not in ("portrait", "landscape"):
+				ori_eff = "portrait"
 			if ps_eff:
-				size_parts.append(str(ps_eff))
-			if ori_eff in ("portrait", "landscape"):
-				size_parts.append(str(ori_eff))
-			if size_parts:
-				page_css_parts.append(f"size: {' '.join(size_parts)};")
+				page_css_parts.append(f"size: {build_page_size_css(ps_eff, ori_eff or 'portrait')};")
+			elif ori_eff in ("portrait", "landscape"):
+				page_css_parts.append(f"size: A4 {ori_eff};")
 			margins = template.margins or {}
+			if is_receipt_paper(ps_eff) and not margins:
+				margins = default_receipt_margins()
 			mt = margins.get("top")
 			mr = margins.get("right")
 			mb = margins.get("bottom")
@@ -778,6 +786,9 @@ class ReportTemplateService:
 			# اگر چیزی برای @page داریم، تزریق کنیم
 			if page_css_parts:
 				page_css = "@page { " + " ".join(page_css_parts) + " }"
+				if is_receipt_paper(ps_eff):
+					cont = "ادامه فاکتور" if context.get("is_fa", True) else "Continued"
+					page_css = page_css + receipt_page_chrome_css(continuation_label=cont)
 				if "</head>" in html:
 					html = html.replace("</head>", f"<style>{page_css}</style></head>")
 				else:

@@ -18,7 +18,8 @@
       }
       @page {
         margin: 1cm;
-        size: {{ (paper_size or 'A4') ~ ' ' ~ (orientation or 'portrait') }};
+        size: {{ page_size_css or ((paper_size or 'A4') ~ ' ' ~ (orientation or 'portrait')) }};
+        {% if not hide_page_numbers %}
         @bottom-left {
           color: #666;
           font-size: 10px;
@@ -35,6 +36,7 @@
           {% if is_fa %}font-family: 'YekanBakhFaNum', Vazirmatn, Tahoma, Arial, sans-serif;{% endif %}
           content: string(doc_footer);
         }
+        {% endif %}
       }
       :root {
         --primary: #366092;

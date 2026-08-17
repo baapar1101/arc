@@ -132,6 +132,7 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
   List<dynamic> _relatedWhDocs = const [];
   final ReportTemplateService _templateService = ReportTemplateService(ApiClient());
   List<Map<String, dynamic>> _invoiceTemplates = const [];
+  List<Map<String, dynamic>> _invoiceReceiptTemplates = const [];
   bool _loadingInvoiceTemplates = false;
   String? _invoicePrintPaperSize;
   String _invoicePrintOrientation = 'landscape';
@@ -636,6 +637,7 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
     final result = await showInvoicePrintOptionsBottomSheet(
       context: context,
       templates: _invoiceTemplates,
+      receiptTemplates: _invoiceReceiptTemplates,
       loadingTemplates: _loadingInvoiceTemplates,
       initialPaperSize: _invoicePrintPaperSize,
       initialOrientation: _invoicePrintOrientation,
@@ -839,20 +841,30 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
       _loadingInvoiceTemplates = true;
     });
     try {
-      final items = await _templateService.listTemplates(
-        businessId: businessId,
-        moduleKey: 'invoices',
-        subtype: 'detail',
-        status: 'published',
-      );
+      final results = await Future.wait([
+        _templateService.listTemplates(
+          businessId: businessId,
+          moduleKey: 'invoices',
+          subtype: 'detail',
+          status: 'published',
+        ),
+        _templateService.listTemplates(
+          businessId: businessId,
+          moduleKey: 'invoices',
+          subtype: 'receipt',
+          status: 'published',
+        ),
+      ]);
       if (!mounted) return;
       setState(() {
-        _invoiceTemplates = items;
+        _invoiceTemplates = results[0];
+        _invoiceReceiptTemplates = results[1];
       });
     } catch (_) {
       if (!mounted) return;
       setState(() {
         _invoiceTemplates = const [];
+        _invoiceReceiptTemplates = const [];
       });
     } finally {
       if (mounted) {

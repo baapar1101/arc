@@ -18,6 +18,7 @@ class ScopeMeta:
 _SCOPES: List[ScopeMeta] = [
     ScopeMeta("invoices", "list", "فاکتورها (لیست)", "Invoices (list)", "invoices", allowed_blocks={"text", "image", "table", "divider", "spacer"}),
     ScopeMeta("invoices", "detail", "فاکتور (جزئیات)", "Invoice (detail)", "invoices", allowed_blocks={"text", "image", "table", "divider", "spacer", "qr", "totals"}),
+    ScopeMeta("invoices", "receipt", "فاکتور (فیش پرینتر)", "Invoice (receipt printer)", "invoices", allowed_blocks={"text", "image", "table", "divider", "spacer", "qr", "totals"}),
     ScopeMeta("receipts_payments", "list", "دریافت/پرداخت (لیست)", "Receipts/Payments (list)", "receipts_payments", allowed_blocks={"text", "image", "table", "divider", "spacer"}),
     ScopeMeta("receipts_payments", "detail", "دریافت/پرداخت (جزئیات)", "Receipts/Payments (detail)", "receipts_payments", allowed_blocks={"text", "image", "table", "divider", "spacer", "totals"}),
     ScopeMeta("expense_income", "list", "هزینه/درآمد (لیست)", "Expense/Income (list)", "expense_income", allowed_blocks={"text", "image", "table", "divider", "spacer"}),

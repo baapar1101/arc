@@ -5472,6 +5472,9 @@ class AppLocalizationsFa extends AppLocalizations {
   String get presetInvoicesDetail => 'فاکتورها / جزئیات';
 
   @override
+  String get presetInvoicesReceipt => 'فاکتورها / فیش پرینتر';
+
+  @override
   String get presetReceiptsPaymentsList => 'دریافت و پرداخت / لیست';
 
   @override

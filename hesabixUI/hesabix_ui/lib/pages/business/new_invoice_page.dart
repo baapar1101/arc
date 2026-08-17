@@ -26,6 +26,7 @@ import '../../utils/number_normalizer.dart';
 import '../../utils/currency_display_utils.dart';
 import '../../services/currency_service.dart';
 import '../../core/api_client.dart';
+import '../../constants/invoice_print_paper.dart';
 import '../../utils/responsive_helper.dart';
 import '../../services/business_api_service.dart';
 import '../../services/person_service.dart';
@@ -143,6 +144,7 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
   Map<String, dynamic>? _businessPrintSettingsDefault;
   Map<String, Map<String, dynamic>> _businessPrintSettingsPerType = {};
   List<Map<String, dynamic>> _availablePrintTemplates = const [];
+  List<Map<String, dynamic>> _availableReceiptPrintTemplates = const [];
   bool _isLoadingPrintTemplates = false;
   
   // تراکنش‌های فاکتور
@@ -893,20 +895,31 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
     });
     try {
       final service = ReportTemplateService(ApiClient());
-      final templates = await service.listTemplates(
-        businessId: widget.businessId,
-        moduleKey: 'invoices',
-        subtype: 'detail',
-        status: 'published',
-      );
+      final results = await Future.wait([
+        service.listTemplates(
+          businessId: widget.businessId,
+          moduleKey: 'invoices',
+          subtype: 'detail',
+          status: 'published',
+        ),
+        service.listTemplates(
+          businessId: widget.businessId,
+          moduleKey: 'invoices',
+          subtype: 'receipt',
+          status: 'published',
+        ),
+      ]);
       if (!mounted) return;
       setState(() {
-        _availablePrintTemplates = templates;
+        _availablePrintTemplates = results[0];
+        _availableReceiptPrintTemplates = results[1];
+        _syncPrintTemplateWithPaperSize();
       });
     } catch (_) {
       if (mounted) {
         setState(() {
           _availablePrintTemplates = const [];
+          _availableReceiptPrintTemplates = const [];
         });
       }
     } finally {
@@ -915,6 +928,24 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
           _isLoadingPrintTemplates = false;
         });
       }
+    }
+  }
+
+  List<Map<String, dynamic>> get _printTemplatesForCurrentPaper =>
+      isInvoiceReceiptPaper(_selectedPaperSize)
+          ? _availableReceiptPrintTemplates
+          : _availablePrintTemplates;
+
+  void _syncPrintTemplateWithPaperSize() {
+    final ids = _printTemplatesForCurrentPaper
+        .map((tpl) => tpl['id']?.toString())
+        .whereType<String>()
+        .toSet();
+    if (_selectedPrintTemplate != null && !ids.contains(_selectedPrintTemplate)) {
+      _selectedPrintTemplate = null;
+    }
+    if (isInvoiceReceiptPaper(_selectedPaperSize)) {
+      _selectedPaperOrientation = 'portrait';
     }
   }
 
@@ -1019,6 +1050,9 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
         final orientation = data['orientation']?.toString();
         if (orientation != null && orientation.isNotEmpty) {
           _selectedPaperOrientation = orientation;
+        }
+        if (isInvoiceReceiptPaper(_selectedPaperSize)) {
+          _selectedPaperOrientation = 'portrait';
         }
         final showStamp = _parseBool(data['show_stamp']);
         if (showStamp != null) {
@@ -2462,8 +2496,11 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
       if (paperSize != null && paperSize.isNotEmpty) {
         query['paper_size'] = paperSize;
       }
-      final orientation = _selectedPaperOrientation;
-      if (orientation != null && orientation.isNotEmpty) {
+      final orientation = invoicePrintOrientationForPaper(
+        paperSize,
+        _selectedPaperOrientation,
+      );
+      if (orientation.isNotEmpty) {
         query['orientation'] = orientation;
       }
       final templateId = int.tryParse(_selectedPrintTemplate ?? '');
@@ -3648,21 +3685,24 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                         
                         // انتخاب سایز کاغذ
                         DropdownButtonFormField<String>(
-                          initialValue: _selectedPaperSize,
+                          value: (_selectedPaperSize != null &&
+                                  kInvoicePrintPaperOptions.any((o) => o.value == _selectedPaperSize))
+                              ? _selectedPaperSize
+                              : 'A4',
                           decoration: const InputDecoration(
                             labelText: 'سایز کاغذ',
                             border: OutlineInputBorder(),
                           ),
-                          items: const [
-                            DropdownMenuItem(value: 'A4', child: Text('A4')),
-                            DropdownMenuItem(value: 'A5', child: Text('A5')),
-                            DropdownMenuItem(value: 'A6', child: Text('A6')),
-                            DropdownMenuItem(value: '80mm', child: Text('80mm (فیش)')),
+                          items: [
+                            ...kInvoicePrintPaperOptions.map(
+                              (o) => DropdownMenuItem(value: o.value, child: Text(o.labelFa)),
+                            ),
                           ],
                           onChanged: (value) {
                             setState(() {
                               _selectedPaperSize = value;
                               _hasUserCustomizedSettings = true;
+                              _syncPrintTemplateWithPaperSize();
                             });
                             _saveLocalSettings();
                           },
@@ -3670,22 +3710,30 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                         const SizedBox(height: 16),
 
                         DropdownButtonFormField<String>(
-                          value: _selectedPaperOrientation,
-                          decoration: const InputDecoration(
+                          value: invoicePrintOrientationForPaper(
+                            _selectedPaperSize,
+                            _selectedPaperOrientation,
+                          ),
+                          decoration: InputDecoration(
                             labelText: 'جهت چاپ',
-                            border: OutlineInputBorder(),
+                            border: const OutlineInputBorder(),
+                            helperText: isInvoiceReceiptPaper(_selectedPaperSize)
+                                ? 'فیش پرینتر همیشه عمودی چاپ می‌شود'
+                                : null,
                           ),
                           items: const [
                             DropdownMenuItem(value: 'portrait', child: Text('عمودی (Portrait)')),
                             DropdownMenuItem(value: 'landscape', child: Text('افقی (Landscape)')),
                           ],
-                          onChanged: (value) {
-                            setState(() {
-                              _selectedPaperOrientation = value;
-                              _hasUserCustomizedSettings = true;
-                            });
-                            _saveLocalSettings();
-                          },
+                          onChanged: isInvoiceReceiptPaper(_selectedPaperSize)
+                              ? null
+                              : (value) {
+                                  setState(() {
+                                    _selectedPaperOrientation = value;
+                                    _hasUserCustomizedSettings = true;
+                                  });
+                                  _saveLocalSettings();
+                                },
                         ),
                         const SizedBox(height: 16),
                         
@@ -3734,7 +3782,7 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                                 value: null,
                                 child: Text(t.noCustomTemplate),
                               ),
-                              ..._availablePrintTemplates.map(
+                              ..._printTemplatesForCurrentPaper.map(
                                 (tpl) => DropdownMenuItem<String?>(
                                   value: tpl['id']?.toString(),
                                   child: Text(tpl['name']?.toString() ?? 'Template ${tpl['id']}'),
