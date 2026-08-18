@@ -447,6 +447,11 @@ hesabix_mirror_summary_flutter() {
   fi
 }
 
+# Write KEY=value into a sourced env file; quote so values with spaces are safe.
+hesabix_write_env_assignment() {
+  printf '%s=%q\n' "$1" "${2:-}"
+}
+
 # Write mirror vars into .deploy_env (append/update keys).
 hesabix_persist_mirror_to_deploy_env() {
   local env_file="${1:-/opt/hesabix/.deploy_env}"
@@ -458,13 +463,13 @@ hesabix_persist_mirror_to_deploy_env() {
   grep -vE '^(PIP_MIRROR|FLUTTER_MIRROR|PIP_INDEX_URL|PIP_EXTRA_INDEX_URL|PIP_TRUSTED_HOST|PUB_HOSTED_URL|FLUTTER_STORAGE_BASE_URL)=' "${env_file}" > "${tmp}" 2>/dev/null || true
   {
     cat "${tmp}"
-    echo "PIP_MIRROR=${PIP_MIRROR:-hesabix}"
-    echo "FLUTTER_MIRROR=${FLUTTER_MIRROR:-hesabix}"
-    echo "PIP_INDEX_URL=${PIP_INDEX_URL:-}"
-    echo "PIP_EXTRA_INDEX_URL=${PIP_EXTRA_INDEX_URL:-}"
-    echo "PIP_TRUSTED_HOST=${PIP_TRUSTED_HOST:-}"
-    echo "PUB_HOSTED_URL=${PUB_HOSTED_URL:-}"
-    echo "FLUTTER_STORAGE_BASE_URL=${FLUTTER_STORAGE_BASE_URL:-}"
+    hesabix_write_env_assignment PIP_MIRROR "${PIP_MIRROR:-hesabix}"
+    hesabix_write_env_assignment FLUTTER_MIRROR "${FLUTTER_MIRROR:-hesabix}"
+    hesabix_write_env_assignment PIP_INDEX_URL "${PIP_INDEX_URL:-}"
+    hesabix_write_env_assignment PIP_EXTRA_INDEX_URL "${PIP_EXTRA_INDEX_URL:-}"
+    hesabix_write_env_assignment PIP_TRUSTED_HOST "${PIP_TRUSTED_HOST:-}"
+    hesabix_write_env_assignment PUB_HOSTED_URL "${PUB_HOSTED_URL:-}"
+    hesabix_write_env_assignment FLUTTER_STORAGE_BASE_URL "${FLUTTER_STORAGE_BASE_URL:-}"
   } > "${env_file}.new"
   mv "${env_file}.new" "${env_file}"
   chmod 600 "${env_file}" 2>/dev/null || true
