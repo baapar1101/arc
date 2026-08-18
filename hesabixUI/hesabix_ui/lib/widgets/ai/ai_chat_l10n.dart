@@ -549,6 +549,15 @@ String aiTraceStepTitle(AppLocalizations l10n, AIAgentTraceStep step) {
       if (step.kind == 'approval') {
         return l10n.aiStatusAwaitingApproval;
       }
+      if (step.kind == 'subagent') {
+        final goal = params['goal'] as String? ??
+            step.bodyMarkdown ??
+            '';
+        final trimmed = goal.trim();
+        return trimmed.isEmpty
+            ? l10n.aiToolSpawnSubagent
+            : '${l10n.aiToolSpawnSubagent}: $trimmed';
+      }
       if (step.tool != null) {
         return aiToolLabel(l10n, step.tool!, toolKey: step.toolKey);
       }

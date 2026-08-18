@@ -20,7 +20,40 @@ const _skipResultKeys = {
   kAgentBudgetStorageKey,
   kAgentTodosStorageKey,
   kAgentRunStorageKey,
+  kAgentCitationsStorageKey,
+  kActivatedSkillsStorageKey,
+  kReasoningTraceStorageKey,
 };
+
+const _traceLikeColumns = {
+  'trace_id',
+  'step_id',
+  'kind',
+  'state',
+  'layer',
+  'visibility',
+  'title_key',
+  'body_markdown',
+};
+
+bool _isInternalResultKey(String key) =>
+    key.startsWith('_') || _skipResultKeys.contains(key);
+
+bool _looksLikeTraceRecords(List<Map<String, dynamic>> records) {
+  if (records.isEmpty) return false;
+  var hits = 0;
+  for (final row in records.take(8)) {
+    final keys = row.keys.map((k) => k.toString()).toSet();
+    final overlap = keys.intersection(_traceLikeColumns);
+    if (overlap.contains('trace_id') ||
+        (overlap.contains('step_id') && overlap.contains('kind')) ||
+        overlap.length >= 3) {
+      hits++;
+    }
+  }
+  final sample = records.length < 8 ? records.length : 8;
+  return hits >= (sample <= 1 ? 1 : (sample / 2).ceil());
+}
 
 bool markdownLooksLikeTable(String content) {
   final t = content.trim();
@@ -66,8 +99,10 @@ List<AITableSpec> extractToolTableSpecsFromResults(Object? functionResults) {
   AITableSpec? best;
   var bestLen = 0;
   for (final entry in functionResults.entries) {
-    if (_skipResultKeys.contains(entry.key.toString())) continue;
+    final key = entry.key.toString();
+    if (_isInternalResultKey(key)) continue;
     final records = extractToolRecordsFromResult(entry.value);
+    if (_looksLikeTraceRecords(records)) continue;
     final spec = AITableSpec.tryFromRecords(records);
     if (spec == null || !spec.hasData) continue;
     if (records.length > bestLen) {

@@ -51,6 +51,24 @@ def test_huge_dict_without_list_stays_valid_json() -> None:
     assert "…" not in text[-5:] or data.get("_envelope") == 1
 
 
+def test_error_compact_keeps_hint_and_expected_args() -> None:
+    payload = {
+        "ok": False,
+        "error": "INVALID_ARGUMENTS",
+        "message": "پارامتر ناقص است",
+        "message_fa": "پارامتر ناقص است",
+        "hint_fa": "items را بفرست",
+        "retryable": True,
+        "expected_args": ["items"],
+        "tool": "create_session_plan",
+    }
+    text = compact_tool_result_for_llm("create_session_plan", payload)
+    data = json.loads(text)
+    assert data["hint_fa"] == "items را بفرست"
+    assert data["expected_args"] == ["items"]
+    assert data["retryable"] is True
+
+
 def test_approval_required_passthrough() -> None:
     payload = {
         "error": "APPROVAL_REQUIRED",

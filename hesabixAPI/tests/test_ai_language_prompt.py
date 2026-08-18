@@ -87,3 +87,21 @@ def test_build_language_context_prompt_block_en():
     block = build_language_context_prompt_block("en")
     assert "English" in block
     assert "analysis-panel" in block or "analysis panel" in block
+
+
+def test_visible_reasoning_markdown_hides_english_for_fa():
+    from app.services.ai.ai_language_prompt import visible_reasoning_markdown
+
+    hidden = visible_reasoning_markdown(
+        "I will now call search_invoices to gather data",
+        "fa",
+    )
+    assert "search_invoices" not in hidden
+    assert "تحلیل" in hidden
+    kept = visible_reasoning_markdown(
+        "ابتدا بازه تاریخ را مشخص می‌کنم و سپس فاکتورها را می‌خوانم",
+        "fa",
+    )
+    assert "بازه تاریخ" in kept
+    english = visible_reasoning_markdown("Looking up invoices next", "en")
+    assert "Looking up" in english

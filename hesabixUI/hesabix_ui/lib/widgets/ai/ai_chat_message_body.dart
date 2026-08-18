@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/models/ai_stream_event.dart';
 import 'package:hesabix_ui/utils/ai_content_sanitize.dart';
+import 'package:hesabix_ui/utils/ai_markdown_normalize.dart';
 import 'ai_reasoning_panel.dart';
 import 'ai_chat_chart_widget.dart';
 import 'ai_chat_l10n.dart';
@@ -24,6 +25,7 @@ class AIChatMessageBody extends StatelessWidget {
   final Object? functionResults;
   final bool suppressApprovalToolChips;
   final void Function(AISessionTodoItem item, String status)? onTodoStatus;
+  final void Function(String subagentId)? onCancelSubagent;
 
   const AIChatMessageBody({
     super.key,
@@ -34,6 +36,7 @@ class AIChatMessageBody extends StatelessWidget {
     this.functionResults,
     this.suppressApprovalToolChips = false,
     this.onTodoStatus,
+    this.onCancelSubagent,
   });
 
   @override
@@ -80,6 +83,7 @@ class AIChatMessageBody extends StatelessWidget {
             compact: true,
             initiallyExpanded: agentTodos?.hasActiveItem ?? false,
             onTodoStatus: onTodoStatus,
+            onCancelSubagent: onCancelSubagent,
           ),
           const SizedBox(height: 8),
         ],
@@ -292,39 +296,6 @@ class _AssistantRichContent extends StatelessWidget {
       listBullet: body,
       listIndent: 20,
     );
-  }
-
-  /// نرمال‌سازی محافظه‌کارانه‌ی markdown دریافتی از هوش مصنوعی.
-  ///
-  /// مدل‌ها اغلب تأکید را با فاصله‌ی اضافه می‌نویسند (`** متن **`) که در
-  /// CommonMark معتبر نیست و bold نمی‌شود. اینجا فقط فاصله‌ی داخل دلیمیترهای
-  /// تأکید حذف می‌شود و محتوای بلوک کد و inline code دست‌نخورده می‌ماند.
-  static String normalizeAssistantMarkdown(String input) {
-    if (input.isEmpty) return input;
-    final codeSpans = RegExp(r'```[\s\S]*?```|`[^`\n]*`');
-    final buffer = StringBuffer();
-    var last = 0;
-    for (final m in codeSpans.allMatches(input)) {
-      if (m.start > last) {
-        buffer.write(_normalizeEmphasis(input.substring(last, m.start)));
-      }
-      buffer.write(m.group(0));
-      last = m.end;
-    }
-    if (last < input.length) {
-      buffer.write(_normalizeEmphasis(input.substring(last)));
-    }
-    return buffer.toString();
-  }
-
-  static final _boldSpaced = RegExp(r'\*\*[ \t]*(\S(?:.*?\S)?)[ \t]*\*\*');
-  static final _boldUnderscoreSpaced =
-      RegExp(r'__[ \t]*(\S(?:.*?\S)?)[ \t]*__');
-
-  static String _normalizeEmphasis(String s) {
-    var out = s.replaceAllMapped(_boldSpaced, (m) => '**${m[1]}**');
-    out = out.replaceAllMapped(_boldUnderscoreSpaced, (m) => '__${m[1]}__');
-    return out;
   }
 
   /// جدا کردن بلوک‌های ```chart / ```table / ```json از متن.

@@ -15,7 +15,7 @@ String? sendBlockReason({
 }) {
   if (voiceActive) return 'voiceActive';
   if (sending) return 'sending';
-  if (content.trim().isEmpty) return 'emptyContent';
+  if (content.trim().isEmpty && !approveWrites) return 'emptyContent';
   if ((approveWrites || requireExistingSession) && sessionId == null) {
     return 'approvalNeedsSession';
   }

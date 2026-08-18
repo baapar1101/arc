@@ -1688,6 +1688,7 @@ class AIService(AIModelRouterMixin, AIUsageMeterMixin):
             session_business_id or self.business_id,
             user_query=effective_user_query,
         )
+        from app.services.ai.ai_language_prompt import visible_reasoning_markdown
         _needs_tools_routing = self._routing_needs_tools(
             use_function_calling, effective_user_query, messages
         )
@@ -2279,7 +2280,9 @@ class AIService(AIModelRouterMixin, AIUsageMeterMixin):
                                         kind="reasoning",
                                         state="active",
                                         title_key="aiTraceReasoning",
-                                        body_markdown=round_reasoning,
+                                        body_markdown=visible_reasoning_markdown(
+                                            round_reasoning, chat_language
+                                        ),
                                         iteration=iteration,
                                         layer="reasoning",
                                     )
@@ -2425,7 +2428,9 @@ class AIService(AIModelRouterMixin, AIUsageMeterMixin):
                         state="done",
                         title_key="aiTraceReasoning",
                         body_markdown=sanitize_assistant_content(
-                            round_reasoning.strip()
+                            visible_reasoning_markdown(
+                                round_reasoning.strip(), chat_language
+                            )
                         ),
                         iteration=iteration,
                         layer="reasoning",
@@ -2641,6 +2646,32 @@ class AIService(AIModelRouterMixin, AIUsageMeterMixin):
                             elapsed_ms=elapsed_ms,
                             result_count=result_count,
                         )
+                        if fname == "spawn_subagent" and isinstance(result, dict):
+                            sid = str(result.get("subagent_id") or "")
+                            child_status = str(result.get("status") or "")
+                            child_state = (
+                                "active"
+                                if child_status == "running"
+                                else ("error" if result.get("error") else "done")
+                            )
+                            yield _emit_trace(
+                                step_id=f"subagent_{sid or tc_id}",
+                                kind="subagent",
+                                state=child_state,
+                                title_key="aiTraceSubagent",
+                                title_params={
+                                    "goal": str(result.get("goal") or "")[:120]
+                                },
+                                body_markdown=str(
+                                    result.get("goal")
+                                    or result.get("content")
+                                    or ""
+                                )[:500],
+                                tool=fname,
+                                tool_key=tool_l10n_key(fname),
+                                iteration=iteration,
+                                explore_target=sid or None,
+                            )
                         yield _emit_trace(
                             step_id=f"obs_{tc_id}",
                             kind="observation",
@@ -3375,8 +3406,14 @@ class AIService(AIModelRouterMixin, AIUsageMeterMixin):
         }
 
         for call in function_calls:
-            function_name = call.get("name")
+            function_name = call.get("name") or "unknown"
             arguments = call.get("arguments", {}) or {}
+
+            if registry.get_function(function_name) is None:
+                from app.services.ai.ai_tool_error import unknown_tool_result
+
+                results[function_name] = unknown_tool_result(function_name)
+                continue
 
             if is_write_function(function_name, registry):
                 if should_block_write_in_analyzer(
@@ -3412,7 +3449,14 @@ class AIService(AIModelRouterMixin, AIUsageMeterMixin):
                 results[function_name] = result
             except Exception as e:
                 logger.error(f"Error calling function {function_name}: {e}", exc_info=True)
-                results[function_name] = {"error": str(e)}
+                from app.services.ai.ai_tool_error import normalize_tool_error
+
+                fn = registry.get_function(function_name)
+                results[function_name] = normalize_tool_error(
+                    function_name,
+                    e,
+                    schema=getattr(fn, "parameters_schema", None),
+                )
 
         return results
 
@@ -3452,6 +3496,12 @@ class AIService(AIModelRouterMixin, AIUsageMeterMixin):
             tc_id = _tool_call_id_for(call, iteration, index)
             if not call.get("id"):
                 call["id"] = tc_id
+
+            registered = registry.get_function(function_name)
+            if registered is None:
+                from app.services.ai.ai_tool_error import unknown_tool_result
+
+                return tc_id, function_name, unknown_tool_result(function_name)
 
             # بررسی نیاز به تأیید با استفاده از registry
             if is_write_function(function_name, registry):
@@ -3532,7 +3582,14 @@ class AIService(AIModelRouterMixin, AIUsageMeterMixin):
                         e,
                         exc_info=True,
                     )
-                    return tc_id, function_name, {"error": str(e), "_elapsed_ms": elapsed_ms}
+                    from app.services.ai.ai_tool_error import normalize_tool_error
+
+                    schema = getattr(registered, "parameters_schema", None)
+                    payload = normalize_tool_error(
+                        function_name, e, schema=schema
+                    )
+                    payload["_elapsed_ms"] = elapsed_ms
+                    return tc_id, function_name, payload
 
             if is_readonly and effective_business_id and session_id:
                 hit, cached_result = get_cached(
@@ -3575,7 +3632,12 @@ class AIService(AIModelRouterMixin, AIUsageMeterMixin):
                     e,
                     exc_info=True,
                 )
-                return tc_id, function_name, {"error": str(e), "_elapsed_ms": elapsed_ms}
+                from app.services.ai.ai_tool_error import normalize_tool_error
+
+                schema = getattr(registered, "parameters_schema", None)
+                payload = normalize_tool_error(function_name, e, schema=schema)
+                payload["_elapsed_ms"] = elapsed_ms
+                return tc_id, function_name, payload
 
         try:
             tasks_results = await run_tool_calls_partitioned(

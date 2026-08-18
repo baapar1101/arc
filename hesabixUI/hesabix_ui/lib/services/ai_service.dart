@@ -584,6 +584,7 @@ class AIService {
     required int sessionId,
     required String content,
     bool approveWrites = false,
+    bool silent = false,
     String? explorationMode,
     String? executionMode,
     String? model,
@@ -600,6 +601,7 @@ class AIService {
       final payload = <String, dynamic>{
         'content': content,
         'approve_writes': approveWrites,
+        if (silent) 'silent': true,
         if (explorationMode != null && explorationMode.isNotEmpty)
           'mode': explorationMode,
         if (executionMode != null && executionMode.isNotEmpty)
@@ -1154,6 +1156,17 @@ class AIService {
     final res = await _api.post<Map<String, dynamic>>(
       '/api/v1/ai/chat/sessions/$sessionId/fork',
       query: query,
+    );
+    final body = res.data as Map<String, dynamic>;
+    return body['data'] as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> cancelSubagent({
+    required int sessionId,
+    required String subagentId,
+  }) async {
+    final res = await _api.post<Map<String, dynamic>>(
+      '/api/v1/ai/chat/sessions/$sessionId/subagents/$subagentId/cancel',
     );
     final body = res.data as Map<String, dynamic>;
     return body['data'] as Map<String, dynamic>;

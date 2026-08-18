@@ -18,6 +18,7 @@ class AIReasoningPanel extends StatefulWidget {
   /// در حین استریم زنده پنل را باز نگه می‌دارد (بدون auto-collapse).
   final bool keepExpanded;
   final void Function(AISessionTodoItem item, String status)? onTodoStatus;
+  final void Function(String subagentId)? onCancelSubagent;
 
   const AIReasoningPanel({
     super.key,
@@ -29,6 +30,7 @@ class AIReasoningPanel extends StatefulWidget {
     this.initiallyExpanded = false,
     this.keepExpanded = false,
     this.onTodoStatus,
+    this.onCancelSubagent,
   });
 
   static List<AIAgentTraceStep> reasoningOnly(List<AIAgentTraceStep> all) {
@@ -256,6 +258,7 @@ class _AIReasoningPanelState extends State<AIReasoningPanel>
                           steps: reasoning,
                           compact: widget.compact,
                           initiallyExpanded: false,
+                          onCancelSubagent: widget.onCancelSubagent,
                         ),
                       if (widget.toolActivities.isNotEmpty)
                         Padding(

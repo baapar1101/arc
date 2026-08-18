@@ -352,9 +352,10 @@ def _session_response_dict(session: AIChatSession) -> Dict[str, Any]:
 
 
 class ChatMessageRequest(BaseModel):
-    content: str
+    content: str = ""
     session_id: Optional[int] = None
     approve_writes: bool = False
+    silent: bool = False
     mode: Optional[str] = None  # explore | auto | off
     execution_mode: Optional[str] = None  # analyzer | supervised | autonomous
     model: Optional[str] = None
@@ -1222,47 +1223,76 @@ async def send_message(
     )
     session.execution_mode = execution_mode
 
-    # پیش‌چک اجباری قبل از ذخیره پیام / فراخوانی provider
-    _ensure_chat_availability(
-        db,
-        ctx,
-        session.business_id,
-        user_text=message_data.content or "",
-        model=message_data.model,
+    from app.services.ai.ai_write_approval_turn import (
+        SILENT_WRITE_APPROVAL_LLM_TURN,
+        is_silent_write_approval,
+        last_real_user_query,
     )
-    
+
+    approve_writes = bool(message_data.approve_writes)
+    silent_approval = is_silent_write_approval(
+        approve_writes=approve_writes,
+        silent=bool(message_data.silent),
+        content=message_data.content,
+    )
+    if not silent_approval and not (message_data.content or "").strip():
+        raise ApiError("EMPTY_MESSAGE", "متن پیام خالی است", http_status=400)
+
     # دریافت پیام‌های قبلی
     message_repo = AIChatMessageRepository(db)
     previous_messages = message_repo.get_session_messages(session_id, limit=50)
-    
-    # ساخت messages برای AI (شامل تاریخچه tool)
-    messages = build_llm_messages_from_history(previous_messages)
-    messages.append({
-        "role": "user",
-        "content": message_data.content
-    })
-    approve_writes = bool(message_data.approve_writes)
+
     approved_write_calls = (
         _extract_pending_write_approvals(previous_messages)
         if approve_writes
         else []
     )
-    
-    # ذخیره پیام کاربر
-    user_message = AIChatMessage(
-        session_id=session_id,
-        role=MessageRole.USER.value,
-        content=message_data.content,
-        tokens_used=0
+    if approve_writes and not approved_write_calls:
+        raise ApiError(
+            "APPROVAL_NOT_FOUND",
+            "عملیات در انتظار تأیید یافت نشد. همان گفت‌وگو را باز کنید و دوباره تأیید کنید.",
+            http_status=400,
+        )
+
+    effective_user_query = (message_data.content or "").strip()
+    if silent_approval:
+        effective_user_query = last_real_user_query(previous_messages) or effective_user_query
+
+    # پیش‌چک اجباری قبل از ذخیره پیام / فراخوانی provider
+    _ensure_chat_availability(
+        db,
+        ctx,
+        session.business_id,
+        user_text=effective_user_query or message_data.content or "",
+        model=message_data.model,
     )
-    db.add(user_message)
+
+    # ساخت messages برای AI (شامل تاریخچه tool)
+    messages = build_llm_messages_from_history(previous_messages)
+    messages.append({
+        "role": "user",
+        "content": (
+            SILENT_WRITE_APPROVAL_LLM_TURN if silent_approval else message_data.content
+        ),
+    })
+
+    persist_user_message = not silent_approval
+    if persist_user_message:
+        user_message = AIChatMessage(
+            session_id=session_id,
+            role=MessageRole.USER.value,
+            content=message_data.content,
+            tokens_used=0
+        )
+        db.add(user_message)
     
     # اگر streaming درخواست شده باشد
     if stream:
         # commit کردن پیام کاربر قبل از شروع streaming
         # تا اگر خطایی رخ داد، حداقل پیام کاربر ذخیره شده باشد
         db.commit()
-        db.refresh(user_message)
+        if persist_user_message:
+            db.refresh(user_message)
         # refresh کردن session تا مطمئن شویم که به‌روزرسانی‌های بعدی کار می‌کنند
         db.refresh(session)
         
@@ -1280,7 +1310,7 @@ async def send_message(
                 ctx=ctx,
                 business_id=business_id,
                 previous_messages=previous_messages,
-                message_content=message_data.content,
+                message_content=effective_user_query,
                 approve_writes=approve_writes,
                 approved_write_calls=approved_write_calls,
                 exploration_mode=exploration_mode,
@@ -1319,7 +1349,7 @@ async def send_message(
             session_id=session_id,
             approve_writes=approve_writes,
             approved_write_calls=approved_write_calls,
-            user_query=message_data.content,
+            user_query=effective_user_query,
             request_model=message_data.model,
             execution_mode=execution_mode,
         )
@@ -1349,7 +1379,7 @@ async def send_message(
         _prepare_ai_service_model(commit_ai_service, message_data.model)
         _apply_chat_routing_context(
             commit_ai_service,
-            user_query=message_data.content,
+            user_query=effective_user_query,
             messages=messages,
         )
         charge_result = commit_ai_service.check_quota_and_charge(
@@ -1362,7 +1392,7 @@ async def send_message(
             response["message"]["content"] or "",
             fc_meta,
             fr_meta,
-            user_query=message_data.content,
+            user_query=effective_user_query,
             history_messages=messages,
         )
         fc_json, fr_json = serialize_function_metadata(persist_calls, persist_results)
@@ -1405,7 +1435,7 @@ async def send_message(
                 commit_session,
                 ctx,
                 business_id,
-                message_data.content,
+                effective_user_query,
             )
 
         commit_db.commit()
@@ -1415,7 +1445,7 @@ async def send_message(
         if needs_title and _session_needs_title(commit_session):
             _schedule_session_title_generation(
                 session_id,
-                message_data.content,
+                effective_user_query,
                 ctx,
                 business_id,
             )
@@ -2703,6 +2733,48 @@ async def edit_user_message(
         },
         request,
     )
+
+
+@router.get("/sessions/{session_id}/subagents", summary="لیست زیر-ایجنت‌های جلسه")
+async def list_chat_subagents(
+    session_id: int = Path(...),
+    request: Request = None,
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+) -> Dict[str, Any]:
+    session_repo = AIChatSessionRepository(db)
+    session = session_repo.get_by_id(session_id)
+    if not session or session.user_id != ctx.get_user_id():
+        raise ApiError("SESSION_NOT_FOUND", "گفت‌وگو یافت نشد", http_status=404)
+    from app.services.ai.ai_subagent import list_session_subagents
+
+    return success_response({"items": list_session_subagents(session_id)}, request)
+
+
+@router.post(
+    "/sessions/{session_id}/subagents/{subagent_id}/cancel",
+    summary="قطع زیر-ایجنت",
+)
+async def cancel_chat_subagent(
+    session_id: int = Path(...),
+    subagent_id: str = Path(...),
+    request: Request = None,
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+) -> Dict[str, Any]:
+    session_repo = AIChatSessionRepository(db)
+    session = session_repo.get_by_id(session_id)
+    if not session or session.user_id != ctx.get_user_id():
+        raise ApiError("SESSION_NOT_FOUND", "گفت‌وگو یافت نشد", http_status=404)
+    from app.services.ai.ai_subagent import cancel_subagent_async
+
+    result = await cancel_subagent_async(subagent_id, session_id=session_id)
+    error = result.get("error")
+    if error == "SUBAGENT_NOT_FOUND":
+        raise ApiError("SUBAGENT_NOT_FOUND", "زیر-ایجنت یافت نشد", http_status=404)
+    if error == "SUBAGENT_SESSION_MISMATCH":
+        raise ApiError("SUBAGENT_SESSION_MISMATCH", "زیر-ایجنت متعلق به این گفت‌وگو نیست", http_status=403)
+    return success_response(result, request)
 
 
 @router.post("/sessions/{session_id}/fork", summary="شاخه‌سازی گفت‌وگو")

@@ -7,6 +7,7 @@ const kAgentTodosStorageKey = '_agent_todos';
 const kAgentRunStorageKey = '_agent_run';
 const kAgentCitationsStorageKey = '_citations';
 const kActivatedSkillsStorageKey = '_activated_skills';
+const kReasoningTraceStorageKey = '_reasoning_trace';
 
 /// استخراج trace از function_results پیام ذخیره‌شده.
 List<AIAgentTraceStep> extractAgentTraceFromResults(Object? functionResults) {
@@ -248,6 +249,12 @@ class AIAgentTraceStep {
           kind != 'answer' &&
           kind != 'system');
   bool get isAnswerLayer => layer == 'answer' || kind == 'answer';
+
+  String? get subagentId {
+    if (kind != 'subagent') return null;
+    final id = exploreTarget?.trim();
+    return (id == null || id.isEmpty) ? null : id;
+  }
 
   /// نمایش زمان اجرا به صورت خوانا
   String? get elapsedLabel {

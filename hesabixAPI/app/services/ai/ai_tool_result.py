@@ -191,8 +191,14 @@ def compact_tool_result_for_llm(
         if "error" in payload:
             return _dumps(
                 {
+                    "ok": False,
                     "error": payload.get("error"),
-                    "message": payload.get("message"),
+                    "message": payload.get("message") or payload.get("message_fa"),
+                    "message_fa": payload.get("message_fa"),
+                    "hint_fa": payload.get("hint_fa"),
+                    "retryable": payload.get("retryable"),
+                    "expected_args": payload.get("expected_args"),
+                    "tool": payload.get("tool") or function_name,
                 }
             )
 

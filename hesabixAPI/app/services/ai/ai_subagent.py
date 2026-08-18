@@ -163,6 +163,23 @@ def _count_running(session_id: Optional[int]) -> int:
     return n
 
 
+def list_session_subagents(session_id: Optional[int]) -> List[Dict[str, Any]]:
+    """وضعیت فرزندان یک جلسه برای UI."""
+    out: List[Dict[str, Any]] = []
+    for run in _runs.values():
+        if session_id is not None and run.parent_session_id != session_id:
+            continue
+        out.append(
+            {
+                "subagent_id": run.subagent_id,
+                "goal": run.goal,
+                "status": run.status,
+                "error": (run.result or {}).get("error") if run.result else None,
+            }
+        )
+    return out
+
+
 async def cancel_session_subagents(session_id: Optional[int]) -> int:
     """قطع همهٔ فرزندان در حال اجرای یک جلسهٔ والد."""
     cancelled = 0
@@ -396,7 +413,7 @@ async def spawn_subagent_async(
     allowlist = _parse_allowlist(
         arguments.get("tool_allowlist") or arguments.get("allowlist")
     )
-    wait = arguments.get("wait", True)
+    wait = arguments.get("wait", False)
     if isinstance(wait, str):
         wait = wait.strip().lower() not in {"false", "0", "no"}
     else:

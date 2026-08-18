@@ -138,6 +138,21 @@ def build_history_summary_system_prompt(language: str = "fa") -> str:
     )
 
 
+def visible_reasoning_markdown(reasoning_text: str, expected_language: str) -> str:
+    """متن تفکر قابل‌نمایش برای UI — native انگلیسی مدل را برای جلسهٔ فارسی پنهان می‌کند."""
+    text = (reasoning_text or "").strip()
+    lang = normalize_language_code(expected_language)
+    if lang != "fa":
+        return text
+    if not text:
+        return "در حال تحلیل داده‌ها و انتخاب گام بعدی…"
+    detected = detect_message_language(text)
+    latin_only = bool(_LATIN_WORD.search(text) and not _PERSIAN_SCRIPT.search(text))
+    if detected == "en" or (detected is None and latin_only):
+        return "در حال تحلیل داده‌ها و انتخاب گام بعدی…"
+    return text
+
+
 def reasoning_language_mismatch(
     reasoning_text: str,
     expected_language: str,

@@ -43,7 +43,8 @@ def register_subagent_functions(registry: "AIFunctionRegistry") -> None:
                 "یک زیر-ایجنت فقط‌خواندنی برای یک حوزهٔ جدا (مثلاً فروش یا موجودی) بساز. "
                 f"حداکثر {MAX_SUBAGENTS_PER_PARENT} فرزند همزمان و {MAX_SUBAGENT_ITERATIONS} نوبت ابزار. "
                 "فقط برای سوال چنددامنه‌ای؛ سوال ساده را خودت با ابزار مستقیم جواب بده. "
-                "tool_allowlist را با نام ابزارهای read همان حوزه پر کن. نوشتن در فرزند ممنوع است."
+                "tool_allowlist را با نام ابزارهای read همان حوزه پر کن. نوشتن در فرزند ممنوع است. "
+                "wait را false بگذار مگر لازم باشد همان لحظه نتیجه را ادغام کنی."
             ),
             parameters_schema={
                 "type": "object",
@@ -63,7 +64,7 @@ def register_subagent_functions(registry: "AIFunctionRegistry") -> None:
                     },
                     "wait": {
                         "type": "boolean",
-                        "description": "صبر تا اتمام (پیش‌فرض true). اگر false، بعداً await_subagent بزن",
+                        "description": "صبر تا اتمام فرزند. پیش‌فرض false تا استریم والد قفل نشود؛ بعداً await_subagent بزن.",
                     },
                 },
                 "required": ["goal"],

@@ -1391,6 +1391,9 @@ class _AIChatDialogState extends State<AIChatDialog> {
       _applyStreamOutcome(outcome);
     } catch (e) {
       if (e is DioException && CancelToken.isCancel(e)) {
+        if (mounted && _streamCancelToken == cancelToken) {
+          setState(() => _sending = false);
+        }
         return;
       }
       if (!mounted) return;
@@ -1544,6 +1547,20 @@ class _AIChatDialogState extends State<AIChatDialog> {
     }
   }
 
+  Future<void> _cancelSubagent(String subagentId) async {
+    final sessionId = _currentSession?.id;
+    if (sessionId == null || subagentId.trim().isEmpty) return;
+    try {
+      await _aiService.cancelSubagent(
+        sessionId: sessionId,
+        subagentId: subagentId.trim(),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      _showSnackbar(ErrorExtractor.userMessage(e));
+    }
+  }
+
   Future<void> _confirmWriteApproval() async {
     if (_sending) return;
     if (!_canConfirmWriteApproval) {
@@ -1551,13 +1568,12 @@ class _AIChatDialogState extends State<AIChatDialog> {
       _clearWriteApprovalState();
       return;
     }
-    setState(_clearWriteApprovalState);
     await _sendMessage(
-      contentOverride:
-          'کاربر عملیات پیشنهادی را تأیید کرد. لطفاً همان عملیات را اجرا کن.',
+      contentOverride: '',
       approveWrites: true,
       skipUserBubble: true,
       requireExistingSession: true,
+      silent: true,
     );
   }
 
@@ -1566,6 +1582,7 @@ class _AIChatDialogState extends State<AIChatDialog> {
     bool approveWrites = false,
     bool skipUserBubble = false,
     bool requireExistingSession = false,
+    bool silent = false,
   }) async {
     final l10n = AppLocalizations.of(context);
     final plan = planChatSend(
@@ -1634,6 +1651,7 @@ class _AIChatDialogState extends State<AIChatDialog> {
         sessionId: _currentSession!.id!,
         content: content,
         approveWrites: approveWrites,
+        silent: silent || approveWrites,
         executionMode: _executionMode,
         model: _selectedModelCode,
         sseCursor: _sseCursor,
@@ -2197,15 +2215,16 @@ class _AIChatDialogState extends State<AIChatDialog> {
                                 writeApprovalOps: _collectPendingApprovalOps(),
                                 writeApprovalLoading: _sending,
                                 canConfirmWriteApproval:
-                                    _canConfirmWriteApproval,
+                                    _canConfirmWriteApproval || _sending,
                                 writeApprovalBlockedReason:
-                                    _canConfirmWriteApproval
+                                    (_canConfirmWriteApproval || _sending)
                                     ? null
                                     : 'برای تأیید، همان گفت‌وگویی را از تاریخچه باز کنید که دستیار در آن درخواست تأیید کرده است.',
                                 onConfirmWriteApproval: _confirmWriteApproval,
                                 onDismissWriteApproval: () =>
                                     setState(_clearWriteApprovalState),
                                 onTodoStatus: _onSessionTodoStatus,
+                                onCancelSubagent: _cancelSubagent,
                                 creditWarningMessage: _creditWarningText(),
                                 onCreditUpgrade: widget.businessId != null
                                     ? _navigateToSubscription

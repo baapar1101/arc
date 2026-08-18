@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from enum import Enum
 from sqlalchemy.orm import Session
 from app.core.auth_dependency import AuthContext
+from app.services.ai.ai_handler_convention import wrap_registry_service_func
 import json
 
 
@@ -1693,74 +1694,12 @@ class AIFunctionRegistry:
         ایجاد wrapper برای service function ها
         این wrapper context (db, user_context) را اضافه می‌کند
         و business_id را از session inject می‌کند (امنیت)
+
+        دو قرارداد پشتیبانی می‌شود:
+        - سبک قدیمی: ``fn(db, business_id, user_id, **kwargs)``
+        - سبک (args, context): ``fn(args, context)`` — مثلاً create_session_plan
         """
-        def handler(args: Dict[str, Any], context: Dict[str, Any]) -> Any:
-            db: Session = context["db"]
-            user_context: AuthContext = context["user_context"]
-
-            from app.services.ai.ai_date_resolver import (
-                calendar_type_from_context,
-                enrich_tool_result_dates,
-                normalize_query_dates,
-            )
-
-            calendar_type = calendar_type_from_context(context)
-            context["calendar_type"] = calendar_type
-
-            _date_keys = frozenset({
-                "from_date", "to_date", "date_from", "date_to",
-                "as_of_date", "document_date", "filters",
-            })
-            if any(k in args for k in _date_keys):
-                try:
-                    normalized = normalize_query_dates(dict(args), calendar_type=calendar_type)
-                    args.update(normalized)
-                except ValueError as exc:
-                    raise ValueError(str(exc)) from exc
-            
-            # دریافت business_id از session (اولویت) یا context
-            session_business_id = context.get("session_business_id")
-            context_business_id = context.get("business_id")
-            effective_business_id = session_business_id or context_business_id
-            
-            # امنیت: اگر AI یک business_id دیگر بدهد، آن را نادیده می‌گیریم
-            if "business_id" in args:
-                provided_business_id = args.get("business_id")
-                # اگر business_id ارائه شده با session متفاوت باشد، از session استفاده می‌کنیم
-                if provided_business_id != effective_business_id:
-                    import logging
-                    logger = logging.getLogger(__name__)
-                    logger.warning(
-                        f"AI attempted to use business_id {provided_business_id} "
-                        f"but session has {effective_business_id}. Using session business_id."
-                    )
-                # همیشه از session/context استفاده می‌کنیم (امنیت)
-                args["business_id"] = effective_business_id
-            elif effective_business_id:
-                # اگر business_id در args نیست، از context اضافه می‌کنیم
-                args["business_id"] = effective_business_id
-            
-            # Validation: بررسی دسترسی کاربر به business_id
-            if args.get("business_id") and not user_context.can_access_business(args["business_id"]):
-                raise PermissionError(
-                    f"User does not have access to business {args['business_id']}"
-                )
-            
-            # اضافه کردن user_id از context
-            if "user_id" not in args:
-                args["user_id"] = user_context.get_user_id()
-            
-            try:
-                result = service_func(db=db, **args)
-                return enrich_tool_result_dates(result, calendar_type=calendar_type)
-            except Exception:
-                try:
-                    db.rollback()
-                except Exception:
-                    pass
-                raise
-        
-        return handler
+        return wrap_registry_service_func(service_func)
     
     def register(self, func: AIFunction):
         """ثبت function جدید"""

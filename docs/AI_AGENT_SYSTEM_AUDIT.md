@@ -6,6 +6,8 @@
 **دامنه:** چت درون‌برنامه، حلقهٔ ایجنت، ابزارها، حافظه، دانش، مهارت، صوت، تلگرام، CRM AI، تیکت، ورک‌فلو، MCP، مشاهده‌پذیری، UX.
 
 > این سند جایگزین سناریوهای اجرایی قبلی نیست. جزئیات فاز ابزارها در [`AI_EXECUTION_PHASES.md`](AI_EXECUTION_PHASES.md)، باگ‌های رفع‌شدهٔ چت در [`AI_CHAT_ISSUES.md`](AI_CHAT_ISSUES.md)، شکاف پوشش دامنه در [`AI_CAPABILITY_GAP_SCENARIO_V2.md`](AI_CAPABILITY_GAP_SCENARIO_V2.md)، و سناریوی subagent / ابزار موازی / cache بینش در [`AI_AGENT_RUNTIME_CAPABILITIES_SCENARIO.md`](AI_AGENT_RUNTIME_CAPABILITIES_SCENARIO.md) است. اینجا **نقشهٔ کیفیت سطح محصول ایجنت‌محور جهانی** است.
+>
+> صف باگ‌های محصولی که کاربر الان در چت می‌بیند (ابزار، زیر-ایجنت، جدول داخلی، markdown، زبان تفکر، تأیید نوشتن): [`AI_CHAT_PRODUCT_ISSUES.md`](AI_CHAT_PRODUCT_ISSUES.md).
 
 ---
 
@@ -211,7 +213,7 @@
 - مشکل: همهٔ کار در یک حلقه و یک مدل است. هیچ ابزار spawn/delegate نیست. ایجنت‌های جهانی برای «گزارش فروش + موجودی + بدهکاران» چند subagent موازی می‌زنند، منتظر اتمام می‌مانند یا قطع می‌کنند، بعد نتیجه را نقد و ادغام می‌کنند. `GAP-07` (شخصیت ثابت حسابدار/انباردار) این قابلیت نیست.
 - معیار پذیرش: والد بتواند حداکثر ۲ زیر-اجرا با allowlist و سقف ۴ نوبت بسازد؛ پیش‌فرض بدون write؛ cancel والد فرزند را هم ببندد؛ نتیجه به‌صورت envelope + citation به والد برگردد؛ سوال ساده spawn نکند.
 - پیشنهاد: الگوی Cursor Task tool / LangGraph subgraph روی همان `AIService` با `operation=subagent`. بعد از AGT-01 و سقف TOOL-06.
-- یادداشت اصلاح: ۱۴۰۵/۰۵/۲۸ — بررسی کد: صفر hit برای spawn/subagent در سرویس AI. اولویت از P3 به P1. سناریوی فاز ۰–۴ نوشته شد. ۱۴۰۵/۰۵/۲۸ (همان روز) — فاز ۰–۲: ابزارهای `spawn_subagent` / `await_subagent` / `cancel_subagent`؛ حلقهٔ تو در تو analyzer با سقف ۲ همزمان و ۴ نوبت؛ write در فرزند fail-closed؛ سوال ساده ابزار spawn نمی‌بیند؛ cancel والد فرزندان در حال اجرا را قطع می‌کند. persist جدول SQL و `trace_step` kind=subagent (فاز ۳–۴) موکول.
+- یادداشت اصلاح: ۱۴۰۵/۰۵/۲۸ — بررسی کد: صفر hit برای spawn/subagent در سرویس AI. اولویت از P3 به P1. سناریوی فاز ۰–۴ نوشته شد. ۱۴۰۵/۰۵/۲۸ (همان روز) — فاز ۰–۲: ابزارهای `spawn_subagent` / `await_subagent` / `cancel_subagent`؛ حلقهٔ تو در تو analyzer با سقف ۲ همزمان و ۴ نوبت؛ write در فرزند fail-closed؛ سوال ساده ابزار spawn نمی‌بیند؛ cancel والد فرزندان در حال اجرا را قطع می‌کند. persist جدول SQL و `trace_step` kind=subagent (فاز ۳–۴) موکول. شکاف UI برای کاربر: [`AI_CHAT_PRODUCT_ISSUES.md`](AI_CHAT_PRODUCT_ISSUES.md) آیتم CHAT-02.
 
 ### AGT-07 — شاخهٔ مرده در ادامهٔ evidence (`prior_goal_reached`)
 - وضعیت: انجام‌شده
@@ -278,7 +280,7 @@
 - مشکل: برش ۶۰۰۰ کاراکتر باعث از دست رفتن ردیف‌های گزارش می‌شود؛ مدل جمع می‌بندد. Citation با حدس کلید `items/data/results` ساخته می‌شود نه با قرارداد اجباری. جدول/نمودار به markdown یا spec وابسته است.
 - معیار پذیرش: هر tool read یک `ToolResultEnvelope` با `records`, `summary`, `citations[]`, `truncated` برگرداند؛ UI جدول را از envelope بکشد نه از markdown.
 - پیشنهاد: envelope واحد + صفحه‌بندی اجباری (`offset/limit`) در همهٔ list toolها.
-- یادداشت اصلاح: ۱۴۰۵/۰۵/۲۶ — لایهٔ dispatch: اگر نتیجه بزرگ باشد envelope معتبر با `truncated`/`omitted_count`/`citations`/`note` ساخته می‌شود (دیگر JSON وسط قطع نمی‌شود). Citation اول از `citations` می‌خواند. UI اگر markdown جدول نداشته باشد از رکوردهای ابزار جدول می‌کشد. بازنویسی تک‌تک list toolها و `offset/limit` اجباری هنوز نیست.
+- یادداشت اصلاح: ۱۴۰۵/۰۵/۲۶ — لایهٔ dispatch: اگر نتیجه بزرگ باشد envelope معتبر با `truncated`/`omitted_count`/`citations`/`note` ساخته می‌شود (دیگر JSON وسط قطع نمی‌شود). Citation اول از `citations` می‌خواند. UI اگر markdown جدول نداشته باشد از رکوردهای ابزار جدول می‌کشد. بازنویسی تک‌تک list toolها و `offset/limit` اجباری هنوز نیست. ۱۴۰۵/۰۵/۲۷ — اثر جانبی: همان جدول خودکار `_reasoning_trace` را با ستون‌های `trace_id`/`step_id`/`kind` نشان می‌دهد (CHAT-03).
 
 ### TOOL-05 — کش ابزار فقط TTL کوتاه و درون‌جلسه‌ای است
 - وضعیت: باز
@@ -942,6 +944,7 @@
 | ۱۴۰۵/۰۵/۲۸ | 2.6 | موج پانزدهم (چت): `AIChatVoiceSessionController` + تفسیر رویداد صوت؛ l10n snackbar چت و شیت حافظه/دانش |
 | ۱۴۰۵/۰۵/۲۸ | 2.7 | بررسی runtime: AGT-06 بدون subagent (P1)؛ TOOL-06 موازی read موجود؛ PRM-04 تکرار بینش در system نه در تاریخچه؛ سناریوی اجرا |
 | ۱۴۰۵/۰۵/۲۸ | 2.8 | PRM-04 لایهٔ semi_static + تفکیک توکن context_usage؛ TOOL-06 متریک موازی و eval چنددامنه‌ای؛ AGT-06 spawn/await/cancel با سقف ۲×۴ و fail-closed نوشتن |
+| ۱۴۰۵/۰۵/۲۷ | 2.8+ | لینک صف محصولی [`AI_CHAT_PRODUCT_ISSUES.md`](AI_CHAT_PRODUCT_ISSUES.md) (CHAT-01…06 از گزارش کاربر) |
 
 <!-- الگو:
 | ۱۴۰۵/۰۶/۰۱ | 1.1 | STR-01 انجام‌شده — reconnect SSE با Last-Event-ID |

@@ -102,6 +102,7 @@ async def test_spawn_two_reads_in_child_and_write_fail_closed():
         {
             "goal": "فروش و موجودی این ماه",
             "tool_allowlist": ["get_sales_report", "get_inventory_status"],
+            "wait": True,
         },
         session_id=9,
         business_id=1,
@@ -189,3 +190,31 @@ async def test_await_subagent_returns_completed_envelope():
     done = await await_subagent_async(spawned["subagent_id"], session_id=4)
     assert done["status"] == "completed"
     assert done["content"] == "done"
+
+
+@pytest.mark.asyncio
+async def test_spawn_default_wait_is_false():
+    reset_subagent_runs_for_tests()
+
+    async def fake_completion(**_kwargs):
+        await asyncio.sleep(0.05)
+        return {"content": "later"}
+
+    class _Parent:
+        _subagent_depth = 0
+        business_id = 1
+        ctx = None
+
+    spawned = await spawn_subagent_async(
+        _Parent(),
+        {"goal": "nonblocking"},
+        session_id=5,
+        completion_fn=fake_completion,
+    )
+    assert spawned["ok"] is True
+    assert spawned["status"] == "running"
+    assert spawned.get("wait") is False
+    from app.services.ai.ai_subagent import cancel_subagent_async
+
+    await cancel_subagent_async(spawned["subagent_id"], session_id=5)
+

@@ -1,0 +1,37 @@
+"""تست نرمال‌سازی خطای ابزار برای مدل."""
+from __future__ import annotations
+
+from app.services.ai.ai_tool_error import normalize_tool_error, unknown_tool_result
+
+
+def test_unknown_tool_is_not_approval():
+    payload = unknown_tool_result("invented_tool")
+    assert payload["error"] == "UNKNOWN_TOOL"
+    assert payload["ok"] is False
+    assert payload["retryable"] is True
+    assert payload["error"] != "APPROVAL_REQUIRED"
+    assert "invented_tool" in payload["message"]
+
+
+def test_unexpected_db_keyword_becomes_invalid_arguments():
+    exc = TypeError(
+        "create_session_plan_handler() got an unexpected keyword argument 'db'"
+    )
+    payload = normalize_tool_error(
+        "create_session_plan",
+        exc,
+        schema={"properties": {"items": {}, "plan_title": {}}},
+    )
+    assert payload["error"] == "INVALID_ARGUMENTS"
+    assert payload["retryable"] is True
+    assert "db" in payload["message_fa"]
+    assert "items" in payload["expected_args"]
+    assert payload.get("hint_fa")
+
+
+def test_not_found_maps_to_unknown_tool():
+    payload = normalize_tool_error(
+        "foo_bar",
+        ValueError("Function 'foo_bar' not found in registry"),
+    )
+    assert payload["error"] == "UNKNOWN_TOOL"

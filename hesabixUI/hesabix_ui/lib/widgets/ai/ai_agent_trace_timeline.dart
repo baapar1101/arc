@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/models/ai_stream_event.dart';
+import 'package:hesabix_ui/utils/ai_markdown_normalize.dart';
 import 'ai_chat_l10n.dart';
 import 'ai_chat_design.dart';
 import 'ai_thinking_scroll_box.dart';
@@ -12,12 +13,14 @@ class AIAgentTraceTimeline extends StatefulWidget {
   final List<AIAgentTraceStep> steps;
   final bool compact;
   final bool initiallyExpanded;
+  final void Function(String subagentId)? onCancelSubagent;
 
   const AIAgentTraceTimeline({
     super.key,
     required this.steps,
     this.compact = false,
     this.initiallyExpanded = false,
+    this.onCancelSubagent,
   });
 
   @override
@@ -111,6 +114,7 @@ class _AIAgentTraceTimelineState extends State<AIAgentTraceTimeline> {
                   scheme: scheme,
                   compact: widget.compact,
                   l10n: l10n,
+                  onCancelSubagent: widget.onCancelSubagent,
                 ),
             ],
           ),
@@ -127,6 +131,7 @@ class _TraceStepTile extends StatefulWidget {
   final ColorScheme scheme;
   final bool compact;
   final AppLocalizations l10n;
+  final void Function(String subagentId)? onCancelSubagent;
 
   const _TraceStepTile({
     required this.step,
@@ -136,6 +141,7 @@ class _TraceStepTile extends StatefulWidget {
     required this.scheme,
     required this.compact,
     required this.l10n,
+    this.onCancelSubagent,
   });
 
   @override
@@ -162,6 +168,8 @@ class _TraceStepTileState extends State<_TraceStepTile> {
         return Icons.record_voice_over_outlined;
       case 'reasoning':
         return Icons.psychology_alt_outlined;
+      case 'subagent':
+        return Icons.account_tree_outlined;
       case 'tool':
         return Icons.build_circle_outlined;
       case 'observation':
@@ -187,6 +195,7 @@ class _TraceStepTileState extends State<_TraceStepTile> {
             step.kind == 'explored' ||
             step.kind == 'thought' ||
             step.kind == 'explore' ||
+            step.kind == 'subagent' ||
             (step.kind != 'answer' && !step.isActive));
 
     final showBodyAlways = hasBody &&
@@ -318,6 +327,29 @@ class _TraceStepTileState extends State<_TraceStepTile> {
                             ),
                           ),
                         ],
+                        if (step.kind == 'subagent' &&
+                            step.isActive &&
+                            step.subagentId != null &&
+                            widget.onCancelSubagent != null) ...[
+                          const SizedBox(width: 4),
+                          Tooltip(
+                            message: widget.l10n.aiToolCancelSubagent,
+                            child: InkWell(
+                              onTap: () => widget.onCancelSubagent!(
+                                step.subagentId!,
+                              ),
+                              borderRadius: BorderRadius.circular(12),
+                              child: Padding(
+                                padding: const EdgeInsets.all(4),
+                                child: Icon(
+                                  Icons.stop_circle_outlined,
+                                  size: 18,
+                                  color: scheme.error,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
                         // toggle expand
                         if (showBodyToggle) ...[
                           const SizedBox(width: 2),
@@ -385,7 +417,7 @@ class _BodyContent extends StatelessWidget {
   Widget build(BuildContext context) {
     if (kind != 'thought' && kind != 'explored' && kind != 'system' && kind != 'reasoning') {
       return MarkdownBody(
-        data: body,
+        data: normalizeAssistantMarkdown(body),
         selectable: true,
         styleSheet: MarkdownStyleSheet(
           p: theme.textTheme.bodySmall?.copyWith(

@@ -75,6 +75,19 @@ void main() {
     expect(ready.content, 'فروش');
   });
 
+  test('planChatSend allows empty content when approving writes', () {
+    final plan = planChatSend(
+      voiceActive: false,
+      sending: false,
+      rawContent: '   ',
+      approveWrites: true,
+      requireExistingSession: true,
+      sessionId: 9,
+    );
+    expect(plan.canSend, isTrue);
+    expect(plan.content, isEmpty);
+  });
+
   test('voicePhaseFromServerEvent maps known types', () {
     expect(voicePhaseFromServerEvent('ready'), VoicePhase.listening);
     expect(voicePhaseFromServerEvent('stt_started'), VoicePhase.processing);

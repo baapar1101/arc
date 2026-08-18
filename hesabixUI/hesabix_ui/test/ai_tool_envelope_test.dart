@@ -51,5 +51,45 @@ void main() {
       expect(specs, hasLength(1));
       expect(specs.first.rows, hasLength(3));
     });
+
+    test('skips _reasoning_trace and underscore keys', () {
+      final specs = extractToolTableSpecsFromResults({
+        '_agent_trace': [
+          {'trace_id': 'a', 'step_id': '1', 'kind': 'tool'},
+          {'trace_id': 'a', 'step_id': '2', 'kind': 'plan'},
+        ],
+        '_reasoning_trace': [
+          {'trace_id': 't', 'step_id': '1', 'kind': 'reasoning', 'state': 'done'},
+          {'trace_id': 't', 'step_id': '2', 'kind': 'plan', 'state': 'done'},
+        ],
+        '_citations': [
+          {'id': 1, 'name': 'فاکتور'},
+          {'id': 2, 'name': 'کالا'},
+        ],
+      });
+      expect(specs, isEmpty);
+    });
+
+    test('skips lists whose columns look like agent trace', () {
+      final specs = extractToolTableSpecsFromResults({
+        'mystery': [
+          {
+            'trace_id': 'x',
+            'step_id': '1',
+            'kind': 'tool',
+            'state': 'done',
+            'layer': 'reasoning',
+          },
+          {
+            'trace_id': 'x',
+            'step_id': '2',
+            'kind': 'plan',
+            'state': 'done',
+            'layer': 'reasoning',
+          },
+        ],
+      });
+      expect(specs, isEmpty);
+    });
   });
 }

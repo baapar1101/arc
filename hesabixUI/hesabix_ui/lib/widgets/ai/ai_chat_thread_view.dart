@@ -85,6 +85,7 @@ class AIChatThreadView extends StatelessWidget {
   final String executionMode;
   final ValueChanged<String>? onExecutionModeChanged;
   final void Function(AISessionTodoItem item, String status)? onTodoStatus;
+  final void Function(String subagentId)? onCancelSubagent;
 
   const AIChatThreadView({
     super.key,
@@ -156,6 +157,7 @@ class AIChatThreadView extends StatelessWidget {
     this.executionMode = AIExecutionMode.analyzer,
     this.onExecutionModeChanged,
     this.onTodoStatus,
+    this.onCancelSubagent,
   });
 
   Widget _buildMessageList(BuildContext context) {
@@ -211,6 +213,9 @@ class AIChatThreadView extends StatelessWidget {
                           message.id == lastAssistantMessageId
                       ? onTodoStatus
                       : null,
+                  onCancelSubagent: message.role == MessageRole.assistant
+                      ? onCancelSubagent
+                      : null,
                 ),
               ),
             ),
@@ -240,6 +245,7 @@ class AIChatThreadView extends StatelessWidget {
               agentBudget: streamingAgentBudget,
               formatTime: formatTime(streamingTimestamp),
               onTodoStatus: onTodoStatus,
+              onCancelSubagent: onCancelSubagent,
             ),
           ),
         );
@@ -394,6 +400,7 @@ class _MessageRow extends StatelessWidget {
   final int? feedbackRating;
   final VoidCallback? onRegenerate;
   final void Function(AISessionTodoItem item, String status)? onTodoStatus;
+  final void Function(String subagentId)? onCancelSubagent;
 
   const _MessageRow({
     this.businessId,
@@ -407,6 +414,7 @@ class _MessageRow extends StatelessWidget {
     this.feedbackRating,
     this.onRegenerate,
     this.onTodoStatus,
+    this.onCancelSubagent,
   });
 
   @override
@@ -480,6 +488,7 @@ class _MessageRow extends StatelessWidget {
                     functionResults: message.functionResults,
                     suppressApprovalToolChips: suppressApprovalToolChips,
                     onTodoStatus: onTodoStatus,
+                    onCancelSubagent: onCancelSubagent,
                   ),
                   Row(
                     children: [
@@ -529,6 +538,7 @@ class _StreamingRow extends StatelessWidget {
   final AIStreamAgentBudget? agentBudget;
   final String formatTime;
   final void Function(AISessionTodoItem item, String status)? onTodoStatus;
+  final void Function(String subagentId)? onCancelSubagent;
 
   const _StreamingRow({
     this.businessId,
@@ -546,6 +556,7 @@ class _StreamingRow extends StatelessWidget {
     this.agentBudget,
     required this.formatTime,
     this.onTodoStatus,
+    this.onCancelSubagent,
   });
 
   @override
@@ -597,6 +608,7 @@ class _StreamingRow extends StatelessWidget {
                     keepExpanded: true,
                     initiallyExpanded: true,
                     onTodoStatus: onTodoStatus,
+                    onCancelSubagent: onCancelSubagent,
                   ),
                 if (hasReasoningPanel && showStatusLine)
                   const SizedBox(height: 8),

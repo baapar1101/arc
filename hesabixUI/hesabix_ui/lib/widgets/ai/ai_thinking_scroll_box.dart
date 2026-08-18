@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'ai_chat_design.dart';
+import 'package:hesabix_ui/utils/ai_markdown_normalize.dart';
 
 /// باکس متن تفکر/استدلال با ارتفاع محدود، اسکرول داخلی و fade پایین.
 class AIThinkingScrollBox extends StatefulWidget {
@@ -113,7 +114,7 @@ class _AIThinkingScrollBoxState extends State<AIThinkingScrollBox> {
                     controller: _scroll,
                     padding: const EdgeInsets.fromLTRB(14, 12, 14, 16),
                     child: MarkdownBody(
-                      data: widget.markdown,
+                      data: normalizeAssistantMarkdown(widget.markdown),
                       selectable: true,
                       styleSheet: MarkdownStyleSheet(
                         p: widget.theme.textTheme.bodySmall?.copyWith(
