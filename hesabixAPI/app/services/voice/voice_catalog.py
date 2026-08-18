@@ -194,10 +194,8 @@ def env_fallback_catalog_items() -> tuple[Dict[str, Any], Dict[str, Any]]:
 def seed_voice_models_from_env(db: Session, *, force: bool = False) -> Dict[str, Any]:
 	repo = AIVoiceModelRepository(db)
 	existing = db.query(AIVoiceModel).count()
-	if existing > 0 and not force:
-		return {"created": 0, "skipped": True, "reason": "catalog_not_empty", "existing_count": existing}
-
 	settings = get_settings()
+	_ = force
 	created = 0
 	presets: List[Dict[str, Any]] = [
 		{
@@ -271,6 +269,26 @@ def seed_voice_models_from_env(db: Session, *, force: bool = False) -> Dict[str,
 			"tier": "basic",
 			"is_default": True,
 			"sort_order": 10,
+		},
+		{
+			"code": "tts-parspack-gpt-4o-mini-tts",
+			"kind": VOICE_KIND_TTS,
+			"display_name": "ParsPack TTS",
+			"description": "متن به گفتار از درگاه پارس‌پک (openai/gpt-4o-mini-tts). همان کلید Custom که برای Whisper استفاده می‌شود.",
+			"provider": "custom",
+			"model_id": "openai/gpt-4o-mini-tts",
+			"voice_id": "alloy",
+			"language": "fa",
+			"tier": "pro",
+			"sort_order": 15,
+			"extra_json": json.dumps(
+				{
+					"api_base_url": "https://ai.parspack.com/v1",
+					"credential_provider": "custom",
+					"response_format": "wav",
+				},
+				ensure_ascii=False,
+			),
 		},
 		{
 			"code": "tts-dummy",
@@ -374,13 +392,17 @@ def apply_voice_model_payload(model: AIVoiceModel, payload: Dict[str, Any], *, c
 	if "sort_order" in payload or creating:
 		model.sort_order = int(payload.get("sort_order") or 0)
 	extra_in = payload.get("extra") if "extra" in payload else None
-	if extra_in is None and any(k in payload for k in ("api_base_url", "audio_endpoint")):
+	if extra_in is None and any(
+		k in payload for k in ("api_base_url", "audio_endpoint", "response_format")
+	):
 		extra_in = _parse_extra(model.extra_json)
 	if isinstance(extra_in, dict):
 		if payload.get("api_base_url"):
 			extra_in["api_base_url"] = str(payload.get("api_base_url")).strip()
 		if payload.get("audio_endpoint"):
 			extra_in["audio_endpoint"] = str(payload.get("audio_endpoint")).strip().lower()
+		if payload.get("response_format"):
+			extra_in["response_format"] = str(payload.get("response_format")).strip().lower()
 		if model.provider in ("custom", "openai", "groq"):
 			extra_in.setdefault("credential_provider", model.provider)
 		model.extra_json = json.dumps(extra_in, ensure_ascii=False)

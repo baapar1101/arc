@@ -7,7 +7,7 @@ import pytest
 
 from app.core.responses import ApiError
 from app.services.voice.contracts import VoiceResolveRequest, provider_is_cloud
-from app.services.voice.openai_audio import OpenAITranscriptionSTT
+from app.services.voice.openai_audio import OpenAITTSEngine, OpenAITranscriptionSTT
 from app.services.voice.voice_catalog import cloud_audio_allowed
 
 
@@ -110,6 +110,43 @@ async def test_openai_stt_falls_back_to_translations():
 	assert result.text == "hello"
 	assert any("transcriptions" in u for u in urls)
 	assert any("translations" in u for u in urls)
+
+
+@pytest.mark.asyncio
+async def test_openai_tts_prefers_wav_then_pcm():
+	engine = OpenAITTSEngine(
+		api_key="sk-test",
+		api_base_url="https://ai.parspack.com/v1",
+		model_id="openai/gpt-4o-mini-tts",
+		voice_id="alloy",
+		response_format="wav",
+	)
+	wav = b"RIFF\x24\x00\x00\x00WAVEfmt "
+	# Minimal valid-looking payload is decoded by looks_like_wav; use a tiny real wav.
+	from app.services.voice.audio_wav import pcm16_to_wav
+
+	wav = pcm16_to_wav(b"\x00\x01" * 32, 24000)
+	ok = SimpleNamespace(status_code=200, content=wav, text="")
+	formats: list[str] = []
+
+	class _Client:
+		async def __aenter__(self):
+			return self
+
+		async def __aexit__(self, *args):
+			return False
+
+		async def post(self, url, headers=None, data=None, files=None, json=None):
+			assert url.endswith("/audio/speech")
+			assert json["model"] == "openai/gpt-4o-mini-tts"
+			formats.append(json["response_format"])
+			return ok
+
+	with patch("app.services.voice.openai_audio.httpx.AsyncClient", return_value=_Client()):
+		pcm, rate = await engine.synthesize_pcm16_async("سلام")
+	assert formats == ["wav"]
+	assert rate == 24000
+	assert len(pcm) == 64
 
 
 def test_cloud_disabled_error_code():

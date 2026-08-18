@@ -108,12 +108,20 @@ class OpenAITTSEngine:
 		model_id: str,
 		voice_id: str | None = None,
 		timeout: float = _DEFAULT_TIMEOUT,
+		response_format: str = "pcm",
 	) -> None:
 		self.api_key = api_key
 		self.api_base_url = api_base_url
 		self.model_id = model_id
 		self.voice_id = (voice_id or "alloy").strip() or "alloy"
 		self.timeout = timeout
+		fmt = (response_format or "pcm").strip().lower() or "pcm"
+		self.response_format = "wav" if fmt in ("wav", "wave") else "pcm"
+
+	def _format_order(self) -> list[str]:
+		if self.response_format == "wav":
+			return ["wav", "pcm"]
+		return ["pcm", "wav"]
 
 	async def synthesize_pcm16_async(self, text: str) -> tuple[bytes, int]:
 		url = _join_url(self.api_base_url, "audio/speech")
@@ -121,28 +129,28 @@ class OpenAITTSEngine:
 			"Authorization": f"Bearer {self.api_key}",
 			"Content-Type": "application/json",
 		}
-		body = {
-			"model": self.model_id,
-			"voice": self.voice_id,
-			"input": text,
-			"response_format": "pcm",
-		}
+		last_error = "TTS ابری ناموفق"
 		async with httpx.AsyncClient(timeout=self.timeout) as client:
-			response = await client.post(url, headers=headers, json=body)
-			if response.status_code >= 400 and "pcm" in (response.text or "").lower():
-				body["response_format"] = "wav"
+			for fmt in self._format_order():
+				body = {
+					"model": self.model_id,
+					"voice": self.voice_id,
+					"input": text,
+					"response_format": fmt,
+				}
 				response = await client.post(url, headers=headers, json=body)
-		if response.status_code >= 400:
-			raise RuntimeError(
-				f"TTS ابری ناموفق ({response.status_code}): {response.text[:400]}"
-			)
-		raw = response.content or b""
-		if looks_like_wav(raw):
-			pcm, rate, channels = wav_to_pcm16(raw)
-			if channels != 1:
-				raise RuntimeError("خروجی TTS ابری باید مونو باشد")
-			return pcm, rate
-		return raw, _OPENAI_TTS_PCM_RATE
+				if response.status_code < 400:
+					raw = response.content or b""
+					if looks_like_wav(raw):
+						pcm, rate, channels = wav_to_pcm16(raw)
+						if channels != 1:
+							raise RuntimeError("خروجی TTS ابری باید مونو باشد")
+						return pcm, rate
+					return raw, _OPENAI_TTS_PCM_RATE
+				last_error = f"TTS ابری ناموفق ({response.status_code}): {response.text[:400]}"
+				if response.status_code not in (400, 404, 405, 415, 422):
+					break
+		raise RuntimeError(last_error)
 
 
 def resample_to_output(pcm: bytes, src_rate: int, dst_rate: int) -> bytes:

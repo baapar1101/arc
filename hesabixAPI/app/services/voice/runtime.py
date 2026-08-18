@@ -167,11 +167,13 @@ def _build_tts_engine(db: Session, model: Optional[AIVoiceModel], language: str,
 	_require_cloud_or_raise(allow_cloud, model)
 	if provider in ("openai", "groq", "custom"):
 		api_key, api_base, _endpoint = _cloud_connection(db, model)
+		extra = _extra(model)
 		return OpenAITTSEngine(
 			api_key=api_key,
 			api_base_url=api_base,
 			model_id=model.model_id,
 			voice_id=model.voice_id,
+			response_format=str(extra.get("response_format") or "pcm"),
 		)
 	raise ApiError("VOICE_PROVIDER_UNSUPPORTED", f"ارائه‌دهنده TTS «{provider}» پشتیبانی نمی‌شود", http_status=400)
 
