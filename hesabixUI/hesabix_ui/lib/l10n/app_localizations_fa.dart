@@ -10762,7 +10762,7 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get aiMemoryIntro =>
-      'دستورات همیشگی را خودتان می‌نویسید؛ حقایق پایدار را دستیار بی‌صدا از گفتگوها یاد می‌گیرد.';
+      'دستیار زمینهٔ پایدار را بین گفت‌وگوها نگه می‌دارد. سیاست‌ها را شما می‌نویسید؛ هویت و ترجیح را بی‌صدا یاد می‌گیرد. اعداد لحظه‌ای همیشه از دادهٔ کسب‌وکار خوانده می‌شوند.';
 
   @override
   String aiMemoryUpdatedAt(String when) {
@@ -10793,11 +10793,11 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get aiMemoryLearnedIntro =>
-      'از گفتگوها به‌صورت خودکار جمع می‌شود. می‌توانید ویرایش یا حذف کنید.';
+      'از گفتگوهای مختلف یاد گرفته می‌شود. هر مورد را می‌توانید ویرایش یا حذف کنید — این حافظه مال شماست.';
 
   @override
   String get aiMemoryLearnedEmpty =>
-      'هنوز چیزی از گفتگوها یاد نگرفته‌ام. با ادامهٔ مکالمه، حقایق پایدار اینجا ظاهر می‌شوند.';
+      'هنوز زمینهٔ پایداری یاد نگرفته‌ام. پس از چند گفت‌وگو، نام، ترجیح و زمینهٔ کار اینجا می‌آید.';
 
   @override
   String get aiMemoryClearAll => 'پاک کردن همه';
@@ -10854,6 +10854,41 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get aiMemorySourceUser => 'ویرایش‌شده توسط شما';
+
+  @override
+  String get aiMemorySourceProfile => 'از حساب کاربری';
+
+  @override
+  String get aiMemorySourceCurator => 'به‌خاطر سپرده از گفتگو';
+
+  @override
+  String get aiMemoryKindIdentity => 'هویت';
+
+  @override
+  String get aiMemoryKindPreference => 'ترجیح';
+
+  @override
+  String get aiMemoryKindContext => 'زمینه';
+
+  @override
+  String get aiMemoryKindGoal => 'هدف';
+
+  @override
+  String get aiMemoryKindConstraint => 'محدودیت';
+
+  @override
+  String aiMemoryLearnedCount(int count) {
+    return '$count مورد به‌خاطر سپرده';
+  }
+
+  @override
+  String get aiMemoryPinToMemory => 'این را به خاطر بسپار';
+
+  @override
+  String get aiMemoryPinned => 'به حافظهٔ دستیار اضافه شد';
+
+  @override
+  String get aiMemoryPoliciesCardTitle => 'سیاست‌های شما';
 
   @override
   String get aiKnowledgeTitle => 'دانشنامه کسب‌وکار';

@@ -375,7 +375,16 @@ class TelegramAIChatService:
 						ai_session.title = generated_title[:80]
 			
 			self.db.commit()
-			
+
+			from app.services.ai.ai_memory_hooks import schedule_memory_update_after_chat
+
+			if active_session.business_id:
+				schedule_memory_update_after_chat(
+					active_session.session_id,
+					int(active_session.business_id),
+					user_context,
+				)
+
 			# ارسال پاسخ (صفحه‌بندی به‌جای برش ۴۰۰۰ کاراکتر)
 			chunks = split_telegram_text(assistant_content)
 			pending_ops = extract_pending_approval_ops(
@@ -591,6 +600,14 @@ class TelegramAIChatService:
 				document_id=charge_result.get("document_id"),
 			)
 			self.db.commit()
+			from app.services.ai.ai_memory_hooks import schedule_memory_update_after_chat
+
+			if active_session.business_id:
+				schedule_memory_update_after_chat(
+					active_session.session_id,
+					int(active_session.business_id),
+					user_context,
+				)
 			chunks = split_telegram_text(assistant_content)
 			keyboard = self._build_inline_keyboard([
 				[{"text": "💬 سوال دیگر", "callback_data": "chat:ask"}],

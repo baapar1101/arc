@@ -72,7 +72,7 @@ def apply_feedback_to_memory(
             business_id,
             user_id,
             item_key=None,
-            category="hint",
+            category="constraint",
             content=note,
             source="feedback",
             confidence="medium",

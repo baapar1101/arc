@@ -379,6 +379,12 @@ class AIMemoryItemUpdateRequest(BaseModel):
     content: str
 
 
+class AIMemoryPinRequest(BaseModel):
+    business_id: Optional[int] = None
+    content: str
+    kind: Optional[str] = "context"
+
+
 class AIKnowledgeCreateRequest(BaseModel):
     business_id: Optional[int] = None
     title: str
@@ -691,6 +697,33 @@ async def delete_ai_memory_item(
     if not ok:
         raise ApiError("NOT_FOUND", "آیتم حافظه یافت نشد", http_status=404)
     return success_response({"deleted": True, "id": item_id}, request, "آیتم حذف شد")
+
+
+@router.post("/memory/entries", summary="افزودن صریح یک مورد به حافظه")
+async def pin_ai_memory_entry(
+    request: Request,
+    params: AIMemoryPinRequest = Body(...),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+) -> Dict[str, Any]:
+    effective_business_id = params.business_id or ctx.business_id
+    if not effective_business_id:
+        raise ApiError("BUSINESS_ID_REQUIRED", "شناسه کسب و کار الزامی است", http_status=400)
+    if not ctx.can_access_business(int(effective_business_id)):
+        raise ApiError("FORBIDDEN", "دسترسی به این کسب‌وکار مجاز نیست", http_status=403)
+    from app.services.ai.ai_memory_service import pin_user_memory_text
+
+    try:
+        item = pin_user_memory_text(
+            db,
+            int(effective_business_id),
+            ctx.get_user_id(),
+            params.content,
+            kind=params.kind or "context",
+        )
+    except ValueError as exc:
+        raise ApiError("INVALID_MEMORY", str(exc), http_status=400) from exc
+    return success_response(item, request, "به حافظه اضافه شد")
 
 
 @router.get("/knowledge", summary="لیست اسناد دانشنامه کسب‌وکار")

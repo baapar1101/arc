@@ -224,7 +224,14 @@ _CATEGORY_TOOLS: dict[str, frozenset[str]] = {
         "hscript_run_preview",
         "hscript_fix_script",
     }),
+    "memory": frozenset({
+        "read_memory",
+        "upsert_memory_entry",
+        "delete_memory_entry",
+    }),
 }
+
+MEMORY_TOOL_NAMES = _CATEGORY_TOOLS["memory"]
 
 # کلیدواژهٔ فارسی/انگلیسی → دسته
 _KEYWORD_CATEGORIES: List[tuple[str, str]] = [
@@ -251,6 +258,13 @@ _KEYWORD_CATEGORIES: List[tuple[str, str]] = [
     (r"اتوماسیون|automation|workflow|گردش\s*کار|اجرای\s*workflow|تریگر\s*workflow", "workflow"),
     (r"کیف\s*پول|wallet|درگاه\s*پرداخت|سرفصل|حساب\s*کل", "financial"),
     (r"hscript|اچ[\s\-]*اسکریپت|اسکریپت\s*حسابیکس", "hscript"),
+    (
+        r"حافظه\s*دستیار|دستورات\s*همیشگی|چی\s*درباره(?:‌|\s)*من|"
+        r"what do you (?:know|remember) about me|از حافظه|"
+        r"فراموش(?:ش)?\s*کن|به\s*خاطر\s*بسپار|remember (?:this|that|me)|"
+        r"forget (?:this|that|my)|read_memory|upsert_memory",
+        "memory",
+    ),
 ]
 
 _WRITE_KEYWORDS = re.compile(
@@ -361,7 +375,7 @@ def matched_query_categories(user_query: Optional[str]) -> Set[str]:
 def detect_categories(user_query: Optional[str]) -> Set[str]:
     text = _normalize_query(user_query)
     if not text:
-        return set(_CATEGORY_TOOLS.keys())
+        return set(_CATEGORY_TOOLS.keys()) - {"memory"}
     found = matched_query_categories(user_query)
     if not found:
         # سوال عمومی — چند دستهٔ پرکاربرد

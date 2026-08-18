@@ -914,7 +914,11 @@ class AIService(AIModelRouterMixin, AIUsageMeterMixin):
                     from app.services.ai.ai_memory_service import format_memory_for_prompt
 
                     return format_memory_for_prompt(
-                        self.db, bid, self.ctx.get_user_id()
+                        self.db,
+                        bid,
+                        self.ctx.get_user_id(),
+                        user_query=user_query,
+                        display_name=self.ctx.get_user_name(),
                     )
                 except Exception as exc:
                     logger.warning("Failed to load AI memory for prompt: %s", exc)
@@ -1148,7 +1152,11 @@ class AIService(AIModelRouterMixin, AIUsageMeterMixin):
                     from app.services.ai.ai_memory_service import format_memory_for_prompt
 
                     return format_memory_for_prompt(
-                        loader_db, bid, self.ctx.get_user_id()
+                        loader_db,
+                        bid,
+                        self.ctx.get_user_id(),
+                        user_query=user_query,
+                        display_name=self.ctx.get_user_name(),
                     )
                 except Exception as exc:
                     logger.warning("Failed to load AI memory for prompt: %s", exc)

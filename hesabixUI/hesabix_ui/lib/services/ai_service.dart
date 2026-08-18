@@ -570,6 +570,23 @@ class AIService {
     return body['data'] as Map<String, dynamic>;
   }
 
+  Future<Map<String, dynamic>> pinAIMemoryEntry({
+    required String content,
+    String kind = 'context',
+    int? businessId,
+  }) async {
+    final res = await _api.post<Map<String, dynamic>>(
+      '/api/v1/ai/chat/memory/entries',
+      data: {
+        'content': content,
+        'kind': kind,
+        if (businessId != null) 'business_id': businessId,
+      },
+    );
+    final body = res.data as Map<String, dynamic>;
+    return body['data'] as Map<String, dynamic>;
+  }
+
   Future<void> deleteAIMemoryItem({
     required int itemId,
     int? businessId,

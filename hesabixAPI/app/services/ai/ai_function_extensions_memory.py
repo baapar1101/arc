@@ -1,5 +1,6 @@
 """
-ابزارهای حافظه بلندمدت دستیار AI — دستورات همیشگی + آیتم‌های یادگرفته‌شده.
+ابزارهای حافظهٔ واحد — فقط وقتی سوال از جنس خود حافظه است در allowlist می‌آیند.
+یادگیری بین جلسات با کیوریتور است، نه با این ابزارها.
 """
 from __future__ import annotations
 
@@ -10,21 +11,27 @@ from app.services.ai.ai_memory_service import (
     upsert_memory,
 )
 from app.services.ai.ai_memory_item_service import (
-    list_memory_items,
     memory_item_to_dict,
     soft_delete_memory_item,
     upsert_memory_item,
 )
+from app.services.ai.ai_memory_keys import canonical_kind
 from app.services.ai.function_registry import AIRole, AIFunction
 
 if TYPE_CHECKING:
     from app.services.ai.function_registry import AIFunctionRegistry
 
+MEMORY_TOOL_NAMES = frozenset({
+    "read_memory",
+    "upsert_memory_entry",
+    "delete_memory_entry",
+})
+
 
 def register_memory_functions(registry: "AIFunctionRegistry") -> None:
     create_handler = registry._create_handler  # noqa: SLF001
 
-    def get_user_memory_handler(args: Dict[str, Any], context: Dict[str, Any]) -> Any:
+    def read_memory_handler(args: Dict[str, Any], context: Dict[str, Any]) -> Any:
         from sqlalchemy.orm import Session
 
         db: Session = context["db"]
@@ -32,143 +39,59 @@ def register_memory_functions(registry: "AIFunctionRegistry") -> None:
         user_id = context["user_context"].get_user_id()
         return get_memory_payload(db, business_id, user_id)
 
-    def update_user_memory_handler(args: Dict[str, Any], context: Dict[str, Any]) -> Any:
-        """به‌روزرسانی دستورات همیشگی کاربر (نه حقایق یادگرفته‌شده)."""
+    def upsert_memory_entry_handler(args: Dict[str, Any], context: Dict[str, Any]) -> Any:
         from sqlalchemy.orm import Session
 
         db: Session = context["db"]
         business_id = int(args.get("business_id") or context.get("business_id"))
         user_id = context["user_context"].get_user_id()
-        mode = str(args.get("mode") or "replace").strip().lower()
-        content = str(args.get("content") or "").strip()
-        if not content and mode != "replace":
-            raise ValueError("پارامتر content الزامی است")
-
-        if mode == "append" and content:
-            from app.services.ai.ai_memory_service import get_memory_content
-
-            current = get_memory_content(db, business_id, user_id)
-            merged = f"{current}\n{content}".strip() if current else content
-            row = upsert_memory(db, business_id, user_id, merged)
-        else:
-            row = upsert_memory(db, business_id, user_id, content)
-
-        return {
-            "success": True,
-            "memory": get_memory_payload(db, business_id, user_id),
-            "mode": mode,
-            "note": "فقط دستورات همیشگی به‌روز شد؛ برای حقایق از upsert_memory_item استفاده کن.",
-        }
-
-    registry.register(
-        AIFunction(
-            name="get_user_memory",
-            description=(
-                "خواندن حافظهٔ بلندمدت: دستورات همیشگی کاربر + حقایق یادگرفته‌شده. "
-                "قبل از پیشنهاد تغییر از این ابزار استفاده کن."
-            ),
-            parameters_schema={
-                "type": "object",
-                "properties": {
-                    "business_id": {
-                        "type": "integer",
-                        "description": "شناسه کسب‌وکار (اختیاری — از context پر می‌شود)",
-                    },
-                },
-            },
-            handler=create_handler(get_user_memory_handler),
-            allowed_roles={AIRole.USER, AIRole.BUSINESS_OWNER, AIRole.OPERATOR, AIRole.ADMIN},
-            required_permissions=[],
-            category="memory",
-            is_readonly=True,
-        )
-    )
-
-    registry.register(
-        AIFunction(
-            name="update_user_memory",
-            description=(
-                "به‌روزرسانی دستورات همیشگی کاربر (متن آزاد: «همیشه این‌ها را مد نظر داشته باش»). "
-                "برای حقایق یادگرفته‌شده از گفتگو از upsert_memory_item استفاده کن. "
-                "mode=replace پیش‌فرض؛ mode=append برای افزودن به دستورات."
-            ),
-            parameters_schema={
-                "type": "object",
-                "properties": {
-                    "content": {
-                        "type": "string",
-                        "description": "متن دستورات همیشگی",
-                    },
-                    "mode": {
-                        "type": "string",
-                        "enum": ["append", "replace"],
-                        "description": "replace (پیش‌فرض) یا append",
-                    },
-                    "business_id": {"type": "integer"},
-                },
-                "required": ["content"],
-            },
-            handler=create_handler(update_user_memory_handler),
-            allowed_roles={AIRole.USER, AIRole.BUSINESS_OWNER, AIRole.OPERATOR, AIRole.ADMIN},
-            required_permissions=[],
-            category="memory",
-            is_readonly=False,
-            requires_approval=True,
-            risk_level="medium",
-        )
-    )
-
-    def list_memory_items_handler(args: Dict[str, Any], context: Dict[str, Any]) -> Any:
-        from sqlalchemy.orm import Session
-
-        db: Session = context["db"]
-        business_id = int(args.get("business_id") or context.get("business_id"))
-        user_id = context["user_context"].get_user_id()
-        category = args.get("category")
-        limit = int(args.get("limit") or 40)
-        rows = list_memory_items(
-            db, business_id, user_id, category=category, limit=limit
-        )
-        return {
-            "items": [memory_item_to_dict(r) for r in rows],
-            "count": len(rows),
-        }
-
-    def upsert_memory_item_handler(args: Dict[str, Any], context: Dict[str, Any]) -> Any:
-        from sqlalchemy.orm import Session
-
-        db: Session = context["db"]
-        business_id = int(args.get("business_id") or context.get("business_id"))
-        user_id = context["user_context"].get_user_id()
-        category = str(args.get("category") or "fact").strip().lower()
         content = str(args.get("content") or "").strip()
         if not content:
             raise ValueError("پارامتر content الزامی است")
+        kind = canonical_kind(args.get("kind") or args.get("category"), default="context")
+        if kind == "instruction":
+            mode = str(args.get("mode") or "replace").strip().lower()
+            if mode == "append":
+                from app.services.ai.ai_memory_service import get_memory_content
+
+                current = get_memory_content(db, business_id, user_id)
+                merged = f"{current}\n{content}".strip() if current else content
+                upsert_memory(db, business_id, user_id, merged)
+            else:
+                upsert_memory(db, business_id, user_id, content)
+            return {
+                "success": True,
+                "kind": "instruction",
+                "memory": get_memory_payload(db, business_id, user_id),
+            }
         row = upsert_memory_item(
             db,
             business_id,
             user_id,
-            item_key=args.get("item_key"),
-            category=category,
+            item_key=args.get("item_key") or args.get("key"),
+            category=kind,
             content=content,
-            structured=args.get("structured") if isinstance(args.get("structured"), dict) else None,
             source="assistant",
             confidence=args.get("confidence"),
         )
         return {"success": True, "item": memory_item_to_dict(row)}
 
-    def delete_memory_item_handler(args: Dict[str, Any], context: Dict[str, Any]) -> Any:
+    def delete_memory_entry_handler(args: Dict[str, Any], context: Dict[str, Any]) -> Any:
         from sqlalchemy.orm import Session
 
         db: Session = context["db"]
         business_id = int(args.get("business_id") or context.get("business_id"))
         user_id = context["user_context"].get_user_id()
+        item_key = args.get("item_key") or args.get("key")
+        if item_key == "instruction" or args.get("kind") == "instruction":
+            upsert_memory(db, business_id, user_id, "")
+            return {"success": True, "deleted": True, "kind": "instruction"}
         ok = soft_delete_memory_item(
             db,
             business_id,
             user_id,
             item_id=args.get("item_id"),
-            item_key=args.get("item_key"),
+            item_key=item_key,
         )
         if not ok:
             raise ValueError("آیتم حافظه یافت نشد")
@@ -176,20 +99,18 @@ def register_memory_functions(registry: "AIFunctionRegistry") -> None:
 
     registry.register(
         AIFunction(
-            name="list_memory_items",
-            description="فهرست حقایق یادگرفته‌شده از گفتگوها (پروژه، ترجیحات، اهداف، اصطلاحات).",
+            name="read_memory",
+            description=(
+                "خواندن حافظهٔ پایدار کاربر در این کسب‌وکار: سیاست‌های همیشگی + هویت، "
+                "ترجیح، زمینه، هدف و محدودیت. فقط وقتی کاربر دربارهٔ خود حافظه می‌پرسد."
+            ),
             parameters_schema={
                 "type": "object",
                 "properties": {
                     "business_id": {"type": "integer"},
-                    "category": {
-                        "type": "string",
-                        "enum": ["fact", "term", "preference", "goal", "hint"],
-                    },
-                    "limit": {"type": "integer", "description": "حداکثر ۵۰"},
                 },
             },
-            handler=create_handler(list_memory_items_handler),
+            handler=create_handler(read_memory_handler),
             allowed_roles={AIRole.USER, AIRole.BUSINESS_OWNER, AIRole.OPERATOR, AIRole.ADMIN},
             required_permissions=[],
             category="memory",
@@ -199,32 +120,47 @@ def register_memory_functions(registry: "AIFunctionRegistry") -> None:
 
     registry.register(
         AIFunction(
-            name="upsert_memory_item",
+            name="upsert_memory_entry",
             description=(
-                "ذخیره یا به‌روزرسانی یک حقیقت یادگرفته‌شده (یادگیری بی‌صدا — بدون پرسیدن از کاربر). "
-                "فقط حقایق پایدار: نام پروژه/کسب‌وکار، ترجیحات، اصطلاحات، اهداف. "
-                "اعداد موقت یا دستور یک‌باره ذخیره نکن."
+                "ذخیره یا به‌روزرسانی یک ورودی حافظه وقتی کاربر صریحاً می‌خواهد چیزی را "
+                "به خاطر بسپاری یا سیاست همیشگی را عوض کند. kind=instruction برای سیاست‌ها؛ "
+                "برای هویت/ترجیح/زمینه از کلید پایدار مثل identity.preferred_name استفاده کن. "
+                "اعداد لحظه‌ای و خروجی tool ذخیره نکن."
             ),
             parameters_schema={
                 "type": "object",
                 "properties": {
-                    "item_key": {"type": "string", "description": "کلید یکتا (اختیاری)"},
-                    "category": {
-                        "type": "string",
-                        "enum": ["fact", "term", "preference", "goal", "hint"],
-                    },
                     "content": {"type": "string"},
-                    "structured": {"type": "object"},
-                    "confidence": {"type": "string", "enum": ["low", "medium", "high"]},
+                    "kind": {
+                        "type": "string",
+                        "enum": [
+                            "instruction",
+                            "identity",
+                            "preference",
+                            "context",
+                            "goal",
+                            "constraint",
+                        ],
+                    },
+                    "item_key": {"type": "string"},
+                    "mode": {
+                        "type": "string",
+                        "enum": ["append", "replace"],
+                        "description": "فقط برای kind=instruction",
+                    },
+                    "confidence": {
+                        "type": "string",
+                        "enum": ["low", "medium", "high"],
+                    },
                     "business_id": {"type": "integer"},
                 },
                 "required": ["content"],
             },
-            handler=create_handler(upsert_memory_item_handler),
+            handler=create_handler(upsert_memory_entry_handler),
             allowed_roles={AIRole.USER, AIRole.BUSINESS_OWNER, AIRole.OPERATOR, AIRole.ADMIN},
             required_permissions=[],
             category="memory",
-            is_readonly=False,
+            is_readonly=True,
             requires_approval=False,
             risk_level="safe",
         )
@@ -232,21 +168,22 @@ def register_memory_functions(registry: "AIFunctionRegistry") -> None:
 
     registry.register(
         AIFunction(
-            name="delete_memory_item",
-            description="حذف نرم یک حقیقت یادگرفته‌شده با item_id یا item_key.",
+            name="delete_memory_entry",
+            description="حذف یک ورودی حافظه با item_id یا item_key وقتی کاربر می‌خواهد فراموش شود.",
             parameters_schema={
                 "type": "object",
                 "properties": {
                     "item_id": {"type": "integer"},
                     "item_key": {"type": "string"},
+                    "kind": {"type": "string"},
                     "business_id": {"type": "integer"},
                 },
             },
-            handler=create_handler(delete_memory_item_handler),
+            handler=create_handler(delete_memory_entry_handler),
             allowed_roles={AIRole.USER, AIRole.BUSINESS_OWNER, AIRole.OPERATOR, AIRole.ADMIN},
             required_permissions=[],
             category="memory",
-            is_readonly=False,
+            is_readonly=True,
             requires_approval=False,
             risk_level="safe",
         )

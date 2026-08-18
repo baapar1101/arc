@@ -4276,7 +4276,7 @@
   "aiVoiceImproveQualityTitle": "Improve voice quality",
   "aiVoiceImproveQualitySubtitle": "Help improve the voice experience by sending anonymous data.",
   "aiMemoryTitle": "Assistant memory",
-  "aiMemoryIntro": "You write standing instructions; the assistant quietly learns lasting facts from conversations.",
+  "aiMemoryIntro": "The assistant keeps lasting context between chats. Standing policies are yours; identity and preferences are learned quietly. Live numbers always come from your books.",
   "aiMemoryUpdatedAt": "Last updated: {when}",
   "@aiMemoryUpdatedAt": {
     "placeholders": {
@@ -4294,8 +4294,8 @@
   },
   "aiMemorySaveInstructions": "Save instructions",
   "aiMemoryLearnedTitle": "What I have learned",
-  "aiMemoryLearnedIntro": "Collected automatically from conversations. You can edit or delete items.",
-  "aiMemoryLearnedEmpty": "Nothing has been learned from conversations yet. Lasting facts will appear here as you keep chatting.",
+  "aiMemoryLearnedIntro": "Learned across conversations. Edit or delete anything — you own this memory.",
+  "aiMemoryLearnedEmpty": "Nothing lasting has been learned yet. After a few chats, names, preferences and work context appear here.",
   "aiMemoryClearAll": "Clear all",
   "aiMemoryLoadFailed": "Could not load memory: {error}",
   "@aiMemoryLoadFailed": {
@@ -4323,6 +4323,22 @@
   "aiMemorySourceAssistant": "Saved by the assistant",
   "aiMemorySourceFeedback": "From your feedback",
   "aiMemorySourceUser": "Edited by you",
+  "aiMemorySourceProfile": "From your account",
+  "aiMemorySourceCurator": "Remembered from chat",
+  "aiMemoryKindIdentity": "Identity",
+  "aiMemoryKindPreference": "Preference",
+  "aiMemoryKindContext": "Context",
+  "aiMemoryKindGoal": "Goal",
+  "aiMemoryKindConstraint": "Constraint",
+  "aiMemoryLearnedCount": "{count} remembered items",
+  "@aiMemoryLearnedCount": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "aiMemoryPinToMemory": "Remember this",
+  "aiMemoryPinned": "Saved to assistant memory",
+  "aiMemoryPoliciesCardTitle": "Your policies",
   "aiKnowledgeTitle": "Business knowledge base",
   "aiKnowledgeIntro": "Related documents are searched and added to context when answering your question.",
   "aiKnowledgeNewDocument": "New document",

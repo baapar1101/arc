@@ -764,7 +764,28 @@ class _AIChatDialogState extends State<AIChatDialog> {
               msg.content.trim().isNotEmpty
           ? () => unawaited(_speakMessage(msg))
           : null,
+      onPinToMemory: widget.businessId == null || msg.content.trim().isEmpty
+          ? null
+          : () => unawaited(_pinMessageToMemory(msg)),
     );
+  }
+
+  Future<void> _pinMessageToMemory(AIChatMessage msg) async {
+    try {
+      await _aiService.pinAIMemoryEntry(
+        content: msg.content.trim(),
+        businessId: widget.businessId,
+      );
+      if (!mounted) return;
+      _showSnackbar(AppLocalizations.of(context).aiMemoryPinned);
+    } catch (e) {
+      if (!mounted) return;
+      _showError(
+        AppLocalizations.of(context).aiMemoryError(
+          ErrorExtractor.forContext(e, context),
+        ),
+      );
+    }
   }
 
   void _copyToClipboard(String text) {

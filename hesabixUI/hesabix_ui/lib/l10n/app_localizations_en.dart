@@ -10825,7 +10825,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get aiMemoryIntro =>
-      'You write standing instructions; the assistant quietly learns lasting facts from conversations.';
+      'The assistant keeps lasting context between chats. Standing policies are yours; identity and preferences are learned quietly. Live numbers always come from your books.';
 
   @override
   String aiMemoryUpdatedAt(String when) {
@@ -10856,11 +10856,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get aiMemoryLearnedIntro =>
-      'Collected automatically from conversations. You can edit or delete items.';
+      'Learned across conversations. Edit or delete anything — you own this memory.';
 
   @override
   String get aiMemoryLearnedEmpty =>
-      'Nothing has been learned from conversations yet. Lasting facts will appear here as you keep chatting.';
+      'Nothing lasting has been learned yet. After a few chats, names, preferences and work context appear here.';
 
   @override
   String get aiMemoryClearAll => 'Clear all';
@@ -10917,6 +10917,41 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get aiMemorySourceUser => 'Edited by you';
+
+  @override
+  String get aiMemorySourceProfile => 'From your account';
+
+  @override
+  String get aiMemorySourceCurator => 'Remembered from chat';
+
+  @override
+  String get aiMemoryKindIdentity => 'Identity';
+
+  @override
+  String get aiMemoryKindPreference => 'Preference';
+
+  @override
+  String get aiMemoryKindContext => 'Context';
+
+  @override
+  String get aiMemoryKindGoal => 'Goal';
+
+  @override
+  String get aiMemoryKindConstraint => 'Constraint';
+
+  @override
+  String aiMemoryLearnedCount(int count) {
+    return '$count remembered items';
+  }
+
+  @override
+  String get aiMemoryPinToMemory => 'Remember this';
+
+  @override
+  String get aiMemoryPinned => 'Saved to assistant memory';
+
+  @override
+  String get aiMemoryPoliciesCardTitle => 'Your policies';
 
   @override
   String get aiKnowledgeTitle => 'Business knowledge base';

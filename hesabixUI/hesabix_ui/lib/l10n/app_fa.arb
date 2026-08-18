@@ -4318,7 +4318,7 @@
   "aiVoiceImproveQualityTitle": "بهبود کیفیت صدا",
   "aiVoiceImproveQualitySubtitle": "با ارسال داده‌های ناشناس به بهبود تجربه صوتی کمک کنید.",
   "aiMemoryTitle": "حافظه دستیار",
-  "aiMemoryIntro": "دستورات همیشگی را خودتان می‌نویسید؛ حقایق پایدار را دستیار بی‌صدا از گفتگوها یاد می‌گیرد.",
+  "aiMemoryIntro": "دستیار زمینهٔ پایدار را بین گفت‌وگوها نگه می‌دارد. سیاست‌ها را شما می‌نویسید؛ هویت و ترجیح را بی‌صدا یاد می‌گیرد. اعداد لحظه‌ای همیشه از دادهٔ کسب‌وکار خوانده می‌شوند.",
   "aiMemoryUpdatedAt": "آخرین به‌روزرسانی: {when}",
   "@aiMemoryUpdatedAt": {
     "placeholders": {
@@ -4336,8 +4336,8 @@
   },
   "aiMemorySaveInstructions": "ذخیره دستورات",
   "aiMemoryLearnedTitle": "آنچه یاد گرفته‌ام",
-  "aiMemoryLearnedIntro": "از گفتگوها به‌صورت خودکار جمع می‌شود. می‌توانید ویرایش یا حذف کنید.",
-  "aiMemoryLearnedEmpty": "هنوز چیزی از گفتگوها یاد نگرفته‌ام. با ادامهٔ مکالمه، حقایق پایدار اینجا ظاهر می‌شوند.",
+  "aiMemoryLearnedIntro": "از گفتگوهای مختلف یاد گرفته می‌شود. هر مورد را می‌توانید ویرایش یا حذف کنید — این حافظه مال شماست.",
+  "aiMemoryLearnedEmpty": "هنوز زمینهٔ پایداری یاد نگرفته‌ام. پس از چند گفت‌وگو، نام، ترجیح و زمینهٔ کار اینجا می‌آید.",
   "aiMemoryClearAll": "پاک کردن همه",
   "aiMemoryLoadFailed": "خطا در بارگذاری حافظه: {error}",
   "@aiMemoryLoadFailed": {
@@ -4365,6 +4365,22 @@
   "aiMemorySourceAssistant": "ذخیره‌شده توسط دستیار",
   "aiMemorySourceFeedback": "از بازخورد شما",
   "aiMemorySourceUser": "ویرایش‌شده توسط شما",
+  "aiMemorySourceProfile": "از حساب کاربری",
+  "aiMemorySourceCurator": "به‌خاطر سپرده از گفتگو",
+  "aiMemoryKindIdentity": "هویت",
+  "aiMemoryKindPreference": "ترجیح",
+  "aiMemoryKindContext": "زمینه",
+  "aiMemoryKindGoal": "هدف",
+  "aiMemoryKindConstraint": "محدودیت",
+  "aiMemoryLearnedCount": "{count} مورد به‌خاطر سپرده",
+  "@aiMemoryLearnedCount": {
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "aiMemoryPinToMemory": "این را به خاطر بسپار",
+  "aiMemoryPinned": "به حافظهٔ دستیار اضافه شد",
+  "aiMemoryPoliciesCardTitle": "سیاست‌های شما",
   "aiKnowledgeTitle": "دانشنامه کسب‌وکار",
   "aiKnowledgeIntro": "اسناد مرتبط هنگام پاسخ‌دهی به پرسش شما جستجو و به context اضافه می‌شوند.",
   "aiKnowledgeNewDocument": "سند جدید",

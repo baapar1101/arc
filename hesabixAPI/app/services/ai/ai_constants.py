@@ -12,11 +12,13 @@ AI_OPERATION_TITLE = "title"
 AI_OPERATION_HISTORY_SUMMARY = "history_summary"
 AI_OPERATION_THOUGHT = "thought_synthesis"
 AI_OPERATION_SUBAGENT = "subagent"
+AI_OPERATION_MEMORY_CURATE = "memory_curate"
 
 LIGHT_AI_OPERATIONS: frozenset[str] = frozenset({
     AI_OPERATION_TITLE,
     AI_OPERATION_HISTORY_SUMMARY,
     AI_OPERATION_THOUGHT,
+    AI_OPERATION_MEMORY_CURATE,
 })
 
 # timeout ارتباط با AI Provider (ثانیه)
@@ -65,9 +67,17 @@ CONTEXT_KEEP_RECENT_MESSAGES = 24
 CONTEXT_KEEP_HEAD_MESSAGES = 4
 
 # حافظه بلندمدت — فاصلهٔ به‌روزرسانی خودکار (پیام کاربر)
+# منسوخ: یادگیری regex دیگر در مسیر production صدا زده نمی‌شود.
 AUTO_SUMMARIZE_USER_MESSAGE_INTERVAL = 6
 MAX_MEMORY_FEEDBACK_UPDATES_PER_DAY = 8
 MAX_LLM_SUMMARIZE_PER_USER_DAY = 24
+MAX_LLM_MEMORY_CURATE_PER_USER_DAY = 80
+MEMORY_CURATE_MAX_OPS = 4
+MEMORY_CURATE_MIN_CONFIDENCE = 0.55
+MEMORY_CURATE_MAX_TOKENS = 500
+MEMORY_ALWAYS_KIND_CHAR_BUDGET = 2200
+MEMORY_RECALL_KIND_CHAR_BUDGET = 1400
+MEMORY_RECALL_MAX_ITEMS = 12
 
 # حداکثر طول JSON نتیجه tool در پیام role=tool
 MAX_TOOL_RESULT_JSON_CHARS = 6_000
@@ -96,6 +106,23 @@ MAX_LLM_RETRIES = 3
 MAX_MEMORY_ITEMS_PER_USER = 200
 MAX_MEMORY_ITEM_CONTENT_CHARS = 2048
 MEMORY_AUTO_APPROVE_CATEGORIES = frozenset({"fact", "term", "preference"})
+MEMORY_KINDS = frozenset({
+    "instruction",
+    "identity",
+    "preference",
+    "context",
+    "goal",
+    "constraint",
+})
+MEMORY_ALWAYS_KINDS = frozenset({"instruction", "identity", "preference", "constraint"})
+MEMORY_RECALL_KINDS = frozenset({"context", "goal"})
+MEMORY_CURATOR_AUTO_KINDS = frozenset({
+    "identity",
+    "preference",
+    "context",
+    "goal",
+    "constraint",
+})
 
 # Exploration mode
 EXPLORATION_COMPLEXITY_ITERATIONS: dict[str, int] = {

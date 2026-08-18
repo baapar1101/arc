@@ -1,4 +1,4 @@
-"""حافظهٔ دو لایهٔ دستیار AI: دستورات کاربر + یادگیری بی‌صدا."""
+"""حافظهٔ واحد دستیار AI: سیاست‌های کاربر + آیتم‌های پایدار + کیوریتور."""
 from __future__ import annotations
 
 import logging
@@ -120,13 +120,35 @@ def memory_to_dict(
 
 def get_memory_payload(db: Session, business_id: int, user_id: int) -> Dict[str, Any]:
     from app.services.ai.ai_memory_item_service import list_memory_items, memory_item_to_dict
+    from app.services.ai.ai_memory_keys import canonical_kind
 
     row = get_memory(db, business_id, user_id)
     items = [
         memory_item_to_dict(r)
         for r in list_memory_items(db, business_id, user_id, limit=100)
     ]
-    return memory_to_dict(row, items=items)
+    payload = memory_to_dict(row, items=items)
+    instructions = payload.get("instructions") or ""
+    entries: List[Dict[str, Any]] = []
+    if instructions.strip():
+        entries.append(
+            {
+                "id": None,
+                "item_key": "instruction",
+                "kind": "instruction",
+                "category": "instruction",
+                "content": instructions,
+                "source": "user",
+                "confidence": "high",
+                "updated_at": payload.get("updated_at"),
+            }
+        )
+    for it in items:
+        kind = canonical_kind(it.get("kind") or it.get("category"))
+        entries.append({**it, "kind": kind, "category": kind})
+    payload["entries"] = entries
+    payload["learned_count"] = len(items)
+    return payload
 
 
 def get_memory_digest(db: Session, business_id: int, user_id: int) -> Dict[str, Any]:
@@ -150,35 +172,98 @@ def get_memory_digest(db: Session, business_id: int, user_id: int) -> Dict[str, 
     }
 
 
-def format_memory_for_prompt(db: Session, business_id: int, user_id: int) -> str:
-    parts: List[str] = []
+def format_memory_for_prompt(
+    db: Session,
+    business_id: int,
+    user_id: int,
+    *,
+    user_query: Optional[str] = None,
+    display_name: Optional[str] = None,
+) -> str:
+    from app.services.ai.ai_memory_compiler import compile_memory_prompt
+    from app.services.ai.ai_memory_item_service import list_memory_items, memory_item_to_dict
 
+    seed_profile_identity(db, business_id, user_id, display_name)
     instructions = get_memory_content(db, business_id, user_id)
-    if instructions:
-        parts.append("### دستورات همیشگی کاربر (الزامی مگر خلاف صریح بگوید)\n" + instructions)
-
-    try:
-        from app.services.ai.ai_memory_item_service import format_memory_items_for_prompt
-
-        items_block = format_memory_items_for_prompt(db, business_id, user_id)
-        if items_block:
-            parts.append(items_block)
-    except Exception:
-        pass
-
-    if not parts:
-        return ""
-
-    body = "\n\n".join(parts)
-    return (
-        "\n\n--- حافظهٔ بلندمدت کاربر ---\n"
-        "دستورات همیشگی را رعایت کن. حقایق یادگرفته‌شده زمینهٔ پایدارند؛ "
-        "اسناد بلند در knowledge و دادهٔ لحظه‌ای با ابزار.\n"
-        "برای افزودن/ویرایش حقایق یادگرفته‌شده از upsert_memory_item / "
-        "list_memory_items / delete_memory_item استفاده کن "
-        "(بدون پرسیدن از کاربر — یادگیری بی‌صدا).\n"
-        f"{body}"
+    items = [
+        memory_item_to_dict(r)
+        for r in list_memory_items(db, business_id, user_id, limit=100)
+    ]
+    return compile_memory_prompt(
+        instructions=instructions,
+        items=items,
+        user_query=user_query,
     )
+
+
+def seed_profile_identity(
+    db: Session,
+    business_id: int,
+    user_id: int,
+    display_name: Optional[str],
+) -> None:
+    """اگر نام پروفایل هست و identity خالی است، بذر بدون LLM بساز."""
+    name = (display_name or "").strip()
+    if len(name) < 2:
+        return
+    from app.services.ai.ai_memory_item_service import get_memory_item_by_key, upsert_memory_item
+
+    existing = get_memory_item_by_key(
+        db, business_id, user_id, "identity.preferred_name"
+    )
+    if existing:
+        return
+    try:
+        upsert_memory_item(
+            db,
+            business_id,
+            user_id,
+            item_key="identity.preferred_name",
+            category="identity",
+            content=f"نام کاربر در حسابیکس «{name}» است. اگر نام خطاب دیگری نگفته، با همین نام خطاب کن.",
+            source="profile",
+            confidence="medium",
+        )
+    except Exception as exc:
+        logger.debug("profile identity seed skipped: %s", exc)
+
+
+def pin_user_memory_text(
+    db: Session,
+    business_id: int,
+    user_id: int,
+    content: str,
+    *,
+    kind: str = "context",
+) -> Dict[str, Any]:
+    """ذخیرهٔ صریح کاربر از منوی پیام."""
+    from app.services.ai.ai_memory_item_service import memory_item_to_dict, upsert_memory_item
+    from app.services.ai.ai_memory_keys import canonical_kind, pinned_context_key
+
+    text = (content or "").strip()
+    if not text:
+        raise ValueError("متن حافظه خالی است")
+    cat = canonical_kind(kind, default="context")
+    if cat == "instruction":
+        row = upsert_memory(db, business_id, user_id, text)
+        return {
+            "kind": "instruction",
+            "item_key": "instruction",
+            "content": get_memory_content(db, business_id, user_id),
+            "updated_at": row.updated_at.isoformat() if row.updated_at else None,
+        }
+    key = "identity.preferred_name" if cat == "identity" else pinned_context_key(text)
+    item = upsert_memory_item(
+        db,
+        business_id,
+        user_id,
+        item_key=key,
+        category=cat,
+        content=text[:500],
+        source="user",
+        confidence="high",
+    )
+    return memory_item_to_dict(item)
 
 
 def format_memory_goal_hint_for_insights(
@@ -418,10 +503,8 @@ async def auto_summarize_session(
     session_messages: List[Dict[str, Any]],
     ai_service=None,  # noqa: ARG001
 ) -> bool:
-    if len(session_messages) < AUTO_SUMMARIZE_MIN_MESSAGES:
-        return False
-    created = silent_learn_from_messages(db, business_id, user_id, session_messages)
-    return created > 0
+    """منسوخ — یادگیری production از کیوریتور است."""
+    return False
 
 
 async def maybe_auto_summarize_session(
@@ -430,7 +513,7 @@ async def maybe_auto_summarize_session(
     user_id: int,
     session_messages: List[Dict[str, Any]],
 ) -> bool:
-    return await auto_summarize_session(db, business_id, user_id, session_messages)
+    return False
 
 
 def append_to_memory(

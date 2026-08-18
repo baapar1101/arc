@@ -20055,7 +20055,7 @@ abstract class AppLocalizations {
   /// No description provided for @aiMemoryIntro.
   ///
   /// In en, this message translates to:
-  /// **'You write standing instructions; the assistant quietly learns lasting facts from conversations.'**
+  /// **'The assistant keeps lasting context between chats. Standing policies are yours; identity and preferences are learned quietly. Live numbers always come from your books.'**
   String get aiMemoryIntro;
 
   /// No description provided for @aiMemoryUpdatedAt.
@@ -20103,13 +20103,13 @@ abstract class AppLocalizations {
   /// No description provided for @aiMemoryLearnedIntro.
   ///
   /// In en, this message translates to:
-  /// **'Collected automatically from conversations. You can edit or delete items.'**
+  /// **'Learned across conversations. Edit or delete anything — you own this memory.'**
   String get aiMemoryLearnedIntro;
 
   /// No description provided for @aiMemoryLearnedEmpty.
   ///
   /// In en, this message translates to:
-  /// **'Nothing has been learned from conversations yet. Lasting facts will appear here as you keep chatting.'**
+  /// **'Nothing lasting has been learned yet. After a few chats, names, preferences and work context appear here.'**
   String get aiMemoryLearnedEmpty;
 
   /// No description provided for @aiMemoryClearAll.
@@ -20213,6 +20213,72 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Edited by you'**
   String get aiMemorySourceUser;
+
+  /// No description provided for @aiMemorySourceProfile.
+  ///
+  /// In en, this message translates to:
+  /// **'From your account'**
+  String get aiMemorySourceProfile;
+
+  /// No description provided for @aiMemorySourceCurator.
+  ///
+  /// In en, this message translates to:
+  /// **'Remembered from chat'**
+  String get aiMemorySourceCurator;
+
+  /// No description provided for @aiMemoryKindIdentity.
+  ///
+  /// In en, this message translates to:
+  /// **'Identity'**
+  String get aiMemoryKindIdentity;
+
+  /// No description provided for @aiMemoryKindPreference.
+  ///
+  /// In en, this message translates to:
+  /// **'Preference'**
+  String get aiMemoryKindPreference;
+
+  /// No description provided for @aiMemoryKindContext.
+  ///
+  /// In en, this message translates to:
+  /// **'Context'**
+  String get aiMemoryKindContext;
+
+  /// No description provided for @aiMemoryKindGoal.
+  ///
+  /// In en, this message translates to:
+  /// **'Goal'**
+  String get aiMemoryKindGoal;
+
+  /// No description provided for @aiMemoryKindConstraint.
+  ///
+  /// In en, this message translates to:
+  /// **'Constraint'**
+  String get aiMemoryKindConstraint;
+
+  /// No description provided for @aiMemoryLearnedCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} remembered items'**
+  String aiMemoryLearnedCount(int count);
+
+  /// No description provided for @aiMemoryPinToMemory.
+  ///
+  /// In en, this message translates to:
+  /// **'Remember this'**
+  String get aiMemoryPinToMemory;
+
+  /// No description provided for @aiMemoryPinned.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved to assistant memory'**
+  String get aiMemoryPinned;
+
+  /// No description provided for @aiMemoryPoliciesCardTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Your policies'**
+  String get aiMemoryPoliciesCardTitle;
 
   /// No description provided for @aiKnowledgeTitle.
   ///

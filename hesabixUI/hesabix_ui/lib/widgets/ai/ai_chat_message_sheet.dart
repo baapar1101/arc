@@ -54,6 +54,7 @@ Future<void> showAIChatMessageActionSheet({
   VoidCallback? onFeedbackDown,
   VoidCallback? onRegenerate,
   VoidCallback? onSpeak,
+  VoidCallback? onPinToMemory,
 }) {
   final flags = AIChatMessageSheetFlags.fromMessage(
     message,
@@ -80,6 +81,12 @@ Future<void> showAIChatMessageActionSheet({
                 title: Text(l10n.aiActionCopy),
                 onTap: () => closeThen(onCopy),
               ),
+              if (onPinToMemory != null && message.content.trim().isNotEmpty)
+                ListTile(
+                  leading: const Icon(Icons.psychology_outlined),
+                  title: Text(l10n.aiMemoryPinToMemory),
+                  onTap: () => closeThen(onPinToMemory),
+                ),
               if (flags.applyHScript && onApplyHScript != null)
                 ListTile(
                   leading: const Icon(Icons.code_rounded),

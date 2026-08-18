@@ -98,6 +98,33 @@ AUX_CHAT_TITLE = (
 
 AUX_CHAT_TITLE_USER = "درخواست کاربر: {user_message}\nفقط عنوان کوتاه تولید کن."
 
+AUX_MEMORY_CURATE = """You are the long-term memory curator for Hesabix, an Iranian SME accounting assistant.
+You do not answer the user. You only decide which durable facts belong in memory across chat sessions.
+
+Return JSON only:
+{"ops":[{"action":"upsert|update|delete|noop","key":"namespace.slug","kind":"identity|preference|context|goal|constraint","content":"...","confidence":0.0,"user_explicit":false}]}
+
+What belongs in memory (meaning, not phrases):
+- How to address the user, their role, lasting work context (project/brand/internal term)
+- Stable preferences for how the assistant should talk or format
+- Durable goals the user wants tracked across days
+- Constraints from explicit "don't do this again"
+- Standing policy ONLY if the user clearly made a lasting rule (then kind=instruction and user_explicit=true)
+
+What never belongs:
+- Today's numbers, invoice/document ids, balances, stock, tool results
+- One-off task details, greetings, or anything the next tool call can fetch
+- Secrets, passwords, API keys
+- Rewriting user standing instructions unless they explicitly changed policy
+
+Rules:
+- Prefer updating an existing key over creating a near-duplicate
+- Use stable keys: identity.preferred_name, identity.role_in_business, preference.report_style, preference.amount_unit, preference.language, context.current_project, context.internal_term.<slug>, goal.sales_monthly, constraint.avoid.<slug>
+- Empty ops or {"ops":[]} if nothing durable
+- confidence 0-1; skip weak guesses
+- Write content in the user's language, one short sentence per item
+"""
+
 SUPPORT_TICKET_SYSTEM = """شما دستیار پیشنهاد پاسخ تیکت برای اپراتورهای پشتیبانی حسابیکس هستید.
 
 **تیکت**
@@ -399,6 +426,7 @@ AI_PROMPT_FALLBACKS: dict[str, str] = {
     "aux.exploration": AUX_EXPLORATION,
     "aux.chat_title": AUX_CHAT_TITLE,
     "aux.chat_title_user": AUX_CHAT_TITLE_USER,
+    "aux.memory_curate": AUX_MEMORY_CURATE,
     "support.ticket_suggest.system": SUPPORT_TICKET_SYSTEM,
     "support.ticket_suggest.user": SUPPORT_TICKET_USER,
     "crm.summarize_lead": CRM_SUMMARIZE_LEAD,
@@ -544,6 +572,14 @@ AI_DEFAULT_PROMPT_ROWS: list[dict[str, str]] = [
         "category": "auxiliary",
         "title": "پیام کاربر برای تولید عنوان",
         "content": AUX_CHAT_TITLE_USER,
+    },
+    {
+        "prompt_key": "aux.memory_curate",
+        "role": "user",
+        "prompt_type": "system",
+        "category": "auxiliary",
+        "title": "کیوریتور حافظه بلندمدت",
+        "content": AUX_MEMORY_CURATE,
     },
     {
         "prompt_key": "support.ticket_suggest.system",

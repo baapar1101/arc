@@ -3,8 +3,9 @@ import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/services/ai_service.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
 import 'package:hesabix_ui/utils/snackbar_helper.dart' show SnackBarHelper;
+import 'package:hesabix_ui/widgets/ai/ai_chat_design.dart';
 
-/// برگهٔ حافظهٔ دو لایه: دستورات همیشگی + حقایق یادگرفته‌شده.
+/// برگهٔ واحد حافظه: سیاست‌های کاربر + آنچه دستیار بین گفت‌وگوها به خاطر می‌سپارد.
 Future<void> showAIChatMemorySheet({
   required BuildContext context,
   required AIService aiService,
@@ -59,6 +60,14 @@ class _AIChatMemorySheetState extends State<_AIChatMemorySheet> {
 
   int get _charCount => _instructionsCtrl.text.length;
 
+  Map<String, List<_LearnedItem>> get _grouped {
+    final map = <String, List<_LearnedItem>>{};
+    for (final item in _items) {
+      map.putIfAbsent(item.kind, () => []).add(item);
+    }
+    return map;
+  }
+
   Future<void> _load() async {
     try {
       final data = await widget.aiService.getAIMemory(businessId: widget.businessId);
@@ -85,7 +94,8 @@ class _AIChatMemorySheetState extends State<_AIChatMemorySheet> {
                   id: id,
                   content: content,
                   source: e['source'] as String? ?? '',
-                  category: e['category'] as String? ?? 'fact',
+                  kind: (e['kind'] as String?) ??
+                      (e['category'] as String? ?? 'context'),
                 ),
               );
             }
@@ -273,169 +283,254 @@ class _AIChatMemorySheetState extends State<_AIChatMemorySheet> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final l10n = AppLocalizations.of(context);
+    final scheme = theme.colorScheme;
     final bottom = MediaQuery.viewInsetsOf(context).bottom;
     final overLimit = _charCount > _maxChars;
+    final height = MediaQuery.sizeOf(context).height * 0.86;
 
-    return Padding(
-      padding: EdgeInsets.fromLTRB(20, 0, 20, 20 + bottom),
-      child: ListView(
-        children: [
-          Text(
-            l10n.aiMemoryTitle,
-            style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            l10n.aiMemoryIntro,
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-            ),
-          ),
-          if (_updatedAt != null) ...[
-            const SizedBox(height: 6),
-            Text(
-              l10n.aiMemoryUpdatedAt(_formatUpdatedAt(_updatedAt!)),
-              style: theme.textTheme.labelSmall?.copyWith(
-                color: theme.colorScheme.outline,
-              ),
-            ),
-          ],
-          const SizedBox(height: 16),
-          if (_loading)
-            const Padding(
-              padding: EdgeInsets.all(24),
-              child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
-            )
-          else ...[
-            Text(l10n.aiMemoryInstructionsTitle, style: theme.textTheme.titleSmall),
-            const SizedBox(height: 6),
-            Text(
-              l10n.aiMemoryInstructionsHint,
-              style: theme.textTheme.labelSmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(height: 8),
-            TextField(
-              controller: _instructionsCtrl,
-              maxLines: 5,
-              minLines: 3,
-              decoration: InputDecoration(
-                hintText: l10n.aiMemoryInstructionsExample,
-                border: const OutlineInputBorder(),
-                errorText: overLimit ? l10n.aiMemoryMaxChars(_maxChars) : null,
-              ),
-            ),
-            const SizedBox(height: 6),
+    return SizedBox(
+      height: height,
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(20, 0, 20, 20 + bottom),
+        child: ListView(
+          children: [
             Row(
               children: [
-                Text(
-                  '$_charCount / $_maxChars',
-                  style: theme.textTheme.labelSmall?.copyWith(
-                    color: overLimit
-                        ? theme.colorScheme.error
-                        : theme.colorScheme.onSurfaceVariant,
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: scheme.primaryContainer,
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Icon(
+                    Icons.psychology_rounded,
+                    color: scheme.onPrimaryContainer,
                   ),
                 ),
-                const Spacer(),
-                FilledButton(
-                  onPressed: _saving || _clearing || overLimit ? null : _saveInstructions,
-                  child: _saving
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        l10n.aiMemoryTitle,
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      if (_updatedAt != null)
+                        Text(
+                          l10n.aiMemoryUpdatedAt(_formatUpdatedAt(_updatedAt!)),
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: scheme.outline,
                           ),
-                        )
-                      : Text(l10n.aiMemorySaveInstructions),
+                        ),
+                    ],
+                  ),
                 ),
               ],
             ),
-            const SizedBox(height: 24),
-            Text(l10n.aiMemoryLearnedTitle, style: theme.textTheme.titleSmall),
-            const SizedBox(height: 6),
+            const SizedBox(height: 10),
             Text(
-              l10n.aiMemoryLearnedIntro,
-              style: theme.textTheme.labelSmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
+              l10n.aiMemoryIntro,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: scheme.onSurfaceVariant,
+                height: 1.45,
               ),
             ),
-            const SizedBox(height: 12),
-            if (_items.isEmpty)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                child: Text(
-                  l10n.aiMemoryLearnedEmpty,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.outline,
+            if (!_loading && _items.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  _StatChip(
+                    icon: Icons.auto_awesome_outlined,
+                    label: l10n.aiMemoryLearnedCount(_items.length),
                   ),
-                ),
+                ],
+              ),
+            ],
+            const SizedBox(height: 18),
+            if (_loading)
+              const Padding(
+                padding: EdgeInsets.all(32),
+                child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
               )
-            else
-              ..._items.map((item) {
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: Material(
-                    color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.45),
-                    borderRadius: BorderRadius.circular(10),
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(12, 10, 4, 10),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+            else ...[
+              DecoratedBox(
+                decoration: AIChatDesign.elevatedCard(theme),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(14, 14, 14, 12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Text(
+                        l10n.aiMemoryPoliciesCardTitle,
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        l10n.aiMemoryInstructionsHint,
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: scheme.onSurfaceVariant,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      TextField(
+                        controller: _instructionsCtrl,
+                        maxLines: 5,
+                        minLines: 3,
+                        decoration: InputDecoration(
+                          hintText: l10n.aiMemoryInstructionsExample,
+                          filled: true,
+                          fillColor: scheme.surface,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          errorText: overLimit ? l10n.aiMemoryMaxChars(_maxChars) : null,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
                         children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(item.content, style: theme.textTheme.bodyMedium),
-                                if (item.source.isNotEmpty) ...[
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    _sourceLabel(item.source),
-                                    style: theme.textTheme.labelSmall?.copyWith(
-                                      color: theme.colorScheme.outline,
-                                    ),
-                                  ),
-                                ],
-                              ],
+                          Text(
+                            '$_charCount / $_maxChars',
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: overLimit ? scheme.error : scheme.onSurfaceVariant,
                             ),
                           ),
-                          IconButton(
-                            tooltip: l10n.edit,
-                            onPressed: _clearing ? null : () => _editItem(item),
-                            icon: const Icon(Icons.edit_outlined, size: 20),
-                          ),
-                          IconButton(
-                            tooltip: l10n.delete,
-                            onPressed: _clearing ? null : () => _deleteItem(item),
-                            icon: const Icon(Icons.delete_outline, size: 20),
+                          const Spacer(),
+                          FilledButton.icon(
+                            onPressed: _saving || _clearing || overLimit
+                                ? null
+                                : _saveInstructions,
+                            icon: _saving
+                                ? const SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Colors.white,
+                                    ),
+                                  )
+                                : const Icon(Icons.save_outlined, size: 18),
+                            label: Text(l10n.aiMemorySaveInstructions),
                           ),
                         ],
                       ),
-                    ),
+                    ],
                   ),
-                );
-              }),
-            const SizedBox(height: 16),
-            Align(
-              alignment: AlignmentDirectional.centerStart,
-              child: TextButton(
-                onPressed: _loading || _saving || _clearing ? null : _clearAll,
-                child: _clearing
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : Text(l10n.aiMemoryClearAll),
+                ),
               ),
-            ),
+              const SizedBox(height: 22),
+              Text(
+                l10n.aiMemoryLearnedTitle,
+                style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                l10n.aiMemoryLearnedIntro,
+                style: theme.textTheme.labelSmall?.copyWith(
+                  color: scheme.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(height: 12),
+              if (_items.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 20),
+                  child: Column(
+                    children: [
+                      Icon(Icons.spa_outlined, size: 36, color: scheme.outline),
+                      const SizedBox(height: 10),
+                      Text(
+                        l10n.aiMemoryLearnedEmpty,
+                        textAlign: TextAlign.center,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: scheme.outline,
+                          height: 1.4,
+                        ),
+                      ),
+                    ],
+                  ),
+                )
+              else
+                ..._kindOrder.where((k) => _grouped.containsKey(k)).expand((kind) {
+                  final group = _grouped[kind]!;
+                  return [
+                    Padding(
+                      padding: const EdgeInsets.only(top: 4, bottom: 8),
+                      child: Text(
+                        _kindLabel(kind, l10n),
+                        style: theme.textTheme.labelLarge?.copyWith(
+                          color: scheme.primary,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                    ...group.map((item) => _MemoryItemCard(
+                          item: item,
+                          sourceLabel: _sourceLabel(item.source),
+                          kindLabel: _kindLabel(item.kind, l10n),
+                          onEdit: _clearing ? null : () => _editItem(item),
+                          onDelete: _clearing ? null : () => _deleteItem(item),
+                        )),
+                  ];
+                }),
+              const SizedBox(height: 12),
+              Align(
+                alignment: AlignmentDirectional.centerStart,
+                child: TextButton.icon(
+                  onPressed: _loading || _saving || _clearing ? null : _clearAll,
+                  icon: _clearing
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.delete_sweep_outlined, size: 18),
+                  label: Text(l10n.aiMemoryClearAll),
+                ),
+              ),
+            ],
           ],
-        ],
+        ),
       ),
     );
+  }
+
+  static const _kindOrder = [
+    'identity',
+    'preference',
+    'context',
+    'goal',
+    'constraint',
+    'fact',
+    'term',
+    'hint',
+  ];
+
+  String _kindLabel(String kind, AppLocalizations l10n) {
+    switch (kind) {
+      case 'identity':
+        return l10n.aiMemoryKindIdentity;
+      case 'preference':
+        return l10n.aiMemoryKindPreference;
+      case 'goal':
+        return l10n.aiMemoryKindGoal;
+      case 'constraint':
+      case 'hint':
+        return l10n.aiMemoryKindConstraint;
+      case 'context':
+      case 'fact':
+      case 'term':
+        return l10n.aiMemoryKindContext;
+      default:
+        return l10n.aiMemoryKindContext;
+    }
   }
 
   String _sourceLabel(String source) {
@@ -449,6 +544,10 @@ class _AIChatMemorySheetState extends State<_AIChatMemorySheet> {
         return l10n.aiMemorySourceFeedback;
       case 'user':
         return l10n.aiMemorySourceUser;
+      case 'profile':
+        return l10n.aiMemorySourceProfile;
+      case 'curator':
+        return l10n.aiMemorySourceCurator;
       default:
         return source;
     }
@@ -465,17 +564,116 @@ class _AIChatMemorySheetState extends State<_AIChatMemorySheet> {
   }
 }
 
+class _StatChip extends StatelessWidget {
+  final IconData icon;
+  final String label;
+
+  const _StatChip({required this.icon, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: AIChatDesign.chipDecoration(theme),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: theme.colorScheme.primary),
+          const SizedBox(width: 6),
+          Text(label, style: theme.textTheme.labelSmall),
+        ],
+      ),
+    );
+  }
+}
+
+class _MemoryItemCard extends StatelessWidget {
+  final _LearnedItem item;
+  final String sourceLabel;
+  final String kindLabel;
+  final VoidCallback? onEdit;
+  final VoidCallback? onDelete;
+
+  const _MemoryItemCard({
+    required this.item,
+    required this.sourceLabel,
+    required this.kindLabel,
+    this.onEdit,
+    this.onDelete,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: DecoratedBox(
+        decoration: AIChatDesign.elevatedCard(theme),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 10, 4, 8),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(item.content, style: theme.textTheme.bodyMedium),
+                    const SizedBox(height: 6),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 4,
+                      children: [
+                        Text(
+                          kindLabel,
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: scheme.primary,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        if (sourceLabel.isNotEmpty)
+                          Text(
+                            sourceLabel,
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: scheme.outline,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              IconButton(
+                tooltip: AppLocalizations.of(context).edit,
+                onPressed: onEdit,
+                icon: const Icon(Icons.edit_outlined, size: 20),
+              ),
+              IconButton(
+                tooltip: AppLocalizations.of(context).delete,
+                onPressed: onDelete,
+                icon: const Icon(Icons.delete_outline, size: 20),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _LearnedItem {
   final int id;
   final String content;
   final String source;
-  final String category;
+  final String kind;
 
   const _LearnedItem({
     required this.id,
     required this.content,
     required this.source,
-    required this.category,
+    required this.kind,
   });
 
   _LearnedItem copyWith({String? content}) {
@@ -483,7 +681,7 @@ class _LearnedItem {
       id: id,
       content: content ?? this.content,
       source: source,
-      category: category,
+      kind: kind,
     );
   }
 }

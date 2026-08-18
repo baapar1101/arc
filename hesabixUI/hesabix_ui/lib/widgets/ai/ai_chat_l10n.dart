@@ -309,6 +309,9 @@ String _toolNameToKey(String name) {
     'list_memory_items': 'aiToolGeneric',
     'upsert_memory_item': 'aiToolGeneric',
     'delete_memory_item': 'aiToolGeneric',
+    'read_memory': 'aiToolGeneric',
+    'upsert_memory_entry': 'aiToolGeneric',
+    'delete_memory_entry': 'aiToolGeneric',
   };
   return map[name] ?? 'aiToolGeneric';
 }
@@ -362,6 +365,9 @@ const _toolLabelFallbackFa = <String, String>{
   'list_memory_items': 'فهرست حافظه یادگرفته‌شده',
   'upsert_memory_item': 'ذخیره حقیقت در حافظه',
   'delete_memory_item': 'حذف حقیقت از حافظه',
+  'read_memory': 'خواندن حافظه دستیار',
+  'upsert_memory_entry': 'ذخیره در حافظه',
+  'delete_memory_entry': 'حذف از حافظه',
 };
 
 /// خلاصهٔ بودجه agent برای نمایش در استریم.
