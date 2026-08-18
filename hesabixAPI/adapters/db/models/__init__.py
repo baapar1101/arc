@@ -135,6 +135,7 @@ from .ai_skill import (  # noqa: F401
     AISkillVisibility,
 )
 from .ai_voice_interaction import AIVoiceInteraction  # noqa: F401
+from .ai_voice_model import AIVoiceModel, AIVoicePolicy, BusinessAIVoiceSettings  # noqa: F401
 # Activity Log models
 from .activity_log import ActivityLog  # noqa: F401
 from .admin_script_run import AdminScriptRun, AdminScriptRunLog  # noqa: F401

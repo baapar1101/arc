@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../models/ai_models.dart';
+import '../../models/ai_voice_models.dart';
 import '../../services/voice/voice_phase.dart';
 import 'ai_chat_composer.dart';
 import 'ai_chat_design.dart';
@@ -21,6 +22,9 @@ class AIChatHomeView extends StatelessWidget {
   final String? blockReason;
   final VoidCallback onSend;
   final VoidCallback? onMic;
+  final VoidCallback? onDictate;
+  final bool dictating;
+  final bool dictateBusy;
   final VoidCallback? onStopVoice;
   final ValueChanged<AIChatSuggestion> onSuggestionSelected;
   final List<AIChatSuggestion> suggestions;
@@ -36,6 +40,12 @@ class AIChatHomeView extends StatelessWidget {
   final VoidCallback? onCreditUpgrade;
   final String executionMode;
   final ValueChanged<String>? onExecutionModeChanged;
+  final List<AIVoiceModelItem> sttModels;
+  final List<AIVoiceModelItem> ttsModels;
+  final String? selectedSttCode;
+  final String? selectedTtsCode;
+  final ValueChanged<String>? onSttChanged;
+  final ValueChanged<String>? onTtsChanged;
 
   const AIChatHomeView({
     super.key,
@@ -51,6 +61,9 @@ class AIChatHomeView extends StatelessWidget {
     this.blockReason,
     required this.onSend,
     this.onMic,
+    this.onDictate,
+    this.dictating = false,
+    this.dictateBusy = false,
     this.onStopVoice,
     required this.onSuggestionSelected,
     this.suggestions = kDefaultAIChatSuggestions,
@@ -66,6 +79,12 @@ class AIChatHomeView extends StatelessWidget {
     this.onCreditUpgrade,
     this.executionMode = AIExecutionMode.analyzer,
     this.onExecutionModeChanged,
+    this.sttModels = const [],
+    this.ttsModels = const [],
+    this.selectedSttCode,
+    this.selectedTtsCode,
+    this.onSttChanged,
+    this.onTtsChanged,
   });
 
   @override
@@ -122,6 +141,9 @@ class AIChatHomeView extends StatelessWidget {
                               voiceStatusEvent: voiceStatusEvent,
                               onSend: onSend,
                               onMic: canUseAi ? onMic : null,
+                              onDictate: canUseAi ? onDictate : null,
+                              dictating: dictating,
+                              dictateBusy: dictateBusy,
                               onStopVoice: onStopVoice,
                               availableModels: availableModels,
                               selectedModelCode: selectedModelCode,
@@ -130,6 +152,12 @@ class AIChatHomeView extends StatelessWidget {
                               modelPricingHint: modelPricingHint,
                               executionMode: executionMode,
                               onExecutionModeChanged: onExecutionModeChanged,
+                              sttModels: sttModels,
+                              ttsModels: ttsModels,
+                              selectedSttCode: selectedSttCode,
+                              selectedTtsCode: selectedTtsCode,
+                              onSttChanged: onSttChanged,
+                              onTtsChanged: onTtsChanged,
                             ),
                             if (creditWarningMessage != null) ...[
                               const SizedBox(height: 8),

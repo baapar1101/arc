@@ -1172,6 +1172,7 @@ def create_app() -> FastAPI:
         router as admin_ai_provider_credentials_router,
     )
     from adapters.api.v1.admin.ai_skills import router as admin_ai_skills_router
+    from adapters.api.v1.admin.ai_voice_models import router as admin_ai_voice_models_router
     application.include_router(admin_ai_settings_router, prefix=settings.api_v1_prefix)
     application.include_router(admin_ai_plans_router, prefix=settings.api_v1_prefix)
     application.include_router(admin_ai_prompts_router, prefix=settings.api_v1_prefix)
@@ -1179,6 +1180,7 @@ def create_app() -> FastAPI:
     application.include_router(admin_ai_models_router, prefix=settings.api_v1_prefix)
     application.include_router(admin_ai_provider_credentials_router, prefix=settings.api_v1_prefix)
     application.include_router(admin_ai_skills_router, prefix=settings.api_v1_prefix)
+    application.include_router(admin_ai_voice_models_router, prefix=settings.api_v1_prefix)
     # User AI endpoints
     from adapters.api.v1.ai.chat import router as ai_chat_router
     from adapters.api.v1.ai.crm_ai import router as ai_crm_router
@@ -1186,6 +1188,7 @@ def create_app() -> FastAPI:
     from adapters.api.v1.ai.prompts import router as ai_prompts_router
     from adapters.api.v1.ai.usage import router as ai_usage_router
     from adapters.api.v1.ai.voice_feedback import router as ai_voice_feedback_router
+    from adapters.api.v1.ai.voice_http import router as ai_voice_http_router
     from adapters.api.v1.ai.mcp import router as ai_mcp_router
     from adapters.api.v1.ai.models import router as ai_models_router
     from adapters.api.v1.ai.skills import router as ai_skills_router
@@ -1199,6 +1202,7 @@ def create_app() -> FastAPI:
     application.include_router(ai_prompts_router, prefix=settings.api_v1_prefix)
     application.include_router(ai_usage_router, prefix=settings.api_v1_prefix)
     application.include_router(ai_voice_feedback_router, prefix=settings.api_v1_prefix)
+    application.include_router(ai_voice_http_router, prefix=settings.api_v1_prefix)
     application.include_router(ai_business_provider_router, prefix=settings.api_v1_prefix)
 
     register_error_handlers(application)

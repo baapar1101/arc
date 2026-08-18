@@ -12,9 +12,13 @@ import 'package:hesabix_ui/core/calendar_controller.dart';
 import 'package:hesabix_ui/core/date_utils.dart' show HesabixDateUtils;
 import 'package:hesabix_ui/models/ai_models.dart';
 import 'package:hesabix_ui/models/ai_stream_event.dart';
+import 'package:hesabix_ui/models/ai_voice_models.dart';
 import 'package:hesabix_ui/services/ai_service.dart';
 import 'package:hesabix_ui/services/voice/voice_chat_controller.dart';
+import 'package:hesabix_ui/services/voice/voice_dictation.dart';
+import 'package:hesabix_ui/services/voice/voice_pcm_wav.dart';
 import 'package:hesabix_ui/services/voice/voice_phase.dart';
+import 'package:hesabix_ui/services/voice/voice_tts_player.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
 import 'package:hesabix_ui/utils/hscript_code_extract.dart';
 import 'package:hesabix_ui/utils/number_formatters.dart';
@@ -166,6 +170,18 @@ class _AIChatDialogState extends State<AIChatDialog> {
   bool _focusChatMode = false;
   String _executionMode = AIExecutionMode.defaultMode;
   bool _initialPromptHandled = false;
+  AIVoiceCatalog? _voiceCatalog;
+  String? _selectedSttCode;
+  String? _selectedTtsCode;
+  bool _businessAllowCloudAudio = false;
+  bool _policyAllowCloudAudio = false;
+  bool _savingVoiceSettings = false;
+  bool _dictating = false;
+  bool _dictateBusy = false;
+  VoiceDictationController? _dictation;
+  final VoiceTtsPlayer _ttsPlayer = VoiceTtsPlayer();
+  String? _speakingMessageKey;
+  Timer? _dictateLimitTimer;
 
   bool get _isJalali => widget.calendarController?.isJalali ?? true;
   bool get _isGenerating => _sending && _stream.isActive;
@@ -189,7 +205,8 @@ class _AIChatDialogState extends State<AIChatDialog> {
       _showWriteApprovalBanner &&
       !_sending &&
       _currentSession?.id != null &&
-      messagesHavePendingWriteApproval(_messages);
+      (messagesHavePendingWriteApproval(_messages) ||
+          _stream.pendingApprovalOps.isNotEmpty);
   bool get _isHomeMode => _thread.isHomeMode(
         streamActive: _stream.isActive,
         sending: _sending,
@@ -257,6 +274,7 @@ class _AIChatDialogState extends State<AIChatDialog> {
       _modelsLoading = true;
       unawaited(_loadProactiveAlerts());
       unawaited(_loadAvailableModels());
+      unawaited(_loadVoiceCatalog());
     }
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted && _isHomeMode) _focusNode.requestFocus();
@@ -390,6 +408,243 @@ class _AIChatDialogState extends State<AIChatDialog> {
     }
   }
 
+  Future<void> _loadVoiceCatalog() async {
+    final bid = widget.businessId;
+    if (bid == null) return;
+    try {
+      final catalog = await _aiService.getVoiceCatalog(businessId: bid);
+      Map<String, dynamic>? settings;
+      try {
+        settings = await _aiService.getBusinessVoiceSettings(bid);
+      } catch (_) {}
+      if (!mounted) return;
+      String? pick(List<AIVoiceModelItem> items, String? preferred, String? fallback) {
+        bool has(String? code) =>
+            code != null && items.any((m) => m.code == code);
+        if (has(preferred)) return preferred;
+        if (has(fallback)) return fallback;
+        for (final item in items) {
+          if (item.isDefault) return item.code;
+        }
+        return items.isNotEmpty ? items.first.code : null;
+      }
+
+      setState(() {
+        _voiceCatalog = catalog;
+        _policyAllowCloudAudio = catalog.policyAllowCloudAudio;
+        _businessAllowCloudAudio =
+            settings?['allow_cloud_audio'] == true || catalog.allowCloudAudio;
+        _selectedSttCode = pick(
+          catalog.stt,
+          settings?['preferred_stt_code'] as String?,
+          catalog.defaultSttCode,
+        );
+        _selectedTtsCode = pick(
+          catalog.tts,
+          settings?['preferred_tts_code'] as String?,
+          catalog.defaultTtsCode,
+        );
+      });
+    } catch (e) {
+      debugPrint('[AIChatDialog] voice catalog failed: $e');
+    }
+  }
+
+  Future<void> _onSttChanged(String code) async {
+    if (code == _selectedSttCode) return;
+    setState(() => _selectedSttCode = code);
+    await _persistVoicePreference(stt: code);
+  }
+
+  Future<void> _onTtsChanged(String code) async {
+    if (code == _selectedTtsCode) return;
+    setState(() => _selectedTtsCode = code);
+    await _persistVoicePreference(tts: code);
+  }
+
+  Future<void> _persistVoicePreference({String? stt, String? tts}) async {
+    final bid = widget.businessId;
+    if (bid == null) return;
+    try {
+      await _aiService.saveBusinessVoiceSettings(bid, {
+        if (stt != null) 'preferred_stt_code': stt,
+        if (tts != null) 'preferred_tts_code': tts,
+      });
+    } catch (e) {
+      debugPrint('[AIChatDialog] persist voice preference failed: $e');
+    }
+  }
+
+  Future<void> _setBusinessCloudAudio(bool value) async {
+    final bid = widget.businessId;
+    if (bid == null || _savingVoiceSettings) return;
+    if (value && !_policyAllowCloudAudio) {
+      _showError(AppLocalizations.of(context).aiVoiceCloudDisabled);
+      return;
+    }
+    setState(() => _savingVoiceSettings = true);
+    try {
+      final saved = await _aiService.saveBusinessVoiceSettings(bid, {
+        'allow_cloud_audio': value,
+      });
+      if (!mounted) return;
+      setState(() {
+        _businessAllowCloudAudio = saved['allow_cloud_audio'] == true;
+        _policyAllowCloudAudio = saved['policy_allow_cloud_audio'] == true;
+      });
+      await _loadVoiceCatalog();
+    } catch (e) {
+      if (!mounted) return;
+      _showError(ErrorExtractor.forContext(e, context));
+    } finally {
+      if (mounted) setState(() => _savingVoiceSettings = false);
+    }
+  }
+
+  void _insertComposerText(String text) {
+    final value = _messageCtrl.value;
+    final current = value.text;
+    final sel = value.selection;
+    if (sel.isValid && sel.start >= 0 && sel.end <= current.length) {
+      final prefix = current.substring(0, sel.start);
+      final suffix = current.substring(sel.end);
+      final glue = prefix.isNotEmpty &&
+              !prefix.endsWith(' ') &&
+              !prefix.endsWith('\n')
+          ? ' '
+          : '';
+      final next = '$prefix$glue$text$suffix';
+      final offset = prefix.length + glue.length + text.length;
+      _messageCtrl.value = TextEditingValue(
+        text: next,
+        selection: TextSelection.collapsed(offset: offset),
+      );
+    } else {
+      final glue =
+          current.isNotEmpty && !current.endsWith(' ') ? ' ' : '';
+      final next = '$current$glue$text';
+      _messageCtrl.value = TextEditingValue(
+        text: next,
+        selection: TextSelection.collapsed(offset: next.length),
+      );
+    }
+  }
+
+  Future<void> _stopDictationCapture() async {
+    _dictateLimitTimer?.cancel();
+    _dictateLimitTimer = null;
+    final controller = _dictation;
+    _dictation = null;
+    if (controller == null) return;
+    try {
+      await controller.dispose();
+    } catch (_) {}
+  }
+
+  Future<void> _toggleDictate() async {
+    if (widget.businessId == null || _voice != null || _voiceStarting) return;
+    final l10n = AppLocalizations.of(context);
+    if (_dictateBusy) return;
+    if (_dictating) {
+      setState(() {
+        _dictating = false;
+        _dictateBusy = true;
+      });
+      _dictateLimitTimer?.cancel();
+      List<int> pcm = const [];
+      try {
+        pcm = await _dictation?.stop() ?? const [];
+      } catch (_) {}
+      await _stopDictationCapture();
+      if (!mounted) return;
+      if (pcm.isEmpty) {
+        setState(() => _dictateBusy = false);
+        _showSnackbar(l10n.aiVoiceDictationEmpty);
+        return;
+      }
+      try {
+        final wav = pcm16ToWav(Uint8List.fromList(pcm));
+        final text = await _aiService.transcribeVoice(
+          wavBytes: wav,
+          businessId: widget.businessId,
+          sttCode: _selectedSttCode,
+        );
+        if (!mounted) return;
+        if (text.isEmpty) {
+          _showSnackbar(l10n.aiVoiceDictationEmpty);
+        } else {
+          _insertComposerText(text);
+          _focusNode.requestFocus();
+        }
+      } catch (e) {
+        if (!mounted) return;
+        _showError(l10n.aiVoiceDictationFailed(ErrorExtractor.forContext(e, context)));
+      } finally {
+        if (mounted) setState(() => _dictateBusy = false);
+      }
+      return;
+    }
+
+    await _ttsPlayer.stop();
+    if (mounted) setState(() => _speakingMessageKey = null);
+    final capture = VoiceDictationController();
+    try {
+      await capture.start(onPcm: (_) {});
+      if (!mounted) {
+        await capture.dispose();
+        return;
+      }
+      _dictation = capture;
+      setState(() => _dictating = true);
+      _dictateLimitTimer?.cancel();
+      _dictateLimitTimer = Timer(const Duration(seconds: 28), () {
+        if (_dictating && mounted) unawaited(_toggleDictate());
+      });
+    } catch (e) {
+      try {
+        await capture.dispose();
+      } catch (_) {}
+      if (!mounted) return;
+      _showError(ErrorExtractor.forContext(e, context));
+    }
+  }
+
+  Future<void> _speakMessage(AIChatMessage message) async {
+    final text = message.content.trim();
+    if (text.isEmpty || widget.businessId == null) return;
+    final l10n = AppLocalizations.of(context);
+    final key = aiChatSpeakKey(message);
+    if (_speakingMessageKey == key) {
+      await _ttsPlayer.stop();
+      if (mounted) setState(() => _speakingMessageKey = null);
+      return;
+    }
+    if (_voice != null) return;
+    if (_dictating) await _toggleDictate();
+    if (!mounted) return;
+    final tts = _voiceCatalog?.tts.where((m) => m.code == _selectedTtsCode);
+    if (tts != null && tts.isNotEmpty && tts.first.dummy) {
+      _showSnackbar(l10n.aiVoiceDummyTtsWarning);
+    }
+    setState(() => _speakingMessageKey = key);
+    try {
+      final wav = await _aiService.synthesizeVoice(
+        text: text,
+        businessId: widget.businessId,
+        ttsCode: _selectedTtsCode,
+      );
+      if (!mounted) return;
+      if (_speakingMessageKey != key) return;
+      await _ttsPlayer.playWav(wav);
+      if (!mounted) return;
+      setState(() => _speakingMessageKey = null);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _speakingMessageKey = null);
+      _showError(l10n.aiVoiceReadAloudFailed(ErrorExtractor.forContext(e, context)));
+    }
+  }
+
   Future<void> _onModelChanged(String? code) async {
     if (code == null || code == _selectedModelCode) return;
     setState(() {
@@ -447,6 +702,9 @@ class _AIChatDialogState extends State<AIChatDialog> {
     _focusNode.dispose();
     _scrollController.dispose();
     _voice?.dispose();
+    _dictateLimitTimer?.cancel();
+    unawaited(_dictation?.dispose());
+    unawaited(_ttsPlayer.dispose());
     super.dispose();
   }
 
@@ -502,6 +760,10 @@ class _AIChatDialogState extends State<AIChatDialog> {
       onFeedbackUp: () => _submitFeedback(msg, 1),
       onFeedbackDown: () => _submitFeedback(msg, -1),
       onRegenerate: _regenerateLastResponse,
+      onSpeak: msg.role == MessageRole.assistant &&
+              msg.content.trim().isNotEmpty
+          ? () => unawaited(_speakMessage(msg))
+          : null,
     );
   }
 
@@ -1573,10 +1835,6 @@ class _AIChatDialogState extends State<AIChatDialog> {
       requireExistingSession: requireExistingSession,
       sessionId: _currentSession?.id,
     );
-    if (plan.blockKey == 'voiceActive') {
-      _showSnackbar(l10n.aiVoiceTextBlockedWhileActive);
-      return;
-    }
     if (plan.blockKey == 'sending' || plan.blockKey == 'emptyContent') return;
     if (plan.blockKey == 'approvalNeedsSession') {
       _showSnackbar(l10n.aiChatApprovalNeedsOpenSession);
@@ -1584,6 +1842,16 @@ class _AIChatDialogState extends State<AIChatDialog> {
     }
 
     final content = plan.content;
+    if (_voice != null) {
+      _voice!.bargeIn();
+    }
+    if (_dictating) {
+      unawaited(_toggleDictate());
+    }
+    await _ttsPlayer.stop();
+    if (_speakingMessageKey != null) {
+      _speakingMessageKey = null;
+    }
 
     if (!skipUserBubble) {
       _messageCtrl.clear();
@@ -1692,6 +1960,14 @@ class _AIChatDialogState extends State<AIChatDialog> {
     if (effect.showDummyTtsWarning) {
       _showSnackbar(AppLocalizations.of(context).aiVoiceDummyTtsWarning);
     }
+    if (effect.approvalDetail != null) {
+      _stream.ingestVoiceApproval(effect.approvalDetail!);
+      _pendingWriteApproval = true;
+      _pendingApprovalSessionId = _currentSession?.id;
+    }
+    if (effect.traceStep != null) {
+      _stream.ingestVoiceTraceStep(effect.traceStep!);
+    }
     final sessionId = _currentSession?.id;
     if (effect.userTranscript != null && sessionId != null) {
       setState(() {
@@ -1717,24 +1993,40 @@ class _AIChatDialogState extends State<AIChatDialog> {
     }
     if (effect.assistantCommit != null || effect.clearStream) {
       final commit = effect.assistantCommit;
+      final approvalOps =
+          List<Map<String, dynamic>>.from(_stream.pendingApprovalOps);
       setState(() {
         if (commit != null &&
-            commit.text.trim().isNotEmpty &&
-            sessionId != null) {
+            sessionId != null &&
+            (commit.text.trim().isNotEmpty || approvalOps.isNotEmpty)) {
+          final results = <String, dynamic>{};
+          for (var i = 0; i < approvalOps.length; i++) {
+            results['voice_approval_$i'] = {
+              ...approvalOps[i],
+              'error': 'APPROVAL_REQUIRED',
+            };
+          }
           _messages = List<AIChatMessage>.from(_messages)
             ..add(
               AIChatMessage(
                 sessionId: sessionId,
                 role: MessageRole.assistant,
-                content: commit.text,
+                content: commit.text.trim().isEmpty
+                    ? 'در انتظار تأیید شما'
+                    : commit.text,
                 tokensUsed: commit.tokensUsed,
+                functionResults: results.isEmpty ? null : results,
                 createdAt: _stream.timestamp ?? DateTime.now(),
               ),
             );
           _syncMessageKeys();
+          if (approvalOps.isNotEmpty) {
+            _pendingWriteApproval = true;
+            _pendingApprovalSessionId = sessionId;
+          }
         }
         if (effect.clearStream) {
-          _stream.clear();
+          _stream.clear(keepWriteApproval: approvalOps.isNotEmpty);
         }
       });
       _scrollToBottom();
@@ -1761,6 +2053,9 @@ class _AIChatDialogState extends State<AIChatDialog> {
   Future<void> _toggleVoice() async {
     if (!await _ensureSession()) return;
     if (_voiceStarting || _voice != null) return;
+    if (_dictating) await _toggleDictate();
+    await _ttsPlayer.stop();
+    if (mounted) setState(() => _speakingMessageKey = null);
 
     setState(_voiceSession.beginConnecting);
     final ready = Completer<void>();
@@ -1768,6 +2063,10 @@ class _AIChatDialogState extends State<AIChatDialog> {
     final controller = VoiceChatController(
       sessionId: _currentSession!.id!,
       collectDataOptIn: _voiceCollectData,
+      modelCode: _selectedModelCode,
+      executionMode: _executionMode,
+      sttCode: _selectedSttCode,
+      ttsCode: _selectedTtsCode,
       onEvent: (event) {
         final effect = interpretVoiceServerEvent(event, gotReady: gotReady);
         _applyVoiceEventEffect(effect);
@@ -1988,6 +2287,28 @@ class _AIChatDialogState extends State<AIChatDialog> {
                   value: _voiceCollectData,
                   onChanged: (v) => setState(() => _voiceCollectData = v),
                 ),
+                if (widget.businessId != null) ...[
+                  const Divider(height: 24),
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: Text(
+                      AppLocalizations.of(context).aiVoiceBusinessAllowCloud,
+                    ),
+                    subtitle: Text(
+                      _policyAllowCloudAudio
+                          ? AppLocalizations.of(context)
+                              .aiVoiceBusinessAllowCloudHint
+                          : AppLocalizations.of(context).aiVoiceCloudDisabled,
+                    ),
+                    value: _businessAllowCloudAudio,
+                    onChanged: _savingVoiceSettings
+                        ? null
+                        : (v) {
+                            Navigator.of(context).pop();
+                            unawaited(_setBusinessCloudAudio(v));
+                          },
+                  ),
+                ],
               ],
             ),
           ),
@@ -2074,6 +2395,11 @@ class _AIChatDialogState extends State<AIChatDialog> {
                                 blockReason: _aiBlockReason,
                                 onSend: () => _sendMessage(),
                                 onMic: _toggleVoice,
+                                onDictate: widget.businessId != null
+                                    ? _toggleDictate
+                                    : null,
+                                dictating: _dictating,
+                                dictateBusy: _dictateBusy,
                                 onStopVoice: _stopVoiceSession,
                                 onSuggestionSelected: _onSuggestionSelected,
                                 suggestions: _suggestions,
@@ -2098,6 +2424,14 @@ class _AIChatDialogState extends State<AIChatDialog> {
                                 executionMode: _executionMode,
                                 onExecutionModeChanged:
                                     _sending ? null : _onExecutionModeChanged,
+                                sttModels: _voiceCatalog?.stt ?? const [],
+                                ttsModels: _voiceCatalog?.tts ?? const [],
+                                selectedSttCode: _selectedSttCode,
+                                selectedTtsCode: _selectedTtsCode,
+                                onSttChanged:
+                                    _sending ? null : _onSttChanged,
+                                onTtsChanged:
+                                    _sending ? null : _onTtsChanged,
                               )
                             : AIChatThreadView(
                                 key: ValueKey(
@@ -2156,6 +2490,11 @@ class _AIChatDialogState extends State<AIChatDialog> {
                                 formatTime: _formatMessageTime,
                                 onSend: () => _sendMessage(),
                                 onMic: _toggleVoice,
+                                onDictate: widget.businessId != null
+                                    ? _toggleDictate
+                                    : null,
+                                dictating: _dictating,
+                                dictateBusy: _dictateBusy,
                                 onStopVoice: _stopVoiceSession,
                                 onStopGenerating: _stopGenerating,
                                 onScrollToBottom: () =>
@@ -2215,6 +2554,18 @@ class _AIChatDialogState extends State<AIChatDialog> {
                                 executionMode: _executionMode,
                                 onExecutionModeChanged:
                                     _sending ? null : _onExecutionModeChanged,
+                                onSpeakMessage: widget.businessId != null
+                                    ? _speakMessage
+                                    : null,
+                                speakingMessageKey: _speakingMessageKey,
+                                sttModels: _voiceCatalog?.stt ?? const [],
+                                ttsModels: _voiceCatalog?.tts ?? const [],
+                                selectedSttCode: _selectedSttCode,
+                                selectedTtsCode: _selectedTtsCode,
+                                onSttChanged:
+                                    _sending ? null : _onSttChanged,
+                                onTtsChanged:
+                                    _sending ? null : _onTtsChanged,
                               ),
                       ),
                     ),

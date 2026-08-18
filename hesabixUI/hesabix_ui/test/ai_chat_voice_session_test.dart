@@ -115,6 +115,38 @@ void main() {
       expect(effect.errorKind, AIChatVoiceErrorMessageKind.generic);
       expect(effect.errorServerMessage, 'boom');
     });
+
+    test('approval_required keeps detail for write banner', () {
+      final effect = interpretVoiceServerEvent(
+        const {
+          'type': 'approval_required',
+          'detail': {
+            'function': 'create_invoice',
+            'label': 'صدور فاکتور',
+          },
+        },
+        gotReady: true,
+      );
+      expect(effect.approvalDetail?['function'], 'create_invoice');
+      expect(effect.phase, VoicePhase.processing);
+    });
+
+    test('trace_step forwards step map', () {
+      final effect = interpretVoiceServerEvent(
+        const {
+          'type': 'trace_step',
+          'step': {
+            'step_id': 't1',
+            'kind': 'tool',
+            'state': 'active',
+            'title_key': 'tool',
+          },
+        },
+        gotReady: true,
+      );
+      expect(effect.traceStep?['step_id'], 't1');
+      expect(effect.traceStep?['kind'], 'tool');
+    });
   });
 
   group('AIChatVoiceSessionController', () {

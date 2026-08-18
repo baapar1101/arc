@@ -4430,6 +4430,55 @@
   "aiVoiceInputHint": "ورودی صوتی",
   "aiVoiceEndCall": "پایان مکالمه صوتی",
   "aiVoiceStartMic": "شروع مکالمه صوتی",
+  "aiVoiceStartCall": "شروع تماس صوتی",
+  "aiVoiceDictate": "دیکته",
+  "aiVoiceDictateStop": "پایان دیکته",
+  "aiVoiceReadAloud": "بلندخوانی",
+  "aiVoiceStopReading": "توقف خواندن",
+  "aiVoicePickStt": "تشخیص گفتار",
+  "aiVoicePickTts": "صدا",
+  "aiVoiceCloudDisabled": "ارسال صوت به ابر برای این کسب‌وکار مجاز نیست.",
+  "aiVoiceDictationFailed": "تبدیل صدا به متن انجام نشد: {error}",
+  "@aiVoiceDictationFailed": {
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+  "aiVoiceListeningDictate": "در حال شنیدن… برای درج متن بزنید",
+  "settingsAIVoiceModels": "مدل‌های صوت AI",
+  "settingsAIVoiceModelsDescription": "مدیریت موتورهای صدا به متن و متن به صدا (محلی و API)",
+  "aiVoiceAdminEdit": "ویرایش مدل صوت",
+  "aiVoiceAdminNew": "مدل صوت جدید",
+  "aiVoiceAdminCode": "کد",
+  "aiVoiceAdminName": "نام نمایشی",
+  "aiVoiceAdminKind": "نوع",
+  "aiVoiceAdminProvider": "ارائه‌دهنده",
+  "aiVoiceAdminModelId": "شناسه مدل API / محلی",
+  "aiVoiceAdminVoiceId": "شناسه صدا",
+  "aiVoiceAdminDescription": "توضیحات",
+  "aiVoiceAdminDefault": "پیش‌فرض",
+  "aiVoiceAdminActive": "فعال",
+  "aiVoiceAdminCancel": "لغو",
+  "aiVoiceAdminSave": "ذخیره",
+  "aiVoiceAdminCreate": "ایجاد",
+  "aiVoiceAdminSeed": "ایجاد خودکار از تنظیمات سرور",
+  "aiVoiceAdminEmpty": "مدل صوتی تعریف نشده است",
+  "aiVoiceAdminAllowCloud": "اجازهٔ ارسال صوت به ارائه‌دهندگان ابری",
+  "aiVoiceAdminAllowCloudHint": "کسب‌وکار باید جداگانه موافقت کند. Whisper و Piper محلی باقی می‌مانند.",
+  "aiVoiceAdminTest": "آزمایش",
+  "aiVoiceAdminTestOk": "آزمایش آداپتور صوت موفق بود",
+  "aiVoiceAdminRequired": "الزامی",
+  "aiVoiceKindStt": "صدا به متن",
+  "aiVoiceKindTts": "متن به صدا",
+  "aiVoiceBusinessAllowCloud": "اجازهٔ گفتار ابری برای این کسب‌وکار",
+  "aiVoiceBusinessAllowCloudHint": "صوت به ارائه‌دهندهٔ ابری فرستاده می‌شود. سیاست سراسری هم باید روشن باشد.",
+  "aiVoiceDictationEmpty": "گفتاری تشخیص داده نشد. دوباره تلاش کنید.",
+  "aiVoiceReadAloudFailed": "پخش صدا انجام نشد: {error}",
+  "@aiVoiceReadAloudFailed": {
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
   "aiStatusElapsed": "{seconds} ثانیه",
   "@aiStatusElapsed": {
     "placeholders": {

@@ -164,6 +164,8 @@ class Settings(BaseSettings):
 	# Data collection (اختیاری، برای بهبود کیفیت در آینده)
 	voice_data_collection_enabled: bool = False
 	voice_data_collection_dir: str = "/var/lib/hesabix/voice-data"
+	voice_max_concurrent_sessions_per_user: int = 2
+	voice_stt_max_seconds: int = 30
 
 	@property
 	def postgresql_dsn(self) -> str:

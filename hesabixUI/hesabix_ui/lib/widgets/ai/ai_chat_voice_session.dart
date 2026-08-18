@@ -36,6 +36,8 @@ class AIChatVoiceEventEffect {
   final String? assistantDelta;
   final AIChatVoiceAssistantCommit? assistantCommit;
   final bool clearStream;
+  final Map<String, dynamic>? approvalDetail;
+  final Map<String, dynamic>? traceStep;
   final AIChatVoiceErrorFollowUp errorFollowUp;
   final AIChatVoiceErrorMessageKind? errorKind;
   final String? errorServerMessage;
@@ -50,6 +52,8 @@ class AIChatVoiceEventEffect {
     this.assistantDelta,
     this.assistantCommit,
     this.clearStream = false,
+    this.approvalDetail,
+    this.traceStep,
     this.errorFollowUp = AIChatVoiceErrorFollowUp.none,
     this.errorKind,
     this.errorServerMessage,
@@ -168,6 +172,33 @@ AIChatVoiceEventEffect interpretVoiceServerEvent(
         interactionId: event['interaction_id'] as int?,
       ),
       clearStream: true,
+    );
+  }
+
+  if (type == 'approval_required') {
+    final detailRaw = event['detail'];
+    final detail = detailRaw is Map
+        ? Map<String, dynamic>.from(detailRaw)
+        : <String, dynamic>{
+            'function': event['function'],
+            'label': event['label'] ?? 'write',
+          };
+    return AIChatVoiceEventEffect(
+      phase: mapped ?? VoicePhase.processing,
+      statusEventForPhase: statusEventForPhase,
+      approvalDetail: detail,
+    );
+  }
+
+  if (type == 'trace_step') {
+    final stepRaw = event['step'];
+    final step = stepRaw is Map
+        ? Map<String, dynamic>.from(stepRaw)
+        : (event['step_id'] != null ? Map<String, dynamic>.from(event) : null);
+    return AIChatVoiceEventEffect(
+      phase: mapped,
+      statusEventForPhase: statusEventForPhase,
+      traceStep: step,
     );
   }
 

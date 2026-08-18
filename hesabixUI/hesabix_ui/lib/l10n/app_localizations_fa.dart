@@ -10971,6 +10971,132 @@ class AppLocalizationsFa extends AppLocalizations {
   String get aiVoiceStartMic => 'شروع مکالمه صوتی';
 
   @override
+  String get aiVoiceStartCall => 'شروع تماس صوتی';
+
+  @override
+  String get aiVoiceDictate => 'دیکته';
+
+  @override
+  String get aiVoiceDictateStop => 'پایان دیکته';
+
+  @override
+  String get aiVoiceReadAloud => 'بلندخوانی';
+
+  @override
+  String get aiVoiceStopReading => 'توقف خواندن';
+
+  @override
+  String get aiVoicePickStt => 'تشخیص گفتار';
+
+  @override
+  String get aiVoicePickTts => 'صدا';
+
+  @override
+  String get aiVoiceCloudDisabled =>
+      'ارسال صوت به ابر برای این کسب‌وکار مجاز نیست.';
+
+  @override
+  String aiVoiceDictationFailed(String error) {
+    return 'تبدیل صدا به متن انجام نشد: $error';
+  }
+
+  @override
+  String get aiVoiceListeningDictate => 'در حال شنیدن… برای درج متن بزنید';
+
+  @override
+  String get settingsAIVoiceModels => 'مدل‌های صوت AI';
+
+  @override
+  String get settingsAIVoiceModelsDescription =>
+      'مدیریت موتورهای صدا به متن و متن به صدا (محلی و API)';
+
+  @override
+  String get aiVoiceAdminEdit => 'ویرایش مدل صوت';
+
+  @override
+  String get aiVoiceAdminNew => 'مدل صوت جدید';
+
+  @override
+  String get aiVoiceAdminCode => 'کد';
+
+  @override
+  String get aiVoiceAdminName => 'نام نمایشی';
+
+  @override
+  String get aiVoiceAdminKind => 'نوع';
+
+  @override
+  String get aiVoiceAdminProvider => 'ارائه‌دهنده';
+
+  @override
+  String get aiVoiceAdminModelId => 'شناسه مدل API / محلی';
+
+  @override
+  String get aiVoiceAdminVoiceId => 'شناسه صدا';
+
+  @override
+  String get aiVoiceAdminDescription => 'توضیحات';
+
+  @override
+  String get aiVoiceAdminDefault => 'پیش‌فرض';
+
+  @override
+  String get aiVoiceAdminActive => 'فعال';
+
+  @override
+  String get aiVoiceAdminCancel => 'لغو';
+
+  @override
+  String get aiVoiceAdminSave => 'ذخیره';
+
+  @override
+  String get aiVoiceAdminCreate => 'ایجاد';
+
+  @override
+  String get aiVoiceAdminSeed => 'ایجاد خودکار از تنظیمات سرور';
+
+  @override
+  String get aiVoiceAdminEmpty => 'مدل صوتی تعریف نشده است';
+
+  @override
+  String get aiVoiceAdminAllowCloud => 'اجازهٔ ارسال صوت به ارائه‌دهندگان ابری';
+
+  @override
+  String get aiVoiceAdminAllowCloudHint =>
+      'کسب‌وکار باید جداگانه موافقت کند. Whisper و Piper محلی باقی می‌مانند.';
+
+  @override
+  String get aiVoiceAdminTest => 'آزمایش';
+
+  @override
+  String get aiVoiceAdminTestOk => 'آزمایش آداپتور صوت موفق بود';
+
+  @override
+  String get aiVoiceAdminRequired => 'الزامی';
+
+  @override
+  String get aiVoiceKindStt => 'صدا به متن';
+
+  @override
+  String get aiVoiceKindTts => 'متن به صدا';
+
+  @override
+  String get aiVoiceBusinessAllowCloud => 'اجازهٔ گفتار ابری برای این کسب‌وکار';
+
+  @override
+  String get aiVoiceBusinessAllowCloudHint =>
+      'صوت به ارائه‌دهندهٔ ابری فرستاده می‌شود. سیاست سراسری هم باید روشن باشد.';
+
+  @override
+  String get aiVoiceDictationEmpty =>
+      'گفتاری تشخیص داده نشد. دوباره تلاش کنید.';
+
+  @override
+  String aiVoiceReadAloudFailed(String error) {
+    return 'پخش صدا انجام نشد: $error';
+  }
+
+  @override
   String aiStatusElapsed(int seconds) {
     return '$seconds ثانیه';
   }

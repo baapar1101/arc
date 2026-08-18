@@ -17,6 +17,7 @@ void main() {
     expect(flags.assistantEdit, isFalse);
     expect(flags.fork, isTrue);
     expect(flags.assistantFeedback, isFalse);
+    expect(flags.readAloud, isFalse);
     expect(flags.applyHScript, isFalse);
   });
 
@@ -34,6 +35,7 @@ void main() {
     expect(flags.assistantEdit, isTrue);
     expect(flags.fork, isTrue);
     expect(flags.assistantFeedback, isTrue);
+    expect(flags.readAloud, isTrue);
   });
 
   test('hscript extract enables apply row when callback is allowed', () {

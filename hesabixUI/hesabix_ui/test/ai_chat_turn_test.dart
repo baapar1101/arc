@@ -4,7 +4,7 @@ import 'package:hesabix_ui/services/voice/voice_phase.dart';
 import 'package:hesabix_ui/widgets/ai/ai_chat_turn.dart';
 
 void main() {
-  test('sendBlockReason blocks voice, empty, and approval without session', () {
+  test('sendBlockReason blocks empty and approval without session, not voice', () {
     expect(
       sendBlockReason(
         voiceActive: true,
@@ -14,7 +14,7 @@ void main() {
         requireExistingSession: false,
         sessionId: 1,
       ),
-      'voiceActive',
+      isNull,
     );
     expect(
       sendBlockReason(

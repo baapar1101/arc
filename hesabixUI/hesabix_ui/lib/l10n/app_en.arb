@@ -4388,6 +4388,55 @@
   "aiVoiceInputHint": "Voice input",
   "aiVoiceEndCall": "End voice call",
   "aiVoiceStartMic": "Start voice chat",
+  "aiVoiceStartCall": "Start voice call",
+  "aiVoiceDictate": "Dictate",
+  "aiVoiceDictateStop": "Stop dictation",
+  "aiVoiceReadAloud": "Read aloud",
+  "aiVoiceStopReading": "Stop reading",
+  "aiVoicePickStt": "Speech recognition",
+  "aiVoicePickTts": "Voice",
+  "aiVoiceCloudDisabled": "Cloud audio is disabled for this business.",
+  "aiVoiceDictationFailed": "Could not transcribe audio: {error}",
+  "@aiVoiceDictationFailed": {
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+  "aiVoiceListeningDictate": "Listening… tap to insert text",
+  "settingsAIVoiceModels": "AI Voice models",
+  "settingsAIVoiceModelsDescription": "Manage STT/TTS engines (local and API providers)",
+  "aiVoiceAdminEdit": "Edit voice model",
+  "aiVoiceAdminNew": "New voice model",
+  "aiVoiceAdminCode": "Code",
+  "aiVoiceAdminName": "Display name",
+  "aiVoiceAdminKind": "Kind",
+  "aiVoiceAdminProvider": "Provider",
+  "aiVoiceAdminModelId": "API / local model id",
+  "aiVoiceAdminVoiceId": "Voice id",
+  "aiVoiceAdminDescription": "Description",
+  "aiVoiceAdminDefault": "Default",
+  "aiVoiceAdminActive": "Active",
+  "aiVoiceAdminCancel": "Cancel",
+  "aiVoiceAdminSave": "Save",
+  "aiVoiceAdminCreate": "Create",
+  "aiVoiceAdminSeed": "Seed from server settings",
+  "aiVoiceAdminEmpty": "No voice models yet",
+  "aiVoiceAdminAllowCloud": "Allow sending audio to cloud providers",
+  "aiVoiceAdminAllowCloudHint": "Businesses must still opt in. Local Whisper/Piper stay available.",
+  "aiVoiceAdminTest": "Test",
+  "aiVoiceAdminTestOk": "Voice adapter test succeeded",
+  "aiVoiceAdminRequired": "Required",
+  "aiVoiceKindStt": "Speech to text",
+  "aiVoiceKindTts": "Text to speech",
+  "aiVoiceBusinessAllowCloud": "Allow cloud speech for this business",
+  "aiVoiceBusinessAllowCloudHint": "Audio is sent to a cloud provider. The system-wide policy must also be on.",
+  "aiVoiceDictationEmpty": "No speech was recognized. Try again.",
+  "aiVoiceReadAloudFailed": "Could not play audio: {error}",
+  "@aiVoiceReadAloudFailed": {
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
   "aiStatusElapsed": "{seconds}s",
   "@aiStatusElapsed": {
     "placeholders": {

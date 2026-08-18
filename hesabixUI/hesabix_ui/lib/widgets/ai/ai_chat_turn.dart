@@ -4,7 +4,8 @@ import 'package:hesabix_ui/services/voice/voice_phase.dart';
 
 /// اگر ارسال الان مجاز نیست، کلید دلیل را برمی‌گرداند.
 ///
-/// `voiceActive` / `sending` / `emptyContent` / `approvalNeedsSession`
+/// `sending` / `emptyContent` / `approvalNeedsSession`
+/// تماس صوتی دیگر ارسال متن را قفل نمی‌کند (تایپ وسط تماس مجاز است).
 String? sendBlockReason({
   required bool voiceActive,
   required bool sending,
@@ -13,7 +14,6 @@ String? sendBlockReason({
   required bool requireExistingSession,
   required int? sessionId,
 }) {
-  if (voiceActive) return 'voiceActive';
   if (sending) return 'sending';
   if (content.trim().isEmpty && !approveWrites) return 'emptyContent';
   if ((approveWrites || requireExistingSession) && sessionId == null) {
@@ -73,6 +73,8 @@ VoicePhase? voicePhaseFromServerEvent(
       return VoicePhase.speaking;
     case 'assistant_done':
       return VoicePhase.listening;
+    case 'approval_required':
+      return VoicePhase.processing;
     case 'error':
       return VoicePhase.error;
     case 'voice_status':

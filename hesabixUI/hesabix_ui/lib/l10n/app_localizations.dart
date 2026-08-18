@@ -20412,6 +20412,240 @@ abstract class AppLocalizations {
   /// **'Start voice chat'**
   String get aiVoiceStartMic;
 
+  /// No description provided for @aiVoiceStartCall.
+  ///
+  /// In en, this message translates to:
+  /// **'Start voice call'**
+  String get aiVoiceStartCall;
+
+  /// No description provided for @aiVoiceDictate.
+  ///
+  /// In en, this message translates to:
+  /// **'Dictate'**
+  String get aiVoiceDictate;
+
+  /// No description provided for @aiVoiceDictateStop.
+  ///
+  /// In en, this message translates to:
+  /// **'Stop dictation'**
+  String get aiVoiceDictateStop;
+
+  /// No description provided for @aiVoiceReadAloud.
+  ///
+  /// In en, this message translates to:
+  /// **'Read aloud'**
+  String get aiVoiceReadAloud;
+
+  /// No description provided for @aiVoiceStopReading.
+  ///
+  /// In en, this message translates to:
+  /// **'Stop reading'**
+  String get aiVoiceStopReading;
+
+  /// No description provided for @aiVoicePickStt.
+  ///
+  /// In en, this message translates to:
+  /// **'Speech recognition'**
+  String get aiVoicePickStt;
+
+  /// No description provided for @aiVoicePickTts.
+  ///
+  /// In en, this message translates to:
+  /// **'Voice'**
+  String get aiVoicePickTts;
+
+  /// No description provided for @aiVoiceCloudDisabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Cloud audio is disabled for this business.'**
+  String get aiVoiceCloudDisabled;
+
+  /// No description provided for @aiVoiceDictationFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not transcribe audio: {error}'**
+  String aiVoiceDictationFailed(String error);
+
+  /// No description provided for @aiVoiceListeningDictate.
+  ///
+  /// In en, this message translates to:
+  /// **'Listening… tap to insert text'**
+  String get aiVoiceListeningDictate;
+
+  /// No description provided for @settingsAIVoiceModels.
+  ///
+  /// In en, this message translates to:
+  /// **'AI Voice models'**
+  String get settingsAIVoiceModels;
+
+  /// No description provided for @settingsAIVoiceModelsDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage STT/TTS engines (local and API providers)'**
+  String get settingsAIVoiceModelsDescription;
+
+  /// No description provided for @aiVoiceAdminEdit.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit voice model'**
+  String get aiVoiceAdminEdit;
+
+  /// No description provided for @aiVoiceAdminNew.
+  ///
+  /// In en, this message translates to:
+  /// **'New voice model'**
+  String get aiVoiceAdminNew;
+
+  /// No description provided for @aiVoiceAdminCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Code'**
+  String get aiVoiceAdminCode;
+
+  /// No description provided for @aiVoiceAdminName.
+  ///
+  /// In en, this message translates to:
+  /// **'Display name'**
+  String get aiVoiceAdminName;
+
+  /// No description provided for @aiVoiceAdminKind.
+  ///
+  /// In en, this message translates to:
+  /// **'Kind'**
+  String get aiVoiceAdminKind;
+
+  /// No description provided for @aiVoiceAdminProvider.
+  ///
+  /// In en, this message translates to:
+  /// **'Provider'**
+  String get aiVoiceAdminProvider;
+
+  /// No description provided for @aiVoiceAdminModelId.
+  ///
+  /// In en, this message translates to:
+  /// **'API / local model id'**
+  String get aiVoiceAdminModelId;
+
+  /// No description provided for @aiVoiceAdminVoiceId.
+  ///
+  /// In en, this message translates to:
+  /// **'Voice id'**
+  String get aiVoiceAdminVoiceId;
+
+  /// No description provided for @aiVoiceAdminDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Description'**
+  String get aiVoiceAdminDescription;
+
+  /// No description provided for @aiVoiceAdminDefault.
+  ///
+  /// In en, this message translates to:
+  /// **'Default'**
+  String get aiVoiceAdminDefault;
+
+  /// No description provided for @aiVoiceAdminActive.
+  ///
+  /// In en, this message translates to:
+  /// **'Active'**
+  String get aiVoiceAdminActive;
+
+  /// No description provided for @aiVoiceAdminCancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get aiVoiceAdminCancel;
+
+  /// No description provided for @aiVoiceAdminSave.
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get aiVoiceAdminSave;
+
+  /// No description provided for @aiVoiceAdminCreate.
+  ///
+  /// In en, this message translates to:
+  /// **'Create'**
+  String get aiVoiceAdminCreate;
+
+  /// No description provided for @aiVoiceAdminSeed.
+  ///
+  /// In en, this message translates to:
+  /// **'Seed from server settings'**
+  String get aiVoiceAdminSeed;
+
+  /// No description provided for @aiVoiceAdminEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No voice models yet'**
+  String get aiVoiceAdminEmpty;
+
+  /// No description provided for @aiVoiceAdminAllowCloud.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow sending audio to cloud providers'**
+  String get aiVoiceAdminAllowCloud;
+
+  /// No description provided for @aiVoiceAdminAllowCloudHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Businesses must still opt in. Local Whisper/Piper stay available.'**
+  String get aiVoiceAdminAllowCloudHint;
+
+  /// No description provided for @aiVoiceAdminTest.
+  ///
+  /// In en, this message translates to:
+  /// **'Test'**
+  String get aiVoiceAdminTest;
+
+  /// No description provided for @aiVoiceAdminTestOk.
+  ///
+  /// In en, this message translates to:
+  /// **'Voice adapter test succeeded'**
+  String get aiVoiceAdminTestOk;
+
+  /// No description provided for @aiVoiceAdminRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Required'**
+  String get aiVoiceAdminRequired;
+
+  /// No description provided for @aiVoiceKindStt.
+  ///
+  /// In en, this message translates to:
+  /// **'Speech to text'**
+  String get aiVoiceKindStt;
+
+  /// No description provided for @aiVoiceKindTts.
+  ///
+  /// In en, this message translates to:
+  /// **'Text to speech'**
+  String get aiVoiceKindTts;
+
+  /// No description provided for @aiVoiceBusinessAllowCloud.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow cloud speech for this business'**
+  String get aiVoiceBusinessAllowCloud;
+
+  /// No description provided for @aiVoiceBusinessAllowCloudHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Audio is sent to a cloud provider. The system-wide policy must also be on.'**
+  String get aiVoiceBusinessAllowCloudHint;
+
+  /// No description provided for @aiVoiceDictationEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No speech was recognized. Try again.'**
+  String get aiVoiceDictationEmpty;
+
+  /// No description provided for @aiVoiceReadAloudFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not play audio: {error}'**
+  String aiVoiceReadAloudFailed(String error);
+
   /// No description provided for @aiStatusElapsed.
   ///
   /// In en, this message translates to:

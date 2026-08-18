@@ -60,6 +60,12 @@ class LocalizationHelper {
         return t.settingsNotificationSmsPricing;
       case 'settingsAISettings':
         return t.settingsAISettings;
+      case 'settingsAIModels':
+        return t.settingsAIModels;
+      case 'settingsAIVoiceModels':
+        return t.settingsAIVoiceModels;
+      case 'settingsAIProviderCredentials':
+        return t.settingsAIProviderCredentials;
       case 'settingsAIPlans':
         return t.settingsAIPlans;
       case 'settingsAIPrompts':
@@ -142,6 +148,12 @@ class LocalizationHelper {
         return t.settingsNotificationSmsPricingDescription;
       case 'settingsAISettingsDescription':
         return t.settingsAISettingsDescription;
+      case 'settingsAIModelsDescription':
+        return t.settingsAIModelsDescription;
+      case 'settingsAIVoiceModelsDescription':
+        return t.settingsAIVoiceModelsDescription;
+      case 'settingsAIProviderCredentialsDescription':
+        return t.settingsAIProviderCredentialsDescription;
       case 'settingsAIPlansDescription':
         return t.settingsAIPlansDescription;
       case 'settingsAIPromptsDescription':

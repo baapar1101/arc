@@ -14,12 +14,20 @@ class VoiceChatController {
     required this.collectDataOptIn,
     required this.onEvent,
     required this.onError,
+    this.modelCode,
+    this.executionMode,
+    this.sttCode,
+    this.ttsCode,
   });
 
   final int sessionId;
   final bool collectDataOptIn;
   final void Function(Map<String, dynamic> event) onEvent;
   final void Function(String message) onError;
+  final String? modelCode;
+  final String? executionMode;
+  final String? sttCode;
+  final String? ttsCode;
 
   final VoiceWsClient _ws = createVoiceWsClient();
 
@@ -62,6 +70,11 @@ class VoiceChatController {
       'collect_data': collectDataOptIn,
       'audio_transport': preferWebm ? 'base64' : 'binary',
       'input_codec': preferWebm ? 'webm_opus' : 'pcm',
+      if (modelCode != null && modelCode!.isNotEmpty) 'model_code': modelCode,
+      if (executionMode != null && executionMode!.isNotEmpty)
+        'execution_mode': executionMode,
+      if (sttCode != null && sttCode!.isNotEmpty) 'stt_code': sttCode,
+      if (ttsCode != null && ttsCode!.isNotEmpty) 'tts_code': ttsCode,
     };
     _ws.setSessionStartPayload(startPayload);
 
@@ -113,6 +126,11 @@ class VoiceChatController {
     } catch (e) {
       onError('خطا در دسترسی به میکروفون: $e');
     }
+  }
+
+  void bargeIn() {
+    if (!_started) return;
+    _ws.sendJson({'type': 'barge_in'});
   }
 
   Future<void> stopRecording() async {

@@ -57,12 +57,14 @@ class AIChatStreamController extends ChangeNotifier {
     notifyListeners();
   }
 
-  void clear() {
+  void clear({bool keepWriteApproval = false}) {
+    final savedPending = pendingWriteApproval;
+    final savedOps = List<Map<String, dynamic>>.from(pendingApprovalOps);
     content = null;
     toolActivities = [];
     traceSteps = [];
     todoSnapshot = null;
-    statusPhase = null;
+    statusPhase = keepWriteApproval ? 'awaiting_approval' : null;
     statusStep = null;
     iteration = null;
     maxIterations = null;
@@ -70,8 +72,8 @@ class AIChatStreamController extends ChangeNotifier {
     startedAt = null;
     // contextUsage* بین پیام‌ها حفظ می‌شود
     timestamp = null;
-    pendingWriteApproval = false;
-    pendingApprovalOps = [];
+    pendingWriteApproval = keepWriteApproval && savedPending;
+    pendingApprovalOps = keepWriteApproval ? savedOps : [];
     agentBudget = null;
     _lastUiUpdate = null;
     notifyListeners();
@@ -311,6 +313,26 @@ class AIChatStreamController extends ChangeNotifier {
       }
     }
     if (changed) notifyListeners();
+  }
+
+  void ingestVoiceApproval(Map<String, dynamic> detail) {
+    pendingWriteApproval = true;
+    statusPhase = 'awaiting_approval';
+    final fn = detail['function'] as String?;
+    final exists = pendingApprovalOps.any(
+      (o) =>
+          o['function'] == fn &&
+          o['arguments'].toString() == detail['arguments'].toString(),
+    );
+    if (!exists) {
+      pendingApprovalOps = [...pendingApprovalOps, detail];
+    }
+    notifyListeners();
+  }
+
+  void ingestVoiceTraceStep(Map<String, dynamic> raw) {
+    _applyTraceStep(AIAgentTraceStep.fromJson(raw));
+    notifyListeners();
   }
 
   void _applyTraceStep(AIAgentTraceStep step) {

@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import '../core/api_client.dart';
 import '../utils/error_extractor.dart';
 import '../models/ai_models.dart';
+import '../models/ai_voice_models.dart';
 import '../models/ai_stream_event.dart';
 import 'ai_sse_client.dart';
 
@@ -143,6 +144,86 @@ class AIService {
     return Map<String, dynamic>.from(body['data'] as Map);
   }
 
+  Future<List<AIVoiceModelItem>> listAdminVoiceModels({String? kind}) async {
+    final query = <String, dynamic>{};
+    if (kind != null) query['kind'] = kind;
+    final res = await _api.get<Map<String, dynamic>>(
+      '/api/v1/admin/ai/voice-models',
+      query: query,
+    );
+    final body = res.data as Map<String, dynamic>;
+    final data = body['data'] as List? ?? const [];
+    return data
+        .whereType<Map>()
+        .map((e) => AIVoiceModelItem.fromJson(Map<String, dynamic>.from(e)))
+        .toList();
+  }
+
+  Future<AIVoiceModelItem> createAdminVoiceModel(Map<String, dynamic> data) async {
+    final res = await _api.post<Map<String, dynamic>>(
+      '/api/v1/admin/ai/voice-models',
+      data: data,
+    );
+    final body = res.data as Map<String, dynamic>;
+    return AIVoiceModelItem.fromJson(body['data'] as Map<String, dynamic>);
+  }
+
+  Future<AIVoiceModelItem> updateAdminVoiceModel(
+    int modelId,
+    Map<String, dynamic> data,
+  ) async {
+    final res = await _api.put<Map<String, dynamic>>(
+      '/api/v1/admin/ai/voice-models/$modelId',
+      data: data,
+    );
+    final body = res.data as Map<String, dynamic>;
+    return AIVoiceModelItem.fromJson(body['data'] as Map<String, dynamic>);
+  }
+
+  Future<void> deleteAdminVoiceModel(int modelId) async {
+    await _api.delete('/api/v1/admin/ai/voice-models/$modelId');
+  }
+
+  Future<Map<String, dynamic>> seedAdminVoiceModels({bool force = false}) async {
+    final res = await _api.post<Map<String, dynamic>>(
+      '/api/v1/admin/ai/voice-models/seed-from-env',
+      data: {'force': force},
+    );
+    final body = res.data as Map<String, dynamic>;
+    return Map<String, dynamic>.from(body['data'] as Map);
+  }
+
+  Future<Map<String, dynamic>> getAdminVoicePolicy() async {
+    final res = await _api.get<Map<String, dynamic>>(
+      '/api/v1/admin/ai/voice-models/policy',
+    );
+    final body = res.data as Map<String, dynamic>;
+    return Map<String, dynamic>.from(body['data'] as Map);
+  }
+
+  Future<Map<String, dynamic>> updateAdminVoicePolicy(
+    Map<String, dynamic> data,
+  ) async {
+    final res = await _api.put<Map<String, dynamic>>(
+      '/api/v1/admin/ai/voice-models/policy',
+      data: data,
+    );
+    final body = res.data as Map<String, dynamic>;
+    return Map<String, dynamic>.from(body['data'] as Map);
+  }
+
+  Future<Map<String, dynamic>> testAdminVoiceModel(
+    int modelId, {
+    String? text,
+  }) async {
+    final res = await _api.post<Map<String, dynamic>>(
+      '/api/v1/admin/ai/voice-models/$modelId/test',
+      data: {if (text != null) 'text': text},
+    );
+    final body = res.data as Map<String, dynamic>;
+    return Map<String, dynamic>.from(body['data'] as Map);
+  }
+
   Future<List<Map<String, dynamic>>> listAIProviderCredentials() async {
     final res = await _api.get<Map<String, dynamic>>(
       '/api/v1/admin/ai/provider-credentials',
@@ -264,6 +345,89 @@ class AIService {
         if (businessId != null) 'business_id': businessId,
       },
     );
+  }
+
+  Future<AIVoiceCatalog> getVoiceCatalog({int? businessId}) async {
+    final query = <String, dynamic>{};
+    if (businessId != null) query['business_id'] = businessId;
+    final res = await _api.get<Map<String, dynamic>>(
+      '/api/v1/ai/voice/catalog',
+      query: query,
+    );
+    final body = res.data as Map<String, dynamic>;
+    return AIVoiceCatalog.fromJson(body['data'] as Map<String, dynamic>);
+  }
+
+  Future<Map<String, dynamic>> getBusinessVoiceSettings(int businessId) async {
+    final res = await _api.get<Map<String, dynamic>>(
+      '/api/v1/ai/voice/settings',
+      query: {'business_id': businessId},
+    );
+    final body = res.data as Map<String, dynamic>;
+    return Map<String, dynamic>.from(body['data'] as Map);
+  }
+
+  Future<Map<String, dynamic>> saveBusinessVoiceSettings(
+    int businessId,
+    Map<String, dynamic> data,
+  ) async {
+    final res = await _api.put<Map<String, dynamic>>(
+      '/api/v1/ai/voice/settings',
+      query: {'business_id': businessId},
+      data: data,
+    );
+    final body = res.data as Map<String, dynamic>;
+    return Map<String, dynamic>.from(body['data'] as Map);
+  }
+
+  Future<String> transcribeVoice({
+    required List<int> wavBytes,
+    int? businessId,
+    String? sttCode,
+  }) async {
+    final form = FormData.fromMap({
+      'file': MultipartFile.fromBytes(
+        wavBytes,
+        filename: 'dictate.wav',
+        contentType: DioMediaType('audio', 'wav'),
+      ),
+      if (sttCode != null && sttCode.isNotEmpty) 'stt_code': sttCode,
+    });
+    final res = await _api.post<Map<String, dynamic>>(
+      '/api/v1/ai/voice/stt',
+      data: form,
+      query: {if (businessId != null) 'business_id': businessId},
+      options: Options(
+        sendTimeout: _kLongAiHttpTimeout,
+        receiveTimeout: _kLongAiHttpTimeout,
+      ),
+    );
+    final body = res.data as Map<String, dynamic>;
+    final data = body['data'] as Map<String, dynamic>;
+    return (data['text'] as String? ?? '').trim();
+  }
+
+  Future<List<int>> synthesizeVoice({
+    required String text,
+    int? businessId,
+    String? ttsCode,
+  }) async {
+    final res = await _api.post<List<int>>(
+      '/api/v1/ai/voice/tts',
+      data: {
+        'text': text,
+        if (ttsCode != null && ttsCode.isNotEmpty) 'tts_code': ttsCode,
+      },
+      query: {if (businessId != null) 'business_id': businessId},
+      options: Options(
+        responseType: ResponseType.bytes,
+        sendTimeout: _kLongAiHttpTimeout,
+        receiveTimeout: _kLongAiHttpTimeout,
+      ),
+    );
+    final data = res.data;
+    if (data == null) return const [];
+    return data;
   }
 
   Future<List<AIPlan>> listPublicAIPlans({int? businessId}) async {

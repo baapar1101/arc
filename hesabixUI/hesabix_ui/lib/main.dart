@@ -261,6 +261,7 @@ import 'pages/public/public_storage_file_share_page.dart';
 import 'pages/admin/ai_settings_page.dart';
 import 'pages/admin/ai_plans_admin_page.dart';
 import 'pages/admin/ai_models_admin_page.dart';
+import 'pages/admin/ai_voice_models_admin_page.dart';
 import 'pages/admin/ai_provider_credentials_admin_page.dart';
 import 'pages/admin/ai_prompts_admin_page.dart';
 import 'pages/admin/ai_skills_admin_page.dart';
@@ -558,6 +559,7 @@ class _MyAppState extends State<MyApp> {
       const EmailSettingsPage();
       const AISettingsPage();
       const AIModelsAdminPage();
+      const AIVoiceModelsAdminPage();
       const AIProviderCredentialsAdminPage();
       const AIPlansAdminPage();
       const AIPromptsAdminPage();
@@ -1804,6 +1806,22 @@ class _MyAppState extends State<MyApp> {
                       return PermissionGuard.buildAccessDeniedPage();
                     }
                     return const AIModelsAdminPage();
+                  },
+                ),
+                GoRoute(
+                  path: 'ai-voice-models',
+                  name: 'system_settings_ai_voice_models',
+                  builder: (context, state) {
+                    if (_authStore == null) {
+                      return PermissionGuard.buildAccessDeniedPage();
+                    }
+                    final allowed =
+                        _authStore!.isSuperAdmin ||
+                        _authStore!.hasAppPermission('system_settings');
+                    if (!allowed) {
+                      return PermissionGuard.buildAccessDeniedPage();
+                    }
+                    return const AIVoiceModelsAdminPage();
                   },
                 ),
                 GoRoute(

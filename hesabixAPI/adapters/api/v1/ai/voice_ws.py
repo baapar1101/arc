@@ -25,9 +25,13 @@ from app.core.settings import get_settings
 import time
 
 from app.services.voice.vad import VadEndpointing, VadConfig
-from app.services.voice.stt import WhisperSTT, STTConfig
-from app.services.voice.tts import TTSFactory, TTSConfig, TextChunker
+from app.services.voice.tts import TTSConfig, TextChunker, StreamingTTS
 from app.services.voice.webm_decode import WebmOpusStreamDecoder, webm_opus_available
+from app.services.voice.contracts import VoiceResolveRequest
+from app.services.voice.runtime import resolve_voice_stack
+from app.services.voice.session_limit import VoiceSessionGuard
+from app.services.voice.audio_wav import max_pcm_bytes_for_seconds, pcm_duration_seconds
+from app.services.ai.ai_ops_metrics import log_ai_event
 from app.services.ws_api_key_handshake import (
 	WsAuthClientDisconnected,
 	WsAuthRejected,
@@ -94,6 +98,9 @@ async def _forward_agent_chunk(chunk: dict[str, Any], send_event) -> bool:
 			await send_event({"type": "voice_status", "phase": "planning_tools"})
 		elif phase == "writing":
 			await send_event({"type": "voice_status", "phase": "writing"})
+		elif phase == "awaiting_approval":
+			await send_event({"type": "voice_status", "phase": "awaiting_approval"})
+			await send_event({"type": "approval_required", "phase": "awaiting_approval"})
 		else:
 			await send_event({"type": "voice_status", "phase": phase or "thinking"})
 		return True
@@ -105,6 +112,25 @@ async def _forward_agent_chunk(chunk: dict[str, Any], send_event) -> bool:
 				"tool": chunk.get("tool"),
 				"tool_key": chunk.get("tool_key"),
 				"label": chunk.get("label"),
+			}
+		)
+		return True
+	if ev == "tool_end" and chunk.get("approval_required"):
+		await send_event(
+			{
+				"type": "approval_required",
+				"detail": chunk.get("approval_detail") or {
+					"function": chunk.get("tool"),
+					"label": chunk.get("label"),
+				},
+			}
+		)
+		return False
+	if ev == "trace_step":
+		await send_event(
+			{
+				"type": "trace_step",
+				"step": chunk.get("step") or chunk,
 			}
 		)
 		return True
@@ -156,8 +182,22 @@ async def ai_voice_ws(websocket: WebSocket):
 		await close_ws_safe(websocket, 4403)
 		return
 
+	session_guard = VoiceSessionGuard(user.id)
+	try:
+		await session_guard.acquire()
+	except ApiError as exc:
+		await websocket.send_text(
+			json.dumps(
+				{"type": "error", "error": exc.error_code, "message": exc.message},
+				ensure_ascii=False,
+			)
+		)
+		await close_ws_safe(websocket, 4429)
+		return
+
 	deps_error = _voice_deps_ready()
 	if deps_error:
+		await session_guard.release()
 		await websocket.send_text(
 			json.dumps(
 				{
@@ -185,6 +225,14 @@ async def ai_voice_ws(websocket: WebSocket):
 	last_activity_time = time.time()
 	SESSION_TIMEOUT_SECONDS = 3600  # 1 hour timeout
 	ACTIVITY_TIMEOUT_SECONDS = 300  # 5 minutes inactivity timeout
+	request_model: Optional[str] = None
+	execution_mode: Optional[str] = None
+	stt = None
+	tts = None
+	resolved_stt_code = ""
+	resolved_tts_code = ""
+	dummy_tts = (settings.voice_tts_engine or "dummy").strip().lower() == "dummy"
+	tts_engine = (settings.voice_tts_engine or "dummy").strip().lower()
 
 	# Configs
 	audio_sample_rate = int(settings.voice_sample_rate_hz)
@@ -199,25 +247,6 @@ async def ai_voice_ws(websocket: WebSocket):
 		max_utterance_ms=int(settings.voice_vad_max_utterance_ms),
 	)
 	vad = VadEndpointing(vad_cfg)
-
-	stt = WhisperSTT(
-		STTConfig(
-			language=settings.voice_stt_language,
-			model_size_or_path=settings.voice_stt_model_size_or_path,
-			device=settings.voice_stt_device,
-			compute_type=settings.voice_stt_compute_type,
-		)
-	)
-	tts = TTSFactory.create(
-		TTSConfig(
-			engine=settings.voice_tts_engine,
-			language=settings.voice_tts_language,
-			model_name=settings.voice_tts_model_name,
-			model_path=settings.voice_tts_model_path,
-			output_sample_rate_hz=int(settings.voice_tts_output_sample_rate_hz),
-			frame_ms=int(settings.voice_tts_frame_ms),
-		)
-	)
 	text_chunker = TextChunker()
 
 	async def send_event(event: dict[str, Any]) -> None:
@@ -246,8 +275,17 @@ async def ai_voice_ws(websocket: WebSocket):
 	async def _handle_utterance(utterance_pcm: bytes) -> None:
 		nonlocal currently_speaking, last_activity_time
 		last_activity_time = time.time()
+		if stt is None or tts is None:
+			await send_event({"type": "error", "error": "NOT_STARTED", "message": "ابتدا پیام start را ارسال کنید"})
+			return
+
+		max_bytes = max_pcm_bytes_for_seconds(int(settings.voice_stt_max_seconds), audio_sample_rate)
+		if len(utterance_pcm) > max_bytes:
+			await send_event({"type": "error", "error": "AUDIO_TOO_LONG", "message": "مدت صدا از سقف مجاز بیشتر است"})
+			return
 
 		await send_event({"type": "speech_end"})
+		stt_started = time.time()
 
 		# STT with retry
 		max_retries = 3
@@ -256,9 +294,22 @@ async def ai_voice_ws(websocket: WebSocket):
 		for attempt in range(max_retries):
 			try:
 				await send_event({"type": "stt_started"})
-				text = await stt.transcribe_pcm16(utterance_pcm, sample_rate_hz=audio_sample_rate)
-				text = (text or "").strip()
+				result = await stt.transcribe_pcm16(utterance_pcm, sample_rate_hz=audio_sample_rate)
+				text = (getattr(result, "text", None) or result or "")
+				if not isinstance(text, str):
+					text = str(text)
+				text = text.strip()
 				await send_event({"type": "transcript_final", "text": text})
+				log_ai_event(
+					"voice_stt_ms",
+					business_id=business_id,
+					user_id=user.id if user else None,
+					session_id=session_id,
+					extra={
+						"ms": int((time.time() - stt_started) * 1000),
+						"code": resolved_stt_code,
+					},
+				)
 				break
 			except Exception as exc:
 				if attempt < max_retries - 1:
@@ -318,6 +369,8 @@ async def ai_voice_ws(websocket: WebSocket):
 		assistant_audio_capture: bytearray | None = bytearray() if collect_data_opt_in else None
 		assistant_message_id: int | None = None
 		speaking_status_sent = False
+		first_audio_logged = False
+		ttfa_origin = time.time()
 
 		try:
 			with get_db_session() as db4:
@@ -328,6 +381,11 @@ async def ai_voice_ws(websocket: WebSocket):
 					messages=messages,
 					use_function_calling=True,
 					session_business_id=business_id,
+					session_id=session_id,
+					request_model=request_model,
+					execution_mode=execution_mode,
+					user_query=text,
+					approve_writes=False,
 				):
 					if cancel_event.is_set():
 						await send_event({"type": "cancelled"})
@@ -349,6 +407,15 @@ async def ai_voice_ws(websocket: WebSocket):
 							async for pcm_frame in tts.synthesize_stream_pcm16(text=speak_text, cancel_event=cancel_event):
 								if cancel_event.is_set():
 									break
+								if not first_audio_logged:
+									first_audio_logged = True
+									log_ai_event(
+										"voice_ttfa_ms",
+										business_id=business_id,
+										user_id=user.id if user else None,
+										session_id=session_id,
+										extra={"ms": int((time.time() - ttfa_origin) * 1000), "tts_code": resolved_tts_code},
+									)
 								await _send_audio_frame(pcm_frame, assistant_audio_capture)
 
 					if chunk.get("usage"):
@@ -500,7 +567,6 @@ async def ai_voice_ws(websocket: WebSocket):
 			}
 		)
 
-	tts_engine = (settings.voice_tts_engine or "dummy").strip().lower()
 	await send_event(
 		{
 			"type": "ready",
@@ -664,6 +730,46 @@ async def ai_voice_ws(websocket: WebSocket):
 						business_id = ai_session.business_id
 						connection_start_time = time.time()
 						last_activity_time = time.time()
+						request_model = (
+							str(payload.get("model_code")).strip()
+							if payload.get("model_code")
+							else None
+						)
+						execution_mode = (
+							str(payload.get("execution_mode")).strip()
+							if payload.get("execution_mode")
+							else None
+						)
+						try:
+							stack = resolve_voice_stack(
+								db2,
+								VoiceResolveRequest(
+									business_id=int(business_id),
+									stt_code=str(payload.get("stt_code")).strip() if payload.get("stt_code") else None,
+									tts_code=str(payload.get("tts_code")).strip() if payload.get("tts_code") else None,
+								),
+							)
+						except ApiError as exc:
+							await send_event(
+								{"type": "error", "error": exc.error_code, "message": exc.message}
+							)
+							session_id = None
+							business_id = None
+							continue
+						stt = stack.stt
+						tts = StreamingTTS(
+							TTSConfig(
+								engine=stack.tts_provider,
+								language=stack.language,
+								output_sample_rate_hz=int(settings.voice_tts_output_sample_rate_hz),
+								frame_ms=int(settings.voice_tts_frame_ms),
+							),
+							stack.tts_engine,
+						)
+						resolved_stt_code = stack.stt_code
+						resolved_tts_code = stack.tts_code
+						tts_engine = stack.tts_provider
+						dummy_tts = stack.dummy_tts
 
 					cancel_event.clear()
 					vad.reset()
@@ -679,8 +785,12 @@ async def ai_voice_ws(websocket: WebSocket):
 							},
 							"tts": {
 								"engine": tts_engine,
-								"dummy_warning": tts_engine == "dummy",
+								"dummy_warning": dummy_tts,
+								"code": resolved_tts_code,
 							},
+							"stt": {"code": resolved_stt_code},
+							"model_code": request_model,
+							"execution_mode": execution_mode,
 							"input_codec": input_codec,
 							"webm_opus_supported": webm_opus_available(),
 						}
@@ -726,6 +836,10 @@ async def ai_voice_ws(websocket: WebSocket):
 	except WebSocketDisconnect:
 		pass
 	finally:
+		try:
+			await session_guard.release()
+		except Exception:
+			pass
 		try:
 			await websocket.close()
 		except Exception:

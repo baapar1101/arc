@@ -217,6 +217,11 @@ class ApiError(HTTPException):
 		if details:
 			error_payload["details"] = details
 
+		self.code = code
+		self.error_code = code
+		self.message = translated_message
+		self.details = details
+
 		super().__init__(
 			status_code=http_status,
 			detail={

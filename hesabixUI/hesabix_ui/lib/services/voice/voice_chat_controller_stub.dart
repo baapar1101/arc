@@ -6,12 +6,20 @@ class VoiceChatController {
     required this.collectDataOptIn,
     required this.onEvent,
     required this.onError,
+    this.modelCode,
+    this.executionMode,
+    this.sttCode,
+    this.ttsCode,
   });
 
   final int sessionId;
   final bool collectDataOptIn;
   final void Function(Map<String, dynamic> event) onEvent;
   final void Function(String message) onError;
+  final String? modelCode;
+  final String? executionMode;
+  final String? sttCode;
+  final String? ttsCode;
 
   bool get isActive => false;
   bool get isRecording => false;
@@ -21,6 +29,7 @@ class VoiceChatController {
   }
 
   Future<void> startRecording() async {}
+  void bargeIn() {}
   Future<void> stopRecording() async {}
   Future<void> stop() async {}
   Future<void> dispose() async {}

@@ -10,6 +10,7 @@ class AIChatMessageSheetFlags {
   final bool assistantEdit;
   final bool fork;
   final bool assistantFeedback;
+  final bool readAloud;
 
   const AIChatMessageSheetFlags({
     required this.applyHScript,
@@ -17,6 +18,7 @@ class AIChatMessageSheetFlags {
     required this.assistantEdit,
     required this.fork,
     required this.assistantFeedback,
+    required this.readAloud,
   });
 
   factory AIChatMessageSheetFlags.fromMessage(
@@ -32,6 +34,7 @@ class AIChatMessageSheetFlags {
       assistantEdit: isAssistant,
       fork: message.id != null,
       assistantFeedback: isAssistant && message.id != null,
+      readAloud: isAssistant && message.content.trim().isNotEmpty,
     );
   }
 }
@@ -50,6 +53,7 @@ Future<void> showAIChatMessageActionSheet({
   VoidCallback? onFeedbackUp,
   VoidCallback? onFeedbackDown,
   VoidCallback? onRegenerate,
+  VoidCallback? onSpeak,
 }) {
   final flags = AIChatMessageSheetFlags.fromMessage(
     message,
@@ -87,6 +91,12 @@ Future<void> showAIChatMessageActionSheet({
                 title: Text(l10n.aiActionShare),
                 onTap: () => closeThen(onShare),
               ),
+              if (flags.readAloud && onSpeak != null)
+                ListTile(
+                  leading: const Icon(Icons.volume_up_outlined),
+                  title: Text(l10n.aiVoiceReadAloud),
+                  onTap: () => closeThen(onSpeak),
+                ),
               if (flags.userEdit && onEditUserResend != null)
                 ListTile(
                   leading: const Icon(Icons.edit_outlined),

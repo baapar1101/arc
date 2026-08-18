@@ -372,6 +372,16 @@ class SettingsCategorizationService {
             order: 3,
           ),
           SettingsItem(
+            id: 'ai_voice_models',
+            title: 'settingsAIVoiceModels',
+            description: 'settingsAIVoiceModelsDescription',
+            icon: Icons.record_voice_over_outlined,
+            color: const Color(0xFF8E24AA),
+            route: '/user/profile/system-settings/ai-voice-models',
+            categoryId: 'ai',
+            order: 4,
+          ),
+          SettingsItem(
             id: 'ai_plans',
             title: 'settingsAIPlans',
             description: 'settingsAIPlansDescription',
@@ -379,7 +389,7 @@ class SettingsCategorizationService {
             color: const Color(0xFF673AB7),
             route: '/user/profile/system-settings/ai-plans',
             categoryId: 'ai',
-            order: 4,
+            order: 5,
           ),
           SettingsItem(
             id: 'ai_prompts',
@@ -389,7 +399,7 @@ class SettingsCategorizationService {
             color: const Color(0xFF5E35B1),
             route: '/user/profile/system-settings/ai-prompts',
             categoryId: 'ai',
-            order: 5,
+            order: 6,
           ),
           SettingsItem(
             id: 'ai_skills',
@@ -399,7 +409,7 @@ class SettingsCategorizationService {
             color: const Color(0xFF512DA8),
             route: '/user/profile/system-settings/ai-skills',
             categoryId: 'ai',
-            order: 6,
+            order: 7,
           ),
           SettingsItem(
             id: 'ai_marketplace',
@@ -409,7 +419,7 @@ class SettingsCategorizationService {
             color: const Color(0xFF4527A0),
             route: '/user/profile/system-settings/ai-marketplace',
             categoryId: 'ai',
-            order: 7,
+            order: 8,
           ),
         ],
       ),

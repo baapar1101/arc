@@ -11034,6 +11034,132 @@ class AppLocalizationsEn extends AppLocalizations {
   String get aiVoiceStartMic => 'Start voice chat';
 
   @override
+  String get aiVoiceStartCall => 'Start voice call';
+
+  @override
+  String get aiVoiceDictate => 'Dictate';
+
+  @override
+  String get aiVoiceDictateStop => 'Stop dictation';
+
+  @override
+  String get aiVoiceReadAloud => 'Read aloud';
+
+  @override
+  String get aiVoiceStopReading => 'Stop reading';
+
+  @override
+  String get aiVoicePickStt => 'Speech recognition';
+
+  @override
+  String get aiVoicePickTts => 'Voice';
+
+  @override
+  String get aiVoiceCloudDisabled =>
+      'Cloud audio is disabled for this business.';
+
+  @override
+  String aiVoiceDictationFailed(String error) {
+    return 'Could not transcribe audio: $error';
+  }
+
+  @override
+  String get aiVoiceListeningDictate => 'Listening… tap to insert text';
+
+  @override
+  String get settingsAIVoiceModels => 'AI Voice models';
+
+  @override
+  String get settingsAIVoiceModelsDescription =>
+      'Manage STT/TTS engines (local and API providers)';
+
+  @override
+  String get aiVoiceAdminEdit => 'Edit voice model';
+
+  @override
+  String get aiVoiceAdminNew => 'New voice model';
+
+  @override
+  String get aiVoiceAdminCode => 'Code';
+
+  @override
+  String get aiVoiceAdminName => 'Display name';
+
+  @override
+  String get aiVoiceAdminKind => 'Kind';
+
+  @override
+  String get aiVoiceAdminProvider => 'Provider';
+
+  @override
+  String get aiVoiceAdminModelId => 'API / local model id';
+
+  @override
+  String get aiVoiceAdminVoiceId => 'Voice id';
+
+  @override
+  String get aiVoiceAdminDescription => 'Description';
+
+  @override
+  String get aiVoiceAdminDefault => 'Default';
+
+  @override
+  String get aiVoiceAdminActive => 'Active';
+
+  @override
+  String get aiVoiceAdminCancel => 'Cancel';
+
+  @override
+  String get aiVoiceAdminSave => 'Save';
+
+  @override
+  String get aiVoiceAdminCreate => 'Create';
+
+  @override
+  String get aiVoiceAdminSeed => 'Seed from server settings';
+
+  @override
+  String get aiVoiceAdminEmpty => 'No voice models yet';
+
+  @override
+  String get aiVoiceAdminAllowCloud => 'Allow sending audio to cloud providers';
+
+  @override
+  String get aiVoiceAdminAllowCloudHint =>
+      'Businesses must still opt in. Local Whisper/Piper stay available.';
+
+  @override
+  String get aiVoiceAdminTest => 'Test';
+
+  @override
+  String get aiVoiceAdminTestOk => 'Voice adapter test succeeded';
+
+  @override
+  String get aiVoiceAdminRequired => 'Required';
+
+  @override
+  String get aiVoiceKindStt => 'Speech to text';
+
+  @override
+  String get aiVoiceKindTts => 'Text to speech';
+
+  @override
+  String get aiVoiceBusinessAllowCloud =>
+      'Allow cloud speech for this business';
+
+  @override
+  String get aiVoiceBusinessAllowCloudHint =>
+      'Audio is sent to a cloud provider. The system-wide policy must also be on.';
+
+  @override
+  String get aiVoiceDictationEmpty => 'No speech was recognized. Try again.';
+
+  @override
+  String aiVoiceReadAloudFailed(String error) {
+    return 'Could not play audio: $error';
+  }
+
+  @override
   String aiStatusElapsed(int seconds) {
     return '${seconds}s';
   }

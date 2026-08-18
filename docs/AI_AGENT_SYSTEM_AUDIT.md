@@ -656,7 +656,8 @@
 - مشکل: STT/VAD/TTS روی سرور خودتان (Piper فارسی) تمایز حریم خصوصی است. کیفیت TTS/STT از ابر پایین‌تر است. چت متنی هنگام صوت قفل می‌شود. رویدادهای `voice_status` با trace متنی یکی نیستند.
 - معیار پذیرش: کاربر بتواند وسط صوت به متن سوییچ کند بدون از دست رفتن context؛ latency perceived < ۱.۵s برای عبارت کوتاه.
 - پیشنهاد: barge-in؛ نمایش transcript زنده در همان thread؛ متریک WER روی نمونهٔ فارسی حسابداری.
-- یادداشت اصلاح: کیفیت TTS/STT و هم‌ترازی با متن باز است. ۱۴۰۵/۰۵/۲۸ — تفسیر رویداد WS و state جلسه از dialog به `interpretVoiceServerEvent` / `AIChatVoiceSessionController` منتقل شد؛ خطاهای timeout/STT/forbidden l10n شدند. کیفیت TTS/STT و هم‌ترازی با متن باز است. ۱۴۰۵/۰۵/۲۸ — تفسیر رویداد WS و state جلسه از dialog به `interpretVoiceServerEvent` / `AIChatVoiceSessionController` منتقل شد؛ خطاهای timeout/STT/forbidden l10n شدند.
+- وضعیت: باز (کیفیت TTS/STT و WER هنوز کامل نیست؛ UX سه‌حالته پیاده شد)
+- یادداشت اصلاح: ۱۴۰۵/۰۵/۲۸ — دیکته و بلندخوانی جدا از تماس؛ composer هنگام تماس قفل نیست؛ مدل/حالت اجرا/STT/TTS به WS پاس می‌شود؛ `approval_required` به بنر تأیید می‌رسد. کیفیت ابری وابسته به سیاست `allow_cloud_audio` است. WER فارسی هنوز معیار جدا می‌خواهد.
 
 ### VOI-02 — احراز هویت WS با api_key در اولین فریم
 - وضعیت: باز
@@ -665,7 +666,7 @@
 - فایل‌ها: مستند صوت، `voice_ws.py`
 - مشکل: طراحی بهتر از query string است. باید timeout برای فریم auth، محدودیت نرخ، و بستن اتصال بدون auth سخت باشد.
 - معیار پذیرش: بدون auth پس از N ثانیه drop؛ rate limit per user؛ عدم ذخیره صوت مگر opt-in (از قبل `voice_data_collection_enabled`).
-- یادداشت اصلاح:
+- یادداشت اصلاح: ۱۴۰۵/۰۵/۲۸ — سقف اتصال همزمان صوت per user (`VoiceSessionGuard`) اضافه شد؛ handshake بدون کلید همچنان timeout دارد. rate limit ریزتر روی utterance باقی است.
 
 ---
 

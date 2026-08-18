@@ -33,6 +33,11 @@ class TTSEngineBase:
 class DummyTTSEngine(TTSEngineBase):
 	"""برای تست: خروجی سکوت تولید می‌کند."""
 
+	engine_name = "dummy"
+	model_id = "dummy"
+	is_cloud = False
+	dummy = True
+
 	def __init__(self, sample_rate_hz: int = 16000) -> None:
 		self.sample_rate_hz = sample_rate_hz
 
@@ -41,12 +46,20 @@ class DummyTTSEngine(TTSEngineBase):
 		samples = int(self.sample_rate_hz * 0.3)
 		return (b"\x00\x00" * samples, self.sample_rate_hz)
 
+	async def synthesize_pcm16_async(self, text: str) -> tuple[bytes, int]:
+		return self.synthesize_pcm16(text)
+
 
 class PiperTTSEngine(TTSEngineBase):
 	"""TTS محلی با Piper (ONNX) — سازگار با Python 3.12، بدون torch."""
 
+	engine_name = "piper"
+	is_cloud = False
+	dummy = False
+
 	def __init__(self, cfg: TTSConfig) -> None:
 		self.cfg = cfg
+		self.model_id = cfg.model_name or "piper"
 		self._voice = None
 		self._lock = asyncio.Lock()
 
@@ -217,7 +230,7 @@ class StreamingTTS:
 		if not text:
 			return
 
-		if isinstance(self.engine, (CoquiTTSEngine, PiperTTSEngine)):
+		if hasattr(self.engine, "synthesize_pcm16_async"):
 			pcm, sr = await self.engine.synthesize_pcm16_async(text)
 		else:
 			pcm, sr = self.engine.synthesize_pcm16(text)
