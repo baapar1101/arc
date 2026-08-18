@@ -47,6 +47,14 @@ KIND_PROMPT_TITLES = {
     "goal": "اهداف پایدار",
 }
 
+KEY_PROMPT_LABELS = {
+    "identity.preferred_name": "نام خطاب کاربر",
+    "identity.role_in_business": "نقش کاربر در این کسب‌وکار",
+    "preference.report_style": "سبک گزارش",
+    "preference.amount_unit": "واحد مبلغ",
+    "preference.language": "زبان پاسخ",
+}
+
 
 def canonical_kind(raw: Optional[str], *, default: str = "context") -> str:
     key = (raw or "").strip().lower()

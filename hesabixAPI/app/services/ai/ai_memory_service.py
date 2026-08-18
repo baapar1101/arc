@@ -172,15 +172,16 @@ def get_memory_digest(db: Session, business_id: int, user_id: int) -> Dict[str, 
     }
 
 
-def format_memory_for_prompt(
+def format_memory_prompt_parts(
     db: Session,
     business_id: int,
     user_id: int,
     *,
     user_query: Optional[str] = None,
     display_name: Optional[str] = None,
-) -> str:
-    from app.services.ai.ai_memory_compiler import compile_memory_prompt
+) -> tuple[str, str]:
+    """بلوک semi_static حافظه + لنگر هویت برای business_anchor."""
+    from app.services.ai.ai_memory_compiler import build_identity_anchor, compile_memory_prompt
     from app.services.ai.ai_memory_item_service import list_memory_items, memory_item_to_dict
 
     seed_profile_identity(db, business_id, user_id, display_name)
@@ -189,11 +190,29 @@ def format_memory_for_prompt(
         memory_item_to_dict(r)
         for r in list_memory_items(db, business_id, user_id, limit=100)
     ]
-    return compile_memory_prompt(
+    block = compile_memory_prompt(
         instructions=instructions,
         items=items,
         user_query=user_query,
     )
+    return block, build_identity_anchor(items)
+
+
+def format_memory_for_prompt(
+    db: Session,
+    business_id: int,
+    user_id: int,
+    *,
+    user_query: Optional[str] = None,
+    display_name: Optional[str] = None,
+) -> str:
+    return format_memory_prompt_parts(
+        db,
+        business_id,
+        user_id,
+        user_query=user_query,
+        display_name=display_name,
+    )[0]
 
 
 def seed_profile_identity(

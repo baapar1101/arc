@@ -767,10 +767,14 @@ app/services/ai/ai_invoice_service.py
 app/services/ai/ai_knowledge_service.py
 app/services/ai/ai_language_prompt.py
 app/services/ai/ai_mcp_service.py
+app/services/ai/ai_memory_compiler.py
+app/services/ai/ai_memory_curator.py
 app/services/ai/ai_memory_feedback_service.py
 app/services/ai/ai_memory_hooks.py
 app/services/ai/ai_memory_item_service.py
+app/services/ai/ai_memory_keys.py
 app/services/ai/ai_memory_proactive_service.py
+app/services/ai/ai_memory_quota.py
 app/services/ai/ai_memory_service.py
 app/services/ai/ai_memory_structured.py
 app/services/ai/ai_message_budget.py
@@ -1204,6 +1208,7 @@ tests/test_ai_language_prompt.py
 tests/test_ai_mcp_write_guard.py
 tests/test_ai_memory_service.py
 tests/test_ai_memory_structured.py
+tests/test_ai_memory_unified.py
 tests/test_ai_model_router.py
 tests/test_ai_model_routing.py
 tests/test_ai_model_seed_service.py

@@ -27,6 +27,27 @@ def test_compile_includes_identity_without_history():
     assert "علی" in text
     assert "تومان" in text
     assert "حافظهٔ پایدار" in text
+    assert "get_business_info" in text
+    assert "از ابزارهای حافظه استفاده کن" not in text
+
+
+def test_compile_labels_bare_preferred_name():
+    from app.services.ai.ai_memory_compiler import build_identity_anchor
+
+    items = [
+        {
+            "kind": "identity",
+            "item_key": "identity.preferred_name",
+            "content": "بابک",
+        }
+    ]
+    text = compile_memory_prompt(items=items, user_query="سلام میدونی اسم من کیه؟")
+    assert "بابک" in text
+    assert "نام خطاب کاربر" in text
+    anchor = build_identity_anchor(items)
+    assert "بابک" in anchor
+    assert "search_persons" in anchor
+    assert "منبع حقیقت" in anchor
 
 
 def test_compile_skips_unrelated_context_when_budget_tight_keeps_identity():

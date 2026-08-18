@@ -164,6 +164,15 @@ logger = logging.getLogger(__name__)
 # Thread pool executor برای اجرای عملیات blocking
 _executor = ThreadPoolExecutor(max_workers=10, thread_name_prefix="ai_service")
 
+
+def _unpack_memory_loader(value: Any) -> tuple[str, str]:
+    """خروجی loader حافظه: (بلوک semi_static, لنگر هویت)."""
+    if isinstance(value, tuple) and len(value) >= 2:
+        return str(value[0] or ""), str(value[1] or "")
+    if isinstance(value, str):
+        return value, ""
+    return "", ""
+
 def _tool_call_id_for(call: Dict[str, Any], iteration: int, index: int) -> str:
     return str(call.get("id") or f"call_{iteration}_{index}_{call.get('name', 'unknown')}")
 
@@ -857,9 +866,10 @@ class AIService(AIModelRouterMixin, AIUsageMeterMixin):
             self._resolve_chat_language(business_id, user_query=user_query)
         )
         mode_block = execution_mode_prompt_block(execution_mode)
-        if language_block and mode_block:
-            return f"{language_block}\n\n{mode_block}"
-        return language_block or mode_block
+        from app.services.ai.ai_memory_compiler import IDENTITY_TOOL_POLICY
+
+        parts = [p for p in (language_block, mode_block, IDENTITY_TOOL_POLICY) if p]
+        return "\n\n".join(parts)
 
     def get_system_prompt(
         self,
@@ -909,11 +919,11 @@ class AIService(AIModelRouterMixin, AIUsageMeterMixin):
                     safe_db_rollback(self.db)
                     return ""
 
-            def _load_memory() -> str:
+            def _load_memory() -> tuple[str, str]:
                 try:
-                    from app.services.ai.ai_memory_service import format_memory_for_prompt
+                    from app.services.ai.ai_memory_service import format_memory_prompt_parts
 
-                    return format_memory_for_prompt(
+                    return format_memory_prompt_parts(
                         self.db,
                         bid,
                         self.ctx.get_user_id(),
@@ -923,7 +933,7 @@ class AIService(AIModelRouterMixin, AIUsageMeterMixin):
                 except Exception as exc:
                     logger.warning("Failed to load AI memory for prompt: %s", exc)
                     safe_db_rollback(self.db)
-                    return ""
+                    return "", ""
 
             def _load_attachments() -> str:
                 try:
@@ -1000,13 +1010,19 @@ class AIService(AIModelRouterMixin, AIUsageMeterMixin):
             )
 
             parts: Dict[str, str] = {}
+            identity_anchor = ""
             futures = [_executor.submit(fn) for _, fn in loaders]
             for (key, _), fut in zip(loaders, futures):
                 try:
-                    parts[key] = fut.result() or ""
+                    result = fut.result()
                 except Exception as exc:
                     logger.warning("Prompt loader %s failed: %s", key, exc)
-                    parts[key] = ""
+                    result = ""
+                if key == "memory":
+                    memory_block, identity_anchor = _unpack_memory_loader(result)
+                    parts[key] = memory_block
+                else:
+                    parts[key] = result or ""
 
             semi, dynamic, insights_text = split_runtime_prompt_parts(
                 {
@@ -1022,7 +1038,7 @@ class AIService(AIModelRouterMixin, AIUsageMeterMixin):
             )
             return compose_structured_system_prompt(
                 static_core=base_prompt,
-                business_anchor=business_info + calendar_block,
+                business_anchor=business_info + identity_anchor + calendar_block,
                 execution_block=self._build_execution_prompt_block(
                     execution_mode, business_id=bid, user_query=user_query
                 ),
@@ -1144,14 +1160,14 @@ class AIService(AIModelRouterMixin, AIUsageMeterMixin):
                     safe_db_rollback(loader_db)
                     return ""
 
-        def _load_memory() -> str:
+        def _load_memory() -> tuple[str, str]:
             from adapters.db.session import get_db_session
 
             with get_db_session() as loader_db:
                 try:
-                    from app.services.ai.ai_memory_service import format_memory_for_prompt
+                    from app.services.ai.ai_memory_service import format_memory_prompt_parts
 
-                    return format_memory_for_prompt(
+                    return format_memory_prompt_parts(
                         loader_db,
                         bid,
                         self.ctx.get_user_id(),
@@ -1161,7 +1177,7 @@ class AIService(AIModelRouterMixin, AIUsageMeterMixin):
                 except Exception as exc:
                     logger.warning("Failed to load AI memory for prompt: %s", exc)
                     safe_db_rollback(loader_db)
-                    return ""
+                    return "", ""
 
         def _load_attachments() -> str:
             from adapters.db.session import get_db_session
@@ -1262,6 +1278,8 @@ class AIService(AIModelRouterMixin, AIUsageMeterMixin):
                     loop.run_in_executor(_executor, loader_fn),
                     timeout=timeout,
                 )
+                if step_key == "loading_memory":
+                    return step_key, text if text is not None else ("", "")
                 return step_key, text or ""
             except asyncio.TimeoutError:
                 logger.info("Prompt loader %s timed out, continuing", step_key)
@@ -1279,6 +1297,7 @@ class AIService(AIModelRouterMixin, AIUsageMeterMixin):
             for step_key, loader_fn in parallel_loaders
         }
         parts: Dict[str, str] = {}
+        identity_anchor = ""
         pending = set(tasks.keys())
         while pending:
             done_set, pending = await asyncio.wait(
@@ -1286,7 +1305,11 @@ class AIService(AIModelRouterMixin, AIUsageMeterMixin):
             )
             for task in done_set:
                 step_key, text = await task
-                parts[step_key] = text
+                if step_key == "loading_memory":
+                    memory_block, identity_anchor = _unpack_memory_loader(text)
+                    parts[step_key] = memory_block
+                else:
+                    parts[step_key] = text or ""
                 yield context_trace(step_key, "done")
                 await asyncio.sleep(0)
 
@@ -1320,7 +1343,7 @@ class AIService(AIModelRouterMixin, AIUsageMeterMixin):
         )
         structured = compose_structured_system_prompt(
             static_core=base_prompt,
-            business_anchor=business_info + calendar_block,
+            business_anchor=business_info + identity_anchor + calendar_block,
             execution_block=self._build_execution_prompt_block(
                 execution_mode, business_id=bid, user_query=user_query
             ),

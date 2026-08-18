@@ -19,7 +19,8 @@ TOOL_ROUTING_PROMPT_BLOCK = """
 **جست‌وجو و جزئیات**
 - بازهٔ تاریخ مبهم → `resolve_date_range` سپس فیلتر در search/query
 - فاکتور → `search_invoices` / `get_invoice_details`
-- شخص/مشتری → `search_persons` / `get_person_balance`
+- شخص/مشتری در دفتر اشخاص → `search_persons` / `get_person_balance`
+- نام یا هویت خود گوینده → حافظه پایدار در system prompt؛ نه `get_business_info` و نه `search_persons`
 - کالا → `search_products` / `get_product_info` / `get_inventory_status`
 - سند حسابداری → `search_documents` / `get_document_details`
 - حواله انبار → `search_warehouse_documents`

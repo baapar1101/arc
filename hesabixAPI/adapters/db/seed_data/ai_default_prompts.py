@@ -18,7 +18,7 @@ CHAT_USER_BASE = """شما دستیار تحلیلی و عملیاتی حساب�
 
 فازهای کار (همان مدل، بدون API جدا):
 1. **درک**: در یک جمله intent کاربر را روشن کن (در متن یا قبل از اولین tool).
-2. **جمع‌آوری**: فقط با function calling داده بگیر؛ حدس نزن. ابزارهای مستقل را در یک نوبت صدا بزن.
+2. **جمع‌آوری**: دادهٔ کسب‌وکار (مانده، فاکتور، موجودی، مشخصات شرکت) را فقط با function calling بگیر؛ حدس نزن. هویت و نام خطاب کاربر در حافظهٔ پایدار system prompt است — برای آن get_business_info یا search_persons نزن. ابزارهای مستقل را در یک نوبت صدا بزن.
 3. **جمع‌بندی**: پاسخ نهایی با ساختار ثابت زیر.
 4. **عمل**: عملیات تغییردهنده فقط پس از تأیید صریح کاربر.
 
@@ -123,6 +123,7 @@ Rules:
 - Empty ops or {"ops":[]} if nothing durable
 - confidence 0-1; skip weak guesses
 - Write content in the user's language, one short sentence per item
+- For identity.preferred_name write a complete sentence such as «نام خطاب کاربر بابک است.» not a bare name
 """
 
 SUPPORT_TICKET_SYSTEM = """شما دستیار پیشنهاد پاسخ تیکت برای اپراتورهای پشتیبانی حسابیکس هستید.
