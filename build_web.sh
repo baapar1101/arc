@@ -181,7 +181,7 @@ if [ "$USE_OFFLINE_CACHE" != true ]; then
   if ! curl -fsS --connect-timeout 4 --max-time 8 "${PUB_HOSTED_URL%/}/" >/dev/null 2>&1 && \
      ! curl -kfsS --connect-timeout 4 --max-time 8 "${PUB_HOSTED_URL%/}/" >/dev/null 2>&1; then
     USE_OFFLINE_CACHE=true
-    warn "آینهٔ pub (${PUB_HOSTED_URL}) در دسترس نیست — اگر cache محلی ندارید، pub get ممکن است شکست بخورد."
+    warn "Pub mirror (${PUB_HOSTED_URL}) is unreachable — pub get may fail without a local cache."
   fi
 fi
 
@@ -488,10 +488,10 @@ if [[ "${SKIP_NGINX_ENSURE:-}" != "1" ]]; then
     if bash "$ENSURE_NGINX_SCRIPT"; then
       :
     else
-      warn "بررسی/به‌روزرسانی nginx انجام نشد (روی میزبان بدون nginx یا بدون sudo طبیعی است). برای رد کردن: SKIP_NGINX_ENSURE=1"
+      warn "Nginx check/update skipped (expected on hosts without nginx or sudo). To skip: SKIP_NGINX_ENSURE=1"
     fi
   else
-    warn "اسکریپت یافت نشد: $ENSURE_NGINX_SCRIPT"
+    warn "Script not found: $ENSURE_NGINX_SCRIPT"
   fi
 fi
 
@@ -502,9 +502,9 @@ if command -v systemctl >/dev/null 2>&1; then
     SUDO_DR=(sudo)
   fi
   if "${SUDO_DR[@]}" systemctl daemon-reload 2>/dev/null; then
-    echo "systemd daemon-reload انجام شد."
+    echo "systemd daemon-reload completed."
   else
-    warn "daemon-reload انجام نشد؛ در صورت خطای start سرویس‌ها: sudo systemctl daemon-reload"
+    warn "daemon-reload failed; if services fail to start: sudo systemctl daemon-reload"
   fi
 fi
 

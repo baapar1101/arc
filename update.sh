@@ -56,7 +56,7 @@ persist_flutter_path_in_profile_d() {
     return 0
   fi
   cat > "${f}" <<'PROFILE'
-# Hesabix: Flutter در PATH برای شِل‌های login (deploy.sh / update.sh) — ترجیحاً دستی ویرایش نشود.
+# Hesabix: Flutter on PATH for login shells (deploy.sh / update.sh) — prefer not to edit by hand.
 if [ -x /opt/flutter/bin/flutter ]; then
   case ":${PATH}:" in
     *:/opt/flutter/bin:*) ;;
@@ -71,12 +71,12 @@ if [ -x /snap/bin/flutter ]; then
 fi
 PROFILE
   chmod 644 "${f}" 2>/dev/null || true
-  log_ok "Flutter برای شِل‌های login در PATH: ${f}"
+  log_ok "Flutter on PATH for login shells: ${f}"
 
   local marker="# hesabix-flutter-PATH (deploy.sh)"
   if [[ -f /etc/bash.bashrc ]] && ! grep -qF "${marker}" /etc/bash.bashrc 2>/dev/null; then
     printf '\n%s\n[ -r /etc/profile.d/hesabix-flutter.sh ] && . /etc/profile.d/hesabix-flutter.sh\n' "${marker}" >> /etc/bash.bashrc
-    log_ok "شِل تعاملی bash: منبع ${f} به /etc/bash.bashrc اضافه شد."
+    log_ok "Interactive bash sources ${f} via /etc/bash.bashrc."
   fi
 }
 
@@ -167,13 +167,13 @@ if [[ "${current_remote}" != "${REPO_URL}" ]]; then
 fi
 git fetch origin --prune
 if ! git show-ref -q "origin/${BRANCH}"; then
-  log_err "شاخه origin/${BRANCH} روی remote نیست. BRANCH و REPO_URL را در ${APP_ROOT}/.deploy_env بررسی کنید."
+  log_err "origin/${BRANCH} is not on the remote. Check BRANCH and REPO_URL in ${APP_ROOT}/.deploy_env"
   exit 1
 fi
 if git checkout -B "${BRANCH}" "origin/${BRANCH}" && git pull origin "${BRANCH}" --ff-only; then
   :
 else
-  log_info "به‌روزرسانی معمولی Git ناموفق (مثلاً تغییرات محلی یا هم‌نشانی نشدن شاخه). در حال بازیابی با reset --hard..."
+  log_info "Normal git update failed (local changes or diverged branch). Recovering with reset --hard..."
   if ! hesabix_force_sync_origin; then
     exit 1
   fi

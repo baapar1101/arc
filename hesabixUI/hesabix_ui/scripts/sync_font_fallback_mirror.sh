@@ -41,19 +41,19 @@ copy_from_bundle() {
   if [ "$SYNC_FONT_FETCH_NETWORK" = "1" ] && command -v curl >/dev/null 2>&1; then
     local base="${GSTATIC_BASE_URL:-https://fonts.gstatic.com/s}"
     base="${base%/}"
-    echo "[info] باندل نبود، دانلود موقت: $rel" >&2
+    echo "[info] not in bundle, temporary download: $rel" >&2
     mkdir -p "$(dirname "$dest")"
     if curl -fsSL --retry 2 --connect-timeout 25 --max-time 120 "${base}/${rel}" -o "$dest.tmp" && mv -f "$dest.tmp" "$dest"; then
       return 0
     fi
     rm -f "$dest.tmp" "$dest"
   fi
-  echo "[warn] فایل باندل نیست: $src — populate_gstatic_font_bundle.sh" >&2
+  echo "[warn] file is not in the bundle: $src — populate_gstatic_font_bundle.sh" >&2
   return 1
 }
 
 if [ ! -f "$PATHS_FILE" ]; then
-  echo "[error] فهرست مسیرها یافت نشد: $PATHS_FILE" >&2
+  echo "[error] path list not found: $PATHS_FILE" >&2
   exit 1
 fi
 
@@ -77,9 +77,9 @@ while IFS= read -r line || [ -n "$line" ]; do
   fi
 done < "$PATHS_FILE"
 
-echo "[info] font mirror: $copied فایل در $TARGET_ROOT/fonts/gstatic/s/ (skipped rare=$skipped_rare)"
+echo "[info] font mirror: $copied files in $TARGET_ROOT/fonts/gstatic/s/ (skipped rare=$skipped_rare)"
 if [ "$missing" -gt 0 ]; then
-  echo "[warn] $missing مسیر بدون فایل — احتمال ۴۰۴ در UI" >&2
+  echo "[warn] $missing paths missing files — UI may 404" >&2
   if [ "$SYNC_FONT_STRICT" = "1" ]; then
     exit 1
   fi

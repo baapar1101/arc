@@ -26,14 +26,14 @@ hesabix_mirrors_urls_equal() {
 hesabix_mirrors_format_status() {
   local code="${1:-000}"
   case "$code" in
-    000|"") printf '%s' "در دسترس نیست" ;;
-    2*) printf '%s' "کار می‌کند" ;;
-    301|302|303|307|308) printf '%s' "کار می‌کند" ;;
-    403) printf '%s' "مسدود (403)" ;;
-    404) printf '%s' "یافت نشد (404)" ;;
-    429) printf '%s' "سهمیه تمام (429)" ;;
-    5*) printf '%s' "خطای سرور (${code})" ;;
-    *) printf '%s' "ناموفق (${code})" ;;
+    000|"") printf '%s' "unreachable" ;;
+    2*) printf '%s' "ok" ;;
+    301|302|303|307|308) printf '%s' "ok" ;;
+    403) printf '%s' "blocked (403)" ;;
+    404) printf '%s' "not found (404)" ;;
+    429) printf '%s' "quota exceeded (429)" ;;
+    5*) printf '%s' "server error (${code})" ;;
+    *) printf '%s' "failed (${code})" ;;
   esac
 }
 
@@ -66,32 +66,32 @@ hesabix_mirrors_probe_urls() {
 # id|label|url
 hesabix_mirrors_pip_catalog() {
   printf '%s\n' \
-    "hesabix|Hesabix (ایران)|${HESABIX_PIP_INDEX_URL}" \
-    "official|رسمی PyPI|https://pypi.org/simple" \
-    "tuna|تسینگ‌هوا (چین)|https://pypi.tuna.tsinghua.edu.cn/simple" \
-    "aliyun|علی‌بابا (چین)|https://mirrors.aliyun.com/pypi/simple" \
+    "hesabix|Hesabix (Iran)|${HESABIX_PIP_INDEX_URL}" \
+    "official|Official PyPI|https://pypi.org/simple" \
+    "tuna|Tsinghua (China)|https://pypi.tuna.tsinghua.edu.cn/simple" \
+    "aliyun|Aliyun (China)|https://mirrors.aliyun.com/pypi/simple" \
     "devneeds|Devneeds|https://pypi.devneeds.ir/simple"
 }
 
 hesabix_mirrors_pub_catalog() {
   printf '%s\n' \
-    "hesabix|Hesabix (ایران)|${HESABIX_PUB_HOSTED_URL}" \
-    "pub_azs|pub-azs.ir (ایران)|https://pub-azs.ir" \
-    "flutter_io_cn|چین (flutter-io.cn)|https://pub.flutter-io.cn" \
-    "tuna|تسینگ‌هوا (چین)|https://mirrors.tuna.tsinghua.edu.cn/dart-pub" \
-    "sjtu|شانگهای SJTU (چین)|https://mirror.sjtu.edu.cn/dart-pub" \
-    "official|رسمی pub.dev|https://pub.dev" \
+    "hesabix|Hesabix (Iran)|${HESABIX_PUB_HOSTED_URL}" \
+    "pub_azs|pub-azs.ir (Iran)|https://pub-azs.ir" \
+    "flutter_io_cn|China (flutter-io.cn)|https://pub.flutter-io.cn" \
+    "tuna|Tsinghua (China)|https://mirrors.tuna.tsinghua.edu.cn/dart-pub" \
+    "sjtu|SJTU (China)|https://mirror.sjtu.edu.cn/dart-pub" \
+    "official|Official pub.dev|https://pub.dev" \
     "devneeds|Devneeds|https://dart.devneeds.ir"
 }
 
 hesabix_mirrors_storage_catalog() {
   printf '%s\n' \
-    "hesabix|Hesabix (ایران)|${HESABIX_FLUTTER_STORAGE_BASE_URL}" \
-    "pub_azs|pub-azs.ir (ایران)|https://pub-azs.ir" \
-    "flutter_io_cn|چین (storage.flutter-io.cn)|https://storage.flutter-io.cn" \
-    "tuna|تسینگ‌هوا (چین)|https://mirrors.tuna.tsinghua.edu.cn/flutter" \
-    "sjtu|شانگهای SJTU (چین)|https://mirror.sjtu.edu.cn" \
-    "official|رسمی Google|https://storage.googleapis.com" \
+    "hesabix|Hesabix (Iran)|${HESABIX_FLUTTER_STORAGE_BASE_URL}" \
+    "pub_azs|pub-azs.ir (Iran)|https://pub-azs.ir" \
+    "flutter_io_cn|China (storage.flutter-io.cn)|https://storage.flutter-io.cn" \
+    "tuna|Tsinghua (China)|https://mirrors.tuna.tsinghua.edu.cn/flutter" \
+    "sjtu|SJTU (China)|https://mirror.sjtu.edu.cn" \
+    "official|Official Google|https://storage.googleapis.com" \
     "devneeds|Devneeds|https://flutter.devneeds.ir"
 }
 
@@ -117,7 +117,7 @@ hesabix_mirrors_build_menu() {
   current_url="$(hesabix_mirrors_norm_url "$current_url")"
 
   if [[ -n "$current_url" ]] && ! "$catalog_fn" | hesabix_mirrors_catalog_has_url "$current_url"; then
-    printf '%s\n' "${n}|custom|سفارشی فعلی|${current_url}|1"
+    printf '%s\n' "${n}|custom|Current custom|${current_url}|1"
     found_current=1
     n=$((n + 1))
   fi
@@ -135,7 +135,7 @@ hesabix_mirrors_build_menu() {
     n=$((n + 1))
   done < <("$catalog_fn")
 
-  printf '%s\n' "${n}|custom_input|آدرس سفارشی||0"
+  printf '%s\n' "${n}|custom_input|Custom URL||0"
 }
 
 hesabix_mirrors_print_menu() {
@@ -146,9 +146,9 @@ hesabix_mirrors_print_menu() {
   echo
   echo "=== ${title} ==="
   if [[ -n "$current_url" ]]; then
-    echo "انتخاب فعلی: ${current_url}"
+    echo "Current: ${current_url}"
   else
-    echo "انتخاب فعلی: (تنظیم نشده)"
+    echo "Current: (not set)"
   fi
   echo
   while IFS= read -r row; do
@@ -164,7 +164,7 @@ hesabix_mirrors_print_menu() {
     status="$(hesabix_mirrors_format_status "$code")"
     printf '  %s [%s] %s\n      %s  —  %s\n' "$mark" "$n" "$label" "$url" "$status"
   done
-  echo "  * = انتخاب ذخیره‌شده"
+  echo "  * = currently saved"
 }
 
 hesabix_mirrors_collect_probe_urls() {
@@ -235,13 +235,13 @@ hesabix_mirrors_pick_from_menu() {
   done <<<"$menu"
 
   while true; do
-    read -rp "${prompt} [Enter = حفظ فعلی]: " choice
+    read -rp "${prompt} [Enter = keep current]: " choice
     if [[ -z "$choice" ]]; then
       printf '%s' "$(hesabix_mirrors_norm_url "$current_url")"
       return 0
     fi
     if [[ ! "$choice" =~ ^[0-9]+$ ]] || (( choice < 1 || choice > max )); then
-      echo "عدد نامعتبر است. بین 1 و ${max} انتخاب کنید." >&2
+      echo "Invalid number. Choose between 1 and ${max}." >&2
       continue
     fi
     while IFS= read -r row; do
@@ -249,10 +249,10 @@ hesabix_mirrors_pick_from_menu() {
       [[ "$n" == "$choice" ]] || continue
       if [[ "$id" == "custom_input" ]]; then
         local custom=""
-        read -rp "آدرس کامل مخزن: " custom
+        read -rp "Full mirror URL: " custom
         custom="$(hesabix_mirrors_norm_url "$custom")"
         if [[ -z "$custom" ]]; then
-          echo "آدرس خالی بود؛ انتخاب فعلی حفظ شد." >&2
+          echo "Empty URL; keeping current selection." >&2
           printf '%s' "$(hesabix_mirrors_norm_url "$current_url")"
           return 0
         fi
@@ -308,7 +308,7 @@ hesabix_mirrors_show() {
   pub_url="$(hesabix_mirrors_norm_url "${PUB_HOSTED_URL:-}")"
   storage_url="$(hesabix_mirrors_norm_url "${FLUTTER_STORAGE_BASE_URL:-}")"
 
-  echo "در حال بررسی دسترسی مخازن..."
+  echo "Checking mirror availability..."
   local -a probe=()
   mapfile -t probe < <(
     {
@@ -337,12 +337,12 @@ hesabix_mirrors_show() {
   storage_menu="$(hesabix_mirrors_build_menu hesabix_mirrors_storage_catalog "$storage_url")"
 
   echo
-  echo "وضعیت مخازن Hesabix"
-  echo "فایل ذخیره: ${HESABIX_DEPLOY_ENV}"
-  echo "برچسب فعلی پایتون: ${PIP_MIRROR:-—}"
-  echo "برچسب فعلی Flutter: ${FLUTTER_MIRROR:-—}"
-  hesabix_mirrors_print_menu "پایتون (pip / PyPI)" "$pip_url" <<<"$pip_menu"
-  hesabix_mirrors_print_menu "Flutter pub (بسته‌های Dart)" "$pub_url" <<<"$pub_menu"
+  echo "Hesabix mirror status"
+  echo "Saved in: ${HESABIX_DEPLOY_ENV}"
+  echo "Python preset: ${PIP_MIRROR:-—}"
+  echo "Flutter preset: ${FLUTTER_MIRROR:-—}"
+  hesabix_mirrors_print_menu "Python (pip / PyPI)" "$pip_url" <<<"$pip_menu"
+  hesabix_mirrors_print_menu "Flutter pub (Dart packages)" "$pub_url" <<<"$pub_menu"
   hesabix_mirrors_print_menu "Flutter storage (engine / SDK artifacts)" "$storage_url" <<<"$storage_menu"
 }
 
@@ -352,7 +352,7 @@ hesabix_mirrors_apply_selection() {
   pub_url="$(hesabix_mirrors_norm_url "$2")"
   storage_url="$(hesabix_mirrors_norm_url "$3")"
   [[ -n "$pip_url" && -n "$pub_url" && -n "$storage_url" ]] || {
-    echo "هر سه مخزن پایتون، Flutter pub و Flutter storage باید مقدار داشته باشند." >&2
+    echo "Python, Flutter pub, and Flutter storage URLs are all required." >&2
     return 1
   }
 
@@ -370,16 +370,16 @@ hesabix_mirrors_apply_selection() {
   hesabix_configure_pip_mirror >/dev/null 2>&1 || true
 
   echo
-  echo "مخازن ذخیره شد:"
-  echo "  پایتون:          ${PIP_MIRROR} — ${PIP_INDEX_URL}"
+  echo "Mirrors saved:"
+  echo "  Python:          ${PIP_MIRROR} — ${PIP_INDEX_URL}"
   echo "  Flutter pub:     ${PUB_HOSTED_URL}"
   echo "  Flutter storage: ${FLUTTER_STORAGE_BASE_URL}"
-  echo "  برچسب Flutter:   ${FLUTTER_MIRROR}"
+  echo "  Flutter preset:  ${FLUTTER_MIRROR}"
 }
 
 hesabix_mirrors_log_current() {
-  echo "مخازن فعال:"
-  echo "  پایتون:          ${PIP_INDEX_URL:-—}"
+  echo "Active mirrors:"
+  echo "  Python:          ${PIP_INDEX_URL:-—}"
   echo "  Flutter pub:     ${PUB_HOSTED_URL:-—}"
   echo "  Flutter storage: ${FLUTTER_STORAGE_BASE_URL:-—}"
 }
@@ -387,19 +387,19 @@ hesabix_mirrors_log_current() {
 hesabix_mirrors_prompt_before_update() {
   if [[ "${HESABIX_SKIP_MIRROR_PROMPT:-0}" == "1" || "${HESABIX_NONINTERACTIVE:-0}" == "1" ]]; then
     hesabix_mirrors_load || true
-    echo "پرسش مخازن رد شد (غیرتعاملی)."
+    echo "Mirror prompt skipped (non-interactive)."
     hesabix_mirrors_log_current
     return 0
   fi
   if [[ ! -t 0 ]]; then
     hesabix_mirrors_load || true
-    echo "stdin تعاملی نیست؛ از مخازن ذخیره‌شده استفاده می‌شود."
+    echo "stdin is not a TTY; using saved mirrors."
     hesabix_mirrors_log_current
     return 0
   fi
   echo
-  echo "قبل از به‌روزرسانی، وضعیت مخازن پایتون و Flutter:"
-  echo "هر بار می‌توانید عوض کنید. Enter همان انتخاب ذخیره‌شده را نگه می‌دارد."
+  echo "Before updating, choose Python and Flutter mirrors."
+  echo "You can change them each time. Enter keeps the saved selection."
   hesabix_mirrors_set_interactive
 }
 
@@ -416,9 +416,9 @@ hesabix_mirrors_set_interactive() {
   storage_menu="$(hesabix_mirrors_build_menu hesabix_mirrors_storage_catalog "$storage_url")"
 
   echo
-  echo "شماره مخزن را وارد کنید. Enter انتخاب فعلی را نگه می‌دارد."
+  echo "Enter a number. Enter keeps the current selection."
   local new_pip new_pub new_storage
-  new_pip="$(hesabix_mirrors_pick_from_menu "پایتون" "$pip_menu" "$pip_url")"
+  new_pip="$(hesabix_mirrors_pick_from_menu "Python" "$pip_menu" "$pip_url")"
   new_pub="$(hesabix_mirrors_pick_from_menu "Flutter pub" "$pub_menu" "$pub_url")"
   new_storage="$(hesabix_mirrors_pick_from_menu "Flutter storage" "$storage_menu" "$storage_url")"
   hesabix_mirrors_apply_selection "$new_pip" "$new_pub" "$new_storage"
@@ -435,44 +435,44 @@ hesabix_mirrors_set_from_args() {
     arg="$1"
     case "$arg" in
       --pip)
-        [[ $# -ge 2 ]] || { echo "--pip نیاز به مقدار دارد." >&2; return 1; }
+        [[ $# -ge 2 ]] || { echo "--pip requires a value." >&2; return 1; }
         val="$2"; shift 2
         resolved="$(hesabix_mirrors_resolve_choice "$val" pip)" || {
-          echo "مخزن پایتون ناشناخته: ${val}" >&2; return 1
+          echo "Unknown Python mirror: ${val}" >&2; return 1
         }
         pip_url="$resolved"
         ;;
       --pub|--flutter-pub)
-        [[ $# -ge 2 ]] || { echo "${arg} نیاز به مقدار دارد." >&2; return 1; }
+        [[ $# -ge 2 ]] || { echo "${arg} requires a value." >&2; return 1; }
         val="$2"; shift 2
         resolved="$(hesabix_mirrors_resolve_choice "$val" pub)" || {
-          echo "مخزن Flutter pub ناشناخته: ${val}" >&2; return 1
+          echo "Unknown Flutter pub mirror: ${val}" >&2; return 1
         }
         pub_url="$resolved"
         ;;
       --storage|--flutter-storage)
-        [[ $# -ge 2 ]] || { echo "${arg} نیاز به مقدار دارد." >&2; return 1; }
+        [[ $# -ge 2 ]] || { echo "${arg} requires a value." >&2; return 1; }
         val="$2"; shift 2
         resolved="$(hesabix_mirrors_resolve_choice "$val" storage)" || {
-          echo "مخزن Flutter storage ناشناخته: ${val}" >&2; return 1
+          echo "Unknown Flutter storage mirror: ${val}" >&2; return 1
         }
         storage_url="$resolved"
         ;;
       --flutter)
-        [[ $# -ge 2 ]] || { echo "--flutter نیاز به مقدار دارد." >&2; return 1; }
+        [[ $# -ge 2 ]] || { echo "--flutter requires a value." >&2; return 1; }
         val="$2"; shift 2
         resolved="$(hesabix_mirrors_resolve_choice "$val" pub)" || {
-          echo "مخزن Flutter ناشناخته: ${val}" >&2; return 1
+          echo "Unknown Flutter mirror: ${val}" >&2; return 1
         }
         pub_url="$resolved"
         resolved="$(hesabix_mirrors_resolve_choice "$val" storage)" || {
-          echo "مخزن Flutter storage برای ${val} تعریف نشده است." >&2; return 1
+          echo "No Flutter storage URL defined for ${val}." >&2; return 1
         }
         storage_url="$resolved"
         ;;
       *)
-        echo "گزینه ناشناخته: ${arg}" >&2
-        echo "استفاده: hesabix -mirrors set [--pip NAME|URL] [--pub NAME|URL] [--storage NAME|URL]" >&2
+        echo "Unknown option: ${arg}" >&2
+        echo "Usage: hesabix -mirrors set [--pip NAME|URL] [--pub NAME|URL] [--storage NAME|URL]" >&2
         return 1
         ;;
     esac
