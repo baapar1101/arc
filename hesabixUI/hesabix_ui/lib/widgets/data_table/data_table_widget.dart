@@ -1706,7 +1706,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
     try {
       final fileSaver = FileSaver.instance;
       final extension = filename.split('.').last;
-      await fileSaver.saveFile(name: filename, bytes: bytes, ext: extension);
+      await fileSaver.saveFile(name: filename, bytes: bytes, fileExtension: extension);
     } catch (e) {
       rethrow;
     }

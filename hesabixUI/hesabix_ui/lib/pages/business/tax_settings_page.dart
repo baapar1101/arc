@@ -891,7 +891,7 @@ class _TaxSettingsPageState extends State<TaxSettingsPage> {
         await FileSaver.instance.saveFile(
           name: safeName,
           bytes: Uint8List.fromList(bytes),
-          ext: _extractExtension(safeName),
+          fileExtension: _extractExtension(safeName),
         );
       }
     } catch (e) {

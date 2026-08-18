@@ -110,7 +110,7 @@ class _AIChatSkillsSheetState extends State<_AIChatSkillsSheet> {
   }
 
   Future<void> _importZip() async {
-    final result = await FilePicker.platform.pickFiles(
+    final result = await FilePicker.pickFiles(
       type: FileType.custom,
       allowedExtensions: const ['zip'],
       withData: true,

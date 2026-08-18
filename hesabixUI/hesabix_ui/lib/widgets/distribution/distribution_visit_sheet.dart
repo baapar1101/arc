@@ -169,7 +169,7 @@ Future<void> showDistributionVisitCompleteSheet({
                   ],
                   OutlinedButton.icon(
                     onPressed: () async {
-                      final pick = await FilePicker.platform.pickFiles(
+                      final pick = await FilePicker.pickFiles(
                         type: FileType.image,
                         withData: true,
                       );

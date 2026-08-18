@@ -113,7 +113,7 @@ class _CheckDetailsDialogState extends State<CheckDetailsDialog> with SingleTick
 
   Future<void> _attachFile() async {
     try {
-      final result = await FilePicker.platform.pickFiles(type: FileType.any, withData: true);
+      final result = await FilePicker.pickFiles(type: FileType.any, withData: true);
 
       if (result == null || result.files.isEmpty) return;
 

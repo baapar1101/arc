@@ -862,7 +862,7 @@ class _ProductsPageState extends State<ProductsPage> {
       return;
     }
     
-    final result = await FilePicker.platform.pickFiles(
+    final result = await FilePicker.pickFiles(
       type: FileType.any,
       withData: true,
     );

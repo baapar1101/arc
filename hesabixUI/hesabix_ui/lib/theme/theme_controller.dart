@@ -2,14 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../core/api_client.dart';
 import '../services/admin_system_settings_service.dart';
+import 'tokens/color_schemes.dart';
 
 class ThemeController extends ChangeNotifier {
   static const String _modeKey = 'theme_mode';
   static const String _seedKey = 'theme_seed';
 
   ThemeMode _mode = ThemeMode.system;
-  // Neutral gray theme: #6B7280
-  Color _seed = const Color(0xFF6B7280);
+  // زمردی برند — با این مقدار پالت صریح دیزاین‌سیستم فعال می‌شود.
+  Color _seed = AppColorTokens.defaultSeed;
 
   ThemeMode get mode => _mode;
   Color get seedColor => _seed;
@@ -50,13 +51,15 @@ class ThemeController extends ChangeNotifier {
       }
     }
     
-    const legacyBlueSeed = Color(0xFF6B7280);
-    const defaultSeed = Color(0xFF6B7280);
+    // خاکستری خنثای قبلی به زمردی دیزاین‌سیستم مهاجرت می‌کند؛ رنگ‌های
+    // سفارشیِ کاربر دست‌نخورده می‌مانند.
+    const legacyNeutralSeed = Color(0xFF6B7280);
+    const defaultSeed = AppColorTokens.defaultSeed;
 
     final seed = p.getInt(_seedKey);
     if (seed != null) {
       final loadedSeed = Color(seed);
-      _seed = loadedSeed == legacyBlueSeed ? defaultSeed : loadedSeed;
+      _seed = loadedSeed == legacyNeutralSeed ? defaultSeed : loadedSeed;
     } else {
       _seed = defaultSeed;
     }

@@ -239,7 +239,7 @@ class _PaymentGatewaysPageState extends State<PaymentGatewaysPage> {
                   // بخش انتخاب Provider
                   Card(
                     elevation: 0,
-                    color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.3),
+                    color: Theme.of(context).colorScheme.surfaceVariant.withValues(alpha: 0.3),
                     child: Padding(
                       padding: const EdgeInsets.all(16),
                       child: Column(
@@ -311,7 +311,7 @@ class _PaymentGatewaysPageState extends State<PaymentGatewaysPage> {
                   // بخش تنظیمات عمومی
                   Card(
                     elevation: 0,
-                    color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.3),
+                    color: Theme.of(context).colorScheme.surfaceVariant.withValues(alpha: 0.3),
                     child: Padding(
                       padding: const EdgeInsets.all(16),
                       child: Column(
@@ -386,7 +386,7 @@ class _PaymentGatewaysPageState extends State<PaymentGatewaysPage> {
                   if (_provider == 'zarinpal' || _provider == 'parsian' || _provider == 'bitpay') ...[
                     Card(
                       elevation: 0,
-                      color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.3),
+                      color: Theme.of(context).colorScheme.surfaceVariant.withValues(alpha: 0.3),
                       child: Padding(
                         padding: const EdgeInsets.all(16),
                         child: Column(
@@ -509,7 +509,7 @@ class _PaymentGatewaysPageState extends State<PaymentGatewaysPage> {
                     // بخش Callback و Redirect
                     Card(
                       elevation: 0,
-                      color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.3),
+                      color: Theme.of(context).colorScheme.surfaceVariant.withValues(alpha: 0.3),
                       child: Padding(
                         padding: const EdgeInsets.all(16),
                         child: Column(
@@ -691,7 +691,7 @@ class _PaymentGatewaysPageState extends State<PaymentGatewaysPage> {
                   // بخش انتخاب Provider
                   Card(
                     elevation: 0,
-                    color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.3),
+                    color: Theme.of(context).colorScheme.surfaceVariant.withValues(alpha: 0.3),
                     child: Padding(
                       padding: const EdgeInsets.all(16),
                       child: Column(
@@ -767,7 +767,7 @@ class _PaymentGatewaysPageState extends State<PaymentGatewaysPage> {
                   // بخش تنظیمات عمومی
                   Card(
                     elevation: 0,
-                    color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.3),
+                    color: Theme.of(context).colorScheme.surfaceVariant.withValues(alpha: 0.3),
                     child: Padding(
                       padding: const EdgeInsets.all(16),
                       child: Column(
@@ -840,7 +840,7 @@ class _PaymentGatewaysPageState extends State<PaymentGatewaysPage> {
                   // بخش تنظیمات درگاه
                   Card(
                     elevation: 0,
-                    color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.3),
+                    color: Theme.of(context).colorScheme.surfaceVariant.withValues(alpha: 0.3),
                     child: Padding(
                       padding: const EdgeInsets.all(16),
                       child: Column(
@@ -963,7 +963,7 @@ class _PaymentGatewaysPageState extends State<PaymentGatewaysPage> {
                   // بخش Callback و Redirect
                   Card(
                     elevation: 0,
-                    color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.3),
+                    color: Theme.of(context).colorScheme.surfaceVariant.withValues(alpha: 0.3),
                     child: Padding(
                       padding: const EdgeInsets.all(16),
                       child: Column(

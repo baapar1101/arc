@@ -739,7 +739,7 @@ class _ProductBasicInfoSectionState extends State<ProductBasicInfoSection> {
     }
     
     try {
-      final result = await FilePicker.platform.pickFiles(
+      final result = await FilePicker.pickFiles(
         type: FileType.image,
         withData: true,
         // حذف allowedExtensions چون FileType.image خودش فیلتر می‌کند

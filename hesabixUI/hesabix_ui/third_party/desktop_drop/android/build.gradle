@@ -93,6 +93,12 @@ android {
         targetCompatibility JavaVersion.VERSION_1_8
     }
 
+    // بدون این، کاتلین jvmTarget را از JDK اجراکنندهٔ گریدل می‌گیرد (۲۱) و با
+    // compileOptions بالا (۱٫۸) تناقض می‌سازد. همان الگوی android/app/build.gradle.kts.
+    kotlinOptions {
+        jvmTarget = JavaVersion.VERSION_1_8.toString()
+    }
+
     sourceSets {
         main.java.srcDirs += 'src/main/kotlin'
     }

@@ -32,7 +32,7 @@ class ReportTemplateStudioCustomizePanel extends StatelessWidget {
   }
 
   Future<void> _pickLogo(BuildContext context) async {
-    final result = await FilePicker.platform.pickFiles(
+    final result = await FilePicker.pickFiles(
       type: FileType.image,
       withData: true,
     );

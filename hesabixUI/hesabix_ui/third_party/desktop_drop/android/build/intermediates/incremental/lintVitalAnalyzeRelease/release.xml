@@ -6,7 +6,7 @@
     mergedManifest="build\intermediates\merged_manifest\release\processReleaseManifest\AndroidManifest.xml"
     proguardFiles="build\intermediates\default_proguard_files\global\proguard-android.txt-8.11.1"
     partialResultsDir="build\intermediates\lint_vital_partial_results\release\lintVitalAnalyzeRelease\out"
-    desugaredMethodsFiles="C:\Users\Albert\.gradle\caches\8.14.5\transforms\ed1de11f445c1a35570f1da132e44cf4\transformed\D8BackportedDesugaredMethods.txt">
+    desugaredMethodsFiles="C:\Users\Albert\.gradle\caches\8.14.5\transforms\219e63c301467e6667105c05185c3b82\transformed\D8BackportedDesugaredMethods.txt">
   <buildFeatures
       namespacing="REQUIRED"/>
   <sourceProviders>
@@ -26,6 +26,6 @@
       applicationId="one.mixin.desktop.drop"
       generatedSourceFolders="build\generated\ap_generated_sources\release\out"
       generatedResourceFolders="build\generated\res\resValues\release"
-      desugaredMethodsFiles="C:\Users\Albert\.gradle\caches\8.14.5\transforms\ed1de11f445c1a35570f1da132e44cf4\transformed\D8BackportedDesugaredMethods.txt">
+      desugaredMethodsFiles="C:\Users\Albert\.gradle\caches\8.14.5\transforms\219e63c301467e6667105c05185c3b82\transformed\D8BackportedDesugaredMethods.txt">
   </artifact>
 </variant>
