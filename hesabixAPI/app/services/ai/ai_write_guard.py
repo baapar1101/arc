@@ -162,10 +162,12 @@ def is_approval_required_result(result: Any) -> bool:
 
 
 def is_write_guard_stop_result(result: Any) -> bool:
-    """نتیجه‌ای که باید حلقه agent متوقف شود (منتظر تأیید یا عدم تطابق)."""
-    if not isinstance(result, dict):
-        return False
-    return result.get("error") in ("APPROVAL_REQUIRED", "APPROVAL_MISMATCH")
+    """نتیجه‌ای که باید حلقه agent برای تأیید کاربر متوقف شود.
+
+    APPROVAL_MISMATCH ابزار را رد می‌کند ولی نباید دوباره کارت تأیید نشان دهد؛
+    مدل باید نتیجه را ببیند و با آرگومان تأییدشده دوباره تلاش کند.
+    """
+    return is_approval_required_result(result)
 
 
 def build_approval_pause_content(
@@ -233,7 +235,27 @@ def extract_pending_approval_ops(function_results: Any) -> List[Dict[str, Any]]:
         payload = approval_payload_from_result_entry(value)
         if payload:
             ops.append(payload)
-    return ops
+    return dedupe_pending_approval_ops(ops)
+
+
+def dedupe_pending_approval_ops(ops: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """حذف تکرار ناشی از ذخیرهٔ همزمان tool_call_id و نام ابزار."""
+    seen: set[str] = set()
+    out: List[Dict[str, Any]] = []
+    for op in ops:
+        if not isinstance(op, dict):
+            continue
+        aid = op.get("approval_id")
+        if isinstance(aid, str) and aid.strip():
+            key = f"id:{aid.strip()}"
+        else:
+            fn = str(op.get("function") or "")
+            key = f"fn:{fn}:{_canonical_json(op.get('arguments'))}"
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(op)
+    return out
 
 
 def approval_payload_from_result_entry(entry: Any) -> Optional[Dict[str, Any]]:

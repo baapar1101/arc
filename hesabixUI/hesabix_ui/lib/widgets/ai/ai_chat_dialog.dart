@@ -1277,6 +1277,7 @@ class _AIChatDialogState extends State<AIChatDialog> {
         _messages = msgs;
         _syncMessageKeys();
         _syncContinueRunFromMessages();
+        _syncPendingWriteApprovalFromMessages();
       });
       await _loadSessions();
       if (!mounted) return;

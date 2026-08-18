@@ -9,6 +9,25 @@ void main() {
       expect(extractPendingApprovalOpsFromResults('x'), isEmpty);
     });
 
+    test('dedupes nested tool_call_id and name-keyed same approval', () {
+      const required = {
+        'error': 'APPROVAL_REQUIRED',
+        'approval_id': 'abc123',
+        'function': 'create_invoice',
+        'arguments': {'person_id': 1},
+      };
+      final ops = extractPendingApprovalOpsFromResults({
+        'call_1': {
+          'name': 'create_invoice',
+          'result': required,
+        },
+        'create_invoice': required,
+      });
+      expect(ops, hasLength(1));
+      expect(ops.single['function'], 'create_invoice');
+      expect(ops.single['approval_id'], 'abc123');
+    });
+
     test('finds APPROVAL_REQUIRED at top level and nested result', () {
       final ops = extractPendingApprovalOpsFromResults({
         '_agent_trace': [

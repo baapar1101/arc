@@ -35,3 +35,15 @@ def test_not_found_maps_to_unknown_tool():
         ValueError("Function 'foo_bar' not found in registry"),
     )
     assert payload["error"] == "UNKNOWN_TOOL"
+
+
+def test_api_error_keeps_business_code():
+    from app.core.responses import ApiError
+
+    payload = normalize_tool_error(
+        "create_invoice",
+        ApiError("PERSON_REQUIRED", "person_id is required for this invoice type", http_status=400),
+    )
+    assert payload["error"] == "PERSON_REQUIRED"
+    assert "person_id" in payload["message"]
+    assert payload.get("detail")

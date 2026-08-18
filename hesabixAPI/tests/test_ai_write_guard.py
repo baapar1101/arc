@@ -115,6 +115,28 @@ def test_extract_pending_approval_ops_from_nested_results():
     assert ops[0].get("approval_id")
 
 
+def test_extract_pending_approval_ops_dedupes_name_and_call_id():
+    from app.services.ai.ai_write_guard import extract_pending_approval_ops
+
+    required = build_approval_required_result("create_invoice", {"person_id": 7})
+    ops = extract_pending_approval_ops(
+        {
+            "call-1": {"name": "create_invoice", "result": required},
+            "create_invoice": required,
+        }
+    )
+    assert len(ops) == 1
+    assert ops[0]["function"] == "create_invoice"
+
+
+def test_mismatch_does_not_stop_agent_loop():
+    mismatch = build_approval_mismatch_result("create_invoice", {"person_id": 1})
+    assert not is_write_guard_stop_result(mismatch)
+    assert is_write_guard_stop_result(
+        build_approval_required_result("create_invoice", {"person_id": 1})
+    )
+
+
 def test_is_write_function_honors_requires_approval_not_static_list():
     from app.services.ai.ai_write_guard import is_write_function
 

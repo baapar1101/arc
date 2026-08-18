@@ -348,16 +348,23 @@ class AIFunctionRegistry:
             user_context: AuthContext = context["user_context"]
             business_id = args.get("business_id") or context.get("business_id")
             user_id = user_context.get_user_id()
+            extra_info = (
+                dict(args.get("extra_info") or {})
+                if isinstance(args.get("extra_info"), dict)
+                else {}
+            )
+            person_id = args.get("person_id")
+            if person_id is not None and extra_info.get("person_id") is None:
+                extra_info["person_id"] = person_id
             
-            # ساخت data dict از args
             data = {
                 "invoice_type": args.get("invoice_type"),
                 "document_date": args.get("document_date"),
                 "currency_id": args.get("currency_id"),
-                "person_id": args.get("person_id"),
+                "person_id": person_id,
                 "description": args.get("description"),
                 "lines": args.get("lines", []),
-                "extra_info": args.get("extra_info", {})
+                "extra_info": extra_info,
             }
             
             return create_invoice(db, business_id, user_id, data)
@@ -399,7 +406,7 @@ class AIFunctionRegistry:
             required_permissions=["invoices.write"],
             category="invoices",
             requires_approval=True,
-            risk_level="high",
+            risk_level="medium",
             is_readonly=False,
         ))
     

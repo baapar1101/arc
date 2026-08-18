@@ -186,21 +186,23 @@ def compact_tool_result_for_llm(
     payload = unwrap_registry_result(result)
 
     if isinstance(payload, dict):
-        if payload.get("error") == "APPROVAL_REQUIRED":
+        if payload.get("error") in ("APPROVAL_REQUIRED", "APPROVAL_MISMATCH"):
             return _dumps(payload)
         if "error" in payload:
-            return _dumps(
-                {
-                    "ok": False,
-                    "error": payload.get("error"),
-                    "message": payload.get("message") or payload.get("message_fa"),
-                    "message_fa": payload.get("message_fa"),
-                    "hint_fa": payload.get("hint_fa"),
-                    "retryable": payload.get("retryable"),
-                    "expected_args": payload.get("expected_args"),
-                    "tool": payload.get("tool") or function_name,
-                }
-            )
+            compact_err = {
+                "ok": False,
+                "error": payload.get("error"),
+                "message": payload.get("message") or payload.get("message_fa"),
+                "message_fa": payload.get("message_fa"),
+                "hint_fa": payload.get("hint_fa"),
+                "retryable": payload.get("retryable"),
+                "expected_args": payload.get("expected_args"),
+                "tool": payload.get("tool") or function_name,
+            }
+            detail = payload.get("detail")
+            if detail:
+                compact_err["detail"] = detail
+            return _dumps(compact_err)
 
     records, _list_key = extract_record_list(payload)
     needs_envelope = False

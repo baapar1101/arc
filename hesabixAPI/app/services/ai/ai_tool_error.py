@@ -56,6 +56,17 @@ def normalize_tool_error(
         )
     elif _NOT_FOUND.search(raw) or "not found in registry" in raw.lower():
         return unknown_tool_result(function_name)
+    elif _is_api_error(exc):
+        code = str(getattr(exc, "code", None) or getattr(exc, "error_code", None) or "TOOL_ERROR")
+        api_message = str(getattr(exc, "message", None) or raw)
+        message_fa = api_message if _looks_persian(api_message) else (
+            f"{api_message}" if api_message else "اجرای ابزار با خطا مواجه شد."
+        )
+        hint_fa = (
+            api_message
+            if _looks_persian(api_message)
+            else "آرگومان را مطابق قرارداد ابزار اصلاح کن و دوباره تلاش کن."
+        )
     elif isinstance(exc, PermissionError):
         code = "PERMISSION_DENIED"
         message_fa = "اجازهٔ اجرای این ابزار را ندارید."
@@ -90,6 +101,12 @@ def _schema_property_names(schema: Optional[Dict[str, Any]]) -> list[str]:
     if not isinstance(props, dict):
         return []
     return [str(k) for k in props.keys()][:24]
+
+
+def _is_api_error(exc: BaseException) -> bool:
+    return type(exc).__name__ == "ApiError" or (
+        hasattr(exc, "error_code") and hasattr(exc, "message")
+    )
 
 
 def _looks_persian(text: str) -> bool:

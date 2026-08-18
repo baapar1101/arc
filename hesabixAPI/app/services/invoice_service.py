@@ -1975,10 +1975,18 @@ def _calculate_seller_commission(
 
 
 def _person_id_from_header(data: Dict[str, Any]) -> Optional[int]:
+    """شخص فاکتور از extra_info یا ریشهٔ payload (قرارداد ابزار AI)."""
     try:
-        ei = data.get("extra_info") or {}
-        pid = ei.get("person_id")
-        return int(pid) if pid is not None else None
+        ei = data.get("extra_info") if isinstance(data.get("extra_info"), dict) else {}
+        for candidate in (
+            (ei or {}).get("person_id"),
+            data.get("person_id"),
+            data.get("customer_id"),
+        ):
+            if candidate is None or candidate == "":
+                continue
+            return int(candidate)
+        return None
     except Exception:
         return None
 
@@ -4597,6 +4605,8 @@ def create_invoice(
     # جمع‌ها: تخفیف کلی (در صورت وجود) سپس totals از extra_info یا خطوط
     raw_extra = data.get("extra_info")
     header_extra: Dict[str, Any] = dict(raw_extra) if isinstance(raw_extra, dict) else {}
+    if person_id and header_extra.get("person_id") is None:
+        header_extra["person_id"] = int(person_id)
     dd_top = data.get("due_date")
     if dd_top is not None and str(dd_top).strip():
         try:

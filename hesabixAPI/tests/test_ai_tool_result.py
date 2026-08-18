@@ -69,6 +69,33 @@ def test_error_compact_keeps_hint_and_expected_args() -> None:
     assert data["retryable"] is True
 
 
+def test_approval_mismatch_passthrough():
+    payload = {
+        "error": "APPROVAL_MISMATCH",
+        "function": "create_invoice",
+        "message": "عدم تطابق",
+        "arg_diff": {"description": {"approved": "a", "requested": None}},
+    }
+    text = compact_tool_result_for_llm("create_invoice", payload)
+    data = json.loads(text)
+    assert data["error"] == "APPROVAL_MISMATCH"
+    assert "arg_diff" in data
+
+
+def test_tool_error_keeps_detail_for_model():
+    payload = {
+        "ok": False,
+        "error": "PERSON_REQUIRED",
+        "message": "شناسه شخص لازم است",
+        "detail": "person_id is required for this invoice type",
+        "tool": "create_invoice",
+    }
+    text = compact_tool_result_for_llm("create_invoice", payload)
+    data = json.loads(text)
+    assert data["error"] == "PERSON_REQUIRED"
+    assert "person_id" in data["detail"]
+
+
 def test_approval_required_passthrough() -> None:
     payload = {
         "error": "APPROVAL_REQUIRED",

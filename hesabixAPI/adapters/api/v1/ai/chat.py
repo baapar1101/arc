@@ -293,25 +293,13 @@ def _approval_from_result_entry(entry: Any) -> Optional[Dict[str, Any]]:
 
 def _extract_pending_write_approvals(messages: List[AIChatMessage]) -> List[Dict[str, Any]]:
     """فقط approvalهای آخرین پاسخ assistant را معتبر می‌داند."""
+    from app.services.ai.ai_write_guard import extract_pending_approval_ops
+
     for msg in reversed(messages):
         role = msg.role if isinstance(msg.role, str) else getattr(msg.role, "value", str(msg.role))
         if role != MessageRole.ASSISTANT.value:
             continue
-        raw_results = parse_json_field(msg.function_results)
-        approvals: List[Dict[str, Any]] = []
-        if isinstance(raw_results, dict):
-            for key, value in raw_results.items():
-                if str(key).startswith("_"):
-                    continue
-                approval = _approval_from_result_entry(value)
-                if approval:
-                    approvals.append(approval)
-        elif isinstance(raw_results, list):
-            for value in raw_results:
-                approval = _approval_from_result_entry(value)
-                if approval:
-                    approvals.append(approval)
-        return approvals
+        return extract_pending_approval_ops(parse_json_field(msg.function_results))
     return []
 
 

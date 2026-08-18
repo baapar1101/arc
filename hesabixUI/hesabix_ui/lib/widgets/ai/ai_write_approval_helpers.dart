@@ -15,7 +15,23 @@ List<Map<String, dynamic>> extractPendingApprovalOpsFromResults(
       ops.add(added);
     }
   }
-  return ops;
+  return _dedupePendingApprovalOps(ops);
+}
+
+List<Map<String, dynamic>> _dedupePendingApprovalOps(
+  List<Map<String, dynamic>> ops,
+) {
+  final seen = <String>{};
+  final out = <Map<String, dynamic>>[];
+  for (final op in ops) {
+    final approvalId = (op['approval_id'] as String?)?.trim();
+    final key = (approvalId != null && approvalId.isNotEmpty)
+        ? 'id:$approvalId'
+        : 'fn:${op['function']}:${op['arguments']}';
+    if (!seen.add(key)) continue;
+    out.add(op);
+  }
+  return out;
 }
 
 Map<String, dynamic>? _approvalOpFromEntry(Object? value) {
