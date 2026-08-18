@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import '../../l10n/app_localizations.dart';
 import '../../models/ai_models.dart';
 import '../../services/voice/voice_phase.dart';
-import 'ai_chat_composer_keys.dart';
 import 'ai_chat_design.dart';
+import 'ai_chat_enter_to_send.dart';
 import 'ai_chat_execution_mode_chip.dart';
 import 'ai_chat_model_chip.dart';
 import 'voice_status_label.dart';
@@ -135,7 +134,6 @@ class _AIChatComposerState extends State<AIChatComposer> {
   void initState() {
     super.initState();
     widget.focusNode.addListener(_onFocus);
-    widget.focusNode.onKeyEvent = _handleComposerKey;
     widget.controller.addListener(_onTextChanged);
     _hasText = widget.controller.text.trim().isNotEmpty;
   }
@@ -145,9 +143,7 @@ class _AIChatComposerState extends State<AIChatComposer> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.focusNode != widget.focusNode) {
       oldWidget.focusNode.removeListener(_onFocus);
-      oldWidget.focusNode.onKeyEvent = null;
       widget.focusNode.addListener(_onFocus);
-      widget.focusNode.onKeyEvent = _handleComposerKey;
     }
     if (oldWidget.controller != widget.controller) {
       oldWidget.controller.removeListener(_onTextChanged);
@@ -160,28 +156,8 @@ class _AIChatComposerState extends State<AIChatComposer> {
   void dispose() {
     _removeSlashOverlay();
     widget.focusNode.removeListener(_onFocus);
-    widget.focusNode.onKeyEvent = null;
     widget.controller.removeListener(_onTextChanged);
     super.dispose();
-  }
-
-  KeyEventResult _handleComposerKey(FocusNode node, KeyEvent event) {
-    if (event is! KeyDownEvent) return KeyEventResult.ignored;
-    final isEnter = event.logicalKey == LogicalKeyboardKey.enter ||
-        event.logicalKey == LogicalKeyboardKey.numpadEnter;
-    if (!isEnter) return KeyEventResult.ignored;
-    if (_slashSuggestions.isNotEmpty) {
-      _selectSlashCommand(_slashSuggestions.first);
-      return KeyEventResult.handled;
-    }
-    if (!composerEnterShouldSend(
-      shiftPressed: HardwareKeyboard.instance.isShiftPressed,
-      compactLayout: AIChatDesign.isCompactWidth(context),
-    )) {
-      return KeyEventResult.ignored;
-    }
-    if (_canSend) widget.onSend();
-    return KeyEventResult.handled;
   }
 
   void _onFocus() {
@@ -346,32 +322,42 @@ class _AIChatComposerState extends State<AIChatComposer> {
                       child: Semantics(
                         textField: true,
                         label: l10n.aiChatComposerSemanticsLabel,
-                        child: TextField(
-                          controller: widget.controller,
+                        child: AIChatEnterToSend(
                           focusNode: widget.focusNode,
-                          enabled: !widget.disabled && !widget.voiceActive,
-                          minLines: 1,
-                          maxLines: isCenter ? 4 : 6,
-                          textInputAction: TextInputAction.newline,
-                          style: theme.textTheme.bodyLarge,
-                          decoration: InputDecoration(
-                            hintText: composerHint,
-                            hintStyle: TextStyle(
-                              color: scheme.onSurfaceVariant.withValues(
-                                alpha: 0.65,
+                          enabled: _canSend,
+                          onSend: widget.onSend,
+                          onEnterOverride: _slashSuggestions.isNotEmpty
+                              ? () => _selectSlashCommand(
+                                    _slashSuggestions.first,
+                                  )
+                              : null,
+                          child: TextField(
+                            controller: widget.controller,
+                            focusNode: widget.focusNode,
+                            enabled: !widget.disabled && !widget.voiceActive,
+                            minLines: 1,
+                            maxLines: isCenter ? 4 : 6,
+                            textInputAction: TextInputAction.newline,
+                            style: theme.textTheme.bodyLarge,
+                            decoration: InputDecoration(
+                              hintText: composerHint,
+                              hintStyle: TextStyle(
+                                color: scheme.onSurfaceVariant.withValues(
+                                  alpha: 0.65,
+                                ),
+                              ),
+                              border: InputBorder.none,
+                              contentPadding: EdgeInsets.fromLTRB(
+                                compact ? 16 : 20,
+                                compact ? 14 : 16,
+                                4,
+                                compact ? 10 : 12,
                               ),
                             ),
-                            border: InputBorder.none,
-                            contentPadding: EdgeInsets.fromLTRB(
-                              compact ? 16 : 20,
-                              compact ? 14 : 16,
-                              4,
-                              compact ? 10 : 12,
-                            ),
+                            onSubmitted: (_) {
+                              if (_canSend) widget.onSend();
+                            },
                           ),
-                          onSubmitted: (_) {
-                            if (_canSend) widget.onSend();
-                          },
                         ),
                       ),
                     ),

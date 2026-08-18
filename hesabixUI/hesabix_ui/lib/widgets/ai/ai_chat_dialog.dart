@@ -37,6 +37,7 @@ import 'package:hesabix_ui/widgets/ai/ai_chat_turn.dart';
 import 'package:hesabix_ui/widgets/ai/ai_chat_session_controller.dart';
 import 'package:hesabix_ui/widgets/ai/ai_chat_voice_session.dart';
 import 'package:hesabix_ui/widgets/ai/ai_chat_message_sheet.dart';
+import 'package:hesabix_ui/widgets/ai/ai_chat_enter_to_send.dart';
 import 'package:hesabix_ui/widgets/ai/ai_execution_mode.dart';
 import 'package:hesabix_ui/widgets/ai/ai_chat_execution_mode_store.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
@@ -1075,33 +1076,10 @@ class _AIChatDialogState extends State<AIChatDialog> {
     required bool regenerateAfter,
   }) async {
     if (_sending || _currentSession?.id == null || msg.id == null) return;
-    final ctrl = TextEditingController(text: msg.content);
     final newText = await showDialog<String>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('ویرایش پیام'),
-        content: TextField(
-          controller: ctrl,
-          maxLines: 6,
-          autofocus: true,
-          decoration: const InputDecoration(
-            hintText: 'متن جدید…',
-            border: OutlineInputBorder(),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('انصراف'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),
-            child: const Text('ارسال'),
-          ),
-        ],
-      ),
+      builder: (ctx) => _AIChatEditMessageDialog(initialText: msg.content),
     );
-    ctrl.dispose();
     if (newText == null || newText.isEmpty) return;
 
     final idx = _messages.indexWhere((m) => m.id == msg.id);
@@ -2076,6 +2054,9 @@ class _AIChatDialogState extends State<AIChatDialog> {
                         duration: AIChatDesign.layoutTransition,
                         switchInCurve: Curves.easeOutCubic,
                         switchOutCurve: Curves.easeInCubic,
+                        layoutBuilder: (currentChild, _) {
+                          return currentChild ?? const SizedBox.shrink();
+                        },
                         child: _isHomeMode
                             ? AIChatHomeView(
                                 key: const ValueKey('home'),
@@ -2599,6 +2580,76 @@ class _AiMenuItem extends StatelessWidget {
         Icon(icon, size: 19, color: scheme.primary),
         const SizedBox(width: 10),
         Text(label),
+      ],
+    );
+  }
+}
+
+class _AIChatEditMessageDialog extends StatefulWidget {
+  final String initialText;
+
+  const _AIChatEditMessageDialog({required this.initialText});
+
+  @override
+  State<_AIChatEditMessageDialog> createState() =>
+      _AIChatEditMessageDialogState();
+}
+
+class _AIChatEditMessageDialogState extends State<_AIChatEditMessageDialog> {
+  late final TextEditingController _ctrl;
+  late final FocusNode _focus;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = TextEditingController(text: widget.initialText);
+    _focus = FocusNode();
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    _focus.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final text = _ctrl.text.trim();
+    if (text.isEmpty) return;
+    Navigator.pop(context, text);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final compact = AIChatDesign.isCompactWidth(context);
+    return AlertDialog(
+      title: const Text('ویرایش پیام'),
+      content: AIChatEnterToSend(
+        focusNode: _focus,
+        onSend: _submit,
+        child: TextField(
+          controller: _ctrl,
+          focusNode: _focus,
+          maxLines: 6,
+          autofocus: true,
+          textInputAction: TextInputAction.newline,
+          decoration: InputDecoration(
+            hintText: compact
+                ? 'متن جدید…'
+                : 'متن جدید… (Enter ارسال، Shift+Enter خط جدید)',
+            border: const OutlineInputBorder(),
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('انصراف'),
+        ),
+        FilledButton(
+          onPressed: _submit,
+          child: const Text('ارسال'),
+        ),
       ],
     );
   }
