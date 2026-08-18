@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import time
 from typing import Any, Optional
 
@@ -13,6 +14,14 @@ from app.services.voice.tts import _resample_pcm16_mono
 
 _DEFAULT_TIMEOUT = 45.0
 _OPENAI_TTS_PCM_RATE = 24000
+_STT_FALLBACK_STATUS = {400, 404, 405, 415, 422, 500, 502, 503}
+_HTTPX_TRANSIENT = (
+	httpx.RemoteProtocolError,
+	httpx.ReadError,
+	httpx.ConnectError,
+	httpx.TimeoutException,
+	httpx.DecodingError,
+)
 
 
 def _join_url(base: str | None, path: str) -> str:
@@ -48,6 +57,10 @@ class OpenAITranscriptionSTT:
 			return ["audio/translations"]
 		if self.audio_endpoint in ("transcriptions", "transcription"):
 			return ["audio/transcriptions"]
+		base = (self.api_base_url or "").lower()
+		# درگاه پارس‌پک transcriptions را با ۵۰۰ ناقص می‌بندد؛ نمونهٔ رسمی‌شان translations است.
+		if "parspack" in base:
+			return ["audio/translations", "audio/transcriptions"]
 		return ["audio/transcriptions", "audio/translations"]
 
 	async def transcribe_pcm16(
@@ -62,36 +75,61 @@ class OpenAITranscriptionSTT:
 		lang = (language or self.language or "fa").strip() or "fa"
 		headers = {"Authorization": f"Bearer {self.api_key}"}
 		last_error = ""
-		async with httpx.AsyncClient(timeout=self.timeout) as client:
+		async with httpx.AsyncClient(timeout=self.timeout, http2=False) as client:
 			for path in self._audio_paths():
 				url = _join_url(self.api_base_url, path)
 				data: dict[str, Any] = {"model": self.model_id}
 				if path.endswith("transcriptions") and lang and lang != "auto":
 					data["language"] = lang
-				response = await client.post(
-					url,
-					headers=headers,
-					data=data,
-					files={"file": ("utterance.wav", wav, "audio/wav")},
-				)
-				if response.status_code < 400:
-					payload = response.json()
-					text = ""
-					if isinstance(payload, dict):
-						text = str(payload.get("text") or "").strip()
-					elif isinstance(payload, str):
-						text = payload.strip()
-					elapsed = int((time.perf_counter() - started) * 1000)
-					return TranscriptResult(
-						text=text,
-						language=lang,
-						engine=self.engine_name,
-						model_id=self.model_id,
-						duration_ms=elapsed,
-					)
-				last_error = f"STT ابری ناموفق ({response.status_code}): {response.text[:400]}"
-				if response.status_code not in (400, 404, 405, 422):
+				status = 0
+				raw = b""
+				try:
+					async with client.stream(
+						"POST",
+						url,
+						headers=headers,
+						data=data,
+						files={"file": ("utterance.wav", wav, "audio/wav")},
+					) as response:
+						status = response.status_code
+						try:
+							async for chunk in response.aiter_bytes():
+								raw += chunk
+								if status >= 400 and len(raw) >= 800:
+									break
+						except _HTTPX_TRANSIENT as exc:
+							if status < 400 and raw:
+								pass
+							else:
+								last_error = f"STT ابری قطع شد ({path}): {type(exc).__name__}"
+								continue
+				except _HTTPX_TRANSIENT as exc:
+					last_error = f"STT ابری قطع شد ({path}): {type(exc).__name__}"
+					continue
+				if status >= 400:
+					snippet = raw[:400].decode("utf-8", errors="replace")
+					last_error = f"STT ابری ناموفق ({status}): {snippet}"
+					if status in _STT_FALLBACK_STATUS:
+						continue
 					break
+				try:
+					payload: Any = json.loads(raw.decode("utf-8")) if raw else {}
+				except Exception:
+					last_error = f"پاسخ STT ابری نامعتبر است ({path})"
+					continue
+				text = ""
+				if isinstance(payload, dict):
+					text = str(payload.get("text") or "").strip()
+				elif isinstance(payload, str):
+					text = payload.strip()
+				elapsed = int((time.perf_counter() - started) * 1000)
+				return TranscriptResult(
+					text=text,
+					language=lang,
+					engine=self.engine_name,
+					model_id=self.model_id,
+					duration_ms=elapsed,
+				)
 		raise RuntimeError(last_error or "STT ابری ناموفق")
 
 

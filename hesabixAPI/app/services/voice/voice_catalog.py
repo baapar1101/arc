@@ -231,7 +231,7 @@ def seed_voice_models_from_env(db: Session, *, force: bool = False) -> Dict[str,
 				{
 					"api_base_url": "https://ai.parspack.com/v1",
 					"credential_provider": "custom",
-					"audio_endpoint": "auto",
+					"audio_endpoint": "translations",
 				},
 				ensure_ascii=False,
 			),

@@ -1,14 +1,53 @@
 from __future__ import annotations
 
+import json
 from types import SimpleNamespace
-from unittest.mock import AsyncMock, patch
+from unittest.mock import patch
 
+import httpx
 import pytest
 
 from app.core.responses import ApiError
 from app.services.voice.contracts import VoiceResolveRequest, provider_is_cloud
 from app.services.voice.openai_audio import OpenAITTSEngine, OpenAITranscriptionSTT
 from app.services.voice.voice_catalog import cloud_audio_allowed
+
+
+class _StreamResp:
+	def __init__(self, status_code: int, body: bytes):
+		self.status_code = status_code
+		self._body = body
+		self._raise = None
+
+	@classmethod
+	def json_ok(cls, payload: dict, status_code: int = 200):
+		return cls(status_code, json.dumps(payload).encode("utf-8"))
+
+	@classmethod
+	def fail(cls, status_code: int, text: str = "err"):
+		return cls(status_code, text.encode("utf-8"))
+
+	@classmethod
+	def protocol_error(cls, status_code: int = 500):
+		obj = cls(status_code, b"")
+		obj._raise = httpx.RemoteProtocolError("incomplete chunked read")
+		return obj
+
+	async def aiter_bytes(self):
+		if self._raise:
+			raise self._raise
+		yield self._body
+
+
+class _StreamCM:
+	def __init__(self, resp):
+		self._resp = resp
+
+	async def __aenter__(self):
+		return self._resp
+
+	async def __aexit__(self, *args):
+		return False
 
 
 class _FakePolicy:
@@ -56,7 +95,6 @@ async def test_openai_stt_posts_wav():
 		model_id="whisper-1",
 		language="fa",
 	)
-	mock_response = SimpleNamespace(status_code=200, json=lambda: {"text": "فروش امروز"}, text="")
 
 	class _Client:
 		async def __aenter__(self):
@@ -65,11 +103,12 @@ async def test_openai_stt_posts_wav():
 		async def __aexit__(self, *args):
 			return False
 
-		async def post(self, url, headers=None, data=None, files=None, json=None):
+		def stream(self, method, url, headers=None, data=None, files=None, json=None):
+			assert method == "POST"
 			assert "transcriptions" in url
 			assert files and "file" in files
 			assert data["model"] == "whisper-1"
-			return mock_response
+			return _StreamCM(_StreamResp.json_ok({"text": "فروش امروز"}))
 
 	with patch("app.services.voice.openai_audio.httpx.AsyncClient", return_value=_Client()):
 		result = await stt.transcribe_pcm16(b"\x00\x00" * 32, 16000)
@@ -78,7 +117,7 @@ async def test_openai_stt_posts_wav():
 
 
 @pytest.mark.asyncio
-async def test_openai_stt_falls_back_to_translations():
+async def test_openai_stt_parspack_uses_translations_first():
 	stt = OpenAITranscriptionSTT(
 		api_key="sk-test",
 		api_base_url="https://ai.parspack.com/v1",
@@ -86,8 +125,6 @@ async def test_openai_stt_falls_back_to_translations():
 		language="fa",
 		audio_endpoint="auto",
 	)
-	ok = SimpleNamespace(status_code=200, json=lambda: {"text": "hello"}, text="")
-	missing = SimpleNamespace(status_code=404, json=lambda: {}, text="not found")
 	urls: list[str] = []
 
 	class _Client:
@@ -97,17 +134,46 @@ async def test_openai_stt_falls_back_to_translations():
 		async def __aexit__(self, *args):
 			return False
 
-		async def post(self, url, headers=None, data=None, files=None, json=None):
+		def stream(self, method, url, headers=None, data=None, files=None, json=None):
 			urls.append(url)
-			if "transcriptions" in url:
-				return missing
 			assert data["model"] == "openai/whisper-1"
 			assert "language" not in data
-			return ok
+			assert "translations" in url
+			return _StreamCM(_StreamResp.json_ok({"text": "hello"}))
 
 	with patch("app.services.voice.openai_audio.httpx.AsyncClient", return_value=_Client()):
 		result = await stt.transcribe_pcm16(b"\x00\x00" * 32, 16000)
 	assert result.text == "hello"
+	assert urls and "translations" in urls[0]
+
+
+@pytest.mark.asyncio
+async def test_openai_stt_falls_back_after_protocol_error():
+	stt = OpenAITranscriptionSTT(
+		api_key="sk-test",
+		api_base_url="https://api.openai.com/v1",
+		model_id="whisper-1",
+		language="fa",
+		audio_endpoint="auto",
+	)
+	urls: list[str] = []
+
+	class _Client:
+		async def __aenter__(self):
+			return self
+
+		async def __aexit__(self, *args):
+			return False
+
+		def stream(self, method, url, headers=None, data=None, files=None, json=None):
+			urls.append(url)
+			if "transcriptions" in url:
+				return _StreamCM(_StreamResp.protocol_error(500))
+			return _StreamCM(_StreamResp.json_ok({"text": "ok"}))
+
+	with patch("app.services.voice.openai_audio.httpx.AsyncClient", return_value=_Client()):
+		result = await stt.transcribe_pcm16(b"\x00\x00" * 32, 16000)
+	assert result.text == "ok"
 	assert any("transcriptions" in u for u in urls)
 	assert any("translations" in u for u in urls)
 

@@ -260,8 +260,14 @@ async def ai_voice_ws(websocket: WebSocket):
 		if vad_event.speech_started:
 			if currently_speaking:
 				cancel_event.set()
+			logger.info("voice speech_start session_id=%s", session_id)
 			asyncio.create_task(send_event({"type": "speech_start"}))
 		if vad_event.utterance_completed and vad_event.utterance_pcm is not None:
+			logger.info(
+				"voice utterance_ready session_id=%s bytes=%s",
+				session_id,
+				len(vad_event.utterance_pcm),
+			)
 			_schedule_utterance(vad_event.utterance_pcm)
 
 	async def _send_audio_frame(pcm_frame: bytes, capture: bytearray | None) -> None:
@@ -809,20 +815,10 @@ async def ai_voice_ws(websocket: WebSocket):
 				await send_event({"type": "error", "error": "UNKNOWN_COMMAND", "message": "دستور ناشناخته"})
 				continue
 
-			# audio frames
+			# audio frames — حتی اگر کلاینت webm اعلام کرده، PCM باینری را هم بپذیر
 			if msg_type == "websocket.receive" and message.get("bytes") is not None:
 				if session_id is None or business_id is None:
 					await send_event({"type": "error", "error": "NOT_STARTED", "message": "ابتدا پیام start را ارسال کنید"})
-					continue
-
-				if input_codec != "pcm":
-					await send_event(
-						{
-							"type": "error",
-							"error": "INVALID_AUDIO",
-							"message": "برای webm_opus از پیام audio_webm استفاده کنید",
-						}
-					)
 					continue
 
 				frame = message["bytes"]

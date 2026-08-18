@@ -174,7 +174,16 @@ async def transcribe_audio(
 		db,
 		VoiceResolveRequest(business_id=bid, stt_code=stt_code),
 	)
-	result = await stack.stt.transcribe_pcm16(pcm, rate, language=stack.language)
+	try:
+		result = await stack.stt.transcribe_pcm16(pcm, rate, language=stack.language)
+	except ApiError:
+		raise
+	except Exception as exc:
+		raise ApiError(
+			"STT_FAILED",
+			str(exc)[:400] or "تبدیل گفتار به متن ناموفق بود",
+			http_status=502,
+		) from exc
 	log_voice_media_usage(
 		db,
 		ctx,
@@ -229,10 +238,19 @@ async def synthesize_speech(
 	import time
 
 	started = time.perf_counter()
-	if isinstance(engine, (PiperTTSEngine, DummyTTSEngine)) or hasattr(engine, "synthesize_pcm16_async"):
-		pcm, sr = await engine.synthesize_pcm16_async(text)
-	else:
-		pcm, sr = engine.synthesize_pcm16(text)
+	try:
+		if isinstance(engine, (PiperTTSEngine, DummyTTSEngine)) or hasattr(engine, "synthesize_pcm16_async"):
+			pcm, sr = await engine.synthesize_pcm16_async(text)
+		else:
+			pcm, sr = engine.synthesize_pcm16(text)
+	except ApiError:
+		raise
+	except Exception as exc:
+		raise ApiError(
+			"TTS_FAILED",
+			str(exc)[:400] or "تبدیل متن به صدا ناموفق بود",
+			http_status=502,
+		) from exc
 	out_rate = int(settings.voice_tts_output_sample_rate_hz)
 	pcm = resample_to_output(pcm, sr, out_rate)
 	elapsed = int((time.perf_counter() - started) * 1000)

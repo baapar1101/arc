@@ -63,13 +63,12 @@ class VoiceChatController {
     } catch (_) {}
     _playHeadTime = _ctx!.currentTime;
 
-    final preferWebm = VoiceWebCapture.supportsWebmOpus;
     final startPayload = <String, dynamic>{
       'type': 'start',
       'session_id': sessionId,
       'collect_data': collectDataOptIn,
-      'audio_transport': preferWebm ? 'base64' : 'binary',
-      'input_codec': preferWebm ? 'webm_opus' : 'pcm',
+      'audio_transport': 'binary',
+      'input_codec': 'pcm',
       if (modelCode != null && modelCode!.isNotEmpty) 'model_code': modelCode,
       if (executionMode != null && executionMode!.isNotEmpty)
         'execution_mode': executionMode,
@@ -85,7 +84,7 @@ class VoiceChatController {
       onError: (e) => onError(e.toString()),
       onDone: () => onError('اتصال صوت قطع شد.'),
       onReconnected: () => onEvent({'type': 'reconnected'}),
-      preferBinaryDownlink: !preferWebm,
+      preferBinaryDownlink: true,
     );
 
     _ws.enableReconnect();
@@ -108,11 +107,6 @@ class VoiceChatController {
         onPcmFrame: (pcm) {
           if (pcm.isNotEmpty) {
             _ws.sendBytes(pcm);
-          }
-        },
-        onWebmChunk: (webm) {
-          if (webm.isNotEmpty) {
-            _ws.sendWebmChunk(webm);
           }
         },
       );
