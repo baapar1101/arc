@@ -220,6 +220,25 @@ def seed_voice_models_from_env(db: Session, *, force: bool = False) -> Dict[str,
 			),
 		},
 		{
+			"code": "stt-parspack-whisper-1",
+			"kind": VOICE_KIND_STT,
+			"display_name": "ParsPack Whisper",
+			"description": "گفتار به متن از درگاه پارس‌پک (openai/whisper-1). کلید در اعتبارنامه Custom ذخیره می‌شود.",
+			"provider": "custom",
+			"model_id": "openai/whisper-1",
+			"language": "fa",
+			"tier": "pro",
+			"sort_order": 15,
+			"extra_json": json.dumps(
+				{
+					"api_base_url": "https://ai.parspack.com/v1",
+					"credential_provider": "custom",
+					"audio_endpoint": "auto",
+				},
+				ensure_ascii=False,
+			),
+		},
+		{
 			"code": "stt-openai-whisper-1",
 			"kind": VOICE_KIND_STT,
 			"display_name": "OpenAI Whisper",
@@ -354,10 +373,42 @@ def apply_voice_model_payload(model: AIVoiceModel, payload: Dict[str, Any], *, c
 		model.is_active = bool(payload.get("is_active", True))
 	if "sort_order" in payload or creating:
 		model.sort_order = int(payload.get("sort_order") or 0)
-	if "extra" in payload:
-		extra = payload.get("extra")
-		model.extra_json = json.dumps(extra, ensure_ascii=False) if isinstance(extra, dict) else None
+	extra_in = payload.get("extra") if "extra" in payload else None
+	if extra_in is None and any(k in payload for k in ("api_base_url", "audio_endpoint")):
+		extra_in = _parse_extra(model.extra_json)
+	if isinstance(extra_in, dict):
+		if payload.get("api_base_url"):
+			extra_in["api_base_url"] = str(payload.get("api_base_url")).strip()
+		if payload.get("audio_endpoint"):
+			extra_in["audio_endpoint"] = str(payload.get("audio_endpoint")).strip().lower()
+		if model.provider in ("custom", "openai", "groq"):
+			extra_in.setdefault("credential_provider", model.provider)
+		model.extra_json = json.dumps(extra_in, ensure_ascii=False)
+	elif "extra" in payload:
+		model.extra_json = None
 	model.updated_at = datetime.utcnow()
+
+
+def persist_voice_gateway_credential(db: Session, payload: Dict[str, Any], model: AIVoiceModel) -> None:
+	"""ذخیره کلید/آدرس درگاه همراه مدل صوت — بدون گذاشتن راز داخل خود ردیف کاتالوگ."""
+	api_key = str(payload.get("api_key") or "").strip()
+	api_base = str(payload.get("api_base_url") or "").strip() or None
+	if not api_key and api_base is None:
+		return
+	from app.services.ai.ai_provider_service import create_or_update_credential
+
+	extra = _parse_extra(model.extra_json)
+	provider = str(extra.get("credential_provider") or model.provider or "custom").strip().lower()
+	if provider in ("local", "dummy", "piper", "whisper"):
+		provider = "custom"
+	create_or_update_credential(
+		db,
+		provider,
+		display_name="ParsPack / Custom Gateway" if provider == "custom" else None,
+		api_base_url=api_base if api_base is not None else extra.get("api_base_url"),
+		api_key=api_key or None,
+		is_active=True,
+	)
 
 
 def clear_other_defaults(db: Session, kind: str, keep_id: Optional[int]) -> None:

@@ -85,8 +85,14 @@ class _AIVoiceModelsAdminPageState extends State<AIVoiceModelsAdminPage> {
     final modelIdCtrl = TextEditingController(text: model?.modelId ?? '');
     final voiceCtrl = TextEditingController(text: model?.voiceId ?? '');
     final descCtrl = TextEditingController(text: model?.description ?? '');
+    final apiBaseCtrl = TextEditingController(
+      text: model?.extra['api_base_url']?.toString() ?? '',
+    );
+    final apiKeyCtrl = TextEditingController();
     String kind = model?.kind ?? 'stt';
     String provider = model?.provider ?? 'local';
+    String audioEndpoint =
+        model?.extra['audio_endpoint']?.toString() ?? 'auto';
     bool isActive = model?.isActive ?? true;
     bool isDefault = model?.isDefault ?? false;
 
@@ -138,11 +144,63 @@ class _AIVoiceModelsAdminPageState extends State<AIVoiceModelsAdminPage> {
                         items: const [
                           DropdownMenuItem(value: 'local', child: Text('Local')),
                           DropdownMenuItem(value: 'openai', child: Text('OpenAI')),
+                          DropdownMenuItem(value: 'custom', child: Text('Custom / ParsPack')),
                           DropdownMenuItem(value: 'dummy', child: Text('Dummy')),
-                          DropdownMenuItem(value: 'custom', child: Text('Custom')),
                         ],
                         onChanged: (v) => setDialogState(() => provider = v!),
                       ),
+                      if (provider != 'local' && provider != 'dummy') ...[
+                        const SizedBox(height: 8),
+                        Text(
+                          l10n.aiVoiceAdminCloudHint,
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                        const SizedBox(height: 12),
+                        TextFormField(
+                          controller: apiBaseCtrl,
+                          decoration: InputDecoration(
+                            labelText: l10n.aiVoiceAdminApiBaseUrl,
+                            hintText: 'https://ai.parspack.com/v1',
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        TextFormField(
+                          controller: apiKeyCtrl,
+                          obscureText: true,
+                          decoration: InputDecoration(
+                            labelText: l10n.aiVoiceAdminApiKey,
+                            helperText: l10n.aiVoiceAdminApiKeyHint,
+                          ),
+                        ),
+                        if (kind == 'stt') ...[
+                          const SizedBox(height: 12),
+                          DropdownButtonFormField<String>(
+                            value: ['auto', 'transcriptions', 'translations']
+                                    .contains(audioEndpoint)
+                                ? audioEndpoint
+                                : 'auto',
+                            decoration: InputDecoration(
+                              labelText: l10n.aiVoiceAdminAudioEndpoint,
+                            ),
+                            items: [
+                              DropdownMenuItem(
+                                value: 'auto',
+                                child: Text(l10n.aiVoiceAdminAudioAuto),
+                              ),
+                              DropdownMenuItem(
+                                value: 'transcriptions',
+                                child: Text(l10n.aiVoiceAdminAudioTranscriptions),
+                              ),
+                              DropdownMenuItem(
+                                value: 'translations',
+                                child: Text(l10n.aiVoiceAdminAudioTranslations),
+                              ),
+                            ],
+                            onChanged: (v) =>
+                                setDialogState(() => audioEndpoint = v ?? 'auto'),
+                          ),
+                        ],
+                      ],
                       const SizedBox(height: 12),
                       TextFormField(
                         controller: modelIdCtrl,
@@ -189,11 +247,30 @@ class _AIVoiceModelsAdminPageState extends State<AIVoiceModelsAdminPage> {
                     'kind': kind,
                     'provider': provider,
                     'model_id': modelIdCtrl.text.trim(),
-                    'voice_id': voiceCtrl.text.trim().isEmpty ? null : voiceCtrl.text.trim(),
-                    'description': descCtrl.text.trim().isEmpty ? null : descCtrl.text.trim(),
+                    'voice_id': voiceCtrl.text.trim().isEmpty
+                        ? null
+                        : voiceCtrl.text.trim(),
+                    'description': descCtrl.text.trim().isEmpty
+                        ? null
+                        : descCtrl.text.trim(),
                     'is_active': isActive,
                     'is_default': isDefault,
                     'language': 'fa',
+                    if (provider != 'local' && provider != 'dummy') ...{
+                      'api_base_url': apiBaseCtrl.text.trim().isEmpty
+                          ? null
+                          : apiBaseCtrl.text.trim(),
+                      'audio_endpoint': audioEndpoint,
+                      'extra': {
+                        if (apiBaseCtrl.text.trim().isNotEmpty)
+                          'api_base_url': apiBaseCtrl.text.trim(),
+                        'audio_endpoint': audioEndpoint,
+                        'credential_provider':
+                            provider == 'custom' ? 'custom' : provider,
+                      },
+                      if (apiKeyCtrl.text.trim().isNotEmpty)
+                        'api_key': apiKeyCtrl.text.trim(),
+                    },
                   };
                   try {
                     if (isEdit && model.id != null) {
@@ -224,6 +301,8 @@ class _AIVoiceModelsAdminPageState extends State<AIVoiceModelsAdminPage> {
     modelIdCtrl.dispose();
     voiceCtrl.dispose();
     descCtrl.dispose();
+    apiBaseCtrl.dispose();
+    apiKeyCtrl.dispose();
   }
 
   @override

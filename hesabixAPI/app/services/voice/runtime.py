@@ -93,6 +93,17 @@ def _credential(db: Session, provider: str) -> tuple[str, Optional[str]]:
 	return api_key, api_base
 
 
+def _cloud_connection(db: Session, model: AIVoiceModel) -> tuple[str, Optional[str], str]:
+	extra = _extra(model)
+	provider = (model.provider or "custom").strip().lower()
+	cred_provider = str(extra.get("credential_provider") or provider).strip().lower()
+	if cred_provider in ("", "local", "dummy", "piper", "whisper"):
+		cred_provider = "custom" if provider == "custom" else provider
+	api_key, api_base = _credential(db, cred_provider)
+	override = str(extra.get("api_base_url") or "").strip() or None
+	return api_key, override or api_base, str(extra.get("audio_endpoint") or "auto")
+
+
 def _build_local_stt(model: Optional[AIVoiceModel], language: str) -> LocalWhisperSTT:
 	settings = get_settings()
 	extra = _extra(model)
@@ -117,12 +128,13 @@ def _build_stt(db: Session, model: Optional[AIVoiceModel], language: str, allow_
 		return DummySTT()
 	_require_cloud_or_raise(allow_cloud, model)
 	if provider in ("openai", "groq", "custom"):
-		api_key, api_base = _credential(db, "openai" if provider == "custom" else provider)
+		api_key, api_base, audio_endpoint = _cloud_connection(db, model)
 		return OpenAITranscriptionSTT(
 			api_key=api_key,
 			api_base_url=api_base,
 			model_id=model.model_id,
 			language=language or model.language or "fa",
+			audio_endpoint=audio_endpoint,
 		)
 	raise ApiError("VOICE_PROVIDER_UNSUPPORTED", f"ارائه‌دهنده STT «{provider}» پشتیبانی نمی‌شود", http_status=400)
 
@@ -154,7 +166,7 @@ def _build_tts_engine(db: Session, model: Optional[AIVoiceModel], language: str,
 		return PiperTTSEngine(cfg)
 	_require_cloud_or_raise(allow_cloud, model)
 	if provider in ("openai", "groq", "custom"):
-		api_key, api_base = _credential(db, "openai" if provider == "custom" else provider)
+		api_key, api_base, _endpoint = _cloud_connection(db, model)
 		return OpenAITTSEngine(
 			api_key=api_key,
 			api_base_url=api_base,

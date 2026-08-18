@@ -11095,6 +11095,35 @@ class AppLocalizationsEn extends AppLocalizations {
   String get aiVoiceAdminModelId => 'API / local model id';
 
   @override
+  String get aiVoiceAdminApiBaseUrl => 'API base URL';
+
+  @override
+  String get aiVoiceAdminApiKey => 'API key';
+
+  @override
+  String get aiVoiceAdminApiKeyHint =>
+      'Leave empty to keep the current key. Saved in provider credentials, not in the model row.';
+
+  @override
+  String get aiVoiceAdminAudioEndpoint => 'Speech API';
+
+  @override
+  String get aiVoiceAdminAudioAuto =>
+      'Auto (transcriptions, then translations)';
+
+  @override
+  String get aiVoiceAdminAudioTranscriptions =>
+      'transcriptions (keep language)';
+
+  @override
+  String get aiVoiceAdminAudioTranslations =>
+      'translations (ParsPack / OpenAI sample)';
+
+  @override
+  String get aiVoiceAdminCloudHint =>
+      'Cloud STT/TTS need a base URL and API key. Local Whisper does not.';
+
+  @override
   String get aiVoiceAdminVoiceId => 'Voice id';
 
   @override

@@ -11032,6 +11032,35 @@ class AppLocalizationsFa extends AppLocalizations {
   String get aiVoiceAdminModelId => 'شناسه مدل API / محلی';
 
   @override
+  String get aiVoiceAdminApiBaseUrl => 'آدرس پایه API';
+
+  @override
+  String get aiVoiceAdminApiKey => 'کلید API';
+
+  @override
+  String get aiVoiceAdminApiKeyHint =>
+      'خالی بگذارید تا کلید فعلی حفظ شود. در اعتبارنامه ارائه‌دهنده ذخیره می‌شود، نه روی خود مدل.';
+
+  @override
+  String get aiVoiceAdminAudioEndpoint => 'نوع API گفتار';
+
+  @override
+  String get aiVoiceAdminAudioAuto =>
+      'خودکار (ابتدا transcriptions، سپس translations)';
+
+  @override
+  String get aiVoiceAdminAudioTranscriptions =>
+      'transcriptions (حفظ زبان اصلی)';
+
+  @override
+  String get aiVoiceAdminAudioTranslations =>
+      'translations (نمونه پارس‌پک / OpenAI)';
+
+  @override
+  String get aiVoiceAdminCloudHint =>
+      'برای STT/TTS ابری باید آدرس و کلید API وارد شود. Whisper محلی نیاز ندارد.';
+
+  @override
   String get aiVoiceAdminVoiceId => 'شناسه صدا';
 
   @override

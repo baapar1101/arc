@@ -77,6 +77,41 @@ async def test_openai_stt_posts_wav():
 	assert result.engine == "openai_transcription"
 
 
+@pytest.mark.asyncio
+async def test_openai_stt_falls_back_to_translations():
+	stt = OpenAITranscriptionSTT(
+		api_key="sk-test",
+		api_base_url="https://ai.parspack.com/v1",
+		model_id="openai/whisper-1",
+		language="fa",
+		audio_endpoint="auto",
+	)
+	ok = SimpleNamespace(status_code=200, json=lambda: {"text": "hello"}, text="")
+	missing = SimpleNamespace(status_code=404, json=lambda: {}, text="not found")
+	urls: list[str] = []
+
+	class _Client:
+		async def __aenter__(self):
+			return self
+
+		async def __aexit__(self, *args):
+			return False
+
+		async def post(self, url, headers=None, data=None, files=None, json=None):
+			urls.append(url)
+			if "transcriptions" in url:
+				return missing
+			assert data["model"] == "openai/whisper-1"
+			assert "language" not in data
+			return ok
+
+	with patch("app.services.voice.openai_audio.httpx.AsyncClient", return_value=_Client()):
+		result = await stt.transcribe_pcm16(b"\x00\x00" * 32, 16000)
+	assert result.text == "hello"
+	assert any("transcriptions" in u for u in urls)
+	assert any("translations" in u for u in urls)
+
+
 def test_cloud_disabled_error_code():
 	from app.services.voice.runtime import _require_cloud_or_raise
 	from adapters.db.models.ai_voice_model import AIVoiceModel

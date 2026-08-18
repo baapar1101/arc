@@ -20526,6 +20526,54 @@ abstract class AppLocalizations {
   /// **'API / local model id'**
   String get aiVoiceAdminModelId;
 
+  /// No description provided for @aiVoiceAdminApiBaseUrl.
+  ///
+  /// In en, this message translates to:
+  /// **'API base URL'**
+  String get aiVoiceAdminApiBaseUrl;
+
+  /// No description provided for @aiVoiceAdminApiKey.
+  ///
+  /// In en, this message translates to:
+  /// **'API key'**
+  String get aiVoiceAdminApiKey;
+
+  /// No description provided for @aiVoiceAdminApiKeyHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Leave empty to keep the current key. Saved in provider credentials, not in the model row.'**
+  String get aiVoiceAdminApiKeyHint;
+
+  /// No description provided for @aiVoiceAdminAudioEndpoint.
+  ///
+  /// In en, this message translates to:
+  /// **'Speech API'**
+  String get aiVoiceAdminAudioEndpoint;
+
+  /// No description provided for @aiVoiceAdminAudioAuto.
+  ///
+  /// In en, this message translates to:
+  /// **'Auto (transcriptions, then translations)'**
+  String get aiVoiceAdminAudioAuto;
+
+  /// No description provided for @aiVoiceAdminAudioTranscriptions.
+  ///
+  /// In en, this message translates to:
+  /// **'transcriptions (keep language)'**
+  String get aiVoiceAdminAudioTranscriptions;
+
+  /// No description provided for @aiVoiceAdminAudioTranslations.
+  ///
+  /// In en, this message translates to:
+  /// **'translations (ParsPack / OpenAI sample)'**
+  String get aiVoiceAdminAudioTranslations;
+
+  /// No description provided for @aiVoiceAdminCloudHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Cloud STT/TTS need a base URL and API key. Local Whisper does not.'**
+  String get aiVoiceAdminCloudHint;
+
   /// No description provided for @aiVoiceAdminVoiceId.
   ///
   /// In en, this message translates to:

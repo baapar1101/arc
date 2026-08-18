@@ -23,6 +23,7 @@ from app.services.voice.tts import DummyTTSEngine, PiperTTSEngine
 from app.services.voice.voice_catalog import (
 	apply_voice_model_payload,
 	clear_other_defaults,
+	persist_voice_gateway_credential,
 	seed_voice_models_from_env,
 	serialize_policy,
 	serialize_voice_model,
@@ -136,6 +137,8 @@ async def create_voice_model(
 	if model.is_default:
 		clear_other_defaults(db, model.kind, None)
 	db.add(model)
+	db.flush()
+	persist_voice_gateway_credential(db, payload, model)
 	db.commit()
 	db.refresh(model)
 	return success_response(serialize_voice_model(model), request, "مدل صوت ایجاد شد")
@@ -157,6 +160,7 @@ async def update_voice_model(
 	apply_voice_model_payload(model, payload, creating=False)
 	if model.is_default:
 		clear_other_defaults(db, model.kind, model.id)
+	persist_voice_gateway_credential(db, payload, model)
 	db.commit()
 	db.refresh(model)
 	return success_response(serialize_voice_model(model), request, "مدل صوت به‌روزرسانی شد")

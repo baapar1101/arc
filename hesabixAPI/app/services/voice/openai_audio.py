@@ -34,12 +34,21 @@ class OpenAITranscriptionSTT:
 		model_id: str,
 		language: str = "fa",
 		timeout: float = _DEFAULT_TIMEOUT,
+		audio_endpoint: str = "auto",
 	) -> None:
 		self.api_key = api_key
 		self.api_base_url = api_base_url
 		self.model_id = model_id
 		self.language = language
 		self.timeout = timeout
+		self.audio_endpoint = (audio_endpoint or "auto").strip().lower() or "auto"
+
+	def _audio_paths(self) -> list[str]:
+		if self.audio_endpoint in ("translations", "translation"):
+			return ["audio/translations"]
+		if self.audio_endpoint in ("transcriptions", "transcription"):
+			return ["audio/transcriptions"]
+		return ["audio/transcriptions", "audio/translations"]
 
 	async def transcribe_pcm16(
 		self,
@@ -51,36 +60,39 @@ class OpenAITranscriptionSTT:
 		started = time.perf_counter()
 		wav = pcm16_to_wav(pcm16, sample_rate_hz)
 		lang = (language or self.language or "fa").strip() or "fa"
-		url = _join_url(self.api_base_url, "audio/transcriptions")
 		headers = {"Authorization": f"Bearer {self.api_key}"}
-		data: dict[str, Any] = {"model": self.model_id}
-		if lang and lang != "auto":
-			data["language"] = lang if lang != "fa" else "fa"
+		last_error = ""
 		async with httpx.AsyncClient(timeout=self.timeout) as client:
-			response = await client.post(
-				url,
-				headers=headers,
-				data=data,
-				files={"file": ("utterance.wav", wav, "audio/wav")},
-			)
-		if response.status_code >= 400:
-			raise RuntimeError(
-				f"STT ابری ناموفق ({response.status_code}): {response.text[:400]}"
-			)
-		payload = response.json()
-		text = ""
-		if isinstance(payload, dict):
-			text = str(payload.get("text") or "").strip()
-		elif isinstance(payload, str):
-			text = payload.strip()
-		elapsed = int((time.perf_counter() - started) * 1000)
-		return TranscriptResult(
-			text=text,
-			language=lang,
-			engine=self.engine_name,
-			model_id=self.model_id,
-			duration_ms=elapsed,
-		)
+			for path in self._audio_paths():
+				url = _join_url(self.api_base_url, path)
+				data: dict[str, Any] = {"model": self.model_id}
+				if path.endswith("transcriptions") and lang and lang != "auto":
+					data["language"] = lang
+				response = await client.post(
+					url,
+					headers=headers,
+					data=data,
+					files={"file": ("utterance.wav", wav, "audio/wav")},
+				)
+				if response.status_code < 400:
+					payload = response.json()
+					text = ""
+					if isinstance(payload, dict):
+						text = str(payload.get("text") or "").strip()
+					elif isinstance(payload, str):
+						text = payload.strip()
+					elapsed = int((time.perf_counter() - started) * 1000)
+					return TranscriptResult(
+						text=text,
+						language=lang,
+						engine=self.engine_name,
+						model_id=self.model_id,
+						duration_ms=elapsed,
+					)
+				last_error = f"STT ابری ناموفق ({response.status_code}): {response.text[:400]}"
+				if response.status_code not in (400, 404, 405, 422):
+					break
+		raise RuntimeError(last_error or "STT ابری ناموفق")
 
 
 class OpenAITTSEngine:

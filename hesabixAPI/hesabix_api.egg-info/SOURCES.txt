@@ -103,6 +103,7 @@ adapters/api/v1/admin/ai_prompts.py
 adapters/api/v1/admin/ai_provider_credentials.py
 adapters/api/v1/admin/ai_settings.py
 adapters/api/v1/admin/ai_skills.py
+adapters/api/v1/admin/ai_voice_models.py
 adapters/api/v1/admin/announcements.py
 adapters/api/v1/admin/businesses_admin.py
 adapters/api/v1/admin/currencies.py
@@ -137,6 +138,7 @@ adapters/api/v1/ai/skills.py
 adapters/api/v1/ai/subscription.py
 adapters/api/v1/ai/usage.py
 adapters/api/v1/ai/voice_feedback.py
+adapters/api/v1/ai/voice_http.py
 adapters/api/v1/ai/voice_ws.py
 adapters/api/v1/business/document_monetization.py
 adapters/api/v1/business/storage.py
@@ -224,6 +226,7 @@ adapters/db/models/ai_skill.py
 adapters/db/models/ai_subscription.py
 adapters/db/models/ai_usage_log.py
 adapters/db/models/ai_voice_interaction.py
+adapters/db/models/ai_voice_model.py
 adapters/db/models/announcement.py
 adapters/db/models/api_key.py
 adapters/db/models/auth_security_event.py
@@ -347,6 +350,7 @@ adapters/db/repositories/ai_prompt_repository.py
 adapters/db/repositories/ai_provider_credential_repository.py
 adapters/db/repositories/ai_subscription_repository.py
 adapters/db/repositories/ai_usage_log_repository.py
+adapters/db/repositories/ai_voice_model_repository.py
 adapters/db/repositories/api_key_repo.py
 adapters/db/repositories/bale_repo.py
 adapters/db/repositories/base_repo.py
@@ -804,6 +808,7 @@ app/services/ai/ai_stream_aggregate.py
 app/services/ai/ai_stream_budget.py
 app/services/ai/ai_stream_helpers.py
 app/services/ai/ai_subagent.py
+app/services/ai/ai_subagent_sse.py
 app/services/ai/ai_summarize_quota.py
 app/services/ai/ai_system_prompt.py
 app/services/ai/ai_tool_cache.py
@@ -948,10 +953,19 @@ app/services/telephony/reports_service.py
 app/services/telephony/softphone_service.py
 app/services/telephony/telephony_service.py
 app/services/voice/__init__.py
+app/services/voice/audio_wav.py
+app/services/voice/contracts.py
+app/services/voice/local_adapters.py
+app/services/voice/openai_audio.py
+app/services/voice/runtime.py
+app/services/voice/session_limit.py
 app/services/voice/stt.py
 app/services/voice/tts.py
+app/services/voice/usage_log.py
 app/services/voice/vad.py
+app/services/voice/voice_catalog.py
 app/services/voice/webm_decode.py
+app/services/voice/whisper_pool.py
 app/services/workflow/__init__.py
 app/services/workflow/action_registry.py
 app/services/workflow/dry_run.py
@@ -1153,6 +1167,7 @@ migrations/versions/20260806_000002_barcode_label_printer_settings.py
 migrations/versions/20260806_000003_telephony_softphone_media_relay.py
 migrations/versions/20260817_000001_quick_sales_print_paper_size.py
 migrations/versions/20260817_000002_ai_agent_runs.py
+migrations/versions/20260818_000001_ai_voice_models.py
 tests/__init__.py
 tests/test_account_balance_core.py
 tests/test_account_tree_roots.py
@@ -1222,6 +1237,8 @@ tests/test_ai_tool_result.py
 tests/test_ai_trace_content.py
 tests/test_ai_untrusted.py
 tests/test_ai_usage_accumulate.py
+tests/test_ai_voice_cloud.py
+tests/test_ai_voice_upgrade.py
 tests/test_ai_workflow_agent_policy.py
 tests/test_ai_write_approval_turn.py
 tests/test_ai_write_guard.py

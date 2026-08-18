@@ -14,6 +14,7 @@ class AIVoiceModelItem {
   final bool isCloud;
   final bool dummy;
   final int sortOrder;
+  final Map<String, dynamic> extra;
 
   const AIVoiceModelItem({
     this.id,
@@ -31,6 +32,7 @@ class AIVoiceModelItem {
     this.isCloud = false,
     this.dummy = false,
     this.sortOrder = 0,
+    this.extra = const {},
   });
 
   factory AIVoiceModelItem.fromJson(Map<String, dynamic> json) {
@@ -50,6 +52,9 @@ class AIVoiceModelItem {
       isCloud: json['is_cloud'] as bool? ?? false,
       dummy: json['dummy'] as bool? ?? false,
       sortOrder: json['sort_order'] as int? ?? 0,
+      extra: json['extra'] is Map
+          ? Map<String, dynamic>.from(json['extra'] as Map)
+          : const {},
     );
   }
 }
