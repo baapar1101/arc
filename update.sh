@@ -139,8 +139,23 @@ fi
 DB_PASSWORD=$(cat "${APP_ROOT}/.db_password")
 export DB_PASSWORD
 
+# --- 0. Python / Flutter mirrors (show status + let the operator pick) ---
+if [[ -r "${UPDATE_SCRIPT_DIR}/scripts/lib/hesabix_mirrors.sh" ]]; then
+  # shellcheck source=scripts/lib/hesabix_mirrors.sh
+  source "${UPDATE_SCRIPT_DIR}/scripts/lib/hesabix_mirrors.sh"
+  hesabix_mirrors_prompt_before_update
+  if [[ -f "${APP_ROOT}/.deploy_env" ]]; then
+    set -a
+    # shellcheck source=/dev/null
+    source "${APP_ROOT}/.deploy_env"
+    set +a
+  fi
+  export DB_PASSWORD
+fi
+
 echo "==========================================" | tee -a "${LOG_FILE}"
 log_info "Hesabix update started (repo=${REPO_URL}, branch=${BRANCH})"
+log_info "Mirrors: pip=${PIP_INDEX_URL:-} pub=${PUB_HOSTED_URL:-} storage=${FLUTTER_STORAGE_BASE_URL:-}"
 echo "==========================================" | tee -a "${LOG_FILE}"
 
 # --- 1. Update from repo ---

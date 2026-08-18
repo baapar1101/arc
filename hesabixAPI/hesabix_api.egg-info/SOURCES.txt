@@ -755,6 +755,7 @@ app/services/ai/ai_function_extensions_session_todos.py
 app/services/ai/ai_function_extensions_subagent.py
 app/services/ai/ai_function_extensions_workflow.py
 app/services/ai/ai_goal_assessment.py
+app/services/ai/ai_handler_convention.py
 app/services/ai/ai_helpers.py
 app/services/ai/ai_history_summarizer.py
 app/services/ai/ai_insight_service.py
@@ -807,6 +808,7 @@ app/services/ai/ai_summarize_quota.py
 app/services/ai/ai_system_prompt.py
 app/services/ai/ai_tool_cache.py
 app/services/ai/ai_tool_catalog.py
+app/services/ai/ai_tool_error.py
 app/services/ai/ai_tool_intent.py
 app/services/ai/ai_tool_keys.py
 app/services/ai/ai_tool_parallel.py
@@ -823,6 +825,7 @@ app/services/ai/ai_workflow_agent_policy.py
 app/services/ai/ai_workflow_catalog_service.py
 app/services/ai/ai_workflow_prompt.py
 app/services/ai/ai_workflow_service.py
+app/services/ai/ai_write_approval_turn.py
 app/services/ai/ai_write_guard.py
 app/services/ai/business_ai_provider_service.py
 app/services/ai/chat_message_builder.py
@@ -1177,6 +1180,7 @@ tests/test_ai_eval_schedule.py
 tests/test_ai_eval_service.py
 tests/test_ai_exploration_service.py
 tests/test_ai_feedback_analytics.py
+tests/test_ai_function_handler_conventions.py
 tests/test_ai_goal_assessment.py
 tests/test_ai_goal_assessment_session_todos.py
 tests/test_ai_json_safe.py
@@ -1210,6 +1214,7 @@ tests/test_ai_subagent.py
 tests/test_ai_subscription_lock.py
 tests/test_ai_subscription_renew.py
 tests/test_ai_tool_catalog.py
+tests/test_ai_tool_error.py
 tests/test_ai_tool_intent.py
 tests/test_ai_tool_intent_gold.py
 tests/test_ai_tool_parallel.py
@@ -1218,6 +1223,7 @@ tests/test_ai_trace_content.py
 tests/test_ai_untrusted.py
 tests/test_ai_usage_accumulate.py
 tests/test_ai_workflow_agent_policy.py
+tests/test_ai_write_approval_turn.py
 tests/test_ai_write_guard.py
 tests/test_balance_sheet_classification.py
 tests/test_balance_sheet_grouping.py

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Hesabix CLI – update / services / domains / SSL / reload itself.
+# Hesabix CLI – update / services / domains / SSL / mirrors / reload itself.
 set -euo pipefail
 
 APP_ROOT="${APP_ROOT:-/opt/hesabix}"
@@ -30,13 +30,16 @@ fi
 usage() {
   cat <<'USAGE'
 Usage:
-  hesabix -update [-source REPO_URL] [-branch BRANCH]
+  hesabix -update [-source REPO_URL] [-branch BRANCH] [-y]
   hesabix -services {start|stop|restart|status|show}
   hesabix -domains {show|set|apply} [options]
   hesabix -ssl {status|enable|renew} [options]
+  hesabix -mirrors [show|set] [options]
   hesabix -cli reload
 
   -update           Run update (pull, migrate, restart, rebuild frontend, reload nginx)
+                    First shows Python/Flutter mirrors and lets you pick (Enter keeps current)
+  -y, --yes         Skip the mirror prompt and use the saved selection
   -source URL       Override repo URL (default: from initial deploy)
   -branch NAME      Override branch (default: from initial deploy)
   -services ACTION  Control Hesabix systemd units:
@@ -58,6 +61,14 @@ Usage:
       --api | --ui | --pgadmin | --all
       --email ADDRESS    Contact email for Let's Encrypt (default: admin@<domain>)
   -ssl renew        Run certbot renew [--dry-run]
+
+  -mirrors          Probe Python and Flutter mirrors, show the saved choice, then pick
+  -mirrors show     List mirrors with live status; mark the currently saved selection
+  -mirrors set      Save a new selection (interactive, or flags below)
+      --pip NAME|URL             Python/PyPI index (hesabix|official|tuna|aliyun|devneeds|URL)
+      --pub NAME|URL             Flutter pub host
+      --storage NAME|URL         Flutter engine/storage host
+      --flutter NAME             Set pub+storage from the same preset
 
   -cli reload       Reload /usr/local/bin/hesabix from the deployed repo
 USAGE
@@ -226,19 +237,32 @@ run_ssl_command() {
   esac
 }
 
+run_mirrors_command() {
+  # shellcheck source=lib/hesabix_mirrors.sh
+  source "${HESABIX_SCRIPT_DIR}/lib/hesabix_mirrors.sh"
+  hesabix_mirrors_command "$@"
+}
+
 UPDATE_MODE=""
 SERVICES_ACTION=""
 CLI_ACTION=""
 DOMAINS_ACTION=""
 SSL_ACTION=""
+MIRRORS_ACTION=""
 SOURCE_URL=""
 BRANCH_OVERRIDE=""
+SKIP_MIRROR_PROMPT=""
 DOMAINS_ARGS=()
 SSL_ARGS=()
+MIRRORS_ARGS=()
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     -update) UPDATE_MODE=1; shift ;;
+    -y|--yes|--skip-mirrors)
+      SKIP_MIRROR_PROMPT=1
+      shift
+      ;;
     -cli)
       if [[ $# -lt 2 || -z "${2:-}" ]]; then
         echo "hesabix -cli requires an action: reload" >&2
@@ -291,6 +315,17 @@ while [[ $# -gt 0 ]]; do
       SSL_ARGS=("$@")
       break
       ;;
+    -mirrors)
+      MIRRORS_ACTION="set"
+      if [[ $# -ge 2 && ( "$2" == "show" || "$2" == "set" || "$2" == "status" ) ]]; then
+        MIRRORS_ACTION="$2"
+        shift 2
+      else
+        shift 1
+      fi
+      MIRRORS_ARGS=("$@")
+      break
+      ;;
     -h|--help)
       usage
       exit 0
@@ -303,7 +338,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 if [[ -n "${CLI_ACTION}" ]]; then
-  if [[ -n "${UPDATE_MODE}" || -n "${SERVICES_ACTION}" || -n "${DOMAINS_ACTION}" || -n "${SSL_ACTION}" ]]; then
+  if [[ -n "${UPDATE_MODE}" || -n "${SERVICES_ACTION}" || -n "${DOMAINS_ACTION}" || -n "${SSL_ACTION}" || -n "${MIRRORS_ACTION}" ]]; then
     echo "Use -cli alone." >&2
     exit 1
   fi
@@ -315,7 +350,7 @@ if [[ -n "${CLI_ACTION}" ]]; then
 fi
 
 if [[ -n "${DOMAINS_ACTION}" ]]; then
-  if [[ -n "${UPDATE_MODE}" || -n "${SERVICES_ACTION}" || -n "${SSL_ACTION}" ]]; then
+  if [[ -n "${UPDATE_MODE}" || -n "${SERVICES_ACTION}" || -n "${SSL_ACTION}" || -n "${MIRRORS_ACTION}" ]]; then
     echo "Use -domains alone." >&2
     exit 1
   fi
@@ -327,8 +362,21 @@ if [[ -n "${DOMAINS_ACTION}" ]]; then
   exit $?
 fi
 
+if [[ -n "${MIRRORS_ACTION}" ]]; then
+  if [[ -n "${UPDATE_MODE}" || -n "${SERVICES_ACTION}" || -n "${DOMAINS_ACTION}" || -n "${SSL_ACTION}" ]]; then
+    echo "Use -mirrors alone." >&2
+    exit 1
+  fi
+  if [[ ! -f "${APP_ROOT}/.deploy_env" ]]; then
+    echo "Hesabix not deployed yet. Run deploy.sh first." >&2
+    exit 1
+  fi
+  run_mirrors_command "${MIRRORS_ACTION}" "${MIRRORS_ARGS[@]}"
+  exit $?
+fi
+
 if [[ -n "${SSL_ACTION}" ]]; then
-  if [[ -n "${UPDATE_MODE}" || -n "${SERVICES_ACTION}" ]]; then
+  if [[ -n "${UPDATE_MODE}" || -n "${SERVICES_ACTION}" || -n "${MIRRORS_ACTION}" ]]; then
     echo "Use -ssl alone." >&2
     exit 1
   fi
@@ -373,6 +421,9 @@ set +a
 
 [[ -n "${SOURCE_URL}" ]] && export REPO_URL="${SOURCE_URL}"
 [[ -n "${BRANCH_OVERRIDE}" ]] && export BRANCH="${BRANCH_OVERRIDE}"
+if [[ -n "${SKIP_MIRROR_PROMPT}" ]]; then
+  export HESABIX_SKIP_MIRROR_PROMPT=1
+fi
 export APP_ROOT
 
 if [[ ! -f "${APP_ROOT}/app/update.sh" ]]; then
