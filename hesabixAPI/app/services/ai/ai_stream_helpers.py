@@ -243,6 +243,8 @@ def chunk_to_sse_data(chunk: Dict[str, Any]) -> List[Dict[str, Any]]:
             "hypothesis",
             "confidence",
             "retry_attempt",
+            "subagent_id",
+            "parent_step_id",
         ):
             if chunk.get(key) is not None:
                 data[key] = chunk.get(key)

@@ -215,6 +215,8 @@ class AIAgentTraceStep {
   final int? findingsCount;
   final String? hypothesis;
   final String? confidence;
+  final String? subagentId;
+  final String? parentStepId;
 
   const AIAgentTraceStep({
     this.traceId,
@@ -239,10 +241,14 @@ class AIAgentTraceStep {
     this.findingsCount,
     this.hypothesis,
     this.confidence,
+    this.subagentId,
+    this.parentStepId,
   });
 
   bool get isActive => state == 'active';
   bool get isError => state == 'error';
+  bool get isNestedSubagentStep =>
+      parentStepId != null && parentStepId!.trim().isNotEmpty;
   bool get isReasoningLayer =>
       layer == 'reasoning' ||
       (layer == null &&
@@ -250,10 +256,12 @@ class AIAgentTraceStep {
           kind != 'system');
   bool get isAnswerLayer => layer == 'answer' || kind == 'answer';
 
-  String? get subagentId {
+  String? get cancelableSubagentId {
     if (kind != 'subagent') return null;
-    final id = exploreTarget?.trim();
-    return (id == null || id.isEmpty) ? null : id;
+    final explicit = subagentId?.trim();
+    if (explicit != null && explicit.isNotEmpty) return explicit;
+    final fallback = exploreTarget?.trim();
+    return (fallback == null || fallback.isEmpty) ? null : fallback;
   }
 
   /// نمایش زمان اجرا به صورت خوانا
@@ -299,6 +307,8 @@ class AIAgentTraceStep {
       findingsCount: json['findings_count'] as int?,
       hypothesis: json['hypothesis'] as String?,
       confidence: json['confidence'] as String?,
+      subagentId: json['subagent_id'] as String?,
+      parentStepId: json['parent_step_id'] as String?,
     );
   }
 
@@ -325,6 +335,8 @@ class AIAgentTraceStep {
         if (findingsCount != null) 'findings_count': findingsCount,
         if (hypothesis != null) 'hypothesis': hypothesis,
         if (confidence != null) 'confidence': confidence,
+        if (subagentId != null) 'subagent_id': subagentId,
+        if (parentStepId != null) 'parent_step_id': parentStepId,
       };
 
   AIAgentTraceStep copyWith({
@@ -356,6 +368,8 @@ class AIAgentTraceStep {
       findingsCount: findingsCount,
       hypothesis: hypothesis,
       confidence: confidence,
+      subagentId: subagentId,
+      parentStepId: parentStepId,
     );
   }
 }

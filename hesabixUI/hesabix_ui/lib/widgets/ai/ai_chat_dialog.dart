@@ -1533,6 +1533,8 @@ class _AIChatDialogState extends State<AIChatDialog> {
         sessionId: sessionId,
         subagentId: subagentId.trim(),
       );
+      if (!mounted) return;
+      _stream.markSubagentCancelled(subagentId.trim());
     } catch (e) {
       if (!mounted) return;
       _showSnackbar(ErrorExtractor.userMessage(e));

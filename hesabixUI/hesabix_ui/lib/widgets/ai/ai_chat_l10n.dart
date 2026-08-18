@@ -514,6 +514,11 @@ String aiTraceStepTitle(AppLocalizations l10n, AIAgentTraceStep step) {
       return l10n.aiStatusThinking;
     case 'aiTraceReasoning':
       return l10n.aiTraceReasoning;
+    case 'aiTraceSubagent':
+      final goal = (params['goal'] as String?)?.trim() ?? '';
+      return goal.isEmpty
+          ? l10n.aiSubagentLabel
+          : '${l10n.aiSubagentLabel}: $goal';
     case 'aiStatusLoadingPrompt':
       return l10n.aiStatusLoadingPrompt;
     case 'aiStatusLoadingInsights':
@@ -555,8 +560,8 @@ String aiTraceStepTitle(AppLocalizations l10n, AIAgentTraceStep step) {
             '';
         final trimmed = goal.trim();
         return trimmed.isEmpty
-            ? l10n.aiToolSpawnSubagent
-            : '${l10n.aiToolSpawnSubagent}: $trimmed';
+            ? l10n.aiSubagentLabel
+            : '${l10n.aiSubagentLabel}: $trimmed';
       }
       if (step.tool != null) {
         return aiToolLabel(l10n, step.tool!, toolKey: step.toolKey);

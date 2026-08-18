@@ -20442,6 +20442,42 @@ abstract class AppLocalizations {
   /// **'Cancel subagent'**
   String get aiToolCancelSubagent;
 
+  /// No description provided for @aiSubagentLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Subagent'**
+  String get aiSubagentLabel;
+
+  /// No description provided for @aiSubagentStatusRunning.
+  ///
+  /// In en, this message translates to:
+  /// **'Running'**
+  String get aiSubagentStatusRunning;
+
+  /// No description provided for @aiSubagentStatusCompleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Completed'**
+  String get aiSubagentStatusCompleted;
+
+  /// No description provided for @aiSubagentStatusCancelled.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancelled'**
+  String get aiSubagentStatusCancelled;
+
+  /// No description provided for @aiSubagentStatusFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed'**
+  String get aiSubagentStatusFailed;
+
+  /// No description provided for @aiSubagentWorking.
+  ///
+  /// In en, this message translates to:
+  /// **'Starting work…'**
+  String get aiSubagentWorking;
+
   /// No description provided for @aiToolGetBusinessInfo.
   ///
   /// In en, this message translates to:

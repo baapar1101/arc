@@ -6,6 +6,7 @@ import 'ai_agent_todo_list.dart';
 import 'ai_chat_design.dart';
 import 'ai_chat_l10n.dart';
 import 'ai_chat_tool_activity_list.dart';
+import 'ai_subagent_trace.dart';
 
 /// پنل استدلال — traceهای لایه reasoning جدا از پاسخ نهایی.
 class AIReasoningPanel extends StatefulWidget {
@@ -106,7 +107,9 @@ class _AIReasoningPanelState extends State<AIReasoningPanel>
   @override
   Widget build(BuildContext context) {
     final reasoning = AIReasoningPanel.reasoningOnly(widget.steps);
-    final toolCount = widget.toolActivities.length;
+    final toolCount = widget.toolActivities
+        .where((a) => !isSubagentLifecycleTool(a.tool))
+        .length;
     final hasOtherReasoning = reasoning.isNotEmpty ||
         toolCount > 0 ||
         widget.agentBudget != null;

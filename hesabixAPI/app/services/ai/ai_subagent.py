@@ -24,6 +24,13 @@ from app.services.ai.ai_tool_intent import (
     matched_query_categories,
 )
 from app.services.ai.ai_write_guard import is_readonly_function, is_write_function
+from app.services.ai.ai_subagent_sse import (
+    emit_parent_subagent_event,
+    remap_child_trace_event,
+    subagent_card_event,
+    subagent_step_id,
+    synthetic_child_tool_events,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -268,12 +275,13 @@ async def cancel_subagent_async(
         return {"ok": False, "subagent_id": sid, "error": "SUBAGENT_SESSION_MISMATCH"}
     await _cancel_run(run)
     log_ai_event("subagent_cancelled", session_id=session_id, extra={"subagent_id": sid})
-    return run.result or _envelope(
+    envelope = run.result or _envelope(
         subagent_id=sid,
         status="cancelled",
         goal=run.goal,
         error="SUBAGENT_CANCELLED",
     )
+    return envelope
 
 
 async def await_subagent_async(
@@ -322,11 +330,22 @@ def _extract_child_payload(raw: Dict[str, Any]) -> Dict[str, Any]:
     message = raw.get("message") if isinstance(raw.get("message"), dict) else {}
     content = str(
         raw.get("content")
+        or raw.get("final_content")
         or (message.get("content") if message else "")
         or ""
     )
-    calls = raw.get("function_calls") or message.get("tool_calls") or []
-    results = raw.get("function_results") or {}
+    calls = (
+        raw.get("function_calls")
+        or raw.get("_function_calls")
+        or message.get("function_calls")
+        or message.get("tool_calls")
+        or []
+    )
+    results = (
+        raw.get("function_results")
+        or raw.get("_function_results")
+        or {}
+    )
     citations = raw.get("citations") or []
     if isinstance(results, dict) and not citations:
         citations = results.get("_citations") or []
@@ -340,6 +359,29 @@ def _extract_child_payload(raw: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
+def has_running_session_subagents(session_id: Optional[int]) -> bool:
+    if session_id is None:
+        return False
+    return any(
+        run.status == "running" and run.parent_session_id == session_id
+        for run in _runs.values()
+    )
+
+
+def _forward_child_event(
+    parent: Any,
+    event: Dict[str, Any],
+    *,
+    subagent_id: str,
+    parent_step_id: str,
+) -> None:
+    remapped = remap_child_trace_event(
+        event, subagent_id=subagent_id, parent_step_id=parent_step_id
+    )
+    if remapped:
+        emit_parent_subagent_event(parent, remapped)
+
+
 async def _run_child_completion(
     parent: Any,
     *,
@@ -348,17 +390,29 @@ async def _run_child_completion(
     max_iterations: int,
     completion_fn: Optional[CompletionFn],
     business_id: Optional[int],
+    subagent_id: Optional[str] = None,
+    parent_step_id: Optional[str] = None,
 ) -> Dict[str, Any]:
     if completion_fn is not None:
-        return await completion_fn(
+        raw = await completion_fn(
             goal=goal,
             allowlist=allowlist,
             max_iterations=max_iterations,
             business_id=business_id,
         )
+        if subagent_id and parent_step_id:
+            payload = _extract_child_payload(raw if isinstance(raw, dict) else {})
+            for ev in synthetic_child_tool_events(
+                subagent_id=subagent_id,
+                parent_step_id=parent_step_id,
+                function_calls=payload.get("function_calls"),
+            ):
+                emit_parent_subagent_event(parent, ev)
+        return raw
 
     from adapters.db.session import get_db_session
     from app.services.ai.ai_service import AIService
+    from app.services.ai.ai_stream_aggregate import aggregate_chat_completion_stream
     from app.services.ai.function_registry import registry
 
     with get_db_session() as child_db:
@@ -381,18 +435,34 @@ async def _run_child_completion(
             session_id=None,
         )
         tools = filter_subagent_tools(tools, allowlist, registry=registry)
-        return await child.chat_completion(
-            messages=[{"role": "user", "content": goal}],
-            tools=tools,
-            use_function_calling=bool(tools),
-            execution_mode="analyzer",
-            approve_writes=False,
-            max_iterations=max_iterations,
-            iteration_cap=max_iterations,
-            session_business_id=business_id or parent.business_id,
-            session_id=None,
-            user_query=goal,
-        )
+
+        async def _tee():
+            async for chunk in child.chat_completion_stream(
+                messages=[{"role": "user", "content": goal}],
+                tools=tools,
+                use_function_calling=bool(tools),
+                execution_mode="analyzer",
+                approve_writes=False,
+                max_iterations=max_iterations,
+                iteration_cap=max_iterations,
+                session_business_id=business_id or parent.business_id,
+                session_id=None,
+                user_query=goal,
+            ):
+                if (
+                    subagent_id
+                    and parent_step_id
+                    and chunk.get("event") == "trace_step"
+                ):
+                    _forward_child_event(
+                        parent,
+                        chunk,
+                        subagent_id=subagent_id,
+                        parent_step_id=parent_step_id,
+                    )
+                yield chunk
+
+        return await aggregate_chat_completion_stream(_tee())
 
 
 async def spawn_subagent_async(
@@ -441,6 +511,33 @@ async def spawn_subagent_async(
         )
         _runs[subagent_id] = run
 
+    card_id = subagent_step_id(subagent_id)
+    started = time.monotonic()
+    emit_parent_subagent_event(
+        parent,
+        subagent_card_event(
+            subagent_id=subagent_id,
+            goal=goal,
+            state="active",
+        ),
+    )
+
+    def _elapsed_ms() -> int:
+        return int((time.monotonic() - started) * 1000)
+
+    def _emit_card(state: str, envelope: Dict[str, Any]) -> None:
+        emit_parent_subagent_event(
+            parent,
+            subagent_card_event(
+                subagent_id=subagent_id,
+                goal=goal,
+                state=state,
+                body=str(envelope.get("content") or envelope.get("error") or goal),
+                elapsed_ms=_elapsed_ms(),
+                error=envelope.get("error"),
+            ),
+        )
+
     async def _execute() -> Dict[str, Any]:
         try:
             raw = await asyncio.wait_for(
@@ -451,6 +548,8 @@ async def spawn_subagent_async(
                     max_iterations=max_iterations,
                     completion_fn=completion_fn,
                     business_id=business_id,
+                    subagent_id=subagent_id,
+                    parent_step_id=card_id,
                 ),
                 timeout=SUBAGENT_TIMEOUT_SEC,
             )
@@ -463,6 +562,7 @@ async def spawn_subagent_async(
             )
             run.status = "completed"
             run.result = envelope
+            _emit_card("done", envelope)
             return envelope
         except asyncio.CancelledError:
             run.status = "cancelled"
@@ -473,6 +573,7 @@ async def spawn_subagent_async(
                 error="SUBAGENT_CANCELLED",
             )
             run.result = envelope
+            _emit_card("error", envelope)
             raise
         except asyncio.TimeoutError:
             run.status = "cancelled"
@@ -483,6 +584,7 @@ async def spawn_subagent_async(
                 error="SUBAGENT_TIMEOUT",
             )
             run.result = envelope
+            _emit_card("error", envelope)
             return envelope
         except Exception as exc:
             logger.exception("subagent %s failed: %s", subagent_id, exc)
@@ -494,6 +596,7 @@ async def spawn_subagent_async(
                 error=str(exc),
             )
             run.result = envelope
+            _emit_card("error", envelope)
             return envelope
 
     task = asyncio.create_task(_execute())

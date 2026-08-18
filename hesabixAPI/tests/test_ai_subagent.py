@@ -218,3 +218,70 @@ async def test_spawn_default_wait_is_false():
 
     await cancel_subagent_async(spawned["subagent_id"], session_id=5)
 
+
+@pytest.mark.asyncio
+async def test_spawn_emits_card_and_child_tool_events():
+    reset_subagent_runs_for_tests()
+
+    async def fake_completion(**kwargs):
+        return {
+            "content": "فروش آماده است.",
+            "function_calls": [{"name": "get_sales_report"}],
+            "function_results": {"get_sales_report": {"total": 1}},
+        }
+
+    class _Parent:
+        _subagent_depth = 0
+        business_id = 1
+        ctx = None
+        _subagent_sse_queue = asyncio.Queue()
+
+    parent = _Parent()
+    result = await spawn_subagent_async(
+        parent,
+        {
+            "goal": "فروش این ماه",
+            "tool_allowlist": ["get_sales_report"],
+            "wait": True,
+        },
+        session_id=11,
+        business_id=1,
+        completion_fn=fake_completion,
+    )
+    assert result["ok"] is True
+    events = []
+    while True:
+        try:
+            events.append(parent._subagent_sse_queue.get_nowait())
+        except asyncio.QueueEmpty:
+            break
+    kinds = [ev.get("kind") for ev in events]
+    assert kinds[0] == "subagent"
+    assert "tool" in kinds
+    assert kinds[-1] == "subagent"
+    assert events[0].get("state") == "active"
+    assert events[-1].get("state") == "done"
+    assert events[0].get("subagent_id") == result["subagent_id"]
+    assert events[0].get("title_params", {}).get("goal")
+
+
+def test_remap_child_trace_prefixes_and_nests():
+    from app.services.ai.ai_subagent_sse import remap_child_trace_event
+    from app.services.ai.ai_trace import trace_step
+
+    ev = remap_child_trace_event(
+        trace_step("tool_1", "tool", "active", tool="get_sales_report"),
+        subagent_id="abc123",
+        parent_step_id="subagent_abc123",
+    )
+    assert ev is not None
+    assert ev["step_id"] == "sa_abc123_tool_1"
+    assert ev["parent_step_id"] == "subagent_abc123"
+    assert ev["subagent_id"] == "abc123"
+    assert remap_child_trace_event(
+        trace_step("ans", "answer", "done"),
+        subagent_id="abc123",
+        parent_step_id="subagent_abc123",
+    ) is None
+
+

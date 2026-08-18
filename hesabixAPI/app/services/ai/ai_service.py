@@ -73,6 +73,7 @@ from app.services.ai.ai_db_helpers import (
 from app.services.ai.ai_constants import (
     AI_OPERATION_CHAT,
     AI_OPERATION_HISTORY_SUMMARY,
+    AI_OPERATION_SUBAGENT,
     AI_OPERATION_TITLE,
     AI_OPERATION_THOUGHT,
     EXPLORATION_COMPLEXITY_ITERATIONS,
@@ -215,6 +216,7 @@ class AIService(AIModelRouterMixin, AIUsageMeterMixin):
         self._routing_context: Optional[Dict[str, Any]] = None
         self._turn_activated_skills: List[Dict[str, Any]] = []
         self._subagent_depth: int = 0
+        self._subagent_sse_queue: asyncio.Queue = asyncio.Queue()
     
     def _get_active_subscription(self) -> Optional[UserAISubscription]:
         """دریافت اشتراک فعال کاربر"""
@@ -1693,7 +1695,11 @@ class AIService(AIModelRouterMixin, AIUsageMeterMixin):
             use_function_calling, effective_user_query, messages
         )
         self.set_routing_context(
-            operation=AI_OPERATION_CHAT,
+            operation=(
+                AI_OPERATION_SUBAGENT
+                if getattr(self, "_subagent_depth", 0) > 0
+                else AI_OPERATION_CHAT
+            ),
             user_query=effective_user_query,
             history_messages=messages,
             needs_tools=_needs_tools_routing,
@@ -1818,6 +1824,16 @@ class AIService(AIModelRouterMixin, AIUsageMeterMixin):
                 kind = kwargs.pop("kind")
                 state = kwargs.pop("state", "done")
                 return _ingest_trace_event(trace_step(sid, kind, state, **kwargs))
+
+            async def _flush_subagent_sse(timeout: float = 0.0):
+                from app.services.ai.ai_subagent_sse import drain_parent_subagent_events
+
+                events = await drain_parent_subagent_events(self, timeout=timeout)
+                for ev in events:
+                    if ev.get("event") == "trace_step" or ev.get("kind"):
+                        yield _ingest_trace_event(ev)
+                    else:
+                        yield ev
 
             def _emit_agent_budget(
                 *,
@@ -2138,6 +2154,8 @@ class AIService(AIModelRouterMixin, AIUsageMeterMixin):
             budget_stop_message: Optional[str] = None
             agent_run.set_phase(AGENT_RUN_PHASE_AGENT_LOOP)
             while True:
+                async for _sa_ev in _flush_subagent_sse():
+                    yield _sa_ev
                 budget_status = resolve_budget_gate(budget, iteration, goal_tracker)
                 if budget_status.stop:
                     budget_stop_reason = budget_status.reason
@@ -2236,6 +2254,8 @@ class AIService(AIModelRouterMixin, AIUsageMeterMixin):
                             stream_source,
                             budget,
                         ):
+                            async for _sa_ev in _flush_subagent_sse():
+                                yield _sa_ev
                             if chunk.get("event") == "tool_planning":
                                 yield status_event("planning_tools")
                                 yield _emit_trace(
@@ -2572,15 +2592,23 @@ class AIService(AIModelRouterMixin, AIUsageMeterMixin):
                     )
 
                     reset_session_todo_sse_buffer()
-                    function_results = await self.handle_function_calls_async(
-                        function_calls,
-                        session_business_id=session_business_id,
-                        approve_writes=approve_writes,
-                        approved_write_calls=approved_write_calls,
-                        iteration=iteration,
-                        session_id=session_id,
-                        execution_mode=effective_execution_mode,
+                    tool_task = asyncio.create_task(
+                        self.handle_function_calls_async(
+                            function_calls,
+                            session_business_id=session_business_id,
+                            approve_writes=approve_writes,
+                            approved_write_calls=approved_write_calls,
+                            iteration=iteration,
+                            session_id=session_id,
+                            execution_mode=effective_execution_mode,
+                        )
                     )
+                    while not tool_task.done():
+                        async for _sa_ev in _flush_subagent_sse(timeout=0.08):
+                            yield _sa_ev
+                    function_results = await tool_task
+                    async for _sa_ev in _flush_subagent_sse():
+                        yield _sa_ev
                     for todo_event in drain_session_todo_sse():
                         yield todo_event
                         await asyncio.sleep(0)
@@ -2666,11 +2694,12 @@ class AIService(AIModelRouterMixin, AIUsageMeterMixin):
                                     result.get("goal")
                                     or result.get("content")
                                     or ""
-                                )[:500],
+                                )[:800],
                                 tool=fname,
                                 tool_key=tool_l10n_key(fname),
                                 iteration=iteration,
                                 explore_target=sid or None,
+                                subagent_id=sid or None,
                             )
                         yield _emit_trace(
                             step_id=f"obs_{tc_id}",
@@ -3168,6 +3197,20 @@ class AIService(AIModelRouterMixin, AIUsageMeterMixin):
 
                 budget.note_round(productive=False)
                 continue
+
+            if session_id and getattr(self, "_subagent_depth", 0) == 0:
+                from app.services.ai.ai_constants import SUBAGENT_TIMEOUT_SEC
+                from app.services.ai.ai_subagent import has_running_session_subagents
+
+                wait_deadline = time.monotonic() + min(30.0, SUBAGENT_TIMEOUT_SEC)
+                while (
+                    has_running_session_subagents(session_id)
+                    and time.monotonic() < wait_deadline
+                ):
+                    async for _sa_ev in _flush_subagent_sse(timeout=0.08):
+                        yield _sa_ev
+                async for _sa_ev in _flush_subagent_sse():
+                    yield _sa_ev
 
             from app.services.ai.ai_agent_continuation import resolve_needs_tools
             from app.services.ai.ai_deliverable_answer import is_deliverable_answer

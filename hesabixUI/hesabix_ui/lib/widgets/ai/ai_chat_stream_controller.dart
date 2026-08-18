@@ -291,6 +291,28 @@ class AIChatStreamController extends ChangeNotifier {
     notifyListeners();
   }
 
+  void markSubagentCancelled(String subagentId) {
+    final id = subagentId.trim();
+    if (id.isEmpty) return;
+    var changed = false;
+    for (var i = 0; i < traceSteps.length; i++) {
+      final step = traceSteps[i];
+      final matchesParent = step.kind == 'subagent' &&
+          (step.cancelableSubagentId == id || step.subagentId == id);
+      final matchesChild =
+          step.kind != 'subagent' && step.subagentId == id;
+      if (!matchesParent && !matchesChild) continue;
+      if (step.kind == 'subagent') {
+        traceSteps[i] = step.copyWith(state: 'error');
+        changed = true;
+      } else if (step.isActive) {
+        traceSteps[i] = step.copyWith(state: 'done');
+        changed = true;
+      }
+    }
+    if (changed) notifyListeners();
+  }
+
   void _applyTraceStep(AIAgentTraceStep step) {
     var next = step;
     final body = next.bodyMarkdown;

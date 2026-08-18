@@ -6,6 +6,8 @@ import 'package:hesabix_ui/models/ai_stream_event.dart';
 import 'package:hesabix_ui/utils/ai_markdown_normalize.dart';
 import 'ai_chat_l10n.dart';
 import 'ai_chat_design.dart';
+import 'ai_chat_subagent_card.dart';
+import 'ai_subagent_trace.dart';
 import 'ai_thinking_scroll_box.dart';
 
 /// تایم‌لاین عمودی مراحل agent — پیش‌فرض جمع‌شده.
@@ -53,14 +55,12 @@ class _AIAgentTraceTimelineState extends State<AIAgentTraceTimeline> {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final activeCount =
-        widget.steps.where((s) => s.isActive).length;
+    final roots = timelineRootSteps(widget.steps);
+    final activeCount = roots.where((s) => s.isActive).length;
 
     final visibleSteps = (_expanded || widget.compact)
-        ? widget.steps
-        : widget.steps
-            .where((s) => s.isActive || s.isError)
-            .toList();
+        ? roots
+        : roots.where((s) => s.isActive || s.isError).toList();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -83,7 +83,7 @@ class _AIAgentTraceTimelineState extends State<AIAgentTraceTimeline> {
                   const SizedBox(width: 6),
                   Expanded(
                     child: Text(
-                      l10n.aiTraceStepsHeader(widget.steps.length),
+                      l10n.aiTraceStepsHeader(roots.length),
                       style: theme.textTheme.labelMedium?.copyWith(
                         color: scheme.primary,
                         fontWeight: FontWeight.w600,
@@ -106,7 +106,14 @@ class _AIAgentTraceTimelineState extends State<AIAgentTraceTimeline> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               for (var i = 0; i < visibleSteps.length; i++)
-                _TraceStepTile(
+                visibleSteps[i].kind == 'subagent'
+                    ? AIChatSubagentCard(
+                        step: visibleSteps[i],
+                        allSteps: widget.steps,
+                        compact: widget.compact,
+                        onCancelSubagent: widget.onCancelSubagent,
+                      )
+                    : _TraceStepTile(
                   step: visibleSteps[i],
                   title: aiTraceStepTitle(l10n, visibleSteps[i]),
                   isLast: i == visibleSteps.length - 1,
@@ -329,14 +336,14 @@ class _TraceStepTileState extends State<_TraceStepTile> {
                         ],
                         if (step.kind == 'subagent' &&
                             step.isActive &&
-                            step.subagentId != null &&
+                            step.cancelableSubagentId != null &&
                             widget.onCancelSubagent != null) ...[
                           const SizedBox(width: 4),
                           Tooltip(
                             message: widget.l10n.aiToolCancelSubagent,
                             child: InkWell(
                               onTap: () => widget.onCancelSubagent!(
-                                step.subagentId!,
+                                step.cancelableSubagentId!,
                               ),
                               borderRadius: BorderRadius.circular(12),
                               child: Padding(

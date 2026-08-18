@@ -73,6 +73,8 @@ def trace_step(
     trace_id: Optional[str] = None,
     visibility: str = TRACE_VISIBILITY_USER,
     retry_attempt: Optional[int] = None,
+    subagent_id: Optional[str] = None,
+    parent_step_id: Optional[str] = None,
 ) -> Dict[str, Any]:
     resolved_layer = layer or layer_for_kind(kind)
     payload: Dict[str, Any] = {
@@ -116,6 +118,10 @@ def trace_step(
         payload["hypothesis"] = hypothesis
     if confidence:
         payload["confidence"] = confidence
+    if subagent_id:
+        payload["subagent_id"] = subagent_id
+    if parent_step_id:
+        payload["parent_step_id"] = parent_step_id
     return payload
 
 

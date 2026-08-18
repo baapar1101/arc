@@ -10988,6 +10988,24 @@ class AppLocalizationsFa extends AppLocalizations {
   String get aiToolCancelSubagent => 'قطع زیر-ایجنت';
 
   @override
+  String get aiSubagentLabel => 'زیر-ایجنت';
+
+  @override
+  String get aiSubagentStatusRunning => 'در حال اجرا';
+
+  @override
+  String get aiSubagentStatusCompleted => 'انجام شد';
+
+  @override
+  String get aiSubagentStatusCancelled => 'قطع شد';
+
+  @override
+  String get aiSubagentStatusFailed => 'ناموفق';
+
+  @override
+  String get aiSubagentWorking => 'در حال شروع کار…';
+
+  @override
   String get aiToolGetBusinessInfo => 'اطلاعات کسب‌وکار';
 
   @override

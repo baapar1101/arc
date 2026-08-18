@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/models/ai_stream_event.dart';
+import 'ai_subagent_trace.dart';
 
 class AIChatToolActivityList extends StatelessWidget {
   final List<AIToolActivity> activities;
@@ -17,11 +18,14 @@ class AIChatToolActivityList extends StatelessWidget {
     final visible = hideApprovalPending
         ? activities.where((a) => !a.approvalRequired).toList()
         : activities;
-    if (visible.isEmpty) return const SizedBox.shrink();
+    final filtered = visible
+        .where((a) => !kSubagentLifecycleTools.contains(a.tool))
+        .toList();
+    if (filtered.isEmpty) return const SizedBox.shrink();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        for (final a in visible)
+        for (final a in filtered)
           Padding(
             padding: const EdgeInsets.only(bottom: 6),
             child: _ToolActivityChip(activity: a),
