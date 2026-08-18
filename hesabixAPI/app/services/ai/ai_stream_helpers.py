@@ -184,18 +184,25 @@ def chunk_to_sse_data(chunk: Dict[str, Any]) -> List[Dict[str, Any]]:
         return [data]
 
     if event_type == "context_usage":
-        return [
-            {
-                "type": "context_usage",
-                "estimated_tokens": chunk.get("estimated_tokens"),
-                "budget_tokens": chunk.get("budget_tokens"),
-                "usage_ratio": chunk.get("usage_ratio"),
-                "usage_percent": chunk.get("usage_percent"),
-                "history_summarized": chunk.get("history_summarized", False),
-                "context_retried": chunk.get("context_retried", False),
-                "done": False,
-            }
-        ]
+        data = {
+            "type": "context_usage",
+            "estimated_tokens": chunk.get("estimated_tokens"),
+            "budget_tokens": chunk.get("budget_tokens"),
+            "usage_ratio": chunk.get("usage_ratio"),
+            "usage_percent": chunk.get("usage_percent"),
+            "history_summarized": chunk.get("history_summarized", False),
+            "context_retried": chunk.get("context_retried", False),
+            "done": False,
+        }
+        for key in (
+            "static_tokens",
+            "semi_static_tokens",
+            "insights_tokens",
+            "runtime_tokens",
+        ):
+            if chunk.get(key) is not None:
+                data[key] = chunk.get(key)
+        return [data]
 
     if event_type == "session_todo_snapshot":
         data = {

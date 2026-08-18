@@ -361,6 +361,10 @@ class AIStreamContextUsage {
   final double? usagePercent;
   final bool historySummarized;
   final bool contextRetried;
+  final int? staticTokens;
+  final int? semiStaticTokens;
+  final int? insightsTokens;
+  final int? runtimeTokens;
 
   const AIStreamContextUsage({
     this.estimatedTokens,
@@ -369,6 +373,10 @@ class AIStreamContextUsage {
     this.usagePercent,
     this.historySummarized = false,
     this.contextRetried = false,
+    this.staticTokens,
+    this.semiStaticTokens,
+    this.insightsTokens,
+    this.runtimeTokens,
   });
 
   factory AIStreamContextUsage.fromJson(Map<String, dynamic> json) {
@@ -379,6 +387,10 @@ class AIStreamContextUsage {
       usagePercent: (json['usage_percent'] as num?)?.toDouble(),
       historySummarized: json['history_summarized'] as bool? ?? false,
       contextRetried: json['context_retried'] as bool? ?? false,
+      staticTokens: json['static_tokens'] as int?,
+      semiStaticTokens: json['semi_static_tokens'] as int?,
+      insightsTokens: json['insights_tokens'] as int?,
+      runtimeTokens: json['runtime_tokens'] as int?,
     );
   }
 }

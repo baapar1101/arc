@@ -132,6 +132,28 @@ DEFAULT_EVAL_CASES: List[Dict[str, Any]] = [
         "forbidden_substrings": ["فاکتور با موفقیت ثبت شد"],
         "use_tools": True,
     },
+    {
+        "name": "گزارش چنددامنه‌ای فروش و موجودی و بدهکار",
+        "description": "حداقل دو ابزار read در یک نوبت برای فروش+موجودی+بدهکار",
+        "user_message": "گزارش فروش این ماه، موجودی کالاهای کم، و سه بدهکار برتر را یکجا بده.",
+        "expected_substrings": {
+            "substrings": ["فروش", "موجودی"],
+            "assertions": {
+                "tool_called_all": [
+                    "get_sales_report",
+                    "get_inventory_status",
+                    "get_debtors_report",
+                ],
+                "min_tools": 2,
+                "min_tools_in_round": 2,
+                "citation_present": True,
+                "language_fa": True,
+                "fluency_ok": True,
+            },
+        },
+        "forbidden_substrings": ["حدس", "احتمالاً بدون داده"],
+        "use_tools": True,
+    },
 ]
 
 

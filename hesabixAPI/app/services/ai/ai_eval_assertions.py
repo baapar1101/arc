@@ -219,5 +219,41 @@ def evaluate_assertions(
         if not ok:
             failed.append("fluency_ok")
 
+    called_names = _iter_called_tool_names(function_calls, function_results)
+
+    min_tools = assertions.get("min_tools")
+    if min_tools is not None:
+        needed = int(min_tools)
+        details["min_tools"] = len(called_names)
+        if len(called_names) < needed:
+            failed.append("min_tools")
+
+    tools_all = assertions.get("tool_called_all")
+    if tools_all:
+        if isinstance(tools_all, str):
+            expected_all = [tools_all]
+        elif isinstance(tools_all, Iterable):
+            expected_all = [str(t) for t in tools_all]
+        else:
+            expected_all = []
+        called_lower = {n.lower() for n in called_names}
+        missing_all = [t for t in expected_all if str(t).lower() not in called_lower]
+        details["tool_called_all_missing"] = missing_all
+        if missing_all:
+            failed.append("tool_called_all")
+
+    min_round = assertions.get("min_tools_in_round")
+    if min_round is not None:
+        round_size = 0
+        if isinstance(function_calls, list) and function_calls:
+            first = function_calls[0]
+            if isinstance(first, list):
+                round_size = max((len(r) for r in function_calls if isinstance(r, list)), default=0)
+            elif isinstance(first, dict):
+                round_size = len(function_calls)
+        details["min_tools_in_round"] = round_size
+        if round_size < int(min_round):
+            failed.append("min_tools_in_round")
+
     details["failed_assertions"] = failed
     return not failed, details

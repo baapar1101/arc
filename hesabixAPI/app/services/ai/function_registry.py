@@ -133,6 +133,11 @@ class AIFunctionRegistry:
         )
 
         register_session_todo_functions(self)
+        from app.services.ai.ai_function_extensions_subagent import (
+            register_subagent_functions,
+        )
+
+        register_subagent_functions(self)
         from app.services.ai.ai_function_extensions_workflow import (
             register_workflow_ai_functions,
         )

@@ -20424,6 +20424,24 @@ abstract class AppLocalizations {
   /// **'Running tool'**
   String get aiToolGeneric;
 
+  /// No description provided for @aiToolSpawnSubagent.
+  ///
+  /// In en, this message translates to:
+  /// **'Spawn subagent'**
+  String get aiToolSpawnSubagent;
+
+  /// No description provided for @aiToolAwaitSubagent.
+  ///
+  /// In en, this message translates to:
+  /// **'Await subagent'**
+  String get aiToolAwaitSubagent;
+
+  /// No description provided for @aiToolCancelSubagent.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel subagent'**
+  String get aiToolCancelSubagent;
+
   /// No description provided for @aiToolGetBusinessInfo.
   ///
   /// In en, this message translates to:

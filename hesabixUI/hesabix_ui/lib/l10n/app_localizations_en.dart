@@ -11042,6 +11042,15 @@ class AppLocalizationsEn extends AppLocalizations {
   String get aiToolGeneric => 'Running tool';
 
   @override
+  String get aiToolSpawnSubagent => 'Spawn subagent';
+
+  @override
+  String get aiToolAwaitSubagent => 'Await subagent';
+
+  @override
+  String get aiToolCancelSubagent => 'Cancel subagent';
+
+  @override
   String get aiToolGetBusinessInfo => 'Business info';
 
   @override

@@ -1,11 +1,11 @@
 # ممیزی سیستم چت و ایجنت هوش مصنوعی حسابیکس
 
-**نسخه سند:** 2.6  
-**تاریخ ممیزی:** ۱۴۰۵/۰۵/۲۸ (۱۸ اوت ۲۰۲۶) — بازبینی همان روز با یافته‌های خط‌به‌خط هسته، UI و زیرسیستم‌ها  
+**نسخه سند:** 2.8  
+**تاریخ ممیزی:** ۱۴۰۵/۰۵/۲۸ (۱۸ اوت ۲۰۲۶) — بازبینی runtime: subagent، ابزار موازی، تکرار context  
 **وضعیت:** زنده — پس از هر اصلاح، وضعیت آیتم را عوض کنید و در [تاریخچهٔ به‌روزرسانی](#تاریخچه-بهروزرسانی) ثبت کنید.  
 **دامنه:** چت درون‌برنامه، حلقهٔ ایجنت، ابزارها، حافظه، دانش، مهارت، صوت، تلگرام، CRM AI، تیکت، ورک‌فلو، MCP، مشاهده‌پذیری، UX.
 
-> این سند جایگزین سناریوهای اجرایی قبلی نیست. جزئیات فاز ابزارها در [`AI_EXECUTION_PHASES.md`](AI_EXECUTION_PHASES.md)، باگ‌های رفع‌شدهٔ چت در [`AI_CHAT_ISSUES.md`](AI_CHAT_ISSUES.md)، و شکاف پوشش دامنه در [`AI_CAPABILITY_GAP_SCENARIO_V2.md`](AI_CAPABILITY_GAP_SCENARIO_V2.md) است. اینجا **نقشهٔ کیفیت سطح محصول ایجنت‌محور جهانی** است.
+> این سند جایگزین سناریوهای اجرایی قبلی نیست. جزئیات فاز ابزارها در [`AI_EXECUTION_PHASES.md`](AI_EXECUTION_PHASES.md)، باگ‌های رفع‌شدهٔ چت در [`AI_CHAT_ISSUES.md`](AI_CHAT_ISSUES.md)، شکاف پوشش دامنه در [`AI_CAPABILITY_GAP_SCENARIO_V2.md`](AI_CAPABILITY_GAP_SCENARIO_V2.md)، و سناریوی subagent / ابزار موازی / cache بینش در [`AI_AGENT_RUNTIME_CAPABILITIES_SCENARIO.md`](AI_AGENT_RUNTIME_CAPABILITIES_SCENARIO.md) است. اینجا **نقشهٔ کیفیت سطح محصول ایجنت‌محور جهانی** است.
 
 ---
 
@@ -34,7 +34,7 @@
 
 | محور | وضعیت امروز | سطح جهانی |
 |------|-------------|-----------|
-| حلقهٔ ایجنت | حلقهٔ واحد (استریم + aggregator)؛ run persist و ادامه؛ plan اجباری برای سوال complex (OpenAI و Anthropic)؛ worker پس‌زمینه هنوز نیست | run بادوام، checkpoint، ادامه پس از قطع، subagent |
+| حلقهٔ ایجنت | حلقهٔ واحد (استریم + aggregator)؛ run persist و ادامه؛ plan اجباری برای سوال complex؛ **subagent موقت** (`spawn_subagent`، سقف ۲×۴ نوبت، بدون write)؛ worker پس‌زمینه هنوز نیست | run بادوام، checkpoint، ادامه پس از قطع، subagent |
 | انتخاب ابزار | فیلتر کلیدواژه‌ای + سقف ۴۸ + envelope برش نتیجه | progressive disclosure / router معنایی / skill-first |
 | UX چت | SSE با event id و بنر ادامه؛ Enter-to-send در دسکتاپ؛ حلقهٔ استریم در `consume`؛ جلسهٔ صوت در کنترلر جدا؛ God Widget هنوز کروم UI را نگه داشته | streaming-first، بازیابی اتصال، Canvas/Artifact |
 | دانش و استناد | RAG ترکیبی با fallback واژه‌ای؛ chip منبع از envelope ابزار (فاکتور/شخص/سرنخ/فرصت) | retrieval با نمره، منبع کلیک‌پذیر، ضد hallucination |
@@ -43,7 +43,7 @@
 | چندرسانه‌ای | متن + PDF محدود؛ بدون تصویر در چت | تصویر، اسکرین‌شات، اکسل واقعی، صوت هم‌تراز متن |
 | کانال‌های جانبی | تلگرام با typing و دکمهٔ تأیید؛ CRM/تیکت حلقه با allowlist (بدون استریم) | همان کیفیت ایجنت در همهٔ سطح‌ها |
 
-**پیشنهاد ترتیب اصلاح (۱۲ هفتهٔ اول):** پایداری استریم و resume → شکستن God Objectها → انتخاب ابزار skill-first → citation قابل کلیک → eval واقعی → چندرسانه‌ای → مشاهده‌پذیری.
+**پیشنهاد ترتیب اصلاح (۱۲ هفتهٔ اول):** پایداری استریم و resume → شکستن God Objectها → **cache نیمه‌پایدار بینش (PRM-04)** → انتخاب ابزار skill-first → subagent (AGT-06) → citation قابل کلیک → eval واقعی → چندرسانه‌ای → مشاهده‌پذیری.
 
 ---
 
@@ -53,11 +53,11 @@
 
 | بخش | شناسه | امتیاز فعلی | هدف ۳ ماه | هدف ۱۲ ماه |
 |-----|--------|-------------|-----------|------------|
-| حلقهٔ ایجنت و بودجه | AGT | 4.1 | 4.0 | 4.5 |
-| انتخاب و اجرای ابزار | TOOL | 4.0 | 4.0 | 4.5 |
+| حلقهٔ ایجنت و بودجه | AGT | 4.3 | 4.0 | 4.5 |
+| انتخاب و اجرای ابزار | TOOL | 4.1 | 4.0 | 4.5 |
 | امنیت و تأیید نوشتن | SEC | 4.3 | 4.0 | 4.5 |
 | استریم و قرارداد SSE | STR | 4.5 | 4.5 | 5.0 |
-| Prompt و مدل | PRM | 3.6 | 3.5 | 4.5 |
+| Prompt و مدل | PRM | 4.0 | 3.5 | 4.5 |
 | حافظه | MEM | 3.0 | 4.0 | 4.5 |
 | دانش / RAG / استناد | RAG | 3.5 | 4.0 | 4.5 |
 | مهارت و مارکت | SKL | 3.0 | 3.5 | 4.5 |
@@ -204,13 +204,14 @@
 - یادداشت اصلاح: ۱۴۰۵/۰۵/۲۶ — ابزارهای plan در allowlist با `prefer_names`/`forced_names` می‌مانند (حتی بدون کلیدواژهٔ برنامه). برای `complex` بدون برنامهٔ باز، prompt `require_first` و در OpenAI/Anthropic `tool_choice` روی `create_session_plan` است؛ medium فقط expose می‌شود. برنامه بالای پنل استدلال پین می‌شود. کاربر می‌تواند آیتم باز را از UI `skipped`/`done` کند (`PATCH .../todos/{id}`، فقط از `pending`/`in_progress`).
 
 ### AGT-06 — Subagent / کار موازی وجود ندارد
-- وضعیت: باز
-- اولویت: P3
-- مالک: backend
-- مشکل: همهٔ کار در یک حلقه و یک مدل است. ایجنت‌های جهانی برای «گزارش فروش + موجودی + بدهکاران» چند subagent موازی می‌زنند.
-- معیار پذیرش: امکان spawn حداکثر N زیر-اجرا با ابزار محدود و ادغام نتایج.
-- پیشنهاد: بعد از AGT-01؛ الگوی Cursor Task tool یا LangGraph subgraph.
-- یادداشت اصلاح:
+- وضعیت: انجام‌شده (فاز ۰–۲؛ UI و citation ادغام موکول)
+- اولویت: P1
+- مالک: backend + flutter
+- فایل‌ها: `ai_subagent.py`، `ai_function_extensions_subagent.py`، `ai_service.py` (`handle_function_calls_async`)، `function_registry.py`، `ai_agent_run.py`؛ سناریو: [`AI_AGENT_RUNTIME_CAPABILITIES_SCENARIO.md`](AI_AGENT_RUNTIME_CAPABILITIES_SCENARIO.md)
+- مشکل: همهٔ کار در یک حلقه و یک مدل است. هیچ ابزار spawn/delegate نیست. ایجنت‌های جهانی برای «گزارش فروش + موجودی + بدهکاران» چند subagent موازی می‌زنند، منتظر اتمام می‌مانند یا قطع می‌کنند، بعد نتیجه را نقد و ادغام می‌کنند. `GAP-07` (شخصیت ثابت حسابدار/انباردار) این قابلیت نیست.
+- معیار پذیرش: والد بتواند حداکثر ۲ زیر-اجرا با allowlist و سقف ۴ نوبت بسازد؛ پیش‌فرض بدون write؛ cancel والد فرزند را هم ببندد؛ نتیجه به‌صورت envelope + citation به والد برگردد؛ سوال ساده spawn نکند.
+- پیشنهاد: الگوی Cursor Task tool / LangGraph subgraph روی همان `AIService` با `operation=subagent`. بعد از AGT-01 و سقف TOOL-06.
+- یادداشت اصلاح: ۱۴۰۵/۰۵/۲۸ — بررسی کد: صفر hit برای spawn/subagent در سرویس AI. اولویت از P3 به P1. سناریوی فاز ۰–۴ نوشته شد. ۱۴۰۵/۰۵/۲۸ (همان روز) — فاز ۰–۲: ابزارهای `spawn_subagent` / `await_subagent` / `cancel_subagent`؛ حلقهٔ تو در تو analyzer با سقف ۲ همزمان و ۴ نوبت؛ write در فرزند fail-closed؛ سوال ساده ابزار spawn نمی‌بیند؛ cancel والد فرزندان در حال اجرا را قطع می‌کند. persist جدول SQL و `trace_step` kind=subagent (فاز ۳–۴) موکول.
 
 ### AGT-07 — شاخهٔ مرده در ادامهٔ evidence (`prior_goal_reached`)
 - وضعیت: انجام‌شده
@@ -297,7 +298,7 @@
 - مشکل: همهٔ toolهای یک نوبت موازی‌اند. چند write + چند read روی همان موجودیت race می‌کنند؛ invalidation کش بعد از هر write است نه اتمیک برای کل round. stampede روی DB در سوال پیچیده محتمل است.
 - معیار پذیرش: سقف همزمانی (مثلاً ۴)؛ writeها سریال؛ readهای readonly موازی؛ ترتیب پایدار در trace.
 - پیشنهاد: semaphore + جدا کردن write/read در round.
-- یادداشت اصلاح: ۱۴۰۵/۰۵/۲۶ — دسته‌بندی پایدار read/write؛ read حداکثر ۴تایی موازی؛ write سد سریال؛ ترتیب مدل حفظ می‌شود. تراکنش اتمیک کل round هنوز نیست.
+- یادداشت اصلاح: ۱۴۰۵/۰۵/۲۶ — دسته‌بندی پایدار read/write؛ read حداکثر ۴تایی موازی؛ write سد سریال؛ ترتیب مدل حفظ می‌شود. تراکنش اتمیک کل round هنوز نیست. ۱۴۰۵/۰۵/۲۸ — تأیید شد مدل مجاز است چند `tool_calls` در یک نوبت بدهد (`parallel_tool_calls` غیرفعال نشده؛ prompt مسیریابی موازی را تشویق می‌کند). شکاف باقی: نمایش موازی در UI، و قفل `tool_choice` روی plan در نوبت صفر `complex`. ۱۴۰۵/۰۵/۲۸ — فاز A–B و سقف prompt: متریک `tool_round_parallel` (`tool_calls_in_round` / `parallel_read_count`)؛ کیس eval طلایی فروش+موجودی+بدهکار با `min_tools_in_round`؛ در routing سقف ۴ read نوشته شد. فاز C (UI موازی) موکول.
 
 ### TOOL-07 — `tool_choice=required` فقط برای OpenAI
 - وضعیت: انجام‌شده
@@ -458,6 +459,16 @@
 - معیار پذیرش: خلاصهٔ جلسه persist شود و در prompt با برچسب «خلاصهٔ قطعی» بیاید؛ بودجه بر اساس context window مدل انتخاب شود نه ثابت جهانی.
 - پیشنهاد: per-model budget از کاتالوگ مدل؛ hierarchical summary (جلسه / بخش).
 - یادداشت اصلاح:
+
+### PRM-04 — بینش و بلوک runtime هر نوبت به مدل می‌روند؛ در تاریخچه تکرار نمی‌شوند
+- وضعیت: انجام‌شده (فاز ۰–۱؛ دانش-به‌ابزار و خط «بینش به‌روز شد» موکول)
+- اولویت: P1
+- مالک: backend
+- فایل‌ها: `build_system_prompt_stream`، `ai_system_prompt.py`، `ai_prompt_cache.py`، `ai_insight_service.py` (`INSIGHTS_CACHE_TTL_SEC = 300`)، `ai_context_budget.py`؛ سناریو: [`AI_AGENT_RUNTIME_CAPABILITIES_SCENARIO.md`](AI_AGENT_RUNTIME_CAPABILITIES_SCENARIO.md)
+- مشکل: هر پیام جدید HTTP جدا است. system از نو ساخته می‌شود: نقش (cacheپذیر) + شناسه کسب‌وکار (cacheپذیر) + datetime/حافظه/بینش/دانش/مهارت/کانکتور/پیوست/todo (dynamic). پیام‌های جلسه در DB این بلوک‌ها را ندارند — فرض «تکرار داخل تاریخچه» نادرست است. تکرار واقعی در **ورودی مدل** است و cache ارائه‌دهنده فقط prefix ثابت را می‌پوشاند. دانش حتی وابسته به متن سوال است (`query_needs_knowledge`).
+- معیار پذیرش: در usage نوبت دوم همان جلسه، اگر KPI عوض نشده، `cache_read_tokens` برای لایهٔ بینش/حافظه دیده شود؛ بینش در ردیف‌های `ai_chat_message` ذخیره نشود؛ دانش از prefix ثابت خارج بماند.
+- پیشنهاد: لایهٔ `semi_static` با hash محتوا و TTL هم‌تراز کش بینش (۵ دقیقه، هم‌راستا با Anthropic ephemeral). دانش را به ابزار بازیابی بسپارید نه به system هر سوال.
+- یادداشت اصلاح: ۱۴۰۵/۰۵/۲۸ — مسیر کد تأیید شد. کش ۳۰۰ثانیه‌ای فقط SQL را کم می‌کند نه توکن ارسالی. همان روز فاز ۰–۱: لایهٔ `semi_static` (حافظه+بینش+کانکتور) با breakpoint جدا در Anthropic/OpenAI؛ datetime/دانش/مهارت در dynamic ماند؛ `context_usage` فیلدهای `static_tokens` / `semi_static_tokens` / `insights_tokens` / `runtime_tokens` را می‌فرستد. دانش هنوز در system است اگر `query_needs_knowledge` (فاز ۲ موکول).
 
 ---
 
@@ -851,7 +862,7 @@
 | GAP-04 | ایجنت پس‌زمینهٔ سفارشی | ChatGPT scheduled, Cursor background | باز (BIL-02) |
 | GAP-05 | فروشگاه مهارت عمومی با پول | GPT Store / Claude skills | فاز ۳ سند مهارت |
 | GAP-06 | پاسخ صوتی دوطرفه هم‌تراز GPT-4o Realtime | OpenAI Realtime | جزئی (VOI) |
-| GAP-07 | چند ایجنت تخصصی (حسابدار، انباردار، فروش) | Custom GPT / Agent teams | باز |
+| GAP-07 | چند ایجنت تخصصی (حسابدار، انباردار، فروش) | Custom GPT / Agent teams | باز — جدا از AGT-06 (subagent موقت) |
 | GAP-08 | شبیه‌سازی what-if مالی با sandbox | Copilot for Finance | باز |
 
 ---
@@ -867,7 +878,7 @@
 | ۵–۶ | ابزار درست | TOOL-01✓، TOOL-06✓، AGT-05✓، TOOL-04✓، TOOL-07✓ |
 | ۷–۸ | اعتماد پاسخ | RAG-02✓، AGT-08✓، OBS-01 (assertion + gold CI)، ARC-06 (شروع) |
 | ۹–۱۰ | کانال‌ها | CHN-01✓، CHN-02 حلقه+allowlist (استریم ویجت مانده)، WFA-01✓، WFA-02 شروع ماتریس، SEC-01✓، SEC-05✓، PRM-02✓، SKL-01 (chip) |
-| ۱۱–۱۲ | چت و مشاهده | UX-09 Enter-to-send، UX-01 شیت پیام + SessionController + consume استریم + VoiceSession، UX-02 snackbar/حافظه/دانش، UX-۰۵ کروم l10n+Semantics، SKL-01 chip، SEC-03/۰۴ (شروع)، OBS-01 CI✓، OBS-02 شمارنده، PRM-01 سیاست استاتیک |
+| ۱۱–۱۲ | چت و مشاهده | UX-09 Enter-to-send، UX-01 شیت پیام + SessionController + consume استریم + VoiceSession، UX-02 snackbar/حافظه/دانش، PRM-04✓ لایهٔ semi_static، TOOL-06✓ متریک موازی، AGT-06✓ قرارداد+حلقه+cancel subagent |
 
 فاز ۹ ابزار دامنه (`TOOL-03`) می‌تواند موازی با هفتهٔ ۵–۸ جلو برود اگر مالک محصول جدا باشد.
 
@@ -889,7 +900,7 @@
 ## فهرست فایل‌های لنگر (برای مرور جزبه‌جز)
 
 **بک‌اند هسته**  
-`ai_service.py` · `ai_model_router.py` · `ai_usage_meter.py` · `ai_agent_run.py` · `ai_agent_continuation.py` · `ai_goal_assessment.py` · `ai_budget.py` · `ai_execution_policy.py` · `ai_write_guard.py` · `ai_untrusted.py` · `ai_tool_intent.py` · `ai_tool_result.py` · `ai_citation_service.py` · `ai_eval_assertions.py` · `function_registry.py` · `ai_provider.py` · `prompt_service.py` · `adapters/api/v1/ai/chat.py`
+`ai_service.py` · `ai_model_router.py` · `ai_usage_meter.py` · `ai_agent_run.py` · `ai_agent_continuation.py` · `ai_goal_assessment.py` · `ai_budget.py` · `ai_execution_policy.py` · `ai_write_guard.py` · `ai_untrusted.py` · `ai_tool_intent.py` · `ai_tool_result.py` · `ai_tool_parallel.py` · `ai_subagent.py` · `ai_system_prompt.py` · `ai_prompt_cache.py` · `ai_insight_service.py` · `ai_citation_service.py` · `ai_eval_assertions.py` · `function_registry.py` · `ai_provider.py` · `prompt_service.py` · `adapters/api/v1/ai/chat.py`
 
 **حافظه و دانش**  
 `ai_memory_service.py` · `ai_memory_item_service.py` · `ai_knowledge_service.py` · `ai_embedding_service.py` · `ai_citation_service.py` · `ai_attachment_service.py`
@@ -929,6 +940,8 @@
 | ۱۴۰۵/۰۵/۲۸ | 2.4 | موج سیزدهم (چت): `AIChatSessionController` برای جلسه/پیام؛ `planChatSend`؛ بدون جابه‌جایی حلقهٔ استریم |
 | ۱۴۰۵/۰۵/۲۸ | 2.5 | موج چهاردهم (چت): حلقهٔ SSE در `AIChatStreamController.consume`؛ `AIChatStreamTurn`؛ l10n پاسخ خالی؛ تست نوبت استریم |
 | ۱۴۰۵/۰۵/۲۸ | 2.6 | موج پانزدهم (چت): `AIChatVoiceSessionController` + تفسیر رویداد صوت؛ l10n snackbar چت و شیت حافظه/دانش |
+| ۱۴۰۵/۰۵/۲۸ | 2.7 | بررسی runtime: AGT-06 بدون subagent (P1)؛ TOOL-06 موازی read موجود؛ PRM-04 تکرار بینش در system نه در تاریخچه؛ سناریوی اجرا |
+| ۱۴۰۵/۰۵/۲۸ | 2.8 | PRM-04 لایهٔ semi_static + تفکیک توکن context_usage؛ TOOL-06 متریک موازی و eval چنددامنه‌ای؛ AGT-06 spawn/await/cancel با سقف ۲×۴ و fail-closed نوشتن |
 
 <!-- الگو:
 | ۱۴۰۵/۰۶/۰۱ | 1.1 | STR-01 انجام‌شده — reconnect SSE با Last-Event-ID |

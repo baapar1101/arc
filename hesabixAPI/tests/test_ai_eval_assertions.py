@@ -116,3 +116,32 @@ def test_fluency_ok_rejects_harmony_and_stock_phrases() -> None:
         {"fluency_ok": True},
     )
     assert ok is True
+
+
+def test_min_tools_and_tool_called_all() -> None:
+    ok, details = evaluate_assertions(
+        "خلاصه فروش و موجودی و بدهکاران آماده است.",
+        {
+            "tool_called_all": ["get_sales_report", "get_inventory_status"],
+            "min_tools": 2,
+            "min_tools_in_round": 2,
+        },
+        function_calls=[
+            {"name": "get_sales_report"},
+            {"name": "get_inventory_status"},
+        ],
+        function_results={},
+    )
+    assert ok is True
+    ok, details = evaluate_assertions(
+        "فقط فروش",
+        {
+            "tool_called_all": ["get_sales_report", "get_inventory_status"],
+            "min_tools_in_round": 2,
+        },
+        function_calls=[{"name": "get_sales_report"}],
+        function_results={},
+    )
+    assert ok is False
+    assert "tool_called_all" in details["failed_assertions"]
+    assert "min_tools_in_round" in details["failed_assertions"]

@@ -136,6 +136,9 @@ TOOL_L10N_KEYS: Dict[str, str] = {
     "adjust_customer_club_points": "aiToolAdjustCustomerClubPoints",
     "recalculate_customer_club_rfm": "aiToolRecalculateCustomerClubRfm",
     "update_customer_club_settings": "aiToolUpdateCustomerClubSettings",
+    "spawn_subagent": "aiToolSpawnSubagent",
+    "await_subagent": "aiToolAwaitSubagent",
+    "cancel_subagent": "aiToolCancelSubagent",
 }
 
 # برچسب فارسی fallback برای پیام‌های سیستمی (تأیید نوشتن و غیره)
@@ -272,6 +275,9 @@ TOOL_LABELS_FA: Dict[str, str] = {
     "create_session_plan": "ساخت برنامهٔ کاری",
     "list_session_todos": "فهرست برنامهٔ کاری",
     "update_session_todo": "به‌روزرسانی مرحله",
+    "spawn_subagent": "ساخت زیر-ایجنت",
+    "await_subagent": "انتظار زیر-ایجنت",
+    "cancel_subagent": "قطع زیر-ایجنت",
 }
 
 

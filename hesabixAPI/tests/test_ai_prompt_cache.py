@@ -30,7 +30,8 @@ def test_structured_prompt_full_text_preserves_layers():
         static_core="BASE " * 200,
         business_anchor="\n\nکسب‌وکار فعلی: شناسه 1",
         execution_block="\n\n[mode]",
-        runtime_sections=("\n\n[memory]",),
+        semi_static_sections=("\n\n[memory]",),
+        runtime_sections=("\n\n[datetime]",),
         role="user",
         business_id=1,
     )
@@ -38,6 +39,33 @@ def test_structured_prompt_full_text_preserves_layers():
     assert "BASE" in text
     assert "کسب‌وکار فعلی" in text
     assert "[memory]" in text
+    assert "[datetime]" in text
+    assert "[memory]" in structured.semi_static_text()
+    assert "[datetime]" in structured.dynamic_system_text()
+    assert "[datetime]" not in structured.semi_static_text()
+
+
+def test_cache_key_changes_when_insights_change():
+    kwargs = dict(
+        static_core="X" * 5000,
+        business_anchor="\n\nbiz",
+        role="user",
+        business_id=7,
+    )
+    a = compose_structured_system_prompt(
+        **kwargs, semi_static_sections=("insights-a",), insights_section="insights-a"
+    )
+    b = compose_structured_system_prompt(
+        **kwargs, semi_static_sections=("insights-b",), insights_section="insights-b"
+    )
+    c = compose_structured_system_prompt(
+        **kwargs,
+        semi_static_sections=("insights-a",),
+        insights_section="insights-a",
+        execution_block="\n\nchanged-mode",
+    )
+    assert a.cache_key() != b.cache_key()
+    assert a.cache_key() == c.cache_key()
 
 
 def test_cache_key_stable_for_same_static_prefix():
@@ -128,6 +156,37 @@ def test_anthropic_system_blocks_cache_control_on_static():
     assert blocks is not None
     assert blocks[0]["cache_control"]["type"] == "ephemeral"
     assert "cache_control" not in blocks[1]
+
+
+def test_anthropic_system_blocks_cache_control_on_semi_static():
+    policy = PromptCachePolicy(
+        enabled=True,
+        cache_key="hx:test",
+        static_system="STATIC",
+        semi_static_system="SEMI",
+        dynamic_system="DYNAMIC",
+    )
+    blocks = build_anthropic_system_blocks(policy)
+    assert blocks is not None
+    assert len(blocks) == 3
+    assert blocks[0]["cache_control"]["type"] == "ephemeral"
+    assert blocks[1]["cache_control"]["type"] == "ephemeral"
+    assert "cache_control" not in blocks[2]
+
+
+def test_split_system_messages_inserts_semi_static():
+    policy = PromptCachePolicy(
+        enabled=True,
+        cache_key="hx:test",
+        static_system="STATIC",
+        semi_static_system="SEMI",
+        dynamic_system="DYNAMIC",
+    )
+    out = split_system_messages_for_provider(
+        [{"role": "system", "content": "ALL"}, {"role": "user", "content": "hi"}],
+        policy,
+    )
+    assert [m["content"] for m in out] == ["STATIC", "SEMI", "DYNAMIC", "hi"]
 
 
 def test_merge_provider_extra_includes_prompt_cache():

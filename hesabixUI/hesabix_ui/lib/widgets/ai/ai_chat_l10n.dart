@@ -165,6 +165,12 @@ String aiToolLabel(AppLocalizations l10n, String toolName, {String? toolKey}) {
       return l10n.aiToolListBasalamSyncedInvoices;
     case 'aiToolListBasalamProductConflicts':
       return l10n.aiToolListBasalamProductConflicts;
+    case 'aiToolSpawnSubagent':
+      return l10n.aiToolSpawnSubagent;
+    case 'aiToolAwaitSubagent':
+      return l10n.aiToolAwaitSubagent;
+    case 'aiToolCancelSubagent':
+      return l10n.aiToolCancelSubagent;
     default:
       return _toolLabelFallbackFa[toolName] ?? l10n.aiToolGeneric;
   }
@@ -295,6 +301,9 @@ String _toolNameToKey(String name) {
     'adjust_customer_club_points': 'aiToolAdjustCustomerClubPoints',
     'recalculate_customer_club_rfm': 'aiToolRecalculateCustomerClubRfm',
     'update_customer_club_settings': 'aiToolUpdateCustomerClubSettings',
+    'spawn_subagent': 'aiToolSpawnSubagent',
+    'await_subagent': 'aiToolAwaitSubagent',
+    'cancel_subagent': 'aiToolCancelSubagent',
     'get_user_memory': 'aiToolGeneric',
     'update_user_memory': 'aiToolGeneric',
     'list_memory_items': 'aiToolGeneric',

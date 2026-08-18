@@ -115,7 +115,7 @@ from app.services.ai.ai_agent_run import (
     new_agent_run_id,
     status_for_stop,
 )
-from app.services.ai.ai_tool_parallel import run_tool_calls_partitioned
+from app.services.ai.ai_tool_parallel import parallel_round_stats, run_tool_calls_partitioned
 from app.services.ai.ai_retry_policy import is_retryable_error
 from app.services.ai.ai_constants import MAX_LLM_RETRIES
 from app.services.ai.ai_budget import (
@@ -139,11 +139,12 @@ from app.services.ai.ai_system_prompt import (
     StructuredSystemPrompt,
     compose_structured_system_prompt,
     coerce_structured_system_prompt,
-    runtime_sections_from_parts,
+    split_runtime_prompt_parts,
 )
 from app.services.ai.ai_model_router import AIModelRouterMixin
 from app.services.ai.ai_usage_meter import AIUsageMeterMixin
 from app.services.ai.ai_context_budget import (
+    context_usage_event_payload,
     is_context_overflow_error,
     prepare_messages_for_context,
 )
@@ -213,6 +214,7 @@ class AIService(AIModelRouterMixin, AIUsageMeterMixin):
         self._request_model_code: Optional[str] = None
         self._routing_context: Optional[Dict[str, Any]] = None
         self._turn_activated_skills: List[Dict[str, Any]] = []
+        self._subagent_depth: int = 0
     
     def _get_active_subscription(self) -> Optional[UserAISubscription]:
         """دریافت اشتراک فعال کاربر"""
@@ -1000,7 +1002,7 @@ class AIService(AIModelRouterMixin, AIUsageMeterMixin):
                     logger.warning("Prompt loader %s failed: %s", key, exc)
                     parts[key] = ""
 
-            runtime = runtime_sections_from_parts(
+            semi, dynamic, insights_text = split_runtime_prompt_parts(
                 {
                     "datetime": datetime_block,
                     "memory": parts.get("memory", ""),
@@ -1019,7 +1021,9 @@ class AIService(AIModelRouterMixin, AIUsageMeterMixin):
                     execution_mode, business_id=bid, user_query=user_query
                 ),
                 plan_block=plan_block,
-                runtime_sections=runtime,
+                runtime_sections=dynamic,
+                semi_static_sections=semi,
+                insights_section=insights_text,
                 role=role.value,
                 business_id=bid,
             )
@@ -1292,6 +1296,18 @@ class AIService(AIModelRouterMixin, AIUsageMeterMixin):
             business_id=int(bid),
         )
 
+        semi, dynamic, insights_text = split_runtime_prompt_parts(
+            {
+                "datetime": datetime_block,
+                "memory": parts.get("loading_memory", ""),
+                "insights": parts.get("loading_insights", ""),
+                "knowledge": parts.get("loading_knowledge", ""),
+                "skills": parts.get("loading_skills", ""),
+                "connectors": parts.get("loading_connectors", ""),
+                "attachments": parts.get("loading_attachments", ""),
+                "todos": parts.get("loading_session_todos", "") or todos_text,
+            }
+        )
         structured = compose_structured_system_prompt(
             static_core=base_prompt,
             business_anchor=business_info + calendar_block,
@@ -1299,18 +1315,9 @@ class AIService(AIModelRouterMixin, AIUsageMeterMixin):
                 execution_mode, business_id=bid, user_query=user_query
             ),
             plan_block=plan_block,
-            runtime_sections=runtime_sections_from_parts(
-                {
-                    "datetime": datetime_block,
-                    "memory": parts.get("loading_memory", ""),
-                    "insights": parts.get("loading_insights", ""),
-                    "knowledge": parts.get("loading_knowledge", ""),
-                    "skills": parts.get("loading_skills", ""),
-                    "connectors": parts.get("loading_connectors", ""),
-                    "attachments": parts.get("loading_attachments", ""),
-                    "todos": parts.get("loading_session_todos", "") or todos_text,
-                }
-            ),
+            runtime_sections=dynamic,
+            semi_static_sections=semi,
+            insights_section=insights_text,
             role=role_value,
             business_id=bid,
         )
@@ -1423,11 +1430,19 @@ class AIService(AIModelRouterMixin, AIUsageMeterMixin):
             SESSION_TODO_TOOL_NAMES,
             should_expose_session_plan_tools,
         )
+        from app.services.ai.ai_subagent import (
+            SUBAGENT_TOOL_NAMES,
+            should_expose_subagent_tools,
+        )
 
         expose_plan_tools = should_expose_session_plan_tools(
             user_query,
             session_id=session_id,
             db=self.db,
+        )
+        expose_subagents = should_expose_subagent_tools(
+            user_query,
+            is_subagent=getattr(self, "_subagent_depth", 0) > 0,
         )
         if user_query and effective_business_id:
             all_names = {
@@ -1438,6 +1453,9 @@ class AIService(AIModelRouterMixin, AIUsageMeterMixin):
             forced = set(force_tool_names or ()) & all_names
             plan_prefer = (
                 set(SESSION_TODO_TOOL_NAMES) & all_names if expose_plan_tools else set()
+            )
+            subagent_prefer = (
+                set(SUBAGENT_TOOL_NAMES) & all_names if expose_subagents else set()
             )
             skill_tools: Set[str] = set()
             try:
@@ -1471,10 +1489,10 @@ class AIService(AIModelRouterMixin, AIUsageMeterMixin):
                     all_names,
                     user_query,
                     history_messages=hist if isinstance(hist, list) else None,
-                    prefer_names=skill_tools | plan_prefer,
+                    prefer_names=skill_tools | plan_prefer | subagent_prefer,
                 ),
                 skill_names=skill_tools,
-                forced_names=forced | plan_prefer,
+                forced_names=forced | plan_prefer | subagent_prefer,
             )
             definitions = filter_function_definitions(definitions, allowed)
         forced_names = set(force_tool_names or ())
@@ -1483,6 +1501,12 @@ class AIService(AIModelRouterMixin, AIUsageMeterMixin):
                 d
                 for d in definitions
                 if (d.get("function") or {}).get("name") not in SESSION_TODO_TOOL_NAMES
+            ]
+        if not expose_subagents and not (forced_names & SUBAGENT_TOOL_NAMES):
+            definitions = [
+                d
+                for d in definitions
+                if (d.get("function") or {}).get("name") not in SUBAGENT_TOOL_NAMES
             ]
         if not exposes_write_tools(resolve_execution_mode(execution_mode)):
             definitions = [
@@ -2003,15 +2027,21 @@ class AIService(AIModelRouterMixin, AIUsageMeterMixin):
                 messages,
                 provider,
             )
-            yield {
-                "event": "context_usage",
-                "estimated_tokens": context_meta.get("estimated_tokens"),
-                "budget_tokens": context_meta.get("budget_tokens"),
-                "usage_ratio": context_meta.get("usage_ratio"),
-                "usage_percent": context_meta.get("usage_percent"),
-                "history_summarized": context_meta.get("history_summarized", False),
-                "done": False,
-            }
+            from app.services.ai.ai_ops_metrics import log_ai_event
+
+            log_ai_event(
+                "context_usage",
+                business_id=session_business_id or self.business_id,
+                session_id=session_id,
+                extra={
+                    "static_tokens": context_meta.get("static_tokens"),
+                    "semi_static_tokens": context_meta.get("semi_static_tokens"),
+                    "insights_tokens": context_meta.get("insights_tokens"),
+                    "runtime_tokens": context_meta.get("runtime_tokens"),
+                    "estimated_tokens": context_meta.get("estimated_tokens"),
+                },
+            )
+            yield context_usage_event_payload(context_meta)
             await asyncio.sleep(0)
 
             from app.services.ai.ai_channel_policy import resolve_round_tool_offer
@@ -2308,16 +2338,11 @@ class AIService(AIModelRouterMixin, AIUsageMeterMixin):
                                 force_summarize=True,
                                 use_llm_summary=True,
                             )
-                            yield {
-                                "event": "context_usage",
-                                "estimated_tokens": context_meta.get("estimated_tokens"),
-                                "budget_tokens": context_meta.get("budget_tokens"),
-                                "usage_ratio": context_meta.get("usage_ratio"),
-                                "usage_percent": context_meta.get("usage_percent"),
-                                "history_summarized": True,
-                                "context_retried": True,
-                                "done": False,
-                            }
+                            yield context_usage_event_payload(
+                                context_meta,
+                                history_summarized=True,
+                                context_retried=True,
+                            )
                             await asyncio.sleep(0)
                             if round_usage_this_iter:
                                 billed_usage = merge_usage(
@@ -3456,7 +3481,59 @@ class AIService(AIModelRouterMixin, AIUsageMeterMixin):
                     arguments = approved_args
 
             # بررسی کش برای توابع read-only
+            from app.services.ai.ai_subagent import (
+                AWAIT_SUBAGENT_TOOL,
+                CANCEL_SUBAGENT_TOOL,
+                SPAWN_SUBAGENT_TOOL,
+                SUBAGENT_TOOL_NAMES,
+                await_subagent_async,
+                cancel_subagent_async,
+                spawn_subagent_async,
+            )
+
             is_readonly = is_readonly_function(function_name, registry)
+            if function_name in SUBAGENT_TOOL_NAMES:
+                start_time = time.monotonic()
+                try:
+                    if function_name == SPAWN_SUBAGENT_TOOL:
+                        result = await spawn_subagent_async(
+                            self,
+                            arguments,
+                            session_id=session_id,
+                            business_id=effective_business_id,
+                        )
+                    elif function_name == CANCEL_SUBAGENT_TOOL:
+                        result = await cancel_subagent_async(
+                            arguments.get("subagent_id") or arguments.get("id"),
+                            session_id=session_id,
+                        )
+                    elif function_name == AWAIT_SUBAGENT_TOOL:
+                        result = await await_subagent_async(
+                            arguments.get("subagent_id") or arguments.get("id"),
+                            session_id=session_id,
+                        )
+                    else:
+                        result = {"ok": False, "error": "UNKNOWN_SUBAGENT_TOOL"}
+                    elapsed_ms = int((time.monotonic() - start_time) * 1000)
+                    if isinstance(result, dict):
+                        result["_elapsed_ms"] = elapsed_ms
+                    return tc_id, function_name, result
+                except asyncio.CancelledError:
+                    from app.services.ai.ai_subagent import cancel_session_subagents
+
+                    await cancel_session_subagents(session_id)
+                    raise
+                except Exception as e:
+                    elapsed_ms = int((time.monotonic() - start_time) * 1000)
+                    logger.error(
+                        "Error calling function %s (%s): %s",
+                        function_name,
+                        tc_id,
+                        e,
+                        exc_info=True,
+                    )
+                    return tc_id, function_name, {"error": str(e), "_elapsed_ms": elapsed_ms}
+
             if is_readonly and effective_business_id and session_id:
                 hit, cached_result = get_cached(
                     effective_business_id, session_id, function_name, arguments
@@ -3500,12 +3577,30 @@ class AIService(AIModelRouterMixin, AIUsageMeterMixin):
                 )
                 return tc_id, function_name, {"error": str(e), "_elapsed_ms": elapsed_ms}
 
-        tasks_results = await run_tool_calls_partitioned(
+        try:
+            tasks_results = await run_tool_calls_partitioned(
+                function_calls,
+                call_single_function,
+                is_write=lambda call: is_write_function(
+                    call.get("name") or "", registry
+                ),
+            )
+        except asyncio.CancelledError:
+            from app.services.ai.ai_subagent import cancel_session_subagents
+
+            await cancel_session_subagents(session_id)
+            raise
+        from app.services.ai.ai_ops_metrics import log_ai_event
+
+        stats = parallel_round_stats(
             function_calls,
-            call_single_function,
-            is_write=lambda call: is_write_function(
-                call.get("name") or "", registry
-            ),
+            lambda call: is_write_function(call.get("name") or "", registry),
+        )
+        log_ai_event(
+            "tool_round_parallel",
+            business_id=effective_business_id,
+            session_id=session_id,
+            extra=stats,
         )
 
         return {

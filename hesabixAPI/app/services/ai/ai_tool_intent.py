@@ -153,6 +153,9 @@ _CATEGORY_TOOLS: dict[str, frozenset[str]] = {
         "create_session_plan",
         "list_session_todos",
         "update_session_todo",
+        "spawn_subagent",
+        "await_subagent",
+        "cancel_subagent",
     }),
     "people": frozenset({
         "search_persons",

@@ -4437,6 +4437,9 @@
     }
   },
   "aiToolGeneric": "اجرای ابزار",
+  "aiToolSpawnSubagent": "ساخت زیر-ایجنت",
+  "aiToolAwaitSubagent": "انتظار زیر-ایجنت",
+  "aiToolCancelSubagent": "قطع زیر-ایجنت",
   "aiToolGetBusinessInfo": "اطلاعات کسب‌وکار",
   "aiToolSearchInvoices": "جستجوی فاکتور",
   "aiToolGetInvoiceDetails": "جزئیات فاکتور",

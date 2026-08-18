@@ -10979,6 +10979,15 @@ class AppLocalizationsFa extends AppLocalizations {
   String get aiToolGeneric => 'اجرای ابزار';
 
   @override
+  String get aiToolSpawnSubagent => 'ساخت زیر-ایجنت';
+
+  @override
+  String get aiToolAwaitSubagent => 'انتظار زیر-ایجنت';
+
+  @override
+  String get aiToolCancelSubagent => 'قطع زیر-ایجنت';
+
+  @override
   String get aiToolGetBusinessInfo => 'اطلاعات کسب‌وکار';
 
   @override

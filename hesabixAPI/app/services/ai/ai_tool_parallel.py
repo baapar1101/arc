@@ -38,6 +38,29 @@ def partition_tool_batches(
     return batches
 
 
+def parallel_round_stats(
+    calls: Sequence[dict[str, Any]],
+    is_write: IsWriteFn,
+) -> dict[str, int]:
+    """شمارش ابزارهای یک نوبت برای متریک TOOL-06."""
+    write_count = 0
+    parallel_read_count = 0
+    max_read_batch = 0
+    for kind, indices in partition_tool_batches(calls, is_write):
+        if kind == "write":
+            write_count += len(indices)
+            continue
+        max_read_batch = max(max_read_batch, len(indices))
+        if len(indices) > 1:
+            parallel_read_count += len(indices)
+    return {
+        "tool_calls_in_round": len(calls),
+        "write_count": write_count,
+        "max_read_batch": max_read_batch,
+        "parallel_read_count": parallel_read_count,
+    }
+
+
 async def run_tool_calls_partitioned(
     calls: Sequence[dict[str, Any]],
     call_fn: CallFn,

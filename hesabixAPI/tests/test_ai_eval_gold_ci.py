@@ -27,6 +27,24 @@ GOLD_TRANSCRIPTS = {
             "create_invoice": {"error": "APPROVAL_REQUIRED", "function": "create_invoice"},
         },
     },
+    "گزارش چنددامنه‌ای فروش و موجودی و بدهکار": {
+        "content": "خلاصه فروش این ماه، موجودی کالاهای کم، و سه بدهکار برتر در ادامه آمده است.",
+        "function_calls": [
+            {"name": "get_sales_report"},
+            {"name": "get_inventory_status"},
+            {"name": "get_debtors_report"},
+        ],
+        "function_results": {
+            "get_sales_report": {"total": 12},
+            "get_inventory_status": {"low_stock": 3},
+            "get_debtors_report": {"items": []},
+            "_citations": [
+                {"type": "report", "id": 1, "name": "فروش"},
+                {"type": "product", "id": 2, "name": "کالا"},
+                {"type": "person", "id": 3, "name": "بدهکار"},
+            ],
+        },
+    },
 }
 
 

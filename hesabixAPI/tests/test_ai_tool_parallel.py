@@ -88,3 +88,19 @@ async def test_write_waits_for_preceding_reads():
     assert results == ["read_a", "write_x", "read_b"]
     assert order.index("end:read_a") < order.index("start:write_x")
     assert order.index("end:write_x") < order.index("start:read_b")
+
+
+def test_parallel_round_stats_counts_reads_and_writes():
+    from app.services.ai.ai_tool_parallel import parallel_round_stats
+
+    calls = [
+        {"name": "search_invoices"},
+        {"name": "get_sales_report"},
+        {"name": "create_invoice"},
+        {"name": "get_invoice_details"},
+    ]
+    stats = parallel_round_stats(calls, lambda c: c["name"] == "create_invoice")
+    assert stats["tool_calls_in_round"] == 4
+    assert stats["write_count"] == 1
+    assert stats["parallel_read_count"] == 2
+    assert stats["max_read_batch"] == 2

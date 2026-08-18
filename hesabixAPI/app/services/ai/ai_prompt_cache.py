@@ -73,6 +73,7 @@ class PromptCachePolicy:
     cache_key: str
     static_system: str
     dynamic_system: str
+    semi_static_system: str = ""
     auto_cache_conversation: bool = True
     anthropic_ttl: str = ANTHROPIC_PROMPT_CACHE_TTL
     openai_retention: str = OPENAI_PROMPT_CACHE_RETENTION
@@ -89,6 +90,7 @@ class PromptCachePolicy:
     ) -> PromptCachePolicy:
         provider = (provider_type or "").strip().lower()
         static_text = structured.static_cacheable_text()
+        semi_text = structured.semi_static_text()
         dynamic_text = structured.dynamic_system_text()
         provider_cache_ok = (
             provider == "anthropic"
@@ -104,6 +106,7 @@ class PromptCachePolicy:
             enabled=eligible,
             cache_key=structured.cache_key(),
             static_system=static_text,
+            semi_static_system=semi_text,
             dynamic_system=dynamic_text,
             auto_cache_conversation=auto_cache_conversation and eligible,
             anthropic_ttl=ANTHROPIC_PROMPT_CACHE_TTL,
@@ -146,6 +149,8 @@ def split_system_messages_for_provider(
             replaced = True
             if policy.static_system:
                 rest.append({"role": "system", "content": policy.static_system})
+            if policy.semi_static_system:
+                rest.append({"role": "system", "content": policy.semi_static_system})
             if policy.dynamic_system:
                 rest.append({"role": "system", "content": policy.dynamic_system})
             continue
@@ -159,18 +164,23 @@ def build_anthropic_system_blocks(policy: PromptCachePolicy) -> Optional[List[Di
     blocks: List[Dict[str, Any]] = []
     if policy.static_system:
         blocks.append({"type": "text", "text": policy.static_system})
+    if policy.semi_static_system:
+        blocks.append({"type": "text", "text": policy.semi_static_system})
     if policy.dynamic_system:
         blocks.append({"type": "text", "text": policy.dynamic_system})
     if not blocks:
         return None
-    # breakpoint روی آخرین block ثابت (static)
+    # breakpoint روی static و semi_static (نه datetime/دانش)
+    cached_count = 0
     if policy.static_system:
-        blocks[0] = {
-            **blocks[0],
-            "cache_control": dict(ANTHROPIC_EPHEMERAL_CACHE),
-        }
+        cached_count += 1
+    if policy.semi_static_system:
+        cached_count += 1
+    for index in range(cached_count):
+        ctrl = dict(ANTHROPIC_EPHEMERAL_CACHE)
         if policy.anthropic_ttl and policy.anthropic_ttl != "5m":
-            blocks[0]["cache_control"]["ttl"] = policy.anthropic_ttl
+            ctrl["ttl"] = policy.anthropic_ttl
+        blocks[index] = {**blocks[index], "cache_control": ctrl}
     return blocks
 
 
@@ -202,6 +212,7 @@ def merge_provider_extra(
             "enabled": True,
             "cache_key": policy.cache_key,
             "static_system": policy.static_system,
+            "semi_static_system": policy.semi_static_system,
             "dynamic_system": policy.dynamic_system,
             "auto_cache_conversation": policy.auto_cache_conversation,
             "anthropic_ttl": policy.anthropic_ttl,
@@ -222,6 +233,7 @@ def extract_prompt_cache_policy(
         enabled=True,
         cache_key=str(raw.get("cache_key") or ""),
         static_system=str(raw.get("static_system") or ""),
+        semi_static_system=str(raw.get("semi_static_system") or ""),
         dynamic_system=str(raw.get("dynamic_system") or ""),
         auto_cache_conversation=bool(raw.get("auto_cache_conversation", True)),
         anthropic_ttl=str(raw.get("anthropic_ttl") or ANTHROPIC_PROMPT_CACHE_TTL),

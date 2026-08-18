@@ -224,5 +224,38 @@ def prepare_messages_for_context(
     usage["structured_system"] = structured
     usage["static_token_estimate"] = structured.estimate_static_tokens(provider)
     usage["prompt_cache_key"] = structured.cache_key()
+    usage.update(structured.estimate_section_tokens(provider))
     return trimmed, usage
+
+
+def context_usage_event_payload(
+    meta: Dict[str, Any],
+    *,
+    history_summarized: Optional[bool] = None,
+    context_retried: bool = False,
+) -> Dict[str, Any]:
+    """رویداد SSE بودجهٔ context به‌همراه تفکیک لایهٔ prompt (PRM-04)."""
+    payload: Dict[str, Any] = {
+        "event": "context_usage",
+        "estimated_tokens": meta.get("estimated_tokens"),
+        "budget_tokens": meta.get("budget_tokens"),
+        "usage_ratio": meta.get("usage_ratio"),
+        "usage_percent": meta.get("usage_percent"),
+        "history_summarized": (
+            bool(history_summarized)
+            if history_summarized is not None
+            else bool(meta.get("history_summarized", False))
+        ),
+        "context_retried": context_retried,
+        "done": False,
+    }
+    for key in (
+        "static_tokens",
+        "semi_static_tokens",
+        "insights_tokens",
+        "runtime_tokens",
+    ):
+        if meta.get(key) is not None:
+            payload[key] = meta.get(key)
+    return payload
 

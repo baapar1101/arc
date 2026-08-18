@@ -4395,6 +4395,9 @@
     }
   },
   "aiToolGeneric": "Running tool",
+  "aiToolSpawnSubagent": "Spawn subagent",
+  "aiToolAwaitSubagent": "Await subagent",
+  "aiToolCancelSubagent": "Cancel subagent",
   "aiToolGetBusinessInfo": "Business info",
   "aiToolSearchInvoices": "Search invoices",
   "aiToolGetInvoiceDetails": "Invoice details",

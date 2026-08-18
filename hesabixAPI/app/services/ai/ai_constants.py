@@ -11,6 +11,7 @@ AI_OPERATION_CHAT = "chat"
 AI_OPERATION_TITLE = "title"
 AI_OPERATION_HISTORY_SUMMARY = "history_summary"
 AI_OPERATION_THOUGHT = "thought_synthesis"
+AI_OPERATION_SUBAGENT = "subagent"
 
 LIGHT_AI_OPERATIONS: frozenset[str] = frozenset({
     AI_OPERATION_TITLE,
@@ -37,6 +38,11 @@ MAX_TOOLS_PER_REQUEST = 48
 
 # سقف همزمانی ابزارهای read-only در یک نوبت (writeها همیشه سریال‌اند)
 MAX_PARALLEL_READ_TOOLS = 4
+
+# سقف subagent موقت (AGT-06) — فقط چت درون‌برنامه
+MAX_SUBAGENTS_PER_PARENT = 2
+MAX_SUBAGENT_ITERATIONS = 4
+SUBAGENT_TIMEOUT_SEC = 90.0
 # providerهایی که tool_choice اجباری را به API می‌فرستند
 PROVIDERS_WITH_FORCED_TOOLS = frozenset({"openai", "anthropic"})
 
