@@ -55,6 +55,46 @@ class AIChartSpec {
   bool get hasData =>
       effectiveSeries.any((s) => s.values.isNotEmpty);
 
+  /// بازهٔ محور Y شامل مقادیر منفی.
+  ///
+  /// اگر فقط `maxY` ست شود و `minY` خالی بماند، fl_chart از `toY` منفی
+  /// `minY` را تا کف داده پایین می‌آورد ولی `horizontalInterval` روی
+  /// `maxY/4` می‌ماند (مثلاً ۰٫۲۵). حلقهٔ شبکه میلیون‌ها تکرار می‌شود و UI فریز می‌شود.
+  (double minY, double maxY) get yAxisBounds {
+    var minV = 0.0;
+    var maxV = 0.0;
+    var any = false;
+    for (final series in effectiveSeries) {
+      for (final raw in series.values) {
+        if (!raw.isFinite) continue;
+        if (!any) {
+          minV = maxV = raw;
+          any = true;
+        } else {
+          if (raw < minV) minV = raw;
+          if (raw > maxV) maxV = raw;
+        }
+      }
+    }
+    if (!any) return (0.0, 1.0);
+
+    final minY = minV < 0 ? minV * 1.15 : 0.0;
+    final maxY = maxV > 0 ? maxV * 1.15 : 0.0;
+    if (maxY <= minY) {
+      return (minY, minY + 1.0);
+    }
+    return (minY, maxY);
+  }
+
+  /// فاصلهٔ شبکه/برچسب؛ حداکثر حدود ۴ خط تا حلقهٔ fl_chart منفجر نشود.
+  double get yGridInterval {
+    final (minY, maxY) = yAxisBounds;
+    final span = maxY - minY;
+    if (!span.isFinite || span <= 0) return 1.0;
+    final interval = span / 4;
+    return interval > 0 ? interval : 1.0;
+  }
+
   factory AIChartSpec.fromJson(Map<String, dynamic> json) {
     final rawLabels = json['labels'];
     final rawValues = json['values'];
