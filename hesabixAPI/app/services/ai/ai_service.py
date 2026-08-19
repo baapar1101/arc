@@ -81,6 +81,7 @@ from app.services.ai.ai_constants import (
     FORCED_SYNTHESIS_TIMEOUT_SEC,
     KNOWLEDGE_LOAD_TIMEOUT_SEC,
     MAX_AGENT_ITERATIONS,
+    MAX_TOOLS_AUTONOMOUS,
     PLANNING_STEP_MIN_CHARS,
     PROMPT_LOADER_TIMEOUT_SEC,
 )
@@ -150,12 +151,14 @@ from app.services.ai.ai_context_budget import (
     prepare_messages_for_context,
 )
 from app.services.ai.ai_tool_intent import (
+    _WRITE_TOOLS,
     estimate_query_complexity,
     filter_function_definitions,
     iterations_for_query,
     merge_tool_allowlists,
     query_expects_tool_use,
     query_needs_knowledge,
+    select_catalog_tool_names,
     select_tool_names,
 )
 
@@ -1517,16 +1520,34 @@ class AIService(AIModelRouterMixin, AIUsageMeterMixin):
             hist = history_messages
             if hist is None:
                 hist = (self._routing_context or {}).get("history_messages")
-            allowed = merge_tool_allowlists(
-                select_tool_names(
-                    all_names,
-                    user_query,
-                    history_messages=hist if isinstance(hist, list) else None,
-                    prefer_names=skill_tools | plan_prefer | subagent_prefer,
-                ),
-                skill_names=skill_tools,
-                forced_names=forced | plan_prefer | subagent_prefer,
-            )
+            mode = resolve_execution_mode(execution_mode)
+            if exposes_write_tools(mode):
+                write_names = set(_WRITE_TOOLS) & all_names
+                write_names |= {
+                    name for name in all_names if is_write_function(name, registry)
+                }
+                allowed = merge_tool_allowlists(
+                    select_catalog_tool_names(
+                        all_names,
+                        user_query,
+                        max_tools=MAX_TOOLS_AUTONOMOUS,
+                        protected_names=write_names | forced,
+                        prefer_names=skill_tools | plan_prefer | subagent_prefer,
+                    ),
+                    skill_names=skill_tools,
+                    forced_names=forced | write_names | plan_prefer | subagent_prefer,
+                )
+            else:
+                allowed = merge_tool_allowlists(
+                    select_tool_names(
+                        all_names,
+                        user_query,
+                        history_messages=hist if isinstance(hist, list) else None,
+                        prefer_names=skill_tools | plan_prefer | subagent_prefer,
+                    ),
+                    skill_names=skill_tools,
+                    forced_names=forced | plan_prefer | subagent_prefer,
+                )
             definitions = filter_function_definitions(definitions, allowed)
         forced_names = set(force_tool_names or ())
         if not expose_plan_tools and not (forced_names & SESSION_TODO_TOOL_NAMES):

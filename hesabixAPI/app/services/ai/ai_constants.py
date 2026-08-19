@@ -37,6 +37,9 @@ QUERY_COMPLEXITY_ITERATIONS: dict[str, int] = {
 
 # حداکثر ابزار ارسالی به مدل در هر درخواست (پس از intent filter)
 MAX_TOOLS_PER_REQUEST = 48
+# حالت خودکار/با تأیید: کاتالوگ کامل تا سقف ایمنی ارائه‌دهنده؛
+# ابزارهای نوشتنی هرگز به‌خاطر ranking حذف نمی‌شوند.
+MAX_TOOLS_AUTONOMOUS = 128
 
 # سقف همزمانی ابزارهای read-only در یک نوبت (writeها همیشه سریال‌اند)
 MAX_PARALLEL_READ_TOOLS = 4

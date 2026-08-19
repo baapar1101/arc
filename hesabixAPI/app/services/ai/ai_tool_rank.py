@@ -1,4 +1,4 @@
-"""رتبه‌بندی واژه‌ای ابزارها هنگام سقف MAX_TOOLS_PER_REQUEST (TOOL-01).
+"""رتبه‌بندی واژه‌ای ابزارها هنگام سقف ابزار در هر درخواست (TOOL-01).
 
 بدون API دوم / embedding: نام ابزار + نام مستعار فارسی/انگلیسی در برابر متن سوال.
 """
@@ -147,13 +147,21 @@ def rank_and_cap_tool_names(
     max_tools: int,
     core_names: AbstractSet[str],
     prefer_names: Optional[AbstractSet[str]] = None,
+    protected_names: Optional[AbstractSet[str]] = None,
 ) -> Set[str]:
-    """حفظ core و ابزار مهارت، سپس پر کردن سقف با بالاترین امتیاز واژه‌ای."""
+    """حفظ ابزارهای protected، سپس core/prefer، سپس پر کردن سقف با امتیاز واژه‌ای.
+
+    protected هرگز به‌خاطر سقف حذف نمی‌شود (حتی اگر از max_tools بزرگ‌تر شود).
+    """
     names = {n for n in selected if n}
     if len(names) <= max_tools:
         return names
+    protected = set(protected_names or ()) & names
+    if len(protected) >= max_tools:
+        return protected
     prefer = set(prefer_names or ()) & names
     query = user_query or ""
+    others = names - protected
 
     def sort_key(n: str) -> tuple:
         return (
@@ -163,5 +171,6 @@ def rank_and_cap_tool_names(
             n,
         )
 
-    ordered = sorted(names, key=sort_key)
-    return set(ordered[:max_tools])
+    ordered = sorted(others, key=sort_key)
+    remaining = max_tools - len(protected)
+    return protected | set(ordered[:remaining])

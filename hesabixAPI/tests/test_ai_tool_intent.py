@@ -6,6 +6,7 @@ from app.services.ai.ai_tool_intent import (
     query_expects_tool_use,
     query_needs_knowledge,
     query_targets_tool_domain,
+    select_catalog_tool_names,
     select_tool_names,
 )
 
@@ -124,3 +125,31 @@ def test_plan_tools_union_survives_intent_without_plan_keywords():
     )
     assert "create_session_plan" in allowed
     assert "update_session_todo" in allowed
+
+
+def test_select_catalog_keeps_write_tools_on_multi_step_query():
+    all_names = {
+        "query_business_data",
+        "create_person",
+        "create_invoice",
+        "create_receipt_payment",
+        "search_persons",
+        "search_products",
+        "list_bank_accounts",
+        "create_session_plan",
+        "spawn_subagent",
+    }
+    all_names |= {f"zzz_filler_{i:03d}" for i in range(140)}
+    selected = select_catalog_tool_names(
+        all_names,
+        "یک شخص به نام علی بساز سپس فاکتور فروش خدمات پشتیبانی سازمانی بزن و با بانک ملت تسویه کن",
+        protected_names={
+            "create_person",
+            "create_invoice",
+            "create_receipt_payment",
+        },
+        prefer_names={"create_session_plan", "spawn_subagent"},
+    )
+    assert "create_person" in selected
+    assert "create_invoice" in selected
+    assert "create_receipt_payment" in selected

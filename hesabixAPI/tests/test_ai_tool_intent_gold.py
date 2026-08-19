@@ -1,13 +1,15 @@
 """مجموعه طلایی recall انتخاب ابزار (TOOL-01)."""
 from __future__ import annotations
 
-from app.services.ai.ai_constants import MAX_TOOLS_PER_REQUEST
+from app.services.ai.ai_constants import MAX_TOOLS_AUTONOMOUS, MAX_TOOLS_PER_REQUEST
 from app.services.ai.ai_tool_intent import (
     _CATEGORY_TOOLS,
     _CORE_TOOL_NAMES,
+    _WRITE_TOOL_COMPANIONS,
     _WRITE_TOOLS,
     detect_categories,
     merge_tool_allowlists,
+    select_catalog_tool_names,
     select_tool_names,
 )
 from app.services.ai.ai_tool_rank import rank_and_cap_tool_names, score_tool_for_query
@@ -157,3 +159,65 @@ def test_wallet_and_accounts_categories_detected():
     assert "hscript" in detect_categories("راهنمای hscript")
     assert "products_write" in detect_categories("لیست کالاها")
     assert "marketplace" in detect_categories("افزونه باشگاه فعال است؟")
+
+
+def test_rank_never_drops_protected_writes():
+    names = {f"read_{i:03d}" for i in range(80)}
+    names |= {"create_person", "create_invoice"}
+    prefer = {f"read_{i:03d}" for i in range(40)}
+    capped = rank_and_cap_tool_names(
+        names,
+        "شخص علی و فاکتور فروش",
+        max_tools=12,
+        core_names=_CORE_TOOL_NAMES,
+        prefer_names=prefer,
+        protected_names={"create_person", "create_invoice"},
+    )
+    assert "create_person" in capped
+    assert "create_invoice" in capped
+    assert len(capped) == 12
+
+
+def test_rank_keeps_all_protected_when_over_cap():
+    protected = {f"write_{i:02d}" for i in range(20)}
+    names = set(protected) | {f"read_{i:03d}" for i in range(50)}
+    capped = rank_and_cap_tool_names(
+        names,
+        "x",
+        max_tools=10,
+        core_names=set(),
+        prefer_names={f"read_{i:03d}" for i in range(10)},
+        protected_names=protected,
+    )
+    assert capped == protected
+    assert len(capped) == 20
+
+
+def test_autonomous_catalog_keeps_907_write_tools():
+    """سقف ۴۸ با companion/plan، ابزارهای نوشتنی را حذف می‌کرد؛ کاتالوگ خودکار نه."""
+    from app.services.ai.ai_session_todo_service import SESSION_TODO_TOOL_NAMES
+    from app.services.ai.ai_subagent import SUBAGENT_TOOL_NAMES
+
+    catalog = _catalog_names()
+    catalog |= {f"zzz_auto_filler_{i:03d}" for i in range(80)}
+    writes = set(_WRITE_TOOLS) & catalog
+    prefer: set[str] = set()
+    for name in writes:
+        prefer |= set(_WRITE_TOOL_COMPANIONS.get(name, ()))
+    prefer |= SESSION_TODO_TOOL_NAMES & catalog
+    prefer |= SUBAGENT_TOOL_NAMES & catalog
+    query = (
+        "یک شخص به نام علی بساز سپس برایش فاکتور فروش خدمات پشتیبانی سازمانی بزن "
+        "و با بانک ملت تسویه کن"
+    )
+    selected = select_catalog_tool_names(
+        catalog,
+        query,
+        max_tools=MAX_TOOLS_AUTONOMOUS,
+        protected_names=writes,
+        prefer_names=prefer,
+    )
+    assert "create_person" in selected
+    assert "create_invoice" in selected
+    assert "create_receipt_payment" in selected
+    assert selected >= writes

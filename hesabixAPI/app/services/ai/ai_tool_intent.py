@@ -7,7 +7,11 @@ from __future__ import annotations
 import re
 from typing import AbstractSet, Iterable, List, Optional, Set
 
-from app.services.ai.ai_constants import MAX_TOOLS_PER_REQUEST, QUERY_COMPLEXITY_ITERATIONS
+from app.services.ai.ai_constants import (
+    MAX_TOOLS_AUTONOMOUS,
+    MAX_TOOLS_PER_REQUEST,
+    QUERY_COMPLEXITY_ITERATIONS,
+)
 
 # همیشه در دسترس (پرس‌وجو و دادهٔ پایه)
 _CORE_TOOL_NAMES: frozenset[str] = frozenset({
@@ -728,6 +732,32 @@ def merge_tool_allowlists(
     if forced_names:
         out |= set(forced_names)
     return out
+
+
+def select_catalog_tool_names(
+    all_names: Iterable[str],
+    user_query: Optional[str],
+    *,
+    max_tools: int = MAX_TOOLS_AUTONOMOUS,
+    protected_names: Optional[AbstractSet[str]] = None,
+    prefer_names: Optional[AbstractSet[str]] = None,
+) -> Set[str]:
+    """کاتالوگ کامل مجاز با سقف ایمنی ارائه‌دهنده.
+
+    برخلاف select_tool_names، از روی intent حذف نمی‌کند.
+    protected (معمولاً ابزارهای نوشتنی) هرگز به‌خاطر سقف حذف نمی‌شود.
+    """
+    from app.services.ai.ai_tool_rank import rank_and_cap_tool_names
+
+    available = {n for n in all_names if n}
+    return rank_and_cap_tool_names(
+        available,
+        user_query,
+        max_tools=max_tools,
+        core_names=_CORE_TOOL_NAMES,
+        prefer_names=prefer_names,
+        protected_names=protected_names,
+    )
 
 
 def select_tool_names(
