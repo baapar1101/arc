@@ -29,6 +29,9 @@ GOLD_CASES: list[tuple[str, tuple[str, ...]]] = [
     ("موجودی کیف پول کسب‌وکار", ("get_wallet_overview",)),
     ("سرفصل حساب‌های کل", ("list_accounts",)),
     ("یه فاکتور برای علی بزن", ("create_invoice", "list_currencies")),
+    ("حواله ورود انبار بزن", ("create_warehouse_document", "list_warehouses")),
+    ("یک چک دریافتی ثبت کن", ("create_check",)),
+    ("اتوماسیون جدید بساز", ("create_workflow", "get_workflow_design_rules")),
 ]
 
 
@@ -127,6 +130,19 @@ def test_invoice_write_keeps_currency_companion_when_capped():
     assert "search_persons" in selected
     assert "search_products" in selected
     assert len(selected) <= MAX_TOOLS_PER_REQUEST
+
+
+def test_warehouse_and_workflow_write_keep_companions():
+    catalog = _catalog_names()
+    wh = select_tool_names(catalog, "حواله ورود انبار بزن")
+    assert "create_warehouse_document" in wh
+    assert "list_warehouses" in wh
+    wf = select_tool_names(catalog, "اتوماسیون جدید بساز")
+    assert "create_workflow" in wf
+    assert "get_workflow_design_rules" in wf
+    rec = select_tool_names(catalog, "یک دریافت از علی ثبت کن")
+    assert "create_receipt_payment" in rec
+    assert "list_bank_accounts" in rec
 
 
 def test_wallet_and_accounts_categories_detected():

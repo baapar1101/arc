@@ -348,59 +348,26 @@ def register_phase4_business_functions(registry: "AIFunctionRegistry") -> None:
 
     # --- Write: check ---
     def create_check_handler(args: Dict[str, Any], context: Dict[str, Any]) -> Any:
+        from app.services.ai.ai_tool_payloads import build_create_check_payload
         from app.services.check_service import create_check
 
         db = context["db"]
         business_id = int(args.get("business_id") or context.get("business_id"))
         user_id = context.get("user_context").get_user_id()
-        data = {
-            "type": args.get("type"),
-            "check_number": args.get("check_number"),
-            "amount": args.get("amount"),
-            "issue_date": args.get("issue_date"),
-            "due_date": args.get("due_date"),
-            "person_id": args.get("person_id"),
-            "bank_name": args.get("bank_name"),
-            "sayad_code": args.get("sayad_code"),
-        }
+        data = build_create_check_payload(args, db=db, business_id=business_id)
         return create_check(db, business_id, user_id, data)
+
+    from app.services.ai.ai_tool_payloads import CREATE_CHECK_PARAMETERS_SCHEMA
 
     registry.register(
         AIFunction(
             name="create_check",
             description=(
                 "ثبت چک دریافتی (received) یا پرداختی (transferred). "
-                "person_id از search_persons. تاریخ‌ها YYYY-MM-DD یا شمسی. نیاز به تأیید."
+                "قبل از صدا: search_persons و در صورت نیاز list_currencies. "
+                "برای دریافتی person_id اجباری است. نیاز به تأیید."
             ),
-            parameters_schema={
-                "type": "object",
-                "properties": {
-                    "type": {
-                        "type": "string",
-                        "enum": ["received", "transferred"],
-                        "description": "received=چک دریافتی، transferred=چک پرداختی",
-                    },
-                    "check_number": {"type": "string", "description": "شماره چک"},
-                    "amount": {"type": "number", "description": "مبلغ چک"},
-                    "issue_date": {
-                        "type": "string",
-                        "format": "date",
-                        "description": "تاریخ صدور",
-                    },
-                    "due_date": {
-                        "type": "string",
-                        "format": "date",
-                        "description": "تاریخ سررسید",
-                    },
-                    "person_id": {
-                        "type": "integer",
-                        "description": "شناسه شخص از search_persons (اختیاری)",
-                    },
-                    "bank_name": {"type": "string", "description": "نام بانک (اختیاری)"},
-                    "sayad_code": {"type": "string", "description": "شناسه صیاد (اختیاری)"},
-                },
-                "required": ["type", "check_number", "amount", "issue_date", "due_date"],
-            },
+            parameters_schema=CREATE_CHECK_PARAMETERS_SCHEMA,
             handler=create_check_handler,
             allowed_roles={AIRole.USER, AIRole.BUSINESS_OWNER, AIRole.OPERATOR, AIRole.ADMIN},
             required_permissions=["checks.write"],
@@ -413,25 +380,13 @@ def register_phase4_business_functions(registry: "AIFunctionRegistry") -> None:
 
     # --- Write: transfer ---
     def create_transfer_handler(args: Dict[str, Any], context: Dict[str, Any]) -> Any:
+        from app.services.ai.ai_tool_payloads import build_create_transfer_payload
         from app.services.transfer_service import create_transfer
 
         db = context["db"]
         business_id = int(args.get("business_id") or context.get("business_id"))
         user_id = context.get("user_context").get_user_id()
-        data = {
-            "document_date": args["document_date"],
-            "currency_id": int(args["currency_id"]),
-            "amount": float(args["amount"]),
-            "description": args.get("description"),
-            "source": {
-                "type": args["from_account_type"],
-                "id": int(args["from_account_id"]),
-            },
-            "destination": {
-                "type": args["to_account_type"],
-                "id": int(args["to_account_id"]),
-            },
-        }
+        data = build_create_transfer_payload(args, db=db, business_id=business_id)
         return create_transfer(db, business_id, user_id, data)
 
     registry.register(
@@ -460,7 +415,7 @@ def register_phase4_business_functions(registry: "AIFunctionRegistry") -> None:
                     },
                     "from_account_id": {
                         "type": "integer",
-                        "description": "شناسه حساب مبدأ",
+                        "description": "شناسه مبدأ از list_bank_accounts / list_cash_registers / list_petty_cash",
                     },
                     "to_account_type": {
                         "type": "string",
@@ -469,7 +424,7 @@ def register_phase4_business_functions(registry: "AIFunctionRegistry") -> None:
                     },
                     "to_account_id": {
                         "type": "integer",
-                        "description": "شناسه حساب مقصد",
+                        "description": "شناسه مقصد از همان لیست‌های حساب نقدی",
                     },
                     "amount": {"type": "number", "description": "مبلغ انتقال"},
                     "description": {"type": "string", "description": "شرح (اختیاری)"},

@@ -7,8 +7,15 @@ from app.services.ai.ai_query_filter_catalog import resolve_filter_property
 from app.services.ai.ai_query_filter_service import normalize_filter_items
 from app.services.ai.ai_tool_payloads import (
     CREATE_INVOICE_PARAMETERS_SCHEMA,
+    build_create_check_payload,
     build_create_invoice_payload,
+    build_create_receipt_payment_payload,
+    build_create_transfer_payload,
+    build_create_warehouse_document_payload,
+    build_create_workflow_payload,
+    build_update_invoice_payload,
     normalize_ai_invoice_line,
+    normalize_workflow_graph,
 )
 from app.services.ai.ai_tool_query_params import ai_list_parameters_schema
 
@@ -93,3 +100,104 @@ def test_search_schema_lists_allowed_filter_properties():
     desc = schema["properties"]["filters"]["description"]
     assert "document_date" in desc
     assert schema["properties"]["take"]["maximum"] == 100
+
+
+def test_receipt_payment_maps_bank_id_not_chart_account():
+    payload = build_create_receipt_payment_payload(
+        {
+            "type": "دریافت",
+            "person_id": 10,
+            "amount": 5000,
+            "account_type": "بانک",
+            "account_id": 3,
+            "currency_id": 1,
+        }
+    )
+    assert payload["document_type"] == "receipt"
+    assert payload["person_lines"][0]["person_id"] == 10
+    line = payload["account_lines"][0]
+    assert line["transaction_type"] == "bank"
+    assert line["bank_id"] == 3
+    assert "account_id" not in line
+
+
+def test_create_check_aliases_and_requires_person_for_received():
+    payload = build_create_check_payload(
+        {
+            "type": "دریافتی",
+            "check_number": "123",
+            "amount": 100,
+            "issue_date": "2026-08-01",
+            "due_date": "2026-09-01",
+            "person_id": 7,
+            "currency_id": 1,
+        }
+    )
+    assert payload["type"] == "received"
+    assert payload["currency_id"] == 1
+    try:
+        build_create_check_payload(
+            {
+                "type": "received",
+                "check_number": "1",
+                "amount": 1,
+                "issue_date": "2026-08-01",
+                "due_date": "2026-09-01",
+                "currency_id": 1,
+            }
+        )
+        assert False, "expected ValueError"
+    except ValueError as exc:
+        assert "person_id" in str(exc)
+
+
+def test_create_transfer_and_warehouse_and_workflow_payloads():
+    tr = build_create_transfer_payload(
+        {
+            "from_account_type": "صندوق",
+            "from_account_id": 2,
+            "to_account_type": "bank",
+            "to_account_id": 4,
+            "amount": 80,
+            "currency_id": 1,
+        }
+    )
+    assert tr["source"] == {"type": "cash_register", "id": 2}
+    assert tr["destination"]["type"] == "bank"
+    assert tr["document_date"] == date.today().isoformat()
+
+    wh = build_create_warehouse_document_payload(
+        {
+            "doc_type": "ورود",
+            "warehouse_id": 9,
+            "lines": [{"product_id": 1, "quantity": 2}],
+        }
+    )
+    assert wh["doc_type"] == "receipt"
+    assert wh["warehouse_id_to"] == 9
+    assert wh["lines"][0]["product_id"] == 1
+
+    wf = build_create_workflow_payload(
+        {
+            "name": "تست",
+            "status": "draft",
+            "workflow_data": {"nodes": [{"id": "a", "type": "trigger"}]},
+        }
+    )
+    assert wf["status"] == "پیش‌نویس"
+    assert wf["workflow_data"]["connections"] == []
+    graph = normalize_workflow_graph({"nodes": []})
+    assert graph["connections"] == []
+
+
+def test_update_invoice_normalizes_lines_when_sent():
+    payload = build_update_invoice_payload(
+        {
+            "invoice_id": 5,
+            "person_id": 8,
+            "lines": [{"product_id": 1, "quantity": 1, "unit_price": 20}],
+        }
+    )
+    assert payload["person_id"] == 8
+    assert payload["extra_info"]["person_id"] == 8
+    assert payload["lines"][0]["extra_info"]["unit_price"] == 20

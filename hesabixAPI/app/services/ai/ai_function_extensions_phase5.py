@@ -27,48 +27,15 @@ _MAX_EXPORT_ROWS = 10_000
 def register_phase5_business_functions(registry: "AIFunctionRegistry") -> None:
     # --- expense / income ---
     def create_expense_income_handler(args: Dict[str, Any], context: Dict[str, Any]) -> Any:
+        from app.services.ai.ai_tool_payloads import build_create_expense_income_payload
         from app.services.expense_income_service import create_expense_income
 
         db = context["db"]
         business_id = int(args.get("business_id") or context.get("business_id"))
         user_id = context["user_context"].get_user_id()
-        amount = float(args["amount"])
-        doc_date = args.get("document_date") or date.today().isoformat()
-        cp_type = str(args.get("counterparty_type", "bank"))
-        cp_id = int(args["counterparty_id"])
-        tx_date = args.get("transaction_date") or f"{doc_date}T12:00:00"
-
-        counterparty_line: Dict[str, Any] = {
-            "transaction_type": cp_type,
-            "amount": amount,
-            "transaction_date": tx_date,
-            "description": args.get("description"),
-        }
-        if cp_type == "bank":
-            counterparty_line["bank_id"] = cp_id
-        elif cp_type == "cash_register":
-            counterparty_line["cash_register_id"] = cp_id
-        elif cp_type == "petty_cash":
-            counterparty_line["petty_cash_id"] = cp_id
-        elif cp_type == "person":
-            counterparty_line["person_id"] = cp_id
-        else:
-            raise ValueError("counterparty_type نامعتبر")
-
-        body = {
-            "document_type": args.get("document_type", "expense"),
-            "document_date": doc_date,
-            "currency_id": int(args["currency_id"]),
-            "description": args.get("description"),
-            "item_lines": [
-                {
-                    "account_id": int(args["account_id"]),
-                    "amount": amount,
-                    "description": args.get("line_description") or args.get("description"),
-                }
-            ],
-            "counterparty_lines": [counterparty_line],
-        }
+        body = build_create_expense_income_payload(
+            args, db=db, business_id=business_id
+        )
         return create_expense_income(db, business_id, user_id, body)
 
     registry.register(
@@ -131,46 +98,25 @@ def register_phase5_business_functions(registry: "AIFunctionRegistry") -> None:
 
     # --- invoice update / delete ---
     def update_invoice_handler(args: Dict[str, Any], context: Dict[str, Any]) -> Any:
+        from app.services.ai.ai_tool_payloads import build_update_invoice_payload
         from app.services.invoice_service import update_invoice
 
         db = context["db"]
         user_id = context["user_context"].get_user_id()
         invoice_id = int(args["invoice_id"])
-        data: Dict[str, Any] = {}
-        for key in (
-            "document_date",
-            "currency_id",
-            "person_id",
-            "description",
-            "is_proforma",
-            "project_id",
-            "lines",
-            "extra_info",
-        ):
-            if key in args and args[key] is not None:
-                data[key] = args[key]
-        if args.get("description") is not None and "extra_info" not in data:
-            data["extra_info"] = {"description": args["description"]}
+        data = build_update_invoice_payload(args, db=db, invoice_id=invoice_id)
         return update_invoice(db, invoice_id, user_id, data)
+
+    from app.services.ai.ai_tool_payloads import (
+        UPDATE_INVOICE_DESCRIPTION,
+        UPDATE_INVOICE_PARAMETERS_SCHEMA,
+    )
 
     registry.register(
         AIFunction(
             name="update_invoice",
-            description="ویرایش فاکتور موجود. فقط فیلدهای ارسالی تغییر می‌کنند. نیاز به تأیید.",
-            parameters_schema={
-                "type": "object",
-                "properties": {
-                    "invoice_id": {"type": "integer", "description": "شناسه سند فاکتور"},
-                    "document_date": {"type": "string", "format": "date"},
-                    "currency_id": {"type": "integer"},
-                    "person_id": {"type": "integer"},
-                    "description": {"type": "string"},
-                    "is_proforma": {"type": "boolean"},
-                    "project_id": {"type": "integer"},
-                    "lines": {"type": "array", "items": {"type": "object"}},
-                },
-                "required": ["invoice_id"],
-            },
+            description=UPDATE_INVOICE_DESCRIPTION,
+            parameters_schema=UPDATE_INVOICE_PARAMETERS_SCHEMA,
             handler=update_invoice_handler,
             allowed_roles={AIRole.USER, AIRole.BUSINESS_OWNER, AIRole.OPERATOR, AIRole.ADMIN},
             required_permissions=["invoices.write"],

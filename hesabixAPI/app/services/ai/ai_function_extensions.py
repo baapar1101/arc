@@ -166,6 +166,40 @@ def register_extended_business_functions(registry: "AIFunctionRegistry") -> None
         )
     )
 
+    def create_warehouse_document_handler(args: Dict[str, Any], context: Dict[str, Any]) -> Any:
+        from app.services.ai.ai_tool_payloads import build_create_warehouse_document_payload
+        from app.services.warehouse_service import (
+            create_manual_warehouse_document,
+            warehouse_document_to_dict,
+        )
+
+        db = context["db"]
+        business_id = int(args.get("business_id") or context.get("business_id"))
+        user_id = context["user_context"].get_user_id()
+        data = build_create_warehouse_document_payload(args)
+        wh = create_manual_warehouse_document(db, business_id, user_id, data)
+        return warehouse_document_to_dict(db, wh)
+
+    from app.services.ai.ai_tool_payloads import (
+        CREATE_WAREHOUSE_DOCUMENT_DESCRIPTION,
+        CREATE_WAREHOUSE_DOCUMENT_PARAMETERS_SCHEMA,
+    )
+
+    registry.register(
+        AIFunction(
+            name="create_warehouse_document",
+            description=CREATE_WAREHOUSE_DOCUMENT_DESCRIPTION,
+            parameters_schema=CREATE_WAREHOUSE_DOCUMENT_PARAMETERS_SCHEMA,
+            handler=create_handler(create_warehouse_document_handler),
+            allowed_roles={AIRole.USER, AIRole.BUSINESS_OWNER, AIRole.OPERATOR, AIRole.ADMIN},
+            required_permissions=["warehouses.write"],
+            category="warehouse",
+            requires_approval=True,
+            risk_level="high",
+            is_readonly=False,
+        )
+    )
+
     # --- چک ---
     registry.register(
         AIFunction(

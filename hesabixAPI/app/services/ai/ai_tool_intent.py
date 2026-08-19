@@ -80,6 +80,7 @@ _CATEGORY_TOOLS: dict[str, frozenset[str]] = {
         "list_warehouse_locations",
         "list_warehouse_placements",
         "get_warehouse_report",
+        "create_warehouse_document",
     }),
     "crm": frozenset({
         "search_leads",
@@ -299,6 +300,7 @@ _WRITE_TOOLS = frozenset({
     "create_account",
     "update_account",
     "delete_account",
+    "create_warehouse_document",
 })
 
 # ابزارهای کمکی که مدل برای تکمیل آرگومان write نیاز دارد — prefer تا سقف ۴۸ حذف‌شان نکند
@@ -323,11 +325,13 @@ _WRITE_TOOL_COMPANIONS: dict[str, frozenset[str]] = {
         "list_currencies",
         "list_bank_accounts",
         "list_cash_registers",
+        "list_petty_cash",
     }),
     "create_check": frozenset({
         "search_persons",
         "list_currencies",
-        "list_bank_accounts",
+        "search_checks",
+        "get_check_details",
     }),
     "create_product": frozenset({
         "search_products",
@@ -339,12 +343,14 @@ _WRITE_TOOL_COMPANIONS: dict[str, frozenset[str]] = {
         "search_persons",
         "list_bank_accounts",
         "list_cash_registers",
+        "list_petty_cash",
     }),
     "create_transfer": frozenset({
         "list_currencies",
         "list_bank_accounts",
         "list_cash_registers",
         "list_petty_cash",
+        "search_transfers",
     }),
     "create_lead": frozenset({
         "search_leads",
@@ -353,6 +359,34 @@ _WRITE_TOOL_COMPANIONS: dict[str, frozenset[str]] = {
     "create_person": frozenset({
         "search_persons",
         "list_person_groups",
+    }),
+    "create_warehouse_document": frozenset({
+        "list_warehouses",
+        "search_products",
+        "search_warehouse_documents",
+        "get_inventory_status",
+        "get_current_fiscal_year",
+    }),
+    "create_workflow": frozenset({
+        "list_workflows",
+        "get_workflow_design_rules",
+        "list_workflow_trigger_catalog",
+        "list_workflow_action_catalog",
+        "validate_workflow_draft",
+    }),
+    "update_workflow": frozenset({
+        "get_workflow",
+        "get_workflow_design_rules",
+        "validate_workflow_draft",
+        "list_workflows",
+    }),
+    "execute_workflow": frozenset({
+        "list_workflows",
+        "get_workflow",
+    }),
+    "create_account": frozenset({
+        "list_accounts",
+        "get_account",
     }),
 }
 

@@ -821,6 +821,7 @@ app/services/ai/ai_tool_error.py
 app/services/ai/ai_tool_intent.py
 app/services/ai/ai_tool_keys.py
 app/services/ai/ai_tool_parallel.py
+app/services/ai/ai_tool_payloads.py
 app/services/ai/ai_tool_query_params.py
 app/services/ai/ai_tool_rank.py
 app/services/ai/ai_tool_result.py
@@ -1172,6 +1173,7 @@ migrations/versions/20260806_000003_telephony_softphone_media_relay.py
 migrations/versions/20260817_000001_quick_sales_print_paper_size.py
 migrations/versions/20260817_000002_ai_agent_runs.py
 migrations/versions/20260818_000001_ai_voice_models.py
+migrations/versions/20260819_000001_ai_memory_identity_prompt.py
 tests/__init__.py
 tests/test_account_balance_core.py
 tests/test_account_tree_roots.py
@@ -1197,6 +1199,7 @@ tests/test_ai_eval_gold_ci.py
 tests/test_ai_eval_premature.py
 tests/test_ai_eval_schedule.py
 tests/test_ai_eval_service.py
+tests/test_ai_execution_policy.py
 tests/test_ai_exploration_service.py
 tests/test_ai_feedback_analytics.py
 tests/test_ai_function_handler_conventions.py
@@ -1238,6 +1241,7 @@ tests/test_ai_tool_error.py
 tests/test_ai_tool_intent.py
 tests/test_ai_tool_intent_gold.py
 tests/test_ai_tool_parallel.py
+tests/test_ai_tool_payloads.py
 tests/test_ai_tool_result.py
 tests/test_ai_trace_content.py
 tests/test_ai_untrusted.py
@@ -1284,6 +1288,7 @@ tests/test_invoice_cogs_gl_service.py
 tests/test_invoice_payable_total.py
 tests/test_invoice_payment_documents.py
 tests/test_invoice_payment_remaining.py
+tests/test_invoice_person_id_header.py
 tests/test_invoice_profit_costing.py
 tests/test_invoice_receipt_pdf_template.py
 tests/test_invoice_tag_service.py

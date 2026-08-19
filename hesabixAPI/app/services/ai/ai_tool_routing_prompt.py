@@ -23,7 +23,7 @@ TOOL_ROUTING_PROMPT_BLOCK = """
 - نام یا هویت خود گوینده → حافظه پایدار در system prompt؛ نه `get_business_info` و نه `search_persons`
 - کالا → `search_products` / `get_product_info` / `get_inventory_status`
 - سند حسابداری → `search_documents` / `get_document_details`
-- حواله انبار → `search_warehouse_documents`
+- حواله انبار → `search_warehouse_documents` / `get_warehouse_document_details` / `list_warehouses`
 - لیست پیشرفته با فیلتر → `list_queryable_fields` سپس `query_business_data`
 - «ماه گذشته»، «فروردین ۱۴۰۴»، «هفته اخیر» → ابتدا `resolve_date_range`
 
@@ -33,7 +33,15 @@ TOOL_ROUTING_PROMPT_BLOCK = """
   - `person_id` و `product_id` باید عدد باشند (نه نام). `unit_price` را در هر سطر `lines[]` بفرست.
   - `take` در جستجو حداکثر ۱۰۰ است.
 - شخص جدید → `create_person` | کالا جدید → `create_product`
-- دریافت/پرداخت → `create_receipt_payment` بعد از `list_bank_accounts`/`list_cash_registers`
+- ویرایش فاکتور → `get_invoice_details` سپس `update_invoice`. اگر فقط تاریخ/شرح/شخص عوض می‌شود `lines` را نفرست تا اقلام فعلی بماند.
+- دریافت/پرداخت → `search_persons` + `list_bank_accounts`/`list_cash_registers` سپس `create_receipt_payment`.
+  - `account_type` = bank|cash_register|petty_cash و `account_id` همان id لیست بانک/صندوق است — نه کدینگ `list_accounts`.
+- چک → `search_persons` + `list_currencies` سپس `create_check`. `type` فقط received یا transferred. برای دریافتی `person_id` اجباری است.
+- انتقال وجه → `list_bank_accounts`/`list_cash_registers`/`list_petty_cash` سپس `create_transfer`.
+- حواله انبار دستی → `list_warehouses` + `search_products` سپس `create_warehouse_document`.
+  - ورود: `doc_type=receipt` + `warehouse_id` مقصد. خروج: `doc_type=issue` + `warehouse_id` مبدأ.
+- هزینه/درآمد → `list_accounts` (سرفصل هزینه/درآمد) + طرف‌حساب نقدی سپس `create_expense_income`.
+- اتوماسیون → `get_workflow_design_rules` + کاتالوگ تریگر/اکشن → `validate_workflow_draft` → `create_workflow` با status=پیش‌نویس.
 - هرگز write بدون خلاصه + تأیید صریح کاربر. اگر ابزار APPROVAL_REQUIRED داد، همان JSON را با آرگومان‌های اصلاح‌نشده تکرار نکن مگر کاربر تأیید کرده باشد.
 
 **CRM**

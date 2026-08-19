@@ -915,79 +915,29 @@ class AIFunctionRegistry:
         
         # اضافه کردن create_receipt_payment
         def create_receipt_payment_wrapper(args: Dict[str, Any], context: Dict[str, Any]) -> Any:
-            """Wrapper برای ایجاد دریافت/پرداخت"""
+            """Wrapper برای ایجاد دریافت/پرداخت — نگاشت bank_id نه کدینگ."""
+            from app.services.ai.ai_tool_payloads import build_create_receipt_payment_payload
+
             db: Session = context["db"]
             user_context: AuthContext = context["user_context"]
             business_id = args.get("business_id") or context.get("business_id")
             user_id = user_context.get_user_id()
-            
-            # ساخت person_lines و account_lines از پارامترها
-            person_lines = []
-            if args.get("person_id") and args.get("amount"):
-                person_lines.append({
-                    "person_id": args.get("person_id"),
-                    "amount": float(args.get("amount", 0)),
-                    "description": args.get("description", "")
-                })
-            
-            account_lines = []
-            if args.get("account_id") and args.get("amount"):
-                account_lines.append({
-                    "account_id": args.get("account_id"),
-                    "amount": float(args.get("amount", 0)),
-                    "description": args.get("description", "")
-                })
-            
-            data = {
-                "document_type": args.get("type"),  # "receipt" or "payment"
-                "document_date": args.get("document_date"),
-                "currency_id": args.get("currency_id"),
-                "description": args.get("description", ""),
-                "person_lines": person_lines if person_lines else args.get("person_lines", []),
-                "account_lines": account_lines if account_lines else args.get("account_lines", []),
-                "extra_info": args.get("extra_info", {})
-            }
-            
+            data = build_create_receipt_payment_payload(
+                args, db=db, business_id=business_id
+            )
             return create_receipt_payment(db, business_id, user_id, data)
-        
+
+        from app.services.ai.ai_tool_payloads import CREATE_RECEIPT_PAYMENT_PARAMETERS_SCHEMA
+
         self.register(AIFunction(
             name="create_receipt_payment",
             description=(
                 "ثبت دریافت (receipt) یا پرداخت (payment). "
-                "account_id شناسه حساب بانکی/صندوق است (list_bank_accounts یا list_cash_registers). "
-                "اگر طرف شخص دارد person_id را از search_persons بگیر. "
-                "currency_id از list_currencies. نیاز به تأیید کاربر."
+                "person_id از search_persons. "
+                "account_type + account_id از list_bank_accounts یا list_cash_registers "
+                "(نه list_accounts کدینگ). نیاز به تأیید کاربر."
             ),
-            parameters_schema={
-                "type": "object",
-                "properties": {
-                    "type": {
-                        "type": "string",
-                        "enum": ["receipt", "payment"],
-                        "description": "receipt=دریافت از شخص، payment=پرداخت به شخص",
-                    },
-                    "document_date": {
-                        "type": "string",
-                        "format": "date",
-                        "description": "تاریخ سند YYYY-MM-DD یا شمسی YYYY/MM/DD",
-                    },
-                    "currency_id": {
-                        "type": "integer",
-                        "description": "شناسه ارز از list_currencies",
-                    },
-                    "person_id": {
-                        "type": "integer",
-                        "description": "شناسه عددی شخص از search_persons (اختیاری اما معمولاً لازم)",
-                    },
-                    "amount": {"type": "number", "description": "مبلغ (بزرگتر از صفر)"},
-                    "account_id": {
-                        "type": "integer",
-                        "description": "شناسه حساب بانکی یا صندوق",
-                    },
-                    "description": {"type": "string", "description": "شرح سند (اختیاری)"},
-                },
-                "required": ["type", "document_date", "currency_id", "amount", "account_id"],
-            },
+            parameters_schema=CREATE_RECEIPT_PAYMENT_PARAMETERS_SCHEMA,
             handler=self._create_handler(create_receipt_payment_wrapper),
             allowed_roles={AIRole.USER, AIRole.BUSINESS_OWNER, AIRole.OPERATOR, AIRole.ADMIN},
             required_permissions=["receipts_payments.write"],

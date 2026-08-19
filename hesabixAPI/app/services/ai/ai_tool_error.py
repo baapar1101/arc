@@ -116,7 +116,7 @@ _BUSINESS_HINTS: Dict[str, str] = {
     "CURRENCY_REQUIRED": (
         "currency_id را با list_currencies بگیر یا خالی بگذار تا ارز پیش‌فرض کسب‌وکار استفاده شود."
     ),
-    "LINES_REQUIRED": "حداقل یک سطر در lines با product_id، quantity و unit_price بفرست.",
+    "LINES_REQUIRED": "حداقل یک سطر در lines با product_id، quantity و در فاکتور unit_price بفرست.",
     "INVALID_LINE": "هر سطر باید product_id و quantity مثبت داشته باشد.",
     "INVALID_INVOICE_TYPE": (
         "invoice_type را یکی از invoice_sales / invoice_purchase / "
@@ -125,6 +125,25 @@ _BUSINESS_HINTS: Dict[str, str] = {
     "PERSON_NOT_FOUND_OR_WRONG_BUSINESS": (
         "person_id متعلق به این کسب‌وکار نیست. دوباره search_persons را در همین کسب‌وکار صدا بزن."
     ),
+    "PERSON_LINES_REQUIRED": "person_id عددی را از search_persons بگیر و همراه amount بفرست.",
+    "ACCOUNT_LINES_REQUIRED": (
+        "account_type=bank|cash_register|petty_cash و account_id را از "
+        "list_bank_accounts / list_cash_registers / list_petty_cash بگیر — نه از list_accounts."
+    ),
+    "ACCOUNT_NOT_FOUND": (
+        "account_id کدینگ نیست. برای دریافت/پرداخت از list_bank_accounts یا list_cash_registers استفاده کن."
+    ),
+    "UNBALANCED_AMOUNTS": "مبلغ شخص و مبلغ حساب باید برابر باشد.",
+    "INVALID_CHECK_TYPE": "type چک فقط received یا transferred است.",
+    "CHECK_NUMBER_REQUIRED": "check_number را بفرست.",
+    "INVALID_AMOUNT": "amount باید عدد بزرگتر از صفر باشد.",
+    "INVALID_SOURCE": "from_account_type باید bank یا cash_register یا petty_cash باشد.",
+    "INVALID_DESTINATION": "to_account_type باید bank یا cash_register یا petty_cash باشد.",
+    "INVALID_DOC_TYPE": "doc_type حواله: receipt (ورود)، issue (خروج)، transfer، adjustment.",
+    "WAREHOUSE_REQUIRED": "شناسه انبار را از list_warehouses بگیر.",
+    "WAREHOUSES_REQUIRED": "برای انتقال، warehouse_id_from و warehouse_id_to هر دو لازم است.",
+    "PRODUCT_REQUIRED": "product_id را از search_products بگیر.",
+    "DATE_REQUIRED": "document_date را YYYY-MM-DD یا شمسی بفرست؛ یا خالی بگذار تا امروز استفاده شود.",
 }
 
 
@@ -139,6 +158,23 @@ def _hint_for_business_code(code: str, function_name: str, api_message: str) -> 
             "آرگومان create_invoice را با person_id، invoice_type=invoice_sales یا invoice_purchase، "
             "و lines[].product_id/quantity/unit_price کامل کن."
         )
+    if function_name == "create_receipt_payment":
+        return (
+            "type=receipt|payment، person_id از search_persons، "
+            "account_type و account_id از لیست بانک/صندوق — نه کدینگ."
+        )
+    if function_name == "create_check":
+        return "type=received|transferred، check_number، amount، تاریخ صدور/سررسید، و برای دریافتی person_id."
+    if function_name == "create_warehouse_document":
+        return (
+            "doc_type=receipt|issue|transfer، انبار از list_warehouses، "
+            "و lines با product_id و quantity."
+        )
+    if function_name in {"create_workflow", "update_workflow", "validate_workflow_draft"}:
+        return (
+            "workflow_data باید {nodes, connections} باشد. "
+            "get_workflow_design_rules و validate_workflow_draft را اول صدا بزن."
+        )
     return "آرگومان را مطابق قرارداد ابزار اصلاح کن و دوباره تلاش کن."
 
 
@@ -149,12 +185,17 @@ def _schema_property_names(schema: Optional[Dict[str, Any]]) -> list[str]:
     if not isinstance(props, dict):
         return []
     names = [str(k) for k in props.keys()]
-    lines = props.get("lines")
-    if isinstance(lines, dict):
-        items = lines.get("items")
+    for nest_key in ("lines", "person_lines", "account_lines", "item_lines"):
+        nested_node = props.get(nest_key)
+        if not isinstance(nested_node, dict):
+            continue
+        items = nested_node.get("items")
         nested = (items or {}).get("properties") if isinstance(items, dict) else None
         if isinstance(nested, dict):
-            names.extend(f"lines[].{k}" for k in nested.keys())
+            names.extend(f"{nest_key}[].{k}" for k in nested.keys())
+    wd = props.get("workflow_data")
+    if isinstance(wd, dict):
+        names.extend(["workflow_data.nodes", "workflow_data.connections"])
     return names[:36]
 
 

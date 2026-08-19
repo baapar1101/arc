@@ -60,3 +60,14 @@ def test_create_invoice_schema_nested_expected_args():
     )
     assert "lines[].unit_price" in payload["expected_args"]
     assert "person_id" in payload["required_args"]
+
+
+def test_receipt_account_error_points_to_bank_list():
+    from app.core.responses import ApiError
+
+    payload = normalize_tool_error(
+        "create_receipt_payment",
+        ApiError("ACCOUNT_LINES_REQUIRED", "At least one account line is required", http_status=400),
+    )
+    assert payload["error"] == "ACCOUNT_LINES_REQUIRED"
+    assert "list_bank_accounts" in (payload.get("hint_fa") or "")
