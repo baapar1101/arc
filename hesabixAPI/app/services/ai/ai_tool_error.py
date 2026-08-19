@@ -120,7 +120,8 @@ _BUSINESS_HINTS: Dict[str, str] = {
     "INVALID_LINE": "هر سطر باید product_id و quantity مثبت داشته باشد.",
     "INVALID_INVOICE_TYPE": (
         "invoice_type را یکی از invoice_sales / invoice_purchase / "
-        "invoice_sales_return / invoice_purchase_return بگذار."
+        "invoice_sales_return / invoice_purchase_return بگذار "
+        "(ضایعات: invoice_waste، مصرف: invoice_direct_consumption، تولید: invoice_production)."
     ),
     "PERSON_NOT_FOUND_OR_WRONG_BUSINESS": (
         "person_id متعلق به این کسب‌وکار نیست. دوباره search_persons را در همین کسب‌وکار صدا بزن."
@@ -155,8 +156,8 @@ def _hint_for_business_code(code: str, function_name: str, api_message: str) -> 
         return api_message
     if function_name == "create_invoice":
         return (
-            "آرگومان create_invoice را با person_id، invoice_type=invoice_sales یا invoice_purchase، "
-            "و lines[].product_id/quantity/unit_price کامل کن."
+            "آرگومان create_invoice را با invoice_type، lines[].product_id/quantity/unit_price "
+            "و برای فروش/خرید person_id کامل کن. تخفیف کلی، سررسید، پرداخت و اضافات هم در همین ابزار است."
         )
     if function_name == "create_receipt_payment":
         return (

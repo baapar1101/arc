@@ -694,6 +694,7 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
               : null,
           personGroupId: _selectedPersonGroupId,
           socialContacts: _socialContactsForApi(),
+          bankAccounts: _bankAccounts,
           openingBalance: openingBalanceInput,
         );
 

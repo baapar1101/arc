@@ -353,7 +353,12 @@ class AIFunctionRegistry:
             data = build_create_invoice_payload(
                 args, db=db, business_id=business_id
             )
-            if not data.get("person_id"):
+            if data.get("invoice_type") in {
+                "invoice_sales",
+                "invoice_purchase",
+                "invoice_sales_return",
+                "invoice_purchase_return",
+            } and not data.get("person_id"):
                 raise ValueError(
                     "person_id الزامی است. ابتدا search_persons را صدا بزن و id عددی شخص را بفرست."
                 )
@@ -363,7 +368,8 @@ class AIFunctionRegistry:
                 )
             if not data.get("invoice_type"):
                 raise ValueError(
-                    "invoice_type الزامی است: invoice_sales یا invoice_purchase."
+                    "invoice_type الزامی است: invoice_sales، invoice_purchase، "
+                    "invoice_sales_return یا invoice_purchase_return."
                 )
             return create_invoice(db, business_id, user_id, data)
 
@@ -544,7 +550,6 @@ class AIFunctionRegistry:
         from app.services.person_service import get_person_by_id, search_persons, calculate_person_balance
         from app.services.person_service import get_debtors_report, get_creditors_report
         from app.services.person_service import create_person, update_person
-        from adapters.api.v1.schema_models.person import PersonCreateRequest, PersonUpdateRequest
         
         def get_person_wrapper(db, business_id, person_id, user_id, **kwargs):
             """Wrapper برای دریافت اطلاعات شخص"""
@@ -580,8 +585,13 @@ class AIFunctionRegistry:
                 q["take"] = limit
             pt = kwargs.get("person_type")
             if pt and pt != "both" and not _has_filter_property(q, "person_types"):
+                from app.services.ai.ai_tool_payloads import normalize_person_type_value
+                try:
+                    pt_value = normalize_person_type_value(pt)
+                except ValueError:
+                    pt_value = pt
                 flt = list(q.get("filters") or [])
-                flt.append({"property": "person_types", "operator": "*", "value": pt})
+                flt.append({"property": "person_types", "operator": "*", "value": pt_value})
                 q["filters"] = flt
             return get_persons_by_business(
                 db,
@@ -601,7 +611,16 @@ class AIFunctionRegistry:
                 extra_properties={
                     "person_type": {
                         "type": "string",
-                        "enum": ["customer", "supplier", "both"],
+                        "enum": [
+                            "customer",
+                            "supplier",
+                            "marketer",
+                            "employee",
+                            "partner",
+                            "seller",
+                            "shareholder",
+                            "both",
+                        ],
                         "description": "نوع شخص (یا فیلتر person_types)",
                     },
                     "page": {"type": "integer", "description": "شماره صفحه (جایگزین skip)"},
@@ -644,65 +663,64 @@ class AIFunctionRegistry:
             category="persons"
         ))
         
-        # اضافه کردن create_person
-        def create_person_wrapper(args: Dict[str, Any], context: Dict[str, Any]) -> Any:
-            """Wrapper برای ایجاد شخص"""
-            from adapters.api.v1.schema_models.person import PersonCreateRequest
-            from adapters.db.models.person import PersonType
-            
+        # اضافه کردن create_person / update_person — هم‌تراز با فرم UI
+        def _ensure_person_opening_balance_permission(
+            context: Dict[str, Any],
+            business_id: int,
+            opening_balance: Any,
+        ) -> None:
+            if not opening_balance:
+                return
+            from app.core.permissions import has_business_permission_for_business
+            from app.core.responses import ApiError
+
+            user_context: AuthContext = context["user_context"]
             db: Session = context["db"]
+            if not has_business_permission_for_business(
+                user_context, db, int(business_id), "opening_balance", "edit"
+            ):
+                raise ApiError(
+                    "OPENING_BALANCE_PERMISSION_REQUIRED",
+                    "برای ثبت مانده افتتاحیه به دسترسی ویرایش تراز افتتاحیه نیاز است",
+                    http_status=403,
+                )
+
+        def create_person_wrapper(args: Dict[str, Any], context: Dict[str, Any]) -> Any:
+            """Wrapper برای ایجاد شخص با تمام فیلدهای فرم UI."""
+            from adapters.api.v1.schema_models.person import PersonCreateRequest
+            from app.services.ai.ai_tool_payloads import build_create_person_payload
+            from app.services.person_opening_balance_service import create_person_with_opening_balance
+            from app.services.person_service import delete_person
+
+            db: Session = context["db"]
+            user_context: AuthContext = context["user_context"]
             business_id = args.get("business_id") or context.get("business_id")
-            
-            # تبدیل person_type از string به PersonType enum
-            person_type_enum = None
-            person_types_list = None
-            if args.get("person_type"):
-                person_type_str = args.get("person_type").lower()
-                if person_type_str == "customer":
-                    person_type_enum = PersonType.CUSTOMER
-                    person_types_list = [PersonType.CUSTOMER]
-                elif person_type_str == "supplier":
-                    person_type_enum = PersonType.SUPPLIER
-                    person_types_list = [PersonType.SUPPLIER]
-            
-            # ساخت PersonCreateRequest از args
-            # alias_name required است، از name استفاده می‌کنیم
-            name = args.get("name", "")
-            alias_name = name if name else "نامشخص"
-            
-            person_data = PersonCreateRequest(
-                alias_name=alias_name,
-                first_name=args.get("name"),
-                code=args.get("code"),
-                phone=args.get("phone"),
-                email=args.get("email"),
-                address=args.get("address"),
-                economic_id=args.get("tax_id"),  # economic_id معادل tax_id است
-                person_type=person_type_enum,
-                person_types=person_types_list
+            person_data = PersonCreateRequest(**build_create_person_payload(args))
+            _ensure_person_opening_balance_permission(
+                context, business_id, getattr(person_data, "opening_balance", None)
             )
-            
+            if person_data.opening_balance is not None:
+                return create_person_with_opening_balance(
+                    db,
+                    business_id,
+                    user_context.get_user_id(),
+                    person_data,
+                    create_person_fn=create_person,
+                    delete_person_fn=delete_person,
+                )
             return create_person(db, business_id, person_data)
-        
+
+        from app.services.ai.ai_tool_payloads import (
+            CREATE_PERSON_DESCRIPTION,
+            CREATE_PERSON_PARAMETERS_SCHEMA,
+            UPDATE_PERSON_DESCRIPTION,
+            UPDATE_PERSON_PARAMETERS_SCHEMA,
+        )
+
         self.register(AIFunction(
             name="create_person",
-            description=(
-                "ایجاد مشتری یا تامین‌کننده جدید. name و person_type الزامی است "
-                "(customer یا supplier). شناسه کسب‌وکار از جلسه گرفته می‌شود. نیاز به تأیید."
-            ),
-            parameters_schema={
-                "type": "object",
-                "properties": {
-                    "name": {"type": "string", "description": "نام شخص"},
-                    "person_type": {"type": "string", "enum": ["customer", "supplier"], "description": "نوع شخص"},
-                    "phone": {"type": "string", "description": "تلفن (اختیاری)"},
-                    "email": {"type": "string", "format": "email", "description": "ایمیل (اختیاری)"},
-                    "address": {"type": "string", "description": "آدرس (اختیاری)"},
-                    "tax_id": {"type": "string", "description": "شناسه ملی/کد اقتصادی (اختیاری)"},
-                    "code": {"type": "integer", "description": "کد شخص (اختیاری - در غیر این صورت خودکار تولید می‌شود)"}
-                },
-                "required": ["name", "person_type"]
-            },
+            description=CREATE_PERSON_DESCRIPTION,
+            parameters_schema=CREATE_PERSON_PARAMETERS_SCHEMA,
             handler=self._create_handler(create_person_wrapper),
             allowed_roles={AIRole.USER, AIRole.BUSINESS_OWNER, AIRole.OPERATOR, AIRole.ADMIN},
             required_permissions=["persons.write"],
@@ -711,54 +729,39 @@ class AIFunctionRegistry:
             risk_level="medium",
             is_readonly=False,
         ))
-        
-        # اضافه کردن update_person
+
         def update_person_wrapper(args: Dict[str, Any], context: Dict[str, Any]) -> Any:
-            """Wrapper برای ویرایش شخص"""
+            """Wrapper برای ویرایش شخص با تمام فیلدهای فرم UI."""
             from adapters.api.v1.schema_models.person import PersonUpdateRequest
-            
+            from app.services.ai.ai_tool_payloads import build_update_person_payload
+            from app.services.person_opening_balance_service import update_person_with_opening_balance
+
             db: Session = context["db"]
+            user_context: AuthContext = context["user_context"]
             business_id = args.get("business_id") or context.get("business_id")
             person_id = args.get("person_id")
-            
             if not person_id:
-                raise ValueError("person_id is required")
-            
-            # ساخت PersonUpdateRequest از args
-            # فقط فیلدهایی که ارائه شده‌اند را set می‌کنیم
-            update_data = {}
-            if args.get("name"):
-                update_data["alias_name"] = args.get("name")
-                update_data["first_name"] = args.get("name")
-            if args.get("phone"):
-                update_data["phone"] = args.get("phone")
-            if args.get("email"):
-                update_data["email"] = args.get("email")
-            if args.get("address"):
-                update_data["address"] = args.get("address")
-            if args.get("tax_id"):
-                update_data["economic_id"] = args.get("tax_id")  # economic_id معادل tax_id است
-            
-            person_data = PersonUpdateRequest(**update_data)
-            
-            # ترتیب صحیح: update_person(db, person_id, business_id, person_data)
+                raise ValueError("person_id الزامی است.")
+
+            person_data = PersonUpdateRequest(**build_update_person_payload(args))
+            _ensure_person_opening_balance_permission(
+                context, business_id, getattr(person_data, "opening_balance", None)
+            )
+            if person_data.opening_balance is not None:
+                return update_person_with_opening_balance(
+                    db,
+                    business_id,
+                    user_context.get_user_id(),
+                    person_id,
+                    person_data,
+                    update_person_fn=update_person,
+                )
             return update_person(db, person_id, business_id, person_data)
-        
+
         self.register(AIFunction(
             name="update_person",
-            description="ویرایش اطلاعات یک مشتری یا تامین‌کننده. شناسه کسب‌وکار به صورت خودکار از جلسه گفت‌وگو گرفته می‌شود.",
-            parameters_schema={
-                "type": "object",
-                "properties": {
-                    "person_id": {"type": "integer", "description": "شناسه شخص"},
-                    "name": {"type": "string", "description": "نام جدید (اختیاری)"},
-                    "phone": {"type": "string", "description": "تلفن جدید (اختیاری)"},
-                    "email": {"type": "string", "format": "email", "description": "ایمیل جدید (اختیاری)"},
-                    "address": {"type": "string", "description": "آدرس جدید (اختیاری)"},
-                    "tax_id": {"type": "string", "description": "شناسه ملی/کد اقتصادی جدید (اختیاری)"}
-                },
-                "required": ["person_id"]
-            },
+            description=UPDATE_PERSON_DESCRIPTION,
+            parameters_schema=UPDATE_PERSON_PARAMETERS_SCHEMA,
             handler=self._create_handler(update_person_wrapper),
             allowed_roles={AIRole.USER, AIRole.BUSINESS_OWNER, AIRole.OPERATOR, AIRole.ADMIN},
             required_permissions=["persons.write"],

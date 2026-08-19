@@ -761,6 +761,8 @@ class PersonUpdateRequest {
   final int? personGroupId;
   /// اگر ارسال شود، لیست راه‌های ارتباطی به‌طور کامل جایگزین می‌شود.
   final List<Map<String, dynamic>>? socialContacts;
+  /// اگر ارسال شود، لیست حساب‌های بانکی شخص جایگزین کامل می‌شود.
+  final List<PersonBankAccount>? bankAccounts;
   final PersonOpeningBalanceInput? openingBalance;
 
   PersonUpdateRequest({
@@ -799,6 +801,7 @@ class PersonUpdateRequest {
     this.commissionPostInInvoiceDocument,
     this.personGroupId,
     this.socialContacts,
+    this.bankAccounts,
     this.openingBalance,
   });
 
@@ -848,6 +851,16 @@ class PersonUpdateRequest {
         'commission_post_in_invoice_document': commissionPostInInvoiceDocument,
       'person_group_id': personGroupId,
       if (socialContacts != null) 'social_contacts': socialContacts,
+      if (bankAccounts != null)
+        'bank_accounts': bankAccounts!
+            .where((ba) => ba.bankName.trim().isNotEmpty)
+            .map((ba) => {
+                  'bank_name': ba.bankName,
+                  'account_number': ba.accountNumber,
+                  'card_number': ba.cardNumber,
+                  'sheba_number': ba.shebaNumber,
+                })
+            .toList(),
       if (openingBalance != null) 'opening_balance': openingBalance!.toJson(),
     };
   }

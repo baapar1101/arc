@@ -28,12 +28,17 @@ TOOL_ROUTING_PROMPT_BLOCK = """
 - «ماه گذشته»، «فروردین ۱۴۰۴»، «هفته اخیر» → ابتدا `resolve_date_range`
 
 **عملیات (نیاز به تأیید)**
-- ثبت فاکتور فروش/خرید → ترتیب: `search_persons` (person_id) سپس `search_products` (product_id و قیمت) سپس در صورت نیاز `list_currencies` سپس `create_invoice`.
-  - `invoice_type` فقط: `invoice_sales` / `invoice_purchase` / `invoice_sales_return` / `invoice_purchase_return`
+- ثبت فاکتور فروش/خرید → ترتیب: `search_persons` (person_id) سپس `search_products` (product_id و قیمت) سپس در صورت نیاز `list_currencies`/`list_warehouses` سپس `create_invoice`.
+  - `invoice_type`: `invoice_sales` / `invoice_purchase` / `invoice_sales_return` / `invoice_purchase_return` (ضایعات/مصرف/تولید هم مجاز است).
   - `person_id` و `product_id` باید عدد باشند (نه نام). `unit_price` را در هر سطر `lines[]` بفرست.
+  - تخفیف کلی: `global_discount`. اضافات/کسورات: `invoice_adjustments`. فروشنده: `seller_id` + `commission`. سررسید: `due_date`.
+  - تسویه همزمان فاکتور قطعی: `payments[]` با type=bank|cash_register|petty_cash و account_id از لیست بانک/صندوق — نه `create_receipt_payment` جدا مگر بعد از فاکتور.
   - `take` در جستجو حداکثر ۱۰۰ است.
-- شخص جدید → `create_person` | کالا جدید → `create_product`
-- ویرایش فاکتور → `get_invoice_details` سپس `update_invoice`. اگر فقط تاریخ/شرح/شخص عوض می‌شود `lines` را نفرست تا اقلام فعلی بماند.
+- ویرایش فاکتور → `get_invoice_details` سپس `update_invoice`. اگر فقط تاریخ/شرح/شخص عوض می‌شود `lines` را نفرست تا اقلام فعلی بماند. `payments` در صورت ارسال جایگزین تسویه‌های قبلی است.
+- شخص جدید → `create_person` با همان فیلدهای فرم UI (از جمله `bank_accounts` برای کارت/شبا/حساب شخص، `social_contacts`، `mobile`، `national_id`). حساب بانکی شخص ≠ `list_bank_accounts` (خزانه کسب‌وکار).
+- ویرایش شخص → `search_persons` سپس `update_person`. اگر `bank_accounts` بفرستی کل لیست حساب‌های شخص جایگزین می‌شود.
+- کالا/خدمت جدید → `create_product` با همان فیلدهای فرم UI (قیمت فروش/خرید پایه، قیمت ارزی با `sales_price_fx`/`purchase_price_fx`/`price_fx_currency_id`، `price_list_items` برای لیست‌های قیمت، واحد، انبار، مالیات، بارکد، ویژگی، تأمین‌کننده، کاتالوگ، تعداد اولیه). دسته از `search_categories`، انبار از `list_warehouses`، لیست قیمت از `list_price_lists`، ارز از `list_currencies`.
+- ویرایش کالا → `search_products` سپس `update_product`. `attribute_ids` و `suppliers` در صورت ارسال جایگزین کامل‌اند. `price_list_items` مثل فرم upsert است (حذف همهٔ قیمت‌های قبلی نیست).
 - دریافت/پرداخت → `search_persons` + `list_bank_accounts`/`list_cash_registers` سپس `create_receipt_payment`.
   - `account_type` = bank|cash_register|petty_cash و `account_id` همان id لیست بانک/صندوق است — نه کدینگ `list_accounts`.
 - چک → `search_persons` + `list_currencies` سپس `create_check`. `type` فقط received یا transferred. برای دریافتی `person_id` اجباری است.

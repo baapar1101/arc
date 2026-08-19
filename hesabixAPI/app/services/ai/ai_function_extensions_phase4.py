@@ -249,57 +249,126 @@ def register_phase4_business_functions(registry: "AIFunctionRegistry") -> None:
     )
 
     # --- Write: product ---
+    def _ensure_product_opening_balance_permission(
+        context: Dict[str, Any],
+        business_id: int,
+        opening_balance: Any,
+    ) -> None:
+        if not opening_balance:
+            return
+        from app.core.permissions import has_business_permission_for_business
+        from app.core.responses import ApiError
+
+        user_context = context["user_context"]
+        db = context["db"]
+        if not has_business_permission_for_business(
+            user_context, db, int(business_id), "opening_balance", "edit"
+        ):
+            raise ApiError(
+                "OPENING_BALANCE_PERMISSION_REQUIRED",
+                "برای ثبت تعداد اولیه به دسترسی ویرایش تراز افتتاحیه نیاز است",
+                http_status=403,
+            )
+
+    def _ensure_product_price_list_permission(
+        context: Dict[str, Any],
+        business_id: int,
+        price_list_items: Any,
+    ) -> None:
+        if not price_list_items:
+            return
+        from app.core.permissions import has_business_permission_for_business
+        from app.core.responses import ApiError
+
+        user_context = context["user_context"]
+        db = context["db"]
+        if not (
+            has_business_permission_for_business(
+                user_context, db, int(business_id), "price_lists", "edit"
+            )
+            or has_business_permission_for_business(
+                user_context, db, int(business_id), "price_lists", "add"
+            )
+        ):
+            raise ApiError(
+                "PRICE_LIST_PERMISSION_REQUIRED",
+                "برای ثبت قیمت در لیست‌های قیمت به دسترسی ویرایش لیست قیمت نیاز است",
+                http_status=403,
+            )
+
+    def _attach_price_list_items_to_product_result(
+        db: Any,
+        business_id: int,
+        result: Any,
+        items: Any,
+        *,
+        product_id: int | None = None,
+    ) -> Any:
+        if not items or not result:
+            return result
+        from app.services.price_list_service import upsert_price_items_for_product
+
+        data = result.get("data") if isinstance(result, dict) else None
+        pid = product_id
+        if pid is None and isinstance(data, dict) and data.get("id") is not None:
+            pid = int(data["id"])
+        if pid is None:
+            return result
+        applied = upsert_price_items_for_product(db, business_id, pid, items)
+        if not isinstance(result, dict):
+            return result
+        out = dict(result)
+        merged = dict(out.get("data") or {})
+        merged["price_list_items"] = applied
+        out["data"] = merged
+        return out
+
     def create_product_handler(args: Dict[str, Any], context: Dict[str, Any]) -> Any:
         from adapters.api.v1.schema_models.product import ProductCreateRequest
-        from app.services.product_service import create_product
+        from app.services.ai.ai_tool_payloads import (
+            build_create_product_payload,
+            extract_product_price_list_items,
+        )
+        from app.services.product_opening_balance_service import create_product_with_opening_balance
+        from app.services.product_service import create_product, delete_product
 
         db = context["db"]
+        user_context = context["user_context"]
         business_id = int(args.get("business_id") or context.get("business_id"))
-        item_type = args.get("item_type") or "کالا"
-        payload = ProductCreateRequest(
-            name=args["name"],
-            item_type=item_type,
-            code=args.get("code"),
-            description=args.get("description"),
-            category_id=args.get("category_id"),
-            base_sales_price=args.get("base_sales_price"),
-            base_purchase_price=args.get("base_purchase_price"),
-            track_inventory=bool(args.get("track_inventory", False)),
+        price_list_items = extract_product_price_list_items(args)
+        payload = ProductCreateRequest(**build_create_product_payload(args))
+        _ensure_product_opening_balance_permission(
+            context, business_id, getattr(payload, "opening_balance", None)
         )
-        return create_product(db, business_id, payload)
+        _ensure_product_price_list_permission(context, business_id, price_list_items)
+        if payload.opening_balance is not None:
+            result = create_product_with_opening_balance(
+                db,
+                business_id,
+                user_context.get_user_id(),
+                payload,
+                create_product_fn=create_product,
+                delete_product_fn=delete_product,
+            )
+        else:
+            result = create_product(db, business_id, payload)
+        return _attach_price_list_items_to_product_result(
+            db, business_id, result, price_list_items
+        )
+
+    from app.services.ai.ai_tool_payloads import (
+        CREATE_PRODUCT_DESCRIPTION,
+        CREATE_PRODUCT_PARAMETERS_SCHEMA,
+        UPDATE_PRODUCT_DESCRIPTION,
+        UPDATE_PRODUCT_PARAMETERS_SCHEMA,
+    )
 
     registry.register(
         AIFunction(
             name="create_product",
-            description=(
-                "ایجاد کالا یا خدمت جدید. name الزامی است. "
-                "item_type: کالا یا خدمت. قیمت‌ها اختیاری. نیاز به تأیید."
-            ),
-            parameters_schema={
-                "type": "object",
-                "properties": {
-                    "name": {"type": "string", "description": "نام کالا یا خدمت"},
-                    "item_type": {
-                        "type": "string",
-                        "enum": ["کالا", "خدمت"],
-                        "description": "کالا (انبارداری ممکن) یا خدمت",
-                    },
-                    "code": {"type": "string", "description": "کد کالا (اختیاری؛ وگرنه خودکار)"},
-                    "description": {"type": "string", "description": "شرح (اختیاری)"},
-                    "category_id": {
-                        "type": "integer",
-                        "description": "شناسه دسته‌بندی از search_categories (اختیاری)",
-                    },
-                    "base_sales_price": {"type": "number", "description": "قیمت فروش پایه (اختیاری)"},
-                    "base_purchase_price": {"type": "number", "description": "قیمت خرید پایه (اختیاری)"},
-                    "track_inventory": {
-                        "type": "boolean",
-                        "description": "اگر true باشد موجودی انبار کنترل می‌شود",
-                    },
-                },
-                "required": ["name"],
-            },
-            handler=create_product_handler,
+            description=CREATE_PRODUCT_DESCRIPTION,
+            parameters_schema=CREATE_PRODUCT_PARAMETERS_SCHEMA,
+            handler=create_handler(create_product_handler),
             allowed_roles={AIRole.USER, AIRole.BUSINESS_OWNER, AIRole.OPERATOR, AIRole.ADMIN},
             required_permissions=["products.write"],
             category="products",
@@ -311,32 +380,46 @@ def register_phase4_business_functions(registry: "AIFunctionRegistry") -> None:
 
     def update_product_handler(args: Dict[str, Any], context: Dict[str, Any]) -> Any:
         from adapters.api.v1.schema_models.product import ProductUpdateRequest
+        from app.services.ai.ai_tool_payloads import (
+            build_update_product_payload,
+            extract_product_price_list_items,
+        )
+        from app.services.product_opening_balance_service import update_product_with_opening_balance
         from app.services.product_service import update_product
 
         db = context["db"]
+        user_context = context["user_context"]
         business_id = int(args.get("business_id") or context.get("business_id"))
         product_id = int(args["product_id"])
-        fields = {k: v for k, v in args.items() if k not in ("product_id", "business_id", "user_id") and v is not None}
-        payload = ProductUpdateRequest(**fields)
-        return update_product(db, product_id, business_id, payload)
+        price_list_items = extract_product_price_list_items(args)
+        payload = ProductUpdateRequest(**build_update_product_payload(args))
+        _ensure_product_opening_balance_permission(
+            context, business_id, getattr(payload, "opening_balance", None)
+        )
+        _ensure_product_price_list_permission(context, business_id, price_list_items)
+        if payload.opening_balance is not None:
+            result = update_product_with_opening_balance(
+                db,
+                business_id,
+                user_context.get_user_id(),
+                product_id,
+                payload,
+                update_product_fn=update_product,
+            )
+        else:
+            result = update_product(
+                db, product_id, business_id, payload, user_id=user_context.get_user_id()
+            )
+        return _attach_price_list_items_to_product_result(
+            db, business_id, result, price_list_items, product_id=product_id
+        )
 
     registry.register(
         AIFunction(
             name="update_product",
-            description="ویرایش کالا/خدمت. فقط فیلدهای ارسالی تغییر می‌کنند. نیاز به تأیید.",
-            parameters_schema={
-                "type": "object",
-                "properties": {
-                    "product_id": {"type": "integer"},
-                    "name": {"type": "string"},
-                    "description": {"type": "string"},
-                    "base_sales_price": {"type": "number"},
-                    "base_purchase_price": {"type": "number"},
-                    "track_inventory": {"type": "boolean"},
-                },
-                "required": ["product_id"],
-            },
-            handler=update_product_handler,
+            description=UPDATE_PRODUCT_DESCRIPTION,
+            parameters_schema=UPDATE_PRODUCT_PARAMETERS_SCHEMA,
+            handler=create_handler(update_product_handler),
             allowed_roles={AIRole.USER, AIRole.BUSINESS_OWNER, AIRole.OPERATOR, AIRole.ADMIN},
             required_permissions=["products.write"],
             category="products",

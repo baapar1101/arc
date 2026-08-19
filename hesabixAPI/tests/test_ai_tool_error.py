@@ -59,7 +59,8 @@ def test_create_invoice_schema_nested_expected_args():
         schema=CREATE_INVOICE_PARAMETERS_SCHEMA,
     )
     assert "lines[].unit_price" in payload["expected_args"]
-    assert "person_id" in payload["required_args"]
+    assert "invoice_type" in payload["required_args"]
+    assert "person_id" in payload["expected_args"]
 
 
 def test_receipt_account_error_points_to_bank_list():

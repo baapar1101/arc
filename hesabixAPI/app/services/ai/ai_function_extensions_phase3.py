@@ -116,7 +116,10 @@ def register_phase3_business_functions(registry: "AIFunctionRegistry") -> None:
     registry.register(
         AIFunction(
             name="list_price_lists",
-            description="لیست‌های قیمت کسب‌وکار.",
+            description=(
+                "لیست‌های قیمت کسب‌وکار (عمده/همکار/…). "
+                "قبل از create_product/update_product برای price_list_id صدا بزن."
+            ),
             parameters_schema={
                 "type": "object",
                 "properties": {**_COMMON},
@@ -126,6 +129,32 @@ def register_phase3_business_functions(registry: "AIFunctionRegistry") -> None:
             allowed_roles={AIRole.USER, AIRole.BUSINESS_OWNER, AIRole.OPERATOR, AIRole.ADMIN},
             required_permissions=["price_lists.view"],
             category="products",
+            is_readonly=True,
+        )
+    )
+
+    registry.register(
+        AIFunction(
+            name="list_price_list_items",
+            description=(
+                "قیمت‌های ثبت‌شده در لیست قیمت. "
+                "با price_list_id اقلام یک لیست، یا با product_id قیمت همین کالا در همهٔ لیست‌ها."
+            ),
+            parameters_schema={
+                "type": "object",
+                "properties": {
+                    "price_list_id": {"type": "integer", "description": "شناسه لیست از list_price_lists"},
+                    "product_id": {"type": "integer", "description": "شناسه کالا از search_products"},
+                    "currency_id": {"type": "integer"},
+                    **_COMMON,
+                },
+                "required": [],
+            },
+            handler=h(_price_list_items),
+            allowed_roles={AIRole.USER, AIRole.BUSINESS_OWNER, AIRole.OPERATOR, AIRole.ADMIN},
+            required_permissions=["price_lists.view"],
+            category="products",
+            is_readonly=True,
         )
     )
 
@@ -345,6 +374,39 @@ def _price_lists(db, business_id, user_id, **kwargs):
     from app.services.ai.ai_query_service import _clamp_pagination
 
     return list_price_lists(db, business_id, _clamp_pagination(kwargs))
+
+
+def _price_list_items(db, business_id, user_id, **kwargs):
+    from app.services.price_list_service import list_price_items, list_price_lists
+
+    price_list_id = kwargs.get("price_list_id")
+    product_id = kwargs.get("product_id")
+    currency_id = kwargs.get("currency_id")
+    if price_list_id:
+        return list_price_items(
+            db,
+            business_id,
+            int(price_list_id),
+            product_id=int(product_id) if product_id else None,
+            currency_id=int(currency_id) if currency_id else None,
+        )
+    if product_id:
+        lists = list_price_lists(db, business_id, {"take": 100, "skip": 0})
+        items = []
+        for pl in lists.get("items") or []:
+            chunk = list_price_items(
+                db,
+                business_id,
+                int(pl["id"]),
+                product_id=int(product_id),
+                currency_id=int(currency_id) if currency_id else None,
+            )
+            for it in chunk.get("items") or []:
+                row = dict(it)
+                row["price_list_name"] = pl.get("name")
+                items.append(row)
+        return {"items": items}
+    raise ValueError("price_list_id یا product_id الزامی است")
 
 
 def _activity_logs(db, business_id, user_id, **kwargs):

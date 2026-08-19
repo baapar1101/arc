@@ -670,6 +670,9 @@ def update_person(
     sync_social: Optional[List[Any]] = None
     if "social_contacts" in update_data:
         sync_social = update_data.pop("social_contacts")
+    sync_banks: Optional[List[Any]] = None
+    if "bank_accounts" in update_data:
+        sync_banks = update_data.pop("bank_accounts")
     # مانده افتتاحیه روی persons ذخیره نمی‌شود؛ در person_opening_balance_service مدیریت می‌شود
     update_data.pop("opening_balance", None)
 
@@ -719,12 +722,35 @@ def update_person(
 
     # سایر فیلدها
     for field in list(update_data.keys()):
-        if field in {'code', 'person_types', 'person_type'}:
+        if field in {'code', 'person_types', 'person_type', 'bank_accounts', 'social_contacts'}:
             continue
         if field == 'legal_entity_type' and update_data[field] is None:
             continue
         setattr(person, field, update_data[field])
     
+    if sync_banks is not None:
+        db.query(PersonBankAccount).filter(PersonBankAccount.person_id == person_id).delete(
+            synchronize_session=False
+        )
+        for bank_account_data in sync_banks:
+            p = (
+                bank_account_data
+                if isinstance(bank_account_data, PersonBankAccountCreateRequest)
+                else PersonBankAccountCreateRequest.model_validate(bank_account_data)
+            )
+            bank_name = (p.bank_name or "").strip()
+            if not bank_name:
+                continue
+            db.add(
+                PersonBankAccount(
+                    person_id=person_id,
+                    bank_name=bank_name,
+                    account_number=p.account_number,
+                    card_number=p.card_number,
+                    sheba_number=p.sheba_number,
+                )
+            )
+
     if sync_social is not None:
         db.query(PersonSocialContact).filter(PersonSocialContact.person_id == person_id).delete(
             synchronize_session=False

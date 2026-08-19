@@ -322,6 +322,11 @@ class PersonUpdateRequest(BaseModel):
     # اعتبار
     credit_limit: Optional[float] = Field(default=None, ge=0, description="سقف اعتبار شخص")
     credit_check_enabled: Optional[bool] = Field(default=None, description="فعال بودن بررسی اعتبار برای شخص (خالی یعنی تبعیت از تنظیمات کسب‌وکار)")
+    # حساب‌های بانکی شخص (در صورت ارسال، کل لیست جایگزین قبلی می‌شود)
+    bank_accounts: Optional[List[PersonBankAccountCreateRequest]] = Field(
+        default=None,
+        description="حساب‌های بانکی شخص؛ اگر ارسال شود جایگزین کامل لیست قبلی است",
+    )
     # پیام‌رسان / شبکه‌های اجتماعی (در صورت ارسال، کل لیست جایگزین قبلی می‌شود)
     social_contacts: Optional[List[PersonSocialContactInput]] = Field(default=None, description="راه‌های ارتباط؛ اگر ارسال شود جایگزین کامل است")
     # مانده افتتاحیه سال جاری (فقط در سند opening_balance؛ در صورت عدم ارسال تغییری نمی‌کند)
