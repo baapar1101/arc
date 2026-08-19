@@ -197,6 +197,7 @@ def compact_tool_result_for_llm(
                 "hint_fa": payload.get("hint_fa"),
                 "retryable": payload.get("retryable"),
                 "expected_args": payload.get("expected_args"),
+                "required_args": payload.get("required_args"),
                 "tool": payload.get("tool") or function_name,
             }
             detail = payload.get("detail")

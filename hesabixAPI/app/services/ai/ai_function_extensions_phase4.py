@@ -199,8 +199,16 @@ def register_phase4_business_functions(registry: "AIFunctionRegistry") -> None:
     registry.register(
         AIFunction(
             name="list_currencies",
-            description="لیست ارزهای سیستم (برای ثبت فاکتور و اسناد).",
-            parameters_schema={"type": "object", "properties": {"search": {"type": "string"}}},
+            description=(
+                "لیست ارزهای سیستم با id عددی. قبل از create_invoice اگر currency_id را نمی‌دانی صدا بزن. "
+                "اگر خالی بماند، ارز پیش‌فرض کسب‌وکار در create_invoice استفاده می‌شود."
+            ),
+            parameters_schema={
+                "type": "object",
+                "properties": {
+                    "search": {"type": "string", "description": "جستجو روی نام/کد ارز (اختیاری)"},
+                },
+            },
             handler=list_currencies_handler,
             allowed_roles={AIRole.USER, AIRole.BUSINESS_OWNER, AIRole.OPERATOR, AIRole.ADMIN},
             required_permissions=["invoices.view"],
@@ -263,18 +271,31 @@ def register_phase4_business_functions(registry: "AIFunctionRegistry") -> None:
     registry.register(
         AIFunction(
             name="create_product",
-            description="ایجاد کالا یا خدمت جدید. نیاز به تأیید.",
+            description=(
+                "ایجاد کالا یا خدمت جدید. name الزامی است. "
+                "item_type: کالا یا خدمت. قیمت‌ها اختیاری. نیاز به تأیید."
+            ),
             parameters_schema={
                 "type": "object",
                 "properties": {
-                    "name": {"type": "string"},
-                    "item_type": {"type": "string", "enum": ["کالا", "خدمت"]},
-                    "code": {"type": "string"},
-                    "description": {"type": "string"},
-                    "category_id": {"type": "integer"},
-                    "base_sales_price": {"type": "number"},
-                    "base_purchase_price": {"type": "number"},
-                    "track_inventory": {"type": "boolean"},
+                    "name": {"type": "string", "description": "نام کالا یا خدمت"},
+                    "item_type": {
+                        "type": "string",
+                        "enum": ["کالا", "خدمت"],
+                        "description": "کالا (انبارداری ممکن) یا خدمت",
+                    },
+                    "code": {"type": "string", "description": "کد کالا (اختیاری؛ وگرنه خودکار)"},
+                    "description": {"type": "string", "description": "شرح (اختیاری)"},
+                    "category_id": {
+                        "type": "integer",
+                        "description": "شناسه دسته‌بندی از search_categories (اختیاری)",
+                    },
+                    "base_sales_price": {"type": "number", "description": "قیمت فروش پایه (اختیاری)"},
+                    "base_purchase_price": {"type": "number", "description": "قیمت خرید پایه (اختیاری)"},
+                    "track_inventory": {
+                        "type": "boolean",
+                        "description": "اگر true باشد موجودی انبار کنترل می‌شود",
+                    },
                 },
                 "required": ["name"],
             },
@@ -347,18 +368,36 @@ def register_phase4_business_functions(registry: "AIFunctionRegistry") -> None:
     registry.register(
         AIFunction(
             name="create_check",
-            description="ثبت چک دریافتی یا پرداختی. type: received یا transferred. نیاز به تأیید.",
+            description=(
+                "ثبت چک دریافتی (received) یا پرداختی (transferred). "
+                "person_id از search_persons. تاریخ‌ها YYYY-MM-DD یا شمسی. نیاز به تأیید."
+            ),
             parameters_schema={
                 "type": "object",
                 "properties": {
-                    "type": {"type": "string", "enum": ["received", "transferred"]},
-                    "check_number": {"type": "string"},
-                    "amount": {"type": "number"},
-                    "issue_date": {"type": "string", "format": "date"},
-                    "due_date": {"type": "string", "format": "date"},
-                    "person_id": {"type": "integer"},
-                    "bank_name": {"type": "string"},
-                    "sayad_code": {"type": "string"},
+                    "type": {
+                        "type": "string",
+                        "enum": ["received", "transferred"],
+                        "description": "received=چک دریافتی، transferred=چک پرداختی",
+                    },
+                    "check_number": {"type": "string", "description": "شماره چک"},
+                    "amount": {"type": "number", "description": "مبلغ چک"},
+                    "issue_date": {
+                        "type": "string",
+                        "format": "date",
+                        "description": "تاریخ صدور",
+                    },
+                    "due_date": {
+                        "type": "string",
+                        "format": "date",
+                        "description": "تاریخ سررسید",
+                    },
+                    "person_id": {
+                        "type": "integer",
+                        "description": "شناسه شخص از search_persons (اختیاری)",
+                    },
+                    "bank_name": {"type": "string", "description": "نام بانک (اختیاری)"},
+                    "sayad_code": {"type": "string", "description": "شناسه صیاد (اختیاری)"},
                 },
                 "required": ["type", "check_number", "amount", "issue_date", "due_date"],
             },
@@ -405,20 +444,35 @@ def register_phase4_business_functions(registry: "AIFunctionRegistry") -> None:
             parameters_schema={
                 "type": "object",
                 "properties": {
-                    "document_date": {"type": "string", "format": "date"},
-                    "currency_id": {"type": "integer"},
+                    "document_date": {
+                        "type": "string",
+                        "format": "date",
+                        "description": "تاریخ سند YYYY-MM-DD یا شمسی",
+                    },
+                    "currency_id": {
+                        "type": "integer",
+                        "description": "شناسه ارز از list_currencies",
+                    },
                     "from_account_type": {
                         "type": "string",
                         "enum": ["bank", "cash_register", "petty_cash"],
+                        "description": "نوع حساب مبدأ",
                     },
-                    "from_account_id": {"type": "integer"},
+                    "from_account_id": {
+                        "type": "integer",
+                        "description": "شناسه حساب مبدأ",
+                    },
                     "to_account_type": {
                         "type": "string",
                         "enum": ["bank", "cash_register", "petty_cash"],
+                        "description": "نوع حساب مقصد",
                     },
-                    "to_account_id": {"type": "integer"},
-                    "amount": {"type": "number"},
-                    "description": {"type": "string"},
+                    "to_account_id": {
+                        "type": "integer",
+                        "description": "شناسه حساب مقصد",
+                    },
+                    "amount": {"type": "number", "description": "مبلغ انتقال"},
+                    "description": {"type": "string", "description": "شرح (اختیاری)"},
                 },
                 "required": [
                     "document_date",

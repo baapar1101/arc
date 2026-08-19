@@ -28,9 +28,13 @@ TOOL_ROUTING_PROMPT_BLOCK = """
 - «ماه گذشته»، «فروردین ۱۴۰۴»، «هفته اخیر» → ابتدا `resolve_date_range`
 
 **عملیات (نیاز به تأیید)**
-- ثبت فاکتور → `create_invoice` | شخص → ابزارهای person
-- دریافت/پرداخت → ابزارهای receipt/payment
-- هرگز write بدون خلاصه + تأیید صریح کاربر
+- ثبت فاکتور فروش/خرید → ترتیب: `search_persons` (person_id) سپس `search_products` (product_id و قیمت) سپس در صورت نیاز `list_currencies` سپس `create_invoice`.
+  - `invoice_type` فقط: `invoice_sales` / `invoice_purchase` / `invoice_sales_return` / `invoice_purchase_return`
+  - `person_id` و `product_id` باید عدد باشند (نه نام). `unit_price` را در هر سطر `lines[]` بفرست.
+  - `take` در جستجو حداکثر ۱۰۰ است.
+- شخص جدید → `create_person` | کالا جدید → `create_product`
+- دریافت/پرداخت → `create_receipt_payment` بعد از `list_bank_accounts`/`list_cash_registers`
+- هرگز write بدون خلاصه + تأیید صریح کاربر. اگر ابزار APPROVAL_REQUIRED داد، همان JSON را با آرگومان‌های اصلاح‌نشده تکرار نکن مگر کاربر تأیید کرده باشد.
 
 **CRM**
 - سرنخ/فرصت/فعالیت → `search_leads` / `search_deals` / `search_activities`

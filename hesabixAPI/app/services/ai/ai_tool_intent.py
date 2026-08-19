@@ -301,6 +301,61 @@ _WRITE_TOOLS = frozenset({
     "delete_account",
 })
 
+# ابزارهای کمکی که مدل برای تکمیل آرگومان write نیاز دارد — prefer تا سقف ۴۸ حذف‌شان نکند
+_WRITE_TOOL_COMPANIONS: dict[str, frozenset[str]] = {
+    "create_invoice": frozenset({
+        "search_persons",
+        "search_products",
+        "get_product_info",
+        "list_currencies",
+        "list_warehouses",
+        "get_current_fiscal_year",
+    }),
+    "update_invoice": frozenset({
+        "search_invoices",
+        "get_invoice_details",
+        "search_persons",
+        "search_products",
+        "list_currencies",
+    }),
+    "create_receipt_payment": frozenset({
+        "search_persons",
+        "list_currencies",
+        "list_bank_accounts",
+        "list_cash_registers",
+    }),
+    "create_check": frozenset({
+        "search_persons",
+        "list_currencies",
+        "list_bank_accounts",
+    }),
+    "create_product": frozenset({
+        "search_products",
+        "search_categories",
+    }),
+    "create_expense_income": frozenset({
+        "list_accounts",
+        "list_currencies",
+        "search_persons",
+        "list_bank_accounts",
+        "list_cash_registers",
+    }),
+    "create_transfer": frozenset({
+        "list_currencies",
+        "list_bank_accounts",
+        "list_cash_registers",
+        "list_petty_cash",
+    }),
+    "create_lead": frozenset({
+        "search_leads",
+        "get_pipeline_report",
+    }),
+    "create_person": frozenset({
+        "search_persons",
+        "list_person_groups",
+    }),
+}
+
 _PEOPLE_KEYWORDS = re.compile(
     r"شخص|مشتری|تامین|تأمین|supplier|customer|people|person|علی|نام\s+",
     re.IGNORECASE,
@@ -596,6 +651,13 @@ def select_tool_names(
     if prefer_names:
         selected |= set(prefer_names) & available
 
+    companions: Set[str] = set()
+    for name in list(selected):
+        companions |= _WRITE_TOOL_COMPANIONS.get(name, frozenset())
+    companions &= available
+    selected |= companions
+    effective_prefer: Set[str] = set(prefer_names or ()) | companions
+
     # اگر هنوز کم است، ابزارهای پرکاربرد اضافه
     if len(selected) < 12:
         for cat in ("financial", "warehouse", "crm"):
@@ -606,7 +668,7 @@ def select_tool_names(
         user_query,
         max_tools=max_tools,
         core_names=_CORE_TOOL_NAMES,
-        prefer_names=prefer_names,
+        prefer_names=effective_prefer,
     )
 
 

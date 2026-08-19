@@ -1982,10 +1982,14 @@ def _person_id_from_header(data: Dict[str, Any]) -> Optional[int]:
             (ei or {}).get("person_id"),
             data.get("person_id"),
             data.get("customer_id"),
+            data.get("supplier_id"),
+            (ei or {}).get("customer_id"),
         ):
             if candidate is None or candidate == "":
                 continue
-            return int(candidate)
+            parsed = int(candidate)
+            if parsed > 0:
+                return parsed
         return None
     except Exception:
         return None

@@ -11,6 +11,7 @@ from app.services.ai.ai_date_resolver import normalize_query_dates
 from app.services.ai.ai_query_filter_catalog import (
     STANDARD_OPERATORS,
     get_entity_query_spec,
+    resolve_filter_property,
 )
 
 _MAX_FILTER_ITEMS = 12
@@ -38,17 +39,22 @@ def normalize_filter_items(
         if not isinstance(item, dict):
             raise ValueError(f"filters[{i}] باید object باشد")
         prop = str(item.get("property") or "").strip()
-        op = str(item.get("operator") or "").strip()
+        op = str(item.get("operator") or "").strip().rstrip(",;").strip()
         if not prop or not op:
             raise ValueError(f"filters[{i}]: property و operator الزامی است")
         if op not in _ALLOWED_OPS:
             raise ValueError(
                 f"عملگر نامعتبر: {op}. مجاز: {', '.join(sorted(_ALLOWED_OPS))}"
             )
+        try:
+            prop = resolve_filter_property(entity, prop)
+        except ValueError:
+            raise
         if allowed_props is not None and prop not in allowed_props:
+            allowed = ", ".join(sorted(allowed_props))
             raise ValueError(
                 f"فیلتر '{prop}' برای entity '{entity}' مجاز نیست. "
-                f"از list_queryable_fields کمک بگیرید."
+                f"propertyهای مجاز: {allowed}. برای نام/کد از search استفاده کن."
             )
         out.append({"property": prop, "operator": op, "value": item.get("value")})
     return out

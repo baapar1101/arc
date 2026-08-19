@@ -1049,7 +1049,6 @@ class _AIChatDialogState extends State<AIChatDialog> {
   }
 
   Future<void> _pickAndUploadAttachment() async {
-    if (!await _ensureSession()) return;
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
       allowedExtensions: [
@@ -1072,6 +1071,7 @@ class _AIChatDialogState extends State<AIChatDialog> {
       _showError(AppLocalizations.of(context).aiChatEmptyFile);
       return;
     }
+    if (!await _ensureSession()) return;
     try {
       await _aiService.uploadSessionAttachment(
         sessionId: _currentSession!.id!,
@@ -2454,6 +2454,13 @@ class _AIChatDialogState extends State<AIChatDialog> {
                                     _sending ? null : _onSttChanged,
                                 onTtsChanged:
                                     _sending ? null : _onTtsChanged,
+                                onAttach: _pickAndUploadAttachment,
+                                attachmentsBar: _attachments.isNotEmpty
+                                    ? _buildAttachmentsBar(
+                                        theme,
+                                        padded: false,
+                                      )
+                                    : null,
                               )
                             : AIChatThreadView(
                                 key: ValueKey(
@@ -2737,10 +2744,12 @@ class _AIChatDialogState extends State<AIChatDialog> {
     );
   }
 
-  Widget _buildAttachmentsBar(ThemeData theme) {
+  Widget _buildAttachmentsBar(ThemeData theme, {bool padded = true}) {
     final scheme = theme.colorScheme;
     return Container(
-      margin: const EdgeInsets.fromLTRB(16, 0, 16, 6),
+      margin: padded
+          ? const EdgeInsets.fromLTRB(16, 0, 16, 6)
+          : EdgeInsets.zero,
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
         color: scheme.surfaceContainerHigh.withValues(alpha: 0.6),

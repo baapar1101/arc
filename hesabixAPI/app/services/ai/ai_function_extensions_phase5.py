@@ -81,19 +81,34 @@ def register_phase5_business_functions(registry: "AIFunctionRegistry") -> None:
             parameters_schema={
                 "type": "object",
                 "properties": {
-                    "document_type": {"type": "string", "enum": ["expense", "income"]},
-                    "document_date": {"type": "string", "format": "date"},
-                    "currency_id": {"type": "integer"},
-                    "account_id": {"type": "integer", "description": "شناسه حساب هزینه/درآمد"},
-                    "amount": {"type": "number"},
+                    "document_type": {
+                        "type": "string",
+                        "enum": ["expense", "income"],
+                        "description": "expense=هزینه، income=درآمد",
+                    },
+                    "document_date": {
+                        "type": "string",
+                        "format": "date",
+                        "description": "تاریخ سند؛ اگر خالی بماند امروز",
+                    },
+                    "currency_id": {
+                        "type": "integer",
+                        "description": "شناسه ارز از list_currencies",
+                    },
+                    "account_id": {"type": "integer", "description": "شناسه حساب هزینه/درآمد از list_accounts"},
+                    "amount": {"type": "number", "description": "مبلغ (بزرگتر از صفر)"},
                     "counterparty_type": {
                         "type": "string",
                         "enum": ["bank", "cash_register", "petty_cash", "person"],
+                        "description": "نوع طرف‌حساب",
                     },
-                    "counterparty_id": {"type": "integer"},
-                    "description": {"type": "string"},
-                    "line_description": {"type": "string"},
-                    "transaction_date": {"type": "string"},
+                    "counterparty_id": {
+                        "type": "integer",
+                        "description": "شناسه طرف‌حساب (بانک/صندوق/شخص)",
+                    },
+                    "description": {"type": "string", "description": "شرح سند (اختیاری)"},
+                    "line_description": {"type": "string", "description": "شرح سطر حساب (اختیاری)"},
+                    "transaction_date": {"type": "string", "description": "تاریخ تراکنش طرف‌حساب (اختیاری)"},
                 },
                 "required": [
                     "document_type",
@@ -275,20 +290,29 @@ def register_phase5_business_functions(registry: "AIFunctionRegistry") -> None:
     registry.register(
         AIFunction(
             name="create_lead",
-            description="ایجاد سرنخ CRM. process_definition_id و stage_id الزامی است.",
+            description=(
+                "ایجاد سرنخ CRM. process_definition_id و stage_id را از قیف/pipeline بگیر. "
+                "name الزامی است. نیاز به تأیید."
+            ),
             parameters_schema={
                 "type": "object",
                 "properties": {
-                    "process_definition_id": {"type": "integer"},
-                    "stage_id": {"type": "integer"},
-                    "name": {"type": "string"},
-                    "code": {"type": "string"},
-                    "source_code": {"type": "string"},
-                    "company_name": {"type": "string"},
-                    "mobile": {"type": "string"},
-                    "email": {"type": "string", "format": "email"},
-                    "description": {"type": "string"},
-                    "assigned_to_user_id": {"type": "integer"},
+                    "process_definition_id": {
+                        "type": "integer",
+                        "description": "شناسه تعریف قیف/فرآیند CRM",
+                    },
+                    "stage_id": {"type": "integer", "description": "شناسه مرحله قیف"},
+                    "name": {"type": "string", "description": "نام سرنخ"},
+                    "code": {"type": "string", "description": "کد سرنخ (اختیاری)"},
+                    "source_code": {"type": "string", "description": "کد منبع جذب (اختیاری)"},
+                    "company_name": {"type": "string", "description": "نام شرکت (اختیاری)"},
+                    "mobile": {"type": "string", "description": "موبایل (اختیاری)"},
+                    "email": {"type": "string", "format": "email", "description": "ایمیل (اختیاری)"},
+                    "description": {"type": "string", "description": "توضیحات (اختیاری)"},
+                    "assigned_to_user_id": {
+                        "type": "integer",
+                        "description": "شناسه کاربر مسئول (اختیاری)",
+                    },
                 },
                 "required": ["process_definition_id", "stage_id", "name"],
             },

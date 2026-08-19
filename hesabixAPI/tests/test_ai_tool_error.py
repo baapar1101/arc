@@ -24,7 +24,7 @@ def test_unexpected_db_keyword_becomes_invalid_arguments():
     )
     assert payload["error"] == "INVALID_ARGUMENTS"
     assert payload["retryable"] is True
-    assert "db" in payload["message_fa"]
+    assert "db" in (payload.get("hint_fa") or "")
     assert "items" in payload["expected_args"]
     assert payload.get("hint_fa")
 
@@ -47,3 +47,16 @@ def test_api_error_keeps_business_code():
     assert payload["error"] == "PERSON_REQUIRED"
     assert "person_id" in payload["message"]
     assert payload.get("detail")
+    assert "search_persons" in (payload.get("hint_fa") or "")
+
+
+def test_create_invoice_schema_nested_expected_args():
+    from app.services.ai.ai_tool_payloads import CREATE_INVOICE_PARAMETERS_SCHEMA
+
+    payload = normalize_tool_error(
+        "create_invoice",
+        ValueError("lines الزامی است و باید حداقل یک قلم کالا داشته باشد."),
+        schema=CREATE_INVOICE_PARAMETERS_SCHEMA,
+    )
+    assert "lines[].unit_price" in payload["expected_args"]
+    assert "person_id" in payload["required_args"]

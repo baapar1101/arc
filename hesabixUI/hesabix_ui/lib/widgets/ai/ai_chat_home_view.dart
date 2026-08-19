@@ -46,6 +46,8 @@ class AIChatHomeView extends StatelessWidget {
   final String? selectedTtsCode;
   final ValueChanged<String>? onSttChanged;
   final ValueChanged<String>? onTtsChanged;
+  final VoidCallback? onAttach;
+  final Widget? attachmentsBar;
 
   const AIChatHomeView({
     super.key,
@@ -85,6 +87,8 @@ class AIChatHomeView extends StatelessWidget {
     this.selectedTtsCode,
     this.onSttChanged,
     this.onTtsChanged,
+    this.onAttach,
+    this.attachmentsBar,
   });
 
   @override
@@ -123,6 +127,10 @@ class AIChatHomeView extends StatelessWidget {
                       ),
                     ],
                     SizedBox(height: compact ? 24 : 32),
+                    if (attachmentsBar != null) ...[
+                      attachmentsBar!,
+                      SizedBox(height: compact ? 10 : 12),
+                    ],
                     Stack(
                       alignment: Alignment.center,
                       children: [
@@ -145,6 +153,7 @@ class AIChatHomeView extends StatelessWidget {
                               dictating: dictating,
                               dictateBusy: dictateBusy,
                               onStopVoice: onStopVoice,
+                              onAttach: canUseAi ? onAttach : null,
                               availableModels: availableModels,
                               selectedModelCode: selectedModelCode,
                               modelsLoading: modelsLoading,

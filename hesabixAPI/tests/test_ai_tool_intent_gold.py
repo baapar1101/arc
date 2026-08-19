@@ -28,7 +28,7 @@ GOLD_CASES: list[tuple[str, tuple[str, ...]]] = [
     ("لیست محصولات و کالاها", ("search_products",)),
     ("موجودی کیف پول کسب‌وکار", ("get_wallet_overview",)),
     ("سرفصل حساب‌های کل", ("list_accounts",)),
-    ("یه فاکتور برای علی بزن", ("create_invoice",)),
+    ("یه فاکتور برای علی بزن", ("create_invoice", "list_currencies")),
 ]
 
 
@@ -117,6 +117,16 @@ def test_prefer_names_survive_cap():
     )
     assert len(selected) <= MAX_TOOLS_PER_REQUEST
     assert "hscript_language_guide" in selected
+
+
+def test_invoice_write_keeps_currency_companion_when_capped():
+    catalog = _catalog_names()
+    selected = select_tool_names(catalog, "یه فاکتور فروش برای رضا بزن")
+    assert "create_invoice" in selected
+    assert "list_currencies" in selected
+    assert "search_persons" in selected
+    assert "search_products" in selected
+    assert len(selected) <= MAX_TOOLS_PER_REQUEST
 
 
 def test_wallet_and_accounts_categories_detected():

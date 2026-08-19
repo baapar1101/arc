@@ -4,6 +4,8 @@ from __future__ import annotations
 import inspect
 from typing import Any, Callable, Dict
 
+from app.services.ai.ai_constants import AI_LIST_TAKE_MAX
+
 
 def handler_uses_args_context(service_func: Callable) -> bool:
     """آیا تابع با قرارداد ``(args, context)`` ثبت شده، نه ``(db, **kwargs)``."""
@@ -23,6 +25,39 @@ def handler_uses_args_context(service_func: Callable) -> bool:
     if len(names) >= 2 and names[0] in {"args", "arguments"} and names[1] == "context":
         return True
     return False
+
+
+def _clamp_take_fields(args: Dict[str, Any]) -> None:
+    for key in ("take", "limit"):
+        if key not in args or args[key] is None:
+            continue
+        try:
+            args[key] = max(1, min(int(args[key]), AI_LIST_TAKE_MAX))
+        except (TypeError, ValueError):
+            args.pop(key, None)
+
+
+def kwargs_for_old_style_handler(service_func: Callable, args: Dict[str, Any]) -> Dict[str, Any]:
+    """فقط آرگومان‌هایی که تابع واقعاً می‌پذیرد — جلوگیری از unexpected keyword."""
+    clean = {k: v for k, v in args.items() if k != "db"}
+    try:
+        params = inspect.signature(service_func).parameters
+    except (TypeError, ValueError):
+        return clean
+    if any(p.kind == inspect.Parameter.VAR_KEYWORD for p in params.values()):
+        return clean
+    allowed = {
+        name
+        for name, p in params.items()
+        if name != "db"
+        and p.kind
+        in (
+            inspect.Parameter.POSITIONAL_ONLY,
+            inspect.Parameter.POSITIONAL_OR_KEYWORD,
+            inspect.Parameter.KEYWORD_ONLY,
+        )
+    }
+    return {k: v for k, v in clean.items() if k in allowed}
 
 
 def wrap_registry_service_func(service_func: Callable) -> Callable:
@@ -79,11 +114,13 @@ def wrap_registry_service_func(service_func: Callable) -> Callable:
         if "user_id" not in args:
             args["user_id"] = user_context.get_user_id()
 
+        _clamp_take_fields(args)
+
         try:
             if uses_args_context:
                 result = service_func(args, context)
             else:
-                result = service_func(db=db, **args)
+                result = service_func(db=db, **kwargs_for_old_style_handler(service_func, args))
             return enrich_tool_result_dates(result, calendar_type=calendar_type)
         except Exception:
             try:

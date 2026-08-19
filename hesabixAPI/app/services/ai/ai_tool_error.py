@@ -42,7 +42,10 @@ def normalize_tool_error(
 ) -> Dict[str, Any]:
     raw = str(exc).strip() or type(exc).__name__
     code = "TOOL_ERROR"
-    hint_fa = "آرگومان را بدون تکرار عینی قبلی اصلاح کن و دوباره تلاش کن."
+    hint_fa = (
+        "آرگومان را مطابق schema همین ابزار اصلاح کن؛ همان JSON قبلی را تکرار نکن. "
+        "شناسه‌ها را از ابزارهای search/list بگیر."
+    )
     message_fa = "اجرای ابزار با خطا مواجه شد."
     retryable = True
 
@@ -50,23 +53,26 @@ def normalize_tool_error(
     if unexpected:
         code = "INVALID_ARGUMENTS"
         bad = unexpected.group(1)
-        message_fa = f"پارامتر «{bad}» برای این ابزار معتبر نیست."
-        hint_fa = (
-            f"آرگومان «{bad}» را حذف کن و فقط فیلدهای schema همین ابزار را بفرست."
-        )
+        if bad in {"db", "user_id", "business_id"}:
+            message_fa = "آرگومان داخلی سیستم به‌اشتباه به ابزار رسید."
+            hint_fa = (
+                "db/user_id/business_id را نفرست؛ جلسه آن‌ها را تزریق می‌کند. "
+                "فقط فیلدهای schema همین ابزار را بفرست."
+            )
+        else:
+            message_fa = f"پارامتر «{bad}» برای این ابزار معتبر نیست."
+            hint_fa = (
+                f"آرگومان «{bad}» را حذف کن و فقط فیلدهای schema همین ابزار را بفرست."
+            )
     elif _NOT_FOUND.search(raw) or "not found in registry" in raw.lower():
         return unknown_tool_result(function_name)
     elif _is_api_error(exc):
         code = str(getattr(exc, "code", None) or getattr(exc, "error_code", None) or "TOOL_ERROR")
         api_message = str(getattr(exc, "message", None) or raw)
         message_fa = api_message if _looks_persian(api_message) else (
-            f"{api_message}" if api_message else "اجرای ابزار با خطا مواجه شد."
+            api_message if api_message else "اجرای ابزار با خطا مواجه شد."
         )
-        hint_fa = (
-            api_message
-            if _looks_persian(api_message)
-            else "آرگومان را مطابق قرارداد ابزار اصلاح کن و دوباره تلاش کن."
-        )
+        hint_fa = _hint_for_business_code(code, function_name, api_message)
     elif isinstance(exc, PermissionError):
         code = "PERMISSION_DENIED"
         message_fa = "اجازهٔ اجرای این ابزار را ندارید."
@@ -76,8 +82,14 @@ def normalize_tool_error(
         code = "INVALID_ARGUMENTS"
         message_fa = raw if _looks_persian(raw) else "پارامترهای ابزار ناقص یا نامعتبر است."
         hint_fa = raw if _looks_persian(raw) else hint_fa
+        if "فیلتر" in raw and "مجاز نیست" in raw:
+            hint_fa = (
+                f"{raw} نام ستون را حدس نزن؛ list_queryable_fields را صدا بزن "
+                "یا از پارامتر search برای نام/کد استفاده کن."
+            )
 
     expected = _schema_property_names(schema)
+    required = _schema_required_names(schema)
     payload: Dict[str, Any] = {
         "ok": False,
         "error": code,
@@ -89,9 +101,45 @@ def normalize_tool_error(
     }
     if expected:
         payload["expected_args"] = expected
+    if required:
+        payload["required_args"] = required
     if raw and raw != message_fa:
         payload["detail"] = raw[:400]
     return payload
+
+
+_BUSINESS_HINTS: Dict[str, str] = {
+    "PERSON_REQUIRED": (
+        "person_id عددی مشتری را از search_persons بردار و در ریشهٔ آرگومان بفرست. "
+        "نام شخص به‌جای شناسه قبول نیست."
+    ),
+    "CURRENCY_REQUIRED": (
+        "currency_id را با list_currencies بگیر یا خالی بگذار تا ارز پیش‌فرض کسب‌وکار استفاده شود."
+    ),
+    "LINES_REQUIRED": "حداقل یک سطر در lines با product_id، quantity و unit_price بفرست.",
+    "INVALID_LINE": "هر سطر باید product_id و quantity مثبت داشته باشد.",
+    "INVALID_INVOICE_TYPE": (
+        "invoice_type را یکی از invoice_sales / invoice_purchase / "
+        "invoice_sales_return / invoice_purchase_return بگذار."
+    ),
+    "PERSON_NOT_FOUND_OR_WRONG_BUSINESS": (
+        "person_id متعلق به این کسب‌وکار نیست. دوباره search_persons را در همین کسب‌وکار صدا بزن."
+    ),
+}
+
+
+def _hint_for_business_code(code: str, function_name: str, api_message: str) -> str:
+    mapped = _BUSINESS_HINTS.get(code)
+    if mapped:
+        return mapped
+    if _looks_persian(api_message):
+        return api_message
+    if function_name == "create_invoice":
+        return (
+            "آرگومان create_invoice را با person_id، invoice_type=invoice_sales یا invoice_purchase، "
+            "و lines[].product_id/quantity/unit_price کامل کن."
+        )
+    return "آرگومان را مطابق قرارداد ابزار اصلاح کن و دوباره تلاش کن."
 
 
 def _schema_property_names(schema: Optional[Dict[str, Any]]) -> list[str]:
@@ -100,7 +148,23 @@ def _schema_property_names(schema: Optional[Dict[str, Any]]) -> list[str]:
     props = schema.get("properties")
     if not isinstance(props, dict):
         return []
-    return [str(k) for k in props.keys()][:24]
+    names = [str(k) for k in props.keys()]
+    lines = props.get("lines")
+    if isinstance(lines, dict):
+        items = lines.get("items")
+        nested = (items or {}).get("properties") if isinstance(items, dict) else None
+        if isinstance(nested, dict):
+            names.extend(f"lines[].{k}" for k in nested.keys())
+    return names[:36]
+
+
+def _schema_required_names(schema: Optional[Dict[str, Any]]) -> list[str]:
+    if not isinstance(schema, dict):
+        return []
+    req = schema.get("required")
+    if not isinstance(req, list):
+        return []
+    return [str(x) for x in req if x][:24]
 
 
 def _is_api_error(exc: BaseException) -> bool:

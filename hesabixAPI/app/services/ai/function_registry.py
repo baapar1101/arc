@@ -197,9 +197,10 @@ class AIFunctionRegistry:
             description=(
                 "جستجو و فیلتر فاکتورها (QueryInfo: search, search_fields, filters با عملگر = > < * in). "
                 "list_queryable_fields(entity=invoice) برای ستون‌های مجاز. "
-                "نتیجه: items + pagination.total."
+                "نتیجه: items + pagination.total. take حداکثر ۱۰۰."
             ),
             parameters_schema=ai_list_parameters_schema(
+                entity="invoice",
                 extra_properties={
                     "document_type": {
                         "type": "string",
@@ -341,67 +342,41 @@ class AIFunctionRegistry:
         
         # اضافه کردن create_invoice
         def create_invoice_wrapper(args: Dict[str, Any], context: Dict[str, Any]) -> Any:
-            """Wrapper برای ایجاد فاکتور"""
+            """Wrapper برای ایجاد فاکتور — نگاشت unit_price/person_id به قرارداد سرویس."""
+            from app.services.ai.ai_tool_payloads import build_create_invoice_payload
             from app.services.invoice_service import create_invoice
-            
+
             db: Session = context["db"]
             user_context: AuthContext = context["user_context"]
             business_id = args.get("business_id") or context.get("business_id")
             user_id = user_context.get_user_id()
-            extra_info = (
-                dict(args.get("extra_info") or {})
-                if isinstance(args.get("extra_info"), dict)
-                else {}
+            data = build_create_invoice_payload(
+                args, db=db, business_id=business_id
             )
-            person_id = args.get("person_id")
-            if person_id is not None and extra_info.get("person_id") is None:
-                extra_info["person_id"] = person_id
-            
-            data = {
-                "invoice_type": args.get("invoice_type"),
-                "document_date": args.get("document_date"),
-                "currency_id": args.get("currency_id"),
-                "person_id": person_id,
-                "description": args.get("description"),
-                "lines": args.get("lines", []),
-                "extra_info": extra_info,
-            }
-            
+            if not data.get("person_id"):
+                raise ValueError(
+                    "person_id الزامی است. ابتدا search_persons را صدا بزن و id عددی شخص را بفرست."
+                )
+            if not data.get("currency_id"):
+                raise ValueError(
+                    "currency_id مشخص نیست. list_currencies را صدا بزن یا ارز پیش‌فرض کسب‌وکار را تنظیم کنید."
+                )
+            if not data.get("invoice_type"):
+                raise ValueError(
+                    "invoice_type الزامی است: invoice_sales یا invoice_purchase."
+                )
             return create_invoice(db, business_id, user_id, data)
-        
+
+        from app.services.ai.ai_tool_payloads import (
+            CREATE_INVOICE_DESCRIPTION,
+            CREATE_INVOICE_PARAMETERS_SCHEMA,
+        )
+
         self.register(AIFunction(
             name="create_invoice",
-            description="ایجاد یک فاکتور جدید (فروش، خرید و غیره). شناسه کسب‌وکار به صورت خودکار از جلسه گفت‌وگو گرفته می‌شود.",
-            parameters_schema={
-                "type": "object",
-                "properties": {
-                    "invoice_type": {
-                        "type": "string",
-                        "enum": ["invoice_sales", "invoice_purchase", "invoice_sales_return", "invoice_purchase_return"],
-                        "description": "نوع فاکتور"
-                    },
-                    "document_date": {"type": "string", "format": "date", "description": "تاریخ فاکتور"},
-                    "currency_id": {"type": "integer", "description": "شناسه ارز"},
-                    "person_id": {"type": "integer", "description": "شناسه مشتری/تامین‌کننده (برای فاکتورهای طرف شخص)"},
-                    "description": {"type": "string", "description": "توضیحات (اختیاری)"},
-                    "lines": {
-                        "type": "array",
-                        "description": "اقلام فاکتور",
-                        "items": {
-                            "type": "object",
-                            "properties": {
-                                "product_id": {"type": "integer", "description": "شناسه محصول"},
-                                "quantity": {"type": "number", "description": "تعداد"},
-                                "unit_price": {"type": "number", "description": "قیمت واحد"},
-                                "description": {"type": "string", "description": "توضیحات (اختیاری)"}
-                            },
-                            "required": ["product_id", "quantity", "unit_price"]
-                        }
-                    }
-                },
-                "required": ["invoice_type", "document_date", "currency_id", "lines"]
-            },
-            handler=create_invoice_wrapper,
+            description=CREATE_INVOICE_DESCRIPTION,
+            parameters_schema=CREATE_INVOICE_PARAMETERS_SCHEMA,
+            handler=self._create_handler(create_invoice_wrapper),
             allowed_roles={AIRole.USER, AIRole.BUSINESS_OWNER, AIRole.OPERATOR, AIRole.ADMIN},
             required_permissions=["invoices.write"],
             category="invoices",
@@ -436,9 +411,10 @@ class AIFunctionRegistry:
             name="search_products",
             description=(
                 "جستجو در کالا/خدمات با QueryInfo (filters, search_fields). "
-                "list_queryable_fields(entity=product)."
+                "list_queryable_fields(entity=product). take حداکثر ۱۰۰."
             ),
             parameters_schema=ai_list_parameters_schema(
+                entity="product",
                 extra_properties={
                     "category_id": {"type": "integer", "description": "فیلتر دسته‌بندی"},
                     "item_type": {
@@ -459,17 +435,30 @@ class AIFunctionRegistry:
             category="products"
         ))
         
+        def get_product_info_wrapper(db, business_id, user_id=None, product_id=None, **kwargs):
+            """get_product امضای user_id ندارد — wrapper آرگومان‌های جلسه را می‌بلعد."""
+            pid = product_id if product_id is not None else kwargs.get("id")
+            if pid is None:
+                raise ValueError("product_id الزامی است. از search_products فیلد id را بردار.")
+            data = get_product(db, int(pid), int(business_id))
+            if not data:
+                raise ValueError(f"کالا/خدمت {pid} در این کسب‌وکار یافت نشد.")
+            return data
+
         self.register(AIFunction(
             name="get_product_info",
-            description="دریافت اطلاعات کامل یک محصول یا کالا. شناسه کسب‌وکار به صورت خودکار از جلسه گفت‌وگو گرفته می‌شود.",
+            description=(
+                "دریافت اطلاعات کامل یک کالا یا خدمت با شناسه عددی. "
+                "product_id را از search_products بگیر. شناسه کسب‌وکار از جلسه تزریق می‌شود."
+            ),
             parameters_schema={
                 "type": "object",
                 "properties": {
-                    "product_id": {"type": "integer", "description": "شناسه محصول"}
+                    "product_id": {"type": "integer", "description": "شناسه عددی کالا/خدمت از search_products"}
                 },
                 "required": ["product_id"]
             },
-            handler=self._create_handler(get_product),
+            handler=self._create_handler(get_product_info_wrapper),
             allowed_roles={AIRole.USER, AIRole.BUSINESS_OWNER, AIRole.OPERATOR, AIRole.ADMIN},
             required_permissions=["inventory.read"],
             category="products"
@@ -605,9 +594,10 @@ class AIFunctionRegistry:
             name="search_persons",
             description=(
                 "جستجو در اشخاص با QueryInfo (filters, search_fields). "
-                "list_queryable_fields(entity=person). پاسخ: items + pagination."
+                "list_queryable_fields(entity=person). پاسخ: items + pagination. take حداکثر ۱۰۰."
             ),
             parameters_schema=ai_list_parameters_schema(
+                entity="person",
                 extra_properties={
                     "person_type": {
                         "type": "string",
@@ -696,7 +686,10 @@ class AIFunctionRegistry:
         
         self.register(AIFunction(
             name="create_person",
-            description="ایجاد یک مشتری یا تامین‌کننده جدید. شناسه کسب‌وکار به صورت خودکار از جلسه گفت‌وگو گرفته می‌شود.",
+            description=(
+                "ایجاد مشتری یا تامین‌کننده جدید. name و person_type الزامی است "
+                "(customer یا supplier). شناسه کسب‌وکار از جلسه گرفته می‌شود. نیاز به تأیید."
+            ),
             parameters_schema={
                 "type": "object",
                 "properties": {
@@ -710,7 +703,7 @@ class AIFunctionRegistry:
                 },
                 "required": ["name", "person_type"]
             },
-            handler=create_person_wrapper,
+            handler=self._create_handler(create_person_wrapper),
             allowed_roles={AIRole.USER, AIRole.BUSINESS_OWNER, AIRole.OPERATOR, AIRole.ADMIN},
             required_permissions=["persons.write"],
             category="persons",
@@ -766,7 +759,7 @@ class AIFunctionRegistry:
                 },
                 "required": ["person_id"]
             },
-            handler=update_person_wrapper,
+            handler=self._create_handler(update_person_wrapper),
             allowed_roles={AIRole.USER, AIRole.BUSINESS_OWNER, AIRole.OPERATOR, AIRole.ADMIN},
             required_permissions=["persons.write"],
             category="persons",
@@ -896,9 +889,10 @@ class AIFunctionRegistry:
             name="search_receipts_payments",
             description=(
                 "جستجو در دریافت/پرداخت با QueryInfo (filters, search_fields). "
-                "type=receipt|payment. فیلترهای ستونی در filters[]"
+                "type=receipt|payment. فیلترهای ستونی در filters[]. take حداکثر ۱۰۰."
             ),
             parameters_schema=ai_list_parameters_schema(
+                entity="document",
                 extra_properties={
                     "type": {
                         "type": "string",
@@ -958,21 +952,43 @@ class AIFunctionRegistry:
         
         self.register(AIFunction(
             name="create_receipt_payment",
-            description="ثبت دریافت یا پرداخت نقدی/بانکی. شناسه کسب‌وکار به صورت خودکار از جلسه گفت‌وگو گرفته می‌شود.",
+            description=(
+                "ثبت دریافت (receipt) یا پرداخت (payment). "
+                "account_id شناسه حساب بانکی/صندوق است (list_bank_accounts یا list_cash_registers). "
+                "اگر طرف شخص دارد person_id را از search_persons بگیر. "
+                "currency_id از list_currencies. نیاز به تأیید کاربر."
+            ),
             parameters_schema={
                 "type": "object",
                 "properties": {
-                    "type": {"type": "string", "enum": ["receipt", "payment"], "description": "نوع: دریافت یا پرداخت"},
-                    "document_date": {"type": "string", "format": "date", "description": "تاریخ سند"},
-                    "currency_id": {"type": "integer", "description": "شناسه ارز"},
-                    "person_id": {"type": "integer", "description": "شناسه شخص (اختیاری)"},
-                    "amount": {"type": "number", "description": "مبلغ"},
-                    "account_id": {"type": "integer", "description": "شناسه حساب بانکی/نقدی"},
-                    "description": {"type": "string", "description": "توضیحات (اختیاری)"}
+                    "type": {
+                        "type": "string",
+                        "enum": ["receipt", "payment"],
+                        "description": "receipt=دریافت از شخص، payment=پرداخت به شخص",
+                    },
+                    "document_date": {
+                        "type": "string",
+                        "format": "date",
+                        "description": "تاریخ سند YYYY-MM-DD یا شمسی YYYY/MM/DD",
+                    },
+                    "currency_id": {
+                        "type": "integer",
+                        "description": "شناسه ارز از list_currencies",
+                    },
+                    "person_id": {
+                        "type": "integer",
+                        "description": "شناسه عددی شخص از search_persons (اختیاری اما معمولاً لازم)",
+                    },
+                    "amount": {"type": "number", "description": "مبلغ (بزرگتر از صفر)"},
+                    "account_id": {
+                        "type": "integer",
+                        "description": "شناسه حساب بانکی یا صندوق",
+                    },
+                    "description": {"type": "string", "description": "شرح سند (اختیاری)"},
                 },
-                "required": ["type", "document_date", "currency_id", "amount", "account_id"]
+                "required": ["type", "document_date", "currency_id", "amount", "account_id"],
             },
-            handler=create_receipt_payment_wrapper,
+            handler=self._create_handler(create_receipt_payment_wrapper),
             allowed_roles={AIRole.USER, AIRole.BUSINESS_OWNER, AIRole.OPERATOR, AIRole.ADMIN},
             required_permissions=["receipts_payments.write"],
             category="financial",

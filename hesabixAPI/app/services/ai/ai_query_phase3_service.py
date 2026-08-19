@@ -34,7 +34,7 @@ def search_activity_logs(
 ) -> Dict[str, Any]:
     from adapters.db.repositories.activity_log_repo import ActivityLogRepository
 
-    q = _clamp_pagination(filters, default_take=50, max_take=200)
+    q = _clamp_pagination(filters, default_take=50, max_take=100)
     page = max(1, _to_int(filters.get("page"), 1) or 1)
     limit = q["take"]
     offset = q["skip"] if filters.get("skip") is not None else (page - 1) * limit

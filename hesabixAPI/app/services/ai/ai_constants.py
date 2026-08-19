@@ -79,6 +79,10 @@ MEMORY_ALWAYS_KIND_CHAR_BUDGET = 2200
 MEMORY_RECALL_KIND_CHAR_BUDGET = 1400
 MEMORY_RECALL_MAX_ITEMS = 12
 
+# سقف صفحه‌بندی ابزارهای لیست (هم‌تراز QueryInfo.le=100)
+AI_LIST_TAKE_MAX = 100
+AI_LIST_TAKE_DEFAULT = 50
+
 # حداکثر طول JSON نتیجه tool در پیام role=tool
 MAX_TOOL_RESULT_JSON_CHARS = 6_000
 # سقف ردیف در envelope ارسالی به مدل (بقیه در summary.total)
