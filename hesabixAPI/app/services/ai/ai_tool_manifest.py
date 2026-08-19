@@ -8,7 +8,16 @@ from __future__ import annotations
 
 from typing import Any, Dict, Optional, Tuple
 
-from app.services.ai.ai_tool_spec import ToolManifestEntry, capability_for_domains
+from app.services.ai.ai_permission_policy import permission_policy_for_name
+from app.services.ai.ai_tool_capability import (
+    namespace_for_capability,
+    resolve_tool_capability,
+)
+from app.services.ai.ai_tool_search_meta import search_meta_for
+from app.services.ai.ai_tool_spec import (
+    ToolManifestEntry,
+    infer_side_effect,
+)
 
 TOOL_MANIFEST: Dict[str, Dict[str, Any]] = {
     'adjust_customer_club_points': {
@@ -363,6 +372,7 @@ TOOL_MANIFEST: Dict[str, Dict[str, Any]] = {
     },
     'invoke_business_connector': {
         'domains': ('integration',),
+        'always_confirm': True,
     },
     'list_accounts': {
         'domains': ('financial',),
@@ -631,6 +641,7 @@ TOOL_MANIFEST: Dict[str, Dict[str, Any]] = {
     },
     'test_workflow': {
         'domains': ('workflow',),
+        'side_effect': 'execute',
     },
     'update_account': {
         'domains': ('financial',),
@@ -692,10 +703,23 @@ TOOL_MANIFEST: Dict[str, Dict[str, Any]] = {
     },
     'upsert_memory_entry': {
         'domains': ('memory',),
+        'intent_write': True,
     },
     'validate_workflow_draft': {
         'domains': ('workflow',),
     },}
+
+
+def _unique_tuple(*groups) -> Tuple[str, ...]:
+    seen: set[str] = set()
+    out: list[str] = []
+    for group in groups:
+        for item in group or ():
+            text = str(item).strip()
+            if text and text not in seen:
+                seen.add(text)
+                out.append(text)
+    return tuple(out)
 
 
 def get_manifest_entry(name: str) -> Optional[ToolManifestEntry]:
@@ -703,16 +727,35 @@ def get_manifest_entry(name: str) -> Optional[ToolManifestEntry]:
     if raw is None:
         return None
     domains = tuple(raw.get("domains") or ())
+    intent_write = bool(raw.get("intent_write", False))
+    always_confirm = bool(raw.get("always_confirm", False))
+    capability = str(raw.get("capability") or resolve_tool_capability(name, domains))
+    side_effect = raw.get("side_effect") or infer_side_effect(
+        name, intent_write=intent_write, always_confirm=always_confirm
+    )
+    extra = search_meta_for(name)
+    policy = permission_policy_for_name(
+        name,
+        explicit=raw.get("permission_policy"),
+    )
     return ToolManifestEntry(
         domains=domains,
-        capability=capability_for_domains(domains),
-        aliases=tuple(raw.get("aliases") or ()),
-        keywords=tuple(raw.get("keywords") or ()),
-        examples=tuple(raw.get("examples") or ()),
-        is_core=bool(raw.get("is_core", False)),
+        capability=capability,
+        namespace=str(raw.get("namespace") or namespace_for_capability(capability)),
+        aliases=_unique_tuple(raw.get("aliases"), extra.get("aliases")),
+        keywords=_unique_tuple(raw.get("keywords"), extra.get("keywords")),
+        examples=_unique_tuple(raw.get("examples"), extra.get("examples")),
         companion_tools=tuple(raw.get("companion_tools") or ()),
-        intent_write=bool(raw.get("intent_write", False)),
-        always_confirm=bool(raw.get("always_confirm", False)),
+        is_core=bool(raw.get("is_core", False)),
+        intent_write=intent_write,
+        always_confirm=always_confirm,
+        side_effect=str(side_effect),
+        permission_policy=policy,
+        enabled=bool(raw.get("enabled", True)),
+        deprecated=bool(raw.get("deprecated", False)),
+        replacement=raw.get("replacement"),
+        version=str(raw.get("version") or "1"),
+        schema_version=str(raw.get("schema_version") or "1"),
     )
 
 

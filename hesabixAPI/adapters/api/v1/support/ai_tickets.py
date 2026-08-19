@@ -136,6 +136,7 @@ async def suggest_ai_reply(
         session_business_id=ai_service.business_id,
         user_query=ticket.title or ticket.description or "",
         execution_mode="analyzer",
+        channel="ticket",
     )
     tools = filter_tools_by_allowlist(catalog, CHANNEL_TICKET_READ_TOOLS)
     response = await ai_service.chat_completion(

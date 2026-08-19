@@ -11,37 +11,14 @@ import json
 import uuid
 from typing import Any, Callable, Dict, Iterable, List, Optional, Set, Tuple
 
+from app.services.ai.ai_tool_index import get_tool_index
 from app.services.ai.ai_tool_keys import TOOL_LABELS_FA
 
-# Fallback static list — تا زمانی که registry آماده نشده
-WRITE_FUNCTIONS: Set[str] = {
-    "create_invoice",
-    "create_person",
-    "update_person",
-    "create_receipt_payment",
-    "update_receipt_payment",
-    "delete_person",
-    "create_product",
-    "update_product",
-    "create_check",
-    "create_transfer",
-    "create_expense_income",
-    "update_expense_income",
-    "update_invoice",
-    "delete_invoice",
-    "create_lead",
-    "execute_workflow",
-    "create_workflow",
-    "update_workflow",
-    "delete_workflow",
-    "export_business_data",
-    "set_default_report_template",
-    "publish_report_template",
-    "adjust_customer_club_points",
-    "recalculate_customer_club_rfm",
-    "update_customer_club_settings",
-    "update_user_memory",
-}
+# Fallback وقتی registry نیست — مشتق از Manifest (intent_write ∪ always_confirm)
+_WRITE_INDEX = get_tool_index()
+WRITE_FUNCTIONS: Set[str] = set(_WRITE_INDEX.intent_write_names) | set(
+    _WRITE_INDEX.always_confirm_names
+)
 
 WRITE_FUNCTION_LABELS_FA: Dict[str, str] = {
     name: TOOL_LABELS_FA[name]

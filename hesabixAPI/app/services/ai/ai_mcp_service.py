@@ -85,6 +85,9 @@ async def handle_mcp_request(
     if method == "tools/list":
         from app.services.ai.function_registry import registry
 
+        # Listing = permission/tenant gate only. Execution guard is in tools/call.
+        # Phase 3: MCP tools/list stays a full permissioned catalog (MCP contract).
+        # Future: optional discover_tools() for intent-scoped MCP listing.
         context = {
             "db": db,
             "user_context": ctx,
@@ -108,6 +111,7 @@ async def handle_mcp_request(
         tool_name_str = str(tool_name)
         arguments = prepare_mcp_tool_arguments(arguments)
         mcp_approve = mcp_explicit_write_approval(params)
+        # Execution guard: listing a write tool never authorizes calling it.
         if is_write_function(tool_name_str, registry) and not mcp_approve:
             result = build_approval_required_result(tool_name_str, arguments)
             text = json.dumps(result, ensure_ascii=False)

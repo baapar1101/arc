@@ -11,6 +11,7 @@ from app.services.ai.ai_exploration_service import (
     EXPLORATION_MODE_AUTO,
     EXPLORATION_MODE_EXPLORE,
 )
+from app.services.ai.ai_tool_index import get_tool_index
 from app.services.ai.ai_write_guard import get_risk_level, is_write_function
 
 EXECUTION_MODE_ANALYZER = "analyzer"
@@ -26,20 +27,8 @@ VALID_EXECUTION_MODES = frozenset({
 DEFAULT_EXECUTION_MODE = EXECUTION_MODE_ANALYZER
 
 # عملیات پرریسک — حتی در حالت خودکار نیاز به تأیید صریح دارند.
-HIGH_RISK_ALWAYS_APPROVE = frozenset({
-    "delete_person",
-    "delete_invoice",
-    "delete_workflow",
-    "execute_workflow",
-    "create_workflow",
-    "update_workflow",
-    "export_business_data",
-    "set_default_report_template",
-    "publish_report_template",
-    "adjust_customer_club_points",
-    "recalculate_customer_club_rfm",
-    "update_customer_club_settings",
-})
+# منبع حقیقت: Tool Manifest.always_confirm (با risk_level=high روی خود Tool)
+HIGH_RISK_ALWAYS_APPROVE = get_tool_index().always_confirm_names
 
 EXECUTION_MODE_LABELS_FA = {
     EXECUTION_MODE_ANALYZER: "تحلیلگر",
@@ -98,6 +87,12 @@ def execution_mode_prompt_block(execution_mode: str) -> str:
 
 
 def is_high_risk_write(function_name: str, registry=None) -> bool:
+    if registry is not None:
+        fn = registry.get_function(function_name)
+        if fn is not None:
+            if bool(getattr(fn, "always_confirm", False)):
+                return True
+            return get_risk_level(function_name, registry) == "high"
     if function_name in HIGH_RISK_ALWAYS_APPROVE:
         return True
     return get_risk_level(function_name, registry) == "high"

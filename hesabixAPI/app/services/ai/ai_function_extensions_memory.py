@@ -160,9 +160,9 @@ def register_memory_functions(registry: "AIFunctionRegistry") -> None:
             allowed_roles={AIRole.USER, AIRole.BUSINESS_OWNER, AIRole.OPERATOR, AIRole.ADMIN},
             required_permissions=[],
             category="memory",
-            is_readonly=True,
+            is_readonly=False,
             requires_approval=False,
-            risk_level="safe",
+            risk_level="medium",
         )
     )
 
@@ -183,8 +183,8 @@ def register_memory_functions(registry: "AIFunctionRegistry") -> None:
             allowed_roles={AIRole.USER, AIRole.BUSINESS_OWNER, AIRole.OPERATOR, AIRole.ADMIN},
             required_permissions=[],
             category="memory",
-            is_readonly=True,
+            is_readonly=False,
             requires_approval=False,
-            risk_level="safe",
+            risk_level="medium",
         )
     )

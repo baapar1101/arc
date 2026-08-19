@@ -246,7 +246,7 @@ def register_workflow_ai_functions(registry: "AIFunctionRegistry") -> None:
     registry.register(
         AIFunction(
             name="delete_workflow",
-            description="حذف اتوماسیون.",
+            description="حذف یک اتوماسیون/گردش‌کار ذخیره‌شده با شناسه. عملیات مخرب است.",
             parameters_schema={
                 "type": "object",
                 "properties": {"workflow_id": {"type": "integer"}},

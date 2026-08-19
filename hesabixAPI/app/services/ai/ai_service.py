@@ -81,7 +81,6 @@ from app.services.ai.ai_constants import (
     FORCED_SYNTHESIS_TIMEOUT_SEC,
     KNOWLEDGE_LOAD_TIMEOUT_SEC,
     MAX_AGENT_ITERATIONS,
-    MAX_TOOLS_AUTONOMOUS,
     PLANNING_STEP_MIN_CHARS,
     PROMPT_LOADER_TIMEOUT_SEC,
 )
@@ -155,11 +154,8 @@ from app.services.ai.ai_tool_intent import (
     estimate_query_complexity,
     filter_function_definitions,
     iterations_for_query,
-    merge_tool_allowlists,
     query_expects_tool_use,
     query_needs_knowledge,
-    select_catalog_tool_names,
-    select_tool_names,
 )
 
 logger = logging.getLogger(__name__)
@@ -1444,13 +1440,15 @@ class AIService(AIModelRouterMixin, AIUsageMeterMixin):
         execution_mode: Optional[str] = None,
         session_id: Optional[int] = None,
         history_messages: Optional[List[Dict[str, Any]]] = None,
+        channel: str = "chat",
     ) -> List[Dict[str, Any]]:
-        """دریافت function های قابل استفاده بر اساس نقش کاربر و intent سوال.
+        """دریافت Schema ابزارها برای LLM.
 
-        force_tool_names: نام ابزارهایی که باید حتماً در لیست بمانند حتی اگر
-        intent متن کاربر آن‌ها را انتخاب نکند (مثلاً ابزار نوشتنیِ تأییدشده
-        هنگام اجرای مرحلهٔ approve). بدون این، پیام تأیید کاربر (که فاقد
-        کلیدواژهٔ نوشتنی است) باعث حذف ابزار از لیست و عدم اجرای عملیات می‌شود.
+        انتخاب نام‌ها از `discover_tools()` است (بدون Schema).
+        این متد بعد از Discovery، JSON Schema کامل را از Registry بارگذاری می‌کند.
+
+        force_tool_names: نام ابزارهایی که باید در لیست بمانند حتی اگر
+        intent متن کاربر آن‌ها را انتخاب نکند (تأیید نوشتن در جریان).
         """
         effective_business_id = session_business_id or self.business_id
         context = {
@@ -1480,20 +1478,27 @@ class AIService(AIModelRouterMixin, AIUsageMeterMixin):
             user_query,
             is_subagent=getattr(self, "_subagent_depth", 0) > 0,
         )
+        all_names = {
+            (d.get("function") or {}).get("name")
+            for d in definitions
+            if (d.get("function") or {}).get("name")
+        }
+        forced = set(force_tool_names or ()) & all_names
+        plan_prefer = (
+            set(SESSION_TODO_TOOL_NAMES) & all_names if expose_plan_tools else set()
+        )
+        subagent_prefer = (
+            set(SUBAGENT_TOOL_NAMES) & all_names if expose_subagents else set()
+        )
+        hist = history_messages
+        if hist is None:
+            hist = (self._routing_context or {}).get("history_messages")
+        hist_list = hist if isinstance(hist, list) else None
+        mode = resolve_execution_mode(execution_mode)
+        from app.services.ai.ai_tool_discovery import discover_tools
+
+        skill_tools: Set[str] = set()
         if user_query and effective_business_id:
-            all_names = {
-                (d.get("function") or {}).get("name")
-                for d in definitions
-                if (d.get("function") or {}).get("name")
-            }
-            forced = set(force_tool_names or ()) & all_names
-            plan_prefer = (
-                set(SESSION_TODO_TOOL_NAMES) & all_names if expose_plan_tools else set()
-            )
-            subagent_prefer = (
-                set(SUBAGENT_TOOL_NAMES) & all_names if expose_subagents else set()
-            )
-            skill_tools: Set[str] = set()
             try:
                 from app.services.ai.ai_skill_runtime import (
                     collect_allowed_tool_names,
@@ -1517,38 +1522,27 @@ class AIService(AIModelRouterMixin, AIUsageMeterMixin):
                     skill_tools = set(collected)
             except Exception as exc:
                 logger.warning("AI skill tool filter failed: %s", exc)
-            hist = history_messages
-            if hist is None:
-                hist = (self._routing_context or {}).get("history_messages")
-            mode = resolve_execution_mode(execution_mode)
-            if exposes_write_tools(mode):
-                write_names = set(_WRITE_TOOLS) & all_names
-                write_names |= {
-                    name for name in all_names if is_write_function(name, registry)
-                }
-                allowed = merge_tool_allowlists(
-                    select_catalog_tool_names(
-                        all_names,
-                        user_query,
-                        max_tools=MAX_TOOLS_AUTONOMOUS,
-                        protected_names=write_names | forced,
-                        prefer_names=skill_tools | plan_prefer | subagent_prefer,
-                    ),
-                    skill_names=skill_tools,
-                    forced_names=forced | write_names | plan_prefer | subagent_prefer,
-                )
-            else:
-                allowed = merge_tool_allowlists(
-                    select_tool_names(
-                        all_names,
-                        user_query,
-                        history_messages=hist if isinstance(hist, list) else None,
-                        prefer_names=skill_tools | plan_prefer | subagent_prefer,
-                    ),
-                    skill_names=skill_tools,
-                    forced_names=forced | plan_prefer | subagent_prefer,
-                )
-            definitions = filter_function_definitions(definitions, allowed)
+
+        write_names: Set[str] = set()
+        if exposes_write_tools(mode):
+            write_names = set(_WRITE_TOOLS) & all_names
+            write_names |= {
+                name for name in all_names if is_write_function(name, registry)
+            }
+        offer = discover_tools(
+            user_query,
+            permissioned_names=all_names,
+            execution_mode=mode,
+            history_messages=hist_list,
+            forced_names=forced | plan_prefer | subagent_prefer,
+            prefer_names=skill_tools | plan_prefer | subagent_prefer,
+            protected_names=write_names,
+            channel=channel or "chat",
+            rank=bool(user_query and effective_business_id),
+        )
+        self._last_discovery_offer = offer
+        ranked_names = [item.name for item in offer.candidates]
+        definitions = filter_function_definitions(definitions, ranked_names)
         forced_names = set(force_tool_names or ())
         if not expose_plan_tools and not (forced_names & SESSION_TODO_TOOL_NAMES):
             definitions = [

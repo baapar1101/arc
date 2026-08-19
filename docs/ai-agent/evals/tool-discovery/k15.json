@@ -1,0 +1,46 @@
+{
+  "k": 15,
+  "recall": 0.7065,
+  "multi_tool_recall": 0.6,
+  "mrr": 0.5364,
+  "precision": 0.0897,
+  "ndcg": 0.5608,
+  "retrieval_success_rate": 0.7043,
+  "avg_schema_tokens": 5315,
+  "context_share": 0.1898,
+  "no_match_success": 1.0,
+  "per_category_recall": {
+    "CRM": 0.4828,
+    "accounting": 0.5977,
+    "customer": 0.8529,
+    "inventory": 0.6667,
+    "invoice": 0.94,
+    "legacy": 0.9545,
+    "memory": 0.9231,
+    "purchase": 1.0,
+    "reports": 0.7632,
+    "sales": 0.9333,
+    "support": 0.5741,
+    "wallet": 0.8889,
+    "workflow": 0.36
+  },
+  "per_difficulty_recall": {
+    "ambiguous": 0.8696,
+    "easy": 0.8582,
+    "hard": 0.5281,
+    "medium": 0.665
+  },
+  "per_hard_case_recall": {
+    "ambiguous": 0.6667,
+    "conversational": 0.9286,
+    "english": 0.8644,
+    "generic": 1.0,
+    "long": 1.0,
+    "multi-intent": 1.0,
+    "persian_accounting": 0.6,
+    "short": 0.8421,
+    "similar_tools": 1.0,
+    "synonyms": 1.0,
+    "typos": 0.4483
+  }
+}

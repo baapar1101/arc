@@ -51,6 +51,7 @@ async def _run_crm_assist(
         session_business_id=ai_service.business_id,
         user_query=user_query,
         execution_mode="analyzer",
+        channel="crm",
     )
     tools = filter_tools_by_allowlist(catalog, CHANNEL_CRM_READ_TOOLS)
     response = await ai_service.chat_completion(

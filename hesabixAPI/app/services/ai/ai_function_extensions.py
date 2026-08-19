@@ -223,7 +223,7 @@ def register_extended_business_functions(registry: "AIFunctionRegistry") -> None
     registry.register(
         AIFunction(
             name="get_check_details",
-            description="جزئیات یک چک.",
+            description="دریافت جزئیات یک چک شامل مبلغ، وضعیت، سررسید و طرف‌حساب.",
             parameters_schema={
                 "type": "object",
                 "properties": {"check_id": {"type": "integer", "description": "شناسه چک"}},

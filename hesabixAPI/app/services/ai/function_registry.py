@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Dict, Any, List, Callable, Optional, Set
+from typing import Dict, Any, List, Callable, Optional, Set, Tuple
 from dataclasses import dataclass
 from enum import Enum
 from sqlalchemy.orm import Session
@@ -33,6 +33,37 @@ class AIFunction:
     risk_level: str = "safe"          # safe / medium / high
     is_readonly: bool = True          # قابل کش شدن — عملیات read-only
     is_agent_internal: bool = False   # state داخلی agent — در حالت تحلیلگر هم مجاز
+    # ---- Metadata واحد Discovery / Intent / Security (منبع: Tool Manifest) ----
+    domains: Tuple[str, ...] = ()
+    capability: str = "misc"
+    namespace: str = ""
+    aliases: Tuple[str, ...] = ()
+    keywords: Tuple[str, ...] = ()
+    examples: Tuple[str, ...] = ()
+    companion_tools: Tuple[str, ...] = ()
+    is_core: bool = False
+    intent_write: bool = False
+    always_confirm: bool = False
+    side_effect: str = "none"
+    permission_policy: str = "required"
+    enabled: bool = True
+    deprecated: bool = False
+    replacement: Optional[str] = None
+    version: str = "1"
+    schema_version: str = "1"
+
+    def search_text(self) -> str:
+        parts = [
+            self.name,
+            self.description or "",
+            self.capability,
+            self.namespace,
+            *self.domains,
+            *self.aliases,
+            *self.keywords,
+            *self.examples,
+        ]
+        return " ".join(part for part in parts if part)
 
 
 def _has_filter_property(query: Dict[str, Any], prop: str) -> bool:
@@ -1658,6 +1689,7 @@ class AIFunctionRegistry:
                 },
                 handler=invoke_connector_handler,
                 allowed_roles={AIRole.USER, AIRole.BUSINESS_OWNER, AIRole.ADMIN},
+                required_permissions=["settings.view"],
                 business_context_required=True,
                 category="integration",
             )
@@ -1676,12 +1708,21 @@ class AIFunctionRegistry:
         return wrap_registry_service_func(service_func)
     
     def register(self, func: AIFunction):
-        """ثبت function جدید"""
-        self._functions[func.name] = func
+        """ثبت function جدید و اتصال Metadata Manifest."""
+        from app.services.ai.ai_tool_index import bind_manifest
+
+        bound = bind_manifest(func)
+        self._functions[bound.name] = bound
 
     def get_function(self, name: str) -> Optional[AIFunction]:
         """دریافت AIFunction با نام — None اگر وجود نداشته باشد."""
         return self._functions.get(name)
+
+    def iter_functions(self) -> List[AIFunction]:
+        return list(self._functions.values())
+
+    def function_names(self) -> List[str]:
+        return list(self._functions.keys())
     
     def _detect_user_role(
         self,
@@ -1734,18 +1775,16 @@ class AIFunctionRegistry:
         
         definitions = []
         for func in self._functions.values():
+            # Tenant/permission اینجا اعمال می‌شود؛ Discovery بعداً فقط روی این مجموعه کار می‌کند.
             # بررسی نقش
             if not (func.allowed_roles & user_roles):
                 continue
             
-            # بررسی دسترسی‌های دقیق‌تر
-            if func.required_permissions:
-                from app.services.ai.ai_permission_map import has_any_ai_tool_permission
+            # بررسی دسترسی‌های دقیق‌تر — خالی + unspecified = deny
+            from app.services.ai.ai_permission_policy import catalog_permission_allows
 
-                if not has_any_ai_tool_permission(
-                    user_context, func.required_permissions, business_id=business_id
-                ):
-                    continue
+            if not catalog_permission_allows(func, user_context, business_id):
+                continue
             
             # بررسی نیاز به business context
             if func.business_context_required and not business_id:
@@ -1813,16 +1852,10 @@ class AIFunctionRegistry:
                 f"Required roles: {func.allowed_roles}"
             )
         
-        # بررسی دسترسی‌های دقیق‌تر
-        if func.required_permissions:
-            from app.services.ai.ai_permission_map import has_any_ai_tool_permission
+        from app.services.ai.ai_permission_policy import catalog_permission_allows
 
-            if not has_any_ai_tool_permission(
-                user_context,
-                func.required_permissions,
-                business_id=effective_business_id,
-            ):
-                raise PermissionError(f"User does not have required permissions for {name}")
+        if not catalog_permission_allows(func, user_context, effective_business_id):
+            raise PermissionError(f"User does not have required permissions for {name}")
         
         # بررسی business context
         if func.business_context_required and not effective_business_id:

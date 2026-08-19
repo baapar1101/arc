@@ -5,246 +5,22 @@
 from __future__ import annotations
 
 import re
-from typing import AbstractSet, Iterable, List, Optional, Set
+from typing import AbstractSet, Iterable, List, Optional, Sequence, Set, Union
 
 from app.services.ai.ai_constants import (
     MAX_TOOLS_AUTONOMOUS,
     MAX_TOOLS_PER_REQUEST,
     QUERY_COMPLEXITY_ITERATIONS,
 )
+from app.services.ai.ai_tool_index import get_tool_index
 
-# همیشه در دسترس (پرس‌وجو و دادهٔ پایه)
-_CORE_TOOL_NAMES: frozenset[str] = frozenset({
-    "query_business_data",
-    "list_queryable_fields",
-    "resolve_date_range",
-    "get_business_info",
-    "get_business_dashboard",
-    "search_persons",
-    "get_person_balance",
-    "get_financial_summary",
-    "search_invoices",
-    "get_invoice_details",
-    "search_products",
-    "get_product_info",
-})
+_TOOL_INDEX = get_tool_index()
+_CATEGORY_TOOLS = _TOOL_INDEX.category_tools
+_CORE_TOOL_NAMES = _TOOL_INDEX.core_names
+_WRITE_TOOLS = _TOOL_INDEX.intent_write_names
+_WRITE_TOOL_COMPANIONS = _TOOL_INDEX.companions
+MEMORY_TOOL_NAMES = _CATEGORY_TOOLS.get("memory", frozenset())
 
-# دسته → ابزارها
-_CATEGORY_TOOLS: dict[str, frozenset[str]] = {
-    "financial": frozenset({
-        "search_invoices",
-        "get_invoice_details",
-        "get_invoices_count",
-        "search_receipts_payments",
-        "get_sales_report",
-        "get_purchase_report",
-        "get_debtors_report",
-        "get_creditors_report",
-        "get_cash_flow",
-        "search_documents",
-        "get_document_details",
-        "list_bank_accounts",
-        "list_cash_registers",
-        "list_fiscal_years",
-        "get_current_fiscal_year",
-        "get_opening_balance",
-        "get_business_credit_settings",
-        "list_credit_installment_plans",
-        "get_person_credit",
-        "search_checks",
-        "get_check_details",
-        "search_transfers",
-        "search_expense_income",
-        "create_receipt_payment",
-        "create_expense_income",
-        "update_expense_income",
-        "delete_expense_income",
-        "update_receipt_payment",
-        "delete_receipt_payment",
-        "update_invoice",
-        "delete_invoice",
-        "list_accounts",
-        "get_account",
-        "get_wallet_overview",
-        "list_wallet_transactions",
-        "list_payment_gateways",
-        "list_currencies",
-        "list_currency_rates",
-        "resolve_currency_rate",
-        "list_loan_facilities",
-        "get_loan_facility",
-        "get_document_numbering_settings",
-    }),
-    "warehouse": frozenset({
-        "search_warehouse_documents",
-        "get_warehouse_document_details",
-        "list_warehouses",
-        "get_warehouse_stock_summary",
-        "get_inventory_status",
-        "get_product_kardex",
-        "get_inventory_valuation",
-        "search_production_documents",
-        "list_boms",
-        "get_bom_details",
-        "list_warehouse_locations",
-        "list_warehouse_placements",
-        "get_warehouse_report",
-        "create_warehouse_document",
-    }),
-    "crm": frozenset({
-        "search_leads",
-        "get_lead_details",
-        "search_deals",
-        "get_deal_details",
-        "search_activities",
-        "get_crm_summary",
-        "get_pipeline_report",
-        "get_lead_funnel_report",
-        "create_lead",
-    }),
-    "customer_club": frozenset({
-        "get_customer_club_settings",
-        "list_customer_club_tiers",
-        "list_customer_club_ledger",
-        "get_customer_club_rfm_summary",
-        "search_customer_club_rfm_persons",
-        "adjust_customer_club_points",
-        "recalculate_customer_club_rfm",
-        "update_customer_club_settings",
-    }),
-    "tax": frozenset({
-        "get_tax_settings",
-        "search_tax_workspace",
-        "get_tax_data_quality",
-    }),
-    "projects": frozenset({
-        "search_projects",
-        "get_project_summary",
-    }),
-    "integration": frozenset({
-        "invoke_business_connector",
-        "list_woocommerce_orders",
-        "list_woocommerce_products",
-        "list_basalam_synced_invoices",
-        "list_basalam_product_conflicts",
-        "get_basalam_overview",
-        "list_basalam_dead_letter",
-    }),
-    "workflow": frozenset({
-        "list_workflow_trigger_catalog",
-        "list_workflow_action_catalog",
-        "list_workflow_builtin_nodes",
-        "get_workflow_component_schema",
-        "get_workflow_design_rules",
-        "validate_workflow_draft",
-        "get_workflow",
-        "create_workflow",
-        "update_workflow",
-        "delete_workflow",
-        "test_workflow",
-        "get_workflow_execution_debug",
-        "poll_workflow_execution",
-        "list_workflows",
-        "list_workflow_executions",
-        "execute_workflow",
-    }),
-    "misc": frozenset({
-        "get_quick_sales_settings",
-        "list_price_lists",
-        "search_activity_logs",
-        "search_repair_orders",
-        "get_repair_order_details",
-        "list_distribution_routes",
-        "search_warranty_codes",
-        "list_petty_cash",
-        "get_person_transactions",
-    }),
-    "agent": frozenset({
-        "create_session_plan",
-        "list_session_todos",
-        "update_session_todo",
-        "spawn_subagent",
-        "await_subagent",
-        "cancel_subagent",
-    }),
-    "people": frozenset({
-        "search_persons",
-        "get_customer_info",
-        "get_person_balance",
-        "get_person_transactions",
-        "create_person",
-        "update_person",
-        "delete_person",
-        "list_person_groups",
-    }),
-    "products_write": frozenset({
-        "search_products",
-        "get_product_info",
-        "create_product",
-        "update_product",
-        "search_categories",
-        "list_product_attributes",
-        "get_product_attribute",
-        "search_product_instances",
-        "list_price_lists",
-        "list_price_list_items",
-        "list_currencies",
-    }),
-    "query": frozenset({
-        "query_business_data",
-        "list_queryable_fields",
-        "resolve_date_range",
-        "batch_query_business_data",
-        "search_invoices",
-        "search_persons",
-        "search_products",
-        "search_checks",
-        "search_transfers",
-        "search_expense_income",
-        "search_documents",
-        "search_receipts_payments",
-        "search_warehouse_documents",
-    }),
-    "reports_meta": frozenset({
-        "get_report",
-        "list_available_reports",
-        "batch_query_business_data",
-        "export_business_data",
-        "get_debtors_report",
-        "get_creditors_report",
-        "get_sales_report",
-        "get_purchase_report",
-        "get_inventory_valuation",
-        "get_cash_flow",
-    }),
-    "report_templates": frozenset({
-        "list_report_templates",
-        "get_report_template",
-        "get_report_template_scope_catalog",
-        "set_default_report_template",
-        "publish_report_template",
-    }),
-    "marketplace": frozenset({
-        "list_marketplace_plugins",
-        "list_business_plugins",
-    }),
-    "hscript": frozenset({
-        "hscript_search_docs",
-        "hscript_retrieve_docs",
-        "hscript_read_doc",
-        "hscript_validate_script",
-        "hscript_language_guide",
-        "hscript_run_preview",
-        "hscript_fix_script",
-    }),
-    "memory": frozenset({
-        "read_memory",
-        "upsert_memory_entry",
-        "delete_memory_entry",
-    }),
-}
-
-MEMORY_TOOL_NAMES = _CATEGORY_TOOLS["memory"]
 
 # کلیدواژهٔ فارسی/انگلیسی → دسته
 _KEYWORD_CATEGORIES: List[tuple[str, str]] = [
@@ -284,189 +60,6 @@ _WRITE_KEYWORDS = re.compile(
     r"ثبت|ایجاد|اضافه|بساز|بزن|ویرایش|حذف|create|update|add|new\s+invoice|مشتری\s+جدید|کالای\s+جدید",
     re.IGNORECASE,
 )
-
-_WRITE_TOOLS = frozenset({
-    "create_invoice",
-    "create_person",
-    "update_person",
-    "create_receipt_payment",
-    "delete_person",
-    "create_product",
-    "update_product",
-    "create_check",
-    "create_transfer",
-    "create_expense_income",
-    "update_expense_income",
-    "update_receipt_payment",
-    "update_invoice",
-    "delete_invoice",
-    "create_lead",
-    "execute_workflow",
-    "create_workflow",
-    "update_workflow",
-    "delete_workflow",
-    "export_business_data",
-    "set_default_report_template",
-    "publish_report_template",
-    "adjust_customer_club_points",
-    "recalculate_customer_club_rfm",
-    "update_customer_club_settings",
-    "create_account",
-    "update_account",
-    "delete_account",
-    "create_warehouse_document",
-})
-
-# ابزارهای کمکی که مدل برای تکمیل آرگومان write نیاز دارد — prefer تا سقف ۴۸ حذف‌شان نکند
-_WRITE_TOOL_COMPANIONS: dict[str, frozenset[str]] = {
-    "create_invoice": frozenset({
-        "search_persons",
-        "search_products",
-        "get_product_info",
-        "list_currencies",
-        "list_warehouses",
-        "get_current_fiscal_year",
-        "list_bank_accounts",
-        "list_cash_registers",
-        "list_petty_cash",
-        "list_accounts",
-        "search_projects",
-        "search_checks",
-        "get_tax_settings",
-    }),
-    "update_invoice": frozenset({
-        "search_invoices",
-        "get_invoice_details",
-        "search_persons",
-        "search_products",
-        "list_currencies",
-        "list_warehouses",
-        "list_bank_accounts",
-        "list_cash_registers",
-        "list_petty_cash",
-        "list_accounts",
-        "search_projects",
-        "search_checks",
-    }),
-    "create_receipt_payment": frozenset({
-        "search_persons",
-        "list_currencies",
-        "list_bank_accounts",
-        "list_cash_registers",
-        "list_petty_cash",
-        "search_checks",
-        "search_projects",
-        "search_invoices",
-        "search_receipts_payments",
-    }),
-    "update_receipt_payment": frozenset({
-        "search_receipts_payments",
-        "search_persons",
-        "list_currencies",
-        "list_bank_accounts",
-        "list_cash_registers",
-        "list_petty_cash",
-        "search_checks",
-        "search_projects",
-        "search_invoices",
-    }),
-    "create_check": frozenset({
-        "search_persons",
-        "list_currencies",
-        "search_checks",
-        "get_check_details",
-    }),
-    "create_product": frozenset({
-        "search_products",
-        "search_categories",
-        "list_warehouses",
-        "list_product_attributes",
-        "list_currencies",
-        "search_persons",
-        "get_tax_settings",
-        "get_current_fiscal_year",
-        "list_price_lists",
-        "list_price_list_items",
-    }),
-    "update_product": frozenset({
-        "search_products",
-        "get_product_info",
-        "search_categories",
-        "list_warehouses",
-        "list_product_attributes",
-        "list_currencies",
-        "search_persons",
-        "get_tax_settings",
-        "get_current_fiscal_year",
-        "list_price_lists",
-        "list_price_list_items",
-    }),
-    "create_expense_income": frozenset({
-        "list_accounts",
-        "list_currencies",
-        "search_persons",
-        "list_bank_accounts",
-        "list_cash_registers",
-        "list_petty_cash",
-        "search_checks",
-        "search_projects",
-        "search_expense_income",
-    }),
-    "update_expense_income": frozenset({
-        "search_expense_income",
-        "list_accounts",
-        "list_currencies",
-        "search_persons",
-        "list_bank_accounts",
-        "list_cash_registers",
-        "list_petty_cash",
-        "search_checks",
-        "search_projects",
-    }),
-    "create_transfer": frozenset({
-        "list_currencies",
-        "list_bank_accounts",
-        "list_cash_registers",
-        "list_petty_cash",
-        "search_transfers",
-    }),
-    "create_lead": frozenset({
-        "search_leads",
-        "get_pipeline_report",
-    }),
-    "create_person": frozenset({
-        "search_persons",
-        "list_person_groups",
-    }),
-    "create_warehouse_document": frozenset({
-        "list_warehouses",
-        "search_products",
-        "search_warehouse_documents",
-        "get_inventory_status",
-        "get_current_fiscal_year",
-    }),
-    "create_workflow": frozenset({
-        "list_workflows",
-        "get_workflow_design_rules",
-        "list_workflow_trigger_catalog",
-        "list_workflow_action_catalog",
-        "validate_workflow_draft",
-    }),
-    "update_workflow": frozenset({
-        "get_workflow",
-        "get_workflow_design_rules",
-        "validate_workflow_draft",
-        "list_workflows",
-    }),
-    "execute_workflow": frozenset({
-        "list_workflows",
-        "get_workflow",
-    }),
-    "create_account": frozenset({
-        "list_accounts",
-        "get_account",
-    }),
-}
 
 _PEOPLE_KEYWORDS = re.compile(
     r"شخص|مشتری|تامین|تأمین|supplier|customer|people|person|علی|نام\s+",
@@ -741,15 +334,22 @@ def select_catalog_tool_names(
     max_tools: int = MAX_TOOLS_AUTONOMOUS,
     protected_names: Optional[AbstractSet[str]] = None,
     prefer_names: Optional[AbstractSet[str]] = None,
+    history_messages: Optional[List[dict]] = None,
 ) -> Set[str]:
     """کاتالوگ کامل مجاز با سقف ایمنی ارائه‌دهنده.
 
-    برخلاف select_tool_names، از روی intent حذف نمی‌کند.
-    protected (معمولاً ابزارهای نوشتنی) هرگز به‌خاطر سقف حذف نمی‌شود.
+    Ranking فقط روی مجموعهٔ امنیتی‌شده انجام می‌شود.
+    protected هرگز به‌خاطر سقف حذف نمی‌شود، اما نمی‌تواند Tool غیرمجاز را برگرداند.
     """
     from app.services.ai.ai_tool_rank import rank_and_cap_tool_names
+    from app.services.ai.ai_tool_security import filter_security_candidates
 
-    available = {n for n in all_names if n}
+    available = filter_security_candidates(
+        {n for n in all_names if n},
+        user_query,
+        history_messages=history_messages,
+        unknown_policy="allow",
+    )
     return rank_and_cap_tool_names(
         available,
         user_query,
@@ -770,6 +370,8 @@ def select_tool_names(
 ) -> Set[str]:
     """
     زیرمجموعهٔ نام functionها برای ارسال به مدل.
+
+    Security filter قبل از Ranking اعمال می‌شود؛ امتیاز keyword امنیت را دور نمی‌زند.
     """
     from app.services.ai.ai_tool_rank import rank_and_cap_tool_names
 
@@ -801,24 +403,62 @@ def select_tool_names(
         for cat in ("financial", "warehouse", "crm"):
             selected |= _CATEGORY_TOOLS.get(cat, frozenset()) & available
 
+    from app.services.ai.ai_tool_security import (
+        ToolSecurityClass,
+        classify_tool_security,
+        filter_security_candidates,
+    )
+
+    selected = filter_security_candidates(
+        selected,
+        user_query,
+        history_messages=history_messages,
+        unknown_policy="allow",
+    )
+    effective_prefer &= selected
+    protected = {
+        name
+        for name in selected
+        if classify_tool_security(name)
+        in (ToolSecurityClass.DESTRUCTIVE, ToolSecurityClass.HIGH_RISK)
+    }
+
     return rank_and_cap_tool_names(
         selected,
         user_query,
         max_tools=max_tools,
         core_names=_CORE_TOOL_NAMES,
         prefer_names=effective_prefer,
+        protected_names=protected,
     )
 
 
 def filter_function_definitions(
     definitions: List[dict],
-    allowed_names: AbstractSet[str],
+    allowed_names: Union[AbstractSet[str], Sequence[str]],
 ) -> List[dict]:
+    """فقط تعاریف داخل allowed_names. مجموعهٔ خالی = هیچ Tool (fail-closed).
+
+    اگر allowed_names دنباله باشد، ترتیب Discovery حفظ می‌شود.
+    """
     if not allowed_names:
-        return definitions
-    out: List[dict] = []
+        return []
+    if isinstance(allowed_names, (set, frozenset)):
+        allowed = {n for n in allowed_names if n}
+        if not allowed:
+            return []
+        return [
+            d
+            for d in definitions
+            if (d.get("function") or {}).get("name") in allowed
+        ]
+    ordered = [n for n in allowed_names if n]
+    allowed = set(ordered)
+    if not allowed:
+        return []
+    by_name = {}
     for d in definitions:
         fn = (d.get("function") or {}).get("name")
-        if fn and fn in allowed_names:
-            out.append(d)
-    return out
+        if fn and fn in allowed and fn not in by_name:
+            by_name[fn] = d
+    return [by_name[n] for n in ordered if n in by_name]

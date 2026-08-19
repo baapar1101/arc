@@ -193,31 +193,37 @@ def test_rank_keeps_all_protected_when_over_cap():
     assert len(capped) == 20
 
 
-def test_autonomous_catalog_keeps_907_write_tools():
-    """سقف ۴۸ با companion/plan، ابزارهای نوشتنی را حذف می‌کرد؛ کاتالوگ خودکار نه."""
+def test_autonomous_catalog_keeps_mutation_allowed_writes():
+    """سقف ۱۲۸ نباید writeهای مجاز query را حذف کند؛ delete/export را هم وارد نکند."""
     from app.services.ai.ai_session_todo_service import SESSION_TODO_TOOL_NAMES
     from app.services.ai.ai_subagent import SUBAGENT_TOOL_NAMES
+    from app.services.ai.ai_tool_security import filter_security_candidates
 
     catalog = _catalog_names()
     catalog |= {f"zzz_auto_filler_{i:03d}" for i in range(80)}
-    writes = set(_WRITE_TOOLS) & catalog
-    prefer: set[str] = set()
-    for name in writes:
-        prefer |= set(_WRITE_TOOL_COMPANIONS.get(name, ()))
-    prefer |= SESSION_TODO_TOOL_NAMES & catalog
-    prefer |= SUBAGENT_TOOL_NAMES & catalog
     query = (
         "یک شخص به نام علی بساز سپس برایش فاکتور فروش خدمات پشتیبانی سازمانی بزن "
         "و با بانک ملت تسویه کن"
     )
+    writes = set(_WRITE_TOOLS) & catalog
+    authorized_writes = filter_security_candidates(writes, query)
+    prefer: set[str] = set()
+    for name in authorized_writes:
+        prefer |= set(_WRITE_TOOL_COMPANIONS.get(name, ()))
+    prefer |= SESSION_TODO_TOOL_NAMES & catalog
+    prefer |= SUBAGENT_TOOL_NAMES & catalog
     selected = select_catalog_tool_names(
         catalog,
         query,
         max_tools=MAX_TOOLS_AUTONOMOUS,
-        protected_names=writes,
+        protected_names=authorized_writes,
         prefer_names=prefer,
     )
     assert "create_person" in selected
     assert "create_invoice" in selected
     assert "create_receipt_payment" in selected
-    assert selected >= writes
+    assert selected >= authorized_writes
+    assert "delete_invoice" not in selected
+    assert "delete_account" not in selected
+    assert "export_business_data" not in selected
+    assert "execute_workflow" not in selected

@@ -97,6 +97,7 @@ PERMISSION_ALIASES: dict[str, List[Tuple[str, str]]] = {
     "credit.view": [("credit", "view")],
     "woocommerce.view": [("woocommerce", "view"), ("marketplace", "view")],
     "basalam.view": [("basalam", "view"), ("marketplace", "view")],
+    "wallet.view": [("wallet", "view"), ("settings", "business")],
 }
 
 

@@ -523,7 +523,7 @@ def register_phase11_business_functions(registry: "AIFunctionRegistry") -> None:
             parameters_schema={"type": "object", "properties": {}, "required": []},
             handler=create_handler(_wallet_overview),
             allowed_roles=_ALL_ROLES,
-            required_permissions=[],
+            required_permissions=["wallet.view"],
             category="financial",
         )
     )
@@ -544,7 +544,7 @@ def register_phase11_business_functions(registry: "AIFunctionRegistry") -> None:
             },
             handler=create_handler(_wallet_transactions),
             allowed_roles=_ALL_ROLES,
-            required_permissions=[],
+            required_permissions=["wallet.view"],
             category="financial",
         )
     )
@@ -563,7 +563,7 @@ def register_phase11_business_functions(registry: "AIFunctionRegistry") -> None:
             },
             handler=create_handler(_wallet_metrics),
             allowed_roles=_ALL_ROLES,
-            required_permissions=[],
+            required_permissions=["wallet.view"],
             category="financial",
         )
     )
@@ -617,7 +617,7 @@ def register_phase11_business_functions(registry: "AIFunctionRegistry") -> None:
     registry.register(
         AIFunction(
             name="delete_check",
-            description="حذف یک چک.",
+            description="حذف یک چک پرداختنی یا دریافتنی با شناسه. عملیات مخرب است و برگشت‌پذیر نیست.",
             parameters_schema={
                 "type": "object",
                 "properties": {"check_id": {"type": "integer", "description": "شناسه چک"}},
@@ -784,7 +784,7 @@ def register_phase11_business_functions(registry: "AIFunctionRegistry") -> None:
             },
             handler=create_handler(_list_frequent_descriptions),
             allowed_roles=_ALL_ROLES,
-            required_permissions=[],
+            required_permissions=["invoices.read"],
             category="business",
         )
     )

@@ -433,6 +433,7 @@ async def _run_child_completion(
             user_query=goal,
             execution_mode="analyzer",
             session_id=None,
+            channel="subagent",
         )
         tools = filter_subagent_tools(tools, allowlist, registry=registry)
 

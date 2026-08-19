@@ -285,7 +285,8 @@ class AIAgentAction(ActionHandler):
             category = config.get("tools_category") if tools_mode == "category" else None
             tools = ai_service.get_available_functions(
                 category=category,
-                session_business_id=business_id
+                session_business_id=business_id,
+                channel="workflow",
             )
             if not isinstance(tools, list):
                 tools = [tools] if tools else []

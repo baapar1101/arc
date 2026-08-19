@@ -3,7 +3,7 @@
 **وضعیت سند:** Phase 0 — فقط بررسی و طراحی؛ هیچ کد منبعی در این مرحله تغییر نکرده است.  
 **تاریخ بررسی:** ۱۹ اوت ۲۰۲۶ (۱۴۰۵/۰۵/۲۸)  
 **دامنه کد:** `hesabixAPI/app/services/ai/`، `hesabixAPI/adapters/api/v1/ai/`، مدل‌های `ai_*`، تست‌های `tests/test_ai_tool_*.py`  
-**اسناد مرتبط:** [`../AI_AGENT_SYSTEM_AUDIT.md`](../AI_AGENT_SYSTEM_AUDIT.md)، [`../AI_EXECUTION_PHASES.md`](../AI_EXECUTION_PHASES.md)، [`../AI_AGENT_RUNTIME_CAPABILITIES_SCENARIO.md`](../AI_AGENT_RUNTIME_CAPABILITIES_SCENARIO.md)
+**اسناد مرتبط:** [`../AI_AGENT_SYSTEM_AUDIT.md`](../AI_AGENT_SYSTEM_AUDIT.md)، [`../AI_EXECUTION_PHASES.md`](../AI_EXECUTION_PHASES.md)، [`../AI_AGENT_RUNTIME_CAPABILITIES_SCENARIO.md`](../AI_AGENT_RUNTIME_CAPABILITIES_SCENARIO.md)، معماری هدف: [`tool-discovery-architecture.md`](tool-discovery-architecture.md)
 
 > **قانون این سند:** هر ادعای «وضعیت فعلی» باید از کد آمده باشد. اگر چیزی از روی کد قابل اثبات نبود، با برچسب **Unknown / نیازمند بررسی** آمده است.
 
@@ -865,7 +865,9 @@ Write پیش‌فرض `APPROVAL_REQUIRED` مگر `params.approve_writes: true`. 
 - **موفقیت:** جدول زنده: count، chars، tokens برای analyzer/autonomous/MCP.
 - **وابستگی:** Phase 0 (می‌تواند موازی Phase 1).
 
-### Phase 4 — Tighter Top-K + Hybrid rank روی زیرساخت موجود
+> **شماره‌گذاری اجرا در برابر این roadmap:** Phase 4 واقعی کد **Permission & Tool Metadata Hardening** است. Phase 5 اجرا **Tight Top-K Evaluation** است (`phase-5-tight-topk-evaluation.md`) و سقف ۴۸ را پایین نیاورد. Hybrid هنوز پیاده نشده.
+
+### Phase 4 (roadmap اولیه) — Tighter Top-K + Hybrid rank روی زیرساخت موجود
 
 - **هدف:** analyzer پیش‌فرض Top-K ≈ ۱۶–۲۰ با حفظ gold recall؛ امتیاز فعلی + (اختیاری) embedding با `ai_embedding_service`.
 - **فایل‌ها:** `ai_tool_intent.py`, `ai_tool_rank.py`, `ai_embedding_service.py`, `ai_constants.py`.
