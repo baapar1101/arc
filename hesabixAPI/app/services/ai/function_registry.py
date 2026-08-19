@@ -930,16 +930,14 @@ class AIFunctionRegistry:
             )
             return create_receipt_payment(db, business_id, user_id, data)
 
-        from app.services.ai.ai_tool_payloads import CREATE_RECEIPT_PAYMENT_PARAMETERS_SCHEMA
+        from app.services.ai.ai_tool_payloads import (
+            CREATE_RECEIPT_PAYMENT_DESCRIPTION,
+            CREATE_RECEIPT_PAYMENT_PARAMETERS_SCHEMA,
+        )
 
         self.register(AIFunction(
             name="create_receipt_payment",
-            description=(
-                "ثبت دریافت (receipt) یا پرداخت (payment). "
-                "person_id از search_persons. "
-                "account_type + account_id از list_bank_accounts یا list_cash_registers "
-                "(نه list_accounts کدینگ). نیاز به تأیید کاربر."
-            ),
+            description=CREATE_RECEIPT_PAYMENT_DESCRIPTION,
             parameters_schema=CREATE_RECEIPT_PAYMENT_PARAMETERS_SCHEMA,
             handler=self._create_handler(create_receipt_payment_wrapper),
             allowed_roles={AIRole.USER, AIRole.BUSINESS_OWNER, AIRole.OPERATOR, AIRole.ADMIN},

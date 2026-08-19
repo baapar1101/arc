@@ -693,36 +693,18 @@ def register_phase11_business_functions(registry: "AIFunctionRegistry") -> None:
         )
     )
 
+    from app.services.ai.ai_tool_payloads import (
+        UPDATE_EXPENSE_INCOME_DESCRIPTION,
+        UPDATE_EXPENSE_INCOME_PARAMETERS_SCHEMA,
+        UPDATE_RECEIPT_PAYMENT_DESCRIPTION,
+        UPDATE_RECEIPT_PAYMENT_PARAMETERS_SCHEMA,
+    )
+
     registry.register(
         AIFunction(
             name="update_receipt_payment",
-            description=(
-                "ویرایش سند دریافت/پرداخت (جایگزینی کامل سطرها). person_lines و account_lines "
-                "باید کامل ارسال شوند و مجموع آن‌ها برابر باشد."
-            ),
-            parameters_schema={
-                "type": "object",
-                "properties": {
-                    "document_id": {"type": "integer", "description": "شناسه سند"},
-                    "document_date": {"type": "string", "format": "date", "description": "تاریخ سند"},
-                    "currency_id": {"type": "integer", "description": "شناسه ارز"},
-                    "description": {"type": "string", "description": "توضیحات (اختیاری)"},
-                    "person_lines": {
-                        "type": "array",
-                        "description": "سطرهای اشخاص: [{person_id, amount, description?}]",
-                        "items": {"type": "object"},
-                    },
-                    "account_lines": {
-                        "type": "array",
-                        "description": (
-                            "سطرهای حساب: [{amount, transaction_type(bank|cash_register|petty_cash|check), "
-                            "transaction_date, bank_id|cash_register_id|petty_cash_id|check_id, description?}]"
-                        ),
-                        "items": {"type": "object"},
-                    },
-                },
-                "required": ["document_id", "document_date", "currency_id", "person_lines", "account_lines"],
-            },
+            description=UPDATE_RECEIPT_PAYMENT_DESCRIPTION,
+            parameters_schema=UPDATE_RECEIPT_PAYMENT_PARAMETERS_SCHEMA,
             handler=_update_receipt_payment_handler,
             allowed_roles=_WRITE_ROLES,
             required_permissions=["receipts_payments.write"],
@@ -755,33 +737,8 @@ def register_phase11_business_functions(registry: "AIFunctionRegistry") -> None:
     registry.register(
         AIFunction(
             name="update_expense_income",
-            description=(
-                "ویرایش سند هزینه/درآمد (جایگزینی کامل سطرها). item_lines و counterparty_lines "
-                "باید کامل ارسال شوند."
-            ),
-            parameters_schema={
-                "type": "object",
-                "properties": {
-                    "document_id": {"type": "integer", "description": "شناسه سند"},
-                    "document_date": {"type": "string", "format": "date", "description": "تاریخ سند"},
-                    "currency_id": {"type": "integer", "description": "شناسه ارز"},
-                    "description": {"type": "string", "description": "توضیحات (اختیاری)"},
-                    "item_lines": {
-                        "type": "array",
-                        "description": "سطرهای حساب هزینه/درآمد: [{account_id, amount, description?}]",
-                        "items": {"type": "object"},
-                    },
-                    "counterparty_lines": {
-                        "type": "array",
-                        "description": (
-                            "سطرهای طرف: [{transaction_type(bank|cash_register|petty_cash|person|check), amount, "
-                            "transaction_date, bank_id|cash_register_id|petty_cash_id|person_id|check_id, description?}]"
-                        ),
-                        "items": {"type": "object"},
-                    },
-                },
-                "required": ["document_id", "document_date", "currency_id", "item_lines", "counterparty_lines"],
-            },
+            description=UPDATE_EXPENSE_INCOME_DESCRIPTION,
+            parameters_schema=UPDATE_EXPENSE_INCOME_PARAMETERS_SCHEMA,
             handler=_update_expense_income_handler,
             allowed_roles=_WRITE_ROLES,
             required_permissions=["expenses_income.write"],
@@ -1483,6 +1440,7 @@ def _delete_transfer_handler(args: Dict[str, Any], context: Dict[str, Any]) -> A
 
 
 def _update_receipt_payment_handler(args: Dict[str, Any], context: Dict[str, Any]) -> Any:
+    from app.services.ai.ai_tool_payloads import build_update_receipt_payment_payload
     from app.services.receipt_payment_service import update_receipt_payment
 
     db = context["db"]
@@ -1490,13 +1448,9 @@ def _update_receipt_payment_handler(args: Dict[str, Any], context: Dict[str, Any
     user_id = context["user_context"].get_user_id()
     document_id = int(args["document_id"])
     _assert_business_document(db, document_id, business_id)
-    data = {
-        "document_date": args["document_date"],
-        "currency_id": int(args["currency_id"]),
-        "description": args.get("description"),
-        "person_lines": args.get("person_lines") or [],
-        "account_lines": args.get("account_lines") or [],
-    }
+    data = build_update_receipt_payment_payload(
+        args, db=db, business_id=business_id
+    )
     return update_receipt_payment(db, document_id, user_id, data)
 
 
@@ -1512,6 +1466,7 @@ def _delete_receipt_payment_handler(args: Dict[str, Any], context: Dict[str, Any
 
 
 def _update_expense_income_handler(args: Dict[str, Any], context: Dict[str, Any]) -> Any:
+    from app.services.ai.ai_tool_payloads import build_update_expense_income_payload
     from app.services.expense_income_service import update_expense_income
 
     db = context["db"]
@@ -1519,13 +1474,9 @@ def _update_expense_income_handler(args: Dict[str, Any], context: Dict[str, Any]
     user_id = context["user_context"].get_user_id()
     document_id = int(args["document_id"])
     _assert_business_document(db, document_id, business_id)
-    data = {
-        "document_date": args["document_date"],
-        "currency_id": int(args["currency_id"]),
-        "description": args.get("description"),
-        "item_lines": args.get("item_lines") or [],
-        "counterparty_lines": args.get("counterparty_lines") or [],
-    }
+    data = build_update_expense_income_payload(
+        args, db=db, business_id=business_id
+    )
     return update_expense_income(db, document_id, user_id, data)
 
 

@@ -1877,10 +1877,30 @@ def update_receipt_payment(
     # 3) اعمال تغییرات در سند (بدون تغییر code و document_type)
     document.document_date = document_date
     document.currency_id = int(currency_id)
-    if isinstance(data.get("extra_info"), dict) or data.get("extra_info") is None:
+    if "extra_info" in data and (
+        isinstance(data.get("extra_info"), dict) or data.get("extra_info") is None
+    ):
         document.extra_info = data.get("extra_info")
-    if isinstance(data.get("description"), str) or data.get("description") is None:
+    if isinstance(data.get("description"), str) or (
+        "description" in data and data.get("description") is None
+    ):
         document.description = data.get("description")
+    if "project_id" in data:
+        project_id = data.get("project_id")
+        if project_id:
+            from adapters.db.models.project import Project
+            project = db.query(Project).filter(
+                and_(
+                    Project.id == int(project_id),
+                    Project.business_id == document.business_id,
+                    Project.is_active == True,
+                )
+            ).first()
+            if not project:
+                raise ApiError("PROJECT_NOT_FOUND", "پروژه یافت نشد یا غیرفعال است", http_status=404)
+            document.project_id = int(project_id)
+        else:
+            document.project_id = None
 
     # تعیین نوع دریافت/پرداخت برای محاسبات بدهکار/بستانکار
     is_receipt = (document.document_type == DOCUMENT_TYPE_RECEIPT)

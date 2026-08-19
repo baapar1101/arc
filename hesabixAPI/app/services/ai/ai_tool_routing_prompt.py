@@ -40,12 +40,17 @@ TOOL_ROUTING_PROMPT_BLOCK = """
 - کالا/خدمت جدید → `create_product` با همان فیلدهای فرم UI (قیمت فروش/خرید پایه، قیمت ارزی با `sales_price_fx`/`purchase_price_fx`/`price_fx_currency_id`، `price_list_items` برای لیست‌های قیمت، واحد، انبار، مالیات، بارکد، ویژگی، تأمین‌کننده، کاتالوگ، تعداد اولیه). دسته از `search_categories`، انبار از `list_warehouses`، لیست قیمت از `list_price_lists`، ارز از `list_currencies`.
 - ویرایش کالا → `search_products` سپس `update_product`. `attribute_ids` و `suppliers` در صورت ارسال جایگزین کامل‌اند. `price_list_items` مثل فرم upsert است (حذف همهٔ قیمت‌های قبلی نیست).
 - دریافت/پرداخت → `search_persons` + `list_bank_accounts`/`list_cash_registers` سپس `create_receipt_payment`.
-  - `account_type` = bank|cash_register|petty_cash و `account_id` همان id لیست بانک/صندوق است — نه کدینگ `list_accounts`.
+  - سند ساده: `account_type` = bank|cash_register|petty_cash|check|person و `account_id` همان id لیست بانک/صندوق/چک/شخص است — نه کدینگ `list_accounts`.
+  - سند کامل فرم: `person_lines[]` + `account_lines[]` (کارمزد، تاریخ تراکنش، چک، اتصال فاکتور با `invoice_id`، اقساط با `settlements`، بین‌ارزی، `project_id`).
+  - ویرایش → `search_receipts_payments` سپس `update_receipt_payment` (جایگزینی کامل سطرها).
 - چک → `search_persons` + `list_currencies` سپس `create_check`. `type` فقط received یا transferred. برای دریافتی `person_id` اجباری است.
 - انتقال وجه → `list_bank_accounts`/`list_cash_registers`/`list_petty_cash` سپس `create_transfer`.
 - حواله انبار دستی → `list_warehouses` + `search_products` سپس `create_warehouse_document`.
   - ورود: `doc_type=receipt` + `warehouse_id` مقصد. خروج: `doc_type=issue` + `warehouse_id` مبدأ.
 - هزینه/درآمد → `list_accounts` (سرفصل هزینه/درآمد) + طرف‌حساب نقدی سپس `create_expense_income`.
+  - سند ساده: `account_id` + `amount` + `counterparty_type`/`counterparty_id` (bank|cash_register|petty_cash|check|person|account).
+  - سند کامل فرم: `item_lines[]` + `counterparty_lines[]` (چند سرفصل، چند طرف‌حساب، کارمزد، `project_id`).
+  - ویرایش → `search_expense_income` سپس `update_expense_income`. حواله کالای هزینه/درآمد انبار ابزار جدا است.
 - اتوماسیون → `get_workflow_design_rules` + کاتالوگ تریگر/اکشن → `validate_workflow_draft` → `create_workflow` با status=پیش‌نویس.
 - هرگز write بدون خلاصه + تأیید صریح کاربر. اگر ابزار APPROVAL_REQUIRED داد، همان JSON را با آرگومان‌های اصلاح‌نشده تکرار نکن مگر کاربر تأیید کرده باشد.
 

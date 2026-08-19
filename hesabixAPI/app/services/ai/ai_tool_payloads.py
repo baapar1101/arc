@@ -865,6 +865,317 @@ def _account_kind(value: Any) -> str:
     return _ACCOUNT_KIND_ALIASES.get(str(value or "").strip().lower(), str(value or "").strip())
 
 
+_TX_TYPE_ALIASES = {
+    **_ACCOUNT_KIND_ALIASES,
+    "check": "check",
+    "چک": "check",
+    "check_expense": "check",
+    "خرج چک": "check",
+    "person": "person",
+    "شخص": "person",
+    "account": "account",
+    "حساب": "account",
+}
+
+
+def _transaction_kind(value: Any) -> str:
+    s = str(value or "").strip()
+    return _TX_TYPE_ALIASES.get(s) or _TX_TYPE_ALIASES.get(s.lower()) or s.lower()
+
+
+def _normalize_cash_side_line(
+    item: Any,
+    *,
+    allow_account: bool = False,
+    default_amount: Optional[float] = None,
+    default_description: Optional[str] = None,
+    default_transaction_date: Optional[str] = None,
+) -> Dict[str, Any]:
+    """سطر بانک/صندوق/تنخواه/چک/شخص (و در هزینه: حساب) مطابق فرم UI."""
+    if not isinstance(item, dict):
+        raise ValueError("هر سطر نقدی باید object باشد.")
+    ttype = _transaction_kind(
+        item.get("transaction_type") or item.get("type") or item.get("account_type")
+    )
+    allowed = {"bank", "cash_register", "petty_cash", "check", "person"}
+    if allow_account:
+        allowed.add("account")
+    if ttype not in allowed:
+        raise ValueError(
+            "transaction_type باید bank، cash_register، petty_cash، check، person"
+            + (" یا account" if allow_account else "")
+            + " باشد."
+        )
+    amount = coerce_number(item.get("amount"))
+    if amount is None:
+        amount = default_amount
+    if amount is None or amount <= 0:
+        raise ValueError("مبلغ هر سطر باید بزرگتر از صفر باشد.")
+    row: Dict[str, Any] = {
+        "transaction_type": ttype,
+        "amount": amount,
+    }
+    desc = item.get("description") or default_description
+    if desc:
+        row["description"] = desc
+    tx_date = item.get("transaction_date") or default_transaction_date
+    if tx_date:
+        row["transaction_date"] = tx_date
+    if item.get("commission") is not None:
+        row["commission"] = coerce_number(item.get("commission"))
+    generic_id = coerce_positive_int(
+        item.get("account_id")
+        or item.get("counterparty_id")
+        or item.get("bank_id")
+        or item.get("bank_account_id")
+        or item.get("cash_register_id")
+        or item.get("petty_cash_id")
+        or item.get("check_id")
+        or item.get("person_id")
+    )
+    if ttype == "bank":
+        bank_id = coerce_positive_int(
+            item.get("bank_id") or item.get("bank_account_id") or generic_id
+        )
+        if not bank_id:
+            raise ValueError("برای بانک، bank_id را از list_bank_accounts بگیر.")
+        row["bank_id"] = bank_id
+        row["bank_account_id"] = bank_id
+        if item.get("bank_name"):
+            row["bank_name"] = item.get("bank_name")
+        if item.get("bank_account_name"):
+            row["bank_account_name"] = item.get("bank_account_name")
+    elif ttype == "cash_register":
+        cid = coerce_positive_int(item.get("cash_register_id") or generic_id)
+        if not cid:
+            raise ValueError("برای صندوق، cash_register_id را از list_cash_registers بگیر.")
+        row["cash_register_id"] = cid
+        if item.get("cash_register_name"):
+            row["cash_register_name"] = item.get("cash_register_name")
+    elif ttype == "petty_cash":
+        pid = coerce_positive_int(item.get("petty_cash_id") or generic_id)
+        if not pid:
+            raise ValueError("برای تنخواه، petty_cash_id را از list_petty_cash بگیر.")
+        row["petty_cash_id"] = pid
+        if item.get("petty_cash_name"):
+            row["petty_cash_name"] = item.get("petty_cash_name")
+    elif ttype == "check":
+        cid = coerce_positive_int(item.get("check_id") or generic_id)
+        if not cid:
+            raise ValueError("برای چک، check_id را از search_checks بگیر.")
+        row["check_id"] = cid
+        if item.get("check_number"):
+            row["check_number"] = item.get("check_number")
+    elif ttype == "person":
+        pid = coerce_positive_int(item.get("person_id") or generic_id)
+        if not pid:
+            raise ValueError("برای شخص، person_id را از search_persons بگیر.")
+        row["person_id"] = pid
+        if item.get("person_name"):
+            row["person_name"] = item.get("person_name")
+    else:
+        aid = coerce_positive_int(item.get("account_id") or generic_id)
+        if not aid:
+            raise ValueError("برای حساب، account_id را از list_accounts بگیر.")
+        row["account_id"] = aid
+        if item.get("account_name"):
+            row["account_name"] = item.get("account_name")
+    if item.get("settles_amount") is not None:
+        row["settles_amount"] = coerce_number(item.get("settles_amount"))
+    if item.get("fx_rate") is not None:
+        row["fx_rate"] = coerce_number(item.get("fx_rate"))
+    pay_cur = coerce_positive_int(item.get("payment_currency_id"))
+    if pay_cur:
+        row["payment_currency_id"] = pay_cur
+    if item.get("allow_large_fx_diff") is not None:
+        row["allow_large_fx_diff"] = bool(item.get("allow_large_fx_diff"))
+    native_amt = item.get("account_currency_amount")
+    if native_amt is not None:
+        row["account_currency_amount"] = native_amt
+    native_cur = coerce_positive_int(item.get("account_currency_id"))
+    if native_cur:
+        row["account_currency_id"] = native_cur
+    return row
+
+
+def _normalize_person_doc_line(item: Any) -> Dict[str, Any]:
+    if not isinstance(item, dict):
+        raise ValueError("هر سطر شخص باید object باشد.")
+    person_id = coerce_positive_int(item.get("person_id"))
+    amount = coerce_number(item.get("amount"))
+    if not person_id:
+        raise ValueError("هر سطر شخص به person_id از search_persons نیاز دارد.")
+    if amount is None or amount <= 0:
+        raise ValueError("مبلغ سطر شخص باید بزرگتر از صفر باشد.")
+    row: Dict[str, Any] = {"person_id": person_id, "amount": amount}
+    if item.get("person_name"):
+        row["person_name"] = item.get("person_name")
+    if item.get("description"):
+        row["description"] = item.get("description")
+    extra = _as_dict(item.get("extra_info"))
+    invoice_id = coerce_positive_int(item.get("invoice_id") or extra.get("invoice_id"))
+    if invoice_id:
+        extra["invoice_id"] = invoice_id
+        extra["link_to_invoice"] = True
+        code = item.get("invoice_code") or extra.get("invoice_code")
+        if code:
+            extra["invoice_code"] = code
+    if extra:
+        row["extra_info"] = extra
+    return row
+
+
+def _normalize_settlements(raw: Any) -> List[Dict[str, Any]]:
+    if not isinstance(raw, list):
+        return []
+    out: List[Dict[str, Any]] = []
+    for item in raw:
+        if not isinstance(item, dict):
+            continue
+        person_id = coerce_positive_int(item.get("person_id"))
+        invoice_id = coerce_positive_int(item.get("invoice_id"))
+        if not person_id or not invoice_id:
+            continue
+        allocations_in = item.get("allocations") or []
+        allocations: List[Dict[str, Any]] = []
+        if isinstance(allocations_in, dict):
+            for seq, amount in allocations_in.items():
+                amt = coerce_number(amount)
+                try:
+                    seq_i = int(seq)
+                except (TypeError, ValueError):
+                    continue
+                if seq_i > 0 and amt is not None and amt > 0:
+                    allocations.append({"seq": seq_i, "amount": amt})
+        elif isinstance(allocations_in, list):
+            for alloc in allocations_in:
+                if not isinstance(alloc, dict):
+                    continue
+                seq_i = coerce_positive_int(alloc.get("seq"))
+                amt = coerce_number(alloc.get("amount"))
+                if seq_i and amt is not None and amt > 0:
+                    allocations.append({"seq": seq_i, "amount": amt})
+        if allocations:
+            out.append(
+                {
+                    "person_id": person_id,
+                    "invoice_id": invoice_id,
+                    "allocations": allocations,
+                }
+            )
+    return out
+
+
+def _settlements_from_person_lines(lines: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    raw: List[Dict[str, Any]] = []
+    for item in lines:
+        if not isinstance(item, dict):
+            continue
+        invoice_id = coerce_positive_int(
+            item.get("installment_invoice_id") or item.get("settlement_invoice_id")
+        )
+        person_id = coerce_positive_int(item.get("person_id"))
+        allocations = item.get("installment_allocations") or item.get("allocations")
+        if invoice_id and person_id and allocations:
+            raw.append(
+                {
+                    "person_id": person_id,
+                    "invoice_id": invoice_id,
+                    "allocations": allocations,
+                }
+            )
+    return _normalize_settlements(raw)
+
+
+_CASH_SIDE_LINE_SCHEMA: Dict[str, Any] = {
+    "type": "object",
+    "properties": {
+        "transaction_type": {
+            "type": "string",
+            "enum": ["bank", "cash_register", "petty_cash", "check", "person", "account"],
+            "description": (
+                "نوع طرف نقدی مثل فرم: bank از list_bank_accounts، "
+                "cash_register از list_cash_registers، petty_cash از list_petty_cash، "
+                "check از search_checks، person از search_persons، account از list_accounts"
+            ),
+        },
+        "amount": {"type": "number", "description": "مبلغ سطر (بزرگتر از صفر)"},
+        "transaction_date": {
+            "type": "string",
+            "description": "تاریخ تراکنش این سطر (اختیاری)",
+        },
+        "commission": {"type": "number", "description": "کارمزد سطر (اختیاری)"},
+        "description": {"type": "string", "description": "شرح سطر (اختیاری)"},
+        "bank_id": {"type": "integer", "description": "شناسه حساب بانکی کسب‌وکار"},
+        "cash_register_id": {"type": "integer", "description": "شناسه صندوق"},
+        "petty_cash_id": {"type": "integer", "description": "شناسه تنخواه"},
+        "check_id": {"type": "integer", "description": "شناسه چک از search_checks"},
+        "person_id": {"type": "integer", "description": "شناسه شخص اگر طرف شخص است"},
+        "account_id": {"type": "integer", "description": "شناسه حساب کدینگ اگر طرف حساب است"},
+        "settles_amount": {
+            "type": "number",
+            "description": "مبلغ تسویه به ارز طرف‌حساب در حالت بین‌ارزی",
+        },
+        "fx_rate": {"type": "number", "description": "نرخ تسعیر سطر (بین‌ارزی)"},
+        "payment_currency_id": {
+            "type": "integer",
+            "description": "ارز طرف‌حساب در حالت بین‌ارزی از list_currencies",
+        },
+        "allow_large_fx_diff": {
+            "type": "boolean",
+            "description": "اجازه اختلاف زیاد نرخ تسعیر",
+        },
+    },
+    "required": ["transaction_type", "amount"],
+}
+
+_RECEIPT_PERSON_LINE_SCHEMA: Dict[str, Any] = {
+    "type": "object",
+    "properties": {
+        "person_id": {
+            "type": "integer",
+            "description": "شناسه شخص از search_persons",
+        },
+        "amount": {"type": "number", "description": "مبلغ این شخص (بزرگتر از صفر)"},
+        "description": {"type": "string", "description": "شرح سطر شخص (اختیاری)"},
+        "invoice_id": {
+            "type": "integer",
+            "description": "اتصال این دریافت/پرداخت به فاکتور از search_invoices",
+        },
+        "invoice_code": {"type": "string", "description": "شماره فاکتور (اختیاری)"},
+        "installment_invoice_id": {
+            "type": "integer",
+            "description": "فاکتور اقساطی برای تخصیص (فقط دریافت)",
+        },
+        "installment_allocations": {
+            "type": "array",
+            "description": "تخصیص اقساط: [{seq, amount}]",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "seq": {"type": "integer"},
+                    "amount": {"type": "number"},
+                },
+            },
+        },
+    },
+    "required": ["person_id", "amount"],
+}
+
+_EXPENSE_ITEM_LINE_SCHEMA: Dict[str, Any] = {
+    "type": "object",
+    "properties": {
+        "account_id": {
+            "type": "integer",
+            "description": "شناسه سرفصل هزینه/درآمد از list_accounts",
+        },
+        "amount": {"type": "number", "description": "مبلغ سطر (بزرگتر از صفر)"},
+        "description": {"type": "string", "description": "شرح سطر (اختیاری)"},
+    },
+    "required": ["account_id", "amount"],
+}
+
+
 def build_create_transfer_payload(
     args: Dict[str, Any],
     *,
@@ -912,45 +1223,255 @@ _RECEIPT_TYPE_ALIASES = {
     "پرداخت": "payment",
 }
 
+_RECEIPT_WRITE_FIELDS_SCHEMA: Dict[str, Any] = {
+    "document_date": {
+        "type": "string",
+        "format": "date",
+        "description": "تاریخ سند؛ اگر خالی بماند امروز",
+    },
+    "currency_id": {
+        "type": "integer",
+        "description": "شناسه ارز از list_currencies؛ اگر خالی باشد ارز پیش‌فرض",
+    },
+    "project_id": {
+        "type": "integer",
+        "description": "پروژه سند از search_projects (اختیاری)",
+    },
+    "description": {"type": "string", "description": "شرح سند (اختیاری)"},
+    "person_id": {
+        "type": "integer",
+        "description": "میانبر تک‌شخص: شناسه از search_persons وقتی person_lines نفرستی",
+    },
+    "amount": {
+        "type": "number",
+        "description": "میانبر تک‌مبلغ وقتی person_lines/account_lines نفرستی",
+    },
+    "account_type": {
+        "type": "string",
+        "enum": ["bank", "cash_register", "petty_cash", "check", "person"],
+        "description": (
+            "میانبر طرف نقدی. bank/cash_register/petty_cash از لیست بانک/صندوق/تنخواه، "
+            "check از search_checks، person از search_persons — نه کدینگ list_accounts."
+        ),
+    },
+    "account_id": {
+        "type": "integer",
+        "description": "میانبر شناسه طرف نقدی مطابق account_type",
+    },
+    "check_id": {
+        "type": "integer",
+        "description": "میانبر چک وقتی account_type=check",
+    },
+    "commission": {"type": "number", "description": "کارمزد طرف نقدی در حالت میانبر"},
+    "transaction_date": {
+        "type": "string",
+        "description": "تاریخ تراکنش طرف نقدی در حالت میانبر",
+    },
+    "invoice_id": {
+        "type": "integer",
+        "description": "اتصال شخص میانبر به فاکتور از search_invoices",
+    },
+    "person_lines": {
+        "type": "array",
+        "description": (
+            "سطرهای اشخاص مثل فرم. اگر خالی باشد از person_id+amount ساخته می‌شود. "
+            "جمع مبالغ باید با account_lines برابر باشد."
+        ),
+        "items": _RECEIPT_PERSON_LINE_SCHEMA,
+    },
+    "account_lines": {
+        "type": "array",
+        "description": (
+            "سطرهای بانک/صندوق/تنخواه/چک/شخص مثل فرم. "
+            "اگر خالی باشد از account_type+account_id ساخته می‌شود."
+        ),
+        "items": {
+            **_CASH_SIDE_LINE_SCHEMA,
+            "properties": {
+                k: v
+                for k, v in _CASH_SIDE_LINE_SCHEMA["properties"].items()
+                if k != "account_id"
+            },
+        },
+    },
+    "settlements": {
+        "type": "array",
+        "description": (
+            "تخصیص اقساط فقط برای دریافت: "
+            "[{person_id, invoice_id, allocations:[{seq, amount}]}]"
+        ),
+        "items": {
+            "type": "object",
+            "properties": {
+                "person_id": {"type": "integer"},
+                "invoice_id": {"type": "integer"},
+                "allocations": {
+                    "type": "array",
+                    "items": {
+                        "type": "object",
+                        "properties": {
+                            "seq": {"type": "integer"},
+                            "amount": {"type": "number"},
+                        },
+                    },
+                },
+            },
+        },
+    },
+}
+
 CREATE_RECEIPT_PAYMENT_PARAMETERS_SCHEMA: Dict[str, Any] = {
     "type": "object",
     "properties": {
         "type": {
             "type": "string",
             "enum": ["receipt", "payment"],
-            "description": "receipt=دریافت از شخص، payment=پرداخت به شخص. نه دریافت به‌صورت آزاد.",
+            "description": "receipt=دریافت از شخص، payment=پرداخت به شخص.",
         },
-        "document_date": {
-            "type": "string",
-            "format": "date",
-            "description": "تاریخ سند؛ اگر خالی بماند امروز",
-        },
-        "currency_id": {
-            "type": "integer",
-            "description": "شناسه ارز از list_currencies؛ اگر خالی باشد ارز پیش‌فرض",
-        },
-        "person_id": {
-            "type": "integer",
-            "description": "شناسه عددی شخص از search_persons (فیلد id)",
-        },
-        "amount": {"type": "number", "description": "مبلغ (بزرگتر از صفر)"},
-        "account_type": {
-            "type": "string",
-            "enum": ["bank", "cash_register", "petty_cash"],
-            "description": (
-                "نوع حساب نقدی طرف. bank از list_bank_accounts، "
-                "cash_register از list_cash_registers، petty_cash از list_petty_cash. "
-                "این id کدینگ حساب کل نیست."
-            ),
-        },
-        "account_id": {
-            "type": "integer",
-            "description": "شناسه بانک/صندوق/تنخواه مطابق account_type — نه account کدینگ",
-        },
-        "description": {"type": "string", "description": "شرح سند (اختیاری)"},
+        **_RECEIPT_WRITE_FIELDS_SCHEMA,
     },
-    "required": ["type", "person_id", "amount", "account_type", "account_id"],
+    "required": ["type"],
 }
+
+CREATE_RECEIPT_PAYMENT_DESCRIPTION = (
+    "ثبت دریافت یا پرداخت با همان فیلدهای فرم: چند شخص، چند طرف نقدی "
+    "(بانک/صندوق/تنخواه/چک/شخص)، کارمزد، پروژه، اتصال به فاکتور، اقساط دریافت، بین‌ارزی. "
+    "برای سند ساده: person_id + amount + account_type + account_id کافی است. "
+    "قبل از صدا: search_persons و list_bank_accounts یا list_cash_registers. "
+    "account_id کدینگ list_accounts نیست. نیاز به تأیید."
+)
+
+UPDATE_RECEIPT_PAYMENT_PARAMETERS_SCHEMA: Dict[str, Any] = {
+    "type": "object",
+    "properties": {
+        "document_id": {
+            "type": "integer",
+            "description": "شناسه سند از search_receipts_payments",
+        },
+        **_RECEIPT_WRITE_FIELDS_SCHEMA,
+    },
+    "required": ["document_id"],
+}
+
+UPDATE_RECEIPT_PAYMENT_DESCRIPTION = (
+    "ویرایش سند دریافت/پرداخت با جایگزینی کامل سطرها مثل فرم. "
+    "اول search_receipts_payments. person_lines و account_lines را کامل بفرست "
+    "یا همان میانبر تک‌سطر. پروژه، فاکتور، اقساط و کارمزد هم همین‌جا است. نیاز به تأیید."
+)
+
+
+def _build_receipt_payment_body(
+    args: Dict[str, Any],
+    *,
+    db: Any = None,
+    business_id: Any = None,
+    require_type: bool = True,
+) -> Dict[str, Any]:
+    raw = dict(args or {})
+    dtype = str(raw.get("type") or raw.get("document_type") or "").strip()
+    dtype = _RECEIPT_TYPE_ALIASES.get(dtype, dtype.lower())
+    if require_type and dtype not in ("receipt", "payment"):
+        raise ValueError("type باید receipt یا payment باشد.")
+    person_id = _person_id_from_args(raw)
+    amount = coerce_number(raw.get("amount"))
+    desc = raw.get("description") or ""
+    raw_person_lines = raw.get("person_lines") if isinstance(raw.get("person_lines"), list) else []
+    raw_account_lines = raw.get("account_lines") if isinstance(raw.get("account_lines"), list) else []
+    if raw_person_lines:
+        person_lines = [_normalize_person_doc_line(item) for item in raw_person_lines]
+    else:
+        if not person_id or amount is None or amount <= 0:
+            raise ValueError(
+                "person_lines یا person_id+amount الزامی است. person_id را از search_persons بگیر."
+            )
+        shortcut_person: Dict[str, Any] = {
+            "person_id": person_id,
+            "amount": amount,
+            "description": desc,
+        }
+        if raw.get("invoice_id"):
+            shortcut_person["invoice_id"] = raw.get("invoice_id")
+        if raw.get("invoice_code"):
+            shortcut_person["invoice_code"] = raw.get("invoice_code")
+        person_lines = [_normalize_person_doc_line(shortcut_person)]
+    tx_date = raw.get("transaction_date")
+    if raw_account_lines:
+        account_lines = [
+            _normalize_cash_side_line(
+                item,
+                default_amount=amount,
+                default_description=desc,
+                default_transaction_date=tx_date,
+            )
+            for item in raw_account_lines
+        ]
+    else:
+        if amount is None or amount <= 0:
+            raise ValueError("amount باید بزرگتر از صفر باشد.")
+        account_type = _transaction_kind(raw.get("account_type") or raw.get("transaction_type"))
+        account_id = coerce_positive_int(
+            raw.get("account_id")
+            or raw.get("bank_id")
+            or raw.get("cash_register_id")
+            or raw.get("petty_cash_id")
+            or raw.get("check_id")
+        )
+        if account_type not in ("bank", "cash_register", "petty_cash", "check", "person") or not account_id:
+            raise ValueError(
+                "account_lines یا account_type+account_id الزامی است. "
+                "id را از list_bank_accounts / list_cash_registers / list_petty_cash / search_checks بگیر "
+                "نه از list_accounts."
+            )
+        shortcut_account: Dict[str, Any] = {
+            "transaction_type": account_type,
+            "amount": amount,
+            "description": desc,
+            "account_id": account_id,
+        }
+        if raw.get("commission") is not None:
+            shortcut_account["commission"] = raw.get("commission")
+        if tx_date:
+            shortcut_account["transaction_date"] = tx_date
+        if raw.get("check_id"):
+            shortcut_account["check_id"] = raw.get("check_id")
+        if raw.get("settles_amount") is not None:
+            shortcut_account["settles_amount"] = raw.get("settles_amount")
+        if raw.get("fx_rate") is not None:
+            shortcut_account["fx_rate"] = raw.get("fx_rate")
+        if raw.get("payment_currency_id"):
+            shortcut_account["payment_currency_id"] = raw.get("payment_currency_id")
+        account_lines = [_normalize_cash_side_line(shortcut_account)]
+    currency_id = coerce_positive_int(raw.get("currency_id")) or _default_currency_id(
+        db, business_id or raw.get("business_id")
+    )
+    if not currency_id:
+        raise ValueError("currency_id مشخص نیست. list_currencies را صدا بزن.")
+    extra = _as_dict(raw.get("extra_info"))
+    settlements = _normalize_settlements(raw.get("settlements") or extra.get("settlements"))
+    if not settlements:
+        settlements = _settlements_from_person_lines(
+            raw_person_lines or [raw]
+        )
+    if settlements:
+        extra["settlements"] = settlements
+    payload: Dict[str, Any] = {
+        "person_lines": person_lines,
+        "account_lines": account_lines,
+    }
+    if raw.get("document_date"):
+        payload["document_date"] = raw.get("document_date")
+    elif require_type:
+        payload["document_date"] = date.today().isoformat()
+    payload["currency_id"] = currency_id
+    if "description" in raw or require_type:
+        payload["description"] = desc
+    if extra or "extra_info" in raw or "settlements" in raw:
+        payload["extra_info"] = extra or None
+    if dtype in ("receipt", "payment"):
+        payload["document_type"] = dtype
+    if "project_id" in raw:
+        payload["project_id"] = coerce_positive_int(raw.get("project_id"))
+    return payload
 
 
 def build_create_receipt_payment_payload(
@@ -959,61 +1480,22 @@ def build_create_receipt_payment_payload(
     db: Any = None,
     business_id: Any = None,
 ) -> Dict[str, Any]:
-    raw = dict(args or {})
-    dtype = str(raw.get("type") or raw.get("document_type") or "").strip()
-    dtype = _RECEIPT_TYPE_ALIASES.get(dtype, dtype.lower())
-    if dtype not in ("receipt", "payment"):
-        raise ValueError("type باید receipt یا payment باشد.")
-    person_id = _person_id_from_args(raw)
-    amount = coerce_number(raw.get("amount"))
-    account_type = _account_kind(raw.get("account_type") or raw.get("transaction_type"))
-    account_id = coerce_positive_int(
-        raw.get("account_id")
-        or raw.get("bank_id")
-        or raw.get("cash_register_id")
-        or raw.get("petty_cash_id")
+    return _build_receipt_payment_body(
+        args, db=db, business_id=business_id, require_type=True
     )
-    person_lines = raw.get("person_lines") if isinstance(raw.get("person_lines"), list) else []
-    account_lines = raw.get("account_lines") if isinstance(raw.get("account_lines"), list) else []
-    desc = raw.get("description") or ""
-    if not person_lines:
-        if not person_id or amount is None or amount <= 0:
-            raise ValueError("person_id و amount الزامی است. person_id را از search_persons بگیر.")
-        person_lines = [{"person_id": person_id, "amount": amount, "description": desc}]
-    if not account_lines:
-        if amount is None or amount <= 0:
-            raise ValueError("amount باید بزرگتر از صفر باشد.")
-        if account_type not in ("bank", "cash_register", "petty_cash") or not account_id:
-            raise ValueError(
-                "account_type و account_id الزامی است. "
-                "id را از list_bank_accounts / list_cash_registers / list_petty_cash بگیر نه از list_accounts."
-            )
-        line: Dict[str, Any] = {
-            "amount": amount,
-            "description": desc,
-            "transaction_type": account_type,
-        }
-        if account_type == "bank":
-            line["bank_id"] = account_id
-        elif account_type == "cash_register":
-            line["cash_register_id"] = account_id
-        else:
-            line["petty_cash_id"] = account_id
-        account_lines = [line]
-    currency_id = coerce_positive_int(raw.get("currency_id")) or _default_currency_id(
-        db, business_id or raw.get("business_id")
+
+
+def build_update_receipt_payment_payload(
+    args: Dict[str, Any],
+    *,
+    db: Any = None,
+    business_id: Any = None,
+) -> Dict[str, Any]:
+    payload = _build_receipt_payment_body(
+        args, db=db, business_id=business_id, require_type=False
     )
-    if not currency_id:
-        raise ValueError("currency_id مشخص نیست. list_currencies را صدا بزن.")
-    return {
-        "document_type": dtype,
-        "document_date": raw.get("document_date") or date.today().isoformat(),
-        "currency_id": currency_id,
-        "description": desc,
-        "person_lines": person_lines,
-        "account_lines": account_lines,
-        "extra_info": _as_dict(raw.get("extra_info")),
-    }
+    payload.pop("document_type", None)
+    return payload
 
 
 _WH_DOC_TYPE_ALIASES = {
@@ -1184,70 +1666,245 @@ def build_create_workflow_payload(args: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-def build_create_expense_income_payload(
+_EXPENSE_WRITE_FIELDS_SCHEMA: Dict[str, Any] = {
+    "document_date": {
+        "type": "string",
+        "format": "date",
+        "description": "تاریخ سند؛ اگر خالی بماند امروز",
+    },
+    "currency_id": {
+        "type": "integer",
+        "description": "شناسه ارز از list_currencies؛ اگر خالی باشد ارز پیش‌فرض",
+    },
+    "project_id": {
+        "type": "integer",
+        "description": "پروژه سند از search_projects (اختیاری)",
+    },
+    "description": {"type": "string", "description": "شرح سند (اختیاری)"},
+    "account_id": {
+        "type": "integer",
+        "description": "میانبر تک‌سرفصل هزینه/درآمد از list_accounts وقتی item_lines نفرستی",
+    },
+    "amount": {
+        "type": "number",
+        "description": "میانبر تک‌مبلغ وقتی item_lines/counterparty_lines نفرستی",
+    },
+    "line_description": {
+        "type": "string",
+        "description": "شرح سطر حساب در حالت میانبر",
+    },
+    "counterparty_type": {
+        "type": "string",
+        "enum": ["bank", "cash_register", "petty_cash", "check", "person", "account"],
+        "description": (
+            "میانبر نوع طرف‌حساب. bank/cash_register/petty_cash از لیست نقد، "
+            "check از search_checks، person از search_persons، account از list_accounts"
+        ),
+    },
+    "counterparty_id": {
+        "type": "integer",
+        "description": "میانبر شناسه طرف‌حساب مطابق counterparty_type",
+    },
+    "commission": {"type": "number", "description": "کارمزد طرف‌حساب در حالت میانبر"},
+    "transaction_date": {
+        "type": "string",
+        "description": "تاریخ تراکنش طرف‌حساب در حالت میانبر",
+    },
+    "item_lines": {
+        "type": "array",
+        "description": (
+            "سطرهای سرفصل هزینه/درآمد مثل فرم. اگر خالی باشد از account_id+amount ساخته می‌شود. "
+            "جمع باید با counterparty_lines برابر باشد."
+        ),
+        "items": _EXPENSE_ITEM_LINE_SCHEMA,
+    },
+    "counterparty_lines": {
+        "type": "array",
+        "description": (
+            "سطرهای طرف‌حساب مثل فرم: بانک/صندوق/تنخواه/چک/شخص/حساب. "
+            "اگر خالی باشد از counterparty_type+counterparty_id ساخته می‌شود."
+        ),
+        "items": _CASH_SIDE_LINE_SCHEMA,
+    },
+}
+
+CREATE_EXPENSE_INCOME_PARAMETERS_SCHEMA: Dict[str, Any] = {
+    "type": "object",
+    "properties": {
+        "document_type": {
+            "type": "string",
+            "enum": ["expense", "income"],
+            "description": "expense=هزینه، income=درآمد",
+        },
+        **_EXPENSE_WRITE_FIELDS_SCHEMA,
+    },
+    "required": ["document_type"],
+}
+
+CREATE_EXPENSE_INCOME_DESCRIPTION = (
+    "ثبت هزینه یا درآمد با همان فیلدهای فرم: چند سرفصل، چند طرف‌حساب "
+    "(بانک/صندوق/تنخواه/چک/شخص/حساب)، کارمزد، پروژه. "
+    "برای سند ساده: account_id + amount + counterparty_type + counterparty_id کافی است. "
+    "قبل از صدا: list_accounts برای سرفصل و list_bank_accounts یا list_cash_registers برای طرف نقدی. "
+    "این ابزار حواله کالای هزینه/درآمد انبار نیست. نیاز به تأیید."
+)
+
+UPDATE_EXPENSE_INCOME_PARAMETERS_SCHEMA: Dict[str, Any] = {
+    "type": "object",
+    "properties": {
+        "document_id": {
+            "type": "integer",
+            "description": "شناسه سند از search_expense_income",
+        },
+        **_EXPENSE_WRITE_FIELDS_SCHEMA,
+    },
+    "required": ["document_id"],
+}
+
+UPDATE_EXPENSE_INCOME_DESCRIPTION = (
+    "ویرایش سند هزینه/درآمد با جایگزینی کامل سطرها مثل فرم. "
+    "اول search_expense_income. item_lines و counterparty_lines را کامل بفرست "
+    "یا همان میانبر تک‌سطر. پروژه و کارمزد هم همین‌جا است. نیاز به تأیید."
+)
+
+
+def _normalize_expense_item_line(item: Any) -> Dict[str, Any]:
+    if not isinstance(item, dict):
+        raise ValueError("هر سطر حساب هزینه/درآمد باید object باشد.")
+    account_id = coerce_positive_int(item.get("account_id"))
+    amount = coerce_number(item.get("amount"))
+    if not account_id:
+        raise ValueError("هر سطر حساب به account_id از list_accounts نیاز دارد.")
+    if amount is None or amount <= 0:
+        raise ValueError("مبلغ سطر حساب باید بزرگتر از صفر باشد.")
+    row: Dict[str, Any] = {"account_id": account_id, "amount": amount}
+    if item.get("description"):
+        row["description"] = item.get("description")
+    return row
+
+
+def _build_expense_income_body(
     args: Dict[str, Any],
     *,
     db: Any = None,
     business_id: Any = None,
+    require_type: bool = True,
 ) -> Dict[str, Any]:
     raw = dict(args or {})
     dtype = str(raw.get("document_type") or raw.get("type") or "").strip().lower()
     dtype = {"expense": "expense", "هزینه": "expense", "income": "income", "درآمد": "income"}.get(
         dtype, dtype
     )
-    if dtype not in ("expense", "income"):
+    if require_type and dtype not in ("expense", "income"):
         raise ValueError("document_type باید expense یا income باشد.")
     amount = coerce_number(raw.get("amount"))
-    if amount is None or amount <= 0:
-        raise ValueError("amount باید بزرگتر از صفر باشد.")
-    account_id = coerce_positive_int(raw.get("account_id"))
-    if not account_id:
-        raise ValueError("account_id حساب هزینه/درآمد را از list_accounts بگیر.")
-    raw_cp = str(raw.get("counterparty_type") or "").strip()
-    if raw_cp.lower() in ("person", "شخص"):
-        cp_type = "person"
+    desc = raw.get("description")
+    raw_items = raw.get("item_lines") if isinstance(raw.get("item_lines"), list) else []
+    raw_cps = (
+        raw.get("counterparty_lines")
+        if isinstance(raw.get("counterparty_lines"), list)
+        else []
+    )
+    if raw_items:
+        item_lines = [_normalize_expense_item_line(item) for item in raw_items]
     else:
-        cp_type = _account_kind(raw_cp)
-    if cp_type not in ("bank", "cash_register", "petty_cash", "person"):
-        raise ValueError("counterparty_type باید bank/cash_register/petty_cash/person باشد.")
-    cp_id = coerce_positive_int(raw.get("counterparty_id"))
-    if not cp_id:
-        raise ValueError("counterparty_id الزامی است.")
+        account_id = coerce_positive_int(raw.get("account_id"))
+        if not account_id or amount is None or amount <= 0:
+            raise ValueError(
+                "item_lines یا account_id+amount الزامی است. account_id را از list_accounts بگیر."
+            )
+        item_lines = [
+            _normalize_expense_item_line(
+                {
+                    "account_id": account_id,
+                    "amount": amount,
+                    "description": raw.get("line_description") or desc,
+                }
+            )
+        ]
+    doc_date = raw.get("document_date") or (date.today().isoformat() if require_type else None)
+    tx_date = raw.get("transaction_date") or (f"{doc_date}T12:00:00" if doc_date else None)
+    if raw_cps:
+        counterparty_lines = [
+            _normalize_cash_side_line(
+                item,
+                allow_account=True,
+                default_amount=amount,
+                default_description=desc,
+                default_transaction_date=tx_date,
+            )
+            for item in raw_cps
+        ]
+    else:
+        raw_cp = str(raw.get("counterparty_type") or "").strip()
+        cp_type = _transaction_kind(raw_cp)
+        cp_id = coerce_positive_int(raw.get("counterparty_id"))
+        if cp_type not in ("bank", "cash_register", "petty_cash", "check", "person", "account") or not cp_id:
+            raise ValueError(
+                "counterparty_lines یا counterparty_type+counterparty_id الزامی است."
+            )
+        if amount is None or amount <= 0:
+            raise ValueError("amount باید بزرگتر از صفر باشد.")
+        shortcut: Dict[str, Any] = {
+            "transaction_type": cp_type,
+            "amount": amount,
+            "transaction_date": tx_date,
+            "description": desc,
+            "account_id": cp_id,
+        }
+        if raw.get("commission") is not None:
+            shortcut["commission"] = raw.get("commission")
+        if raw.get("check_id"):
+            shortcut["check_id"] = raw.get("check_id")
+        counterparty_lines = [
+            _normalize_cash_side_line(shortcut, allow_account=True)
+        ]
     currency_id = coerce_positive_int(raw.get("currency_id")) or _default_currency_id(
         db, business_id or raw.get("business_id")
     )
     if not currency_id:
         raise ValueError("currency_id مشخص نیست. list_currencies را صدا بزن.")
-    doc_date = raw.get("document_date") or date.today().isoformat()
-    tx_date = raw.get("transaction_date") or f"{doc_date}T12:00:00"
-    counterparty_line: Dict[str, Any] = {
-        "transaction_type": cp_type,
-        "amount": amount,
-        "transaction_date": tx_date,
-        "description": raw.get("description"),
-    }
-    if cp_type == "bank":
-        counterparty_line["bank_id"] = cp_id
-    elif cp_type == "cash_register":
-        counterparty_line["cash_register_id"] = cp_id
-    elif cp_type == "petty_cash":
-        counterparty_line["petty_cash_id"] = cp_id
-    else:
-        counterparty_line["person_id"] = cp_id
-    return {
-        "document_type": dtype,
-        "document_date": doc_date,
+    payload: Dict[str, Any] = {
         "currency_id": currency_id,
-        "description": raw.get("description"),
-        "item_lines": [
-            {
-                "account_id": account_id,
-                "amount": amount,
-                "description": raw.get("line_description") or raw.get("description"),
-            }
-        ],
-        "counterparty_lines": [counterparty_line],
+        "item_lines": item_lines,
+        "counterparty_lines": counterparty_lines,
     }
+    if doc_date:
+        payload["document_date"] = doc_date
+    if "description" in raw or require_type:
+        payload["description"] = desc
+    if dtype in ("expense", "income"):
+        payload["document_type"] = dtype
+    if "project_id" in raw:
+        payload["project_id"] = coerce_positive_int(raw.get("project_id"))
+    extra = _as_dict(raw.get("extra_info"))
+    if extra or "extra_info" in raw:
+        payload["extra_info"] = extra or None
+    return payload
+
+
+def build_create_expense_income_payload(
+    args: Dict[str, Any],
+    *,
+    db: Any = None,
+    business_id: Any = None,
+) -> Dict[str, Any]:
+    return _build_expense_income_body(
+        args, db=db, business_id=business_id, require_type=True
+    )
+
+
+def build_update_expense_income_payload(
+    args: Dict[str, Any],
+    *,
+    db: Any = None,
+    business_id: Any = None,
+) -> Dict[str, Any]:
+    payload = _build_expense_income_body(
+        args, db=db, business_id=business_id, require_type=False
+    )
+    payload.pop("document_type", None)
+    return payload
 
 
 # --- اشخاص: هم‌تراز با فرم UI / PersonCreateRequest و PersonUpdateRequest ---

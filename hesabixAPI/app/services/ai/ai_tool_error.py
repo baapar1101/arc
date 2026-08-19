@@ -161,8 +161,25 @@ def _hint_for_business_code(code: str, function_name: str, api_message: str) -> 
         )
     if function_name == "create_receipt_payment":
         return (
-            "type=receipt|payment، person_id از search_persons، "
-            "account_type و account_id از لیست بانک/صندوق — نه کدینگ."
+            "type=receipt|payment. سند ساده: person_id از search_persons و "
+            "account_type/account_id از لیست بانک/صندوق/تنخواه/چک. "
+            "سند کامل فرم: person_lines و account_lines با کارمزد، پروژه، فاکتور یا اقساط."
+        )
+    if function_name == "update_receipt_payment":
+        return (
+            "document_id از search_receipts_payments و سطرهای کامل person_lines/account_lines "
+            "مثل فرم ویرایش."
+        )
+    if function_name == "create_expense_income":
+        return (
+            "document_type=expense|income. سند ساده: account_id از list_accounts و "
+            "counterparty_type/id. سند کامل فرم: item_lines و counterparty_lines "
+            "(بانک/صندوق/تنخواه/چک/شخص/حساب) و در صورت نیاز project_id."
+        )
+    if function_name == "update_expense_income":
+        return (
+            "document_id از search_expense_income و سطرهای کامل item_lines/counterparty_lines "
+            "مثل فرم ویرایش."
         )
     if function_name == "create_check":
         return "type=received|transferred، check_number، amount، تاریخ صدور/سررسید، و برای دریافتی person_id."
@@ -186,7 +203,7 @@ def _schema_property_names(schema: Optional[Dict[str, Any]]) -> list[str]:
     if not isinstance(props, dict):
         return []
     names = [str(k) for k in props.keys()]
-    for nest_key in ("lines", "person_lines", "account_lines", "item_lines"):
+    for nest_key in ("lines", "person_lines", "account_lines", "item_lines", "counterparty_lines"):
         nested_node = props.get(nest_key)
         if not isinstance(nested_node, dict):
             continue

@@ -146,6 +146,9 @@ def test_warehouse_and_workflow_write_keep_companions():
     rec = select_tool_names(catalog, "یک دریافت از علی ثبت کن")
     assert "create_receipt_payment" in rec
     assert "list_bank_accounts" in rec
+    exp = select_tool_names(catalog, "یک هزینه ثبت کن")
+    assert "create_expense_income" in exp
+    assert "list_accounts" in exp
 
 
 def test_wallet_and_accounts_categories_detected():

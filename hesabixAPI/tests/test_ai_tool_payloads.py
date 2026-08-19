@@ -136,6 +136,129 @@ def test_receipt_payment_maps_bank_id_not_chart_account():
     assert "account_id" not in line
 
 
+def test_receipt_payment_full_form_lines_and_project():
+    payload = build_create_receipt_payment_payload(
+        {
+            "type": "payment",
+            "currency_id": 1,
+            "project_id": 9,
+            "invoice_id": 44,
+            "person_lines": [
+                {
+                    "person_id": 10,
+                    "amount": 8000,
+                    "invoice_id": 44,
+                    "invoice_code": "F-1",
+                }
+            ],
+            "account_lines": [
+                {
+                    "transaction_type": "check",
+                    "amount": 8000,
+                    "check_id": 5,
+                    "commission": 50,
+                    "transaction_date": "2026-08-01T12:00:00",
+                }
+            ],
+            "settlements": [
+                {
+                    "person_id": 10,
+                    "invoice_id": 44,
+                    "allocations": [{"seq": 1, "amount": 8000}],
+                }
+            ],
+        }
+    )
+    assert payload["document_type"] == "payment"
+    assert payload["project_id"] == 9
+    assert payload["person_lines"][0]["extra_info"]["invoice_id"] == 44
+    assert payload["person_lines"][0]["extra_info"]["link_to_invoice"] is True
+    line = payload["account_lines"][0]
+    assert line["transaction_type"] == "check"
+    assert line["check_id"] == 5
+    assert line["commission"] == 50
+    assert payload["extra_info"]["settlements"][0]["invoice_id"] == 44
+
+
+def test_create_expense_income_maps_simple_and_full_form():
+    from app.services.ai.ai_tool_payloads import (
+        CREATE_EXPENSE_INCOME_PARAMETERS_SCHEMA,
+        build_create_expense_income_payload,
+        build_update_expense_income_payload,
+        build_update_receipt_payment_payload,
+    )
+
+    simple = build_create_expense_income_payload(
+        {
+            "document_type": "هزینه",
+            "account_id": 21,
+            "amount": 1000,
+            "counterparty_type": "بانک",
+            "counterparty_id": 3,
+            "currency_id": 1,
+            "project_id": 8,
+            "commission": 10,
+        }
+    )
+    assert simple["document_type"] == "expense"
+    assert simple["project_id"] == 8
+    assert simple["item_lines"][0]["account_id"] == 21
+    cp = simple["counterparty_lines"][0]
+    assert cp["transaction_type"] == "bank"
+    assert cp["bank_id"] == 3
+    assert cp["commission"] == 10
+
+    full = build_create_expense_income_payload(
+        {
+            "type": "income",
+            "currency_id": 1,
+            "item_lines": [
+                {"account_id": 30, "amount": 400, "description": "فروش"},
+                {"account_id": 31, "amount": 600},
+            ],
+            "counterparty_lines": [
+                {"transaction_type": "person", "person_id": 12, "amount": 700},
+                {"type": "check", "check_id": 4, "amount": 300},
+            ],
+        }
+    )
+    assert full["document_type"] == "income"
+    assert len(full["item_lines"]) == 2
+    assert full["counterparty_lines"][0]["person_id"] == 12
+    assert full["counterparty_lines"][1]["check_id"] == 4
+
+    updated = build_update_expense_income_payload(
+        {
+            "document_id": 9,
+            "account_id": 21,
+            "amount": 500,
+            "counterparty_type": "cash_register",
+            "counterparty_id": 2,
+            "currency_id": 1,
+        }
+    )
+    assert "document_type" not in updated
+    assert updated["item_lines"][0]["amount"] == 500
+    assert updated["counterparty_lines"][0]["cash_register_id"] == 2
+
+    receipt_update = build_update_receipt_payment_payload(
+        {
+            "document_id": 3,
+            "person_id": 10,
+            "amount": 200,
+            "account_type": "صندوق",
+            "account_id": 6,
+            "currency_id": 1,
+        }
+    )
+    assert "document_type" not in receipt_update
+    assert receipt_update["account_lines"][0]["cash_register_id"] == 6
+    props = CREATE_EXPENSE_INCOME_PARAMETERS_SCHEMA["properties"]
+    assert "item_lines" in props
+    assert "counterparty_lines" in props
+    assert "project_id" in props
+
+
 def test_create_check_aliases_and_requires_person_for_received():
     payload = build_create_check_payload(
         {

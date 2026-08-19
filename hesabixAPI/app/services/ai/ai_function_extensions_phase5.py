@@ -25,9 +25,14 @@ _MAX_EXPORT_ROWS = 10_000
 
 
 def register_phase5_business_functions(registry: "AIFunctionRegistry") -> None:
+    from app.services.ai.ai_tool_payloads import (
+        CREATE_EXPENSE_INCOME_DESCRIPTION,
+        CREATE_EXPENSE_INCOME_PARAMETERS_SCHEMA,
+        build_create_expense_income_payload,
+    )
+
     # --- expense / income ---
     def create_expense_income_handler(args: Dict[str, Any], context: Dict[str, Any]) -> Any:
-        from app.services.ai.ai_tool_payloads import build_create_expense_income_payload
         from app.services.expense_income_service import create_expense_income
 
         db = context["db"]
@@ -41,51 +46,8 @@ def register_phase5_business_functions(registry: "AIFunctionRegistry") -> None:
     registry.register(
         AIFunction(
             name="create_expense_income",
-            description=(
-                "ثبت سند هزینه یا درآمد ساده (یک سطر حساب + یک طرف‌حساب). "
-                "document_type: expense یا income. counterparty_type: bank, cash_register, petty_cash, person."
-            ),
-            parameters_schema={
-                "type": "object",
-                "properties": {
-                    "document_type": {
-                        "type": "string",
-                        "enum": ["expense", "income"],
-                        "description": "expense=هزینه، income=درآمد",
-                    },
-                    "document_date": {
-                        "type": "string",
-                        "format": "date",
-                        "description": "تاریخ سند؛ اگر خالی بماند امروز",
-                    },
-                    "currency_id": {
-                        "type": "integer",
-                        "description": "شناسه ارز از list_currencies",
-                    },
-                    "account_id": {"type": "integer", "description": "شناسه حساب هزینه/درآمد از list_accounts"},
-                    "amount": {"type": "number", "description": "مبلغ (بزرگتر از صفر)"},
-                    "counterparty_type": {
-                        "type": "string",
-                        "enum": ["bank", "cash_register", "petty_cash", "person"],
-                        "description": "نوع طرف‌حساب",
-                    },
-                    "counterparty_id": {
-                        "type": "integer",
-                        "description": "شناسه طرف‌حساب (بانک/صندوق/شخص)",
-                    },
-                    "description": {"type": "string", "description": "شرح سند (اختیاری)"},
-                    "line_description": {"type": "string", "description": "شرح سطر حساب (اختیاری)"},
-                    "transaction_date": {"type": "string", "description": "تاریخ تراکنش طرف‌حساب (اختیاری)"},
-                },
-                "required": [
-                    "document_type",
-                    "currency_id",
-                    "account_id",
-                    "amount",
-                    "counterparty_type",
-                    "counterparty_id",
-                ],
-            },
+            description=CREATE_EXPENSE_INCOME_DESCRIPTION,
+            parameters_schema=CREATE_EXPENSE_INCOME_PARAMETERS_SCHEMA,
             handler=create_expense_income_handler,
             allowed_roles={AIRole.USER, AIRole.BUSINESS_OWNER, AIRole.OPERATOR, AIRole.ADMIN},
             required_permissions=["expenses_income.write"],
