@@ -68,8 +68,25 @@ class LabelPrintJobDialog extends StatefulWidget {
     );
   }
 
-  /// ساخت ردیف از داده کالای عمومی.
-  static LabelPrintJobRow fromProductMap(Map<String, dynamic> product, {String? barcodeOverride, int qty = 1}) {
+  static dynamic _firstNonEmpty(Map<String, dynamic> map, List<String> keys) {
+    for (final key in keys) {
+      final v = map[key];
+      if (v == null) continue;
+      if (v is String && v.trim().isEmpty) continue;
+      return v;
+    }
+    return null;
+  }
+
+  /// فیلدهای کالا برای binding طرح برچسب.
+  ///
+  /// لیست کالا از API فیلدهای `base_sales_price` / `base_purchase_price` دارد،
+  /// در حالی که طرح‌ها به `product.price` و `product.sale_price` وصل می‌شوند.
+  /// فرم کالا این نام‌ها را از قبل نگاشت می‌کند؛ چاپ گروهی باید همین کار را بکند.
+  static Map<String, dynamic> productBindingMap(
+    Map<String, dynamic> product, {
+    String? barcodeOverride,
+  }) {
     final name = product['name']?.toString() ?? '';
     final code = product['code']?.toString() ?? '';
     final gb = barcodeOverride ??
@@ -80,20 +97,40 @@ class LabelPrintJobDialog extends StatefulWidget {
         .split(RegExp(r'[,،\n]+'))
         .map((e) => e.trim())
         .firstWhere((e) => e.isNotEmpty, orElse: () => code);
+    final salePrice = _firstNonEmpty(product, const [
+      'sale_price',
+      'price',
+      'base_sales_price',
+      'sales_price',
+    ]);
+    final buyPrice = _firstNonEmpty(product, const [
+      'buy_price',
+      'base_purchase_price',
+      'purchase_price',
+    ]);
+    return {
+      'name': name,
+      'code': code,
+      'price': salePrice ?? buyPrice,
+      'sale_price': salePrice ?? buyPrice,
+      'general_barcode': firstBarcode,
+      'image_url': product['image_url'] ?? product['thumbnail_url'],
+    };
+  }
+
+  /// ساخت ردیف از داده کالای عمومی.
+  static LabelPrintJobRow fromProductMap(Map<String, dynamic> product, {String? barcodeOverride, int qty = 1}) {
+    final fields = productBindingMap(product, barcodeOverride: barcodeOverride);
+    final name = fields['name']?.toString() ?? '';
+    final code = fields['code']?.toString() ?? '';
+    final firstBarcode = fields['general_barcode']?.toString() ?? '';
     return LabelPrintJobRow(
       key: 'p-${product['id']}-$firstBarcode',
       title: name,
       subtitle: '$code · $firstBarcode',
       qty: qty,
       context: {
-        'product': {
-          'name': name,
-          'code': code,
-          'price': product['price'] ?? product['buy_price'],
-          'sale_price': product['sale_price'] ?? product['price'],
-          'general_barcode': firstBarcode,
-          'image_url': product['image_url'] ?? product['thumbnail_url'],
-        },
+        'product': fields,
         'instance': {'serial': '', 'barcode': ''},
         'warehouse': {'name': product['warehouse_name']?.toString() ?? ''},
         'business': {'name': ''},

@@ -469,19 +469,15 @@ class _ProductsPageState extends State<ProductsPage> {
             final wId = widRaw is int ? widRaw : int.tryParse(widRaw?.toString() ?? '');
             final serial = m['serial_number']?.toString() ?? '';
             final bc = m['barcode']?.toString() ?? serial;
+            final productFields = LabelPrintJobDialog.productBindingMap(row);
+            productFields['general_barcode'] = bc;
             rows.add(
               LabelPrintJobRow(
                 key: 'inst-${m['id']}',
                 title: name,
                 subtitle: '$code · $serial',
                 context: {
-                  'product': {
-                    'name': name,
-                    'code': code,
-                    'general_barcode': bc,
-                    'price': row['price'],
-                    'sale_price': row['sale_price'] ?? row['price'],
-                  },
+                  'product': productFields,
                   'instance': {'serial': serial, 'barcode': bc},
                   'warehouse': {'name': wId != null ? (whMap[wId] ?? '') : ''},
                   'business': {'name': ''},

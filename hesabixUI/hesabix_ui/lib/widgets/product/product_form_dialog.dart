@@ -463,6 +463,8 @@ class _ProductFormDialogState extends State<ProductFormDialog> {
       'price': fd.baseSalesPrice ?? widget.product?['price'],
       'sale_price': fd.baseSalesPrice ?? widget.product?['sale_price'],
       'buy_price': fd.basePurchasePrice ?? widget.product?['buy_price'],
+      'base_sales_price': fd.baseSalesPrice ?? widget.product?['base_sales_price'],
+      'base_purchase_price': fd.basePurchasePrice ?? widget.product?['base_purchase_price'],
     };
     final tokens = parseGeneralBarcodeTokens(productMap['general_barcodes']?.toString());
     final rows = <LabelPrintJobRow>[];
