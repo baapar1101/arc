@@ -2495,6 +2495,26 @@ class _MyAppState extends State<MyApp> {
                             },
                           ),
                           GoRoute(
+                            path: 'ai/chat/:sessionId',
+                            pageBuilder: (context, state) {
+                              final businessId = int.parse(
+                                state.pathParameters['business_id']!,
+                              );
+                              final sessionId = int.tryParse(
+                                state.pathParameters['sessionId'] ?? '',
+                              );
+                              return hesabixNoTransitionPage(
+                                state,
+                                AIChatPage(
+                                  businessId: businessId,
+                                  authStore: _authStore!,
+                                  calendarController: _calendarController,
+                                  initialSessionId: sessionId,
+                                ),
+                              );
+                            },
+                          ),
+                          GoRoute(
                             path: 'ai/subscription',
                             pageBuilder: (context, state) {
                               final businessId = int.parse(

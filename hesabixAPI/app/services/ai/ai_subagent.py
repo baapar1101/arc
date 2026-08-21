@@ -1,7 +1,7 @@
 """اجرای موقت subagent برای سوال چنددامنه‌ای (AGT-06).
 
 سقف محصول: حداکثر ۲ فرزند همزمان، ۴ نوبت ابزار، analyzer بدون write.
-ذخیرهٔ run درون‌پردازه‌ای است (فاز ۰–۲)؛ جدول SQL موکول به persist بادوام.
+وضعیت زنده در حافظه است؛ snapshot در جدول ai_subagent_runs برای رفرش.
 """
 from __future__ import annotations
 
@@ -65,6 +65,7 @@ class SubagentRun:
     task: Optional[asyncio.Task] = None
     result: Optional[Dict[str, Any]] = None
     cancel_requested: bool = False
+    business_id: Optional[int] = None
     created_at: float = field(default_factory=time.monotonic)
 
 
@@ -74,6 +75,28 @@ _lock = asyncio.Lock()
 
 def reset_subagent_runs_for_tests() -> None:
     _runs.clear()
+
+
+def _persist_run(run: SubagentRun) -> None:
+    from app.services.ai.ai_subagent_run_store import persist_subagent_run
+
+    persist_subagent_run(
+        subagent_id=run.subagent_id,
+        session_id=run.parent_session_id,
+        business_id=run.business_id,
+        goal=run.goal,
+        status=run.status,
+        result=run.result,
+    )
+
+
+def _ui_item_from_run(run: SubagentRun) -> Dict[str, Any]:
+    return {
+        "subagent_id": run.subagent_id,
+        "goal": run.goal,
+        "status": run.status,
+        "error": (run.result or {}).get("error") if run.result else None,
+    }
 
 
 def should_expose_subagent_tools(
@@ -171,20 +194,34 @@ def _count_running(session_id: Optional[int]) -> int:
 
 
 def list_session_subagents(session_id: Optional[int]) -> List[Dict[str, Any]]:
-    """وضعیت فرزندان یک جلسه برای UI."""
-    out: List[Dict[str, Any]] = []
+    """وضعیت فرزندان یک جلسه برای UI — حافظه زنده + جدول SQL."""
+    by_id: Dict[str, Dict[str, Any]] = {}
+    live_ids: set[str] = set()
     for run in _runs.values():
         if session_id is not None and run.parent_session_id != session_id:
             continue
-        out.append(
-            {
-                "subagent_id": run.subagent_id,
-                "goal": run.goal,
-                "status": run.status,
-                "error": (run.result or {}).get("error") if run.result else None,
-            }
-        )
-    return out
+        live_ids.add(run.subagent_id)
+        by_id[run.subagent_id] = _ui_item_from_run(run)
+    if session_id is not None:
+        try:
+            from adapters.db.session import get_db_session
+            from app.services.ai.ai_subagent_run_store import (
+                list_session_subagent_rows,
+                mark_stale_running_interrupted,
+            )
+
+            with get_db_session() as db:
+                mark_stale_running_interrupted(
+                    db, session_id=int(session_id), live_ids=live_ids
+                )
+                for item in list_session_subagent_rows(db, int(session_id)):
+                    sid = str(item.get("subagent_id") or "")
+                    if not sid or sid in by_id:
+                        continue
+                    by_id[sid] = item
+        except Exception:
+            logger.debug("list_session_subagents db merge skipped", exc_info=True)
+    return list(by_id.values())
 
 
 async def cancel_session_subagents(session_id: Optional[int]) -> int:
@@ -226,6 +263,7 @@ async def _cancel_run(run: SubagentRun) -> bool:
             goal=run.goal,
             error="SUBAGENT_CANCELLED",
         )
+        _persist_run(run)
         return True
     return False
 
@@ -256,6 +294,7 @@ def cancel_subagent_sync(
         error="SUBAGENT_CANCELLED",
     )
     run.result = envelope
+    _persist_run(run)
     log_ai_event("subagent_cancelled", session_id=session_id, extra={"subagent_id": sid})
     return envelope
 
@@ -509,8 +548,10 @@ async def spawn_subagent_async(
             subagent_id=subagent_id,
             parent_session_id=session_id,
             goal=goal,
+            business_id=business_id,
         )
         _runs[subagent_id] = run
+        _persist_run(run)
 
     card_id = subagent_step_id(subagent_id)
     started = time.monotonic()
@@ -563,6 +604,7 @@ async def spawn_subagent_async(
             )
             run.status = "completed"
             run.result = envelope
+            _persist_run(run)
             _emit_card("done", envelope)
             return envelope
         except asyncio.CancelledError:
@@ -574,6 +616,7 @@ async def spawn_subagent_async(
                 error="SUBAGENT_CANCELLED",
             )
             run.result = envelope
+            _persist_run(run)
             _emit_card("error", envelope)
             raise
         except asyncio.TimeoutError:
@@ -585,6 +628,7 @@ async def spawn_subagent_async(
                 error="SUBAGENT_TIMEOUT",
             )
             run.result = envelope
+            _persist_run(run)
             _emit_card("error", envelope)
             return envelope
         except Exception as exc:
@@ -597,6 +641,7 @@ async def spawn_subagent_async(
                 error=str(exc),
             )
             run.result = envelope
+            _persist_run(run)
             _emit_card("error", envelope)
             return envelope
 

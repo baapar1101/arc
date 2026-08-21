@@ -37,6 +37,7 @@ import 'package:hesabix_ui/widgets/ai/ai_chat_stream_controller.dart';
 import 'package:hesabix_ui/widgets/ai/ai_chat_stream_turn.dart';
 import 'package:hesabix_ui/widgets/ai/ai_chat_resume.dart';
 import 'package:hesabix_ui/widgets/ai/ai_write_approval_helpers.dart';
+import 'package:hesabix_ui/widgets/ai/ai_subagent_restore.dart';
 import 'package:hesabix_ui/widgets/ai/ai_chat_turn.dart';
 import 'package:hesabix_ui/widgets/ai/ai_chat_session_controller.dart';
 import 'package:hesabix_ui/widgets/ai/ai_chat_voice_session.dart';
@@ -44,6 +45,8 @@ import 'package:hesabix_ui/widgets/ai/ai_chat_message_sheet.dart';
 import 'package:hesabix_ui/widgets/ai/ai_chat_enter_to_send.dart';
 import 'package:hesabix_ui/widgets/ai/ai_execution_mode.dart';
 import 'package:hesabix_ui/widgets/ai/ai_chat_execution_mode_store.dart';
+import 'package:hesabix_ui/widgets/ai/ai_chat_last_session_store.dart';
+import 'package:hesabix_ui/widgets/ai/ai_chat_location.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/widgets/ai/ai_chat_l10n.dart';
 import 'package:share_plus/share_plus.dart';
@@ -66,6 +69,9 @@ class AIChatDialog extends StatefulWidget {
   /// مدل از پیش‌انتخاب‌شده (مثلاً از دیالوگ «از AI بساز»).
   final String? initialModelCode;
 
+  /// بازگردانی جلسه بعد از رفرش وب (`/ai/chat/:sessionId`).
+  final int? initialSessionId;
+
   /// وقتی از استودیو HScript باز شود، امکان اعمال مستقیم اسکریپت از پیام‌ها.
   final void Function(String code)? onApplyHScriptCode;
 
@@ -78,6 +84,7 @@ class AIChatDialog extends StatefulWidget {
     this.initialPrompt,
     this.autoSendInitialPrompt = true,
     this.initialModelCode,
+    this.initialSessionId,
     this.onApplyHScriptCode,
   });
 
@@ -160,6 +167,7 @@ class _AIChatDialogState extends State<AIChatDialog> {
   String? _streamErrorMessage;
   bool _streamErrorRecoverable = false;
   VoidCallback? _pendingStreamRetry;
+  bool _didRestoreSession = false;
   final AISseCursor _sseCursor = AISseCursor();
   String? _continueRunId;
   String? _continueStopMessage;
@@ -267,9 +275,9 @@ class _AIChatDialogState extends State<AIChatDialog> {
     _aiService = AIService(ApiClient());
     _stream.addListener(_onStreamStateChanged);
     _scrollController.addListener(_onScrollChanged);
-    _loadSessions();
     _loadSuggestions();
     unawaited(_loadExecutionModePreference());
+    unawaited(_bootstrapSessions());
     if (widget.businessId != null) {
       _modelsLoading = true;
       unawaited(_loadProactiveAlerts());
@@ -799,6 +807,13 @@ class _AIChatDialogState extends State<AIChatDialog> {
       token.cancel('user_cancel');
     }
     _streamCancelToken = null;
+    final runId = _stream.runId ?? _sseCursor.runId;
+    final sessionId = _currentSession?.id;
+    if (runId != null && runId.isNotEmpty && sessionId != null) {
+      unawaited(
+        _aiService.cancelAgentRun(sessionId: sessionId, runId: runId),
+      );
+    }
     final snap = _stream.snapshotForCancel();
     setState(() {
       if (snap != null && _currentSession?.id != null) {
@@ -972,6 +987,83 @@ class _AIChatDialogState extends State<AIChatDialog> {
     }
   }
 
+  Future<void> _bootstrapSessions() async {
+    await _loadSessions();
+    if (!mounted) return;
+    await _restoreSessionIfNeeded();
+  }
+
+  void _rememberOpenSession(int? sessionId) {
+    _reflectSessionLocation(sessionId);
+    if (sessionId == null) {
+      unawaited(AIChatLastSessionStore.clear(widget.businessId));
+      return;
+    }
+    unawaited(AIChatLastSessionStore.save(widget.businessId, sessionId));
+  }
+
+  void _reflectSessionLocation(int? sessionId) {
+    if (!widget.embeddedInShell) return;
+    replaceAiChatSessionPath(sessionId: sessionId);
+  }
+
+  Future<void> _restoreSessionIfNeeded() async {
+    if (_didRestoreSession) return;
+    _didRestoreSession = true;
+    if (_currentSession != null) return;
+    final prompt = widget.initialPrompt?.trim();
+    if (prompt != null && prompt.isNotEmpty) return;
+
+    var id = widget.initialSessionId;
+    id ??= await AIChatLastSessionStore.load(widget.businessId);
+    if (id == null || !mounted) return;
+
+    var session = _thread.sessionById(id);
+    session ??= await _aiService.getChatSession(sessionId: id);
+    if (session == null || !mounted) return;
+    await _selectSession(session, resumeActiveRun: true);
+  }
+
+  Future<void> _resumeActiveRunIfNeeded() async {
+    final sessionId = _currentSession?.id;
+    if (sessionId == null || _sending) return;
+    final active = await _aiService.getActiveAgentRun(sessionId: sessionId);
+    if (!mounted) return;
+    if (active == null || active.runId.isEmpty) return;
+    final l10n = AppLocalizations.of(context);
+
+    if (active.isGenerating) {
+      _sseCursor.runId = active.runId;
+      if (active.lastEventId > 0) {
+        _sseCursor.lastEventId = active.lastEventId;
+      }
+      _showSnackbar(l10n.aiResumingPreviousRun);
+      setState(() {
+        _stream.begin(phase: 'connecting');
+        _sending = true;
+      });
+      await _runAssistantStream(
+        (cancelToken) => _aiService.subscribeAgentRunStream(
+          sessionId: sessionId,
+          runId: active.runId,
+          sseCursor: _sseCursor,
+          cancelToken: cancelToken,
+        ),
+        errorLabel: l10n.aiContinueAnalysis,
+      );
+      return;
+    }
+
+    if (active.canContinue) {
+      setState(() {
+        _continueRunId = active.runId;
+        _continueStopMessage = active.stopMessageFa?.trim().isNotEmpty == true
+            ? active.stopMessageFa
+            : l10n.aiContinueAfterRefreshHint;
+      });
+    }
+  }
+
   Future<bool> _ensureSession() async {
     if (_currentSession != null) return true;
     try {
@@ -984,6 +1076,7 @@ class _AIChatDialogState extends State<AIChatDialog> {
         _thread.adoptCreatedSession(session);
         _clearWriteApprovalState();
       });
+      _rememberOpenSession(session.id);
       unawaited(_loadSessions());
       return true;
     } catch (e) {
@@ -997,7 +1090,10 @@ class _AIChatDialogState extends State<AIChatDialog> {
     }
   }
 
-  Future<void> _selectSession(AIChatSession session) async {
+  Future<void> _selectSession(
+    AIChatSession session, {
+    bool resumeActiveRun = false,
+  }) async {
     if (_currentSession?.id == session.id) return;
     if (_isGenerating) {
       _stopGenerating(showNotice: false);
@@ -1019,11 +1115,16 @@ class _AIChatDialogState extends State<AIChatDialog> {
         _syncPendingWriteApprovalFromMessages();
         _syncContinueRunFromMessages();
       });
+      _rememberOpenSession(session.id);
       _scrollToBottom(force: true);
+      await _restorePersistedSubagents(session.id!);
       await _checkAvailability();
       unawaited(_loadAttachments());
       if (_messages.isEmpty) {
         _focusNode.requestFocus();
+      }
+      if (resumeActiveRun) {
+        await _resumeActiveRunIfNeeded();
       }
     } catch (e) {
       if (!mounted) return;
@@ -1034,6 +1135,33 @@ class _AIChatDialogState extends State<AIChatDialog> {
         ),
       );
     }
+  }
+
+  Future<void> _restorePersistedSubagents(int sessionId) async {
+    try {
+      final items = await _aiService.listSessionSubagents(sessionId);
+      if (!mounted || items.isEmpty) return;
+      final merged = mergeSubagentSummariesIntoMessages(_messages, items);
+      if (identical(merged, _messages)) return;
+      setState(() {
+        _messages = merged;
+        _syncMessageKeys();
+      });
+    } catch (e) {
+      debugPrint('[AIChatDialog] subagent restore failed: $e');
+    }
+  }
+
+  void _dropAwaitingApprovalAssistantForResume() {
+    if (_messages.isEmpty) return;
+    final last = _messages.last;
+    if (last.role != MessageRole.assistant) return;
+    final pending = extractPendingApprovalOpsFromResults(last.functionResults);
+    if (!functionResultsAwaitApproval(last.functionResults) && pending.isEmpty) {
+      return;
+    }
+    _messages = List<AIChatMessage>.from(_messages)..removeLast();
+    _syncMessageKeys();
   }
 
   Future<void> _loadAttachments() async {
@@ -1256,6 +1384,12 @@ class _AIChatDialogState extends State<AIChatDialog> {
       return true;
     } catch (e) {
       debugPrint('[AIChatDialog] Error checking availability before send: $e');
+      if (!mounted) return false;
+      _showError(
+        AppLocalizations.of(context).aiStreamAvailabilityCheckFailed(
+          ErrorExtractor.forContext(e, context),
+        ),
+      );
       return false;
     }
   }
@@ -1302,6 +1436,8 @@ class _AIChatDialogState extends State<AIChatDialog> {
       _continueRunId = null;
       _continueStopMessage = null;
     });
+    _reflectSessionLocation(null);
+    unawaited(AIChatLastSessionStore.clear(widget.businessId));
     _messageCtrl.clear();
     _focusNode.requestFocus();
   }
@@ -1427,18 +1563,6 @@ class _AIChatDialogState extends State<AIChatDialog> {
         regenerateAfter: true,
         cancelToken: token,
         onComplete: (_, __) {},
-        onError: (error) {
-          if (!mounted) return;
-          setState(() {
-            _sending = false;
-            _stream.clear();
-          });
-          _showError(
-            AppLocalizations.of(context).aiChatEditFailed(
-              ErrorExtractor.forContext(error, context),
-            ),
-          );
-        },
       ),
       errorLabel: AppLocalizations.of(context).aiChatErrorLabelEdit,
     );
@@ -1555,6 +1679,20 @@ class _AIChatDialogState extends State<AIChatDialog> {
     }
   }
 
+  String _friendlyStreamError(AIChatStreamTurnOutcome outcome) {
+    final l10n = AppLocalizations.of(context);
+    switch (outcome.errorCode) {
+      case 'STREAM_STALL':
+        return l10n.aiStreamStallError;
+      case 'EMPTY_STREAM':
+        return l10n.aiStreamEmptyError;
+      case 'RUN_IDLE':
+        return l10n.aiContinueAfterRefreshHint;
+      default:
+        return outcome.errorMessage ?? l10n.aiErrorRecoveryTitle;
+    }
+  }
+
   String _labelForResolvedModel(String? code) {
     final resolvedCode = code?.trim();
     if (resolvedCode == null || resolvedCode.isEmpty) return '';
@@ -1563,6 +1701,13 @@ class _AIChatDialogState extends State<AIChatDialog> {
   }
 
   void _applyStreamOutcome(AIChatStreamTurnOutcome outcome) {
+    if (outcome.errorCode == 'RUN_CANCELLED') {
+      setState(() {
+        _sending = false;
+        _stream.clear();
+      });
+      return;
+    }
     if (outcome.status == AIChatStreamTurnStatus.chunkError) {
       setState(() {
         if (outcome.hasPartialAssistant && _currentSession?.id != null) {
@@ -1577,7 +1722,7 @@ class _AIChatDialogState extends State<AIChatDialog> {
               ),
             );
         }
-        _streamErrorMessage = outcome.errorMessage;
+        _streamErrorMessage = _friendlyStreamError(outcome);
         _streamErrorRecoverable = outcome.errorRecoverable;
         if (outcome.applyContinue) {
           _continueRunId = outcome.continueRunId;
@@ -1635,6 +1780,7 @@ class _AIChatDialogState extends State<AIChatDialog> {
   Future<void> _runAssistantStream(
     Stream<AIStreamChunk> Function(CancelToken cancelToken) streamFactory, {
     String? errorLabel,
+    int reconnectAttempt = 0,
   }) async {
     _pendingStreamRetry = () {
       unawaited(_runAssistantStream(streamFactory, errorLabel: errorLabel));
@@ -1650,12 +1796,39 @@ class _AIChatDialogState extends State<AIChatDialog> {
         onContentTick: _scrollToBottom,
       );
       if (!mounted) return;
+      if (reconnectAttempt < 2 &&
+          outcome.shouldReconnect &&
+          await _reconnectAssistantStream(
+            outcome,
+            errorLabel: errorLabel,
+            reconnectAttempt: reconnectAttempt,
+          )) {
+        return;
+      }
       _applyStreamOutcome(outcome);
     } catch (e) {
       if (e is DioException && CancelToken.isCancel(e)) {
         if (mounted && _streamCancelToken == cancelToken) {
           setState(() => _sending = false);
         }
+        return;
+      }
+      if (!mounted) return;
+      final synthetic = AIChatStreamTurnOutcome(
+        status: AIChatStreamTurnStatus.chunkError,
+        errorMessage: ErrorExtractor.forContext(e, context),
+        errorRecoverable: true,
+        errorCode: 'NETWORK',
+        suggestedAction: 'reconnect',
+        applyContinue: true,
+        continueRunId: _stream.runId ?? _sseCursor.runId,
+      );
+      if (reconnectAttempt < 2 &&
+          await _reconnectAssistantStream(
+            synthetic,
+            errorLabel: errorLabel,
+            reconnectAttempt: reconnectAttempt,
+          )) {
         return;
       }
       if (!mounted) return;
@@ -1678,6 +1851,43 @@ class _AIChatDialogState extends State<AIChatDialog> {
     }
   }
 
+  Future<bool> _reconnectAssistantStream(
+    AIChatStreamTurnOutcome outcome, {
+    String? errorLabel,
+    required int reconnectAttempt,
+  }) async {
+    final sessionId = _currentSession?.id;
+    final runId = outcome.continueRunId ?? _stream.runId ?? _sseCursor.runId;
+    if (sessionId == null || runId == null || runId.isEmpty) return false;
+    if (!mounted) return false;
+    _sseCursor.runId = runId;
+    setState(() {
+      _sending = true;
+      _stream.statusPhase = 'connecting';
+    });
+    final useContinue = outcome.shouldContinueRun;
+    await _runAssistantStream(
+      (cancelToken) => useContinue
+          ? _aiService.continueAgentRunStream(
+              sessionId: sessionId,
+              runId: runId,
+              executionMode: _executionMode,
+              model: _selectedModelCode,
+              sseCursor: _sseCursor,
+              cancelToken: cancelToken,
+            )
+          : _aiService.subscribeAgentRunStream(
+              sessionId: sessionId,
+              runId: runId,
+              sseCursor: _sseCursor,
+              cancelToken: cancelToken,
+            ),
+      errorLabel: errorLabel,
+      reconnectAttempt: reconnectAttempt + 1,
+    );
+    return true;
+  }
+
   Future<void> _continueIncompleteRun() async {
     final runId = _continueRunId;
     final sessionId = _currentSession?.id;
@@ -1697,20 +1907,6 @@ class _AIChatDialogState extends State<AIChatDialog> {
         model: _selectedModelCode,
         sseCursor: _sseCursor,
         cancelToken: cancelToken,
-        onComplete: (_, __) {},
-        onError: (error) {
-          if (!mounted) return;
-          setState(() {
-            _sending = false;
-            _stream.clear();
-          });
-          _showError(
-            AppLocalizations.of(context).aiChatActionFailed(
-              AppLocalizations.of(context).aiContinueAnalysis,
-              ErrorExtractor.forContext(error, context),
-            ),
-          );
-        },
       ),
       errorLabel: AppLocalizations.of(context).aiContinueAnalysis,
     );
@@ -1737,18 +1933,6 @@ class _AIChatDialogState extends State<AIChatDialog> {
         sessionId: _currentSession!.id!,
         cancelToken: token,
         onComplete: (_, __) {},
-        onError: (error) {
-          if (!mounted) return;
-          setState(() {
-            _sending = false;
-            _stream.clear();
-          });
-          _showError(
-            AppLocalizations.of(context).aiChatRegenerateFailed(
-              ErrorExtractor.forContext(error, context),
-            ),
-          );
-        },
       ),
       errorLabel: AppLocalizations.of(context).aiChatErrorLabelRegenerate,
     );
@@ -1911,6 +2095,9 @@ class _AIChatDialogState extends State<AIChatDialog> {
 
     if (!mounted) return;
     setState(() {
+      if (silent || approveWrites) {
+        _dropAwaitingApprovalAssistantForResume();
+      }
       _stream.begin(phase: 'connecting');
       _sending = true;
     });
@@ -1927,16 +2114,6 @@ class _AIChatDialogState extends State<AIChatDialog> {
         sseCursor: _sseCursor,
         onComplete: (usage, messageId) {
           finalUsage = usage;
-        },
-        onError: (error) {
-          if (!mounted) return;
-          setState(() {
-            _sending = false;
-            _stream.clear();
-          });
-          _showError(
-            l10n.aiChatSendFailed(ErrorExtractor.forContext(error, context)),
-          );
         },
         cancelToken: cancelToken,
       ),

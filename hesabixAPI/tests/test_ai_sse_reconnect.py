@@ -25,12 +25,14 @@ def test_sequencer_increments_and_buffers():
     seq = SseEventSequencer(run_id="deadbeefcafebabe", start_id=0)
     first = seq.format({"type": "status", "phase": "thinking", "done": False})
     second = seq.format({"type": "heartbeat", "elapsed_ms": 3, "done": False})
+    third = seq.format({"type": "status", "phase": "writing", "done": False})
     assert "id: 1\n" in first
     assert "id: 2\n" in second
+    assert "id: 3\n" in third
     replayed = events_after("deadbeefcafebabe", 1)
     assert len(replayed) == 1
-    assert replayed[0][0] == 2
-    assert replayed[0][1]["type"] == "heartbeat"
+    assert replayed[0][0] == 3
+    assert replayed[0][1]["type"] == "status"
     drop_sse_events("deadbeefcafebabe")
 
 

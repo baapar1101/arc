@@ -61,6 +61,8 @@ class AIChatStreamTurnOutcome {
   final bool applyContinue;
   final String? errorMessage;
   final bool errorRecoverable;
+  final String? errorCode;
+  final String? suggestedAction;
   final String? resolvedModelCode;
   final String? partialContent;
   final DateTime? partialCreatedAt;
@@ -79,11 +81,24 @@ class AIChatStreamTurnOutcome {
     this.applyContinue = true,
     this.errorMessage,
     this.errorRecoverable = false,
+    this.errorCode,
+    this.suggestedAction,
     this.resolvedModelCode,
     this.partialContent,
     this.partialCreatedAt,
     this.partialFunctionResults,
   });
+
+  bool get shouldReconnect {
+    if (status != AIChatStreamTurnStatus.chunkError) return false;
+    if (!errorRecoverable) return false;
+    final action = suggestedAction;
+    if (action == 'reconnect' || action == 'continue') return true;
+    return errorCode == 'STREAM_STALL' || errorCode == 'EMPTY_STREAM';
+  }
+
+  bool get shouldContinueRun =>
+      suggestedAction == 'continue' || errorCode == 'RUN_IDLE';
 
   bool get hasPartialAssistant =>
       status == AIChatStreamTurnStatus.chunkError &&

@@ -7,7 +7,8 @@ from __future__ import annotations
 from typing import Dict, Any, Optional
 import logging
 
-from fastapi import APIRouter, Depends, Path, Body
+from fastapi import APIRouter, Depends, Path, Body, Query
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, or_
 
@@ -26,6 +27,8 @@ from app.services.ai.ai_channel_policy import (
     filter_tools_by_allowlist,
 )
 from app.services.ai.ai_untrusted import wrap_untrusted_block
+from app.services.ai.ai_channel_stream import iter_channel_assist_sse
+from app.services.ai.ai_stream_helpers import sse_response_headers
 
 router = APIRouter(prefix="/ai/crm", tags=["AI-CRM"])
 logger = logging.getLogger(__name__)
@@ -101,6 +104,38 @@ def _charge_usage(response: Dict[str, Any]) -> Dict[str, Any]:
     return dict(response.get("_charge") or {})
 
 
+def _crm_stream_response(
+    ai_service: AIService,
+    messages: list,
+    *,
+    user_query: str,
+    result_field: str,
+    feature: str,
+    extra: Dict[str, Any],
+) -> StreamingResponse:
+    catalog = ai_service.get_available_functions(
+        session_business_id=ai_service.business_id,
+        user_query=user_query,
+        execution_mode="analyzer",
+        channel="crm",
+    )
+    tools = filter_tools_by_allowlist(catalog, CHANNEL_CRM_READ_TOOLS)
+    return StreamingResponse(
+        iter_channel_assist_sse(
+            ai_service,
+            messages,
+            tools=tools,
+            user_query=user_query,
+            iteration_cap=CHANNEL_ITERATION_CAP[CHANNEL_CRM],
+            result_field=result_field,
+            feature=feature,
+            extra=extra,
+        ),
+        media_type="text/event-stream",
+        headers=sse_response_headers(),
+    )
+
+
 def _lead_context(lead: Lead) -> str:
     """ساخت متن خلاصه سرنخ برای AI"""
     from app.services.ai.ai_untrusted import mask_email, mask_phone
@@ -153,6 +188,7 @@ def _activities_context(activities: list) -> str:
 async def summarize_lead(
     business_id: int = Path(..., gt=0),
     lead_id: int = Body(..., embed=True),
+    stream: bool = Query(False, description="استریم SSE به‌جای JSON"),
     db: Session = Depends(get_db),
     ctx: AuthContext = Depends(get_current_user),
     _: None = Depends(require_business_permission_dep("crm", "view")),
@@ -206,6 +242,15 @@ async def summarize_lead(
         {"role": "system", "content": system_prompt},
         {"role": "user", "content": user_content},
     ]
+    if stream:
+        return _crm_stream_response(
+            ai_service,
+            messages,
+            user_query=lead.name or f"lead {lead.id}",
+            result_field="summary",
+            feature="crm_summarize_lead",
+            extra={"lead_id": lead_id},
+        )
     response = await _run_crm_assist(
         ai_service,
         messages,
@@ -231,6 +276,7 @@ async def summarize_lead(
 async def summarize_deal(
     business_id: int = Path(..., gt=0),
     deal_id: int = Body(..., embed=True),
+    stream: bool = Query(False, description="استریم SSE به‌جای JSON"),
     db: Session = Depends(get_db),
     ctx: AuthContext = Depends(get_current_user),
     _: None = Depends(require_business_permission_dep("crm", "view")),
@@ -280,6 +326,15 @@ async def summarize_deal(
         {"role": "system", "content": system_prompt},
         {"role": "user", "content": user_content},
     ]
+    if stream:
+        return _crm_stream_response(
+            ai_service,
+            messages,
+            user_query=deal.title or f"deal {deal.id}",
+            result_field="summary",
+            feature="crm_summarize_deal",
+            extra={"deal_id": deal_id},
+        )
     response = await _run_crm_assist(
         ai_service,
         messages,

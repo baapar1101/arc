@@ -4609,6 +4609,32 @@
   "aiContinueAnalysis": "Continue analysis",
   "aiContinueAnalysisHint": "The analysis stopped early. Continue from the same run without repeating completed tools.",
   "aiContinueAnalysisDismiss": "Not now",
+  "aiStreamStallError": "The connection dropped. Your reply so far is saved.",
+  "aiStreamEmptyError": "The reply did not finish because the connection closed.",
+  "aiStreamAvailabilityCheckFailed": "Cannot send right now: {error}",
+  "@aiStreamAvailabilityCheckFailed": {
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+  "aiContinueAfterRefreshHint": "The previous analysis was left unfinished. You can continue from the same point.",
+  "aiResumingPreviousRun": "Resuming the previous reply...",
+  "aiCrmAssistantTitle": "Smart assistant",
+  "aiCrmSummarizeAction": "Summary and next step",
+  "aiCrmStopAction": "Stop",
+  "aiTicketAssistantTitle": "AI assistance",
+  "aiTicketAssistantHintExpanded": "The assistant is ready. Get a suggestion or send an automatic reply.",
+  "aiTicketAssistantHintCollapsed": "Tap to show the assistant and AI actions.",
+  "aiTicketSuggestReply": "Suggest a reply",
+  "aiTicketAutoReply": "Automatic reply",
+  "aiTicketAutoReplyConfirmTitle": "Automatic reply",
+  "aiTicketAutoReplyConfirmBody": "Should the assistant reply to this ticket automatically?",
+  "aiTicketSuggestionLabel": "AI suggestion",
+  "aiTicketUseSuggestion": "Use this reply",
+  "aiTicketSuggestFailed": "Could not get a suggestion: {error}",
+  "@aiTicketSuggestFailed": {
+    "placeholders": { "error": { "type": "String" } }
+  },
   "aiConversationNavTitle": "Messages ({count})",
   "@aiConversationNavTitle": {
     "placeholders": {

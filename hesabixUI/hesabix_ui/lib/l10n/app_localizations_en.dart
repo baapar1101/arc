@@ -11611,6 +11611,70 @@ class AppLocalizationsEn extends AppLocalizations {
   String get aiContinueAnalysisDismiss => 'Not now';
 
   @override
+  String get aiStreamStallError =>
+      'The connection dropped. Your reply so far is saved.';
+
+  @override
+  String get aiStreamEmptyError =>
+      'The reply did not finish because the connection closed.';
+
+  @override
+  String aiStreamAvailabilityCheckFailed(String error) {
+    return 'Cannot send right now: $error';
+  }
+
+  @override
+  String get aiContinueAfterRefreshHint =>
+      'The previous analysis was left unfinished. You can continue from the same point.';
+
+  @override
+  String get aiResumingPreviousRun => 'Resuming the previous reply...';
+
+  @override
+  String get aiCrmAssistantTitle => 'Smart assistant';
+
+  @override
+  String get aiCrmSummarizeAction => 'Summary and next step';
+
+  @override
+  String get aiCrmStopAction => 'Stop';
+
+  @override
+  String get aiTicketAssistantTitle => 'AI assistance';
+
+  @override
+  String get aiTicketAssistantHintExpanded =>
+      'The assistant is ready. Get a suggestion or send an automatic reply.';
+
+  @override
+  String get aiTicketAssistantHintCollapsed =>
+      'Tap to show the assistant and AI actions.';
+
+  @override
+  String get aiTicketSuggestReply => 'Suggest a reply';
+
+  @override
+  String get aiTicketAutoReply => 'Automatic reply';
+
+  @override
+  String get aiTicketAutoReplyConfirmTitle => 'Automatic reply';
+
+  @override
+  String get aiTicketAutoReplyConfirmBody =>
+      'Should the assistant reply to this ticket automatically?';
+
+  @override
+  String get aiTicketSuggestionLabel => 'AI suggestion';
+
+  @override
+  String get aiTicketUseSuggestion => 'Use this reply';
+
+  @override
+  String aiTicketSuggestFailed(String error) {
+    return 'Could not get a suggestion: $error';
+  }
+
+  @override
   String aiConversationNavTitle(int count) {
     return 'Messages ($count)';
   }

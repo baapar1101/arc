@@ -15,6 +15,15 @@ const _listKeys = [
   'rows',
 ];
 
+bool _isSuccessfulToolEnvelope(Map<String, dynamic> map) {
+  if (map['ok'] == false) return false;
+  final err = map['error'];
+  if (err != null && err.toString().trim().isNotEmpty && map['ok'] != true) {
+    return false;
+  }
+  return map['ok'] == true || map.containsKey('_envelope');
+}
+
 const _skipResultKeys = {
   kAgentTraceStorageKey,
   kAgentBudgetStorageKey,
@@ -23,6 +32,7 @@ const _skipResultKeys = {
   kAgentCitationsStorageKey,
   kActivatedSkillsStorageKey,
   kReasoningTraceStorageKey,
+  kAwaitingApprovalStorageKey,
 };
 
 const _traceLikeColumns = {
@@ -73,14 +83,9 @@ Object? _unwrapToolEntry(Object? entry) {
 
 List<Map<String, dynamic>> extractToolRecordsFromResult(Object? result) {
   final payload = _unwrapToolEntry(result);
-  if (payload is List) {
-    return payload
-        .whereType<Map>()
-        .map((e) => Map<String, dynamic>.from(e))
-        .toList();
-  }
   if (payload is! Map) return [];
   final map = Map<String, dynamic>.from(payload);
+  if (!_isSuccessfulToolEnvelope(map)) return [];
   for (final key in _listKeys) {
     final raw = map[key];
     if (raw is List && raw.isNotEmpty) {

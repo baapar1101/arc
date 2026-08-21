@@ -28,6 +28,7 @@ void main() {
       expect(spec, isNotNull);
       expect(spec!.hasData, isTrue);
       expect(spec.columns.length, greaterThanOrEqualTo(2));
+      expect(spec.columns.any((c) => c.key == 'id' && c.label == 'شناسه'), isTrue);
       expect(AITableSpec.tryFromRecords([{'id': 1, 'name': 'تنها'}]), isNull);
     });
 
@@ -35,12 +36,14 @@ void main() {
       final specs = extractToolTableSpecsFromResults({
         '_agent_trace': [],
         'search_invoices': {
+          'ok': true,
           'items': [
             {'id': 1, 'name': 'الف'},
             {'id': 2, 'name': 'ب'},
           ],
         },
         'search_persons': {
+          'ok': true,
           'items': [
             {'id': 1, 'name': 'علی', 'balance': 1},
             {'id': 2, 'name': 'رضا', 'balance': 2},
@@ -50,6 +53,30 @@ void main() {
       });
       expect(specs, hasLength(1));
       expect(specs.first.rows, hasLength(3));
+    });
+
+    test('skips failed envelopes and raw lists', () {
+      expect(
+        extractToolTableSpecsFromResults({
+          'search_invoices': {
+            'ok': false,
+            'items': [
+              {'id': 1, 'name': 'الف'},
+              {'id': 2, 'name': 'ب'},
+            ],
+          },
+        }),
+        isEmpty,
+      );
+      expect(
+        extractToolTableSpecsFromResults({
+          'mystery': [
+            {'id': 1, 'name': 'الف'},
+            {'id': 2, 'name': 'ب'},
+          ],
+        }),
+        isEmpty,
+      );
     });
 
     test('skips _reasoning_trace and underscore keys', () {

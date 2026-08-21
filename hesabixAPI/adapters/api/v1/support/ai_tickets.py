@@ -1,5 +1,6 @@
 from typing import Dict, Any, TYPE_CHECKING
-from fastapi import APIRouter, Depends, Request, Body, Path
+from fastapi import APIRouter, Depends, Request, Body, Path, Query
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from adapters.db.session import get_db
@@ -15,6 +16,8 @@ from app.services.ai.ai_channel_policy import (
     filter_tools_by_allowlist,
 )
 from app.services.ai.ai_untrusted import wrap_untrusted_block
+from app.services.ai.ai_channel_stream import iter_channel_assist_sse
+from app.services.ai.ai_stream_helpers import sse_response_headers
 from adapters.db.repositories.support.ticket_repository import TicketRepository
 from adapters.db.repositories.support.message_repository import MessageRepository
 from adapters.api.v1.schemas import QueryInfo
@@ -41,6 +44,7 @@ async def suggest_ai_reply(
     options: AISuggestReplyRequest = Body(...),
     db: Session = Depends(get_db),
     ctx: AuthContext = Depends(get_current_user),
+    stream: bool = Query(False, description="استریم SSE به‌جای JSON"),
 ) -> Dict[str, Any]:
     """دریافت پیشنهاد پاسخ AI برای تیکت"""
     ticket_repo = TicketRepository(db)
@@ -139,6 +143,21 @@ async def suggest_ai_reply(
         channel="ticket",
     )
     tools = filter_tools_by_allowlist(catalog, CHANNEL_TICKET_READ_TOOLS)
+    if stream:
+        return StreamingResponse(
+            iter_channel_assist_sse(
+                ai_service,
+                ai_messages,
+                tools=tools,
+                user_query=ticket.title or "",
+                iteration_cap=CHANNEL_ITERATION_CAP[CHANNEL_TICKET],
+                result_field="suggested_reply",
+                feature="ticket_suggest_reply",
+                extra={"ticket_id": ticket_id},
+            ),
+            media_type="text/event-stream",
+            headers=sse_response_headers(),
+        )
     response = await ai_service.chat_completion(
         ai_messages,
         tools=tools,

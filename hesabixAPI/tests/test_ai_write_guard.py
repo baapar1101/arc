@@ -2,8 +2,10 @@ from app.services.ai.ai_write_guard import (
     build_approval_mismatch_result,
     build_approval_pause_content,
     build_approval_required_result,
+    function_results_await_approval,
     is_approval_required_result,
     is_write_guard_stop_result,
+    mark_function_results_awaiting_approval,
     write_call_is_approved,
 )
 
@@ -143,3 +145,15 @@ def test_is_write_function_honors_requires_approval_not_static_list():
     reg = _Reg({"brand_new_write": _Fn(True, False)})
     assert is_write_function("brand_new_write", reg) is True
     assert is_write_function("brand_new_write") is False
+
+
+def test_awaiting_approval_flag_roundtrip():
+    marked = mark_function_results_awaiting_approval(
+        {"create_person": {"error": "APPROVAL_REQUIRED"}},
+        True,
+    )
+    assert function_results_await_approval(marked) is True
+    cleared = mark_function_results_awaiting_approval(marked, False)
+    assert function_results_await_approval(cleared) is False
+    assert function_results_await_approval('{"_awaiting_approval": true}') is True
+

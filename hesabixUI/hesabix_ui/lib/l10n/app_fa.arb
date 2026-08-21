@@ -4651,6 +4651,32 @@
   "aiContinueAnalysis": "ادامهٔ تحلیل",
   "aiContinueAnalysisHint": "تحلیل ناقص ماند. می‌توانید از همان نقطه ادامه دهید؛ ابزارهای قبلی تکرار نمی‌شوند.",
   "aiContinueAnalysisDismiss": "فعلاً نه",
+  "aiStreamStallError": "ارتباط لحظه‌ای قطع شد. پاسخ تا اینجا ذخیره شده است.",
+  "aiStreamEmptyError": "پاسخ کامل نرسید؛ اتصال قبل از اتمام بسته شد.",
+  "aiStreamAvailabilityCheckFailed": "الان نمی‌توان پیام فرستاد: {error}",
+  "@aiStreamAvailabilityCheckFailed": {
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+  "aiContinueAfterRefreshHint": "تحلیل قبلی ناتمام ماند. می‌توانید از همان نقطه ادامه دهید.",
+  "aiResumingPreviousRun": "در حال ادامهٔ پاسخ قبلی…",
+  "aiCrmAssistantTitle": "دستیار هوشمند",
+  "aiCrmSummarizeAction": "خلاصه و پیشنهاد",
+  "aiCrmStopAction": "توقف",
+  "aiTicketAssistantTitle": "کمک هوش مصنوعی",
+  "aiTicketAssistantHintExpanded": "دستیار فعال است. پیشنهاد یا پاسخ خودکار دریافت کنید.",
+  "aiTicketAssistantHintCollapsed": "برای نمایش دستیار و دکمه‌های AI ضربه بزنید.",
+  "aiTicketSuggestReply": "پیشنهاد پاسخ",
+  "aiTicketAutoReply": "پاسخ خودکار",
+  "aiTicketAutoReplyConfirmTitle": "پاسخ خودکار",
+  "aiTicketAutoReplyConfirmBody": "آیا می‌خواهید دستیار به‌صورت خودکار به این تیکت پاسخ دهد؟",
+  "aiTicketSuggestionLabel": "پیشنهاد AI",
+  "aiTicketUseSuggestion": "استفاده از این پاسخ",
+  "aiTicketSuggestFailed": "خطا در دریافت پیشنهاد: {error}",
+  "@aiTicketSuggestFailed": {
+    "placeholders": { "error": { "type": "String" } }
+  },
   "aiConversationNavTitle": "فهرست پیام‌ها ({count})",
   "@aiConversationNavTitle": {
     "placeholders": {

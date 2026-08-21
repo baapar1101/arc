@@ -166,6 +166,23 @@ void main() {
       expect(outcome.status, AIChatStreamTurnStatus.success);
     });
 
+    test('stream end without done is a recoverable reconnect error', () async {
+      final c = AIChatStreamController();
+      c.begin();
+      c.runId = 'run-live';
+      final outcome = await c.consume(
+        Stream.fromIterable(const [
+          AIStreamChunk(contentDelta: 'نیمه'),
+        ]),
+        resolveToolLabel: label,
+        sseCursorRunId: 'run-live',
+      );
+      expect(outcome.status, AIChatStreamTurnStatus.chunkError);
+      expect(outcome.errorCode, 'EMPTY_STREAM');
+      expect(outcome.shouldReconnect, isTrue);
+      expect(outcome.continueRunId, 'run-live');
+    });
+
     test('done without visible output is empty', () async {
       final c = AIChatStreamController();
       c.begin();
@@ -232,7 +249,7 @@ void main() {
       expect(outcome.continueStopMessage, 'بودجه تمام شد');
     });
 
-    test('stream without done still completes from accumulated deltas', () async {
+    test('stream without done is recoverable reconnect with partial', () async {
       final c = AIChatStreamController();
       c.begin();
       final outcome = await c.consume(
@@ -241,9 +258,11 @@ void main() {
         ]),
         resolveToolLabel: label,
       );
-      expect(outcome.status, AIChatStreamTurnStatus.success);
-      expect(outcome.resolvedContent, 'فقط دلتا');
-      expect(outcome.continueRunId, isNull);
+      expect(outcome.status, AIChatStreamTurnStatus.chunkError);
+      expect(outcome.errorCode, 'EMPTY_STREAM');
+      expect(outcome.shouldReconnect, isTrue);
+      expect(outcome.hasPartialAssistant, isTrue);
+      expect(outcome.partialContent, 'فقط دلتا');
     });
   });
 }

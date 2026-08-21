@@ -1763,6 +1763,7 @@ class AIService(AIModelRouterMixin, AIUsageMeterMixin):
         )
 
     def _observe_tool_batch(self, items: List[tuple]) -> None:
+        from app.services.ai.ai_ops_metrics import log_ai_event
         from app.services.ai.ai_tool_discovery_telemetry import (
             mark_first_pass,
             observe_tool_call_result,
@@ -1792,6 +1793,17 @@ class AIService(AIModelRouterMixin, AIUsageMeterMixin):
                 mutation=getattr(getattr(self, "_last_discovery_offer", None), "mutation", "")
                 or "",
             )
+            err = payload.get("error")
+            if payload.get("ok") is False or (
+                err and err not in ("APPROVAL_REQUIRED",)
+            ):
+                log_ai_event(
+                    "tool_error",
+                    extra={
+                        "tool": name,
+                        "code": str(err or "TOOL_ERROR"),
+                    },
+                )
             if (
                 last_miss
                 and name == last_miss
@@ -2761,6 +2773,16 @@ class AIService(AIModelRouterMixin, AIUsageMeterMixin):
                     if reasoning_language_mismatch(
                         round_reasoning, chat_language
                     ):
+                        from app.services.ai.ai_ops_metrics import log_ai_event
+
+                        log_ai_event(
+                            "reasoning_language_mismatch",
+                            session_id=session_id,
+                            extra={
+                                "expected": chat_language,
+                                "iteration": iteration,
+                            },
+                        )
                         logger.warning(
                             "[AI Agent][session=%s] reasoning language mismatch "
                             "(expected=%s iteration=%s preview=%r)",

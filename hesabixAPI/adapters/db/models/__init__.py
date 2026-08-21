@@ -115,6 +115,7 @@ from .ai_chat_session import AIChatSession  # noqa: F401
 from .ai_chat_message import AIChatMessage, MessageRole  # noqa: F401
 from .ai_session_todo import AISessionTodo  # noqa: F401
 from .ai_agent_run import AIAgentRun  # noqa: F401
+from .ai_subagent_run import AISubagentRun  # noqa: F401
 from .ai_business_memory import AIBusinessMemory  # noqa: F401
 from .ai_chat_attachment import AIChatAttachment  # noqa: F401
 from .ai_knowledge_document import AIKnowledgeDocument  # noqa: F401

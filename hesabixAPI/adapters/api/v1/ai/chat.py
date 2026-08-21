@@ -1108,6 +1108,71 @@ async def create_chat_session(
     return success_response(_session_response_dict(session), request, "جلسه چت با موفقیت ایجاد شد")
 
 
+@router.get("/sessions/{session_id}", summary="دریافت یک گفت‌وگو")
+async def get_chat_session(
+    session_id: int = Path(...),
+    request: Request = None,
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+) -> Dict[str, Any]:
+    session_repo = AIChatSessionRepository(db)
+    session = session_repo.get_by_id(session_id)
+    if not session or session.user_id != ctx.get_user_id():
+        raise ApiError("SESSION_NOT_FOUND", "گفت‌وگو یافت نشد", http_status=404)
+    return success_response(_session_response_dict(session), request)
+
+
+@router.get("/sessions/{session_id}/active-run", summary="اجرای ناتمام یا زندهٔ جلسه")
+async def get_active_agent_run(
+    session_id: int = Path(...),
+    request: Request = None,
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+) -> Dict[str, Any]:
+    from adapters.db.models.ai_agent_run import AIAgentRunStatus
+    from app.services.ai.ai_agent_run_store import get_latest_active_run
+    from app.services.ai.ai_run_hub import agent_run_hub, is_running_row_fresh
+
+    session_repo = AIChatSessionRepository(db)
+    session = session_repo.get_by_id(session_id)
+    if not session or session.user_id != ctx.get_user_id():
+        raise ApiError("SESSION_NOT_FOUND", "گفت‌وگو یافت نشد", http_status=404)
+
+    row = get_latest_active_run(
+        db, session_id=session_id, user_id=ctx.get_user_id()
+    )
+    if row is None:
+        return success_response(None, request)
+
+    live = agent_run_hub.is_live(row.run_id)
+    can_continue = row.status in AIAgentRunStatus.RESUMABLE or (
+        row.status == AIAgentRunStatus.RUNNING and not live and not is_running_row_fresh(row.updated_at)
+    )
+    stop_message = None
+    if row.budget_json:
+        try:
+            import json
+
+            budget = json.loads(row.budget_json)
+            if isinstance(budget, dict):
+                stop_message = budget.get("stop_message_fa")
+        except (TypeError, ValueError):
+            stop_message = None
+    return success_response(
+        {
+            "run_id": row.run_id,
+            "status": row.status,
+            "live": live,
+            "can_continue": bool(can_continue),
+            "last_event_id": int(row.last_event_id or 0),
+            "stop_reason": row.stop_reason,
+            "stop_message_fa": stop_message,
+            "updated_at": row.updated_at.isoformat() if row.updated_at else None,
+        },
+        request,
+    )
+
+
 @router.patch("/sessions/{session_id}", summary="به‌روزرسانی گفت‌وگو")
 async def update_chat_session(
     session_id: int = Path(...),
@@ -1494,6 +1559,14 @@ async def send_message(
     }, request)
 
 
+def _sse_stream_headers() -> Dict[str, str]:
+    return {
+        "Cache-Control": "no-cache",
+        "Connection": "keep-alive",
+        "X-Accel-Buffering": "no",
+    }
+
+
 def _sse_payload(
     data: Dict[str, Any],
     sequencer: Optional[Any] = None,
@@ -1511,6 +1584,13 @@ def _emit_chunk_as_sse(chunk: Dict[str, Any], sequencer: Optional[Any] = None):
 
     for data in chunk_to_sse_data(chunk):
         yield _sse_payload(data, sequencer)
+
+
+def _publish_chunk(live: Any, chunk: Dict[str, Any]) -> None:
+    from app.services.ai.ai_stream_helpers import chunk_to_sse_data
+
+    for data in chunk_to_sse_data(chunk):
+        live.publish(data)
 
 
 def _extract_content_from_agent_trace(
@@ -1605,6 +1685,27 @@ def _merge_agent_budget_checkpoint(
     return merged
 
 
+def _latest_awaiting_approval_assistant(
+    db, session_id: int
+) -> Optional[AIChatMessage]:
+    from app.services.ai.ai_write_guard import function_results_await_approval
+
+    rows = (
+        db.query(AIChatMessage)
+        .filter(
+            AIChatMessage.session_id == session_id,
+            AIChatMessage.role == MessageRole.ASSISTANT.value,
+        )
+        .order_by(AIChatMessage.created_at.desc(), AIChatMessage.id.desc())
+        .limit(8)
+        .all()
+    )
+    for row in rows:
+        if function_results_await_approval(row.function_results):
+            return row
+    return None
+
+
 async def _persist_stream_assistant_message(
     *,
     session_id: int,
@@ -1622,6 +1723,7 @@ async def _persist_stream_assistant_message(
     stream_ai_config: Any = None,
     final_agent_run: Optional[Dict[str, Any]] = None,
     final_agent_budget: Optional[Dict[str, Any]] = None,
+    awaiting_approval: bool = False,
 ) -> tuple[Optional[int], Optional[Dict[str, Any]], str]:
     """ذخیره پاسخ assistant و ثبت usage. برمی‌گرداند (message_id, usage, content)."""
     from adapters.db.session import get_db_session
@@ -1668,46 +1770,36 @@ async def _persist_stream_assistant_message(
     usage = _estimate_stream_usage_if_missing(
         final_usage, stream_ai_config, messages, content
     )
+    from app.services.ai.ai_write_guard import mark_function_results_awaiting_approval
 
-    if usage:
-        input_tokens = usage.get("input_tokens", 0)
-        output_tokens = usage.get("output_tokens", 0)
+    merged_function_results = mark_function_results_awaiting_approval(
+        merged_function_results, awaiting_approval
+    )
+    persist_content = content or "خطا در دریافت پاسخ"
+    input_tokens = int((usage or {}).get("input_tokens", 0) or 0)
+    output_tokens = int((usage or {}).get("output_tokens", 0) or 0)
 
-        with get_db_session() as new_db:
-            session_repo = AIChatSessionRepository(new_db)
-            updated_session = session_repo.get_by_id(session_id)
-            if not updated_session:
-                logger.error("Session %s not found for commit", session_id)
-                return None, usage, content
+    with get_db_session() as new_db:
+        session_repo = AIChatSessionRepository(new_db)
+        updated_session = session_repo.get_by_id(session_id)
+        if not updated_session:
+            logger.error("Session %s not found for commit", session_id)
+            return None, usage, persist_content
 
-            new_ai_service = AIService(new_db, ctx, updated_session.business_id)
-            _prepare_ai_service_model(new_ai_service, request_model)
-            _apply_chat_routing_context(
-                new_ai_service,
-                user_query=message_content,
-                messages=messages,
-            )
+        new_ai_service = AIService(new_db, ctx, updated_session.business_id)
+        _prepare_ai_service_model(new_ai_service, request_model)
+        _apply_chat_routing_context(
+            new_ai_service,
+            user_query=message_content,
+            messages=messages,
+        )
 
+        if usage:
             charge_result = new_ai_service.check_quota_and_charge(
                 input_tokens,
                 output_tokens,
                 model_code=new_ai_service.get_effective_model_code(),
             )
-
-            merged_results = merged_function_results or {}
-            fc_json, fr_json = serialize_function_metadata(
-                function_calls, merged_results
-            )
-            assistant_message = AIChatMessage(
-                session_id=session_id,
-                role=MessageRole.ASSISTANT.value,
-                content=content,
-                function_calls=fc_json,
-                function_results=fr_json,
-                tokens_used=input_tokens + output_tokens,
-            )
-            new_db.add(assistant_message)
-
             provider_name, model_code = _usage_provider_and_model(new_ai_service)
             new_ai_service.log_usage(
                 provider=provider_name,
@@ -1720,94 +1812,99 @@ async def _persist_stream_assistant_message(
                 document_id=charge_result.get("document_id"),
                 context=_usage_log_context(new_ai_service, final_usage),
             )
-            new_ai_service.clear_routing_context()
+        new_ai_service.clear_routing_context()
 
-            from datetime import datetime
-
-            updated_session.updated_at = datetime.utcnow()
-
-            needs_title = _session_needs_title(updated_session) and len(
-                previous_messages
-            ) == 0
-
-            if needs_title:
-                await _maybe_generate_session_title(
-                    new_db,
-                    updated_session,
-                    ctx,
-                    updated_session.business_id or business_id,
-                    message_content,
-                )
-
-            new_db.commit()
-            new_db.refresh(assistant_message)
-            message_id = assistant_message.id
-
-            if needs_title and _session_needs_title(updated_session):
-                _schedule_session_title_generation(
-                    session_id,
-                    message_content,
-                    ctx,
-                    updated_session.business_id or business_id,
-                )
-
-            from app.services.ai.ai_memory_hooks import schedule_memory_update_after_chat
-
-            schedule_memory_update_after_chat(
-                session_id,
-                updated_session.business_id or business_id,
-                ctx,
-            )
-
-            if final_agent_run and final_agent_run.get("run_id"):
-                from app.services.ai.ai_agent_run_store import (
-                    persist_agent_run_checkpoint,
-                    tools_called_from_function_results,
-                )
-
-                persist_agent_run_checkpoint(
-                    run_id=str(final_agent_run["run_id"]),
-                    session_id=session_id,
-                    user_id=ctx.get_user_id(),
-                    business_id=updated_session.business_id or business_id,
-                    snapshot=dict(final_agent_run),
-                    status=final_agent_run.get("status"),
-                    stop_reason=final_agent_run.get("stop_reason")
-                    or (
-                        final_agent_budget.get("stop_reason")
-                        if isinstance(final_agent_budget, dict)
-                        else None
-                    ),
-                    tools_called=tools_called_from_function_results(
-                        merged_function_results
-                    ),
-                    budget=final_agent_budget
-                    if isinstance(final_agent_budget, dict)
-                    else None,
-                    origin_message_id=message_id,
-                )
-
-        return message_id, usage, content
-
-    with get_db_session() as new_db:
-        session_repo = AIChatSessionRepository(new_db)
-        updated_session = session_repo.get_by_id(session_id)
-        if not updated_session:
-            return None, None, content
-
-        assistant_message = AIChatMessage(
-            session_id=session_id,
-            role=MessageRole.ASSISTANT.value,
-            content=content or "خطا در دریافت پاسخ",
-            tokens_used=0,
+        merged_results = merged_function_results or {}
+        fc_json, fr_json = serialize_function_metadata(
+            function_calls, merged_results
         )
-        new_db.add(assistant_message)
+        existing_pause = _latest_awaiting_approval_assistant(new_db, session_id)
+        if existing_pause is not None:
+            existing_pause.content = persist_content
+            existing_pause.function_calls = fc_json
+            existing_pause.function_results = fr_json
+            existing_pause.tokens_used = max(
+                int(existing_pause.tokens_used or 0),
+                input_tokens + output_tokens,
+            )
+            assistant_message = existing_pause
+        else:
+            assistant_message = AIChatMessage(
+                session_id=session_id,
+                role=MessageRole.ASSISTANT.value,
+                content=persist_content,
+                function_calls=fc_json,
+                function_results=fr_json,
+                tokens_used=input_tokens + output_tokens,
+            )
+            new_db.add(assistant_message)
+
         from datetime import datetime
 
         updated_session.updated_at = datetime.utcnow()
+
+        needs_title = _session_needs_title(updated_session) and len(
+            previous_messages
+        ) == 0
+
+        if needs_title:
+            await _maybe_generate_session_title(
+                new_db,
+                updated_session,
+                ctx,
+                updated_session.business_id or business_id,
+                message_content,
+            )
+
         new_db.commit()
         new_db.refresh(assistant_message)
-        return assistant_message.id, None, content or "خطا در دریافت پاسخ"
+        message_id = assistant_message.id
+
+        if needs_title and _session_needs_title(updated_session):
+            _schedule_session_title_generation(
+                session_id,
+                message_content,
+                ctx,
+                updated_session.business_id or business_id,
+            )
+
+        from app.services.ai.ai_memory_hooks import schedule_memory_update_after_chat
+
+        schedule_memory_update_after_chat(
+            session_id,
+            updated_session.business_id or business_id,
+            ctx,
+        )
+
+        if final_agent_run and final_agent_run.get("run_id"):
+            from app.services.ai.ai_agent_run_store import (
+                persist_agent_run_checkpoint,
+                tools_called_from_function_results,
+            )
+
+            persist_agent_run_checkpoint(
+                run_id=str(final_agent_run["run_id"]),
+                session_id=session_id,
+                user_id=ctx.get_user_id(),
+                business_id=updated_session.business_id or business_id,
+                snapshot=dict(final_agent_run),
+                status=final_agent_run.get("status"),
+                stop_reason=final_agent_run.get("stop_reason")
+                or (
+                    final_agent_budget.get("stop_reason")
+                    if isinstance(final_agent_budget, dict)
+                    else None
+                ),
+                tools_called=tools_called_from_function_results(
+                    merged_function_results
+                ),
+                budget=final_agent_budget
+                if isinstance(final_agent_budget, dict)
+                else None,
+                origin_message_id=message_id,
+            )
+
+        return message_id, usage, persist_content
 
 
 def _schedule_stream_persist_after_disconnect(
@@ -1827,6 +1924,7 @@ def _schedule_stream_persist_after_disconnect(
     stream_ai_config: Any = None,
     final_agent_run: Optional[Dict[str, Any]] = None,
     final_agent_budget: Optional[Dict[str, Any]] = None,
+    awaiting_approval: bool = False,
 ) -> None:
     """ذخیره پاسخ در پس‌زمینه وقتی کلاینت قبل از done قطع می‌کند."""
     import asyncio
@@ -1857,6 +1955,7 @@ def _schedule_stream_persist_after_disconnect(
                 stream_ai_config=stream_ai_config,
                 final_agent_run=final_agent_run,
                 final_agent_budget=final_agent_budget,
+                awaiting_approval=awaiting_approval,
             )
         except Exception as exc:
             logger.warning(
@@ -1869,6 +1968,116 @@ def _schedule_stream_persist_after_disconnect(
         asyncio.get_running_loop().create_task(_task())
     except RuntimeError:
         pass
+
+
+async def _iter_run_sse(
+    *,
+    run_id: str,
+    last_event_id: Optional[int],
+    session_id: int,
+    user_id: int,
+):
+    """مشترک شدن به run زنده، یا polling اگر روی worker دیگری باشد."""
+    import asyncio
+    import time
+
+    from adapters.db.models.ai_agent_run import AIAgentRunStatus
+    from adapters.db.session import get_db_session
+    from app.services.ai.ai_agent_run_store import get_owned_agent_run
+    from app.services.ai.ai_run_hub import agent_run_hub, is_running_row_fresh
+    from app.services.ai.ai_stream_errors import STREAM_ERROR_IDLE, stream_error_payload
+    from app.services.ai.ai_stream_helpers import format_sse_payload
+
+    if agent_run_hub.is_live(run_id):
+        async for sse in agent_run_hub.iter_formatted(run_id, int(last_event_id or 0)):
+            yield sse
+        return
+
+    from app.services.ai.ai_run_hub import replay_buffered_events
+
+    cursor = int(last_event_id or 0)
+    replayed, cursor, terminal = replay_buffered_events(run_id, cursor)
+    for event_id, payload in replayed:
+        yield format_sse_payload(payload, event_id=event_id)
+    if terminal:
+        return
+
+    started = time.monotonic()
+    last_heartbeat = started
+    if not replayed:
+        yield format_sse_payload(
+            {
+                "type": "status",
+                "phase": "connecting",
+                "run_id": run_id,
+                "done": False,
+            }
+        )
+    while True:
+        if agent_run_hub.is_live(run_id):
+            async for sse in agent_run_hub.iter_formatted(run_id, cursor):
+                yield sse
+            return
+        more, cursor, terminal = replay_buffered_events(run_id, cursor)
+        for event_id, payload in more:
+            yield format_sse_payload(payload, event_id=event_id)
+        if terminal:
+            return
+        with get_db_session() as db:
+            row = get_owned_agent_run(
+                db, run_id=run_id, session_id=session_id, user_id=user_id
+            )
+        if row is None:
+            yield format_sse_payload(
+                stream_error_payload(code=STREAM_ERROR_IDLE, run_id=run_id, can_continue=False)
+            )
+            return
+        if row.status != AIAgentRunStatus.RUNNING:
+            more, cursor, terminal = replay_buffered_events(run_id, cursor)
+            for event_id, payload in more:
+                yield format_sse_payload(payload, event_id=event_id)
+            if terminal:
+                return
+            can_continue = row.status in AIAgentRunStatus.RESUMABLE
+            if can_continue:
+                yield format_sse_payload(
+                    stream_error_payload(
+                        code=STREAM_ERROR_IDLE,
+                        run_id=run_id,
+                        can_continue=True,
+                    )
+                )
+            else:
+                yield format_sse_payload(
+                    {
+                        "content": "",
+                        "done": True,
+                        "run_id": run_id,
+                        "message_id": row.origin_message_id,
+                        "can_continue": False,
+                    }
+                )
+            return
+        if not is_running_row_fresh(row.updated_at):
+            yield format_sse_payload(
+                stream_error_payload(
+                    code=STREAM_ERROR_IDLE, run_id=run_id, can_continue=True
+                )
+            )
+            return
+        now = time.monotonic()
+        if now - last_heartbeat >= 2.0:
+            elapsed_ms = int((now - started) * 1000)
+            yield format_sse_payload(
+                {
+                    "type": "heartbeat",
+                    "elapsed_ms": elapsed_ms,
+                    "run_id": run_id,
+                    "done": False,
+                }
+            )
+            last_heartbeat = now
+        await asyncio.sleep(0.4)
 
 
 async def _stream_message_response(
@@ -1886,12 +2095,90 @@ async def _stream_message_response(
     resume_from_run: Optional[Dict[str, Any]] = None,
     last_event_id: Optional[int] = None,
 ):
-    """Generator برای streaming response.
+    """مشترک SSE به یک run که روی سرور مستقل از اتصال کلاینت اجرا می‌شود."""
+    import asyncio
 
-    فاز ۱: ساخت system prompt در session کوتاه‌عمر.
-    فاز ۲: استریم LLM در session جدا (بدون نگه‌داشتن اتصال در فاز ۱).
-    فاز ۳: ذخیره پاسخ در session تازه؛ در صورت قطع کلاینت، ذخیره پس‌زمینه.
-    """
+    from app.services.ai.ai_agent_run import (
+        AGENT_RUN_STATUS_RUNNING,
+        new_agent_run_id,
+    )
+    from app.services.ai.ai_agent_run_store import persist_agent_run_checkpoint
+    from app.services.ai.ai_run_hub import agent_run_hub
+
+    resume_run_id = None
+    if isinstance(resume_from_run, dict):
+        resume_run_id = resume_from_run.get("run_id")
+    run_id = str(resume_run_id) if resume_run_id else new_agent_run_id()
+    user_id = ctx.get_user_id()
+
+    if agent_run_hub.is_live(run_id):
+        async for sse in agent_run_hub.iter_formatted(run_id, int(last_event_id or 0)):
+            yield sse
+        return
+
+    persist_agent_run_checkpoint(
+        run_id=run_id,
+        session_id=session_id,
+        user_id=user_id,
+        business_id=business_id,
+        snapshot={
+            "run_id": run_id,
+            "status": AGENT_RUN_STATUS_RUNNING,
+            "phase": "gather_context",
+        },
+        status=AGENT_RUN_STATUS_RUNNING,
+        last_event_id=int(last_event_id or 0),
+    )
+
+    async def producer(live) -> None:
+        await _produce_agent_stream(
+            live,
+            session_id=session_id,
+            messages=messages,
+            ctx=ctx,
+            business_id=business_id,
+            previous_messages=previous_messages,
+            message_content=message_content,
+            approve_writes=approve_writes,
+            approved_write_calls=approved_write_calls,
+            exploration_mode=exploration_mode,
+            execution_mode=execution_mode,
+            request_model=request_model,
+            resume_from_run=resume_from_run,
+        )
+
+    start_id = int(last_event_id or 0) if resume_run_id else 0
+    await agent_run_hub.attach_or_start(
+        run_id=run_id,
+        session_id=session_id,
+        user_id=user_id,
+        producer=producer,
+        start_id=start_id,
+    )
+    try:
+        async for sse in agent_run_hub.iter_formatted(run_id, int(last_event_id or 0)):
+            yield sse
+    except asyncio.CancelledError:
+        raise
+
+
+async def _produce_agent_stream(
+    live: Any,
+    *,
+    session_id: int,
+    messages: List[Dict[str, Any]],
+    ctx: AuthContext,
+    business_id: int,
+    previous_messages: List[AIChatMessage],
+    message_content: str,
+    approve_writes: bool = False,
+    approved_write_calls: Optional[List[Dict[str, Any]]] = None,
+    exploration_mode: str = "auto",
+    execution_mode: str = "analyzer",
+    request_model: Optional[str] = None,
+    resume_from_run: Optional[Dict[str, Any]] = None,
+) -> None:
+    """حلقهٔ ایجنت؛ قطع SSE این تابع را کنسل نمی‌کند — فقط cancel صریح."""
     import asyncio
 
     from adapters.db.session import get_db_session
@@ -1900,10 +2187,14 @@ async def _stream_message_response(
         STOP_REASON_DISCONNECT,
     )
     from app.services.ai.ai_agent_run_store import persist_agent_run_checkpoint
-    from app.services.ai.ai_sse_event_buffer import events_after
-    from app.services.ai.ai_stream_helpers import SseEventSequencer, iter_with_heartbeat
+    from app.services.ai.ai_stream_errors import stream_error_payload
+    from app.services.ai.ai_stream_helpers import (
+        build_chat_done_sse_data,
+        iter_with_heartbeat,
+    )
     from app.services.ai.ai_tool_keys import status_event
 
+    sequencer = live.sequencer
     accumulated_content = ""
     final_usage = None
     final_function_calls: Optional[List[Dict[str, Any]]] = None
@@ -1921,17 +2212,16 @@ async def _stream_message_response(
     stream_ai_config = None
     prebuilt_prompt: Optional[str] = None
     prebuilt_structured: Optional[Any] = None
-    message_id: Optional[int] = None
     resume_run_id = None
     if isinstance(resume_from_run, dict):
         resume_run_id = resume_from_run.get("run_id")
-    sequencer = SseEventSequencer(
-        run_id=str(resume_run_id) if resume_run_id else None,
-        start_id=int(last_event_id or 0),
-    )
+    if resume_run_id:
+        sequencer.bind_run(str(resume_run_id))
+    elif live.run_id:
+        sequencer.bind_run(str(live.run_id))
 
     def _persist_live_run(snapshot: Dict[str, Any], *, interrupted: bool = False) -> None:
-        run_id = snapshot.get("run_id")
+        run_id = snapshot.get("run_id") or live.run_id
         if not run_id:
             return
         persist_agent_run_checkpoint(
@@ -1953,15 +2243,13 @@ async def _stream_message_response(
         nonlocal accumulated_content, final_usage, final_function_calls
         nonlocal final_function_results, final_agent_trace, final_agent_run
         nonlocal final_agent_budget, final_awaiting_approval
-        nonlocal final_citations_context, final_citations, final_activated_skills, final_requested_model
-        nonlocal final_resolved_model, final_execution_mode
+        nonlocal final_citations_context, final_citations, final_activated_skills
+        nonlocal final_requested_model, final_resolved_model, final_execution_mode
         delta = chunk.get("delta", {})
         content_chunk = delta.get("content", "")
         if content_chunk:
             accumulated_content += content_chunk
         if chunk.get("usage"):
-            # chunk نهایی (done) usage تجمیعی authoritative دارد؛
-            # نوبت‌های میانی را merge می‌کنیم تا چیزی از دست نرود.
             if chunk.get("done"):
                 final_usage = chunk["usage"]
             else:
@@ -2025,19 +2313,22 @@ async def _stream_message_response(
             stream_ai_config=stream_ai_config,
             final_agent_run=final_agent_run,
             final_agent_budget=final_agent_budget,
+            awaiting_approval=final_awaiting_approval,
         )
 
     try:
-        if resume_run_id and last_event_id is not None:
-            from app.services.ai.ai_stream_helpers import format_sse_payload
-
-            for eid, payload in events_after(str(resume_run_id), int(last_event_id)):
-                if payload.get("done"):
-                    continue
-                yield format_sse_payload(payload, event_id=eid)
-                if eid > sequencer.last_id:
-                    sequencer.last_id = eid
-            yield sequencer.format(
+        live.publish(
+            {
+                "type": "agent_run",
+                "run_id": live.run_id,
+                "phase": "gather_context",
+                "status": "running",
+                "can_continue": False,
+                "done": False,
+            }
+        )
+        if resume_run_id:
+            live.publish(
                 {
                     "type": "run_resumed",
                     "run_id": resume_run_id,
@@ -2047,12 +2338,9 @@ async def _stream_message_response(
                 }
             )
 
-        yield _sse_payload(
-            {"type": "status", "phase": "connecting", "done": False}, sequencer
-        )
+        live.publish({"type": "status", "phase": "connecting", "done": False})
         await asyncio.sleep(0)
 
-        # پیش‌چک اجباری در ابتدای استریم (قبل از هر فراخوانی LLM)
         with get_db_session() as gate_db:
             _ensure_chat_availability(
                 gate_db,
@@ -2063,12 +2351,9 @@ async def _stream_message_response(
                 messages=messages,
             )
 
-        yield _sse_payload(
-            {"type": "status", "phase": "thinking", "done": False}, sequencer
-        )
+        live.publish({"type": "status", "phase": "thinking", "done": False})
         await asyncio.sleep(0)
 
-        # فاز ۱: آماده‌سازی prompt (session کوتاه)
         with get_db_session() as prep_db:
             prep_service = AIService(prep_db, ctx, business_id)
             _prepare_ai_service_model(prep_service, request_model)
@@ -2084,16 +2369,9 @@ async def _stream_message_response(
                     prebuilt_prompt = build_item.get("prompt") or ""
                     prebuilt_structured = build_item.get("structured_prompt")
                     continue
-                if build_item.get("event") == "trace_step":
-                    for payload in _emit_chunk_as_sse(build_item, sequencer):
-                        yield payload
-                    await asyncio.sleep(0)
-                    continue
-                for payload in _emit_chunk_as_sse(build_item, sequencer):
-                    yield payload
-                    await asyncio.sleep(0)
+                _publish_chunk(live, build_item)
+                await asyncio.sleep(0)
 
-        # فاز ۲: استریم LLM (session جدا — فقط برای tool calls در صورت نیاز)
         with get_db_session() as stream_db:
             stream_ai_service = AIService(stream_db, ctx, business_id)
             _prepare_ai_service_model(stream_ai_service, request_model)
@@ -2125,11 +2403,15 @@ async def _stream_message_response(
             ):
                 event_type = chunk.get("event")
                 if event_type == "heartbeat":
-                    yield _sse_payload({
+                    live.publish({
                         "type": "heartbeat",
                         "elapsed_ms": chunk.get("elapsed_ms", 0),
                         "done": False,
-                    }, sequencer)
+                    })
+                    if sequencer.last_id % 5 == 0 and (final_agent_run or live.run_id):
+                        _persist_live_run(
+                            dict(final_agent_run or {"run_id": live.run_id, "status": "running"})
+                        )
                     continue
 
                 if event_type == "prompt_ready":
@@ -2137,17 +2419,11 @@ async def _stream_message_response(
 
                 _capture_chunk(chunk)
 
-                # نکته مهم: chunk نهایی (done=True) اینجا به‌عنوان SSE ارسال
-                # نمی‌شود — هنوز message_id ندارد. state آن capture شده و بعد
-                # از persist، یک done یکتا با message_id ارسال می‌شود
-                # (جلوگیری از double-done که در Flutter باعث از دست رفتن
-                # message_id می‌شد).
                 if chunk.get("done", False):
                     break
 
-                for payload in _emit_chunk_as_sse(chunk, sequencer):
-                    yield payload
-                    await asyncio.sleep(0)
+                _publish_chunk(live, chunk)
+                await asyncio.sleep(0)
 
         logger.info(
             "[AI Stream][session=%s] final_response_length=%s preview=%s",
@@ -2156,8 +2432,7 @@ async def _stream_message_response(
             (accumulated_content or "")[:500],
         )
 
-        for payload in _emit_chunk_as_sse(status_event("saving"), sequencer):
-            yield payload
+        _publish_chunk(live, status_event("saving"))
 
         message_id, final_usage, persisted_content = await _persist_stream_assistant_message(
             session_id=session_id,
@@ -2175,12 +2450,11 @@ async def _stream_message_response(
             stream_ai_config=stream_ai_config,
             final_agent_run=final_agent_run,
             final_agent_budget=final_agent_budget,
+            awaiting_approval=final_awaiting_approval,
         )
 
-        from app.services.ai.ai_stream_helpers import build_chat_done_sse_data
-
         can_continue = bool((final_agent_run or {}).get("can_continue"))
-        yield _sse_payload(
+        live.publish(
             build_chat_done_sse_data(
                 message_id=message_id,
                 usage=final_usage,
@@ -2198,7 +2472,7 @@ async def _stream_message_response(
                     "resolved_model": final_resolved_model,
                     "execution_mode": final_execution_mode,
                     "can_continue": can_continue,
-                    "run_id": (final_agent_run or {}).get("run_id"),
+                    "run_id": (final_agent_run or {}).get("run_id") or live.run_id,
                     "final_content": persisted_content,
                     "stop_reason": (
                         (final_agent_budget or {}).get("stop_reason")
@@ -2211,33 +2485,39 @@ async def _stream_message_response(
                         else None
                     ),
                 },
-            ),
-            sequencer,
+            )
         )
 
     except asyncio.CancelledError:
-        if final_agent_run:
-            _persist_live_run(dict(final_agent_run), interrupted=True)
+        if final_agent_run or live.run_id:
+            _persist_live_run(
+                dict(final_agent_run or {"run_id": live.run_id, "status": "interrupted"}),
+                interrupted=True,
+            )
         _schedule_persist_on_disconnect()
+        live.publish(
+            stream_error_payload(
+                code="RUN_CANCELLED",
+                run_id=live.run_id,
+                can_continue=bool(live.run_id),
+            )
+        )
         raise
     except Exception as e:
-        if final_agent_run:
-            _persist_live_run(dict(final_agent_run), interrupted=True)
+        if final_agent_run or live.run_id:
+            _persist_live_run(
+                dict(final_agent_run or {"run_id": live.run_id, "status": "interrupted"}),
+                interrupted=True,
+            )
         _schedule_persist_on_disconnect()
         logger.error("Error in streaming response: %s", e, exc_info=True)
-        from app.services.ai.ai_retry_policy import is_retryable_error
-
-        recoverable = is_retryable_error(e)
-        error_data = {
-            "type": "error",
-            "error": str(e),
-            "recoverable": recoverable,
-            "suggested_action": "retry" if recoverable else "dismiss",
-            "done": True,
-            "can_continue": bool(final_agent_run and final_agent_run.get("run_id")),
-            "run_id": (final_agent_run or {}).get("run_id"),
-        }
-        yield _sse_payload(error_data, sequencer)
+        live.publish(
+            stream_error_payload(
+                e,
+                run_id=(final_agent_run or {}).get("run_id") or live.run_id,
+                can_continue=bool((final_agent_run or live.run_id)),
+            )
+        )
 
 
 @router.post(
@@ -2257,6 +2537,7 @@ async def continue_agent_run(
     from adapters.db.models.ai_agent_run import AIAgentRunStatus
     from app.services.ai.ai_agent_run import build_resume_continue_prompt
     from app.services.ai.ai_agent_run_store import get_owned_agent_run, run_to_checkpoint
+    from app.services.ai.ai_run_hub import agent_run_hub, is_running_row_fresh
 
     session_repo = AIChatSessionRepository(db)
     session = session_repo.get_by_id(session_id)
@@ -2271,6 +2552,39 @@ async def continue_agent_run(
     )
     if row is None:
         raise ApiError("RUN_NOT_FOUND", "اجرای قابل ادامه یافت نشد", http_status=404)
+
+    header_last_id = None
+    if request is not None:
+        raw_header = request.headers.get("last-event-id") or request.headers.get(
+            "Last-Event-ID"
+        )
+        if raw_header:
+            try:
+                header_last_id = int(raw_header)
+            except ValueError:
+                header_last_id = None
+    last_event_id = body.last_event_id if body.last_event_id is not None else header_last_id
+
+    if agent_run_hub.is_live(run_id) or (
+        row.status == AIAgentRunStatus.RUNNING and is_running_row_fresh(row.updated_at)
+    ):
+        db.close()
+        return StreamingResponse(
+            _iter_run_sse(
+                run_id=run_id,
+                last_event_id=last_event_id,
+                session_id=session_id,
+                user_id=ctx.get_user_id(),
+            ),
+            media_type="text/event-stream",
+            headers=_sse_stream_headers(),
+        )
+
+    if row.status == AIAgentRunStatus.RUNNING:
+        row.status = AIAgentRunStatus.INTERRUPTED
+        db.commit()
+        db.refresh(row)
+
     if row.status not in AIAgentRunStatus.RESUMABLE:
         raise ApiError(
             "RUN_NOT_RESUMABLE",
@@ -2301,17 +2615,6 @@ async def continue_agent_run(
     approved_write_calls = (
         _extract_pending_write_approvals(previous_messages) if approve_writes else []
     )
-    header_last_id = None
-    if request is not None:
-        raw_header = request.headers.get("last-event-id") or request.headers.get(
-            "Last-Event-ID"
-        )
-        if raw_header:
-            try:
-                header_last_id = int(raw_header)
-            except ValueError:
-                header_last_id = None
-    last_event_id = body.last_event_id if body.last_event_id is not None else header_last_id
 
     _ensure_chat_availability(
         db,
@@ -2349,11 +2652,104 @@ async def continue_agent_run(
             last_event_id=last_event_id,
         ),
         media_type="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "Connection": "keep-alive",
-            "X-Accel-Buffering": "no",
-        },
+        headers=_sse_stream_headers(),
+    )
+
+
+@router.post(
+    "/sessions/{session_id}/runs/{run_id}/events",
+    summary="اشتراک مجدد به رویدادهای یک اجرای زنده",
+)
+async def subscribe_agent_run_events(
+    session_id: int = Path(...),
+    run_id: str = Path(..., min_length=8, max_length=16),
+    request: Request = None,
+    body: ChatContinueRunRequest = Body(default_factory=ChatContinueRunRequest),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+):
+    """بدون اجرای دوبارهٔ ایجنت؛ اگر زنده نباشد وضعیت/ادامه را اعلام می‌کند."""
+    from app.services.ai.ai_agent_run_store import get_owned_agent_run
+
+    session_repo = AIChatSessionRepository(db)
+    session = session_repo.get_by_id(session_id)
+    if not session or session.user_id != ctx.get_user_id():
+        raise ApiError("SESSION_NOT_FOUND", "گفت‌وگو یافت نشد", http_status=404)
+    row = get_owned_agent_run(
+        db,
+        run_id=run_id,
+        session_id=session_id,
+        user_id=ctx.get_user_id(),
+    )
+    if row is None:
+        raise ApiError("RUN_NOT_FOUND", "اجرا یافت نشد", http_status=404)
+
+    header_last_id = None
+    if request is not None:
+        raw_header = request.headers.get("last-event-id") or request.headers.get(
+            "Last-Event-ID"
+        )
+        if raw_header:
+            try:
+                header_last_id = int(raw_header)
+            except ValueError:
+                header_last_id = None
+    last_event_id = body.last_event_id if body.last_event_id is not None else header_last_id
+    db.close()
+    return StreamingResponse(
+        _iter_run_sse(
+            run_id=run_id,
+            last_event_id=last_event_id,
+            session_id=session_id,
+            user_id=ctx.get_user_id(),
+        ),
+        media_type="text/event-stream",
+        headers=_sse_stream_headers(),
+    )
+
+
+@router.post(
+    "/sessions/{session_id}/runs/{run_id}/cancel",
+    summary="توقف صریح اجرای زنده",
+)
+async def cancel_agent_run(
+    session_id: int = Path(...),
+    run_id: str = Path(..., min_length=8, max_length=16),
+    request: Request = None,
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+):
+    from adapters.db.models.ai_agent_run import AIAgentRunStatus
+    from app.services.ai.ai_agent_run_store import get_owned_agent_run, persist_agent_run_checkpoint
+    from app.services.ai.ai_run_hub import agent_run_hub
+
+    session_repo = AIChatSessionRepository(db)
+    session = session_repo.get_by_id(session_id)
+    if not session or session.user_id != ctx.get_user_id():
+        raise ApiError("SESSION_NOT_FOUND", "گفت‌وگو یافت نشد", http_status=404)
+    row = get_owned_agent_run(
+        db,
+        run_id=run_id,
+        session_id=session_id,
+        user_id=ctx.get_user_id(),
+    )
+    if row is None:
+        raise ApiError("RUN_NOT_FOUND", "اجرا یافت نشد", http_status=404)
+
+    cancelled = agent_run_hub.request_cancel(run_id)
+    if row.status == AIAgentRunStatus.RUNNING:
+        persist_agent_run_checkpoint(
+            run_id=run_id,
+            session_id=session_id,
+            user_id=ctx.get_user_id(),
+            business_id=session.business_id,
+            snapshot={"run_id": run_id, "status": AIAgentRunStatus.INTERRUPTED},
+            status=AIAgentRunStatus.INTERRUPTED,
+            stop_reason="cancel",
+        )
+    return success_response(
+        {"run_id": run_id, "cancelled": cancelled, "status": "interrupted"},
+        request,
     )
 
 

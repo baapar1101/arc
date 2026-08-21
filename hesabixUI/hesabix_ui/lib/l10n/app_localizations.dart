@@ -21510,6 +21510,114 @@ abstract class AppLocalizations {
   /// **'Not now'**
   String get aiContinueAnalysisDismiss;
 
+  /// No description provided for @aiStreamStallError.
+  ///
+  /// In en, this message translates to:
+  /// **'The connection dropped. Your reply so far is saved.'**
+  String get aiStreamStallError;
+
+  /// No description provided for @aiStreamEmptyError.
+  ///
+  /// In en, this message translates to:
+  /// **'The reply did not finish because the connection closed.'**
+  String get aiStreamEmptyError;
+
+  /// No description provided for @aiStreamAvailabilityCheckFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Cannot send right now: {error}'**
+  String aiStreamAvailabilityCheckFailed(String error);
+
+  /// No description provided for @aiContinueAfterRefreshHint.
+  ///
+  /// In en, this message translates to:
+  /// **'The previous analysis was left unfinished. You can continue from the same point.'**
+  String get aiContinueAfterRefreshHint;
+
+  /// No description provided for @aiResumingPreviousRun.
+  ///
+  /// In en, this message translates to:
+  /// **'Resuming the previous reply...'**
+  String get aiResumingPreviousRun;
+
+  /// No description provided for @aiCrmAssistantTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Smart assistant'**
+  String get aiCrmAssistantTitle;
+
+  /// No description provided for @aiCrmSummarizeAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Summary and next step'**
+  String get aiCrmSummarizeAction;
+
+  /// No description provided for @aiCrmStopAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Stop'**
+  String get aiCrmStopAction;
+
+  /// No description provided for @aiTicketAssistantTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'AI assistance'**
+  String get aiTicketAssistantTitle;
+
+  /// No description provided for @aiTicketAssistantHintExpanded.
+  ///
+  /// In en, this message translates to:
+  /// **'The assistant is ready. Get a suggestion or send an automatic reply.'**
+  String get aiTicketAssistantHintExpanded;
+
+  /// No description provided for @aiTicketAssistantHintCollapsed.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap to show the assistant and AI actions.'**
+  String get aiTicketAssistantHintCollapsed;
+
+  /// No description provided for @aiTicketSuggestReply.
+  ///
+  /// In en, this message translates to:
+  /// **'Suggest a reply'**
+  String get aiTicketSuggestReply;
+
+  /// No description provided for @aiTicketAutoReply.
+  ///
+  /// In en, this message translates to:
+  /// **'Automatic reply'**
+  String get aiTicketAutoReply;
+
+  /// No description provided for @aiTicketAutoReplyConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Automatic reply'**
+  String get aiTicketAutoReplyConfirmTitle;
+
+  /// No description provided for @aiTicketAutoReplyConfirmBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Should the assistant reply to this ticket automatically?'**
+  String get aiTicketAutoReplyConfirmBody;
+
+  /// No description provided for @aiTicketSuggestionLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'AI suggestion'**
+  String get aiTicketSuggestionLabel;
+
+  /// No description provided for @aiTicketUseSuggestion.
+  ///
+  /// In en, this message translates to:
+  /// **'Use this reply'**
+  String get aiTicketUseSuggestion;
+
+  /// No description provided for @aiTicketSuggestFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not get a suggestion: {error}'**
+  String aiTicketSuggestFailed(String error);
+
   /// No description provided for @aiConversationNavTitle.
   ///
   /// In en, this message translates to:

@@ -6,6 +6,7 @@ import '../utils/error_extractor.dart';
 import '../models/ai_models.dart';
 import '../models/ai_voice_models.dart';
 import '../models/ai_stream_event.dart';
+import '../widgets/ai/ai_subagent_restore.dart';
 import 'ai_sse_client.dart';
 
 // Enable debug prints
@@ -693,6 +694,50 @@ class AIService {
         .toList();
   }
 
+  Future<AIChatSession?> getChatSession({required int sessionId}) async {
+    try {
+      final res = await _api.get<Map<String, dynamic>>(
+        '/api/v1/ai/chat/sessions/$sessionId',
+      );
+      final data = res.data?['data'];
+      if (data is Map<String, dynamic>) {
+        return AIChatSession.fromJson(data);
+      }
+    } catch (e) {
+      debugPrint('[AIService] getChatSession failed: $e');
+    }
+    return null;
+  }
+
+  Future<AIChatActiveRun?> getActiveAgentRun({required int sessionId}) async {
+    try {
+      final res = await _api.get<Map<String, dynamic>>(
+        '/api/v1/ai/chat/sessions/$sessionId/active-run',
+      );
+      final data = res.data?['data'];
+      if (data is Map<String, dynamic>) {
+        return AIChatActiveRun.fromJson(data);
+      }
+    } catch (e) {
+      debugPrint('[AIService] getActiveAgentRun failed: $e');
+    }
+    return null;
+  }
+
+  Future<void> cancelAgentRun({
+    required int sessionId,
+    required String runId,
+  }) async {
+    try {
+      await _api.post(
+        '/api/v1/ai/chat/sessions/$sessionId/runs/$runId/cancel',
+        data: const <String, dynamic>{},
+      );
+    } catch (e) {
+      debugPrint('[AIService] cancelAgentRun failed: $e');
+    }
+  }
+
   Future<AIChatSession> createChatSession({
     int? businessId,
     String? executionMode,
@@ -741,6 +786,21 @@ class AIService {
     final data = body['data'] as List;
     return data
         .map((e) => AIChatMessage.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<List<AIChatSubagentSummary>> listSessionSubagents(int sessionId) async {
+    final res = await _api.get<Map<String, dynamic>>(
+      '/api/v1/ai/chat/sessions/$sessionId/subagents',
+    );
+    final body = res.data as Map<String, dynamic>;
+    final data = body['data'];
+    final rawItems = data is Map ? data['items'] : null;
+    if (rawItems is! List) return const [];
+    return rawItems
+        .whereType<Map>()
+        .map((e) => AIChatSubagentSummary.fromJson(Map<String, dynamic>.from(e)))
+        .where((e) => e.subagentId.isNotEmpty)
         .toList();
   }
 
@@ -912,6 +972,7 @@ class AIService {
         done: data['done'] as bool? ?? true,
         recoverable: data['recoverable'] as bool? ?? false,
         suggestedAction: data['suggested_action'] as String?,
+        errorCode: data['error_code'] as String?,
         runId: runId,
         sseId: sseId,
         canContinue: canContinue,
@@ -1042,12 +1103,25 @@ class AIService {
         runId: runId,
         sseId: sseId,
         canContinue: canContinue,
-        finalContent: data['final_content'] as String?,
+        finalContent: _assistFinalText(data),
       );
     }
 
     if (content.isNotEmpty) {
       return AIStreamChunk(contentDelta: content);
+    }
+    return null;
+  }
+
+  static String? _assistFinalText(Map<String, dynamic> data) {
+    for (final key in [
+      'final_content',
+      'summary',
+      'suggested_reply',
+      'suggested_text',
+    ]) {
+      final value = data[key];
+      if (value is String && value.trim().isNotEmpty) return value;
     }
     return null;
   }
@@ -1081,6 +1155,28 @@ class AIService {
       onError: onError,
       cancelToken: cancelToken,
       logLabel: 'ContinueRun',
+      sseCursor: sseCursor,
+    );
+  }
+
+  /// اشتراک مجدد به run زنده بدون اجرای دوبارهٔ ایجنت.
+  Stream<AIStreamChunk> subscribeAgentRunStream({
+    required int sessionId,
+    required String runId,
+    AISseCursor? sseCursor,
+    void Function(Map<String, dynamic>? usage, int? messageId)? onComplete,
+    void Function(String error)? onError,
+    CancelToken? cancelToken,
+  }) {
+    return _postSseStream(
+      '/api/v1/ai/chat/sessions/$sessionId/runs/$runId/events',
+      data: {
+        if (sseCursor?.lastEventId != null) 'last_event_id': sseCursor!.lastEventId,
+      },
+      onComplete: onComplete,
+      onError: onError,
+      cancelToken: cancelToken,
+      logLabel: 'SubscribeRun',
       sseCursor: sseCursor,
     );
   }
@@ -2031,6 +2127,48 @@ class AIService {
   }
 
   // ========== Support: AI Ticket Suggestions ==========
+  Stream<AIStreamChunk> streamCrmSummarizeLead({
+    required int businessId,
+    required int leadId,
+    CancelToken? cancelToken,
+  }) {
+    return _postSseStream(
+      '/api/v1/ai/crm/businesses/$businessId/summarize-lead',
+      query: {'stream': 'true'},
+      data: {'lead_id': leadId},
+      cancelToken: cancelToken,
+      logLabel: 'CRM-lead',
+    );
+  }
+
+  Stream<AIStreamChunk> streamCrmSummarizeDeal({
+    required int businessId,
+    required int dealId,
+    CancelToken? cancelToken,
+  }) {
+    return _postSseStream(
+      '/api/v1/ai/crm/businesses/$businessId/summarize-deal',
+      query: {'stream': 'true'},
+      data: {'deal_id': dealId},
+      cancelToken: cancelToken,
+      logLabel: 'CRM-deal',
+    );
+  }
+
+  Stream<AIStreamChunk> streamTicketSuggestReply({
+    required int ticketId,
+    String? context,
+    CancelToken? cancelToken,
+  }) {
+    return _postSseStream(
+      '/api/v1/support/tickets/$ticketId/ai-suggest-reply',
+      query: {'stream': 'true'},
+      data: {if (context != null) 'context': context},
+      cancelToken: cancelToken,
+      logLabel: 'ticket-suggest',
+    );
+  }
+
   Future<Map<String, dynamic>> suggestTicketReply({
     required int ticketId,
     String? context,

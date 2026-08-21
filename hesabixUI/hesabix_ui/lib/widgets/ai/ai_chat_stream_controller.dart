@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:hesabix_ui/models/ai_stream_event.dart';
 import 'package:hesabix_ui/utils/ai_content_sanitize.dart';
@@ -484,6 +486,8 @@ class AIChatStreamController extends ChangeNotifier {
       applyContinue: offerContinue,
       errorMessage: chunk.error,
       errorRecoverable: chunk.recoverable,
+      errorCode: chunk.errorCode,
+      suggestedAction: chunk.suggestedAction,
       continueRunId: offerContinue ? resumeId : null,
       continueStopMessage: offerContinue
           ? (chunk.agentBudget?.stopMessageFa ?? agentBudget?.stopMessageFa)
@@ -494,6 +498,8 @@ class AIChatStreamController extends ChangeNotifier {
     );
   }
 
+  static const stallTimeout = Duration(seconds: 20);
+
   /// حلقهٔ نوبت استریم بدون BuildContext — dialog فقط نتیجه را به UI می‌زند.
   Future<AIChatStreamTurnOutcome> consume(
     Stream<AIStreamChunk> chunks, {
@@ -502,20 +508,51 @@ class AIChatStreamController extends ChangeNotifier {
     void Function()? onContentTick,
   }) async {
     final turn = AIChatStreamTurn();
-    await for (final chunk in chunks) {
-      if (chunk.error != null) {
-        return completeErrorTurn(chunk, sseCursorRunId: sseCursorRunId);
+    var completed = false;
+    try {
+      await for (final chunk in chunks.timeout(stallTimeout)) {
+        if (chunk.error != null) {
+          return completeErrorTurn(chunk, sseCursorRunId: sseCursorRunId);
+        }
+        final action = ingestLiveChunk(
+          chunk,
+          turn,
+          resolveToolLabel: resolveToolLabel,
+          sseCursorRunId: sseCursorRunId,
+          onContentTick: onContentTick,
+        );
+        if (action == AIChatLiveChunkAction.completed) {
+          completed = true;
+          break;
+        }
       }
-      final action = ingestLiveChunk(
-        chunk,
-        turn,
-        resolveToolLabel: resolveToolLabel,
+    } on TimeoutException {
+      return completeErrorTurn(
+        AIStreamChunk(
+          error: 'ارتباط لحظه‌ای قطع شد. پاسخ تا اینجا ذخیره شده است.',
+          errorCode: 'STREAM_STALL',
+          recoverable: true,
+          suggestedAction: 'reconnect',
+          done: true,
+          canContinue: true,
+          runId: runId ?? sseCursorRunId,
+        ),
         sseCursorRunId: sseCursorRunId,
-        onContentTick: onContentTick,
       );
-      if (action == AIChatLiveChunkAction.completed) {
-        break;
-      }
+    }
+    if (!completed) {
+      return completeErrorTurn(
+        AIStreamChunk(
+          error: 'پاسخ کامل نرسید؛ اتصال قبل از اتمام بسته شد.',
+          errorCode: 'EMPTY_STREAM',
+          recoverable: true,
+          suggestedAction: 'reconnect',
+          done: true,
+          canContinue: true,
+          runId: runId ?? sseCursorRunId,
+        ),
+        sseCursorRunId: sseCursorRunId,
+      );
     }
     return completeSuccessTurn(turn);
   }

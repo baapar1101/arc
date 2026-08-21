@@ -18,6 +18,29 @@ Stream<String> postSsePayloads({
   var pendingText = '';
   final eventBuffer = <String>[];
   var completed = false;
+  Timer? stallTimer;
+  const stallTimeout = Duration(seconds: 25);
+
+  void resetStallWatchdog() {
+    stallTimer?.cancel();
+    if (completed) return;
+    stallTimer = Timer(stallTimeout, () {
+      if (completed) return;
+      try {
+        request.abort();
+      } catch (_) {}
+      if (!controller.isClosed) {
+        controller.addError(
+          DioException(
+            requestOptions: RequestOptions(path: uri.toString()),
+            type: DioExceptionType.receiveTimeout,
+            error: 'STREAM_STALL',
+          ),
+        );
+        controller.close();
+      }
+    });
+  }
 
   void emitBufferedEvent() {
     if (eventBuffer.isEmpty) return;
@@ -63,6 +86,7 @@ Stream<String> postSsePayloads({
   void finishIfNeeded() {
     if (completed) return;
     completed = true;
+    stallTimer?.cancel();
     consumeAvailableText();
     if (pendingText.trim().isNotEmpty) {
       final line = pendingText.trimRight();
@@ -79,7 +103,10 @@ Stream<String> postSsePayloads({
     }
   }
 
-  request.onProgress.listen((_) => consumeAvailableText());
+  request.onProgress.listen((_) {
+    resetStallWatchdog();
+    consumeAvailableText();
+  });
   request.onLoadEnd.listen((_) {
     final status = request.status ?? 0;
     if (status >= 200 && status < 400) {
@@ -87,6 +114,8 @@ Stream<String> postSsePayloads({
       return;
     }
     if (!controller.isClosed) {
+      completed = true;
+      stallTimer?.cancel();
       controller.addError(
         DioException(
           requestOptions: RequestOptions(path: uri.toString()),
@@ -104,6 +133,8 @@ Stream<String> postSsePayloads({
   });
   request.onError.listen((_) {
     if (!controller.isClosed) {
+      completed = true;
+      stallTimer?.cancel();
       controller.addError(
         DioException(
           requestOptions: RequestOptions(path: uri.toString()),
@@ -116,6 +147,8 @@ Stream<String> postSsePayloads({
   });
 
   cancelToken?.whenCancel.then((_) {
+    completed = true;
+    stallTimer?.cancel();
     try {
       request.abort();
     } catch (_) {
@@ -133,6 +166,7 @@ Stream<String> postSsePayloads({
         ..responseType = 'text';
       headers.forEach(request.setRequestHeader);
       request.send(body);
+      resetStallWatchdog();
     } catch (error) {
       if (!controller.isClosed) {
         controller.addError(error);

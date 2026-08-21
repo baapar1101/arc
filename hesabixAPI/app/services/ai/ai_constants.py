@@ -92,9 +92,15 @@ SUBAGENT_TIMEOUT_SEC = 90.0
 # providerهایی که tool_choice اجباری را به API می‌فرستند
 PROVIDERS_WITH_FORCED_TOOLS = frozenset({"openai", "anthropic"})
 
-# بافر SSE درون‌پردازه‌ای برای Last-Event-ID (بدون Redis)
+# بافر SSE برای Last-Event-ID — حافظه + Redis در صورت فعال بودن
 SSE_EVENT_BUFFER_MAX = 400
 SSE_EVENT_BUFFER_TTL_SEC = 15 * 60
+SSE_EVENT_REDIS_KEY_PREFIX = "hesabix:ai:sse:"
+SSE_SCHEMA_VERSION = 1
+# اگر producer روی این worker نباشد، RUNNING تازه یعنی هنوز زنده است
+LIVE_RUN_STALE_SEC = 180
+# کلاینت اگر به این مدت heartbeat نبیند استریم را fail می‌کند
+SSE_CLIENT_STALL_SEC = 20
 
 # محدودیت پیام‌ها برای context
 MAX_HISTORY_MESSAGES = 40

@@ -180,6 +180,34 @@ def get_owned_agent_run(
     )
 
 
+_ACTIVE_STATUSES = frozenset(
+    {
+        AIAgentRunStatus.RUNNING,
+        AIAgentRunStatus.INTERRUPTED,
+        AIAgentRunStatus.BUDGET_EXHAUSTED,
+        AIAgentRunStatus.AWAITING_APPROVAL,
+    }
+)
+
+
+def get_latest_active_run(
+    db: Session,
+    *,
+    session_id: int,
+    user_id: int,
+) -> Optional[AIAgentRun]:
+    return (
+        db.query(AIAgentRun)
+        .filter(
+            AIAgentRun.session_id == session_id,
+            AIAgentRun.user_id == user_id,
+            AIAgentRun.status.in_(tuple(_ACTIVE_STATUSES)),
+        )
+        .order_by(AIAgentRun.updated_at.desc(), AIAgentRun.id.desc())
+        .first()
+    )
+
+
 def run_to_checkpoint(row: AIAgentRun) -> dict[str, Any]:
     return {
         "run_id": row.run_id,

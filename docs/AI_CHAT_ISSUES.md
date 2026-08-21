@@ -36,7 +36,8 @@
 - `_register_operator_functions` و admin هنوز خالی (`pass`).
 
 ### CRM / تیکت / workflow
-- non-streaming — فقط spinner کلی.
+- پیشنهاد تیکت و خلاصهٔ CRM با `?stream=true` استریم می‌شوند (ویجت متن زنده + وضعیت + توقف).
+- مسیر JSON قبلی برای سازگاری و پاسخ خودکار تیکت مانده است.
 
 ## 🔵 پیشنهاد بعدی
 

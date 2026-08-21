@@ -8,6 +8,7 @@ const kAgentRunStorageKey = '_agent_run';
 const kAgentCitationsStorageKey = '_citations';
 const kActivatedSkillsStorageKey = '_activated_skills';
 const kReasoningTraceStorageKey = '_reasoning_trace';
+const kAwaitingApprovalStorageKey = '_awaiting_approval';
 
 /// استخراج trace از function_results پیام ذخیره‌شده.
 List<AIAgentTraceStep> extractAgentTraceFromResults(Object? functionResults) {
@@ -113,6 +114,7 @@ class AIStreamChunk {
   final String? error;
   final bool recoverable;
   final String? suggestedAction;
+  final String? errorCode;
   final String? requestedModel;
   final String? resolvedModel;
   final bool? awaitingApproval;
@@ -142,6 +144,7 @@ class AIStreamChunk {
     this.error,
     this.recoverable = false,
     this.suggestedAction,
+    this.errorCode,
     this.requestedModel,
     this.resolvedModel,
     this.awaitingApproval,
@@ -177,6 +180,7 @@ class AIStreamChunk {
       error: error,
       recoverable: recoverable,
       suggestedAction: suggestedAction,
+      errorCode: errorCode,
       requestedModel: requestedModel,
       resolvedModel: resolvedModel,
       awaitingApproval: awaitingApproval,

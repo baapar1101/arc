@@ -167,7 +167,39 @@ class AITableColumn {
   }
 }
 
-/// مشخصات جدول — JSON در بلوک ```table
+/// برچسب فارسی ستون جدول خودکار از کلید envelope.
+String tableColumnLabelFa(String key) {
+  switch (key) {
+    case 'id':
+      return 'شناسه';
+    case 'code':
+      return 'کد';
+    case 'name':
+    case 'title':
+      return 'نام';
+    case 'amount':
+    case 'total':
+    case 'price':
+      return 'مبلغ';
+    case 'quantity':
+    case 'qty':
+      return 'تعداد';
+    case 'date':
+    case 'created_at':
+      return 'تاریخ';
+    case 'status':
+      return 'وضعیت';
+    case 'balance':
+      return 'مانده';
+    case 'type':
+      return 'نوع';
+    case 'description':
+      return 'شرح';
+    default:
+      return key;
+  }
+}
+
 class AITableSpec {
   final String? title;
   final List<AITableColumn> columns;
@@ -292,7 +324,7 @@ class AITableSpec {
         .map(
           (e) => AITableColumn(
             key: e.key,
-            label: e.key,
+            label: tableColumnLabelFa(e.key),
             align: 'right',
           ),
         )

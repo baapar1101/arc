@@ -1,5 +1,4 @@
 import 'package:hesabix_ui/models/ai_models.dart';
-import 'package:hesabix_ui/models/ai_stream_event.dart';
 
 /// استخراج عملیات در انتظار تأیید از function_results یک پیام.
 List<Map<String, dynamic>> extractPendingApprovalOpsFromResults(
@@ -9,7 +8,7 @@ List<Map<String, dynamic>> extractPendingApprovalOpsFromResults(
   if (functionResults is! Map) return ops;
 
   for (final entry in functionResults.entries) {
-    if (entry.key.toString().startsWith(kAgentTraceStorageKey)) continue;
+    if (entry.key.toString().startsWith('_')) continue;
     final added = _approvalOpFromEntry(entry.value);
     if (added != null) {
       ops.add(added);

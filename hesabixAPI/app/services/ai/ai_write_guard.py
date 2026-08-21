@@ -149,6 +149,35 @@ def is_write_guard_stop_result(result: Any) -> bool:
     return is_approval_required_result(result)
 
 
+AWAITING_APPROVAL_STORAGE_KEY = "_awaiting_approval"
+
+
+def mark_function_results_awaiting_approval(
+    function_results: Optional[Dict[str, Any]],
+    awaiting: bool,
+) -> Optional[Dict[str, Any]]:
+    """پرچم pause تأیید در function_results تا حباب بعدی جایگزین شود."""
+    if not awaiting and not function_results:
+        return function_results
+    merged = dict(function_results or {})
+    if awaiting:
+        merged[AWAITING_APPROVAL_STORAGE_KEY] = True
+    else:
+        merged.pop(AWAITING_APPROVAL_STORAGE_KEY, None)
+    return merged or None
+
+
+def function_results_await_approval(function_results: Any) -> bool:
+    if isinstance(function_results, str):
+        try:
+            function_results = json.loads(function_results)
+        except (TypeError, ValueError, json.JSONDecodeError):
+            return False
+    return isinstance(function_results, dict) and bool(
+        function_results.get(AWAITING_APPROVAL_STORAGE_KEY)
+    )
+
+
 def build_approval_pause_content(
     function_calls: List[Dict[str, Any]],
     lookup_result: Callable[[Dict[str, Any]], Any],

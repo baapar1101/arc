@@ -166,14 +166,14 @@
 - یادداشت اصلاح: ۱۴۰۵/۰۵/۲۶ — جدول `ai_agent_runs`، checkpoint هر نوبت tool، `POST /sessions/{id}/runs/{run_id}/continue`، رویداد `run_resumed`/`agent_run`، بنر «ادامهٔ تحلیل». حلقه هنوز داخل همان درخواست HTTP است (AGT-02). میگریشن `20260817_000002_ai_agent_runs`.
 
 ### AGT-02 — حلقه داخل یک درخواست HTTP زندگی می‌کند
-- وضعیت: باز
+- وضعیت: انجام‌شده
 - اولویت: P1
 - مالک: backend
-- فایل‌ها: `adapters/api/v1/ai/chat.py` (`_stream_message_response`)، `ai_service.py`
+- فایل‌ها: `adapters/api/v1/ai/chat.py` (`_stream_message_response`)، `ai_run_hub.py`، `ai_sse_event_buffer.py`
 - مشکل: کل حلقه تا ۳۰۰ ثانیه (سوال پیچیده) روی یک اتصال SSE است. persist پس از disconnect با `_schedule_stream_persist_after_disconnect` بهتر از هیچ است، اما worker جدا برای ایجنت وجود ندارد. مقیاس و timeout پروکسی (nginx) شکننده است.
 - معیار پذیرش: اجرای ایجنت روی job/queue با fan-out رویداد به کلاینت؛ قطع مرورگر اجرای سرور را نکشد.
 - پیشنهاد: الگوی «run در پس‌زمینه + SSE/WS subscribe». مشابه OpenAI Assistants `runs` یا LangGraph Server.
-- یادداشت اصلاح:
+- یادداشت اصلاح: ۱۴۰۵/۰۵/۳۰ — `AgentRunHub` producer را مستقل از مشترک SSE نگه می‌دارد؛ Stop فقط با API cancel. بافر SSE حافظه+Redis. اگر run روی worker دیگر باشد، `_iter_run_sse` همان بافر را حین poll replay می‌کند نه فقط heartbeat. صف جدا (Celery) عمداً نیست.
 
 ### AGT-03 — سقف بودجه و ضد حلقه خوب است؛ سیگنال به کاربر ضعیف است
 - وضعیت: انجام‌شده
@@ -377,7 +377,7 @@
 - مشکل: اگر تب پس‌زمینه شود، پروکسی قطع کند، یا Wi-Fi بپرد، استریم می‌میرد. ChatGPT/Claude از event id و replay استفاده می‌کنند. کلاینت وب و غیر وب SSE جدا دارند.
 - معیار پذیرش: reconnect با `Last-Event-ID` تا ۱۵ دقیقه؛ UI بدون پیام تکراری؛ اگر run در پس‌زمینه است (AGT-02) فقط subscribe مجدد.
 - پیشنهاد: `id:` در هر SSE؛ بافر حلقوی per run در Redis؛ Dart: retry با backoff.
-- یادداشت اصلاح: ۱۴۰۵/۰۵/۲۶ — `id:` + `sse_id` روی هر رویداد؛ بافر درون‌پردازه‌ای ۱۵ دقیقه (نه Redis)؛ کلاینت `Last-Event-ID` می‌فرستد؛ اگر producer مرده باشد reconnect برابر continue همان `run_id` است (AGT-01). worker پس‌زمینه هنوز AGT-02 است.
+- یادداشت اصلاح: ۱۴۰۵/۰۵/۳۰ — `id:` + `sse_id`؛ بافر حافظه ۱۵ دقیقه و dual-write به Redis اگر فعال باشد؛ کلاینت `Last-Event-ID`؛ subscribe مجدد روی run زنده (AGT-02).
 
 ### STR-02 — مسیر non-stream هنوز بزرگ و دوگانه است
 - وضعیت: انجام‌شده
@@ -387,17 +387,17 @@
 - مشکل: مسیر غیر استریم exploration، Plan C، سنتز اجباری، `tool_choice=required` و wall-clock وسط استریم را ندارد. تلگرام/CRM/تیکت/ورک‌فلو روی همین مسیر نازک‌اند؛ کیفیت ایجنت بین کانال‌ها دوشاخه شده.
 - معیار پذیرش: یک حلقهٔ واحد؛ non-stream فقط aggregator روی همان generator.
 - پیشنهاد: `chat_completion` را به consume کردن `chat_completion_stream` تبدیل کنید.
-- یادداشت اصلاح: ۱۴۰۵/۰۵/۲۶ — `chat_completion` فقط `aggregate_chat_completion_stream` است؛ `temperature_override` به استریم رسید. UX استریم برای CRM/تیکت هنوز CHN-02 است.
+- یادداشت اصلاح: ۱۴۰۵/۰۵/۲۶ — `chat_completion` فقط `aggregate_chat_completion_stream` است؛ `temperature_override` به استریم رسید. ۱۴۰۵/۰۵/۳۰ — UX استریم CRM/تیکت در CHN-02 بسته شد.
 
 ### STR-03 — heartbeat و status خوب‌اند؛ event id و schema نسخه‌بندی ندارند
-- وضعیت: باز
+- وضعیت: در حال اصلاح
 - اولویت: P2
 - مالک: backend + flutter
-- فایل‌ها: `AI_CHAT_ISSUES.md` جدول SSE، `ai_stream_event.dart`
+- فایل‌ها: `AI_CHAT_ISSUES.md` جدول SSE، `ai_stream_event.dart`، `ai_stream_helpers.format_sse_payload`
 - مشکل: قرارداد در markdown است نه در OpenAPI/JSON Schema. کلاینت قدیمی با فیلد جدید می‌شکند یا نادیده می‌گیرد. `trace_id` در ISSUES به‌عنوان پیشنهاد مانده.
 - معیار پذیرش: `protocol_version` در اولین event؛ schema تولیدشده؛ `trace_id`/`run_id` روی همهٔ eventها.
 - پیشنهاد: Pydantic مدل برای SSE + تست سازگاری Dart.
-- یادداشت اصلاح:
+- یادداشت اصلاح: ۱۴۰۵/۰۵/۳۰ — هر رویداد SSE فیلد `schema_version` (ثابت `SSE_SCHEMA_VERSION`) دارد. OpenAPI/Pydantic برای کل قرارداد و `trace_id` اجباری روی همهٔ eventها هنوز نیست.
 
 ### STR-04 — Local/Ollama در استریم ابزار ندارد
 - وضعیت: باز
@@ -685,14 +685,14 @@
 - یادداشت اصلاح: ۱۴۰۵/۰۵/۲۶ — `execution_mode=supervised` و `approve_writes=False`؛ نتایج ابزار persist می‌شوند؛ پاسخ بلند صفحه‌بندی می‌شود. دکمهٔ inline `ai:approve:{id}` / `ai:reject:{id}` و `sendChatAction(typing)` اضافه شد. استریم و جدول در تلگرام هنوز نیست (عمداً خارج از معیار پذیرش این آیتم).
 
 ### CHN-02 — CRM AI و پیشنهاد تیکت غیر استریم و بدون ابزار دامنهٔ کامل
-- وضعیت: در حال اصلاح
+- وضعیت: انجام‌شده
 - اولویت: P1
 - مالک: backend + flutter
-- فایل‌ها: `adapters/api/v1/ai/crm_ai.py`، `ai_crm_parse.py`، `adapters/api/v1/support/ai_tickets.py`، `ai_channel_policy.py`، `crm_ai_assistant_widget.dart`
+- فایل‌ها: `adapters/api/v1/ai/crm_ai.py`، `ai_crm_parse.py`، `adapters/api/v1/support/ai_tickets.py`، `ai_channel_policy.py`، `ai_channel_stream.py`، `crm_ai_assistant_widget.dart`، `ai_ticket_assistant.dart`
 - مشکل: یک completion با context متنی (حتی PII). بدون SSE، بدون function calling کامل، بدون citation. `suggest-deal-probability` در parse ناموفق به **۵۰٪** برمی‌گردد — عدد ساختگی خطرناک است. تاریخچهٔ فعالیت نازک (حدود ۵–۱۰ مورد). تست endpoint وجود ندارد.
 - معیار پذیرش: همان حلقهٔ ایجنت با ابزار محدود همان موجودیت؛ اگر احتمال قابل استخراج نیست خطا/نامشخص نه ۵۰؛ استریم در ویجت.
 - پیشنهاد: `operation=crm_assist` با tool allowlist؛ نمایش در `crm_ai_assistant_widget.dart`.
-- یادداشت اصلاح: ۱۴۰۵/۰۵/۲۶ — fallback ۵۰ حذف شد. حلقه با `execution_mode=analyzer`، allowlist فقط‌خواندنی، سقف ۴ نوبت، حصار untrusted، و فیلدهای `tools_used`/`citations`؛ ویجت CRM chip ابزار و استناد نشان می‌دهد. استریم SSE در ویجت هنوز باز است.
+- یادداشت اصلاح: ۱۴۰۵/۰۵/۲۶ — fallback ۵۰ حذف شد. حلقه با `execution_mode=analyzer`، allowlist فقط‌خواندنی، سقف ۴ نوبت، حصار untrusted، و فیلدهای `tools_used`/`citations`. ۱۴۰۵/۰۵/۳۰ — `?stream=true` روی خلاصهٔ سرنخ/فرصت و پیشنهاد تیکت؛ ویجت متن و وضعیت را زنده نشان می‌دهد و توقف قطع می‌کند. احتمال معامله همچنان JSON است (عدد پارس‌شده).
 
 ### CHN-03 — چت وب CRM باید مسیر ارجاع به ایجنت داشته باشد
 - وضعیت: باز
@@ -946,6 +946,7 @@
 | ۱۴۰۵/۰۵/۲۸ | 2.7 | بررسی runtime: AGT-06 بدون subagent (P1)؛ TOOL-06 موازی read موجود؛ PRM-04 تکرار بینش در system نه در تاریخچه؛ سناریوی اجرا |
 | ۱۴۰۵/۰۵/۲۸ | 2.8 | PRM-04 لایهٔ semi_static + تفکیک توکن context_usage؛ TOOL-06 متریک موازی و eval چنددامنه‌ای؛ AGT-06 spawn/await/cancel با سقف ۲×۴ و fail-closed نوشتن |
 | ۱۴۰۵/۰۵/۲۷ | 2.8+ | لینک صف محصولی [`AI_CHAT_PRODUCT_ISSUES.md`](AI_CHAT_PRODUCT_ISSUES.md) (CHAT-01…06 از گزارش کاربر) |
+| ۱۴۰۵/۰۵/۳۰ | 2.9 | CHN-02 استریم CRM/تیکت؛ replay بافر حین poll چند-ورکر؛ `schema_version` روی SSE |
 
 <!-- الگو:
 | ۱۴۰۵/۰۶/۰۱ | 1.1 | STR-01 انجام‌شده — reconnect SSE با Last-Event-ID |

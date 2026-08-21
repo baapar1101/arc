@@ -9,9 +9,18 @@ from typing import Any, AsyncGenerator, Callable, Dict, List, Optional
 
 from app.core.json_safe import json_dumps_safe
 from app.services.ai.ai_sse_event_buffer import append_sse_event
+from app.services.ai.ai_constants import SSE_SCHEMA_VERSION
 
 HEARTBEAT_INTERVAL_SEC = 3.0
 SSE_NGINX_PAD = ":" + (" " * 2048) + "\n"
+
+
+def sse_response_headers() -> Dict[str, str]:
+    return {
+        "Cache-Control": "no-cache",
+        "Connection": "keep-alive",
+        "X-Accel-Buffering": "no",
+    }
 
 
 def format_sse_payload(
@@ -20,10 +29,12 @@ def format_sse_payload(
     event_id: Optional[int] = None,
 ) -> str:
     """قالب SSE با pad پروکسی و شناسهٔ رویداد اختیاری."""
+    payload = dict(data)
+    payload.setdefault("schema_version", SSE_SCHEMA_VERSION)
     parts = [SSE_NGINX_PAD]
     if event_id is not None:
         parts.append(f"id: {event_id}\n")
-    parts.append(f"data: {json_dumps_safe(data)}\n\n")
+    parts.append(f"data: {json_dumps_safe(payload)}\n\n")
     return "".join(parts)
 
 
@@ -38,15 +49,20 @@ class SseEventSequencer:
         if run_id:
             self.run_id = str(run_id)
 
-    def format(self, data: Dict[str, Any]) -> str:
+    def push(self, data: Dict[str, Any]) -> tuple[int, Dict[str, Any]]:
+        """شناسه بده، در بافر بگذار (به‌جز heartbeat)، payload نهایی را برگردان."""
         self.last_id += 1
         payload = dict(data)
         payload["sse_id"] = self.last_id
         if self.run_id and "run_id" not in payload:
             payload["run_id"] = self.run_id
-        if self.run_id:
+        if self.run_id and payload.get("type") != "heartbeat":
             append_sse_event(self.run_id, self.last_id, payload)
-        return format_sse_payload(payload, event_id=self.last_id)
+        return self.last_id, payload
+
+    def format(self, data: Dict[str, Any]) -> str:
+        event_id, payload = self.push(data)
+        return format_sse_payload(payload, event_id=event_id)
 
 
 # فیلدهایی که باید از chunk پایانی سرویس به رویداد done کلاینت برسند.
@@ -136,6 +152,15 @@ def chunk_to_sse_data(chunk: Dict[str, Any]) -> List[Dict[str, Any]]:
                 "run_id": chunk.get("run_id"),
                 "phase": chunk.get("phase"),
                 "iteration": chunk.get("iteration"),
+                "done": False,
+            }
+        ]
+
+    if event_type == "heartbeat":
+        return [
+            {
+                "type": "heartbeat",
+                "elapsed_ms": chunk.get("elapsed_ms"),
                 "done": False,
             }
         ]

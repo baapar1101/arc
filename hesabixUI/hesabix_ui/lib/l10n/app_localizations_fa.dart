@@ -11548,6 +11548,70 @@ class AppLocalizationsFa extends AppLocalizations {
   String get aiContinueAnalysisDismiss => 'فعلاً نه';
 
   @override
+  String get aiStreamStallError =>
+      'ارتباط لحظه‌ای قطع شد. پاسخ تا اینجا ذخیره شده است.';
+
+  @override
+  String get aiStreamEmptyError =>
+      'پاسخ کامل نرسید؛ اتصال قبل از اتمام بسته شد.';
+
+  @override
+  String aiStreamAvailabilityCheckFailed(String error) {
+    return 'الان نمی‌توان پیام فرستاد: $error';
+  }
+
+  @override
+  String get aiContinueAfterRefreshHint =>
+      'تحلیل قبلی ناتمام ماند. می‌توانید از همان نقطه ادامه دهید.';
+
+  @override
+  String get aiResumingPreviousRun => 'در حال ادامهٔ پاسخ قبلی…';
+
+  @override
+  String get aiCrmAssistantTitle => 'دستیار هوشمند';
+
+  @override
+  String get aiCrmSummarizeAction => 'خلاصه و پیشنهاد';
+
+  @override
+  String get aiCrmStopAction => 'توقف';
+
+  @override
+  String get aiTicketAssistantTitle => 'کمک هوش مصنوعی';
+
+  @override
+  String get aiTicketAssistantHintExpanded =>
+      'دستیار فعال است. پیشنهاد یا پاسخ خودکار دریافت کنید.';
+
+  @override
+  String get aiTicketAssistantHintCollapsed =>
+      'برای نمایش دستیار و دکمه‌های AI ضربه بزنید.';
+
+  @override
+  String get aiTicketSuggestReply => 'پیشنهاد پاسخ';
+
+  @override
+  String get aiTicketAutoReply => 'پاسخ خودکار';
+
+  @override
+  String get aiTicketAutoReplyConfirmTitle => 'پاسخ خودکار';
+
+  @override
+  String get aiTicketAutoReplyConfirmBody =>
+      'آیا می‌خواهید دستیار به‌صورت خودکار به این تیکت پاسخ دهد؟';
+
+  @override
+  String get aiTicketSuggestionLabel => 'پیشنهاد AI';
+
+  @override
+  String get aiTicketUseSuggestion => 'استفاده از این پاسخ';
+
+  @override
+  String aiTicketSuggestFailed(String error) {
+    return 'خطا در دریافت پیشنهاد: $error';
+  }
+
+  @override
   String aiConversationNavTitle(int count) {
     return 'فهرست پیام‌ها ($count)';
   }
