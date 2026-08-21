@@ -11775,7 +11775,93 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get quickSalesAutoCreateReceiptSwitchHint =>
-      'سند دریافت جداگانه همراه فاکتور ثبت شود (پرداخت نقدی در صندوق)';
+      'دریافت نقدی، بانکی یا چک همراه فاکتور ثبت شود. مانده روی حساب مشتری می‌ماند.';
+
+  @override
+  String get quickSalesPayCashRegister => 'صندوق';
+
+  @override
+  String get quickSalesPayCashRegisterHint => 'انتخاب صندوق';
+
+  @override
+  String get quickSalesPayBank => 'بانک';
+
+  @override
+  String get quickSalesPayBankHint => 'انتخاب حساب بانکی';
+
+  @override
+  String get quickSalesPayCheck => 'چک';
+
+  @override
+  String get quickSalesPayCheckHint => 'انتخاب یا ثبت چک دریافتی';
+
+  @override
+  String get quickSalesPayAmount => 'مبلغ';
+
+  @override
+  String get quickSalesPayAddCash => '+ صندوق';
+
+  @override
+  String get quickSalesPayAddBank => '+ بانک';
+
+  @override
+  String get quickSalesPayAddCheck => '+ چک';
+
+  @override
+  String get quickSalesPayFillRemaining => 'پر کردن مانده';
+
+  @override
+  String get quickSalesPayRemoveLine => 'حذف این پرداخت';
+
+  @override
+  String get quickSalesPayPaidLabel => 'پرداخت‌شده';
+
+  @override
+  String get quickSalesPayRemainingLabel => 'مانده';
+
+  @override
+  String get quickSalesPaySettled => 'تسویه کامل';
+
+  @override
+  String get quickSalesPayPartialStatus => 'مانده روی حساب مشتری می‌ماند';
+
+  @override
+  String get quickSalesPayOverpaid => 'جمع پرداخت‌ها از مبلغ فاکتور بیشتر است';
+
+  @override
+  String get quickSalesPayRemainingCustomerHint =>
+      'مانده به‌صورت نسیه روی حساب همین مشتری ثبت می‌شود.';
+
+  @override
+  String get quickSalesPayRemainingAnonymousHint =>
+      'مانده روی حساب مشتری ناشناس ثبت می‌شود. برای نسیه، مشتری واقعی را انتخاب کنید.';
+
+  @override
+  String get quickSalesPayShareRemaining => 'ارسال لینک برای مانده';
+
+  @override
+  String get quickSalesPayShareRemainingHint =>
+      'لینک پرداخت آنلاین فقط برای مبلغ باقی‌مانده ارسال شود';
+
+  @override
+  String get quickSalesPaySelectCashRegister =>
+      'برای پرداخت صندوق، صندوق را انتخاب کنید';
+
+  @override
+  String get quickSalesPaySelectBank =>
+      'برای پرداخت بانکی، حساب بانک را انتخاب کنید';
+
+  @override
+  String get quickSalesPaySelectCheck =>
+      'برای پرداخت چکی، چک را انتخاب یا ثبت کنید';
+
+  @override
+  String get quickSalesPayOverpaidError =>
+      'جمع پرداخت‌ها از مبلغ فاکتور بیشتر است. مبالغ را اصلاح کنید.';
+
+  @override
+  String get quickSalesPayNeedDestination =>
+      'هر ردیف پرداخت باید صندوق، بانک یا چک داشته باشد';
 
   @override
   String get quickSalesShareSectionTitle => 'اشتراک‌گذاری';
@@ -11855,7 +11941,7 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get quickSalesSettingsShareDefaultsHint =>
-      'وقتی «ثبت سند دریافت» خاموش است، این مقادیر در صفحه فروش سریع اعمال می‌شوند';
+      'وقتی سند دریافت خاموش است، یا برای ماندهٔ فاکتور لینک می‌فرستید، این مقادیر اعمال می‌شوند';
 
   @override
   String get quickSalesSettingsShareExpiryLabel => 'مدت اعتبار لینک';

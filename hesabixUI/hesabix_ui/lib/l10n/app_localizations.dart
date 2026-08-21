@@ -21909,8 +21909,164 @@ abstract class AppLocalizations {
   /// No description provided for @quickSalesAutoCreateReceiptSwitchHint.
   ///
   /// In en, this message translates to:
-  /// **'Record a separate receipt with the invoice (cash register payment)'**
+  /// **'Record cash, bank, or check receipts with the invoice. Any remainder stays on the customer account.'**
   String get quickSalesAutoCreateReceiptSwitchHint;
+
+  /// No description provided for @quickSalesPayCashRegister.
+  ///
+  /// In en, this message translates to:
+  /// **'Cash register'**
+  String get quickSalesPayCashRegister;
+
+  /// No description provided for @quickSalesPayCashRegisterHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Select cash register'**
+  String get quickSalesPayCashRegisterHint;
+
+  /// No description provided for @quickSalesPayBank.
+  ///
+  /// In en, this message translates to:
+  /// **'Bank'**
+  String get quickSalesPayBank;
+
+  /// No description provided for @quickSalesPayBankHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Select bank account'**
+  String get quickSalesPayBankHint;
+
+  /// No description provided for @quickSalesPayCheck.
+  ///
+  /// In en, this message translates to:
+  /// **'Check'**
+  String get quickSalesPayCheck;
+
+  /// No description provided for @quickSalesPayCheckHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Select or add a received check'**
+  String get quickSalesPayCheckHint;
+
+  /// No description provided for @quickSalesPayAmount.
+  ///
+  /// In en, this message translates to:
+  /// **'Amount'**
+  String get quickSalesPayAmount;
+
+  /// No description provided for @quickSalesPayAddCash.
+  ///
+  /// In en, this message translates to:
+  /// **'+ Cash'**
+  String get quickSalesPayAddCash;
+
+  /// No description provided for @quickSalesPayAddBank.
+  ///
+  /// In en, this message translates to:
+  /// **'+ Bank'**
+  String get quickSalesPayAddBank;
+
+  /// No description provided for @quickSalesPayAddCheck.
+  ///
+  /// In en, this message translates to:
+  /// **'+ Check'**
+  String get quickSalesPayAddCheck;
+
+  /// No description provided for @quickSalesPayFillRemaining.
+  ///
+  /// In en, this message translates to:
+  /// **'Fill remaining'**
+  String get quickSalesPayFillRemaining;
+
+  /// No description provided for @quickSalesPayRemoveLine.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove this payment'**
+  String get quickSalesPayRemoveLine;
+
+  /// No description provided for @quickSalesPayPaidLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Paid'**
+  String get quickSalesPayPaidLabel;
+
+  /// No description provided for @quickSalesPayRemainingLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Remaining'**
+  String get quickSalesPayRemainingLabel;
+
+  /// No description provided for @quickSalesPaySettled.
+  ///
+  /// In en, this message translates to:
+  /// **'Fully settled'**
+  String get quickSalesPaySettled;
+
+  /// No description provided for @quickSalesPayPartialStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Remainder stays on the customer account'**
+  String get quickSalesPayPartialStatus;
+
+  /// No description provided for @quickSalesPayOverpaid.
+  ///
+  /// In en, this message translates to:
+  /// **'Payments exceed the invoice total'**
+  String get quickSalesPayOverpaid;
+
+  /// No description provided for @quickSalesPayRemainingCustomerHint.
+  ///
+  /// In en, this message translates to:
+  /// **'The remainder is recorded as credit on this customer.'**
+  String get quickSalesPayRemainingCustomerHint;
+
+  /// No description provided for @quickSalesPayRemainingAnonymousHint.
+  ///
+  /// In en, this message translates to:
+  /// **'The remainder will be on the walk-in customer. Choose a real customer for credit sales.'**
+  String get quickSalesPayRemainingAnonymousHint;
+
+  /// No description provided for @quickSalesPayShareRemaining.
+  ///
+  /// In en, this message translates to:
+  /// **'Send a link for the remainder'**
+  String get quickSalesPayShareRemaining;
+
+  /// No description provided for @quickSalesPayShareRemainingHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Send an online payment link only for the unpaid amount'**
+  String get quickSalesPayShareRemainingHint;
+
+  /// No description provided for @quickSalesPaySelectCashRegister.
+  ///
+  /// In en, this message translates to:
+  /// **'Select a cash register for the cash payment'**
+  String get quickSalesPaySelectCashRegister;
+
+  /// No description provided for @quickSalesPaySelectBank.
+  ///
+  /// In en, this message translates to:
+  /// **'Select a bank account for the bank payment'**
+  String get quickSalesPaySelectBank;
+
+  /// No description provided for @quickSalesPaySelectCheck.
+  ///
+  /// In en, this message translates to:
+  /// **'Select or add a check for the check payment'**
+  String get quickSalesPaySelectCheck;
+
+  /// No description provided for @quickSalesPayOverpaidError.
+  ///
+  /// In en, this message translates to:
+  /// **'Payments exceed the invoice total. Adjust the amounts.'**
+  String get quickSalesPayOverpaidError;
+
+  /// No description provided for @quickSalesPayNeedDestination.
+  ///
+  /// In en, this message translates to:
+  /// **'Each payment line needs a cash register, bank, or check'**
+  String get quickSalesPayNeedDestination;
 
   /// No description provided for @quickSalesShareSectionTitle.
   ///
@@ -22041,7 +22197,7 @@ abstract class AppLocalizations {
   /// No description provided for @quickSalesSettingsShareDefaultsHint.
   ///
   /// In en, this message translates to:
-  /// **'Applied on the quick sales page when \"Create receipt document\" is off'**
+  /// **'Used on the quick sales page when receipt is off, or when sharing a remaining balance'**
   String get quickSalesSettingsShareDefaultsHint;
 
   /// No description provided for @quickSalesSettingsShareExpiryLabel.

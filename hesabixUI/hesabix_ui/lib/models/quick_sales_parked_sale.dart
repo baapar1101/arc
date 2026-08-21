@@ -16,7 +16,8 @@ class QuickSalesParkedSale {
   final DateTime updatedAt;
   final Customer? customer;
   final List<InvoiceLineItem> cartItems;
-  final InvoiceTransaction? payment;
+  final List<InvoiceTransaction> payments;
+  final bool cashFollowsTotal;
   final String? cashRegisterId;
   final int? warehouseId;
   final DateTime documentDate;
@@ -39,7 +40,8 @@ class QuickSalesParkedSale {
     required this.updatedAt,
     this.customer,
     this.cartItems = const [],
-    this.payment,
+    this.payments = const [],
+    this.cashFollowsTotal = true,
     this.cashRegisterId,
     this.warehouseId,
     required this.documentDate,
@@ -60,20 +62,32 @@ class QuickSalesParkedSale {
   static String newId() => const Uuid().v4();
 
   bool isBlank({int? anonymousCustomerId}) {
-    final isAnon = customer == null ||
+    final isAnon =
+        customer == null ||
         (anonymousCustomerId != null && customer!.id == anonymousCustomerId);
     return cartItems.isEmpty &&
         isAnon &&
         documentDescription.trim().isEmpty &&
         globalDiscountValue.trim().isEmpty &&
-        payment == null;
+        !_hasCustomPayments;
+  }
+
+  bool get _hasCustomPayments {
+    if (payments.isEmpty) return false;
+    if (cashFollowsTotal &&
+        payments.length == 1 &&
+        payments.first.type == TransactionType.cashRegister) {
+      return false;
+    }
+    return true;
   }
 
   QuickSalesParkedSale copyWith({
     DateTime? updatedAt,
     Customer? customer,
     List<InvoiceLineItem>? cartItems,
-    InvoiceTransaction? payment,
+    List<InvoiceTransaction>? payments,
+    bool? cashFollowsTotal,
     String? cashRegisterId,
     int? warehouseId,
     DateTime? documentDate,
@@ -96,7 +110,8 @@ class QuickSalesParkedSale {
       updatedAt: updatedAt ?? this.updatedAt,
       customer: customer ?? this.customer,
       cartItems: cartItems ?? this.cartItems,
-      payment: payment ?? this.payment,
+      payments: payments ?? this.payments,
+      cashFollowsTotal: cashFollowsTotal ?? this.cashFollowsTotal,
       cashRegisterId: cashRegisterId ?? this.cashRegisterId,
       warehouseId: warehouseId ?? this.warehouseId,
       documentDate: documentDate ?? this.documentDate,
@@ -124,7 +139,8 @@ class QuickSalesParkedSale {
       'updated_at': updatedAt.toIso8601String(),
       'customer': customer?.toJson(),
       'cart_items': cartItems.map(encodeLine).toList(),
-      'payment': payment?.toJson(),
+      'payments': payments.map((p) => p.toJson()).toList(),
+      'cash_follows_total': cashFollowsTotal,
       'cash_register_id': cashRegisterId,
       'warehouse_id': warehouseId,
       'document_date': documentDate.toIso8601String(),
@@ -154,26 +170,47 @@ class QuickSalesParkedSale {
       }
     }
 
-    InvoiceTransaction? payment;
-    final paymentRaw = json['payment'];
-    if (paymentRaw is Map) {
-      try {
-        payment = InvoiceTransaction.fromJson(Map<String, dynamic>.from(paymentRaw));
-      } catch (_) {
-        payment = null;
+    final payments = <InvoiceTransaction>[];
+    final paymentsRaw = json['payments'];
+    if (paymentsRaw is List) {
+      for (final raw in paymentsRaw) {
+        if (raw is Map) {
+          try {
+            payments.add(
+              InvoiceTransaction.fromJson(Map<String, dynamic>.from(raw)),
+            );
+          } catch (_) {}
+        }
+      }
+    } else {
+      final paymentRaw = json['payment'];
+      if (paymentRaw is Map) {
+        try {
+          payments.add(
+            InvoiceTransaction.fromJson(Map<String, dynamic>.from(paymentRaw)),
+          );
+        } catch (_) {}
       }
     }
 
     return QuickSalesParkedSale(
       id: json['id']?.toString() ?? newId(),
-      createdAt: DateTime.tryParse(json['created_at']?.toString() ?? '') ?? DateTime.now(),
-      updatedAt: DateTime.tryParse(json['updated_at']?.toString() ?? '') ?? DateTime.now(),
+      createdAt:
+          DateTime.tryParse(json['created_at']?.toString() ?? '') ??
+          DateTime.now(),
+      updatedAt:
+          DateTime.tryParse(json['updated_at']?.toString() ?? '') ??
+          DateTime.now(),
       customer: _customerFromJson(json['customer']),
       cartItems: items,
-      payment: payment,
+      payments: payments,
+      cashFollowsTotal:
+          json['cash_follows_total'] != false && (payments.length <= 1),
       cashRegisterId: json['cash_register_id']?.toString(),
       warehouseId: _asInt(json['warehouse_id']),
-      documentDate: DateTime.tryParse(json['document_date']?.toString() ?? '') ?? DateTime.now(),
+      documentDate:
+          DateTime.tryParse(json['document_date']?.toString() ?? '') ??
+          DateTime.now(),
       documentDescription: json['document_description']?.toString() ?? '',
       globalDiscountType: json['global_discount_type']?.toString() ?? 'percent',
       globalDiscountValue: json['global_discount_value']?.toString() ?? '',
@@ -189,7 +226,8 @@ class QuickSalesParkedSale {
     );
   }
 
-  static InvoiceLineItem cloneLine(InvoiceLineItem item) => decodeLine(encodeLine(item));
+  static InvoiceLineItem cloneLine(InvoiceLineItem item) =>
+      decodeLine(encodeLine(item));
 
   static Map<String, dynamic> encodeLine(InvoiceLineItem item) {
     final map = <String, dynamic>{
@@ -275,10 +313,10 @@ class QuickSalesParkedSalesBundle {
   });
 
   Map<String, dynamic> toJson() => {
-        'version': version,
-        'active_id': activeId,
-        'sales': sales.map((s) => s.toJson()).toList(),
-      };
+    'version': version,
+    'active_id': activeId,
+    'sales': sales.map((s) => s.toJson()).toList(),
+  };
 
   static QuickSalesParkedSalesBundle? tryParse(Object? decoded) {
     if (decoded is! Map) return null;
@@ -289,7 +327,9 @@ class QuickSalesParkedSalesBundle {
     final sales = <QuickSalesParkedSale>[];
     for (final raw in rawSales) {
       if (raw is Map) {
-        sales.add(QuickSalesParkedSale.fromJson(Map<String, dynamic>.from(raw)));
+        sales.add(
+          QuickSalesParkedSale.fromJson(Map<String, dynamic>.from(raw)),
+        );
       }
     }
     if (sales.isEmpty) return null;
@@ -317,7 +357,10 @@ class QuickSalesParkedSalesStorage {
     }
   }
 
-  static Future<void> save(int businessId, QuickSalesParkedSalesBundle bundle) async {
+  static Future<void> save(
+    int businessId,
+    QuickSalesParkedSalesBundle bundle,
+  ) async {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(keyFor(businessId), jsonEncode(bundle.toJson()));

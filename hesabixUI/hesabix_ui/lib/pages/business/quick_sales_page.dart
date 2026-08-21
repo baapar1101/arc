@@ -30,8 +30,9 @@ import '../../models/invoice_transaction.dart';
 import '../../models/quick_sales_parked_sale.dart';
 import '../../widgets/invoice/customer_combobox_widget.dart';
 import '../../widgets/quick_sales/quick_sales_parked_sales_bar.dart';
-import '../../widgets/invoice/cash_register_combobox_widget.dart';
+import '../../widgets/quick_sales/quick_sales_payment_composer.dart';
 import '../../widgets/invoice/warehouse_combobox_widget.dart';
+import '../../utils/currency_display_utils.dart';
 import '../../widgets/permission/access_denied_page.dart';
 import '../../widgets/product/product_form_dialog.dart';
 import '../../widgets/product/category_tree_widget.dart';
@@ -100,26 +101,31 @@ class QuickSalesPage extends StatefulWidget {
   State<QuickSalesPage> createState() => _QuickSalesPageState();
 }
 
-class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProviderStateMixin {
+class _QuickSalesPageState extends State<QuickSalesPage>
+    with SingleTickerProviderStateMixin {
   /// نمایشگرهای خیلی باریک (مثلاً آیفون ۶ ~۳۷۵pt، SE قدیمی ~۳۲۰pt)
   static const double _compactBreakpoint = 400.0;
   final QuickSalesService _quickSalesService = QuickSalesService();
   final InvoiceService _invoiceService = InvoiceService();
-  final PaymentGatewayService _paymentGatewayService = PaymentGatewayService(ApiClient());
+  final PaymentGatewayService _paymentGatewayService = PaymentGatewayService(
+    ApiClient(),
+  );
   final ProductService _productService = ProductService();
   final WarehouseService _warehouseService = WarehouseService();
-  final PriceListService _priceListService = PriceListService(apiClient: ApiClient());
+  final PriceListService _priceListService = PriceListService(
+    apiClient: ApiClient(),
+  );
   final CategoryService _categoryService = CategoryService(ApiClient());
-  
+
   bool _loading = true;
   _QuickSalesSaveAction _saveAction = _QuickSalesSaveAction.none;
   bool get _isSaving => _saveAction != _QuickSalesSaveAction.none;
   Map<String, dynamic>? _settings;
   Customer? _anonymousCustomer;
-  
+
   // سبد خرید
   List<InvoiceLineItem> _cartItems = [];
-  
+
   // موجودی محصولات (productId -> stock)
   Map<int, num> _productStocks = {};
   final Set<int> _loadingStockProductIds = <int>{};
@@ -134,19 +140,21 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
   bool _barcodeSearching = false;
   int? _addingProductId;
   int? _recentProductLoadingId;
-  
+
   // تاریخچه محصولات اخیر
   List<Map<String, dynamic>> _recentProducts = [];
   static const String _recentProductsKey = 'quick_sales_recent_products';
   static const int _maxRecentProducts = 10;
-  
+
   // مشتری
   Customer? _selectedCustomer;
-  
+
   // پرداخت
-  InvoiceTransaction? _payment;
+  List<InvoiceTransaction> _payments = [];
   String? _selectedCashRegisterId;
   bool _autoCreatePaymentDocument = true;
+  bool _cashFollowsTotal = true;
+  bool _shareRemainingEnabled = false;
 
   // اشتراک‌گذاری (وقتی سند دریافت ثبت نمی‌شود)
   bool _shareOnlinePaymentEnabled = true;
@@ -157,7 +165,7 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
   int _shareExpiryHours = 168;
   List<Map<String, dynamic>> _shareGateways = const [];
   bool _loadingShareGateways = false;
-  
+
   // تنظیمات
   int? _defaultWarehouseId;
   int? _defaultCurrencyId;
@@ -172,12 +180,14 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
   bool _showPurchasePrice = false;
   int? _printTemplateId;
   String? _printPaperSize = '80mm';
-  
+
   // تاریخ و شرح سند فاکتور
   DateTime _documentDate = DateTime.now();
-  final TextEditingController _documentDescriptionController = TextEditingController();
+  final TextEditingController _documentDescriptionController =
+      TextEditingController();
 
-  InvoiceGlobalDiscountPolicy _globalDiscountPolicy = const InvoiceGlobalDiscountPolicy();
+  InvoiceGlobalDiscountPolicy _globalDiscountPolicy =
+      const InvoiceGlobalDiscountPolicy();
   String _globalDiscountType = 'percent';
   late final TextEditingController _globalDiscountValueController;
 
@@ -188,13 +198,15 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
   final LayerLink _barcodeFieldLayerLink = LayerLink();
   final ScrollController _barcodeOverlayScrollController = ScrollController();
   OverlayEntry? _barcodeOverlayEntry;
-  List<Map<String, dynamic>> _barcodeSuggestions = const <Map<String, dynamic>>[];
+  List<Map<String, dynamic>> _barcodeSuggestions =
+      const <Map<String, dynamic>>[];
   bool _barcodeSuggestionsLoading = false;
   bool _barcodeSuggestionsLoadingMore = false;
   bool _barcodeSuggestionsHasMore = false;
   int _barcodeSuggestionsSkip = 0;
   String _barcodeSuggestionsQuery = '';
   int _barcodeHighlightedIndex = -1;
+
   /// جلوگیری از دوبار اجرا شدن انتخاب با دابل‌کلیک روی همان ردیف اورلی پیشنهادها.
   DateTime? _lastOverlaySuggestionTapAt;
   int? _lastOverlaySuggestionTapProductId;
@@ -204,11 +216,13 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
   final Set<int> _mobileTabsBuilt = <int>{0};
   Timer? _searchDebounce;
   Timer? _globalDiscountDebounce;
-  String? _lastFailedSearchQuery; // آخرین جستجوی ناموفق برای نمایش دکمه افزودن کالا
+  String?
+  _lastFailedSearchQuery; // آخرین جستجوی ناموفق برای نمایش دکمه افزودن کالا
 
   /// هم‌سو با API (`products.add`)؛ بدون این مجوز نباید دیالوگ افزودن کالا باز شود.
-  bool get _canCreateProducts => widget.authStore.hasBusinessPermission('products', 'add');
-  
+  bool get _canCreateProducts =>
+      widget.authStore.hasBusinessPermission('products', 'add');
+
   // دسته‌بندی‌ها
   List<CategoryNode> _categoryTree = [];
   bool _loadingCategories = false;
@@ -238,7 +252,11 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
   @override
   void initState() {
     super.initState();
-    _mobileTabController = TabController(length: 3, vsync: this, initialIndex: _mobileTabIndex);
+    _mobileTabController = TabController(
+      length: 3,
+      vsync: this,
+      initialIndex: _mobileTabIndex,
+    );
     _mobileTabController.addListener(_onMobileTabChanged);
     _globalDiscountValueController = TextEditingController();
     _globalDiscountValueController.addListener(() {
@@ -266,17 +284,21 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
       _keyboardListenerFocus.requestFocus();
     });
   }
-  
+
   Future<void> _loadCategories() async {
     if (_loadingCategories) return;
     setState(() {
       _loadingCategories = true;
     });
     try {
-      final categories = await _categoryService.getCategoriesTree(businessId: widget.businessId);
+      final categories = await _categoryService.getCategoriesTree(
+        businessId: widget.businessId,
+      );
       if (mounted) {
         setState(() {
-          _categoryTree = categories.map((e) => CategoryNode.fromMap(e)).toList();
+          _categoryTree = categories
+              .map((e) => CategoryNode.fromMap(e))
+              .toList();
           _loadingCategories = false;
         });
       }
@@ -289,18 +311,18 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
       }
     }
   }
-  
+
   List<int> _getCategoryIdsForFilter(int? categoryId) {
     if (categoryId == null) return [];
-    
+
     // پیدا کردن node مربوط به دسته انتخاب شده
     final node = findCategoryNode(_categoryTree, categoryId);
     if (node == null) return [categoryId];
-    
+
     // جمع‌آوری تمام IDهای زیردسته‌ها
     return getAllCategoryIds(node);
   }
-  
+
   Future<void> _loadRecentProducts() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -321,36 +343,42 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
       // خطا در خواندن تاریخچه، ادامه می‌دهیم
     }
   }
-  
+
   Future<void> _saveRecentProduct(Map<String, dynamic> product) async {
     try {
       final productId = _productIntId(product);
       if (productId == null) return;
-      
+
       // حذف محصول اگر قبلاً وجود داشته
-      _recentProducts.removeWhere((p) => _productIntId(Map<String, dynamic>.from(p)) == productId);
-      
+      _recentProducts.removeWhere(
+        (p) => _productIntId(Map<String, dynamic>.from(p)) == productId,
+      );
+
       // اضافه کردن به ابتدا
       _recentProducts.insert(0, {
         'id': productId,
-        'code': _quickSalesDisplayProductBusinessCode(product) ?? product['code']?.toString(),
+        'code':
+            _quickSalesDisplayProductBusinessCode(product) ??
+            product['code']?.toString(),
         'name': product['name']?.toString(),
-        'sales_price': _toNum(product['base_sales_price'] ?? product['sales_price']),
+        'sales_price': _toNum(
+          product['base_sales_price'] ?? product['sales_price'],
+        ),
         'tax_rate': _toNum(product['sales_tax_rate'] ?? product['tax_rate']),
         'track_inventory': product['track_inventory'] ?? false,
         'added_at': DateTime.now().millisecondsSinceEpoch,
       });
-      
+
       // محدود کردن به حداکثر تعداد
       if (_recentProducts.length > _maxRecentProducts) {
         _recentProducts = _recentProducts.take(_maxRecentProducts).toList();
       }
-      
+
       // ذخیره در SharedPreferences
       final prefs = await SharedPreferences.getInstance();
       final key = '${_recentProductsKey}_${widget.businessId}';
       await prefs.setString(key, jsonEncode(_recentProducts));
-      
+
       if (mounted) {
         setState(() {});
       }
@@ -381,7 +409,10 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
       unawaited(
         QuickSalesParkedSalesStorage.save(
           widget.businessId,
-          QuickSalesParkedSalesBundle(activeId: _activeSaleId, sales: List.of(_sales)),
+          QuickSalesParkedSalesBundle(
+            activeId: _activeSaleId,
+            sales: List.of(_sales),
+          ),
         ),
       );
     }
@@ -391,7 +422,9 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
     _removeBarcodeOverlay();
     _mobileTabController.dispose();
     _barcodeController.dispose();
-    _documentDescriptionController.removeListener(_onParkedSaleDescriptionChanged);
+    _documentDescriptionController.removeListener(
+      _onParkedSaleDescriptionChanged,
+    );
     _documentDescriptionController.dispose();
     _globalDiscountValueController.dispose();
     _barcodeOverlayScrollController.removeListener(_onBarcodeOverlayScroll);
@@ -442,18 +475,25 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
         );
         _selectedCustomer = _anonymousCustomer;
         _defaultWarehouseId = settings['default_warehouse_id'];
-        _defaultCurrencyId = settings['default_currency_id'] ?? widget.authStore.currentBusiness?.defaultCurrency?.id;
+        _defaultCurrencyId =
+            settings['default_currency_id'] ??
+            widget.authStore.currentBusiness?.defaultCurrency?.id;
         _defaultPriceListId = settings['default_price_list_id'];
-        _selectedCashRegisterId = settings['default_cash_register_id']?.toString();
+        _selectedCashRegisterId = settings['default_cash_register_id']
+            ?.toString();
         _autoPrint = settings['auto_print'] ?? false;
-        _enableWarehouseDocument = settings['enable_warehouse_document'] ?? true;
-        _warehouseDocumentType = settings['warehouse_document_type'] ?? 'posted';
+        _enableWarehouseDocument =
+            settings['enable_warehouse_document'] ?? true;
+        _warehouseDocumentType =
+            settings['warehouse_document_type'] ?? 'posted';
         _showInventory = settings['show_inventory'] ?? true;
-        _showPurchasePrice = (settings['show_purchase_price'] ?? false) &&
+        _showPurchasePrice =
+            (settings['show_purchase_price'] ?? false) &&
             widget.authStore.canViewPurchasePrice();
         _printTemplateId = settings['print_template_id'];
         _printPaperSize = (settings['print_paper_size'] ?? '80mm')?.toString();
-        _autoCreatePaymentDocument = settings['auto_create_payment_document'] ?? true;
+        _autoCreatePaymentDocument =
+            settings['auto_create_payment_document'] ?? true;
         _settingsDefaultWarehouseId = _defaultWarehouseId;
         _settingsDefaultCashRegisterId = _selectedCashRegisterId;
         _settingsAutoCreatePaymentDocument = _autoCreatePaymentDocument;
@@ -499,12 +539,18 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
     try {
       final results = await Future.wait<dynamic>([
         BusinessApiService.getBusiness(widget.businessId),
-        CurrencyService(ApiClient()).listBusinessCurrencies(businessId: widget.businessId),
+        CurrencyService(
+          ApiClient(),
+        ).listBusinessCurrencies(businessId: widget.businessId),
       ]);
       if (!mounted) return;
       setState(() {
-        _globalDiscountPolicy = InvoiceGlobalDiscountPolicy.fromBusiness(results[0]);
-        _businessCurrenciesCache = List<Map<String, dynamic>>.from(results[1] as List);
+        _globalDiscountPolicy = InvoiceGlobalDiscountPolicy.fromBusiness(
+          results[0],
+        );
+        _businessCurrenciesCache = List<Map<String, dynamic>>.from(
+          results[1] as List,
+        );
         _applyCurrencyMetaFromCache();
       });
     } catch (_) {}
@@ -514,14 +560,26 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
     if (_parkedHydrated) _schedulePersistParkedSales();
   }
 
+  bool get _hasCustomPayments {
+    if (_payments.isEmpty) return false;
+    if (_cashFollowsTotal &&
+        _payments.length == 1 &&
+        _payments.first.type == TransactionType.cashRegister) {
+      return false;
+    }
+    return true;
+  }
+
   bool get _isActiveSaleBlank {
-    final isAnon = _selectedCustomer == null ||
-        (_anonymousCustomer != null && _selectedCustomer!.id == _anonymousCustomer!.id);
+    final isAnon =
+        _selectedCustomer == null ||
+        (_anonymousCustomer != null &&
+            _selectedCustomer!.id == _anonymousCustomer!.id);
     return _cartItems.isEmpty &&
         isAnon &&
         _documentDescriptionController.text.trim().isEmpty &&
         _globalDiscountValueController.text.trim().isEmpty &&
-        _payment == null;
+        !_hasCustomPayments;
   }
 
   bool get _shouldShowParkedSalesBar => _parkedHydrated && _sales.length > 1;
@@ -538,14 +596,19 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
     _captureActiveSaleIntoList();
     await QuickSalesParkedSalesStorage.save(
       widget.businessId,
-      QuickSalesParkedSalesBundle(activeId: _activeSaleId, sales: List.of(_sales)),
+      QuickSalesParkedSalesBundle(
+        activeId: _activeSaleId,
+        sales: List.of(_sales),
+      ),
     );
   }
 
   void _captureActiveSaleIntoList() {
     if (_activeSaleId.isEmpty) return;
     final existingIndex = _sales.indexWhere((s) => s.id == _activeSaleId);
-    final createdAt = existingIndex >= 0 ? _sales[existingIndex].createdAt : DateTime.now();
+    final createdAt = existingIndex >= 0
+        ? _sales[existingIndex].createdAt
+        : DateTime.now();
     final snap = _snapshotActiveSale(createdAt: createdAt);
     if (existingIndex >= 0) {
       _sales[existingIndex] = snap;
@@ -553,7 +616,9 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
       _sales.add(snap);
     }
     final anonId = _anonymousCustomer?.id;
-    _sales.removeWhere((s) => s.id != _activeSaleId && s.isBlank(anonymousCustomerId: anonId));
+    _sales.removeWhere(
+      (s) => s.id != _activeSaleId && s.isBlank(anonymousCustomerId: anonId),
+    );
   }
 
   QuickSalesParkedSale _snapshotActiveSale({DateTime? createdAt}) {
@@ -564,7 +629,8 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
       updatedAt: now,
       customer: _selectedCustomer,
       cartItems: _cartItems.map(QuickSalesParkedSale.cloneLine).toList(),
-      payment: _payment,
+      payments: List<InvoiceTransaction>.from(_payments),
+      cashFollowsTotal: _cashFollowsTotal,
       cashRegisterId: _selectedCashRegisterId,
       warehouseId: _defaultWarehouseId,
       documentDate: _documentDate,
@@ -593,8 +659,11 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
     }
     _selectedCustomer = customer;
     _cartItems = sale.cartItems.map(QuickSalesParkedSale.cloneLine).toList();
-    _payment = sale.payment;
-    _selectedCashRegisterId = sale.cashRegisterId ?? _settingsDefaultCashRegisterId;
+    _payments = List<InvoiceTransaction>.from(sale.payments);
+    _cashFollowsTotal = sale.cashFollowsTotal;
+    _shareRemainingEnabled = false;
+    _selectedCashRegisterId =
+        sale.cashRegisterId ?? _settingsDefaultCashRegisterId;
     _defaultWarehouseId = sale.warehouseId ?? _settingsDefaultWarehouseId;
     _documentDate = sale.documentDate;
     _documentDescriptionController.text = sale.documentDescription;
@@ -616,7 +685,9 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
   void _applyBlankSaleState() {
     _selectedCustomer = _anonymousCustomer;
     _cartItems = [];
-    _payment = null;
+    _payments = [];
+    _cashFollowsTotal = true;
+    _shareRemainingEnabled = false;
     _selectedCashRegisterId = _settingsDefaultCashRegisterId;
     _defaultWarehouseId = _settingsDefaultWarehouseId;
     _documentDate = DateTime.now();
@@ -672,7 +743,10 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
     if (_isSaving) return;
     final t = AppLocalizations.of(context);
     if (_isActiveSaleBlank) {
-      SnackBarHelper.show(context, message: t.quickSalesParkedNewSaleAlreadyEmpty);
+      SnackBarHelper.show(
+        context,
+        message: t.quickSalesParkedNewSaleAlreadyEmpty,
+      );
       return;
     }
     _captureActiveSaleIntoList();
@@ -768,7 +842,8 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
 
   List<QuickSalesParkedSaleChipData> _parkedSaleChipData(AppLocalizations t) {
     return [
-      for (var i = 0; i < _sales.length; i++) _chipForSale(_sales[i], index: i, t: t),
+      for (var i = 0; i < _sales.length; i++)
+        _chipForSale(_sales[i], index: i, t: t),
     ];
   }
 
@@ -782,7 +857,8 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
     final customerName = customer?.name.trim() ?? '';
     final itemCount = isActive ? _cartItems.length : sale.itemCount;
     final total = isActive ? _totalAmount : sale.totalAmount;
-    final isAnon = customer == null ||
+    final isAnon =
+        customer == null ||
         (_anonymousCustomer != null && customer.id == _anonymousCustomer!.id);
     final isBlank = isActive
         ? _isActiveSaleBlank
@@ -793,7 +869,9 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
     } else if (itemCount > 0) {
       title = t.quickSalesParkedSaleFallback(index + 1);
     } else if (isAnon) {
-      title = isBlank ? t.quickSalesParkedNewSale : t.quickSalesParkedAnonymousCustomer;
+      title = isBlank
+          ? t.quickSalesParkedNewSale
+          : t.quickSalesParkedAnonymousCustomer;
     } else {
       title = t.quickSalesParkedSaleFallback(index + 1);
     }
@@ -807,7 +885,9 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
       isActive: isActive,
       isBlank: isBlank,
       showDiscard: _sales.length > 1 || !isBlank,
-      customerInitial: (!isAnon && customerName.isNotEmpty) ? customerName : null,
+      customerInitial: (!isAnon && customerName.isNotEmpty)
+          ? customerName
+          : null,
     );
   }
 
@@ -820,7 +900,8 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
           sales: _parkedSaleChipData(t),
           compact: compact,
           enabled: !_isSaving,
-          newSaleEnabled: !_isActiveSaleBlank && _sales.length < _maxParkedSales,
+          newSaleEnabled:
+              !_isActiveSaleBlank && _sales.length < _maxParkedSales,
           newSaleLabel: t.quickSalesParkedNewSale,
           newSaleTooltip: _isActiveSaleBlank
               ? t.quickSalesParkedNewSaleAlreadyEmpty
@@ -853,7 +934,8 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
   }
 
   void _applyShareDefaultsFromSettings(Map<String, dynamic> settings) {
-    _shareOnlinePaymentEnabled = settings['default_share_online_payment'] ?? true;
+    _shareOnlinePaymentEnabled =
+        settings['default_share_online_payment'] ?? true;
     final gatewayRaw = settings['default_share_gateway_id'];
     if (gatewayRaw is int) {
       _shareGatewayId = gatewayRaw;
@@ -862,7 +944,8 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
     } else {
       _shareGatewayId = int.tryParse('$gatewayRaw');
     }
-    _shareExpiryHours = (settings['default_share_expiry_hours'] as num?)?.toInt() ?? 168;
+    _shareExpiryHours =
+        (settings['default_share_expiry_hours'] as num?)?.toInt() ?? 168;
     final channels = settings['default_share_channels'];
     if (channels is List) {
       final set = channels.map((e) => e.toString()).toSet();
@@ -877,16 +960,22 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
     if (!mounted) return;
     setState(() => _loadingShareGateways = true);
     try {
-      final gateways = await _paymentGatewayService.listBusinessGateways(widget.businessId);
+      final gateways = await _paymentGatewayService.listBusinessGateways(
+        widget.businessId,
+      );
       if (!mounted) return;
 
       final preserveShareChoices = _parkedHydrated;
 
       // اگر در تنظیمات فروش سریع درگاه تعریف نشده، از تنظیمات عمومی اشتراک فاکتور استفاده کن
       if (!preserveShareChoices &&
-          (_shareGatewayId == null || _settings?['default_share_gateway_id'] == null)) {
+          (_shareGatewayId == null ||
+              _settings?['default_share_gateway_id'] == null)) {
         try {
-          final shareSettings = await BusinessApiService.getInvoiceShareSettings(widget.businessId);
+          final shareSettings =
+              await BusinessApiService.getInvoiceShareSettings(
+                widget.businessId,
+              );
           if (_settings?['default_share_gateway_id'] == null) {
             final g = shareSettings['default_online_payment_gateway_id'];
             if (g is int) {
@@ -938,24 +1027,139 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
   void _onAutoCreatePaymentDocumentChanged(bool value) {
     setState(() {
       _autoCreatePaymentDocument = value;
-      if (value) {
-        _restoreCashPaymentFromRegister();
-      } else {
-        _payment = null;
+      _shareRemainingEnabled = false;
+      _payments = [];
+      _cashFollowsTotal = true;
+      if (!value) {
         _syncShareChannelDefaults();
       }
     });
   }
 
-  void _restoreCashPaymentFromRegister() {
-    if (_selectedCashRegisterId == null || _totalAmount <= 0) return;
-    _payment = InvoiceTransaction(
-      id: DateTime.now().millisecondsSinceEpoch.toString(),
-      type: TransactionType.cashRegister,
-      cashRegisterId: _selectedCashRegisterId,
-      transactionDate: DateTime.now(),
-      amount: _totalAmount,
-    );
+  num get _paidAmount => _payments.fold<num>(0, (sum, p) => sum + p.amount);
+
+  num get _paymentEpsilon {
+    if (_invoiceCurrencyDecimalPlaces <= 0) return 0.5;
+    var e = 1.0;
+    for (var i = 0; i < _invoiceCurrencyDecimalPlaces; i++) {
+      e /= 10;
+    }
+    return e / 2;
+  }
+
+  num get _remainingAmount {
+    if (!_autoCreatePaymentDocument) return _totalAmount;
+    final raw = _totalAmount - _paidAmount;
+    if (raw.abs() <= _paymentEpsilon) return 0;
+    return raw;
+  }
+
+  bool get _isOverpaid =>
+      _autoCreatePaymentDocument &&
+      _paidAmount > _totalAmount + _paymentEpsilon;
+
+  bool get _isAnonymousSelected {
+    if (_selectedCustomer == null || _anonymousCustomer == null) {
+      return _selectedCustomer == null;
+    }
+    return _selectedCustomer!.id == _anonymousCustomer!.id;
+  }
+
+  bool get _shouldShareAfterSave {
+    if (!_autoCreatePaymentDocument) return true;
+    if (_remainingAmount <= 0 || _isOverpaid) return false;
+    return _shareRemainingEnabled;
+  }
+
+  String get _paymentCurrencyUnit =>
+      currencyUnitLabelForBusinessCurrencyIdOrNull(
+        _defaultCurrencyId,
+        _businessCurrenciesCache,
+      ) ??
+      'ریال';
+
+  void _onPaymentsChanged(List<InvoiceTransaction> payments) {
+    setState(() {
+      _payments = payments;
+      InvoiceTransaction? cash;
+      for (final p in payments) {
+        if (p.type == TransactionType.cashRegister) {
+          cash = p;
+          break;
+        }
+      }
+      if (cash?.cashRegisterId != null && cash!.cashRegisterId!.isNotEmpty) {
+        _selectedCashRegisterId = cash.cashRegisterId;
+      }
+      if (_remainingAmount <= 0) {
+        _shareRemainingEnabled = false;
+      }
+    });
+  }
+
+  List<Map<String, dynamic>> _buildPaymentPayloads() {
+    if (!_autoCreatePaymentDocument) return const [];
+    final out = <Map<String, dynamic>>[];
+    for (final p in _payments) {
+      if (p.amount <= 0) continue;
+      final map = <String, dynamic>{
+        'transaction_type': p.type.value,
+        'type': p.type.value,
+        'amount': p.amount,
+        'transaction_date': p.transactionDate.toIso8601String(),
+      };
+      switch (p.type) {
+        case TransactionType.cashRegister:
+          final id = int.tryParse(p.cashRegisterId ?? '');
+          if (id != null) map['cash_register_id'] = id;
+          if (p.cashRegisterName != null) {
+            map['cash_register_name'] = p.cashRegisterName;
+          }
+          break;
+        case TransactionType.bank:
+          final id = int.tryParse(p.bankId ?? '');
+          if (id != null) map['bank_id'] = id;
+          if (p.bankName != null) map['bank_name'] = p.bankName;
+          break;
+        case TransactionType.check:
+          final id = int.tryParse(p.checkId ?? '');
+          if (id != null) map['check_id'] = id;
+          if (p.checkNumber != null) map['check_number'] = p.checkNumber;
+          break;
+        default:
+          break;
+      }
+      out.add(map);
+    }
+    return out;
+  }
+
+  String? _validatePayments(AppLocalizations t) {
+    if (!_autoCreatePaymentDocument) return null;
+    if (_isOverpaid) return t.quickSalesPayOverpaidError;
+    for (final p in _payments) {
+      if (p.amount <= 0) continue;
+      switch (p.type) {
+        case TransactionType.cashRegister:
+          if (int.tryParse(p.cashRegisterId ?? '') == null) {
+            return t.quickSalesPaySelectCashRegister;
+          }
+          break;
+        case TransactionType.bank:
+          if (int.tryParse(p.bankId ?? '') == null) {
+            return t.quickSalesPaySelectBank;
+          }
+          break;
+        case TransactionType.check:
+          if (int.tryParse(p.checkId ?? '') == null) {
+            return t.quickSalesPaySelectCheck;
+          }
+          break;
+        default:
+          return t.quickSalesPayNeedDestination;
+      }
+    }
+    return null;
   }
 
   Future<Map<String, dynamic>?> _sendInvoiceShareNotification({
@@ -1018,8 +1222,9 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
         invoiceId: invoiceId,
         expiresInHours: _shareExpiryHours,
         onlinePaymentEnabled: _shareOnlinePaymentEnabled,
-        onlinePaymentGatewayId:
-            _shareOnlinePaymentEnabled ? _shareGatewayId : null,
+        onlinePaymentGatewayId: _shareOnlinePaymentEnabled
+            ? _shareGatewayId
+            : null,
       );
       final shortUrl = link['short_url']?.toString();
       if (shortUrl == null || shortUrl.isEmpty) {
@@ -1028,7 +1233,10 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
       }
       notes.add(t.quickSalesShareLinkCreated);
 
-      final canNotify = widget.authStore.hasBusinessPermission('notifications', 'send');
+      final canNotify = widget.authStore.hasBusinessPermission(
+        'notifications',
+        'send',
+      );
 
       if (_shareSendSms) {
         if (_selectedCustomerPhone == null) {
@@ -1046,12 +1254,16 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
             );
             if (!mounted) return notes;
             final result = response?['data'] as Map<String, dynamic>?;
-            final smsResult = (result?['results'] as Map<String, dynamic>?)?['sms'] as Map<String, dynamic>?;
+            final smsResult =
+                (result?['results'] as Map<String, dynamic>?)?['sms']
+                    as Map<String, dynamic>?;
             if (smsResult?['success'] == true) {
               notes.add(t.personShareSmsSent);
             } else {
               final error = smsResult?['error']?.toString() ?? '';
-              if (error.contains('قالب') || error.contains('فعال') || error.contains('template')) {
+              if (error.contains('قالب') ||
+                  error.contains('فعال') ||
+                  error.contains('template')) {
                 notes.add(t.quickSalesShareNoTemplateHint);
               } else if (error.isNotEmpty) {
                 notes.add(error);
@@ -1080,12 +1292,15 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
             if (!mounted) return notes;
             final result = response?['data'] as Map<String, dynamic>?;
             final emailResult =
-                (result?['results'] as Map<String, dynamic>?)?['email'] as Map<String, dynamic>?;
+                (result?['results'] as Map<String, dynamic>?)?['email']
+                    as Map<String, dynamic>?;
             if (emailResult?['success'] == true) {
               notes.add(t.quickSalesShareEmailSent);
             } else {
               final error = emailResult?['error']?.toString() ?? '';
-              if (error.contains('قالب') || error.contains('فعال') || error.contains('template')) {
+              if (error.contains('قالب') ||
+                  error.contains('فعال') ||
+                  error.contains('template')) {
                 notes.add(t.quickSalesShareNoTemplateHint);
               } else if (error.isNotEmpty) {
                 notes.add(error);
@@ -1103,7 +1318,9 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
 
       return notes;
     } catch (e) {
-      notes.add('${t.quickSalesShareLinkFailed}: ${ErrorExtractor.forContext(e, context)}');
+      notes.add(
+        '${t.quickSalesShareLinkFailed}: ${ErrorExtractor.forContext(e, context)}',
+      );
       return notes;
     }
   }
@@ -1140,7 +1357,8 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
       if (mounted) {
         SnackBarHelper.show(
           context,
-          message: 'خطا در افزودن محصول: ${ErrorExtractor.forContext(e, context)}',
+          message:
+              'خطا در افزودن محصول: ${ErrorExtractor.forContext(e, context)}',
           isError: true,
         );
       }
@@ -1182,103 +1400,119 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
     setState(() => _barcodeSearching = true);
     try {
       try {
-      // جستجو در کالاهای یونیک
-      final instanceData = await _warehouseService.searchInstanceByCode(
-        businessId: widget.businessId,
-        code: code.trim(),
-      );
-      
-      // بررسی اینکه آیا چند نتیجه برگردانده شده یا نه
-      final multipleResults = instanceData['multiple_results'] == true;
-      final items = instanceData['items'] as List?;
-      
-      if (multipleResults && items != null && items.isNotEmpty) {
-        // اگر چند نتیجه پیدا شد، دیالوگ انتخاب نمایش بده
-        if (!mounted) return;
-        final selected = await showDialog<Map<String, dynamic>>(
-          context: context,
-          builder: (context) => _InstanceSelectionDialog(
-            instances: items,
-            searchCode: code.trim(),
-          ),
-        );
-        
-        if (selected != null) {
-          final productId = selected['product_id'] as int?;
-          if (productId != null) {
-            final product = await _productService.getProduct(
-              businessId: widget.businessId,
-              productId: productId,
-            );
-            final instanceId = (selected['id'] as num?)?.toInt();
-            final instanceWarehouseId = (selected['warehouse_id'] as num?)?.toInt() ??
-                (selected['warehouseId'] as num?)?.toInt() ??
-                int.tryParse('${selected['warehouse_id'] ?? selected['warehouseId'] ?? ''}');
-            await _addToCart(product, instanceId: instanceId, instanceWarehouseId: instanceWarehouseId, skipHydrate: true);
-            await _saveRecentProduct(product);
-            _barcodeController.clear();
-            _barcodeFocus.requestFocus();
-            // پاک کردن جستجوی ناموفق قبلی
-            if (mounted) {
-              setState(() {
-                _lastFailedSearchQuery = null;
-              });
-            }
-            if (mounted) {
-              SnackBarHelper.show(
-                context,
-                message: '${product['name'] ?? 'محصول'} به سبد اضافه شد',
-              );
-            }
-            return;
-          }
-        }
-        // اگر دیالوگ انتخاب بسته شد بدون انتخاب، جستجوی ناموفق را ثبت کن
-        if (mounted) {
-          setState(() {
-            _lastFailedSearchQuery = _canCreateProducts ? code.trim() : null;
-          });
-        }
-        return;
-      }
-      
-      // اگر یک نتیجه یا نتیجه مستقیم برگردانده شد
-      final productId = instanceData['product_id'] as int?;
-      if (productId != null) {
-        // دریافت اطلاعات محصول
-        final product = await _productService.getProduct(
+        // جستجو در کالاهای یونیک
+        final instanceData = await _warehouseService.searchInstanceByCode(
           businessId: widget.businessId,
-          productId: productId,
+          code: code.trim(),
         );
-        
-        // افزودن به سبد
-        final instanceId = (instanceData['id'] as num?)?.toInt();
-        final instanceWarehouseId = (instanceData['warehouse_id'] as num?)?.toInt() ??
-            (instanceData['warehouseId'] as num?)?.toInt() ??
-            int.tryParse('${instanceData['warehouse_id'] ?? instanceData['warehouseId'] ?? ''}');
-        await _addToCart(product, instanceId: instanceId, instanceWarehouseId: instanceWarehouseId, skipHydrate: true);
-        await _saveRecentProduct(product);
-        _barcodeController.clear();
-        _barcodeFocus.requestFocus();
-        // پاک کردن جستجوی ناموفق قبلی
-        if (mounted) {
-          setState(() {
-            _lastFailedSearchQuery = null;
-          });
-        }
-        // فیدبک بصری
-        if (mounted) {
-          SnackBarHelper.show(
-            context,
-            message: '${product['name'] ?? 'محصول'} به سبد اضافه شد',
+
+        // بررسی اینکه آیا چند نتیجه برگردانده شده یا نه
+        final multipleResults = instanceData['multiple_results'] == true;
+        final items = instanceData['items'] as List?;
+
+        if (multipleResults && items != null && items.isNotEmpty) {
+          // اگر چند نتیجه پیدا شد، دیالوگ انتخاب نمایش بده
+          if (!mounted) return;
+          final selected = await showDialog<Map<String, dynamic>>(
+            context: context,
+            builder: (context) => _InstanceSelectionDialog(
+              instances: items,
+              searchCode: code.trim(),
+            ),
           );
+
+          if (selected != null) {
+            final productId = selected['product_id'] as int?;
+            if (productId != null) {
+              final product = await _productService.getProduct(
+                businessId: widget.businessId,
+                productId: productId,
+              );
+              final instanceId = (selected['id'] as num?)?.toInt();
+              final instanceWarehouseId =
+                  (selected['warehouse_id'] as num?)?.toInt() ??
+                  (selected['warehouseId'] as num?)?.toInt() ??
+                  int.tryParse(
+                    '${selected['warehouse_id'] ?? selected['warehouseId'] ?? ''}',
+                  );
+              await _addToCart(
+                product,
+                instanceId: instanceId,
+                instanceWarehouseId: instanceWarehouseId,
+                skipHydrate: true,
+              );
+              await _saveRecentProduct(product);
+              _barcodeController.clear();
+              _barcodeFocus.requestFocus();
+              // پاک کردن جستجوی ناموفق قبلی
+              if (mounted) {
+                setState(() {
+                  _lastFailedSearchQuery = null;
+                });
+              }
+              if (mounted) {
+                SnackBarHelper.show(
+                  context,
+                  message: '${product['name'] ?? 'محصول'} به سبد اضافه شد',
+                );
+              }
+              return;
+            }
+          }
+          // اگر دیالوگ انتخاب بسته شد بدون انتخاب، جستجوی ناموفق را ثبت کن
+          if (mounted) {
+            setState(() {
+              _lastFailedSearchQuery = _canCreateProducts ? code.trim() : null;
+            });
+          }
+          return;
         }
-        return;
-      }
+
+        // اگر یک نتیجه یا نتیجه مستقیم برگردانده شد
+        final productId = instanceData['product_id'] as int?;
+        if (productId != null) {
+          // دریافت اطلاعات محصول
+          final product = await _productService.getProduct(
+            businessId: widget.businessId,
+            productId: productId,
+          );
+
+          // افزودن به سبد
+          final instanceId = (instanceData['id'] as num?)?.toInt();
+          final instanceWarehouseId =
+              (instanceData['warehouse_id'] as num?)?.toInt() ??
+              (instanceData['warehouseId'] as num?)?.toInt() ??
+              int.tryParse(
+                '${instanceData['warehouse_id'] ?? instanceData['warehouseId'] ?? ''}',
+              );
+          await _addToCart(
+            product,
+            instanceId: instanceId,
+            instanceWarehouseId: instanceWarehouseId,
+            skipHydrate: true,
+          );
+          await _saveRecentProduct(product);
+          _barcodeController.clear();
+          _barcodeFocus.requestFocus();
+          // پاک کردن جستجوی ناموفق قبلی
+          if (mounted) {
+            setState(() {
+              _lastFailedSearchQuery = null;
+            });
+          }
+          // فیدبک بصری
+          if (mounted) {
+            SnackBarHelper.show(
+              context,
+              message: '${product['name'] ?? 'محصول'} به سبد اضافه شد',
+            );
+          }
+          return;
+        }
       } catch (e) {
         // اگر کالای یونیک پیدا نشد، در محصولات عادی جستجو می‌کنیم
       }
-    
+
       // جستجو در محصولات عادی (از طریق کد، بارکد یا نام)
       final categoryIds = _getCategoryIdsForFilter(_selectedCategoryId);
       final products = await _productService.searchProducts(
@@ -1289,17 +1523,21 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
         categoryIds: categoryIds.isNotEmpty ? categoryIds : null,
       );
       await _hydrateProductMapsBatched(products);
-      
+
       if (products.isEmpty) {
         if (mounted) {
           setState(() {
             _lastFailedSearchQuery = _canCreateProducts ? code.trim() : null;
           });
-          SnackBarHelper.show(context, message: 'محصولی یافت نشد', isError: true);
+          SnackBarHelper.show(
+            context,
+            message: 'محصولی یافت نشد',
+            isError: true,
+          );
         }
         return;
       }
-      
+
       // اگر چند نتیجه پیدا شد، دیالوگ انتخاب نمایش بده
       if (products.length > 1) {
         if (!mounted) return;
@@ -1310,7 +1548,7 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
             searchCode: code.trim(),
           ),
         );
-        
+
         if (selected != null) {
           await _addToCart(selected, skipHydrate: true);
           await _saveRecentProduct(selected);
@@ -1339,7 +1577,7 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
         }
         return;
       }
-      
+
       // اگر فقط یک نتیجه پیدا شد، مستقیماً اضافه کن
       final product = products.first;
       await _addToCart(product, skipHydrate: true);
@@ -1396,20 +1634,20 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
           onSuccess: () {},
         ),
       );
-      
+
       if (!mounted) return;
-      
+
       // اگر کالا با موفقیت ثبت شد
       if (result != null && result != false) {
         int? newProductId;
-        
+
         // استخراج product_id از نتیجه
         if (result is int) {
           newProductId = result;
         } else if (result is Map) {
           newProductId = result['id'] as int?;
         }
-        
+
         // اگر product_id را داریم، کالا را دریافت و به سبد اضافه کن
         if (newProductId != null) {
           try {
@@ -1417,20 +1655,21 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
               businessId: widget.businessId,
               productId: newProductId,
             );
-            
+
             await _addToCart(product, skipHydrate: true);
             await _saveRecentProduct(product);
-            
+
             // پاک کردن جستجوی ناموفق و فیلد جستجو
             setState(() {
               _lastFailedSearchQuery = null;
             });
             _barcodeController.clear();
             _barcodeFocus.requestFocus();
-            
+
             SnackBarHelper.show(
               context,
-              message: '${product['name'] ?? 'محصول'} با موفقیت اضافه شد و به سبد خرید اضافه گردید',
+              message:
+                  '${product['name'] ?? 'محصول'} با موفقیت اضافه شد و به سبد خرید اضافه گردید',
             );
           } catch (e) {
             SnackBarHelper.show(
@@ -1447,10 +1686,7 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
           });
           _barcodeController.clear();
           _barcodeFocus.requestFocus();
-          SnackBarHelper.show(
-            context,
-            message: 'کالا با موفقیت ثبت شد',
-          );
+          SnackBarHelper.show(context, message: 'کالا با موفقیت ثبت شد');
         }
       } else {
         // اگر دیالوگ بسته شد بدون ثبت، جستجوی ناموفق را نگه دار
@@ -1486,7 +1722,7 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
     if (_defaultPriceListId == null || _defaultCurrencyId == null) {
       return 0;
     }
-    
+
     try {
       final items = await _priceListService.listItems(
         businessId: widget.businessId,
@@ -1494,13 +1730,13 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
         productId: productId,
         currencyId: _defaultCurrencyId,
       );
-      
+
       // جستجوی قیمت برای واحد اصلی (unit_id == null)
       for (final item in items) {
         final unitId = item['unit_id'] as int?;
         final priceValue = item['price'];
         num? price;
-        
+
         // تبدیل قیمت به num
         if (priceValue == null) {
           price = null;
@@ -1511,7 +1747,7 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
         } else {
           price = num.tryParse(priceValue.toString());
         }
-        
+
         // اگر unit_id null باشد، یعنی قیمت برای واحد اصلی است
         if (unitId == null && price != null && price > 0) {
           _priceListCache[productId] = price;
@@ -1527,7 +1763,8 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
     return 0;
   }
 
-  bool get _hasUniqueItemsInCart => _cartItems.any((it) => it.extraInfo?['instance_id'] != null);
+  bool get _hasUniqueItemsInCart =>
+      _cartItems.any((it) => it.extraInfo?['instance_id'] != null);
 
   /// تغییر انبار انتخابی برای اقلام فاکتور
   /// - مقدار اولیه از تنظیمات (`_defaultWarehouseId`) است
@@ -1536,13 +1773,17 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
     // اگر کالای یونیک در سبد داریم، برای جلوگیری از چند-انباره شدن فاکتور، تغییر را محدود می‌کنیم
     if (_hasUniqueItemsInCart && newWarehouseId != null) {
       final conflictingUnique = _cartItems.firstWhere(
-        (it) => it.extraInfo?['instance_id'] != null && it.warehouseId != null && it.warehouseId != newWarehouseId,
+        (it) =>
+            it.extraInfo?['instance_id'] != null &&
+            it.warehouseId != null &&
+            it.warehouseId != newWarehouseId,
         orElse: () => InvoiceLineItem(),
       );
       if (conflictingUnique.productId != null) {
         SnackBarHelper.show(
           context,
-          message: 'در سبد کالاهای یونیک از انبار دیگری وجود دارد. ابتدا آن را حذف کنید یا انبار همان کالا را انتخاب کنید.',
+          message:
+              'در سبد کالاهای یونیک از انبار دیگری وجود دارد. ابتدا آن را حذف کنید یا انبار همان کالا را انتخاب کنید.',
           isError: true,
         );
         return;
@@ -1586,7 +1827,9 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
   bool _shouldHydrateProductCode(Map<String, dynamic> product) {
     final id = _productIntId(product);
     if (id == null) return false;
-    final code = number_utils.toEnglishDigits((product['code']?.toString() ?? '').trim());
+    final code = number_utils.toEnglishDigits(
+      (product['code']?.toString() ?? '').trim(),
+    );
     if (code.isEmpty) return true;
     return code == id.toString();
   }
@@ -1625,16 +1868,17 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
     }
   }
 
-  Future<void> _hydrateProductMapsBatched(List<Map<String, dynamic>> items, {int batch = 6}) async {
+  Future<void> _hydrateProductMapsBatched(
+    List<Map<String, dynamic>> items, {
+    int batch = 6,
+  }) async {
     if (items.isEmpty) return;
     for (var i = 0; i < items.length; i += batch) {
       if (!mounted) return;
       final end = i + batch > items.length ? items.length : i + batch;
-      await Future.wait(
-        <Future<void>>[
-          for (var j = i; j < end; j++) _hydrateProductCodeIfNeeded(items[j]),
-        ],
-      );
+      await Future.wait(<Future<void>>[
+        for (var j = i; j < end; j++) _hydrateProductCodeIfNeeded(items[j]),
+      ]);
     }
   }
 
@@ -1652,92 +1896,99 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
 
     setState(() => _addingProductId = productId);
     try {
-    
-    final trackInventory = product['track_inventory'] == true;
-    
-    // بررسی اینکه آیا محصول در سبد وجود دارد (فقط برای محصولات غیر یونیک)
-    if (instanceId == null) {
-      final existingIndex = _cartItems.indexWhere(
-        (item) => item.productId == productId && item.extraInfo?['instance_id'] == null,
-      );
-      
-      if (existingIndex != -1) {
-        // افزایش تعداد محصول موجود
-        setState(() {
-          final existingItem = _cartItems[existingIndex];
-          _cartItems[existingIndex] = existingItem.copyWith(
-            quantity: existingItem.quantity + 1,
-          );
-        });
-        // بارگذاری موجودی اگر لازم باشد و نمایش موجودی فعال باشد
-        if (trackInventory && _showInventory) {
-          _scheduleStockLoads([productId]);
+      final trackInventory = product['track_inventory'] == true;
+
+      // بررسی اینکه آیا محصول در سبد وجود دارد (فقط برای محصولات غیر یونیک)
+      if (instanceId == null) {
+        final existingIndex = _cartItems.indexWhere(
+          (item) =>
+              item.productId == productId &&
+              item.extraInfo?['instance_id'] == null,
+        );
+
+        if (existingIndex != -1) {
+          // افزایش تعداد محصول موجود
+          setState(() {
+            final existingItem = _cartItems[existingIndex];
+            _cartItems[existingIndex] = existingItem.copyWith(
+              quantity: existingItem.quantity + 1,
+            );
+          });
+          // بارگذاری موجودی اگر لازم باشد و نمایش موجودی فعال باشد
+          if (trackInventory && _showInventory) {
+            _scheduleStockLoads([productId]);
+          }
+          return;
         }
-        return;
       }
-    }
-    
-    // تلاش برای دریافت قیمت از لیست قیمت
-    num unitPrice = 0.0;
-    String unitPriceSource = 'base';
-    
-    if (_defaultPriceListId != null && _defaultCurrencyId != null) {
-      final priceFromList = await _getPriceFromPriceList(productId);
-      if (priceFromList > 0) {
-        unitPrice = priceFromList;
-        unitPriceSource = 'priceList';
+
+      // تلاش برای دریافت قیمت از لیست قیمت
+      num unitPrice = 0.0;
+      String unitPriceSource = 'base';
+
+      if (_defaultPriceListId != null && _defaultCurrencyId != null) {
+        final priceFromList = await _getPriceFromPriceList(productId);
+        if (priceFromList > 0) {
+          unitPrice = priceFromList;
+          unitPriceSource = 'priceList';
+        }
       }
-    }
-    
-    // اگر قیمت از لیست قیمت پیدا نشد یا صفر بود، از قیمت پایه استفاده کن
-    if (unitPrice == 0) {
-      unitPrice = _toNum(product['base_sales_price'] ?? product['sales_price']);
-      unitPriceSource = 'base';
-    }
-    
-    final lineItem = InvoiceLineItem(
-      productId: productId,
-      productCode: _quickSalesDisplayProductBusinessCode(product) ?? product['code']?.toString(),
-      productName: product['name']?.toString(),
-      quantity: instanceId != null ? 1 : 1, // برای کالاهای یونیک همیشه 1
-      unitPrice: unitPrice,
-      unitPriceSource: unitPriceSource,
-      discountType: 'amount',
-      discountValue: 0,
-      taxRate: _toNum(product['sales_tax_rate'] ?? product['tax_rate']),
-      trackInventory: trackInventory,
-      warehouseId: instanceWarehouseId ?? _defaultWarehouseId,
-      basePurchasePriceMainUnit: product['base_purchase_price'] != null
-          ? _toNum(product['base_purchase_price'])
-          : null,
-      extraInfo: instanceId != null
-          ? {
-              'instance_id': instanceId,
-              if (instanceWarehouseId != null) 'instance_warehouse_id': instanceWarehouseId,
-            }
-          : null,
-    );
-    
-    setState(() {
-      _cartItems.add(lineItem);
-    });
-    
-    // بارگذاری موجودی اگر لازم باشد و نمایش موجودی فعال باشد
-    if (trackInventory && instanceId == null && _showInventory) {
-      _scheduleStockLoads([productId]);
-    }
+
+      // اگر قیمت از لیست قیمت پیدا نشد یا صفر بود، از قیمت پایه استفاده کن
+      if (unitPrice == 0) {
+        unitPrice = _toNum(
+          product['base_sales_price'] ?? product['sales_price'],
+        );
+        unitPriceSource = 'base';
+      }
+
+      final lineItem = InvoiceLineItem(
+        productId: productId,
+        productCode:
+            _quickSalesDisplayProductBusinessCode(product) ??
+            product['code']?.toString(),
+        productName: product['name']?.toString(),
+        quantity: instanceId != null ? 1 : 1, // برای کالاهای یونیک همیشه 1
+        unitPrice: unitPrice,
+        unitPriceSource: unitPriceSource,
+        discountType: 'amount',
+        discountValue: 0,
+        taxRate: _toNum(product['sales_tax_rate'] ?? product['tax_rate']),
+        trackInventory: trackInventory,
+        warehouseId: instanceWarehouseId ?? _defaultWarehouseId,
+        basePurchasePriceMainUnit: product['base_purchase_price'] != null
+            ? _toNum(product['base_purchase_price'])
+            : null,
+        extraInfo: instanceId != null
+            ? {
+                'instance_id': instanceId,
+                if (instanceWarehouseId != null)
+                  'instance_warehouse_id': instanceWarehouseId,
+              }
+            : null,
+      );
+
+      setState(() {
+        _cartItems.add(lineItem);
+      });
+
+      // بارگذاری موجودی اگر لازم باشد و نمایش موجودی فعال باشد
+      if (trackInventory && instanceId == null && _showInventory) {
+        _scheduleStockLoads([productId]);
+      }
     } finally {
       if (mounted && _addingProductId == productId) {
         setState(() => _addingProductId = null);
       }
     }
   }
-  
+
   void _scheduleStockLoads(Iterable<int> productIds) {
     if (!_showInventory || _defaultWarehouseId == null) return;
     var scheduled = false;
     for (final productId in productIds) {
-      if (_productStocks.containsKey(productId) || _loadingStockProductIds.contains(productId)) {
+      if (_productStocks.containsKey(productId) ||
+          _loadingStockProductIds.contains(productId)) {
         continue;
       }
       _pendingStockProductIds.add(productId);
@@ -1751,7 +2002,9 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
   }
 
   Future<void> _flushPendingStockLoads() async {
-    if (!_showInventory || _defaultWarehouseId == null || _pendingStockProductIds.isEmpty) {
+    if (!_showInventory ||
+        _defaultWarehouseId == null ||
+        _pendingStockProductIds.isEmpty) {
       return;
     }
     final productIds = _pendingStockProductIds.toList();
@@ -1800,22 +2053,27 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
     if (!_showInventory) {
       return;
     }
-    
+
     final trackInventoryProductIds = _cartItems
-        .where((item) => item.trackInventory && item.productId != null && item.extraInfo?['instance_id'] == null)
+        .where(
+          (item) =>
+              item.trackInventory &&
+              item.productId != null &&
+              item.extraInfo?['instance_id'] == null,
+        )
         .map((item) => item.productId!)
         .toSet()
         .toList();
-    
+
     if (trackInventoryProductIds.isEmpty || _defaultWarehouseId == null) {
       return;
     }
-    
+
     setState(() {
       _loadingStocksBulk = true;
       _loadingStockProductIds.addAll(trackInventoryProductIds);
     });
-    
+
     try {
       final stockReport = await _warehouseService.getStockReport(
         businessId: widget.businessId,
@@ -1826,17 +2084,17 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
           'include_zero': true,
         },
       );
-      
+
       final items = List<dynamic>.from(stockReport['items'] ?? []);
       final stocksMap = <int, num>{};
-      
+
       for (final item in items) {
         final pid = (item['product_id'] as num?)?.toInt();
         if (pid != null) {
           stocksMap[pid] = (item['quantity'] as num?) ?? 0;
         }
       }
-      
+
       if (mounted) {
         setState(() {
           _productStocks = stocksMap;
@@ -1858,9 +2116,11 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
     if (productId == null) return null;
     return _productStocks[productId];
   }
-  
+
   bool _hasInsufficientStock(InvoiceLineItem item) {
-    if (!item.trackInventory || item.productId == null || item.extraInfo?['instance_id'] != null) {
+    if (!item.trackInventory ||
+        item.productId == null ||
+        item.extraInfo?['instance_id'] != null) {
       return false; // کالاهای یونیک یا بدون کنترل موجودی
     }
     final stock = _getProductStock(item.productId);
@@ -1872,27 +2132,30 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
     setState(() {
       final item = _cartItems[index];
       _cartItems.removeAt(index);
-      
+
       // اگر آخرین مورد از این محصول حذف شد، موجودی را هم حذف کن
       final hasMoreOfProduct = _cartItems.any(
-        (cartItem) => cartItem.productId == item.productId && 
-                     cartItem.extraInfo?['instance_id'] == null,
+        (cartItem) =>
+            cartItem.productId == item.productId &&
+            cartItem.extraInfo?['instance_id'] == null,
       );
       if (!hasMoreOfProduct && item.productId != null) {
         _productStocks.remove(item.productId);
       }
     });
   }
-  
+
   Future<void> _clearCart() async {
     if (_cartItems.isEmpty) return;
-    
+
     // نمایش دیالوگ تأیید
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('پاک کردن سبد'),
-        content: Text('آیا مطمئن هستید که می‌خواهید همه ${_cartItems.length} محصول را از سبد حذف کنید؟'),
+        content: Text(
+          'آیا مطمئن هستید که می‌خواهید همه ${_cartItems.length} محصول را از سبد حذف کنید؟',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
@@ -1909,12 +2172,11 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
         ],
       ),
     );
-    
+
     if (confirmed == true && mounted) {
       setState(() {
         _cartItems.clear();
         _productStocks.clear();
-        _payment = null;
         _globalDiscountValueController.clear();
       });
       _barcodeFocus.requestFocus();
@@ -1926,9 +2188,12 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
     setState(() {
       _cartItems[index] = item;
     });
-    
+
     // به‌روزرسانی موجودی در صورت تغییر تعداد (اگر نمایش موجودی فعال باشد)
-    if (item.trackInventory && item.productId != null && item.extraInfo?['instance_id'] == null && _showInventory) {
+    if (item.trackInventory &&
+        item.productId != null &&
+        item.extraInfo?['instance_id'] == null &&
+        _showInventory) {
       _scheduleStockLoads([item.productId!]);
     }
   }
@@ -1982,10 +2247,15 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
       SnackBarHelper.show(context, message: 'سبد خرید خالی است', isError: true);
       return;
     }
-    
+
     // اعتبارسنجی ارز
     if (_defaultCurrencyId == null) {
-      SnackBarHelper.show(context, message: 'ارز پیش‌فرض تنظیم نشده است. لطفاً در تنظیمات فاکتور سریع تنظیم کنید.', isError: true);
+      SnackBarHelper.show(
+        context,
+        message:
+            'ارز پیش‌فرض تنظیم نشده است. لطفاً در تنظیمات فاکتور سریع تنظیم کنید.',
+        isError: true,
+      );
       return;
     }
 
@@ -1998,57 +2268,69 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
       );
       return;
     }
-    
-    // اعتبارسنجی صندوق (برای پرداخت نقدی همراه سند دریافت)
+
+    // اعتبارسنجی پرداخت
+    final t = AppLocalizations.of(context);
     if (_autoCreatePaymentDocument) {
-      if (_payment != null && _selectedCashRegisterId == null) {
-        SnackBarHelper.show(context, message: 'لطفاً صندوق را انتخاب کنید', isError: true);
+      final paymentError = _validatePayments(t);
+      if (paymentError != null) {
+        SnackBarHelper.show(context, message: paymentError, isError: true);
         return;
       }
+    }
+    if (_shouldShareAfterSave) {
+      if (_shareOnlinePaymentEnabled) {
+        if (_shareGateways.isEmpty) {
+          SnackBarHelper.show(
+            context,
+            message: t.quickSalesShareNoGateway,
+            isError: true,
+          );
+          return;
+        }
+        if (_shareGatewayId == null) {
+          SnackBarHelper.show(
+            context,
+            message: t.quickSalesShareGatewayRequired,
+            isError: true,
+          );
+          return;
+        }
+      }
+    }
 
-      if (_payment != null && _payment!.amount != _totalAmount) {
+    final gv0 = _parsedGlobalDiscountValue;
+    if (gv0 != null && gv0 > 0) {
+      if (_globalDiscountType == 'percent' && (gv0 < 0 || gv0 > 100)) {
         SnackBarHelper.show(
           context,
-          message: 'مبلغ پرداخت (${_formatNumber(_payment!.amount)}) باید برابر با مبلغ فاکتور (${_formatNumber(_totalAmount)}) باشد',
+          message: t.invoiceGlobalDiscountPercentInvalid,
           isError: true,
         );
         return;
       }
-    } else {
-      final t = AppLocalizations.of(context);
-      if (_shareOnlinePaymentEnabled) {
-        if (_shareGateways.isEmpty) {
-          SnackBarHelper.show(context, message: t.quickSalesShareNoGateway, isError: true);
-          return;
-        }
-        if (_shareGatewayId == null) {
-          SnackBarHelper.show(context, message: t.quickSalesShareGatewayRequired, isError: true);
-          return;
-        }
+      if (_globalDiscountType == 'amount' && gv0 < 0) {
+        SnackBarHelper.show(
+          context,
+          message: t.invoiceGlobalDiscountAmountInvalid,
+          isError: true,
+        );
+        return;
       }
     }
 
-    final t = AppLocalizations.of(context);
-    final gv0 = _parsedGlobalDiscountValue;
-    if (gv0 != null && gv0 > 0) {
-      if (_globalDiscountType == 'percent' && (gv0 < 0 || gv0 > 100)) {
-        SnackBarHelper.show(context, message: t.invoiceGlobalDiscountPercentInvalid, isError: true);
-        return;
-      }
-      if (_globalDiscountType == 'amount' && gv0 < 0) {
-        SnackBarHelper.show(context, message: t.invoiceGlobalDiscountAmountInvalid, isError: true);
-        return;
-      }
-    }
-    
     setState(() {
-      _saveAction = print ? _QuickSalesSaveAction.saveAndPrint : _QuickSalesSaveAction.save;
+      _saveAction = print
+          ? _QuickSalesSaveAction.saveAndPrint
+          : _QuickSalesSaveAction.save;
     });
 
     final shouldPrint = print || _autoPrint;
-    final shouldShare = !_autoCreatePaymentDocument;
-    final savedTotalAmount = _totalAmount;
-    
+    final shouldShare = _shouldShareAfterSave;
+    final savedShareAmount = _remainingAmount > 0
+        ? _remainingAmount
+        : _totalAmount;
+
     try {
       // ساخت payload
       final lines = _cartItems.map((item) {
@@ -2056,7 +2338,7 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
         final lineDiscount = item.discountAmount;
         final taxAmount = item.taxAmount;
         final lineTotal = item.total;
-        
+
         // ساختن extra_info با تمام اطلاعات قیمت (مثل new_invoice_page)
         final extraInfoMap = <String, dynamic>{
           'unit_price': item.unitPrice,
@@ -2070,7 +2352,7 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
           if (item.warehouseId != null) 'warehouse_id': item.warehouseId,
           if (item.extraInfo != null) ...item.extraInfo!,
         };
-        
+
         final lineData = <String, dynamic>{
           'product_id': item.productId,
           'quantity': item.quantity,
@@ -2083,20 +2365,13 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
         };
         return lineData;
       }).toList();
-      
-      final payments = <Map<String, dynamic>>[];
-      if (_autoCreatePaymentDocument && _payment != null && _selectedCashRegisterId != null) {
-        payments.add({
-          'transaction_type': 'cash_register',
-          'cash_register_id': int.tryParse(_selectedCashRegisterId!),
-          'amount': _payment!.amount,
-          'transaction_date': _payment!.transactionDate.toIso8601String(),
-        });
-      }
-      
+
+      final payments = _buildPaymentPayloads();
+
       // تعیین person_id: اگر مشتری انتخاب شده باشد از آن استفاده می‌کنیم، وگرنه از مشتری ناشناس
       int? personId;
-      if (_selectedCustomer != null && _selectedCustomer != _anonymousCustomer) {
+      if (_selectedCustomer != null &&
+          _selectedCustomer != _anonymousCustomer) {
         personId = _selectedCustomer!.id;
       } else if (_anonymousCustomer != null) {
         personId = _anonymousCustomer!.id;
@@ -2104,11 +2379,12 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
         // fallback: اگر مشتری ناشناس null باشد اما مشتری انتخاب شده باشد
         personId = _selectedCustomer!.id;
       }
-      
+
       if (personId == null) {
         SnackBarHelper.show(
           context,
-          message: 'خطا: مشتری ناشناس تنظیم نشده است. لطفاً در تنظیمات فروش سریع یک مشتری پیش‌فرض انتخاب کنید.',
+          message:
+              'خطا: مشتری ناشناس تنظیم نشده است. لطفاً در تنظیمات فروش سریع یک مشتری پیش‌فرض انتخاب کنید.',
           isError: true,
         );
         setState(() {
@@ -2116,16 +2392,18 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
         });
         return;
       }
-      
+
       // استفاده از سویچ صفحه (پیش‌فرض از تنظیمات کسب‌وکار)
       final autoCreatePaymentDoc = _autoCreatePaymentDocument;
-      
+
       // ساخت extra_info با person_id و تنظیمات حواله انبار
       final extraInfo = <String, dynamic>{
         'quick_sale': true,
         'person_id': personId, // همیشه person_id را اضافه می‌کنیم
         'post_inventory': _enableWarehouseDocument, // آیا حواله ایجاد شود؟
-        'auto_post_warehouse': _enableWarehouseDocument && _warehouseDocumentType == 'posted', // آیا حواله قطعی شود؟
+        'auto_post_warehouse':
+            _enableWarehouseDocument &&
+            _warehouseDocumentType == 'posted', // آیا حواله قطعی شود؟
         'auto_create_payment_document': autoCreatePaymentDoc,
         'totals': {
           'gross': _subtotalAmount,
@@ -2142,11 +2420,11 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
           'value': gvSave.toDouble(),
         };
       }
-      
+
       if (_defaultWarehouseId != null) {
         extraInfo['warehouse_id'] = _defaultWarehouseId;
       }
-      
+
       final desc = _documentDescriptionController.text.trim();
       final payload = <String, dynamic>{
         'invoice_type': 'invoice_sales',
@@ -2158,20 +2436,22 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
         if (payments.isNotEmpty) 'payments': payments,
         if (desc.isNotEmpty) 'description': desc,
       };
-      
+
       final result = await _invoiceService.createInvoice(
         businessId: widget.businessId,
         payload: payload,
       );
-      
+
       if (!mounted) return;
-      
+
       final invoiceId = (result['id'] as num?)?.toInt();
       final invoiceCode = result['code']?.toString();
 
       setState(() {
         _cartItems.clear();
-        _payment = null;
+        _payments = [];
+        _cashFollowsTotal = true;
+        _shareRemainingEnabled = false;
         _productStocks.clear();
         _pendingStockProductIds.clear();
         _documentDate = DateTime.now();
@@ -2187,14 +2467,16 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
       SnackBarHelper.show(context, message: successMsg.toString());
 
       if (invoiceId != null && (shouldPrint || shouldShare)) {
-        unawaited(_runPostSaveTasks(
-          invoiceId: invoiceId,
-          invoiceCode: invoiceCode,
-          personId: personId,
-          totalAmount: savedTotalAmount,
-          shouldPrint: shouldPrint,
-          shouldShare: shouldShare,
-        ));
+        unawaited(
+          _runPostSaveTasks(
+            invoiceId: invoiceId,
+            invoiceCode: invoiceCode,
+            personId: personId,
+            totalAmount: savedShareAmount,
+            shouldPrint: shouldPrint,
+            shouldShare: shouldShare,
+          ),
+        );
       } else if (shouldPrint && invoiceId == null) {
         SnackBarHelper.show(
           context,
@@ -2238,7 +2520,9 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
       try {
         await _printInvoice(invoiceId: invoiceId, invoiceCode: invoiceCode);
       } catch (e) {
-        followUpNotes.add('خطا در چاپ: ${ErrorExtractor.forContext(e, context)}');
+        followUpNotes.add(
+          'خطا در چاپ: ${ErrorExtractor.forContext(e, context)}',
+        );
       }
     }
 
@@ -2259,8 +2543,11 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
     if (!mounted || followUpNotes.isEmpty) return;
     SnackBarHelper.show(context, message: followUpNotes.join('\n'));
   }
-  
-  Future<void> _printInvoice({required int invoiceId, String? invoiceCode}) async {
+
+  Future<void> _printInvoice({
+    required int invoiceId,
+    String? invoiceCode,
+  }) async {
     try {
       // استفاده از قالب چاپ پیش‌فرض اگر تنظیم شده باشد
       final query = <String, dynamic>{};
@@ -2271,19 +2558,23 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
       if (paperSize.isNotEmpty) {
         query['paper_size'] = paperSize;
       }
-      query['orientation'] = isInvoiceReceiptPaper(paperSize) ? 'portrait' : 'landscape';
-      
+      query['orientation'] = isInvoiceReceiptPaper(paperSize)
+          ? 'portrait'
+          : 'landscape';
+
       final bytes = await _invoiceService.downloadInvoicePdf(
         businessId: widget.businessId,
         invoiceId: invoiceId,
         query: query.isNotEmpty ? query : null,
       );
-      
+
       if (!mounted) return;
-      
+
       final filename = invoiceCode ?? 'invoice_$invoiceId';
       final safeName = filename.trim().isEmpty ? 'invoice.pdf' : filename;
-      final finalName = safeName.toLowerCase().endsWith('.pdf') ? safeName : '$safeName.pdf';
+      final finalName = safeName.toLowerCase().endsWith('.pdf')
+          ? safeName
+          : '$safeName.pdf';
       final result = await BytesExportService.export(
         bytes: bytes,
         filename: finalName,
@@ -2293,8 +2584,9 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
     } catch (e) {
       if (mounted) {
         SnackBarHelper.show(
-          context, 
-          message: 'خطا در چاپ فاکتور: ${ErrorExtractor.forContext(e, context)}',
+          context,
+          message:
+              'خطا در چاپ فاکتور: ${ErrorExtractor.forContext(e, context)}',
           isError: true,
         );
       }
@@ -2311,7 +2603,7 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
         allowEditUnitPrice: widget.authStore.canChangeInvoiceUnitPrice(),
       ),
     );
-    
+
     if (result != null) {
       _updateCartItem(index, result);
     }
@@ -2320,9 +2612,11 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
   void _increaseQuantity(int index) {
     setState(() {
       final item = _cartItems[index];
-      
+
       // بررسی موجودی قبل از افزایش
-      if (item.trackInventory && item.productId != null && item.extraInfo?['instance_id'] == null) {
+      if (item.trackInventory &&
+          item.productId != null &&
+          item.extraInfo?['instance_id'] == null) {
         final stock = _getProductStock(item.productId);
         if (stock != null && stock <= item.quantity) {
           SnackBarHelper.show(
@@ -2333,7 +2627,7 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
           return;
         }
       }
-      
+
       _cartItems[index] = item.copyWith(quantity: item.quantity + 1);
     });
   }
@@ -2352,10 +2646,13 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
     final ctx = primary?.context;
     if (ctx == null) return false;
     // اگر فوکوس روی هر نوع فیلد متنی/EditableText باشد (یا داخل آن باشد)، نباید میانبرهای سراسری مثل Enter برای ثبت اجرا شوند.
-    return ctx.widget is EditableText || ctx.findAncestorWidgetOfExactType<EditableText>() != null;
+    return ctx.widget is EditableText ||
+        ctx.findAncestorWidgetOfExactType<EditableText>() != null;
   }
 
-  bool get _isDesktopLike => MediaQuery.sizeOf(context).width >= ResponsiveHelper.shellPersistentNavMinWidth;
+  bool get _isDesktopLike =>
+      MediaQuery.sizeOf(context).width >=
+      ResponsiveHelper.shellPersistentNavMinWidth;
 
   void _onBarcodeFocusChanged() {
     if (!mounted || !_isDesktopLike) return;
@@ -2455,19 +2752,28 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (_barcodeSuggestionsLoading) const LinearProgressIndicator(minHeight: 2),
+        if (_barcodeSuggestionsLoading)
+          const LinearProgressIndicator(minHeight: 2),
         Flexible(
           child: ListView.separated(
             controller: _barcodeOverlayScrollController,
             padding: const EdgeInsets.symmetric(vertical: 4),
-            itemCount: _barcodeSuggestions.length + (_barcodeSuggestionsLoadingMore ? 1 : 0),
-            separatorBuilder: (context, _) => Divider(height: 1, color: cs.outline.withValues(alpha: 0.2)),
+            itemCount:
+                _barcodeSuggestions.length +
+                (_barcodeSuggestionsLoadingMore ? 1 : 0),
+            separatorBuilder: (context, _) =>
+                Divider(height: 1, color: cs.outline.withValues(alpha: 0.2)),
             itemBuilder: (context, index) {
-              if (_barcodeSuggestionsLoadingMore && index == _barcodeSuggestions.length) {
+              if (_barcodeSuggestionsLoadingMore &&
+                  index == _barcodeSuggestions.length) {
                 return const Padding(
                   padding: EdgeInsets.symmetric(vertical: 10),
                   child: Center(
-                    child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)),
+                    child: SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
                   ),
                 );
               }
@@ -2481,18 +2787,25 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
                 color: cs.onSurface.withOpacity(0.72),
               );
               return Material(
-                color: selected ? cs.primary.withValues(alpha: 0.10) : Colors.transparent,
+                color: selected
+                    ? cs.primary.withValues(alpha: 0.10)
+                    : Colors.transparent,
                 child: ListTile(
                   dense: true,
                   mouseCursor: SystemMouseCursors.click,
                   leading: const Icon(Icons.inventory_2_outlined),
-                  title: Text(name, maxLines: 1, overflow: TextOverflow.ellipsis),
+                  title: Text(
+                    name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                   subtitle: (code.isNotEmpty || gb != null)
                       ? Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            if (code.isNotEmpty) Text('کد: $code', style: subStyle),
+                            if (code.isNotEmpty)
+                              Text('کد: $code', style: subStyle),
                             if (gb != null) Text('بارکد: $gb', style: subStyle),
                           ],
                         )
@@ -2675,7 +2988,9 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
   }
 
   void _ensureHighlightedSuggestionVisible() {
-    if (_barcodeHighlightedIndex < 0 || !_barcodeOverlayScrollController.hasClients) return;
+    if (_barcodeHighlightedIndex < 0 ||
+        !_barcodeOverlayScrollController.hasClients)
+      return;
     const itemExtent = 56.0;
     final pos = _barcodeOverlayScrollController.position;
     final target = _barcodeHighlightedIndex * itemExtent;
@@ -2697,7 +3012,8 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
 
   Future<void> _selectHighlightedBarcodeSuggestion() async {
     if (_barcodeSuggestions.isEmpty) return;
-    final idx = (_barcodeHighlightedIndex >= 0 &&
+    final idx =
+        (_barcodeHighlightedIndex >= 0 &&
             _barcodeHighlightedIndex < _barcodeSuggestions.length)
         ? _barcodeHighlightedIndex
         : 0;
@@ -2710,7 +3026,8 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
     if (id != null &&
         _lastOverlaySuggestionTapProductId == id &&
         _lastOverlaySuggestionTapAt != null &&
-        now.difference(_lastOverlaySuggestionTapAt!) < const Duration(milliseconds: 400)) {
+        now.difference(_lastOverlaySuggestionTapAt!) <
+            const Duration(milliseconds: 400)) {
       return;
     }
     _lastOverlaySuggestionTapProductId = id;
@@ -2754,13 +3071,14 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
         // Enter روی پیشنهادها فقط در onSubmitted فیلد جستجو پردازش می‌شود؛
         // تکرار اینجا باعث دو بار _addToCart می‌شد (KeyboardListener همیشه ignored برمی‌گرداند).
         if (event.logicalKey == LogicalKeyboardKey.escape) {
-          if (_barcodeController.text.isNotEmpty || _barcodeSuggestions.isNotEmpty) {
+          if (_barcodeController.text.isNotEmpty ||
+              _barcodeSuggestions.isNotEmpty) {
             _removeBarcodeOverlay();
             return true;
           }
         }
       }
-      
+
       // Enter: ثبت فاکتور
       if (event.logicalKey == LogicalKeyboardKey.enter &&
           !isControlPressed &&
@@ -2775,7 +3093,7 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
           return true;
         }
       }
-      
+
       // Ctrl/Cmd + P: ثبت و چاپ
       if ((isControlPressed || isMetaPressed) &&
           event.logicalKey == LogicalKeyboardKey.keyP) {
@@ -2784,7 +3102,7 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
           return true;
         }
       }
-      
+
       // +: افزایش تعداد آخرین محصول
       if (event.logicalKey == LogicalKeyboardKey.equal ||
           event.logicalKey == LogicalKeyboardKey.numpadAdd) {
@@ -2793,7 +3111,7 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
           return true;
         }
       }
-      
+
       // -: کاهش تعداد آخرین محصول
       if (event.logicalKey == LogicalKeyboardKey.minus ||
           event.logicalKey == LogicalKeyboardKey.numpadSubtract) {
@@ -2802,18 +3120,20 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
           return true;
         }
       }
-      
+
       // Delete: حذف آخرین محصول
       if (event.logicalKey == LogicalKeyboardKey.delete ||
           event.logicalKey == LogicalKeyboardKey.backspace) {
         // فقط وقتی فیلد جستجو خالی است، Backspace/Delete را به حذف آخرین قلم نگاشت می‌کنیم
         // تا هنگام ویرایش متن، کاربر بتواند به شکل طبیعی کاراکترها را پاک کند.
-        if (_cartItems.isNotEmpty && _barcodeFocus.hasFocus && _barcodeController.text.isEmpty) {
+        if (_cartItems.isNotEmpty &&
+            _barcodeFocus.hasFocus &&
+            _barcodeController.text.isEmpty) {
           _removeFromCart(_cartItems.length - 1);
           return true;
         }
       }
-      
+
       // Ctrl/Cmd + N: فروش جدید (نگه داشتن سبد فعلی)
       if ((isControlPressed || isMetaPressed) &&
           event.logicalKey == LogicalKeyboardKey.keyN) {
@@ -2827,7 +3147,7 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
         _clearCart();
         return true;
       }
-      
+
       // Escape: پاک کردن فیلد جستجو
       if (event.logicalKey == LogicalKeyboardKey.escape) {
         if (_barcodeFocus.hasFocus && _barcodeController.text.isNotEmpty) {
@@ -2840,7 +3160,10 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
   }
 
   /// تاریخ فاکتور (شمسی/میلادی طبق تنظیم کاربر) و شرح سند — چیدمان فشرده
-  Widget _buildDocumentDateAndDescription({required bool isMobile, bool compact = false}) {
+  Widget _buildDocumentDateAndDescription({
+    required bool isMobile,
+    bool compact = false,
+  }) {
     final dateWidget = DateInputField(
       value: _documentDate,
       labelText: 'تاریخ فاکتور',
@@ -2861,13 +3184,18 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
       controller: _documentDescriptionController,
       maxLines: 1,
       maxLength: 1000,
-      buildCounter: (context, {required currentLength, required isFocused, maxLength}) => null,
+      buildCounter:
+          (context, {required currentLength, required isFocused, maxLength}) =>
+              null,
       decoration: InputDecoration(
         labelText: 'شرح',
         hintText: 'اختیاری',
         border: const OutlineInputBorder(),
         isDense: true,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 12,
+          vertical: 16,
+        ),
         suffixIcon: IgnorePointer(
           child: IconButton(
             icon: const Icon(Icons.calendar_today, color: Colors.transparent),
@@ -2884,15 +3212,17 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
           children: [
             dateWidget,
             Theme(
-              data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+              data: Theme.of(
+                context,
+              ).copyWith(dividerColor: Colors.transparent),
               child: ExpansionTile(
                 tilePadding: EdgeInsets.zero,
                 childrenPadding: const EdgeInsets.only(bottom: 4),
                 title: Text(
                   'شرح سند (اختیاری)',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
                 ),
                 initiallyExpanded: false,
                 children: [descWidget],
@@ -2903,11 +3233,7 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
       }
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          dateWidget,
-          const SizedBox(height: 8),
-          descWidget,
-        ],
+        children: [dateWidget, const SizedBox(height: 8), descWidget],
       );
     }
 
@@ -2967,7 +3293,9 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
     );
 
     final breakdown = Column(
-      crossAxisAlignment: compact ? CrossAxisAlignment.start : CrossAxisAlignment.end,
+      crossAxisAlignment: compact
+          ? CrossAxisAlignment.start
+          : CrossAxisAlignment.end,
       children: [
         Text(
           '${_formatNumber(item.quantity)} × ${_formatNumber(item.unitPrice)}',
@@ -2979,10 +3307,7 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
         if (item.discountValue > 0)
           Text(
             'تخفیف: ${item.discountType == 'percent' ? '${item.discountValue}%' : _formatNumber(item.discountValue)}',
-            style: TextStyle(
-              fontSize: compact ? 10 : 11,
-              color: cs.error,
-            ),
+            style: TextStyle(fontSize: compact ? 10 : 11, color: cs.error),
           ),
         if (item.taxRate > 0)
           Text(
@@ -3008,10 +3333,7 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Align(
-            alignment: AlignmentDirectional.centerStart,
-            child: stepper,
-          ),
+          Align(alignment: AlignmentDirectional.centerStart, child: stepper),
           const SizedBox(height: 6),
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -3048,7 +3370,7 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
     final screenWidth = MediaQuery.sizeOf(context).width;
     final isMobile = screenWidth < ResponsiveHelper.shellPersistentNavMinWidth;
     final isCompactHeader = screenWidth < _compactBreakpoint;
-    
+
     if (_loading) {
       return Scaffold(
         appBar: AppBar(title: const Text('فروش سریع')),
@@ -3067,66 +3389,77 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
         ),
       );
     }
-    if (!widget.authStore.canAccessInvoiceType('invoice_sales', action: 'add')) {
-      return const AccessDeniedPage(message: 'دسترسی شما برای فروش سریع محدود شده است');
+    if (!widget.authStore.canAccessInvoiceType(
+      'invoice_sales',
+      action: 'add',
+    )) {
+      return const AccessDeniedPage(
+        message: 'دسترسی شما برای فروش سریع محدود شده است',
+      );
     }
-    
+
     final scaffold = Scaffold(
       appBar: AppBar(
         automaticallyImplyLeading: shouldShowHesabixBackButton(),
-        leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
+        leading: hesabixBackAppBarLeading(
+          context,
+          businessId: widget.businessId,
+        ),
         title: isMobile
             ? (isCompactHeader
-                ? Row(
-                    children: [
-                      const Expanded(
-                        child: Text(
-                          'فروش سریع',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      if (_cartItems.isNotEmpty)
-                        Flexible(
+                  ? Row(
+                      children: [
+                        const Expanded(
                           child: Text(
-                            _formatNumber(_totalAmount),
+                            'فروش سریع',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        if (_cartItems.isNotEmpty)
+                          Flexible(
+                            child: Text(
+                              _formatNumber(_totalAmount),
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold,
+                                color: cs.primary,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              textAlign: TextAlign.end,
+                            ),
+                          ),
+                      ],
+                    )
+                  : Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('فروش سریع'),
+                        if (_cartItems.isNotEmpty)
+                          Text(
+                            '${_cartItems.length} قلم • ${_formatNumber(_totalAmount)}',
                             style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.bold,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
                               color: cs.primary,
                             ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            textAlign: TextAlign.end,
                           ),
-                        ),
-                    ],
-                  )
-                : Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('فروش سریع'),
-                  if (_cartItems.isNotEmpty)
-                    Text(
-                      '${_cartItems.length} قلم • ${_formatNumber(_totalAmount)}',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: cs.primary,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                ],
-              ))
+                      ],
+                    ))
             : Row(
                 children: [
                   const Text('فروش سریع'),
                   if (_cartItems.isNotEmpty) ...[
                     const SizedBox(width: 16),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
                       decoration: BoxDecoration(
                         color: cs.primaryContainer,
                         borderRadius: BorderRadius.circular(12),
@@ -3157,7 +3490,9 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
         actions: [
           IconButton(
             icon: const Icon(Icons.add),
-            tooltip: AppLocalizations.of(context).quickSalesParkedNewSaleTooltip,
+            tooltip: AppLocalizations.of(
+              context,
+            ).quickSalesParkedNewSaleTooltip,
             onPressed: _isSaving ? null : _startNewSale,
           ),
           if (_cartItems.isNotEmpty)
@@ -3170,7 +3505,9 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
             icon: const Icon(Icons.settings),
             tooltip: 'تنظیمات',
             onPressed: () {
-              context.push('/business/${widget.businessId}/settings/quick-sales');
+              context.push(
+                '/business/${widget.businessId}/settings/quick-sales',
+              );
             },
           ),
         ],
@@ -3197,19 +3534,32 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
                           Row(
                             children: [
                               // دکمه refresh موجودی (فقط اگر نمایش موجودی فعال باشد)
-                              if (_showInventory && _cartItems.any((item) => item.trackInventory && item.productId != null))
+                              if (_showInventory &&
+                                  _cartItems.any(
+                                    (item) =>
+                                        item.trackInventory &&
+                                        item.productId != null,
+                                  ))
                                 IconButton(
                                   icon: _loadingStocksBulk
                                       ? const SizedBox(
                                           width: 20,
                                           height: 20,
-                                          child: CircularProgressIndicator(strokeWidth: 2),
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                          ),
                                         )
                                       : const Icon(Icons.refresh),
-                                  onPressed: _loadingStocksBulk ? null : () => _refreshAllStocks(),
+                                  onPressed: _loadingStocksBulk
+                                      ? null
+                                      : () => _refreshAllStocks(),
                                   tooltip: 'به‌روزرسانی موجودی',
                                 ),
-                              Expanded(child: _buildBarcodeSearchField(compact: isCompact)),
+                              Expanded(
+                                child: _buildBarcodeSearchField(
+                                  compact: isCompact,
+                                ),
+                              ),
                             ],
                           ),
                           SizedBox(height: isCompact ? 6 : 8),
@@ -3217,7 +3567,8 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
                             selectedCustomer: _selectedCustomer,
                             onCustomerChanged: (customer) {
                               setState(() {
-                                _selectedCustomer = customer ?? _anonymousCustomer;
+                                _selectedCustomer =
+                                    customer ?? _anonymousCustomer;
                                 _syncShareChannelDefaults();
                               });
                             },
@@ -3228,7 +3579,10 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
                             hintText: 'مشتری ناشناس',
                           ),
                           SizedBox(height: isCompact ? 6 : 8),
-                          _buildDocumentDateAndDescription(isMobile: true, compact: isCompact),
+                          _buildDocumentDateAndDescription(
+                            isMobile: true,
+                            compact: isCompact,
+                          ),
                         ],
                       )
                     : Column(
@@ -3239,171 +3593,224 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
                           Row(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              if (_showInventory && _cartItems.any((item) => item.trackInventory && item.productId != null))
+                              if (_showInventory &&
+                                  _cartItems.any(
+                                    (item) =>
+                                        item.trackInventory &&
+                                        item.productId != null,
+                                  ))
                                 IconButton(
                                   icon: _loadingStocksBulk
                                       ? const SizedBox(
                                           width: 20,
                                           height: 20,
-                                          child: CircularProgressIndicator(strokeWidth: 2),
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                          ),
                                         )
                                       : const Icon(Icons.refresh),
-                                  onPressed: _loadingStocksBulk ? null : () => _refreshAllStocks(),
+                                  onPressed: _loadingStocksBulk
+                                      ? null
+                                      : () => _refreshAllStocks(),
                                   tooltip: 'به‌روزرسانی موجودی',
                                 ),
-                              Expanded(child: _buildBarcodeSearchField(compact: false)),
+                              Expanded(
+                                child: _buildBarcodeSearchField(compact: false),
+                              ),
                             ],
                           ),
                         ],
                       ),
               ),
-                // تاریخچه محصولات اخیر
-                if (_recentProducts.isNotEmpty && _cartItems.isEmpty)
-                  Container(
-                    padding: EdgeInsets.symmetric(horizontal: isCompact ? 12 : 16, vertical: 8),
-                    color: cs.surfaceContainerHighest,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Icon(Icons.history, size: 18, color: cs.onSurface.withOpacity(0.7)),
-                            const SizedBox(width: 8),
-                            Text(
-                              'محصولات اخیر',
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.bold,
-                                color: cs.onSurface.withOpacity(0.7),
-                              ),
+              // تاریخچه محصولات اخیر
+              if (_recentProducts.isNotEmpty && _cartItems.isEmpty)
+                Container(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: isCompact ? 12 : 16,
+                    vertical: 8,
+                  ),
+                  color: cs.surfaceContainerHighest,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.history,
+                            size: 18,
+                            color: cs.onSurface.withOpacity(0.7),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            'محصولات اخیر',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                              color: cs.onSurface.withOpacity(0.7),
                             ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        SizedBox(
-                          height: 60,
-                          child: ListView.builder(
-                            scrollDirection: Axis.horizontal,
-                            itemCount: _recentProducts.length,
-                            itemBuilder: (context, index) {
-                              final product = _recentProducts[index];
-                              return Padding(
-                                padding: const EdgeInsets.only(right: 8),
-                                child: InkWell(
-                                  onTap: () => _onRecentProductTap(product),
-                                  child: AnimatedContainer(
-                                    duration: const Duration(milliseconds: 200),
-                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                    decoration: BoxDecoration(
-                                      color: cs.surface,
-                                      borderRadius: BorderRadius.circular(8),
-                                      border: Border.all(
-                                        color: _recentProductLoadingId == _productIntId(product)
-                                            ? cs.primary
-                                            : cs.outline.withOpacity(0.3),
-                                      ),
-                                    ),
-                                    child: _recentProductLoadingId == _productIntId(product)
-                                        ? SizedBox(
-                                            width: 80,
-                                            child: Center(
-                                              child: SizedBox(
-                                                width: 18,
-                                                height: 18,
-                                                child: CircularProgressIndicator(
-                                                  strokeWidth: 2,
-                                                  color: cs.primary,
-                                                ),
-                                              ),
-                                            ),
-                                          )
-                                        : Column(
-                                      mainAxisSize: MainAxisSize.min,
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          product['name']?.toString() ?? 'نامشخص',
-                                          style: const TextStyle(
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                        const SizedBox(height: 4),
-                                        Text(
-                                          '${_formatNumber(_toNum(product['base_sales_price'] ?? product['sales_price']))}',
-                                          style: TextStyle(
-                                            fontSize: 11,
-                                            color: cs.primary,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
-                                      ],
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      SizedBox(
+                        height: 60,
+                        child: ListView.builder(
+                          scrollDirection: Axis.horizontal,
+                          itemCount: _recentProducts.length,
+                          itemBuilder: (context, index) {
+                            final product = _recentProducts[index];
+                            return Padding(
+                              padding: const EdgeInsets.only(right: 8),
+                              child: InkWell(
+                                onTap: () => _onRecentProductTap(product),
+                                child: AnimatedContainer(
+                                  duration: const Duration(milliseconds: 200),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 8,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: cs.surface,
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(
+                                      color:
+                                          _recentProductLoadingId ==
+                                              _productIntId(product)
+                                          ? cs.primary
+                                          : cs.outline.withOpacity(0.3),
                                     ),
                                   ),
+                                  child:
+                                      _recentProductLoadingId ==
+                                          _productIntId(product)
+                                      ? SizedBox(
+                                          width: 80,
+                                          child: Center(
+                                            child: SizedBox(
+                                              width: 18,
+                                              height: 18,
+                                              child: CircularProgressIndicator(
+                                                strokeWidth: 2,
+                                                color: cs.primary,
+                                              ),
+                                            ),
+                                          ),
+                                        )
+                                      : Column(
+                                          mainAxisSize: MainAxisSize.min,
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              product['name']?.toString() ??
+                                                  'نامشخص',
+                                              style: const TextStyle(
+                                                fontSize: 12,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                            ),
+                                            const SizedBox(height: 4),
+                                            Text(
+                                              '${_formatNumber(_toNum(product['base_sales_price'] ?? product['sales_price']))}',
+                                              style: TextStyle(
+                                                fontSize: 11,
+                                                color: cs.primary,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
                                 ),
-                              );
-                            },
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              // لیست سبد خرید
+              Expanded(
+                child: _cartItems.isEmpty
+                    ? Center(
+                        child: AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 300),
+                          child: Column(
+                            key: ValueKey(_recentProducts.isEmpty),
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.shopping_cart_outlined,
+                                size: 64,
+                                color: cs.outline,
+                              ),
+                              const SizedBox(height: 16),
+                              Text(
+                                'سبد خرید خالی است',
+                                style: TextStyle(color: cs.outline),
+                              ),
+                            ],
                           ),
                         ),
-                      ],
-                    ),
-                  ),
-                // لیست سبد خرید
-                Expanded(
-                  child: _cartItems.isEmpty
-                      ? Center(
-                          child: AnimatedSwitcher(
+                      )
+                    : ListView.builder(
+                        padding: EdgeInsets.all(isCompact ? 6 : 8),
+                        itemCount: _cartItems.length,
+                        itemBuilder: (context, index) {
+                          final item = _cartItems[index];
+                          final hasInsufficientStock = _hasInsufficientStock(
+                            item,
+                          );
+                          return AnimatedContainer(
                             duration: const Duration(milliseconds: 300),
-                            child: Column(
-                              key: ValueKey(_recentProducts.isEmpty),
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(Icons.shopping_cart_outlined, size: 64, color: cs.outline),
-                                const SizedBox(height: 16),
-                                Text('سبد خرید خالی است', style: TextStyle(color: cs.outline)),
-                              ],
-                            ),
-                          ),
-                        )
-                      : ListView.builder(
-                          padding: EdgeInsets.all(isCompact ? 6 : 8),
-                          itemCount: _cartItems.length,
-                          itemBuilder: (context, index) {
-                            final item = _cartItems[index];
-                            final hasInsufficientStock = _hasInsufficientStock(item);
-                            return AnimatedContainer(
-                              duration: const Duration(milliseconds: 300),
-                              curve: Curves.easeInOut,
-                              margin: const EdgeInsets.symmetric(vertical: 4),
-                              child: Card(
-                                color: hasInsufficientStock ? cs.errorContainer.withOpacity(0.3) : null,
-                                child: InkWell(
+                            curve: Curves.easeInOut,
+                            margin: const EdgeInsets.symmetric(vertical: 4),
+                            child: Card(
+                              color: hasInsufficientStock
+                                  ? cs.errorContainer.withOpacity(0.3)
+                                  : null,
+                              child: InkWell(
                                 onTap: () => _editCartItem(index),
                                 child: Padding(
                                   padding: EdgeInsets.all(isCompact ? 6 : 8),
                                   child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       // هشدار موجودی ناکافی (فقط اگر نمایش موجودی فعال باشد)
-                                      if (_showInventory && hasInsufficientStock)
+                                      if (_showInventory &&
+                                          hasInsufficientStock)
                                         Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                          margin: const EdgeInsets.only(bottom: 8),
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 8,
+                                            vertical: 4,
+                                          ),
+                                          margin: const EdgeInsets.only(
+                                            bottom: 8,
+                                          ),
                                           decoration: BoxDecoration(
                                             color: cs.errorContainer,
-                                            borderRadius: BorderRadius.circular(4),
+                                            borderRadius: BorderRadius.circular(
+                                              4,
+                                            ),
                                           ),
                                           child: Row(
                                             children: [
-                                              Icon(Icons.warning_amber_rounded, size: 16, color: cs.onErrorContainer),
+                                              Icon(
+                                                Icons.warning_amber_rounded,
+                                                size: 16,
+                                                color: cs.onErrorContainer,
+                                              ),
                                               const SizedBox(width: 8),
                                               Expanded(
                                                 child: Text(
                                                   'موجودی کافی نیست! موجودی: ${_formatNumber(_getProductStock(item.productId) ?? 0)}، درخواست: ${_formatNumber(item.quantity)}',
                                                   style: TextStyle(
-                                                    fontSize: isCompact ? 11 : 12,
+                                                    fontSize: isCompact
+                                                        ? 11
+                                                        : 12,
                                                     color: cs.onErrorContainer,
                                                     fontWeight: FontWeight.bold,
                                                   ),
@@ -3416,73 +3823,132 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
                                         children: [
                                           Expanded(
                                             child: Column(
-                                              crossAxisAlignment: CrossAxisAlignment.start,
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.start,
                                               children: [
                                                 Text(
                                                   item.productName ?? 'نامشخص',
                                                   style: TextStyle(
                                                     fontWeight: FontWeight.bold,
-                                                    fontSize: isCompact ? 14 : 16,
+                                                    fontSize: isCompact
+                                                        ? 14
+                                                        : 16,
                                                   ),
                                                 ),
                                                 const SizedBox(height: 4),
                                                 Text(
                                                   'کد: ${item.productCode ?? '-'}',
                                                   style: TextStyle(
-                                                    color: cs.onSurface.withOpacity(0.7),
+                                                    color: cs.onSurface
+                                                        .withOpacity(0.7),
                                                     fontSize: 12,
                                                   ),
                                                 ),
                                                 // نمایش قیمت خرید (فقط اگر تنظیمات نمایش قیمت خرید فعال باشد)
-                                                if (_showPurchasePrice && item.basePurchasePriceMainUnit != null)
+                                                if (_showPurchasePrice &&
+                                                    item.basePurchasePriceMainUnit !=
+                                                        null)
                                                   Padding(
-                                                    padding: const EdgeInsets.only(top: 4),
+                                                    padding:
+                                                        const EdgeInsets.only(
+                                                          top: 4,
+                                                        ),
                                                     child: Text(
                                                       'قیمت خرید: ${_formatNumber(item.basePurchasePriceMainUnit!)}',
                                                       style: TextStyle(
                                                         fontSize: 11,
-                                                        color: cs.onSurface.withOpacity(0.6),
-                                                        fontStyle: FontStyle.italic,
+                                                        color: cs.onSurface
+                                                            .withOpacity(0.6),
+                                                        fontStyle:
+                                                            FontStyle.italic,
                                                       ),
                                                     ),
                                                   ),
                                                 // نمایش موجودی (فقط اگر تنظیمات نمایش موجودی فعال باشد)
-                                                if (_showInventory && item.trackInventory && item.productId != null && item.extraInfo?['instance_id'] == null)
+                                                if (_showInventory &&
+                                                    item.trackInventory &&
+                                                    item.productId != null &&
+                                                    item.extraInfo?['instance_id'] ==
+                                                        null)
                                                   Builder(
                                                     builder: (context) {
-                                                      final stock = _getProductStock(item.productId);
+                                                      final stock =
+                                                          _getProductStock(
+                                                            item.productId,
+                                                          );
                                                       // اگر موجودی null است و در حال بارگذاری نیست، سعی کن بارگذاری کن
                                                       if (stock == null &&
-                                                          !_isProductStockLoading(item.productId) &&
-                                                          _defaultWarehouseId != null) {
-                                                        WidgetsBinding.instance.addPostFrameCallback((_) {
-                                                          if (mounted && _showInventory) {
-                                                            _scheduleStockLoads([item.productId!]);
-                                                          }
-                                                        });
+                                                          !_isProductStockLoading(
+                                                            item.productId,
+                                                          ) &&
+                                                          _defaultWarehouseId !=
+                                                              null) {
+                                                        WidgetsBinding.instance
+                                                            .addPostFrameCallback((
+                                                              _,
+                                                            ) {
+                                                              if (mounted &&
+                                                                  _showInventory) {
+                                                                _scheduleStockLoads([
+                                                                  item.productId!,
+                                                                ]);
+                                                              }
+                                                            });
                                                       }
-                                                      final isStockPending = stock == null && _isProductStockLoading(item.productId);
-                                                      final hasInsufficientStock = stock != null && stock < item.quantity;
+                                                      final isStockPending =
+                                                          stock == null &&
+                                                          _isProductStockLoading(
+                                                            item.productId,
+                                                          );
+                                                      final hasInsufficientStock =
+                                                          stock != null &&
+                                                          stock < item.quantity;
                                                       return Padding(
-                                                        padding: const EdgeInsets.only(top: 4),
+                                                        padding:
+                                                            const EdgeInsets.only(
+                                                              top: 4,
+                                                            ),
                                                         child: Row(
                                                           children: [
                                                             Icon(
-                                                              hasInsufficientStock ? Icons.warning : Icons.inventory_2,
+                                                              hasInsufficientStock
+                                                                  ? Icons
+                                                                        .warning
+                                                                  : Icons
+                                                                        .inventory_2,
                                                               size: 14,
-                                                              color: hasInsufficientStock ? cs.error : cs.onSurface.withOpacity(0.6),
+                                                              color:
+                                                                  hasInsufficientStock
+                                                                  ? cs.error
+                                                                  : cs.onSurface
+                                                                        .withOpacity(
+                                                                          0.6,
+                                                                        ),
                                                             ),
-                                                            const SizedBox(width: 4),
+                                                            const SizedBox(
+                                                              width: 4,
+                                                            ),
                                                             Text(
                                                               stock != null
                                                                   ? 'موجودی: ${_formatNumber(stock)}'
                                                                   : (isStockPending
-                                                                      ? 'در حال بررسی موجودی...'
-                                                                      : 'موجودی نامشخص'),
+                                                                        ? 'در حال بررسی موجودی...'
+                                                                        : 'موجودی نامشخص'),
                                                               style: TextStyle(
                                                                 fontSize: 11,
-                                                                color: hasInsufficientStock ? cs.error : cs.onSurface.withOpacity(0.6),
-                                                                fontWeight: hasInsufficientStock ? FontWeight.bold : FontWeight.normal,
+                                                                color:
+                                                                    hasInsufficientStock
+                                                                    ? cs.error
+                                                                    : cs.onSurface
+                                                                          .withOpacity(
+                                                                            0.6,
+                                                                          ),
+                                                                fontWeight:
+                                                                    hasInsufficientStock
+                                                                    ? FontWeight
+                                                                          .bold
+                                                                    : FontWeight
+                                                                          .normal,
                                                               ),
                                                             ),
                                                           ],
@@ -3494,16 +3960,28 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
                                             ),
                                           ),
                                           IconButton(
-                                            icon: const Icon(Icons.edit, size: 20),
-                                            onPressed: () => _editCartItem(index),
+                                            icon: const Icon(
+                                              Icons.edit,
+                                              size: 20,
+                                            ),
+                                            onPressed: () =>
+                                                _editCartItem(index),
                                             tooltip: 'ویرایش',
-                                            visualDensity: isCompact ? VisualDensity.compact : VisualDensity.standard,
+                                            visualDensity: isCompact
+                                                ? VisualDensity.compact
+                                                : VisualDensity.standard,
                                           ),
                                           IconButton(
-                                            icon: const Icon(Icons.delete, size: 20),
-                                            onPressed: () => _removeFromCart(index),
+                                            icon: const Icon(
+                                              Icons.delete,
+                                              size: 20,
+                                            ),
+                                            onPressed: () =>
+                                                _removeFromCart(index),
                                             tooltip: 'حذف',
-                                            visualDensity: isCompact ? VisualDensity.compact : VisualDensity.standard,
+                                            visualDensity: isCompact
+                                                ? VisualDensity.compact
+                                                : VisualDensity.standard,
                                           ),
                                         ],
                                       ),
@@ -3514,17 +3992,17 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
                                         cs: cs,
                                         compact: isCompact,
                                       ),
-                                  ],
+                                    ],
                                   ),
                                 ),
                               ),
                             ),
-                            );
-                          },
-                        ),
-                ),
-              ],
-            );
+                          );
+                        },
+                      ),
+              ),
+            ],
+          );
 
           return _withParkedSalesBar(
             Row(
@@ -3591,7 +4069,9 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
               Row(
                 children: [
                   if (_showInventory &&
-                      _cartItems.any((item) => item.trackInventory && item.productId != null))
+                      _cartItems.any(
+                        (item) => item.trackInventory && item.productId != null,
+                      ))
                     IconButton(
                       icon: _loadingStocksBulk
                           ? const SizedBox(
@@ -3600,7 +4080,9 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
                               child: CircularProgressIndicator(strokeWidth: 2),
                             )
                           : const Icon(Icons.refresh),
-                      onPressed: _loadingStocksBulk ? null : () => _refreshAllStocks(),
+                      onPressed: _loadingStocksBulk
+                          ? null
+                          : () => _refreshAllStocks(),
                       tooltip: 'به‌روزرسانی موجودی',
                     ),
                   Expanded(child: _buildBarcodeSearchField(compact: isCompact)),
@@ -3611,14 +4093,21 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
         ),
         if (_recentProducts.isNotEmpty && _cartItems.isEmpty)
           Container(
-            padding: EdgeInsets.symmetric(horizontal: isCompact ? 12 : 16, vertical: 8),
+            padding: EdgeInsets.symmetric(
+              horizontal: isCompact ? 12 : 16,
+              vertical: 8,
+            ),
             color: cs.surfaceContainerHighest,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
                   children: [
-                    Icon(Icons.history, size: 18, color: cs.onSurface.withOpacity(0.7)),
+                    Icon(
+                      Icons.history,
+                      size: 18,
+                      color: cs.onSurface.withOpacity(0.7),
+                    ),
                     const SizedBox(width: 8),
                     Text(
                       'محصولات اخیر',
@@ -3644,17 +4133,24 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
                           onTap: () => _onRecentProductTap(product),
                           child: AnimatedContainer(
                             duration: const Duration(milliseconds: 200),
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 8,
+                            ),
                             decoration: BoxDecoration(
                               color: cs.surface,
                               borderRadius: BorderRadius.circular(8),
                               border: Border.all(
-                                color: _recentProductLoadingId == _productIntId(product)
+                                color:
+                                    _recentProductLoadingId ==
+                                        _productIntId(product)
                                     ? cs.primary
                                     : cs.outline.withOpacity(0.3),
                               ),
                             ),
-                            child: _recentProductLoadingId == _productIntId(product)
+                            child:
+                                _recentProductLoadingId ==
+                                    _productIntId(product)
                                 ? SizedBox(
                                     width: 80,
                                     child: Center(
@@ -3669,29 +4165,30 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
                                     ),
                                   )
                                 : Column(
-                              mainAxisSize: MainAxisSize.min,
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  product['name']?.toString() ?? 'نامشخص',
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.bold,
+                                    mainAxisSize: MainAxisSize.min,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        product['name']?.toString() ?? 'نامشخص',
+                                        style: const TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        '${_formatNumber(_toNum(product['base_sales_price'] ?? product['sales_price']))}',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          color: cs.primary,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ],
                                   ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  '${_formatNumber(_toNum(product['base_sales_price'] ?? product['sales_price']))}',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    color: cs.primary,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ],
-                            ),
                           ),
                         ),
                       );
@@ -3710,9 +4207,16 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
                       key: ValueKey(_recentProducts.isEmpty),
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.shopping_cart_outlined, size: 64, color: cs.outline),
+                        Icon(
+                          Icons.shopping_cart_outlined,
+                          size: 64,
+                          color: cs.outline,
+                        ),
                         const SizedBox(height: 16),
-                        Text('سبد خرید خالی است', style: TextStyle(color: cs.outline)),
+                        Text(
+                          'سبد خرید خالی است',
+                          style: TextStyle(color: cs.outline),
+                        ),
                       ],
                     ),
                   ),
@@ -3728,7 +4232,9 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
                       curve: Curves.easeInOut,
                       margin: const EdgeInsets.symmetric(vertical: 4),
                       child: Card(
-                        color: hasInsufficientStock ? cs.errorContainer.withOpacity(0.3) : null,
+                        color: hasInsufficientStock
+                            ? cs.errorContainer.withOpacity(0.3)
+                            : null,
                         child: InkWell(
                           onTap: () => _editCartItem(index),
                           child: Padding(
@@ -3738,8 +4244,10 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
                               children: [
                                 if (_showInventory && hasInsufficientStock)
                                   Container(
-                                    padding:
-                                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 8,
+                                      vertical: 4,
+                                    ),
                                     margin: const EdgeInsets.only(bottom: 8),
                                     decoration: BoxDecoration(
                                       color: cs.errorContainer,
@@ -3770,7 +4278,8 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
                                   children: [
                                     Expanded(
                                       child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
                                         children: [
                                           Text(
                                             item.productName ?? 'نامشخص',
@@ -3783,19 +4292,25 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
                                           Text(
                                             'کد: ${item.productCode ?? '-'}',
                                             style: TextStyle(
-                                              color: cs.onSurface.withOpacity(0.7),
+                                              color: cs.onSurface.withOpacity(
+                                                0.7,
+                                              ),
                                               fontSize: 12,
                                             ),
                                           ),
                                           if (_showPurchasePrice &&
-                                              item.basePurchasePriceMainUnit != null)
+                                              item.basePurchasePriceMainUnit !=
+                                                  null)
                                             Padding(
-                                              padding: const EdgeInsets.only(top: 4),
+                                              padding: const EdgeInsets.only(
+                                                top: 4,
+                                              ),
                                               child: Text(
                                                 'قیمت خرید: ${_formatNumber(item.basePurchasePriceMainUnit!)}',
                                                 style: TextStyle(
                                                   fontSize: 11,
-                                                  color: cs.onSurface.withOpacity(0.6),
+                                                  color: cs.onSurface
+                                                      .withOpacity(0.6),
                                                   fontStyle: FontStyle.italic,
                                                 ),
                                               ),
@@ -3803,25 +4318,44 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
                                           if (_showInventory &&
                                               item.trackInventory &&
                                               item.productId != null &&
-                                              item.extraInfo?['instance_id'] == null)
+                                              item.extraInfo?['instance_id'] ==
+                                                  null)
                                             Builder(
                                               builder: (context) {
-                                                final stock = _getProductStock(item.productId);
+                                                final stock = _getProductStock(
+                                                  item.productId,
+                                                );
                                                 if (stock == null &&
-                                                    !_isProductStockLoading(item.productId) &&
-                                                    _defaultWarehouseId != null) {
-                                                  WidgetsBinding.instance.addPostFrameCallback((_) {
-                                                    if (mounted && _showInventory) {
-                                                      _scheduleStockLoads([item.productId!]);
-                                                    }
-                                                  });
+                                                    !_isProductStockLoading(
+                                                      item.productId,
+                                                    ) &&
+                                                    _defaultWarehouseId !=
+                                                        null) {
+                                                  WidgetsBinding.instance
+                                                      .addPostFrameCallback((
+                                                        _,
+                                                      ) {
+                                                        if (mounted &&
+                                                            _showInventory) {
+                                                          _scheduleStockLoads([
+                                                            item.productId!,
+                                                          ]);
+                                                        }
+                                                      });
                                                 }
                                                 final isStockPending =
-                                                    stock == null && _isProductStockLoading(item.productId);
+                                                    stock == null &&
+                                                    _isProductStockLoading(
+                                                      item.productId,
+                                                    );
                                                 final insufficient =
-                                                    stock != null && stock < item.quantity;
+                                                    stock != null &&
+                                                    stock < item.quantity;
                                                 return Padding(
-                                                  padding: const EdgeInsets.only(top: 4),
+                                                  padding:
+                                                      const EdgeInsets.only(
+                                                        top: 4,
+                                                      ),
                                                   child: Row(
                                                     children: [
                                                       Icon(
@@ -3831,23 +4365,31 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
                                                         size: 14,
                                                         color: insufficient
                                                             ? cs.error
-                                                            : cs.onSurface.withOpacity(0.6),
+                                                            : cs.onSurface
+                                                                  .withOpacity(
+                                                                    0.6,
+                                                                  ),
                                                       ),
                                                       const SizedBox(width: 4),
                                                       Text(
                                                         stock != null
                                                             ? 'موجودی: ${_formatNumber(stock)}'
                                                             : (isStockPending
-                                                                ? 'در حال بررسی موجودی...'
-                                                                : 'موجودی نامشخص'),
+                                                                  ? 'در حال بررسی موجودی...'
+                                                                  : 'موجودی نامشخص'),
                                                         style: TextStyle(
                                                           fontSize: 11,
                                                           color: insufficient
                                                               ? cs.error
-                                                              : cs.onSurface.withOpacity(0.6),
-                                                          fontWeight: insufficient
+                                                              : cs.onSurface
+                                                                    .withOpacity(
+                                                                      0.6,
+                                                                    ),
+                                                          fontWeight:
+                                                              insufficient
                                                               ? FontWeight.bold
-                                                              : FontWeight.normal,
+                                                              : FontWeight
+                                                                    .normal,
                                                         ),
                                                       ),
                                                     ],
@@ -3896,7 +4438,10 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
     );
   }
 
-  Widget _buildMobileDocumentInfoTab(ColorScheme cs, {required bool isCompact}) {
+  Widget _buildMobileDocumentInfoTab(
+    ColorScheme cs, {
+    required bool isCompact,
+  }) {
     return SingleChildScrollView(
       padding: EdgeInsets.all(isCompact ? 12 : 16),
       child: Column(
@@ -3940,10 +4485,14 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
     final cs = Theme.of(context).colorScheme;
     final filterBtn = IconButton(
       icon: Icon(
-        _selectedCategoryId != null ? Icons.filter_alt : Icons.filter_alt_outlined,
+        _selectedCategoryId != null
+            ? Icons.filter_alt
+            : Icons.filter_alt_outlined,
       ),
       tooltip: 'فیلتر دسته‌بندی',
-      color: _selectedCategoryId != null ? cs.primary : cs.onSurface.withOpacity(0.6),
+      color: _selectedCategoryId != null
+          ? cs.primary
+          : cs.onSurface.withOpacity(0.6),
       onPressed: () => _showCategoryFilter(context),
       visualDensity: compact ? VisualDensity.compact : VisualDensity.standard,
     );
@@ -3956,7 +4505,9 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
         enabled: !_barcodeSearching,
         decoration: InputDecoration(
           labelText: compact ? 'جستجوی کالا' : 'بارکد / کد / نام محصول',
-          hintText: compact ? 'کد، نام یا بارکد' : 'اسکن یا وارد کردن بارکد، کد یا نام',
+          hintText: compact
+              ? 'کد، نام یا بارکد'
+              : 'اسکن یا وارد کردن بارکد، کد یا نام',
           prefixIcon: compact ? null : const Icon(Icons.qr_code_scanner),
           isDense: compact,
           border: const OutlineInputBorder(),
@@ -3984,14 +4535,18 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
                   icon: const Icon(Icons.add),
                   tooltip: 'افزودن کالای جدید',
                   onPressed: () => _openAddProductDialog(),
-                  visualDensity: compact ? VisualDensity.compact : VisualDensity.standard,
+                  visualDensity: compact
+                      ? VisualDensity.compact
+                      : VisualDensity.standard,
                 ),
               if (_supportsCameraScanButton)
                 IconButton(
                   icon: const Icon(Icons.photo_camera_outlined),
                   tooltip: 'اسکن بارکد یا QR با دوربین',
                   onPressed: _scanBarcodeWithCamera,
-                  visualDensity: compact ? VisualDensity.compact : VisualDensity.standard,
+                  visualDensity: compact
+                      ? VisualDensity.compact
+                      : VisualDensity.standard,
                 ),
               if (_canCreateProducts &&
                   _lastFailedSearchQuery != null &&
@@ -3999,14 +4554,19 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
                 IconButton(
                   icon: const Icon(Icons.add_circle, color: Colors.green),
                   tooltip: 'افزودن کالای جدید: $_lastFailedSearchQuery',
-                  onPressed: () => _openAddProductDialog(presetName: _lastFailedSearchQuery),
-                  visualDensity: compact ? VisualDensity.compact : VisualDensity.standard,
+                  onPressed: () =>
+                      _openAddProductDialog(presetName: _lastFailedSearchQuery),
+                  visualDensity: compact
+                      ? VisualDensity.compact
+                      : VisualDensity.standard,
                 ),
               IconButton(
                 icon: const Icon(Icons.search),
                 onPressed: () => _searchByBarcode(_barcodeController.text),
                 tooltip: 'جستجو',
-                visualDensity: compact ? VisualDensity.compact : VisualDensity.standard,
+                visualDensity: compact
+                    ? VisualDensity.compact
+                    : VisualDensity.standard,
               ),
             ],
           ),
@@ -4019,7 +4579,8 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
           }
         },
         onChanged: (value) {
-          if (_lastFailedSearchQuery != null && value != _lastFailedSearchQuery) {
+          if (_lastFailedSearchQuery != null &&
+              value != _lastFailedSearchQuery) {
             setState(() {
               _lastFailedSearchQuery = null;
             });
@@ -4049,8 +4610,12 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
             },
             deleteIcon: const Icon(Icons.close, size: 18),
             avatar: const Icon(Icons.category, size: 18),
-            materialTapTargetSize: compact ? MaterialTapTargetSize.shrinkWrap : MaterialTapTargetSize.padded,
-            visualDensity: compact ? VisualDensity.compact : VisualDensity.standard,
+            materialTapTargetSize: compact
+                ? MaterialTapTargetSize.shrinkWrap
+                : MaterialTapTargetSize.padded,
+            visualDensity: compact
+                ? VisualDensity.compact
+                : VisualDensity.standard,
           )
         : null;
 
@@ -4091,19 +4656,19 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
       ],
     );
   }
-  
+
   String _getCategoryLabel(int categoryId) {
     final node = findCategoryNode(_categoryTree, categoryId);
     return node?.label ?? 'دسته‌بندی';
   }
-  
+
   void _showCategoryFilter(BuildContext context) {
     if (_categoryTree.isEmpty && !_loadingCategories) {
       unawaited(_loadCategories());
     }
     final screenWidth = MediaQuery.of(context).size.width;
     final isMobile = screenWidth < ResponsiveHelper.shellPersistentNavMinWidth;
-    
+
     if (isMobile) {
       // موبایل: bottom sheet
       showModalBottomSheet(
@@ -4120,8 +4685,8 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
                     Text(
                       'انتخاب دسته‌بندی',
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w600,
-                          ),
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                     const Spacer(),
                     IconButton(
@@ -4165,10 +4730,14 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.surfaceContainerHighest,
                       border: Border(
                         bottom: BorderSide(
-                          color: Theme.of(context).colorScheme.outline.withOpacity(0.2),
+                          color: Theme.of(
+                            context,
+                          ).colorScheme.outline.withOpacity(0.2),
                         ),
                       ),
                     ),
@@ -4176,9 +4745,8 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
                       children: [
                         Text(
                           'انتخاب دسته‌بندی',
-                          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                                fontWeight: FontWeight.w600,
-                              ),
+                          style: Theme.of(context).textTheme.titleLarge
+                              ?.copyWith(fontWeight: FontWeight.w600),
                         ),
                         const Spacer(),
                         IconButton(
@@ -4245,7 +4813,10 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
                     ),
                     Padding(
                       padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-                      child: _buildDocumentDateAndDescription(isMobile: true, compact: false),
+                      child: _buildDocumentDateAndDescription(
+                        isMobile: true,
+                        compact: false,
+                      ),
                     ),
                     const Divider(height: 24),
                     _buildInvoiceSummarySection(cs),
@@ -4275,7 +4846,10 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             if (!narrow) ...[
-              Text(t.invoiceGlobalDiscountSection, style: Theme.of(context).textTheme.titleSmall),
+              Text(
+                t.invoiceGlobalDiscountSection,
+                style: Theme.of(context).textTheme.titleSmall,
+              ),
               const SizedBox(height: 8),
             ],
             if (narrow)
@@ -4325,7 +4899,9 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
             const SizedBox(height: 8),
             TextField(
               controller: _globalDiscountValueController,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
               decoration: InputDecoration(
                 labelText: t.invoiceGlobalDiscountValueLabel,
                 isDense: true,
@@ -4335,14 +4911,20 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
             const SizedBox(height: 6),
             Text(
               t.invoiceGlobalDiscountLineDiscountHint(_formatNumber(lineDisc)),
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
             ),
             if (g != null && g.globalDiscountAmount > 0)
               Padding(
                 padding: const EdgeInsets.only(top: 4),
                 child: Text(
-                  t.invoiceGlobalDiscountAmountComputedHint(_formatNumber(g.globalDiscountAmount)),
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                  t.invoiceGlobalDiscountAmountComputedHint(
+                    _formatNumber(g.globalDiscountAmount),
+                  ),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
                 ),
               ),
           ],
@@ -4369,15 +4951,37 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
           const SizedBox(height: 16),
           if (_cartItems.isNotEmpty) _buildGlobalDiscountSection(cs),
           _buildSummaryRow('تعداد اقلام', '${_cartItems.length}'),
-          _buildSummaryRow(t.invoiceSummarySubtotal, _formatNumber(_subtotalAmount)),
-          if (_totalDiscount > 0) _buildSummaryRow(t.invoiceSummaryDiscount, '-${_formatNumber(_totalDiscount)}'),
-          if (_totalTax > 0) _buildSummaryRow(t.invoiceSummaryTax, _formatNumber(_totalTax)),
+          _buildSummaryRow(
+            t.invoiceSummarySubtotal,
+            _formatNumber(_subtotalAmount),
+          ),
+          if (_totalDiscount > 0)
+            _buildSummaryRow(
+              t.invoiceSummaryDiscount,
+              '-${_formatNumber(_totalDiscount)}',
+            ),
+          if (_totalTax > 0)
+            _buildSummaryRow(t.invoiceSummaryTax, _formatNumber(_totalTax)),
           const Divider(),
-          _buildSummaryRow(t.invoiceSummaryTotal, _formatNumber(_totalAmount), isTotal: true),
-          if (_payment != null && _payment!.amount < _totalAmount) ...[
+          _buildSummaryRow(
+            t.invoiceSummaryTotal,
+            _formatNumber(_totalAmount),
+            isTotal: true,
+          ),
+          if (_autoCreatePaymentDocument &&
+              _payments.isNotEmpty &&
+              (_remainingAmount > 0 || _isOverpaid)) ...[
             const SizedBox(height: 8),
-            _buildSummaryRow('مبلغ پرداخت شده', _formatNumber(_payment!.amount), isWarning: true),
-            _buildSummaryRow('باقیمانده', _formatNumber(_totalAmount - _payment!.amount), isWarning: true),
+            _buildSummaryRow(
+              t.quickSalesPayPaidLabel,
+              _formatNumber(_paidAmount),
+              isWarning: _isOverpaid,
+            ),
+            _buildSummaryRow(
+              t.quickSalesPayRemainingLabel,
+              _formatNumber(_remainingAmount < 0 ? 0 : _remainingAmount),
+              isWarning: true,
+            ),
           ],
         ],
       ),
@@ -4393,10 +4997,7 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
         children: [
           const Text(
             'پرداخت',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-            ),
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 8),
           SwitchListTile(
@@ -4408,29 +5009,44 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
           ),
           if (_autoCreatePaymentDocument) ...[
             const SizedBox(height: 8),
-            CashRegisterComboboxWidget(
+            QuickSalesPaymentComposer(
+              key: ValueKey(_activeSaleId),
               businessId: widget.businessId,
-              selectedRegisterId: _selectedCashRegisterId,
-              onChanged: (option) {
-                setState(() {
-                  _selectedCashRegisterId = option?.id;
-                  if (option != null && _totalAmount > 0) {
-                    _payment = InvoiceTransaction(
-                      id: DateTime.now().millisecondsSinceEpoch.toString(),
-                      type: TransactionType.cashRegister,
-                      cashRegisterId: option.id,
-                      cashRegisterName: option.name,
-                      transactionDate: DateTime.now(),
-                      amount: _totalAmount,
-                    );
-                  } else {
-                    _payment = null;
-                  }
-                });
+              payments: _payments,
+              onChanged: _onPaymentsChanged,
+              cashFollowsTotal: _cashFollowsTotal,
+              onCashFollowsTotalChanged: (v) {
+                if (v == _cashFollowsTotal) return;
+                setState(() => _cashFollowsTotal = v);
               },
-              label: 'صندوق',
-              hintText: 'انتخاب صندوق',
+              invoiceTotal: _totalAmount,
+              defaultCashRegisterId: _selectedCashRegisterId,
+              enabled: !_isSaving,
+              currencyId: _defaultCurrencyId,
+              currencyUnit: _paymentCurrencyUnit,
+              decimalPlaces: _invoiceCurrencyDecimalPlaces,
+              authStore: widget.authStore,
+              calendarController: widget.calendarController,
+              isAnonymousCustomer: _isAnonymousSelected,
             ),
+            if (_remainingAmount > 0 && !_isOverpaid) ...[
+              const SizedBox(height: 4),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: Text(t.quickSalesPayShareRemaining),
+                subtitle: Text(t.quickSalesPayShareRemainingHint),
+                value: _shareRemainingEnabled,
+                onChanged: _isSaving
+                    ? null
+                    : (v) {
+                        setState(() {
+                          _shareRemainingEnabled = v;
+                          if (v) _syncShareChannelDefaults();
+                        });
+                      },
+              ),
+              if (_shareRemainingEnabled) _buildShareSection(cs, t),
+            ],
           ] else ...[
             const SizedBox(height: 8),
             _buildShareSection(cs, t),
@@ -4457,8 +5073,8 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
         .toSet();
     final dropdownValue =
         _shareGatewayId != null && gatewayIds.contains(_shareGatewayId)
-            ? _shareGatewayId
-            : null;
+        ? _shareGatewayId
+        : null;
     final hasPhone = _selectedCustomerPhone != null;
     final hasEmail = _selectedCustomerEmail != null;
 
@@ -4477,7 +5093,9 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
             const SizedBox(height: 4),
             Text(
               t.quickSalesShareSectionHint,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
             ),
             const SizedBox(height: 8),
             SwitchListTile(
@@ -4499,7 +5117,9 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
             else if (_shareOnlinePaymentEnabled && _shareGateways.isEmpty)
               Text(
                 t.quickSalesShareNoGateway,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(color: cs.error),
+                style: Theme.of(
+                  context,
+                ).textTheme.bodySmall?.copyWith(color: cs.error),
               )
             else if (_shareOnlinePaymentEnabled) ...[
               const SizedBox(height: 4),
@@ -4539,7 +5159,9 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
                 padding: const EdgeInsets.only(bottom: 4),
                 child: Text(
                   t.quickSalesShareNoPhoneHint,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(color: cs.error),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodySmall?.copyWith(color: cs.error),
                 ),
               ),
             CheckboxListTile(
@@ -4555,14 +5177,18 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
                 padding: const EdgeInsets.only(bottom: 4),
                 child: Text(
                   t.quickSalesShareNoEmailHint,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
                 ),
               ),
             CheckboxListTile(
               contentPadding: EdgeInsets.zero,
               title: Text(t.quickSalesShareChannelNative),
               value: _shareViaNativeShare,
-              onChanged: _isSaving ? null : (v) => setState(() => _shareViaNativeShare = v ?? false),
+              onChanged: _isSaving
+                  ? null
+                  : (v) => setState(() => _shareViaNativeShare = v ?? false),
             ),
           ],
         ),
@@ -4572,13 +5198,10 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
 
   Widget _buildCheckoutButtons(ColorScheme cs) {
     Widget saveSpinner({double size = 20}) => SizedBox(
-          width: size,
-          height: size,
-          child: CircularProgressIndicator(
-            strokeWidth: 2,
-            color: cs.onPrimary,
-          ),
-        );
+      width: size,
+      height: size,
+      child: CircularProgressIndicator(strokeWidth: 2, color: cs.onPrimary),
+    );
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -4609,7 +5232,10 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
                   ? SizedBox(
                       width: 20,
                       height: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: cs.primary),
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: cs.primary,
+                      ),
                     )
                   : const Icon(Icons.save),
               label: const Text('ثبت'),
@@ -4626,10 +5252,15 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
     return SafeArea(
       top: false,
       child: Container(
-        padding: EdgeInsets.symmetric(horizontal: narrow ? 8 : 12, vertical: narrow ? 8 : 10),
+        padding: EdgeInsets.symmetric(
+          horizontal: narrow ? 8 : 12,
+          vertical: narrow ? 8 : 10,
+        ),
         decoration: BoxDecoration(
           color: cs.surface,
-          border: Border(top: BorderSide(color: cs.outlineVariant.withOpacity(0.4))),
+          border: Border(
+            top: BorderSide(color: cs.outlineVariant.withOpacity(0.4)),
+          ),
         ),
         child: Row(
           children: [
@@ -4663,7 +5294,12 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
             FilledButton(
               onPressed: canCheckout ? () => _openCheckoutSheet(cs) : null,
               style: narrow
-                  ? FilledButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10))
+                  ? FilledButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 10,
+                      ),
+                    )
                   : null,
               child: _isSaving
                   ? SizedBox(
@@ -4728,7 +5364,9 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
                         )
                       : Icon(
                           Icons.more_vert,
-                          color: canCheckout ? cs.onSurface : cs.onSurface.withOpacity(0.4),
+                          color: canCheckout
+                              ? cs.onSurface
+                              : cs.onSurface.withOpacity(0.4),
                         ),
                 ),
               ),
@@ -4772,12 +5410,13 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
                 Container(
                   decoration: BoxDecoration(
                     color: cs.surface,
-                    border: Border(top: BorderSide(color: cs.outlineVariant.withOpacity(0.4))),
+                    border: Border(
+                      top: BorderSide(
+                        color: cs.outlineVariant.withOpacity(0.4),
+                      ),
+                    ),
                   ),
-                  child: SafeArea(
-                    top: false,
-                    child: _buildCheckoutButtons(cs),
-                  ),
+                  child: SafeArea(top: false, child: _buildCheckoutButtons(cs)),
                 ),
               ],
             );
@@ -4787,7 +5426,12 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
     );
   }
 
-  Widget _buildSummaryRow(String label, String value, {bool isTotal = false, bool isWarning = false}) {
+  Widget _buildSummaryRow(
+    String label,
+    String value, {
+    bool isTotal = false,
+    bool isWarning = false,
+  }) {
     final cs = Theme.of(context).colorScheme;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
@@ -4807,7 +5451,9 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
             style: TextStyle(
               fontSize: isTotal ? 18 : 14,
               fontWeight: FontWeight.bold,
-              color: isTotal ? cs.primary : (isWarning ? cs.error : cs.onSurface),
+              color: isTotal
+                  ? cs.primary
+                  : (isWarning ? cs.error : cs.onSurface),
             ),
           ),
         ],
@@ -4816,7 +5462,10 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
   }
 
   String _formatNumber(num value) {
-    return formatWithThousands(value, decimalPlaces: _invoiceCurrencyDecimalPlaces);
+    return formatWithThousands(
+      value,
+      decimalPlaces: _invoiceCurrencyDecimalPlaces,
+    );
   }
 }
 
@@ -4871,17 +5520,31 @@ class _CartItemEditDialogState extends State<_CartItemEditDialog> {
   }
 
   InvoiceLineItem _buildUpdatedItem() {
-    final quantityValue = number_utils.parseFormattedNumber(_quantityController.text);
+    final quantityValue = number_utils.parseFormattedNumber(
+      _quantityController.text,
+    );
     final priceValue = number_utils.parseFormattedNumber(_priceController.text);
-    final discountValue = number_utils.parseFormattedNumber(_discountController.text);
-    final taxRateValue = number_utils.parseFormattedNumber(_taxRateController.text);
-    
-    final quantity = (quantityValue != null && quantityValue > 0) ? quantityValue : widget.item.quantity;
+    final discountValue = number_utils.parseFormattedNumber(
+      _discountController.text,
+    );
+    final taxRateValue = number_utils.parseFormattedNumber(
+      _taxRateController.text,
+    );
+
+    final quantity = (quantityValue != null && quantityValue > 0)
+        ? quantityValue
+        : widget.item.quantity;
     final price = widget.allowEditUnitPrice
-        ? ((priceValue != null && priceValue >= 0) ? priceValue : widget.item.unitPrice)
+        ? ((priceValue != null && priceValue >= 0)
+              ? priceValue
+              : widget.item.unitPrice)
         : widget.item.unitPrice;
-    final discount = (discountValue != null && discountValue >= 0) ? discountValue : widget.item.discountValue;
-    final taxRate = (taxRateValue != null && taxRateValue >= 0) ? taxRateValue : widget.item.taxRate;
+    final discount = (discountValue != null && discountValue >= 0)
+        ? discountValue
+        : widget.item.discountValue;
+    final taxRate = (taxRateValue != null && taxRateValue >= 0)
+        ? taxRateValue
+        : widget.item.taxRate;
 
     return widget.item.copyWith(
       quantity: quantity > 0 ? quantity : 1,
@@ -4898,9 +5561,7 @@ class _CartItemEditDialogState extends State<_CartItemEditDialog> {
     final updatedItem = _buildUpdatedItem();
 
     return Dialog(
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Container(
         constraints: const BoxConstraints(maxWidth: 500),
         child: Column(
@@ -4969,10 +5630,14 @@ class _CartItemEditDialogState extends State<_CartItemEditDialog> {
                         filled: true,
                         fillColor: cs.surfaceContainerHighest,
                       ),
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
                       inputFormatters: [
                         number_utils.EnglishDigitsFormatter(),
-                        const number_utils.ThousandsSeparatorInputFormatter(allowDecimal: true),
+                        const number_utils.ThousandsSeparatorInputFormatter(
+                          allowDecimal: true,
+                        ),
                       ],
                       onChanged: (_) => setState(() {}),
                     ),
@@ -4990,8 +5655,16 @@ class _CartItemEditDialogState extends State<_CartItemEditDialog> {
                       ),
                       decoration: InputDecoration(
                         labelText: 'قیمت واحد',
-                        hintText: widget.allowEditUnitPrice ? 'مثال: 100,000' : AppLocalizations.of(context).unitPriceReadOnlyFieldHint,
-                        helperText: widget.allowEditUnitPrice ? null : AppLocalizations.of(context).unitPriceReadOnlyFieldHint,
+                        hintText: widget.allowEditUnitPrice
+                            ? 'مثال: 100,000'
+                            : AppLocalizations.of(
+                                context,
+                              ).unitPriceReadOnlyFieldHint,
+                        helperText: widget.allowEditUnitPrice
+                            ? null
+                            : AppLocalizations.of(
+                                context,
+                              ).unitPriceReadOnlyFieldHint,
                         helperMaxLines: 2,
                         prefixIcon: const Icon(Icons.attach_money),
                         suffixText: 'ریال',
@@ -5003,60 +5676,88 @@ class _CartItemEditDialogState extends State<_CartItemEditDialog> {
                             ? cs.surfaceContainerHighest
                             : cs.surfaceContainerHigh.withValues(alpha: 0.85),
                       ),
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
                       inputFormatters: [
                         number_utils.EnglishDigitsFormatter(),
-                        const number_utils.ThousandsSeparatorInputFormatter(allowDecimal: false),
+                        const number_utils.ThousandsSeparatorInputFormatter(
+                          allowDecimal: false,
+                        ),
                       ],
-                      onChanged: widget.allowEditUnitPrice ? (_) => setState(() {}) : null,
+                      onChanged: widget.allowEditUnitPrice
+                          ? (_) => setState(() {})
+                          : null,
                     ),
                     const SizedBox(height: 16),
                     // نوع تخفیف و مبلغ تخفیف (در موبایل هر کدام یک سطر تا آیکون % با برچسب قاطی نشود)
                     Builder(
                       builder: (context) {
                         final stackedDiscount =
-                            MediaQuery.sizeOf(context).width < ResponsiveHelper.shellPersistentNavMinWidth;
-                        final discountDropdown = DropdownButtonFormField<String>(
-                          value: _discountType,
-                          decoration: InputDecoration(
-                            labelText: 'نوع تخفیف',
-                            prefixIcon: const Icon(Icons.percent),
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            filled: true,
-                            fillColor: cs.surfaceContainerHighest,
-                          ),
-                          items: const [
-                            DropdownMenuItem(value: 'amount', child: Text('مبلغی')),
-                            DropdownMenuItem(value: 'percent', child: Text('درصدی')),
-                          ],
-                          onChanged: (value) {
-                            if (value != null) {
-                              setState(() {
-                                _discountType = value;
-                              });
-                            }
-                          },
-                        );
+                            MediaQuery.sizeOf(context).width <
+                            ResponsiveHelper.shellPersistentNavMinWidth;
+                        final discountDropdown =
+                            DropdownButtonFormField<String>(
+                              value: _discountType,
+                              decoration: InputDecoration(
+                                labelText: 'نوع تخفیف',
+                                prefixIcon: const Icon(Icons.percent),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                filled: true,
+                                fillColor: cs.surfaceContainerHighest,
+                              ),
+                              items: const [
+                                DropdownMenuItem(
+                                  value: 'amount',
+                                  child: Text('مبلغی'),
+                                ),
+                                DropdownMenuItem(
+                                  value: 'percent',
+                                  child: Text('درصدی'),
+                                ),
+                              ],
+                              onChanged: (value) {
+                                if (value != null) {
+                                  setState(() {
+                                    _discountType = value;
+                                  });
+                                }
+                              },
+                            );
                         final discountValueField = TextField(
                           controller: _discountController,
                           decoration: InputDecoration(
-                            labelText: _discountType == 'percent' ? 'درصد تخفیف' : 'مبلغ تخفیف',
-                            hintText: _discountType == 'percent' ? 'مثال: 10' : 'مثال: 5,000',
-                            prefixIcon: Icon(_discountType == 'percent' ? Icons.percent : Icons.discount),
-                            suffixText: _discountType == 'percent' ? '%' : 'ریال',
+                            labelText: _discountType == 'percent'
+                                ? 'درصد تخفیف'
+                                : 'مبلغ تخفیف',
+                            hintText: _discountType == 'percent'
+                                ? 'مثال: 10'
+                                : 'مثال: 5,000',
+                            prefixIcon: Icon(
+                              _discountType == 'percent'
+                                  ? Icons.percent
+                                  : Icons.discount,
+                            ),
+                            suffixText: _discountType == 'percent'
+                                ? '%'
+                                : 'ریال',
                             border: OutlineInputBorder(
                               borderRadius: BorderRadius.circular(8),
                             ),
                             filled: true,
                             fillColor: cs.surfaceContainerHighest,
                           ),
-                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                          keyboardType: const TextInputType.numberWithOptions(
+                            decimal: true,
+                          ),
                           inputFormatters: [
                             number_utils.EnglishDigitsFormatter(),
                             number_utils.ThousandsSeparatorInputFormatter(
-                              allowDecimal: _discountType == 'percent' ? false : true,
+                              allowDecimal: _discountType == 'percent'
+                                  ? false
+                                  : true,
                             ),
                           ],
                           onChanged: (_) => setState(() {}),
@@ -5095,10 +5796,14 @@ class _CartItemEditDialogState extends State<_CartItemEditDialog> {
                         filled: true,
                         fillColor: cs.surfaceContainerHighest,
                       ),
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
                       inputFormatters: [
                         number_utils.EnglishDigitsFormatter(),
-                        const number_utils.ThousandsSeparatorInputFormatter(allowDecimal: false),
+                        const number_utils.ThousandsSeparatorInputFormatter(
+                          allowDecimal: false,
+                        ),
                       ],
                       onChanged: (_) => setState(() {}),
                     ),
@@ -5119,7 +5824,11 @@ class _CartItemEditDialogState extends State<_CartItemEditDialog> {
                         children: [
                           Row(
                             children: [
-                              Icon(Icons.calculate, size: 20, color: cs.primary),
+                              Icon(
+                                Icons.calculate,
+                                size: 20,
+                                color: cs.primary,
+                              ),
                               const SizedBox(width: 8),
                               Text(
                                 'خلاصه محاسبات',
@@ -5134,7 +5843,10 @@ class _CartItemEditDialogState extends State<_CartItemEditDialog> {
                           const SizedBox(height: 16),
                           _buildSummaryRow(
                             'جمع کل',
-                            formatWithThousands(updatedItem.subtotal, decimalPlaces: widget.currencyDecimalPlaces),
+                            formatWithThousands(
+                              updatedItem.subtotal,
+                              decimalPlaces: widget.currencyDecimalPlaces,
+                            ),
                             icon: Icons.summarize,
                           ),
                           if (updatedItem.discountValue > 0) ...[
@@ -5150,14 +5862,20 @@ class _CartItemEditDialogState extends State<_CartItemEditDialog> {
                             const SizedBox(height: 8),
                             _buildSummaryRow(
                               'مالیات',
-                              formatWithThousands(updatedItem.taxAmount, decimalPlaces: widget.currencyDecimalPlaces),
+                              formatWithThousands(
+                                updatedItem.taxAmount,
+                                decimalPlaces: widget.currencyDecimalPlaces,
+                              ),
                               icon: Icons.receipt,
                             ),
                           ],
                           const Divider(height: 24),
                           _buildSummaryRow(
                             'مبلغ نهایی',
-                            formatWithThousands(updatedItem.total, decimalPlaces: widget.currencyDecimalPlaces),
+                            formatWithThousands(
+                              updatedItem.total,
+                              decimalPlaces: widget.currencyDecimalPlaces,
+                            ),
                             icon: Icons.payments,
                             isTotal: true,
                           ),
@@ -5186,7 +5904,10 @@ class _CartItemEditDialogState extends State<_CartItemEditDialog> {
                     icon: const Icon(Icons.cancel_outlined),
                     label: const Text('انصراف'),
                     style: TextButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 12,
+                      ),
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -5199,7 +5920,10 @@ class _CartItemEditDialogState extends State<_CartItemEditDialog> {
                     style: ElevatedButton.styleFrom(
                       backgroundColor: cs.primary,
                       foregroundColor: cs.onPrimary,
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 12,
+                      ),
                     ),
                   ),
                 ],
@@ -5275,11 +5999,9 @@ class _InstanceSelectionDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    
+
     return Dialog(
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Container(
         constraints: const BoxConstraints(maxWidth: 600, maxHeight: 500),
         child: Column(
@@ -5335,22 +6057,24 @@ class _InstanceSelectionDialog extends StatelessWidget {
                 shrinkWrap: true,
                 itemCount: instances.length,
                 itemBuilder: (context, index) {
-                  final instance = Map<String, dynamic>.from(instances[index] as Map);
-                  final serialNumber = instance['serial_number']?.toString() ?? '-';
+                  final instance = Map<String, dynamic>.from(
+                    instances[index] as Map,
+                  );
+                  final serialNumber =
+                      instance['serial_number']?.toString() ?? '-';
                   final barcode = instance['barcode']?.toString() ?? '-';
-                  final productName = instance['product_name']?.toString() ?? 'نامشخص';
+                  final productName =
+                      instance['product_name']?.toString() ?? 'نامشخص';
                   final warehouseName = instance['warehouse_name']?.toString();
-                  
+
                   return ListTile(
                     leading: const Icon(Icons.inventory_2),
                     title: Text(productName),
                     subtitle: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        if (serialNumber != '-') 
-                          Text('سریال: $serialNumber'),
-                        if (barcode != '-') 
-                          Text('بارکد: $barcode'),
+                        if (serialNumber != '-') Text('سریال: $serialNumber'),
+                        if (barcode != '-') Text('بارکد: $barcode'),
                         if (warehouseName != null)
                           Text('انبار: $warehouseName'),
                       ],
@@ -5393,20 +6117,20 @@ class _ProductSelectionDialog extends StatelessWidget {
 
   String _formatNumber(num? value) {
     if (value == null) return '-';
-    return value.toStringAsFixed(0).replaceAllMapped(
-      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
-      (Match m) => '${m[1]},',
-    );
+    return value
+        .toStringAsFixed(0)
+        .replaceAllMapped(
+          RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+          (Match m) => '${m[1]},',
+        );
   }
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    
+
     return Dialog(
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Container(
         constraints: const BoxConstraints(maxWidth: 600, maxHeight: 500),
         child: Column(
@@ -5464,12 +6188,16 @@ class _ProductSelectionDialog extends StatelessWidget {
                 itemBuilder: (context, index) {
                   final product = products[index];
                   final productName = product['name']?.toString() ?? 'نامشخص';
-                  final productCode = _quickSalesDisplayProductBusinessCode(product);
+                  final productCode = _quickSalesDisplayProductBusinessCode(
+                    product,
+                  );
                   final showBarcodeLine = !ResponsiveHelper.isMobile(context);
-                  final barcodeLine =
-                      showBarcodeLine ? productPrimaryBarcodeForSearchDisplay(product) : null;
-                  final salesPrice = product['base_sales_price'] ?? product['sales_price'];
-                  
+                  final barcodeLine = showBarcodeLine
+                      ? productPrimaryBarcodeForSearchDisplay(product)
+                      : null;
+                  final salesPrice =
+                      product['base_sales_price'] ?? product['sales_price'];
+
                   return ListTile(
                     leading: const Icon(Icons.shopping_bag),
                     title: Text(productName),
@@ -5525,4 +6253,3 @@ class _ProductSelectionDialog extends StatelessWidget {
     return num.tryParse(value.toString()) ?? defaultValue;
   }
 }
-

@@ -11838,7 +11838,94 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get quickSalesAutoCreateReceiptSwitchHint =>
-      'Record a separate receipt with the invoice (cash register payment)';
+      'Record cash, bank, or check receipts with the invoice. Any remainder stays on the customer account.';
+
+  @override
+  String get quickSalesPayCashRegister => 'Cash register';
+
+  @override
+  String get quickSalesPayCashRegisterHint => 'Select cash register';
+
+  @override
+  String get quickSalesPayBank => 'Bank';
+
+  @override
+  String get quickSalesPayBankHint => 'Select bank account';
+
+  @override
+  String get quickSalesPayCheck => 'Check';
+
+  @override
+  String get quickSalesPayCheckHint => 'Select or add a received check';
+
+  @override
+  String get quickSalesPayAmount => 'Amount';
+
+  @override
+  String get quickSalesPayAddCash => '+ Cash';
+
+  @override
+  String get quickSalesPayAddBank => '+ Bank';
+
+  @override
+  String get quickSalesPayAddCheck => '+ Check';
+
+  @override
+  String get quickSalesPayFillRemaining => 'Fill remaining';
+
+  @override
+  String get quickSalesPayRemoveLine => 'Remove this payment';
+
+  @override
+  String get quickSalesPayPaidLabel => 'Paid';
+
+  @override
+  String get quickSalesPayRemainingLabel => 'Remaining';
+
+  @override
+  String get quickSalesPaySettled => 'Fully settled';
+
+  @override
+  String get quickSalesPayPartialStatus =>
+      'Remainder stays on the customer account';
+
+  @override
+  String get quickSalesPayOverpaid => 'Payments exceed the invoice total';
+
+  @override
+  String get quickSalesPayRemainingCustomerHint =>
+      'The remainder is recorded as credit on this customer.';
+
+  @override
+  String get quickSalesPayRemainingAnonymousHint =>
+      'The remainder will be on the walk-in customer. Choose a real customer for credit sales.';
+
+  @override
+  String get quickSalesPayShareRemaining => 'Send a link for the remainder';
+
+  @override
+  String get quickSalesPayShareRemainingHint =>
+      'Send an online payment link only for the unpaid amount';
+
+  @override
+  String get quickSalesPaySelectCashRegister =>
+      'Select a cash register for the cash payment';
+
+  @override
+  String get quickSalesPaySelectBank =>
+      'Select a bank account for the bank payment';
+
+  @override
+  String get quickSalesPaySelectCheck =>
+      'Select or add a check for the check payment';
+
+  @override
+  String get quickSalesPayOverpaidError =>
+      'Payments exceed the invoice total. Adjust the amounts.';
+
+  @override
+  String get quickSalesPayNeedDestination =>
+      'Each payment line needs a cash register, bank, or check';
 
   @override
   String get quickSalesShareSectionTitle => 'Share';
@@ -11918,7 +12005,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get quickSalesSettingsShareDefaultsHint =>
-      'Applied on the quick sales page when \"Create receipt document\" is off';
+      'Used on the quick sales page when receipt is off, or when sharing a remaining balance';
 
   @override
   String get quickSalesSettingsShareExpiryLabel => 'Link expiry';
