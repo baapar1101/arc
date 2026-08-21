@@ -30,6 +30,23 @@ AIChatResumeHint resumeHintFromFunctionResults(
   return AIChatResumeHint(runId: runId, stopMessageFa: stop);
 }
 
+/// آخرین پیام کاربر است و هنوز پاسخ دستیار در تاریخچه نیست.
+bool sessionAwaitsAssistantReply(List<AIChatMessage> messages) {
+  if (messages.isEmpty) return false;
+  return messages.last.role == MessageRole.user;
+}
+
+/// بعد از بستن صفحه، Last-Event-ID سرور یعنی «رویدادهایی که این کلاینت ندیده».
+/// اگر حباب دستیار در UI نیست باید از صفر replay شود.
+int sseReplayCursor({
+  required bool uiHasAssistantPartial,
+  required int serverLastEventId,
+}) {
+  if (!uiHasAssistantPartial) return 0;
+  if (serverLastEventId < 0) return 0;
+  return serverLastEventId;
+}
+
 /// فقط آخرین پیام assistant را می‌بیند — هم‌تراز منطق قبلی dialog.
 AIChatResumeHint resumeHintFromMessages(
   List<AIChatMessage> messages, {

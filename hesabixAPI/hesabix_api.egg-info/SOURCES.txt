@@ -223,6 +223,7 @@ adapters/db/models/ai_prompt.py
 adapters/db/models/ai_provider_credential.py
 adapters/db/models/ai_session_todo.py
 adapters/db/models/ai_skill.py
+adapters/db/models/ai_subagent_run.py
 adapters/db/models/ai_subscription.py
 adapters/db/models/ai_usage_log.py
 adapters/db/models/ai_voice_interaction.py
@@ -724,6 +725,7 @@ app/services/ai/ai_attachment_service.py
 app/services/ai/ai_budget.py
 app/services/ai/ai_calendar_prompt.py
 app/services/ai/ai_channel_policy.py
+app/services/ai/ai_channel_stream.py
 app/services/ai/ai_citation_service.py
 app/services/ai/ai_connector_service.py
 app/services/ai/ai_constants.py
@@ -801,6 +803,7 @@ app/services/ai/ai_reports_catalog.py
 app/services/ai/ai_reports_service.py
 app/services/ai/ai_retry_policy.py
 app/services/ai/ai_role_security_prompt.py
+app/services/ai/ai_run_hub.py
 app/services/ai/ai_scheduled_task_service.py
 app/services/ai/ai_service.py
 app/services/ai/ai_session_todo_events.py
@@ -812,8 +815,10 @@ app/services/ai/ai_skill_service.py
 app/services/ai/ai_sse_event_buffer.py
 app/services/ai/ai_stream_aggregate.py
 app/services/ai/ai_stream_budget.py
+app/services/ai/ai_stream_errors.py
 app/services/ai/ai_stream_helpers.py
 app/services/ai/ai_subagent.py
+app/services/ai/ai_subagent_run_store.py
 app/services/ai/ai_subagent_sse.py
 app/services/ai/ai_summarize_quota.py
 app/services/ai/ai_system_prompt.py
@@ -1208,6 +1213,7 @@ migrations/versions/20260817_000001_quick_sales_print_paper_size.py
 migrations/versions/20260817_000002_ai_agent_runs.py
 migrations/versions/20260818_000001_ai_voice_models.py
 migrations/versions/20260819_000001_ai_memory_identity_prompt.py
+migrations/versions/20260821_000001_ai_subagent_runs.py
 tests/__init__.py
 tests/test_account_balance_core.py
 tests/test_account_tree_roots.py
@@ -1220,6 +1226,7 @@ tests/test_ai_answer_from_evidence.py
 tests/test_ai_budget.py
 tests/test_ai_calendar_prompt.py
 tests/test_ai_channel_policy.py
+tests/test_ai_channel_stream.py
 tests/test_ai_citation_service.py
 tests/test_ai_connector_security.py
 tests/test_ai_content_sanitize.py
@@ -1259,6 +1266,8 @@ tests/test_ai_quota_helpers.py
 tests/test_ai_reports_catalog.py
 tests/test_ai_retry_policy.py
 tests/test_ai_routing_alignment.py
+tests/test_ai_run_freshness.py
+tests/test_ai_run_hub.py
 tests/test_ai_scheduled_task_metering.py
 tests/test_ai_session_todo_service.py
 tests/test_ai_skill_parser.py
@@ -1267,7 +1276,9 @@ tests/test_ai_sse_reconnect.py
 tests/test_ai_stream_aggregate.py
 tests/test_ai_stream_budget.py
 tests/test_ai_stream_done.py
+tests/test_ai_stream_errors.py
 tests/test_ai_subagent.py
+tests/test_ai_subagent_run_store.py
 tests/test_ai_subscription_lock.py
 tests/test_ai_subscription_renew.py
 tests/test_ai_tool_catalog.py

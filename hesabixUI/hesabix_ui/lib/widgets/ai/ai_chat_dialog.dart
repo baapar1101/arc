@@ -1027,16 +1027,31 @@ class _AIChatDialogState extends State<AIChatDialog> {
   Future<void> _resumeActiveRunIfNeeded() async {
     final sessionId = _currentSession?.id;
     if (sessionId == null || _sending) return;
-    final active = await _aiService.getActiveAgentRun(sessionId: sessionId);
+
+    Future<void> reloadMessages() async {
+      final msgs = await _aiService.getSessionMessages(sessionId: sessionId);
+      if (!mounted) return;
+      setState(() {
+        _messages = msgs;
+        _syncMessageKeys();
+        _syncContinueRunFromMessages();
+        _syncPendingWriteApprovalFromMessages();
+      });
+    }
+
+    bool awaitsAssistant() => sessionAwaitsAssistantReply(_messages);
+
+    var active = await _aiService.getActiveAgentRun(sessionId: sessionId);
     if (!mounted) return;
-    if (active == null || active.runId.isEmpty) return;
     final l10n = AppLocalizations.of(context);
 
-    if (active.isGenerating) {
-      _sseCursor.runId = active.runId;
-      if (active.lastEventId > 0) {
-        _sseCursor.lastEventId = active.lastEventId;
-      }
+    if (active != null && active.isGenerating) {
+      final runId = active.runId;
+      _sseCursor.runId = runId;
+      _sseCursor.lastEventId = sseReplayCursor(
+        uiHasAssistantPartial: !awaitsAssistant(),
+        serverLastEventId: active.lastEventId,
+      );
       _showSnackbar(l10n.aiResumingPreviousRun);
       setState(() {
         _stream.begin(phase: 'connecting');
@@ -1045,21 +1060,55 @@ class _AIChatDialogState extends State<AIChatDialog> {
       await _runAssistantStream(
         (cancelToken) => _aiService.subscribeAgentRunStream(
           sessionId: sessionId,
-          runId: active.runId,
+          runId: runId,
           sseCursor: _sseCursor,
           cancelToken: cancelToken,
         ),
         errorLabel: l10n.aiContinueAnalysis,
       );
+      if (mounted && !_sending) {
+        await reloadMessages();
+      }
       return;
     }
 
-    if (active.canContinue) {
+    if (awaitsAssistant()) {
+      await reloadMessages();
+    }
+    if (!mounted || _sending) return;
+
+    if (awaitsAssistant()) {
+      unawaited(_pollPersistedAssistant(sessionId));
+    }
+
+    if (active != null && active.canContinue) {
       setState(() {
         _continueRunId = active.runId;
         _continueStopMessage = active.stopMessageFa?.trim().isNotEmpty == true
             ? active.stopMessageFa
             : l10n.aiContinueAfterRefreshHint;
+      });
+    }
+  }
+
+  Future<void> _pollPersistedAssistant(int sessionId) async {
+    for (var attempt = 0; attempt < 6; attempt++) {
+      await Future<void>.delayed(Duration(milliseconds: 400 * (attempt + 1)));
+      if (!mounted || _sending) return;
+      if (!sessionAwaitsAssistantReply(_messages)) return;
+      final active = await _aiService.getActiveAgentRun(sessionId: sessionId);
+      if (!mounted || _sending) return;
+      if (active != null && active.isGenerating) {
+        await _resumeActiveRunIfNeeded();
+        return;
+      }
+      final msgs = await _aiService.getSessionMessages(sessionId: sessionId);
+      if (!mounted || _sending) return;
+      setState(() {
+        _messages = msgs;
+        _syncMessageKeys();
+        _syncContinueRunFromMessages();
+        _syncPendingWriteApprovalFromMessages();
       });
     }
   }
@@ -1092,7 +1141,7 @@ class _AIChatDialogState extends State<AIChatDialog> {
 
   Future<void> _selectSession(
     AIChatSession session, {
-    bool resumeActiveRun = false,
+    bool resumeActiveRun = true,
   }) async {
     if (_currentSession?.id == session.id) return;
     if (_isGenerating) {
@@ -1101,6 +1150,8 @@ class _AIChatDialogState extends State<AIChatDialog> {
     if (_voice != null) {
       await _stopVoiceSession();
     }
+    _sseCursor.lastEventId = null;
+    _sseCursor.runId = null;
     setState(() {
       _thread.beginSelectSession(session);
       _executionMode = AIExecutionMode.normalize(session.executionMode);

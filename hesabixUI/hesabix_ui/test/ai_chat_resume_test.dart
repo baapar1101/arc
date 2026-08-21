@@ -73,4 +73,47 @@ void main() {
       expect(hint.runId, isNull);
     });
   });
+
+  group('session reopen catch-up', () {
+    test('awaits assistant when last message is the user', () {
+      final messages = [
+        AIChatMessage(
+          sessionId: 1,
+          role: MessageRole.user,
+          content: 'موجودی صندوق؟',
+        ),
+      ];
+      expect(sessionAwaitsAssistantReply(messages), isTrue);
+    });
+
+    test('does not await when assistant already persisted', () {
+      final messages = [
+        AIChatMessage(
+          sessionId: 1,
+          role: MessageRole.user,
+          content: 'سوال',
+        ),
+        AIChatMessage(
+          sessionId: 1,
+          role: MessageRole.assistant,
+          content: 'پاسخ',
+        ),
+      ];
+      expect(sessionAwaitsAssistantReply(messages), isFalse);
+    });
+
+    test('cold UI replays SSE from the start even if server last_event_id is high', () {
+      expect(
+        sseReplayCursor(uiHasAssistantPartial: false, serverLastEventId: 42),
+        0,
+      );
+    });
+
+    test('live reconnect keeps server cursor when partial is already on screen', () {
+      expect(
+        sseReplayCursor(uiHasAssistantPartial: true, serverLastEventId: 42),
+        42,
+      );
+    });
+  });
 }
