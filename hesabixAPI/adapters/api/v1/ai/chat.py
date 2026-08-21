@@ -2393,7 +2393,10 @@ async def _produce_agent_stream(
                         if prebuilt_structured is not None
                         else prebuilt_prompt
                     ),
-                    resume_from_run=resume_from_run,
+                    resume_from_run={
+                        **(resume_from_run or {}),
+                        "run_id": live.run_id,
+                    },
                 ):
                     yield chunk
 
@@ -2489,19 +2492,21 @@ async def _produce_agent_stream(
         )
 
     except asyncio.CancelledError:
+        user_stop = bool(getattr(live, "cancel_requested", False))
         if final_agent_run or live.run_id:
             _persist_live_run(
                 dict(final_agent_run or {"run_id": live.run_id, "status": "interrupted"}),
                 interrupted=True,
             )
         _schedule_persist_on_disconnect()
-        live.publish(
-            stream_error_payload(
-                code="RUN_CANCELLED",
-                run_id=live.run_id,
-                can_continue=bool(live.run_id),
+        if user_stop:
+            live.publish(
+                stream_error_payload(
+                    code="RUN_CANCELLED",
+                    run_id=live.run_id,
+                    can_continue=bool(live.run_id),
+                )
             )
-        )
         raise
     except Exception as e:
         if final_agent_run or live.run_id:

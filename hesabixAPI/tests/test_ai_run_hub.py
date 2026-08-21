@@ -47,6 +47,40 @@ async def test_subscriber_cancel_does_not_stop_producer():
 
 
 @pytest.mark.asyncio
+async def test_cancelling_request_task_does_not_stop_producer():
+    drop_sse_events("hubrun000000005")
+    hub = AgentRunHub()
+    hub.start_supervisor()
+    started = asyncio.Event()
+    finished = asyncio.Event()
+
+    async def producer(live):
+        started.set()
+        await asyncio.sleep(0.2)
+        live.publish({"content": "ok", "done": True})
+        finished.set()
+
+    async def fake_sse_request():
+        await hub.attach_or_start(
+            run_id="hubrun000000005",
+            session_id=1,
+            user_id=1,
+            producer=producer,
+        )
+        async for _ in hub.iter_formatted("hubrun000000005", 0):
+            break
+
+    request_task = asyncio.create_task(fake_sse_request())
+    await started.wait()
+    request_task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await request_task
+    assert hub.is_live("hubrun000000005")
+    await asyncio.wait_for(finished.wait(), timeout=1.0)
+    drop_sse_events("hubrun000000005")
+
+
+@pytest.mark.asyncio
 async def test_late_subscriber_replays_buffered_events():
     drop_sse_events("hubrun000000002")
     hub = AgentRunHub()

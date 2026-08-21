@@ -153,6 +153,21 @@ def persist_agent_run_checkpoint(
                 origin_message_id=origin_message_id,
             )
             db.commit()
+            resolved = status or snap.get("status")
+            if resolved == AIAgentRunStatus.COMPLETED:
+                db.query(AIAgentRun).filter(
+                    AIAgentRun.session_id == session_id,
+                    AIAgentRun.run_id != str(run_id),
+                    AIAgentRun.status == AIAgentRunStatus.RUNNING,
+                    AIAgentRun.last_event_id == 0,
+                ).update(
+                    {
+                        "status": AIAgentRunStatus.INTERRUPTED,
+                        "stop_reason": "superseded",
+                    },
+                    synchronize_session=False,
+                )
+                db.commit()
     except Exception as exc:
         logger.warning(
             "Failed to persist agent run checkpoint run_id=%s session=%s: %s",

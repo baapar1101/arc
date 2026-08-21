@@ -2015,14 +2015,16 @@ class AIService(AIModelRouterMixin, AIUsageMeterMixin):
         )
         # وضعیت اجرا (run_id/phase) — checkpoint در جدول و function_results.
         resume_run_id = None
+        resume_iteration = None
         if isinstance(resume_from_run, dict):
             resume_run_id = resume_from_run.get("run_id")
+            resume_iteration = resume_from_run.get("iteration")
         agent_run = AgentRunState(
             run_id=str(resume_run_id) if resume_run_id else new_agent_run_id(),
             needs_tools=_needs_tools_routing,
             phase=(
                 AGENT_RUN_PHASE_AGENT_LOOP
-                if resume_run_id
+                if resume_iteration
                 else AGENT_RUN_PHASE_GATHER_CONTEXT
             ),
         )

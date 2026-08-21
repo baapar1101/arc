@@ -53,6 +53,7 @@ class LiveAgentRun:
     cancel_requested: bool = False
     finished: bool = False
     started_at: float = field(default_factory=time.monotonic)
+    spawned: asyncio.Event = field(default_factory=asyncio.Event)
 
     def publish(self, data: dict[str, Any]) -> tuple[int, dict[str, Any]]:
         event_id, payload = self.sequencer.push(data)
@@ -79,6 +80,47 @@ class AgentRunHub:
     def __init__(self) -> None:
         self._runs: dict[str, LiveAgentRun] = {}
         self._lock = asyncio.Lock()
+        self._mailbox: Optional[asyncio.Queue] = None
+        self._supervisor: Optional[asyncio.Task] = None
+
+    def start_supervisor(self) -> None:
+        """باید در startup اپ صدا زده شود تا خارج از cancel scope درخواست بماند."""
+        if self._supervisor is not None and not self._supervisor.done():
+            return
+        self._mailbox = asyncio.Queue()
+        self._supervisor = asyncio.create_task(
+            self._supervise_forever(), name="ai-run-hub-supervisor"
+        )
+
+    async def _supervise_forever(self) -> None:
+        assert self._mailbox is not None
+        while True:
+            live, producer = await self._mailbox.get()
+            live.task = asyncio.create_task(
+                self._run_producer(live, producer),
+                name=f"ai-run-{live.run_id}",
+            )
+            live.spawned.set()
+
+    async def _run_producer(self, live: LiveAgentRun, producer: ProducerFn) -> None:
+        try:
+            await producer(live)
+        except asyncio.CancelledError:
+            if live.cancel_requested:
+                raise
+            logger.warning(
+                "agent run producer cancelled without user stop run_id=%s",
+                live.run_id,
+            )
+            raise
+        except Exception:
+            logger.exception("agent run producer crashed run_id=%s", live.run_id)
+        finally:
+            live.notify_finished()
+            await asyncio.sleep(1.5)
+            async with self._lock:
+                if self._runs.get(live.run_id) is live:
+                    self._runs.pop(live.run_id, None)
 
     def get(self, run_id: str) -> Optional[LiveAgentRun]:
         return self._runs.get(str(run_id))
@@ -108,6 +150,7 @@ class AgentRunHub:
         start_id: int = 0,
     ) -> LiveAgentRun:
         """اگر producer زنده است همان را برگردان؛ وگرنه یکی بساز و شروع کن."""
+        self.start_supervisor()
         async with self._lock:
             existing = self._runs.get(run_id)
             if existing is not None and not existing.finished:
@@ -120,21 +163,9 @@ class AgentRunHub:
             )
             self._runs[run_id] = live
 
-        async def _runner() -> None:
-            try:
-                await producer(live)
-            except asyncio.CancelledError:
-                raise
-            except Exception:
-                logger.exception("agent run producer crashed run_id=%s", run_id)
-            finally:
-                live.notify_finished()
-                await asyncio.sleep(1.5)
-                async with self._lock:
-                    if self._runs.get(run_id) is live:
-                        self._runs.pop(run_id, None)
-
-        live.task = asyncio.create_task(_runner(), name=f"ai-run-{run_id}")
+        assert self._mailbox is not None
+        await self._mailbox.put((live, producer))
+        await live.spawned.wait()
         return live
 
     async def iter_formatted(

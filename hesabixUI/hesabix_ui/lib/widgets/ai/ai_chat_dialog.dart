@@ -801,7 +801,10 @@ class _AIChatDialogState extends State<AIChatDialog> {
     _showSnackbar(AppLocalizations.of(context).aiChatCopied);
   }
 
-  void _stopGenerating({bool showNotice = true}) {
+  void _stopGenerating({
+    bool showNotice = true,
+    bool cancelServerRun = true,
+  }) {
     final token = _streamCancelToken;
     if (token != null && !token.isCancelled) {
       token.cancel('user_cancel');
@@ -809,7 +812,10 @@ class _AIChatDialogState extends State<AIChatDialog> {
     _streamCancelToken = null;
     final runId = _stream.runId ?? _sseCursor.runId;
     final sessionId = _currentSession?.id;
-    if (runId != null && runId.isNotEmpty && sessionId != null) {
+    if (cancelServerRun &&
+        runId != null &&
+        runId.isNotEmpty &&
+        sessionId != null) {
       unawaited(
         _aiService.cancelAgentRun(sessionId: sessionId, runId: runId),
       );
@@ -1145,7 +1151,7 @@ class _AIChatDialogState extends State<AIChatDialog> {
   }) async {
     if (_currentSession?.id == session.id) return;
     if (_isGenerating) {
-      _stopGenerating(showNotice: false);
+      _stopGenerating(showNotice: false, cancelServerRun: false);
     }
     if (_voice != null) {
       await _stopVoiceSession();
@@ -1476,7 +1482,7 @@ class _AIChatDialogState extends State<AIChatDialog> {
   }
 
   Future<void> _goToHome() async {
-    if (_isGenerating) _stopGenerating(showNotice: false);
+    if (_isGenerating) _stopGenerating(showNotice: false, cancelServerRun: false);
     if (_voice != null) await _stopVoiceSession();
     if (!mounted) return;
     setState(() {

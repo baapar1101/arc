@@ -1219,6 +1219,9 @@ def create_app() -> FastAPI:
         from app.services.crm_chat_realtime_fanout import start_crm_chat_fanout_subscriber
 
         loop = asyncio.get_running_loop()
+        from app.services.ai.ai_run_hub import agent_run_hub
+
+        agent_run_hub.start_supervisor()
         start_crm_chat_fanout_subscriber(loop)
 
         from app.services.support.support_realtime_fanout import start_support_fanout_subscriber
