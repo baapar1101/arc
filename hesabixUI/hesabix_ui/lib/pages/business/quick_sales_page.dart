@@ -240,6 +240,7 @@ class _QuickSalesPageState extends State<QuickSalesPage>
   String _activeSaleId = '';
   bool _parkedHydrated = false;
   Timer? _parkedPersistDebounce;
+  bool _checkoutDiscountExpanded = false;
 
   @override
   void setState(VoidCallback fn) {
@@ -662,6 +663,7 @@ class _QuickSalesPageState extends State<QuickSalesPage>
     _payments = List<InvoiceTransaction>.from(sale.payments);
     _cashFollowsTotal = sale.cashFollowsTotal;
     _shareRemainingEnabled = false;
+    _checkoutDiscountExpanded = false;
     _selectedCashRegisterId =
         sale.cashRegisterId ?? _settingsDefaultCashRegisterId;
     _defaultWarehouseId = sale.warehouseId ?? _settingsDefaultWarehouseId;
@@ -688,6 +690,7 @@ class _QuickSalesPageState extends State<QuickSalesPage>
     _payments = [];
     _cashFollowsTotal = true;
     _shareRemainingEnabled = false;
+    _checkoutDiscountExpanded = false;
     _selectedCashRegisterId = _settingsDefaultCashRegisterId;
     _defaultWarehouseId = _settingsDefaultWarehouseId;
     _documentDate = DateTime.now();
@@ -2452,6 +2455,7 @@ class _QuickSalesPageState extends State<QuickSalesPage>
         _payments = [];
         _cashFollowsTotal = true;
         _shareRemainingEnabled = false;
+        _checkoutDiscountExpanded = false;
         _productStocks.clear();
         _pendingStockProductIds.clear();
         _documentDate = DateTime.now();
@@ -4469,14 +4473,25 @@ class _QuickSalesPageState extends State<QuickSalesPage>
   }
 
   Widget _buildMobileCheckoutTab(ColorScheme cs) {
-    return ListView(
-      padding: const EdgeInsets.only(bottom: 12),
+    return Column(
       children: [
-        _buildInvoiceSummarySection(cs),
-        const Divider(),
-        _buildPaymentSection(cs),
-        const SizedBox(height: 8),
-        _buildCheckoutButtons(cs),
+        Expanded(
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+            children: [
+              _buildCheckoutScrollBody(
+                cs,
+                includeCustomer: false,
+                includeDocumentMeta: false,
+              ),
+            ],
+          ),
+        ),
+        Material(
+          elevation: 3,
+          color: cs.surface,
+          child: SafeArea(top: false, child: _buildCheckoutButtons(cs)),
+        ),
       ],
     );
   }
@@ -4781,7 +4796,7 @@ class _QuickSalesPageState extends State<QuickSalesPage>
 
   Widget _buildDesktopCheckoutPanel(ColorScheme cs) {
     return Container(
-      width: 350,
+      width: 384,
       color: cs.surfaceContainerHighest,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -4790,62 +4805,226 @@ class _QuickSalesPageState extends State<QuickSalesPage>
             child: Scrollbar(
               thumbVisibility: true,
               child: SingleChildScrollView(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-                      child: CustomerComboboxWidget(
-                        selectedCustomer: _selectedCustomer,
-                        onCustomerChanged: (customer) {
-                          setState(() {
-                            _selectedCustomer = customer ?? _anonymousCustomer;
-                            _syncShareChannelDefaults();
-                          });
-                        },
-                        businessId: widget.businessId,
-                        authStore: widget.authStore,
-                        isRequired: false,
-                        label: 'مشتری',
-                        hintText: 'مشتری ناشناس',
-                      ),
-                    ),
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-                      child: _buildDocumentDateAndDescription(
-                        isMobile: true,
-                        compact: false,
-                      ),
-                    ),
-                    const Divider(height: 24),
-                    _buildInvoiceSummarySection(cs),
-                    const Divider(),
-                    _buildPaymentSection(cs),
-                  ],
+                padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
+                child: _buildCheckoutScrollBody(
+                  cs,
+                  includeCustomer: true,
+                  includeDocumentMeta: true,
                 ),
               ),
             ),
           ),
-          _buildCheckoutButtons(cs),
+          Material(
+            elevation: 2,
+            color: cs.surface,
+            child: _buildCheckoutButtons(cs),
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildGlobalDiscountSection(ColorScheme cs) {
+  Widget _buildCheckoutScrollBody(
+    ColorScheme cs, {
+    required bool includeCustomer,
+    required bool includeDocumentMeta,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (includeCustomer) ...[
+          CustomerComboboxWidget(
+            selectedCustomer: _selectedCustomer,
+            onCustomerChanged: (customer) {
+              setState(() {
+                _selectedCustomer = customer ?? _anonymousCustomer;
+                _syncShareChannelDefaults();
+              });
+            },
+            businessId: widget.businessId,
+            authStore: widget.authStore,
+            isRequired: false,
+            dense: true,
+            label: 'مشتری',
+            hintText: 'مشتری ناشناس',
+          ),
+          const SizedBox(height: 10),
+        ],
+        _buildCheckoutTotalHero(cs),
+        const SizedBox(height: 4),
+        _buildCheckoutDiscountBlock(cs),
+        const SizedBox(height: 10),
+        _buildPaymentSection(cs),
+        const SizedBox(height: 4),
+        _buildCheckoutDetailsTile(cs, includeDocumentMeta: includeDocumentMeta),
+      ],
+    );
+  }
+
+  Widget _buildCheckoutTotalHero(ColorScheme cs) {
+    final t = AppLocalizations.of(context);
+    return Material(
+      color: cs.primaryContainer.withValues(alpha: 0.55),
+      borderRadius: BorderRadius.circular(12),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              t.invoiceSummaryTotal,
+              style: Theme.of(
+                context,
+              ).textTheme.labelLarge?.copyWith(color: cs.onPrimaryContainer),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              _formatNumber(_totalAmount),
+              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                fontWeight: FontWeight.w800,
+                color: cs.onPrimaryContainer,
+              ),
+            ),
+            if (_totalDiscount > 0)
+              Padding(
+                padding: const EdgeInsets.only(top: 2),
+                child: Text(
+                  '${t.invoiceSummaryDiscount}: -${_formatNumber(_totalDiscount)}',
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodySmall?.copyWith(color: cs.onPrimaryContainer),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  bool get _hasGlobalDiscount {
+    final v = _parsedGlobalDiscountValue;
+    return v != null && v > 0;
+  }
+
+  Widget _buildCheckoutDiscountBlock(ColorScheme cs) {
+    final t = AppLocalizations.of(context);
+    final expanded = _checkoutDiscountExpanded || _hasGlobalDiscount;
+    if (!expanded) {
+      return Align(
+        alignment: AlignmentDirectional.centerStart,
+        child: TextButton.icon(
+          onPressed: _isSaving
+              ? null
+              : () => setState(() => _checkoutDiscountExpanded = true),
+          icon: const Icon(Icons.percent, size: 18),
+          label: Text(t.invoiceGlobalDiscountSection),
+          style: TextButton.styleFrom(
+            visualDensity: VisualDensity.compact,
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+          ),
+        ),
+      );
+    }
+    return _buildGlobalDiscountSection(cs, showHeading: false);
+  }
+
+  bool get _forceCheckoutDetails =>
+      _enableWarehouseDocument && _defaultWarehouseId == null;
+
+  Widget _buildCheckoutDetailsTile(
+    ColorScheme cs, {
+    required bool includeDocumentMeta,
+  }) {
+    final t = AppLocalizations.of(context);
+    return Theme(
+      data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+      child: ExpansionTile(
+        key: ValueKey('qs-details-$_forceCheckoutDetails'),
+        initiallyExpanded: _forceCheckoutDetails,
+        tilePadding: EdgeInsets.zero,
+        childrenPadding: const EdgeInsets.only(bottom: 8),
+        visualDensity: VisualDensity.compact,
+        title: Text(
+          t.quickSalesCheckoutDetails,
+          style: Theme.of(
+            context,
+          ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+        ),
+        subtitle: _forceCheckoutDetails
+            ? Text(
+                t.quickSalesCheckoutWarehouseRequired,
+                style: Theme.of(
+                  context,
+                ).textTheme.bodySmall?.copyWith(color: cs.error),
+              )
+            : null,
+        children: [
+          if (includeDocumentMeta) ...[
+            _buildDocumentDateAndDescription(isMobile: true, compact: true),
+            const SizedBox(height: 8),
+          ],
+          _buildCheckoutBreakdown(cs, t),
+          const SizedBox(height: 10),
+          WarehouseComboboxWidget(
+            businessId: widget.businessId,
+            selectedWarehouseId: _defaultWarehouseId,
+            onChanged: _onWarehouseForInvoiceChanged,
+            label: 'انبار اقلام',
+            hintText: 'انتخاب انبار برای اقلام فاکتور',
+            isRequired: _enableWarehouseDocument,
+            selectDefaultWhenUnset: true,
+          ),
+          const SizedBox(height: 4),
+          SwitchListTile.adaptive(
+            contentPadding: EdgeInsets.zero,
+            dense: true,
+            title: Tooltip(
+              message: t.quickSalesAutoCreateReceiptSwitchHint,
+              child: Text(t.quickSalesAutoCreateReceiptSwitch),
+            ),
+            value: _autoCreatePaymentDocument,
+            onChanged: _isSaving ? null : _onAutoCreatePaymentDocumentChanged,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCheckoutBreakdown(ColorScheme cs, AppLocalizations t) {
+    return Column(
+      children: [
+        _buildSummaryRow('تعداد اقلام', '${_cartItems.length}'),
+        _buildSummaryRow(
+          t.invoiceSummarySubtotal,
+          _formatNumber(_subtotalAmount),
+        ),
+        if (_totalDiscount > 0)
+          _buildSummaryRow(
+            t.invoiceSummaryDiscount,
+            '-${_formatNumber(_totalDiscount)}',
+          ),
+        if (_totalTax > 0)
+          _buildSummaryRow(t.invoiceSummaryTax, _formatNumber(_totalTax)),
+      ],
+    );
+  }
+
+  Widget _buildGlobalDiscountSection(
+    ColorScheme cs, {
+    bool showHeading = true,
+  }) {
     final t = AppLocalizations.of(context);
     final g = _totalsWithGlobal;
     final lineDisc = _lineDiscountOnly;
     final narrow = MediaQuery.sizeOf(context).width < _compactBreakpoint;
     return Card(
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: EdgeInsets.zero,
       child: Padding(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.all(10),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            if (!narrow) ...[
+            if (showHeading && !narrow) ...[
               Text(
                 t.invoiceGlobalDiscountSection,
                 style: Theme.of(context).textTheme.titleSmall,
@@ -4933,136 +5112,62 @@ class _QuickSalesPageState extends State<QuickSalesPage>
     );
   }
 
-  Widget _buildInvoiceSummarySection(ColorScheme cs) {
-    final t = AppLocalizations.of(context);
-    return Container(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'خلاصه فاکتور',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: cs.onSurface,
-            ),
-          ),
-          const SizedBox(height: 16),
-          if (_cartItems.isNotEmpty) _buildGlobalDiscountSection(cs),
-          _buildSummaryRow('تعداد اقلام', '${_cartItems.length}'),
-          _buildSummaryRow(
-            t.invoiceSummarySubtotal,
-            _formatNumber(_subtotalAmount),
-          ),
-          if (_totalDiscount > 0)
-            _buildSummaryRow(
-              t.invoiceSummaryDiscount,
-              '-${_formatNumber(_totalDiscount)}',
-            ),
-          if (_totalTax > 0)
-            _buildSummaryRow(t.invoiceSummaryTax, _formatNumber(_totalTax)),
-          const Divider(),
-          _buildSummaryRow(
-            t.invoiceSummaryTotal,
-            _formatNumber(_totalAmount),
-            isTotal: true,
-          ),
-          if (_autoCreatePaymentDocument &&
-              _payments.isNotEmpty &&
-              (_remainingAmount > 0 || _isOverpaid)) ...[
-            const SizedBox(height: 8),
-            _buildSummaryRow(
-              t.quickSalesPayPaidLabel,
-              _formatNumber(_paidAmount),
-              isWarning: _isOverpaid,
-            ),
-            _buildSummaryRow(
-              t.quickSalesPayRemainingLabel,
-              _formatNumber(_remainingAmount < 0 ? 0 : _remainingAmount),
-              isWarning: true,
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
   Widget _buildPaymentSection(ColorScheme cs) {
     final t = AppLocalizations.of(context);
-    return Padding(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'پرداخت',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 8),
-          SwitchListTile(
-            contentPadding: EdgeInsets.zero,
-            title: Text(t.quickSalesAutoCreateReceiptSwitch),
-            subtitle: Text(t.quickSalesAutoCreateReceiptSwitchHint),
-            value: _autoCreatePaymentDocument,
-            onChanged: _isSaving ? null : _onAutoCreatePaymentDocumentChanged,
-          ),
-          if (_autoCreatePaymentDocument) ...[
-            const SizedBox(height: 8),
-            QuickSalesPaymentComposer(
-              key: ValueKey(_activeSaleId),
-              businessId: widget.businessId,
-              payments: _payments,
-              onChanged: _onPaymentsChanged,
-              cashFollowsTotal: _cashFollowsTotal,
-              onCashFollowsTotalChanged: (v) {
-                if (v == _cashFollowsTotal) return;
-                setState(() => _cashFollowsTotal = v);
-              },
-              invoiceTotal: _totalAmount,
-              defaultCashRegisterId: _selectedCashRegisterId,
-              enabled: !_isSaving,
-              currencyId: _defaultCurrencyId,
-              currencyUnit: _paymentCurrencyUnit,
-              decimalPlaces: _invoiceCurrencyDecimalPlaces,
-              authStore: widget.authStore,
-              calendarController: widget.calendarController,
-              isAnonymousCustomer: _isAnonymousSelected,
-            ),
-            if (_remainingAmount > 0 && !_isOverpaid) ...[
-              const SizedBox(height: 4),
-              SwitchListTile(
-                contentPadding: EdgeInsets.zero,
-                title: Text(t.quickSalesPayShareRemaining),
-                subtitle: Text(t.quickSalesPayShareRemainingHint),
-                value: _shareRemainingEnabled,
-                onChanged: _isSaving
-                    ? null
-                    : (v) {
-                        setState(() {
-                          _shareRemainingEnabled = v;
-                          if (v) _syncShareChannelDefaults();
-                        });
-                      },
-              ),
-              if (_shareRemainingEnabled) _buildShareSection(cs, t),
-            ],
-          ] else ...[
-            const SizedBox(height: 8),
-            _buildShareSection(cs, t),
-          ],
-          const SizedBox(height: 16),
-          WarehouseComboboxWidget(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'پرداخت',
+          style: Theme.of(
+            context,
+          ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+        ),
+        const SizedBox(height: 8),
+        if (_autoCreatePaymentDocument) ...[
+          QuickSalesPaymentComposer(
+            key: ValueKey(_activeSaleId),
             businessId: widget.businessId,
-            selectedWarehouseId: _defaultWarehouseId,
-            onChanged: _onWarehouseForInvoiceChanged,
-            label: 'انبار اقلام',
-            hintText: 'انتخاب انبار برای اقلام فاکتور',
-            isRequired: _enableWarehouseDocument,
-            selectDefaultWhenUnset: true,
+            payments: _payments,
+            onChanged: _onPaymentsChanged,
+            cashFollowsTotal: _cashFollowsTotal,
+            onCashFollowsTotalChanged: (v) {
+              if (v == _cashFollowsTotal) return;
+              setState(() => _cashFollowsTotal = v);
+            },
+            invoiceTotal: _totalAmount,
+            defaultCashRegisterId: _selectedCashRegisterId,
+            enabled: !_isSaving,
+            currencyId: _defaultCurrencyId,
+            currencyUnit: _paymentCurrencyUnit,
+            decimalPlaces: _invoiceCurrencyDecimalPlaces,
+            authStore: widget.authStore,
+            calendarController: widget.calendarController,
+            isAnonymousCustomer: _isAnonymousSelected,
           ),
-        ],
-      ),
+          if (_remainingAmount > 0 && !_isOverpaid) ...[
+            SwitchListTile.adaptive(
+              contentPadding: EdgeInsets.zero,
+              dense: true,
+              title: Tooltip(
+                message: t.quickSalesPayShareRemainingHint,
+                child: Text(t.quickSalesPayShareRemaining),
+              ),
+              value: _shareRemainingEnabled,
+              onChanged: _isSaving
+                  ? null
+                  : (v) {
+                      setState(() {
+                        _shareRemainingEnabled = v;
+                        if (v) _syncShareChannelDefaults();
+                      });
+                    },
+            ),
+            if (_shareRemainingEnabled) _buildShareSection(cs, t),
+          ],
+        ] else
+          _buildShareSection(cs, t),
+      ],
     );
   }
 
@@ -5078,167 +5183,163 @@ class _QuickSalesPageState extends State<QuickSalesPage>
     final hasPhone = _selectedCustomerPhone != null;
     final hasEmail = _selectedCustomerEmail != null;
 
-    return Card(
-      elevation: 0,
-      color: cs.surfaceContainerHighest.withValues(alpha: 0.35),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              t.quickSalesShareSectionTitle,
-              style: const TextStyle(fontWeight: FontWeight.w600),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          t.quickSalesShareSectionTitle,
+          style: Theme.of(
+            context,
+          ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+        ),
+        const SizedBox(height: 4),
+        SwitchListTile.adaptive(
+          contentPadding: EdgeInsets.zero,
+          dense: true,
+          title: Tooltip(
+            message: t.quickSalesShareOnlinePaymentHint,
+            child: Text(t.quickSalesShareOnlinePayment),
+          ),
+          value: _shareOnlinePaymentEnabled,
+          onChanged: _isSaving || _loadingShareGateways
+              ? null
+              : (v) {
+                  setState(() {
+                    _shareOnlinePaymentEnabled = v;
+                    if (!v) _shareGatewayId = null;
+                  });
+                },
+        ),
+        if (_loadingShareGateways)
+          const LinearProgressIndicator()
+        else if (_shareOnlinePaymentEnabled && _shareGateways.isEmpty)
+          Text(
+            t.quickSalesShareNoGateway,
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: cs.error),
+          )
+        else if (_shareOnlinePaymentEnabled) ...[
+          DropdownButtonFormField<int?>(
+            value: dropdownValue,
+            decoration: InputDecoration(
+              labelText: t.quickSalesShareGatewayLabel,
+              border: const OutlineInputBorder(),
+              isDense: true,
             ),
-            const SizedBox(height: 4),
-            Text(
-              t.quickSalesShareSectionHint,
+            items: [
+              for (final g in _shareGateways)
+                DropdownMenuItem<int?>(
+                  value: (g['id'] as num?)?.toInt(),
+                  child: Text(
+                    '${g['display_name'] ?? g['id']}${g['provider'] != null ? ' (${g['provider']})' : ''}',
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+            ],
+            onChanged: _isSaving || !_shareOnlinePaymentEnabled
+                ? null
+                : (v) => setState(() => _shareGatewayId = v),
+          ),
+          const SizedBox(height: 8),
+        ],
+        Wrap(
+          spacing: 8,
+          runSpacing: 4,
+          children: [
+            FilterChip(
+              label: Text(t.quickSalesShareChannelSms),
+              selected: _shareSendSms,
+              onSelected: _isSaving || !hasPhone
+                  ? null
+                  : (v) => setState(() => _shareSendSms = v),
+            ),
+            FilterChip(
+              label: Text(t.quickSalesShareChannelEmail),
+              selected: _shareSendEmail,
+              onSelected: _isSaving || !hasEmail
+                  ? null
+                  : (v) => setState(() => _shareSendEmail = v),
+            ),
+            FilterChip(
+              label: Text(t.quickSalesShareChannelNative),
+              selected: _shareViaNativeShare,
+              onSelected: _isSaving
+                  ? null
+                  : (v) => setState(() => _shareViaNativeShare = v),
+            ),
+          ],
+        ),
+        if (!hasPhone)
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Text(
+              t.quickSalesShareNoPhoneHint,
+              style: Theme.of(
+                context,
+              ).textTheme.bodySmall?.copyWith(color: cs.error),
+            ),
+          ),
+        if (!hasEmail)
+          Padding(
+            padding: const EdgeInsets.only(top: 2),
+            child: Text(
+              t.quickSalesShareNoEmailHint,
               style: Theme.of(
                 context,
               ).textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
             ),
-            const SizedBox(height: 8),
-            SwitchListTile(
-              contentPadding: EdgeInsets.zero,
-              title: Text(t.quickSalesShareOnlinePayment),
-              subtitle: Text(t.quickSalesShareOnlinePaymentHint),
-              value: _shareOnlinePaymentEnabled,
-              onChanged: _isSaving || _loadingShareGateways
-                  ? null
-                  : (v) {
-                      setState(() {
-                        _shareOnlinePaymentEnabled = v;
-                        if (!v) _shareGatewayId = null;
-                      });
-                    },
-            ),
-            if (_loadingShareGateways)
-              const LinearProgressIndicator()
-            else if (_shareOnlinePaymentEnabled && _shareGateways.isEmpty)
-              Text(
-                t.quickSalesShareNoGateway,
-                style: Theme.of(
-                  context,
-                ).textTheme.bodySmall?.copyWith(color: cs.error),
-              )
-            else if (_shareOnlinePaymentEnabled) ...[
-              const SizedBox(height: 4),
-              DropdownButtonFormField<int?>(
-                value: dropdownValue,
-                decoration: InputDecoration(
-                  labelText: t.quickSalesShareGatewayLabel,
-                  border: const OutlineInputBorder(),
-                  isDense: true,
-                ),
-                items: [
-                  for (final g in _shareGateways)
-                    DropdownMenuItem<int?>(
-                      value: (g['id'] as num?)?.toInt(),
-                      child: Text(
-                        '${g['display_name'] ?? g['id']}${g['provider'] != null ? ' (${g['provider']})' : ''}',
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                ],
-                onChanged: _isSaving || !_shareOnlinePaymentEnabled
-                    ? null
-                    : (v) => setState(() => _shareGatewayId = v),
-              ),
-            ],
-            const Divider(height: 24),
-            CheckboxListTile(
-              contentPadding: EdgeInsets.zero,
-              title: Text(t.quickSalesShareChannelSms),
-              value: _shareSendSms,
-              onChanged: _isSaving || !hasPhone
-                  ? null
-                  : (v) => setState(() => _shareSendSms = v ?? false),
-            ),
-            if (!hasPhone)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 4),
-                child: Text(
-                  t.quickSalesShareNoPhoneHint,
-                  style: Theme.of(
-                    context,
-                  ).textTheme.bodySmall?.copyWith(color: cs.error),
-                ),
-              ),
-            CheckboxListTile(
-              contentPadding: EdgeInsets.zero,
-              title: Text(t.quickSalesShareChannelEmail),
-              value: _shareSendEmail,
-              onChanged: _isSaving || !hasEmail
-                  ? null
-                  : (v) => setState(() => _shareSendEmail = v ?? false),
-            ),
-            if (!hasEmail)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 4),
-                child: Text(
-                  t.quickSalesShareNoEmailHint,
-                  style: Theme.of(
-                    context,
-                  ).textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-                ),
-              ),
-            CheckboxListTile(
-              contentPadding: EdgeInsets.zero,
-              title: Text(t.quickSalesShareChannelNative),
-              value: _shareViaNativeShare,
-              onChanged: _isSaving
-                  ? null
-                  : (v) => setState(() => _shareViaNativeShare = v ?? false),
-            ),
-          ],
-        ),
-      ),
+          ),
+      ],
     );
   }
 
   Widget _buildCheckoutButtons(ColorScheme cs) {
-    Widget saveSpinner({double size = 20}) => SizedBox(
+    Widget saveSpinner({double size = 18}) => SizedBox(
       width: size,
       height: size,
       child: CircularProgressIndicator(strokeWidth: 2, color: cs.onPrimary),
     );
 
-    return Container(
-      padding: const EdgeInsets.all(16),
-      child: Column(
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+      child: Row(
         children: [
-          SizedBox(
-            width: double.infinity,
-            height: 50,
-            child: ElevatedButton.icon(
-              onPressed: _isSaving ? null : () => _saveInvoice(print: true),
-              icon: _saveAction == _QuickSalesSaveAction.saveAndPrint
-                  ? saveSpinner()
-                  : const Icon(Icons.print),
-              label: const Text('ثبت و چاپ'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: cs.primary,
-                foregroundColor: cs.onPrimary,
+          Expanded(
+            child: SizedBox(
+              height: 48,
+              child: OutlinedButton.icon(
+                onPressed: _isSaving ? null : () => _saveInvoice(print: false),
+                icon: _saveAction == _QuickSalesSaveAction.save
+                    ? SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: cs.primary,
+                        ),
+                      )
+                    : const Icon(Icons.save, size: 20),
+                label: const Text('ثبت'),
               ),
             ),
           ),
-          const SizedBox(height: 8),
-          SizedBox(
-            width: double.infinity,
-            height: 50,
-            child: OutlinedButton.icon(
-              onPressed: _isSaving ? null : () => _saveInvoice(print: false),
-              icon: _saveAction == _QuickSalesSaveAction.save
-                  ? SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: cs.primary,
-                      ),
-                    )
-                  : const Icon(Icons.save),
-              label: const Text('ثبت'),
+          const SizedBox(width: 8),
+          Expanded(
+            flex: 2,
+            child: SizedBox(
+              height: 48,
+              child: ElevatedButton.icon(
+                onPressed: _isSaving ? null : () => _saveInvoice(print: true),
+                icon: _saveAction == _QuickSalesSaveAction.saveAndPrint
+                    ? saveSpinner()
+                    : const Icon(Icons.print, size: 20),
+                label: const Text('ثبت و چاپ'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: cs.primary,
+                  foregroundColor: cs.onPrimary,
+                ),
+              ),
             ),
           ),
         ],
@@ -5400,10 +5501,14 @@ class _QuickSalesPageState extends State<QuickSalesPage>
                     controller: scrollController,
                     padding: const EdgeInsets.only(bottom: 12),
                     children: [
-                      _buildInvoiceSummarySection(cs),
-                      const Divider(),
-                      _buildPaymentSection(cs),
-                      const SizedBox(height: 8),
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+                        child: _buildCheckoutScrollBody(
+                          cs,
+                          includeCustomer: true,
+                          includeDocumentMeta: true,
+                        ),
+                      ),
                     ],
                   ),
                 ),

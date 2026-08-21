@@ -11864,6 +11864,13 @@ class AppLocalizationsFa extends AppLocalizations {
       'هر ردیف پرداخت باید صندوق، بانک یا چک داشته باشد';
 
   @override
+  String get quickSalesCheckoutDetails => 'جزئیات سند';
+
+  @override
+  String get quickSalesCheckoutWarehouseRequired =>
+      'برای صدور حواله، انتخاب انبار الزامی است';
+
+  @override
   String get quickSalesShareSectionTitle => 'اشتراک‌گذاری';
 
   @override

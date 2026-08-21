@@ -283,39 +283,9 @@ class _QuickSalesPaymentComposerState extends State<QuickSalesPaymentComposer> {
       children: [
         if (!_isSimpleCash || _remaining != 0 || _isOverpaid)
           _buildBalanceStrip(t, theme, cs),
-        if (_isSimpleCash) ...[
-          CashRegisterComboboxWidget(
-            businessId: widget.businessId,
-            selectedRegisterId: widget.payments.first.cashRegisterId,
-            filterCurrencyId: widget.currencyId,
-            dense: true,
-            onChanged: widget.enabled
-                ? (option) {
-                    _replaceAt(
-                      0,
-                      widget.payments.first.copyWith(
-                        cashRegisterId: option?.id,
-                        cashRegisterName: option?.name,
-                      ),
-                    );
-                  }
-                : (_) {},
-            label: t.quickSalesPayCashRegister,
-            hintText: t.quickSalesPayCashRegisterHint,
-            isRequired: true,
-          ),
-          const SizedBox(height: 8),
-          _PaymentAmountField(
-            key: ValueKey('amt-${widget.payments.first.id}'),
-            paymentId: widget.payments.first.id,
-            amount: widget.payments.first.amount,
-            decimalPlaces: widget.decimalPlaces,
-            currencyUnit: widget.currencyUnit,
-            enabled: widget.enabled,
-            autofocus: false,
-            onAmountChanged: (v) => _onAmountEdited(0, v),
-          ),
-        ] else ...[
+        if (_isSimpleCash)
+          _buildSimpleCashFields(t)
+        else ...[
           for (var i = 0; i < widget.payments.length; i++) ...[
             if (i > 0) const SizedBox(height: 8),
             _PaymentRow(
@@ -345,10 +315,10 @@ class _QuickSalesPaymentComposerState extends State<QuickSalesPaymentComposer> {
             ),
           ],
         ],
-        const SizedBox(height: 10),
+        const SizedBox(height: 8),
         _buildAddButtons(t),
         if (_remaining > 0 && !_isOverpaid) ...[
-          const SizedBox(height: 10),
+          const SizedBox(height: 6),
           _buildRemainingNote(t, cs),
         ],
       ],
@@ -357,6 +327,58 @@ class _QuickSalesPaymentComposerState extends State<QuickSalesPaymentComposer> {
 
   void unawaitedRememberBank(String id) {
     _rememberBank(id);
+  }
+
+  Widget _buildSimpleCashFields(AppLocalizations t) {
+    final register = CashRegisterComboboxWidget(
+      businessId: widget.businessId,
+      selectedRegisterId: widget.payments.first.cashRegisterId,
+      filterCurrencyId: widget.currencyId,
+      dense: true,
+      onChanged: widget.enabled
+          ? (option) {
+              _replaceAt(
+                0,
+                widget.payments.first.copyWith(
+                  cashRegisterId: option?.id,
+                  cashRegisterName: option?.name,
+                ),
+              );
+            }
+          : (_) {},
+      label: t.quickSalesPayCashRegister,
+      hintText: t.quickSalesPayCashRegisterHint,
+      isRequired: true,
+    );
+    final amount = _PaymentAmountField(
+      key: ValueKey('amt-${widget.payments.first.id}'),
+      paymentId: widget.payments.first.id,
+      amount: widget.payments.first.amount,
+      decimalPlaces: widget.decimalPlaces,
+      currencyUnit: widget.currencyUnit,
+      enabled: widget.enabled,
+      autofocus: false,
+      onAmountChanged: (v) => _onAmountEdited(0, v),
+    );
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final sideBySide = constraints.maxWidth >= 300;
+        if (!sideBySide) {
+          return Column(
+            children: [register, const SizedBox(height: 8), amount],
+          );
+        }
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(flex: 7, child: register),
+            const SizedBox(width: 8),
+            Expanded(flex: 6, child: amount),
+          ],
+        );
+      },
+    );
   }
 
   Widget _buildBalanceStrip(
@@ -382,12 +404,12 @@ class _QuickSalesPaymentComposerState extends State<QuickSalesPaymentComposer> {
     }
 
     return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.only(bottom: 8),
       child: Material(
         color: bg,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(10),
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+          padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -410,14 +432,16 @@ class _QuickSalesPaymentComposerState extends State<QuickSalesPaymentComposer> {
                   ),
                 ],
               ),
-              const SizedBox(height: 4),
-              Text(
-                status,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: fg,
-                  fontWeight: FontWeight.w600,
+              if (_isOverpaid || _remaining <= 0) ...[
+                const SizedBox(height: 2),
+                Text(
+                  status,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: fg,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
-              ),
+              ],
             ],
           ),
         ),

@@ -4770,6 +4770,8 @@
   "quickSalesPaySelectCheck": "برای پرداخت چکی، چک را انتخاب یا ثبت کنید",
   "quickSalesPayOverpaidError": "جمع پرداخت‌ها از مبلغ فاکتور بیشتر است. مبالغ را اصلاح کنید.",
   "quickSalesPayNeedDestination": "هر ردیف پرداخت باید صندوق، بانک یا چک داشته باشد",
+  "quickSalesCheckoutDetails": "جزئیات سند",
+  "quickSalesCheckoutWarehouseRequired": "برای صدور حواله، انتخاب انبار الزامی است",
   "quickSalesShareSectionTitle": "اشتراک‌گذاری",
   "quickSalesShareSectionHint": "فاکتور با لینک پرداخت آنلاین برای مشتری ارسال شود",
   "quickSalesShareOnlinePayment": "پرداخت آنلاین در لینک",

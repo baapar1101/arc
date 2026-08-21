@@ -22068,6 +22068,18 @@ abstract class AppLocalizations {
   /// **'Each payment line needs a cash register, bank, or check'**
   String get quickSalesPayNeedDestination;
 
+  /// No description provided for @quickSalesCheckoutDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'Document details'**
+  String get quickSalesCheckoutDetails;
+
+  /// No description provided for @quickSalesCheckoutWarehouseRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'A warehouse is required to post stock'**
+  String get quickSalesCheckoutWarehouseRequired;
+
   /// No description provided for @quickSalesShareSectionTitle.
   ///
   /// In en, this message translates to:

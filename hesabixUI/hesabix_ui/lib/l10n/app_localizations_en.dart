@@ -11928,6 +11928,13 @@ class AppLocalizationsEn extends AppLocalizations {
       'Each payment line needs a cash register, bank, or check';
 
   @override
+  String get quickSalesCheckoutDetails => 'Document details';
+
+  @override
+  String get quickSalesCheckoutWarehouseRequired =>
+      'A warehouse is required to post stock';
+
+  @override
   String get quickSalesShareSectionTitle => 'Share';
 
   @override

@@ -4728,6 +4728,8 @@
   "quickSalesPaySelectCheck": "Select or add a check for the check payment",
   "quickSalesPayOverpaidError": "Payments exceed the invoice total. Adjust the amounts.",
   "quickSalesPayNeedDestination": "Each payment line needs a cash register, bank, or check",
+  "quickSalesCheckoutDetails": "Document details",
+  "quickSalesCheckoutWarehouseRequired": "A warehouse is required to post stock",
   "quickSalesShareSectionTitle": "Share",
   "quickSalesShareSectionHint": "Send the invoice with an online payment link to the customer",
   "quickSalesShareOnlinePayment": "Online payment on link",
