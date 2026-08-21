@@ -851,9 +851,13 @@ def create_app() -> FastAPI:
     @application.middleware("http")
     async def smart_number_normalizer(request: Request, call_next):
         """Middleware هوشمند برای تبدیل اعداد فارسی/عربی به انگلیسی"""
-        # Streaming/SSE: برای جلوگیری از مشکلات Starlette/ASGI در listen_for_disconnect
-        # (و چون payload این endpoint کوچک و ثابت است) از normalize صرف‌نظر می‌کنیم.
-        if request.query_params.get("stream") == "true" and request.url.path.startswith("/api/v1/ai/chat/"):
+        # Streaming/SSE: BaseHTTPMiddleware اگر body را replay کند،
+        # listen_for_disconnect پیام http.request می‌بیند و ExceptionGroup می‌سازد.
+        path = request.url.path
+        if path.startswith("/api/v1/ai/chat/") and (
+            request.query_params.get("stream") == "true"
+            or path.endswith("/events")
+        ):
             return await call_next(request)
 
         # فقط برای درخواست‌های POST/PUT/PATCH با Content-Type JSON اعمال شود
@@ -866,7 +870,6 @@ def create_app() -> FastAPI:
         
         # استثنا برای endpoint های خاص که نباید normalize شوند
         # endpoint های zohal که ممکن است JSON پیچیده یا داده‌های خاص داشته باشند
-        path = request.url.path
         
         # اگر path مربوط به zohal است، از normalize کردن صرف نظر کن
         if "/zohal/" in path:
