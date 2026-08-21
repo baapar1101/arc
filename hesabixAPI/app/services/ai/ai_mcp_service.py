@@ -87,7 +87,8 @@ async def handle_mcp_request(
 
         # Listing = permission/tenant gate only. Execution guard is in tools/call.
         # Phase 3: MCP tools/list stays a full permissioned catalog (MCP contract).
-        # Future: optional discover_tools() for intent-scoped MCP listing.
+        # Phase 7: tools/list can later reuse load_tool_schemas(); MCP listing
+        # remains a separate contract from the agent Schema Loader path.
         context = {
             "db": db,
             "user_context": ctx,

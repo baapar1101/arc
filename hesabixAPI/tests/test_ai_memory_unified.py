@@ -155,7 +155,7 @@ def test_memory_tools_not_selected_for_sales_report():
         "upsert_memory_entry",
         "delete_memory_entry",
     }
-    selected = select_tool_names(names, "گزارش فروش ماه گذشته")
+    selected = select_tool_names(names, "گزارش فروش ماه گذشته", max_tools=3)
     assert "search_invoices" in selected
     assert "read_memory" not in selected
     assert "upsert_memory_entry" not in selected

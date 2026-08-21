@@ -48,14 +48,17 @@ _EXPORT_QUERY = re.compile(
     re.IGNORECASE,
 )
 _EXECUTE_QUERY = re.compile(
-    r"اجرای\s*(?:workflow|اتوماسیون)|execute_workflow|اتوماسیون\s*را\s*اجرا|"
-    r"workflow\s*را\s*اجرا",
+    r"اجرای\s*(?:workflow|اتوماسیون|گردش[\s\-]*کار)|execute_workflow|"
+    r"اتوماسیون\s*را\s*اجرا|گردش[\s\-]*کار\s*را\s*اجرا|"
+    r"workflow\s*را\s*اجرا|run this workflow|test this automation|"
+    r"اتوماسیون\s*را\s*تست|تست\s*(?:این\s*)?(?:اتوماسیون|گردش[\s\-]*کار|workflow)",
     re.IGNORECASE,
 )
 # بدون «حذف» — آن Destructive است
 _WRITE_QUERY = re.compile(
     r"ثبت|ایجاد|اضافه|بساز|بزن|ویرایش|create|update|\badd\b|new\s+invoice|"
-    r"مشتری\s+جدید|کالای\s+جدید|به\s*خاطر\s*بسپار|یادت\s*باشه|remember\b",
+    r"مشتری\s+جدید|کالای\s+جدید|به\s*خاطر\s*بسپار|یادت\s*باشه|remember\b|"
+    r"بروزرسانی|به‌?روز(?:رسانی)?|عوض\s*کن|اصلاح\s*کن",
     re.IGNORECASE,
 )
 _LEADING_GREETING = re.compile(
@@ -99,7 +102,7 @@ def classify_query_mutation(
 
 
 def _classify_text(text: str) -> QueryMutation:
-    q = (text or "").strip()
+    q = (text or "").replace("\u200c", "").replace("\u200d", "").strip()
     if len(q) < 2:
         return QueryMutation.UNKNOWN
     if _DESTRUCTIVE_QUERY.search(q):

@@ -1,12 +1,13 @@
 from __future__ import annotations
 
+import hashlib
+import json
 from typing import Dict, Any, List, Callable, Optional, Set, Tuple
 from dataclasses import dataclass
 from enum import Enum
 from sqlalchemy.orm import Session
 from app.core.auth_dependency import AuthContext
 from app.services.ai.ai_handler_convention import wrap_registry_service_func
-import json
 
 
 class AIRole(str, Enum):
@@ -1758,6 +1759,73 @@ class AIFunctionRegistry:
         
         return roles
     
+    def _authorized_functions(
+        self,
+        context: Dict[str, Any],
+        filter_by_category: Optional[str] = None,
+    ) -> List["AIFunction"]:
+        """Functionهای مجاز tenant/role/permission — بدون ساخت JSON Schema."""
+        user_context: AuthContext = context["user_context"]
+        business_id = context.get("business_id")
+        user_roles = self._detect_user_role(user_context, business_id)
+        from app.services.ai.ai_permission_policy import catalog_permission_allows
+
+        out: List[AIFunction] = []
+        for func in self._functions.values():
+            if not (func.allowed_roles & user_roles):
+                continue
+            if not catalog_permission_allows(func, user_context, business_id):
+                continue
+            if func.business_context_required and not business_id:
+                continue
+            if filter_by_category and func.category != filter_by_category:
+                continue
+            out.append(func)
+        return out
+
+    def get_authorized_function_names(
+        self,
+        context: Dict[str, Any],
+        filter_by_category: Optional[str] = None,
+    ) -> List[str]:
+        return [func.name for func in self._authorized_functions(context, filter_by_category)]
+
+    def build_openai_tool_definition(self, name: str) -> Optional[Dict[str, Any]]:
+        func = self._functions.get(name)
+        if func is None:
+            return None
+        return {
+            "type": "function",
+            "function": {
+                "name": func.name,
+                "description": func.description,
+                "parameters": func.parameters_schema,
+            },
+        }
+
+    def schema_version_for(self, name: str) -> str:
+        """Cache key: declared schema_version + hash of description/parameters.
+
+        Authors should bump `schema_version` when the contract changes.
+        The content hash still invalidates the cache if the JSON drifts
+        without a manual bump.
+        """
+        func = self._functions.get(name)
+        if func is None:
+            return "0"
+        declared = str(getattr(func, "schema_version", None) or "1")
+        payload = json.dumps(
+            {
+                "description": getattr(func, "description", None),
+                "parameters": getattr(func, "parameters_schema", None),
+            },
+            sort_keys=True,
+            ensure_ascii=False,
+            default=str,
+        )
+        digest = hashlib.sha256(payload.encode("utf-8")).hexdigest()[:12]
+        return f"{declared}.{digest}"
+
     def get_function_definitions(
         self,
         context: Dict[str, Any],
@@ -1767,42 +1835,11 @@ class AIFunctionRegistry:
         دریافت لیست function definitions برای OpenAI
         فقط function هایی که کاربر دسترسی دارد را برمی‌گرداند
         """
-        user_context: AuthContext = context["user_context"]
-        business_id = context.get("business_id")
-        
-        # تشخیص نقش کاربر
-        user_roles = self._detect_user_role(user_context, business_id)
-        
         definitions = []
-        for func in self._functions.values():
-            # Tenant/permission اینجا اعمال می‌شود؛ Discovery بعداً فقط روی این مجموعه کار می‌کند.
-            # بررسی نقش
-            if not (func.allowed_roles & user_roles):
-                continue
-            
-            # بررسی دسترسی‌های دقیق‌تر — خالی + unspecified = deny
-            from app.services.ai.ai_permission_policy import catalog_permission_allows
-
-            if not catalog_permission_allows(func, user_context, business_id):
-                continue
-            
-            # بررسی نیاز به business context
-            if func.business_context_required and not business_id:
-                continue
-            
-            # فیلتر بر اساس دسته‌بندی
-            if filter_by_category and func.category != filter_by_category:
-                continue
-            
-            definitions.append({
-                "type": "function",
-                "function": {
-                    "name": func.name,
-                    "description": func.description,
-                    "parameters": func.parameters_schema
-                }
-            })
-        
+        for func in self._authorized_functions(context, filter_by_category):
+            built = self.build_openai_tool_definition(func.name)
+            if built:
+                definitions.append(built)
         return definitions
     
     def call_function(

@@ -33,7 +33,7 @@ _KEYWORD_CATEGORIES: List[tuple[str, str]] = [
     (r"ووکامرس|woocommerce|باسلام|basalam|کانکتور|connector|یکپارچه", "integration"),
     (r"مرحله|گام|قدم|سناریو|چند\s*مرحله|گام\s*به\s*گام|برنامه\s*کار|checklist|todo", "agent"),
     (r"فروش\s*سریع|quick\s*sales|لیست\s*قیمت|price\s*list|لاگ|فعالیت\s*سیستم|workflow|تعمیر|گارانتی|توزیع|صندوق\s*خرد", "misc"),
-    (r"شخص|مشتری|تامین|تأمین|supplier|customer|people|گروه\s*اشخاص", "people"),
+    (r"شخص|مشتری|تامین|تأمین|supplier|customer|people|گروه\s*اشخاص|طرف[\s\-]*حساب", "people"),
     (r"دسته\s*بندی|category|ویژگی\s*کالا|attribute|کالا|محصول|product", "products_write"),
     (r"فیلتر\s*پیشرفته|عملگر|بزرگتر\s*از|کمتر\s*از|شامل|list_queryable|query_business", "query"),
     (r"ماه\s*گذشته|هفته\s*اخیر|امروز|دیروز|فروردین|اردیبهشت|خرداد|مرداد|شهریور|آبان|اسفند|بازه\s*تاریخ|resolve_date|از\s*تاریخ|تا\s*تاریخ", "query"),
@@ -195,7 +195,7 @@ def estimate_query_complexity(
     if len(q) < 15 or _SIMPLE_PATTERNS.match(q):
         return "simple"
 
-    categories = detect_categories(q)
+    categories = matched_query_categories(q)
     if len(categories) >= 3:
         return "complex"
     if len(categories) >= 2 and (
@@ -230,6 +230,41 @@ def estimate_query_complexity(
     return "simple"
 
 
+# Date/filter words ("امروز") are too broad to count as an accounting domain.
+_RANKING_WEAK_DOMAINS = frozenset({"query"})
+_STRONG_DATE_INTENT = re.compile(
+    r"از\s*تاریخ|تا\s*تاریخ|ماه\s*گذشته|هفته\s*اخیر|بازه\s*تاریخ|"
+    r"فروردین|اردیبهشت|خرداد|مرداد|شهریور|آبان|اسفند|"
+    r"resolve_date|\d+\s*ماه\s*پیش|سه\s*ماه|۳\s*ماه",
+    re.IGNORECASE,
+)
+
+
+def ranking_intent_domains(
+    user_query: Optional[str],
+    history_messages: Optional[List[dict]] = None,
+) -> Set[str]:
+    """دسته‌های واقعاً تطبیق‌یافته برای امتیازدهی — بدون dump عمومی.
+
+    detect_categories برای پیچیدگی هنوز fallback دارد؛ Ranking نباید از آن
+    برای پر کردن Top-K استفاده کند.
+    """
+    found = matched_query_categories(_strip_leading_greeting(user_query))
+    q = (user_query or "").strip()
+    if history_messages and (not (found - _RANKING_WEAK_DOMAINS) or len(q) < 40):
+        for msg in reversed(history_messages[-8:]):
+            if msg.get("role") != "user":
+                continue
+            content = msg.get("content") or ""
+            if len(content) < 10:
+                continue
+            prev = matched_query_categories(content) - _RANKING_WEAK_DOMAINS
+            if prev:
+                found |= prev
+                break
+    return found - _RANKING_WEAK_DOMAINS
+
+
 def query_targets_tool_domain(user_query: Optional[str]) -> bool:
     """آیا سوال کاربر به دامنهٔ داده/ابزار کسب‌وکار اشاره دارد (routing، نه پاسخ مدل)."""
     text = _normalize_query(_strip_leading_greeting(user_query))
@@ -237,9 +272,12 @@ def query_targets_tool_domain(user_query: Optional[str]) -> bool:
         return False
     if _SIMPLE_PATTERNS.match(text):
         return False
-    for pattern, _category in _KEYWORD_CATEGORIES:
-        if re.search(pattern, text, re.IGNORECASE):
-            return True
+    found = matched_query_categories(text)
+    if found - _RANKING_WEAK_DOMAINS:
+        return True
+    # «امروز» به‌تنهایی (مثلاً آب‌وهوا) دامنهٔ ابزار نیست؛ بازهٔ تاریخ هست.
+    if "query" in found and _STRONG_DATE_INTENT.search(text):
+        return True
     return False
 
 
@@ -357,6 +395,7 @@ def select_catalog_tool_names(
         core_names=_CORE_TOOL_NAMES,
         prefer_names=prefer_names,
         protected_names=protected_names,
+        intent_domains=ranking_intent_domains(user_query, history_messages),
     )
 
 
@@ -367,6 +406,7 @@ def select_tool_names(
     max_tools: int = MAX_TOOLS_PER_REQUEST,
     history_messages: Optional[List[dict]] = None,
     prefer_names: Optional[AbstractSet[str]] = None,
+    protected_names: Optional[AbstractSet[str]] = None,
 ) -> Set[str]:
     """
     زیرمجموعهٔ نام functionها برای ارسال به مدل.
@@ -374,62 +414,32 @@ def select_tool_names(
     Security filter قبل از Ranking اعمال می‌شود؛ امتیاز keyword امنیت را دور نمی‌زند.
     """
     from app.services.ai.ai_tool_rank import rank_and_cap_tool_names
+    from app.services.ai.ai_tool_security import filter_security_candidates
 
-    available = set(all_names)
-    selected: Set[str] = set(_CORE_TOOL_NAMES) & available
-
-    cats = detect_categories_from_history(user_query, history_messages)
-    for cat in cats:
-        selected |= _CATEGORY_TOOLS.get(cat, frozenset()) & available
-
-    if _WRITE_KEYWORDS.search(user_query or ""):
-        selected |= _WRITE_TOOLS & available
-
-    if _PEOPLE_KEYWORDS.search(user_query or ""):
-        selected |= _CATEGORY_TOOLS.get("people", frozenset()) & available
-
-    if prefer_names:
-        selected |= set(prefer_names) & available
-
-    companions: Set[str] = set()
-    for name in list(selected):
-        companions |= _WRITE_TOOL_COMPANIONS.get(name, frozenset())
-    companions &= available
-    selected |= companions
-    effective_prefer: Set[str] = set(prefer_names or ()) | companions
-
-    # اگر هنوز کم است، ابزارهای پرکاربرد اضافه
-    if len(selected) < 12:
-        for cat in ("financial", "warehouse", "crm"):
-            selected |= _CATEGORY_TOOLS.get(cat, frozenset()) & available
-
-    from app.services.ai.ai_tool_security import (
-        ToolSecurityClass,
-        classify_tool_security,
-        filter_security_candidates,
-    )
-
-    selected = filter_security_candidates(
-        selected,
+    available = filter_security_candidates(
+        {n for n in all_names if n},
         user_query,
         history_messages=history_messages,
         unknown_policy="allow",
     )
-    effective_prefer &= selected
-    protected = {
-        name
-        for name in selected
-        if classify_tool_security(name)
-        in (ToolSecurityClass.DESTRUCTIVE, ToolSecurityClass.HIGH_RISK)
-    }
+    cats = ranking_intent_domains(user_query, history_messages)
+    prefer: Set[str] = set(prefer_names or ()) & available
+    if _WRITE_KEYWORDS.search(user_query or ""):
+        for name in _WRITE_TOOLS & available:
+            prefer |= set(_WRITE_TOOL_COMPANIONS.get(name, ()))
+        prefer &= available
+    if _PEOPLE_KEYWORDS.search(user_query or ""):
+        prefer |= _CATEGORY_TOOLS.get("people", frozenset()) & available
 
+    # Core وارد استخر می‌شود اما ظرفیت Top-K را reserve نمی‌کند.
     return rank_and_cap_tool_names(
-        selected,
+        available,
         user_query,
         max_tools=max_tools,
         core_names=_CORE_TOOL_NAMES,
-        prefer_names=effective_prefer,
-        protected_names=protected,
+        prefer_names=prefer,
+        protected_names=protected_names,
+        intent_domains=cats,
     )
 
 

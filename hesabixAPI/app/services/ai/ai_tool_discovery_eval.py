@@ -38,13 +38,13 @@ K_SWEEP: Tuple[int, ...] = (3, 5, 8, 10, 12, 15, 20, 30, 48, 64, 128)
 PRIMARY_KS: Tuple[int, ...] = (5, 10, 15, 20, 48)
 EVAL_DIR = Path("/opt/hesabix/app/docs/ai-agent/evals/tool-discovery")
 
-# Floors set after measuring the v1 baseline (see phase-5 doc). Slightly
-# below observed values so CI catches regressions, not noise.
-CI_RECALL_AT_10_MIN = 0.30
-CI_RECALL_AT_20_MIN = 0.75
-CI_RECALL_AT_48_MIN = 0.85
+# Floors set after Phase 6 ranking correction. Slightly below observed
+# values so CI catches regressions, not noise.
+CI_RECALL_AT_10_MIN = 0.90
+CI_RECALL_AT_20_MIN = 0.93
+CI_RECALL_AT_48_MIN = 0.93
 CI_LEGACY_RECALL_AT_48_MIN = 0.95
-CI_RETRIEVAL_SUCCESS_AT_15_MIN = 0.65
+CI_RETRIEVAL_SUCCESS_AT_15_MIN = 0.92
 
 
 def permissioned_catalog() -> List[str]:
@@ -225,8 +225,7 @@ def evaluate_query(row: GoldQuery, *, k: int, catalog: Sequence[str]) -> QueryOu
     returned = tuple(item.name for item in ranked)
     scores = {item.name: int(item.score) for item in ranked}
     gap = score_gap(ranked)
-    expects = query_expects_tool_use(row.query, list(row.history) or None)
-    low_conf = (not expects and gap["top_score"] <= 4) or gap["top_score"] <= 0
+    low_conf = bool(offer.low_confidence)
     primary = row.primary_expected_tools
     success = row.success_tools()
     ranks = {name: first_rank(returned, [name]) for name in primary}
@@ -236,7 +235,7 @@ def evaluate_query(row: GoldQuery, *, k: int, catalog: Sequence[str]) -> QueryOu
     if not primary and not row.no_match:
         retrieval_success = False
     if row.no_match:
-        retrieval_success = low_conf or len(returned) == 0 or gap["top_score"] <= 4
+        retrieval_success = low_conf and len(returned) == 0
         hit = retrieval_success
         multi_hit = retrieval_success
     relevant_hits = sum(1 for name in returned[:k] if name in success)
@@ -339,6 +338,14 @@ def summarize_outcomes(outcomes: Sequence[QueryOutcome]) -> Dict[str, Any]:
         "no_match_success": round(
             sum(1 for o in none if o.no_match_ok) / len(none), 4
         ) if none else 1.0,
+        # no-match query still received candidates (incorrect match)
+        "no_match_false_positive": round(
+            sum(1 for o in none if len(o.returned) > 0) / len(none), 4
+        ) if none else 0.0,
+        # valid query received an empty offer (dangerous)
+        "no_match_false_negative": round(
+            sum(1 for o in match if len(o.returned) == 0) / len(match), 4
+        ) if match else 0.0,
         "per_category_recall": {
             cat: recall(items) for cat, items in sorted(by_cat.items())
         },
@@ -569,6 +576,8 @@ def write_eval_artifacts(report: Dict[str, Any], gold: List[GoldQuery]) -> None:
                 "avg_schema_tokens": v["avg_schema_tokens"],
                 "context_share": v["context_share"],
                 "no_match_success": v["no_match_success"],
+                "no_match_false_positive": v.get("no_match_false_positive"),
+                "no_match_false_negative": v.get("no_match_false_negative"),
                 "per_category_recall": v["per_category_recall"],
                 "per_difficulty_recall": v["per_difficulty_recall"],
                 "per_hard_case_recall": v["per_hard_case_recall"],

@@ -175,7 +175,7 @@ TOOL_MANIFEST: Dict[str, Dict[str, Any]] = {
         'domains': ('financial',),
     },
     'get_business_dashboard': {
-        'domains': ('financial',),
+        'domains': ('financial', 'reports_meta'),
         'is_core': True,
     },
     'get_business_info': {
@@ -262,6 +262,7 @@ TOOL_MANIFEST: Dict[str, Dict[str, Any]] = {
     'get_person_balance': {
         'domains': ('people',),
         'is_core': True,
+        'aliases': ('مانده حساب', 'مانده شخص'),
     },
     'get_person_credit': {
         'domains': ('financial',),
@@ -424,7 +425,7 @@ TOOL_MANIFEST: Dict[str, Dict[str, Any]] = {
     },
     'list_currencies': {
         'domains': ('financial', 'products_write'),
-        'aliases': ('ارز', 'currency', 'واحد پول'),
+        'aliases': ('ارز', 'ارزها', 'لیست ارزها', 'currency', 'واحد پول'),
     },
     'list_currency_rates': {
         'domains': ('financial',),

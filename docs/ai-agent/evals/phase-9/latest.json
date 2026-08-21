@@ -1,0 +1,190 @@
+{
+  "dataset_version": "2026-08-19.v1",
+  "queries": 443,
+  "policy": "tight",
+  "control": {
+    "k_policy": "fixed_48",
+    "recall": 0.9819,
+    "average_k": 30.56,
+    "p50_k": 33.0,
+    "p95_k": 48.0,
+    "avg_schema_tokens": 7862,
+    "avg_schema_tokens_per_request": 42977,
+    "first_pass_success": 0.9819
+  },
+  "experiment": {
+    "k_policy": "adaptive_tight",
+    "recall": 0.9661,
+    "average_k": 10.19,
+    "p50_k": 10.0,
+    "p95_k": 15.0,
+    "avg_schema_tokens": 2841,
+    "avg_schema_tokens_per_request": 15330,
+    "first_pass_success": 0.9661,
+    "k_histogram": {
+      "10": 355,
+      "15": 87,
+      "20": 1,
+      "fallback": 0
+    },
+    "recommended_k_avg": 10.89
+  },
+  "tool_discovery_miss_proxy": 0.0339,
+  "retrieval_miss_proxy": 0.0339,
+  "schema_miss_proxy": 0.0,
+  "rediscovery_rate_proxy": 0.0339,
+  "rediscovery_recovery_proxy": 0.4667,
+  "rediscovery_recovered": 7,
+  "rediscovery_failed_even_at_k48": 8,
+  "unknown_tool_proxy": 0.0,
+  "high_risk": {
+    "n": 103,
+    "control_recall": 0.9515,
+    "adaptive_recall": 0.9223
+  },
+  "by_intent": {
+    "read": {
+      "n": 340,
+      "control_recall": 0.9912,
+      "adaptive_recall": 0.9794
+    },
+    "write": {
+      "n": 69,
+      "control_recall": 0.9565,
+      "adaptive_recall": 0.9565
+    },
+    "delete": {
+      "n": 20,
+      "control_recall": 1.0,
+      "adaptive_recall": 0.85
+    },
+    "execute": {
+      "n": 7,
+      "control_recall": 0.7143,
+      "adaptive_recall": 0.7143
+    },
+    "export": {
+      "n": 7,
+      "control_recall": 1.0,
+      "adaptive_recall": 1.0
+    }
+  },
+  "by_category": {
+    "legacy": {
+      "n": 22,
+      "control_recall": 1.0,
+      "adaptive_recall": 1.0
+    },
+    "invoice": {
+      "n": 50,
+      "control_recall": 1.0,
+      "adaptive_recall": 1.0
+    },
+    "reports": {
+      "n": 38,
+      "control_recall": 0.9474,
+      "adaptive_recall": 0.9474
+    },
+    "sales": {
+      "n": 15,
+      "control_recall": 1.0,
+      "adaptive_recall": 1.0
+    },
+    "purchase": {
+      "n": 7,
+      "control_recall": 1.0,
+      "adaptive_recall": 1.0
+    },
+    "customer": {
+      "n": 34,
+      "control_recall": 1.0,
+      "adaptive_recall": 0.9118
+    },
+    "accounting": {
+      "n": 87,
+      "control_recall": 1.0,
+      "adaptive_recall": 0.9655
+    },
+    "inventory": {
+      "n": 60,
+      "control_recall": 1.0,
+      "adaptive_recall": 0.9833
+    },
+    "wallet": {
+      "n": 9,
+      "control_recall": 1.0,
+      "adaptive_recall": 1.0
+    },
+    "memory": {
+      "n": 13,
+      "control_recall": 1.0,
+      "adaptive_recall": 1.0
+    },
+    "workflow": {
+      "n": 25,
+      "control_recall": 1.0,
+      "adaptive_recall": 1.0
+    },
+    "CRM": {
+      "n": 29,
+      "control_recall": 0.931,
+      "adaptive_recall": 0.931
+    },
+    "support": {
+      "n": 54,
+      "control_recall": 0.9259,
+      "adaptive_recall": 0.9259
+    }
+  },
+  "by_difficulty": {
+    "medium": {
+      "n": 197,
+      "control_recall": 0.9848,
+      "adaptive_recall": 0.9594
+    },
+    "easy": {
+      "n": 134,
+      "control_recall": 1.0,
+      "adaptive_recall": 0.9925
+    },
+    "hard": {
+      "n": 89,
+      "control_recall": 0.9551,
+      "adaptive_recall": 0.9438
+    },
+    "ambiguous": {
+      "n": 23,
+      "control_recall": 0.9565,
+      "adaptive_recall": 0.9565
+    }
+  },
+  "flags": {
+    "PROGRESSIVE_SCHEMA_LOADING": false,
+    "ADAPTIVE_DISCOVERY_K": false,
+    "ADAPTIVE_K_ROLLOUT_PERCENT": 0,
+    "HYBRID_TOOL_DISCOVERY": false,
+    "MAX_TOOLS_PER_REQUEST": 48
+  },
+  "live": {
+    "requests": 0,
+    "control": {
+      "requests": 0,
+      "average_k": 0.0,
+      "p50_k": 0,
+      "p95_k": 0,
+      "avg_schema_tokens": 0,
+      "avg_latency_ms": 0.0
+    },
+    "experiment": {
+      "requests": 0,
+      "average_k": 0.0,
+      "p50_k": 0,
+      "p95_k": 0,
+      "avg_schema_tokens": 0,
+      "avg_latency_ms": 0.0
+    },
+    "min_samples": 500,
+    "decision": "HOLD"
+  },
+  "note": "Gold recall is a retrieval proxy, not live task completion. Do not ROLL OUT Adaptive K from this file alone."
+}

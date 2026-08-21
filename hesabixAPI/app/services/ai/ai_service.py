@@ -152,7 +152,6 @@ from app.services.ai.ai_context_budget import (
 from app.services.ai.ai_tool_intent import (
     _WRITE_TOOLS,
     estimate_query_complexity,
-    filter_function_definitions,
     iterations_for_query,
     query_expects_tool_use,
     query_needs_knowledge,
@@ -225,6 +224,17 @@ class AIService(AIModelRouterMixin, AIUsageMeterMixin):
         self._turn_activated_skills: List[Dict[str, Any]] = []
         self._subagent_depth: int = 0
         self._subagent_sse_queue: asyncio.Queue = asyncio.Queue()
+        self._tool_schema_state = None
+        self._last_schema_load = None
+        self._last_discovery_offer = None
+        self._offered_tool_names: Optional[Set[str]] = None
+        self._tool_context_fingerprint = ""
+        self._adaptive_assignment = None
+        self._indexed_assignment = None
+        self._first_pass_open = False
+        from app.services.ai.ai_tool_rollout import RediscoveryState
+
+        self._rediscovery = RediscoveryState()
     
     def _get_active_subscription(self) -> Optional[UserAISubscription]:
         """دریافت اشتراک فعال کاربر"""
@@ -1441,6 +1451,7 @@ class AIService(AIModelRouterMixin, AIUsageMeterMixin):
         session_id: Optional[int] = None,
         history_messages: Optional[List[Dict[str, Any]]] = None,
         channel: str = "chat",
+        schema_max_total: Optional[int] = None,
     ) -> List[Dict[str, Any]]:
         """دریافت Schema ابزارها برای LLM.
 
@@ -1457,9 +1468,6 @@ class AIService(AIModelRouterMixin, AIUsageMeterMixin):
             "business_id": effective_business_id,
             "session_business_id": session_business_id,
         }
-        definitions = registry.get_function_definitions(
-            context, filter_by_category=category
-        )
         from app.services.ai.ai_session_todo_service import (
             SESSION_TODO_TOOL_NAMES,
             should_expose_session_plan_tools,
@@ -1467,6 +1475,11 @@ class AIService(AIModelRouterMixin, AIUsageMeterMixin):
         from app.services.ai.ai_subagent import (
             SUBAGENT_TOOL_NAMES,
             should_expose_subagent_tools,
+        )
+        from app.services.ai.ai_tool_schema import (
+            RegistrySchemaSource,
+            ToolContextState,
+            load_tool_schemas,
         )
 
         expose_plan_tools = should_expose_session_plan_tools(
@@ -1478,12 +1491,12 @@ class AIService(AIModelRouterMixin, AIUsageMeterMixin):
             user_query,
             is_subagent=getattr(self, "_subagent_depth", 0) > 0,
         )
-        all_names = {
-            (d.get("function") or {}).get("name")
-            for d in definitions
-            if (d.get("function") or {}).get("name")
-        }
+        all_names = set(registry.get_authorized_function_names(context, category))
         forced = set(force_tool_names or ()) & all_names
+        rd = getattr(self, "_rediscovery", None)
+        if rd and rd.force_names:
+            forced |= rd.force_names & all_names
+            rd.pending = False
         plan_prefer = (
             set(SESSION_TODO_TOOL_NAMES) & all_names if expose_plan_tools else set()
         )
@@ -1495,7 +1508,33 @@ class AIService(AIModelRouterMixin, AIUsageMeterMixin):
             hist = (self._routing_context or {}).get("history_messages")
         hist_list = hist if isinstance(hist, list) else None
         mode = resolve_execution_mode(execution_mode)
+        from app.services.ai.ai_tool_canary import (
+            query_hash,
+            resolve_adaptive_assignment,
+            resolve_indexed_assignment,
+        )
         from app.services.ai.ai_tool_discovery import discover_tools
+
+        user_id = None
+        getter = getattr(self.ctx, "get_user_id", None)
+        if callable(getter):
+            try:
+                user_id = int(getter())
+            except Exception:
+                user_id = None
+        assignment = resolve_adaptive_assignment(
+            business_id=effective_business_id,
+            user_id=user_id,
+        )
+        self._adaptive_assignment = assignment
+        indexed = resolve_indexed_assignment(
+            business_id=effective_business_id,
+            user_id=user_id,
+            channel=channel or "chat",
+        )
+        self._indexed_assignment = indexed
+        if not getattr(self, "_tool_schema_state", None):
+            self._first_pass_open = True
 
         skill_tools: Set[str] = set()
         if user_query and effective_business_id:
@@ -1539,35 +1578,246 @@ class AIService(AIModelRouterMixin, AIUsageMeterMixin):
             protected_names=write_names,
             channel=channel or "chat",
             rank=bool(user_query and effective_business_id),
+            apply_adaptive=assignment.enabled,
+            apply_indexed=indexed.enabled,
         )
         self._last_discovery_offer = offer
         ranked_names = [item.name for item in offer.candidates]
-        definitions = filter_function_definitions(definitions, ranked_names)
         forced_names = set(force_tool_names or ())
         if not expose_plan_tools and not (forced_names & SESSION_TODO_TOOL_NAMES):
-            definitions = [
-                d
-                for d in definitions
-                if (d.get("function") or {}).get("name") not in SESSION_TODO_TOOL_NAMES
-            ]
+            ranked_names = [n for n in ranked_names if n not in SESSION_TODO_TOOL_NAMES]
         if not expose_subagents and not (forced_names & SUBAGENT_TOOL_NAMES):
-            definitions = [
-                d
-                for d in definitions
-                if (d.get("function") or {}).get("name") not in SUBAGENT_TOOL_NAMES
-            ]
+            ranked_names = [n for n in ranked_names if n not in SUBAGENT_TOOL_NAMES]
         if not exposes_write_tools(resolve_execution_mode(execution_mode)):
-            definitions = [
-                d
-                for d in definitions
-                if is_readonly_function(
-                    (d.get("function") or {}).get("name") or "", registry
-                )
-                or is_agent_internal_function(
-                    (d.get("function") or {}).get("name") or "", registry
-                )
+            ranked_names = [
+                n
+                for n in ranked_names
+                if is_readonly_function(n, registry)
+                or is_agent_internal_function(n, registry)
             ]
-        return definitions
+        state = getattr(self, "_tool_schema_state", None) or ToolContextState()
+        from app.services.ai.ai_constants import (
+            PROGRESSIVE_SCHEMA_INITIAL_K,
+        )
+        from app.services.ai.ai_tool_rollout import progressive_rollout_allows
+
+        effective_max = schema_max_total
+        use_progressive = progressive_rollout_allows(effective_business_id)
+        if effective_max is None and use_progressive and not state.order:
+            effective_max = PROGRESSIVE_SCHEMA_INITIAL_K
+        load = load_tool_schemas(
+            ranked_names,
+            authorized_names=all_names,
+            source=RegistrySchemaSource(registry),
+            state=state,
+            max_total=effective_max,
+            iteration=len(state.rounds),
+        )
+        self._tool_schema_state = load.state
+        self._last_schema_load = load
+        self._offered_tool_names = set(load.names())
+        from app.services.ai.ai_provider_context import fingerprint_from_state
+        from app.services.ai.ai_tool_discovery_telemetry import observe_discovery_request
+
+        wire_tokens = 0
+        if load.state.rounds:
+            wire_tokens = int(load.state.rounds[-1].wire_schema_tokens)
+        observe_discovery_request(
+            arm=assignment.arm,
+            channel=channel or "chat",
+            mutation=offer.mutation,
+            adaptive_enabled=assignment.enabled,
+            recommended_k=offer.recommended_k,
+            effective_k=len(load.names()),
+            schema_count=len(load.names()),
+            schema_tokens=wire_tokens,
+            latency_ms=offer.latency_ms,
+            top_score=offer.top_score,
+            second_score=offer.second_score,
+            score_gap=offer.score_gap,
+            query_hash=query_hash(user_query),
+            capability=offer.capability,
+            confidence_level=offer.confidence_level,
+            strategy=offer.strategy,
+            indexed_arm=indexed.arm,
+            indexed_enabled=indexed.enabled,
+            indexed_fallback=offer.indexed_fallback,
+            indexed_fallback_reason=getattr(offer, "indexed_fallback_reason", "") or "",
+            candidate_count=offer.candidate_count,
+            final_tool_count=len(load.names()),
+            execution_mode=offer.execution_mode,
+            index_success=getattr(offer, "index_success", None),
+            index_latency_ms=float(getattr(offer, "index_latency_ms", 0.0) or 0.0),
+            rank_latency_ms=float(getattr(offer, "rank_latency_ms", 0.0) or 0.0),
+            effective_candidate_retrieval=getattr(
+                offer, "effective_candidate_retrieval", ""
+            )
+            or "",
+            expects_tools=bool(getattr(offer, "expects_tools", False)),
+        )
+
+        self._tool_context_fingerprint = fingerprint_from_state(load.state)
+        return list(load.definitions)
+
+    def _progressive_schema_round(
+        self,
+        tools: Optional[List[Dict[str, Any]]],
+        *,
+        use_tools: bool,
+        iteration: int,
+        session_business_id: Optional[int],
+        effective_user_query: Optional[str],
+        approve_writes: bool,
+        approved_write_calls: Optional[List[Dict[str, Any]]],
+        effective_execution_mode: Optional[str],
+        session_id: Optional[int],
+        messages: Optional[List[Dict[str, Any]]],
+    ) -> tuple:
+        from app.services.ai.ai_constants import (
+            MAX_TOOLS_AUTONOMOUS,
+            MAX_TOOLS_PER_REQUEST,
+        )
+        from app.services.ai.ai_execution_policy import exposes_write_tools
+        from app.services.ai.ai_tool_rollout import progressive_rollout_allows
+        from app.services.ai.ai_tool_schema import record_wire_repeat
+
+        if not use_tools:
+            return tools, False
+        state = getattr(self, "_tool_schema_state", None)
+        rd = getattr(self, "_rediscovery", None)
+        reload_schemas = bool(rd and rd.pending and rd.force_names)
+        if (progressive_rollout_allows(session_business_id) and iteration > 1) or (
+            reload_schemas and iteration > 1
+        ):
+            cap = (
+                MAX_TOOLS_AUTONOMOUS
+                if exposes_write_tools(effective_execution_mode)
+                else MAX_TOOLS_PER_REQUEST
+            )
+            forced = set(
+                self._forced_write_tool_names(approve_writes, approved_write_calls) or ()
+            )
+            if rd and rd.force_names:
+                forced |= set(rd.force_names)
+            expanded = self.get_available_functions(
+                session_business_id=session_business_id,
+                user_query=effective_user_query,
+                force_tool_names=forced,
+                execution_mode=effective_execution_mode,
+                session_id=session_id,
+                history_messages=messages,
+                schema_max_total=cap,
+            )
+            return expanded, bool(expanded)
+        if state is not None:
+            if not state.rounds or iteration > 1:
+                record_wire_repeat(state, iteration=iteration)
+        return tools, True
+
+    def _observe_schema_round(self, iteration: int) -> None:
+        from app.services.ai.ai_ops_metrics import log_ai_event
+        from app.services.ai.ai_tool_schema import schema_round_totals
+
+        state = getattr(self, "_tool_schema_state", None)
+        if state is None or not state.rounds:
+            return
+        last = state.rounds[-1]
+        log_ai_event(
+            "tool_schema_round",
+            extra={
+                **last.to_dict(),
+                "totals": schema_round_totals(state),
+            },
+        )
+
+    def _adaptive_arm(self) -> str:
+        assignment = getattr(self, "_adaptive_assignment", None)
+        return getattr(assignment, "arm", "") or "control"
+
+    def _indexed_arm(self) -> str:
+        assignment = getattr(self, "_indexed_assignment", None)
+        return getattr(assignment, "arm", "") or "control"
+
+    def _plan_unoffered_tool(self, function_name: str, context: Dict[str, Any]) -> dict:
+        from app.services.ai.ai_tool_rollout import RediscoveryState, plan_unknown_tool_recovery
+
+        rd = getattr(self, "_rediscovery", None)
+        if rd is None:
+            rd = RediscoveryState()
+            self._rediscovery = rd
+        offer = getattr(self, "_last_discovery_offer", None)
+        ranked = offer.names() if offer is not None else None
+        pool = set(getattr(offer, "candidate_pool", ()) or ()) if offer is not None else None
+        return plan_unknown_tool_recovery(
+            function_name,
+            rd,
+            authorized_names=set(registry.get_authorized_function_names(context)),
+            offered_names=getattr(self, "_offered_tool_names", None),
+            ranked_names=ranked,
+            in_registry=registry.get_function(function_name) is not None,
+            channel=getattr(offer, "channel", "") or "chat",
+            arm=self._adaptive_arm(),
+            indexed_enabled=bool(getattr(offer, "indexed_enabled", False)),
+            candidate_pool=pool,
+            indexed_fallback=bool(getattr(offer, "indexed_fallback", False)),
+        )
+
+    def _observe_tool_batch(self, items: List[tuple]) -> None:
+        from app.services.ai.ai_tool_discovery_telemetry import (
+            mark_first_pass,
+            observe_tool_call_result,
+            record_unoffered_tool,
+            EVENT_UNKNOWN_TOOL,
+        )
+
+        rd = getattr(self, "_rediscovery", None)
+        last_miss = rd.last_miss if rd else ""
+        had_rediscovery = False
+        for name, result in items:
+            payload = result if isinstance(result, dict) else {}
+            if payload.get("error") == "UNKNOWN_TOOL" and payload.get("rediscovery"):
+                had_rediscovery = True
+            if payload.get("error") == "UNKNOWN_TOOL" and registry.get_function(name) is None:
+                record_unoffered_tool(
+                    name,
+                    kind=EVENT_UNKNOWN_TOOL,
+                    channel=getattr(getattr(self, "_last_discovery_offer", None), "channel", "") or "chat",
+                    arm=self._adaptive_arm(),
+                )
+            observe_tool_call_result(
+                name,
+                result,
+                last_miss=last_miss,
+                indexed_arm=self._indexed_arm(),
+                mutation=getattr(getattr(self, "_last_discovery_offer", None), "mutation", "")
+                or "",
+            )
+            if (
+                last_miss
+                and name == last_miss
+                and payload.get("error") != "UNKNOWN_TOOL"
+                and rd is not None
+            ):
+                rd.last_miss = ""
+        if getattr(self, "_first_pass_open", False) and items:
+            mark_first_pass(
+                self._adaptive_arm(),
+                success=not had_rediscovery,
+                indexed_arm=self._indexed_arm(),
+            )
+            started = getattr(self, "_turn_started", None)
+            if started:
+                from app.services.ai.ai_tool_discovery_telemetry import (
+                    observe_request_latency,
+                )
+
+                observe_request_latency(
+                    indexed_arm=self._indexed_arm(),
+                    latency_ms=(time.perf_counter() - started) * 1000.0,
+                    channel=getattr(getattr(self, "_last_discovery_offer", None), "channel", "")
+                    or "chat",
+                )
+            self._first_pass_open = False
     
     
     
@@ -1728,6 +1978,7 @@ class AIService(AIModelRouterMixin, AIUsageMeterMixin):
          - session caching در handle_function_calls_async
         """
         self._validate_messages(messages)
+        self._turn_started = time.perf_counter()
         if request_model:
             self.set_request_model(request_model)
         self._validate_request_model_if_set()
@@ -2122,6 +2373,17 @@ class AIService(AIModelRouterMixin, AIUsageMeterMixin):
             elif offer == "keep":
                 tools = offered_tools
                 eff_tools = bool(tools)
+                from app.services.ai.ai_tool_schema import hydrate_state_from_definitions
+
+                self._tool_schema_state = hydrate_state_from_definitions(
+                    tools or [],
+                    state=getattr(self, "_tool_schema_state", None),
+                )
+                self._offered_tool_names = {
+                    (d.get("function") or {}).get("name")
+                    for d in (tools or [])
+                    if (d.get("function") or {}).get("name")
+                }
             else:
                 tools = self.get_available_functions(
                     session_business_id=session_business_id,
@@ -2215,6 +2477,25 @@ class AIService(AIModelRouterMixin, AIUsageMeterMixin):
                 round_text = ""
                 use_tools = bool(eff_tools and tools)
                 writing_status_sent = False
+                if use_tools:
+                    tools, use_tools = self._progressive_schema_round(
+                        tools,
+                        use_tools=use_tools,
+                        iteration=iteration,
+                        session_business_id=session_business_id,
+                        effective_user_query=effective_user_query,
+                        approve_writes=approve_writes,
+                        approved_write_calls=approved_write_calls,
+                        effective_execution_mode=effective_execution_mode,
+                        session_id=session_id,
+                        messages=full_messages,
+                    )
+                    self._offered_tool_names = {
+                        (d.get("function") or {}).get("name")
+                        for d in (tools or [])
+                        if (d.get("function") or {}).get("name")
+                    }
+                    self._observe_schema_round(iteration)
 
                 yield {
                     "event": "status",
@@ -3503,6 +3784,18 @@ class AIService(AIModelRouterMixin, AIUsageMeterMixin):
 
                 results[function_name] = unknown_tool_result(function_name)
                 continue
+            from app.services.ai.ai_tool_schema import is_tool_schema_offered
+
+            if not is_tool_schema_offered(
+                getattr(self, "_offered_tool_names", None), function_name
+            ):
+                from app.services.ai.ai_tool_error import unknown_tool_result
+
+                plan = self._plan_unoffered_tool(function_name, context)
+                results[function_name] = unknown_tool_result(
+                    function_name, rediscovery=bool(plan.get("rediscovery"))
+                )
+                continue
 
             if is_write_function(function_name, registry):
                 if should_block_write_in_analyzer(
@@ -3547,6 +3840,7 @@ class AIService(AIModelRouterMixin, AIUsageMeterMixin):
                     schema=getattr(fn, "parameters_schema", None),
                 )
 
+        self._observe_tool_batch(list(results.items()))
         return results
 
     async def handle_function_calls_async(
@@ -3591,6 +3885,17 @@ class AIService(AIModelRouterMixin, AIUsageMeterMixin):
                 from app.services.ai.ai_tool_error import unknown_tool_result
 
                 return tc_id, function_name, unknown_tool_result(function_name)
+            from app.services.ai.ai_tool_schema import is_tool_schema_offered
+
+            if not is_tool_schema_offered(
+                getattr(self, "_offered_tool_names", None), function_name
+            ):
+                from app.services.ai.ai_tool_error import unknown_tool_result
+
+                plan = self._plan_unoffered_tool(function_name, context)
+                return tc_id, function_name, unknown_tool_result(
+                    function_name, rediscovery=bool(plan.get("rediscovery"))
+                )
 
             # بررسی نیاز به تأیید با استفاده از registry
             if is_write_function(function_name, registry):
@@ -3752,6 +4057,9 @@ class AIService(AIModelRouterMixin, AIUsageMeterMixin):
             business_id=effective_business_id,
             session_id=session_id,
             extra=stats,
+        )
+        self._observe_tool_batch(
+            [(fname, result) for _tc_id, fname, result in tasks_results]
         )
 
         return {

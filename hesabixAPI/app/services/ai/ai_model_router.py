@@ -310,6 +310,28 @@ class AIModelRouterMixin:
                 provider,
             )
             merged = merge_provider_extra(merged, policy)
+        from app.services.ai.ai_prompt_cache import openai_supports_prompt_cache
+        from app.services.ai.ai_provider_context import (
+            attach_fingerprint_to_cache_key,
+            resolve_provider_context_policy,
+        )
+
+        fingerprint = getattr(self, "_tool_context_fingerprint", "") or ""
+        ctx_policy = resolve_provider_context_policy(
+            self.get_effective_provider_type(),
+            fingerprint=fingerprint,
+            openai_official=openai_supports_prompt_cache(
+                getattr(provider, "api_base_url", None)
+            ),
+        )
+        merged = dict(merged or {})
+        merged["tool_context"] = ctx_policy.to_dict()
+        cache_block = merged.get("prompt_cache")
+        if fingerprint and isinstance(cache_block, dict) and cache_block.get("cache_key"):
+            cache_block["cache_key"] = attach_fingerprint_to_cache_key(
+                str(cache_block.get("cache_key") or ""),
+                fingerprint,
+            )
         if merged:
             return {"provider_extra": merged}
         return {}

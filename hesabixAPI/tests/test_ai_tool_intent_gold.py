@@ -111,20 +111,20 @@ def test_skill_union_does_not_drop_intent_tools():
     assert "create_invoice" in merged
 
 
-def test_prefer_names_survive_cap():
-    catalog = _catalog_names()
-    # سوال چنددامنه‌ای که سقف ۴۸ را پر می‌کند
-    query = (
-        "گزارش فاکتور فروش انبار موجودی سرنخ باشگاه مالیات "
-        "پروژه ووکامرس اتوماسیون مشتری کالا قالب افزونه"
+def test_prefer_names_are_a_score_bonus_not_reservation():
+    q = "گزارش فاکتور فروش"
+    assert score_tool_for_query("hscript_language_guide", q, prefer=True) > (
+        score_tool_for_query("hscript_language_guide", q, prefer=False)
     )
+    catalog = _catalog_names()
     selected = select_tool_names(
         catalog,
-        query,
+        q,
         prefer_names={"hscript_language_guide"},
+        max_tools=5,
     )
-    assert len(selected) <= MAX_TOOLS_PER_REQUEST
-    assert "hscript_language_guide" in selected
+    assert len(selected) <= 5
+    assert "search_invoices" in selected or "get_sales_report" in selected
 
 
 def test_invoice_write_keeps_currency_companion_when_capped():

@@ -173,17 +173,30 @@ def test_capability_is_prefer_not_hard_filter():
     assert "get_sales_report" in offer.names()
 
 
-def test_semantic_strategy_not_enabled():
-    try:
-        SemanticStrategy().select(set(), "x")
-        assert False, "expected NotImplementedError"
-    except NotImplementedError:
-        pass
-    try:
-        HybridStrategy().select(set(), "x")
-        assert False, "expected NotImplementedError"
-    except NotImplementedError:
-        pass
+def test_hybrid_strategy_only_returns_authorized_names():
+    offer = discover_tools(
+        "فاکتور فروش را پیدا کن",
+        permissioned_names=["search_invoices", "list_accounts"],
+        execution_mode="analyzer",
+        limit=10,
+        channel="eval",
+        strategy=HybridStrategy(),
+    )
+    assert offer.names() <= {"search_invoices", "list_accounts"}
+    assert "create_invoice" not in offer.names()
+
+
+def test_semantic_strategy_does_not_bypass_authorization():
+    offer = discover_tools(
+        "delete this check",
+        permissioned_names=["search_invoices"],
+        execution_mode="analyzer",
+        limit=8,
+        channel="eval",
+        strategy=SemanticStrategy(),
+    )
+    assert offer.names() <= {"search_invoices"}
+    assert "delete_check" not in offer.names()
 
 
 def test_engine_uses_keyword_strategy_by_default():
@@ -208,6 +221,7 @@ def test_chat_get_available_functions_calls_discover_tools():
     text = source.read_text(encoding="utf-8")
     assert "from app.services.ai.ai_tool_discovery import discover_tools" in text
     assert "discover_tools(" in text
+    assert "load_tool_schemas(" in text
     assert "select_tool_names(" not in text
 
 
@@ -218,3 +232,31 @@ def test_subagent_uses_get_available_functions_channel():
     assert 'channel="subagent"' in text
     assert "select_tool_names(" not in text
     assert "select_catalog_tool_names(" not in text
+
+
+def test_crm_ticket_workflow_use_unified_schema_loader():
+    root = Path(__file__).resolve().parents[1]
+    crm = (root / "adapters" / "api" / "v1" / "ai" / "crm_ai.py").read_text(encoding="utf-8")
+    tickets = (root / "adapters" / "api" / "v1" / "support" / "ai_tickets.py").read_text(
+        encoding="utf-8"
+    )
+    workflow = (
+        root / "app" / "services" / "workflow" / "actions" / "ai_agent_action.py"
+    ).read_text(encoding="utf-8")
+    assert "get_available_functions(" in crm
+    assert "get_available_functions(" in tickets
+    assert "get_available_functions(" in workflow
+
+
+def test_crm_ticket_workflow_use_unified_schema_loader():
+    root = Path(__file__).resolve().parents[1]
+    crm = (root / "adapters" / "api" / "v1" / "ai" / "crm_ai.py").read_text(encoding="utf-8")
+    tickets = (root / "adapters" / "api" / "v1" / "support" / "ai_tickets.py").read_text(
+        encoding="utf-8"
+    )
+    workflow = (
+        root / "app" / "services" / "workflow" / "actions" / "ai_agent_action.py"
+    ).read_text(encoding="utf-8")
+    assert "get_available_functions(" in crm
+    assert "get_available_functions(" in tickets
+    assert "get_available_functions(" in workflow

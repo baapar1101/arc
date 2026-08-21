@@ -64,9 +64,10 @@ def test_retrieval_ci_gates_match_measured_baseline():
         "20": s20,
         "48": s48,
     })
-    assert rec["decision"] == "C"
-    assert rec["recommended_analyzer_k"] == MAX_TOOLS_PER_REQUEST
+    # Production K stays 48 in Phase 6 regardless of eval decision.
+    assert MAX_TOOLS_PER_REQUEST == 48
     assert MAX_TOOLS_AUTONOMOUS == 128
+    assert rec["keep_autonomous_k"] == 128
 
 
 def test_no_match_is_marked_low_confidence():
@@ -78,6 +79,7 @@ def test_no_match_is_marked_low_confidence():
     )
     assert offer.low_confidence is True
     assert offer.top_score <= 4
+    assert offer.candidates == ()
 
 
 def test_ranked_candidates_are_score_descending():

@@ -1,0 +1,122 @@
+{
+  "fixed": {
+    "k10": {
+      "queries": 443,
+      "recall": 0.9549,
+      "mrr": 0.7856,
+      "ndcg": 0.8069,
+      "precision": 0.2164,
+      "avg_k": 9.43,
+      "avg_initial_schema_tokens": 2605,
+      "avg_schema_tokens_per_request": 13958,
+      "k": 10,
+      "mode": "fixed_10"
+    },
+    "k15": {
+      "queries": 443,
+      "recall": 0.9752,
+      "mrr": 0.787,
+      "ndcg": 0.8141,
+      "precision": 0.1706,
+      "avg_k": 13.51,
+      "avg_initial_schema_tokens": 3706,
+      "avg_schema_tokens_per_request": 19931,
+      "k": 15,
+      "mode": "fixed_15"
+    },
+    "k20": {
+      "queries": 443,
+      "recall": 0.9819,
+      "mrr": 0.7873,
+      "ndcg": 0.8167,
+      "precision": 0.1496,
+      "avg_k": 17.05,
+      "avg_initial_schema_tokens": 4621,
+      "avg_schema_tokens_per_request": 24837,
+      "k": 20,
+      "mode": "fixed_20"
+    }
+  },
+  "adaptive": [
+    {
+      "queries": 443,
+      "recall": 0.9707,
+      "mrr": 0.7866,
+      "ndcg": 0.8099,
+      "precision": 0.1999,
+      "avg_k": 11.23,
+      "avg_initial_schema_tokens": 3112,
+      "avg_schema_tokens_per_request": 16776,
+      "mode": "adaptive_gap_v1",
+      "policy": "gap_v1",
+      "levels": {
+        "high": 308,
+        "low": 87,
+        "normal": 37,
+        "none": 10,
+        "fail": 1
+      },
+      "recall_ok": true
+    },
+    {
+      "queries": 443,
+      "recall": 0.9661,
+      "mrr": 0.7863,
+      "ndcg": 0.8086,
+      "precision": 0.208,
+      "avg_k": 10.19,
+      "avg_initial_schema_tokens": 2841,
+      "avg_schema_tokens_per_request": 15330,
+      "mode": "adaptive_tight",
+      "policy": "tight",
+      "levels": {
+        "high": 308,
+        "low": 87,
+        "normal": 37,
+        "none": 10,
+        "fail": 1
+      },
+      "recall_ok": true
+    },
+    {
+      "queries": 443,
+      "recall": 0.9707,
+      "mrr": 0.7866,
+      "ndcg": 0.8101,
+      "precision": 0.198,
+      "avg_k": 11.72,
+      "avg_initial_schema_tokens": 3235,
+      "avg_schema_tokens_per_request": 17441,
+      "mode": "adaptive_wide",
+      "policy": "wide",
+      "levels": {
+        "high": 308,
+        "low": 87,
+        "normal": 37,
+        "none": 10,
+        "fail": 1
+      },
+      "recall_ok": true
+    }
+  ],
+  "best": {
+    "queries": 443,
+    "recall": 0.9661,
+    "mrr": 0.7863,
+    "ndcg": 0.8086,
+    "precision": 0.208,
+    "avg_k": 10.19,
+    "avg_initial_schema_tokens": 2841,
+    "avg_schema_tokens_per_request": 15330,
+    "mode": "adaptive_tight",
+    "policy": "tight",
+    "levels": {
+      "high": 308,
+      "low": 87,
+      "normal": 37,
+      "none": 10,
+      "fail": 1
+    },
+    "recall_ok": true
+  }
+}

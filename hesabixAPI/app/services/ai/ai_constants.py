@@ -43,6 +43,45 @@ MAX_TOOLS_AUTONOMOUS = 128
 # سقف مطلق Discovery — Consumer نمی‌تواند کل کاتالوگ نامحدود را بخواهد.
 DISCOVERY_HARD_MAX = 256
 
+# Progressive schema loading: construction/dedup always on.
+# Sending a smaller initial schema set than Discovery K is eval/opt-in.
+# Production Discovery K stays 48/128.
+PROGRESSIVE_SCHEMA_LOADING = False
+PROGRESSIVE_SCHEMA_INITIAL_K = 15
+# Adaptive Top-K after ranking. Production stays fixed 48/128 until rollout.
+ADAPTIVE_DISCOVERY_K = False
+# Independent canary percent: 0, 5, 10, 25, 50, 100. Does not turn the global flag on.
+ADAPTIVE_K_ROLLOUT_PERCENT = 0
+ADAPTIVE_K_CANARY_SALT = "adaptive-k-v1"
+# Do not promote from Gold alone; need this many live discovery requests per arm.
+ADAPTIVE_K_MIN_LIVE_SAMPLES = 500
+# Hybrid lexical+semantic add-on. Default ranker stays keyword/intent.
+HYBRID_TOOL_DISCOVERY = False
+# Derived inverted index → candidate N → existing ranker.
+# False = not 100%. Percent canary is independent. Set False + percent 0, or
+# HESABIX_INDEXED_CANDIDATE_KILL=1, to stop canary without touching Adaptive K.
+INDEXED_CANDIDATE_RETRIEVAL = False
+# First live canary. Allowed: 0, 5, 10, 25, 50, 100. Does not enable Adaptive K.
+INDEXED_CANDIDATE_ROLLOUT_PERCENT = 5
+INDEXED_CANDIDATE_CANARY_SALT = "indexed-retrieval-v1"
+INDEXED_CANDIDATE_MIN_LIVE_SAMPLES = 500
+INDEXED_CANDIDATE_KILL_SWITCH = False
+# Default N is eval-calibrated; Gold sweep overwrites if a smaller N hits 99%.
+CANDIDATE_RETRIEVAL_N = 100
+# Canary: empty / weak / inconsistent index → full authorized ranker, never fail open.
+INDEXED_CANDIDATE_FALLBACK = True
+# Channel names forced to control without killing the whole canary. Empty = none.
+# Runtime: HESABIX_INDEXED_CANDIDATE_CHANNEL_HOLD=ticket,crm
+INDEXED_CANDIDATE_CHANNEL_HOLD: tuple = ()
+# Optional ANN candidate generator. Never replaces keyword retrieval.
+VECTOR_CANDIDATE_RETRIEVAL = False
+# Refuse O(N) hashed-ngram scan above this authorized-set size.
+VECTOR_BRUTE_FORCE_MAX = 512
+# off | eval | canary | majority | full — never bypasses PROGRESSIVE_SCHEMA_LOADING.
+PROGRESSIVE_ROLLOUT_STAGE = "off"
+PROGRESSIVE_CANARY_PERCENT = 5
+MAX_DISCOVERY_RETRIES = 1
+
 # سقف همزمانی ابزارهای read-only در یک نوبت (writeها همیشه سریال‌اند)
 MAX_PARALLEL_READ_TOOLS = 4
 

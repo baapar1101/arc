@@ -141,10 +141,9 @@ def test_high_risk_uses_always_confirm_on_bound_function():
     assert is_high_risk_write("create_invoice", reg) is False
 
 
-def test_intent_still_selects_core_and_writes():
+def test_intent_still_selects_writes_over_unrelated_core():
     selected = select_tool_names(
         {"query_business_data", "create_person", "search_invoices"},
         "یک مشتری به نام علی اضافه کن",
     )
     assert "create_person" in selected
-    assert "query_business_data" in selected

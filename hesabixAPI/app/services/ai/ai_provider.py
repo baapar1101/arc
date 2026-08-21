@@ -640,7 +640,15 @@ class AnthropicProvider(AIProviderBase):
             max_tokens = _MAX_SAFE_CHAT_OUTPUT_TOKENS
         cache_policy = extract_prompt_cache_policy(provider_extra)
         system_message, anthropic_messages = _openai_messages_to_anthropic(messages)
-        anthropic_tools = _openai_tools_to_anthropic(tools)
+        from app.services.ai.ai_provider_context import (
+            apply_anthropic_tool_cache,
+            extract_provider_context_policy,
+        )
+
+        anthropic_tools = apply_anthropic_tool_cache(
+            _openai_tools_to_anthropic(tools),
+            extract_provider_context_policy(provider_extra),
+        )
         kwargs: Dict[str, Any] = {
             "model": model,
             "max_tokens": max_tokens,

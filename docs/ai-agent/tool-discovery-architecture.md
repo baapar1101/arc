@@ -1,7 +1,7 @@
 # Target Architecture — Scalable Tool Discovery (1,200+ Tools)
 
-**وضعیت:** Target State مشخص است. Phase 0–5 در کد پیاده شده‌اند (Metadata، Security-First، Unified Discovery، Catalog Hardening، Tight Top-K Evaluation).  
-**تاریخ:** ۱۹ اوت ۲۰۲۶  
+**وضعیت:** Target State مشخص است. Phase 0–14 در کد پیاده شده‌اند. Indexed Retrieval روی Canary ۵٪ است و **Promotion به ۱۰٪ HOLD** است تا ترافیک زنده جمع شود. Adaptive K / Hybrid / Progressive خاموش‌اند.  
+**تاریخ:** ۲۱ اوت ۲۰۲۶  
 **Source of Truth کد:** `hesabixAPI/app/services/ai/`  
 **مرتبط:** [`dynamic-tool-discovery.md`](dynamic-tool-discovery.md)
 
@@ -17,7 +17,8 @@
 - ثبت Static در `AIFunctionRegistry` (Singleton)
 - فیلتر: Role + Permission + Execution mode + Intent کلیدواژه‌ای
 - سقف: ۴۸ (analyzer) / ۱۲۸ (supervised/autonomous)
-- Schema کامل زیرمجموعه در **هر iteration** دوباره به Provider می‌رود
+- Schema کامل زیرمجموعه از `load_tool_schemas`؛ ساخت JSON فقط برای نام‌های Discovery (نه کل ۱۸۰)
+- روی سیم: Provider هنوز `tools` را در **هر iteration** می‌گیرد مگر K کوچک‌تر شود یا cache مخصوص Provider فعال شود
 - MCP = سرور خروجی (`POST /api/v1/ai/mcp`)، نه Discovery داخل Agent
 - ۱۸۰ `AIFunction` واقعی
 
@@ -110,7 +111,7 @@ AIFunction (runtime)
 | `namespace` | جلوگیری از تصادم نام در ۱۲۰۰+ |
 | `aliases` / `keywords` / `examples` | keyword + later embedding text |
 | `companion_tools` | write بدون حذف lookupهای لازم |
-| `is_core` | همیشه در K حداقلی |
+| `is_core` | سیگنال ranking / tie-break / fallback — **نه** ظرفیت رزرو Top-K |
 | `intent_write` | کشف نوشتن جدا از `requires_approval` |
 | `always_confirm` / `side_effect` | سیاست destructive قبل از LLM |
 | `enabled` / `deprecated` / `replacement` | رشد کاتالوگ بدون حذف ناگهانی |
@@ -262,16 +263,23 @@ score = w1*semantic + w2*keyword + w3*alias + w4*core
 
 ## 12. Schema Loading
 
-Schema کامل فقط برای offer فعلی. منبع: `AIFunction.parameters_schema`.
+Schema کامل فقط برای offer فعلی. منبع: `AIFunction.parameters_schema` از طریق `load_tool_schemas()`.
+
+Discovery (`ToolCandidate`) JSON Schema ندارد.
 
 هدف iteration 2+: اگر hash مجموعه Tool عوض نشده، **از نظر معماری** همان offer است. محدودیت: بسیاری از Providerها `tools` را در هر call می‌خواهند. استراتژی:
 
-- داخلی: `tool_set_hash` روی session؛ از ساخت مجدد JSON پرهیز
+- داخلی: `ToolSchemaCache` keyed by `(name, schema_version)`؛ از ساخت مجدد JSON پرهیز
+- session: `ToolContextState` فقط schemaهای جدید را می‌سازد
 - Anthropic: cache_control روی بلوک پایدار (system)؛ tools جدا است
 - OpenAI رسمی: `prompt_cache_key` برای prefix؛ tools ممکن است cache نشود
 - Local/vLLM: فرض **resend هر call**؛ بهینه‌سازی = کوچک کردن K نه حذف فیلد API
 
 پس «نفرستادن Schema» فقط جایی تضمین می‌شود که API Provider اجازه دهد. کاهش K اثر قطعی دارد.
+
+**Schema cache is not an authorization cache.** مجوز هر round جداگانه اعمال می‌شود.
+
+جزئیات: [`phase-7-progressive-schema-loading.md`](phase-7-progressive-schema-loading.md)
 
 ---
 
@@ -402,7 +410,13 @@ Bottleneck هزینه همیشه LLM است اگر K کنترل شود.
 | **11** | Redis result cache / worker | مقیاس کاربر | 7 |
 | **12** | Production hardening | cap مطلق، feature flag، rollback | همه |
 
-**Phase 0–5 در کد هستند.** Tight Top-K اندازه‌گیری شد و deploy نشد (Recall@20=78.6٪). Hybrid هنوز شروع نشده.
+**Phase 0–10 در کد هستند.** Ranking اصلاح شد (`Recall@15 = 97.5٪`). Schema Loading از Discovery جدا است. Adaptive K و Hybrid و Progressive و Indexed Candidate Retrieval به‌صورت flag خاموش‌اند. سقف production هنوز ۴۸/۱۲۸ است. Canary Adaptive K آماده و HOLD است. Inverted index مشتق برای Candidate Retrieval ساخته شد ولی مسیر آنلاین همان Ranker کامل است.
+
+اصول Phase 6:
+
+- Core is a ranking signal, not a reserved capacity.
+- Every authorized candidate must compete on relevance before Top-K truncation.
+- Do not introduce semantic retrieval to compensate for a deterministic ranking bug.
 
 ### search_tools: گزینهٔ انتخاب‌شده
 
@@ -483,3 +497,134 @@ Orchestrator همیشه K می‌دهد. `search_tools` Schema کوچک دارد
 - `DiscoveryOffer` فیلد confidence دارد؛ کاندیداها score-desc مرتب می‌شوند
 
 جزئیات: [`phase-5-tight-topk-evaluation.md`](phase-5-tight-topk-evaluation.md)
+
+## Phase 6 — آنچه در کد فرود آمده
+
+- `rank_and_cap`: score همهٔ authorized candidates، سپس Top-K. Core/prefer دیگر ظرفیت رزرو نمی‌کنند
+- `is_core` فقط tie-break است؛ `fallback_names` جدا از ranked results و بدون Schema کامل
+- No-match احتیاطی: empty offer فقط وقتی `top_score<=0` و query دامنهٔ ابزار نیست (FN empty روی Gold = ۰)
+- Alias/example فقط برای missهای Gold؛ کاتالوگ ۱۸۰ تایی ماند
+- سقف production همان ۴۸/۱۲۸؛ `Recall@15 = 97.52٪` روی Gold v1
+
+جزئیات: [`phase-6-ranking-correction.md`](phase-6-ranking-correction.md)
+
+## Phase 7 — آنچه در کد فرود آمده
+
+- `load_tool_schemas` جدا از `discover_tools`؛ `ToolCandidate` بدون JSON Schema
+- `ToolSchemaCache` + versioning (`declared.hash`)؛ cache ≠ authorization
+- `ToolContextState` در Chat و Subagent؛ CRM / Ticket / Workflow از همان loader
+- Progressive loading opt-in (`PROGRESSIVE_SCHEMA_LOADING=False`)؛ production K همان ۴۸/۱۲۸
+- Eval: Progressive K=15 حدود ۵۴٪ توکن schema کمتر از Current K=48 اگر مجموعهٔ کوچک‌تر روی سیم برود
+- MCP `tools/list` عوض نشد
+
+جزئیات: [`phase-7-progressive-schema-loading.md`](phase-7-progressive-schema-loading.md)
+
+## Phase 8 — آنچه در کد فرود آمده
+
+- `DiscoveryConfidence` + `AdaptiveKPolicy` (برنده eval: tight، Avg K=۱۰.۱۹، Recall=۹۶.۶۱٪) — flag خاموش
+- Hybrid اختیاری روی ranker واژه‌ای؛ n-gram metadata؛ وزن lexical_dominant بهترین Hybrid است ولی از Keyword بهتر نیست
+- Semantic فقط روی authorized؛ cache/fingerprint ≠ authorization
+- `ProviderContextPolicy` + fingerprint؛ Anthropic last-tool cache hint؛ Local = resend
+- Rediscovery حداکثر ۱ بار؛ `tool_discovery_miss` telemetry
+- Benchmark مصنوعی تا ۱۰٬۰۰۰ metadata؛ Schema Top-15 ≈۳.۵ms
+- Production همچنان Analyzer=۴۸ / Autonomous=۱۲۸
+
+جزئیات: [`phase-8-adaptive-hybrid-context.md`](phase-8-adaptive-hybrid-context.md)
+
+## Phase 9 — Production Canary architecture
+
+هدف: رفتار Adaptive K را روی ترافیک واقعی بسنجید؛ Offline Gold را با Tool Discovery Success زنده اشتباه نگیرید.
+
+```text
+Tenant + Role + Permission + mode
+        ↓
+Keyword/intent ranker   (یکسان برای هر دو بازو؛ Hybrid OFF)
+        ↓
+Wide candidates (Analyzer 48 / Autonomous 128)
+        ↓
+         ┌─ control ──────────── effective K = 48/128
+hash(biz, user) % 100
+         └─ experiment ──────── Adaptive tight truncate (≈10/15/20)
+        ↓
+load_tool_schemas  (Progressive flag جدا و خاموش)
+        ↓
+LLM  →  typed miss / rediscovery≤1 / execution
+```
+
+قواعد:
+
+1. `ADAPTIVE_DISCOVERY_K` و `ADAPTIVE_K_ROLLOUT_PERCENT` مستقل از `PROGRESSIVE_SCHEMA_LOADING` هستند.
+2. Assignment با SHA256 پایدار است؛ شناسه در Log نیست.
+3. `retrieval_miss` / `schema_miss` / `authorization_failure` / `execution_failure` رویدادهای جدا هستند.
+4. Tool مجازِ unoffered = Discovery failure. Tool غیرمجاز هرگز rediscover نمی‌شود.
+5. Metric روی سیم: `schema_count` + `wire_schema_tokens` — نه cache hit ارائه‌دهنده.
+6. Hybrid Canary ندارد. Semantic خطی ۱۰k Production نیست.
+7. Phase 10: inverted index + vector ANN روی metadata، سپس ranker فعلی، Adaptive K، Progressive Schema.
+
+تصمیم فعلی: **HOLD** (نمونه زنده < ۵۰۰ در هر بازو).
+
+جزئیات: [`phase-9-adaptive-k-canary.md`](phase-9-adaptive-k-canary.md)
+
+## Phase 10 — Scalable candidate index
+
+```text
+Tool Registry → Security → Candidate Retrieval (inverted ⊕ optional ANN)
+        → Existing Ranker → Adaptive K → Progressive Schema → LLM
+```
+
+- Registry = source of truth. Index = derived posting lists + capability/domain/namespace maps.
+- `INDEXED_CANDIDATE_RETRIEVAL = False` — Production هنوز همهٔ Authorized را rank می‌کند.
+- Candidate Recall@100 = ۹۸.۸۷٪ (اشباع؛ ۵ miss متادیتا). هدف ۹۹٪+ نرسید → flag خاموش ماند.
+- Vector ANN / pgvector برای Tool ساخته نشد. pgvector موجود برای دانشنامه است.
+- Neural embedding و Hybrid Production خاموش‌اند.
+- Adaptive K Promoted نشد.
+
+جزئیات: [`phase-10-scalable-tool-index.md`](phase-10-scalable-tool-index.md)
+
+## Phase 11 — Index quality and independent canary
+
+پنج miss متادیتا پوشش داده شد. Candidate Recall@100 = ۱۰۰٪. N بزرگ نشد.
+
+```text
+Control:     Authorized → Phase 6 Ranker → K=48/128
+Experiment:  Authorized → Indexed candidates (N=100) → Phase 6 Ranker → K=48/128
+```
+
+- `INDEXED_CANDIDATE_RETRIEVAL = False` و `INDEXED_CANDIDATE_ROLLOUT_PERCENT = 0`.
+- Assignment با salt جدا (`indexed-retrieval-v1`) از Adaptive K.
+- Fallback خالی → Ranker روی همان Authorized Set؛ هرگز Global Registry.
+- `indexed_retrieval_miss` ≠ `retrieval_miss`.
+- Adaptive K HOLD. Hybrid OFF.
+
+جزئیات: [`phase-11-index-quality-canary.md`](phase-11-index-quality-canary.md)
+
+## Phase 12 — Indexed retrieval production canary
+
+تنها متغیر: Candidate Retrieval (full authorized vs indexed N=100). Ranker / K / Schema / Adaptive / Hybrid ثابت.
+
+```text
+INDEXED_CANDIDATE_RETRIEVAL = False
+INDEXED_CANDIDATE_ROLLOUT_PERCENT = 5
+INDEXED_CANDIDATE_FALLBACK = True
+```
+
+- Assignment: SHA256(`indexed-retrieval-v1` + business_id + user_id). شناسه لاگ نمی‌شود.
+- Kill switch بدون دست‌زدن به Adaptive: `HESABIX_INDEXED_CANDIDATE_KILL=1` یا `HESABIX_INDEXED_CANDIDATE_RETRIEVAL=0`.
+- Fallback reasons (Phase 13 canonical): `empty` / `low_candidate_quality` / `stale_index` / `index_error` / `index_inconsistency` / `unknown`.
+- Live promotion: **HOLD** تا ۵۰۰ نمونه در هر بازو.
+
+جزئیات: [`phase-12-indexed-retrieval-canary.md`](phase-12-indexed-retrieval-canary.md)
+
+## Phase 13 — Production evidence gate
+
+شواهد Gold و Production جدا می‌مانند. رویداد `indexed_candidate_exposure`، شمارنده‌های بازو، hit/miss/empty/stale، و `index_success ≠ task_success`. Auto-promotion ممنوع. Kill switch بدون restart. نردبان ۵/۱۰/۲۵/۵۰/۱۰۰ فقط با تصمیم صریح.
+
+این محیط: Live control = 0، Live experiment = 0 → **HOLD**. Adaptive K / Hybrid / Progressive همچنان OFF.
+
+جزئیات: [`phase-13-production-evidence-gate.md`](phase-13-production-evidence-gate.md)
+
+## Phase 14 — Live canary validation
+
+فقط جمع‌آوری و ارزیابی شواهد Production. Gold / Control / Experiment جدا. `live_control_requests` / `live_experiment_requests`. `indexed_retrieval_error` و Fallback counters جدا از Miss. Task completion ساختگی نیست. Channel-specific HOLD: `HESABIX_INDEXED_CANDIDATE_CHANNEL_HOLD`. این محیط همچنان ۰/۰ → **HOLD**.
+
+جزئیات: [`phase-14-live-canary-validation.md`](phase-14-live-canary-validation.md)

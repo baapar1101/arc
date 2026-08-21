@@ -18,19 +18,30 @@ _NOT_FOUND = re.compile(
 )
 
 
-def unknown_tool_result(function_name: str) -> Dict[str, Any]:
+def unknown_tool_result(
+    function_name: str,
+    *,
+    rediscovery: bool = False,
+) -> Dict[str, Any]:
     name = (function_name or "unknown").strip() or "unknown"
+    hint = (
+        "این ابزار در نوبت قبل در فهرست نبود. اگر در دور بعد در tools آمد "
+        "از schema جدید استفاده کن؛ تا آن زمان آن را اجرا نکن."
+        if rediscovery
+        else (
+            "فقط از نام ابزارهایی استفاده کن که در همین نوبت به تو داده شده‌اند. "
+            "نام را حدس نزن و برای ابزار ناموجود تأیید نوشتن نخواه."
+        )
+    )
     return {
         "ok": False,
         "error": "UNKNOWN_TOOL",
         "tool": name,
         "message": f"ابزار «{name}» در کاتالوگ این نوبت وجود ندارد.",
         "message_fa": f"ابزار «{name}» وجود ندارد.",
-        "hint_fa": (
-            "فقط از نام ابزارهایی استفاده کن که در همین نوبت به تو داده شده‌اند. "
-            "نام را حدس نزن و برای ابزار ناموجود تأیید نوشتن نخواه."
-        ),
+        "hint_fa": hint,
         "retryable": True,
+        "rediscovery": bool(rediscovery),
     }
 
 
