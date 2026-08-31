@@ -1554,8 +1554,8 @@ install_prereqs() {
   # hesabix-api requires Python >= 3.11 (pyproject.toml). Ubuntu 24.04: python3=3.12;
   # Ubuntu 22.04: python3=3.10 — install python3.11 when needed (scripts/hesabix_python.sh).
   # WeasyPrint (PDF) requires: libcairo2, libpango*, libgdk-pixbuf-2.0-0 (note: hyphen in package name on Ubuntu 24)
-  log_info "Installing: git, curl, unzip, xz-utils, ca-certificates, python3, python3-venv, python3-pip, build-essential, nginx, postgresql, postgresql-contrib, postgresql-client, redis-server, WeasyPrint system deps (libpango/cairo)..."
-  apt-get install -y git curl unzip xz-utils ca-certificates \
+  log_info "Installing: git, curl, unzip, xz-utils, ca-certificates, rsync, python3, python3-venv, python3-pip, build-essential, nginx, postgresql, postgresql-contrib, postgresql-client, redis-server, WeasyPrint system deps (libpango/cairo)..."
+  apt-get install -y git curl unzip xz-utils ca-certificates rsync \
     python3 python3-venv python3-pip build-essential \
     nginx postgresql postgresql-contrib postgresql-client redis-server \
     libcairo2 libpango-1.0-0 libpangocairo-1.0-0 libgdk-pixbuf-2.0-0 libffi-dev shared-mime-info
@@ -2820,6 +2820,12 @@ ensure_swap_for_flutter_build() {
 install_flutter_and_build_frontend() {
   log_step "Building Flutter frontend..."
   set_flutter_mirror_env
+  if declare -F hesabix_resolve_flutter_pub_hosted_url >/dev/null 2>&1; then
+    hesabix_resolve_flutter_pub_hosted_url || true
+  fi
+  if declare -F hesabix_resolve_flutter_storage_base_url >/dev/null 2>&1; then
+    hesabix_resolve_flutter_storage_base_url || true
+  fi
   ensure_flutter_sdk
   ensure_swap_for_flutter_build
   export PATH="/opt/flutter/bin:/snap/bin:$PATH"
@@ -2895,6 +2901,14 @@ install_flutter_and_build_frontend() {
   log_info "  Destination: /var/www/${UI_DOMAIN}/"
   
   mkdir -p "/var/www/${UI_DOMAIN}"
+  if ! command -v rsync >/dev/null 2>&1; then
+    log_info "Installing rsync (required to publish Flutter web build)..."
+    apt-get install -y -qq rsync >/dev/null 2>&1 || true
+  fi
+  if ! command -v rsync >/dev/null 2>&1; then
+    log_error "rsync is required but not installed. Run: apt-get install -y rsync"
+    exit 1
+  fi
   rsync -a --delete "${build_output}/" "/var/www/${UI_DOMAIN}/"
   
   # Verify deployment

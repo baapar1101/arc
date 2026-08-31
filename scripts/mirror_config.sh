@@ -249,6 +249,9 @@ hesabix_apply_pip_mirror_env() {
 }
 
 # Apply Flutter mirror: explicit URLs win; else FLUTTER_MIRROR preset; else Hesabix.
+# Note: callers that need a reachable mirror should also run
+# hesabix_resolve_flutter_pub_hosted_url / hesabix_resolve_flutter_storage_base_url
+# (saved "official"/pub.dev often returns HTTP 403 from filtered networks).
 hesabix_apply_flutter_mirror_env() {
   if [[ -n "${PUB_HOSTED_URL:-}" && -n "${FLUTTER_STORAGE_BASE_URL:-}" ]]; then
     export PUB_HOSTED_URL FLUTTER_STORAGE_BASE_URL
@@ -327,6 +330,67 @@ hesabix_resolve_flutter_storage_base_url() {
     hesabix_mirror_log_warning "Flutter storage fallback: ${preferred} → ${resolved} (engine artifacts missing on preferred mirror)"
   else
     hesabix_mirror_log_info "Flutter storage: ${resolved}"
+  fi
+  return 0
+}
+
+# Ordered pub hosted bases (preferred env URL first). pub.dev often returns 403 from
+# sanctioned/filtered networks; Dart reports that as "authorization failed".
+hesabix_flutter_pub_fallback_bases() {
+  local -a bases=()
+  local b
+  if [[ -n "${PUB_HOSTED_URL:-}" ]]; then
+    bases+=("${PUB_HOSTED_URL%/}")
+  fi
+  bases+=(
+    "${HESABIX_PUB_HOSTED_URL}"
+    "https://pub.flutter-io.cn"
+    "https://pub-azs.ir"
+    "https://mirrors.tuna.tsinghua.edu.cn/dart-pub"
+    "https://mirror.sjtu.edu.cn/dart-pub"
+    "https://pub.dev"
+  )
+  local -A seen=()
+  for b in "${bases[@]}"; do
+    b="${b%/}"
+    [[ -n "$b" && -z "${seen[$b]:-}" ]] || continue
+    seen[$b]=1
+    printf '%s\n' "$b"
+  done
+}
+
+# Probe a known package API; print first working PUB_HOSTED_URL base.
+hesabix_probe_flutter_pub_hosted() {
+  local base url code
+  while IFS= read -r base; do
+    [[ -n "$base" ]] || continue
+    base="${base%/}"
+    url="${base}/api/packages/intl"
+    code="$(curl -fsSI -o /dev/null -w '%{http_code}' --connect-timeout 8 --max-time 20 "$url" 2>/dev/null || true)"
+    code="${code:-000}"
+    if [[ "$code" == "200" ]]; then
+      printf '%s' "$base"
+      return 0
+    fi
+  done < <(hesabix_flutter_pub_fallback_bases)
+  return 1
+}
+
+# If the preferred pub mirror is blocked/unreachable, switch to a working fallback.
+hesabix_resolve_flutter_pub_hosted_url() {
+  local preferred resolved
+  preferred="${PUB_HOSTED_URL:-}"
+  hesabix_apply_flutter_mirror_env >/dev/null 2>&1 || true
+  preferred="${PUB_HOSTED_URL:-${preferred}}"
+  resolved="$(hesabix_probe_flutter_pub_hosted)" || {
+    hesabix_mirror_log_warning "No Flutter pub mirror can serve package metadata (intl)."
+    return 1
+  }
+  export PUB_HOSTED_URL="${resolved}"
+  if [[ -n "${preferred}" && "${resolved}" != "${preferred%/}" ]]; then
+    hesabix_mirror_log_warning "Flutter pub fallback: ${preferred} → ${resolved} (preferred blocked or unreachable)"
+  else
+    hesabix_mirror_log_info "Flutter pub: ${resolved}"
   fi
   return 0
 }

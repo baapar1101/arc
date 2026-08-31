@@ -332,6 +332,9 @@ if ! command -v flutter >/dev/null 2>&1; then
   exit 1
 fi
 persist_flutter_path_in_profile_d
+if declare -F hesabix_resolve_flutter_pub_hosted_url >/dev/null 2>&1; then
+  hesabix_resolve_flutter_pub_hosted_url || true
+fi
 if declare -F hesabix_resolve_flutter_storage_base_url >/dev/null 2>&1; then
   hesabix_resolve_flutter_storage_base_url || true
 elif declare -F hesabix_apply_flutter_mirror_env >/dev/null 2>&1; then
@@ -380,6 +383,14 @@ if [[ ! -f "${build_output}/index.html" ]]; then
   exit 1
 fi
 mkdir -p "/var/www/${UI_DOMAIN}"
+if ! command -v rsync >/dev/null 2>&1; then
+  log_info "Installing rsync (required to publish Flutter web build)..."
+  apt-get install -y -qq rsync >/dev/null 2>&1 || true
+fi
+if ! command -v rsync >/dev/null 2>&1; then
+  log_err "rsync is required but not installed. Run: apt-get install -y rsync"
+  exit 1
+fi
 rsync -a --delete "${build_output}/" "/var/www/${UI_DOMAIN}/"
 chown -R www-data:www-data "/var/www/${UI_DOMAIN}"
 log_ok "Frontend built and deployed to /var/www/${UI_DOMAIN}."

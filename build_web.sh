@@ -174,12 +174,14 @@ export FLUTTER_STORAGE_BASE_URL="${FLUTTER_STORAGE_BASE_URL:-https://f.mirror.he
 if [[ -r "${REPO_ROOT}/scripts/mirror_config.sh" ]]; then
   # shellcheck disable=SC1091
   source "${REPO_ROOT}/scripts/mirror_config.sh"
+  # Prefer a reachable pub host (pub.dev 403 → "authorization failed") and storage base.
+  hesabix_resolve_flutter_pub_hosted_url || true
   hesabix_resolve_flutter_storage_base_url || true
 fi
 # اگر --offline داده نشده و آینهٔ انتخاب‌شده در دسترس نبود، مثل حالت آفلاین رفتار کن
 if [ "$USE_OFFLINE_CACHE" != true ]; then
-  if ! curl -fsS --connect-timeout 4 --max-time 8 "${PUB_HOSTED_URL%/}/" >/dev/null 2>&1 && \
-     ! curl -kfsS --connect-timeout 4 --max-time 8 "${PUB_HOSTED_URL%/}/" >/dev/null 2>&1; then
+  if ! curl -fsS --connect-timeout 4 --max-time 8 "${PUB_HOSTED_URL%/}/api/packages/intl" >/dev/null 2>&1 && \
+     ! curl -kfsS --connect-timeout 4 --max-time 8 "${PUB_HOSTED_URL%/}/api/packages/intl" >/dev/null 2>&1; then
     USE_OFFLINE_CACHE=true
     warn "Pub mirror (${PUB_HOSTED_URL}) is unreachable — pub get may fail without a local cache."
   fi

@@ -69,6 +69,14 @@ hesabix_rebuild_frontend() {
     return 1
   fi
   mkdir -p "/var/www/${UI_DOMAIN}"
+  if ! command -v rsync >/dev/null 2>&1; then
+    echo "Installing rsync..." >&2
+    apt-get install -y -qq rsync >/dev/null 2>&1 || true
+  fi
+  if ! command -v rsync >/dev/null 2>&1; then
+    echo "rsync is required but not installed. Run: apt-get install -y rsync" >&2
+    return 1
+  fi
   rsync -a --delete "${build_output}/" "/var/www/${UI_DOMAIN}/"
   chown -R www-data:www-data "/var/www/${UI_DOMAIN}"
   echo "✓ Frontend deployed to /var/www/${UI_DOMAIN}"
