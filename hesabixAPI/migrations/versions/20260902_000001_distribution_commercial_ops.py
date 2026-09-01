@@ -19,11 +19,11 @@ def upgrade() -> None:
 	# --- settings columns ---
 	op.add_column(
 		"distribution_business_settings",
-		sa.Column("enable_presell", sa.Boolean(), nullable=False, server_default=sa.text("0")),
+		sa.Column("enable_presell", sa.Boolean(), nullable=False, server_default=sa.text("false")),
 	)
 	op.add_column(
 		"distribution_business_settings",
-		sa.Column("enable_promotions", sa.Boolean(), nullable=False, server_default=sa.text("0")),
+		sa.Column("enable_promotions", sa.Boolean(), nullable=False, server_default=sa.text("false")),
 	)
 	op.add_column(
 		"distribution_business_settings",
@@ -36,7 +36,7 @@ def upgrade() -> None:
 	)
 	op.add_column(
 		"distribution_business_settings",
-		sa.Column("enable_suggested_order", sa.Boolean(), nullable=False, server_default=sa.text("1")),
+		sa.Column("enable_suggested_order", sa.Boolean(), nullable=False, server_default=sa.text("true")),
 	)
 
 	# --- settlement cheque refs ---
@@ -147,7 +147,7 @@ def upgrade() -> None:
 		sa.Column("territory_id", sa.Integer(), nullable=True),
 		sa.Column("route_id", sa.Integer(), nullable=True),
 		sa.Column("product_ids", sa.JSON(), nullable=True),
-		sa.Column("is_active", sa.Boolean(), nullable=False, server_default=sa.text("1")),
+		sa.Column("is_active", sa.Boolean(), nullable=False, server_default=sa.text("true")),
 		sa.Column("notes", sa.Text(), nullable=True),
 		sa.Column("created_at", sa.DateTime(), nullable=False, server_default=sa.text("CURRENT_TIMESTAMP")),
 		sa.Column("updated_at", sa.DateTime(), nullable=False, server_default=sa.text("CURRENT_TIMESTAMP")),
@@ -192,7 +192,7 @@ def upgrade() -> None:
 		sa.Column("person_id", sa.Integer(), nullable=False),
 		sa.Column("sort_order", sa.Integer(), nullable=False, server_default="0"),
 		sa.Column("status", sa.String(length=32), nullable=False, server_default="pending"),
-		sa.Column("pod_confirmed", sa.Boolean(), nullable=False, server_default=sa.text("0")),
+		sa.Column("pod_confirmed", sa.Boolean(), nullable=False, server_default=sa.text("false")),
 		sa.Column("pod_signer_name", sa.String(length=255), nullable=True),
 		sa.Column("pod_note", sa.Text(), nullable=True),
 		sa.Column("pod_photo_file_id", sa.Integer(), nullable=True),
@@ -254,7 +254,7 @@ def upgrade() -> None:
 		sa.Column("name", sa.String(length=255), nullable=False),
 		sa.Column("rule_type", sa.String(length=32), nullable=False, server_default="percent_of_sales"),
 		sa.Column("config", sa.JSON(), nullable=False),
-		sa.Column("is_active", sa.Boolean(), nullable=False, server_default=sa.text("1")),
+		sa.Column("is_active", sa.Boolean(), nullable=False, server_default=sa.text("true")),
 		sa.Column("valid_from", sa.Date(), nullable=True),
 		sa.Column("valid_to", sa.Date(), nullable=True),
 		sa.Column("created_at", sa.DateTime(), nullable=False, server_default=sa.text("CURRENT_TIMESTAMP")),

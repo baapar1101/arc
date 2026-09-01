@@ -542,8 +542,11 @@ app/services/dashboard_widgets_service.py
 app/services/data_table_user_settings_service.py
 app/services/database_backup_service.py
 app/services/database_restore_service.py
+app/services/distribution_commercial_service.py
+app/services/distribution_documents.py
 app/services/distribution_geo.py
 app/services/distribution_phase3_service.py
+app/services/distribution_phase4_service.py
 app/services/distribution_service.py
 app/services/document_code_reservation_service.py
 app/services/document_line_fx_service.py
@@ -698,6 +701,7 @@ app/services/telegram_ai_chat_service.py
 app/services/telegram_ai_chat_text.py
 app/services/template_builder_compiler.py
 app/services/template_design_v2_compiler.py
+app/services/theme_brand_colors.py
 app/services/transfer_service.py
 app/services/trial_balance_service.py
 app/services/turnover_report_export_service.py
@@ -1214,6 +1218,10 @@ migrations/versions/20260817_000002_ai_agent_runs.py
 migrations/versions/20260818_000001_ai_voice_models.py
 migrations/versions/20260819_000001_ai_memory_identity_prompt.py
 migrations/versions/20260821_000001_ai_subagent_runs.py
+migrations/versions/20260901_000001_distribution_phase4_ops.py
+migrations/versions/20260901_000002_distribution_day_sort.py
+migrations/versions/20260902_000001_distribution_commercial_ops.py
+migrations/versions/20260902_000002_distribution_target_product_key.py
 tests/__init__.py
 tests/test_account_balance_core.py
 tests/test_account_tree_roots.py
