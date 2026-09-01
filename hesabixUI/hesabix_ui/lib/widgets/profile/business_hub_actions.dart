@@ -8,6 +8,7 @@ import '../../services/business_api_service.dart';
 import '../../services/business_user_service.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 typedef BusinessHubRefreshCallback = VoidCallback;
 
@@ -74,7 +75,7 @@ class BusinessHubActions {
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(t.cancel)),
           FilledButton(
             onPressed: () => Navigator.pop(ctx, true),
-            style: FilledButton.styleFrom(backgroundColor: Colors.green),
+            style: FilledButton.styleFrom(backgroundColor: SemanticColorResolver.positive(context)),
             child: Text(t.businessesHubRestore),
           ),
         ],

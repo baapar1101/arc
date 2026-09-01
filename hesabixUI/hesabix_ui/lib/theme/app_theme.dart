@@ -9,9 +9,9 @@ class AppTheme {
   static ThemeData build({
     required bool isDark,
     required Locale locale,
-    required Color seed,
+    required AppThemeDefinition themeDef,
   }) {
-    final scheme = AppColorTokens.schemeFromSeed(seed, dark: isDark);
+    final scheme = AppColorTokens.schemeForTheme(themeDef, dark: isDark);
     final isFa = locale.languageCode.toLowerCase() == 'fa';
 
     final textTheme = isFa ? faTextTheme(isDark: isDark) : enTextTheme(isDark: isDark);
@@ -20,6 +20,11 @@ class AppTheme {
     const spacing = AppSpacing();
     const radii = AppRadii();
     final shellColors = AppShellColors.fromScheme(scheme, isDark: isDark);
+    final semantics = AppSemanticColors.fromDefinition(
+      themeDef,
+      isDark: isDark,
+      scheme: scheme,
+    );
 
     return ThemeData(
       useMaterial3: true,
@@ -50,7 +55,31 @@ class AppTheme {
         spacing,
         radii,
         shellColors,
+        semantics,
       ],
+    );
+  }
+
+  /// سازگاری با فراخوانی‌های قدیمی مبتنی بر seed.
+  static ThemeData buildFromSeed({
+    required bool isDark,
+    required Locale locale,
+    required Color seed,
+  }) {
+    return build(
+      isDark: isDark,
+      locale: locale,
+      themeDef: AppThemeDefinition(
+        id: 'custom_seed',
+        labelFa: 'سفارشی',
+        labelEn: 'Custom',
+        primary: seed,
+        secondary: const Color(0xFF5A6A7A),
+        positive: const Color(0xFF2E7D32),
+        negative: const Color(0xFFB3261E),
+        warning: const Color(0xFFF0B92A),
+        seedOnly: true,
+      ),
     );
   }
 }

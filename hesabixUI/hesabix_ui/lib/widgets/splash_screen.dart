@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
+import 'package:hesabix_ui/theme/brand_logo.dart';
 
 class SplashScreen extends StatelessWidget {
   final String? message;
@@ -64,22 +65,10 @@ class SplashScreen extends StatelessWidget {
                 ),
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(20),
-                  child: Image.asset(
-                    isDark ? 'assets/images/logo-light.png' : 'assets/images/logo-blue.png',
-                    fit: BoxFit.contain,
-                    errorBuilder: (context, error, stackTrace) {
-                      return Container(
-                        decoration: BoxDecoration(
-                          color: primary,
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Icon(
-                          Icons.account_balance,
-                          size: 60,
-                          color: colorScheme.onPrimary,
-                        ),
-                      );
-                    },
+                  child: BrandLogo(
+                    width: 120,
+                    height: 120,
+                    primaryOverride: primary,
                   ),
                 ),
               ),

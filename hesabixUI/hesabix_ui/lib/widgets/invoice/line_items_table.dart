@@ -23,6 +23,7 @@ import '../../utils/invoice_line_preferences.dart';
 import '../money/amount_field_words_tooltip.dart';
 import '../../constants/frequent_description_scope.dart';
 import '../inputs/frequent_description_text_field.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 void _invoiceLineAttrsLog(String message) {
   if (kDebugMode) {
@@ -1394,7 +1395,7 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
                   size: 22,
                   color: theme.colorScheme.onSurfaceVariant,
                 ),
-                const SizedBox(width: 6),
+                SizedBox(width: 6),
                 Expanded(
                   child: Text(
                     'ردیف ${index + 1}',
@@ -1413,7 +1414,7 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
                     children: [
                       if (index > 0)
                         IconButton(
-                          icon: const Icon(Icons.keyboard_arrow_up),
+                          icon: Icon(Icons.keyboard_arrow_up),
                           onPressed: () => _reorderRows(index, index - 1),
                           tooltip: 'جابجایی به بالا',
                           iconSize: 20,
@@ -1448,7 +1449,7 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
                         onPressed: () => _removeRow(index),
                         tooltip: 'حذف',
                         iconSize: 20,
-                        color: Colors.red,
+                        color: SemanticColorResolver.negative(context),
                         padding: EdgeInsets.zero,
                         constraints: const BoxConstraints(
                           minWidth: 36,
@@ -1683,25 +1684,25 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
             ),
             // سطر سوم: نمایش instance های انتخاب شده (فقط برای کالاهای یونیک)
             if (_shouldShowInstanceSelector(item)) ...[
-              const SizedBox(height: 12),
+              SizedBox(height: 12),
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.blue[50],
+                  color: SemanticColorResolver.info(context).withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(4),
-                  border: Border.all(color: Colors.blue[200]!),
+                  border: Border.all(color: SemanticColorResolver.info(context).withValues(alpha: 0.35)!),
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.qr_code_scanner, size: 20, color: Colors.blue[700]),
-                    const SizedBox(width: 8),
+                    Icon(Icons.qr_code_scanner, size: 20, color: SemanticColorResolver.info(context)),
+                    SizedBox(width: 8),
                     Expanded(
                       child: item.selectedInstanceIds != null && item.selectedInstanceIds!.isNotEmpty
                           ? Text(
                               '${item.selectedInstanceIds!.length} کالای یونیک انتخاب شده',
                               style: TextStyle(
                                 fontSize: 14,
-                                color: Colors.blue[900],
+                                color: SemanticColorResolver.info(context),
                                 fontWeight: FontWeight.w500,
                               ),
                             )
@@ -1709,7 +1710,7 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
                               'برای انتخاب کالاهای یونیک کلیک کنید',
                               style: TextStyle(
                                 fontSize: 14,
-                                color: Colors.blue[700],
+                                color: SemanticColorResolver.info(context),
                                 fontStyle: FontStyle.italic,
                               ),
                             ),
@@ -1866,7 +1867,7 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
                   ),
                 ),
               ),
-              const SizedBox(width: 8),
+              SizedBox(width: 8),
               // مبلغ کل
               Expanded(
                 flex: 2,
@@ -1896,8 +1897,8 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
               // دکمه حذف
               IconButton(
                 onPressed: () => _removeRow(index),
-                icon: const Icon(Icons.delete_outline),
-                color: Colors.red,
+                icon: Icon(Icons.delete_outline),
+                color: SemanticColorResolver.negative(context),
                 tooltip: 'حذف',
                 iconSize: 24,
               ),
@@ -1970,7 +1971,7 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
           ),
           // سطر سوم: نمایش instance های انتخاب شده (فقط برای کالاهای یونیک)
           if (_shouldShowInstanceSelector(item)) ...[
-            const SizedBox(height: 8),
+            SizedBox(height: 8),
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -1979,21 +1980,21 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
                   child: Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: Colors.blue[50],
+                      color: SemanticColorResolver.info(context).withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(4),
-                      border: Border.all(color: Colors.blue[200]!),
+                      border: Border.all(color: SemanticColorResolver.info(context).withValues(alpha: 0.35)!),
                     ),
                     child: Row(
                       children: [
-                        Icon(Icons.qr_code_scanner, size: 18, color: Colors.blue[700]),
-                        const SizedBox(width: 8),
+                        Icon(Icons.qr_code_scanner, size: 18, color: SemanticColorResolver.info(context)),
+                        SizedBox(width: 8),
                         Expanded(
                           child: item.selectedInstanceIds != null && item.selectedInstanceIds!.isNotEmpty
                               ? Text(
                                   '${item.selectedInstanceIds!.length} کالای یونیک انتخاب شده',
                                   style: TextStyle(
                                     fontSize: 13,
-                                    color: Colors.blue[900],
+                                    color: SemanticColorResolver.info(context),
                                     fontWeight: FontWeight.w500,
                                   ),
                                 )
@@ -2001,7 +2002,7 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
                                   'برای انتخاب کالاهای یونیک کلیک کنید',
                                   style: TextStyle(
                                     fontSize: 13,
-                                    color: Colors.blue[700],
+                                    color: SemanticColorResolver.info(context),
                                     fontStyle: FontStyle.italic,
                                   ),
                                 ),
@@ -2177,10 +2178,10 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
           children: [
             if (item.mainUnit?.isNotEmpty == true)
               ListTile(
-                leading: const Icon(Icons.straighten),
+                leading: Icon(Icons.straighten),
                 title: Text(item.mainUnit!),
                 subtitle: Text(AppLocalizations.of(context).mainUnitLabel),
-                trailing: (item.selectedUnit == item.mainUnit) ? const Icon(Icons.check, color: Colors.green) : null,
+                trailing: (item.selectedUnit == item.mainUnit) ? Icon(Icons.check, color: SemanticColorResolver.positive(context)) : null,
                 onTap: () {
                   onChanged(item.mainUnit);
                   Navigator.of(context).pop();
@@ -2188,10 +2189,10 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
               ),
             if (item.secondaryUnit?.isNotEmpty == true)
               ListTile(
-                leading: const Icon(Icons.inventory_2),
+                leading: Icon(Icons.inventory_2),
                 title: Text(item.secondaryUnit!),
                 subtitle: Text(AppLocalizations.of(context).secondaryUnitLabel),
-                trailing: (item.selectedUnit == item.secondaryUnit) ? const Icon(Icons.check, color: Colors.green) : null,
+                trailing: (item.selectedUnit == item.secondaryUnit) ? Icon(Icons.check, color: SemanticColorResolver.positive(context)) : null,
                 onTap: () {
                   onChanged(item.secondaryUnit);
                   Navigator.of(context).pop();

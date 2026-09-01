@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:hesabix_ui/widgets/data_table/helpers/data_table_utils.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 /// ویجت نمایش صورت ترازنامه
 class BalanceSheetStatementView extends StatelessWidget {
@@ -172,16 +173,16 @@ class BalanceSheetStatementView extends StatelessWidget {
       final balanced = line['equation_balanced'] == true;
       return Container(
         padding: const EdgeInsets.all(16),
-        color: balanced ? Colors.green.withValues(alpha: 0.08) : Colors.orange.withValues(alpha: 0.1),
+        color: balanced ? SemanticColorResolver.positive(context).withValues(alpha: 0.08) : SemanticColorResolver.warning(context).withValues(alpha: 0.1),
         child: Row(
           children: [
             Icon(balanced ? Icons.check_circle_outline : Icons.warning_amber_outlined,
-                color: balanced ? Colors.green[700] : Colors.orange[800]),
-            const SizedBox(width: 8),
-            Expanded(child: Text(label, style: const TextStyle(fontWeight: FontWeight.w600))),
+                color: balanced ? SemanticColorResolver.positive(context) : SemanticColorResolver.warning(context)),
+            SizedBox(width: 8),
+            Expanded(child: Text(label, style: TextStyle(fontWeight: FontWeight.w600))),
             Text(
               balanced ? 'متوازن' : 'اختلاف: ${_fmt(line['amount'])}',
-              style: TextStyle(fontWeight: FontWeight.w700, color: balanced ? Colors.green[800] : Colors.orange[900]),
+              style: TextStyle(fontWeight: FontWeight.w700, color: balanced ? SemanticColorResolver.positive(context) : SemanticColorResolver.warning(context)),
             ),
           ],
         ),

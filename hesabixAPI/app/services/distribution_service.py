@@ -169,6 +169,43 @@ def _validate_return_lines(db: Session, business_id: int, lines: List[Dict[str, 
 	return out
 
 
+def _cap_return_lines_against_source(
+	db: Session,
+	business_id: int,
+	source_document_id: int,
+	lines: List[Dict[str, Any]],
+) -> None:
+	"""اگر خط مرجوعی از مقدار فروخته‌شده در فاکتور منبع بیشتر باشد، خطا بده."""
+	from adapters.db.models.document_line import DocumentLine
+
+	sold: Dict[int, float] = {}
+	for dl in (
+		db.query(DocumentLine)
+		.filter(DocumentLine.document_id == source_document_id, DocumentLine.product_id.isnot(None))
+		.all()
+	):
+		pid = int(dl.product_id)
+		sold[pid] = sold.get(pid, 0.0) + float(dl.quantity or 0)
+	if not sold:
+		return
+	for i, ln in enumerate(lines):
+		pid = int(ln["product_id"])
+		qty = float(ln["quantity"])
+		max_qty = sold.get(pid)
+		if max_qty is None:
+			raise ApiError(
+				"VALIDATION_ERROR",
+				f"lines[{i}]: product {pid} not on source invoice",
+				http_status=400,
+			)
+		if qty > max_qty + 1e-9:
+			raise ApiError(
+				"VALIDATION_ERROR",
+				f"lines[{i}]: quantity {qty} exceeds sold {max_qty} on source invoice",
+				http_status=400,
+			)
+
+
 def _ensure_route_allowed_for_strict(db: Session, business_id: int, ctx: AuthContext, route_id: int) -> None:
 	if not _use_strict_catalog_for_field_user(db, business_id, ctx):
 		return
@@ -609,6 +646,8 @@ def list_assignments(db: Session, business_id: int, route_id: Optional[int], ctx
 			return []
 		q = q.filter(DistributionRouteAssignment.user_id == uid)
 	rows = q.order_by(DistributionRouteAssignment.valid_from.desc()).all()
+	from app.services.distribution_documents import user_label
+
 	out = []
 	for a in rows:
 		out.append(
@@ -616,6 +655,7 @@ def list_assignments(db: Session, business_id: int, route_id: Optional[int], ctx
 				"id": a.id,
 				"route_id": a.route_id,
 				"user_id": a.user_id,
+				"user_name": user_label(db, a.user_id),
 				"valid_from": a.valid_from.isoformat() if a.valid_from else None,
 				"valid_to": a.valid_to.isoformat() if a.valid_to else None,
 				"created_at": a.created_at.isoformat() if a.created_at else None,
@@ -708,18 +748,36 @@ def get_daily_plan(db: Session, business_id: int, target_user_id: int, plan_date
 			person = db.query(Person).filter(Person.id == s.person_id).first()
 			pname = (person.alias_name or "").strip() if person else None
 			plats = person_coords(person) if person else (None, None)
+			# ترتیب روزمحور از override مسیر (در صورت وجود)
+			day_sort = s.sort_order
+			overrides = getattr(route, "plan_sort_overrides", None) or {}
+			day_map = overrides.get(plan_date.isoformat()) if isinstance(overrides, dict) else None
+			if isinstance(day_map, dict) and str(s.id) in day_map:
+				try:
+					day_sort = int(day_map[str(s.id)])
+				except (TypeError, ValueError):
+					day_sort = s.sort_order
+			mobile = None
+			if person is not None:
+				for cand in (getattr(person, "mobile", None), getattr(person, "phone", None), getattr(person, "mobile_2", None)):
+					if cand and str(cand).strip():
+						mobile = str(cand).strip()
+						break
 			items.append(
 				{
 					"route_id": route.id,
 					"route_code": route.code,
 					"route_name": route.name,
 					"stop_id": s.id,
-					"sort_order": s.sort_order,
+					"sort_order": day_sort,
+					"catalog_sort_order": s.sort_order,
 					"person_id": s.person_id,
 					"person_name": pname or str(s.person_id),
+					"person_mobile": mobile,
 					"weekday": s.weekday,
 					"latitude": plats[0],
 					"longitude": plats[1],
+					"day_optimized": isinstance(day_map, dict) and str(s.id) in day_map,
 				}
 			)
 	items.sort(key=lambda x: (x["route_code"], x["sort_order"], x["person_id"]))
@@ -791,13 +849,33 @@ def start_visit(
 	_slng = float(_lng) if _lng is not None and str(_lng).strip() != "" else None
 	from app.services.distribution_phase3_service import validate_geofence_on_start
 
+	want_override = bool(payload.get("geofence_override"))
+	if want_override:
+		can_override = False
+		if ctx is not None:
+			can_override = _can_see_full_distribution_catalog(ctx, business_id) or ctx.has_business_permission(
+				"distribution", "manage"
+			)
+		if not can_override:
+			raise ApiError(
+				"FORBIDDEN",
+				"geofence_override requires distribution.manage",
+				http_status=403,
+			)
+		override_reason = str(payload.get("geofence_override_reason") or "").strip()
+		if len(override_reason) < 3:
+			raise ApiError(
+				"VALIDATION_ERROR",
+				"geofence_override_reason required (min 3 chars)",
+				http_status=400,
+			)
 	geo = validate_geofence_on_start(
 		db,
 		business_id,
 		person_id,
 		_slat,
 		_slng,
-		allow_override=bool(payload.get("geofence_override")),
+		allow_override=want_override,
 	)
 	_extra = payload.get("extra_info")
 	if _extra is not None and not isinstance(_extra, dict):
@@ -807,6 +885,10 @@ def start_visit(
 		_extra["geofence_warning"] = geo["geofence_warning"]
 	if geo.get("distance_meters") is not None:
 		_extra["geofence_distance_meters"] = geo["distance_meters"]
+	if want_override:
+		_extra["geofence_override"] = True
+		_extra["geofence_override_reason"] = str(payload.get("geofence_override_reason") or "").strip()
+		_extra["geofence_override_by"] = user_id
 	v = DistributionFieldVisit(
 		business_id=business_id,
 		person_id=person_id,
@@ -825,6 +907,96 @@ def start_visit(
 	db.refresh(v)
 	pname = (person.alias_name or "").strip()
 	return visit_to_dict(v, pname)
+
+
+def heartbeat_visit(
+	db: Session,
+	business_id: int,
+	user_id: int,
+	visit_id: int,
+	latitude: float,
+	longitude: float,
+) -> Dict[str, Any]:
+	"""به‌روزرسانی موقعیت زندهٔ ویزیت در حال انجام برای نقشه تیم."""
+	_ensure_plugin(db, business_id)
+	v = (
+		db.query(DistributionFieldVisit)
+		.filter(
+			DistributionFieldVisit.id == visit_id,
+			DistributionFieldVisit.business_id == business_id,
+		)
+		.first()
+	)
+	if not v:
+		raise ApiError("NOT_FOUND", "Visit not found", http_status=404)
+	if int(v.user_id) != int(user_id):
+		raise ApiError("FORBIDDEN", "Only the assigned visitor can update location", http_status=403)
+	if v.status != "in_progress":
+		raise ApiError("VALIDATION_ERROR", "Visit is not in progress", http_status=400)
+	_base = dict(v.extra_info or {})
+	_base["live_location"] = {
+		"latitude": float(latitude),
+		"longitude": float(longitude),
+		"updated_at": datetime.utcnow().isoformat() + "Z",
+	}
+	v.extra_info = _base
+	# برای سازگاری با خواننده‌های قدیمی، start را هم به‌روز نگه می‌داریم به‌عنوان آخرین نقطه
+	v.start_latitude = float(latitude)
+	v.start_longitude = float(longitude)
+	v.updated_at = datetime.utcnow()
+	try:
+		from app.services.distribution_commercial_service import record_heartbeat_trail
+
+		record_heartbeat_trail(db, business_id, user_id, visit_id, latitude, longitude)
+	except Exception:
+		pass
+	db.commit()
+	db.refresh(v)
+	return {
+		"visit_id": v.id,
+		"latitude": float(latitude),
+		"longitude": float(longitude),
+		"updated_at": _base["live_location"]["updated_at"],
+	}
+
+
+def get_person_credit_summary(db: Session, business_id: int, person_id: int) -> Dict[str, Any]:
+	"""خلاصه اعتبار مشتری برای UI میدانی."""
+	_ensure_plugin(db, business_id)
+	from app.services.credit_service import get_person_credit, get_business_credit_settings
+	from app.services.person_service import calculate_person_balance
+
+	person = db.query(Person).filter(Person.id == person_id, Person.business_id == business_id).first()
+	if not person:
+		raise ApiError("NOT_FOUND", "Person not found", http_status=404)
+	credit = get_person_credit(db, business_id, person_id)
+	biz_settings = get_business_credit_settings(db, business_id)
+	check_enabled = credit.get("credit_check_enabled")
+	if check_enabled is None:
+		check_enabled = bool(biz_settings.get("is_enabled"))
+	balance = None
+	debt = None
+	try:
+		bal, _st = calculate_person_balance(db, person_id)
+		if bal is not None:
+			balance = float(bal)
+			debt = float(-bal) if bal < 0 else 0.0
+	except Exception:
+		pass
+	limit = credit.get("effective_credit_limit")
+	available = None
+	if check_enabled and limit is not None and debt is not None:
+		available = float(limit) - float(debt)
+	return {
+		"person_id": person_id,
+		"person_name": (person.alias_name or "").strip() or str(person_id),
+		"credit_check_enabled": bool(check_enabled),
+		"credit_limit": limit,
+		"balance": balance,
+		"current_debt": debt,
+		"available_credit": available,
+		"blocked": bool(check_enabled and available is not None and available < 0),
+	}
 
 
 def complete_visit(
@@ -871,6 +1043,26 @@ def complete_visit(
 		_base = dict(v.extra_info or {})
 		_base.update(_ex or {})
 		v.extra_info = _base
+	# POD — تأیید تحویل/امضا
+	if outcome == "order":
+		pod_confirmed = payload.get("pod_confirmed")
+		pod_name = str(payload.get("pod_signer_name") or "").strip()
+		if pod_confirmed is True:
+			if len(pod_name) < 2:
+				raise ApiError(
+					"VALIDATION_ERROR",
+					"pod_signer_name required when pod_confirmed",
+					http_status=400,
+				)
+			_base = dict(v.extra_info or {})
+			_base["pod"] = {
+				"confirmed": True,
+				"signer_name": pod_name[:255],
+				"note": (str(payload.get("pod_note") or "").strip()[:500] or None),
+				"confirmed_at": datetime.utcnow().isoformat() + "Z",
+				"confirmed_by_user_id": user_id,
+			}
+			v.extra_info = _base
 	_elat = payload.get("end_latitude")
 	_elng = payload.get("end_longitude")
 	if _elat is not None and str(_elat).strip() != "":
@@ -887,13 +1079,43 @@ def complete_visit(
 	van_lines = payload.get("van_sale_lines")
 	if van_lines and outcome == "order":
 		settings_v = get_or_create_distribution_settings(db, business_id)
-		if getattr(settings_v, "enable_van_sales", False) and isinstance(van_lines, list):
-			from app.services.distribution_phase3_service import record_van_sale_issue
+		if getattr(settings_v, "enable_van_sales", False) and isinstance(van_lines, list) and van_lines:
+			from app.services.distribution_phase3_service import get_van_for_user
+			from app.services.distribution_documents import create_distribution_invoice
+			from app.services.invoice_service import INVOICE_SALES
+			from app.services.distribution_commercial_service import apply_promotions_to_lines
 
-			wh_doc_id = record_van_sale_issue(db, business_id, user_id, v, van_lines)
-			if wh_doc_id:
+			promo_ids = None
+			ex = payload.get("extra_info") if isinstance(payload.get("extra_info"), dict) else {}
+			if isinstance(ex.get("promotion_ids"), list):
+				promo_ids = [int(x) for x in ex["promotion_ids"]]
+			van_lines, _disc, applied = apply_promotions_to_lines(
+				db, business_id, list(van_lines), promotion_ids=promo_ids,
+			)
+			if applied:
 				_base = dict(v.extra_info or {})
-				_base["van_issue_warehouse_document_id"] = wh_doc_id
+				_base["promotion_ids"] = applied
+				v.extra_info = _base
+
+			van = get_van_for_user(db, business_id, user_id)
+			if not van:
+				raise ApiError("VALIDATION_ERROR", "No van assigned for van sale", http_status=400)
+			if not v.document_id:
+				# Fail-closed: بدون فاکتور موفق، ویزیت کامل نمی‌شود (بدون حوالهٔ خام انبار)
+				inv = create_distribution_invoice(
+					db,
+					business_id,
+					user_id,
+					invoice_type=INVOICE_SALES,
+					person_id=int(v.person_id),
+					raw_lines=van_lines,
+					warehouse_id=int(van.warehouse_id),
+					description=f"فروش ون — ویزیت #{v.id}",
+					meta={"distribution_visit_id": v.id, "van_id": van.id},
+				)
+				v.document_id = int(inv["id"])
+				_base = dict(v.extra_info or {})
+				_base["van_sale_invoice_id"] = int(inv["id"])
 				v.extra_info = _base
 	v.updated_at = datetime.utcnow()
 
@@ -1024,12 +1246,21 @@ def create_return_request(db: Session, business_id: int, user_id: int, payload: 
 		raise ApiError("VALIDATION_ERROR", "lines must be a non-empty list", http_status=400)
 	lines = _validate_return_lines(db, business_id, raw_lines)
 	vid = payload.get("visit_id")
+	source_document_id = payload.get("source_document_id")
+	if source_document_id:
+		_validate_document_for_business(db, business_id, int(source_document_id), person_id)
+		# سقف مقدار نسبت به خطوط فاکتور منبع (در صورت وجود)
+		_cap_return_lines_against_source(db, business_id, int(source_document_id), lines)
+	# source_document_id را در meta خطوط نگه می‌داریم تا بدون مایگریشن ستون جدید حفظ شود
+	meta_lines = list(lines)
+	if source_document_id:
+		meta_lines = [{**ln, "source_document_id": int(source_document_id)} for ln in lines]
 	row = DistributionReturnRequest(
 		business_id=business_id,
 		person_id=person_id,
 		visit_id=int(vid) if vid else None,
 		status="pending",
-		lines=lines,
+		lines=meta_lines,
 		notes=payload.get("notes"),
 		created_by_user_id=user_id,
 	)
@@ -1042,6 +1273,7 @@ def create_return_request(db: Session, business_id: int, user_id: int, payload: 
 		"visit_id": row.visit_id,
 		"status": row.status,
 		"lines": row.lines,
+		"source_document_id": int(source_document_id) if source_document_id else None,
 		"notes": row.notes,
 		"created_at": row.created_at.isoformat() if row.created_at else None,
 	}
@@ -1056,18 +1288,22 @@ def list_return_requests(db: Session, business_id: int, ctx: AuthContext, status
 	if status:
 		q = q.filter(DistributionReturnRequest.status == status)
 	rows = q.order_by(DistributionReturnRequest.created_at.desc()).limit(500).all()
+	from app.services.distribution_documents import person_label, user_label
+
 	out = []
 	for r in rows:
 		out.append(
 			{
 				"id": r.id,
 				"person_id": r.person_id,
+				"person_name": person_label(db, r.person_id),
 				"visit_id": r.visit_id,
 				"status": r.status,
 				"lines": r.lines,
 				"notes": r.notes,
 				"resolved_document_id": r.resolved_document_id,
 				"created_by_user_id": r.created_by_user_id,
+				"created_by_user_name": user_label(db, r.created_by_user_id),
 				"created_at": r.created_at.isoformat() if r.created_at else None,
 			}
 		)
@@ -1089,16 +1325,87 @@ def resolve_return_request(
 	)
 	if not row:
 		raise ApiError("NOT_FOUND", "Return request not found", http_status=404)
+	if row.status != "pending":
+		raise ApiError("VALIDATION_ERROR", "Return request already resolved", http_status=400)
 	new_status = str(payload.get("status") or "").strip()
 	if new_status not in ("approved", "rejected"):
 		raise ApiError("VALIDATION_ERROR", "status must be approved or rejected", http_status=400)
 	row.status = new_status
 	row.resolved_by_user_id = resolver_user_id
 	row.resolved_at = datetime.utcnow()
+	warehouse_document_id: Optional[int] = None
+	auto_invoice_id: Optional[int] = None
 	if payload.get("resolved_document_id"):
 		doc_id = int(payload["resolved_document_id"])
 		_validate_document_for_business(db, business_id, doc_id, row.person_id)
 		row.resolved_document_id = doc_id
+	elif new_status == "approved":
+		from app.services.distribution_documents import create_distribution_invoice
+		from app.services.invoice_service import INVOICE_SALES_RETURN
+
+		settings = get_or_create_distribution_settings(db, business_id)
+		wh_id = getattr(settings, "default_source_warehouse_id", None)
+		restock_to_van = bool(payload.get("restock_to_van"))
+		if restock_to_van or (not wh_id and row.visit_id):
+			from app.services.distribution_phase3_service import get_van_for_user
+
+			visit = None
+			if row.visit_id:
+				visit = (
+					db.query(DistributionFieldVisit)
+					.filter(DistributionFieldVisit.id == row.visit_id, DistributionFieldVisit.business_id == business_id)
+					.first()
+				)
+			if visit:
+				van = get_van_for_user(db, business_id, int(visit.user_id))
+				if van:
+					wh_id = van.warehouse_id
+		if not wh_id:
+			from adapters.db.models.warehouse import Warehouse
+
+			wh = (
+				db.query(Warehouse)
+				.filter(Warehouse.business_id == business_id)
+				.order_by(Warehouse.is_default.desc(), Warehouse.id.asc())
+				.first()
+			)
+			wh_id = wh.id if wh else None
+		lines = row.lines if isinstance(row.lines, list) else []
+		source_document_id = payload.get("source_document_id")
+		if not source_document_id and lines:
+			for ln in lines:
+				if isinstance(ln, dict) and ln.get("source_document_id"):
+					source_document_id = int(ln["source_document_id"])
+					break
+		if not wh_id:
+			raise ApiError("VALIDATION_ERROR", "No warehouse available for return", http_status=400)
+		if not lines:
+			raise ApiError("VALIDATION_ERROR", "Return lines empty", http_status=400)
+		# Fail-closed: تأیید مرجوعی بدون فاکتور برگشت مجاز نیست
+		inv = create_distribution_invoice(
+			db,
+			business_id,
+			resolver_user_id,
+			invoice_type=INVOICE_SALES_RETURN,
+			person_id=int(row.person_id),
+			raw_lines=lines,
+			warehouse_id=int(wh_id),
+			description=f"برگشت از فروش — مرجوعی پخش #{row.id}",
+			meta={
+				"distribution_return_request_id": row.id,
+				"source_document_id": int(source_document_id) if source_document_id else None,
+			},
+			source_document_id=int(source_document_id) if source_document_id else None,
+		)
+		auto_invoice_id = int(inv["id"])
+		row.resolved_document_id = auto_invoice_id
+		note_bits = []
+		if row.notes:
+			note_bits.append(str(row.notes))
+		note_bits.append(f"[inv:{auto_invoice_id}]")
+		if source_document_id:
+			note_bits.append(f"[src:{int(source_document_id)}]")
+		row.notes = "\n".join(note_bits) if note_bits else row.notes
 	row.updated_at = datetime.utcnow()
 	db.commit()
 	db.refresh(row)
@@ -1106,6 +1413,8 @@ def resolve_return_request(
 		"id": row.id,
 		"status": row.status,
 		"resolved_document_id": row.resolved_document_id,
+		"warehouse_document_id": warehouse_document_id,
+		"auto_invoice_id": auto_invoice_id,
 		"resolved_at": row.resolved_at.isoformat() if row.resolved_at else None,
 	}
 
@@ -1129,6 +1438,14 @@ def update_distribution_settings(db: Session, business_id: int, payload: Dict[st
 	if "default_source_warehouse_id" in payload:
 		v = payload.get("default_source_warehouse_id")
 		row.default_source_warehouse_id = int(v) if v else None
+	if "enable_presell" in payload:
+		row.enable_presell = bool(payload["enable_presell"])
+	if "enable_promotions" in payload:
+		row.enable_promotions = bool(payload["enable_promotions"])
+	if "visitor_max_discount_percent" in payload:
+		row.visitor_max_discount_percent = max(0.0, min(100.0, float(payload.get("visitor_max_discount_percent") or 0)))
+	if "enable_suggested_order" in payload:
+		row.enable_suggested_order = bool(payload["enable_suggested_order"])
 	row.updated_at = datetime.utcnow()
 	db.commit()
 	db.refresh(row)
@@ -1177,6 +1494,46 @@ def get_distribution_reports_dashboard(
 		by_outcome[str(key)] = int(cnt)
 
 	by_user: Optional[List[Dict[str, Any]]] = None
+	from app.services.distribution_documents import document_net_amount, user_label
+
+	sales_linked_total = 0.0
+	sales_linked_count = 0
+	completed_q = (
+		db.query(DistributionFieldVisit)
+		.filter(DistributionFieldVisit.business_id == business_id)
+		.filter(func.date(DistributionFieldVisit.started_at) >= from_date)
+		.filter(func.date(DistributionFieldVisit.started_at) <= to_date)
+		.filter(DistributionFieldVisit.status == "completed")
+	)
+	if target_user_id is not None:
+		completed_q = completed_q.filter(DistributionFieldVisit.user_id == int(target_user_id))
+	elif scope_uid is not None:
+		completed_q = completed_q.filter(DistributionFieldVisit.user_id == scope_uid)
+	completed_list = completed_q.all()
+	for visit in completed_list:
+		if visit.document_id:
+			amt = document_net_amount(db, int(visit.document_id))
+			if amt is not None:
+				sales_linked_total += float(amt)
+				sales_linked_count += 1
+
+	plan_stops = 0
+	visited_persons: set[int] = {int(v.person_id) for v in completed_list}
+	if target_user_id is not None or scope_uid is not None:
+		uid_cov = int(target_user_id) if target_user_id is not None else int(scope_uid)  # type: ignore[arg-type]
+		from datetime import timedelta
+
+		span_days = (to_date - from_date).days
+		if span_days <= 62:
+			d = from_date
+			while d <= to_date:
+				plan = get_daily_plan(db, business_id, uid_cov, d)
+				plan_stops += len(plan.get("items") or [])
+				d = d + timedelta(days=1)
+	coverage_pct = None
+	if plan_stops > 0:
+		coverage_pct = round(100.0 * min(len(visited_persons), plan_stops) / float(plan_stops), 1)
+
 	if _can_see_full_distribution_catalog(ctx, business_id):
 		uq = (
 			db.query(DistributionFieldVisit.user_id, func.count(DistributionFieldVisit.id))
@@ -1187,7 +1544,10 @@ def get_distribution_reports_dashboard(
 		if target_user_id is not None:
 			uq = uq.filter(DistributionFieldVisit.user_id == int(target_user_id))
 		uq = uq.group_by(DistributionFieldVisit.user_id).all()
-		by_user = [{"user_id": int(uid), "visit_count": int(c)} for uid, c in uq]
+		by_user = [
+			{"user_id": int(uid), "user_name": user_label(db, int(uid)), "visit_count": int(c)}
+			for uid, c in uq
+		]
 
 	rq = db.query(DistributionReturnRequest).filter(DistributionReturnRequest.business_id == business_id)
 	rq = rq.filter(func.date(DistributionReturnRequest.created_at) >= from_date)
@@ -1200,6 +1560,32 @@ def get_distribution_reports_dashboard(
 	def _cnt(st: str) -> int:
 		return int(rq.filter(DistributionReturnRequest.status == st).count())
 
+	# تسویه‌های بازه
+	from adapters.db.models.distribution import DistributionDailySettlement
+
+	sq = db.query(DistributionDailySettlement).filter(DistributionDailySettlement.business_id == business_id)
+	sq = sq.filter(DistributionDailySettlement.settlement_date >= from_date)
+	sq = sq.filter(DistributionDailySettlement.settlement_date <= to_date)
+	if target_user_id is not None:
+		sq = sq.filter(DistributionDailySettlement.user_id == int(target_user_id))
+	elif scope_uid is not None:
+		sq = sq.filter(DistributionDailySettlement.user_id == scope_uid)
+	settlements = sq.all()
+	sett_confirmed = [s for s in settlements if s.status == "confirmed"]
+	sett_draft = [s for s in settlements if s.status == "draft"]
+	variance_abs = sum(abs(float(s.variance or 0)) for s in sett_confirmed)
+	collected_total = sum(
+		float(s.cash_collected or 0)
+		+ float(s.cheque_collected or 0)
+		+ float(s.card_collected or 0)
+		+ float(s.other_collected or 0)
+		for s in sett_confirmed
+	)
+
+	# sell-through تقریبی: فروش لینک‌شده / (فروش لینک‌شده + موجودی نمونه نه) — فقط نسبت سفارش به تکمیل
+	orders = int(by_outcome.get("order") or 0)
+	sell_through_pct = round(100.0 * orders / completed, 1) if completed > 0 else None
+
 	return {
 		"from_date": from_date.isoformat(),
 		"to_date": to_date.isoformat(),
@@ -1210,11 +1596,23 @@ def get_distribution_reports_dashboard(
 			"cancelled": cancelled_vis,
 			"in_progress": inprog,
 			"by_outcome": by_outcome,
+			"sales_linked_count": sales_linked_count,
+			"sales_linked_net_total": sales_linked_total,
+			"plan_stops_in_range": plan_stops,
+			"unique_persons_visited": len(visited_persons),
+			"coverage_percent": coverage_pct,
+			"order_rate_percent": sell_through_pct,
 		},
 		"by_user": by_user,
 		"returns": {
 			"pending": _cnt("pending"),
 			"approved": _cnt("approved"),
 			"rejected": _cnt("rejected"),
+		},
+		"settlements": {
+			"draft_count": len(sett_draft),
+			"confirmed_count": len(sett_confirmed),
+			"confirmed_collected_total": collected_total,
+			"confirmed_variance_abs_total": variance_abs,
 		},
 	}

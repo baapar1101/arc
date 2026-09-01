@@ -7,6 +7,7 @@ import 'package:hesabix_ui/utils/error_extractor.dart';
 import 'package:hesabix_ui/widgets/support/sla_indicator.dart';
 import 'package:hesabix_ui/widgets/support/support_activity_chart.dart';
 import 'package:hesabix_ui/widgets/support/operator_inbox_list.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 class OperatorDashboardPage extends StatefulWidget {
   final CalendarController? calendarController;
@@ -67,9 +68,9 @@ class _OperatorDashboardPageState extends State<OperatorDashboardPage> {
     final theme = Theme.of(context);
     return Scaffold(
       appBar: AppBar(
-        title: const Text('داشبورد پشتیبانی'),
+        title: Text('داشبورد پشتیبانی'),
         actions: [
-          IconButton(onPressed: _load, icon: const Icon(Icons.refresh)),
+          IconButton(onPressed: _load, icon: Icon(Icons.refresh)),
           TextButton.icon(
             onPressed: () => context.go('/user/profile/operator'),
             icon: const Icon(Icons.inbox_outlined),
@@ -104,10 +105,10 @@ class _OperatorDashboardPageState extends State<OperatorDashboardPage> {
                         children: [
                           _legendDot(theme.colorScheme.primary, 'ایجاد شده'),
                           const SizedBox(width: 16),
-                          _legendDot(Colors.green, 'حل شده'),
+                          _legendDot(SemanticColorResolver.positive(context), 'حل شده'),
                         ],
                       ),
-                      const SizedBox(height: 8),
+                      SizedBox(height: 8),
                       Card(
                         clipBehavior: Clip.antiAlias,
                         child: Padding(
@@ -120,7 +121,7 @@ class _OperatorDashboardPageState extends State<OperatorDashboardPage> {
                         children: [
                           Text('تیکت‌های معوق SLA', style: theme.textTheme.titleMedium),
                           const Spacer(),
-                          TextButton(onPressed: () => _openInbox(OperatorInboxView.overdue), child: const Text('مشاهده همه')),
+                          TextButton(onPressed: () => _openInbox(OperatorInboxView.overdue), child: Text('مشاهده همه')),
                         ],
                       ),
                       const SizedBox(height: 8),
@@ -130,7 +131,7 @@ class _OperatorDashboardPageState extends State<OperatorDashboardPage> {
                             padding: const EdgeInsets.all(20),
                             child: Row(
                               children: [
-                                Icon(Icons.check_circle_outline, color: Colors.green.shade600),
+                                Icon(Icons.check_circle_outline, color: SemanticColorResolver.positive(context)),
                                 const SizedBox(width: 12),
                                 const Expanded(child: Text('تیکت معوقی وجود ندارد — عالی است!')),
                               ],
@@ -169,7 +170,7 @@ class _OperatorDashboardPageState extends State<OperatorDashboardPage> {
             _statCard('من', '${s['my_open_count'] ?? 0}', Icons.person_outline, theme.colorScheme.secondary, () => _openInbox(OperatorInboxView.mine), width: w.clamp(120, 200)),
             _statCard('خوانده‌نشده', '${s['unread_count'] ?? 0}', Icons.mark_email_unread_outlined, theme.colorScheme.tertiary, () => _openInbox(OperatorInboxView.unread), width: w.clamp(120, 200)),
             _statCard('معوق SLA', '${s['overdue_count'] ?? 0}', Icons.warning_amber_outlined, theme.colorScheme.error, () => _openInbox(OperatorInboxView.overdue), width: w.clamp(120, 200)),
-            _statCard('حل‌شده امروز', '${s['resolved_today_count'] ?? 0}', Icons.check_circle_outline, Colors.green, () => _openInbox(OperatorInboxView.all), width: w.clamp(120, 200)),
+            _statCard('حل‌شده امروز', '${s['resolved_today_count'] ?? 0}', Icons.check_circle_outline, SemanticColorResolver.positive(context), () => _openInbox(OperatorInboxView.all), width: w.clamp(120, 200)),
           ],
         );
       },

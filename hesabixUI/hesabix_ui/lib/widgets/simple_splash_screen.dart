@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'dart:async';
 import '../core/auth_store.dart';
 import '../l10n/app_localizations.dart';
+import '../theme/brand_logo.dart';
 
 class SimpleSplashScreen extends StatefulWidget {
   final String? message;
@@ -200,22 +201,10 @@ class _SimpleSplashScreenState extends State<SimpleSplashScreen>
                         ),
                         child: ClipRRect(
                           borderRadius: BorderRadius.circular(20),
-                          child: Image.asset(
-                            isDark ? 'assets/images/logo-light.png' : 'assets/images/logo-blue.png',
-                            fit: BoxFit.contain,
-                            errorBuilder: (context, error, stackTrace) {
-                              return Container(
-                                decoration: BoxDecoration(
-                                  color: primary,
-                                  borderRadius: BorderRadius.circular(20),
-                                ),
-                                child: Icon(
-                                  Icons.account_balance,
-                                  size: 50,
-                                  color: colorScheme.onPrimary,
-                                ),
-                              );
-                            },
+                          child: BrandLogo(
+                            width: 100,
+                            height: 100,
+                            primaryOverride: primary,
                           ),
                         ),
                       ),

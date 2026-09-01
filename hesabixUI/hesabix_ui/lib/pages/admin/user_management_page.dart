@@ -9,6 +9,7 @@ import 'package:hesabix_ui/utils/error_extractor.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table.dart';
 
 import 'admin_user_password_dialog.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 class UserManagementPage extends StatefulWidget {
   const UserManagementPage({super.key});
@@ -384,9 +385,9 @@ class _UserManagementPageState extends State<UserManagementPage> {
     if (ids.isEmpty) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
+          SnackBar(
             content: Text('شناسهٔ معتبری در انتخاب فعلی یافت نشد. صفحه را تازه‌سازی کنید.'),
-            backgroundColor: Colors.orange,
+            backgroundColor: SemanticColorResolver.warning(context),
           ),
         );
       }
@@ -540,17 +541,17 @@ class _UserManagementPageState extends State<UserManagementPage> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('تعلیق کاربر'),
+        title: Text('تعلیق کاربر'),
         content: Text('آیا مطمئن هستید که می‌خواهید ${user['full_name'] ?? 'کاربر'} را تعلیق کنید؟'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('انصراف'),
+            child: Text('انصراف'),
           ),
           FilledButton(
             onPressed: () => Navigator.of(context).pop(true),
             style: FilledButton.styleFrom(
-              backgroundColor: Colors.red,
+              backgroundColor: SemanticColorResolver.negative(context),
             ),
             child: const Text('تعلیق'),
           ),
@@ -577,7 +578,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
             content: Text(
               'خطا در تعلیق کاربر: ${ErrorExtractor.forContext(e, context)}',
             ),
-            backgroundColor: Colors.red,
+            backgroundColor: SemanticColorResolver.negative(context),
           ),
         );
       }
@@ -655,8 +656,8 @@ class _StatusChip extends StatelessWidget {
     final Color foreground;
     switch (value) {
       case 'active':
-        background = Colors.green.shade100;
-        foreground = Colors.green.shade800;
+        background = SemanticColorResolver.positive(context).withValues(alpha: 0.18);
+        foreground = SemanticColorResolver.positive(context);
         break;
       case 'inactive':
         background = Colors.grey.shade200;
@@ -667,8 +668,8 @@ class _StatusChip extends StatelessWidget {
         foreground = Colors.amber.shade800;
         break;
       case 'suspended':
-        background = Colors.red.shade100;
-        foreground = Colors.red.shade800;
+        background = SemanticColorResolver.negative(context).withValues(alpha: 0.18);
+        foreground = SemanticColorResolver.negative(context);
         break;
       default:
         background = Colors.blueGrey.shade100;
@@ -709,8 +710,8 @@ class _RoleChip extends StatelessWidget {
         foreground = Colors.deepPurple.shade800;
         break;
       case 'operator':
-        background = Colors.blue.shade100;
-        foreground = Colors.blue.shade800;
+        background = SemanticColorResolver.info(context).withValues(alpha: 0.18);
+        foreground = SemanticColorResolver.info(context);
         break;
       case 'supervisor':
         background = Colors.teal.shade100;

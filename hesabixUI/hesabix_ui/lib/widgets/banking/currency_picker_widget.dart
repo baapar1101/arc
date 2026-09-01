@@ -3,6 +3,7 @@ import '../../core/api_client.dart';
 import '../../services/currency_service.dart';
 import '../../utils/error_extractor.dart';
 import '../invoice/invoice_form_layout.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 class CurrencyPickerWidget extends StatefulWidget {
   final int? selectedCurrencyId;
@@ -136,12 +137,12 @@ class _CurrencyPickerWidgetState extends State<CurrencyPickerWidget> {
         ),
         child: Row(
           children: [
-            const Icon(Icons.error_outline, color: Colors.red),
-            const SizedBox(width: 8),
+            Icon(Icons.error_outline, color: SemanticColorResolver.negative(context)),
+            SizedBox(width: 8),
             Expanded(
               child: Text(
                 'خطا در بارگذاری ارزها',
-                style: const TextStyle(color: Colors.red),
+                style: TextStyle(color: SemanticColorResolver.negative(context)),
               ),
             ),
             TextButton(

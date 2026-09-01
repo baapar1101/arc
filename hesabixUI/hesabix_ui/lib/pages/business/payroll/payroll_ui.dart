@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 import '../../../utils/number_formatters.dart' show formatWithThousands;
 import '../../../utils/number_normalizer.dart'
@@ -121,7 +122,7 @@ class PayrollUi {
       case 'finalized':
         return cs.primary;
       case 'posted':
-        return Colors.green.shade700;
+        return SemanticColorResolver.positive(context);
       case 'cancelled':
         return cs.error;
       default:
@@ -453,7 +454,7 @@ class PayrollUi {
     Color color;
     switch (kind) {
       case 'earning':
-        color = Colors.green.shade700;
+        color = SemanticColorResolver.positive(context);
       case 'deduction':
         color = cs.error;
       case 'employer_cost':

@@ -6,6 +6,7 @@ import 'package:hesabix_ui/services/storage_plan_service.dart';
 import 'package:hesabix_ui/services/currency_service.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 class StoragePlansAdminPage extends StatefulWidget {
   const StoragePlansAdminPage({super.key});
@@ -491,7 +492,7 @@ class _StoragePlansAdminPageState extends State<StoragePlansAdminPage> {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text(isEdit ? 'پلن با موفقیت به‌روزرسانی شد' : 'پلن با موفقیت ایجاد شد'),
-                      backgroundColor: Colors.green,
+                      backgroundColor: SemanticColorResolver.positive(context),
                     ),
                   );
                 } catch (e) {
@@ -499,7 +500,7 @@ class _StoragePlansAdminPageState extends State<StoragePlansAdminPage> {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text('خطا: ${ErrorExtractor.forContext(e, context)}'),
-                      backgroundColor: Colors.red,
+                      backgroundColor: SemanticColorResolver.negative(context),
                     ),
                   );
                 }
@@ -526,8 +527,8 @@ class _StoragePlansAdminPageState extends State<StoragePlansAdminPage> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('حذف پلن'),
-        content: const Text('آیا از حذف این پلن اطمینان دارید؟'),
+        title: Text('حذف پلن'),
+        content: Text('آیا از حذف این پلن اطمینان دارید؟'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -535,7 +536,7 @@ class _StoragePlansAdminPageState extends State<StoragePlansAdminPage> {
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
-            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            style: FilledButton.styleFrom(backgroundColor: SemanticColorResolver.negative(context)),
             child: const Text('حذف'),
           ),
         ],
@@ -549,9 +550,9 @@ class _StoragePlansAdminPageState extends State<StoragePlansAdminPage> {
       if (mounted) {
         _load();
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
+          SnackBar(
             content: Text('پلن با موفقیت حذف شد'),
-            backgroundColor: Colors.green,
+            backgroundColor: SemanticColorResolver.positive(context),
           ),
         );
       }
@@ -560,7 +561,7 @@ class _StoragePlansAdminPageState extends State<StoragePlansAdminPage> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('خطا: ${ErrorExtractor.forContext(e, context)}'),
-            backgroundColor: Colors.red,
+            backgroundColor: SemanticColorResolver.negative(context),
           ),
         );
       }
@@ -673,7 +674,7 @@ class _StoragePlansAdminPageState extends State<StoragePlansAdminPage> {
                             child: ExpansionTile(
                               leading: Icon(
                                 isActive ? Icons.check_circle : Icons.cancel,
-                                color: isActive ? Colors.green : Colors.grey,
+                                color: isActive ? SemanticColorResolver.positive(context) : Colors.grey,
                               ),
                               title: Text(
                                 plan['name'] ?? '-',
@@ -699,12 +700,12 @@ class _StoragePlansAdminPageState extends State<StoragePlansAdminPage> {
                                   IconButton(
                                     tooltip: 'ویرایش',
                                     onPressed: () => _showEditDialog(plan),
-                                    icon: const Icon(Icons.edit_outlined),
+                                    icon: Icon(Icons.edit_outlined),
                                   ),
                                   IconButton(
                                     tooltip: 'حذف',
                                     onPressed: () => _deletePlan(plan['id']),
-                                    icon: const Icon(Icons.delete_outline, color: Colors.red),
+                                    icon: Icon(Icons.delete_outline, color: SemanticColorResolver.negative(context)),
                                   ),
                                 ],
                               ),

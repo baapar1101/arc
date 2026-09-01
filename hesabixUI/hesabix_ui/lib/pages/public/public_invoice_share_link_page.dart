@@ -17,6 +17,7 @@ import 'package:hesabix_ui/utils/invoice_payable_total.dart';
 import 'package:hesabix_ui/utils/snackbar_helper.dart';
 import 'package:hesabix_ui/widgets/invoice/invoice_fx_dual_totals_banner.dart';
 import 'package:hesabix_ui/services/bytes_export/bytes_export_service.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 class PublicInvoiceShareLinkPage extends StatefulWidget {
   final String code;
@@ -853,10 +854,10 @@ class _PublicInvoiceShareLinkPageState extends State<PublicInvoiceShareLinkPage>
     ThemeData theme,
     List<Map<String, dynamic>> rows,
   ) {
-    final addBg = Colors.green.shade50;
-    final dedBg = Colors.red.shade50;
-    final addAccent = Colors.green.shade700;
-    final dedAccent = Colors.red.shade700;
+    final addBg = SemanticColorResolver.positive(context).withValues(alpha: 0.12);
+    final dedBg = SemanticColorResolver.negative(context).withValues(alpha: 0.12);
+    final addAccent = SemanticColorResolver.positive(context);
+    final dedAccent = SemanticColorResolver.negative(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -1077,7 +1078,7 @@ class _PublicInvoiceShareLinkPageState extends State<PublicInvoiceShareLinkPage>
           children: [
             Text('خلاصه مبالغ', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
             if (curSuffix != null) ...[
-              const SizedBox(height: 4),
+              SizedBox(height: 4),
               Text('واحد پول: $curSuffix', style: theme.textTheme.bodySmall),
             ],
             const SizedBox(height: 8),
@@ -1096,7 +1097,7 @@ class _PublicInvoiceShareLinkPageState extends State<PublicInvoiceShareLinkPage>
                   'اضافات (با مالیات)${s != '' ? s : ''}',
                   additionsTotal,
                   theme,
-                  color: Colors.green.shade700,
+                  color: SemanticColorResolver.positive(context),
                   prefix: '+',
                 ),
               if (deductionsTotal > 0)
@@ -1104,7 +1105,7 @@ class _PublicInvoiceShareLinkPageState extends State<PublicInvoiceShareLinkPage>
                   'کسورات (با مالیات)${s != '' ? s : ''}',
                   deductionsTotal,
                   theme,
-                  color: Colors.red.shade700,
+                  color: SemanticColorResolver.negative(context),
                   prefix: '−',
                 ),
               Divider(

@@ -5,6 +5,7 @@ import 'package:hesabix_ui/services/support_billing_service.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
 import 'package:hesabix_ui/utils/number_formatters.dart';
 import 'package:hesabix_ui/utils/snackbar_helper.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 class SupportBillingStatsAdminPage extends StatefulWidget {
   const SupportBillingStatsAdminPage({super.key});
@@ -378,8 +379,8 @@ class _SupportBillingStatsAdminPageState extends State<SupportBillingStatsAdminP
                                       },
                                     ),
                                   ActionChip(
-                                    avatar: const Icon(Icons.date_range, size: 16),
-                                    label: const Text('بازه سفارشی'),
+                                    avatar: Icon(Icons.date_range, size: 16),
+                                    label: Text('بازه سفارشی'),
                                     onPressed: _pickCustomRange,
                                   ),
                                 ],
@@ -417,7 +418,7 @@ class _SupportBillingStatsAdminPageState extends State<SupportBillingStatsAdminP
                               title: 'پرداخت موفق',
                               value: '${s?['paid_count'] ?? 0}',
                               icon: Icons.check_circle,
-                              color: Colors.green,
+                              color: SemanticColorResolver.positive(context),
                             ),
                           ),
                           SizedBox(
@@ -445,7 +446,7 @@ class _SupportBillingStatsAdminPageState extends State<SupportBillingStatsAdminP
                               title: 'در انتظار پرداخت',
                               value: '${s?['awaiting_payment_count'] ?? 0}',
                               icon: Icons.hourglass_empty,
-                              color: Colors.orange,
+                              color: SemanticColorResolver.warning(context),
                             ),
                           ),
                           SizedBox(
@@ -765,9 +766,9 @@ class _SupportBillingStatsAdminPageState extends State<SupportBillingStatsAdminP
                         ..._invoices.map((inv) {
                           final status = inv['status']?.toString() ?? '';
                           final color = switch (status) {
-                            'paid' => Colors.green,
+                            'paid' => SemanticColorResolver.positive(context),
                             'failed' => theme.colorScheme.error,
-                            'awaiting_payment' => Colors.orange,
+                            'awaiting_payment' => SemanticColorResolver.warning(context),
                             'void' => Colors.grey,
                             'expired' => Colors.blueGrey,
                             _ => theme.colorScheme.primary,

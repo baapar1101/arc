@@ -18,12 +18,13 @@ class MobileLauncherAppearancePage extends StatefulWidget {
   final AuthStore authStore;
 
   static const List<int> presetArgb = [
+    0xFF0F4C81, // classic blue
+    0xFF00A8BD, // turquoise sea
+    0xFF0F766E, // emerald forest
+    0xFFB45309, // warm copper
     0xFF1565C0,
     0xFF283593,
-    0xFF00695C,
     0xFF2E7D32,
-    0xFF6A1B9A,
-    0xFF4527A0,
     0xFFC62828,
     0xFF37474F,
     0xFF263238,

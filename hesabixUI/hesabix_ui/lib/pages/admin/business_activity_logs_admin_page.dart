@@ -9,6 +9,7 @@ import 'package:hesabix_ui/core/date_utils.dart';
 import 'package:hesabix_ui/services/admin_activity_log_service.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table.dart';
 import 'package:hesabix_ui/widgets/date_input_field.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 /// صفحه‌ی پنل سوپرادمین برای مشاهده‌ی لاگ فعالیت همه‌ی کسب‌وکارها.
 ///
@@ -264,13 +265,13 @@ class _BusinessActivityLogsAdminPageState
 
   Color _categoryColor(String? c) {
     if (c == null) return Colors.grey;
-    const m = <String, Color>{
-      'accounting': Colors.blue,
-      'warehouse': Colors.orange,
-      'product': Colors.green,
+    final m = <String, Color>{
+      'accounting': SemanticColorResolver.info(context),
+      'warehouse': SemanticColorResolver.warning(context),
+      'product': SemanticColorResolver.positive(context),
       'person': Colors.purple,
       'business': Colors.indigo,
-      'user': Colors.red,
+      'user': SemanticColorResolver.negative(context),
       'settings': Colors.teal,
       'invoice': Colors.amber,
       'document': Colors.cyan,
@@ -863,7 +864,7 @@ class _SearchPickerDialogState extends State<_SearchPickerDialog> {
       return Padding(
         padding: const EdgeInsets.all(16),
         child: Text('خطا: $_error',
-            style: const TextStyle(color: Colors.red)),
+            style: TextStyle(color: SemanticColorResolver.negative(context))),
       );
     }
     if (_items.isEmpty) {

@@ -37,6 +37,10 @@ def extend_settings_dict(row: Any) -> Dict[str, Any]:
 			"visit_checklist_template": [],
 			"enable_van_sales": False,
 			"default_source_warehouse_id": None,
+			"enable_presell": False,
+			"enable_promotions": False,
+			"visitor_max_discount_percent": 0,
+			"enable_suggested_order": True,
 		}
 	return {
 		"shared_routing_catalog": bool(row.shared_routing_catalog),
@@ -46,6 +50,10 @@ def extend_settings_dict(row: Any) -> Dict[str, Any]:
 		"visit_checklist_template": getattr(row, "visit_checklist_template", None) or [],
 		"enable_van_sales": bool(getattr(row, "enable_van_sales", False)),
 		"default_source_warehouse_id": getattr(row, "default_source_warehouse_id", None),
+		"enable_presell": bool(getattr(row, "enable_presell", False)),
+		"enable_promotions": bool(getattr(row, "enable_promotions", False)),
+		"visitor_max_discount_percent": float(getattr(row, "visitor_max_discount_percent", 0) or 0),
+		"enable_suggested_order": bool(getattr(row, "enable_suggested_order", True)),
 	}
 
 
@@ -87,6 +95,8 @@ def update_person_location(db: Session, business_id: int, person_id: int, lat: f
 
 def list_vans(db: Session, business_id: int, ctx: AuthContext) -> List[Dict[str, Any]]:
 	dist_svc._ensure_plugin(db, business_id)
+	from app.services.distribution_documents import user_label
+
 	q = db.query(DistributionVan).filter(DistributionVan.business_id == business_id)
 	if not dist_svc._can_see_full_distribution_catalog(ctx, business_id):
 		uid = ctx.get_user_id()
@@ -103,10 +113,35 @@ def list_vans(db: Session, business_id: int, ctx: AuthContext) -> List[Dict[str,
 				"name": v.name,
 				"warehouse_id": v.warehouse_id,
 				"user_id": v.user_id,
+				"user_name": user_label(db, v.user_id),
 				"is_active": v.is_active,
 			}
 		)
 	return out
+
+
+def update_van(db: Session, business_id: int, van_id: int, payload: Dict[str, Any]) -> Dict[str, Any]:
+	dist_svc._ensure_plugin(db, business_id)
+	van = db.query(DistributionVan).filter(DistributionVan.id == van_id, DistributionVan.business_id == business_id).first()
+	if not van:
+		raise ApiError("NOT_FOUND", "Van not found", http_status=404)
+	if "name" in payload and payload["name"]:
+		van.name = str(payload["name"]).strip()[:255]
+	if "user_id" in payload:
+		van.user_id = int(payload["user_id"]) if payload.get("user_id") else None
+	if "is_active" in payload:
+		van.is_active = bool(payload["is_active"])
+	van.updated_at = datetime.utcnow()
+	db.commit()
+	db.refresh(van)
+	return {
+		"id": van.id,
+		"code": van.code,
+		"name": van.name,
+		"warehouse_id": van.warehouse_id,
+		"user_id": van.user_id,
+		"is_active": van.is_active,
+	}
 
 
 def create_van(db: Session, business_id: int, payload: Dict[str, Any]) -> Dict[str, Any]:
@@ -160,12 +195,25 @@ def get_van_stock(db: Session, business_id: int, van_id: int) -> Dict[str, Any]:
 	van = db.query(DistributionVan).filter(DistributionVan.id == van_id, DistributionVan.business_id == business_id).first()
 	if not van:
 		raise ApiError("NOT_FOUND", "Van not found", http_status=404)
+	from app.services.distribution_documents import _resolve_unit_price
+
 	products = db.query(Product).filter(Product.business_id == business_id, Product.track_inventory == True).all()  # noqa: E712
 	items = []
 	for p in products:
 		qty = get_physical_stock(db, business_id, p.id, van.warehouse_id, business_today(business_id))
 		if qty and float(qty) > 0:
-			items.append({"product_id": p.id, "product_name": p.name, "quantity": float(qty)})
+			unit_price = _resolve_unit_price(db, business_id, p, None)
+			tax_rate = float(p.sales_tax_rate or 0) if bool(getattr(p, "is_sales_taxable", False)) else 0.0
+			items.append(
+				{
+					"product_id": p.id,
+					"product_name": p.name,
+					"quantity": float(qty),
+					"unit_price": unit_price,
+					"tax_rate": tax_rate,
+					"is_sales_taxable": bool(getattr(p, "is_sales_taxable", False)),
+				}
+			)
 	return {"van_id": van_id, "warehouse_id": van.warehouse_id, "items": items}
 
 
@@ -197,6 +245,16 @@ def load_van(
 			raise ApiError("VALIDATION_ERROR", f"lines[{i}] product_id and quantity required", http_status=400)
 		wh_lines.append({"product_id": pid, "quantity": qty})
 	today = business_today(business_id)
+	# پیش‌بررسی موجودی مبدأ
+	for ln in wh_lines:
+		avail = float(get_physical_stock(db, business_id, int(ln["product_id"]), int(src), today) or 0)
+		if avail + 1e-9 < float(ln["quantity"]):
+			raise ApiError(
+				"INSUFFICIENT_STOCK",
+				f"Insufficient stock for product {ln['product_id']}: available {avail}, requested {ln['quantity']}",
+				http_status=400,
+				details={"product_id": ln["product_id"], "available": avail, "requested": ln["quantity"]},
+			)
 	wh_doc = create_manual_warehouse_document(
 		db,
 		business_id,
@@ -213,6 +271,101 @@ def load_van(
 	post_warehouse_document(db, wh_doc.id)
 	db.commit()
 	return {"van_id": van_id, "warehouse_document_id": wh_doc.id, "status": "posted"}
+
+
+def unload_van(
+	db: Session,
+	business_id: int,
+	user_id: int,
+	van_id: int,
+	lines: List[Dict[str, Any]],
+	dest_warehouse_id: Optional[int] = None,
+) -> Dict[str, Any]:
+	"""تخلیهٔ موجودی ون به انبار مرکزی."""
+	dist_svc._ensure_plugin(db, business_id)
+	van = db.query(DistributionVan).filter(DistributionVan.id == van_id, DistributionVan.business_id == business_id).first()
+	if not van:
+		raise ApiError("NOT_FOUND", "Van not found", http_status=404)
+	settings = dist_svc.get_or_create_distribution_settings(db, business_id)
+	dest = dest_warehouse_id or getattr(settings, "default_source_warehouse_id", None)
+	if not dest:
+		raise ApiError("VALIDATION_ERROR", "dest_warehouse_id required", http_status=400)
+	if int(dest) == int(van.warehouse_id):
+		raise ApiError("VALIDATION_ERROR", "destination must differ from van warehouse", http_status=400)
+	if not lines:
+		raise ApiError("VALIDATION_ERROR", "lines required", http_status=400)
+	wh_lines = []
+	for i, ln in enumerate(lines):
+		if not isinstance(ln, dict):
+			raise ApiError("VALIDATION_ERROR", f"lines[{i}] invalid", http_status=400)
+		pid = int(ln.get("product_id") or 0)
+		qty = float(ln.get("quantity") or 0)
+		if pid <= 0 or qty <= 0:
+			raise ApiError("VALIDATION_ERROR", f"lines[{i}] product_id and quantity required", http_status=400)
+		avail = get_physical_stock(db, business_id, pid, van.warehouse_id, business_today(business_id))
+		if float(avail or 0) < qty:
+			raise ApiError("INSUFFICIENT_VAN_STOCK", f"Insufficient stock for product {pid}", http_status=400)
+		wh_lines.append({"product_id": pid, "quantity": qty})
+	wh_doc = create_manual_warehouse_document(
+		db,
+		business_id,
+		user_id,
+		{
+			"doc_type": "transfer",
+			"document_date": business_today(business_id).isoformat(),
+			"warehouse_id_from": int(van.warehouse_id),
+			"warehouse_id_to": int(dest),
+			"description": f"تخلیه ون {van.code}",
+			"lines": wh_lines,
+		},
+	)
+	post_warehouse_document(db, wh_doc.id)
+	db.commit()
+	return {"van_id": van_id, "warehouse_document_id": wh_doc.id, "status": "posted"}
+
+
+def apply_route_optimize(
+	db: Session,
+	business_id: int,
+	route_id: int,
+	plan_date: date,
+	start_lat: Optional[float] = None,
+	start_lng: Optional[float] = None,
+) -> Dict[str, Any]:
+	"""بهینه‌سازی و ذخیرهٔ ترتیب فقط برای همان روز (بدون بازنویسی sort_order کاتالوگ)."""
+	result = optimize_route_plan(db, business_id, route_id, plan_date, start_lat, start_lng)
+	items = result.get("items") or []
+	if not result.get("optimized"):
+		return {**result, "persisted": False, "persist_mode": "day_override"}
+	route = db.query(DistributionRoute).filter(
+		DistributionRoute.id == route_id,
+		DistributionRoute.business_id == business_id,
+	).first()
+	if not route:
+		raise ApiError("NOT_FOUND", "Route not found", http_status=404)
+	overrides = dict(route.plan_sort_overrides or {})
+	day_key = plan_date.isoformat()
+	day_map: Dict[str, int] = {}
+	for it in items:
+		sid = it.get("stop_id")
+		new_sort = it.get("optimized_sort")
+		if sid is None or new_sort is None:
+			continue
+		day_map[str(int(sid))] = int(new_sort)
+	overrides[day_key] = day_map
+	# پاکسازی کلیدهای قدیمی‌تر از ۹۰ روز برای جلوگیری از رشد بی‌نهایت
+	try:
+		from datetime import timedelta
+
+		cutoff = (plan_date - timedelta(days=90)).isoformat()
+		overrides = {k: v for k, v in overrides.items() if isinstance(k, str) and k >= cutoff}
+		overrides[day_key] = day_map
+	except Exception:
+		pass
+	route.plan_sort_overrides = overrides
+	route.updated_at = datetime.utcnow()
+	db.commit()
+	return {**result, "persisted": True, "persist_mode": "day_override", "day": day_key}
 
 
 def record_van_sale_issue(
@@ -330,6 +483,8 @@ def get_team_map(
 	dist_svc._ensure_plugin(db, business_id)
 	if not dist_svc._can_see_full_distribution_catalog(ctx, business_id):
 		raise ApiError("FORBIDDEN", "Team map requires manage or reports_team", http_status=403)
+	from app.services.distribution_documents import user_label
+
 	d = plan_date or business_today(business_id)
 	start = datetime.combine(d, datetime.min.time())
 	end = datetime.combine(d, datetime.max.time())
@@ -347,23 +502,46 @@ def get_team_map(
 	for v in rows:
 		if v.user_id in by_user:
 			continue
-		lat = float(v.start_latitude) if v.start_latitude is not None else None
-		lng = float(v.start_longitude) if v.start_longitude is not None else None
+		extra = v.extra_info if isinstance(v.extra_info, dict) else {}
+		live = extra.get("live_location") if isinstance(extra.get("live_location"), dict) else {}
+		lat = None
+		lng = None
+		loc_source = None
+		if live.get("latitude") is not None and live.get("longitude") is not None:
+			lat = float(live["latitude"])
+			lng = float(live["longitude"])
+			loc_source = "live"
+		elif v.status == "completed" and v.end_latitude is not None:
+			lat = float(v.end_latitude)
+			lng = float(v.end_longitude) if v.end_longitude is not None else None
+			loc_source = "end"
+		elif v.start_latitude is not None:
+			lat = float(v.start_latitude)
+			lng = float(v.start_longitude) if v.start_longitude is not None else None
+			loc_source = "start"
 		person = db.query(Person).filter(Person.id == v.person_id).first()
 		plats = person_coords(person) if person else (None, None)
 		by_user[v.user_id] = {
 			"user_id": v.user_id,
+			"user_name": user_label(db, v.user_id),
 			"visit_id": v.id,
 			"status": v.status,
 			"person_id": v.person_id,
 			"person_name": (person.alias_name or "").strip() if person else None,
 			"visit_latitude": lat,
 			"visit_longitude": lng,
+			"location_source": loc_source,
+			"live_updated_at": live.get("updated_at"),
 			"customer_latitude": plats[0],
 			"customer_longitude": plats[1],
 			"started_at": v.started_at.isoformat() if v.started_at else None,
+			"pod": (extra.get("pod") if isinstance(extra.get("pod"), dict) else None),
 		}
-	return {"plan_date": d.isoformat(), "markers": list(by_user.values())}
+	return {
+		"plan_date": d.isoformat(),
+		"markers": list(by_user.values()),
+		"generated_at": datetime.utcnow().isoformat() + "Z",
+	}
 
 
 def process_offline_sync(
@@ -420,6 +598,41 @@ def process_offline_sync(
 			elif op == "create_return":
 				data = dist_svc.create_return_request(db, business_id, user_id, payload)
 				results.append({"client_ref": client_ref, "ok": True, "return_request_id": data.get("id")})
+			elif op == "create_presell_order":
+				from app.services import distribution_commercial_service as dist_c
+
+				data = dist_c.create_visit_order(db, business_id, user_id, payload, auto_confirm=bool(payload.get("confirm")))
+				results.append({"client_ref": client_ref, "ok": True, "order_id": data.get("id"), "document_id": data.get("document_id")})
+			elif op == "complete_visit_with_presell":
+				# سفارش پیش‌فروش + تکمیل ویزیت در یک عمل آفلاین
+				from app.services import distribution_commercial_service as dist_c
+
+				order_payload = payload.get("order") if isinstance(payload.get("order"), dict) else {}
+				visit_payload = payload.get("visit") if isinstance(payload.get("visit"), dict) else {}
+				vid = int(visit_payload.get("visit_id") or payload.get("visit_id") or 0)
+				order_data = dist_c.create_visit_order(
+					db, business_id, user_id, order_payload, auto_confirm=bool(order_payload.get("confirm", True)),
+				)
+				if order_data.get("document_id") and not visit_payload.get("document_id"):
+					visit_payload = dict(visit_payload)
+					visit_payload["document_id"] = order_data["document_id"]
+				ex = dict(visit_payload.get("extra_info") or {})
+				ex["presell_order_id"] = order_data.get("id")
+				visit_payload["extra_info"] = ex
+				data = dist_svc.complete_visit(
+					db,
+					business_id,
+					user_id,
+					vid,
+					visit_payload,
+					allow_manage_override=ctx.has_business_permission("distribution", "manage"),
+				)
+				results.append({
+					"client_ref": client_ref,
+					"ok": True,
+					"visit_id": data.get("id"),
+					"order_id": order_data.get("id"),
+				})
 			else:
 				results.append({"client_ref": client_ref, "ok": False, "error": f"unknown op {op}"})
 		except ApiError as e:

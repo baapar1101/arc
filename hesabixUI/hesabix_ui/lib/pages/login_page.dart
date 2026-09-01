@@ -1330,11 +1330,7 @@ class _LoginPageState extends State<LoginPage> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final logoAsset = isDark ? 'assets/images/logo-light.png' : 'assets/images/logo-blue.png';
-
     return AuthShell(
-      logoAsset: logoAsset,
       localeController: widget.localeController,
       calendarController: widget.calendarController,
       themeController: widget.themeController,

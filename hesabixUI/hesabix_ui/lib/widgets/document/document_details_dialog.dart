@@ -51,6 +51,7 @@ import 'package:hesabix_ui/utils/invoice_transaction_preferences.dart';
 import 'package:hesabix_ui/models/invoice_transaction.dart' show TransactionType;
 import 'package:share_plus/share_plus.dart';
 import 'package:hesabix_ui/services/bytes_export/bytes_export_service.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 int? _parseInstallmentSeq(dynamic v) {
   if (v == null) return null;
@@ -285,7 +286,7 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
       builder: (context) => AlertDialog(
         title: Row(
           children: [
-            Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 28),
+            Icon(Icons.warning_amber_rounded, color: SemanticColorResolver.warning(context), size: 28),
             const SizedBox(width: 12),
             const Expanded(
               child: Text(
@@ -368,7 +369,7 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
             style: theme.textTheme.bodyMedium?.copyWith(
               fontWeight: isHighlight ? FontWeight.bold : FontWeight.normal,
               color: isError 
-                  ? Colors.red 
+                  ? SemanticColorResolver.negative(context) 
                   : isHighlight 
                       ? theme.colorScheme.primary 
                       : theme.colorScheme.onSurface,
@@ -1047,9 +1048,9 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
     final isInvoice = _document?.documentType.startsWith('invoice') ?? false;
     final balance = (_document?.totalCredit ?? 0) - (_document?.totalDebit ?? 0);
     final balanceColor = balance > 0
-        ? Colors.green
+        ? SemanticColorResolver.positive(context)
         : balance < 0
-            ? Colors.red
+            ? SemanticColorResolver.negative(context)
             : theme.colorScheme.onSurfaceVariant;
 
     // رنگ نشانگر «پیش‌نویس / قطعی» در چیپ وضعیت (مستقل از تراز سند)
@@ -1058,7 +1059,7 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
       if (doc == null) return t.colorScheme.onSurfaceVariant;
       return doc.isProforma
           ? (t.brightness == Brightness.dark ? Colors.amberAccent : Colors.deepOrange.shade700)
-          : Colors.green.shade700;
+          : SemanticColorResolver.positive(context);
     }
 
     final headerChips = <Widget>[
@@ -1202,7 +1203,7 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.error_outline, size: 64, color: Colors.red),
+          Icon(Icons.error_outline, size: 64, color: SemanticColorResolver.negative(context)),
           const SizedBox(height: 16),
           Text(
             'خطا در بارگذاری سند',
@@ -1397,7 +1398,7 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
     Color statusColor;
     switch (status) {
       case 'فعال':
-        statusColor = Colors.green[700] ?? theme.colorScheme.primary;
+        statusColor = SemanticColorResolver.positive(context);
         break;
       case 'منقضی':
         statusColor = theme.colorScheme.error;
@@ -1572,7 +1573,7 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.error_outline, color: Colors.red, size: 48),
+            Icon(Icons.error_outline, color: SemanticColorResolver.negative(context), size: 48),
             const SizedBox(height: 12),
             Text(_errorMessage!),
             const SizedBox(height: 12),
@@ -1685,11 +1686,11 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
   Color _warehouseDocStatusColor(String? status) {
     switch (status) {
       case 'draft':
-        return Colors.orange;
+        return SemanticColorResolver.warning(context);
       case 'posted':
-        return Colors.green;
+        return SemanticColorResolver.positive(context);
       case 'cancelled':
-        return Colors.red;
+        return SemanticColorResolver.negative(context);
       default:
         return Colors.grey;
     }
@@ -2260,10 +2261,10 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
               children: [
                 Icon(
                   isPositive ? Icons.trending_up : Icons.trending_down,
-                  color: isPositive ? Colors.green : Colors.red,
+                  color: isPositive ? SemanticColorResolver.positive(context) : SemanticColorResolver.negative(context),
                   size: 24,
                 ),
-                const SizedBox(width: 8),
+                SizedBox(width: 8),
                 Text(
                   'سود فاکتور',
                   style: theme.textTheme.titleMedium?.copyWith(
@@ -2276,10 +2277,10 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
             Container(
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: isPositive ? Colors.green.shade50 : Colors.red.shade50,
+                color: isPositive ? SemanticColorResolver.positive(context).withValues(alpha: 0.12) : SemanticColorResolver.negative(context).withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(
-                  color: isPositive ? Colors.green.shade200 : Colors.red.shade200,
+                  color: isPositive ? SemanticColorResolver.positive(context).withValues(alpha: 0.35) : SemanticColorResolver.negative(context).withValues(alpha: 0.35),
                 ),
               ),
               child: Row(
@@ -2311,7 +2312,7 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
                         style: TextStyle(
                           fontSize: 20,
                           fontWeight: FontWeight.bold,
-                          color: isPositive ? Colors.green.shade700 : Colors.red.shade700,
+                          color: isPositive ? SemanticColorResolver.positive(context) : SemanticColorResolver.negative(context),
                         ),
                       ),
                       if (profitPercentValue != 0)
@@ -2319,7 +2320,7 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
                           '${profitPercentValue.toStringAsFixed(2)}%',
                           style: TextStyle(
                             fontSize: 14,
-                            color: isPositive ? Colors.green.shade600 : Colors.red.shade600,
+                            color: isPositive ? SemanticColorResolver.positive(context) : SemanticColorResolver.negative(context),
                           ),
                         ),
                       if (totalOverhead != null && totalOverhead.toDouble() > 0)
@@ -2336,7 +2337,7 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
             ),
             // نمایش سود ناخالص و خالص (اگر هر دو موجود باشند)
             if (grossProfit != null && netProfit != null && grossProfit != netProfit) ...[
-              const SizedBox(height: 12),
+              SizedBox(height: 12),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
                 children: [
@@ -2344,9 +2345,9 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
                     child: Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: Colors.blue.shade50,
+                        color: SemanticColorResolver.info(context).withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.blue.shade200),
+                        border: Border.all(color: SemanticColorResolver.info(context).withValues(alpha: 0.35)),
                       ),
                       child: Column(
                         children: [
@@ -2354,12 +2355,12 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
                             'سود ناخالص',
                             style: theme.textTheme.bodySmall,
                           ),
-                          const SizedBox(height: 4),
+                          SizedBox(height: 4),
                           Text(
                             formatWithThousands(grossProfit.toDouble()),
                             style: TextStyle(
                               fontWeight: FontWeight.bold,
-                              color: Colors.blue.shade700,
+                              color: SemanticColorResolver.info(context),
                             ),
                           ),
                           if (grossProfitPercent != null && grossProfitPercent.toDouble() != 0)
@@ -2367,7 +2368,7 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
                               '${grossProfitPercent.toStringAsFixed(1)}%',
                               style: TextStyle(
                                 fontSize: 12,
-                                color: Colors.blue.shade600,
+                                color: SemanticColorResolver.info(context),
                               ),
                             ),
                         ],
@@ -2439,7 +2440,7 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
               'خلاصه مالی فاکتور',
               style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
             ),
-            const SizedBox(height: 12),
+            SizedBox(height: 12),
             Wrap(
               spacing: 12,
               runSpacing: 12,
@@ -2456,7 +2457,7 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
                   theme,
                   label: 'تخفیف',
                   value: discount,
-                  color: Colors.orange,
+                  color: SemanticColorResolver.warning(context),
                   icon: Icons.discount,
                   formatter: formatter,
                 ),
@@ -2464,7 +2465,7 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
                   theme,
                   label: 'مالیات',
                   value: tax,
-                  color: Colors.blue,
+                  color: SemanticColorResolver.info(context),
                   icon: Icons.account_balance,
                   formatter: formatter,
                 ),
@@ -2472,7 +2473,7 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
                   theme,
                   label: 'خالص ردیف‌ها',
                   value: net,
-                  color: Colors.green[700],
+                  color: SemanticColorResolver.positive(context),
                   icon: Icons.account_balance_wallet,
                   formatter: formatter,
                 ),
@@ -3512,7 +3513,7 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
                               discount > 0 ? formatWithThousands(discount, decimalPlaces: discount % 1 == 0 ? 0 : 2) : '-',
                               textAlign: TextAlign.center,
                               textDirection: ui.TextDirection.ltr,
-                              style: baseNumberStyle.copyWith(color: Colors.orange),
+                              style: baseNumberStyle.copyWith(color: SemanticColorResolver.warning(context)),
                             ),
                           ),
                         ),
@@ -3522,7 +3523,7 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
                               tax > 0 ? formatWithThousands(tax, decimalPlaces: tax % 1 == 0 ? 0 : 2) : '-',
                               textAlign: TextAlign.center,
                               textDirection: ui.TextDirection.ltr,
-                              style: baseNumberStyle.copyWith(color: Colors.blue),
+                              style: baseNumberStyle.copyWith(color: SemanticColorResolver.info(context)),
                             ),
                           ),
                         ),
@@ -3533,7 +3534,7 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
                               textAlign: TextAlign.center,
                               textDirection: ui.TextDirection.ltr,
                               style: baseNumberStyle.copyWith(
-                                color: Colors.green,
+                                color: SemanticColorResolver.positive(context),
                                 fontWeight: FontWeight.bold,
                               ),
                             ),
@@ -3564,7 +3565,7 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
                                         textAlign: TextAlign.center,
                                         textDirection: ui.TextDirection.ltr,
                                         style: baseNumberStyle.copyWith(
-                                          color: profitValue >= 0 ? Colors.green : Colors.red,
+                                          color: profitValue >= 0 ? SemanticColorResolver.positive(context) : SemanticColorResolver.negative(context),
                                           fontWeight: FontWeight.bold,
                                         ),
                                       ),
@@ -3575,7 +3576,7 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
                                           textDirection: ui.TextDirection.ltr,
                                           style: TextStyle(
                                             fontSize: 11,
-                                            color: profitValue >= 0 ? Colors.green.shade700 : Colors.red.shade700,
+                                            color: profitValue >= 0 ? SemanticColorResolver.positive(context) : SemanticColorResolver.negative(context),
                                           ),
                                         ),
                                     ],
@@ -3726,10 +3727,10 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
                         textDirection: ui.TextDirection.ltr,
                         style: theme.textTheme.bodyMedium?.copyWith(
                           fontFeatures: const [FontFeature.tabularFigures()],
-                          color: Colors.red,
-                        ) ?? const TextStyle(
+                          color: SemanticColorResolver.negative(context),
+                        ) ?? TextStyle(
                           fontFeatures: [FontFeature.tabularFigures()],
-                          color: Colors.red,
+                          color: SemanticColorResolver.negative(context),
                         ),
                       ),
                     ),
@@ -3739,10 +3740,10 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
                         textDirection: ui.TextDirection.ltr,
                         style: theme.textTheme.bodyMedium?.copyWith(
                           fontFeatures: const [FontFeature.tabularFigures()],
-                          color: Colors.green,
-                        ) ?? const TextStyle(
+                          color: SemanticColorResolver.positive(context),
+                        ) ?? TextStyle(
                           fontFeatures: [FontFeature.tabularFigures()],
-                          color: Colors.green,
+                          color: SemanticColorResolver.positive(context),
                         ),
                       ),
                     ),
@@ -3794,11 +3795,11 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
                 children: [
                   _buildTotalItem('جمع کل (قبل از تخفیف)', formatWithThousands(gross.toInt()), theme.colorScheme.primary),
                   Container(width: 2, height: 40, color: theme.dividerColor),
-                  _buildTotalItem('تخفیف', formatWithThousands(discount.toInt()), Colors.orange),
+                  _buildTotalItem('تخفیف', formatWithThousands(discount.toInt()), SemanticColorResolver.warning(context)),
                   Container(width: 2, height: 40, color: theme.dividerColor),
-                  _buildTotalItem('مالیات', formatWithThousands(tax.toInt()), Colors.blue),
+                  _buildTotalItem('مالیات', formatWithThousands(tax.toInt()), SemanticColorResolver.info(context)),
                   Container(width: 2, height: 40, color: theme.dividerColor),
-                  _buildTotalItem('خالص ردیف‌ها', formatWithThousands(net.toInt()), Colors.green),
+                  _buildTotalItem('خالص ردیف‌ها', formatWithThousands(net.toInt()), SemanticColorResolver.positive(context)),
                   if (adjNet != 0 || adjTax != 0) ...[
                     Container(width: 2, height: 40, color: theme.dividerColor),
                     _buildTotalItem(
@@ -3836,9 +3837,9 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
                 children: [
-                  _buildTotalItem('جمع بدهکار', formatWithThousands(_document!.totalDebit.toInt()), Colors.red),
+                  _buildTotalItem('جمع بدهکار', formatWithThousands(_document!.totalDebit.toInt()), SemanticColorResolver.negative(context)),
                   Container(width: 2, height: 40, color: theme.dividerColor),
-                  _buildTotalItem('جمع بستانکار', formatWithThousands(_document!.totalCredit.toInt()), Colors.green),
+                  _buildTotalItem('جمع بستانکار', formatWithThousands(_document!.totalCredit.toInt()), SemanticColorResolver.positive(context)),
                   Container(width: 2, height: 40, color: theme.dividerColor),
                   _buildTotalItem('تعداد سطرها', '${_document!.linesCount}', theme.colorScheme.secondary),
                 ],
@@ -3861,7 +3862,7 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
             _buildTotalItem(
               'جمع بدهکار',
               formatWithThousands(_document!.totalDebit.toInt()),
-              Colors.red,
+              SemanticColorResolver.negative(context),
             ),
             Container(
               width: 2,
@@ -3871,7 +3872,7 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
             _buildTotalItem(
               'جمع بستانکار',
               formatWithThousands(_document!.totalCredit.toInt()),
-              Colors.green,
+              SemanticColorResolver.positive(context),
             ),
             Container(
               width: 2,
@@ -4107,10 +4108,10 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
               children: [
                 Icon(
                   isReceipt ? Icons.arrow_downward : Icons.arrow_upward,
-                  color: isReceipt ? Colors.green : Colors.red,
+                  color: isReceipt ? SemanticColorResolver.positive(context) : SemanticColorResolver.negative(context),
                   size: 20,
                 ),
-                const SizedBox(width: 8),
+                SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     doc.code,
@@ -4123,14 +4124,14 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
                     color: isReceipt 
-                        ? Colors.green.withValues(alpha: 0.1)
-                        : Colors.red.withValues(alpha: 0.1),
+                        ? SemanticColorResolver.positive(context).withValues(alpha: 0.1)
+                        : SemanticColorResolver.negative(context).withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
                     isReceipt ? 'دریافت' : 'پرداخت',
                     style: TextStyle(
-                      color: isReceipt ? Colors.green : Colors.red,
+                      color: isReceipt ? SemanticColorResolver.positive(context) : SemanticColorResolver.negative(context),
                       fontWeight: FontWeight.w600,
                       fontSize: 12,
                     ),
@@ -5146,7 +5147,7 @@ class _ReceiptPaymentTransactionDialogState extends State<_ReceiptPaymentTransac
                     color: theme.colorScheme.onPrimary,
                     size: 24,
                   ),
-                  const SizedBox(width: 8),
+                  SizedBox(width: 8),
                   Text(
                     isEdit ? 'ویرایش تراکنش' : 'افزودن تراکنش',
                     style: theme.textTheme.titleLarge?.copyWith(
@@ -5157,7 +5158,7 @@ class _ReceiptPaymentTransactionDialogState extends State<_ReceiptPaymentTransac
                   const Spacer(),
                   IconButton(
                     onPressed: () => Navigator.pop(context),
-                    icon: const Icon(Icons.close),
+                    icon: Icon(Icons.close),
                     color: theme.colorScheme.onPrimary,
                   ),
                 ],
@@ -5187,8 +5188,8 @@ class _ReceiptPaymentTransactionDialogState extends State<_ReceiptPaymentTransac
                                   ? Icons.arrow_downward 
                                   : Icons.arrow_upward,
                               color: widget.transactionType == 'receipt' 
-                                  ? Colors.green 
-                                  : Colors.red,
+                                  ? SemanticColorResolver.positive(context) 
+                                  : SemanticColorResolver.negative(context),
                             ),
                             const SizedBox(width: 8),
                             Text(

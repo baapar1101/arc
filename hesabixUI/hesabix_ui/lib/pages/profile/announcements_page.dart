@@ -4,6 +4,7 @@ import '../../services/announcements_service.dart';
 import '../../utils/announcement_navigation.dart';
 import '../../utils/date_formatters.dart';
 import '../../utils/error_extractor.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 class AnnouncementsPage extends StatefulWidget {
   const AnnouncementsPage({super.key});
@@ -305,8 +306,8 @@ class _AnnouncementsPageState extends State<AnnouncementsPage> {
                     final time = '${it['updated_at'] ?? it['time'] ?? ''}';
 
                     final Color lvlColor = switch (level) {
-                      'critical' => Colors.red,
-                      'warning' => Colors.orange,
+                      'critical' => SemanticColorResolver.negative(context),
+                      'warning' => SemanticColorResolver.warning(context),
                       _ => cs.primary,
                     };
 

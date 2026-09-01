@@ -8,6 +8,7 @@ import 'package:hesabix_ui/utils/snackbar_helper.dart';
 import 'package:hesabix_ui/widgets/permission/permission_widgets.dart';
 import 'package:intl/intl.dart';
 import 'package:hesabix_ui/core/hesabix_back.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 /// صف کار فروشنده: تسک‌های باز، پیگیری‌های سررسید و نقض SLA
 class CrmTasksPage extends StatefulWidget {
@@ -161,13 +162,13 @@ class _CrmTasksPageState extends State<CrmTasksPage> with SingleTickerProviderSt
   Color _priorityColor(String? priority) {
     switch (priority) {
       case 'urgent':
-        return Colors.red;
+        return SemanticColorResolver.negative(context);
       case 'high':
-        return Colors.orange;
+        return SemanticColorResolver.warning(context);
       case 'low':
         return Colors.blueGrey;
       default:
-        return Colors.blue;
+        return SemanticColorResolver.info(context);
     }
   }
 
@@ -291,10 +292,10 @@ class _CrmTasksPageState extends State<CrmTasksPage> with SingleTickerProviderSt
             margin: const EdgeInsets.only(bottom: 8),
             child: ListTile(
               leading: CircleAvatar(
-                backgroundColor: overdue ? Colors.red.shade100 : Theme.of(context).colorScheme.primaryContainer,
+                backgroundColor: overdue ? SemanticColorResolver.negative(context).withValues(alpha: 0.18) : Theme.of(context).colorScheme.primaryContainer,
                 child: Icon(
                   overdue ? Icons.warning_amber_rounded : Icons.check_box_outlined,
-                  color: overdue ? Colors.red : Theme.of(context).colorScheme.onPrimaryContainer,
+                  color: overdue ? SemanticColorResolver.negative(context) : Theme.of(context).colorScheme.onPrimaryContainer,
                 ),
               ),
               title: Row(
@@ -304,7 +305,7 @@ class _CrmTasksPageState extends State<CrmTasksPage> with SingleTickerProviderSt
                     Padding(
                       padding: const EdgeInsets.only(left: 4),
                       child: Chip(
-                        label: Text(_priorityLabel(priority), style: const TextStyle(fontSize: 11)),
+                        label: Text(_priorityLabel(priority), style: TextStyle(fontSize: 11)),
                         visualDensity: VisualDensity.compact,
                         backgroundColor: _priorityColor(priority).withValues(alpha: 0.15),
                         side: BorderSide(color: _priorityColor(priority).withValues(alpha: 0.4)),
@@ -316,7 +317,7 @@ class _CrmTasksPageState extends State<CrmTasksPage> with SingleTickerProviderSt
                   ? null
                   : Text(
                       subtitleParts.join(' · '),
-                      style: TextStyle(color: overdue ? Colors.red : null),
+                      style: TextStyle(color: overdue ? SemanticColorResolver.negative(context) : null),
                     ),
               trailing: canWrite
                   ? Row(
@@ -359,11 +360,11 @@ class _CrmTasksPageState extends State<CrmTasksPage> with SingleTickerProviderSt
             return Card(
               margin: const EdgeInsets.only(bottom: 8),
               child: ListTile(
-                leading: const Icon(Icons.contact_phone_outlined),
+                leading: Icon(Icons.contact_phone_outlined),
                 title: Text(l['name']?.toString() ?? '-', overflow: TextOverflow.ellipsis),
                 subtitle: Text(
                   'سرنخ · ${_formatDateTime(at)}',
-                  style: TextStyle(color: overdue ? Colors.red : null),
+                  style: TextStyle(color: overdue ? SemanticColorResolver.negative(context) : null),
                 ),
                 onTap: () => _navigateForEntity(leadId: (l['id'] as num?)?.toInt()),
               ),
@@ -375,11 +376,11 @@ class _CrmTasksPageState extends State<CrmTasksPage> with SingleTickerProviderSt
             return Card(
               margin: const EdgeInsets.only(bottom: 8),
               child: ListTile(
-                leading: const Icon(Icons.trending_up),
+                leading: Icon(Icons.trending_up),
                 title: Text(d['title']?.toString() ?? '-', overflow: TextOverflow.ellipsis),
                 subtitle: Text(
                   '${d['person_name'] ?? ''} · ${_formatDateTime(at)}',
-                  style: TextStyle(color: overdue ? Colors.red : null),
+                  style: TextStyle(color: overdue ? SemanticColorResolver.negative(context) : null),
                   overflow: TextOverflow.ellipsis,
                 ),
                 onTap: () => _navigateForEntity(dealId: (d['id'] as num?)?.toInt()),
@@ -407,13 +408,13 @@ class _CrmTasksPageState extends State<CrmTasksPage> with SingleTickerProviderSt
             margin: const EdgeInsets.only(bottom: 8),
             child: ListTile(
               leading: CircleAvatar(
-                backgroundColor: Colors.red.shade100,
-                child: const Icon(Icons.timer_off_outlined, color: Colors.red),
+                backgroundColor: SemanticColorResolver.negative(context).withValues(alpha: 0.18),
+                child: Icon(Icons.timer_off_outlined, color: SemanticColorResolver.negative(context)),
               ),
               title: Text(l['name']?.toString() ?? '-', overflow: TextOverflow.ellipsis),
               subtitle: Text(
                 'مهلت SLA: ${_formatDateTime(due)}',
-                style: const TextStyle(color: Colors.red),
+                style: TextStyle(color: SemanticColorResolver.negative(context)),
               ),
               onTap: () => _navigateForEntity(leadId: (l['id'] as num?)?.toInt()),
             ),

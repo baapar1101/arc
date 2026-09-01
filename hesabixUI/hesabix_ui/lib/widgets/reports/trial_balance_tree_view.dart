@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/widgets/data_table/helpers/data_table_utils.dart';
 import 'package:hesabix_ui/utils/financial_report_navigation.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 /// نمای درختی تراز آزمایشی با امکان drill-down به دفتر کل.
 class TrialBalanceTreeView extends StatefulWidget {
@@ -234,11 +235,11 @@ class _TrialBalanceTreeViewState extends State<TrialBalanceTreeView> {
                         ? Icons.check_circle_outline
                         : Icons.warning_amber_outlined,
                     color: balanceValid
-                        ? Colors.green[700]
-                        : Colors.orange[800],
+                        ? SemanticColorResolver.positive(context)
+                        : SemanticColorResolver.warning(context),
                     size: 20,
                   ),
-                  const SizedBox(width: 8),
+                  SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       balanceValid
@@ -247,8 +248,8 @@ class _TrialBalanceTreeViewState extends State<TrialBalanceTreeView> {
                                 'تراز آزمایشی نامتوازن'),
                       style: TextStyle(
                         color: balanceValid
-                            ? Colors.green[800]
-                            : Colors.orange[900],
+                            ? SemanticColorResolver.positive(context)
+                            : SemanticColorResolver.warning(context),
                         fontWeight: FontWeight.w600,
                       ),
                     ),

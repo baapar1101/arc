@@ -4,6 +4,7 @@ import '../../models/workflow_editor_state.dart';
 import '../../utils/workflow_auto_layout.dart';
 import '../../utils/workflow_responsive.dart';
 import 'workflow_connection_help_dialog.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 /// Toolbar برای workflow editor
 class WorkflowToolbarWidget extends StatelessWidget {
@@ -48,7 +49,7 @@ class WorkflowToolbarWidget extends StatelessWidget {
         builder: (context) => AlertDialog(
           title: Row(
             children: [
-              Icon(Icons.check_circle, color: Colors.green),
+              Icon(Icons.check_circle, color: SemanticColorResolver.positive(context)),
               const SizedBox(width: 8),
               Text(t.workflowValidationSuccess),
             ],
@@ -70,7 +71,7 @@ class WorkflowToolbarWidget extends StatelessWidget {
       builder: (context) => AlertDialog(
         title: Row(
           children: [
-            Icon(Icons.error, color: Colors.red),
+            Icon(Icons.error, color: SemanticColorResolver.negative(context)),
             const SizedBox(width: 8),
             Text(t.workflowNodesWithErrors(errors.length)),
           ],
@@ -92,12 +93,12 @@ class WorkflowToolbarWidget extends StatelessWidget {
                       children: [
                         Row(
                           children: [
-                            Icon(Icons.error, color: Colors.red, size: 20),
-                            const SizedBox(width: 8),
+                            Icon(Icons.error, color: SemanticColorResolver.negative(context), size: 20),
+                            SizedBox(width: 8),
                             Expanded(
                               child: Text(
                                 node?.label ?? AppLocalizations.of(context).workflowNodeUnknown,
-                                style: const TextStyle(fontWeight: FontWeight.bold),
+                                style: TextStyle(fontWeight: FontWeight.bold),
                               ),
                             ),
                           ],
@@ -108,7 +109,7 @@ class WorkflowToolbarWidget extends StatelessWidget {
                           child: Row(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const Text('• ', style: TextStyle(color: Colors.red)),
+                              Text('• ', style: TextStyle(color: SemanticColorResolver.negative(context))),
                               Expanded(child: Text(error)),
                             ],
                           ),
@@ -317,12 +318,12 @@ class WorkflowToolbarWidget extends StatelessWidget {
               return items;
             },
           ),
-        if (state.selectedNodeIds.length >= 2) const SizedBox(width: 8),
+        if (state.selectedNodeIds.length >= 2) SizedBox(width: 8),
         const VerticalDivider(),
         Tooltip(
           message: t.workflowToolbarClearAll,
           child: IconButton(
-            icon: const Icon(Icons.cleaning_services),
+            icon: Icon(Icons.cleaning_services),
             onPressed: onClear,
           ),
         ),
@@ -396,7 +397,7 @@ class WorkflowToolbarWidget extends StatelessWidget {
               isLabelVisible: state.getAllValidationErrors().isNotEmpty,
               child: const Icon(Icons.warning_amber),
             ),
-            color: state.getAllValidationErrors().isNotEmpty ? Colors.orange : null,
+            color: state.getAllValidationErrors().isNotEmpty ? SemanticColorResolver.warning(context) : null,
             onPressed: () {
               _showValidationErrors(context, state);
             },

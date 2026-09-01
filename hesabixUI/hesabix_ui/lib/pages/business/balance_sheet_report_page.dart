@@ -17,6 +17,7 @@ import 'package:hesabix_ui/utils/responsive_helper.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 import 'package:hesabix_ui/core/hesabix_back.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 class BalanceSheetReportPage extends StatefulWidget {
   final int businessId;
@@ -213,7 +214,7 @@ class _BalanceSheetReportPageState extends State<BalanceSheetReportPage> {
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(t.reportsBalanceSheetTitle, style: const TextStyle(fontSize: 18)),
+            Text(t.reportsBalanceSheetTitle, style: TextStyle(fontSize: 18)),
             Text(
               t.reportsBalanceSheetSubtitle,
               style: TextStyle(fontSize: 12, color: cs.onSurface.withValues(alpha: 0.65), fontWeight: FontWeight.w400),
@@ -224,12 +225,12 @@ class _BalanceSheetReportPageState extends State<BalanceSheetReportPage> {
           PopupMenuButton<String>(
             icon: _exporting
                 ? SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: cs.onSurface))
-                : const Icon(Icons.download_outlined),
+                : Icon(Icons.download_outlined),
             enabled: !_exporting && !_loading,
             onSelected: _export,
             itemBuilder: (context) => [
-              PopupMenuItem(value: 'excel', child: Row(children: [Icon(Icons.table_chart_outlined, color: Colors.green[700]), const SizedBox(width: 8), Text(t.exportToExcel)])),
-              PopupMenuItem(value: 'pdf', child: Row(children: [Icon(Icons.picture_as_pdf_outlined, color: Colors.red[700]), const SizedBox(width: 8), Text(t.exportToPdf)])),
+              PopupMenuItem(value: 'excel', child: Row(children: [Icon(Icons.table_chart_outlined, color: SemanticColorResolver.positive(context)), SizedBox(width: 8), Text(t.exportToExcel)])),
+              PopupMenuItem(value: 'pdf', child: Row(children: [Icon(Icons.picture_as_pdf_outlined, color: SemanticColorResolver.negative(context)), const SizedBox(width: 8), Text(t.exportToPdf)])),
             ],
           ),
           IconButton(icon: const Icon(Icons.refresh), onPressed: (_loading || !_filtersReady) ? null : _fetchData),

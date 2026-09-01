@@ -6,6 +6,7 @@ import '../../core/calendar_controller.dart';
 import '../../utils/attribute_formatter.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 
 /// Dialog for selecting unique product instances in invoice
@@ -405,7 +406,7 @@ class _UniqueProductInstanceSelectorDialogState
                         Text(
                           'لطفاً ${widget.requiredQuantity - _selectedIds.length} کالای دیگر انتخاب کنید',
                           style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                color: Colors.orange,
+                                color: SemanticColorResolver.warning(context),
                               ),
                         ),
                     ],

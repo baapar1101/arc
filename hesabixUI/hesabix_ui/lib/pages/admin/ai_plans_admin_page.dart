@@ -5,6 +5,7 @@ import 'package:hesabix_ui/services/ai_service.dart';
 import 'package:hesabix_ui/services/system_settings_service.dart';
 import 'package:hesabix_ui/models/ai_models.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 class AIPlansAdminPage extends StatefulWidget {
   const AIPlansAdminPage({super.key});
@@ -778,7 +779,7 @@ class _AIPlansAdminPageState extends State<AIPlansAdminPage> {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           if (plan.isActive)
-                            const Icon(Icons.check_circle, color: Colors.green)
+                            Icon(Icons.check_circle, color: SemanticColorResolver.positive(context))
                           else
                             const Icon(Icons.cancel, color: Colors.grey),
                           const SizedBox(width: 8),

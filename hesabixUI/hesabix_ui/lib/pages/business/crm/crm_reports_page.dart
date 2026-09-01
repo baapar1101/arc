@@ -13,6 +13,7 @@ import 'package:hesabix_ui/widgets/permission/permission_widgets.dart';
 import 'package:hesabix_ui/core/hesabix_back.dart';
 import 'package:intl/intl.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 /// صفحه گزارشات CRM
 class CrmReportsPage extends StatefulWidget {
@@ -815,7 +816,7 @@ class _CrmReportsPageState extends State<CrmReportsPage> with SingleTickerProvid
   }
 
   Color _chartColor(int i) {
-    final colors = [Colors.blue, Colors.green, Colors.orange, Colors.purple, Colors.teal, Colors.pink];
+    final colors = [SemanticColorResolver.info(context), SemanticColorResolver.positive(context), SemanticColorResolver.warning(context), Colors.purple, Colors.teal, Colors.pink];
     return colors[i % colors.length];
   }
 

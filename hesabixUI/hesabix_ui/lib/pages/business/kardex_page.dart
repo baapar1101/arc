@@ -33,6 +33,7 @@ import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 class KardexPage extends StatefulWidget {
   final int businessId;
@@ -566,8 +567,8 @@ class _KardexPageState extends State<KardexPage> {
                 ? v.toDouble()
                 : double.tryParse('${v ?? ''}') ?? 0.0;
             final color = d > 0
-                ? Colors.green[700]
-                : (d < 0 ? Colors.red[700] : null);
+                ? SemanticColorResolver.positive(context)
+                : (d < 0 ? SemanticColorResolver.negative(context) : null);
             return Text(
               d == d.roundToDouble()
                   ? d.toStringAsFixed(0)
@@ -590,8 +591,8 @@ class _KardexPageState extends State<KardexPage> {
                 ? v.toDouble()
                 : double.tryParse('${v ?? ''}') ?? 0.0;
             final color = d > 0
-                ? Colors.green[700]
-                : (d < 0 ? Colors.red[700] : null);
+                ? SemanticColorResolver.positive(context)
+                : (d < 0 ? SemanticColorResolver.negative(context) : null);
             return Text(
               d == d.roundToDouble()
                   ? d.toStringAsFixed(0)
@@ -644,10 +645,10 @@ class _KardexPageState extends State<KardexPage> {
           final m = item as Map<String, dynamic>;
           final mv = (m['movement'] ?? '').toString().toLowerCase();
           if (mv == 'in') {
-            return Colors.green.withValues(alpha: 0.06);
+            return SemanticColorResolver.positive(context).withValues(alpha: 0.06);
           }
           if (mv == 'out') {
-            return Colors.red.withValues(alpha: 0.06);
+            return SemanticColorResolver.negative(context).withValues(alpha: 0.06);
           }
         } catch (_) {}
         return null;

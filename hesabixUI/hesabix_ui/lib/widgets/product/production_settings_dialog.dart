@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../services/production_settings_service.dart';
 import '../../utils/error_extractor.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 class ProductionSettingsDialog extends StatefulWidget {
   final int businessId;
@@ -149,22 +150,22 @@ class _ProductionSettingsDialogState extends State<ProductionSettingsDialog> {
                         },
                       ),
                       if (_errorMessage != null) ...[
-                        const SizedBox(height: 12),
+                        SizedBox(height: 12),
                         Container(
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            color: Colors.red.shade50,
+                            color: SemanticColorResolver.negative(context).withValues(alpha: 0.12),
                             borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: Colors.red.shade300),
+                            border: Border.all(color: SemanticColorResolver.negative(context).withValues(alpha: 0.5)),
                           ),
                           child: Row(
                             children: [
-                              Icon(Icons.error_outline, color: Colors.red.shade700),
-                              const SizedBox(width: 8),
+                              Icon(Icons.error_outline, color: SemanticColorResolver.negative(context)),
+                              SizedBox(width: 8),
                               Expanded(
                                 child: Text(
                                   _errorMessage!,
-                                  style: TextStyle(color: Colors.red.shade700),
+                                  style: TextStyle(color: SemanticColorResolver.negative(context)),
                                 ),
                               ),
                             ],

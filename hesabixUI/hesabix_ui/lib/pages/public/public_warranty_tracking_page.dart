@@ -7,6 +7,7 @@ import '../../core/api_client.dart';
 import '../../utils/error_extractor.dart';
 import '../../core/date_utils.dart';
 import '../../core/calendar_controller.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 class PublicWarrantyTrackingPage extends StatefulWidget {
   final String? codeOrSerial;
@@ -322,7 +323,7 @@ class _PublicWarrantyTrackingPageState extends State<PublicWarrantyTrackingPage>
           children: [
             Row(
               children: [
-                Icon(Icons.verified_user, color: Colors.green),
+                Icon(Icons.verified_user, color: SemanticColorResolver.positive(context)),
                 const SizedBox(width: 12),
                 Text(
                   'اطلاعات گارانتی',

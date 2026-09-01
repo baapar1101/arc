@@ -26,6 +26,7 @@ import '../../utils/responsive_helper.dart';
 import '../../widgets/project/project_selector_widget.dart';
 import '../../widgets/invoice/invoice_list_document_type_filter_bar.dart';
 import '../../models/invoice_tag_ref.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 /// صفحه لیست فاکتورها با ویجت جدول عمومی
 class InvoicesListPage extends StatefulWidget {
@@ -1302,7 +1303,7 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
                       formatWithThousands(profitValue),
                       textAlign: TextAlign.center,
                       style: TextStyle(
-                        color: profitValue >= 0 ? Colors.green : Colors.red,
+                        color: profitValue >= 0 ? SemanticColorResolver.positive(context) : SemanticColorResolver.negative(context),
                         fontWeight: FontWeight.bold,
                       ),
                     ),
@@ -1312,7 +1313,7 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           fontSize: 12,
-                          color: profitValue >= 0 ? Colors.green.shade700 : Colors.red.shade700,
+                          color: profitValue >= 0 ? SemanticColorResolver.positive(context) : SemanticColorResolver.negative(context),
                         ),
                       ),
                   ],
@@ -1333,8 +1334,8 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
             if (!invoice.isInstallmentSale) {
               return const SizedBox.shrink();
             }
-            return const Center(
-              child: Icon(Icons.check_circle, color: Colors.green, size: 18),
+            return Center(
+              child: Icon(Icons.check_circle, color: SemanticColorResolver.positive(context), size: 18),
             );
           },
           tooltip: t.installmentsTitle,
@@ -2107,7 +2108,7 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
                         ),
                         leading: Icon(
                           success ? Icons.check_circle : Icons.warning_amber_rounded,
-                          color: success ? Colors.green : Colors.deepOrange,
+                          color: success ? SemanticColorResolver.positive(context) : Colors.deepOrange,
                         ),
                         title: Text('شناسه فاکتور: ${id ?? "-"}'),
                         subtitle: Text(lines.where((e) => e.isNotEmpty).join('\n')),
@@ -2197,22 +2198,22 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: Colors.orange.shade50,
+              color: SemanticColorResolver.warning(context).withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.orange.shade200),
+              border: Border.all(color: SemanticColorResolver.warning(context).withValues(alpha: 0.35)),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
                   children: [
-                    Icon(Icons.payment, size: 20, color: Colors.orange.shade700),
-                    const SizedBox(width: 8),
+                    Icon(Icons.payment, size: 20, color: SemanticColorResolver.warning(context)),
+                    SizedBox(width: 8),
                     Text(
                       t.deleteInvoiceReceiptPaymentsWarning,
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
-                        color: Colors.orange.shade900,
+                        color: SemanticColorResolver.warning(context),
                       ),
                     ),
                   ],
@@ -2247,22 +2248,22 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: Colors.orange.shade50,
+              color: SemanticColorResolver.warning(context).withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.orange.shade200),
+              border: Border.all(color: SemanticColorResolver.warning(context).withValues(alpha: 0.35)),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
                   children: [
-                    Icon(Icons.inventory_2, size: 20, color: Colors.orange.shade700),
-                    const SizedBox(width: 8),
+                    Icon(Icons.inventory_2, size: 20, color: SemanticColorResolver.warning(context)),
+                    SizedBox(width: 8),
                     Text(
                       t.deleteInvoiceWarehouseWarning,
                       style: TextStyle(
                         fontWeight: FontWeight.bold,
-                        color: Colors.orange.shade900,
+                        color: SemanticColorResolver.warning(context),
                       ),
                     ),
                   ],
@@ -2291,14 +2292,14 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: Colors.blue.shade50,
+              color: SemanticColorResolver.info(context).withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.blue.shade200),
+              border: Border.all(color: SemanticColorResolver.info(context).withValues(alpha: 0.35)),
             ),
             child: Row(
               children: [
-                Icon(Icons.calendar_today, size: 20, color: Colors.blue.shade700),
-                const SizedBox(width: 8),
+                Icon(Icons.calendar_today, size: 20, color: SemanticColorResolver.info(context)),
+                SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     t.deleteInvoiceInstallmentsWarning(
@@ -2306,7 +2307,7 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
                     ),
                     style: TextStyle(
                       fontSize: 12,
-                      color: Colors.blue.shade900,
+                      color: SemanticColorResolver.info(context),
                     ),
                   ),
                 ),
@@ -2339,7 +2340,7 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
             style: FilledButton.styleFrom(
-              backgroundColor: Colors.red,
+              backgroundColor: SemanticColorResolver.negative(context),
               foregroundColor: Colors.white,
             ),
             child: Text(t.delete),

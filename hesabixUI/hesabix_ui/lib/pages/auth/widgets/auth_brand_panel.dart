@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
+import 'package:hesabix_ui/theme/brand_logo.dart';
 
 /// پنل برند سمت چپ (دسکتاپ) — storytelling و trust signals.
 class AuthBrandPanel extends StatelessWidget {
-  final String logoAsset;
+  /// سازگاری قدیمی؛ لوگو از تم گرفته می‌شود.
+  @Deprecated('Logo follows theme via BrandLogo')
+  final String? logoAsset;
 
-  const AuthBrandPanel({super.key, required this.logoAsset});
+  const AuthBrandPanel({super.key, this.logoAsset});
 
   @override
   Widget build(BuildContext context) {
@@ -35,7 +38,7 @@ class AuthBrandPanel extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Image.asset(logoAsset, height: 48),
+            const BrandLogo(height: 48),
             const SizedBox(height: 32),
             Text(
               t.welcomeTitle,

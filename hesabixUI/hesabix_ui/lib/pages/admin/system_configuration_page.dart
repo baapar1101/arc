@@ -6,6 +6,8 @@ import 'package:hesabix_ui/utils/number_normalizer.dart';
 import '../../core/api_client.dart';
 import '../../services/admin_system_settings_service.dart';
 import '../../utils/error_extractor.dart';
+import '../../utils/snackbar_helper.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 class SystemConfigurationPage extends StatefulWidget {
   const SystemConfigurationPage({super.key});
@@ -26,6 +28,7 @@ class _SystemConfigurationPageState extends State<SystemConfigurationPage> {
   String _appVersion = '';
   String _defaultLanguage = 'fa';
   String _defaultTheme = 'system';
+  String _defaultThemeId = 'classic_blue';
   String _defaultDisplayTimezone = 'Asia/Tehran';
   bool _enableRegistration = true;
   bool _enableEmailVerification = true;
@@ -153,6 +156,16 @@ class _SystemConfigurationPageState extends State<SystemConfigurationPage> {
           _appVersion = data['app_version']?.toString() ?? '1.0.23';
           _defaultLanguage = data['default_language']?.toString() ?? 'fa';
           _defaultTheme = data['default_theme']?.toString() ?? 'system';
+          final themeIdRaw = data['default_theme_id']?.toString().trim().toLowerCase();
+          _defaultThemeId = (themeIdRaw != null &&
+                  const {
+                    'classic_blue',
+                    'turquoise_sea',
+                    'emerald_forest',
+                    'warm_copper',
+                  }.contains(themeIdRaw))
+              ? themeIdRaw
+              : 'classic_blue';
           final tzRaw = data['default_timezone']?.toString().trim();
           _defaultDisplayTimezone = (tzRaw != null && tzRaw.isNotEmpty) ? tzRaw : 'Asia/Tehran';
           _enableRegistration = data['enable_registration'] as bool? ?? true;
@@ -238,7 +251,7 @@ class _SystemConfigurationPageState extends State<SystemConfigurationPage> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('${t.errorLoadingSettings}: $err'),
-            backgroundColor: Colors.red,
+            backgroundColor: SemanticColorResolver.negative(context),
           ),
         );
       }
@@ -294,7 +307,7 @@ class _SystemConfigurationPageState extends State<SystemConfigurationPage> {
           foregroundColor: theme.colorScheme.onPrimary,
           elevation: 0,
           leading: IconButton(
-            icon: const Icon(Icons.arrow_back),
+            icon: Icon(Icons.arrow_back),
             onPressed: () => context.go('/user/profile/system-settings'),
           ),
         ),
@@ -304,7 +317,7 @@ class _SystemConfigurationPageState extends State<SystemConfigurationPage> {
             children: [
               Text(
                 _error!,
-                style: const TextStyle(color: Colors.red),
+                style: TextStyle(color: SemanticColorResolver.negative(context)),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 16),
@@ -414,6 +427,26 @@ class _SystemConfigurationPageState extends State<SystemConfigurationPage> {
                         DropdownMenuItem(value: 'dark', child: Text(t.dark)),
                       ],
                       onChanged: (value) => setState(() => _defaultTheme = value!),
+                    ),
+                    _buildDropdownField(
+                      label: t.defaultColorTheme,
+                      value: _defaultThemeId,
+                      items: [
+                        DropdownMenuItem(value: 'classic_blue', child: Text(t.themeClassicBlue)),
+                        DropdownMenuItem(value: 'turquoise_sea', child: Text(t.themeTurquoiseSea)),
+                        DropdownMenuItem(value: 'emerald_forest', child: Text(t.themeEmeraldForest)),
+                        DropdownMenuItem(value: 'warm_copper', child: Text(t.themeWarmCopper)),
+                      ],
+                      onChanged: (value) => setState(() => _defaultThemeId = value!),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 16),
+                      child: Text(
+                        t.defaultColorThemeHint,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
                     ),
                     _buildTextField(
                       label: 'منطقهٔ زمانی نمایش (IANA)',
@@ -1130,6 +1163,7 @@ class _SystemConfigurationPageState extends State<SystemConfigurationPage> {
         'app_version': _appVersion.trim(),
         'default_language': _defaultLanguage,
         'default_theme': _defaultTheme,
+        'default_theme_id': _defaultThemeId,
         'default_timezone': _defaultDisplayTimezone.trim(),
         'enable_registration': _enableRegistration,
         'enable_email_verification': _enableEmailVerification,
@@ -1179,23 +1213,13 @@ class _SystemConfigurationPageState extends State<SystemConfigurationPage> {
 
       if (mounted) {
         final t = AppLocalizations.of(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(t.settingsSavedSuccessfully),
-            backgroundColor: Colors.green,
-          ),
-        );
+        SnackBarHelper.showSuccess(context, message: t.settingsSavedSuccessfully);
       }
     } catch (e) {
       if (mounted) {
         final t = AppLocalizations.of(context);
         final err = ErrorExtractor.forContext(e, context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('${t.errorSavingSettings}: $err'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        SnackBarHelper.showError(context, message: '${t.errorSavingSettings}: $err');
       }
     } finally {
       if (mounted) {

@@ -9,6 +9,7 @@ import '../../../utils/snackbar_helper.dart';
 import '../../../utils/error_extractor.dart';
 import '../../../widgets/business_subpage_back_leading.dart';
 import 'repair_shop_calendar_utils.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 
 /// صفحه جزئیات و عملیات سفارش تعمیر
@@ -49,18 +50,22 @@ class _RepairOrderDetailPageState extends State<RepairOrderDetailPage> {
     'cancelled': 'لغو شده',
   };
 
-  final Map<String, Color> _statusColors = {
-    'received': Colors.blue,
+  Color _statusColorFor(BuildContext context, String? status) {
+    final map = <String, Color>{
+    'received': SemanticColorResolver.info(context),
     'assigned': Colors.purple,
-    'in_progress': Colors.orange,
+    'in_progress': SemanticColorResolver.warning(context),
     'waiting_parts': Colors.amber,
     'testing': Colors.cyan,
-    'completed_fixed': Colors.green,
-    'completed_unfixable': Colors.red,
+    'completed_fixed': SemanticColorResolver.positive(context),
+    'completed_unfixable': SemanticColorResolver.negative(context),
     'ready_for_pickup': Colors.teal,
     'delivered': Colors.grey,
     'cancelled': Colors.black54,
-  };
+    };
+    return map[status] ?? Colors.grey;
+  }
+
 
   @override
   void initState() {
@@ -109,7 +114,7 @@ class _RepairOrderDetailPageState extends State<RepairOrderDetailPage> {
                   width: 12,
                   height: 12,
                   decoration: BoxDecoration(
-                    color: _statusColors[entry.key],
+                    color: _statusColorFor(context, entry.key),
                     shape: BoxShape.circle,
                   ),
                 ),
@@ -131,8 +136,8 @@ class _RepairOrderDetailPageState extends State<RepairOrderDetailPage> {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('لغو سفارش'),
-        content: const Text('آیا مطمئن هستید که می‌خواهید این سفارش را لغو کنید؟'),
+        title: Text('لغو سفارش'),
+        content: Text('آیا مطمئن هستید که می‌خواهید این سفارش را لغو کنید؟'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -141,7 +146,7 @@ class _RepairOrderDetailPageState extends State<RepairOrderDetailPage> {
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
+              backgroundColor: SemanticColorResolver.negative(context),
             ),
             child: const Text('بله، لغو کن'),
           ),
@@ -344,13 +349,13 @@ class _RepairOrderDetailPageState extends State<RepairOrderDetailPage> {
                         ],
                       ),
                     ),
-                    const PopupMenuItem(
+                    PopupMenuItem(
                       value: 'delete',
                       child: Row(
                         children: [
-                          Icon(Icons.delete, color: Colors.red),
+                          Icon(Icons.delete, color: SemanticColorResolver.negative(context)),
                           SizedBox(width: 8),
-                          Text('لغو سفارش', style: TextStyle(color: Colors.red)),
+                          Text('لغو سفارش', style: TextStyle(color: SemanticColorResolver.negative(context))),
                         ],
                       ),
                     ),
@@ -404,7 +409,7 @@ class _RepairOrderDetailPageState extends State<RepairOrderDetailPage> {
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(16),
-            color: _statusColors[order.status]?.withValues(alpha: 0.1),
+            color: _statusColorFor(context, order.status).withValues(alpha: 0.1),
             child: Column(
               children: [
                 Text(
@@ -417,7 +422,7 @@ class _RepairOrderDetailPageState extends State<RepairOrderDetailPage> {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   decoration: BoxDecoration(
-                    color: _statusColors[order.status],
+                    color: _statusColorFor(context, order.status),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
@@ -561,7 +566,7 @@ class _RepairOrderDetailPageState extends State<RepairOrderDetailPage> {
                     width: 12,
                     height: 12,
                     decoration: BoxDecoration(
-                      color: _statusColors[status.status],
+                      color: _statusColorFor(context, status.status),
                       shape: BoxShape.circle,
                     ),
                   ),

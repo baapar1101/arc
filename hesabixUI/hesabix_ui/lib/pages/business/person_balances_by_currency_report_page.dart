@@ -7,6 +7,7 @@ import 'package:hesabix_ui/utils/number_formatters.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table_config.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table_widget.dart';
 import 'package:hesabix_ui/core/hesabix_back.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 class PersonBalancesByCurrencyReportPage extends StatefulWidget {
   const PersonBalancesByCurrencyReportPage({
@@ -118,9 +119,9 @@ class _PersonBalancesByCurrencyReportPageState
               ? (row['balance'] as num).toDouble()
               : double.tryParse(row['balance']?.toString() ?? '') ?? 0;
           final color = balance > 0
-              ? Colors.green[700]
+              ? SemanticColorResolver.positive(context)
               : balance < 0
-              ? Colors.red[700]
+              ? SemanticColorResolver.negative(context)
               : Colors.grey;
           return Text(
             status,

@@ -11,6 +11,7 @@ import 'package:hesabix_ui/widgets/data_table/data_table_config.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table_widget.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:hesabix_ui/core/hesabix_back.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 class BasalamReportsOverviewPage extends StatefulWidget {
   final int businessId;
@@ -627,9 +628,9 @@ class _BasalamProductConflictsReportPageState
         : <String, dynamic>{};
 
     final palette = [
-      Colors.blue,
-      Colors.orange,
-      Colors.green,
+      SemanticColorResolver.info(context),
+      SemanticColorResolver.warning(context),
+      SemanticColorResolver.positive(context),
       Colors.purple,
       Colors.teal,
       Colors.deepOrange,

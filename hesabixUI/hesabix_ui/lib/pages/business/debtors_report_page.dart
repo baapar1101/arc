@@ -14,6 +14,7 @@ import 'package:hesabix_ui/utils/number_formatters.dart';
 import 'package:hesabix_ui/utils/number_normalizer.dart';
 import 'package:hesabix_ui/core/date_utils.dart';
 import 'package:hesabix_ui/core/hesabix_back.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 class DebtorsReportPage extends StatefulWidget {
   final int businessId;
@@ -192,11 +193,11 @@ class _DebtorsReportPageState extends State<DebtorsReportPage> {
             
             Color? color;
             if (b < 0) {
-              color = Colors.red[700];
+              color = SemanticColorResolver.negative(context);
             } else if (b == 0) {
               color = Colors.grey;
             } else {
-              color = Colors.green[700];
+              color = SemanticColorResolver.positive(context);
             }
             
             return Text(
@@ -219,7 +220,7 @@ class _DebtorsReportPageState extends State<DebtorsReportPage> {
           final balance = m['balance'];
           final b = balance is num ? balance.toDouble() : double.tryParse(balance?.toString() ?? '0') ?? 0.0;
           if (b < 0) {
-            return Colors.red.withValues(alpha: 0.05);
+            return SemanticColorResolver.negative(context).withValues(alpha: 0.05);
           }
         } catch (_) {}
         return null;

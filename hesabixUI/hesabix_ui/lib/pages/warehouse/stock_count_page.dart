@@ -17,6 +17,7 @@ import '../../utils/error_extractor.dart';
 import '../../core/date_utils.dart';
 import '../../widgets/jalali_date_picker.dart';
 import '../../utils/responsive_helper.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 String _rowKey(int? productId, int? warehouseId) => '${productId ?? 0}:${warehouseId ?? 0}';
 
@@ -574,7 +575,7 @@ class _StockCountPageState extends State<StockCountPage> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
-        backgroundColor: Colors.red,
+        backgroundColor: SemanticColorResolver.negative(context),
       ),
     );
   }
@@ -584,7 +585,7 @@ class _StockCountPageState extends State<StockCountPage> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
-        backgroundColor: Colors.green,
+        backgroundColor: SemanticColorResolver.positive(context),
       ),
     );
   }
@@ -773,8 +774,8 @@ class _StockCountPageState extends State<StockCountPage> {
             final diff = (_calculatedByKey[key]?['difference'] as num?)?.toDouble();
             Color? c;
             if (diff != null) {
-              if (diff > 0) c = Colors.green;
-              if (diff < 0) c = Colors.red;
+              if (diff > 0) c = SemanticColorResolver.positive(context);
+              if (diff < 0) c = SemanticColorResolver.negative(context);
             }
             return Text(
               diff == null ? '-' : formatWithThousands(diff),
@@ -799,7 +800,7 @@ class _StockCountPageState extends State<StockCountPage> {
         final key = _rowKey(pid, wid);
         final diff = (_calculatedByKey[key]?['difference'] as num?)?.toDouble() ?? 0.0;
         if (diff == 0) return null;
-        return diff > 0 ? Colors.green.withValues(alpha: 0.05) : Colors.red.withValues(alpha: 0.05);
+        return diff > 0 ? SemanticColorResolver.positive(context).withValues(alpha: 0.05) : SemanticColorResolver.negative(context).withValues(alpha: 0.05);
       },
       expandBodyHeightToFitRows: true,
     );
@@ -1289,13 +1290,13 @@ class _StockCountRowCard extends StatelessWidget {
 
     Color? diffColor;
     if (diff != null) {
-      if (diff > 0) diffColor = Colors.green;
-      if (diff < 0) diffColor = Colors.red;
+      if (diff > 0) diffColor = SemanticColorResolver.positive(context);
+      if (diff < 0) diffColor = SemanticColorResolver.negative(context);
     }
 
     final bg = (diff == null || diff == 0)
         ? cs.surface
-        : (diff > 0 ? Colors.green.withValues(alpha: 0.06) : Colors.red.withValues(alpha: 0.06));
+        : (diff > 0 ? SemanticColorResolver.positive(context).withValues(alpha: 0.06) : SemanticColorResolver.negative(context).withValues(alpha: 0.06));
 
     return Card(
       color: bg,

@@ -6,6 +6,7 @@ import '../../models/business_dashboard_models.dart';
 import '../../utils/responsive_helper.dart';
 import 'business_hub_actions.dart';
 import 'businesses_hub_utils.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 /// آواتار ساده برای سوییچر فضای کاری.
 class BusinessSwitcherAvatar extends StatelessWidget {
@@ -260,7 +261,7 @@ class _PendingDeletionRow extends StatelessWidget {
                 opacity: 0.55,
                 child: BusinessSwitcherAvatar(name: business.name, size: 44),
               ),
-              const SizedBox(width: 14),
+              SizedBox(width: 14),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -279,7 +280,7 @@ class _PendingDeletionRow extends StatelessWidget {
                     Text(
                       remaining ?? t.businessesHubDeletionPending,
                       style: theme.textTheme.bodySmall?.copyWith(
-                        color: Colors.orange.shade800,
+                        color: SemanticColorResolver.warning(context),
                         fontWeight: FontWeight.w600,
                       ),
                       maxLines: 2,
@@ -445,7 +446,7 @@ class BusinessSwitcherMenu extends StatelessWidget {
               items.add(PopupMenuItem(
                 value: _SwitcherMenuAction.restore,
                 child: ListTile(
-                  leading: const Icon(Icons.restore_rounded, color: Colors.green),
+                  leading: Icon(Icons.restore_rounded, color: SemanticColorResolver.positive(context)),
                   title: Text(t.businessesHubRestore),
                   contentPadding: EdgeInsets.zero,
                   dense: true,

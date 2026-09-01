@@ -14,6 +14,7 @@ import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../utils/number_formatters.dart';
 import '../../services/list_filter_preferences_service.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 class BankAccountsPage extends StatefulWidget {
   final int businessId;
@@ -274,7 +275,7 @@ class _BankAccountsPageState extends State<BankAccountsPage> {
             DataTableAction(
               icon: Icons.delete,
               label: t.delete,
-              color: Colors.red,
+              color: SemanticColorResolver.negative(context),
               onTap: (account) => _deleteBankAccount(account),
             ),
           ],
@@ -417,7 +418,7 @@ class _BankAccountsPageState extends State<BankAccountsPage> {
               Navigator.of(context).pop();
               await _performDelete(account);
             },
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            style: TextButton.styleFrom(foregroundColor: SemanticColorResolver.negative(context)),
             child: Text(t.delete),
           ),
         ],

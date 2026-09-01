@@ -10,6 +10,7 @@ import '../../../utils/error_extractor.dart';
 import '../../../widgets/date_input_field.dart';
 import '../../../widgets/business_subpage_back_leading.dart';
 import 'repair_shop_calendar_utils.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 /// صفحه لیست سفارشات تعمیر
 class RepairOrdersListPage extends StatefulWidget {
@@ -55,18 +56,22 @@ class _RepairOrdersListPageState extends State<RepairOrdersListPage> {
     'cancelled': 'لغو شده',
   };
 
-  final Map<String, Color> _statusColors = {
-    'received': Colors.blue,
+  Color _statusColorFor(BuildContext context, String? status) {
+    final map = <String, Color>{
+    'received': SemanticColorResolver.info(context),
     'assigned': Colors.purple,
-    'in_progress': Colors.orange,
+    'in_progress': SemanticColorResolver.warning(context),
     'waiting_parts': Colors.amber,
     'testing': Colors.cyan,
-    'completed_fixed': Colors.green,
-    'completed_unfixable': Colors.red,
+    'completed_fixed': SemanticColorResolver.positive(context),
+    'completed_unfixable': SemanticColorResolver.negative(context),
     'ready_for_pickup': Colors.teal,
     'delivered': Colors.grey,
     'cancelled': Colors.black54,
-  };
+    };
+    return map[status] ?? Colors.grey;
+  }
+
 
   @override
   void initState() {
@@ -242,7 +247,7 @@ class _RepairOrdersListPageState extends State<RepairOrdersListPage> {
                             width: 12,
                             height: 12,
                             decoration: BoxDecoration(
-                              color: _statusColors[entry.key],
+                              color: _statusColorFor(context, entry.key),
                               shape: BoxShape.circle,
                             ),
                           ),
@@ -472,7 +477,7 @@ class _RepairOrdersListPageState extends State<RepairOrdersListPage> {
   ) {
     final status = order.status;
     final statusLabel = _statusLabels[status] ?? status;
-    final statusColor = _statusColors[status] ?? Colors.grey;
+    final statusColor = _statusColorFor(context, status);
     final isJalali = widget.calendarController.isJalali;
     final receivedLabel = RepairShopCalendarUtils.formatDateTime(
       order.receivedAt,
@@ -524,7 +529,7 @@ class _RepairOrdersListPageState extends State<RepairOrdersListPage> {
                             shape: BoxShape.circle,
                           ),
                         ),
-                        const SizedBox(width: 6),
+                        SizedBox(width: 6),
                         Text(
                           statusLabel,
                           style: TextStyle(
@@ -578,8 +583,8 @@ class _RepairOrdersListPageState extends State<RepairOrdersListPage> {
               const SizedBox(height: 8),
               Row(
                 children: [
-                  Icon(Icons.report_problem_outlined, size: 18, color: Colors.orange),
-                  const SizedBox(width: 8),
+                  Icon(Icons.report_problem_outlined, size: 18, color: SemanticColorResolver.warning(context)),
+                  SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       order.problemDescription,
@@ -603,12 +608,12 @@ class _RepairOrdersListPageState extends State<RepairOrdersListPage> {
                   ],
                   const Spacer(),
                   if (order.finalCost > 0) ...[
-                    Icon(Icons.payments, size: 16, color: Colors.green),
-                    const SizedBox(width: 4),
+                    Icon(Icons.payments, size: 16, color: SemanticColorResolver.positive(context)),
+                    SizedBox(width: 4),
                     Text(
                       order.formattedFinalCost,
                       style: theme.textTheme.titleSmall?.copyWith(
-                        color: Colors.green,
+                        color: SemanticColorResolver.positive(context),
                         fontWeight: FontWeight.bold,
                       ),
                     ),

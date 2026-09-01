@@ -212,6 +212,60 @@ abstract class AppLocalizations {
   /// **'Theme'**
   String get theme;
 
+  /// No description provided for @colorTheme.
+  ///
+  /// In en, this message translates to:
+  /// **'Color theme'**
+  String get colorTheme;
+
+  /// No description provided for @colorThemeDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a color palette applied across the whole app.'**
+  String get colorThemeDescription;
+
+  /// No description provided for @themeModeLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Light / Dark mode'**
+  String get themeModeLabel;
+
+  /// No description provided for @defaultColorTheme.
+  ///
+  /// In en, this message translates to:
+  /// **'Default color theme'**
+  String get defaultColorTheme;
+
+  /// No description provided for @defaultColorThemeHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Applied for users who have not chosen a color theme yet.'**
+  String get defaultColorThemeHint;
+
+  /// No description provided for @themeClassicBlue.
+  ///
+  /// In en, this message translates to:
+  /// **'Classic Blue'**
+  String get themeClassicBlue;
+
+  /// No description provided for @themeTurquoiseSea.
+  ///
+  /// In en, this message translates to:
+  /// **'Turquoise Sea'**
+  String get themeTurquoiseSea;
+
+  /// No description provided for @themeEmeraldForest.
+  ///
+  /// In en, this message translates to:
+  /// **'Emerald Forest'**
+  String get themeEmeraldForest;
+
+  /// No description provided for @themeWarmCopper.
+  ///
+  /// In en, this message translates to:
+  /// **'Warm Copper'**
+  String get themeWarmCopper;
+
   /// No description provided for @system.
   ///
   /// In en, this message translates to:
@@ -28898,6 +28952,258 @@ abstract class AppLocalizations {
   /// **'Notes'**
   String get distributionNotesLabel;
 
+  /// No description provided for @distributionVanCreate.
+  ///
+  /// In en, this message translates to:
+  /// **'Create van'**
+  String get distributionVanCreate;
+
+  /// No description provided for @distributionVanUnload.
+  ///
+  /// In en, this message translates to:
+  /// **'Unload van'**
+  String get distributionVanUnload;
+
+  /// No description provided for @distributionSelectVisitor.
+  ///
+  /// In en, this message translates to:
+  /// **'Select visitor'**
+  String get distributionSelectVisitor;
+
+  /// No description provided for @distributionSourceWarehouse.
+  ///
+  /// In en, this message translates to:
+  /// **'Source warehouse'**
+  String get distributionSourceWarehouse;
+
+  /// No description provided for @distributionDestWarehouse.
+  ///
+  /// In en, this message translates to:
+  /// **'Destination warehouse'**
+  String get distributionDestWarehouse;
+
+  /// No description provided for @distributionNoVanAssigned.
+  ///
+  /// In en, this message translates to:
+  /// **'No van is assigned to you.'**
+  String get distributionNoVanAssigned;
+
+  /// No description provided for @distributionVanStockEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'Van stock is empty.'**
+  String get distributionVanStockEmpty;
+
+  /// No description provided for @distributionDeleteStop.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete stop'**
+  String get distributionDeleteStop;
+
+  /// No description provided for @distributionDeleteAssignment.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove assignment'**
+  String get distributionDeleteAssignment;
+
+  /// No description provided for @distributionApplyOptimize.
+  ///
+  /// In en, this message translates to:
+  /// **'Apply & save order'**
+  String get distributionApplyOptimize;
+
+  /// No description provided for @distributionOfflinePartial.
+  ///
+  /// In en, this message translates to:
+  /// **'Some offline actions failed.'**
+  String get distributionOfflinePartial;
+
+  /// No description provided for @distributionVisitStayHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Visit started; complete it when you finish with the customer.'**
+  String get distributionVisitStayHint;
+
+  /// No description provided for @distributionSalesLinked.
+  ///
+  /// In en, this message translates to:
+  /// **'Linked sales'**
+  String get distributionSalesLinked;
+
+  /// No description provided for @distributionCoveragePercent.
+  ///
+  /// In en, this message translates to:
+  /// **'Route coverage'**
+  String get distributionCoveragePercent;
+
+  /// No description provided for @distributionChecklistAddItem.
+  ///
+  /// In en, this message translates to:
+  /// **'Add checklist item'**
+  String get distributionChecklistAddItem;
+
+  /// No description provided for @distributionDefaultWarehouse.
+  ///
+  /// In en, this message translates to:
+  /// **'Default load warehouse'**
+  String get distributionDefaultWarehouse;
+
+  /// No description provided for @distributionOpenInvoiceKeepVisit.
+  ///
+  /// In en, this message translates to:
+  /// **'Invoice (visit stays open)'**
+  String get distributionOpenInvoiceKeepVisit;
+
+  /// No description provided for @distributionTabSettlement.
+  ///
+  /// In en, this message translates to:
+  /// **'Daily settlement'**
+  String get distributionTabSettlement;
+
+  /// No description provided for @distributionExpectedSales.
+  ///
+  /// In en, this message translates to:
+  /// **'Expected sales today'**
+  String get distributionExpectedSales;
+
+  /// No description provided for @distributionCashCollected.
+  ///
+  /// In en, this message translates to:
+  /// **'Cash collected'**
+  String get distributionCashCollected;
+
+  /// No description provided for @distributionChequeCollected.
+  ///
+  /// In en, this message translates to:
+  /// **'Cheques collected'**
+  String get distributionChequeCollected;
+
+  /// No description provided for @distributionCardCollected.
+  ///
+  /// In en, this message translates to:
+  /// **'Card / POS'**
+  String get distributionCardCollected;
+
+  /// No description provided for @distributionOtherCollected.
+  ///
+  /// In en, this message translates to:
+  /// **'Other collected'**
+  String get distributionOtherCollected;
+
+  /// No description provided for @distributionSettlementExpenses.
+  ///
+  /// In en, this message translates to:
+  /// **'Day expenses'**
+  String get distributionSettlementExpenses;
+
+  /// No description provided for @distributionSettlementVariance.
+  ///
+  /// In en, this message translates to:
+  /// **'Variance'**
+  String get distributionSettlementVariance;
+
+  /// No description provided for @distributionCreateReceiptOnConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Create cash receipt on confirm'**
+  String get distributionCreateReceiptOnConfirm;
+
+  /// No description provided for @distributionCashRegister.
+  ///
+  /// In en, this message translates to:
+  /// **'Cash register'**
+  String get distributionCashRegister;
+
+  /// No description provided for @distributionCashRegisterRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Select a cash register to create a receipt.'**
+  String get distributionCashRegisterRequired;
+
+  /// No description provided for @distributionSaveDraft.
+  ///
+  /// In en, this message translates to:
+  /// **'Save draft'**
+  String get distributionSaveDraft;
+
+  /// No description provided for @distributionConfirmSettlement.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm settlement'**
+  String get distributionConfirmSettlement;
+
+  /// No description provided for @distributionSettlementConfirmed.
+  ///
+  /// In en, this message translates to:
+  /// **'Settlement confirmed'**
+  String get distributionSettlementConfirmed;
+
+  /// No description provided for @distributionPrintSettlement.
+  ///
+  /// In en, this message translates to:
+  /// **'Print settlement'**
+  String get distributionPrintSettlement;
+
+  /// No description provided for @distributionPrintDailyPlan.
+  ///
+  /// In en, this message translates to:
+  /// **'Print daily plan'**
+  String get distributionPrintDailyPlan;
+
+  /// No description provided for @distributionPrintLoadingList.
+  ///
+  /// In en, this message translates to:
+  /// **'Print loading list'**
+  String get distributionPrintLoadingList;
+
+  /// No description provided for @distributionPdfExported.
+  ///
+  /// In en, this message translates to:
+  /// **'PDF exported'**
+  String get distributionPdfExported;
+
+  /// No description provided for @distributionTargetsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Visitor sales targets'**
+  String get distributionTargetsTitle;
+
+  /// No description provided for @distributionTargetCreate.
+  ///
+  /// In en, this message translates to:
+  /// **'New target'**
+  String get distributionTargetCreate;
+
+  /// No description provided for @distributionTargetPeriodType.
+  ///
+  /// In en, this message translates to:
+  /// **'Period type'**
+  String get distributionTargetPeriodType;
+
+  /// No description provided for @distributionTargetPeriodDay.
+  ///
+  /// In en, this message translates to:
+  /// **'Daily'**
+  String get distributionTargetPeriodDay;
+
+  /// No description provided for @distributionTargetPeriodMonth.
+  ///
+  /// In en, this message translates to:
+  /// **'Monthly'**
+  String get distributionTargetPeriodMonth;
+
+  /// No description provided for @distributionTargetAmount.
+  ///
+  /// In en, this message translates to:
+  /// **'Target amount'**
+  String get distributionTargetAmount;
+
+  /// No description provided for @distributionTargetsEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No targets defined yet.'**
+  String get distributionTargetsEmpty;
+
   /// No description provided for @reportsDistributionSection.
   ///
   /// In en, this message translates to:
@@ -34558,6 +34864,1080 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'ESC/POS sent to printer'**
   String get barcodeLabelPrinterEscPosSent;
+
+  /// No description provided for @distributionVisitCompleteHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Record the visit outcome; pick an invoice or sell from van stock.'**
+  String get distributionVisitCompleteHint;
+
+  /// No description provided for @distributionLinkInvoice.
+  ///
+  /// In en, this message translates to:
+  /// **'Link sales invoice'**
+  String get distributionLinkInvoice;
+
+  /// No description provided for @distributionSelectInvoice.
+  ///
+  /// In en, this message translates to:
+  /// **'Select invoice'**
+  String get distributionSelectInvoice;
+
+  /// No description provided for @distributionNoInvoiceLink.
+  ///
+  /// In en, this message translates to:
+  /// **'No invoice link'**
+  String get distributionNoInvoiceLink;
+
+  /// No description provided for @distributionNoRecentInvoices.
+  ///
+  /// In en, this message translates to:
+  /// **'No recent invoices for this customer.'**
+  String get distributionNoRecentInvoices;
+
+  /// No description provided for @distributionLinkedDocument.
+  ///
+  /// In en, this message translates to:
+  /// **'Linked document'**
+  String get distributionLinkedDocument;
+
+  /// No description provided for @distributionRemaining.
+  ///
+  /// In en, this message translates to:
+  /// **'Remaining'**
+  String get distributionRemaining;
+
+  /// No description provided for @distributionVanSaleFromStock.
+  ///
+  /// In en, this message translates to:
+  /// **'Sell from van stock'**
+  String get distributionVanSaleFromStock;
+
+  /// No description provided for @distributionVanSaleFromStockHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick SKUs from current van stock; invoice uses price and tax.'**
+  String get distributionVanSaleFromStockHint;
+
+  /// No description provided for @distributionVanQtyExceedsStock.
+  ///
+  /// In en, this message translates to:
+  /// **'Quantity exceeds van stock.'**
+  String get distributionVanQtyExceedsStock;
+
+  /// No description provided for @distributionVarianceMustBeZero.
+  ///
+  /// In en, this message translates to:
+  /// **'Variance must be zero, or manager must allow variance.'**
+  String get distributionVarianceMustBeZero;
+
+  /// No description provided for @distributionVarianceOverrideManageOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'Variance override requires manage permission.'**
+  String get distributionVarianceOverrideManageOnly;
+
+  /// No description provided for @distributionBankRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Select a bank account for card collection.'**
+  String get distributionBankRequired;
+
+  /// No description provided for @distributionBankForCard.
+  ///
+  /// In en, this message translates to:
+  /// **'Bank account (card)'**
+  String get distributionBankForCard;
+
+  /// No description provided for @distributionCreateReceiptHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Cash/card receipts allocate to the day\'\'s visit invoices.'**
+  String get distributionCreateReceiptHint;
+
+  /// No description provided for @distributionAllowVariance.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow confirm with variance'**
+  String get distributionAllowVariance;
+
+  /// No description provided for @distributionAllowVarianceHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Only managers can confirm settlements with variance.'**
+  String get distributionAllowVarianceHint;
+
+  /// No description provided for @distributionDraftAwaitingConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Draft saved; final confirm needs settle/manage.'**
+  String get distributionDraftAwaitingConfirm;
+
+  /// No description provided for @distributionSaveDraftOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'Draft only'**
+  String get distributionSaveDraftOnly;
+
+  /// No description provided for @distributionConfirmNeedsManager.
+  ///
+  /// In en, this message translates to:
+  /// **'Final settlement confirm needs settle or manage.'**
+  String get distributionConfirmNeedsManager;
+
+  /// No description provided for @distributionGeofenceOverrideManageOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'Geofence override is manage-only.'**
+  String get distributionGeofenceOverrideManageOnly;
+
+  /// No description provided for @distributionGeofenceOverrideReason.
+  ///
+  /// In en, this message translates to:
+  /// **'Override reason'**
+  String get distributionGeofenceOverrideReason;
+
+  /// No description provided for @distributionPermissionSettle.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm daily settlement'**
+  String get distributionPermissionSettle;
+
+  /// No description provided for @distributionPermissionApproveReturns.
+  ///
+  /// In en, this message translates to:
+  /// **'Approve distribution returns'**
+  String get distributionPermissionApproveReturns;
+
+  /// No description provided for @distributionSourceInvoice.
+  ///
+  /// In en, this message translates to:
+  /// **'Source invoice for return'**
+  String get distributionSourceInvoice;
+
+  /// No description provided for @distributionSettlementsReport.
+  ///
+  /// In en, this message translates to:
+  /// **'Settlements'**
+  String get distributionSettlementsReport;
+
+  /// No description provided for @distributionOrderRate.
+  ///
+  /// In en, this message translates to:
+  /// **'Order rate'**
+  String get distributionOrderRate;
+
+  /// No description provided for @distributionVarianceAbs.
+  ///
+  /// In en, this message translates to:
+  /// **'Abs. variance total'**
+  String get distributionVarianceAbs;
+
+  /// No description provided for @distributionCustomerCredit.
+  ///
+  /// In en, this message translates to:
+  /// **'Customer credit'**
+  String get distributionCustomerCredit;
+
+  /// No description provided for @distributionCustomerCreditBlocked.
+  ///
+  /// In en, this message translates to:
+  /// **'Customer credit limit exceeded or blocked; van sale not allowed.'**
+  String get distributionCustomerCreditBlocked;
+
+  /// No description provided for @distributionAvailableCredit.
+  ///
+  /// In en, this message translates to:
+  /// **'Available credit'**
+  String get distributionAvailableCredit;
+
+  /// No description provided for @distributionCreditLimit.
+  ///
+  /// In en, this message translates to:
+  /// **'Credit limit'**
+  String get distributionCreditLimit;
+
+  /// No description provided for @distributionPodTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Proof of delivery (POD)'**
+  String get distributionPodTitle;
+
+  /// No description provided for @distributionPodHint.
+  ///
+  /// In en, this message translates to:
+  /// **'If goods were delivered, record the recipient name.'**
+  String get distributionPodHint;
+
+  /// No description provided for @distributionPodConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Delivery confirmed'**
+  String get distributionPodConfirm;
+
+  /// No description provided for @distributionPodSignerName.
+  ///
+  /// In en, this message translates to:
+  /// **'Receiver name'**
+  String get distributionPodSignerName;
+
+  /// No description provided for @distributionPodNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Delivery note'**
+  String get distributionPodNote;
+
+  /// No description provided for @distributionPodSignerRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Receiver name is required'**
+  String get distributionPodSignerRequired;
+
+  /// No description provided for @distributionLiveRefresh.
+  ///
+  /// In en, this message translates to:
+  /// **'Live'**
+  String get distributionLiveRefresh;
+
+  /// No description provided for @distributionLastUpdated.
+  ///
+  /// In en, this message translates to:
+  /// **'Last updated'**
+  String get distributionLastUpdated;
+
+  /// No description provided for @distributionLiveAt.
+  ///
+  /// In en, this message translates to:
+  /// **'Live location'**
+  String get distributionLiveAt;
+
+  /// No description provided for @distributionTeamMapEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No locations to show.'**
+  String get distributionTeamMapEmpty;
+
+  /// No description provided for @distributionStatusUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Unknown'**
+  String get distributionStatusUnknown;
+
+  /// No description provided for @distributionReturnPending.
+  ///
+  /// In en, this message translates to:
+  /// **'Pending'**
+  String get distributionReturnPending;
+
+  /// No description provided for @distributionReturnApproved.
+  ///
+  /// In en, this message translates to:
+  /// **'Approved'**
+  String get distributionReturnApproved;
+
+  /// No description provided for @distributionReturnRejected.
+  ///
+  /// In en, this message translates to:
+  /// **'Rejected'**
+  String get distributionReturnRejected;
+
+  /// No description provided for @distributionDayProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'Today\'\'s progress'**
+  String get distributionDayProgress;
+
+  /// No description provided for @distributionStopsRemaining.
+  ///
+  /// In en, this message translates to:
+  /// **'Remaining'**
+  String get distributionStopsRemaining;
+
+  /// No description provided for @distributionStopsDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Done'**
+  String get distributionStopsDone;
+
+  /// No description provided for @distributionNextStop.
+  ///
+  /// In en, this message translates to:
+  /// **'Next stop'**
+  String get distributionNextStop;
+
+  /// No description provided for @distributionCallCustomer.
+  ///
+  /// In en, this message translates to:
+  /// **'Call'**
+  String get distributionCallCustomer;
+
+  /// No description provided for @distributionNavigate.
+  ///
+  /// In en, this message translates to:
+  /// **'Navigate'**
+  String get distributionNavigate;
+
+  /// No description provided for @distributionCompleteVisitCta.
+  ///
+  /// In en, this message translates to:
+  /// **'Complete visit'**
+  String get distributionCompleteVisitCta;
+
+  /// No description provided for @distributionVisitWizardStepOutcome.
+  ///
+  /// In en, this message translates to:
+  /// **'Outcome'**
+  String get distributionVisitWizardStepOutcome;
+
+  /// No description provided for @distributionVisitWizardStepSale.
+  ///
+  /// In en, this message translates to:
+  /// **'Sale / invoice'**
+  String get distributionVisitWizardStepSale;
+
+  /// No description provided for @distributionVisitWizardStepDelivery.
+  ///
+  /// In en, this message translates to:
+  /// **'Delivery & docs'**
+  String get distributionVisitWizardStepDelivery;
+
+  /// No description provided for @distributionVisitWizardNext.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue'**
+  String get distributionVisitWizardNext;
+
+  /// No description provided for @distributionVisitWizardBack.
+  ///
+  /// In en, this message translates to:
+  /// **'Back'**
+  String get distributionVisitWizardBack;
+
+  /// No description provided for @distributionVisitWizardFinish.
+  ///
+  /// In en, this message translates to:
+  /// **'Finish visit'**
+  String get distributionVisitWizardFinish;
+
+  /// No description provided for @distributionBackToVisit.
+  ///
+  /// In en, this message translates to:
+  /// **'Visit stays open after invoice'**
+  String get distributionBackToVisit;
+
+  /// No description provided for @distributionEmptyVisits.
+  ///
+  /// In en, this message translates to:
+  /// **'No visits in this range.'**
+  String get distributionEmptyVisits;
+
+  /// No description provided for @distributionEmptyVisitsHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Start today\'\'s plan from the Field tab.'**
+  String get distributionEmptyVisitsHint;
+
+  /// No description provided for @distributionEmptyReturns.
+  ///
+  /// In en, this message translates to:
+  /// **'No return requests yet.'**
+  String get distributionEmptyReturns;
+
+  /// No description provided for @distributionFilterAll.
+  ///
+  /// In en, this message translates to:
+  /// **'All'**
+  String get distributionFilterAll;
+
+  /// No description provided for @distributionFilterPending.
+  ///
+  /// In en, this message translates to:
+  /// **'Pending'**
+  String get distributionFilterPending;
+
+  /// No description provided for @distributionGoToField.
+  ///
+  /// In en, this message translates to:
+  /// **'Go to Field'**
+  String get distributionGoToField;
+
+  /// No description provided for @distributionGoToReports.
+  ///
+  /// In en, this message translates to:
+  /// **'Performance report'**
+  String get distributionGoToReports;
+
+  /// No description provided for @distributionOfflineQueued.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved to offline queue — will sync when online'**
+  String get distributionOfflineQueued;
+
+  /// No description provided for @distributionOfflineQueueTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Offline queue'**
+  String get distributionOfflineQueueTitle;
+
+  /// No description provided for @distributionVarianceFormula.
+  ///
+  /// In en, this message translates to:
+  /// **'Variance = collections − expected − expenses'**
+  String get distributionVarianceFormula;
+
+  /// No description provided for @distributionCashPrefillHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Cash defaults to expected sales; adjust if needed.'**
+  String get distributionCashPrefillHint;
+
+  /// No description provided for @distributionManageSectionRoutes.
+  ///
+  /// In en, this message translates to:
+  /// **'Routes & stops'**
+  String get distributionManageSectionRoutes;
+
+  /// No description provided for @distributionManageSectionSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Distribution settings'**
+  String get distributionManageSectionSettings;
+
+  /// No description provided for @distributionAssignmentFrom.
+  ///
+  /// In en, this message translates to:
+  /// **'Valid from'**
+  String get distributionAssignmentFrom;
+
+  /// No description provided for @distributionAssignmentTo.
+  ///
+  /// In en, this message translates to:
+  /// **'Valid to'**
+  String get distributionAssignmentTo;
+
+  /// No description provided for @distributionHubToday.
+  ///
+  /// In en, this message translates to:
+  /// **'Today'**
+  String get distributionHubToday;
+
+  /// No description provided for @distributionMoreActions.
+  ///
+  /// In en, this message translates to:
+  /// **'More'**
+  String get distributionMoreActions;
+
+  /// No description provided for @distributionStopDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Done'**
+  String get distributionStopDone;
+
+  /// No description provided for @distributionStopCurrent.
+  ///
+  /// In en, this message translates to:
+  /// **'Current'**
+  String get distributionStopCurrent;
+
+  /// No description provided for @distributionStopPending.
+  ///
+  /// In en, this message translates to:
+  /// **'Todo'**
+  String get distributionStopPending;
+
+  /// No description provided for @distributionLiveAutoRefresh.
+  ///
+  /// In en, this message translates to:
+  /// **'Auto refresh'**
+  String get distributionLiveAutoRefresh;
+
+  /// No description provided for @distributionViewQueue.
+  ///
+  /// In en, this message translates to:
+  /// **'View queue'**
+  String get distributionViewQueue;
+
+  /// No description provided for @distributionTargetOnField.
+  ///
+  /// In en, this message translates to:
+  /// **'Your sales target'**
+  String get distributionTargetOnField;
+
+  /// No description provided for @distributionTabCommercial.
+  ///
+  /// In en, this message translates to:
+  /// **'Commercial'**
+  String get distributionTabCommercial;
+
+  /// No description provided for @distributionTabOrders.
+  ///
+  /// In en, this message translates to:
+  /// **'Orders'**
+  String get distributionTabOrders;
+
+  /// No description provided for @distributionTabDelivery.
+  ///
+  /// In en, this message translates to:
+  /// **'Delivery'**
+  String get distributionTabDelivery;
+
+  /// No description provided for @distributionTabLoadPlan.
+  ///
+  /// In en, this message translates to:
+  /// **'Load plan'**
+  String get distributionTabLoadPlan;
+
+  /// No description provided for @distributionTabPromos.
+  ///
+  /// In en, this message translates to:
+  /// **'Promotions'**
+  String get distributionTabPromos;
+
+  /// No description provided for @distributionTabKpiCommission.
+  ///
+  /// In en, this message translates to:
+  /// **'KPI'**
+  String get distributionTabKpiCommission;
+
+  /// No description provided for @distributionPresellOrdersHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Pre-sell orders waiting for warehouse load and delivery.'**
+  String get distributionPresellOrdersHint;
+
+  /// No description provided for @distributionCreateTripFromOrders.
+  ///
+  /// In en, this message translates to:
+  /// **'Create delivery trip'**
+  String get distributionCreateTripFromOrders;
+
+  /// No description provided for @distributionNoOrders.
+  ///
+  /// In en, this message translates to:
+  /// **'No pre-sell orders yet'**
+  String get distributionNoOrders;
+
+  /// No description provided for @distributionOrderStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Status'**
+  String get distributionOrderStatus;
+
+  /// No description provided for @distributionNetTotal.
+  ///
+  /// In en, this message translates to:
+  /// **'Net'**
+  String get distributionNetTotal;
+
+  /// No description provided for @distributionConfirmOrder.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm'**
+  String get distributionConfirmOrder;
+
+  /// No description provided for @distributionOrderConfirmed.
+  ///
+  /// In en, this message translates to:
+  /// **'Order confirmed'**
+  String get distributionOrderConfirmed;
+
+  /// No description provided for @distributionNoOrdersForTrip.
+  ///
+  /// In en, this message translates to:
+  /// **'No confirmed orders to put on a trip'**
+  String get distributionNoOrdersForTrip;
+
+  /// No description provided for @distributionTripCreated.
+  ///
+  /// In en, this message translates to:
+  /// **'Delivery trip created'**
+  String get distributionTripCreated;
+
+  /// No description provided for @distributionNoTrips.
+  ///
+  /// In en, this message translates to:
+  /// **'No delivery trips for this day'**
+  String get distributionNoTrips;
+
+  /// No description provided for @distributionTrip.
+  ///
+  /// In en, this message translates to:
+  /// **'Trip'**
+  String get distributionTrip;
+
+  /// No description provided for @distributionStartTrip.
+  ///
+  /// In en, this message translates to:
+  /// **'Start'**
+  String get distributionStartTrip;
+
+  /// No description provided for @distributionDeliver.
+  ///
+  /// In en, this message translates to:
+  /// **'Deliver'**
+  String get distributionDeliver;
+
+  /// No description provided for @distributionDeliveryPodTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Proof of delivery'**
+  String get distributionDeliveryPodTitle;
+
+  /// No description provided for @distributionMarkDelivered.
+  ///
+  /// In en, this message translates to:
+  /// **'Mark delivered'**
+  String get distributionMarkDelivered;
+
+  /// No description provided for @distributionMarkFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not deliver'**
+  String get distributionMarkFailed;
+
+  /// No description provided for @distributionDeliveredOk.
+  ///
+  /// In en, this message translates to:
+  /// **'Delivery recorded'**
+  String get distributionDeliveredOk;
+
+  /// No description provided for @distributionBuildLoadPlan.
+  ///
+  /// In en, this message translates to:
+  /// **'Build load plan from orders'**
+  String get distributionBuildLoadPlan;
+
+  /// No description provided for @distributionLoadPlanHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Aggregates confirmed pre-sell lines into a picking wave.'**
+  String get distributionLoadPlanHint;
+
+  /// No description provided for @distributionNoLoadPlans.
+  ///
+  /// In en, this message translates to:
+  /// **'No load plans'**
+  String get distributionNoLoadPlans;
+
+  /// No description provided for @distributionLoadPlan.
+  ///
+  /// In en, this message translates to:
+  /// **'Load plan'**
+  String get distributionLoadPlan;
+
+  /// No description provided for @distributionSkuLines.
+  ///
+  /// In en, this message translates to:
+  /// **'SKU lines'**
+  String get distributionSkuLines;
+
+  /// No description provided for @distributionConfirmLoad.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm & load van'**
+  String get distributionConfirmLoad;
+
+  /// No description provided for @distributionLoadPlanCreated.
+  ///
+  /// In en, this message translates to:
+  /// **'Load plan created'**
+  String get distributionLoadPlanCreated;
+
+  /// No description provided for @distributionLoadPlanConfirmed.
+  ///
+  /// In en, this message translates to:
+  /// **'Load plan confirmed'**
+  String get distributionLoadPlanConfirmed;
+
+  /// No description provided for @distributionManageOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'Only managers can edit this section'**
+  String get distributionManageOnly;
+
+  /// No description provided for @distributionPromoCreate.
+  ///
+  /// In en, this message translates to:
+  /// **'New promotion'**
+  String get distributionPromoCreate;
+
+  /// No description provided for @distributionPromoCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Code'**
+  String get distributionPromoCode;
+
+  /// No description provided for @distributionPromoName.
+  ///
+  /// In en, this message translates to:
+  /// **'Name'**
+  String get distributionPromoName;
+
+  /// No description provided for @distributionPromoPercent.
+  ///
+  /// In en, this message translates to:
+  /// **'Discount %'**
+  String get distributionPromoPercent;
+
+  /// No description provided for @distributionNoPromos.
+  ///
+  /// In en, this message translates to:
+  /// **'No promotions'**
+  String get distributionNoPromos;
+
+  /// No description provided for @distributionKpiPackTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Distribution KPI pack'**
+  String get distributionKpiPackTitle;
+
+  /// No description provided for @distributionKpiCoverage.
+  ///
+  /// In en, this message translates to:
+  /// **'Coverage'**
+  String get distributionKpiCoverage;
+
+  /// No description provided for @distributionKpiStrike.
+  ///
+  /// In en, this message translates to:
+  /// **'Strike rate'**
+  String get distributionKpiStrike;
+
+  /// No description provided for @distributionKpiDropSize.
+  ///
+  /// In en, this message translates to:
+  /// **'Drop size'**
+  String get distributionKpiDropSize;
+
+  /// No description provided for @distributionKpiPresell.
+  ///
+  /// In en, this message translates to:
+  /// **'Pre-sell orders'**
+  String get distributionKpiPresell;
+
+  /// No description provided for @distributionKpiSales.
+  ///
+  /// In en, this message translates to:
+  /// **'Linked sales'**
+  String get distributionKpiSales;
+
+  /// No description provided for @distributionKpiShelf.
+  ///
+  /// In en, this message translates to:
+  /// **'Shelf score'**
+  String get distributionKpiShelf;
+
+  /// No description provided for @distributionCommissionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Commission runs'**
+  String get distributionCommissionTitle;
+
+  /// No description provided for @distributionNoCommissionRuns.
+  ///
+  /// In en, this message translates to:
+  /// **'No commission runs yet'**
+  String get distributionNoCommissionRuns;
+
+  /// No description provided for @distributionEnablePresell.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable pre-sell orders'**
+  String get distributionEnablePresell;
+
+  /// No description provided for @distributionEnablePresellHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Visitor takes order for later delivery (separate from van sale).'**
+  String get distributionEnablePresellHint;
+
+  /// No description provided for @distributionEnablePromotions.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable trade promotions'**
+  String get distributionEnablePromotions;
+
+  /// No description provided for @distributionEnableSuggestedOrder.
+  ///
+  /// In en, this message translates to:
+  /// **'Suggested order from history'**
+  String get distributionEnableSuggestedOrder;
+
+  /// No description provided for @distributionVisitorMaxDiscount.
+  ///
+  /// In en, this message translates to:
+  /// **'Visitor max discount %'**
+  String get distributionVisitorMaxDiscount;
+
+  /// No description provided for @distributionSaleMode.
+  ///
+  /// In en, this message translates to:
+  /// **'Sale type'**
+  String get distributionSaleMode;
+
+  /// No description provided for @distributionSaleModeVan.
+  ///
+  /// In en, this message translates to:
+  /// **'Van'**
+  String get distributionSaleModeVan;
+
+  /// No description provided for @distributionSaleModePresell.
+  ///
+  /// In en, this message translates to:
+  /// **'Pre-sell'**
+  String get distributionSaleModePresell;
+
+  /// No description provided for @distributionSaleModeInvoice.
+  ///
+  /// In en, this message translates to:
+  /// **'Invoice'**
+  String get distributionSaleModeInvoice;
+
+  /// No description provided for @distributionApplySuggestedOrder.
+  ///
+  /// In en, this message translates to:
+  /// **'Apply suggested order'**
+  String get distributionApplySuggestedOrder;
+
+  /// No description provided for @distributionApplyPromos.
+  ///
+  /// In en, this message translates to:
+  /// **'Apply promotions'**
+  String get distributionApplyPromos;
+
+  /// No description provided for @distributionPresellLinesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Pre-sell lines'**
+  String get distributionPresellLinesTitle;
+
+  /// No description provided for @distributionPresellLinesHint.
+  ///
+  /// In en, this message translates to:
+  /// **'These items will be delivered later — not taken from van stock.'**
+  String get distributionPresellLinesHint;
+
+  /// No description provided for @distributionProductId.
+  ///
+  /// In en, this message translates to:
+  /// **'Product ID'**
+  String get distributionProductId;
+
+  /// No description provided for @distributionProductNameOptional.
+  ///
+  /// In en, this message translates to:
+  /// **'Product name (optional)'**
+  String get distributionProductNameOptional;
+
+  /// No description provided for @distributionChequeItemsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Cheque details'**
+  String get distributionChequeItemsTitle;
+
+  /// No description provided for @distributionChequeItemsHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Each cheque becomes a received check document on confirm.'**
+  String get distributionChequeItemsHint;
+
+  /// No description provided for @distributionChequePersonId.
+  ///
+  /// In en, this message translates to:
+  /// **'Customer ID'**
+  String get distributionChequePersonId;
+
+  /// No description provided for @distributionChequeAmount.
+  ///
+  /// In en, this message translates to:
+  /// **'Amount'**
+  String get distributionChequeAmount;
+
+  /// No description provided for @distributionChequeNumber.
+  ///
+  /// In en, this message translates to:
+  /// **'Cheque no.'**
+  String get distributionChequeNumber;
+
+  /// No description provided for @distributionChequeDueDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Due date'**
+  String get distributionChequeDueDate;
+
+  /// No description provided for @distributionAddChequeItem.
+  ///
+  /// In en, this message translates to:
+  /// **'Add cheque'**
+  String get distributionAddChequeItem;
+
+  /// No description provided for @distributionChequeItemsRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Add cheque details when cheque amount > 0'**
+  String get distributionChequeItemsRequired;
+
+  /// No description provided for @distributionChequeItemsMismatch.
+  ///
+  /// In en, this message translates to:
+  /// **'Cheque lines total must match cheque collected'**
+  String get distributionChequeItemsMismatch;
+
+  /// No description provided for @distributionLineDiscount.
+  ///
+  /// In en, this message translates to:
+  /// **'Line discount'**
+  String get distributionLineDiscount;
+
+  /// No description provided for @distributionShelfAuditTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Shelf audit'**
+  String get distributionShelfAuditTitle;
+
+  /// No description provided for @distributionShelfFacingOk.
+  ///
+  /// In en, this message translates to:
+  /// **'Facing is correct'**
+  String get distributionShelfFacingOk;
+
+  /// No description provided for @distributionShelfPriceOk.
+  ///
+  /// In en, this message translates to:
+  /// **'Price label is correct'**
+  String get distributionShelfPriceOk;
+
+  /// No description provided for @distributionShelfStockOk.
+  ///
+  /// In en, this message translates to:
+  /// **'Shelf stock is adequate'**
+  String get distributionShelfStockOk;
+
+  /// No description provided for @distributionSelectVan.
+  ///
+  /// In en, this message translates to:
+  /// **'Select van'**
+  String get distributionSelectVan;
+
+  /// No description provided for @distributionSelectWarehouse.
+  ///
+  /// In en, this message translates to:
+  /// **'Select source warehouse'**
+  String get distributionSelectWarehouse;
+
+  /// No description provided for @distributionTabShelfAssets.
+  ///
+  /// In en, this message translates to:
+  /// **'Shelf & assets'**
+  String get distributionTabShelfAssets;
+
+  /// No description provided for @distributionCommissionRulesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Commission rules'**
+  String get distributionCommissionRulesTitle;
+
+  /// No description provided for @distributionCommissionRuleCreate.
+  ///
+  /// In en, this message translates to:
+  /// **'New rule'**
+  String get distributionCommissionRuleCreate;
+
+  /// No description provided for @distributionCommissionPercent.
+  ///
+  /// In en, this message translates to:
+  /// **'Commission %'**
+  String get distributionCommissionPercent;
+
+  /// No description provided for @distributionCommissionCompute.
+  ///
+  /// In en, this message translates to:
+  /// **'Compute commission'**
+  String get distributionCommissionCompute;
+
+  /// No description provided for @distributionCommissionComputed.
+  ///
+  /// In en, this message translates to:
+  /// **'Commission computed'**
+  String get distributionCommissionComputed;
+
+  /// No description provided for @distributionNoCommissionRules.
+  ///
+  /// In en, this message translates to:
+  /// **'No commission rules yet'**
+  String get distributionNoCommissionRules;
+
+  /// No description provided for @distributionAssetsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Customer assets'**
+  String get distributionAssetsTitle;
+
+  /// No description provided for @distributionAssetCreate.
+  ///
+  /// In en, this message translates to:
+  /// **'Register asset'**
+  String get distributionAssetCreate;
+
+  /// No description provided for @distributionAssetType.
+  ///
+  /// In en, this message translates to:
+  /// **'Asset type'**
+  String get distributionAssetType;
+
+  /// No description provided for @distributionAssetCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Asset code'**
+  String get distributionAssetCode;
+
+  /// No description provided for @distributionNoAssets.
+  ///
+  /// In en, this message translates to:
+  /// **'No assets registered'**
+  String get distributionNoAssets;
+
+  /// No description provided for @distributionNoShelfAudits.
+  ///
+  /// In en, this message translates to:
+  /// **'No shelf audits yet'**
+  String get distributionNoShelfAudits;
+
+  /// No description provided for @distributionTargetMetric.
+  ///
+  /// In en, this message translates to:
+  /// **'Target metric'**
+  String get distributionTargetMetric;
+
+  /// No description provided for @distributionMetricAmount.
+  ///
+  /// In en, this message translates to:
+  /// **'Sales amount'**
+  String get distributionMetricAmount;
+
+  /// No description provided for @distributionMetricVisits.
+  ///
+  /// In en, this message translates to:
+  /// **'Visit count'**
+  String get distributionMetricVisits;
+
+  /// No description provided for @distributionMetricSkuQty.
+  ///
+  /// In en, this message translates to:
+  /// **'SKU quantity'**
+  String get distributionMetricSkuQty;
+
+  /// No description provided for @distributionMetricCoverage.
+  ///
+  /// In en, this message translates to:
+  /// **'Coverage %'**
+  String get distributionMetricCoverage;
+
+  /// No description provided for @distributionTargetValue.
+  ///
+  /// In en, this message translates to:
+  /// **'Target value'**
+  String get distributionTargetValue;
 }
 
 class _AppLocalizationsDelegate

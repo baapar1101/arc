@@ -16,6 +16,7 @@ import 'package:hesabix_ui/widgets/permission/permission_widgets.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
 import 'package:hesabix_ui/services/bytes_export/bytes_export_service.dart';
 import 'package:hesabix_ui/core/hesabix_back.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 /// صفحه لیست سرنخ‌های CRM
 class CrmLeadsPage extends StatefulWidget {
@@ -495,10 +496,10 @@ class _CrmLeadsPageState extends State<CrmLeadsPage> {
                                   margin: const EdgeInsets.only(bottom: 8),
                                   child: ListTile(
                                     leading: CircleAvatar(
-                                      backgroundColor: isConverted ? Colors.green.shade100 : Theme.of(context).colorScheme.primaryContainer,
+                                      backgroundColor: isConverted ? SemanticColorResolver.positive(context).withValues(alpha: 0.18) : Theme.of(context).colorScheme.primaryContainer,
                                       child: Icon(
                                         isConverted ? Icons.check_circle : Icons.contact_phone,
-                                        color: isConverted ? Colors.green : Theme.of(context).colorScheme.onPrimaryContainer,
+                                        color: isConverted ? SemanticColorResolver.positive(context) : Theme.of(context).colorScheme.onPrimaryContainer,
                                       ),
                                     ),
                                     title: Row(
@@ -509,15 +510,15 @@ class _CrmLeadsPageState extends State<CrmLeadsPage> {
                                             padding: const EdgeInsets.only(left: 4),
                                             child: Chip(
                                               avatar: Icon(Icons.local_fire_department, size: 16, color: Theme.of(context).colorScheme.primary),
-                                              label: Text('$score', style: const TextStyle(fontSize: 12)),
+                                              label: Text('$score', style: TextStyle(fontSize: 12)),
                                               visualDensity: VisualDensity.compact,
                                             ),
                                           ),
                                         if (isConverted)
                                           Chip(
-                                            label: Text(personName ?? 'تبدیل شده', style: const TextStyle(fontSize: 12)),
+                                            label: Text(personName ?? 'تبدیل شده', style: TextStyle(fontSize: 12)),
                                             visualDensity: VisualDensity.compact,
-                                            backgroundColor: Colors.green.shade50,
+                                            backgroundColor: SemanticColorResolver.positive(context).withValues(alpha: 0.12),
                                           ),
                                       ],
                                     ),

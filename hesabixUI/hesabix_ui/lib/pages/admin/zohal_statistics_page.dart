@@ -4,6 +4,7 @@ import '../../core/api_client.dart';
 import '../../services/zohal_service.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/number_formatters.dart' show formatWithThousands;
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 class ZohalStatisticsPage extends StatefulWidget {
   const ZohalStatisticsPage({super.key});
@@ -62,10 +63,10 @@ class _ZohalStatisticsPageState extends State<ZohalStatisticsPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('آمار استفاده از سرویس‌های زحل'),
+        title: Text('آمار استفاده از سرویس‌های زحل'),
         actions: [
           IconButton(
-            icon: const Icon(Icons.refresh),
+            icon: Icon(Icons.refresh),
             onPressed: _load,
             tooltip: 'بارگذاری مجدد',
           ),
@@ -129,17 +130,17 @@ class _ZohalStatisticsPageState extends State<ZohalStatisticsPage> {
                                           'موفق',
                                           (_statistics!['successful_requests'] ?? 0).toString(),
                                           Icons.check_circle,
-                                          Colors.green,
+                                          SemanticColorResolver.positive(context),
                                         ),
                                       ),
-                                      const SizedBox(width: 12),
+                                      SizedBox(width: 12),
                                       Expanded(
                                         child: _buildStatCard(
                                           theme,
                                           'ناموفق',
                                           (_statistics!['failed_requests'] ?? 0).toString(),
                                           Icons.cancel,
-                                          Colors.red,
+                                          SemanticColorResolver.negative(context),
                                         ),
                                       ),
                                     ],

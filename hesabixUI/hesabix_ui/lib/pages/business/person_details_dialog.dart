@@ -33,6 +33,7 @@ import 'package:hesabix_ui/utils/currency_display_utils.dart';
 import 'package:hesabix_ui/utils/number_formatters.dart';
 import '../../utils/snackbar_helper.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 String? _firstNonEmptyPersonMobile(Person? p) {
   if (p == null) return null;
@@ -672,7 +673,7 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.error_outline, color: Colors.red, size: 48),
+            Icon(Icons.error_outline, color: SemanticColorResolver.negative(context), size: 48),
             const SizedBox(height: 12),
             Text(_detailsError!),
             const SizedBox(height: 12),
@@ -859,9 +860,24 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
             key: _kardexTableKey,
             config: _buildKardexConfig(t),
             fromJson: (json) => json,
+            calendarController: _calendarController,
           ),
         ),
       ],
+    );
+  }
+
+  bool get _isJalaliCalendar =>
+      _calendarController?.isJalali ??
+      ApiClient.getCalendarController()?.isJalali ??
+      true;
+
+  String _formatKardexDocumentDate(Map<String, dynamic> item) {
+    return HesabixDateUtils.formatApiDateForDisplay(
+      item['document_date'] ?? item['document_date_formatted'],
+      _isJalaliCalendar,
+      rawValue: item['document_date_raw'],
+      fallback: '',
     );
   }
 
@@ -939,7 +955,7 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
           'document_date',
           t.documentDate,
           filterType: ColumnFilterType.dateRange,
-          formatter: (item) => (item as Map<String, dynamic>)['document_date']?.toString(),
+          formatter: (item) => _formatKardexDocumentDate(item as Map<String, dynamic>),
         ),
         TextColumn(
           'document_code',
@@ -1162,11 +1178,11 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
   Color _getStatusColor(WarrantyStatus status, ThemeData theme) {
     switch (status) {
       case WarrantyStatus.activated:
-        return Colors.green;
+        return SemanticColorResolver.positive(context);
       case WarrantyStatus.expired:
-        return Colors.orange;
+        return SemanticColorResolver.warning(context);
       case WarrantyStatus.revoked:
-        return Colors.red;
+        return SemanticColorResolver.negative(context);
       default:
         return theme.colorScheme.primary;
     }
@@ -1696,7 +1712,7 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
     Color statusColor;
     switch (link.status) {
       case 'فعال':
-        statusColor = Colors.green[700] ?? theme.colorScheme.primary;
+        statusColor = SemanticColorResolver.positive(context);
         break;
       case 'منقضی':
         statusColor = theme.colorScheme.error;
@@ -1983,7 +1999,7 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
                   'خلاصه وضعیت مالی',
                   style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
                 ),
-                const SizedBox(width: 12),
+                SizedBox(width: 12),
                 if (_currentFiscalYearName != null)
                   Chip(
                     label: Text(_currentFiscalYearName!),
@@ -2005,7 +2021,7 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
                           height: 18,
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
-                      : const Icon(Icons.refresh),
+                      : Icon(Icons.refresh),
                 ),
               ],
             ),
@@ -2049,7 +2065,7 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
                     display: _person?.totalCredit == null
                         ? '-'
                         : formatAmountWithCurrencyUnit(_person!.totalCredit, unit: unit, decimalPlaces: 0),
-                    color: Colors.green[700],
+                    color: SemanticColorResolver.positive(context),
                     icon: Icons.north_east,
                   ),
                   _buildSummaryStat(
@@ -2139,13 +2155,13 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
   Color _statusColor(String status) {
     switch (personBalanceStatusLabel(status)) {
       case 'بستانکار':
-        return Colors.green[700] ?? Colors.green;
+        return SemanticColorResolver.positive(context);
       case 'بدهکار':
-        return Colors.red;
+        return SemanticColorResolver.negative(context);
       case 'بدون تراکنش':
         return Colors.blueGrey;
       case 'تسویه':
-        return Colors.orange;
+        return SemanticColorResolver.warning(context);
       default:
         return Colors.blueGrey;
     }
@@ -2307,7 +2323,7 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
         return AlertDialog(
           title: Row(
             children: [
-              const Icon(Icons.warning_amber_rounded, color: Colors.orange),
+              Icon(Icons.warning_amber_rounded, color: SemanticColorResolver.warning(context)),
               const SizedBox(width: 8),
               const Text('محدودیت فضای ذخیره‌سازی'),
             ],
@@ -2353,7 +2369,7 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
             value,
             style: theme.textTheme.bodyMedium?.copyWith(
               fontWeight: highlight ? FontWeight.w600 : FontWeight.normal,
-              color: isError ? Colors.red : theme.colorScheme.onSurface,
+              color: isError ? SemanticColorResolver.negative(context) : theme.colorScheme.onSurface,
             ),
           ),
         ],

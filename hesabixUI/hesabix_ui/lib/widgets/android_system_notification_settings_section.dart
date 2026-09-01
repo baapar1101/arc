@@ -38,14 +38,14 @@ class _AndroidSystemNotificationSettingsSectionState extends State<AndroidSystem
   bool _busy = false;
 
   static const _swatches = <int>[
-    0xFF1565C0, // blue
+    0xFF0F4C81, // classic blue
+    0xFF00A8BD, // turquoise sea
+    0xFF0F766E, // emerald forest
+    0xFFB45309, // warm copper
     0xFF2E7D32, // green
-    0xFF6A1B9A, // purple
     0xFFC62828, // red
     0xFFEF6C00, // orange
-    0xFF00838F, // teal
     0xFF455A64, // blue grey
-    0xFFAD1457, // pink
   ];
 
   @override

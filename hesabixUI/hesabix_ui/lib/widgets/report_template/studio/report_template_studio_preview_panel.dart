@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 
 import '../../../utils/web/web_utils.dart' as web_utils;
 import '../embedded_pdf_iframe.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 class ReportTemplateStudioPreviewPanel extends StatelessWidget {
   final bool loading;
@@ -66,16 +67,16 @@ class ReportTemplateStudioPreviewPanel extends StatelessWidget {
         if (errors.isNotEmpty)
           Container(
             width: double.infinity,
-            color: Colors.red.shade50,
+            color: SemanticColorResolver.negative(context).withValues(alpha: 0.12),
             padding: const EdgeInsets.all(8),
-            child: Text(errors.join('\n'), style: TextStyle(color: Colors.red.shade800, fontSize: 12)),
+            child: Text(errors.join('\n'), style: TextStyle(color: SemanticColorResolver.negative(context), fontSize: 12)),
           ),
         if (warnings.isNotEmpty)
           Container(
             width: double.infinity,
-            color: Colors.orange.shade50,
+            color: SemanticColorResolver.warning(context).withValues(alpha: 0.12),
             padding: const EdgeInsets.all(8),
-            child: Text(warnings.join('\n'), style: TextStyle(color: Colors.orange.shade900, fontSize: 12)),
+            child: Text(warnings.join('\n'), style: TextStyle(color: SemanticColorResolver.warning(context), fontSize: 12)),
           ),
         Expanded(
           child: Stack(

@@ -18,6 +18,7 @@ import '../../utils/snackbar_helper.dart';
 import '../../services/errors/api_error.dart';
 import '../../utils/responsive_helper.dart';
 import '../../widgets/marketplace/moadian_plugin_gate.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 /// صفحه کارپوشه مودیان (لیست فاکتورهای موجود در کارپوشه و وضعیت ارسال به سامانه)
 class TaxWorkspacePage extends StatefulWidget {
@@ -2217,7 +2218,7 @@ class _TaxWorkspacePageState extends State<TaxWorkspacePage> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.warning_amber, size: 20, color: Colors.orange),
+          Icon(Icons.warning_amber, size: 20, color: SemanticColorResolver.warning(context)),
           const SizedBox(width: 8),
           Expanded(
             child: Column(
@@ -2322,7 +2323,7 @@ class _TaxWorkspacePageState extends State<TaxWorkspacePage> {
               Icon(
                 successCount > 0 ? Icons.warning_amber : Icons.error_outline,
                 color: successCount > 0 
-                    ? Colors.orange
+                    ? SemanticColorResolver.warning(context)
                     : Theme.of(context).colorScheme.error,
               ),
               const SizedBox(width: 8),
@@ -2440,9 +2441,9 @@ class _TaxWorkspacePageState extends State<TaxWorkspacePage> {
   }
 
   Color _getCategoryColor(String category, AppLocalizations t) {
-    if (category == t.taxErrorCategoryValidation) return Colors.orange;
-    if (category == t.taxErrorCategoryNetwork) return Colors.blue;
-    if (category == t.taxErrorCategoryAccess) return Colors.red;
+    if (category == t.taxErrorCategoryValidation) return SemanticColorResolver.warning(context);
+    if (category == t.taxErrorCategoryNetwork) return SemanticColorResolver.info(context);
+    if (category == t.taxErrorCategoryAccess) return SemanticColorResolver.negative(context);
     if (category == t.taxErrorCategoryStatus) return Colors.amber;
     return Colors.grey;
   }
@@ -2548,8 +2549,8 @@ class _TaxWorkspacePageState extends State<TaxWorkspacePage> {
         return AlertDialog(
           title: Row(
             children: [
-              const Icon(Icons.error_outline, color: Colors.redAccent),
-              const SizedBox(width: 8),
+              Icon(Icons.error_outline, color: Colors.redAccent),
+              SizedBox(width: 8),
               Expanded(child: Text(t.taxValidationIssuesTitle)),
             ],
           ),
@@ -2597,9 +2598,9 @@ class _TaxWorkspacePageState extends State<TaxWorkspacePage> {
                             context,
                             t.taxValidationIssuesCategoryPerson,
                             Icons.person_outline,
-                            Colors.orange,
+                            SemanticColorResolver.warning(context),
                           ),
-                          const SizedBox(height: 8),
+                          SizedBox(height: 8),
                           ...categorizedIssues['person']!.map((issue) => _buildIssueItem(context, issue, t, invoiceId: invoiceId)),
                           const SizedBox(height: 16),
                         ],
@@ -2609,7 +2610,7 @@ class _TaxWorkspacePageState extends State<TaxWorkspacePage> {
                             context,
                             t.taxValidationIssuesCategoryProduct,
                             Icons.inventory_2_outlined,
-                            Colors.blue,
+                            SemanticColorResolver.info(context),
                           ),
                           const SizedBox(height: 8),
                           ...categorizedIssues['product']!.map((issue) => _buildIssueItem(context, issue, t, invoiceId: invoiceId)),

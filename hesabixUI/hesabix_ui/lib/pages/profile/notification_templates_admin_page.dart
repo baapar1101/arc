@@ -9,6 +9,7 @@ import '../../widgets/data_table/helpers/data_table_utils.dart';
 import '../../models/notification_template_model.dart';
 import '../../models/event_key_info.dart';
 import '../../utils/error_extractor.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 class NotificationTemplatesAdminPage extends StatefulWidget {
   const NotificationTemplatesAdminPage({super.key});
@@ -125,8 +126,8 @@ class _NotificationTemplatesAdminPageState extends State<NotificationTemplatesAd
                 message: 'کلیک برای مشاهده کامل',
                 child: Text(
                   preview,
-                  style: const TextStyle(
-                    color: Colors.blue,
+                  style: TextStyle(
+                    color: SemanticColorResolver.info(context),
                     decoration: TextDecoration.underline,
                   ),
                 ),
@@ -145,14 +146,14 @@ class _NotificationTemplatesAdminPageState extends State<NotificationTemplatesAd
               children: [
                 Icon(
                   item.isActive ? Icons.check_circle : Icons.cancel,
-                  color: item.isActive ? Colors.green : Colors.red,
+                  color: item.isActive ? SemanticColorResolver.positive(context) : SemanticColorResolver.negative(context),
                   size: 20,
                 ),
-                const SizedBox(width: 4),
+                SizedBox(width: 4),
                 Text(
                   item.isActive ? 'فعال' : 'غیرفعال',
                   style: TextStyle(
-                    color: item.isActive ? Colors.green : Colors.red,
+                    color: item.isActive ? SemanticColorResolver.positive(context) : SemanticColorResolver.negative(context),
                     fontWeight: FontWeight.w500,
                   ),
                 ),
@@ -680,7 +681,7 @@ class _NotificationTemplatesAdminPageState extends State<NotificationTemplatesAd
                                   },
                                   secondary: Icon(
                                     isActive ? Icons.check_circle : Icons.cancel,
-                                    color: isActive ? Colors.green : Colors.red,
+                                    color: isActive ? SemanticColorResolver.positive(context) : SemanticColorResolver.negative(context),
                                   ),
                                 ),
                               ),
@@ -848,17 +849,17 @@ class _NotificationTemplatesAdminPageState extends State<NotificationTemplatesAd
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        icon: const Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 48),
-        title: const Text('تایید حذف'),
+        icon: Icon(Icons.warning_amber_rounded, color: SemanticColorResolver.warning(context), size: 48),
+        title: Text('تایید حذف'),
         content: Text('آیا از حذف قالب "${item.eventKey}" (${item.channel}) اطمینان دارید؟\n\nاین عمل قابل بازگشت نیست.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('انصراف'),
+            child: Text('انصراف'),
           ),
           FilledButton(
             onPressed: () => Navigator.of(context).pop(true),
-            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            style: FilledButton.styleFrom(backgroundColor: SemanticColorResolver.negative(context)),
             child: const Text('حذف'),
           ),
         ],
@@ -985,7 +986,7 @@ class _NotificationTemplatesAdminPageState extends State<NotificationTemplatesAd
             children: [
               Row(
                 children: [
-                  const Icon(Icons.preview, size: 28, color: Colors.blue),
+                  Icon(Icons.preview, size: 28, color: SemanticColorResolver.info(context)),
                   const SizedBox(width: 12),
                   Text(
                     'پیش‌نمایش قالب',

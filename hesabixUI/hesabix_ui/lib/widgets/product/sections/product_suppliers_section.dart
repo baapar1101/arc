@@ -9,6 +9,7 @@ import '../../../services/person_service.dart';
 import '../../../utils/responsive_helper.dart';
 import '../../../utils/snackbar_helper.dart';
 import '../../invoice/person_combobox_widget.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 class ProductSuppliersSection extends StatefulWidget {
   final int businessId;
@@ -402,7 +403,7 @@ class _ProductSuppliersSectionState extends State<ProductSuppliersSection> {
                             ),
                             IconButton(
                               onPressed: () => _removeSocialRow(index, scIndex),
-                              icon: const Icon(Icons.delete_outline, color: Colors.red),
+                              icon: Icon(Icons.delete_outline, color: SemanticColorResolver.negative(context)),
                             ),
                           ],
                         ),

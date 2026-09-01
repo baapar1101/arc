@@ -17,6 +17,7 @@ import '../../utils/snackbar_helper.dart';
 import '../../utils/warehouse_invoice_lines.dart';
 import '../../services/list_filter_preferences_service.dart';
 import 'package:hesabix_ui/services/bytes_export/bytes_export_service.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 class WarehouseDocsPage extends StatefulWidget {
   final int businessId;
@@ -91,9 +92,9 @@ class _WarehouseDocsPageState extends State<WarehouseDocsPage> {
     if (doc.status != 'draft' && doc.status != 'posted') {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
+        SnackBar(
           content: Text('فقط حواله‌های پیش‌نویس و قطعی شده قابل ویرایش هستند'),
-          backgroundColor: Colors.orange,
+          backgroundColor: SemanticColorResolver.warning(context),
         ),
       );
       return;
@@ -121,7 +122,7 @@ class _WarehouseDocsPageState extends State<WarehouseDocsPage> {
             content: Text(
               'خطا در بارگذاری حواله: ${ErrorExtractor.forContext(e, context)}',
             ),
-            backgroundColor: Colors.red,
+            backgroundColor: SemanticColorResolver.negative(context),
           ),
         );
       }

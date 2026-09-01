@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 /// بنر هشدار کیفیت داده چندارزی (خطوط بدون معادل پایه).
 class FxDataQualityBanner extends StatelessWidget {
@@ -26,9 +27,9 @@ class FxDataQualityBanner extends StatelessWidget {
     final message = (q['message_fa'] ?? q['message_en'] ?? '').toString();
     final isHigh = severity == 'high';
     final bg = isHigh
-        ? Colors.orange.withValues(alpha: 0.14)
+        ? SemanticColorResolver.warning(context).withValues(alpha: 0.14)
         : cs.tertiaryContainer.withValues(alpha: 0.45);
-    final fg = isHigh ? Colors.orange.shade900 : cs.onTertiaryContainer;
+    final fg = isHigh ? SemanticColorResolver.warning(context) : cs.onTertiaryContainer;
 
     return Material(
       color: bg,

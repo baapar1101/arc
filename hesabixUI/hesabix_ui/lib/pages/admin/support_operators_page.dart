@@ -3,6 +3,7 @@ import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/services/admin_users_service.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 class SupportOperatorsPage extends StatefulWidget {
   const SupportOperatorsPage({super.key});
@@ -40,7 +41,7 @@ class _SupportOperatorsPageState extends State<SupportOperatorsPage> {
             content: Text(
               '${t.errorLoadingSettings}: ${ErrorExtractor.forContext(e, context)}',
             ),
-            backgroundColor: Colors.red,
+            backgroundColor: SemanticColorResolver.negative(context),
           ),
         );
       }
@@ -62,7 +63,7 @@ class _SupportOperatorsPageState extends State<SupportOperatorsPage> {
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            style: ElevatedButton.styleFrom(backgroundColor: SemanticColorResolver.negative(context)),
             child: Text(t.delete),
           ),
         ],
@@ -78,7 +79,7 @@ class _SupportOperatorsPageState extends State<SupportOperatorsPage> {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(t.supportOperatorsAccessRevokedSuccess),
-              backgroundColor: Colors.green,
+              backgroundColor: SemanticColorResolver.positive(context),
             ),
           );
         }
@@ -89,7 +90,7 @@ class _SupportOperatorsPageState extends State<SupportOperatorsPage> {
               content: Text(
                 '${t.errorSavingSettings}: ${ErrorExtractor.forContext(e, context)}',
               ),
-              backgroundColor: Colors.red,
+              backgroundColor: SemanticColorResolver.negative(context),
             ),
           );
         }
@@ -153,9 +154,9 @@ class _SupportOperatorsPageState extends State<SupportOperatorsPage> {
                       child: ListTile(
                         leading: CircleAvatar(
                           backgroundColor: isActive
-                              ? Colors.green
+                              ? SemanticColorResolver.positive(context)
                               : Colors.grey,
-                          child: const Icon(
+                          child: Icon(
                             Icons.support_agent,
                             color: Colors.white,
                           ),
@@ -165,7 +166,7 @@ class _SupportOperatorsPageState extends State<SupportOperatorsPage> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             if (fullName != null) Text(email),
-                            const SizedBox(height: 4),
+                            SizedBox(height: 4),
                             Row(
                               children: [
                                 Icon(
@@ -174,17 +175,17 @@ class _SupportOperatorsPageState extends State<SupportOperatorsPage> {
                                       : Icons.telegram_outlined,
                                   size: 16,
                                   color: telegramId != null
-                                      ? Colors.blue
+                                      ? SemanticColorResolver.info(context)
                                       : Colors.grey,
                                 ),
-                                const SizedBox(width: 4),
+                                SizedBox(width: 4),
                                 Text(
                                   telegramId != null
                                       ? t.supportOperatorsTelegramConnected
                                       : t.supportOperatorsTelegramNotConnected,
                                   style: TextStyle(
                                     color: telegramId != null
-                                        ? Colors.blue
+                                        ? SemanticColorResolver.info(context)
                                         : Colors.grey,
                                     fontSize: 12,
                                   ),
@@ -196,8 +197,8 @@ class _SupportOperatorsPageState extends State<SupportOperatorsPage> {
                                 padding: const EdgeInsets.only(top: 4),
                                 child: Text(
                                   t.supportOperatorsStatusInactive,
-                                  style: const TextStyle(
-                                    color: Colors.red,
+                                  style: TextStyle(
+                                    color: SemanticColorResolver.negative(context),
                                     fontSize: 12,
                                     fontWeight: FontWeight.bold,
                                   ),
@@ -206,7 +207,7 @@ class _SupportOperatorsPageState extends State<SupportOperatorsPage> {
                           ],
                         ),
                         trailing: IconButton(
-                          icon: const Icon(Icons.delete, color: Colors.red),
+                          icon: Icon(Icons.delete, color: SemanticColorResolver.negative(context)),
                           onPressed: () => _removeOperator(
                             operator['id'] as int,
                             email,

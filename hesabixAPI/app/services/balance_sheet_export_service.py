@@ -372,6 +372,14 @@ def build_balance_sheet_pdf_bytes(
         font_face_css += f'@font-face {{ font-family: \'YekanBakhFaNum\'; src: url("{fa_font_url_bold}") format(\'truetype\'); font-weight: 700; }}\n'
 
     preferred_stack = "YekanBakhFaNum, Vazirmatn, Tahoma, Arial, sans-serif" if is_fa else "Arial, sans-serif"
+    try:
+        from app.services.theme_brand_colors import resolve_theme_brand_context
+
+        _brand = resolve_theme_brand_context()
+        brand_positive = _brand.get("brand_positive", "#2E7D32")
+        brand_negative = _brand.get("brand_negative", "#B3261E")
+    except Exception:
+        brand_positive, brand_negative = "#2E7D32", "#B3261E"
     injected = (
         "<style id=\"hesabix-font-inject\">"
         + (font_face_css or "")
@@ -402,8 +410,8 @@ def build_balance_sheet_pdf_bytes(
       tr.section-row td {{ background: #dce6f1; font-weight: 700; }}
       tr.subtotal-row td {{ background: #fff8e1; font-weight: 700; }}
       tr.highlight-row td {{ background: #e8f4fd; font-weight: 700; }}
-      tr.equation-balanced td {{ background: #ecfdf5; color: #065f46; font-weight: 700; }}
-      tr.equation-unbalanced td {{ background: #fff7ed; color: #9a3412; font-weight: 700; }}
+      tr.equation-balanced td {{ background: #ecfdf5; color: {brand_positive}; font-weight: 700; }}
+      tr.equation-unbalanced td {{ background: #fff7ed; color: {brand_negative}; font-weight: 700; }}
     """)
     font_config = FontConfiguration()
     return HTML(string=table_html).write_pdf(stylesheets=[css], font_config=font_config)

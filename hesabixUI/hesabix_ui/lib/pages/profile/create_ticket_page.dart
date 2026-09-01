@@ -7,6 +7,7 @@ import 'package:hesabix_ui/services/support_tickets_public_config.dart';
 import 'package:hesabix_ui/models/support_models.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/responsive_helper.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 class CreateTicketPage extends StatefulWidget {
   final bool fullPage;
@@ -77,7 +78,7 @@ class _CreateTicketPageState extends State<CreateTicketPage> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Icon(
-                  backgroundColor == Colors.green ? Icons.check_circle : Icons.error,
+                  backgroundColor == SemanticColorResolver.positive(context) ? Icons.check_circle : Icons.error,
                   color: Colors.white,
                   size: 20,
                 ),
@@ -146,7 +147,7 @@ class _CreateTicketPageState extends State<CreateTicketPage> {
       final t = AppLocalizations.of(context);
       _showOverlayMessage(
         t.pleaseSelectCategoryAndPriority,
-        Colors.red,
+        SemanticColorResolver.negative(context),
         const Duration(seconds: 3),
       );
       return;
@@ -171,7 +172,7 @@ class _CreateTicketPageState extends State<CreateTicketPage> {
         final t = AppLocalizations.of(context);
         _showOverlayMessage(
           t.ticketCreatedSuccessfully,
-          Colors.green,
+          SemanticColorResolver.positive(context),
           const Duration(seconds: 2),
         );
         Navigator.pop(context, true);
@@ -337,16 +338,16 @@ class _CreateTicketPageState extends State<CreateTicketPage> {
               Container(
                 padding: const EdgeInsets.all(24),
                 decoration: BoxDecoration(
-                  color: Colors.red.withValues(alpha: 0.1),
+                  color: SemanticColorResolver.negative(context).withValues(alpha: 0.1),
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
                   Icons.error_outline,
                   size: 48,
-                  color: Colors.red.withValues(alpha: 0.8),
+                  color: SemanticColorResolver.negative(context).withValues(alpha: 0.8),
                 ),
               ),
-              const SizedBox(height: 24),
+              SizedBox(height: 24),
               Text(
                 t.dataLoadingError,
                 style: theme.textTheme.titleLarge?.copyWith(
@@ -357,7 +358,7 @@ class _CreateTicketPageState extends State<CreateTicketPage> {
               Text(
                 _error!,
                 style: theme.textTheme.bodyMedium?.copyWith(
-                  color: Colors.red,
+                  color: SemanticColorResolver.negative(context),
                 ),
                 textAlign: TextAlign.center,
               ),

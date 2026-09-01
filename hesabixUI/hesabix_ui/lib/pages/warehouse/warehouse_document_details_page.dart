@@ -9,6 +9,7 @@ import '../../core/date_utils.dart' show HesabixDateUtils;
 import '../../utils/error_extractor.dart';
 import '../../widgets/business_subpage_back_leading.dart';
 import 'package:hesabix_ui/services/bytes_export/bytes_export_service.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 class WarehouseDocumentDetailsPage extends StatefulWidget {
   final int businessId;
@@ -142,9 +143,9 @@ class _WarehouseDocumentDetailsPageState extends State<WarehouseDocumentDetailsP
 
   Color _getStatusColor(String? status) {
     switch (status) {
-      case 'draft': return Colors.orange;
-      case 'posted': return Colors.green;
-      case 'cancelled': return Colors.red;
+      case 'draft': return SemanticColorResolver.warning(context);
+      case 'posted': return SemanticColorResolver.positive(context);
+      case 'cancelled': return SemanticColorResolver.negative(context);
       default: return Colors.grey;
     }
   }

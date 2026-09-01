@@ -7,6 +7,7 @@ import '../../services/payment_gateway_service.dart';
 import '../../core/api_client.dart';
 import '../../utils/number_normalizer.dart';
 import '../../utils/snackbar_helper.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 /// دیالوگ افزایش اعتبار کیف پول
 /// 
@@ -348,7 +349,7 @@ class _WalletTopUpDialogState extends State<WalletTopUpDialog> {
                             },
                             autofocus: true,
                           ),
-                          const SizedBox(height: 20),
+                          SizedBox(height: 20),
                           // فیلد توضیحات
                           TextFormField(
                             controller: _descCtrl,
@@ -356,7 +357,7 @@ class _WalletTopUpDialogState extends State<WalletTopUpDialog> {
                             decoration: InputDecoration(
                               labelText: t.descriptionOptional,
                               hintText: 'توضیحات مربوط به این تراکنش',
-                              prefixIcon: const Icon(Icons.description_outlined),
+                              prefixIcon: Icon(Icons.description_outlined),
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(12),
                               ),
@@ -410,21 +411,21 @@ class _WalletTopUpDialogState extends State<WalletTopUpDialog> {
                             Container(
                               padding: const EdgeInsets.all(16),
                               decoration: BoxDecoration(
-                                color: Colors.orange.withValues(alpha: 0.1),
+                                color: SemanticColorResolver.warning(context).withValues(alpha: 0.1),
                                 borderRadius: BorderRadius.circular(12),
                                 border: Border.all(
-                                  color: Colors.orange.withValues(alpha: 0.3),
+                                  color: SemanticColorResolver.warning(context).withValues(alpha: 0.3),
                                 ),
                               ),
                               child: Row(
                                 children: [
-                                  Icon(Icons.info_outline, color: Colors.orange[700], size: 24),
-                                  const SizedBox(width: 12),
+                                  Icon(Icons.info_outline, color: SemanticColorResolver.warning(context), size: 24),
+                                  SizedBox(width: 12),
                                   Expanded(
                                     child: Text(
                                       'هیچ درگاه پرداختی تنظیم نشده است. لطفاً از بخش تنظیمات، درگاه پرداخت اضافه کنید.',
                                       style: theme.textTheme.bodySmall?.copyWith(
-                                        color: Colors.orange[900],
+                                        color: SemanticColorResolver.warning(context),
                                       ),
                                     ),
                                   ),

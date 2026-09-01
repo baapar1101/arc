@@ -6,6 +6,7 @@ import 'package:hesabix_ui/services/ai_service.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
 import 'package:hesabix_ui/utils/snackbar_helper.dart';
 import '../../widgets/business_subpage_back_leading.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 /// تنظیمات ارائه‌دهنده AI اختصاصی (پلن BYOK) برای کسب‌وکار.
 class BusinessAIProviderSettingsPage extends StatefulWidget {
@@ -467,13 +468,13 @@ class _BusinessAIProviderSettingsPageState
     Color bg;
     String text;
     if (_lastTestOk == true) {
-      bg = Colors.green.withValues(alpha: 0.12);
+      bg = SemanticColorResolver.positive(context).withValues(alpha: 0.12);
       text = 'آماده استفاده — آخرین تست موفق${_lastTestedAt != null ? ' ($_lastTestedAt)' : ''}';
     } else if (_lastTestOk == false) {
       bg = theme.colorScheme.errorContainer;
       text = 'آخرین تست ناموفق${_lastTestError != null ? ': $_lastTestError' : ''}';
     } else if (_hasApiKey) {
-      bg = Colors.orange.withValues(alpha: 0.15);
+      bg = SemanticColorResolver.warning(context).withValues(alpha: 0.15);
       text = 'ذخیره شده — هنوز تست اتصال انجام نشده';
     } else {
       bg = theme.colorScheme.surfaceContainerHighest;

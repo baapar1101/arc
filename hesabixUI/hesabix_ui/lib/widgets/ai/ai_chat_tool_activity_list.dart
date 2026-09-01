@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/models/ai_stream_event.dart';
 import 'ai_subagent_trace.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 class AIChatToolActivityList extends StatelessWidget {
   final List<AIToolActivity> activities;
@@ -56,7 +57,7 @@ class _ToolActivityChip extends StatelessWidget {
       iconColor = scheme.tertiary;
     } else if (activity.success == true) {
       icon = Icons.check_circle_outline_rounded;
-      iconColor = Colors.green.shade700;
+      iconColor = SemanticColorResolver.positive(context);
     } else if (activity.success == false) {
       icon = Icons.error_outline_rounded;
       iconColor = scheme.error;

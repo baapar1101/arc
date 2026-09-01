@@ -13,6 +13,7 @@ import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../widgets/business_subpage_back_leading.dart';
 import '../../widgets/jalali_date_picker.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 DateTime _membershipEndOfLocalDayUtc(DateTime d) {
   final endLocal = DateTime(d.year, d.month, d.day, 23, 59, 59);
@@ -263,7 +264,7 @@ class _UsersPermissionsPageState extends State<UsersPermissionsPage> {
       builder: (context) => AlertDialog(
         title: Row(
           children: [
-            Icon(Icons.warning, color: Colors.orange),
+            Icon(Icons.warning, color: SemanticColorResolver.warning(context)),
             const SizedBox(width: 8),
             Text(t.ownerWarningTitle),
           ],
@@ -286,7 +287,7 @@ class _UsersPermissionsPageState extends State<UsersPermissionsPage> {
       builder: (context) => AlertDialog(
         title: Row(
           children: [
-            Icon(Icons.info, color: Colors.blue),
+            Icon(Icons.info, color: SemanticColorResolver.info(context)),
             const SizedBox(width: 8),
             Text(t.alreadyAddedWarningTitle),
           ],
@@ -847,10 +848,10 @@ class _UsersPermissionsPageState extends State<UsersPermissionsPage> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: Colors.orange.withValues(alpha: 0.1),
+        color: SemanticColorResolver.warning(context).withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: Colors.orange.withValues(alpha: 0.3),
+          color: SemanticColorResolver.warning(context).withValues(alpha: 0.3),
           width: 1,
         ),
       ),
@@ -859,14 +860,14 @@ class _UsersPermissionsPageState extends State<UsersPermissionsPage> {
         children: [
           Icon(
             Icons.star,
-            color: Colors.orange,
+            color: SemanticColorResolver.warning(context),
             size: 12,
           ),
-          const SizedBox(width: 4),
+          SizedBox(width: 4),
           Text(
             AppLocalizations.of(context).owner,
             style: TextStyle(
-              color: Colors.orange.shade700,
+              color: SemanticColorResolver.warning(context),
               fontSize: 11,
               fontWeight: FontWeight.w600,
             ),
@@ -1288,6 +1289,8 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
         'manage': t.distributionPermissionManage,
         'operate': t.distributionPermissionOperate,
         'reports_team': t.distributionPermissionReportsTeam,
+        'settle': t.distributionPermissionSettle,
+        'approve_returns': t.distributionPermissionApproveReturns,
       },
       'payroll': {
         'view': '${t.view} ${t.payrollMenu}',
@@ -2191,6 +2194,10 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
           return t.permissionCrmTeamPerformanceReports;
         }
         return t.distributionPermissionReportsTeam;
+      case 'settle':
+        return t.distributionPermissionSettle;
+      case 'approve_returns':
+        return t.distributionPermissionApproveReturns;
       case 'reports':
         return sectionKey == 'crm' ? t.permissionCrmViewReports : t.reports;
       case 'schedule':

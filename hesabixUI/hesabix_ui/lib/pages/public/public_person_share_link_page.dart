@@ -11,6 +11,7 @@ import '../../models/public_invoice_details.dart';
 import '../../services/public_person_share_service.dart';
 import '../../utils/currency_display_utils.dart';
 import '../../utils/error_extractor.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 class PublicPersonShareLinkPage extends StatefulWidget {
   final String code;
@@ -309,7 +310,7 @@ class _PublicPersonShareLinkPageState extends State<PublicPersonShareLinkPage> {
     Color balanceColor;
     switch (statusText) {
       case 'بستانکار':
-        balanceColor = Colors.green[700] ?? Colors.green;
+        balanceColor = SemanticColorResolver.positive(context);
         break;
       case 'بدهکار':
         balanceColor = theme.colorScheme.error;
@@ -338,7 +339,7 @@ class _PublicPersonShareLinkPageState extends State<PublicPersonShareLinkPage> {
           theme: theme,
           title: 'جمع بستانکار',
           value: formatter.format(summary.totalCredit ?? 0),
-          color: Colors.green[700] ?? theme.colorScheme.primary,
+          color: SemanticColorResolver.positive(context),
         ),
         _summaryCard(
           theme: theme,

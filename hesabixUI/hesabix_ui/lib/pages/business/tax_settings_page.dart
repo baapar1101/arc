@@ -12,6 +12,7 @@ import '../../utils/snackbar_helper.dart';
 import '../../widgets/business_subpage_back_leading.dart';
 import '../../widgets/marketplace/moadian_plugin_gate.dart';
 import 'package:hesabix_ui/services/bytes_export/bytes_export_service.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 class TaxSettingsPage extends StatefulWidget {
   final int businessId;
@@ -231,12 +232,12 @@ class _TaxSettingsPageState extends State<TaxSettingsPage> {
                         ? Icons.gpp_bad
                         : Icons.warning_amber,
                 color: isOk
-                    ? Colors.green
+                    ? SemanticColorResolver.positive(context)
                     : isIdentityIssue
-                        ? Colors.red
-                        : Colors.orange,
+                        ? SemanticColorResolver.negative(context)
+                        : SemanticColorResolver.warning(context),
               ),
-              const SizedBox(width: 8),
+              SizedBox(width: 8),
               Expanded(child: Text(t.taxTestConnectionResultTitle)),
             ],
           ),
@@ -293,12 +294,12 @@ class _TaxSettingsPageState extends State<TaxSettingsPage> {
                     Container(
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
-                        color: Colors.orange.shade100,
+                        color: SemanticColorResolver.warning(context).withValues(alpha: 0.18),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Row(
                         children: [
-                          const Icon(Icons.warning_amber, color: Colors.orange),
+                          Icon(Icons.warning_amber, color: SemanticColorResolver.warning(context)),
                           const SizedBox(width: 8),
                           Expanded(child: Text(t.taxSandboxModeActive)),
                         ],
@@ -362,7 +363,7 @@ class _TaxSettingsPageState extends State<TaxSettingsPage> {
         ? Theme.of(context).colorScheme.error
         : level == 'info'
             ? Theme.of(context).colorScheme.primary
-            : Colors.orange.shade800;
+            : SemanticColorResolver.warning(context);
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: Row(
@@ -434,12 +435,12 @@ class _TaxSettingsPageState extends State<TaxSettingsPage> {
       decoration: BoxDecoration(
         color: hasError
             ? Theme.of(context).colorScheme.errorContainer.withOpacity(0.5)
-            : Colors.orange.shade50,
+            : SemanticColorResolver.warning(context).withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
           color: hasError
               ? Theme.of(context).colorScheme.error
-              : Colors.orange.shade300,
+              : SemanticColorResolver.warning(context).withValues(alpha: 0.5),
         ),
       ),
       child: Column(
@@ -451,7 +452,7 @@ class _TaxSettingsPageState extends State<TaxSettingsPage> {
                 hasError ? Icons.gpp_bad : Icons.warning_amber,
                 color: hasError
                     ? Theme.of(context).colorScheme.error
-                    : Colors.orange.shade800,
+                    : SemanticColorResolver.warning(context),
               ),
               const SizedBox(width: 8),
               Text(

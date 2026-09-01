@@ -13,6 +13,7 @@ import '../../utils/general_barcode_utils.dart';
 import '../../utils/error_extractor.dart';
 import '../../services/marketplace_service.dart';
 import '../barcode_label/label_print_job_dialog.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 class ProductFormDialog extends StatefulWidget {
   final int businessId;
@@ -305,15 +306,15 @@ class _ProductFormDialogState extends State<ProductFormDialog> {
       margin: const EdgeInsets.only(top: 16),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.red.shade50,
-        border: Border.all(color: Colors.red.shade200),
+        color: SemanticColorResolver.negative(context).withValues(alpha: 0.12),
+        border: Border.all(color: SemanticColorResolver.negative(context).withValues(alpha: 0.35)),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(Icons.error_outline, color: Colors.red.shade600, size: 20),
-          const SizedBox(width: 8),
+          Icon(Icons.error_outline, color: SemanticColorResolver.negative(context), size: 20),
+          SizedBox(width: 8),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -321,16 +322,16 @@ class _ProductFormDialogState extends State<ProductFormDialog> {
                 Text(
                   'خطا',
                   style: TextStyle(
-                    color: Colors.red.shade900,
+                    color: SemanticColorResolver.negative(context),
                     fontWeight: FontWeight.bold,
                     fontSize: 14,
                   ),
                 ),
-                const SizedBox(height: 4),
+                SizedBox(height: 4),
                 Text(
                   _controller.errorMessage!,
                   style: TextStyle(
-                    color: Colors.red.shade700,
+                    color: SemanticColorResolver.negative(context),
                     fontSize: 13,
                   ),
                 ),
@@ -338,8 +339,8 @@ class _ProductFormDialogState extends State<ProductFormDialog> {
             ),
           ),
           IconButton(
-            icon: const Icon(Icons.close, size: 18),
-            color: Colors.red.shade600,
+            icon: Icon(Icons.close, size: 18),
+            color: SemanticColorResolver.negative(context),
             padding: EdgeInsets.zero,
             constraints: const BoxConstraints(),
             onPressed: () {

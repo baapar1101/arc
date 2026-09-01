@@ -5,6 +5,7 @@ import 'package:hesabix_ui/models/email_models.dart';
 import 'package:hesabix_ui/services/email_service.dart';
 import 'package:hesabix_ui/utils/number_normalizer.dart';
 import '../../utils/error_extractor.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 class EmailSettingsPage extends StatefulWidget {
   const EmailSettingsPage({super.key});
@@ -472,7 +473,7 @@ class _EmailSettingsPageState extends State<EmailSettingsPage> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
-        backgroundColor: Colors.red,
+        backgroundColor: SemanticColorResolver.negative(context),
       ),
     );
   }
@@ -481,7 +482,7 @@ class _EmailSettingsPageState extends State<EmailSettingsPage> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
-        backgroundColor: Colors.green,
+        backgroundColor: SemanticColorResolver.positive(context),
       ),
     );
   }
@@ -551,23 +552,23 @@ class _EmailSettingsPageState extends State<EmailSettingsPage> {
       child: ListTile(
         leading: Icon(
           config.isActive ? Icons.email : Icons.email_outlined,
-          color: config.isActive ? Colors.green : colorScheme.onSurface.withValues(alpha: 0.6),
+          color: config.isActive ? SemanticColorResolver.positive(context) : colorScheme.onSurface.withValues(alpha: 0.6),
         ),
         title: Row(
           children: [
             Text(config.name),
             if (config.isDefault) ...[
-              const SizedBox(width: 8),
+              SizedBox(width: 8),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
-                  color: Colors.blue.withValues(alpha: 0.1),
+                  color: SemanticColorResolver.info(context).withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
                   t.currentDefault,
                   style: TextStyle(
-                    color: Colors.blue,
+                    color: SemanticColorResolver.info(context),
                     fontSize: 10,
                     fontWeight: FontWeight.w500,
                   ),
@@ -584,13 +585,13 @@ class _EmailSettingsPageState extends State<EmailSettingsPage> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: Colors.green.withValues(alpha: 0.1),
+                  color: SemanticColorResolver.positive(context).withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
                   t.active,
                   style: TextStyle(
-                    color: Colors.green,
+                    color: SemanticColorResolver.positive(context),
                     fontSize: 12,
                     fontWeight: FontWeight.w500,
                   ),
@@ -770,7 +771,7 @@ class _EmailSettingsPageState extends State<EmailSettingsPage> {
                   ),
                 ],
               ),
-              const SizedBox(height: 16),
+              SizedBox(height: 16),
               Row(
                 children: [
                   Checkbox(
@@ -813,10 +814,10 @@ class _EmailSettingsPageState extends State<EmailSettingsPage> {
                       child: ElevatedButton(
                         onPressed: _isTesting ? null : _testConnection,
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.blue,
+                          backgroundColor: SemanticColorResolver.info(context),
                         ),
                         child: _isTesting
-                            ? const SizedBox(
+                            ? SizedBox(
                                 width: 20,
                                 height: 20,
                                 child: CircularProgressIndicator(strokeWidth: 2),
@@ -829,7 +830,7 @@ class _EmailSettingsPageState extends State<EmailSettingsPage> {
                       child: ElevatedButton(
                         onPressed: _sendTestEmail,
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.green,
+                          backgroundColor: SemanticColorResolver.positive(context),
                         ),
                         child: Text(t.sendTestEmail),
                       ),

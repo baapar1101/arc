@@ -10,6 +10,7 @@ import 'package:hesabix_ui/core/calendar_controller.dart';
 import 'package:hesabix_ui/services/support_service.dart';
 import 'package:hesabix_ui/models/support_models.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
+import 'package:hesabix_ui/utils/snackbar_helper.dart';
 import 'package:hesabix_ui/widgets/support/ticket_details_dialog.dart';
 import 'package:hesabix_ui/services/support_realtime_service.dart';
 import 'package:hesabix_ui/widgets/support/operator_command_palette.dart';
@@ -193,14 +194,16 @@ class _OperatorTicketsPageState extends State<OperatorTicketsPage> {
         _refreshCounter++;
       });
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('${result['updated_count']} تیکت به شما تخصیص داده شد'), backgroundColor: Colors.green),
+        SnackBarHelper.showSuccess(
+          context,
+          message: '${result['updated_count']} تیکت به شما تخصیص داده شد',
         );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(ErrorExtractor.forContext(e, context)), backgroundColor: Colors.red),
+        SnackBarHelper.showError(
+          context,
+          message: ErrorExtractor.forContext(e, context),
         );
       }
     }
@@ -228,14 +231,16 @@ class _OperatorTicketsPageState extends State<OperatorTicketsPage> {
         _refreshCounter++;
       });
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('${result['updated_count']} تیکت حل‌شده شد'), backgroundColor: Colors.green),
+        SnackBarHelper.showSuccess(
+          context,
+          message: '${result['updated_count']} تیکت حل‌شده شد',
         );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(ErrorExtractor.forContext(e, context)), backgroundColor: Colors.red),
+        SnackBarHelper.showError(
+          context,
+          message: ErrorExtractor.forContext(e, context),
         );
       }
     }
@@ -274,8 +279,9 @@ class _OperatorTicketsPageState extends State<OperatorTicketsPage> {
     } catch (e) {
       _safeSetState(() => _selectedTicketLoading = false);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(ErrorExtractor.forContext(e, context)), backgroundColor: Colors.red),
+        SnackBarHelper.showError(
+          context,
+          message: ErrorExtractor.forContext(e, context),
         );
       }
     }
@@ -316,8 +322,9 @@ class _OperatorTicketsPageState extends State<OperatorTicketsPage> {
       });
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(ErrorExtractor.forContext(e, context)), backgroundColor: Colors.red),
+        SnackBarHelper.showError(
+          context,
+          message: ErrorExtractor.forContext(e, context),
         );
       }
     }

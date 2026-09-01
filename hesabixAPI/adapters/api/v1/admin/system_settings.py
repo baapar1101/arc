@@ -397,6 +397,11 @@ class SystemConfigurationPayload(BaseModel):
 	app_version: str | None = None
 	default_language: str | None = None
 	default_theme: str | None = None
+	default_theme_id: str | None = Field(
+		default=None,
+		description="شناسه پالت رنگی پیش‌فرض: classic_blue | turquoise_sea | emerald_forest | warm_copper",
+		max_length=64,
+	)
 	default_timezone: str | None = Field(
 		default=None,
 		description="نام منطقهٔ زمانی IANA برای نمایش تاریخ/زمان در کل سیستم (مثال Asia/Tehran)",
@@ -495,6 +500,7 @@ def set_system_configuration_endpoint(
 		app_version=payload.app_version,
 		default_language=payload.default_language,
 		default_theme=payload.default_theme,
+		default_theme_id=payload.default_theme_id,
 		default_timezone=payload.default_timezone,
 		enable_registration=payload.enable_registration,
 		enable_email_verification=payload.enable_email_verification,

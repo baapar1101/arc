@@ -20,6 +20,7 @@ import '../../utils/responsive_helper.dart';
 import '../../constants/frequent_description_scope.dart';
 import '../../widgets/inputs/frequent_description_text_field.dart';
 import '../../utils/error_extractor.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 class ExpenseIncomePage extends StatefulWidget {
   final int businessId;
@@ -255,9 +256,9 @@ class _ExpenseIncomePageState extends State<ExpenseIncomePage> {
                           runSpacing: 8,
                           crossAxisAlignment: WrapCrossAlignment.center,
                           children: [
-                            _chip('جمع اقلام', _sumItems()),
-                            _chip('جمع طرف‌حساب', _sumTxs()),
-                            _chip('اختلاف', (_docType == 'income' ? _sumTxs() - _sumItems() : _sumItems() - _sumTxs()), isError: _sumItems() != _sumTxs()),
+                            _chip(context, 'جمع اقلام', _sumItems()),
+                            _chip(context, 'جمع طرف‌حساب', _sumTxs()),
+                            _chip(context, 'اختلاف', (_docType == 'income' ? _sumTxs() - _sumItems() : _sumItems() - _sumTxs()), isError: _sumItems() != _sumTxs()),
                           ],
                         ),
                         Padding(
@@ -683,10 +684,10 @@ class _TxLine {
   }
 }
 
-Widget _chip(String label, double value, {bool isError = false}) {
+Widget _chip(BuildContext context, String label, double value, {bool isError = false}) {
   return Chip(
     label: Text('$label: ${formatWithThousands(value)}'),
-    backgroundColor: isError ? Colors.red.shade100 : Colors.grey.shade200,
+    backgroundColor: isError ? SemanticColorResolver.negative(context).withValues(alpha: 0.18) : Colors.grey.shade200,
   );
 }
 

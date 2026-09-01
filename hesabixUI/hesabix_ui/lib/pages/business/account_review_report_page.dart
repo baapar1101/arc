@@ -14,6 +14,7 @@ import '../../utils/snackbar_helper.dart';
 
 import 'package:hesabix_ui/services/bytes_export/bytes_export_service.dart';
 import 'package:hesabix_ui/core/hesabix_back.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 class AccountReviewReportPage extends StatefulWidget {
   final int businessId;
@@ -574,8 +575,8 @@ class _AccountReviewReportPageState extends State<AccountReviewReportPage> {
                 value: 'excel',
                 child: Row(
                   children: [
-                    Icon(Icons.table_chart, color: Colors.green[600]),
-                    const SizedBox(width: 8),
+                    Icon(Icons.table_chart, color: SemanticColorResolver.positive(context)),
+                    SizedBox(width: 8),
                     Text(t.exportToExcel),
                   ],
                 ),
@@ -584,7 +585,7 @@ class _AccountReviewReportPageState extends State<AccountReviewReportPage> {
                 value: 'pdf',
                 child: Row(
                   children: [
-                    Icon(Icons.picture_as_pdf, color: Colors.red[600]),
+                    Icon(Icons.picture_as_pdf, color: SemanticColorResolver.negative(context)),
                     const SizedBox(width: 8),
                     Text(t.exportToPdf),
                   ],
@@ -1172,9 +1173,9 @@ class _AccountReviewReportPageState extends State<AccountReviewReportPage> {
                                                       textAlign: TextAlign.center,
                                                       style: TextStyle(
                                                         color: (detail['balance_type']?.toString() == 'debit')
-                                                            ? Colors.blue
+                                                            ? SemanticColorResolver.info(context)
                                                             : (detail['balance_type']?.toString() == 'credit')
-                                                                ? Colors.orange
+                                                                ? SemanticColorResolver.warning(context)
                                                                 : null,
                                                       ),
                                                     )),

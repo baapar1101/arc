@@ -21,6 +21,7 @@ import 'package:hesabix_ui/widgets/support/user_support_inbox_sidebar.dart';
 import 'package:hesabix_ui/widgets/support/user_support_tab_bar.dart';
 import 'package:hesabix_ui/widgets/support/user_support_types.dart';
 import 'create_ticket_page.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 class SupportPage extends StatefulWidget {
   final CalendarController? calendarController;
@@ -612,16 +613,16 @@ class _SupportPageState extends State<SupportPage> with WidgetsBindingObserver {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('حذف فیلتر'),
+        title: Text('حذف فیلتر'),
         content: Text('آیا مطمئن هستید که می‌خواهید فیلتر "$filterName" را حذف کنید؟'),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('لغو'),
+            child: Text('لغو'),
           ),
           ElevatedButton(
             onPressed: () => Navigator.of(context).pop(true),
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            style: ElevatedButton.styleFrom(backgroundColor: SemanticColorResolver.negative(context)),
             child: const Text('حذف'),
           ),
         ],

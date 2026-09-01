@@ -13,6 +13,7 @@ import 'package:hesabix_ui/utils/responsive_helper.dart';
 import 'package:hesabix_ui/widgets/project/project_form_dialog.dart';
 import 'package:hesabix_ui/widgets/business_subpage_back_leading.dart';
 import 'package:hesabix_ui/services/list_filter_preferences_service.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 /// صفحه لیست پروژه‌ها
 class ProjectsPage extends StatefulWidget {
@@ -241,16 +242,16 @@ class _ProjectsPageState extends State<ProjectsPage> {
             Color color;
             switch (status) {
               case 'active':
-                color = Colors.green;
+                color = SemanticColorResolver.positive(context);
                 break;
               case 'completed':
-                color = Colors.blue;
+                color = SemanticColorResolver.info(context);
                 break;
               case 'on_hold':
-                color = Colors.orange;
+                color = SemanticColorResolver.warning(context);
                 break;
               case 'cancelled':
-                color = Colors.red;
+                color = SemanticColorResolver.negative(context);
                 break;
               default:
                 color = Colors.grey;
@@ -485,17 +486,17 @@ class _ProjectsPageState extends State<ProjectsPage> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('حذف پروژه'),
+        title: Text('حذف پروژه'),
         content: Text('آیا از حذف پروژه "$projectName" اطمینان دارید؟'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('انصراف'),
+            child: Text('انصراف'),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
+              backgroundColor: SemanticColorResolver.negative(context),
               foregroundColor: Colors.white,
             ),
             child: const Text('حذف'),
@@ -525,17 +526,17 @@ class _ProjectsPageState extends State<ProjectsPage> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('حذف گروهی'),
+        title: Text('حذف گروهی'),
         content: Text('آیا از حذف ${selectedItems.length} پروژه اطمینان دارید؟'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('انصراف'),
+            child: Text('انصراف'),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
+              backgroundColor: SemanticColorResolver.negative(context),
               foregroundColor: Colors.white,
             ),
             child: const Text('حذف همه'),

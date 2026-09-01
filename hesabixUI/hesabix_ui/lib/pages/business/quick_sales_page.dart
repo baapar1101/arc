@@ -47,6 +47,7 @@ import '../../widgets/barcode/web_barcode_scan_screen.dart';
 import '../../utils/general_barcode_utils.dart';
 import '../../utils/responsive_helper.dart';
 import 'package:hesabix_ui/services/bytes_export/bytes_export_service.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 /// کد کسب‌وکاری برای نمایش در فروش سریع: اگر [code] با [id] یکی باشد، از `product_code`، `tax_code` یا اولین بارکد عمومی استفاده می‌شود.
 String? _quickSalesDisplayProductBusinessCode(Map<String, dynamic> p) {
@@ -4523,7 +4524,7 @@ class _QuickSalesPageState extends State<QuickSalesPage>
           hintText: compact
               ? 'کد، نام یا بارکد'
               : 'اسکن یا وارد کردن بارکد، کد یا نام',
-          prefixIcon: compact ? null : const Icon(Icons.qr_code_scanner),
+          prefixIcon: compact ? null : Icon(Icons.qr_code_scanner),
           isDense: compact,
           border: const OutlineInputBorder(),
           suffixIconConstraints: BoxConstraints(
@@ -4547,7 +4548,7 @@ class _QuickSalesPageState extends State<QuickSalesPage>
                 ),
               if (_canCreateProducts)
                 IconButton(
-                  icon: const Icon(Icons.add),
+                  icon: Icon(Icons.add),
                   tooltip: 'افزودن کالای جدید',
                   onPressed: () => _openAddProductDialog(),
                   visualDensity: compact
@@ -4567,7 +4568,7 @@ class _QuickSalesPageState extends State<QuickSalesPage>
                   _lastFailedSearchQuery != null &&
                   _lastFailedSearchQuery!.isNotEmpty)
                 IconButton(
-                  icon: const Icon(Icons.add_circle, color: Colors.green),
+                  icon: Icon(Icons.add_circle, color: SemanticColorResolver.positive(context)),
                   tooltip: 'افزودن کالای جدید: $_lastFailedSearchQuery',
                   onPressed: () =>
                       _openAddProductDialog(presetName: _lastFailedSearchQuery),

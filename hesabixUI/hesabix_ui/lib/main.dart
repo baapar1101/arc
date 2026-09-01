@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:go_router/go_router.dart';
@@ -401,6 +403,11 @@ class _MyAppState extends State<MyApp> {
     ApiClient.bindAuthStore(authStore);
     await authStore.load();
     if (!mounted) return;
+    // پس از در دسترس بودن کلید API، تم ذخیره‌شده کاربر را هم‌گام کن
+    if (authStore.apiKey != null && authStore.apiKey!.isNotEmpty) {
+      await themeController.syncFromServerAfterLogin();
+    }
+    if (!mounted) return;
     setState(() => _authStore = authStore);
     _reportInitProgress(AppInitPhase.auth);
 
@@ -421,6 +428,17 @@ class _MyAppState extends State<MyApp> {
 
     _themeController!.addListener(() {
       setState(() {});
+    });
+
+    String? lastThemeSyncApiKey = _authStore!.apiKey;
+    _authStore!.addListener(() {
+      final key = _authStore!.apiKey;
+      if (key != null && key.isNotEmpty && key != lastThemeSyncApiKey) {
+        lastThemeSyncApiKey = key;
+        unawaited(_themeController!.syncFromServerAfterLogin());
+      } else if (key == null || key.isEmpty) {
+        lastThemeSyncApiKey = null;
+      }
     });
 
     // AuthStore changes must NOT call setState here: that rebuilt MyApp and
@@ -855,6 +873,21 @@ class _MyAppState extends State<MyApp> {
       return MaterialApp.router(
         title: 'Hesabix',
         routerConfig: loadingRouter,
+        theme: _themeController == null
+            ? null
+            : AppTheme.build(
+                isDark: false,
+                locale: _controller?.locale ?? const Locale('fa'),
+                themeDef: _themeController!.themeDefinition,
+              ),
+        darkTheme: _themeController == null
+            ? null
+            : AppTheme.build(
+                isDark: true,
+                locale: _controller?.locale ?? const Locale('fa'),
+                themeDef: _themeController!.themeDefinition,
+              ),
+        themeMode: _themeController?.mode ?? ThemeMode.system,
         locale: _controller?.locale ?? const Locale('fa'),
         supportedLocales: const [Locale('en'), Locale('fa')],
         localizationsDelegates: const [
@@ -1362,7 +1395,9 @@ class _MyAppState extends State<MyApp> {
             GoRoute(
               path: '/user/profile/appearance-settings',
               name: 'profile_appearance_settings',
-              builder: (context, state) => const AppearanceSettingsPage(),
+              builder: (context, state) => AppearanceSettingsPage(
+                themeController: themeController,
+              ),
             ),
             GoRoute(
               path: '/user/profile/marketing',
@@ -5774,12 +5809,12 @@ class _MyAppState extends State<MyApp> {
               theme: AppTheme.build(
                 isDark: false,
                 locale: controller.locale,
-                seed: themeController.seedColor,
+                themeDef: themeController.themeDefinition,
               ),
               darkTheme: AppTheme.build(
                 isDark: true,
                 locale: controller.locale,
-                seed: themeController.seedColor,
+                themeDef: themeController.themeDefinition,
               ),
               themeMode: themeController.mode,
               routerConfig: _router!,

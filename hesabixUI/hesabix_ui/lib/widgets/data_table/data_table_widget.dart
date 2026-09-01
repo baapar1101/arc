@@ -25,6 +25,7 @@ import '../../utils/error_extractor.dart';
 import '../../utils/responsive_helper.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../core/hesabix_back.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 /// مقایسهٔ مقدارمحور [additionalParams] تا با rebuild والد که هر بار Map جدید می‌سازد،
 /// بارگذاری بی‌دلیل تکرار نشود؛ فقط وقتی محتوا عوض شده باشد refetch می‌شود.
@@ -2308,8 +2309,8 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
                 value: 'refresh',
                 child: Row(
                   children: [
-                    const Icon(Icons.refresh, size: 20),
-                    const SizedBox(width: 8),
+                    Icon(Icons.refresh, size: 20),
+                    SizedBox(width: 8),
                     Text(t.refresh),
                   ],
                 ),
@@ -2321,8 +2322,8 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
                 enabled: !_isExporting,
                 child: Row(
                   children: [
-                    Icon(Icons.table_chart, size: 20, color: Colors.green[700]),
-                    const SizedBox(width: 8),
+                    Icon(Icons.table_chart, size: 20, color: SemanticColorResolver.positive(context)),
+                    SizedBox(width: 8),
                     Text(t.exportToExcel),
                     const SizedBox(width: 6),
                     Text('(${t.exportAll})', style: theme.textTheme.bodySmall),
@@ -2338,9 +2339,9 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
                       Icon(
                         Icons.table_chart_outlined,
                         size: 20,
-                        color: Colors.green[700],
+                        color: SemanticColorResolver.positive(context),
                       ),
-                      const SizedBox(width: 8),
+                      SizedBox(width: 8),
                       Text(t.exportToExcel),
                       const SizedBox(width: 6),
                       Text(
@@ -2361,9 +2362,9 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
                     Icon(
                       Icons.picture_as_pdf,
                       size: 20,
-                      color: Colors.red[700],
+                      color: SemanticColorResolver.negative(context),
                     ),
-                    const SizedBox(width: 8),
+                    SizedBox(width: 8),
                     Text(t.exportToPdf),
                     const SizedBox(width: 6),
                     Text('(${t.exportAll})', style: theme.textTheme.bodySmall),
@@ -2379,7 +2380,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
                       Icon(
                         Icons.picture_as_pdf_outlined,
                         size: 20,
-                        color: Colors.red[700],
+                        color: SemanticColorResolver.negative(context),
                       ),
                       const SizedBox(width: 8),
                       Text(t.exportToPdf),
@@ -2622,12 +2623,12 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
                       color: theme.colorScheme.onSurfaceVariant,
                     ),
                   ),
-                  const SizedBox(height: 8),
+                  SizedBox(height: 8),
                   if (widget.config.excelEndpoint != null)
                     ListTile(
                       leading: Icon(
                         Icons.table_chart,
-                        color: Colors.green[700],
+                        color: SemanticColorResolver.positive(context),
                       ),
                       title: Text(t.exportToExcel),
                       subtitle: Text(t.exportAll),
@@ -2644,7 +2645,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
                     ListTile(
                       leading: Icon(
                         Icons.table_chart_outlined,
-                        color: Colors.green[700],
+                        color: SemanticColorResolver.positive(context),
                       ),
                       title: Text(t.exportToExcel),
                       subtitle: Text(t.exportSelected),
@@ -2659,7 +2660,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
                     ListTile(
                       leading: Icon(
                         Icons.picture_as_pdf,
-                        color: Colors.red[700],
+                        color: SemanticColorResolver.negative(context),
                       ),
                       title: Text(t.exportToPdf),
                       subtitle: Text(t.exportAll),
@@ -2676,7 +2677,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
                     ListTile(
                       leading: Icon(
                         Icons.picture_as_pdf_outlined,
-                        color: Colors.red[700],
+                        color: SemanticColorResolver.negative(context),
                       ),
                       title: Text(t.exportToPdf),
                       subtitle: Text(t.exportSelected),
@@ -2949,7 +2950,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
                                     });
                                     ensureTemplatesLoaded();
                                   },
-                            icon: const Icon(Icons.refresh),
+                            icon: Icon(Icons.refresh),
                           ),
                         ],
                       ),
@@ -2961,7 +2962,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
                 // Excel options
                 if (widget.config.excelEndpoint != null) ...[
                   ListTile(
-                    leading: Icon(Icons.table_chart, color: Colors.green[600]),
+                    leading: Icon(Icons.table_chart, color: SemanticColorResolver.positive(context)),
                     title: Text(t.exportToExcel),
                     subtitle: Text(t.exportAll),
                     onTap: () {
@@ -2992,7 +2993,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
                     const Divider(height: 1),
 
                   ListTile(
-                    leading: Icon(Icons.picture_as_pdf, color: Colors.red[600]),
+                    leading: Icon(Icons.picture_as_pdf, color: SemanticColorResolver.negative(context)),
                     title: Text(t.exportToPdf),
                     subtitle: Text(t.exportAll),
                     onTap: () {

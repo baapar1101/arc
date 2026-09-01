@@ -59,6 +59,7 @@ SYSTEM_CONFIG_APP_NAME = "system_config_app_name"
 SYSTEM_CONFIG_APP_VERSION = "system_config_app_version"
 SYSTEM_CONFIG_DEFAULT_LANGUAGE = "system_config_default_language"
 SYSTEM_CONFIG_DEFAULT_THEME = "system_config_default_theme"
+SYSTEM_CONFIG_DEFAULT_THEME_ID = "system_config_default_theme_id"
 # منطقهٔ زمانی IANA برای نمایش تاریخ/زمان در API (قرارداد: مقادیر naive در DB = UTC)
 SYSTEM_CONFIG_DEFAULT_TIMEZONE = "system_config_default_timezone"
 SYSTEM_CONFIG_ENABLE_REGISTRATION = "system_config_enable_registration"
@@ -795,6 +796,27 @@ def get_default_theme(db: Session) -> str:
 	return (default_theme.value_string if default_theme and default_theme.value_string else "system")
 
 
+_ALLOWED_COLOR_THEME_IDS = frozenset({"classic_blue", "turquoise_sea", "emerald_forest", "warm_copper"})
+
+
+def get_default_theme_id(db: Session) -> str:
+	"""شناسه پالت رنگی پیش‌فرض سیستم."""
+	row = _get_setting(db, SYSTEM_CONFIG_DEFAULT_THEME_ID)
+	value = (row.value_string if row and row.value_string else "classic_blue").strip().lower()
+	if value not in _ALLOWED_COLOR_THEME_IDS:
+		return "classic_blue"
+	return value
+
+
+def theme_public_config_dict(db: Session) -> Dict[str, Any]:
+	"""تنظیمات تم قابل‌دسترسی برای همه (مهمان/کاربر) بدون دسترسی ادمین."""
+	return {
+		"default_theme": get_default_theme(db),
+		"default_theme_id": get_default_theme_id(db),
+		"available_theme_ids": sorted(_ALLOWED_COLOR_THEME_IDS),
+	}
+
+
 def validate_iana_timezone_name(name: str) -> str:
 	"""نام IANA را اعتبارسنجی می‌کند؛ در صورت نامعتبر بودن Asia/Tehran برمی‌گرداند."""
 	from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
@@ -938,6 +960,7 @@ def get_system_configuration(db: Session) -> Dict[str, Any]:
 		"app_version": (app_version.value_string if app_version and app_version.value_string else env.app_version),
 		"default_language": (default_language.value_string if default_language and default_language.value_string else "fa"),
 		"default_theme": (default_theme.value_string if default_theme and default_theme.value_string else "system"),
+		"default_theme_id": get_default_theme_id(db),
 		"default_timezone": resolve_system_display_timezone_string(db),
 		"enable_registration": (enable_registration if enable_registration is not None else True),
 		"enable_email_verification": (enable_email_verification if enable_email_verification is not None else True),
@@ -990,6 +1013,7 @@ def set_system_configuration(
 	app_version: str | None = None,
 	default_language: str | None = None,
 	default_theme: str | None = None,
+	default_theme_id: str | None = None,
 	default_timezone: str | None = None,
 	enable_registration: bool | None = None,
 	enable_email_verification: bool | None = None,
@@ -1068,6 +1092,16 @@ def set_system_configuration(
 		if default_theme not in {"system", "light", "dark"}:
 			raise ApiError("INVALID_THEME", "تم باید system، light یا dark باشد", http_status=400)
 		_upsert_setting_string(db, SYSTEM_CONFIG_DEFAULT_THEME, default_theme)
+
+	if default_theme_id is not None:
+		theme_id = str(default_theme_id).strip().lower()
+		if theme_id not in _ALLOWED_COLOR_THEME_IDS:
+			raise ApiError(
+				"INVALID_THEME_ID",
+				"شناسه تم رنگی معتبر نیست",
+				http_status=400,
+			)
+		_upsert_setting_string(db, SYSTEM_CONFIG_DEFAULT_THEME_ID, theme_id)
 
 	if default_timezone is not None:
 		from zoneinfo import ZoneInfo, ZoneInfoNotFoundError

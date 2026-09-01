@@ -17,6 +17,7 @@ import '../../core/api_client.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../utils/responsive_helper.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 class PersonFormDialog extends StatefulWidget {
   final int businessId;
@@ -1231,9 +1232,9 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
           children: [
             Text(
               t.personOpeningBalanceSectionTitle,
-              style: const TextStyle(fontWeight: FontWeight.bold),
+              style: TextStyle(fontWeight: FontWeight.bold),
             ),
-            const SizedBox(height: 8),
+            SizedBox(height: 8),
             if (loading)
               const Padding(
                 padding: EdgeInsets.symmetric(vertical: 8),
@@ -1250,8 +1251,8 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
                 margin: const EdgeInsets.only(bottom: 12),
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.orange.shade50,
-                  border: Border.all(color: Colors.orange.shade200),
+                  color: SemanticColorResolver.warning(context).withValues(alpha: 0.12),
+                  border: Border.all(color: SemanticColorResolver.warning(context).withValues(alpha: 0.35)),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Row(
@@ -1260,14 +1261,14 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
                     Icon(
                       Icons.lock_outline,
                       size: 18,
-                      color: Colors.orange.shade800,
+                      color: SemanticColorResolver.warning(context),
                     ),
-                    const SizedBox(width: 8),
+                    SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         readonlyWarning,
                         style: TextStyle(
-                          color: Colors.orange.shade900,
+                          color: SemanticColorResolver.warning(context),
                           fontSize: 13,
                           height: 1.35,
                         ),
@@ -2379,7 +2380,7 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
                 ),
                 IconButton(
                   onPressed: () => _removeSocialRow(index),
-                  icon: const Icon(Icons.delete, color: Colors.red),
+                  icon: Icon(Icons.delete, color: SemanticColorResolver.negative(context)),
                 ),
               ],
             ),
@@ -2497,7 +2498,7 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
                     alignment: Alignment.centerLeft,
                     child: IconButton(
                       onPressed: () => _removeBankAccount(index),
-                      icon: const Icon(Icons.delete, color: Colors.red),
+                      icon: Icon(Icons.delete, color: SemanticColorResolver.negative(context)),
                     ),
                   ),
                 ],
@@ -2517,7 +2518,7 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
                   SizedBox(width: spacing),
                   IconButton(
                     onPressed: () => _removeBankAccount(index),
-                    icon: const Icon(Icons.delete, color: Colors.red),
+                    icon: Icon(Icons.delete, color: SemanticColorResolver.negative(context)),
                   ),
                 ],
               ),

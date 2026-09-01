@@ -5,6 +5,7 @@ import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/models/support_models.dart';
 import 'package:hesabix_ui/widgets/support/sla_indicator.dart';
 import 'package:hesabix_ui/widgets/support/support_semantic_colors.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 /// Dense inbox row for operator ticket lists (Zendesk/Gmail-style, ~52–64px).
 class OperatorTicketListItem extends StatelessWidget {
@@ -46,35 +47,56 @@ class OperatorTicketListItem extends StatelessWidget {
     return l10n.justNow;
   }
 
-  Color _statusColor(SupportStatus status, ThemeData theme) {
+  Color _statusColor(SupportStatus status, BuildContext context, ThemeData theme) {
     if (status.color != null) {
       try {
         return Color(int.parse(status.color!.replaceFirst('#', '0xFF')));
       } catch (_) {}
     }
-    return switch (status.name.toLowerCase()) {
-      'باز' => Colors.blue,
-      'در حال پیگیری' => Colors.purple,
-      'در انتظار کاربر' => Colors.cyan,
-      'بسته' => Colors.grey,
-      'حل شده' => Colors.green,
-      _ => theme.colorScheme.primary,
-    };
+    final semantics = SemanticColorResolver.of(context);
+    switch (status.name.toLowerCase()) {
+      case 'باز':
+      case 'open':
+        return semantics.info;
+      case 'در حال پیگیری':
+      case 'in progress':
+        return theme.colorScheme.tertiary;
+      case 'در انتظار کاربر':
+      case 'waiting':
+        return semantics.warning;
+      case 'بسته':
+      case 'closed':
+        return theme.colorScheme.outline;
+      case 'حل شده':
+      case 'resolved':
+        return semantics.positive;
+      default:
+        return theme.colorScheme.primary;
+    }
   }
 
-  Color _priorityColor(SupportPriority priority, ThemeData theme) {
+  Color _priorityColor(SupportPriority priority, BuildContext context, ThemeData theme) {
     if (priority.color != null) {
       try {
         return Color(int.parse(priority.color!.replaceFirst('#', '0xFF')));
       } catch (_) {}
     }
-    return switch (priority.name.toLowerCase()) {
-      'کم' => Colors.green,
-      'متوسط' => Colors.orange,
-      'بالا' => Colors.red,
-      'فوری' => Colors.red.shade800,
-      _ => theme.colorScheme.primary,
-    };
+    final semantics = SemanticColorResolver.of(context);
+    switch (priority.name.toLowerCase()) {
+      case 'کم':
+      case 'low':
+        return semantics.positive;
+      case 'متوسط':
+      case 'medium':
+        return semantics.warning;
+      case 'بالا':
+      case 'high':
+      case 'فوری':
+      case 'urgent':
+        return semantics.negative;
+      default:
+        return theme.colorScheme.primary;
+    }
   }
 
   @override
@@ -91,7 +113,7 @@ class OperatorTicketListItem extends StatelessWidget {
         ? SupportUser.fromJson(Map<String, dynamic>.from(userMap)).displayName
         : '';
     final slaStatus = slaStatusFromRow(row);
-    final slaSide = slaRowBorderSide(slaStatus);
+    final slaSide = slaRowBorderSide(context, slaStatus);
     final activityAt = ticket?.lastActivityAt ?? DateTime.now();
     final showCheckbox = onToggleSelect != null && isChecked != null;
     final sub = ticket?.supportSubscription ??
@@ -234,7 +256,7 @@ class OperatorTicketListItem extends StatelessWidget {
                           ),
                         ),
                         if (ticket?.status != null) ...[
-                          _CompactStatus(status: ticket!.status!, color: _statusColor(ticket.status!, theme)),
+                          _CompactStatus(status: ticket!.status!, color: _statusColor(ticket.status!, context, theme)),
                           const SizedBox(width: 6),
                         ],
                         if (ticket?.priority != null)
@@ -243,7 +265,7 @@ class OperatorTicketListItem extends StatelessWidget {
                             child: Icon(
                               Icons.flag,
                               size: 13,
-                              color: _priorityColor(ticket.priority!, theme),
+                              color: _priorityColor(ticket.priority!, context, theme),
                             ),
                           ),
                         if (ticket?.priority != null) const SizedBox(width: 4),

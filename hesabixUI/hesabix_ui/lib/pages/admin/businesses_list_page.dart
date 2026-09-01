@@ -12,6 +12,7 @@ import '../../core/api_client.dart';
 import '../../services/document_monetization_service.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 class BusinessesListPage extends StatefulWidget {
   const BusinessesListPage({super.key});
@@ -208,13 +209,13 @@ class _BusinessesListPageState extends State<BusinessesListPage> {
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                       decoration: BoxDecoration(
-                        color: Colors.orange.shade100,
+                        color: SemanticColorResolver.warning(context).withValues(alpha: 0.18),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
                         'در حال حذف',
                         style: TextStyle(
-                          color: Colors.orange.shade900,
+                          color: SemanticColorResolver.warning(context),
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
                         ),
@@ -228,13 +229,13 @@ class _BusinessesListPageState extends State<BusinessesListPage> {
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
-                      color: Colors.green.shade100,
+                      color: SemanticColorResolver.positive(context).withValues(alpha: 0.18),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(
                       'فعال',
                       style: TextStyle(
-                        color: Colors.green.shade900,
+                        color: SemanticColorResolver.positive(context),
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
                       ),
@@ -270,9 +271,9 @@ class _BusinessesListPageState extends State<BusinessesListPage> {
             final isDeleted = item['is_deleted'] as bool? ?? false;
             if (isDeleted) {
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
+                SnackBar(
                   content: Text('این کسب و کار حذف شده است و نمی‌توان به آن دسترسی داشت. می‌توانید آن را بازیابی کنید.'),
-                  backgroundColor: Colors.orange,
+                  backgroundColor: SemanticColorResolver.warning(context),
                 ),
               );
               return;
@@ -337,7 +338,7 @@ class _BusinessDetailsDialogState extends State<_BusinessDetailsDialog> {
                     Icons.business,
                     color: theme.colorScheme.onPrimary,
                   ),
-                  const SizedBox(width: 12),
+                  SizedBox(width: 12),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -356,13 +357,13 @@ class _BusinessDetailsDialogState extends State<_BusinessDetailsDialog> {
                             child: Container(
                               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                               decoration: BoxDecoration(
-                                color: Colors.orange.shade300,
+                                color: SemanticColorResolver.warning(context).withValues(alpha: 0.5),
                                 borderRadius: BorderRadius.circular(4),
                               ),
                               child: Text(
                                 'در حال حذف',
                                 style: TextStyle(
-                                  color: Colors.orange.shade900,
+                                  color: SemanticColorResolver.warning(context),
                                   fontSize: 11,
                                   fontWeight: FontWeight.w600,
                                 ),
@@ -373,7 +374,7 @@ class _BusinessDetailsDialogState extends State<_BusinessDetailsDialog> {
                     ),
                   ),
                   if (isDeleted || isDeletionPending) ...[
-                    const SizedBox(width: 8),
+                    SizedBox(width: 8),
                     ElevatedButton.icon(
                       onPressed: _isRestoring ? null : () => _handleRestore(context),
                       icon: _isRestoring
@@ -385,10 +386,10 @@ class _BusinessDetailsDialogState extends State<_BusinessDetailsDialog> {
                                 valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                               ),
                             )
-                          : const Icon(Icons.restore, size: 18),
+                          : Icon(Icons.restore, size: 18),
                       label: Text(_isRestoring ? 'در حال بازیابی...' : 'بازیابی'),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.green,
+                        backgroundColor: SemanticColorResolver.positive(context),
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                       ),
@@ -443,18 +444,18 @@ class _BusinessDetailsDialogState extends State<_BusinessDetailsDialog> {
     final confirmed = await showDialog<bool>(
       context: pageContext,
       builder: (context) => AlertDialog(
-        title: const Text('بازیابی کسب و کار'),
+        title: Text('بازیابی کسب و کار'),
         content: Text(
           'آیا مطمئن هستید که می‌خواهید کسب و کار "${widget.business['name']}" را بازیابی کنید؟',
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('انصراف'),
+            child: Text('انصراف'),
           ),
           FilledButton(
             onPressed: () => Navigator.of(context).pop(true),
-            style: FilledButton.styleFrom(backgroundColor: Colors.green),
+            style: FilledButton.styleFrom(backgroundColor: SemanticColorResolver.positive(context)),
             child: const Text('بازیابی'),
           ),
         ],
@@ -472,9 +473,9 @@ class _BusinessDetailsDialogState extends State<_BusinessDetailsDialog> {
 
       if (!pageContext.mounted) return;
       ScaffoldMessenger.of(pageContext).showSnackBar(
-        const SnackBar(
+        SnackBar(
           content: Text('کسب و کار با موفقیت بازیابی شد'),
-          backgroundColor: Colors.green,
+          backgroundColor: SemanticColorResolver.positive(context),
         ),
       );
       Navigator.of(pageContext).pop();
@@ -485,7 +486,7 @@ class _BusinessDetailsDialogState extends State<_BusinessDetailsDialog> {
           content: Text(
             'خطا در بازیابی کسب و کار: ${ErrorExtractor.forContext(e, pageContext)}',
           ),
-          backgroundColor: Colors.red,
+          backgroundColor: SemanticColorResolver.negative(context),
         ),
       );
     } finally {
@@ -756,9 +757,9 @@ class _WalletTabState extends State<_WalletTab> {
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
+          SnackBar(
             content: Text('موجودی هدیه با موفقیت اضافه شد'),
-            backgroundColor: Colors.green,
+            backgroundColor: SemanticColorResolver.positive(context),
           ),
         );
       }
@@ -790,7 +791,7 @@ class _WalletTabState extends State<_WalletTab> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.error_outline, size: 48, color: Colors.red[300]),
+            Icon(Icons.error_outline, size: 48, color: SemanticColorResolver.negative(context)),
             const SizedBox(height: 16),
             Text(
               'خطا در دریافت اطلاعات کیف‌پول',
@@ -863,7 +864,7 @@ class _WalletTabState extends State<_WalletTab> {
               theme,
               'موجودی قابل استفاده',
               _formatCurrency(availableBalance, currencyCode),
-              Colors.green[700],
+              SemanticColorResolver.positive(context),
               FontWeight.bold,
             ),
             const Divider(height: 24),
@@ -871,14 +872,14 @@ class _WalletTabState extends State<_WalletTab> {
               theme,
               'موجودی در انتظار',
               _formatCurrency(pendingBalance, currencyCode),
-              Colors.orange[700],
+              SemanticColorResolver.warning(context),
             ),
             const Divider(height: 24),
             _buildInfoRow(
               theme,
               'وضعیت',
               status == 'active' ? 'فعال' : 'معلق',
-              status == 'active' ? Colors.green : Colors.red,
+              status == 'active' ? SemanticColorResolver.positive(context) : SemanticColorResolver.negative(context),
             ),
             const Divider(height: 24),
             _buildInfoRow(theme, 'ارز پایه', currencyCode),
@@ -960,7 +961,7 @@ class _WalletTabState extends State<_WalletTab> {
                   return null;
                 },
               ),
-              const SizedBox(height: 16),
+              SizedBox(height: 16),
               TextFormField(
                 controller: _descriptionController,
                 decoration: const InputDecoration(
@@ -987,18 +988,18 @@ class _WalletTabState extends State<_WalletTab> {
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: Colors.red[50],
+                    color: SemanticColorResolver.negative(context).withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.red[300]!),
+                    border: Border.all(color: SemanticColorResolver.negative(context)!),
                   ),
                   child: Row(
                     children: [
-                      Icon(Icons.error_outline, color: Colors.red[700]),
-                      const SizedBox(width: 12),
+                      Icon(Icons.error_outline, color: SemanticColorResolver.negative(context)),
+                      SizedBox(width: 12),
                       Expanded(
                         child: Text(
                           _errorMessage!,
-                          style: TextStyle(color: Colors.red[700]),
+                          style: TextStyle(color: SemanticColorResolver.negative(context)),
                         ),
                       ),
                     ],
@@ -1254,7 +1255,7 @@ class _BusinessPoliciesTabState extends State<_BusinessPoliciesTab> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.error_outline, color: Colors.red, size: 32),
+            Icon(Icons.error_outline, color: SemanticColorResolver.negative(context), size: 32),
             const SizedBox(height: 8),
             Text(_error!),
             const SizedBox(height: 12),

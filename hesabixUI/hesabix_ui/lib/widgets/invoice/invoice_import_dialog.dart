@@ -6,6 +6,7 @@ import '../../services/bytes_export/bytes_export_service.dart';
 import '../../services/invoice_service.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 
 class InvoiceImportDialog extends StatefulWidget {
@@ -295,7 +296,7 @@ class _ResultSummary extends StatelessWidget {
                 final errorList = (e['errors'] as List?)?.cast<String>() ?? [];
                 return ListTile(
                   dense: true,
-                  leading: const Icon(Icons.error_outline, color: Colors.red),
+                  leading: Icon(Icons.error_outline, color: SemanticColorResolver.negative(context)),
                   title: Text('فاکتور: $invoiceNumber (ردیف: $row)'),
                   subtitle: Text(errorList.join(', ')),
                 );

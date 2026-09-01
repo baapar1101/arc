@@ -216,6 +216,18 @@ from .distribution import (  # noqa: F401
 	DistributionReturnRequest,
 	DistributionVan,
 	DistributionOfflineSyncBatch,
+	DistributionSalesTarget,
+	DistributionDailySettlement,
+	DistributionVisitHeartbeat,
+	DistributionVisitOrder,
+	DistributionTradePromotion,
+	DistributionDeliveryTrip,
+	DistributionDeliveryStop,
+	DistributionLoadPlan,
+	DistributionCommissionRule,
+	DistributionCommissionRun,
+	DistributionShelfAudit,
+	DistributionCustomerAsset,
 )
 from .telephony import (  # noqa: F401
 	TelephonySettings,

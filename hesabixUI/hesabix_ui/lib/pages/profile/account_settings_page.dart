@@ -6,6 +6,7 @@ import '../../core/auth_store.dart';
 import 'android_update_settings_page.dart';
 import 'windows_update_settings_page.dart';
 import 'biometric_lock_settings_page.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 class AccountSettingsPage extends StatelessWidget {
   final CalendarController calendarController;
@@ -68,14 +69,14 @@ class AccountSettingsPage extends StatelessWidget {
                       title: t.marketing,
                       description: t.accountSettingsMarketingDescription,
                       icon: Icons.campaign,
-                      color: Colors.orange,
+                      color: SemanticColorResolver.warning(context),
                       onTap: () => context.go('/user/profile/marketing'),
                     ),
                     _SettingsCard(
                       title: t.accountSettingsNotificationsTitle,
                       description: t.accountSettingsNotificationsDescription,
                       icon: Icons.notifications_active,
-                      color: Colors.blue,
+                      color: SemanticColorResolver.info(context),
                       onTap: () => context.go('/user/profile/notifications'),
                     ),
                     _SettingsCard(
@@ -89,7 +90,7 @@ class AccountSettingsPage extends StatelessWidget {
                       title: t.accountSettingsApiKeysTitle,
                       description: t.accountSettingsApiKeysDescription,
                       icon: Icons.key,
-                      color: Colors.green,
+                      color: SemanticColorResolver.positive(context),
                       onTap: () => context.go('/user/profile/api-keys'),
                     ),
                     _SettingsCard(
@@ -127,7 +128,7 @@ class AccountSettingsPage extends StatelessWidget {
                       title: t.changePassword,
                       description: t.accountSettingsChangePasswordDescription,
                       icon: Icons.password,
-                      color: Colors.red,
+                      color: SemanticColorResolver.negative(context),
                       onTap: () => context.go('/user/profile/change-password'),
                     ),
                     _SettingsCard(

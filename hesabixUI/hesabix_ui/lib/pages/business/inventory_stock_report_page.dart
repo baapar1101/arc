@@ -18,6 +18,7 @@ import 'package:hesabix_ui/widgets/category/category_picker_field.dart';
 import 'package:hesabix_ui/core/date_utils.dart';
 import 'package:hesabix_ui/utils/responsive_helper.dart';
 import 'package:hesabix_ui/core/hesabix_back.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 class InventoryStockReportPage extends StatefulWidget {
   final int businessId;
@@ -462,13 +463,13 @@ class _InventoryStockReportPageState extends State<InventoryStockReportPage> {
             IconData? iconData;
             
             if (qty < 0) {
-              textColor = Colors.red.shade700;
+              textColor = SemanticColorResolver.negative(context);
               iconData = Icons.warning;
             } else if (qty == 0) {
-              textColor = Colors.orange.shade700;
+              textColor = SemanticColorResolver.warning(context);
               iconData = Icons.remove_circle_outline;
             } else {
-              textColor = Colors.green.shade700;
+              textColor = SemanticColorResolver.positive(context);
               iconData = Icons.check_circle_outline;
             }
             
@@ -512,7 +513,7 @@ class _InventoryStockReportPageState extends State<InventoryStockReportPage> {
             return Center(
               child: Icon(
                 trackInventory ? Icons.check_circle : Icons.cancel,
-                color: trackInventory ? Colors.green : Colors.grey,
+                color: trackInventory ? SemanticColorResolver.positive(context) : Colors.grey,
                 size: 20,
               ),
             );
@@ -1391,25 +1392,25 @@ class _InventoryStockReportPageState extends State<InventoryStockReportPage> {
                 title: 'کل محصولات',
                 value: _formatNumber(totalProducts),
                 icon: Icons.inventory_2,
-                color: Colors.blue,
+                color: SemanticColorResolver.info(context),
               ),
               _buildSummaryCard(
                 title: 'با موجودی',
                 value: _formatNumber(totalWithStock),
                 icon: Icons.check_circle,
-                color: Colors.green,
+                color: SemanticColorResolver.positive(context),
               ),
               _buildSummaryCard(
                 title: 'موجودی منفی',
                 value: _formatNumber(totalNegativeStock),
                 icon: Icons.warning,
-                color: Colors.red,
+                color: SemanticColorResolver.negative(context),
               ),
               _buildSummaryCard(
                 title: 'موجودی صفر',
                 value: _formatNumber(totalZeroStock),
                 icon: Icons.remove_circle,
-                color: Colors.orange,
+                color: SemanticColorResolver.warning(context),
               ),
             ],
           );
@@ -1480,7 +1481,7 @@ class _InventoryStockReportPageState extends State<InventoryStockReportPage> {
             IconButton(
               icon: Stack(
                 children: [
-                  const Icon(Icons.filter_list),
+                  Icon(Icons.filter_list),
                   if (activeFiltersCount > 0)
                     Positioned(
                       right: 0,
@@ -1488,7 +1489,7 @@ class _InventoryStockReportPageState extends State<InventoryStockReportPage> {
                       child: Container(
                         padding: const EdgeInsets.all(4),
                         decoration: BoxDecoration(
-                          color: Colors.red,
+                          color: SemanticColorResolver.negative(context),
                           shape: BoxShape.circle,
                         ),
                         constraints: const BoxConstraints(

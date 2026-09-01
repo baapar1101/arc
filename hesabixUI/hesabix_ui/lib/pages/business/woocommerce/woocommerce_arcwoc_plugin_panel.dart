@@ -10,6 +10,7 @@ import '../../../utils/snackbar_helper.dart';
 import '../../../widgets/data_table/data_table_config.dart';
 import '../../../widgets/data_table/data_table_widget.dart';
 import 'woocommerce_l10n_format.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 String _prettyJson(Object? value) {
   try {
@@ -406,7 +407,7 @@ class _WooArcwocPluginSettingsPanelState
           children: [
             Icon(
               ok ? Icons.check_circle_outline : Icons.error_outline,
-              color: ok ? Colors.green : Theme.of(context).colorScheme.error,
+              color: ok ? SemanticColorResolver.positive(context) : Theme.of(context).colorScheme.error,
             ),
             const SizedBox(width: 8),
             Expanded(

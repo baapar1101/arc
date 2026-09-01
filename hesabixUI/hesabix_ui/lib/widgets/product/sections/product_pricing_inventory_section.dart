@@ -14,6 +14,7 @@ import '../../../utils/snackbar_helper.dart';
 import '../../../utils/responsive_helper.dart';
 import '../../../widgets/multi_currency_gate.dart';
 import 'product_suppliers_section.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 
 class ProductPricingInventorySection extends StatefulWidget {
@@ -222,11 +223,11 @@ class _ProductPricingInventorySectionState extends State<ProductPricingInventory
                 ),
                 // گزینه‌های ردیابی برای حالت یونیک
                 if (widget.formData.inventoryMode == 'unique') ...[
-                  const SizedBox(height: 16),
+                  SizedBox(height: 16),
                   SwitchListTile(
                     value: widget.formData.trackSerial,
                     onChanged: (value) => _updateFormData(widget.formData.copyWith(trackSerial: value)),
-                    title: const Text('ردیابی سریال نامبر'),
+                    title: Text('ردیابی سریال نامبر'),
                     subtitle: const Text('هر واحد کالا دارای شماره سریال یکتا خواهد بود'),
                   ),
                   SwitchListTile(
@@ -242,19 +243,19 @@ class _ProductPricingInventorySectionState extends State<ProductPricingInventory
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: Colors.blue.shade50,
-                      border: Border.all(color: Colors.blue.shade200),
+                      color: SemanticColorResolver.info(context).withValues(alpha: 0.12),
+                      border: Border.all(color: SemanticColorResolver.info(context).withValues(alpha: 0.35)),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Row(
                       children: [
-                        Icon(Icons.info_outline, color: Colors.blue.shade700, size: 20),
-                        const SizedBox(width: 8),
+                        Icon(Icons.info_outline, color: SemanticColorResolver.info(context), size: 20),
+                        SizedBox(width: 8),
                         Expanded(
                           child: Text(
                             t.inventoryUniqueModeRequiresTrack,
                             style: TextStyle(
-                              color: Colors.blue.shade800,
+                              color: SemanticColorResolver.info(context),
                               fontSize: 13,
                             ),
                           ),
@@ -434,7 +435,7 @@ class _ProductPricingInventorySectionState extends State<ProductPricingInventory
                     fontWeight: FontWeight.bold,
                   ),
             ),
-            const SizedBox(height: 8),
+            SizedBox(height: 8),
             if (controller.obEligibilityLoading)
               const Padding(
                 padding: EdgeInsets.symmetric(vertical: 8),
@@ -451,8 +452,8 @@ class _ProductPricingInventorySectionState extends State<ProductPricingInventory
                 margin: const EdgeInsets.only(bottom: 12),
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.orange.shade50,
-                  border: Border.all(color: Colors.orange.shade200),
+                  color: SemanticColorResolver.warning(context).withValues(alpha: 0.12),
+                  border: Border.all(color: SemanticColorResolver.warning(context).withValues(alpha: 0.35)),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Row(
@@ -461,14 +462,14 @@ class _ProductPricingInventorySectionState extends State<ProductPricingInventory
                     Icon(
                       Icons.lock_outline,
                       size: 18,
-                      color: Colors.orange.shade800,
+                      color: SemanticColorResolver.warning(context),
                     ),
-                    const SizedBox(width: 8),
+                    SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         readonlyWarning,
                         style: TextStyle(
-                          color: Colors.orange.shade900,
+                          color: SemanticColorResolver.warning(context),
                           fontSize: 13,
                           height: 1.35,
                         ),
@@ -778,7 +779,7 @@ class _ProductPricingInventorySectionState extends State<ProductPricingInventory
                                   },
                                 ),
                                 IconButton(
-                                  icon: const Icon(Icons.delete, color: Colors.red),
+                                  icon: Icon(Icons.delete, color: SemanticColorResolver.negative(context)),
                                   onPressed: () => widget.onDeletePriceItem(it),
                                 ),
                               ],
@@ -891,7 +892,7 @@ class _ProductPricingInventorySectionState extends State<ProductPricingInventory
                           },
                         ),
                         IconButton(
-                          icon: const Icon(Icons.delete, color: Colors.red),
+                          icon: Icon(Icons.delete, color: SemanticColorResolver.negative(context)),
                           onPressed: () => widget.onDeletePriceItem(it),
                         ),
                       ],
@@ -962,8 +963,8 @@ class _ProductPricingInventorySectionState extends State<ProductPricingInventory
       builder: (ctx) => AlertDialog(
         title: Row(
           children: [
-            Icon(Icons.warning, color: Colors.orange[700]),
-            const SizedBox(width: 8),
+            Icon(Icons.warning, color: SemanticColorResolver.warning(context)),
+            SizedBox(width: 8),
             Text(t.noPriceListsTitle),
           ],
         ),
@@ -976,19 +977,19 @@ class _ProductPricingInventorySectionState extends State<ProductPricingInventory
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.blue.withValues(alpha: 0.1),
+                color: SemanticColorResolver.info(context).withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.blue.withValues(alpha: 0.3)),
+                border: Border.all(color: SemanticColorResolver.info(context).withValues(alpha: 0.3)),
               ),
               child: Row(
                 children: [
-                  Icon(Icons.info, color: Colors.blue[700], size: 20),
-                  const SizedBox(width: 8),
+                  Icon(Icons.info, color: SemanticColorResolver.info(context), size: 20),
+                  SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       t.noPriceListsHint,
                       style: TextStyle(
-                        color: Colors.blue[700],
+                        color: SemanticColorResolver.info(context),
                         fontSize: 14,
                       ),
                     ),
@@ -1309,8 +1310,8 @@ class _ProductPricingInventorySectionState extends State<ProductPricingInventory
           margin: const EdgeInsets.only(top: 16),
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: Colors.orange.shade50,
-            border: Border.all(color: Colors.orange.shade200),
+            color: SemanticColorResolver.warning(context).withValues(alpha: 0.12),
+            border: Border.all(color: SemanticColorResolver.warning(context).withValues(alpha: 0.35)),
             borderRadius: BorderRadius.circular(8),
           ),
           child: Column(
@@ -1318,23 +1319,23 @@ class _ProductPricingInventorySectionState extends State<ProductPricingInventory
             children: [
               Row(
                 children: [
-                  Icon(Icons.warning_amber_rounded, color: Colors.orange.shade700),
-                  const SizedBox(width: 8),
+                  Icon(Icons.warning_amber_rounded, color: SemanticColorResolver.warning(context)),
+                  SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       'تبدیل به حالت یونیک',
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.bold,
-                        color: Colors.orange.shade900,
+                        color: SemanticColorResolver.warning(context),
                       ),
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 12),
+              SizedBox(height: 12),
               Text(
                 'این کالا دارای $stock واحد موجودی است. برای تبدیل به حالت یونیک، باید برای هر واحد موجودی یک instance ایجاد شود.',
-                style: TextStyle(color: Colors.orange.shade800),
+                style: TextStyle(color: SemanticColorResolver.warning(context)),
               ),
               const SizedBox(height: 12),
               Row(
@@ -1360,10 +1361,10 @@ class _ProductPricingInventorySectionState extends State<ProductPricingInventory
                         SnackBarHelper.showError(context, message: controller?.errorMessage ?? 'خطا در تبدیل کالا');
                       }
                     },
-                    icon: const Icon(Icons.transform),
-                    label: const Text('تبدیل و ایجاد Instance ها'),
+                    icon: Icon(Icons.transform),
+                    label: Text('تبدیل و ایجاد Instance ها'),
                     style: FilledButton.styleFrom(
-                      backgroundColor: Colors.orange.shade700,
+                      backgroundColor: SemanticColorResolver.warning(context),
                     ),
                   ),
                 ],

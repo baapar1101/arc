@@ -13,6 +13,7 @@ import '../../services/in_app_notification_preferences_controller.dart';
 import '../../services/in_app_notifications_hub.dart';
 import '../../utils/announcement_navigation.dart';
 import '../../utils/snackbar_helper.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 String _localizedAnnouncementLevel(BuildContext context, String raw) {
   final t = AppLocalizations.of(context);
@@ -212,11 +213,11 @@ class _NotificationBellButtonState extends State<NotificationBellButton> {
                           switch (level) {
                             case 'warning':
                               icon = Icons.warning_amber_rounded;
-                              levelColor = Colors.orange;
+                              levelColor = SemanticColorResolver.warning(context);
                               break;
                             case 'critical':
                               icon = Icons.error_outline;
-                              levelColor = Colors.red;
+                              levelColor = SemanticColorResolver.negative(context);
                               break;
                             default:
                               icon = Icons.notifications_none;

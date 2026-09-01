@@ -11,6 +11,7 @@ import '../../theme/theme_controller.dart';
 import '../../widgets/language_switcher.dart';
 import '../../widgets/calendar_switcher.dart';
 import '../../widgets/theme_mode_switcher.dart';
+import '../../widgets/theme_palette_switcher.dart';
 import '../../widgets/logout_button.dart';
 import '../../widgets/notification/notification_bell_button.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
@@ -206,6 +207,8 @@ class _ProfileShellState extends State<ProfileShell> with WidgetsBindingObserver
           ),
         ],
         if (widget.themeController != null) ...[
+          ThemePaletteSwitcher(controller: widget.themeController!, toolbarCompact: true),
+          const SizedBox(width: 4),
           ThemeModeSwitcher(controller: widget.themeController!, toolbarCompact: true),
           const SizedBox(width: 6),
         ],

@@ -35,6 +35,7 @@ import '../../utils/snackbar_helper.dart';
 import '../../widgets/workflow/workflow_publish_to_marketplace_dialog.dart';
 import '../../widgets/ai/ai_workflow_chat_actions.dart';
 import 'business_shell_side_nav_scope.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 
 class WorkflowVisualEditorPage extends StatefulWidget {
@@ -791,7 +792,7 @@ class _WorkflowVisualEditorPageState extends State<WorkflowVisualEditorPage> {
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Icon(Icons.error, color: Colors.red, size: 20),
+                      Icon(Icons.error, color: SemanticColorResolver.negative(context), size: 20),
                       const SizedBox(width: 8),
                       Expanded(child: Text(error)),
                     ],
@@ -1178,7 +1179,7 @@ class _WorkflowVisualEditorPageState extends State<WorkflowVisualEditorPage> {
                 Navigator.pop(context);
                 SnackBarHelper.show(context, message: t.workflowNoteDeleted);
               },
-              child: Text(t.delete, style: const TextStyle(color: Colors.red)),
+              child: Text(t.delete, style: TextStyle(color: SemanticColorResolver.negative(context))),
             ),
           FilledButton(
             onPressed: () {
@@ -1457,13 +1458,13 @@ class _TemplateSelectorDialog extends StatelessWidget {
                             itemBuilder: (context, index) {
                               final template = savedTemplates[index];
                               return ListTile(
-                                leading: const Icon(Icons.insert_drive_file),
+                                leading: Icon(Icons.insert_drive_file),
                                 title: Text(template['name'] ?? t.workflowTemplateN(index + 1)),
                                 subtitle: Text(template['created_at'] != null
                                     ? t.workflowCreatedAt(template['created_at'].toString())
                                     : ''),
                                 trailing: IconButton(
-                                  icon: const Icon(Icons.delete, color: Colors.red),
+                                  icon: Icon(Icons.delete, color: SemanticColorResolver.negative(context)),
                                   onPressed: () => onDeleteSaved(index),
                                 ),
                                 onTap: () => Navigator.pop(context, {

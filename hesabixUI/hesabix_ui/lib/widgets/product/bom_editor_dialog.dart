@@ -10,6 +10,7 @@ import '../../utils/number_normalizer.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../utils/responsive_helper.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 class BomEditorDialog extends StatefulWidget {
   final int businessId;
@@ -192,7 +193,7 @@ class _BomEditorDialogState extends State<BomEditorDialog> with SingleTickerProv
                 color: theme.colorScheme.onPrimary,
                 size: 28,
               ),
-              const SizedBox(width: 12),
+              SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -209,7 +210,7 @@ class _BomEditorDialogState extends State<BomEditorDialog> with SingleTickerProv
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                         decoration: BoxDecoration(
-                          color: Colors.orange.withValues(alpha: 0.3),
+                          color: SemanticColorResolver.warning(context).withValues(alpha: 0.3),
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: Row(
@@ -307,7 +308,7 @@ class _BomEditorDialogState extends State<BomEditorDialog> with SingleTickerProv
                                 Icon(
                                   _isDefault ? Icons.star : Icons.star_border,
                                   color: _isDefault
-                                      ? Colors.orange
+                                      ? SemanticColorResolver.warning(context)
                                       : theme.colorScheme.onSurface.withValues(alpha: 0.6),
                                   size: 24,
                                 ),
@@ -387,7 +388,7 @@ class _BomEditorDialogState extends State<BomEditorDialog> with SingleTickerProv
                                 Icon(
                                   _isDefault ? Icons.star : Icons.star_border,
                                   color: _isDefault
-                                      ? Colors.orange
+                                      ? SemanticColorResolver.warning(context)
                                       : theme.colorScheme.onSurface.withValues(alpha: 0.6),
                                   size: 24,
                                 ),
@@ -881,16 +882,16 @@ class _BomEditorDialogState extends State<BomEditorDialog> with SingleTickerProv
                           alignment: Alignment.centerRight,
                           padding: const EdgeInsets.only(right: 20),
                           decoration: BoxDecoration(
-                            color: Colors.red.shade400,
+                            color: SemanticColorResolver.negative(context),
                             borderRadius: BorderRadius.circular(8),
                           ),
-                          child: const Icon(Icons.delete, color: Colors.white, size: 32),
+                          child: Icon(Icons.delete, color: Colors.white, size: 32),
                         ),
                         confirmDismiss: (direction) async {
                           return await showDialog<bool>(
                             context: context,
                             builder: (context) => AlertDialog(
-                              title: const Text('تأیید حذف'),
+                              title: Text('تأیید حذف'),
                               content: const Text('آیا از حذف این سطر اطمینان دارید؟'),
                               actions: [
                                 TextButton(
@@ -899,7 +900,7 @@ class _BomEditorDialogState extends State<BomEditorDialog> with SingleTickerProv
                                 ),
                                 FilledButton(
                                   onPressed: () => Navigator.pop(context, true),
-                                  style: FilledButton.styleFrom(backgroundColor: Colors.red),
+                                  style: FilledButton.styleFrom(backgroundColor: SemanticColorResolver.negative(context)),
                                   child: const Text('حذف'),
                                 ),
                               ],
@@ -969,7 +970,7 @@ class _BomEditorDialogState extends State<BomEditorDialog> with SingleTickerProv
         borderRadius: BorderRadius.circular(12),
         side: isValid 
             ? BorderSide.none 
-            : BorderSide(color: Colors.red.shade300, width: 2),
+            : BorderSide(color: SemanticColorResolver.negative(context).withValues(alpha: 0.5), width: 2),
       ),
       child: Padding(
         padding: EdgeInsets.all(ResponsiveHelper.getPadding(context)),
@@ -982,7 +983,7 @@ class _BomEditorDialogState extends State<BomEditorDialog> with SingleTickerProv
                 Row(
                   children: [
                     if (!isValid) ...[
-                      Icon(Icons.warning_amber_rounded, color: Colors.red.shade700, size: 20),
+                      Icon(Icons.warning_amber_rounded, color: SemanticColorResolver.negative(context), size: 20),
                       const SizedBox(width: 8),
                     ],
                     Text(
@@ -1013,7 +1014,7 @@ class _BomEditorDialogState extends State<BomEditorDialog> with SingleTickerProv
                       _itemsListKey++;
                     });
                   },
-                  icon: const Icon(Icons.delete_outline, color: Colors.red),
+                  icon: Icon(Icons.delete_outline, color: SemanticColorResolver.negative(context)),
                 ),
               ],
             ),
@@ -1133,7 +1134,7 @@ class _BomEditorDialogState extends State<BomEditorDialog> with SingleTickerProv
           if (!isValid) ...[
             Tooltip(
               message: 'این سطر نامعتبر است: کالا باید انتخاب شود و مقدار باید بزرگ‌تر از صفر باشد',
-              child: Icon(Icons.warning_amber_rounded, color: Colors.red.shade700, size: 20),
+              child: Icon(Icons.warning_amber_rounded, color: SemanticColorResolver.negative(context), size: 20),
             ),
             SizedBox(width: ResponsiveHelper.getGridSpacing(context)),
           ],
@@ -1364,16 +1365,16 @@ class _BomEditorDialogState extends State<BomEditorDialog> with SingleTickerProv
                               alignment: Alignment.centerRight,
                               padding: const EdgeInsets.only(right: 20),
                               decoration: BoxDecoration(
-                                color: Colors.red.shade400,
+                                color: SemanticColorResolver.negative(context),
                                 borderRadius: BorderRadius.circular(8),
                               ),
-                              child: const Icon(Icons.delete, color: Colors.white, size: 32),
+                              child: Icon(Icons.delete, color: Colors.white, size: 32),
                             ),
                             confirmDismiss: (direction) async {
                               return await showDialog<bool>(
                                 context: context,
                                 builder: (context) => AlertDialog(
-                                  title: const Text('تأیید حذف'),
+                                  title: Text('تأیید حذف'),
                                   content: const Text('آیا از حذف این سطر اطمینان دارید؟'),
                                   actions: [
                                     TextButton(
@@ -1382,7 +1383,7 @@ class _BomEditorDialogState extends State<BomEditorDialog> with SingleTickerProv
                                     ),
                                     FilledButton(
                                       onPressed: () => Navigator.pop(context, true),
-                                      style: FilledButton.styleFrom(backgroundColor: Colors.red),
+                                      style: FilledButton.styleFrom(backgroundColor: SemanticColorResolver.negative(context)),
                                       child: const Text('حذف'),
                                     ),
                                   ],
@@ -1444,7 +1445,7 @@ class _BomEditorDialogState extends State<BomEditorDialog> with SingleTickerProv
         borderRadius: BorderRadius.circular(12),
         side: isValid 
             ? BorderSide.none 
-            : BorderSide(color: Colors.red.shade300, width: 2),
+            : BorderSide(color: SemanticColorResolver.negative(context).withValues(alpha: 0.5), width: 2),
       ),
       child: Padding(
         padding: EdgeInsets.all(ResponsiveHelper.getPadding(context)),
@@ -1457,7 +1458,7 @@ class _BomEditorDialogState extends State<BomEditorDialog> with SingleTickerProv
                 Row(
                   children: [
                     if (!isValid) ...[
-                      Icon(Icons.warning_amber_rounded, color: Colors.red.shade700, size: 20),
+                      Icon(Icons.warning_amber_rounded, color: SemanticColorResolver.negative(context), size: 20),
                       const SizedBox(width: 8),
                     ],
                     Text(
@@ -1482,7 +1483,7 @@ class _BomEditorDialogState extends State<BomEditorDialog> with SingleTickerProv
                       _outputsListKey++;
                     });
                   },
-                  icon: const Icon(Icons.delete_outline, color: Colors.red),
+                  icon: Icon(Icons.delete_outline, color: SemanticColorResolver.negative(context)),
                 ),
               ],
             ),
@@ -1554,7 +1555,7 @@ class _BomEditorDialogState extends State<BomEditorDialog> with SingleTickerProv
           if (!isValid) ...[
             Tooltip(
               message: 'این سطر نامعتبر است: محصول خروجی باید انتخاب شود و نسبت باید بزرگ‌تر از صفر باشد',
-              child: Icon(Icons.warning_amber_rounded, color: Colors.red.shade700, size: 20),
+              child: Icon(Icons.warning_amber_rounded, color: SemanticColorResolver.negative(context), size: 20),
             ),
             SizedBox(width: ResponsiveHelper.getGridSpacing(context)),
           ],
@@ -1716,16 +1717,16 @@ class _BomEditorDialogState extends State<BomEditorDialog> with SingleTickerProv
                               alignment: Alignment.centerRight,
                               padding: const EdgeInsets.only(right: 20),
                               decoration: BoxDecoration(
-                                color: Colors.red.shade400,
+                                color: SemanticColorResolver.negative(context),
                                 borderRadius: BorderRadius.circular(8),
                               ),
-                              child: const Icon(Icons.delete, color: Colors.white, size: 32),
+                              child: Icon(Icons.delete, color: Colors.white, size: 32),
                             ),
                             confirmDismiss: (direction) async {
                               return await showDialog<bool>(
                                 context: context,
                                 builder: (context) => AlertDialog(
-                                  title: const Text('تأیید حذف'),
+                                  title: Text('تأیید حذف'),
                                   content: const Text('آیا از حذف این سطر اطمینان دارید؟'),
                                   actions: [
                                     TextButton(
@@ -1734,7 +1735,7 @@ class _BomEditorDialogState extends State<BomEditorDialog> with SingleTickerProv
                                     ),
                                     FilledButton(
                                       onPressed: () => Navigator.pop(context, true),
-                                      style: FilledButton.styleFrom(backgroundColor: Colors.red),
+                                      style: FilledButton.styleFrom(backgroundColor: SemanticColorResolver.negative(context)),
                                       child: const Text('حذف'),
                                     ),
                                   ],
@@ -1840,7 +1841,7 @@ class _BomEditorDialogState extends State<BomEditorDialog> with SingleTickerProv
                       _operationsListKey++;
                     });
                   },
-                  icon: const Icon(Icons.delete_outline, color: Colors.red),
+                  icon: Icon(Icons.delete_outline, color: SemanticColorResolver.negative(context)),
                 ),
               ],
             ),
@@ -2435,8 +2436,8 @@ class _BomEditorDialogState extends State<BomEditorDialog> with SingleTickerProv
       builder: (context) => AlertDialog(
         title: Row(
           children: [
-            Icon(Icons.warning_amber_rounded, color: Colors.orange.shade700, size: 28),
-            const SizedBox(width: 12),
+            Icon(Icons.warning_amber_rounded, color: SemanticColorResolver.warning(context), size: 28),
+            SizedBox(width: 12),
             const Expanded(
               child: Text('هشدار: کالای فرمول در خروجی‌ها نیست'),
             ),
@@ -2449,15 +2450,15 @@ class _BomEditorDialogState extends State<BomEditorDialog> with SingleTickerProv
             children: [
               Text(
                 'کالای این فرمول تولید ("$productName") در لیست خروجی‌های فرمول تعریف نشده است.',
-                style: const TextStyle(fontSize: 15),
+                style: TextStyle(fontSize: 15),
               ),
               const SizedBox(height: 16),
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.blue.shade50,
+                  color: SemanticColorResolver.info(context).withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.blue.shade200),
+                  border: Border.all(color: SemanticColorResolver.info(context).withValues(alpha: 0.35)),
                 ),
                 child: const Column(
                   crossAxisAlignment: CrossAxisAlignment.start,

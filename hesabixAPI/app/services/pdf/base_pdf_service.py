@@ -61,9 +61,21 @@ class BasePDFModule(ABC):
         return get_translator(locale)
     
     def render_template(self, template_name: str, context: Dict[str, Any]) -> str:
-        """Render template with context"""
+        """Render template with context — رنگ برند تم سیستم را تزریق می‌کند."""
+        enriched = dict(context or {})
+        if "brand_primary" not in enriched:
+            try:
+                from app.services.theme_brand_colors import resolve_theme_brand_context
+
+                enriched.update(resolve_theme_brand_context())
+            except Exception:
+                enriched.setdefault("brand_primary", "#0F4C81")
+                enriched.setdefault("brand_positive", "#2E7D32")
+                enriched.setdefault("brand_negative", "#B3261E")
+                enriched.setdefault("brand_warning", "#F0B92A")
+                enriched.setdefault("brand_secondary", "#5A6A7A")
         template = self.jinja_env.get_template(template_name)
-        return template.render(**context)
+        return template.render(**enriched)
 
 
 class PDFService:

@@ -8,6 +8,7 @@ import '../../services/bytes_export/bytes_export_service.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 import '../common/excel_import_dialog_shell.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 class ProductImportDialog extends StatefulWidget {
   final int businessId;
@@ -547,7 +548,7 @@ class _ResultSummaryBodyState extends State<_ResultSummaryBody> {
               return ListTile(
                 dense: true,
                 contentPadding: const EdgeInsets.symmetric(horizontal: 0),
-                leading: const Icon(Icons.error_outline, color: Colors.red, size: 20),
+                leading: Icon(Icons.error_outline, color: SemanticColorResolver.negative(context), size: 20),
                 title: Text('${t.row} ${e['row']}'),
                 subtitle: Text(((e['errors'] as List?)?.join(', ')) ?? ''),
               );

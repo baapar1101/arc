@@ -13,6 +13,7 @@ import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 import 'package:hesabix_ui/services/bytes_export/bytes_export_service.dart';
 import 'package:hesabix_ui/core/hesabix_back.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 class PnlCumulativeReportPage extends StatefulWidget {
   final int businessId;
@@ -212,7 +213,7 @@ class _PnlCumulativeReportPageState extends State<PnlCumulativeReportPage> {
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(t.reportsPnlCumulativeTitle, style: const TextStyle(fontSize: 18)),
+            Text(t.reportsPnlCumulativeTitle, style: TextStyle(fontSize: 18)),
             Text(
               'از ابتدای سال مالی تا تاریخ انتخابی',
               style: TextStyle(
@@ -231,7 +232,7 @@ class _PnlCumulativeReportPageState extends State<PnlCumulativeReportPage> {
                     height: 20,
                     child: CircularProgressIndicator(strokeWidth: 2, color: cs.onSurface),
                   )
-                : const Icon(Icons.download_outlined),
+                : Icon(Icons.download_outlined),
             tooltip: t.export,
             enabled: !_exporting && !_loading,
             onSelected: _export,
@@ -240,8 +241,8 @@ class _PnlCumulativeReportPageState extends State<PnlCumulativeReportPage> {
                 value: 'excel',
                 child: Row(
                   children: [
-                    Icon(Icons.table_chart_outlined, color: Colors.green[700]),
-                    const SizedBox(width: 8),
+                    Icon(Icons.table_chart_outlined, color: SemanticColorResolver.positive(context)),
+                    SizedBox(width: 8),
                     Text(t.exportToExcel),
                   ],
                 ),
@@ -250,7 +251,7 @@ class _PnlCumulativeReportPageState extends State<PnlCumulativeReportPage> {
                 value: 'pdf',
                 child: Row(
                   children: [
-                    Icon(Icons.picture_as_pdf_outlined, color: Colors.red[700]),
+                    Icon(Icons.picture_as_pdf_outlined, color: SemanticColorResolver.negative(context)),
                     const SizedBox(width: 8),
                     Text(t.exportToPdf),
                   ],

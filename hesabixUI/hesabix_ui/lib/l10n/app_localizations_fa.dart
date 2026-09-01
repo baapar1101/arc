@@ -66,6 +66,35 @@ class AppLocalizationsFa extends AppLocalizations {
   String get theme => 'تم';
 
   @override
+  String get colorTheme => 'تم رنگی';
+
+  @override
+  String get colorThemeDescription =>
+      'پالت رنگی را انتخاب کنید؛ در کل سیستم اعمال می‌شود.';
+
+  @override
+  String get themeModeLabel => 'حالت روشن / تیره';
+
+  @override
+  String get defaultColorTheme => 'تم رنگی پیش‌فرض';
+
+  @override
+  String get defaultColorThemeHint =>
+      'برای کاربرانی که هنوز تم رنگی انتخاب نکرده‌اند اعمال می‌شود.';
+
+  @override
+  String get themeClassicBlue => 'آبی کلاسیک';
+
+  @override
+  String get themeTurquoiseSea => 'دریای فیروزه';
+
+  @override
+  String get themeEmeraldForest => 'جنگل زمردی';
+
+  @override
+  String get themeWarmCopper => 'مسی گرم';
+
+  @override
   String get system => 'سیستم';
 
   @override
@@ -15602,6 +15631,135 @@ class AppLocalizationsFa extends AppLocalizations {
   String get distributionNotesLabel => 'یادداشت';
 
   @override
+  String get distributionVanCreate => 'ایجاد ون';
+
+  @override
+  String get distributionVanUnload => 'تخلیه ون';
+
+  @override
+  String get distributionSelectVisitor => 'انتخاب ویزیتور';
+
+  @override
+  String get distributionSourceWarehouse => 'انبار مبدأ';
+
+  @override
+  String get distributionDestWarehouse => 'انبار مقصد';
+
+  @override
+  String get distributionNoVanAssigned => 'ونی به شما تخصیص داده نشده است.';
+
+  @override
+  String get distributionVanStockEmpty => 'موجودی ون خالی است.';
+
+  @override
+  String get distributionDeleteStop => 'حذف توقف';
+
+  @override
+  String get distributionDeleteAssignment => 'حذف تخصیص';
+
+  @override
+  String get distributionApplyOptimize => 'اعمال و ذخیرهٔ ترتیب';
+
+  @override
+  String get distributionOfflinePartial => 'برخی اقدامات آفلاین ناموفق ماندند.';
+
+  @override
+  String get distributionVisitStayHint =>
+      'ویزیت شروع شد؛ پس از اتمام کار مشتری، پایان ویزیت را بزنید.';
+
+  @override
+  String get distributionSalesLinked => 'فروش متصل';
+
+  @override
+  String get distributionCoveragePercent => 'پوشش مسیر';
+
+  @override
+  String get distributionChecklistAddItem => 'افزودن مورد چک‌لیست';
+
+  @override
+  String get distributionDefaultWarehouse => 'انبار پیش‌فرض بارگیری';
+
+  @override
+  String get distributionOpenInvoiceKeepVisit => 'فاکتور (ویزیت باز می‌ماند)';
+
+  @override
+  String get distributionTabSettlement => 'تسویه روزانه';
+
+  @override
+  String get distributionExpectedSales => 'فروش مورد انتظار روز';
+
+  @override
+  String get distributionCashCollected => 'نقد وصول‌شده';
+
+  @override
+  String get distributionChequeCollected => 'چک وصول‌شده';
+
+  @override
+  String get distributionCardCollected => 'کارت / پوز';
+
+  @override
+  String get distributionOtherCollected => 'سایر وصولی';
+
+  @override
+  String get distributionSettlementExpenses => 'هزینه‌های روز';
+
+  @override
+  String get distributionSettlementVariance => 'مغایرت';
+
+  @override
+  String get distributionCreateReceiptOnConfirm =>
+      'ایجاد سند دریافت نقدی هنگام تأیید';
+
+  @override
+  String get distributionCashRegister => 'صندوق';
+
+  @override
+  String get distributionCashRegisterRequired =>
+      'برای ایجاد رسید، صندوق را انتخاب کنید.';
+
+  @override
+  String get distributionSaveDraft => 'ذخیره پیش‌نویس';
+
+  @override
+  String get distributionConfirmSettlement => 'تأیید تسویه';
+
+  @override
+  String get distributionSettlementConfirmed => 'تسویه تأیید شد';
+
+  @override
+  String get distributionPrintSettlement => 'چاپ تسویه';
+
+  @override
+  String get distributionPrintDailyPlan => 'چاپ برنامه روز';
+
+  @override
+  String get distributionPrintLoadingList => 'چاپ لیست بارگیری';
+
+  @override
+  String get distributionPdfExported => 'فایل PDF آماده شد';
+
+  @override
+  String get distributionTargetsTitle => 'اهداف فروش ویزیتور';
+
+  @override
+  String get distributionTargetCreate => 'هدف جدید';
+
+  @override
+  String get distributionTargetPeriodType => 'نوع دوره';
+
+  @override
+  String get distributionTargetPeriodDay => 'روزانه';
+
+  @override
+  String get distributionTargetPeriodMonth => 'ماهانه';
+
+  @override
+  String get distributionTargetAmount => 'مبلغ هدف';
+
+  @override
+  String get distributionTargetsEmpty => 'هنوز هدفی تعریف نشده است.';
+
+  @override
   String get reportsDistributionSection => 'پخش و ویزیت میدانی';
 
   @override
@@ -18780,4 +18938,567 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get barcodeLabelPrinterEscPosSent => 'دستور ESC/POS به چاپگر ارسال شد';
+
+  @override
+  String get distributionVisitCompleteHint =>
+      'نتیجه ویزیت را ثبت کنید؛ فاکتور را از لیست انتخاب کنید یا از موجودی ون بفروشید.';
+
+  @override
+  String get distributionLinkInvoice => 'لینک فاکتور فروش';
+
+  @override
+  String get distributionSelectInvoice => 'انتخاب فاکتور';
+
+  @override
+  String get distributionNoInvoiceLink => 'بدون لینک فاکتور';
+
+  @override
+  String get distributionNoRecentInvoices =>
+      'فاکتور اخیری برای این مشتری یافت نشد.';
+
+  @override
+  String get distributionLinkedDocument => 'سند متصل';
+
+  @override
+  String get distributionRemaining => 'مانده';
+
+  @override
+  String get distributionVanSaleFromStock => 'فروش از موجودی ون';
+
+  @override
+  String get distributionVanSaleFromStockHint =>
+      'کالا را از موجودی فعلی ون انتخاب کنید؛ فاکتور با قیمت و مالیات ساخته می‌شود.';
+
+  @override
+  String get distributionVanQtyExceedsStock => 'مقدار از موجودی ون بیشتر است.';
+
+  @override
+  String get distributionVarianceMustBeZero =>
+      'مغایرت باید صفر باشد یا اجازهٔ مغایرت توسط مدیر فعال شود.';
+
+  @override
+  String get distributionVarianceOverrideManageOnly =>
+      'اجازهٔ مغایرت فقط برای مدیر است.';
+
+  @override
+  String get distributionBankRequired =>
+      'برای وصول کارتی، حساب بانک را انتخاب کنید.';
+
+  @override
+  String get distributionBankForCard => 'حساب بانک (کارت)';
+
+  @override
+  String get distributionCreateReceiptHint =>
+      'رسید نقد/کارت با تخصیص به فاکتورهای ویزیت‌های روز ساخته می‌شود.';
+
+  @override
+  String get distributionAllowVariance => 'اجازهٔ تأیید با مغایرت';
+
+  @override
+  String get distributionAllowVarianceHint =>
+      'فقط مدیر می‌تواند تسویهٔ دارای مغایرت را تأیید کند.';
+
+  @override
+  String get distributionDraftAwaitingConfirm =>
+      'پیش‌نویس ذخیره شد؛ تأیید نهایی توسط مدیر/تسویه‌کننده.';
+
+  @override
+  String get distributionSaveDraftOnly => 'فقط پیش‌نویس';
+
+  @override
+  String get distributionConfirmNeedsManager =>
+      'تأیید نهایی تسویه نیازمند دسترسی settle یا manage است.';
+
+  @override
+  String get distributionGeofenceOverrideManageOnly =>
+      'دور زدن geofence فقط برای مدیر مجاز است.';
+
+  @override
+  String get distributionGeofenceOverrideReason => 'دلیل دور زدن محدوده';
+
+  @override
+  String get distributionPermissionSettle => 'تأیید تسویه روزانه';
+
+  @override
+  String get distributionPermissionApproveReturns => 'تأیید مرجوعی پخش';
+
+  @override
+  String get distributionSourceInvoice => 'فاکتور منبع مرجوعی';
+
+  @override
+  String get distributionSettlementsReport => 'تسویه‌ها';
+
+  @override
+  String get distributionOrderRate => 'نرخ سفارش';
+
+  @override
+  String get distributionVarianceAbs => 'جمع قدرمطلق مغایرت';
+
+  @override
+  String get distributionCustomerCredit => 'اعتبار مشتری';
+
+  @override
+  String get distributionCustomerCreditBlocked =>
+      'سقف اعتبار این مشتری پر شده یا مسدود است؛ فروش ون مجاز نیست.';
+
+  @override
+  String get distributionAvailableCredit => 'اعتبار باقی‌مانده';
+
+  @override
+  String get distributionCreditLimit => 'سقف اعتبار';
+
+  @override
+  String get distributionPodTitle => 'تأیید تحویل (POD)';
+
+  @override
+  String get distributionPodHint =>
+      'در صورت تحویل کالا، نام گیرنده را ثبت کنید.';
+
+  @override
+  String get distributionPodConfirm => 'تحویل تأیید شد';
+
+  @override
+  String get distributionPodSignerName => 'نام گیرنده';
+
+  @override
+  String get distributionPodNote => 'یادداشت تحویل';
+
+  @override
+  String get distributionPodSignerRequired => 'نام گیرنده الزامی است';
+
+  @override
+  String get distributionLiveRefresh => 'زنده';
+
+  @override
+  String get distributionLastUpdated => 'آخرین به‌روزرسانی';
+
+  @override
+  String get distributionLiveAt => 'موقعیت زنده';
+
+  @override
+  String get distributionTeamMapEmpty => 'موقعیتی برای نمایش نیست.';
+
+  @override
+  String get distributionStatusUnknown => 'نامشخص';
+
+  @override
+  String get distributionReturnPending => 'در انتظار';
+
+  @override
+  String get distributionReturnApproved => 'تأیید شده';
+
+  @override
+  String get distributionReturnRejected => 'رد شده';
+
+  @override
+  String get distributionDayProgress => 'پیشرفت امروز';
+
+  @override
+  String get distributionStopsRemaining => 'باقی‌مانده';
+
+  @override
+  String get distributionStopsDone => 'انجام‌شده';
+
+  @override
+  String get distributionNextStop => 'توقف بعدی';
+
+  @override
+  String get distributionCallCustomer => 'تماس';
+
+  @override
+  String get distributionNavigate => 'مسیریابی';
+
+  @override
+  String get distributionCompleteVisitCta => 'پایان ویزیت';
+
+  @override
+  String get distributionVisitWizardStepOutcome => 'نتیجه';
+
+  @override
+  String get distributionVisitWizardStepSale => 'فروش / فاکتور';
+
+  @override
+  String get distributionVisitWizardStepDelivery => 'تحویل و مدارک';
+
+  @override
+  String get distributionVisitWizardNext => 'ادامه';
+
+  @override
+  String get distributionVisitWizardBack => 'قبلی';
+
+  @override
+  String get distributionVisitWizardFinish => 'ثبت پایان ویزیت';
+
+  @override
+  String get distributionBackToVisit => 'بازگشت به ویزیت باز می‌ماند';
+
+  @override
+  String get distributionEmptyVisits => 'ویزیتی در این بازه نیست.';
+
+  @override
+  String get distributionEmptyVisitsHint =>
+      'از تب میدان، برنامهٔ امروز را شروع کنید.';
+
+  @override
+  String get distributionEmptyReturns => 'مرجوعی ثبت نشده است.';
+
+  @override
+  String get distributionFilterAll => 'همه';
+
+  @override
+  String get distributionFilterPending => 'در انتظار';
+
+  @override
+  String get distributionGoToField => 'برو به میدان';
+
+  @override
+  String get distributionGoToReports => 'گزارش عملکرد';
+
+  @override
+  String get distributionOfflineQueued =>
+      'در صف آفلاین ذخیره شد و بعد از اتصال همگام می‌شود';
+
+  @override
+  String get distributionOfflineQueueTitle => 'صف آفلاین';
+
+  @override
+  String get distributionVarianceFormula =>
+      'مغایرت = جمع وصول − فروش مورد انتظار − هزینه';
+
+  @override
+  String get distributionCashPrefillHint =>
+      'پیش‌فرض نقد برابر فروش مورد انتظار است؛ در صورت نیاز اصلاح کنید.';
+
+  @override
+  String get distributionManageSectionRoutes => 'مسیرها و توقف‌ها';
+
+  @override
+  String get distributionManageSectionSettings => 'تنظیمات پخش';
+
+  @override
+  String get distributionAssignmentFrom => 'از تاریخ';
+
+  @override
+  String get distributionAssignmentTo => 'تا تاریخ';
+
+  @override
+  String get distributionHubToday => 'امروز';
+
+  @override
+  String get distributionMoreActions => 'بیشتر';
+
+  @override
+  String get distributionStopDone => 'انجام شد';
+
+  @override
+  String get distributionStopCurrent => 'جاری';
+
+  @override
+  String get distributionStopPending => 'باقی';
+
+  @override
+  String get distributionLiveAutoRefresh => 'به‌روزرسانی خودکار';
+
+  @override
+  String get distributionViewQueue => 'مشاهده صف';
+
+  @override
+  String get distributionTargetOnField => 'هدف فروش شما';
+
+  @override
+  String get distributionTabCommercial => 'تجاری';
+
+  @override
+  String get distributionTabOrders => 'سفارش‌ها';
+
+  @override
+  String get distributionTabDelivery => 'تحویل';
+
+  @override
+  String get distributionTabLoadPlan => 'بارگیری';
+
+  @override
+  String get distributionTabPromos => 'پروموشن';
+
+  @override
+  String get distributionTabKpiCommission => 'KPI';
+
+  @override
+  String get distributionPresellOrdersHint =>
+      'سفارش‌های پیش‌فروش در انتظار بارگیری و تحویل.';
+
+  @override
+  String get distributionCreateTripFromOrders => 'ساخت مسیر تحویل';
+
+  @override
+  String get distributionNoOrders => 'هنوز سفارش پیش‌فروشی نیست';
+
+  @override
+  String get distributionOrderStatus => 'وضعیت';
+
+  @override
+  String get distributionNetTotal => 'خالص';
+
+  @override
+  String get distributionConfirmOrder => 'تأیید';
+
+  @override
+  String get distributionOrderConfirmed => 'سفارش تأیید شد';
+
+  @override
+  String get distributionNoOrdersForTrip =>
+      'سفارش تأییدشده‌ای برای مسیر تحویل نیست';
+
+  @override
+  String get distributionTripCreated => 'مسیر تحویل ساخته شد';
+
+  @override
+  String get distributionNoTrips => 'برای این روز مسیر تحویلی نیست';
+
+  @override
+  String get distributionTrip => 'مسیر';
+
+  @override
+  String get distributionStartTrip => 'شروع';
+
+  @override
+  String get distributionDeliver => 'تحویل';
+
+  @override
+  String get distributionDeliveryPodTitle => 'تأیید تحویل';
+
+  @override
+  String get distributionMarkDelivered => 'ثبت تحویل';
+
+  @override
+  String get distributionMarkFailed => 'عدم تحویل';
+
+  @override
+  String get distributionDeliveredOk => 'تحویل ثبت شد';
+
+  @override
+  String get distributionBuildLoadPlan => 'ساخت موج بارگیری از سفارش‌ها';
+
+  @override
+  String get distributionLoadPlanHint =>
+      'اقلام سفارش‌های تأییدشده را برای picking تجمیع می‌کند.';
+
+  @override
+  String get distributionNoLoadPlans => 'موج بارگیری نیست';
+
+  @override
+  String get distributionLoadPlan => 'موج بارگیری';
+
+  @override
+  String get distributionSkuLines => 'قلم کالا';
+
+  @override
+  String get distributionConfirmLoad => 'تأیید و بار زدن به ون';
+
+  @override
+  String get distributionLoadPlanCreated => 'موج بارگیری ساخته شد';
+
+  @override
+  String get distributionLoadPlanConfirmed => 'موج بارگیری تأیید شد';
+
+  @override
+  String get distributionManageOnly =>
+      'فقط مدیر می‌تواند این بخش را ویرایش کند';
+
+  @override
+  String get distributionPromoCreate => 'پروموشن جدید';
+
+  @override
+  String get distributionPromoCode => 'کد';
+
+  @override
+  String get distributionPromoName => 'نام';
+
+  @override
+  String get distributionPromoPercent => 'درصد تخفیف';
+
+  @override
+  String get distributionNoPromos => 'پروموشنی نیست';
+
+  @override
+  String get distributionKpiPackTitle => 'بسته KPI پخش';
+
+  @override
+  String get distributionKpiCoverage => 'پوشش';
+
+  @override
+  String get distributionKpiStrike => 'نرخ سفارش';
+
+  @override
+  String get distributionKpiDropSize => 'سبد متوسط';
+
+  @override
+  String get distributionKpiPresell => 'سفارش پیش‌فروش';
+
+  @override
+  String get distributionKpiSales => 'فروش لینک‌شده';
+
+  @override
+  String get distributionKpiShelf => 'امتیاز قفسه';
+
+  @override
+  String get distributionCommissionTitle => 'اجرای پورسانت';
+
+  @override
+  String get distributionNoCommissionRuns => 'هنوز محاسبه پورسانتی نیست';
+
+  @override
+  String get distributionEnablePresell => 'فعال‌سازی پیش‌فروش';
+
+  @override
+  String get distributionEnablePresellHint =>
+      'ویزیتور سفارش برای تحویل بعدی ثبت می‌کند (جدا از فروش ون).';
+
+  @override
+  String get distributionEnablePromotions => 'فعال‌سازی پروموشن تجاری';
+
+  @override
+  String get distributionEnableSuggestedOrder => 'پیشنهاد سفارش از سابقه';
+
+  @override
+  String get distributionVisitorMaxDiscount => 'سقف تخفیف ویزیتور ٪';
+
+  @override
+  String get distributionSaleMode => 'نوع فروش';
+
+  @override
+  String get distributionSaleModeVan => 'ون';
+
+  @override
+  String get distributionSaleModePresell => 'پیش‌فروش';
+
+  @override
+  String get distributionSaleModeInvoice => 'فاکتور';
+
+  @override
+  String get distributionApplySuggestedOrder => 'اعمال سفارش پیشنهادی';
+
+  @override
+  String get distributionApplyPromos => 'اعمال پروموشن';
+
+  @override
+  String get distributionPresellLinesTitle => 'اقلام پیش‌فروش';
+
+  @override
+  String get distributionPresellLinesHint =>
+      'این اقلام بعداً تحویل می‌شوند — از موجودی ون کم نمی‌شوند.';
+
+  @override
+  String get distributionProductId => 'شناسه کالا';
+
+  @override
+  String get distributionProductNameOptional => 'نام کالا (اختیاری)';
+
+  @override
+  String get distributionChequeItemsTitle => 'جزئیات چک';
+
+  @override
+  String get distributionChequeItemsHint =>
+      'با تأیید تسویه، برای هر قلم سند چک دریافتی ساخته می‌شود.';
+
+  @override
+  String get distributionChequePersonId => 'شناسه مشتری';
+
+  @override
+  String get distributionChequeAmount => 'مبلغ';
+
+  @override
+  String get distributionChequeNumber => 'شماره چک';
+
+  @override
+  String get distributionChequeDueDate => 'سررسید';
+
+  @override
+  String get distributionAddChequeItem => 'افزودن چک';
+
+  @override
+  String get distributionChequeItemsRequired =>
+      'با مبلغ چک، جزئیات چک را وارد کنید';
+
+  @override
+  String get distributionChequeItemsMismatch =>
+      'جمع اقلام چک باید با مبلغ چک برابر باشد';
+
+  @override
+  String get distributionLineDiscount => 'تخفیف خط';
+
+  @override
+  String get distributionShelfAuditTitle => 'ممیزی قفسه';
+
+  @override
+  String get distributionShelfFacingOk => 'چینش/Facing درست است';
+
+  @override
+  String get distributionShelfPriceOk => 'برچسب قیمت درست است';
+
+  @override
+  String get distributionShelfStockOk => 'موجودی قفسه کافی است';
+
+  @override
+  String get distributionSelectVan => 'انتخاب ون';
+
+  @override
+  String get distributionSelectWarehouse => 'انتخاب انبار مبدأ';
+
+  @override
+  String get distributionTabShelfAssets => 'قفسه و دارایی';
+
+  @override
+  String get distributionCommissionRulesTitle => 'قوانین پورسانت';
+
+  @override
+  String get distributionCommissionRuleCreate => 'قانون جدید';
+
+  @override
+  String get distributionCommissionPercent => 'درصد پورسانت';
+
+  @override
+  String get distributionCommissionCompute => 'محاسبه پورسانت';
+
+  @override
+  String get distributionCommissionComputed => 'پورسانت محاسبه شد';
+
+  @override
+  String get distributionNoCommissionRules => 'هنوز قانونی تعریف نشده';
+
+  @override
+  String get distributionAssetsTitle => 'دارایی نزد مشتری';
+
+  @override
+  String get distributionAssetCreate => 'ثبت دارایی';
+
+  @override
+  String get distributionAssetType => 'نوع دارایی';
+
+  @override
+  String get distributionAssetCode => 'کد دارایی';
+
+  @override
+  String get distributionNoAssets => 'دارایی ثبت نشده است';
+
+  @override
+  String get distributionNoShelfAudits => 'ممیزی قفسه‌ای ثبت نشده';
+
+  @override
+  String get distributionTargetMetric => 'معیار هدف';
+
+  @override
+  String get distributionMetricAmount => 'مبلغ فروش';
+
+  @override
+  String get distributionMetricVisits => 'تعداد ویزیت';
+
+  @override
+  String get distributionMetricSkuQty => 'تعداد کالا';
+
+  @override
+  String get distributionMetricCoverage => 'پوشش ٪';
+
+  @override
+  String get distributionTargetValue => 'مقدار هدف';
 }

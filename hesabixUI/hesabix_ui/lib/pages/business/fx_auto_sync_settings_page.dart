@@ -9,6 +9,7 @@ import 'package:hesabix_ui/utils/error_extractor.dart';
 import 'package:hesabix_ui/utils/snackbar_helper.dart';
 import 'package:hesabix_ui/widgets/business_subpage_back_leading.dart';
 import 'package:hesabix_ui/widgets/multi_currency_gate.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 /// زمان‌بندی خودکار ثبت نرخ تسعیر از اسنپ‌شات مرکزی + آفست per ارز.
 class FxAutoSyncSettingsPage extends StatefulWidget {
@@ -314,7 +315,7 @@ class _FxAutoSyncSettingsPageState extends State<FxAutoSyncSettingsPage> {
       case 'ok':
         return cs.primary;
       case 'partial':
-        return Colors.orange.shade700;
+        return SemanticColorResolver.warning(context);
       case 'error':
       case 'stale':
       case 'missing_snapshot':
@@ -445,7 +446,7 @@ class _FxAutoSyncSettingsPageState extends State<FxAutoSyncSettingsPage> {
                           ),
                       ],
                     ),
-                    const SizedBox(height: 8),
+                    SizedBox(height: 8),
                     Row(
                       children: [
                         Expanded(
@@ -534,7 +535,7 @@ class _FxAutoSyncSettingsPageState extends State<FxAutoSyncSettingsPage> {
                                 height: 16,
                                 child: CircularProgressIndicator(strokeWidth: 2),
                               )
-                            : const Icon(Icons.refresh, size: 18),
+                            : Icon(Icons.refresh, size: 18),
                         label: Text(t.fxAutoSyncRefreshPreview),
                       ),
                     ],
@@ -542,7 +543,7 @@ class _FxAutoSyncSettingsPageState extends State<FxAutoSyncSettingsPage> {
                   if (_previewWarning != null) ...[
                     const SizedBox(height: 8),
                     Material(
-                      color: Colors.orange.withValues(alpha: 0.12),
+                      color: SemanticColorResolver.warning(context).withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(8),
                       child: Padding(
                         padding: const EdgeInsets.all(12),

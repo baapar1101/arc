@@ -7,6 +7,7 @@ import '../../utils/number_formatters.dart';
 import '../../utils/responsive_helper.dart';
 import '../../widgets/data_table/data_table_widget.dart';
 import '../../widgets/data_table/data_table_config.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 class WarehouseDocWizardResult {
   final bool isManual;
@@ -214,9 +215,9 @@ class _WarehouseDocWizardDialogState extends State<WarehouseDocWizardDialog> {
   Color _stateColor(BuildContext context, String state) {
     switch (state) {
       case 'draft':
-        return Colors.orange;
+        return SemanticColorResolver.warning(context);
       case 'posted':
-        return Colors.green;
+        return SemanticColorResolver.positive(context);
       case 'partial':
         return Colors.amber;
       default:

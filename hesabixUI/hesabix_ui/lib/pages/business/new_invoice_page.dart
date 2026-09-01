@@ -51,6 +51,7 @@ import '../../utils/invoice_adjustments_account_filter.dart';
 import 'business_shell_side_nav_scope.dart';
 import '../../widgets/business_subpage_back_leading.dart';
 import 'package:hesabix_ui/services/bytes_export/bytes_export_service.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 
 class NewInvoicePage extends StatefulWidget {
@@ -1525,7 +1526,7 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                                       padding: const EdgeInsets.only(top: 4),
                                       child: Text(
                                         'ثبت این فاکتور احتمالاً از سقف اعتبار عبور می‌کند و توسط سیستم رد می‌شود مگر این‌که گزینه نادیده گرفتن اعتبار را فعال کنید.',
-                                        style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.red),
+                                        style: Theme.of(context).textTheme.bodySmall?.copyWith(color: SemanticColorResolver.negative(context)),
                                       ),
                                     ),
                                   if (limitExceeded && _ignoreCreditCheck)
@@ -1533,7 +1534,7 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                                       padding: const EdgeInsets.only(top: 4),
                                       child: Text(
                                         'هشدار: این فاکتور با وجود عبور از سقف اعتبار، به دلیل فعال بودن نادیده گرفتن اعتبار ثبت خواهد شد.',
-                                        style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.orange),
+                                        style: Theme.of(context).textTheme.bodySmall?.copyWith(color: SemanticColorResolver.warning(context)),
                                       ),
                                     ),
                                 ],
@@ -1781,7 +1782,7 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
                       final sumTotal = _installmentsTotal;
                       final targetPrincipal = (_invoiceGrandTotal.toDouble() - (_downPayment ?? 0)).clamp(0, double.infinity);
                       final diff = sumPrincipal - targetPrincipal;
-                      final diffColor = diff.abs() <= 1 ? Colors.green : Colors.orange;
+                      final diffColor = diff.abs() <= 1 ? SemanticColorResolver.positive(context) : SemanticColorResolver.warning(context);
                       return Align(
                         alignment: Alignment.centerRight,
                         child: Wrap(

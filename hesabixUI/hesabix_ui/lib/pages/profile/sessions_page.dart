@@ -4,6 +4,7 @@ import '../../l10n/app_localizations.dart';
 import '../../services/session_service.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 class SessionsPage extends StatefulWidget {
   const SessionsPage({super.key});
@@ -178,7 +179,7 @@ class _SessionsPageState extends State<SessionsPage> {
 
   Color _getDeviceColor(SessionInfo session) {
     if (session.deviceType == 'mobile') {
-      return Colors.blue;
+      return SemanticColorResolver.info(context);
     } else if (session.deviceType == 'tablet') {
       return Colors.purple;
     } else {

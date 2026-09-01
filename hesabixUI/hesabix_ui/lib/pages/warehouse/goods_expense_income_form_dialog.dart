@@ -16,6 +16,7 @@ import '../../widgets/invoice/person_combobox_widget.dart';
 import '../../widgets/invoice/product_combobox_widget.dart';
 import '../../widgets/invoice/warehouse_combobox_widget.dart';
 import 'goods_expense_income_list_page.dart' show docKindLabel, geiStatusLabel;
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 const String _kSection = 'goods_expense_income';
 
@@ -448,7 +449,7 @@ class _GoodsExpenseIncomeFormDialogState extends State<GoodsExpenseIncomeFormDia
                                   },
                                 ),
                               ),
-                              const SizedBox(width: 12),
+                              SizedBox(width: 12),
                               Expanded(
                                 child: PersonComboboxWidget(
                                   businessId: widget.businessId,
@@ -494,7 +495,7 @@ class _GoodsExpenseIncomeFormDialogState extends State<GoodsExpenseIncomeFormDia
                               if (_opsEditable)
                                 TextButton.icon(
                                   onPressed: () => setState(() => _lines.add(_LineVm())),
-                                  icon: const Icon(Icons.add),
+                                  icon: Icon(Icons.add),
                                   label: const Text('افزودن سطر'),
                                 ),
                             ],
@@ -598,7 +599,7 @@ class _GoodsExpenseIncomeFormDialogState extends State<GoodsExpenseIncomeFormDia
                     ),
                   if (_isEdit && _status == 'posted' && _can('cancel'))
                     FilledButton(
-                      style: FilledButton.styleFrom(backgroundColor: Colors.red),
+                      style: FilledButton.styleFrom(backgroundColor: SemanticColorResolver.negative(context)),
                       onPressed: _saving
                           ? null
                           : () => _runAction(
@@ -639,7 +640,7 @@ class _GoodsExpenseIncomeFormDialogState extends State<GoodsExpenseIncomeFormDia
                         _lines.removeAt(index);
                       });
                     },
-                    icon: const Icon(Icons.delete_outline, color: Colors.red),
+                    icon: Icon(Icons.delete_outline, color: SemanticColorResolver.negative(context)),
                   ),
               ],
             ),

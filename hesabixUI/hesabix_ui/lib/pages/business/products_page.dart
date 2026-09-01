@@ -44,6 +44,7 @@ import '../../utils/error_extractor.dart';
 import '../../utils/general_barcode_utils.dart';
 import '../../core/date_utils.dart';
 import '../../widgets/jalali_date_picker.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 class ProductsPage extends StatefulWidget {
   final int businessId;
@@ -1051,7 +1052,7 @@ class _ProductsPageState extends State<ProductsPage> {
         return AlertDialog(
           title: Row(
             children: [
-              Icon(Icons.warning_amber_rounded, color: Colors.orange.shade600),
+              Icon(Icons.warning_amber_rounded, color: SemanticColorResolver.warning(context)),
               const SizedBox(width: 12),
               const Expanded(
                 child: Text(
@@ -1136,7 +1137,7 @@ class _ProductsPageState extends State<ProductsPage> {
             style: theme.textTheme.bodyMedium?.copyWith(
               fontWeight: highlight ? FontWeight.bold : FontWeight.normal,
               color: isError
-                  ? Colors.red
+                  ? SemanticColorResolver.negative(context)
                   : highlight
                       ? theme.colorScheme.primary
                       : theme.colorScheme.onSurface,
@@ -1758,10 +1759,10 @@ class _ProductsPageState extends State<ProductsPage> {
                 
                 // اگر موجودی حسابداری یا نقطه سفارش مجدد null باشد، ضربدر نمایش بده
                 if (stockFinancial == null || reorderPoint == null) {
-                  return const Center(
+                  return Center(
                     child: Icon(
                       Icons.close,
-                      color: Colors.red,
+                      color: SemanticColorResolver.negative(context),
                       size: 20,
                     ),
                   );
@@ -1772,18 +1773,18 @@ class _ProductsPageState extends State<ProductsPage> {
                 
                 // اگر موجودی حسابداری کمتر از نقطه سفارش مجدد باشد، تیک بزن
                 if (stock < reorder) {
-                  return const Center(
+                  return Center(
                     child: Icon(
                       Icons.check_circle,
-                      color: Colors.green,
+                      color: SemanticColorResolver.positive(context),
                       size: 20,
                     ),
                   );
                 } else {
-                  return const Center(
+                  return Center(
                     child: Icon(
                       Icons.close,
-                      color: Colors.red,
+                      color: SemanticColorResolver.negative(context),
                       size: 20,
                     ),
                   );
@@ -3002,9 +3003,9 @@ class _ProductStockTabWidgetState extends State<_ProductStockTabWidget> {
                                       formatWithThousands(quantity, decimalPlaces: 2),
                                       style: TextStyle(
                                         color: isNegative
-                                            ? Colors.red
+                                            ? SemanticColorResolver.negative(context)
                                             : isLow
-                                                ? Colors.orange
+                                                ? SemanticColorResolver.warning(context)
                                                 : null,
                                         fontWeight: isNegative || isLow
                                             ? FontWeight.w600

@@ -4,6 +4,7 @@ import 'package:hesabix_ui/core/calendar_controller.dart';
 import 'package:hesabix_ui/widgets/date_input_field.dart';
 import 'package:hesabix_ui/widgets/project/project_selector_widget.dart';
 import 'package:hesabix_ui/utils/responsive_helper.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 /// فیلترهای مشترک برای گزارشات مالی
 /// 
@@ -159,12 +160,12 @@ class CommonReportFilters extends StatelessWidget {
                             margin: const EdgeInsets.only(right: 4),
                             padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
                             decoration: BoxDecoration(
-                              color: Colors.green.withOpacity(0.2),
+                              color: SemanticColorResolver.positive(context).withValues(alpha: 0.2),
                               borderRadius: BorderRadius.circular(3),
                             ),
-                            child: const Text(
+                            child: Text(
                               'جاری',
-                              style: TextStyle(fontSize: 10, color: Colors.green),
+                              style: TextStyle(fontSize: 10, color: SemanticColorResolver.positive(context)),
                             ),
                           ),
                       ],
@@ -210,28 +211,28 @@ class ProjectFilterBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        color: Colors.blue.shade50,
+        color: SemanticColorResolver.info(context).withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.blue.shade200),
+        border: Border.all(color: SemanticColorResolver.info(context).withValues(alpha: 0.35)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.folder_special, size: 16, color: Colors.blue.shade700),
-          const SizedBox(width: 6),
+          Icon(Icons.folder_special, size: 16, color: SemanticColorResolver.info(context)),
+          SizedBox(width: 6),
           Text(
             'پروژه: $projectName',
             style: TextStyle(
-              color: Colors.blue.shade900,
+              color: SemanticColorResolver.info(context),
               fontSize: 13,
               fontWeight: FontWeight.w500,
             ),
           ),
-          const SizedBox(width: 4),
+          SizedBox(width: 4),
           InkWell(
             onTap: onClear,
             borderRadius: BorderRadius.circular(12),
-            child: Icon(Icons.close, size: 16, color: Colors.blue.shade700),
+            child: Icon(Icons.close, size: 16, color: SemanticColorResolver.info(context)),
           ),
         ],
       ),

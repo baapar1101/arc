@@ -2,28 +2,33 @@ import 'package:flutter/material.dart';
 
 import '../../../core/calendar_controller.dart';
 import '../../../core/locale_controller.dart';
+import '../../../theme/brand_logo.dart';
 import '../../../theme/theme_controller.dart';
 import '../../../utils/responsive_helper.dart';
 import '../../../widgets/calendar_switcher.dart';
 import '../../../widgets/language_switcher.dart';
 import '../../../widgets/theme_mode_switcher.dart';
+import '../../../widgets/theme_palette_switcher.dart';
 import 'auth_brand_panel.dart';
 
 /// قالب دو ستونه صفحات auth — برند + فرم.
 class AuthShell extends StatelessWidget {
-  final String logoAsset;
   final Widget formPanel;
   final LocaleController localeController;
   final CalendarController calendarController;
   final ThemeController? themeController;
 
+  /// سازگاری با فراخوانی‌های قدیمی؛ نادیده گرفته می‌شود (لوگو از تم می‌آید).
+  @Deprecated('Logo follows theme via BrandLogo')
+  final String? logoAsset;
+
   const AuthShell({
     super.key,
-    required this.logoAsset,
     required this.formPanel,
     required this.localeController,
     required this.calendarController,
     this.themeController,
+    this.logoAsset,
   });
 
   @override
@@ -39,7 +44,7 @@ class AuthShell extends StatelessWidget {
             if (isWide)
               Row(
                 children: [
-                  Expanded(child: AuthBrandPanel(logoAsset: logoAsset)),
+                  const Expanded(child: AuthBrandPanel()),
                   Expanded(
                     child: _FormScroll(
                       bottomInset: bottomInset,
@@ -54,11 +59,11 @@ class AuthShell extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
+                    const Padding(
+                      padding: EdgeInsets.fromLTRB(24, 16, 24, 0),
                       child: Row(
                         children: [
-                          Image.asset(logoAsset, height: 36),
+                          BrandLogo(height: 36),
                         ],
                       ),
                     ),
@@ -74,6 +79,8 @@ class AuthShell extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
                   if (themeController != null) ...[
+                    ThemePaletteSwitcher(controller: themeController!),
+                    const SizedBox(width: 4),
                     ThemeModeSwitcher(controller: themeController!),
                     const SizedBox(width: 4),
                   ],

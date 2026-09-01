@@ -66,6 +66,35 @@ class AppLocalizationsEn extends AppLocalizations {
   String get theme => 'Theme';
 
   @override
+  String get colorTheme => 'Color theme';
+
+  @override
+  String get colorThemeDescription =>
+      'Choose a color palette applied across the whole app.';
+
+  @override
+  String get themeModeLabel => 'Light / Dark mode';
+
+  @override
+  String get defaultColorTheme => 'Default color theme';
+
+  @override
+  String get defaultColorThemeHint =>
+      'Applied for users who have not chosen a color theme yet.';
+
+  @override
+  String get themeClassicBlue => 'Classic Blue';
+
+  @override
+  String get themeTurquoiseSea => 'Turquoise Sea';
+
+  @override
+  String get themeEmeraldForest => 'Emerald Forest';
+
+  @override
+  String get themeWarmCopper => 'Warm Copper';
+
+  @override
   String get system => 'System';
 
   @override
@@ -15683,6 +15712,135 @@ class AppLocalizationsEn extends AppLocalizations {
   String get distributionNotesLabel => 'Notes';
 
   @override
+  String get distributionVanCreate => 'Create van';
+
+  @override
+  String get distributionVanUnload => 'Unload van';
+
+  @override
+  String get distributionSelectVisitor => 'Select visitor';
+
+  @override
+  String get distributionSourceWarehouse => 'Source warehouse';
+
+  @override
+  String get distributionDestWarehouse => 'Destination warehouse';
+
+  @override
+  String get distributionNoVanAssigned => 'No van is assigned to you.';
+
+  @override
+  String get distributionVanStockEmpty => 'Van stock is empty.';
+
+  @override
+  String get distributionDeleteStop => 'Delete stop';
+
+  @override
+  String get distributionDeleteAssignment => 'Remove assignment';
+
+  @override
+  String get distributionApplyOptimize => 'Apply & save order';
+
+  @override
+  String get distributionOfflinePartial => 'Some offline actions failed.';
+
+  @override
+  String get distributionVisitStayHint =>
+      'Visit started; complete it when you finish with the customer.';
+
+  @override
+  String get distributionSalesLinked => 'Linked sales';
+
+  @override
+  String get distributionCoveragePercent => 'Route coverage';
+
+  @override
+  String get distributionChecklistAddItem => 'Add checklist item';
+
+  @override
+  String get distributionDefaultWarehouse => 'Default load warehouse';
+
+  @override
+  String get distributionOpenInvoiceKeepVisit => 'Invoice (visit stays open)';
+
+  @override
+  String get distributionTabSettlement => 'Daily settlement';
+
+  @override
+  String get distributionExpectedSales => 'Expected sales today';
+
+  @override
+  String get distributionCashCollected => 'Cash collected';
+
+  @override
+  String get distributionChequeCollected => 'Cheques collected';
+
+  @override
+  String get distributionCardCollected => 'Card / POS';
+
+  @override
+  String get distributionOtherCollected => 'Other collected';
+
+  @override
+  String get distributionSettlementExpenses => 'Day expenses';
+
+  @override
+  String get distributionSettlementVariance => 'Variance';
+
+  @override
+  String get distributionCreateReceiptOnConfirm =>
+      'Create cash receipt on confirm';
+
+  @override
+  String get distributionCashRegister => 'Cash register';
+
+  @override
+  String get distributionCashRegisterRequired =>
+      'Select a cash register to create a receipt.';
+
+  @override
+  String get distributionSaveDraft => 'Save draft';
+
+  @override
+  String get distributionConfirmSettlement => 'Confirm settlement';
+
+  @override
+  String get distributionSettlementConfirmed => 'Settlement confirmed';
+
+  @override
+  String get distributionPrintSettlement => 'Print settlement';
+
+  @override
+  String get distributionPrintDailyPlan => 'Print daily plan';
+
+  @override
+  String get distributionPrintLoadingList => 'Print loading list';
+
+  @override
+  String get distributionPdfExported => 'PDF exported';
+
+  @override
+  String get distributionTargetsTitle => 'Visitor sales targets';
+
+  @override
+  String get distributionTargetCreate => 'New target';
+
+  @override
+  String get distributionTargetPeriodType => 'Period type';
+
+  @override
+  String get distributionTargetPeriodDay => 'Daily';
+
+  @override
+  String get distributionTargetPeriodMonth => 'Monthly';
+
+  @override
+  String get distributionTargetAmount => 'Target amount';
+
+  @override
+  String get distributionTargetsEmpty => 'No targets defined yet.';
+
+  @override
   String get reportsDistributionSection => 'Distribution & field visits';
 
   @override
@@ -18881,4 +19039,567 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get barcodeLabelPrinterEscPosSent => 'ESC/POS sent to printer';
+
+  @override
+  String get distributionVisitCompleteHint =>
+      'Record the visit outcome; pick an invoice or sell from van stock.';
+
+  @override
+  String get distributionLinkInvoice => 'Link sales invoice';
+
+  @override
+  String get distributionSelectInvoice => 'Select invoice';
+
+  @override
+  String get distributionNoInvoiceLink => 'No invoice link';
+
+  @override
+  String get distributionNoRecentInvoices =>
+      'No recent invoices for this customer.';
+
+  @override
+  String get distributionLinkedDocument => 'Linked document';
+
+  @override
+  String get distributionRemaining => 'Remaining';
+
+  @override
+  String get distributionVanSaleFromStock => 'Sell from van stock';
+
+  @override
+  String get distributionVanSaleFromStockHint =>
+      'Pick SKUs from current van stock; invoice uses price and tax.';
+
+  @override
+  String get distributionVanQtyExceedsStock => 'Quantity exceeds van stock.';
+
+  @override
+  String get distributionVarianceMustBeZero =>
+      'Variance must be zero, or manager must allow variance.';
+
+  @override
+  String get distributionVarianceOverrideManageOnly =>
+      'Variance override requires manage permission.';
+
+  @override
+  String get distributionBankRequired =>
+      'Select a bank account for card collection.';
+
+  @override
+  String get distributionBankForCard => 'Bank account (card)';
+
+  @override
+  String get distributionCreateReceiptHint =>
+      'Cash/card receipts allocate to the day\'s visit invoices.';
+
+  @override
+  String get distributionAllowVariance => 'Allow confirm with variance';
+
+  @override
+  String get distributionAllowVarianceHint =>
+      'Only managers can confirm settlements with variance.';
+
+  @override
+  String get distributionDraftAwaitingConfirm =>
+      'Draft saved; final confirm needs settle/manage.';
+
+  @override
+  String get distributionSaveDraftOnly => 'Draft only';
+
+  @override
+  String get distributionConfirmNeedsManager =>
+      'Final settlement confirm needs settle or manage.';
+
+  @override
+  String get distributionGeofenceOverrideManageOnly =>
+      'Geofence override is manage-only.';
+
+  @override
+  String get distributionGeofenceOverrideReason => 'Override reason';
+
+  @override
+  String get distributionPermissionSettle => 'Confirm daily settlement';
+
+  @override
+  String get distributionPermissionApproveReturns =>
+      'Approve distribution returns';
+
+  @override
+  String get distributionSourceInvoice => 'Source invoice for return';
+
+  @override
+  String get distributionSettlementsReport => 'Settlements';
+
+  @override
+  String get distributionOrderRate => 'Order rate';
+
+  @override
+  String get distributionVarianceAbs => 'Abs. variance total';
+
+  @override
+  String get distributionCustomerCredit => 'Customer credit';
+
+  @override
+  String get distributionCustomerCreditBlocked =>
+      'Customer credit limit exceeded or blocked; van sale not allowed.';
+
+  @override
+  String get distributionAvailableCredit => 'Available credit';
+
+  @override
+  String get distributionCreditLimit => 'Credit limit';
+
+  @override
+  String get distributionPodTitle => 'Proof of delivery (POD)';
+
+  @override
+  String get distributionPodHint =>
+      'If goods were delivered, record the recipient name.';
+
+  @override
+  String get distributionPodConfirm => 'Delivery confirmed';
+
+  @override
+  String get distributionPodSignerName => 'Receiver name';
+
+  @override
+  String get distributionPodNote => 'Delivery note';
+
+  @override
+  String get distributionPodSignerRequired => 'Receiver name is required';
+
+  @override
+  String get distributionLiveRefresh => 'Live';
+
+  @override
+  String get distributionLastUpdated => 'Last updated';
+
+  @override
+  String get distributionLiveAt => 'Live location';
+
+  @override
+  String get distributionTeamMapEmpty => 'No locations to show.';
+
+  @override
+  String get distributionStatusUnknown => 'Unknown';
+
+  @override
+  String get distributionReturnPending => 'Pending';
+
+  @override
+  String get distributionReturnApproved => 'Approved';
+
+  @override
+  String get distributionReturnRejected => 'Rejected';
+
+  @override
+  String get distributionDayProgress => 'Today\'s progress';
+
+  @override
+  String get distributionStopsRemaining => 'Remaining';
+
+  @override
+  String get distributionStopsDone => 'Done';
+
+  @override
+  String get distributionNextStop => 'Next stop';
+
+  @override
+  String get distributionCallCustomer => 'Call';
+
+  @override
+  String get distributionNavigate => 'Navigate';
+
+  @override
+  String get distributionCompleteVisitCta => 'Complete visit';
+
+  @override
+  String get distributionVisitWizardStepOutcome => 'Outcome';
+
+  @override
+  String get distributionVisitWizardStepSale => 'Sale / invoice';
+
+  @override
+  String get distributionVisitWizardStepDelivery => 'Delivery & docs';
+
+  @override
+  String get distributionVisitWizardNext => 'Continue';
+
+  @override
+  String get distributionVisitWizardBack => 'Back';
+
+  @override
+  String get distributionVisitWizardFinish => 'Finish visit';
+
+  @override
+  String get distributionBackToVisit => 'Visit stays open after invoice';
+
+  @override
+  String get distributionEmptyVisits => 'No visits in this range.';
+
+  @override
+  String get distributionEmptyVisitsHint =>
+      'Start today\'s plan from the Field tab.';
+
+  @override
+  String get distributionEmptyReturns => 'No return requests yet.';
+
+  @override
+  String get distributionFilterAll => 'All';
+
+  @override
+  String get distributionFilterPending => 'Pending';
+
+  @override
+  String get distributionGoToField => 'Go to Field';
+
+  @override
+  String get distributionGoToReports => 'Performance report';
+
+  @override
+  String get distributionOfflineQueued =>
+      'Saved to offline queue — will sync when online';
+
+  @override
+  String get distributionOfflineQueueTitle => 'Offline queue';
+
+  @override
+  String get distributionVarianceFormula =>
+      'Variance = collections − expected − expenses';
+
+  @override
+  String get distributionCashPrefillHint =>
+      'Cash defaults to expected sales; adjust if needed.';
+
+  @override
+  String get distributionManageSectionRoutes => 'Routes & stops';
+
+  @override
+  String get distributionManageSectionSettings => 'Distribution settings';
+
+  @override
+  String get distributionAssignmentFrom => 'Valid from';
+
+  @override
+  String get distributionAssignmentTo => 'Valid to';
+
+  @override
+  String get distributionHubToday => 'Today';
+
+  @override
+  String get distributionMoreActions => 'More';
+
+  @override
+  String get distributionStopDone => 'Done';
+
+  @override
+  String get distributionStopCurrent => 'Current';
+
+  @override
+  String get distributionStopPending => 'Todo';
+
+  @override
+  String get distributionLiveAutoRefresh => 'Auto refresh';
+
+  @override
+  String get distributionViewQueue => 'View queue';
+
+  @override
+  String get distributionTargetOnField => 'Your sales target';
+
+  @override
+  String get distributionTabCommercial => 'Commercial';
+
+  @override
+  String get distributionTabOrders => 'Orders';
+
+  @override
+  String get distributionTabDelivery => 'Delivery';
+
+  @override
+  String get distributionTabLoadPlan => 'Load plan';
+
+  @override
+  String get distributionTabPromos => 'Promotions';
+
+  @override
+  String get distributionTabKpiCommission => 'KPI';
+
+  @override
+  String get distributionPresellOrdersHint =>
+      'Pre-sell orders waiting for warehouse load and delivery.';
+
+  @override
+  String get distributionCreateTripFromOrders => 'Create delivery trip';
+
+  @override
+  String get distributionNoOrders => 'No pre-sell orders yet';
+
+  @override
+  String get distributionOrderStatus => 'Status';
+
+  @override
+  String get distributionNetTotal => 'Net';
+
+  @override
+  String get distributionConfirmOrder => 'Confirm';
+
+  @override
+  String get distributionOrderConfirmed => 'Order confirmed';
+
+  @override
+  String get distributionNoOrdersForTrip =>
+      'No confirmed orders to put on a trip';
+
+  @override
+  String get distributionTripCreated => 'Delivery trip created';
+
+  @override
+  String get distributionNoTrips => 'No delivery trips for this day';
+
+  @override
+  String get distributionTrip => 'Trip';
+
+  @override
+  String get distributionStartTrip => 'Start';
+
+  @override
+  String get distributionDeliver => 'Deliver';
+
+  @override
+  String get distributionDeliveryPodTitle => 'Proof of delivery';
+
+  @override
+  String get distributionMarkDelivered => 'Mark delivered';
+
+  @override
+  String get distributionMarkFailed => 'Could not deliver';
+
+  @override
+  String get distributionDeliveredOk => 'Delivery recorded';
+
+  @override
+  String get distributionBuildLoadPlan => 'Build load plan from orders';
+
+  @override
+  String get distributionLoadPlanHint =>
+      'Aggregates confirmed pre-sell lines into a picking wave.';
+
+  @override
+  String get distributionNoLoadPlans => 'No load plans';
+
+  @override
+  String get distributionLoadPlan => 'Load plan';
+
+  @override
+  String get distributionSkuLines => 'SKU lines';
+
+  @override
+  String get distributionConfirmLoad => 'Confirm & load van';
+
+  @override
+  String get distributionLoadPlanCreated => 'Load plan created';
+
+  @override
+  String get distributionLoadPlanConfirmed => 'Load plan confirmed';
+
+  @override
+  String get distributionManageOnly => 'Only managers can edit this section';
+
+  @override
+  String get distributionPromoCreate => 'New promotion';
+
+  @override
+  String get distributionPromoCode => 'Code';
+
+  @override
+  String get distributionPromoName => 'Name';
+
+  @override
+  String get distributionPromoPercent => 'Discount %';
+
+  @override
+  String get distributionNoPromos => 'No promotions';
+
+  @override
+  String get distributionKpiPackTitle => 'Distribution KPI pack';
+
+  @override
+  String get distributionKpiCoverage => 'Coverage';
+
+  @override
+  String get distributionKpiStrike => 'Strike rate';
+
+  @override
+  String get distributionKpiDropSize => 'Drop size';
+
+  @override
+  String get distributionKpiPresell => 'Pre-sell orders';
+
+  @override
+  String get distributionKpiSales => 'Linked sales';
+
+  @override
+  String get distributionKpiShelf => 'Shelf score';
+
+  @override
+  String get distributionCommissionTitle => 'Commission runs';
+
+  @override
+  String get distributionNoCommissionRuns => 'No commission runs yet';
+
+  @override
+  String get distributionEnablePresell => 'Enable pre-sell orders';
+
+  @override
+  String get distributionEnablePresellHint =>
+      'Visitor takes order for later delivery (separate from van sale).';
+
+  @override
+  String get distributionEnablePromotions => 'Enable trade promotions';
+
+  @override
+  String get distributionEnableSuggestedOrder => 'Suggested order from history';
+
+  @override
+  String get distributionVisitorMaxDiscount => 'Visitor max discount %';
+
+  @override
+  String get distributionSaleMode => 'Sale type';
+
+  @override
+  String get distributionSaleModeVan => 'Van';
+
+  @override
+  String get distributionSaleModePresell => 'Pre-sell';
+
+  @override
+  String get distributionSaleModeInvoice => 'Invoice';
+
+  @override
+  String get distributionApplySuggestedOrder => 'Apply suggested order';
+
+  @override
+  String get distributionApplyPromos => 'Apply promotions';
+
+  @override
+  String get distributionPresellLinesTitle => 'Pre-sell lines';
+
+  @override
+  String get distributionPresellLinesHint =>
+      'These items will be delivered later — not taken from van stock.';
+
+  @override
+  String get distributionProductId => 'Product ID';
+
+  @override
+  String get distributionProductNameOptional => 'Product name (optional)';
+
+  @override
+  String get distributionChequeItemsTitle => 'Cheque details';
+
+  @override
+  String get distributionChequeItemsHint =>
+      'Each cheque becomes a received check document on confirm.';
+
+  @override
+  String get distributionChequePersonId => 'Customer ID';
+
+  @override
+  String get distributionChequeAmount => 'Amount';
+
+  @override
+  String get distributionChequeNumber => 'Cheque no.';
+
+  @override
+  String get distributionChequeDueDate => 'Due date';
+
+  @override
+  String get distributionAddChequeItem => 'Add cheque';
+
+  @override
+  String get distributionChequeItemsRequired =>
+      'Add cheque details when cheque amount > 0';
+
+  @override
+  String get distributionChequeItemsMismatch =>
+      'Cheque lines total must match cheque collected';
+
+  @override
+  String get distributionLineDiscount => 'Line discount';
+
+  @override
+  String get distributionShelfAuditTitle => 'Shelf audit';
+
+  @override
+  String get distributionShelfFacingOk => 'Facing is correct';
+
+  @override
+  String get distributionShelfPriceOk => 'Price label is correct';
+
+  @override
+  String get distributionShelfStockOk => 'Shelf stock is adequate';
+
+  @override
+  String get distributionSelectVan => 'Select van';
+
+  @override
+  String get distributionSelectWarehouse => 'Select source warehouse';
+
+  @override
+  String get distributionTabShelfAssets => 'Shelf & assets';
+
+  @override
+  String get distributionCommissionRulesTitle => 'Commission rules';
+
+  @override
+  String get distributionCommissionRuleCreate => 'New rule';
+
+  @override
+  String get distributionCommissionPercent => 'Commission %';
+
+  @override
+  String get distributionCommissionCompute => 'Compute commission';
+
+  @override
+  String get distributionCommissionComputed => 'Commission computed';
+
+  @override
+  String get distributionNoCommissionRules => 'No commission rules yet';
+
+  @override
+  String get distributionAssetsTitle => 'Customer assets';
+
+  @override
+  String get distributionAssetCreate => 'Register asset';
+
+  @override
+  String get distributionAssetType => 'Asset type';
+
+  @override
+  String get distributionAssetCode => 'Asset code';
+
+  @override
+  String get distributionNoAssets => 'No assets registered';
+
+  @override
+  String get distributionNoShelfAudits => 'No shelf audits yet';
+
+  @override
+  String get distributionTargetMetric => 'Target metric';
+
+  @override
+  String get distributionMetricAmount => 'Sales amount';
+
+  @override
+  String get distributionMetricVisits => 'Visit count';
+
+  @override
+  String get distributionMetricSkuQty => 'SKU quantity';
+
+  @override
+  String get distributionMetricCoverage => 'Coverage %';
+
+  @override
+  String get distributionTargetValue => 'Target value';
 }

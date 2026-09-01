@@ -10,6 +10,7 @@ import '../../utils/number_formatters.dart';
 import '../../utils/number_normalizer.dart';
 import '../../utils/snackbar_helper.dart';
 import '../date_input_field.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 /// ویرایشگر طرح اقساط (فروش / برگشت از فروش) برای صفحهٔ ویرایش فاکتور و موارد مشابه.
 class InvoiceInstallmentsEditor extends StatefulWidget {
@@ -885,7 +886,7 @@ class InvoiceInstallmentsEditorState extends State<InvoiceInstallmentsEditor> {
                       final targetPrincipal =
                           (widget.sumTotal.toDouble() - (_downPayment ?? 0)).clamp(0, double.infinity);
                       final diff = sumPrincipal - targetPrincipal;
-                      final diffColor = diff.abs() <= 1 ? Colors.green : Colors.orange;
+                      final diffColor = diff.abs() <= 1 ? SemanticColorResolver.positive(context) : SemanticColorResolver.warning(context);
                       return Align(
                         alignment: Alignment.centerRight,
                         child: Wrap(

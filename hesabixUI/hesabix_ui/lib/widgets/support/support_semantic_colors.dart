@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hesabix_ui/theme/tokens/semantic_colors.dart';
 
 /// Theme-aware semantic colors for support / ticketing UI.
 class SupportSemanticColors {
@@ -35,10 +36,11 @@ class SupportSemanticColors {
   factory SupportSemanticColors.of(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final semantics = Theme.of(context).extension<AppSemanticColors>();
     return SupportSemanticColors(
-      slaOk: Colors.green.shade600,
-      slaWarning: Colors.orange.shade700,
-      slaBreached: scheme.error,
+      slaOk: semantics?.positive ?? Colors.green.shade600,
+      slaWarning: semantics?.warning ?? Colors.orange.shade700,
+      slaBreached: semantics?.negative ?? scheme.error,
       internalNoteBg: isDark ? const Color(0xFF3D3200) : const Color(0xFFFFF8E1),
       internalNoteBorder: isDark ? Colors.amber.shade700 : Colors.amber.shade300,
       internalNoteFg: isDark ? Colors.amber.shade100 : Colors.amber.shade900,

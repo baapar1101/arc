@@ -11,6 +11,7 @@ import '../../utils/snackbar_helper.dart';
 import '../../widgets/data_table/data_table.dart';
 import '../../core/hesabix_back.dart';
 import 'goods_expense_income_form_dialog.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 const String _kSection = 'goods_expense_income';
 
@@ -42,14 +43,14 @@ String geiStatusLabel(String? status) {
   }
 }
 
-Color? geiStatusColor(String? status) {
+Color? geiStatusColor(BuildContext context, String? status) {
   switch (status) {
     case 'posted':
-      return Colors.green;
+      return SemanticColorResolver.positive(context);
     case 'cancelled':
-      return Colors.red;
+      return SemanticColorResolver.negative(context);
     case 'pending_accounting':
-      return Colors.orange;
+      return SemanticColorResolver.warning(context);
     case 'draft_accounting':
       return Colors.blueGrey;
     default:
@@ -223,12 +224,12 @@ class _GoodsExpenseIncomeListPageState extends State<GoodsExpenseIncomeListPage>
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('ابطال سند'),
+        title: Text('ابطال سند'),
         content: Text('آیا از ابطال سند قطعی ${doc['code']} مطمئن هستید؟ حواله انبار و سند حسابداری مرتبط برگشت می‌خورد.'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('انصراف')),
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text('انصراف')),
           FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            style: FilledButton.styleFrom(backgroundColor: SemanticColorResolver.negative(context)),
             onPressed: () => Navigator.pop(ctx, true),
             child: const Text('ابطال'),
           ),
@@ -251,12 +252,12 @@ class _GoodsExpenseIncomeListPageState extends State<GoodsExpenseIncomeListPage>
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('حذف سند'),
+        title: Text('حذف سند'),
         content: Text('آیا از حذف سند ${doc['code']} مطمئن هستید؟'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('انصراف')),
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text('انصراف')),
           FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            style: FilledButton.styleFrom(backgroundColor: SemanticColorResolver.negative(context)),
             onPressed: () => Navigator.pop(ctx, true),
             child: const Text('حذف'),
           ),
@@ -360,7 +361,7 @@ class _GoodsExpenseIncomeListPageState extends State<GoodsExpenseIncomeListPage>
           builder: (item, index) {
             final m = item as Map<String, dynamic>;
             final status = m['status'] as String?;
-            final color = geiStatusColor(status);
+            final color = geiStatusColor(context, status);
             return Chip(
               label: Text(geiStatusLabel(status)),
               backgroundColor: color?.withValues(alpha: 0.12),

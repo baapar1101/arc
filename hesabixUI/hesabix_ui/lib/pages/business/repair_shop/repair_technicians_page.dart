@@ -8,6 +8,7 @@ import '../../../core/calendar_controller.dart';
 import '../../../utils/snackbar_helper.dart';
 import '../../../utils/error_extractor.dart';
 import '../../../widgets/business_subpage_back_leading.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 
 /// صفحه مدیریت تعمیرکاران
@@ -100,18 +101,18 @@ class _RepairTechniciansPageState extends State<RepairTechniciansPage> {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('غیرفعال کردن تعمیرکار'),
+        title: Text('غیرفعال کردن تعمیرکار'),
         content: Text(
             'آیا مطمئن هستید که می‌خواهید "${technician.personName}" را غیرفعال کنید؟'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('خیر'),
+            child: Text('خیر'),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
+              backgroundColor: SemanticColorResolver.negative(context),
             ),
             child: const Text('بله، غیرفعال کن'),
           ),
@@ -236,7 +237,7 @@ class _RepairTechniciansPageState extends State<RepairTechniciansPage> {
               : Colors.grey,
           child: Text(
             technician.personName[0].toUpperCase(),
-            style: const TextStyle(color: Colors.white),
+            style: TextStyle(color: Colors.white),
           ),
         ),
         title: Text(
@@ -258,9 +259,9 @@ class _RepairTechniciansPageState extends State<RepairTechniciansPage> {
               ),
             ),
             if (!technician.isActive)
-              const Text(
+              Text(
                 'غیرفعال',
-                style: TextStyle(color: Colors.red, fontSize: 12),
+                style: TextStyle(color: SemanticColorResolver.negative(context), fontSize: 12),
               ),
           ],
         ),
@@ -287,13 +288,13 @@ class _RepairTechniciansPageState extends State<RepairTechniciansPage> {
               ),
             ),
             if (technician.isActive)
-              const PopupMenuItem(
+              PopupMenuItem(
                 value: 'delete',
                 child: Row(
                   children: [
-                    Icon(Icons.delete, size: 20, color: Colors.red),
+                    Icon(Icons.delete, size: 20, color: SemanticColorResolver.negative(context)),
                     SizedBox(width: 8),
-                    Text('غیرفعال کردن', style: TextStyle(color: Colors.red)),
+                    Text('غیرفعال کردن', style: TextStyle(color: SemanticColorResolver.negative(context))),
                   ],
                 ),
               ),

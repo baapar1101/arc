@@ -7,6 +7,7 @@ import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../widgets/business_subpage_back_leading.dart';
 import 'dart:ui' as ui;
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 class BusinessCurrenciesSettingsPage extends StatefulWidget {
   final int businessId;
@@ -482,11 +483,11 @@ class _BusinessCurrenciesSettingsPageState extends State<BusinessCurrenciesSetti
                   ),
                 ),
               ),
-              const SizedBox(height: 16),
+              SizedBox(height: 16),
             ] else ...[
               // بخش انتخاب ارز پیش‌فرض (اگر ارز پیش‌فرض وجود نداشته باشد)
               Card(
-                color: Colors.orange.shade50,
+                color: SemanticColorResolver.warning(context).withValues(alpha: 0.12),
                 child: Padding(
                   padding: const EdgeInsets.all(16),
                   child: Column(
@@ -494,25 +495,25 @@ class _BusinessCurrenciesSettingsPageState extends State<BusinessCurrenciesSetti
                     children: [
                       Row(
                         children: [
-                          Icon(Icons.warning_amber_rounded, color: Colors.orange.shade900, size: 24),
-                          const SizedBox(width: 12),
+                          Icon(Icons.warning_amber_rounded, color: SemanticColorResolver.warning(context), size: 24),
+                          SizedBox(width: 12),
                           Expanded(
                             child: Text(
                               'کسب‌وکار شما ارز پیش‌فرض تنظیم نکرده است',
                               style: TextStyle(
                                 fontWeight: FontWeight.w600,
-                                color: Colors.orange.shade900,
+                                color: SemanticColorResolver.warning(context),
                                 fontSize: 16,
                               ),
                             ),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 12),
+                      SizedBox(height: 12),
                       Text(
                         'لطفاً یک ارز پیش‌فرض انتخاب کنید تا بتوانید سند حسابداری ثبت کنید.',
                         style: TextStyle(
-                          color: Colors.orange.shade900,
+                          color: SemanticColorResolver.warning(context),
                           fontSize: 13,
                         ),
                       ),
@@ -540,7 +541,7 @@ class _BusinessCurrenciesSettingsPageState extends State<BusinessCurrenciesSetti
                                 });
                               },
                       ),
-                      const SizedBox(height: 16),
+                      SizedBox(height: 16),
                       SizedBox(
                         width: double.infinity,
                         child: FilledButton.icon(
@@ -553,10 +554,10 @@ class _BusinessCurrenciesSettingsPageState extends State<BusinessCurrenciesSetti
                                   height: 16,
                                   child: CircularProgressIndicator(strokeWidth: 2),
                                 )
-                              : const Icon(Icons.check),
+                              : Icon(Icons.check),
                           label: Text(_savingDefaultCurrency ? 'در حال ذخیره...' : 'تنظیم ارز پیش‌فرض'),
                           style: FilledButton.styleFrom(
-                            backgroundColor: Colors.orange.shade700,
+                            backgroundColor: SemanticColorResolver.warning(context),
                             foregroundColor: Colors.white,
                             padding: const EdgeInsets.symmetric(vertical: 16),
                           ),

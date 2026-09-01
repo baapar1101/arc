@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:hesabix_ui/core/app_init_progress.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
+import 'package:hesabix_ui/theme/brand_logo.dart';
 
 /// Splash با پیشرفت determinate بر اساس مراحل واقعی init (سناریو B).
 class ProgressSplashScreen extends StatefulWidget {
@@ -139,24 +140,10 @@ class _ProgressSplashScreenState extends State<ProgressSplashScreen>
                             ),
                             child: ClipRRect(
                               borderRadius: BorderRadius.circular(20),
-                              child: Image.asset(
-                                isDark
-                                    ? 'assets/images/logo-light.png'
-                                    : 'assets/images/logo-blue.png',
-                                fit: BoxFit.contain,
-                                errorBuilder: (context, error, stackTrace) {
-                                  return Container(
-                                    decoration: BoxDecoration(
-                                      color: primary,
-                                      borderRadius: BorderRadius.circular(20),
-                                    ),
-                                    child: Icon(
-                                      Icons.account_balance,
-                                      size: 50,
-                                      color: colorScheme.onPrimary,
-                                    ),
-                                  );
-                                },
+                              child: BrandLogo(
+                                width: 100,
+                                height: 100,
+                                primaryOverride: primary,
                               ),
                             ),
                           ),

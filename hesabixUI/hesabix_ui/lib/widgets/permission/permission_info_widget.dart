@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../core/auth_store.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 /// ویجت برای نمایش اطلاعات دسترسی‌های کاربر
 class PermissionInfoWidget extends StatelessWidget {
@@ -47,7 +48,7 @@ class PermissionInfoWidget extends StatelessWidget {
                 size: 20,
                 color: colorScheme.primary,
               ),
-              const SizedBox(width: 8),
+              SizedBox(width: 8),
               Text(
                 _getSectionTitle(section),
                 style: theme.textTheme.titleMedium?.copyWith(
@@ -60,10 +61,10 @@ class PermissionInfoWidget extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
-                    color: Colors.orange.withValues(alpha: 0.1),
+                    color: SemanticColorResolver.warning(context).withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
-                      color: Colors.orange.withValues(alpha: 0.3),
+                      color: SemanticColorResolver.warning(context).withValues(alpha: 0.3),
                       width: 1,
                     ),
                   ),
@@ -73,13 +74,13 @@ class PermissionInfoWidget extends StatelessWidget {
                       Icon(
                         Icons.star,
                         size: 12,
-                        color: Colors.orange,
+                        color: SemanticColorResolver.warning(context),
                       ),
-                      const SizedBox(width: 4),
+                      SizedBox(width: 4),
                       Text(
                         'مالک',
                         style: TextStyle(
-                          color: Colors.orange.shade700,
+                          color: SemanticColorResolver.warning(context),
                           fontSize: 11,
                           fontWeight: FontWeight.w600,
                         ),

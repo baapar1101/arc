@@ -6,6 +6,7 @@ import 'package:hesabix_ui/services/currency_service.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../utils/number_formatters.dart' show formatWithThousands;
 import 'package:hesabix_ui/utils/error_extractor.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 class MarketplacePluginsAdminPage extends StatefulWidget {
   const MarketplacePluginsAdminPage({super.key});
@@ -68,7 +69,7 @@ class _MarketplacePluginsAdminPageState extends State<MarketplacePluginsAdminPag
         message:
             'همگام‌سازی انجام شد. افزونه جدید: $createdP، به‌روزشده: $updatedP، '
             'پلن جدید: $createdPlans، پلن فعال‌شده: $reactivated',
-        backgroundColor: Colors.green,
+        backgroundColor: SemanticColorResolver.positive(context),
       );
       await _load();
     } catch (e) {
@@ -76,7 +77,7 @@ class _MarketplacePluginsAdminPageState extends State<MarketplacePluginsAdminPag
       SnackBarHelper.show(
         context,
         message: 'خطا در همگام‌سازی: ${ErrorExtractor.forContext(e, context)}',
-        backgroundColor: Colors.red,
+        backgroundColor: SemanticColorResolver.negative(context),
       );
     } finally {
       if (mounted) setState(() => _syncing = false);
@@ -315,14 +316,14 @@ class _MarketplacePluginsAdminPageState extends State<MarketplacePluginsAdminPag
                                 SnackBarHelper.show(
                                   context,
                                   message: isEdit ? 'افزونه با موفقیت به‌روزرسانی شد' : 'افزونه با موفقیت ایجاد شد',
-                                  backgroundColor: Colors.green,
+                                  backgroundColor: SemanticColorResolver.positive(context),
                                 );
                               } catch (e) {
                                 if (!context.mounted) return;
                                 SnackBarHelper.show(
                                   context,
                                   message: 'خطا: ${ErrorExtractor.forContext(e, context)}',
-                                  backgroundColor: Colors.red,
+                                  backgroundColor: SemanticColorResolver.negative(context),
                                 );
                               }
                             },
@@ -492,7 +493,7 @@ class _MarketplacePluginsAdminPageState extends State<MarketplacePluginsAdminPag
                             onPressed: () async {
                               if (!(formKey.currentState?.validate() ?? false)) return;
                               if (selectedCurrencyId == null) {
-                                SnackBarHelper.show(context, message: 'لطفاً ارز را انتخاب کنید', backgroundColor: Colors.red);
+                                SnackBarHelper.show(context, message: 'لطفاً ارز را انتخاب کنید', backgroundColor: SemanticColorResolver.negative(context));
                                 return;
                               }
                               
@@ -516,14 +517,14 @@ class _MarketplacePluginsAdminPageState extends State<MarketplacePluginsAdminPag
                                 SnackBarHelper.show(
                                   context,
                                   message: isEdit ? 'پلن با موفقیت به‌روزرسانی شد' : 'پلن با موفقیت ایجاد شد',
-                                  backgroundColor: Colors.green,
+                                  backgroundColor: SemanticColorResolver.positive(context),
                                 );
                               } catch (e) {
                                 if (!context.mounted) return;
                                 SnackBarHelper.show(
                                   context,
                                   message: 'خطا: ${ErrorExtractor.forContext(e, context)}',
-                                  backgroundColor: Colors.red,
+                                  backgroundColor: SemanticColorResolver.negative(context),
                                 );
                               }
                             },
@@ -566,9 +567,9 @@ class _MarketplacePluginsAdminPageState extends State<MarketplacePluginsAdminPag
     try {
       await _marketplaceService.deletePlugin(pluginId);
       _load();
-      SnackBarHelper.show(context, message: 'افزونه با موفقیت حذف شد', backgroundColor: Colors.green);
+      SnackBarHelper.show(context, message: 'افزونه با موفقیت حذف شد', backgroundColor: SemanticColorResolver.positive(context));
     } catch (e) {
-      SnackBarHelper.show(context, message: 'خطا: ${ErrorExtractor.forContext(e, context)}', backgroundColor: Colors.red);
+      SnackBarHelper.show(context, message: 'خطا: ${ErrorExtractor.forContext(e, context)}', backgroundColor: SemanticColorResolver.negative(context));
     }
   }
 
@@ -596,9 +597,9 @@ class _MarketplacePluginsAdminPageState extends State<MarketplacePluginsAdminPag
     try {
       await _marketplaceService.deletePluginPlan(planId);
       _load();
-      SnackBarHelper.show(context, message: 'پلن با موفقیت حذف شد', backgroundColor: Colors.green);
+      SnackBarHelper.show(context, message: 'پلن با موفقیت حذف شد', backgroundColor: SemanticColorResolver.positive(context));
     } catch (e) {
-      SnackBarHelper.show(context, message: 'خطا: ${ErrorExtractor.forContext(e, context)}', backgroundColor: Colors.red);
+      SnackBarHelper.show(context, message: 'خطا: ${ErrorExtractor.forContext(e, context)}', backgroundColor: SemanticColorResolver.negative(context));
     }
   }
 
@@ -619,14 +620,14 @@ class _MarketplacePluginsAdminPageState extends State<MarketplacePluginsAdminPag
     if (_error != null) {
       return Scaffold(
         appBar: AppBar(
-          title: const Text('مدیریت افزونه‌های بازار'),
+          title: Text('مدیریت افزونه‌های بازار'),
           actions: _appBarSyncActions(),
         ),
         body: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Text('خطا: $_error', style: const TextStyle(color: Colors.red)),
+              Text('خطا: $_error', style: TextStyle(color: SemanticColorResolver.negative(context))),
               const SizedBox(height: 16),
               ElevatedButton(
                 onPressed: _load,
@@ -660,11 +661,11 @@ class _MarketplacePluginsAdminPageState extends State<MarketplacePluginsAdminPag
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   IconButton(
-                    icon: const Icon(Icons.edit),
+                    icon: Icon(Icons.edit),
                     onPressed: () => _showEditPluginDialog(plugin),
                   ),
                   IconButton(
-                    icon: const Icon(Icons.delete, color: Colors.red),
+                    icon: Icon(Icons.delete, color: SemanticColorResolver.negative(context)),
                     onPressed: () => _deletePlugin(plugin['id']),
                   ),
                 ],
@@ -711,11 +712,11 @@ class _MarketplacePluginsAdminPageState extends State<MarketplacePluginsAdminPag
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         IconButton(
-                          icon: const Icon(Icons.edit),
+                          icon: Icon(Icons.edit),
                           onPressed: () => _showEditPlanDialog(plugin['id'], plan),
                         ),
                         IconButton(
-                          icon: const Icon(Icons.delete, color: Colors.red),
+                          icon: Icon(Icons.delete, color: SemanticColorResolver.negative(context)),
                           onPressed: () => _deletePlan(plan['id']),
                         ),
                       ],

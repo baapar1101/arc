@@ -25,6 +25,7 @@ import '../../utils/snackbar_helper.dart';
 import '../../utils/bulk_delete_feedback.dart';
 import '../../services/marketplace_service.dart';
 import '../../widgets/business_subpage_back_leading.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 class PersonsPage extends StatefulWidget {
   final int businessId;
@@ -482,9 +483,9 @@ class _PersonsPageState extends State<PersonsPage> {
             
             Color balanceColor;
             if (balance > 0) {
-              balanceColor = Colors.green;
+              balanceColor = SemanticColorResolver.positive(context);
             } else if (balance < 0) {
-              balanceColor = Colors.red;
+              balanceColor = SemanticColorResolver.negative(context);
             } else {
               balanceColor = Colors.grey;
             }
@@ -558,13 +559,13 @@ class _PersonsPageState extends State<PersonsPage> {
             Color statusColor;
             switch (raw) {
               case 'بستانکار':
-                statusColor = Colors.green;
+                statusColor = SemanticColorResolver.positive(context);
                 break;
               case 'بدهکار':
-                statusColor = Colors.red;
+                statusColor = SemanticColorResolver.negative(context);
                 break;
               case 'تسویه':
-                statusColor = Colors.blue;
+                statusColor = SemanticColorResolver.info(context);
                 break;
               case 'بدون تراکنش':
                 statusColor = Colors.grey;
@@ -620,7 +621,7 @@ class _PersonsPageState extends State<PersonsPage> {
             DataTableAction(
               icon: Icons.delete,
               label: t.delete,
-              color: Colors.red,
+              color: SemanticColorResolver.negative(context),
               onTap: (person) => _deletePerson(person),
             ),
           ],
@@ -842,7 +843,7 @@ class _PersonsPageState extends State<PersonsPage> {
               Navigator.of(context).pop();
               await _performDelete(person);
             },
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            style: TextButton.styleFrom(foregroundColor: SemanticColorResolver.negative(context)),
             child: Text(t.delete),
           ),
         ],

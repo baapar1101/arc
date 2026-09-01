@@ -42,10 +42,11 @@ class SlaIndicator extends StatelessWidget {
   }
 }
 
-BorderSide? slaRowBorderSide(String slaStatus) {
+BorderSide? slaRowBorderSide(BuildContext context, String slaStatus) {
+  final colors = SupportSemanticColors.of(context);
   return switch (slaStatus) {
-    'breached' => const BorderSide(color: Colors.red, width: 3),
-    'warning' => const BorderSide(color: Colors.orange, width: 3),
+    'breached' => BorderSide(color: colors.slaBreached, width: 3),
+    'warning' => BorderSide(color: colors.slaWarning, width: 3),
     _ => null,
   };
 }
@@ -88,10 +89,11 @@ String slaStatusFromRow(Map<String, dynamic> row) {
   );
 }
 
-Color? slaRowBackgroundColor(Map<String, dynamic> row) {
+Color? slaRowBackgroundColor(BuildContext context, Map<String, dynamic> row) {
+  final colors = SupportSemanticColors.of(context);
   return switch (slaStatusFromRow(row)) {
-    'breached' => Colors.red.withValues(alpha: 0.10),
-    'warning' => Colors.orange.withValues(alpha: 0.10),
+    'breached' => colors.slaBreached.withValues(alpha: 0.10),
+    'warning' => colors.slaWarning.withValues(alpha: 0.10),
     _ => null,
   };
 }

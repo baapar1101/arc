@@ -41,6 +41,7 @@ import 'package:hesabix_ui/utils/currency_display_utils.dart';
 import 'package:hesabix_ui/utils/invoice_payment_tx_from_receipt.dart';
 import '../../services/business_dashboard_service.dart';
 import 'package:hesabix_ui/services/bytes_export/bytes_export_service.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 /// صفحه لیست اسناد دریافت و پرداخت با ویجت جدول
 class ReceiptsPaymentsListPage extends StatefulWidget {
@@ -2682,10 +2683,10 @@ class _InstallmentInvoicePickerDialogState extends State<_InstallmentInvoicePick
 
   Color _statusColor(String? status) {
     switch (status) {
-      case 'paid': return Colors.green;
-      case 'partial': return Colors.orange;
-      case 'pending': return Colors.blue;
-      case 'overdue': return Colors.red;
+      case 'paid': return SemanticColorResolver.positive(context);
+      case 'partial': return SemanticColorResolver.warning(context);
+      case 'pending': return SemanticColorResolver.info(context);
+      case 'overdue': return SemanticColorResolver.negative(context);
       default: return Colors.grey;
     }
   }
@@ -2696,7 +2697,7 @@ class _InstallmentInvoicePickerDialogState extends State<_InstallmentInvoicePick
     return AlertDialog(
       title: Row(
         children: [
-          const Icon(Icons.receipt_long, color: Colors.green),
+          Icon(Icons.receipt_long, color: SemanticColorResolver.positive(context)),
           const SizedBox(width: 8),
           Expanded(child: Text(t.installmentsInvoicePickerTitle)),
         ],
@@ -2792,7 +2793,7 @@ class _InstallmentInvoicePickerDialogState extends State<_InstallmentInvoicePick
                     return Card(
                       margin: const EdgeInsets.symmetric(vertical: 4),
                       child: ListTile(
-                        leading: const Icon(Icons.receipt_long, color: Colors.green),
+                        leading: Icon(Icons.receipt_long, color: SemanticColorResolver.positive(context)),
                         title: Row(
                           children: [
                             Text(code, style: const TextStyle(fontWeight: FontWeight.w600)),

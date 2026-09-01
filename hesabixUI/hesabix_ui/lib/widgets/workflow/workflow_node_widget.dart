@@ -4,6 +4,7 @@ import '../../models/workflow_editor_models.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/workflow_basalam_guard.dart';
 import '../../utils/workflow_constants.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 /// Widget برای نمایش یک node در workflow
 class WorkflowNodeWidget extends StatelessWidget {
@@ -48,7 +49,7 @@ class WorkflowNodeWidget extends StatelessWidget {
   Widget build(BuildContext context) {
     try {
       final theme = Theme.of(context);
-      final color = _getNodeColor(node.type, theme, node.key);
+      final color = _getNodeColor(context, node.type, theme, node.key);
 
       // بررسی اعتبار موقعیت
       final validPosition = _isValidPosition(node.position) 
@@ -75,7 +76,7 @@ class WorkflowNodeWidget extends StatelessWidget {
       final Color borderColor;
       final double borderWidth;
       if (hasErrors) {
-        borderColor = Colors.red;
+        borderColor = SemanticColorResolver.negative(context);
         borderWidth = (isSelectedForClosure || hasErrors) ? 3.0 : 2.0;
       } else {
         switch (runPhase) {
@@ -84,11 +85,11 @@ class WorkflowNodeWidget extends StatelessWidget {
             borderWidth = 3.5;
             break;
           case WorkflowNodeRunPhase.success:
-            borderColor = Colors.green.shade700;
+            borderColor = SemanticColorResolver.positive(context);
             borderWidth = 3.0;
             break;
           case WorkflowNodeRunPhase.error:
-            borderColor = Colors.red.shade800;
+            borderColor = SemanticColorResolver.negative(context);
             borderWidth = 3.0;
             break;
           case WorkflowNodeRunPhase.historyReplay:
@@ -168,9 +169,9 @@ class WorkflowNodeWidget extends StatelessWidget {
         child: Container(
           width: 180,
           height: 100,
-          color: Colors.red.withOpacity(0.2),
-          child: const Center(
-            child: Icon(Icons.error, color: Colors.red),
+          color: SemanticColorResolver.negative(context).withValues(alpha: 0.2),
+          child: Center(
+            child: Icon(Icons.error, color: SemanticColorResolver.negative(context)),
           ),
         ),
       );
@@ -379,7 +380,7 @@ class WorkflowNodeWidget extends StatelessWidget {
             child: Container(
               padding: const EdgeInsets.all(4),
               decoration: BoxDecoration(
-                color: Colors.red,
+                color: SemanticColorResolver.negative(context),
                 shape: BoxShape.circle,
                 border: Border.all(color: Colors.white, width: 2),
               ),
@@ -404,7 +405,7 @@ class WorkflowNodeWidget extends StatelessWidget {
               child: Container(
                 padding: const EdgeInsets.all(4),
                 decoration: BoxDecoration(
-                  color: Colors.blue,
+                  color: SemanticColorResolver.info(context),
                   shape: BoxShape.circle,
                   border: Border.all(color: Colors.white, width: 2),
                 ),
@@ -440,7 +441,7 @@ class WorkflowNodeWidget extends StatelessWidget {
           Positioned(
             top: 4,
             right: 4,
-            child: Icon(Icons.check_circle, color: Colors.green.shade700, size: 20),
+            child: Icon(Icons.check_circle, color: SemanticColorResolver.positive(context), size: 20),
           ),
         );
       }
@@ -449,7 +450,7 @@ class WorkflowNodeWidget extends StatelessWidget {
           Positioned(
             top: 4,
             right: 4,
-            child: Icon(Icons.cancel, color: Colors.red.shade800, size: 20),
+            child: Icon(Icons.cancel, color: SemanticColorResolver.negative(context), size: 20),
           ),
         );
       }
@@ -474,11 +475,11 @@ class WorkflowNodeWidget extends StatelessWidget {
       return Container(
         width: WorkflowConstants.nodeWidth,
         height: WorkflowConstants.nodeHeight,
-        color: Colors.red.withOpacity(0.2),
+        color: SemanticColorResolver.negative(context).withValues(alpha: 0.2),
         child: Center(
           child: Text(
             'خطا: ${ErrorExtractor.forContext(e, context)}',
-            style: const TextStyle(color: Colors.red, fontSize: 10),
+            style: TextStyle(color: SemanticColorResolver.negative(context), fontSize: 10),
             maxLines: 3,
             overflow: TextOverflow.ellipsis,
           ),
@@ -524,6 +525,7 @@ class WorkflowNodeWidget extends StatelessWidget {
             }
           },
           child: _buildConnectionPointContainer(
+            context: context,
             theme: theme,
             isHighlighted: isHighlighted,
             isOutput: isOutput,
@@ -551,13 +553,14 @@ class WorkflowNodeWidget extends StatelessWidget {
         height: 16,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          color: Colors.red,
+          color: SemanticColorResolver.negative(context),
         ),
       );
     }
   }
 
   Widget _buildConnectionPointContainer({
+    required BuildContext context,
     required ThemeData theme,
     required bool isHighlighted,
     required bool isOutput,
@@ -568,14 +571,14 @@ class WorkflowNodeWidget extends StatelessWidget {
       height: isHighlighted ? WorkflowConstants.connectionPointHighlightSize : WorkflowConstants.connectionPointSize,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        color: isHighlighted ? Colors.green : theme.colorScheme.primary,
+        color: isHighlighted ? SemanticColorResolver.positive(context) : theme.colorScheme.primary,
         border: Border.all(
           color: theme.colorScheme.surface,
           width: isHighlighted ? 3 : 2,
         ),
         boxShadow: [
           BoxShadow(
-            color: (isHighlighted ? Colors.green : Colors.black).withOpacity(isHighlighted ? 0.5 : 0.2),
+            color: (isHighlighted ? SemanticColorResolver.positive(context) : Colors.black).withOpacity(isHighlighted ? 0.5 : 0.2),
             blurRadius: isHighlighted ? 8 : 4,
             offset: const Offset(0, 2),
             spreadRadius: isHighlighted ? 2 : 0,
@@ -594,7 +597,7 @@ class WorkflowNodeWidget extends StatelessWidget {
     );
   }
 
-  Color _getNodeColor(WorkflowNodeType type, ThemeData theme, String? nodeKey) {
+  Color _getNodeColor(BuildContext context, WorkflowNodeType type, ThemeData theme, String? nodeKey) {
     if (type == WorkflowNodeType.action && nodeKey == 'send_business_sms') {
       return Colors.teal.shade700;
     }
@@ -603,11 +606,11 @@ class WorkflowNodeWidget extends StatelessWidget {
     }
     switch (type) {
       case WorkflowNodeType.trigger:
-        return Colors.green;
+        return SemanticColorResolver.positive(context);
       case WorkflowNodeType.action:
         return theme.colorScheme.primary;
       case WorkflowNodeType.condition:
-        return Colors.orange;
+        return SemanticColorResolver.warning(context);
       case WorkflowNodeType.loop:
         return Colors.purple;
     }

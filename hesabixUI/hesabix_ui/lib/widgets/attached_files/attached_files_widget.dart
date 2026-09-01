@@ -4,6 +4,7 @@ import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 import 'package:hesabix_ui/services/bytes_export/bytes_export_service.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 /// کلید برای دسترسی به state از خارج (برای refresh)
 class AttachedFilesWidgetKey {
@@ -208,7 +209,7 @@ class _AttachedFilesWidgetState extends State<AttachedFilesWidget> {
     return showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('حذف فایل'),
+        title: Text('حذف فایل'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -217,11 +218,11 @@ class _AttachedFilesWidgetState extends State<AttachedFilesWidget> {
               'آیا از حذف فایل "${file['original_name']}" اطمینان دارید؟',
               style: theme.textTheme.bodyMedium,
             ),
-            const SizedBox(height: 16),
+            SizedBox(height: 16),
             if (usageError != null)
               Text(
                 'خطا در دریافت وابستگی‌ها: $usageError',
-                style: theme.textTheme.bodySmall?.copyWith(color: Colors.red),
+                style: theme.textTheme.bodySmall?.copyWith(color: SemanticColorResolver.negative(context)),
               )
             else if (dependencies.isEmpty)
               Text(
@@ -255,7 +256,7 @@ class _AttachedFilesWidgetState extends State<AttachedFilesWidget> {
                   },
                 ),
               ),
-              const SizedBox(height: 8),
+              SizedBox(height: 8),
               Text(
                 'با حذف فایل، لینک‌های مرتبط نیز پاک می‌شوند.',
                 style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
@@ -266,11 +267,11 @@ class _AttachedFilesWidgetState extends State<AttachedFilesWidget> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('انصراف'),
+            child: Text('انصراف'),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
-            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            style: FilledButton.styleFrom(backgroundColor: SemanticColorResolver.negative(context)),
             child: const Text('حذف'),
           ),
         ],
@@ -311,7 +312,7 @@ class _AttachedFilesWidgetState extends State<AttachedFilesWidget> {
           Row(
             children: [
               Icon(Icons.attach_file, size: 20, color: theme.colorScheme.primary),
-              const SizedBox(width: 8),
+              SizedBox(width: 8),
               Text(
                 widget.title!,
                 style: theme.textTheme.titleMedium?.copyWith(
@@ -321,7 +322,7 @@ class _AttachedFilesWidgetState extends State<AttachedFilesWidget> {
               const Spacer(),
               if (!widget.autoLoad)
                 IconButton(
-                  icon: const Icon(Icons.refresh),
+                  icon: Icon(Icons.refresh),
                   onPressed: _loadFiles,
                   tooltip: 'بروزرسانی',
                 ),
@@ -339,17 +340,17 @@ class _AttachedFilesWidgetState extends State<AttachedFilesWidget> {
           )
         else if (_error != null)
           Card(
-            color: Colors.red.shade50,
+            color: SemanticColorResolver.negative(context).withValues(alpha: 0.12),
             child: Padding(
               padding: const EdgeInsets.all(12),
               child: Row(
                 children: [
-                  Icon(Icons.error_outline, color: Colors.red),
-                  const SizedBox(width: 8),
+                  Icon(Icons.error_outline, color: SemanticColorResolver.negative(context)),
+                  SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       _error!,
-                      style: TextStyle(color: Colors.red.shade900),
+                      style: TextStyle(color: SemanticColorResolver.negative(context)),
                     ),
                   ),
                   TextButton(
@@ -396,7 +397,7 @@ class _AttachedFilesWidgetState extends State<AttachedFilesWidget> {
                   ),
                   title: Text(
                     filename,
-                    style: const TextStyle(fontWeight: FontWeight.w500),
+                    style: TextStyle(fontWeight: FontWeight.w500),
                     overflow: TextOverflow.ellipsis,
                   ),
                   subtitle: Text(
@@ -407,7 +408,7 @@ class _AttachedFilesWidgetState extends State<AttachedFilesWidget> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       IconButton(
-                        icon: const Icon(Icons.download),
+                        icon: Icon(Icons.download),
                         onPressed: () => _downloadFile(file),
                         tooltip: 'دانلود',
                         color: theme.colorScheme.primary,
@@ -417,7 +418,7 @@ class _AttachedFilesWidgetState extends State<AttachedFilesWidget> {
                           icon: const Icon(Icons.delete_outline),
                           onPressed: () => _deleteFile(file),
                           tooltip: 'حذف',
-                          color: Colors.red,
+                          color: SemanticColorResolver.negative(context),
                         ),
                     ],
                   ),

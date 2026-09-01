@@ -16,7 +16,20 @@ class AndroidNotificationPrefs {
   static const _kLedEnabled = 'android_notif_led_enabled';
   static const _kVibrate = 'android_notif_vibrate';
 
-  static const int defaultAccentColor = 0xFF1565C0; // blue 800
+  static const int defaultAccentColor = 0xFF0F4C81; // classic blue (catalog default)
+
+  /// آخرین primary تم سراسری — وقتی کاربر رنگ نوتیف را دستی تنظیم نکرده باشد.
+  static const String themePrimaryFallbackKey = 'hesabix_theme_primary_argb';
+
+  static Future<void> syncThemePrimaryFallback(int argb) async {
+    final p = await SharedPreferences.getInstance();
+    await p.setInt(themePrimaryFallbackKey, argb);
+  }
+
+  static Future<int> _themePrimaryFallbackOrDefault() async {
+    final p = await SharedPreferences.getInstance();
+    return p.getInt(themePrimaryFallbackKey) ?? defaultAccentColor;
+  }
 
   static Future<bool> isKeepAliveEnabled() async {
     final p = await SharedPreferences.getInstance();
@@ -30,7 +43,10 @@ class AndroidNotificationPrefs {
 
   static Future<int> getAccentColor() async {
     final p = await SharedPreferences.getInstance();
-    return p.getInt(_kAccentColor) ?? defaultAccentColor;
+    if (!p.containsKey(_kAccentColor)) {
+      return _themePrimaryFallbackOrDefault();
+    }
+    return p.getInt(_kAccentColor) ?? await _themePrimaryFallbackOrDefault();
   }
 
   static Future<void> setAccentColor(int argb) async {

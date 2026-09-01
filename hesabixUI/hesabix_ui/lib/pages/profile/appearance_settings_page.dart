@@ -8,6 +8,8 @@ import '../../core/api_client.dart';
 import '../../models/business_dashboard_models.dart';
 import '../../services/business_dashboard_service.dart';
 import '../../services/business_menu_preferences_service.dart';
+import '../../theme/theme_controller.dart';
+import '../../widgets/theme_palette_switcher.dart';
 
 /// کلیدهای جداکننده در [business_shell] — همیشه در rootOrder حفظ می‌شوند.
 const String _sepPracticalTools = 'sep_practical_tools';
@@ -16,7 +18,9 @@ const String _sepServicesPlugins = 'sep_services_plugins';
 const String _sepOthers = 'sep_others';
 
 class AppearanceSettingsPage extends StatefulWidget {
-  const AppearanceSettingsPage({super.key});
+  final ThemeController? themeController;
+
+  const AppearanceSettingsPage({super.key, this.themeController});
 
   @override
   State<AppearanceSettingsPage> createState() => _AppearanceSettingsPageState();
@@ -409,6 +413,20 @@ class _AppearanceSettingsPageState extends State<AppearanceSettingsPage> {
           children: [
             Text(t.appearanceSettingsPageTitle, style: theme.textTheme.headlineSmall),
             const SizedBox(height: 8),
+            if (widget.themeController != null) ...[
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: ListenableBuilder(
+                    listenable: widget.themeController!,
+                    builder: (context, _) => ThemePalettePicker(
+                      controller: widget.themeController!,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+            ],
             if (_error != null)
               Padding(
                 padding: const EdgeInsets.only(bottom: 12),

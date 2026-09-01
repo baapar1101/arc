@@ -15,6 +15,7 @@ import '../../core/date_utils.dart' show HesabixDateUtils;
 import 'warehouse_postal_label_print_dialog.dart';
 import '../../utils/error_extractor.dart';
 import 'package:hesabix_ui/services/bytes_export/bytes_export_service.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 class WarehouseDocumentDetailsDialog extends StatefulWidget {
   final int businessId;
@@ -152,9 +153,9 @@ class _WarehouseDocumentDetailsDialogState extends State<WarehouseDocumentDetail
 
   Color _getStatusColor(String? status) {
     switch (status) {
-      case 'draft': return Colors.orange;
-      case 'posted': return Colors.green;
-      case 'cancelled': return Colors.red;
+      case 'draft': return SemanticColorResolver.warning(context);
+      case 'posted': return SemanticColorResolver.positive(context);
+      case 'cancelled': return SemanticColorResolver.negative(context);
       default: return Colors.grey;
     }
   }
@@ -379,7 +380,7 @@ class _WarehouseDocumentDetailsDialogState extends State<WarehouseDocumentDetail
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              const Icon(Icons.error_outline, color: Colors.red, size: 48),
+                              Icon(Icons.error_outline, color: SemanticColorResolver.negative(context), size: 48),
                               const SizedBox(height: 12),
                               Text(_error!),
                               const SizedBox(height: 12),

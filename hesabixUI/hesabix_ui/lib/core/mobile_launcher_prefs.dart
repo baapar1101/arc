@@ -6,7 +6,8 @@ enum MobileBusinessEntryMode { standard, launcher }
 
 /// تنظیمات محلی لانچر موبایل؛ هر کلید به ازای شناسهٔ کاربر جدا می‌شود (از اشتراک داده بین حساب‌ها جلوگیری می‌شود).
 class MobileLauncherPrefs {
-  static const defaultBackgroundArgb = 0xFF1565C0;
+  static const defaultBackgroundArgb = 0xFF0F4C81;
+  static const String themePrimaryFallbackKey = 'hesabix_theme_primary_argb';
   static const int defaultGridColumns = 3;
   static const int defaultGridRows = 4;
 
@@ -230,13 +231,16 @@ class MobileLauncherPrefs {
     return prefs.getInt(_legacyBiz);
   }
 
-  static Future<int> backgroundColorArgb(int? userId) async {
+  static Future<int> backgroundColorArgb(int? userId, {int? themeFallbackArgb}) async {
     await migrateLegacyIfNeeded(userId);
     final prefs = await SharedPreferences.getInstance();
+    final fallback = themeFallbackArgb ??
+        prefs.getInt(themePrimaryFallbackKey) ??
+        defaultBackgroundArgb;
     if (userId != null && userId > 0) {
-      return prefs.getInt(_bgKey(userId)) ?? defaultBackgroundArgb;
+      return prefs.getInt(_bgKey(userId)) ?? fallback;
     }
-    return prefs.getInt(_legacyBg) ?? defaultBackgroundArgb;
+    return prefs.getInt(_legacyBg) ?? fallback;
   }
 
   static Future<void> setBackgroundColorArgb(int? userId, int argb) async {

@@ -10,6 +10,7 @@ import '../../utils/snackbar_helper.dart';
 import '../../widgets/data_table/data_table_config.dart';
 import '../../widgets/data_table/data_table_widget.dart';
 import '../../widgets/permission/permission_widgets.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 class CatalogSpecFieldItem {
   final int id;
@@ -127,7 +128,7 @@ class _CatalogSpecFieldsPageState extends State<CatalogSpecFieldsPage> {
         TextColumn('is_active', t.status, width: ColumnWidth.small, formatter: (e) => e.isActive ? t.active : t.inactive),
         ActionColumn('actions', t.actions, actions: [
           DataTableAction(icon: Icons.edit, label: t.edit, onTap: (e) => _openForm(editing: e)),
-          DataTableAction(icon: Icons.delete, label: t.delete, color: Colors.red, onTap: (e) => _confirmDelete(e)),
+          DataTableAction(icon: Icons.delete, label: t.delete, color: SemanticColorResolver.negative(context), onTap: (e) => _confirmDelete(e)),
         ]),
       ],
       searchFields: ['title', 'description'],

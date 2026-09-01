@@ -394,6 +394,23 @@ def build_financial_package_pdf_bytes(
         if is_fa
         else "Arial, sans-serif"
     )
+    try:
+        from app.services.theme_brand_colors import resolve_theme_brand_context
+
+        _brand = resolve_theme_brand_context()
+        brand_primary = _brand.get("brand_primary", "#0F4C81")
+        brand_positive = _brand.get("brand_positive", "#2E7D32")
+        brand_negative = _brand.get("brand_negative", "#B3261E")
+        brand_warning = _brand.get("brand_warning", "#F0B92A")
+        brand_secondary = _brand.get("brand_secondary", "#5A6A7A")
+    except Exception:
+        brand_primary, brand_positive, brand_negative, brand_warning, brand_secondary = (
+            "#0F4C81",
+            "#2E7D32",
+            "#B3261E",
+            "#F0B92A",
+            "#5A6A7A",
+        )
     injected = (
         "<style id=\"hesabix-font-inject\">"
         + (font_face_css or "")
@@ -424,15 +441,15 @@ def build_financial_package_pdf_bytes(
       .summary-card {{ flex: 1 1 140px; border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px 10px; background: #fafbfc; }}
       .summary-card .label {{ font-size: 9px; color: #64748b; }}
       .summary-card .value {{ font-size: 12px; font-weight: 700; }}
-      .summary-card.balanced .value {{ color: #15803d; }}
-      .summary-card.unbalanced .value {{ color: #b91c1c; }}
-      .summary-card.assets .value {{ color: #0369a1; }}
-      .summary-card.liab .value {{ color: #7c3aed; }}
-      .summary-card.profit .value {{ color: #1d4ed8; }}
-      .summary-card.loss .value {{ color: #c2410c; }}
+      .summary-card.balanced .value {{ color: {brand_positive}; }}
+      .summary-card.unbalanced .value {{ color: {brand_negative}; }}
+      .summary-card.assets .value {{ color: {brand_primary}; }}
+      .summary-card.liab .value {{ color: {brand_secondary}; }}
+      .summary-card.profit .value {{ color: {brand_primary}; }}
+      .summary-card.loss .value {{ color: {brand_warning}; }}
       .report-section {{ margin-top: 18px; }}
       .report-section.page-break {{ page-break-before: always; }}
-      h2.section-title {{ font-size: 13px; margin: 0 0 8px; color: #1e3a5f; border-bottom: 1px solid #cbd5e1; padding-bottom: 4px; }}
+      h2.section-title {{ font-size: 13px; margin: 0 0 8px; color: {brand_primary}; border-bottom: 1px solid #cbd5e1; padding-bottom: 4px; }}
       table.report-table {{ width: 100%; border-collapse: collapse; }}
       thead th {{ background: #f0f3f7; border: 1px solid #c7cdd6; padding: 6px; text-align: center; font-weight: 700; font-size: 10px; }}
       tbody td {{ border: 1px solid #d7dde6; padding: 5px; vertical-align: top; font-size: 10px; }}
@@ -442,8 +459,8 @@ def build_financial_package_pdf_bytes(
       tr.subtotal-row td {{ background: #fff8e1; font-weight: 700; }}
       tr.highlight-row td {{ background: #e8f4fd; font-weight: 700; }}
       tr.grand-total td {{ font-weight: 800; font-size: 11px; }}
-      tr.grand-total.profit td {{ background: #ecfdf5; color: #065f46; }}
-      tr.grand-total.loss td {{ background: #fff7ed; color: #9a3412; }}
+      tr.grand-total.profit td {{ background: #ecfdf5; color: {brand_positive}; }}
+      tr.grand-total.loss td {{ background: #fff7ed; color: {brand_negative}; }}
     """)
 
     font_config = FontConfiguration()

@@ -22,6 +22,7 @@ import 'package:hesabix_ui/widgets/support/ticket_pinned_request.dart';
 import 'package:hesabix_ui/widgets/support/ticket_meta_sidebar.dart';
 import 'package:hesabix_ui/widgets/support/ticket_status_chip.dart';
 import 'package:hesabix_ui/utils/support_ticket_clipboard.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 enum TicketDetailDisplayMode { dialog, page, embedded }
 
@@ -181,7 +182,7 @@ class _TicketDetailViewState extends State<TicketDetailView> {
       }
     } catch (e) {
       if (mounted) {
-        _showOverlayMessage('خطا در آپلود فایل', Colors.red, const Duration(seconds: 3));
+        _showOverlayMessage('خطا در آپلود فایل', SemanticColorResolver.negative(context), const Duration(seconds: 3));
       }
     } finally {
       if (mounted) setState(() => _isUploadingAttachment = false);
@@ -194,14 +195,14 @@ class _TicketDetailViewState extends State<TicketDetailView> {
       final updated = await SupportService(ApiClient()).closeTicket(_ticket.id);
       if (!mounted) return;
       setState(() => _ticket = updated);
-      _showOverlayMessage('تیکت بسته شد', Colors.green, const Duration(seconds: 2));
+      _showOverlayMessage('تیکت بسته شد', SemanticColorResolver.positive(context), const Duration(seconds: 2), isSuccess: true);
       widget.onTicketUpdated?.call();
       if (!widget.isOperator && updated.csatSubmittedAt == null) {
         widget.onRequestCsat?.call();
       }
     } catch (e) {
       if (mounted) {
-        _showOverlayMessage('خطا در بستن تیکت', Colors.red, const Duration(seconds: 3));
+        _showOverlayMessage('خطا در بستن تیکت', SemanticColorResolver.negative(context), const Duration(seconds: 3));
       }
     } finally {
       if (mounted) setState(() => _isActionBusy = false);
@@ -214,11 +215,11 @@ class _TicketDetailViewState extends State<TicketDetailView> {
       final updated = await SupportService(ApiClient()).reopenTicket(_ticket.id);
       if (!mounted) return;
       setState(() => _ticket = updated);
-      _showOverlayMessage('تیکت بازگشایی شد', Colors.green, const Duration(seconds: 2));
+      _showOverlayMessage('تیکت بازگشایی شد', SemanticColorResolver.positive(context), const Duration(seconds: 2), isSuccess: true);
       widget.onTicketUpdated?.call();
     } catch (e) {
       if (mounted) {
-        _showOverlayMessage('خطا در بازگشایی تیکت', Colors.red, const Duration(seconds: 3));
+        _showOverlayMessage('خطا در بازگشایی تیکت', SemanticColorResolver.negative(context), const Duration(seconds: 3));
       }
     } finally {
       if (mounted) setState(() => _isActionBusy = false);
@@ -238,7 +239,7 @@ class _TicketDetailViewState extends State<TicketDetailView> {
       widget.onTicketUpdated?.call();
     } catch (e) {
       if (mounted) {
-        _showOverlayMessage('خطا در تغییر وضعیت', Colors.red, const Duration(seconds: 3));
+        _showOverlayMessage('خطا در تغییر وضعیت', SemanticColorResolver.negative(context), const Duration(seconds: 3));
       }
     } finally {
       if (mounted) setState(() => _isActionBusy = false);
@@ -258,7 +259,7 @@ class _TicketDetailViewState extends State<TicketDetailView> {
       widget.onTicketUpdated?.call();
     } catch (e) {
       if (mounted) {
-        _showOverlayMessage('خطا در تغییر اولویت', Colors.red, const Duration(seconds: 3));
+        _showOverlayMessage('خطا در تغییر اولویت', SemanticColorResolver.negative(context), const Duration(seconds: 3));
       }
     } finally {
       if (mounted) setState(() => _isActionBusy = false);
@@ -278,7 +279,7 @@ class _TicketDetailViewState extends State<TicketDetailView> {
       widget.onTicketUpdated?.call();
     } catch (e) {
       if (mounted) {
-        _showOverlayMessage('خطا در تخصیص تیکت', Colors.red, const Duration(seconds: 3));
+        _showOverlayMessage('خطا در تخصیص تیکت', SemanticColorResolver.negative(context), const Duration(seconds: 3));
       }
     } finally {
       if (mounted) setState(() => _isActionBusy = false);
@@ -328,7 +329,7 @@ class _TicketDetailViewState extends State<TicketDetailView> {
     super.dispose();
   }
 
-  void _showOverlayMessage(String message, Color backgroundColor, Duration duration) {
+  void _showOverlayMessage(String message, Color backgroundColor, Duration duration, {bool isSuccess = false}) {
     final overlay = Overlay.of(context);
     late OverlayEntry overlayEntry;
     
@@ -356,7 +357,7 @@ class _TicketDetailViewState extends State<TicketDetailView> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Icon(
-                  backgroundColor == Colors.green ? Icons.check_circle : Icons.error,
+                  isSuccess ? Icons.check_circle : Icons.error,
                   color: Colors.white,
                   size: 20,
                 ),
@@ -431,7 +432,7 @@ class _TicketDetailViewState extends State<TicketDetailView> {
         final l10n = AppLocalizations.of(context);
         _showOverlayMessage(
           l10n.ticketLoadingError,
-          Colors.red,
+          SemanticColorResolver.negative(context),
           const Duration(seconds: 3),
         );
       }
@@ -495,8 +496,9 @@ class _TicketDetailViewState extends State<TicketDetailView> {
         // Show success message using Overlay to appear above dialog
         _showOverlayMessage(
           l10n.messageSentSuccessfully,
-          Colors.green,
+          SemanticColorResolver.positive(context),
           const Duration(seconds: 2),
+          isSuccess: true,
         );
       }
 
@@ -512,7 +514,7 @@ class _TicketDetailViewState extends State<TicketDetailView> {
         // Show error message using Overlay to appear above dialog
         _showOverlayMessage(
           l10n.errorSendingMessage,
-          Colors.red,
+          SemanticColorResolver.negative(context),
           const Duration(seconds: 3),
         );
       }
@@ -1100,15 +1102,15 @@ class _TicketDetailViewState extends State<TicketDetailView> {
               Container(
                 width: double.infinity,
                 padding: EdgeInsets.symmetric(horizontal: 12, vertical: useCompactChrome ? 6 : 10),
-                color: Colors.orange.shade50,
+                color: SemanticColorResolver.warning(context).withValues(alpha: 0.12),
                 child: Row(
                   children: [
-                    Icon(Icons.info_outline, color: Colors.orange.shade800, size: 16),
-                    const SizedBox(width: 8),
+                    Icon(Icons.info_outline, color: SemanticColorResolver.warning(context), size: 16),
+                    SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         'این تیکت بسته شده است. برای ادامه گفتگو آن را بازگشایی کنید.',
-                        style: TextStyle(color: Colors.orange.shade900, fontSize: useCompactChrome ? 12 : 13),
+                        style: TextStyle(color: SemanticColorResolver.warning(context), fontSize: useCompactChrome ? 12 : 13),
                       ),
                     ),
                     if (!widget.isOperator)

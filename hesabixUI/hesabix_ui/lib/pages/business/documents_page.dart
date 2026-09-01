@@ -22,6 +22,7 @@ import '../../widgets/project/project_selector_widget.dart';
 import '../../widgets/invoice/person_combobox_widget.dart';
 import '../../widgets/fx/report_currency_filter_dropdown.dart';
 import '../../services/list_filter_preferences_service.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 /// صفحه لیست اسناد حسابداری (عمومی و اتوماتیک)
 class DocumentsPage extends StatefulWidget {
@@ -761,14 +762,14 @@ class _DocumentsPageState extends State<DocumentsPage> {
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
               decoration: BoxDecoration(
                 color: doc.isProforma
-                    ? Colors.orange.withValues(alpha: 0.1)
-                    : Colors.green.withValues(alpha: 0.1),
+                    ? SemanticColorResolver.warning(context).withValues(alpha: 0.1)
+                    : SemanticColorResolver.positive(context).withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Text(
                 doc.statusText,
                 style: TextStyle(
-                  color: doc.isProforma ? Colors.orange : Colors.green,
+                  color: doc.isProforma ? SemanticColorResolver.warning(context) : SemanticColorResolver.positive(context),
                   fontSize: 11,
                 ),
               ),
@@ -868,15 +869,15 @@ class _DocumentsPageState extends State<DocumentsPage> {
   Color _getDocumentTypeColor(String type) {
     switch (type) {
       case 'manual':
-        return Colors.blue;
+        return SemanticColorResolver.info(context);
       case 'expense':
-        return Colors.red;
+        return SemanticColorResolver.negative(context);
       case 'income':
-        return Colors.green;
+        return SemanticColorResolver.positive(context);
       case 'receipt':
         return Colors.teal;
       case 'payment':
-        return Colors.orange;
+        return SemanticColorResolver.warning(context);
       case 'transfer':
         return Colors.purple;
       case 'invoice':
@@ -947,17 +948,17 @@ class _DocumentsPageState extends State<DocumentsPage> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('تأیید حذف'),
+        title: Text('تأیید حذف'),
         content: Text('آیا از حذف سند ${doc.code} اطمینان دارید؟'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('انصراف'),
+            child: Text('انصراف'),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
+              backgroundColor: SemanticColorResolver.negative(context),
               foregroundColor: Colors.white,
             ),
             child: const Text('حذف'),
@@ -989,18 +990,18 @@ class _DocumentsPageState extends State<DocumentsPage> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('تأیید حذف گروهی'),
+        title: Text('تأیید حذف گروهی'),
         content: Text(
             'آیا از حذف $_selectedCount سند انتخاب شده اطمینان دارید؟\n\nتوجه: فقط اسناد دستی حذف خواهند شد.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('انصراف'),
+            child: Text('انصراف'),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
+              backgroundColor: SemanticColorResolver.negative(context),
               foregroundColor: Colors.white,
             ),
             child: const Text('حذف'),

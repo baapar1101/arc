@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/utils/password_validator.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 class ChangePasswordPage extends StatefulWidget {
   const ChangePasswordPage({super.key});
@@ -54,7 +55,7 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
         ScaffoldMessenger.of(navigatorContext).showSnackBar(
           SnackBar(
             content: Text(AppLocalizations.of(ctx).changePasswordSuccess),
-            backgroundColor: Colors.green,
+            backgroundColor: SemanticColorResolver.positive(context),
             behavior: SnackBarBehavior.floating,
             margin: const EdgeInsets.all(16),
             duration: const Duration(seconds: 2),
@@ -86,7 +87,7 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
       ScaffoldMessenger.of(Navigator.of(context, rootNavigator: true).context).showSnackBar(
         SnackBar(
           content: Text(message),
-          backgroundColor: Colors.red,
+          backgroundColor: SemanticColorResolver.negative(context),
           behavior: SnackBarBehavior.floating,
           margin: const EdgeInsets.all(16),
           duration: const Duration(seconds: 5), // نمایش طولانی‌تر برای خواندن

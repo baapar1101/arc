@@ -147,5 +147,17 @@ def render_template(template_path: str, context: Dict[str, Any]) -> str:
 	Render a repository template under templates/ directory with common filters.
 	Example: render_template("pdf/invoices/detail.html", ctx)
 	"""
+	enriched = dict(context or {})
+	if "brand_primary" not in enriched:
+		try:
+			from app.services.theme_brand_colors import resolve_theme_brand_context
+
+			enriched.update(resolve_theme_brand_context())
+		except Exception:
+			enriched.setdefault("brand_primary", "#0F4C81")
+			enriched.setdefault("brand_positive", "#2E7D32")
+			enriched.setdefault("brand_negative", "#B3261E")
+			enriched.setdefault("brand_warning", "#F0B92A")
+			enriched.setdefault("brand_secondary", "#5A6A7A")
 	template = get_env().get_template(template_path)
-	return template.render(**context)
+	return template.render(**enriched)

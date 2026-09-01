@@ -20,6 +20,7 @@ import 'package:hesabix_ui/widgets/permission/permission_widgets.dart';
 import 'package:intl/intl.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
 import 'package:hesabix_ui/core/hesabix_back.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 /// صفحه لیست فعالیت‌های CRM
 class CrmActivitiesPage extends StatefulWidget {
@@ -320,11 +321,11 @@ class _CrmActivitiesPageState extends State<CrmActivitiesPage> {
                                   child: ListTile(
                                     leading: CircleAvatar(
                                       backgroundColor: isTask
-                                          ? (overdue ? Colors.red.shade100 : Theme.of(context).colorScheme.tertiaryContainer)
+                                          ? (overdue ? SemanticColorResolver.negative(context).withValues(alpha: 0.18) : Theme.of(context).colorScheme.tertiaryContainer)
                                           : Theme.of(context).colorScheme.primaryContainer,
                                       child: Icon(
                                         isTask ? (isOpenTask ? Icons.check_box_outlined : Icons.check_box) : _activityIcon(type),
-                                        color: overdue ? Colors.red : Theme.of(context).colorScheme.onPrimaryContainer,
+                                        color: overdue ? SemanticColorResolver.negative(context) : Theme.of(context).colorScheme.onPrimaryContainer,
                                       ),
                                     ),
                                     title: Row(
@@ -332,14 +333,14 @@ class _CrmActivitiesPageState extends State<CrmActivitiesPage> {
                                         Expanded(child: Text(subject.isNotEmpty ? subject : typeLabel)),
                                         if (isTask && priority != null && priority.isNotEmpty && priority != 'normal')
                                           Chip(
-                                            label: Text(_priorityLabel(priority), style: const TextStyle(fontSize: 11)),
+                                            label: Text(_priorityLabel(priority), style: TextStyle(fontSize: 11)),
                                             visualDensity: VisualDensity.compact,
                                           ),
                                       ],
                                     ),
                                     subtitle: Text(
                                       subtitleParts.join(' · '),
-                                      style: overdue ? const TextStyle(color: Colors.red) : null,
+                                      style: overdue ? TextStyle(color: SemanticColorResolver.negative(context)) : null,
                                     ),
                                     trailing: canWrite
                                         ? Row(
