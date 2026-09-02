@@ -1,0 +1,150 @@
+.his-wrap {
+	max-width: 1200px;
+}
+
+.his-cards {
+	display: grid;
+	grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+	gap: 12px;
+	margin: 16px 0 24px;
+}
+
+.his-card {
+	background: #fff;
+	border: 1px solid #dcdcde;
+	border-radius: 4px;
+	padding: 14px 16px;
+}
+
+.his-card__label {
+	display: block;
+	color: #646970;
+	font-size: 12px;
+	margin-bottom: 6px;
+}
+
+.his-card__value {
+	font-size: 22px;
+	font-weight: 600;
+	line-height: 1.2;
+	color: #1d2327;
+}
+
+.his-grid-2 {
+	display: grid;
+	grid-template-columns: 1fr 1fr;
+	gap: 20px;
+	margin-bottom: 24px;
+}
+
+@media (max-width: 960px) {
+	.his-grid-2 {
+		grid-template-columns: 1fr;
+	}
+}
+
+.his-panel {
+	background: #fff;
+	border: 1px solid #dcdcde;
+	border-radius: 4px;
+	padding: 16px;
+}
+
+.his-panel h2 {
+	margin-top: 0;
+	font-size: 15px;
+}
+
+.his-table {
+	width: 100%;
+	border-collapse: collapse;
+}
+
+.his-table th,
+.his-table td {
+	padding: 8px 10px;
+	border-bottom: 1px solid #f0f0f1;
+	text-align: right;
+	vertical-align: middle;
+}
+
+.his-table th {
+	font-weight: 600;
+	color: #1d2327;
+}
+
+.his-bar {
+	display: inline-block;
+	width: 120px;
+	height: 8px;
+	background: #f0f0f1;
+	border-radius: 4px;
+	overflow: hidden;
+	vertical-align: middle;
+	margin-left: 8px;
+}
+
+.his-bar__fill {
+	display: block;
+	height: 100%;
+	background: #2271b1;
+}
+
+.his-muted {
+	color: #646970;
+}
+
+.his-mono {
+	font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+	font-size: 12px;
+}
+
+.his-filters {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	align-items: center;
+	margin: 12px 0 16px;
+}
+
+.his-spark {
+	display: flex;
+	align-items: flex-end;
+	gap: 3px;
+	height: 80px;
+	margin-top: 8px;
+}
+
+.his-spark__bar {
+	flex: 1;
+	min-width: 4px;
+	background: #72aee6;
+	border-radius: 2px 2px 0 0;
+}
+
+.his-domain-actions {
+	margin-top: 4px;
+	font-size: 12px;
+}
+
+.his-role {
+	display: inline-block;
+	padding: 2px 8px;
+	border-radius: 3px;
+	font-size: 12px;
+	font-weight: 600;
+}
+
+.his-role--api {
+	background: #e7f0fa;
+	color: #135e96;
+}
+
+.his-role--ui {
+	background: #edfaef;
+	color: #007017;
+}
+
+.his-domains-table td {
+	vertical-align: top;
+}

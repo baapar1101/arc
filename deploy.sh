@@ -36,6 +36,9 @@ IFS=$'\n\t'
 # Notes:
 # - Designed for Ubuntu 22.04+/Debian 12+
 # - Minimum install RAM: ~5.5 GiB — see check_minimum_ram
+# - Standalone curl|bash: deploy.sh must not require sibling files before clone.
+#   Python/mirror helpers are inlined when scripts/ is missing; after clone,
+#   DEPLOY_SCRIPT_DIR is rebound to ${APP_ROOT}/app so scripts/ resolve.
 # - Nginx/domains: after install, use `sudo hesabix -domains set` or `sudo hesabix -domains apply`;
 #   legacy: scripts/update_nginx_domains.sh. SSL: `sudo hesabix -ssl enable`. Let's Encrypt or SSL_LETSENCRYPT_LIVE in .deploy_env.
 # - Web build API URL: auto http/https from certificate at
@@ -70,6 +73,10 @@ IFS=$'\n\t'
 # - Apt/needrestart: by default NEEDRESTART_SUSPEND=1 during deploy so post-install service
 #   restarts (e.g. fwupd-refresh) do not run and fail on headless VPS. Set NEEDRESTART_SUSPEND=0
 #   to allow needrestart behavior.
+# - Install telemetry (optional): after a successful deploy, a non-blocking POST is sent to
+#   https://hesabix.ir/wp-json/hesabix-stats/v1/event with domain, public IP, RAM/CPU, OS, branch.
+#   Opt out: HESABIX_TELEMETRY=0. Override endpoint/token: HESABIX_STATS_URL / HESABIX_STATS_TOKEN.
+#   Persistent anonymous id: INSTALL_ID in ${APP_ROOT}/.deploy_env (see scripts/hesabix_telemetry.sh).
 #
 # ============================================================================
 
@@ -89,6 +96,33 @@ CROSS_MARK=$'\xE2\x9D\x8C'
 WARNING_MARK=$'\xE2\x9A\xA0'
 
 DEPLOY_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# When deploy.sh is curl'd to /tmp/installer.sh, DEPLOY_SCRIPT_DIR is /tmp and has no scripts/.
+# After the repo is cloned (or already present), rebind to the app tree so scripts/ resolve.
+hesabix_bind_deploy_script_dir_to_repo() {
+  if [[ -d "${APP_ROOT}/app/scripts" ]]; then
+    DEPLOY_SCRIPT_DIR="${APP_ROOT}/app"
+  fi
+}
+
+# Prefer cloned repo scripts, then the directory beside this deploy.sh (dev checkout).
+hesabix_find_repo_script() {
+  local name="$1"
+  local f
+  for f in \
+    "${APP_ROOT}/app/scripts/${name}" \
+    "${DEPLOY_SCRIPT_DIR}/scripts/${name}"; do
+    if [[ -f "${f}" ]]; then
+      printf '%s' "${f}"
+      return 0
+    fi
+  done
+  return 1
+}
+
+# If already installed (resume / re-run), bind early so helper sources can use repo scripts.
+hesabix_bind_deploy_script_dir_to_repo
+
 # shellcheck source=scripts/api_public_scheme.sh
 if [[ -r "${DEPLOY_SCRIPT_DIR}/scripts/api_public_scheme.sh" ]]; then
   # shellcheck disable=SC1091
@@ -117,7 +151,7 @@ for _hesabix_py_lib in \
 done
 unset _hesabix_py_lib
 if ! declare -F hesabix_resolve_backend_python >/dev/null 2>&1; then
-  # Standalone: curl shell.hesabix.ir/deploy.sh — no scripts/ beside installer.sh
+  # Standalone: curl raw deploy.sh to /tmp — no scripts/ beside installer.sh
   # shellcheck disable=SC1091
   source /dev/stdin <<'HESABIX_PYTHON_INLINE'
 : "${HESABIX_MIN_PYTHON_MAJOR:=3}"
@@ -219,7 +253,7 @@ hesabix_load_mirror_config() {
       return 0
     fi
   done
-  # Standalone: curl shell.hesabix.ir/deploy.sh — no scripts/ beside installer.sh
+  # Standalone: curl raw deploy.sh to /tmp — no scripts/ beside installer.sh
   # shellcheck disable=SC1091
   source /dev/stdin <<'HESABIX_MIRROR_CONFIG_INLINE'
 HESABIX_PIP_INDEX_URL="https://p.mirror.hesabix.ir/simple"
@@ -1196,6 +1230,22 @@ install_hesabix_command() {
     hesabix_apply_pip_mirror_env
     hesabix_apply_flutter_mirror_env
   fi
+
+  # Stable anonymous install id for telemetry (preserve across re-deploys).
+  local telem=""
+  if telem="$(hesabix_find_repo_script hesabix_telemetry.sh 2>/dev/null)"; then
+    # shellcheck source=scripts/hesabix_telemetry.sh
+    # shellcheck disable=SC1090
+    source "${telem}"
+    hesabix_ensure_install_id || true
+  elif [[ -z "${INSTALL_ID:-}" ]]; then
+    if command -v uuidgen >/dev/null 2>&1; then
+      INSTALL_ID="$(uuidgen | tr '[:upper:]' '[:lower:]')"
+    elif [[ -r /proc/sys/kernel/random/uuid ]]; then
+      INSTALL_ID="$(tr '[:upper:]' '[:lower:]' < /proc/sys/kernel/random/uuid)"
+    fi
+  fi
+
   cat > "${env_file}" <<ENV
 API_DOMAIN=${API_DOMAIN}
 UI_DOMAIN=${UI_DOMAIN}
@@ -1209,16 +1259,14 @@ PIP_EXTRA_INDEX_URL=${PIP_EXTRA_INDEX_URL:-}
 PIP_TRUSTED_HOST=${PIP_TRUSTED_HOST:-}
 PUB_HOSTED_URL=${PUB_HOSTED_URL:-}
 FLUTTER_STORAGE_BASE_URL=${FLUTTER_STORAGE_BASE_URL:-}
+INSTALL_ID=${INSTALL_ID:-}
 ENV
   chmod 600 "${env_file}"
   log_info "Saved deployment config to ${env_file}"
 
   local bin_hesabix="/usr/local/bin/hesabix"
-  local cli_src="${APP_ROOT}/app/scripts/hesabix"
-  if [[ ! -f "${cli_src}" ]]; then
-    cli_src="$(pwd)/scripts/hesabix"
-  fi
-  if [[ ! -f "${cli_src}" ]]; then
+  local cli_src=""
+  if ! cli_src="$(hesabix_find_repo_script hesabix)"; then
     log_error "CLI source not found: scripts/hesabix (expected at ${APP_ROOT}/app/scripts/hesabix)"
     return 1
   fi
@@ -1600,10 +1648,11 @@ install_prereqs() {
   fi
 
   # pgvector for semantic RAG search (optional; non-fatal if apt package missing)
-  if [[ -f "${DEPLOY_SCRIPT_DIR}/scripts/ensure_pgvector.sh" ]]; then
-    chmod +x "${DEPLOY_SCRIPT_DIR}/scripts/ensure_pgvector.sh" 2>/dev/null || true
+  local pgvector_script=""
+  if pgvector_script="$(hesabix_find_repo_script ensure_pgvector.sh)"; then
+    chmod +x "${pgvector_script}" 2>/dev/null || true
     log_info "Ensuring PostgreSQL pgvector package (optional)..."
-    if bash "${DEPLOY_SCRIPT_DIR}/scripts/ensure_pgvector.sh"; then
+    if bash "${pgvector_script}"; then
       log_success "pgvector package check completed."
     else
       log_warning "pgvector package install skipped or failed (non-fatal)."
@@ -1680,6 +1729,8 @@ clone_repo() {
   local actual_branch
   actual_branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unknown")
   log_success "Repository ready at ${APP_ROOT}/app (branch: ${actual_branch})"
+  # Standalone curl installs: switch script root from /tmp to the cloned tree.
+  hesabix_bind_deploy_script_dir_to_repo
 }
 
 setup_db() {
@@ -2120,8 +2171,8 @@ SQL
 # pg_restore --no-owner leaves objects owned by postgres without ACLs.
 # Grant and reassign owners so hesabix (app user) can run Alembic and the API.
 hesabix_fixup_seed_object_privileges() {
-  local fixup_script="${DEPLOY_SCRIPT_DIR}/scripts/hesabix_fixup_db_privileges.sh"
-  if [[ -f "${fixup_script}" ]]; then
+  local fixup_script=""
+  if fixup_script="$(hesabix_find_repo_script hesabix_fixup_db_privileges.sh)"; then
     chmod +x "${fixup_script}" 2>/dev/null || true
     bash "${fixup_script}"
     return 0
@@ -2256,21 +2307,24 @@ deploy_backend() {
     fi
   fi
   merge_hesabix_api_env_file "${env_file}"
-  local ensure_secrets="${DEPLOY_SCRIPT_DIR}/scripts/ensure_api_production_secrets.sh"
-  if [[ -f "${ensure_secrets}" ]]; then
-    chmod +x "${ensure_secrets}" 2>/dev/null || true
-    log_info "Ensuring API production secrets in .env..."
-    if APP_ROOT="${APP_ROOT}" bash "${ensure_secrets}"; then
-      log_success "API production secrets verified."
-    else
-      log_error "Failed to ensure API production secrets."
-      exit 1
-    fi
+  local ensure_secrets=""
+  if ! ensure_secrets="$(hesabix_find_repo_script ensure_api_production_secrets.sh)"; then
+    log_error "ensure_api_production_secrets.sh not found (expected under ${APP_ROOT}/app/scripts after clone)."
+    log_error "Standalone install must complete the repository clone step first."
+    exit 1
+  fi
+  chmod +x "${ensure_secrets}" 2>/dev/null || true
+  log_info "Ensuring API production secrets in .env..."
+  if APP_ROOT="${APP_ROOT}" bash "${ensure_secrets}"; then
+    log_success "API production secrets verified."
+  else
+    log_error "Failed to ensure API production secrets."
+    exit 1
   fi
 
   if [[ "${INSTALL_VOICE:-N}" =~ ^[Yy]$ ]]; then
-    local voice_script="${DEPLOY_SCRIPT_DIR}/scripts/ensure_voice_chat.sh"
-    if [[ -f "${voice_script}" ]]; then
+    local voice_script=""
+    if voice_script="$(hesabix_find_repo_script ensure_voice_chat.sh)"; then
       chmod +x "${voice_script}" 2>/dev/null || true
       log_info "Installing AI voice chat prerequisites (local STT/TTS)..."
       if INSTALL_VOICE=Y bash "${voice_script}" --non-interactive; then
@@ -2338,10 +2392,11 @@ print('Connection successful')
   fi
 
   # pgvector (for servers where prereqs step was skipped earlier)
-  if [[ -f "${DEPLOY_SCRIPT_DIR}/scripts/ensure_pgvector.sh" ]]; then
-    chmod +x "${DEPLOY_SCRIPT_DIR}/scripts/ensure_pgvector.sh" 2>/dev/null || true
+  local pgvector_script=""
+  if pgvector_script="$(hesabix_find_repo_script ensure_pgvector.sh)"; then
+    chmod +x "${pgvector_script}" 2>/dev/null || true
     log_info "Ensuring PostgreSQL pgvector package before migrations..."
-    bash "${DEPLOY_SCRIPT_DIR}/scripts/ensure_pgvector.sh" || log_warning "pgvector install skipped (non-fatal)."
+    bash "${pgvector_script}" || log_warning "pgvector install skipped (non-fatal)."
   fi
 
   # Always run migrations (after optional seed import, or when DB was already initialized)
@@ -2760,9 +2815,9 @@ ensure_flutter_sdk() {
       exit 1
     fi
   else
-    local ensure_flutter_script="${DEPLOY_SCRIPT_DIR}/scripts/ensure_flutter_sdk_for_update.sh"
+    local ensure_flutter_script=""
     export HESABIX_UPDATE_FLUTTER_SDK="${HESABIX_UPDATE_FLUTTER_SDK:-1}"
-    if [[ -f "${ensure_flutter_script}" ]]; then
+    if ensure_flutter_script="$(hesabix_find_repo_script ensure_flutter_sdk_for_update.sh)"; then
       chmod +x "${ensure_flutter_script}" 2>/dev/null || true
       if ! bash "${ensure_flutter_script}"; then
         log_warning "Flutter SDK ensure failed after git update; trying flutter doctor..."
@@ -3883,6 +3938,18 @@ main() {
   else
     echo "$CHECK_MARK Repository already cloned/updated. Skipping..."
   fi
+  # Critical for curl|bash installs: DEPLOY_SCRIPT_DIR must point at cloned app (not /tmp).
+  hesabix_bind_deploy_script_dir_to_repo
+  if [[ ! -d "${DEPLOY_SCRIPT_DIR}/scripts" ]]; then
+    log_error "App scripts directory missing after clone: ${APP_ROOT}/app/scripts"
+    log_error "Cannot continue standalone deploy without repository scripts."
+    exit 1
+  fi
+  # Prefer full mirror helpers from the cloned repo when available.
+  if [[ -r "${DEPLOY_SCRIPT_DIR}/scripts/mirror_config.sh" ]]; then
+    # shellcheck disable=SC1090
+    source "${DEPLOY_SCRIPT_DIR}/scripts/mirror_config.sh" || true
+  fi
   echo
   
   # Setup database (idempotent)
@@ -4049,6 +4116,21 @@ main() {
   log_info "Database password is stored in:"
   echo "  ${APP_ROOT}/.db_password"
   echo
+
+  # Anonymous install telemetry (non-blocking; never fails the deploy).
+  # Opt out: HESABIX_TELEMETRY=0
+  local telem_script=""
+  if telem_script="$(hesabix_find_repo_script hesabix_telemetry.sh 2>/dev/null)"; then
+    # shellcheck source=scripts/hesabix_telemetry.sh
+    # shellcheck disable=SC1090
+    source "${telem_script}"
+    if hesabix_telemetry_enabled; then
+      log_info "Sending anonymous install stats to hesabix.ir (set HESABIX_TELEMETRY=0 to disable)..."
+      hesabix_telemetry_send "install" "deploy" || true
+    else
+      log_info "Install telemetry disabled (HESABIX_TELEMETRY=0)."
+    fi
+  fi
 }
 
 main "$@"

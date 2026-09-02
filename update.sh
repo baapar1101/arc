@@ -6,6 +6,7 @@
 # AI voice (local STT/TTS): scripts/ensure_voice_chat.sh — prompts if deps missing (INSTALL_VOICE in .deploy_env).
 # Requires: API_DOMAIN, UI_DOMAIN, BRANCH, REPO_URL in env or in ${APP_ROOT}/.deploy_env
 # Web build API URL: https if /etc/letsencrypt/live/<API_DOMAIN> exists; else http unless API_PUBLIC_SCHEME is set in env (custom TLS).
+# Telemetry: after success, optional POST to hesabix.ir (HESABIX_TELEMETRY=0 to disable); see scripts/hesabix_telemetry.sh.
 set -euo pipefail
 
 APP_ROOT="${APP_ROOT:-/opt/hesabix}"
@@ -543,3 +544,15 @@ fi
 echo "==========================================" | tee -a "${LOG_FILE}"
 log_ok "Hesabix update completed."
 echo "==========================================" | tee -a "${LOG_FILE}"
+
+# Anonymous update telemetry (non-blocking). Opt out: HESABIX_TELEMETRY=0
+telem_script="${app_dir}/scripts/hesabix_telemetry.sh"
+if [[ -r "${telem_script}" ]]; then
+  # shellcheck source=scripts/hesabix_telemetry.sh
+  # shellcheck disable=SC1090
+  source "${telem_script}"
+  if hesabix_telemetry_enabled; then
+    log_info "Sending anonymous update stats to hesabix.ir (set HESABIX_TELEMETRY=0 to disable)..."
+    hesabix_telemetry_send "update" "update" || true
+  fi
+fi

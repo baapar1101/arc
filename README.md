@@ -79,21 +79,21 @@ The installation script automatically installs all required software:
 
 ### Quick Installation
 
-The easiest way to install Hesabix is using the automated installation script:
+The easiest way to install Hesabix is using the automated installation script from the project repository:
 
 ```bash
-cd /tmp && curl -sSL --http1.1 https://shell.hesabix.ir/deploy.sh | tr -d '\r' > installer.sh && chmod +x installer.sh && sudo bash installer.sh
+cd /tmp && curl -sSL --http1.1 https://source.hesabix.ir/hesabix/arc/raw/branch/master/deploy.sh | tr -d '\r' > installer.sh && chmod +x installer.sh && sudo bash installer.sh
 ```
 
 > **HTTP/2 issue on some servers**: On some servers (e.g. older curl versions or specific network/firewall configuration), using HTTP/2 may cause errors. The command above uses the `--http1.1` flag to always use HTTP/1.1. If you get a curl error, see the [Troubleshooting HTTP/2](#troubleshooting-http2-when-downloading-install-script) section.
 
 **Alternative method using wget** (if curl still fails):
 ```bash
-cd /tmp && wget -qO- https://shell.hesabix.ir/deploy.sh | tr -d '\r' > installer.sh && chmod +x installer.sh && sudo bash installer.sh
+cd /tmp && wget -qO- https://source.hesabix.ir/hesabix/arc/raw/branch/master/deploy.sh | tr -d '\r' > installer.sh && chmod +x installer.sh && sudo bash installer.sh
 ```
 
 This command will:
-1. Download the installation script
+1. Download the installation script from `https://source.hesabix.ir/hesabix/arc`
 2. Make it executable
 3. Run the installation with root privileges
 
@@ -176,7 +176,7 @@ You can upgrade in either of the following ways.
 To upgrade by downloading and running the deployment script again:
 
 ```bash
-cd /tmp && curl -sSL --http1.1 https://shell.hesabix.ir/deploy.sh | tr -d '\r' > installer.sh && chmod +x installer.sh && sudo bash installer.sh
+cd /tmp && curl -sSL --http1.1 https://source.hesabix.ir/hesabix/arc/raw/branch/master/deploy.sh | tr -d '\r' > installer.sh && chmod +x installer.sh && sudo bash installer.sh
 ```
 
 The script is idempotent and safe to re-run. It will update the code and restart services.
@@ -261,7 +261,7 @@ Some servers have issues with HTTP/2 due to curl version, network configuration,
 1. **Use HTTP/1.1 with curl**  
    Always include the `--http1.1` flag in the command:
    ```bash
-   curl -sSL --http1.1 -o installer.sh https://shell.hesabix.ir/deploy.sh
+   curl -sSL --http1.1 -o installer.sh https://source.hesabix.ir/hesabix/arc/raw/branch/master/deploy.sh
    ```
    Then run:
    ```bash
@@ -271,7 +271,7 @@ Some servers have issues with HTTP/2 due to curl version, network configuration,
 2. **Use wget instead of curl**  
    wget uses HTTP/1.1 by default:
    ```bash
-   cd /tmp && wget -qO- https://shell.hesabix.ir/deploy.sh | tr -d '\r' > installer.sh && chmod +x installer.sh && sudo bash installer.sh
+   cd /tmp && wget -qO- https://source.hesabix.ir/hesabix/arc/raw/branch/master/deploy.sh | tr -d '\r' > installer.sh && chmod +x installer.sh && sudo bash installer.sh
    ```
    If you get an SSL certificate error, you can add `--no-check-certificate` to the wget command (only in test environments or when you are sure it is safe).
 
@@ -332,6 +332,14 @@ The installation script automatically sets appropriate file permissions:
 - `.env` file: `600` (read/write for owner only)
 - Application files: Owned by `www-data` user
 - Database password: Stored securely with restricted access
+
+### Install telemetry (anonymous / semi-anonymous)
+
+After a **successful** install (`deploy.sh`) or update (`hesabix -update`), Hesabix may send a small JSON report to `https://hesabix.ir` so the maintainers can understand real-world usage (domains, public IP, RAM/CPU, OS, git branch/commit, SSL and optional feature flags). No database passwords, JWT secrets, or business/user data are included. A stable random `INSTALL_ID` is stored in `/opt/hesabix/.deploy_env`.
+
+- **Disable**: `HESABIX_TELEMETRY=0` (environment variable) before running deploy/update
+- **Override endpoint/token** (advanced): `HESABIX_STATS_URL`, `HESABIX_STATS_TOKEN`
+- Implementation: `scripts/hesabix_telemetry.sh`; WordPress receiver (for hesabix.ir only): `extraScripts/hesabix-install-stats/`
 
 ## License
 
