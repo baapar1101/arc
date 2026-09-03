@@ -317,21 +317,57 @@ async def get_public_invoice_document_pdf(
 
 	def _normalize_line(row: dict) -> dict:
 		q = _num(row.get("quantity"))
-		from app.services.print_tax_discount_display import enrich_line_amount_fields
+		from app.services.print_tax_discount_display import (
+			enrich_line_amount_fields,
+			line_amounts_before_global_discount,
+			parse_discount_meta,
+			should_restore_line_amounts_before_global,
+		)
 
-		return enrich_line_amount_fields({
-			"product_code": row.get("product_code"),
-			"product_name": row.get("product_name"),
-			"description": row.get("description"),
-			"quantity": q,
-			"quantity_display": str(int(q)) if float(q).is_integer() else f"{q:.3f}".rstrip("0").rstrip("."),
-			"unit_display": _line_unit_display(row),
-			"unit_price": _num(row.get("unit_price")),
-			"discount": _num(row.get("line_discount")),
-			"tax_amount": _num(row.get("tax_amount")),
-			"line_total": _num(row.get("line_total")),
-			"attributes_display": "",
-		})
+		info = row.get("extra_info") if isinstance(row.get("extra_info"), dict) else {}
+		unit_price = _num(row.get("unit_price") if row.get("unit_price") is not None else info.get("unit_price"))
+		line_discount = _num(
+			row.get("line_discount") if row.get("line_discount") is not None else info.get("line_discount")
+		)
+		tax_amount = _num(
+			row.get("tax_amount") if row.get("tax_amount") is not None else info.get("tax_amount")
+		)
+		line_total = _num(
+			row.get("line_total") if row.get("line_total") is not None else info.get("line_total")
+		)
+		discount_type, discount_value = parse_discount_meta(info)
+		if discount_type is None:
+			discount_type, discount_value = parse_discount_meta(row)
+
+		gd = (extra or {}).get("global_discount") if isinstance(extra, dict) else None
+		if should_restore_line_amounts_before_global(gd if isinstance(gd, dict) else None):
+			restored = line_amounts_before_global_discount(
+				quantity=q,
+				unit_price=unit_price,
+				line_discount=line_discount,
+				tax_rate=info.get("tax_rate", row.get("tax_rate")),
+			)
+			tax_amount = restored["tax_amount"]
+			line_total = restored["line_total"]
+
+		return enrich_line_amount_fields(
+			{
+				"product_code": row.get("product_code"),
+				"product_name": row.get("product_name"),
+				"description": row.get("description"),
+				"quantity": q,
+				"quantity_display": str(int(q)) if float(q).is_integer() else f"{q:.3f}".rstrip("0").rstrip("."),
+				"unit_display": _line_unit_display(row),
+				"unit_price": unit_price,
+				"discount": line_discount,
+				"discount_type": discount_type,
+				"discount_value": discount_value,
+				"tax_amount": tax_amount,
+				"line_total": line_total,
+				"attributes_display": "",
+			},
+			is_fa=is_fa,
+		)
 
 	normalized_lines = [_normalize_line(row) for row in lines if isinstance(row, dict)]
 	has_line_discount = any((_num(x.get("discount")) != 0) for x in normalized_lines)
@@ -416,7 +452,10 @@ async def get_public_invoice_document_pdf(
 	invoice_view["amount_without_tax"] = _num(totals.get("gross")) - _num(totals.get("discount"))
 
 	from app.services.business_print_settings_resolver import load_print_settings
-	from app.services.print_tax_discount_display import build_invoice_tax_discount_display_flags
+	from app.services.print_tax_discount_display import (
+		build_global_discount_print_info,
+		build_invoice_tax_discount_display_flags,
+	)
 
 	business_id = invoice.get("business_id") or business.get("id")
 	print_settings = load_print_settings(
@@ -433,6 +472,24 @@ async def get_public_invoice_document_pdf(
 		amount_without_tax=invoice_view.get("amount_without_tax"),
 		subtotal=invoice_view.get("subtotal"),
 	)
+
+	line_discount_total = sum(_num(x.get("discount")) for x in normalized_lines)
+	global_discount_print = build_global_discount_print_info(
+		extra if isinstance(extra, dict) else {},
+		line_discount_total=line_discount_total,
+		is_fa=is_fa,
+	)
+	invoice_view["line_discount_total"] = global_discount_print["line_discount_total"]
+	invoice_view["global_discount_amount"] = global_discount_print["global_discount_amount"]
+	invoice_view["global_discount_type"] = global_discount_print["global_discount_type"]
+	invoice_view["global_discount_value"] = global_discount_print["global_discount_value"]
+	invoice_view["global_discount_display"] = global_discount_print["global_discount_display"]
+	invoice_view["show_discount_breakdown"] = global_discount_print["show_discount_breakdown"]
+	invoice_view["discount_summary_label"] = global_discount_print["discount_summary_label"]
+	invoice_view["discount_line_label"] = global_discount_print["discount_line_label"]
+	invoice_view["discount_global_label"] = global_discount_print["discount_global_label"]
+	invoice_view["discount_summary_display"] = global_discount_print["discount_summary_display"]
+	invoice_view["has_global_discount"] = global_discount_print["has_global_discount"]
 
 	invoice_adjustments_rows: list = []
 	adjustments_net_signed = 0.0

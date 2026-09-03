@@ -3431,6 +3431,24 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
                       final quantity = (line['quantity'] as num?)?.toDouble() ?? 0.0;
                       final unitPrice = (extraInfo?['unit_price'] as num?)?.toDouble() ?? 0.0;
                       final discount = (extraInfo?['line_discount'] as num?)?.toDouble() ?? 0.0;
+                      final discountType = (extraInfo?['discount_type'] as String?)?.toLowerCase();
+                      final discountValue = (extraInfo?['discount_value'] as num?)?.toDouble();
+                      String discountText = '-';
+                      if (discount > 0) {
+                        final amountText = formatWithThousands(
+                          discount,
+                          decimalPlaces: discount % 1 == 0 ? 0 : 2,
+                        );
+                        if (discountType == 'percent' && discountValue != null && discountValue != 0) {
+                          final pctText = formatWithThousands(
+                            discountValue,
+                            decimalPlaces: discountValue % 1 == 0 ? 0 : 2,
+                          );
+                          discountText = '$pctText٪ ($amountText)';
+                        } else {
+                          discountText = amountText;
+                        }
+                      }
                       final tax = (extraInfo?['tax_amount'] as num?)?.toDouble() ?? 0.0;
                       final lineTotal = (extraInfo?['line_total'] as num?)?.toDouble() ?? 0.0;
                       final unit = extraInfo?['unit'] as String? ?? '-';
@@ -3510,7 +3528,7 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
                         DataCell(
                           Center(
                             child: Text(
-                              discount > 0 ? formatWithThousands(discount, decimalPlaces: discount % 1 == 0 ? 0 : 2) : '-',
+                              discountText,
                               textAlign: TextAlign.center,
                               textDirection: ui.TextDirection.ltr,
                               style: baseNumberStyle.copyWith(color: SemanticColorResolver.warning(context)),
@@ -3781,6 +3799,41 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
       final adjNet = (totals['adjustments_net'] as num?)?.toDouble() ?? 0.0;
       final adjTax = (totals['adjustments_tax'] as num?)?.toDouble() ?? 0.0;
       final payable = invoicePayableTotalFromTotals(totals) ?? net;
+
+      final globalDiscount = _document?.extraInfo?['global_discount'];
+      String discountLabel = 'تخفیف';
+      String discountDisplay = formatWithThousands(discount.toInt());
+      if (globalDiscount is Map) {
+        final gdType = (globalDiscount['type'] as String?)?.toLowerCase();
+        final gdValue = (globalDiscount['value'] as num?)?.toDouble();
+        final gdAmount = (globalDiscount['amount'] as num?)?.toDouble() ?? 0.0;
+        double lineDiscSum = 0.0;
+        final productLines = _rawDocumentData?['product_lines'];
+        if (productLines is List) {
+          for (final raw in productLines) {
+            if (raw is! Map) continue;
+            final ei = raw['extra_info'];
+            if (ei is Map) {
+              lineDiscSum += (ei['line_discount'] as num?)?.toDouble() ?? 0.0;
+            }
+          }
+        }
+        if (gdAmount > 0 || (gdType == 'percent' && (gdValue ?? 0) > 0)) {
+          final amountText = formatWithThousands(gdAmount.toInt());
+          final globalText = (gdType == 'percent' && gdValue != null)
+              ? '${formatWithThousands(gdValue, decimalPlaces: gdValue % 1 == 0 ? 0 : 2)}٪ ($amountText)'
+              : amountText;
+          if (lineDiscSum > 0) {
+            discountLabel = 'تخفیف (سطری + کلی)';
+            discountDisplay =
+                '${formatWithThousands(lineDiscSum.toInt())} + $globalText';
+          } else {
+            discountLabel = 'تخفیف کلی';
+            discountDisplay = globalText;
+          }
+        }
+      }
+
       return Card(
         elevation: 2,
         color: theme.colorScheme.primaryContainer.withValues(alpha: 0.3),
@@ -3795,7 +3848,7 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
                 children: [
                   _buildTotalItem('جمع کل (قبل از تخفیف)', formatWithThousands(gross.toInt()), theme.colorScheme.primary),
                   Container(width: 2, height: 40, color: theme.dividerColor),
-                  _buildTotalItem('تخفیف', formatWithThousands(discount.toInt()), SemanticColorResolver.warning(context)),
+                  _buildTotalItem(discountLabel, discountDisplay, SemanticColorResolver.warning(context)),
                   Container(width: 2, height: 40, color: theme.dividerColor),
                   _buildTotalItem('مالیات', formatWithThousands(tax.toInt()), SemanticColorResolver.info(context)),
                   Container(width: 2, height: 40, color: theme.dividerColor),

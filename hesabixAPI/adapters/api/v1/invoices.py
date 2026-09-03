@@ -1401,8 +1401,12 @@ async def export_single_invoice_pdf(
         pick_print_settings,
     )
     from app.services.print_tax_discount_display import (
+        build_global_discount_print_info,
         build_invoice_tax_discount_display_flags,
         enrich_line_amount_fields,
+        line_amounts_before_global_discount,
+        parse_discount_meta,
+        should_restore_line_amounts_before_global,
     )
 
     # تنظیمات چاپ کسب‌وکار (لوگو، مهر، پرداخت‌ها، اقساط و متن انتهایی)
@@ -1700,6 +1704,14 @@ async def export_single_invoice_pdf(
     )
 
     # خطوط فاکتور (کالا/خدمت)
+    # اگر تخفیف کلی با حالت مالیات متناسب روی سطرها پخش شده باشد،
+    # برای نمایش پرینت مبالغ سطر را به حالت قبل از تخفیف کلی برمی‌گردانیم
+    # تا کاربر حس نکند تخفیف کلی روی فیلد تخفیف سطری نشسته است.
+    _gd_preview = (extra.get("global_discount") if isinstance(extra, dict) else None) or {}
+    _restore_pre_global = should_restore_line_amounts_before_global(
+        _gd_preview if isinstance(_gd_preview, dict) else None
+    )
+
     normalized_lines: list[dict[str, Any]] = []
     try:
         for pl in item.get("product_lines", []) or []:
@@ -1709,6 +1721,7 @@ async def export_single_invoice_pdf(
             line_discount = info.get("line_discount") or 0
             tax_amount = info.get("tax_amount") or 0
             line_total = info.get("line_total")
+            discount_type, discount_value = parse_discount_meta(info)
             qty_display = None
             try:
                 qf = float(qty or 0)
@@ -1717,6 +1730,15 @@ async def export_single_invoice_pdf(
                 taxf = float(tax_amount or 0)
                 if line_total is None:
                     line_total = (qf * upf) - discf + taxf
+                if _restore_pre_global:
+                    restored = line_amounts_before_global_discount(
+                        quantity=qf,
+                        unit_price=upf,
+                        line_discount=discf,
+                        tax_rate=info.get("tax_rate"),
+                    )
+                    tax_amount = restored["tax_amount"]
+                    line_total = restored["line_total"]
                 # نمایش تعداد: بدون اعشار اگر عدد صحیح باشد
                 if qf.is_integer():
                     qty_display = f"{int(qf):,}"
@@ -1739,11 +1761,14 @@ async def export_single_invoice_pdf(
                         "unit_display": _invoice_line_unit_display_for_pdf(pl if isinstance(pl, dict) else {}),
                         "unit_price": unit_price,
                         "discount": line_discount,
+                        "discount_type": discount_type,
+                        "discount_value": discount_value,
                         "tax_amount": tax_amount,
                         "line_total": line_total,
                         "line_custom_attributes": lc_attrs,
                         "attributes_display": attrs_display,
-                    }
+                    },
+                    is_fa=is_fa,
                 )
             )
     except Exception:
@@ -2288,6 +2313,31 @@ async def export_single_invoice_pdf(
         amount_without_tax=amount_without_tax,
         subtotal=subtotal,
     )
+
+    # جمع تخفیف سطری (بدون تخفیف کلی) برای تفکیک در خلاصه مالی پرینت
+    line_discount_total = 0.0
+    try:
+        for ln in normalized_lines:
+            line_discount_total += float(ln.get("discount") or 0)
+    except Exception:
+        line_discount_total = 0.0
+
+    global_discount_print = build_global_discount_print_info(
+        extra if isinstance(extra, dict) else {},
+        line_discount_total=line_discount_total,
+        is_fa=is_fa,
+    )
+    item["line_discount_total"] = global_discount_print["line_discount_total"]
+    item["global_discount_amount"] = global_discount_print["global_discount_amount"]
+    item["global_discount_type"] = global_discount_print["global_discount_type"]
+    item["global_discount_value"] = global_discount_print["global_discount_value"]
+    item["global_discount_display"] = global_discount_print["global_discount_display"]
+    item["show_discount_breakdown"] = global_discount_print["show_discount_breakdown"]
+    item["discount_summary_label"] = global_discount_print["discount_summary_label"]
+    item["discount_line_label"] = global_discount_print["discount_line_label"]
+    item["discount_global_label"] = global_discount_print["discount_global_label"]
+    item["discount_summary_display"] = global_discount_print["discount_summary_display"]
+    item["has_global_discount"] = global_discount_print["has_global_discount"]
 
     # نام کاربر صادرکننده فاکتور
     issuer_name: Optional[str] = None

@@ -254,10 +254,33 @@
         <td class="val">{{ (invoice.amount_before_discount_and_tax or invoice.subtotal or 0) | format_amount(0) | ltr | safe }}</td>
       </tr>
       {% if show_summary_discount | default(invoice.discount_total) %}
-        <tr>
-          <td class="lbl">{{ 'تخفیف' if is_fa else 'Discount' }}</td>
-          <td class="val">{{ (invoice.discount_total or 0) | format_amount(0) | ltr | safe }}</td>
-        </tr>
+        {% if invoice.show_discount_breakdown %}
+          <tr>
+            <td class="lbl">{{ invoice.discount_line_label | default(('تخفیف سطری' if is_fa else 'Line discount')) }}</td>
+            <td class="val">{{ (invoice.line_discount_total or 0) | format_amount(0) | ltr | safe }}</td>
+          </tr>
+          <tr>
+            <td class="lbl">{{ invoice.discount_global_label | default(('تخفیف کلی' if is_fa else 'Invoice discount')) }}</td>
+            <td class="val">
+              {% if invoice.global_discount_display %}
+                {{ invoice.global_discount_display | ltr | safe }}
+              {% else %}
+                {{ (invoice.global_discount_amount or 0) | format_amount(0) | ltr | safe }}
+              {% endif %}
+            </td>
+          </tr>
+        {% else %}
+          <tr>
+            <td class="lbl">{{ invoice.discount_summary_label | default(('تخفیف' if is_fa else 'Discount')) }}</td>
+            <td class="val">
+              {% if invoice.discount_summary_display %}
+                {{ invoice.discount_summary_display | ltr | safe }}
+              {% else %}
+                {{ (invoice.discount_total or 0) | format_amount(0) | ltr | safe }}
+              {% endif %}
+            </td>
+          </tr>
+        {% endif %}
       {% endif %}
       {% if show_summary_tax | default(invoice.tax_total) %}
         <tr>

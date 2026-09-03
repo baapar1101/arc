@@ -75,6 +75,13 @@ def _wrap_if_flag(flag: str | None, inner: str) -> str:
 def _cell_expr(col: Dict[str, Any]) -> str:
 	key = _esc(col.get("key") or "")
 	fmt = str(col.get("format") or "").lower()
+	# تخفیف سطری: اگر درصد ذخیره شده باشد، متن آمادهٔ discount_display را نشان بده
+	if key == "discount":
+		return (
+			"{{ row.discount_display|default(row.discount|money, true) "
+			"if row.discount_display is defined and row.discount_display "
+			"else (row.discount|default(0, true)|money) }}"
+		)
 	val = f"row.{key}|default('', true)"
 	if fmt == "money":
 		return f"{{{{ {val}|money }}}}"
@@ -86,8 +93,16 @@ def _cell_expr(col: Dict[str, Any]) -> str:
 def _total_expr(row: Dict[str, Any]) -> str:
 	expr = str(row.get("expr") or "").strip()
 	fmt = str(row.get("format") or "").lower()
+	key = str(row.get("key") or "").strip()
 	if not expr:
 		return '""'
+	# تخفیف خلاصه: نمایش درصد تخفیف کلی در صورت وجود
+	if key == "discount":
+		return (
+			"{{ invoice.discount_summary_display|default("
+			+ f"{expr}|default('', true)|money"
+			+ ", true) }}"
+		)
 	safe = f"{expr}|default('', true)"
 	if fmt == "money":
 		return f"{{{{ {safe}|money }}}}"
