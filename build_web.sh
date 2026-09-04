@@ -19,10 +19,15 @@ API_BASE_URL="$DEFAULT_API_BASE_URL"
 CLEAN_BUILD=false
 INSTALL_DEPS=false
 USE_OFFLINE_CACHE=false
+# Optional CLI overrides for UI branding (else env / .deploy_env)
+BRANDING_MODE_CLI=""
+BRANDING_DIR_CLI=""
+APP_NAME_FA_CLI=""
+APP_NAME_EN_CLI=""
 
 print_usage() {
   cat <<EOF
-Usage: ./build_web.sh [--project <path>] [--mode <debug|profile|release>] [--build-dir <dir>] [--api-base-url <url>] [--clean] [--install-deps] [--offline] [--help]
+Usage: ./build_web.sh [--project <path>] [--mode <debug|profile|release>] [--build-dir <dir>] [--api-base-url <url>] [--clean] [--install-deps] [--offline] [--branding <default|custom>] [--branding-dir <path>] [--app-name-fa <name>] [--app-name-en <name>] [--help]
 
 Options:
   --project PATH     Flutter project path (contains pubspec.yaml). If not specified, will be auto-detected.
@@ -32,6 +37,10 @@ Options:
   --clean            Clean build directory before building.
   --install-deps     Install dependencies before building.
   --offline          Use offline cache for pub dependencies (no network access).
+  --branding MODE    UI branding: default (Hesabix) or custom (default: from BRANDING_MODE env / .deploy_env).
+  --branding-dir DIR Branding pack directory (default: BRANDING_DIR or /opt/hesabix/branding).
+  --app-name-fa NAME Persian display name for custom branding.
+  --app-name-en NAME English display name for custom branding.
   -h, --help         Show help.
 
 Usage examples:
@@ -40,6 +49,7 @@ Usage examples:
   ./build_web.sh --project hesabixUI/hesabix_ui
   ./build_web.sh --api-base-url https://hsxn.hesabix.ir
   ./build_web.sh --offline
+  ./build_web.sh --branding custom --branding-dir /opt/hesabix/branding
 EOF
 }
 
@@ -136,6 +146,18 @@ while [[ $# -gt 0 ]]; do
       INSTALL_DEPS=true; shift ;;
     --offline)
       USE_OFFLINE_CACHE=true; shift ;;
+    --branding)
+      [[ $# -ge 2 ]] || die "Value for --branding not provided"
+      BRANDING_MODE_CLI="$2"; shift 2 ;;
+    --branding-dir)
+      [[ $# -ge 2 ]] || die "Value for --branding-dir not provided"
+      BRANDING_DIR_CLI="$2"; shift 2 ;;
+    --app-name-fa)
+      [[ $# -ge 2 ]] || die "Value for --app-name-fa not provided"
+      APP_NAME_FA_CLI="$2"; shift 2 ;;
+    --app-name-en)
+      [[ $# -ge 2 ]] || die "Value for --app-name-en not provided"
+      APP_NAME_EN_CLI="$2"; shift 2 ;;
     -h|--help)
       print_usage; exit 0 ;;
     *)
@@ -164,6 +186,32 @@ echo "Project path: $APP_DIR"
 echo "Mode: $MODE"
 echo "Build path: $BUILD_DIR"
 echo "API URL: $API_BASE_URL"
+
+# Load saved deploy branding when present (hesabix -update / -domains rebuild).
+if [[ -r "${APP_ROOT:-/opt/hesabix}/.deploy_env" ]]; then
+  # shellcheck disable=SC1090
+  set -a
+  # shellcheck source=/dev/null
+  source "${APP_ROOT:-/opt/hesabix}/.deploy_env"
+  set +a
+fi
+# CLI overrides win over .deploy_env
+[[ -n "$BRANDING_MODE_CLI" ]] && export BRANDING_MODE_OVERRIDE="$BRANDING_MODE_CLI"
+[[ -n "$BRANDING_DIR_CLI" ]] && export BRANDING_DIR_OVERRIDE="$BRANDING_DIR_CLI"
+[[ -n "$APP_NAME_FA_CLI" ]] && export APP_NAME_FA_OVERRIDE="$APP_NAME_FA_CLI"
+[[ -n "$APP_NAME_EN_CLI" ]] && export APP_NAME_EN_OVERRIDE="$APP_NAME_EN_CLI"
+
+# shellcheck source=scripts/lib/hesabix_branding.sh
+BRANDING_LIB="${REPO_ROOT}/scripts/lib/hesabix_branding.sh"
+if [[ -r "$BRANDING_LIB" ]]; then
+  # shellcheck disable=SC1091
+  source "$BRANDING_LIB"
+else
+  warn "Branding library missing: $BRANDING_LIB (continuing without custom branding)"
+  hesabix_branding_apply() { :; }
+  hesabix_branding_restore() { :; }
+  hesabix_branding_append_dart_defines() { :; }
+fi
 
 cd "$APP_DIR"
 
@@ -228,8 +276,13 @@ if [ "$CLEAN_BUILD" = true ]; then
   rm -rf "$BUILD_DIR"
 fi
 
-# Configure dart-define arguments for API URL
+# Configure dart-define arguments for API URL (+ optional branding names)
 DART_DEFINE_ARGS=(--dart-define "API_BASE_URL=$API_BASE_URL")
+hesabix_branding_append_dart_defines DART_DEFINE_ARGS
+
+# Apply UI branding overlay (restored on EXIT so git tree stays clean)
+trap 'hesabix_branding_restore "$APP_DIR" || true' EXIT
+hesabix_branding_apply "$APP_DIR"
 
 # Determine PWA strategy and optimizations based on mode
 BUILD_FLAGS=()
@@ -266,7 +319,7 @@ else
   echo "  - Base Href: /"
 fi
 
-echo "Full command: flutter build web --$MODE ${BUILD_FLAGS[*]} --dart-define API_BASE_URL=$API_BASE_URL"
+echo "Full command: flutter build web --$MODE ${BUILD_FLAGS[*]} ${DART_DEFINE_ARGS[*]}"
 echo ""
 
 # Configure CPU workers: on low-RAM use 1 worker only to avoid OOM
@@ -465,6 +518,7 @@ if [ "$MODE" = "release" ]; then
   echo "  - Heap Size: ${HEAP_SIZE_MB}MB (80% of ${TOTAL_RAM_MB}MB RAM)"
   echo "  - Base Href: /"
   echo "  - API Base URL: $API_BASE_URL"
+  echo "  - Branding: ${BRANDING_MODE:-default}"
   echo ""
   echo "Note: Flutter service worker is disabled to avoid CanvasKit startup races."
 else
@@ -475,6 +529,7 @@ else
   echo "  - Heap Size: ${HEAP_SIZE_MB}MB (80% of ${TOTAL_RAM_MB}MB RAM)"
   echo "  - Base Href: /"
   echo "  - API Base URL: $API_BASE_URL"
+  echo "  - Branding: ${BRANDING_MODE:-default}"
 fi
 echo ""
 echo "To serve, you can use a web server:"

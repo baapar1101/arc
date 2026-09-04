@@ -1386,6 +1386,7 @@ tests/test_phase3_optimization.py
 tests/test_phase4_background_jobs.py
 tests/test_physical_stock.py
 tests/test_pnl_service.py
+tests/test_print_discount_percent_display.py
 tests/test_print_tax_discount_display.py
 tests/test_product_catalog_profile.py
 tests/test_product_excel_import.py

@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
+import 'package:hesabix_ui/config/brand_config.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:intl/intl.dart';
 
@@ -402,7 +403,7 @@ class _MobileLauncherHomePageState extends State<MobileLauncherHomePage> {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     _LauncherHeader(
-                      brandName: t.mobileLauncherBrandName,
+                      brandName: BrandConfig.mobileLauncherBrandName(t),
                       businessName: businessName,
                       onBg: onBg,
                       onBgMuted: onBgMuted,

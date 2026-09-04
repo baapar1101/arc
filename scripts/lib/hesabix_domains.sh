@@ -52,12 +52,16 @@ hesabix_rebuild_frontend() {
   api_scheme="$(hesabix_resolve_api_public_scheme)"
   api_url="${api_scheme}://${API_DOMAIN}"
 
-  echo ">> Rebuilding Flutter web (API_BASE_URL=${api_url})..."
+  echo ">> Rebuilding Flutter web (API_BASE_URL=${api_url}, branding=${BRANDING_MODE:-default})..."
   cd "${app_dir}"
   if ! env PATH="/opt/flutter/bin:/snap/bin:$PATH" \
       PUB_HOSTED_URL="${PUB_HOSTED_URL:-}" \
       FLUTTER_STORAGE_BASE_URL="${FLUTTER_STORAGE_BASE_URL:-}" \
       SKIP_NGINX_ENSURE=1 \
+      BRANDING_MODE="${BRANDING_MODE:-}" \
+      BRANDING_DIR="${BRANDING_DIR:-}" \
+      APP_NAME_FA="${APP_NAME_FA:-}" \
+      APP_NAME_EN="${APP_NAME_EN:-}" \
       bash "${build_script}" --mode release --api-base-url "${api_url}" --clean --install-deps; then
     echo "Frontend build failed." >&2
     return 1

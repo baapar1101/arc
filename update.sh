@@ -370,9 +370,14 @@ fi
 api_scheme="$(hesabix_resolve_api_public_scheme)"
 api_url="${api_scheme}://${API_DOMAIN}"
 cd "${app_dir}"
+log_info "UI branding: mode=${BRANDING_MODE:-default} dir=${BRANDING_DIR:-/opt/hesabix/branding}"
 if ! env PATH="/opt/flutter/bin:/snap/bin:$PATH" \
     PUB_HOSTED_URL="${PUB_HOSTED_URL:-}" FLUTTER_STORAGE_BASE_URL="${FLUTTER_STORAGE_BASE_URL:-}" \
     SKIP_NGINX_ENSURE=1 \
+    BRANDING_MODE="${BRANDING_MODE:-}" \
+    BRANDING_DIR="${BRANDING_DIR:-}" \
+    APP_NAME_FA="${APP_NAME_FA:-}" \
+    APP_NAME_EN="${APP_NAME_EN:-}" \
     bash build_web.sh --mode release --api-base-url "${api_url}" --clean --install-deps; then
   log_err "Frontend build failed."
   exit 1

@@ -22,6 +22,7 @@ import '../../widgets/category/category_tree_dialog.dart';
 import '../../services/business_dashboard_service.dart';
 import '../../services/marketplace_service.dart';
 import '../../core/api_client.dart';
+import 'package:hesabix_ui/config/brand_config.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'receipts_payments_list_page.dart' show BulkSettlementDialog;
 import '../../widgets/document/document_form_dialog.dart';
@@ -2516,7 +2517,7 @@ class _BusinessShellState extends State<BusinessShell> {
             const SizedBox(width: 10),
             Flexible(
               child: Text(
-                t.appTitle,
+                BrandConfig.appTitle(t),
                 style: appBarTitleStyle,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,

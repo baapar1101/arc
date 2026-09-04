@@ -2913,6 +2913,7 @@ install_flutter_and_build_frontend() {
   echo "  Mode: release"
   echo "  API URL: ${api_url} (scheme from TLS detection or API_PUBLIC_SCHEME)"
   echo "  Output: /var/www/${UI_DOMAIN}"
+  echo "  Branding: ${BRANDING_MODE:-default}"
   echo
   echo "$CHECK_MARK Flutter build uses mirror: ${PUB_HOSTED_URL:-f.mirror.hesabix.ir}"
 
@@ -2920,6 +2921,10 @@ install_flutter_and_build_frontend() {
   log_info "Building Flutter web (pub/storage via ${PUB_HOSTED_URL})"
   if ! env PATH="/opt/flutter/bin:/snap/bin:$PATH" \
       PUB_HOSTED_URL="${PUB_HOSTED_URL}" FLUTTER_STORAGE_BASE_URL="${FLUTTER_STORAGE_BASE_URL}" \
+      BRANDING_MODE="${BRANDING_MODE:-}" \
+      BRANDING_DIR="${BRANDING_DIR:-}" \
+      APP_NAME_FA="${APP_NAME_FA:-}" \
+      APP_NAME_EN="${APP_NAME_EN:-}" \
       bash build_web.sh \
     --mode release \
     --api-base-url "${api_url}" \

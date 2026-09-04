@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hesabix_ui/config/brand_config.dart';
 import 'package:hesabix_ui/core/app_init_progress.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/theme/brand_logo.dart';
@@ -150,7 +151,7 @@ class _ProgressSplashScreenState extends State<ProgressSplashScreen>
                           const SizedBox(height: 28),
                         ],
                         Text(
-                          t.appTitle,
+                          BrandConfig.appTitle(t),
                           style: theme.textTheme.headlineLarge?.copyWith(
                             fontWeight: FontWeight.bold,
                             color: colorScheme.onSurface,

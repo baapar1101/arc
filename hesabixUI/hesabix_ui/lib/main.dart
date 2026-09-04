@@ -14,6 +14,7 @@ import 'pages/profile/notification_event_types_admin_page.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_web_plugins/url_strategy.dart';
 import 'l10n/app_localizations.dart';
+import 'config/brand_config.dart';
 
 import 'pages/login_page.dart';
 import 'pages/profile/profile_shell.dart';
@@ -871,7 +872,7 @@ class _MyAppState extends State<MyApp> {
       );
 
       return MaterialApp.router(
-        title: 'Hesabix',
+        title: BrandConfig.materialTitle,
         routerConfig: loadingRouter,
         theme: _themeController == null
             ? null
@@ -5805,7 +5806,7 @@ class _MyAppState extends State<MyApp> {
           child: UserActivityHeartbeat(
             authStore: _authStore!,
             child: MaterialApp.router(
-              title: 'Hesabix',
+              title: BrandConfig.materialTitle,
               theme: AppTheme.build(
                 isDark: false,
                 locale: controller.locale,

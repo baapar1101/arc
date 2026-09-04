@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'package:hesabix_ui/config/brand_config.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import '../core/locale_controller.dart';
 import '../core/calendar_controller.dart';
@@ -20,7 +21,7 @@ class HomePage extends StatelessWidget {
     final t = AppLocalizations.of(context);
     return Scaffold(
       appBar: AppBar(
-        title: Text(t.appTitle),
+        title: Text(BrandConfig.appTitle(t)),
         actions: [
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 4.0),

@@ -35,10 +35,12 @@ Usage:
   hesabix -domains {show|set|apply} [options]
   hesabix -ssl {status|enable|renew} [options]
   hesabix -mirrors [show|set] [options]
+  hesabix -branding {show|set|default|apply} [options]
   hesabix -cli reload
 
   -update           Run update (pull, migrate, restart, rebuild frontend, reload nginx)
                     First shows Python/Flutter mirrors and lets you pick (Enter keeps current)
+                    Custom UI branding from .deploy_env is applied automatically during web build
   -y, --yes         Skip the mirror prompt and use the saved selection
   -source URL       Override repo URL (default: from initial deploy)
   -branch NAME      Override branch (default: from initial deploy)
@@ -69,6 +71,15 @@ Usage:
       --pub NAME|URL             Flutter pub host
       --storage NAME|URL         Flutter engine/storage host
       --flutter NAME             Set pub+storage from the same preset
+
+  -branding show    Show saved UI branding (logos/icons/app names for web build)
+  -branding set     Save custom branding pack path and optional names
+      --dir PATH             Branding pack directory (default: /opt/hesabix/branding)
+      --name-fa NAME         Persian app display name
+      --name-en NAME         English app display name
+      --rebuild              Rebuild and publish Flutter web after saving
+  -branding default Reset to Hesabix logos and names [--rebuild]
+  -branding apply   Rebuild frontend with the currently saved branding
 
   -cli reload       Reload /usr/local/bin/hesabix from the deployed repo
 USAGE
@@ -243,18 +254,26 @@ run_mirrors_command() {
   hesabix_mirrors_command "$@"
 }
 
+run_branding_command() {
+  # shellcheck source=lib/hesabix_branding.sh
+  source "${HESABIX_SCRIPT_DIR}/lib/hesabix_branding.sh"
+  hesabix_branding_command "$@"
+}
+
 UPDATE_MODE=""
 SERVICES_ACTION=""
 CLI_ACTION=""
 DOMAINS_ACTION=""
 SSL_ACTION=""
 MIRRORS_ACTION=""
+BRANDING_ACTION=""
 SOURCE_URL=""
 BRANCH_OVERRIDE=""
 SKIP_MIRROR_PROMPT=""
 DOMAINS_ARGS=()
 SSL_ARGS=()
 MIRRORS_ARGS=()
+BRANDING_ARGS=()
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -326,6 +345,16 @@ while [[ $# -gt 0 ]]; do
       MIRRORS_ARGS=("$@")
       break
       ;;
+    -branding)
+      if [[ $# -lt 2 || -z "${2:-}" ]]; then
+        echo "hesabix -branding requires an action: show|set|default|apply" >&2
+        exit 1
+      fi
+      BRANDING_ACTION="$2"
+      shift 2
+      BRANDING_ARGS=("$@")
+      break
+      ;;
     -h|--help)
       usage
       exit 0
@@ -338,7 +367,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 if [[ -n "${CLI_ACTION}" ]]; then
-  if [[ -n "${UPDATE_MODE}" || -n "${SERVICES_ACTION}" || -n "${DOMAINS_ACTION}" || -n "${SSL_ACTION}" || -n "${MIRRORS_ACTION}" ]]; then
+  if [[ -n "${UPDATE_MODE}" || -n "${SERVICES_ACTION}" || -n "${DOMAINS_ACTION}" || -n "${SSL_ACTION}" || -n "${MIRRORS_ACTION}" || -n "${BRANDING_ACTION}" ]]; then
     echo "Use -cli alone." >&2
     exit 1
   fi
@@ -350,7 +379,7 @@ if [[ -n "${CLI_ACTION}" ]]; then
 fi
 
 if [[ -n "${DOMAINS_ACTION}" ]]; then
-  if [[ -n "${UPDATE_MODE}" || -n "${SERVICES_ACTION}" || -n "${SSL_ACTION}" || -n "${MIRRORS_ACTION}" ]]; then
+  if [[ -n "${UPDATE_MODE}" || -n "${SERVICES_ACTION}" || -n "${SSL_ACTION}" || -n "${MIRRORS_ACTION}" || -n "${BRANDING_ACTION}" ]]; then
     echo "Use -domains alone." >&2
     exit 1
   fi
@@ -363,7 +392,7 @@ if [[ -n "${DOMAINS_ACTION}" ]]; then
 fi
 
 if [[ -n "${MIRRORS_ACTION}" ]]; then
-  if [[ -n "${UPDATE_MODE}" || -n "${SERVICES_ACTION}" || -n "${DOMAINS_ACTION}" || -n "${SSL_ACTION}" ]]; then
+  if [[ -n "${UPDATE_MODE}" || -n "${SERVICES_ACTION}" || -n "${DOMAINS_ACTION}" || -n "${SSL_ACTION}" || -n "${BRANDING_ACTION}" ]]; then
     echo "Use -mirrors alone." >&2
     exit 1
   fi
@@ -375,8 +404,21 @@ if [[ -n "${MIRRORS_ACTION}" ]]; then
   exit $?
 fi
 
+if [[ -n "${BRANDING_ACTION}" ]]; then
+  if [[ -n "${UPDATE_MODE}" || -n "${SERVICES_ACTION}" || -n "${DOMAINS_ACTION}" || -n "${SSL_ACTION}" || -n "${MIRRORS_ACTION}" ]]; then
+    echo "Use -branding alone." >&2
+    exit 1
+  fi
+  if [[ ! -f "${APP_ROOT}/.deploy_env" ]]; then
+    echo "Hesabix not deployed yet. Run deploy.sh first." >&2
+    exit 1
+  fi
+  run_branding_command "${BRANDING_ACTION}" "${BRANDING_ARGS[@]}"
+  exit $?
+fi
+
 if [[ -n "${SSL_ACTION}" ]]; then
-  if [[ -n "${UPDATE_MODE}" || -n "${SERVICES_ACTION}" || -n "${MIRRORS_ACTION}" ]]; then
+  if [[ -n "${UPDATE_MODE}" || -n "${SERVICES_ACTION}" || -n "${MIRRORS_ACTION}" || -n "${BRANDING_ACTION}" ]]; then
     echo "Use -ssl alone." >&2
     exit 1
   fi

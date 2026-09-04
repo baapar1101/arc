@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'dart:async';
 import '../core/auth_store.dart';
+import '../config/brand_config.dart';
 import '../l10n/app_localizations.dart';
 import '../theme/brand_logo.dart';
 
@@ -125,7 +126,7 @@ class _SimpleSplashScreenState extends State<SimpleSplashScreen>
 
   String _getAppName(BuildContext context) {
     final t = AppLocalizations.of(context);
-    return t.appTitle;
+    return BrandConfig.appTitle(t);
   }
 
 

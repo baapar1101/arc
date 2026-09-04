@@ -14,6 +14,7 @@ import '../../widgets/theme_mode_switcher.dart';
 import '../../widgets/theme_palette_switcher.dart';
 import '../../widgets/logout_button.dart';
 import '../../widgets/notification/notification_bell_button.dart';
+import 'package:hesabix_ui/config/brand_config.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import '../../theme/tokens/extensions.dart';
 import '../../utils/responsive_helper.dart';
@@ -170,7 +171,7 @@ class _ProfileShellState extends State<ProfileShell> with WidgetsBindingObserver
           Image.asset(logoAsset, height: 22),
           const SizedBox(width: 10),
           Text(
-            t.appTitle,
+            BrandConfig.appTitle(t),
             style: Theme.of(context).textTheme.titleSmall?.copyWith(
               color: appBarFg,
               fontWeight: FontWeight.w700,
