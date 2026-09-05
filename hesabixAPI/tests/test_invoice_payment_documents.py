@@ -92,6 +92,63 @@ def test_create_receipt_payment_documents_for_invoice_payments_creates_one_per_i
 
 @patch("app.services.invoice_service._validate_invoice_payment_item_currency", return_value=None)
 @patch("app.services.receipt_payment_service.create_receipt_payment")
+def test_create_receipt_payment_documents_allows_two_same_type_bank_items(
+    mock_create,
+    _mock_validate,
+):
+    """دو دریافت بانکی جدا — حتی به یک حساب — دو سند دریافت متوازن می‌سازند."""
+    mock_create.side_effect = [{"id": 301}, {"id": 302}]
+    document = Document(
+        id=77,
+        code="1003",
+        business_id=1,
+        currency_id=1,
+        document_date=date(2024, 3, 1),
+    )
+    payments = [
+        {
+            "type": "bank",
+            "amount": 500000,
+            "transaction_date": "2024-03-12",
+            "bank_id": 9,
+        },
+        {
+            "type": "bank",
+            "amount": 300000,
+            "transaction_date": "2024-03-12",
+            "bank_id": 9,
+        },
+    ]
+
+    created_ids = _create_receipt_payment_documents_for_invoice_payments(
+        MagicMock(),
+        business_id=1,
+        user_id=2,
+        document=document,
+        person_id=10,
+        payments=payments,
+        invoice_type=INVOICE_SALES,
+    )
+
+    assert created_ids == [301, 302]
+    assert mock_create.call_count == 2
+
+    first = mock_create.call_args_list[0].kwargs["data"]
+    second = mock_create.call_args_list[1].kwargs["data"]
+    assert first["document_type"] == "receipt"
+    assert second["document_type"] == "receipt"
+    assert first["account_lines"][0]["transaction_type"] == "bank"
+    assert second["account_lines"][0]["transaction_type"] == "bank"
+    assert first["account_lines"][0]["bank_id"] == 9
+    assert second["account_lines"][0]["bank_id"] == 9
+    assert first["person_lines"][0]["amount"] == 500000.0
+    assert second["person_lines"][0]["amount"] == 300000.0
+    assert first["account_lines"][0]["amount"] == 500000.0
+    assert second["account_lines"][0]["amount"] == 300000.0
+
+
+@patch("app.services.invoice_service._validate_invoice_payment_item_currency", return_value=None)
+@patch("app.services.receipt_payment_service.create_receipt_payment")
 def test_create_receipt_payment_documents_skips_zero_amount_items(
     mock_create,
     _mock_validate,

@@ -22230,6 +22230,12 @@ abstract class AppLocalizations {
   /// **'Each payment line needs a cash register, bank, or check'**
   String get quickSalesPayNeedDestination;
 
+  /// No description provided for @quickSalesPaySameTypeHint.
+  ///
+  /// In en, this message translates to:
+  /// **'You can add several receipts of the same type, for example two bank or card payments. Each line creates its own receipt document.'**
+  String get quickSalesPaySameTypeHint;
+
   /// No description provided for @quickSalesCheckoutDetails.
   ///
   /// In en, this message translates to:

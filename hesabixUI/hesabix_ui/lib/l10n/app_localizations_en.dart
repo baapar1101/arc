@@ -12021,6 +12021,10 @@ class AppLocalizationsEn extends AppLocalizations {
       'Each payment line needs a cash register, bank, or check';
 
   @override
+  String get quickSalesPaySameTypeHint =>
+      'You can add several receipts of the same type, for example two bank or card payments. Each line creates its own receipt document.';
+
+  @override
   String get quickSalesCheckoutDetails => 'Document details';
 
   @override
@@ -15722,7 +15726,8 @@ class AppLocalizationsEn extends AppLocalizations {
   String get distributionMapTileSourceOsm => 'OpenStreetMap (free, worldwide)';
 
   @override
-  String get distributionMapTileSourceMemaps => 'MeMaps (Iran, API key required)';
+  String get distributionMapTileSourceMemaps =>
+      'MeMaps (Iran, API key required)';
 
   @override
   String get distributionMemapsApiKey => 'MeMaps API key';

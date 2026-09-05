@@ -1222,6 +1222,7 @@ migrations/versions/20260901_000001_distribution_phase4_ops.py
 migrations/versions/20260901_000002_distribution_day_sort.py
 migrations/versions/20260902_000001_distribution_commercial_ops.py
 migrations/versions/20260902_000002_distribution_target_product_key.py
+migrations/versions/20260906_000001_distribution_map_tile_source.py
 tests/__init__.py
 tests/test_account_balance_core.py
 tests/test_account_tree_roots.py

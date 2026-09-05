@@ -9,6 +9,7 @@ import '../../l10n/app_localizations.dart';
 import '../../models/invoice_transaction.dart';
 import '../../utils/number_formatters.dart';
 import '../../utils/number_normalizer.dart';
+import '../../utils/quick_sales_payment_balance.dart';
 import '../../widgets/invoice/bank_account_combobox_widget.dart';
 import '../../widgets/invoice/cash_register_combobox_widget.dart';
 import '../../widgets/invoice/check_combobox_widget.dart';
@@ -18,6 +19,7 @@ import '../../widgets/money/amount_field_words_tooltip.dart';
 ///
 /// مسیر پیش‌فرض: یک ردیف صندوق که مبلغش با جمع فاکتور همگام است.
 /// صندوق‌دار با کم کردن مبلغ یا دکمهٔ بانک/چک وارد تقسیم می‌شود.
+/// چند ردیف هم‌نوع (مثلاً دو بانک) مجاز است؛ هر ردیف یک سند دریافت جدا می‌شود.
 class QuickSalesPaymentComposer extends StatefulWidget {
   final int businessId;
   final List<InvoiceTransaction> payments;
@@ -64,14 +66,7 @@ class _QuickSalesPaymentComposerState extends State<QuickSalesPaymentComposer> {
   String? _lastBankId;
   String? _focusAmountId;
 
-  num get _epsilon {
-    if (widget.decimalPlaces <= 0) return 0.5;
-    var e = 1.0;
-    for (var i = 0; i < widget.decimalPlaces; i++) {
-      e /= 10;
-    }
-    return e / 2;
-  }
+  num get _epsilon => quickSalesPaymentEpsilon(widget.decimalPlaces);
 
   num get _paid => widget.payments.fold<num>(0, (sum, p) => sum + p.amount);
 
@@ -88,7 +83,12 @@ class _QuickSalesPaymentComposerState extends State<QuickSalesPaymentComposer> {
     return widget.payments.first.type == TransactionType.cashRegister;
   }
 
-  bool get _canAdd => widget.enabled && widget.payments.length < _maxLines;
+  bool get _canAdd => canAddQuickSalesPaymentLine(
+    payments: widget.payments,
+    enabled: widget.enabled,
+    epsilon: _epsilon,
+    maxLines: _maxLines,
+  );
 
   @override
   void initState() {
@@ -133,14 +133,8 @@ class _QuickSalesPaymentComposerState extends State<QuickSalesPaymentComposer> {
   static String _bankPrefKey(int businessId) =>
       'quick_sales_last_bank_$businessId';
 
-  num _roundMoney(num value) {
-    if (widget.decimalPlaces <= 0) return value.round();
-    var f = 1;
-    for (var i = 0; i < widget.decimalPlaces; i++) {
-      f *= 10;
-    }
-    return (value * f).round() / f;
-  }
+  num _roundMoney(num value) =>
+      roundQuickSalesMoney(value, widget.decimalPlaces);
 
   bool _amountsEqual(num a, num b) => (a - b).abs() <= _epsilon;
 
@@ -246,27 +240,48 @@ class _QuickSalesPaymentComposerState extends State<QuickSalesPaymentComposer> {
     _emit([...widget.payments, tx]);
   }
 
+  int _indexOfId(String id) =>
+      widget.payments.indexWhere((p) => p.id == id);
+
   void _replaceAt(int index, InvoiceTransaction tx) {
+    if (index < 0 || index >= widget.payments.length) return;
     final next = List<InvoiceTransaction>.from(widget.payments);
     next[index] = tx;
     _emit(next);
   }
 
-  void _removeAt(int index) {
+  void _replaceById(InvoiceTransaction tx) {
+    _replaceAt(_indexOfId(tx.id), tx);
+  }
+
+  void _removeById(String id) {
+    final index = _indexOfId(id);
+    if (index < 0) return;
     final next = List<InvoiceTransaction>.from(widget.payments)
       ..removeAt(index);
     _emit(next);
   }
 
-  void _fillRemaining(int index) {
+  void _fillRemainingById(String id) {
     if (_remaining <= 0) return;
+    final index = _indexOfId(id);
+    if (index < 0) return;
     final current = widget.payments[index];
     _replaceAt(index, current.copyWith(amount: current.amount + _remaining));
   }
 
-  void _onAmountEdited(int index, num amount) {
-    final safe = amount < 0 ? 0 : amount;
-    _replaceAt(index, widget.payments[index].copyWith(amount: safe));
+  void _onAmountEditedById(String id, num amount) {
+    final index = _indexOfId(id);
+    if (index < 0) return;
+    _emit(
+      applyQuickSalesPaymentAmount(
+        payments: widget.payments,
+        index: index,
+        amount: amount,
+        invoiceTotal: widget.invoiceTotal,
+        decimalPlaces: widget.decimalPlaces,
+      ),
+    );
   }
 
   String _format(num value) =>
@@ -307,16 +322,26 @@ class _QuickSalesPaymentComposerState extends State<QuickSalesPaymentComposer> {
                     tx.bankId!.isNotEmpty) {
                   unawaitedRememberBank(tx.bankId!);
                 }
-                _replaceAt(i, tx);
+                _replaceById(tx);
               },
-              onFillRemaining: () => _fillRemaining(i),
-              onRemove: () => _removeAt(i),
-              onAmountChanged: (v) => _onAmountEdited(i, v),
+              onFillRemaining: () => _fillRemainingById(widget.payments[i].id),
+              onRemove: () => _removeById(widget.payments[i].id),
+              onAmountChanged: (v) =>
+                  _onAmountEditedById(widget.payments[i].id, v),
             ),
           ],
         ],
         const SizedBox(height: 8),
         _buildAddButtons(t),
+        if (widget.enabled) ...[
+          const SizedBox(height: 6),
+          Text(
+            t.quickSalesPaySameTypeHint,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: cs.onSurfaceVariant,
+            ),
+          ),
+        ],
         if (_remaining > 0 && !_isOverpaid) ...[
           const SizedBox(height: 6),
           _buildRemainingNote(t, cs),
@@ -337,8 +362,7 @@ class _QuickSalesPaymentComposerState extends State<QuickSalesPaymentComposer> {
       dense: true,
       onChanged: widget.enabled
           ? (option) {
-              _replaceAt(
-                0,
+              _replaceById(
                 widget.payments.first.copyWith(
                   cashRegisterId: option?.id,
                   cashRegisterName: option?.name,
@@ -358,7 +382,8 @@ class _QuickSalesPaymentComposerState extends State<QuickSalesPaymentComposer> {
       currencyUnit: widget.currencyUnit,
       enabled: widget.enabled,
       autofocus: false,
-      onAmountChanged: (v) => _onAmountEdited(0, v),
+      onAmountChanged: (v) =>
+          _onAmountEditedById(widget.payments.first.id, v),
     );
 
     return LayoutBuilder(

@@ -4763,6 +4763,7 @@
   "quickSalesPaySelectCheck": "Select or add a check for the check payment",
   "quickSalesPayOverpaidError": "Payments exceed the invoice total. Adjust the amounts.",
   "quickSalesPayNeedDestination": "Each payment line needs a cash register, bank, or check",
+  "quickSalesPaySameTypeHint": "You can add several receipts of the same type, for example two bank or card payments. Each line creates its own receipt document.",
   "quickSalesCheckoutDetails": "Document details",
   "quickSalesCheckoutWarehouseRequired": "A warehouse is required to post stock",
   "quickSalesShareSectionTitle": "Share",

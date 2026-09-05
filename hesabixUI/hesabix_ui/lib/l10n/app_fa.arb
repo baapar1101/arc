@@ -4805,6 +4805,7 @@
   "quickSalesPaySelectCheck": "برای پرداخت چکی، چک را انتخاب یا ثبت کنید",
   "quickSalesPayOverpaidError": "جمع پرداخت‌ها از مبلغ فاکتور بیشتر است. مبالغ را اصلاح کنید.",
   "quickSalesPayNeedDestination": "هر ردیف پرداخت باید صندوق، بانک یا چک داشته باشد",
+  "quickSalesPaySameTypeHint": "می‌توانید چند دریافت از یک نوع ثبت کنید؛ مثلاً دو کارت/بانک. هر ردیف یک سند دریافت جدا می‌سازد.",
   "quickSalesCheckoutDetails": "جزئیات سند",
   "quickSalesCheckoutWarehouseRequired": "برای صدور حواله، انتخاب انبار الزامی است",
   "quickSalesShareSectionTitle": "اشتراک‌گذاری",

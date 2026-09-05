@@ -11957,6 +11957,10 @@ class AppLocalizationsFa extends AppLocalizations {
       'هر ردیف پرداخت باید صندوق، بانک یا چک داشته باشد';
 
   @override
+  String get quickSalesPaySameTypeHint =>
+      'می‌توانید چند دریافت از یک نوع ثبت کنید؛ مثلاً دو کارت/بانک. هر ردیف یک سند دریافت جدا می‌سازد.';
+
+  @override
   String get quickSalesCheckoutDetails => 'جزئیات سند';
 
   @override
