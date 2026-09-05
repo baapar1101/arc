@@ -19,6 +19,8 @@ class DistributionSettingsPayload(BaseModel):
 	enable_promotions: Optional[bool] = None
 	visitor_max_discount_percent: Optional[float] = Field(None, ge=0, le=100)
 	enable_suggested_order: Optional[bool] = None
+	map_tile_source: Optional[Literal["osm", "memaps"]] = None
+	memaps_api_key: Optional[str] = Field(None, max_length=255)
 
 
 class TerritoryCreatePayload(BaseModel):

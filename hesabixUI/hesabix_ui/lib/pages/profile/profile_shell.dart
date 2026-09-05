@@ -16,6 +16,7 @@ import '../../widgets/logout_button.dart';
 import '../../widgets/notification/notification_bell_button.dart';
 import 'package:hesabix_ui/config/brand_config.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
+import '../../theme/brand_logo.dart';
 import '../../theme/tokens/extensions.dart';
 import '../../utils/responsive_helper.dart';
 
@@ -88,11 +89,6 @@ class _ProfileShellState extends State<ProfileShell> with WidgetsBindingObserver
     } catch (e) {
       // اگر GoRouterState در دسترس نیست، از default استفاده کن
     }
-    final bool isDark = Theme.of(context).brightness == Brightness.dark;
-    final String logoAsset = isDark
-        ? 'assets/images/logo-light.png'
-        : 'assets/images/logo-light.png';
-
     final t = AppLocalizations.of(context);
     final destinations = <_Dest>[
       _Dest(t.dashboard, Icons.dashboard_outlined, Icons.dashboard, '/user/profile/dashboard'),
@@ -168,7 +164,7 @@ class _ProfileShellState extends State<ProfileShell> with WidgetsBindingObserver
       title: Row(
         children: [
           SizedBox(width: useRail ? 12 : 8),
-          Image.asset(logoAsset, height: 22),
+          const BrandLogo(height: 22),
           const SizedBox(width: 10),
           Text(
             BrandConfig.appTitle(t),

@@ -49,6 +49,17 @@ class DistributionBusinessSettings(Base):
 	enable_promotions: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
 	visitor_max_discount_percent: Mapped[float] = mapped_column(Numeric(5, 2), nullable=False, default=0)
 	enable_suggested_order: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+	map_tile_source: Mapped[str] = mapped_column(
+		String(32),
+		nullable=False,
+		default="osm",
+		comment="منبع تایل نقشه: osm (جهانی و رایگان) یا memaps (نیاز به کلید API).",
+	)
+	memaps_api_key: Mapped[str | None] = mapped_column(
+		String(255),
+		nullable=True,
+		comment="کلید API می‌مپس؛ با ?key= یا هدر X-Memaps-Key ارسال می‌شود.",
+	)
 	created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
 	updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 

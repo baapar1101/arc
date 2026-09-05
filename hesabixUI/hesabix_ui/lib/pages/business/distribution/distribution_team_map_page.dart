@@ -9,6 +9,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/calendar_controller.dart';
 import '../../../core/date_utils.dart' as Hd;
+import '../../../core/distribution_map_tiles.dart';
 import '../../../widgets/distribution/distribution_map_marker.dart';
 import '../../../widgets/distribution/distribution_memaps_map.dart';
 import '../../../widgets/distribution/distribution_person_location_sheet.dart';
@@ -42,6 +43,7 @@ class _DistributionTeamMapPageState extends State<DistributionTeamMapPage> {
   bool _autoRefresh = true;
   Timer? _refreshTimer;
   DateTime? _lastLoadedAt;
+  DistributionMapTileConfig _tileConfig = const DistributionMapTileConfig();
 
   String _iso(DateTime d) =>
       '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
@@ -50,9 +52,17 @@ class _DistributionTeamMapPageState extends State<DistributionTeamMapPage> {
     if (!silent && mounted) setState(() => _loading = true);
     try {
       final d = await _svc.getTeamMap(businessId: widget.businessId, planDate: _iso(_day));
+      DistributionMapTileConfig tiles = _tileConfig;
+      try {
+        final settings = await _svc.getDistributionSettings(businessId: widget.businessId);
+        tiles = DistributionMapTileConfig.fromSettings(settings);
+      } catch (_) {
+        // نقشه تیم بدون تنظیمات تایل هم باید نمایش داده شود
+      }
       if (mounted) {
         setState(() {
           _data = d;
+          _tileConfig = tiles;
           _lastLoadedAt = DateTime.now();
         });
       }
@@ -118,6 +128,7 @@ class _DistributionTeamMapPageState extends State<DistributionTeamMapPage> {
       distributionService: _svc,
       initialLat: double.tryParse('${m['customer_latitude']}'),
       initialLng: double.tryParse('${m['customer_longitude']}'),
+      tileConfig: _tileConfig,
     );
     if (saved == true) await _load();
   }
@@ -208,6 +219,7 @@ class _DistributionTeamMapPageState extends State<DistributionTeamMapPage> {
                     builder: (context, constraints) => DistributionMemapsMap(
                       markers: mapMarkers,
                       height: constraints.maxHeight,
+                      tileConfig: _tileConfig,
                     ),
                   ),
           ),

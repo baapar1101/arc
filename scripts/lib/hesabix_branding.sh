@@ -168,7 +168,8 @@ hesabix_branding_install_file() {
   [[ -f "$src" ]] || return 1
   mkdir -p "$(dirname "$dest")"
   hesabix_branding_backup_file "$dest" "$backup_root" "$app_dir"
-  cp -a "$src" "$dest"
+  cp -f "$src" "$dest"
+  touch "$dest" 2>/dev/null || true
   echo "[branding] overlay: ${dest#"$app_dir"/}"
 }
 
@@ -249,6 +250,40 @@ if loader.is_file():
         count=1,
     )
     t = re.sub(r"(logo\.alt\s*=\s*')Hesabix(')", rf"\1{en}\2", t, count=1)
+    # لوگوی رنگی کاستوم: در تم روشن هم خود تصویر نشان داده شود (بدون mask/tint)
+    if "HESABIX_BRAND_KEEP_LOGO_COLORS" not in t:
+        t = t.replace(
+            "logo.src = 'images/logo-light.png';",
+            "logo.src = 'images/logo-light.png';\n"
+            "      var HESABIX_BRAND_KEEP_LOGO_COLORS = true;",
+            1,
+        )
+    # dark branch already shows as-is; force light branch to same behavior when flag set
+    old_light = """} else {
+        // سیلوئت سفید مخفی؛ رنگ برند روی wrap با mask
+        logo.style.opacity = '0';
+        if (wrap) {
+          wrap.classList.add('loader-logo-wrap--tinted');
+          wrap.style.setProperty('--loader-logo-tint', readBrandFromStorage());
+        }
+      }"""
+    new_light = """} else if (typeof HESABIX_BRAND_KEEP_LOGO_COLORS !== 'undefined' && HESABIX_BRAND_KEEP_LOGO_COLORS) {
+        logo.style.opacity = '1';
+        logo.style.filter = 'none';
+        if (wrap) {
+          wrap.classList.remove('loader-logo-wrap--tinted');
+          wrap.style.removeProperty('--loader-logo-tint');
+        }
+      } else {
+        // سیلوئت سفید مخفی؛ رنگ برند روی wrap با mask
+        logo.style.opacity = '0';
+        if (wrap) {
+          wrap.classList.add('loader-logo-wrap--tinted');
+          wrap.style.setProperty('--loader-logo-tint', readBrandFromStorage());
+        }
+      }"""
+    if old_light in t:
+        t = t.replace(old_light, new_light, 1)
     loader.write_text(t, encoding="utf-8")
     print("[branding] patched web/hesabix_web_loader.js names")
 PY
@@ -296,11 +331,16 @@ hesabix_branding_apply() {
       hesabix_branding_install_file "$src" "$app_dir/web/assets/images/logo-light.svg" "$backup" "$app_dir"
     fi
   fi
-  if src="$(hesabix_branding_find_file "$dir" "logo.png" "logos" "images" ".")"; then
-    hesabix_branding_install_file "$src" "$app_dir/assets/images/logo.png" "$backup" "$app_dir"
-  fi
   if src="$(hesabix_branding_find_file "$dir" "logo32.png" "logos" "images" ".")"; then
     hesabix_branding_install_file "$src" "$app_dir/assets/images/logo32.png" "$backup" "$app_dir"
+  elif src="$(hesabix_branding_find_file "$dir" "logo-light.png" "logos" "images" ".")"; then
+    # لانچر موبایل از logo32 استفاده می‌کند
+    hesabix_branding_install_file "$src" "$app_dir/assets/images/logo32.png" "$backup" "$app_dir"
+  fi
+  if src="$(hesabix_branding_find_file "$dir" "logo.png" "logos" "images" ".")"; then
+    hesabix_branding_install_file "$src" "$app_dir/assets/images/logo.png" "$backup" "$app_dir"
+  elif src="$(hesabix_branding_find_file "$dir" "logo-light.png" "logos" "images" ".")"; then
+    hesabix_branding_install_file "$src" "$app_dir/assets/images/logo.png" "$backup" "$app_dir"
   fi
 
   # PWA icons
@@ -362,19 +402,76 @@ hesabix_branding_restore() {
     return 0
   fi
   echo "[branding] restoring original project assets from backup..."
-  # Restore every backed-up relative path
-  (
-    cd "$backup" || exit 0
-    find . -type f -print0 2>/dev/null | while IFS= read -r -d '' rel; do
-      rel="${rel#./}"
-      mkdir -p "$(dirname "$app_dir/$rel")"
-      cp -a "$backup/$rel" "$app_dir/$rel"
-    done
-  )
+  local rel
+  while IFS= read -r -d '' rel; do
+    rel="${rel#./}"
+    mkdir -p "$(dirname "$app_dir/$rel")"
+    cp -f "$backup/$rel" "$app_dir/$rel"
+  done < <(cd "$backup" && find . -type f -print0)
   rm -rf "$backup" 2>/dev/null || true
   _HESABIX_BRANDING_BACKUP_DIR=""
   _HESABIX_BRANDING_APPLIED=0
   echo "[branding] restore complete"
+}
+
+# Copy branding files into the Flutter web output so cached assets cannot
+# keep the default Hesabix logos after a custom build.
+hesabix_branding_stamp_build_output() {
+  local build_dir="$1"
+  [[ -n "$build_dir" && -d "$build_dir" ]] || return 0
+  hesabix_branding_resolve
+  if [[ "$_HESABIX_BRANDING_EFFECTIVE_MODE" != "custom" ]]; then
+    return 0
+  fi
+  local dir="${BRANDING_DIR}"
+  [[ -d "$dir" ]] || return 0
+  echo "[branding] stamping custom logos/icons into $build_dir"
+
+  local src dest
+  _hesabix_branding_stamp_one() {
+    local from="$1"
+    local to="$2"
+    [[ -f "$from" ]] || return 0
+    mkdir -p "$(dirname "$to")"
+    cp -f "$from" "$to"
+    touch "$to" 2>/dev/null || true
+    echo "[branding] stamped: ${to#"$build_dir"/}"
+  }
+
+  if src="$(hesabix_branding_find_file "$dir" "logo-light.png" "logos" "images" ".")"; then
+    _hesabix_branding_stamp_one "$src" "$build_dir/images/logo-light.png"
+    _hesabix_branding_stamp_one "$src" "$build_dir/assets/assets/images/logo-light.png"
+    _hesabix_branding_stamp_one "$src" "$build_dir/assets/images/logo-light.png"
+  fi
+  if src="$(hesabix_branding_find_file "$dir" "logo-blue.png" "logos" "images" ".")"; then
+    _hesabix_branding_stamp_one "$src" "$build_dir/images/logo-blue.png"
+    _hesabix_branding_stamp_one "$src" "$build_dir/assets/assets/images/logo-blue.png"
+    _hesabix_branding_stamp_one "$src" "$build_dir/assets/images/logo-blue.png"
+  elif src="$(hesabix_branding_find_file "$dir" "logo-light.png" "logos" "images" ".")"; then
+    _hesabix_branding_stamp_one "$src" "$build_dir/images/logo-blue.png"
+    _hesabix_branding_stamp_one "$src" "$build_dir/assets/assets/images/logo-blue.png"
+  fi
+  if src="$(hesabix_branding_find_file "$dir" "logo.png" "logos" "images" ".")" \
+     || src="$(hesabix_branding_find_file "$dir" "logo-light.png" "logos" "images" ".")"; then
+    _hesabix_branding_stamp_one "$src" "$build_dir/assets/assets/images/logo.png"
+  fi
+  if src="$(hesabix_branding_find_file "$dir" "logo32.png" "logos" "images" ".")" \
+     || src="$(hesabix_branding_find_file "$dir" "logo-light.png" "logos" "images" ".")"; then
+    _hesabix_branding_stamp_one "$src" "$build_dir/assets/assets/images/logo32.png"
+  fi
+
+  local icon_name
+  for icon_name in Icon-192.png Icon-512.png Icon-maskable-192.png Icon-maskable-512.png; do
+    if src="$(hesabix_branding_find_file "$dir" "$icon_name" "icons" ".")"; then
+      _hesabix_branding_stamp_one "$src" "$build_dir/icons/$icon_name"
+    fi
+  done
+  if src="$(hesabix_branding_find_file "$dir" "favicon.ico" "icons" ".")"; then
+    _hesabix_branding_stamp_one "$src" "$build_dir/favicon.ico"
+  fi
+  if src="$(hesabix_branding_find_file "$dir" "favicon.png" "icons" ".")"; then
+    _hesabix_branding_stamp_one "$src" "$build_dir/favicon.png"
+  fi
 }
 
 # Append branding name dart-defines onto global array DART_DEFINE_ARGS.
@@ -390,6 +487,8 @@ hesabix_branding_append_dart_defines() {
   if [[ -n "${HESABIX_BRANDING_NAME_FA}" ]]; then
     DART_DEFINE_ARGS+=(--dart-define "APP_NAME_FA=${HESABIX_BRANDING_NAME_FA}")
   fi
+  # لوگوی رنگی کاستوم را با ColorFilter تم حسابیکس بازنویسی نکن
+  DART_DEFINE_ARGS+=(--dart-define "BRAND_LOGO_TINT=0")
 }
 
 hesabix_branding_persist() {

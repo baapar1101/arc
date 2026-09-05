@@ -56,6 +56,17 @@ def test_extend_settings_defaults():
 	assert d["enable_van_sales"] is False
 	assert d["geofence_radius_meters"] == 0
 	assert d["visit_checklist_template"] == []
+	assert d["map_tile_source"] == "osm"
+	assert d["memaps_api_key"] is None
+
+
+def test_normalize_map_tile_source():
+	from app.services.distribution_phase3_service import normalize_map_tile_source
+
+	assert normalize_map_tile_source("osm") == "osm"
+	assert normalize_map_tile_source("MEMAPS") == "memaps"
+	assert normalize_map_tile_source("google") == "osm"
+	assert normalize_map_tile_source(None) == "osm"
 
 
 def test_period_bounds_month():

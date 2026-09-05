@@ -15628,6 +15628,34 @@ class AppLocalizationsFa extends AppLocalizations {
   String get distributionSettingsSaved => 'تنظیمات ذخیره شد.';
 
   @override
+  String get distributionMapSectionTitle => 'نقشه';
+
+  @override
+  String get distributionMapTileSource => 'منبع نمایش تایل‌ها';
+
+  @override
+  String get distributionMapTileSourceHint =>
+      'OpenStreetMap رایگان و جهانی است. می‌مپس سرور ایرانی است و طبق مستندات memaps.ir به کلید API نیاز دارد.';
+
+  @override
+  String get distributionMapTileSourceOsm => 'OpenStreetMap (رایگان، جهانی)';
+
+  @override
+  String get distributionMapTileSourceMemaps =>
+      'می‌مپس (ایران، نیازمند کلید API)';
+
+  @override
+  String get distributionMemapsApiKey => 'کلید API می‌مپس';
+
+  @override
+  String get distributionMemapsApiKeyHint =>
+      'کلید را از پنل memaps.ir بسازید. درخواست تایل با ?key= یا هدر X-Memaps-Key ارسال می‌شود.';
+
+  @override
+  String get distributionMemapsApiKeyMissing =>
+      'تایل‌های می‌مپس به کلید API نیاز دارند. آن را در تنظیمات پخش وارد کنید یا منبع را روی OpenStreetMap بگذارید.';
+
+  @override
   String get distributionNotesLabel => 'یادداشت';
 
   @override

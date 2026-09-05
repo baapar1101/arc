@@ -17,8 +17,20 @@ class BrandConfig {
     defaultValue: '',
   );
 
+  /// وقتی `0`/`false` باشد، [BrandLogo] لوگو را بدون ColorFilter نشان می‌دهد
+  /// (مناسب برند کاستوم رنگی مثل سیان روی شفاف).
+  static const String _logoTintRaw = String.fromEnvironment(
+    'BRAND_LOGO_TINT',
+    defaultValue: '1',
+  );
+
   static bool get hasCustomName =>
       appNameEn.trim().isNotEmpty || appNameFa.trim().isNotEmpty;
+
+  static bool get tintLogo {
+    final v = _logoTintRaw.trim().toLowerCase();
+    return v != '0' && v != 'false' && v != 'no' && v != 'off';
+  }
 
   /// عنوان MaterialApp / مرورگر (ترجیح انگلیسی، سپس فارسی، سپس Hesabix).
   static String get materialTitle {
@@ -63,4 +75,27 @@ class BrandConfig {
       fallback: l10n.mobileLauncherBrandName,
     );
   }
+
+  /// جایگزینی نام محصول در متن‌های l10n که «حسابیکس / Hesabix» دارند.
+  static String rebrandText(AppLocalizations l10n, String input) {
+    if (!hasCustomName) return input;
+    final code = l10n.localeName;
+    final name = resolve(
+      languageCode: code.isNotEmpty ? code : 'en',
+      fallback: '',
+    );
+    if (name.isEmpty) return input;
+    return input
+        .replaceAll('حسابیکس', name)
+        .replaceAll('Hesabix', name);
+  }
+
+  static String welcomeTitle(AppLocalizations l10n) =>
+      rebrandText(l10n, l10n.welcomeTitle);
+
+  static String welcomeSubtitle(AppLocalizations l10n) =>
+      rebrandText(l10n, l10n.welcomeSubtitle);
+
+  static String brandTagline(AppLocalizations l10n) =>
+      rebrandText(l10n, l10n.brandTagline);
 }

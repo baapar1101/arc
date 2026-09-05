@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hesabix_ui/config/brand_config.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/theme/brand_logo.dart';
 
@@ -41,7 +42,7 @@ class AuthBrandPanel extends StatelessWidget {
             const BrandLogo(height: 48),
             const SizedBox(height: 32),
             Text(
-              t.welcomeTitle,
+              BrandConfig.welcomeTitle(t),
               style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                     fontWeight: FontWeight.w700,
                     height: 1.3,
@@ -49,7 +50,7 @@ class AuthBrandPanel extends StatelessWidget {
             ),
             const SizedBox(height: 12),
             Text(
-              t.welcomeSubtitle,
+              BrandConfig.welcomeSubtitle(t),
               style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                     color: scheme.onSurfaceVariant,
                     height: 1.6,
@@ -57,7 +58,7 @@ class AuthBrandPanel extends StatelessWidget {
             ),
             const SizedBox(height: 32),
             Text(
-              t.brandTagline,
+              BrandConfig.brandTagline(t),
               style: Theme.of(context).textTheme.titleMedium?.copyWith(
                     color: scheme.primary,
                     fontWeight: FontWeight.w600,

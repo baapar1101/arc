@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 
-/// مسیر و ویجت لوگوی برند — در حالت روشن با رنگ primary تم رنگ‌آمیزی می‌شود.
+import 'package:hesabix_ui/config/brand_config.dart';
+
+/// مسیر و ویجت لوگوی برند — در حالت روشن با رنگ primary تم رنگ‌آمیزی می‌شود
+/// (مگر برند کاستوم با `BRAND_LOGO_TINT=0`).
 class BrandLogoAssets {
   BrandLogoAssets._();
 
@@ -35,9 +38,14 @@ class BrandLogo extends StatelessWidget {
     final scheme = Theme.of(context).colorScheme;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final primary = primaryOverride ?? scheme.primary;
+    final tint = BrandConfig.tintLogo;
+
+    final asset = tint
+        ? BrandLogoAssets.lightSilhouette
+        : BrandLogoAssets.assetForBrightness(isDark: isDark);
 
     final image = Image.asset(
-      BrandLogoAssets.lightSilhouette,
+      asset,
       width: width,
       height: height,
       fit: fit,
@@ -50,8 +58,7 @@ class BrandLogo extends StatelessWidget {
       },
     );
 
-    if (isDark) {
-      // لوگو سفید روی پس‌زمینه تیره
+    if (!tint || isDark) {
       return image;
     }
 

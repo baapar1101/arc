@@ -24,6 +24,7 @@ import '../../services/marketplace_service.dart';
 import '../../core/api_client.dart';
 import 'package:hesabix_ui/config/brand_config.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
+import '../../theme/brand_logo.dart';
 import 'receipts_payments_list_page.dart' show BulkSettlementDialog;
 import '../../widgets/document/document_form_dialog.dart';
 import '../../widgets/wallet/wallet_top_up_dialog.dart';
@@ -1437,10 +1438,6 @@ class _BusinessShellState extends State<BusinessShell> {
     }
     _maybeRefreshPluginsAfterMarketplace(location);
     final bool isDark = Theme.of(context).brightness == Brightness.dark;
-    final String logoAsset = isDark
-        ? 'assets/images/logo-light.png'
-        : 'assets/images/logo-light.png';
-
     final workflowLabel = _workflowMenuLabel(t);
     
     // ساختار متمرکز منو
@@ -2511,7 +2508,7 @@ class _BusinessShellState extends State<BusinessShell> {
               maxHeight: 22,
               maxWidth: isMobile ? 72 : 160,
             ),
-            child: Image.asset(logoAsset, height: 22, fit: BoxFit.contain),
+            child: const BrandLogo(height: 22),
           ),
           if (!isMobile) ...[
             const SizedBox(width: 10),

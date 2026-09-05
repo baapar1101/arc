@@ -27,6 +27,14 @@ from app.services.distribution_geo import check_geofence, haversine_meters, pers
 from app.services.warehouse_service import create_manual_warehouse_document, get_physical_stock, post_warehouse_document
 
 
+_MAP_TILE_SOURCES = frozenset({"osm", "memaps"})
+
+
+def normalize_map_tile_source(value: Any) -> str:
+	source = str(value or "osm").strip().lower()
+	return source if source in _MAP_TILE_SOURCES else "osm"
+
+
 def extend_settings_dict(row: Any) -> Dict[str, Any]:
 	if not row:
 		return {
@@ -41,7 +49,11 @@ def extend_settings_dict(row: Any) -> Dict[str, Any]:
 			"enable_promotions": False,
 			"visitor_max_discount_percent": 0,
 			"enable_suggested_order": True,
+			"map_tile_source": "osm",
+			"memaps_api_key": None,
 		}
+	key = getattr(row, "memaps_api_key", None)
+	key_s = str(key).strip() if key else None
 	return {
 		"shared_routing_catalog": bool(row.shared_routing_catalog),
 		"require_visit_in_daily_plan": bool(row.require_visit_in_daily_plan),
@@ -54,6 +66,8 @@ def extend_settings_dict(row: Any) -> Dict[str, Any]:
 		"enable_promotions": bool(getattr(row, "enable_promotions", False)),
 		"visitor_max_discount_percent": float(getattr(row, "visitor_max_discount_percent", 0) or 0),
 		"enable_suggested_order": bool(getattr(row, "enable_suggested_order", True)),
+		"map_tile_source": normalize_map_tile_source(getattr(row, "map_tile_source", "osm")),
+		"memaps_api_key": key_s or None,
 	}
 
 

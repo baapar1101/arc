@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hesabix_ui/config/brand_config.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/theme/brand_logo.dart';
 
@@ -21,6 +22,7 @@ class SplashScreen extends StatelessWidget {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
+    final t = AppLocalizations.of(context);
     
     final bgColor = backgroundColor ?? colorScheme.surface;
     final primary = primaryColor ?? colorScheme.primary;
@@ -77,7 +79,7 @@ class SplashScreen extends StatelessWidget {
             
             // App Name
             Text(
-              'Hesabix',
+              BrandConfig.appTitle(t),
               style: theme.textTheme.headlineMedium?.copyWith(
                 fontWeight: FontWeight.bold,
                 color: colorScheme.onSurface,
@@ -88,7 +90,7 @@ class SplashScreen extends StatelessWidget {
             
             // Subtitle
             Text(
-              AppLocalizations.of(context).businessManagementPlatform,
+              t.businessManagementPlatform,
               style: theme.textTheme.bodyLarge?.copyWith(
                 color: colorScheme.onSurfaceVariant,
                 fontWeight: FontWeight.w400,
@@ -111,7 +113,7 @@ class SplashScreen extends StatelessWidget {
                 
                 // Loading Message
                 Text(
-                  message ?? AppLocalizations.of(context).loading,
+                  message ?? t.loading,
                   style: theme.textTheme.bodyMedium?.copyWith(
                     color: colorScheme.onSurfaceVariant,
                     fontWeight: FontWeight.w500,
@@ -124,7 +126,7 @@ class SplashScreen extends StatelessWidget {
             
             // Version Info (Optional)
             Text(
-              AppLocalizations.of(context).version,
+              t.version,
               style: theme.textTheme.bodySmall?.copyWith(
                 color: colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
               ),

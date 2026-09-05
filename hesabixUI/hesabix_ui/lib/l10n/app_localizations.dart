@@ -28946,6 +28946,54 @@ abstract class AppLocalizations {
   /// **'Settings saved.'**
   String get distributionSettingsSaved;
 
+  /// No description provided for @distributionMapSectionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Map tiles'**
+  String get distributionMapSectionTitle;
+
+  /// No description provided for @distributionMapTileSource.
+  ///
+  /// In en, this message translates to:
+  /// **'Tile source'**
+  String get distributionMapTileSource;
+
+  /// No description provided for @distributionMapTileSourceHint.
+  ///
+  /// In en, this message translates to:
+  /// **'OpenStreetMap is free and worldwide. MeMaps is an Iranian tile server and requires an API key from memaps.ir.'**
+  String get distributionMapTileSourceHint;
+
+  /// No description provided for @distributionMapTileSourceOsm.
+  ///
+  /// In en, this message translates to:
+  /// **'OpenStreetMap (free, worldwide)'**
+  String get distributionMapTileSourceOsm;
+
+  /// No description provided for @distributionMapTileSourceMemaps.
+  ///
+  /// In en, this message translates to:
+  /// **'MeMaps (Iran, API key required)'**
+  String get distributionMapTileSourceMemaps;
+
+  /// No description provided for @distributionMemapsApiKey.
+  ///
+  /// In en, this message translates to:
+  /// **'MeMaps API key'**
+  String get distributionMemapsApiKey;
+
+  /// No description provided for @distributionMemapsApiKeyHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Create a key in the memaps.ir panel. Tile requests send it as ?key= or the X-Memaps-Key header.'**
+  String get distributionMemapsApiKeyHint;
+
+  /// No description provided for @distributionMemapsApiKeyMissing.
+  ///
+  /// In en, this message translates to:
+  /// **'MeMaps tiles need an API key. Add it in distribution settings, or switch to OpenStreetMap.'**
+  String get distributionMemapsApiKeyMissing;
+
   /// No description provided for @distributionNotesLabel.
   ///
   /// In en, this message translates to:

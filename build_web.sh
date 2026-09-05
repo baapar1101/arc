@@ -211,6 +211,7 @@ else
   hesabix_branding_apply() { :; }
   hesabix_branding_restore() { :; }
   hesabix_branding_append_dart_defines() { :; }
+  hesabix_branding_stamp_build_output() { :; }
 fi
 
 cd "$APP_DIR"
@@ -383,6 +384,8 @@ fi
 if [ ! -f "$BUILD_DIR/index.html" ]; then
   die "flutter build web did not produce index.html. Flutter SDK may be broken (e.g. Dart SDK download failed). Try: rm -rf /opt/flutter && re-run deploy with mirror set."
 fi
+
+hesabix_branding_stamp_build_output "$BUILD_DIR"
 
 # همان آینهٔ gstatic را روی خروجی نهایی هم بنویس (با هرس خانواده‌های نادر مگر SYNC_FONT_INCLUDE_RARE=1)
 if [ -f "$SYNC_FONT_MIRROR" ]; then

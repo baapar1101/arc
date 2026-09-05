@@ -17,6 +17,7 @@ import '../../../utils/snackbar_helper.dart' show SnackBarHelper;
 import '../../../widgets/business_subpage_back_leading.dart';
 import '../../../widgets/distribution/distribution_map_marker.dart';
 import '../../../widgets/distribution/distribution_memaps_map.dart';
+import '../../../core/distribution_map_tiles.dart';
 import '../../../widgets/distribution/distribution_person_location_sheet.dart';
 import '../../../widgets/distribution/distribution_return_dialog.dart';
 import '../../../widgets/distribution/distribution_ui_helpers.dart';
@@ -60,6 +61,7 @@ class _DistributionMainPageState extends State<DistributionMainPage> with Single
   bool _enablePresell = false;
   bool _enablePromotions = false;
   bool _enableSuggestedOrder = true;
+  final TextEditingController _memapsKeyCtl = TextEditingController();
   List<dynamic> _checklistTemplate = [];
   List<dynamic>? _optimizedPlanItems;
 
@@ -158,6 +160,10 @@ class _DistributionMainPageState extends State<DistributionMainPage> with Single
       _enableSuggestedOrder = ds['enable_suggested_order'] != false;
       final tpl = ds['visit_checklist_template'];
       _checklistTemplate = tpl is List ? tpl : [];
+      final key = (ds['memaps_api_key'] ?? '').toString();
+      if (_memapsKeyCtl.text != key) {
+        _memapsKeyCtl.text = key;
+      }
     }
   }
 
@@ -165,7 +171,13 @@ class _DistributionMainPageState extends State<DistributionMainPage> with Single
   void dispose() {
     _heartbeatTimer?.cancel();
     _tabController.dispose();
+    _memapsKeyCtl.dispose();
     super.dispose();
+  }
+
+  DistributionMapTileConfig get _mapTiles {
+    final ds = _summary['distribution_settings'];
+    return DistributionMapTileConfig.fromSettings(ds is Map<String, dynamic> ? ds : null);
   }
 
   String _iso(DateTime d) =>
@@ -467,6 +479,7 @@ class _DistributionMainPageState extends State<DistributionMainPage> with Single
       distributionService: _svc,
       initialLat: double.tryParse('${item['latitude']}'),
       initialLng: double.tryParse('${item['longitude']}'),
+      tileConfig: _mapTiles,
     );
     if (saved == true) {
       await _refreshPlan();
@@ -1049,7 +1062,11 @@ class _DistributionMainPageState extends State<DistributionMainPage> with Single
                       padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(12),
-                        child: DistributionMemapsMap(markers: _planMapMarkers(planItems), height: 200),
+                        child: DistributionMemapsMap(
+                          markers: _planMapMarkers(planItems),
+                          height: 200,
+                          tileConfig: _mapTiles,
+                        ),
                       ),
                     ),
                   ),
@@ -1183,6 +1200,7 @@ class _DistributionMainPageState extends State<DistributionMainPage> with Single
 
   Widget _settingsSection(AppLocalizations t) {
     final ds = _summary['distribution_settings'] as Map<String, dynamic>;
+    final mapSource = (ds['map_tile_source'] ?? 'osm').toString() == 'memaps' ? 'memaps' : 'osm';
     Future<void> persist(Map<String, dynamic> patch) async {
       try {
         await _svc.updateDistributionSettings(
@@ -1205,6 +1223,65 @@ class _DistributionMainPageState extends State<DistributionMainPage> with Single
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Column(
         children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
+            child: Align(
+              alignment: AlignmentDirectional.centerStart,
+              child: Text(t.distributionMapSectionTitle, style: Theme.of(context).textTheme.titleSmall),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(t.distributionMapTileSource, style: Theme.of(context).textTheme.bodyLarge),
+                const SizedBox(height: 4),
+                Text(
+                  t.distributionMapTileSourceHint,
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+                RadioListTile<String>(
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(t.distributionMapTileSourceOsm),
+                  value: 'osm',
+                  groupValue: mapSource,
+                  onChanged: (v) {
+                    if (v != null) persist({'map_tile_source': v});
+                  },
+                ),
+                RadioListTile<String>(
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(t.distributionMapTileSourceMemaps),
+                  value: 'memaps',
+                  groupValue: mapSource,
+                  onChanged: (v) {
+                    if (v != null) persist({'map_tile_source': v});
+                  },
+                ),
+              ],
+            ),
+          ),
+          if (mapSource == 'memaps')
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+              child: TextField(
+                controller: _memapsKeyCtl,
+                obscureText: true,
+                decoration: InputDecoration(
+                  labelText: t.distributionMemapsApiKey,
+                  helperText: t.distributionMemapsApiKeyHint,
+                  helperMaxLines: 4,
+                  border: const OutlineInputBorder(),
+                  suffixIcon: IconButton(
+                    tooltip: t.save,
+                    icon: const Icon(Icons.save_outlined),
+                    onPressed: () => persist({'memaps_api_key': _memapsKeyCtl.text.trim()}),
+                  ),
+                ),
+                onSubmitted: (v) => persist({'memaps_api_key': v.trim()}),
+              ),
+            ),
           SwitchListTile(
             title: Text(t.distributionSharedRoutingCatalog),
             subtitle: Text(t.distributionSharedRoutingCatalogHint),
@@ -1603,6 +1680,7 @@ class _DistributionMainPageState extends State<DistributionMainPage> with Single
                                 personId: personId,
                                 personName: m['person_name']?.toString() ?? '$personId',
                                 distributionService: _svc,
+                                tileConfig: _mapTiles,
                               );
                               if (saved == true) await _loadStops(rid);
                             },

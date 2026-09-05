@@ -486,6 +486,32 @@ ${UI_SSL_BLOCK}
     try_files \$uri =404;
   }
 
+  # Branding / Flutter image assets change in place — never immutable-cache them
+  location ^~ /assets/assets/ {
+    add_header Cache-Control "no-cache, must-revalidate" always;
+    expires off;
+  }
+
+  location ^~ /images/ {
+    add_header Cache-Control "no-cache, must-revalidate" always;
+    expires off;
+  }
+
+  location ^~ /icons/ {
+    add_header Cache-Control "no-cache, must-revalidate" always;
+    expires off;
+  }
+
+  location = /favicon.ico {
+    add_header Cache-Control "no-cache, must-revalidate" always;
+    expires off;
+  }
+
+  location = /favicon.png {
+    add_header Cache-Control "no-cache, must-revalidate" always;
+    expires off;
+  }
+
   location / {
     try_files \$uri \$uri/ /index.html;
   }

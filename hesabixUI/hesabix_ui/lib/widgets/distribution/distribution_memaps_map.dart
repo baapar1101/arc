@@ -2,16 +2,19 @@ import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
 
+import '../../core/distribution_map_tiles.dart';
 import '../../core/memaps_config.dart';
+import '../../l10n/app_localizations.dart';
 import 'distribution_map_marker.dart';
 
-/// نقشهٔ تعاملی با تایل می‌مپس و مارکرها.
+/// نقشهٔ تعاملی با تایل OSM یا می‌مپس و مارکرها.
 class DistributionMemapsMap extends StatefulWidget {
   final List<DistributionMapMarker> markers;
   final double height;
   final LatLng? selectedPoint;
   final bool pickMode;
   final ValueChanged<LatLng>? onPick;
+  final DistributionMapTileConfig tileConfig;
 
   const DistributionMemapsMap({
     super.key,
@@ -20,6 +23,7 @@ class DistributionMemapsMap extends StatefulWidget {
     this.selectedPoint,
     this.pickMode = false,
     this.onPick,
+    this.tileConfig = const DistributionMapTileConfig(),
   });
 
   @override
@@ -61,6 +65,9 @@ class _DistributionMemapsMapState extends State<DistributionMemapsMap> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final t = AppLocalizations.of(context);
+    final tiles = widget.tileConfig;
+    final dark = Theme.of(context).brightness == Brightness.dark;
     final allMarkers = <Marker>[];
 
     for (final m in widget.markers) {
@@ -111,8 +118,13 @@ class _DistributionMemapsMapState extends State<DistributionMemapsMap> {
               ),
               children: [
                 TileLayer(
-                  urlTemplate: MemapsConfig.tileUrlTemplate,
-                  retinaMode: RetinaMode.isHighDensity(context),
+                  key: ValueKey(
+                    '${tiles.source}:${tiles.memapsApiKey}:$dark:${tiles.isMemaps}',
+                  ),
+                  urlTemplate: tiles.urlTemplate(dark: dark),
+                  additionalOptions: tiles.additionalOptions,
+                  retinaMode: tiles.isMemaps && !dark && RetinaMode.isHighDensity(context),
+                  maxZoom: tiles.maxZoom.toDouble(),
                   userAgentPackageName: 'ir.hesabix.ui',
                 ),
                 MarkerLayer(markers: allMarkers),
@@ -120,9 +132,17 @@ class _DistributionMemapsMapState extends State<DistributionMemapsMap> {
             ),
           ),
         ),
+        if (tiles.needsMemapsKey) ...[
+          const SizedBox(height: 6),
+          Text(
+            t.distributionMemapsApiKeyMissing,
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(color: cs.error),
+            textAlign: TextAlign.center,
+          ),
+        ],
         const SizedBox(height: 4),
         Text(
-          MemapsConfig.attribution,
+          tiles.attribution,
           style: Theme.of(context).textTheme.labelSmall?.copyWith(color: cs.outline),
           textAlign: TextAlign.center,
         ),

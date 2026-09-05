@@ -1446,6 +1446,14 @@ def update_distribution_settings(db: Session, business_id: int, payload: Dict[st
 		row.visitor_max_discount_percent = max(0.0, min(100.0, float(payload.get("visitor_max_discount_percent") or 0)))
 	if "enable_suggested_order" in payload:
 		row.enable_suggested_order = bool(payload["enable_suggested_order"])
+	if "map_tile_source" in payload:
+		from app.services.distribution_phase3_service import normalize_map_tile_source
+
+		row.map_tile_source = normalize_map_tile_source(payload.get("map_tile_source"))
+	if "memaps_api_key" in payload:
+		raw_key = payload.get("memaps_api_key")
+		key = str(raw_key).strip() if raw_key is not None else ""
+		row.memaps_api_key = key[:255] if key else None
 	row.updated_at = datetime.utcnow()
 	db.commit()
 	db.refresh(row)

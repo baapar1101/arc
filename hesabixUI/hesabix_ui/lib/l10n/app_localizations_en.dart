@@ -15709,6 +15709,33 @@ class AppLocalizationsEn extends AppLocalizations {
   String get distributionSettingsSaved => 'Settings saved.';
 
   @override
+  String get distributionMapSectionTitle => 'Map tiles';
+
+  @override
+  String get distributionMapTileSource => 'Tile source';
+
+  @override
+  String get distributionMapTileSourceHint =>
+      'OpenStreetMap is free and worldwide. MeMaps is an Iranian tile server and requires an API key from memaps.ir.';
+
+  @override
+  String get distributionMapTileSourceOsm => 'OpenStreetMap (free, worldwide)';
+
+  @override
+  String get distributionMapTileSourceMemaps => 'MeMaps (Iran, API key required)';
+
+  @override
+  String get distributionMemapsApiKey => 'MeMaps API key';
+
+  @override
+  String get distributionMemapsApiKeyHint =>
+      'Create a key in the memaps.ir panel. Tile requests send it as ?key= or the X-Memaps-Key header.';
+
+  @override
+  String get distributionMemapsApiKeyMissing =>
+      'MeMaps tiles need an API key. Add it in distribution settings, or switch to OpenStreetMap.';
+
+  @override
   String get distributionNotesLabel => 'Notes';
 
   @override
