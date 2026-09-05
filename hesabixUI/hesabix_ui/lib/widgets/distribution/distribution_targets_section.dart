@@ -8,6 +8,7 @@ import 'package:hesabix_ui/services/business_user_service.dart';
 import 'package:hesabix_ui/services/distribution_service.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
 import 'package:hesabix_ui/utils/snackbar_helper.dart';
+import 'package:hesabix_ui/widgets/distribution/distribution_form_helpers.dart';
 import 'package:hesabix_ui/widgets/distribution/distribution_ui_helpers.dart';
 import 'package:hesabix_ui/widgets/jalali_date_picker.dart';
 
@@ -57,13 +58,16 @@ class _DistributionTargetsSectionState extends State<DistributionTargetsSection>
     WidgetsBinding.instance.addPostFrameCallback((_) => _reload());
   }
 
-  Future<void> _showCreate() async {
+  Future<void> _showCreate({Map<String, dynamic>? existing}) async {
     final t = AppLocalizations.of(context);
-    int? userId;
-    String periodType = 'month';
-    String metric = 'amount';
-    DateTime periodStart = DateTime(DateTime.now().year, DateTime.now().month, 1);
-    final amountCtl = TextEditingController();
+    int? userId = int.tryParse('${existing?['user_id'] ?? ''}');
+    String periodType = existing?['period_type']?.toString() ?? 'month';
+    String metric = existing?['metric']?.toString() ?? 'amount';
+    DateTime periodStart = DateTime.tryParse('${existing?['period_start'] ?? ''}') ??
+        DateTime(DateTime.now().year, DateTime.now().month, 1);
+    final amountCtl = TextEditingController(
+      text: existing == null ? '' : '${existing['target_amount'] ?? existing['target_value'] ?? ''}',
+    );
     List<BusinessUser> users = const [];
     try {
       users = (await BusinessUserService(ApiClient()).getBusinessUsers(widget.businessId)).users;
@@ -75,12 +79,9 @@ class _DistributionTargetsSectionState extends State<DistributionTargetsSection>
       builder: (ctx) => StatefulBuilder(
         builder: (context, setD) => AlertDialog(
           title: Text(t.distributionTargetCreate),
-          content: SizedBox(
-            width: 360,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                DropdownButtonFormField<int>(
+          content: distributionFormColumn(
+            children: [
+              DropdownButtonFormField<int>(
                   value: userId,
                   decoration: InputDecoration(
                     labelText: t.distributionSelectVisitor,
@@ -157,7 +158,6 @@ class _DistributionTargetsSectionState extends State<DistributionTargetsSection>
                 ),
               ],
             ),
-          ),
           actions: [
             TextButton(onPressed: () => Navigator.pop(ctx), child: Text(t.cancel)),
             FilledButton(
@@ -245,26 +245,41 @@ class _DistributionTargetsSectionState extends State<DistributionTargetsSection>
                   '${pct != null ? ' ($pct%)' : ''}',
                 ),
                 isThreeLine: true,
-                trailing: IconButton(
-                  icon: const Icon(Icons.delete_outline),
-                  onPressed: () async {
-                    final id = int.tryParse('${m['id']}');
-                    if (id == null) return;
-                    try {
-                      await widget.service.deleteTarget(
-                        businessId: widget.businessId,
-                        targetId: id,
-                      );
-                      await _reload();
-                    } catch (e) {
-                      if (mounted) {
-                        SnackBarHelper.showError(
-                          context,
-                          message: ErrorExtractor.forContext(e, context),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.edit_outlined),
+                      onPressed: () => _showCreate(existing: m),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.delete_outline),
+                      onPressed: () async {
+                        final id = int.tryParse('${m['id']}');
+                        if (id == null) return;
+                        final ok = await confirmDistributionDelete(
+                          context: context,
+                          title: t.distributionTargetsTitle,
+                          message: t.distributionDeleteTargetConfirm,
                         );
-                      }
-                    }
-                  },
+                        if (!ok) return;
+                        try {
+                          await widget.service.deleteTarget(
+                            businessId: widget.businessId,
+                            targetId: id,
+                          );
+                          await _reload();
+                        } catch (e) {
+                          if (mounted) {
+                            SnackBarHelper.showError(
+                              context,
+                              message: ErrorExtractor.forContext(e, context),
+                            );
+                          }
+                        }
+                      },
+                    ),
+                  ],
                 ),
               ),
             );

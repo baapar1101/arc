@@ -15,6 +15,8 @@ import '../distribution_reports_dashboard_page.dart';
 import '../../../utils/error_extractor.dart';
 import '../../../utils/snackbar_helper.dart' show SnackBarHelper;
 import '../../../widgets/business_subpage_back_leading.dart';
+import '../../../widgets/distribution/distribution_form_helpers.dart';
+import '../../../widgets/distribution/distribution_setup_plan_sheet.dart';
 import '../../../widgets/distribution/distribution_map_marker.dart';
 import '../../../widgets/distribution/distribution_memaps_map.dart';
 import '../../../core/distribution_map_tiles.dart';
@@ -273,6 +275,34 @@ class _DistributionMainPageState extends State<DistributionMainPage> with Single
     } catch (e) {
       if (mounted) SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
     }
+  }
+
+  void _goToManage() {
+    final i = _tabKeys.indexOf('manage');
+    if (i >= 0) _tabController.animateTo(i);
+  }
+
+  Future<void> _openSetupPlan(AppLocalizations t) async {
+    if (!_canManage) return;
+    if (_routes.isEmpty) await _refreshRoutesMaster();
+    if (!mounted) return;
+    if (_routes.isEmpty) {
+      SnackBarHelper.show(context, message: t.distributionNoRoutesYet);
+      _goToManage();
+      return;
+    }
+    final userId = await showDistributionSetupPlanSheet(
+      context: context,
+      businessId: widget.businessId,
+      service: _svc,
+      calendarController: widget.calendarController,
+      routes: _routes,
+      planDate: _planDay,
+    );
+    if (userId == null || !mounted) return;
+    setState(() => _teamTargetUserId = userId);
+    SnackBarHelper.showSuccess(context, message: t.distributionPlanAssigned);
+    await _refreshPlan();
   }
 
   Future<void> _refreshVisits({bool detectActiveOnly = false}) async {
@@ -954,6 +984,14 @@ class _DistributionMainPageState extends State<DistributionMainPage> with Single
                     icon: const Icon(Icons.calendar_month),
                     label: Text(Hd.HesabixDateUtils.formatForDisplay(_planDay, _jalali)),
                   ),
+                  if (_canManage) ...[
+                    const SizedBox(width: 8),
+                    FilledButton.icon(
+                      onPressed: () => _openSetupPlan(t),
+                      icon: const Icon(Icons.playlist_add_check_outlined),
+                      label: Text(t.distributionSetupPlan),
+                    ),
+                  ],
                   const SizedBox(width: 4),
                   PopupMenuButton<String>(
                     tooltip: t.distributionMoreActions,
@@ -1050,7 +1088,26 @@ class _DistributionMainPageState extends State<DistributionMainPage> with Single
                 context: context,
                 icon: Icons.route_outlined,
                 title: t.distributionNoPlan,
-                subtitle: t.distributionEmptyVisitsHint,
+                subtitle: t.distributionNoPlanHint,
+                action: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (_canManage)
+                      FilledButton.icon(
+                        onPressed: () => _openSetupPlan(t),
+                        icon: const Icon(Icons.playlist_add_check_outlined),
+                        label: Text(t.distributionSetupPlan),
+                      ),
+                    if (_canManage) ...[
+                      const SizedBox(height: 8),
+                      TextButton.icon(
+                        onPressed: _goToManage,
+                        icon: const Icon(Icons.settings_outlined),
+                        label: Text(t.distributionGoToManage),
+                      ),
+                    ],
+                  ],
+                ),
               ),
             )
           else
@@ -1598,17 +1655,50 @@ class _DistributionMainPageState extends State<DistributionMainPage> with Single
           child: Text(t.distributionManageSectionRoutes, style: Theme.of(context).textTheme.titleMedium),
         ),
         Padding(
-          padding: const EdgeInsets.all(8),
+          padding: const EdgeInsets.fromLTRB(12, 4, 12, 8),
           child: Row(
             children: [
+              Text(t.distributionTerritoryName, style: Theme.of(context).textTheme.titleSmall),
+              const Spacer(),
               FilledButton.tonalIcon(
-                onPressed: () => _showCreateTerritoryDialog(t),
-                icon: const Icon(Icons.map_outlined),
+                onPressed: () => _showTerritoryDialog(t),
+                icon: const Icon(Icons.add),
                 label: Text(t.distributionTerritoryCreate),
               ),
-              const SizedBox(width: 8),
+            ],
+          ),
+        ),
+        if (_territories.isEmpty)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Text(t.distributionNoRoutesYet, style: Theme.of(context).textTheme.bodySmall),
+          )
+        else
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: _territories.map((raw) {
+                final m = Map<String, dynamic>.from(raw as Map);
+                return InputChip(
+                  avatar: const Icon(Icons.map_outlined, size: 18),
+                  label: Text(distributionEntityLabel(m)),
+                  onPressed: () => _showTerritoryDialog(t, existing: m),
+                  onDeleted: () => _confirmDeleteTerritory(t, m),
+                  deleteIcon: const Icon(Icons.close, size: 18),
+                );
+              }).toList(),
+            ),
+          ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 16, 12, 8),
+          child: Row(
+            children: [
+              Text(t.distributionSelectRoute, style: Theme.of(context).textTheme.titleSmall),
+              const Spacer(),
               FilledButton.tonalIcon(
-                onPressed: () => _showCreateRouteDialog(t),
+                onPressed: () => _showRouteDialog(t),
                 icon: const Icon(Icons.add_road),
                 label: Text(t.distributionRouteCreate),
               ),
@@ -1628,7 +1718,7 @@ class _DistributionMainPageState extends State<DistributionMainPage> with Single
               margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               child: ExpansionTile(
                 leading: const Icon(Icons.alt_route),
-                title: Text('${r['code']} — ${r['name']}'),
+                title: Text(distributionEntityLabel(r)),
                 subtitle: Text('${r['territory_name'] ?? '—'}'),
                 onExpansionChanged: (ex) {
                   if (ex) _loadStops(rid);
@@ -1636,10 +1726,11 @@ class _DistributionMainPageState extends State<DistributionMainPage> with Single
                 children: [
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 8),
-                    child: Row(
+                    child: Wrap(
+                      spacing: 4,
                       children: [
                         TextButton.icon(
-                          onPressed: () => _showAddStopDialog(t, rid),
+                          onPressed: () => _showStopDialog(t, rid),
                           icon: const Icon(Icons.add_location_alt),
                           label: Text(t.distributionAddStop),
                         ),
@@ -1647,6 +1738,11 @@ class _DistributionMainPageState extends State<DistributionMainPage> with Single
                           onPressed: () => _showAssignmentDialog(t, rid),
                           icon: const Icon(Icons.person_add_alt),
                           label: Text(t.distributionAssignVisitor),
+                        ),
+                        IconButton(
+                          tooltip: t.distributionRouteEdit,
+                          onPressed: () => _showRouteDialog(t, existing: r),
+                          icon: const Icon(Icons.edit_outlined),
                         ),
                         IconButton(
                           tooltip: t.distributionDeleteRoute,
@@ -1668,6 +1764,11 @@ class _DistributionMainPageState extends State<DistributionMainPage> with Single
                       trailing: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
+                          IconButton(
+                            icon: const Icon(Icons.edit_outlined),
+                            tooltip: t.distributionStopEdit,
+                            onPressed: () => _showStopDialog(t, rid, existing: m),
+                          ),
                           IconButton(
                             icon: const Icon(Icons.edit_location_alt_outlined),
                             tooltip: t.distributionSetPersonLocation,
@@ -1691,6 +1792,12 @@ class _DistributionMainPageState extends State<DistributionMainPage> with Single
                             onPressed: () async {
                               final sid = int.tryParse('${m['id']}');
                               if (sid == null) return;
+                              final ok = await confirmDistributionDelete(
+                                context: context,
+                                title: t.distributionDeleteStop,
+                                message: t.distributionDeleteStopConfirm,
+                              );
+                              if (!ok) return;
                               try {
                                 await _svc.deleteStop(
                                   businessId: widget.businessId,
@@ -1736,18 +1843,13 @@ class _DistributionMainPageState extends State<DistributionMainPage> with Single
   }
 
   Future<void> _confirmDeleteRoute(AppLocalizations t, int routeId) async {
-    final ok = await showDialog<bool>(
+    final ok = await confirmDistributionDelete(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(t.distributionDeleteRoute),
-        content: Text(t.distributionDeleteRouteConfirm),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(t.cancel)),
-          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: Text(t.distributionDeleteRoute)),
-        ],
-      ),
+      title: t.distributionDeleteRoute,
+      message: t.distributionDeleteRouteConfirm,
+      confirmLabel: t.distributionDeleteRoute,
     );
-    if (ok != true) return;
+    if (!ok) return;
     try {
       await _svc.deleteRoute(businessId: widget.businessId, routeId: routeId);
       await _refreshRoutesMaster();
@@ -1756,23 +1858,39 @@ class _DistributionMainPageState extends State<DistributionMainPage> with Single
     }
   }
 
-  Future<void> _showCreateTerritoryDialog(AppLocalizations t) async {
-    final codeCtl = TextEditingController();
-    final nameCtl = TextEditingController();
+  Future<void> _confirmDeleteTerritory(AppLocalizations t, Map<String, dynamic> row) async {
+    final id = int.tryParse('${row['id']}');
+    if (id == null) return;
+    final ok = await confirmDistributionDelete(
+      context: context,
+      title: t.distributionDeleteTerritory,
+      message: t.distributionDeleteTerritoryConfirm,
+    );
+    if (!ok) return;
+    try {
+      await _svc.deleteTerritory(businessId: widget.businessId, territoryId: id);
+      await _refreshRoutesMaster();
+    } catch (e) {
+      if (mounted) SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
+    }
+  }
+
+  Future<void> _showTerritoryDialog(AppLocalizations t, {Map<String, dynamic>? existing}) async {
+    final nameCtl = TextEditingController(text: existing?['name']?.toString() ?? '');
+    final editing = existing != null;
     await showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text(t.distributionTerritoryCreate),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
+        title: Text(editing ? t.distributionTerritoryEdit : t.distributionTerritoryCreate),
+        content: distributionFormColumn(
           children: [
             TextField(
-              controller: codeCtl,
-              decoration: InputDecoration(labelText: t.distributionTerritoryCode, border: const OutlineInputBorder()),
-            ),
-            TextField(
               controller: nameCtl,
-              decoration: InputDecoration(labelText: t.distributionTerritoryName, border: const OutlineInputBorder()),
+              autofocus: true,
+              decoration: InputDecoration(
+                labelText: t.distributionTerritoryName,
+                border: const OutlineInputBorder(),
+              ),
             ),
           ],
         ),
@@ -1780,11 +1898,24 @@ class _DistributionMainPageState extends State<DistributionMainPage> with Single
           TextButton(onPressed: () => Navigator.pop(ctx), child: Text(t.cancel)),
           FilledButton(
             onPressed: () async {
+              final name = nameCtl.text.trim();
+              if (name.isEmpty) return;
               try {
-                await _svc.createTerritory(
-                  businessId: widget.businessId,
-                  payload: {'code': codeCtl.text.trim(), 'name': nameCtl.text.trim()},
-                );
+                if (editing) {
+                  await _svc.updateTerritory(
+                    businessId: widget.businessId,
+                    territoryId: int.parse('${existing['id']}'),
+                    payload: {'name': name},
+                  );
+                } else {
+                  await _svc.createTerritory(
+                    businessId: widget.businessId,
+                    payload: {
+                      'code': nextDistributionCode('T', _territories),
+                      'name': name,
+                    },
+                  );
+                }
                 if (ctx.mounted) Navigator.pop(ctx);
                 await _refreshRoutesMaster();
               } catch (e) {
@@ -1798,55 +1929,72 @@ class _DistributionMainPageState extends State<DistributionMainPage> with Single
     );
   }
 
-  Future<void> _showCreateRouteDialog(AppLocalizations t) async {
-    final codeCtl = TextEditingController();
-    final nameCtl = TextEditingController();
-    int? territoryId;
+  Future<void> _showRouteDialog(AppLocalizations t, {Map<String, dynamic>? existing}) async {
+    final nameCtl = TextEditingController(text: existing?['name']?.toString() ?? '');
+    int? territoryId = int.tryParse('${existing?['territory_id'] ?? ''}');
+    final editing = existing != null;
     await showDialog<void>(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (context, setD) => AlertDialog(
-          title: Text(t.distributionRouteCreate),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: codeCtl,
-                  decoration: InputDecoration(labelText: t.distributionRouteCode, border: const OutlineInputBorder()),
+          title: Text(editing ? t.distributionRouteEdit : t.distributionRouteCreate),
+          content: distributionFormColumn(
+            children: [
+              TextField(
+                controller: nameCtl,
+                autofocus: true,
+                decoration: InputDecoration(
+                  labelText: t.distributionRouteName,
+                  border: const OutlineInputBorder(),
                 ),
-                TextField(
-                  controller: nameCtl,
-                  decoration: InputDecoration(labelText: t.distributionRouteName, border: const OutlineInputBorder()),
+              ),
+              DropdownButtonFormField<int?>(
+                value: territoryId,
+                isExpanded: true,
+                decoration: InputDecoration(
+                  labelText: t.distributionTerritoryName,
+                  border: const OutlineInputBorder(),
                 ),
-                DropdownButtonFormField<int?>(
-                  value: territoryId,
-                  decoration: InputDecoration(labelText: t.distributionTerritoryName, border: const OutlineInputBorder()),
-                  items: [
-                    DropdownMenuItem<int?>(value: null, child: Text('—')),
-                    ..._territories.map<DropdownMenuItem<int?>>((e) {
-                      final m = Map<String, dynamic>.from(e as Map);
-                      return DropdownMenuItem<int?>(value: m['id'] as int?, child: Text('${m['code']} ${m['name']}'));
-                    }),
-                  ],
-                  onChanged: (v) => setD(() => territoryId = v),
-                ),
-              ],
-            ),
+                items: [
+                  DropdownMenuItem<int?>(value: null, child: Text('—')),
+                  ..._territories.map<DropdownMenuItem<int?>>((e) {
+                    final m = Map<String, dynamic>.from(e as Map);
+                    return DropdownMenuItem<int?>(
+                      value: m['id'] as int?,
+                      child: Text(distributionEntityLabel(m)),
+                    );
+                  }),
+                ],
+                onChanged: (v) => setD(() => territoryId = v),
+              ),
+            ],
           ),
           actions: [
             TextButton(onPressed: () => Navigator.pop(ctx), child: Text(t.cancel)),
             FilledButton(
               onPressed: () async {
+                final name = nameCtl.text.trim();
+                if (name.isEmpty) return;
                 try {
-                  await _svc.createRoute(
-                    businessId: widget.businessId,
-                    payload: <String, dynamic>{
-                      'code': codeCtl.text.trim(),
-                      'name': nameCtl.text.trim(),
-                      if (territoryId != null) 'territory_id': territoryId,
-                    },
-                  );
+                  if (editing) {
+                    await _svc.updateRoute(
+                      businessId: widget.businessId,
+                      routeId: int.parse('${existing['id']}'),
+                      payload: <String, dynamic>{
+                        'name': name,
+                        'territory_id': territoryId,
+                      },
+                    );
+                  } else {
+                    await _svc.createRoute(
+                      businessId: widget.businessId,
+                      payload: <String, dynamic>{
+                        'code': nextDistributionCode('R', _routes),
+                        'name': name,
+                        if (territoryId != null) 'territory_id': territoryId,
+                      },
+                    );
+                  }
                   if (ctx.mounted) Navigator.pop(ctx);
                   await _refreshRoutesMaster();
                 } catch (e) {
@@ -1861,17 +2009,28 @@ class _DistributionMainPageState extends State<DistributionMainPage> with Single
     );
   }
 
-  Future<void> _showAddStopDialog(AppLocalizations t, int routeId) async {
+  Future<void> _showStopDialog(AppLocalizations t, int routeId, {Map<String, dynamic>? existing}) async {
     Person? person;
-    final sortCtl = TextEditingController(text: '0');
-    int? weekday;
+    final pid = int.tryParse('${existing?['person_id'] ?? ''}');
+    if (pid != null) {
+      person = distributionPersonStub(
+        businessId: widget.businessId,
+        id: pid,
+        name: existing?['person_name']?.toString() ?? '$pid',
+      );
+    }
+    final stops = _stopsByRoute[routeId] ?? [];
+    final defaultSort = existing != null
+        ? '${existing['sort_order'] ?? 0}'
+        : '${stops.length + 1}';
+    final sortCtl = TextEditingController(text: defaultSort);
+    int? weekday = existing?['weekday'] is int ? existing!['weekday'] as int : int.tryParse('${existing?['weekday'] ?? ''}');
     await showDialog<void>(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (context, setD) => AlertDialog(
-          title: Text(t.distributionAddStop),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
+          title: Text(existing == null ? t.distributionAddStop : t.distributionStopEdit),
+          content: distributionFormColumn(
             children: [
               PersonComboboxWidget(
                 businessId: widget.businessId,
@@ -1879,14 +2038,13 @@ class _DistributionMainPageState extends State<DistributionMainPage> with Single
                 label: t.distributionSelectPerson,
                 onChanged: (p) => setD(() => person = p),
               ),
-              TextField(
-                controller: sortCtl,
-                keyboardType: TextInputType.number,
-                decoration: InputDecoration(labelText: t.distributionSortOrder, border: const OutlineInputBorder()),
-              ),
               DropdownButtonFormField<int?>(
                 value: weekday,
-                decoration: InputDecoration(labelText: t.distributionWeekdayLabel, border: const OutlineInputBorder()),
+                isExpanded: true,
+                decoration: InputDecoration(
+                  labelText: t.distributionWeekdayLabel,
+                  border: const OutlineInputBorder(),
+                ),
                 items: [
                   DropdownMenuItem<int?>(value: null, child: Text(t.distributionWeekdayAny)),
                   ...List.generate(
@@ -1895,6 +2053,11 @@ class _DistributionMainPageState extends State<DistributionMainPage> with Single
                   ),
                 ],
                 onChanged: (v) => setD(() => weekday = v),
+              ),
+              TextField(
+                controller: sortCtl,
+                keyboardType: TextInputType.number,
+                decoration: InputDecoration(labelText: t.distributionSortOrder, border: const OutlineInputBorder()),
               ),
             ],
           ),
@@ -1908,6 +2071,7 @@ class _DistributionMainPageState extends State<DistributionMainPage> with Single
                     businessId: widget.businessId,
                     routeId: routeId,
                     payload: <String, dynamic>{
+                      if (existing != null) 'id': existing['id'],
                       'person_id': person!.id,
                       'sort_order': int.tryParse(sortCtl.text.trim()) ?? 0,
                       'weekday': weekday,
@@ -1982,7 +2146,8 @@ class _DistributionMainPageState extends State<DistributionMainPage> with Single
                     },
                   ),
                   ListTile(
-                    title: Text(to == null ? 'valid_to' : Hd.HesabixDateUtils.formatForDisplay(to!, _jalali)),
+                    title: Text(to == null ? '∞' : Hd.HesabixDateUtils.formatForDisplay(to!, _jalali)),
+                    subtitle: Text(t.distributionAssignmentTo),
                     onTap: () async {
                       final d = await showAdaptiveDatePicker(
                         context: context,
@@ -1999,7 +2164,9 @@ class _DistributionMainPageState extends State<DistributionMainPage> with Single
                       return ListTile(
                         dense: true,
                         title: Text(m['user_name']?.toString() ?? 'user ${m['user_id']}'),
-                        subtitle: Text('${t.distributionAssignmentFrom}: ${m['valid_from']} → ${t.distributionAssignmentTo}: ${m['valid_to'] ?? '∞'}'),
+                        subtitle: Text(
+                          '${t.distributionAssignmentFrom}: ${m['valid_from'] ?? '—'} → ${t.distributionAssignmentTo}: ${m['valid_to'] ?? '∞'}',
+                        ),
                         trailing: IconButton(
                           tooltip: t.distributionDeleteAssignment,
                           icon: const Icon(Icons.delete_outline),

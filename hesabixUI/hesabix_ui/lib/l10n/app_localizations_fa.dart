@@ -15378,6 +15378,81 @@ class AppLocalizationsFa extends AppLocalizations {
   String get distributionNoPlan => 'برنامه‌ای برای این روز ثبت نشده است.';
 
   @override
+  String get distributionNoPlanHint =>
+      'برنامهٔ روز از مسیر تخصیص‌داده‌شده به ویزیتور ساخته می‌شود. قلمرو و مسیر بسازید، مشتری را به‌عنوان توقف اضافه کنید، سپس ویزیتور را تخصیص دهید — یا از «ساخت برنامه» استفاده کنید.';
+
+  @override
+  String get distributionSetupPlan => 'ساخت برنامه';
+
+  @override
+  String get distributionSetupPlanHint =>
+      'ویزیتور و مسیر را انتخاب کنید. توقف‌های همان مسیر برای این روز هفته، برنامهٔ میدان می‌شوند.';
+
+  @override
+  String get distributionAssignAndShowPlan => 'تخصیص و نمایش برنامه';
+
+  @override
+  String get distributionSelectRoute => 'مسیر';
+
+  @override
+  String get distributionNoRoutesYet =>
+      'هنوز مسیری نیست. ابتدا در مدیریت قلمرو و مسیر بسازید.';
+
+  @override
+  String get distributionGoToManage => 'برو به مدیریت';
+
+  @override
+  String get distributionGoToManageHint =>
+      'برای افزودن قلمرو، مسیر و توقف به تب مدیریت بروید.';
+
+  @override
+  String get distributionPlanAssigned =>
+      'ویزیتور تخصیص داده شد. برنامهٔ میدان آماده است.';
+
+  @override
+  String get distributionTerritoryEdit => 'ویرایش قلمرو';
+
+  @override
+  String get distributionRouteEdit => 'ویرایش مسیر';
+
+  @override
+  String get distributionStopEdit => 'ویرایش توقف';
+
+  @override
+  String get distributionVanEdit => 'ویرایش ون';
+
+  @override
+  String get distributionVanName => 'نام ون';
+
+  @override
+  String get distributionDeleteTerritory => 'حذف قلمرو';
+
+  @override
+  String get distributionDeleteTerritoryConfirm =>
+      'این قلمرو حذف شود؟ مسیرها می‌مانند ولی پیوند قلمرو برداشته می‌شود.';
+
+  @override
+  String get distributionDeleteStopConfirm => 'این مشتری از مسیر حذف شود؟';
+
+  @override
+  String get distributionDeletePromoConfirm => 'این پروموشن حذف شود؟';
+
+  @override
+  String get distributionDeleteTargetConfirm => 'این هدف فروش حذف شود؟';
+
+  @override
+  String get distributionAssetTypeCooler => 'یخچال';
+
+  @override
+  String get distributionAssetTypeFreezer => 'فریزر';
+
+  @override
+  String get distributionAssetTypeShelf => 'قفسه';
+
+  @override
+  String get distributionAssetTypeOther => 'سایر';
+
+  @override
   String get distributionStartVisit => 'شروع ویزیت';
 
   @override

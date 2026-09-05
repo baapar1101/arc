@@ -5,13 +5,13 @@ import 'package:hesabix_ui/core/date_utils.dart' as Hd;
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/models/business_user_model.dart';
 import 'package:hesabix_ui/models/person_model.dart';
-import 'package:hesabix_ui/models/warehouse_model.dart';
 import 'package:hesabix_ui/services/business_user_service.dart';
 import 'package:hesabix_ui/services/distribution_service.dart';
-import 'package:hesabix_ui/services/warehouse_service.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
 import 'package:hesabix_ui/utils/snackbar_helper.dart';
+import 'package:hesabix_ui/widgets/distribution/distribution_form_helpers.dart';
 import 'package:hesabix_ui/widgets/invoice/person_combobox_widget.dart';
+import 'package:hesabix_ui/widgets/invoice/warehouse_combobox_widget.dart';
 import 'package:hesabix_ui/widgets/jalali_date_picker.dart';
 
 /// پنل عملیات تجاری پخش: سفارش پیش‌فروش، تحویل، بارگیری، پروموشن، پورسانت.
@@ -73,7 +73,6 @@ class _DistributionCommercialPanelState extends State<DistributionCommercialPane
 
   Future<void> _load() async {
     setState(() => _loading = true);
-    final t = AppLocalizations.of(context);
     try {
       switch (_tabs.index) {
         case 0:
@@ -140,10 +139,8 @@ class _DistributionCommercialPanelState extends State<DistributionCommercialPane
   Future<void> _buildLoadPlan() async {
     final t = AppLocalizations.of(context);
     List<dynamic> vans = const [];
-    List<Warehouse> whs = const [];
     try {
       vans = await widget.service.listVans(businessId: widget.businessId);
-      whs = await WarehouseService().listWarehouses(businessId: widget.businessId);
     } catch (_) {}
     if (!mounted) return;
     int? vanId;
@@ -178,24 +175,13 @@ class _DistributionCommercialPanelState extends State<DistributionCommercialPane
                   onChanged: (v) => setD(() => vanId = v),
                 ),
                 const SizedBox(height: 8),
-                DropdownButtonFormField<int?>(
-                  value: whId,
-                  isExpanded: true,
-                  decoration: InputDecoration(
-                    labelText: t.distributionSelectWarehouse,
-                    border: const OutlineInputBorder(),
+                  WarehouseComboboxWidget(
+                    businessId: widget.businessId,
+                    selectedWarehouseId: whId,
+                    label: t.distributionSelectWarehouse,
+                    selectDefaultWhenUnset: true,
+                    onChanged: (id) => setD(() => whId = id),
                   ),
-                  items: [
-                    DropdownMenuItem<int?>(value: null, child: Text('—')),
-                    ...whs.map(
-                      (w) => DropdownMenuItem<int?>(
-                        value: w.id,
-                        child: Text(w.name),
-                      ),
-                    ),
-                  ],
-                  onChanged: (v) => setD(() => whId = v),
-                ),
               ],
             ),
           ),
@@ -385,49 +371,46 @@ class _DistributionCommercialPanelState extends State<DistributionCommercialPane
     }
   }
 
-  Future<void> _addPromoDialog() async {
+  Future<void> _addPromoDialog({Map<String, dynamic>? existing}) async {
     final t = AppLocalizations.of(context);
-    final codeCtl = TextEditingController();
-    final nameCtl = TextEditingController();
-    final pctCtl = TextEditingController(text: '5');
+    final nameCtl = TextEditingController(text: existing?['name']?.toString() ?? '');
+    final cfg = existing?['config'] is Map ? Map<String, dynamic>.from(existing!['config'] as Map) : <String, dynamic>{};
+    final pctCtl = TextEditingController(text: '${cfg['percent'] ?? 5}');
+    final editing = existing != null;
     await showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(t.distributionPromoCreate),
-        content: SizedBox(
-          width: 360,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: codeCtl,
-                decoration: InputDecoration(labelText: t.distributionPromoCode, border: const OutlineInputBorder()),
-              ),
-              const SizedBox(height: 8),
-              TextField(
-                controller: nameCtl,
-                decoration: InputDecoration(labelText: t.distributionPromoName, border: const OutlineInputBorder()),
-              ),
-              const SizedBox(height: 8),
-              TextField(
-                controller: pctCtl,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                decoration: InputDecoration(labelText: t.distributionPromoPercent, border: const OutlineInputBorder()),
-              ),
-            ],
-          ),
+        content: distributionFormColumn(
+          children: [
+            TextField(
+              controller: nameCtl,
+              autofocus: true,
+              decoration: InputDecoration(labelText: t.distributionPromoName, border: const OutlineInputBorder()),
+            ),
+            TextField(
+              controller: pctCtl,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              decoration: InputDecoration(labelText: t.distributionPromoPercent, border: const OutlineInputBorder()),
+            ),
+          ],
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx), child: Text(t.cancel)),
           FilledButton(
             onPressed: () async {
+              final name = nameCtl.text.trim();
+              if (name.isEmpty) return;
               Navigator.pop(ctx);
               try {
                 await widget.service.upsertPromotion(
                   businessId: widget.businessId,
+                  promoId: editing ? int.tryParse('${existing['id']}') : null,
                   payload: {
-                    'code': codeCtl.text.trim(),
-                    'name': nameCtl.text.trim(),
+                    'code': editing
+                        ? '${existing['code']}'
+                        : nextDistributionCode('PR', _promos),
+                    'name': name,
                     'mechanic': 'percent_off',
                     'config': {'percent': double.tryParse(pctCtl.text.trim()) ?? 5},
                     'valid_from': _iso(DateTime.now()),
@@ -738,23 +721,38 @@ class _DistributionCommercialPanelState extends State<DistributionCommercialPane
                 ),
                 child: ListTile(
                   leading: Icon(Icons.sell_outlined, color: cs.primary),
-                  title: Text('${m['name']} (${m['code']})'),
+                  title: Text('${m['name']}'),
                   subtitle: Text('${m['mechanic']} · ${cfg['percent'] ?? cfg['amount'] ?? ''}'),
-                  trailing: IconButton(
-                    icon: const Icon(Icons.delete_outline),
-                    onPressed: () async {
-                      try {
-                        await widget.service.deletePromotion(
-                          businessId: widget.businessId,
-                          promoId: int.parse('${m['id']}'),
-                        );
-                        await _load();
-                      } catch (e) {
-                        if (mounted) {
-                          SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
-                        }
-                      }
-                    },
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.edit_outlined),
+                        onPressed: () => _addPromoDialog(existing: m),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.delete_outline),
+                        onPressed: () async {
+                          final ok = await confirmDistributionDelete(
+                            context: context,
+                            title: t.distributionPromoCreate,
+                            message: t.distributionDeletePromoConfirm,
+                          );
+                          if (!ok) return;
+                          try {
+                            await widget.service.deletePromotion(
+                              businessId: widget.businessId,
+                              promoId: int.parse('${m['id']}'),
+                            );
+                            await _load();
+                          } catch (e) {
+                            if (mounted) {
+                              SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
+                            }
+                          }
+                        },
+                      ),
+                    ],
                   ),
                 ),
               );
@@ -1051,8 +1049,12 @@ class _DistributionCommercialPanelState extends State<DistributionCommercialPane
                 child: ListTile(
                   title: Text(m['asset_type']?.toString() ?? t.distributionAssetType),
                   subtitle: Text(
-                    '${m['person_name'] ?? m['person_id']} · ${m['asset_code'] ?? ''}'
+                    '${m['person_name'] ?? m['person_id']}'
                     '${m['status'] != null ? ' · ${m['status']}' : ''}',
+                  ),
+                  trailing: IconButton(
+                    icon: const Icon(Icons.edit_outlined),
+                    onPressed: () => _addAssetDialog(existing: m),
                   ),
                 ),
               );
@@ -1080,55 +1082,70 @@ class _DistributionCommercialPanelState extends State<DistributionCommercialPane
     );
   }
 
-  Future<void> _addAssetDialog() async {
+  Future<void> _addAssetDialog({Map<String, dynamic>? existing}) async {
     final t = AppLocalizations.of(context);
-    final typeCtl = TextEditingController(text: 'cooler');
-    final codeCtl = TextEditingController();
+    final types = <String, String>{
+      'cooler': t.distributionAssetTypeCooler,
+      'freezer': t.distributionAssetTypeFreezer,
+      'shelf': t.distributionAssetTypeShelf,
+      'other': t.distributionAssetTypeOther,
+    };
+    var type = existing?['asset_type']?.toString() ?? 'cooler';
+    if (!types.containsKey(type)) type = 'other';
     Person? person;
+    final pid = int.tryParse('${existing?['person_id'] ?? ''}');
+    if (pid != null) {
+      person = distributionPersonStub(
+        businessId: widget.businessId,
+        id: pid,
+        name: existing?['person_name']?.toString() ?? '$pid',
+      );
+    }
     await showDialog<void>(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (context, setD) => AlertDialog(
           title: Text(t.distributionAssetCreate),
-          content: SizedBox(
-            width: 360,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                PersonComboboxWidget(
-                  businessId: widget.businessId,
-                  selectedPerson: person,
-                  label: t.distributionSelectPerson,
-                  hintText: t.distributionSelectPerson,
-                  isRequired: true,
-                  onChanged: (p) => setD(() => person = p),
+          content: distributionFormColumn(
+            children: [
+              PersonComboboxWidget(
+                businessId: widget.businessId,
+                selectedPerson: person,
+                label: t.distributionSelectPerson,
+                hintText: t.distributionSelectPerson,
+                isRequired: true,
+                onChanged: (p) => setD(() => person = p),
+              ),
+              DropdownButtonFormField<String>(
+                value: type,
+                isExpanded: true,
+                decoration: InputDecoration(
+                  labelText: t.distributionAssetType,
+                  border: const OutlineInputBorder(),
                 ),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: typeCtl,
-                  decoration: InputDecoration(labelText: t.distributionAssetType, border: const OutlineInputBorder()),
-                ),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: codeCtl,
-                  decoration: InputDecoration(labelText: t.distributionAssetCode, border: const OutlineInputBorder()),
-                ),
-              ],
-            ),
+                items: types.entries
+                    .map((e) => DropdownMenuItem(value: e.key, child: Text(e.value)))
+                    .toList(),
+                onChanged: (v) => setD(() => type = v ?? 'cooler'),
+              ),
+            ],
           ),
           actions: [
             TextButton(onPressed: () => Navigator.pop(ctx), child: Text(t.cancel)),
             FilledButton(
               onPressed: () async {
-                if (person == null || codeCtl.text.trim().isEmpty) return;
+                if (person == null) return;
                 Navigator.pop(ctx);
                 try {
                   await widget.service.upsertCustomerAsset(
                     businessId: widget.businessId,
+                    assetId: existing != null ? int.tryParse('${existing['id']}') : null,
                     payload: {
                       'person_id': person!.id,
-                      'asset_type': typeCtl.text.trim(),
-                      'asset_code': codeCtl.text.trim(),
+                      'asset_type': type,
+                      'asset_code': existing != null
+                          ? '${existing['asset_code'] ?? nextDistributionCode('AST', _assets)}'
+                          : nextDistributionCode('AST', _assets),
                       'status': 'active',
                     },
                   );

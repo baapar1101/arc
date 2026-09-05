@@ -28466,6 +28466,144 @@ abstract class AppLocalizations {
   /// **'No route plan for this date.'**
   String get distributionNoPlan;
 
+  /// No description provided for @distributionNoPlanHint.
+  ///
+  /// In en, this message translates to:
+  /// **'The daily plan is built from a route assigned to a visitor. Create a territory and route, add customers as stops, then assign the visitor — or use Set up plan.'**
+  String get distributionNoPlanHint;
+
+  /// No description provided for @distributionSetupPlan.
+  ///
+  /// In en, this message translates to:
+  /// **'Set up plan'**
+  String get distributionSetupPlan;
+
+  /// No description provided for @distributionSetupPlanHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a visitor and a route. Stops on that route for this weekday become today’s field plan.'**
+  String get distributionSetupPlanHint;
+
+  /// No description provided for @distributionAssignAndShowPlan.
+  ///
+  /// In en, this message translates to:
+  /// **'Assign and show plan'**
+  String get distributionAssignAndShowPlan;
+
+  /// No description provided for @distributionSelectRoute.
+  ///
+  /// In en, this message translates to:
+  /// **'Route'**
+  String get distributionSelectRoute;
+
+  /// No description provided for @distributionNoRoutesYet.
+  ///
+  /// In en, this message translates to:
+  /// **'No routes yet. Create a territory and a route in Manage first.'**
+  String get distributionNoRoutesYet;
+
+  /// No description provided for @distributionGoToManage.
+  ///
+  /// In en, this message translates to:
+  /// **'Go to Manage'**
+  String get distributionGoToManage;
+
+  /// No description provided for @distributionGoToManageHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Open Manage to add territories, routes and stops.'**
+  String get distributionGoToManageHint;
+
+  /// No description provided for @distributionPlanAssigned.
+  ///
+  /// In en, this message translates to:
+  /// **'Visitor assigned. The field plan is ready.'**
+  String get distributionPlanAssigned;
+
+  /// No description provided for @distributionTerritoryEdit.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit territory'**
+  String get distributionTerritoryEdit;
+
+  /// No description provided for @distributionRouteEdit.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit route'**
+  String get distributionRouteEdit;
+
+  /// No description provided for @distributionStopEdit.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit stop'**
+  String get distributionStopEdit;
+
+  /// No description provided for @distributionVanEdit.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit van'**
+  String get distributionVanEdit;
+
+  /// No description provided for @distributionVanName.
+  ///
+  /// In en, this message translates to:
+  /// **'Van name'**
+  String get distributionVanName;
+
+  /// No description provided for @distributionDeleteTerritory.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete territory'**
+  String get distributionDeleteTerritory;
+
+  /// No description provided for @distributionDeleteTerritoryConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete this territory? Routes stay, but the territory link is removed.'**
+  String get distributionDeleteTerritoryConfirm;
+
+  /// No description provided for @distributionDeleteStopConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove this customer from the route?'**
+  String get distributionDeleteStopConfirm;
+
+  /// No description provided for @distributionDeletePromoConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete this promotion?'**
+  String get distributionDeletePromoConfirm;
+
+  /// No description provided for @distributionDeleteTargetConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete this sales target?'**
+  String get distributionDeleteTargetConfirm;
+
+  /// No description provided for @distributionAssetTypeCooler.
+  ///
+  /// In en, this message translates to:
+  /// **'Cooler'**
+  String get distributionAssetTypeCooler;
+
+  /// No description provided for @distributionAssetTypeFreezer.
+  ///
+  /// In en, this message translates to:
+  /// **'Freezer'**
+  String get distributionAssetTypeFreezer;
+
+  /// No description provided for @distributionAssetTypeShelf.
+  ///
+  /// In en, this message translates to:
+  /// **'Shelf'**
+  String get distributionAssetTypeShelf;
+
+  /// No description provided for @distributionAssetTypeOther.
+  ///
+  /// In en, this message translates to:
+  /// **'Other'**
+  String get distributionAssetTypeOther;
+
   /// No description provided for @distributionStartVisit.
   ///
   /// In en, this message translates to:

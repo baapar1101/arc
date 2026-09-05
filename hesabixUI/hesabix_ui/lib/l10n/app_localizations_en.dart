@@ -15458,6 +15458,80 @@ class AppLocalizationsEn extends AppLocalizations {
   String get distributionNoPlan => 'No route plan for this date.';
 
   @override
+  String get distributionNoPlanHint =>
+      'The daily plan is built from a route assigned to a visitor. Create a territory and route, add customers as stops, then assign the visitor — or use Set up plan.';
+
+  @override
+  String get distributionSetupPlan => 'Set up plan';
+
+  @override
+  String get distributionSetupPlanHint =>
+      'Choose a visitor and a route. Stops on that route for this weekday become today’s field plan.';
+
+  @override
+  String get distributionAssignAndShowPlan => 'Assign and show plan';
+
+  @override
+  String get distributionSelectRoute => 'Route';
+
+  @override
+  String get distributionNoRoutesYet =>
+      'No routes yet. Create a territory and a route in Manage first.';
+
+  @override
+  String get distributionGoToManage => 'Go to Manage';
+
+  @override
+  String get distributionGoToManageHint =>
+      'Open Manage to add territories, routes and stops.';
+
+  @override
+  String get distributionPlanAssigned => 'Visitor assigned. The field plan is ready.';
+
+  @override
+  String get distributionTerritoryEdit => 'Edit territory';
+
+  @override
+  String get distributionRouteEdit => 'Edit route';
+
+  @override
+  String get distributionStopEdit => 'Edit stop';
+
+  @override
+  String get distributionVanEdit => 'Edit van';
+
+  @override
+  String get distributionVanName => 'Van name';
+
+  @override
+  String get distributionDeleteTerritory => 'Delete territory';
+
+  @override
+  String get distributionDeleteTerritoryConfirm =>
+      'Delete this territory? Routes stay, but the territory link is removed.';
+
+  @override
+  String get distributionDeleteStopConfirm => 'Remove this customer from the route?';
+
+  @override
+  String get distributionDeletePromoConfirm => 'Delete this promotion?';
+
+  @override
+  String get distributionDeleteTargetConfirm => 'Delete this sales target?';
+
+  @override
+  String get distributionAssetTypeCooler => 'Cooler';
+
+  @override
+  String get distributionAssetTypeFreezer => 'Freezer';
+
+  @override
+  String get distributionAssetTypeShelf => 'Shelf';
+
+  @override
+  String get distributionAssetTypeOther => 'Other';
+
+  @override
   String get distributionStartVisit => 'Start visit';
 
   @override

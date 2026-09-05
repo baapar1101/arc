@@ -7,6 +7,7 @@ import 'package:hesabix_ui/services/business_user_service.dart';
 import 'package:hesabix_ui/services/distribution_service.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
 import 'package:hesabix_ui/utils/snackbar_helper.dart';
+import 'package:hesabix_ui/widgets/distribution/distribution_form_helpers.dart';
 import 'package:hesabix_ui/widgets/invoice/product_combobox_widget.dart';
 import 'package:hesabix_ui/widgets/invoice/warehouse_combobox_widget.dart';
 
@@ -69,11 +70,10 @@ class _DistributionVanPanelState extends State<DistributionVanPanel> {
     WidgetsBinding.instance.addPostFrameCallback((_) => _reload());
   }
 
-  Future<void> _showCreateVan() async {
+  Future<void> _showVanDialog({Map<String, dynamic>? existing}) async {
     final t = AppLocalizations.of(context);
-    final codeCtl = TextEditingController();
-    final nameCtl = TextEditingController();
-    int? userId;
+    final nameCtl = TextEditingController(text: existing?['name']?.toString() ?? '');
+    int? userId = int.tryParse('${existing?['user_id'] ?? ''}');
     List<BusinessUser> users = const [];
     try {
       final res = await BusinessUserService(ApiClient()).getBusinessUsers(widget.businessId);
@@ -81,65 +81,68 @@ class _DistributionVanPanelState extends State<DistributionVanPanel> {
     } catch (_) {}
 
     if (!mounted) return;
+    final editing = existing != null;
     await showDialog<void>(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (context, setD) => AlertDialog(
-          title: Text(t.distributionVanCreate),
-          content: SizedBox(
-            width: 360,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: codeCtl,
-                  decoration: InputDecoration(
-                    labelText: t.distributionRouteCode,
-                    border: const OutlineInputBorder(),
-                  ),
+          title: Text(editing ? t.distributionVanEdit : t.distributionVanCreate),
+          content: distributionFormColumn(
+            children: [
+              TextField(
+                controller: nameCtl,
+                autofocus: true,
+                decoration: InputDecoration(
+                  labelText: t.distributionVanName,
+                  border: const OutlineInputBorder(),
                 ),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: nameCtl,
-                  decoration: InputDecoration(
-                    labelText: t.distributionRouteName,
-                    border: const OutlineInputBorder(),
-                  ),
+              ),
+              DropdownButtonFormField<int?>(
+                value: userId,
+                isExpanded: true,
+                decoration: InputDecoration(
+                  labelText: t.distributionSelectVisitor,
+                  border: const OutlineInputBorder(),
                 ),
-                const SizedBox(height: 8),
-                DropdownButtonFormField<int?>(
-                  value: userId,
-                  decoration: InputDecoration(
-                    labelText: t.distributionSelectVisitor,
-                    border: const OutlineInputBorder(),
-                  ),
-                  items: [
-                    const DropdownMenuItem<int?>(value: null, child: Text('—')),
-                    ...users.map(
-                      (u) => DropdownMenuItem<int?>(
-                        value: u.userId,
-                        child: Text(u.userName.isNotEmpty ? u.userName : 'user ${u.userId}'),
-                      ),
+                items: [
+                  const DropdownMenuItem<int?>(value: null, child: Text('—')),
+                  ...users.map(
+                    (u) => DropdownMenuItem<int?>(
+                      value: u.userId,
+                      child: Text(u.userName.isNotEmpty ? u.userName : 'user ${u.userId}'),
                     ),
-                  ],
-                  onChanged: (v) => setD(() => userId = v),
-                ),
-              ],
-            ),
+                  ),
+                ],
+                onChanged: (v) => setD(() => userId = v),
+              ),
+            ],
           ),
           actions: [
             TextButton(onPressed: () => Navigator.pop(ctx), child: Text(t.cancel)),
             FilledButton(
               onPressed: () async {
+                final name = nameCtl.text.trim();
+                if (name.isEmpty) return;
                 try {
-                  await widget.service.createVan(
-                    businessId: widget.businessId,
-                    payload: {
-                      'code': codeCtl.text.trim(),
-                      'name': nameCtl.text.trim(),
-                      if (userId != null) 'user_id': userId,
-                    },
-                  );
+                  if (editing) {
+                    await widget.service.updateVan(
+                      businessId: widget.businessId,
+                      vanId: int.parse('${existing['id']}'),
+                      payload: {
+                        'name': name,
+                        'user_id': userId,
+                      },
+                    );
+                  } else {
+                    await widget.service.createVan(
+                      businessId: widget.businessId,
+                      payload: {
+                        'code': nextDistributionCode('VAN', _vans),
+                        'name': name,
+                        if (userId != null) 'user_id': userId,
+                      },
+                    );
+                  }
                   if (ctx.mounted) Navigator.pop(ctx);
                   await _reload();
                   if (mounted) {
@@ -309,7 +312,7 @@ class _DistributionVanPanelState extends State<DistributionVanPanel> {
             Row(
               children: [
                 FilledButton.tonalIcon(
-                  onPressed: _showCreateVan,
+                  onPressed: () => _showVanDialog(),
                   icon: const Icon(Icons.add),
                   label: Text(t.distributionVanCreate),
                 ),
@@ -327,7 +330,9 @@ class _DistributionVanPanelState extends State<DistributionVanPanel> {
                         final m = Map<String, dynamic>.from(raw as Map);
                         return DropdownMenuItem<int>(
                           value: m['id'] as int,
-                          child: Text('${m['code']} — ${m['name']} (${m['user_name'] ?? m['user_id'] ?? '—'})'),
+                          child: Text(
+                            '${distributionEntityLabel(m)} · ${m['user_name'] ?? m['user_id'] ?? '—'}',
+                          ),
                         );
                       }).toList(),
                       onChanged: (id) async {
@@ -349,6 +354,18 @@ class _DistributionVanPanelState extends State<DistributionVanPanel> {
                         }
                       },
                     ),
+                  ),
+                if (_selectedVanId != null)
+                  IconButton(
+                    tooltip: t.distributionVanEdit,
+                    icon: const Icon(Icons.edit_outlined),
+                    onPressed: () {
+                      final row = _vans.cast<dynamic>().map((raw) => Map<String, dynamic>.from(raw as Map)).firstWhere(
+                            (m) => m['id'] == _selectedVanId,
+                            orElse: () => <String, dynamic>{},
+                          );
+                      if (row.isNotEmpty) _showVanDialog(existing: row);
+                    },
                   ),
               ],
             ),
