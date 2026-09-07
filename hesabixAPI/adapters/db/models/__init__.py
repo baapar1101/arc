@@ -229,6 +229,9 @@ from .distribution import (  # noqa: F401
 	DistributionCommissionRun,
 	DistributionShelfAudit,
 	DistributionCustomerAsset,
+	DistributionAssortment,
+	DistributionCustomerProfile,
+	DistributionVanLot,
 )
 from .telephony import (  # noqa: F401
 	TelephonySettings,

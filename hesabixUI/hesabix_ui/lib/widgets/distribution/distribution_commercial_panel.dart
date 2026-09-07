@@ -10,6 +10,7 @@ import 'package:hesabix_ui/services/distribution_service.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
 import 'package:hesabix_ui/utils/snackbar_helper.dart';
 import 'package:hesabix_ui/widgets/distribution/distribution_form_helpers.dart';
+import 'package:hesabix_ui/widgets/distribution/distribution_delivery_pod_sheet.dart';
 import 'package:hesabix_ui/widgets/invoice/person_combobox_widget.dart';
 import 'package:hesabix_ui/widgets/invoice/warehouse_combobox_widget.dart';
 import 'package:hesabix_ui/widgets/jalali_date_picker.dart';
@@ -21,6 +22,8 @@ class DistributionCommercialPanel extends StatefulWidget {
   final CalendarController calendarController;
   final bool canManage;
   final bool canOperate;
+  final bool requirePodSignature;
+  final bool requirePodPhoto;
 
   const DistributionCommercialPanel({
     super.key,
@@ -29,6 +32,8 @@ class DistributionCommercialPanel extends StatefulWidget {
     required this.calendarController,
     required this.canManage,
     required this.canOperate,
+    this.requirePodSignature = false,
+    this.requirePodPhoto = false,
   });
 
   @override
@@ -213,11 +218,74 @@ class _DistributionCommercialPanelState extends State<DistributionCommercialPane
     }
   }
 
-  Future<void> _confirmPlan(int id) async {
+  Future<void> _confirmPlan(int id, {Map<String, dynamic>? plan}) async {
+    final t = AppLocalizations.of(context);
+    final lines = ((plan?['lines'] as List?) ?? const [])
+        .map((e) => Map<String, dynamic>.from(e as Map))
+        .toList();
+    final qtyCtls = {
+      for (final ln in lines)
+        int.tryParse('${ln['product_id']}') ?? 0: TextEditingController(
+          text: '${ln['quantity'] ?? ln['planned_qty'] ?? 0}',
+        ),
+    }..removeWhere((k, _) => k <= 0);
+    var ok = true;
+    if (lines.isNotEmpty) {
+      ok = await showDialog<bool>(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              title: Text(t.distributionConfirmLoad),
+              content: SizedBox(
+                width: 420,
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(t.distributionLoadVariance, style: Theme.of(ctx).textTheme.bodySmall),
+                      const SizedBox(height: 12),
+                      ...lines.map((ln) {
+                        final pid = int.tryParse('${ln['product_id']}') ?? 0;
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: TextField(
+                            controller: qtyCtls[pid],
+                            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                            decoration: InputDecoration(
+                              labelText: '${ln['product_name'] ?? pid} · ${t.distributionOrderedQty}: ${ln['quantity']}',
+                              border: const OutlineInputBorder(),
+                              isDense: true,
+                            ),
+                          ),
+                        );
+                      }),
+                    ],
+                  ),
+                ),
+              ),
+              actions: [
+                TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(t.cancel)),
+                FilledButton(onPressed: () => Navigator.pop(ctx, true), child: Text(t.distributionConfirmLoad)),
+              ],
+            ),
+          ) ??
+          false;
+    }
+    if (!ok) return;
     try {
-      await widget.service.confirmLoadPlan(businessId: widget.businessId, planId: id);
+      await widget.service.confirmLoadPlan(
+        businessId: widget.businessId,
+        planId: id,
+        actualLines: qtyCtls.entries
+            .map(
+              (e) => {
+                'product_id': e.key,
+                'quantity': double.tryParse(e.value.text.trim().replaceAll(',', '.')) ?? 0,
+              },
+            )
+            .toList(),
+      );
       if (mounted) {
-        SnackBarHelper.showSuccess(context, message: AppLocalizations.of(context).distributionLoadPlanConfirmed);
+        SnackBarHelper.showSuccess(context, message: t.distributionLoadPlanConfirmed);
       }
       await _load();
     } catch (e) {
@@ -301,114 +369,15 @@ class _DistributionCommercialPanelState extends State<DistributionCommercialPane
   }
 
   Future<void> _completeStopUi(Map stop) async {
-    final t = AppLocalizations.of(context);
-    final nameCtl = TextEditingController();
-    final noteCtl = TextEditingController();
-    var ok = false;
-    await showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      showDragHandle: true,
-      builder: (ctx) {
-        return Padding(
-          padding: EdgeInsets.only(
-            left: 20,
-            right: 20,
-            top: 8,
-            bottom: MediaQuery.of(ctx).viewInsets.bottom + 20,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Text(t.distributionDeliveryPodTitle, style: Theme.of(ctx).textTheme.titleMedium),
-              const SizedBox(height: 4),
-              Text(
-                stop['person_name']?.toString() ?? '#${stop['person_id']}',
-                style: Theme.of(ctx).textTheme.bodyMedium?.copyWith(
-                      color: Theme.of(ctx).colorScheme.onSurfaceVariant,
-                    ),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: nameCtl,
-                decoration: InputDecoration(
-                  labelText: t.distributionPodSignerName,
-                  border: const OutlineInputBorder(),
-                  prefixIcon: const Icon(Icons.badge_outlined),
-                ),
-                textInputAction: TextInputAction.next,
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: noteCtl,
-                maxLines: 2,
-                decoration: InputDecoration(
-                  labelText: t.distributionPodNote,
-                  border: const OutlineInputBorder(),
-                ),
-              ),
-              const SizedBox(height: 16),
-              FilledButton.icon(
-                onPressed: () {
-                  if (nameCtl.text.trim().length < 2) {
-                    SnackBarHelper.showError(ctx, message: t.distributionPodSignerRequired);
-                    return;
-                  }
-                  ok = true;
-                  Navigator.pop(ctx);
-                },
-                icon: const Icon(Icons.check_circle_outline),
-                label: Text(t.distributionMarkDelivered),
-                style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(48)),
-              ),
-              const SizedBox(height: 8),
-              OutlinedButton(
-                onPressed: () async {
-                  ok = false;
-                  Navigator.pop(ctx);
-                  final sid = int.tryParse('${stop['id']}');
-                  if (sid == null) return;
-                  try {
-                    await widget.service.completeDeliveryStop(
-                      businessId: widget.businessId,
-                      stopId: sid,
-                      payload: {
-                        'status': 'failed',
-                        'failure_reason': 'customer_unavailable',
-                      },
-                    );
-                    await _load();
-                  } catch (e) {
-                    if (mounted) {
-                      SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
-                    }
-                  }
-                },
-                child: Text(t.distributionMarkFailed),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-    if (!ok) return;
-    final sid = int.tryParse('${stop['id']}');
-    if (sid == null) return;
     try {
-      await widget.service.completeDeliveryStop(
+      await showDistributionDeliveryPodSheet(
+        context: context,
         businessId: widget.businessId,
-        stopId: sid,
-        payload: {
-          'status': 'delivered',
-          'pod_confirmed': true,
-          'pod_signer_name': nameCtl.text.trim(),
-          if (noteCtl.text.trim().isNotEmpty) 'pod_note': noteCtl.text.trim(),
-        },
+        service: widget.service,
+        stop: Map<String, dynamic>.from(stop),
+        requireSignature: widget.requirePodSignature,
+        requirePhoto: widget.requirePodPhoto,
       );
-      if (mounted) {
-        SnackBarHelper.showSuccess(context, message: t.distributionDeliveredOk);
-      }
       await _load();
     } catch (e) {
       if (mounted) {
@@ -713,19 +682,35 @@ class _DistributionCommercialPanelState extends State<DistributionCommercialPane
                 ),
                 child: ExpansionTile(
                   title: Text('${t.distributionLoadPlan} #${m['id']} · ${m['status']}'),
-                  subtitle: Text('${lines.length} ${t.distributionSkuLines}'),
+                  subtitle: Text(
+                    [
+                      '${lines.length} ${t.distributionSkuLines}',
+                      if ((m['variance_line_count'] ?? 0) is num && (m['variance_line_count'] as num) > 0)
+                        '${t.distributionLoadVariance}: ${m['variance_line_count']}',
+                    ].join(' · '),
+                  ),
                   trailing: m['status'] == 'draft' && widget.canManage
                       ? FilledButton(
-                          onPressed: () => _confirmPlan(int.parse('${m['id']}')),
+                          onPressed: () => _confirmPlan(int.parse('${m['id']}'), plan: m),
                           child: Text(t.distributionConfirmLoad),
                         )
                       : null,
                   children: lines.map((ln) {
                     final l = Map<String, dynamic>.from(ln as Map);
+                    final planned = l['planned_qty'] ?? l['quantity'];
+                    final loaded = l['loaded_qty'];
+                    final variance = l['variance_qty'];
                     return ListTile(
                       dense: true,
                       title: Text(l['product_name']?.toString() ?? '#${l['product_id']}'),
-                      trailing: Text('${l['quantity']}'),
+                      subtitle: loaded == null
+                          ? null
+                          : Text('${t.distributionOrderedQty}: $planned · ${t.distributionDeliveryQty}: $loaded'),
+                      trailing: Text(
+                        variance == null || (variance is num && variance == 0)
+                            ? '${l['quantity']}'
+                            : '${l['quantity']} (${t.distributionLoadVariance}: $variance)',
+                      ),
                     );
                   }).toList(),
                 ),
@@ -856,7 +841,14 @@ class _DistributionCommercialPanelState extends State<DistributionCommercialPane
                 return ListTile(
                   dense: true,
                   title: Text('${m['name']}'),
-                  subtitle: Text('${m['rule_type']} · ${cfg['percent'] ?? ''}%'),
+                  subtitle: Text(
+                    [
+                      '${m['rule_type']}',
+                      if (cfg['percent'] != null) '${cfg['percent']}%',
+                      if (cfg['on_collection'] == true) t.distributionCommissionOnCollection,
+                      if (cfg['coverage_factor'] == true) t.distributionCommissionCoverage,
+                    ].join(' · '),
+                  ),
                   trailing: m['is_active'] == true
                       ? Icon(Icons.check_circle, color: cs.primary, size: 18)
                       : Icon(Icons.pause_circle_outline, color: cs.outline, size: 18),
@@ -903,53 +895,73 @@ class _DistributionCommercialPanelState extends State<DistributionCommercialPane
     final t = AppLocalizations.of(context);
     final nameCtl = TextEditingController();
     final pctCtl = TextEditingController(text: '1');
+    var onCollection = false;
+    var coverageFactor = false;
     await showDialog<void>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text(t.distributionCommissionRuleCreate),
-        content: SizedBox(
-          width: 360,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: nameCtl,
-                decoration: InputDecoration(labelText: t.distributionPromoName, border: const OutlineInputBorder()),
-              ),
-              const SizedBox(height: 8),
-              TextField(
-                controller: pctCtl,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                decoration: InputDecoration(labelText: t.distributionCommissionPercent, border: const OutlineInputBorder()),
-              ),
-            ],
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setD) => AlertDialog(
+          title: Text(t.distributionCommissionRuleCreate),
+          content: SizedBox(
+            width: 360,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: nameCtl,
+                  decoration: InputDecoration(labelText: t.distributionPromoName, border: const OutlineInputBorder()),
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: pctCtl,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  decoration: InputDecoration(labelText: t.distributionCommissionPercent, border: const OutlineInputBorder()),
+                ),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(t.distributionCommissionOnCollection),
+                  value: onCollection,
+                  onChanged: (v) => setD(() => onCollection = v),
+                ),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(t.distributionCommissionCoverage),
+                  value: coverageFactor,
+                  onChanged: (v) => setD(() => coverageFactor = v),
+                ),
+              ],
+            ),
           ),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: Text(t.cancel)),
-          FilledButton(
-            onPressed: () async {
-              Navigator.pop(ctx);
-              try {
-                await widget.service.upsertCommissionRule(
-                  businessId: widget.businessId,
-                  payload: {
-                    'name': nameCtl.text.trim().isEmpty ? 'default' : nameCtl.text.trim(),
-                    'rule_type': 'percent_of_sales',
-                    'config': {'percent': double.tryParse(pctCtl.text.trim()) ?? 1},
-                    'is_active': true,
-                  },
-                );
-                await _load();
-              } catch (e) {
-                if (mounted) {
-                  SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: Text(t.cancel)),
+            FilledButton(
+              onPressed: () async {
+                Navigator.pop(ctx);
+                try {
+                  await widget.service.upsertCommissionRule(
+                    businessId: widget.businessId,
+                    payload: {
+                      'name': nameCtl.text.trim().isEmpty ? 'default' : nameCtl.text.trim(),
+                      'rule_type': 'percent_of_sales',
+                      'config': {
+                        'percent': double.tryParse(pctCtl.text.trim()) ?? 1,
+                        'on_collection': onCollection,
+                        'coverage_factor': coverageFactor,
+                      },
+                      'is_active': true,
+                    },
+                  );
+                  await _load();
+                } catch (e) {
+                  if (mounted) {
+                    SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
+                  }
                 }
-              }
-            },
-            child: Text(t.save),
-          ),
-        ],
+              },
+              child: Text(t.save),
+            ),
+          ],
+        ),
       ),
     );
   }

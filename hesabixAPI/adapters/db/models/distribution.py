@@ -66,6 +66,15 @@ class DistributionBusinessSettings(Base):
 		default=True,
 		comment="اگر True باشد موقعیت ویزیتور برای مدیر روی نقشه تیم دیده می‌شود.",
 	)
+	carry_over_missed_visits: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+	carry_over_days: Mapped[int] = mapped_column(Integer, nullable=False, default=7)
+	require_pod_signature: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+	require_pod_photo: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+	nav_provider: Mapped[str] = mapped_column(String(16), nullable=False, default="neshan")
+	setup_completed: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+	auto_apply_promotions: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+	enable_perfect_store: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+	near_expiry_days: Mapped[int] = mapped_column(Integer, nullable=False, default=14)
 	created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
 	updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
@@ -138,6 +147,9 @@ class DistributionRouteStop(Base):
 	person_id: Mapped[int] = mapped_column(Integer, ForeignKey("persons.id", ondelete="CASCADE"), index=True)
 	sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 	weekday: Mapped[int | None] = mapped_column(Integer, nullable=True)
+	frequency: Mapped[str] = mapped_column(String(16), nullable=False, default="weekly")
+	cycle_offset: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+	customer_class: Mapped[str | None] = mapped_column(String(8), nullable=True)
 	notes: Mapped[str | None] = mapped_column(Text, nullable=True)
 	created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
 	updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
@@ -184,6 +196,12 @@ class DistributionFieldVisit(Base):
 	end_longitude: Mapped[float | None] = mapped_column(Numeric(11, 8), nullable=True)
 	checklist_answers: Mapped[dict | list | None] = mapped_column(JSON, nullable=True)
 	shelf_photo_file_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+	supervisor_user_id: Mapped[int | None] = mapped_column(
+		Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True,
+	)
+	no_order_reason_code: Mapped[str | None] = mapped_column(String(32), nullable=True)
+	is_carried_over: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+	pod_signature_file_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
 	extra_info: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 	created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
 	updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
@@ -219,6 +237,9 @@ class DistributionVan(Base):
 	user_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True)
 	code: Mapped[str] = mapped_column(String(50), nullable=False)
 	name: Mapped[str] = mapped_column(String(255), nullable=False)
+	plate_number: Mapped[str | None] = mapped_column(String(32), nullable=True)
+	max_weight_kg: Mapped[float | None] = mapped_column(Numeric(12, 2), nullable=True)
+	max_volume_m3: Mapped[float | None] = mapped_column(Numeric(12, 3), nullable=True)
 	is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
 	created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
 	updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
@@ -518,5 +539,70 @@ class DistributionCustomerAsset(Base):
 	last_checked_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 	notes: Mapped[str | None] = mapped_column(Text, nullable=True)
 	extra_info: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+	created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+	updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+
+class DistributionAssortment(Base):
+	__tablename__ = "distribution_assortments"
+	__table_args__ = (UniqueConstraint("business_id", "code", name="uq_dist_assortment_code"),)
+
+	id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+	business_id: Mapped[int] = mapped_column(Integer, ForeignKey("businesses.id", ondelete="CASCADE"), index=True)
+	code: Mapped[str] = mapped_column(String(50), nullable=False)
+	name: Mapped[str] = mapped_column(String(255), nullable=False)
+	outlet_type: Mapped[str | None] = mapped_column(String(32), nullable=True)
+	product_ids: Mapped[Any | None] = mapped_column(JSON, nullable=True)
+	must_sell_product_ids: Mapped[Any | None] = mapped_column(JSON, nullable=True)
+	is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+	notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+	created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+	updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+
+class DistributionCustomerProfile(Base):
+	"""پروفایل پخش مشتری: کلاس، فرکانس، لیست قیمت، نوع فروشگاه."""
+
+	__tablename__ = "distribution_customer_profiles"
+	__table_args__ = (UniqueConstraint("business_id", "person_id", name="uq_dist_customer_profile_person"),)
+
+	id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+	business_id: Mapped[int] = mapped_column(Integer, ForeignKey("businesses.id", ondelete="CASCADE"), index=True)
+	person_id: Mapped[int] = mapped_column(Integer, ForeignKey("persons.id", ondelete="CASCADE"), index=True)
+	customer_class: Mapped[str | None] = mapped_column(String(8), nullable=True)
+	visit_frequency: Mapped[str] = mapped_column(String(16), nullable=False, default="weekly")
+	cycle_offset: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+	price_list_id: Mapped[int | None] = mapped_column(
+		Integer, ForeignKey("price_lists.id", ondelete="SET NULL"), nullable=True,
+	)
+	outlet_type: Mapped[str | None] = mapped_column(String(32), nullable=True)
+	assortment_id: Mapped[int | None] = mapped_column(
+		Integer, ForeignKey("distribution_assortments.id", ondelete="SET NULL"), nullable=True,
+	)
+	storefront_photo_file_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+	onboarded_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+	notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+	extra_info: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+	created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+	updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+
+class DistributionVanLot(Base):
+	"""لات/انقضای موجودی ون برای FEFO."""
+
+	__tablename__ = "distribution_van_lots"
+	__table_args__ = (
+		UniqueConstraint("van_id", "product_id", "lot_code", "expiry_date", name="uq_dist_van_lot_key"),
+	)
+
+	id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+	business_id: Mapped[int] = mapped_column(Integer, ForeignKey("businesses.id", ondelete="CASCADE"), index=True)
+	van_id: Mapped[int] = mapped_column(Integer, ForeignKey("distribution_vans.id", ondelete="CASCADE"), index=True)
+	product_id: Mapped[int] = mapped_column(Integer, ForeignKey("products.id", ondelete="CASCADE"), index=True)
+	lot_code: Mapped[str] = mapped_column(String(64), nullable=False, default="-")
+	expiry_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+	quantity: Mapped[float] = mapped_column(Numeric(18, 3), nullable=False, default=0)
+	unit_weight_kg: Mapped[float | None] = mapped_column(Numeric(12, 3), nullable=True)
+	unit_volume_m3: Mapped[float | None] = mapped_column(Numeric(12, 4), nullable=True)
 	created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
 	updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)

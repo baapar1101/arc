@@ -7,15 +7,17 @@ import 'package:hesabix_ui/widgets/invoice/product_combobox_widget.dart';
 import '../../services/distribution_service.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
+import 'distribution_field_helpers.dart';
 
 class _ReturnLineRow {
   Map<String, dynamic>? product;
   final TextEditingController qtyCtl = TextEditingController(text: '1');
-  final TextEditingController reasonCtl = TextEditingController();
+  String reasonCode = 'damaged';
+  final TextEditingController noteCtl = TextEditingController();
 
   void dispose() {
     qtyCtl.dispose();
-    reasonCtl.dispose();
+    noteCtl.dispose();
   }
 
   Map<String, dynamic> toPayload() {
@@ -23,7 +25,11 @@ class _ReturnLineRow {
     return {
       'product_id': pid is int ? pid : int.parse('$pid'),
       'quantity': double.tryParse(qtyCtl.text.trim().replaceAll(',', '.')) ?? 1,
-      if (reasonCtl.text.trim().isNotEmpty) 'reason': reasonCtl.text.trim(),
+      'reason_code': reasonCode,
+      'reason': [
+        reasonCode,
+        if (noteCtl.text.trim().isNotEmpty) noteCtl.text.trim(),
+      ].join(' · '),
     };
   }
 }
@@ -157,14 +163,36 @@ Future<void> showDistributionReturnDialog({
                                   ),
                               ],
                             ),
-                            TextField(
-                              controller: row.reasonCtl,
+                            const SizedBox(height: 8),
+                            DropdownButtonFormField<String>(
+                              value: row.reasonCode,
+                              isExpanded: true,
                               decoration: InputDecoration(
-                                labelText: t.distributionNotesLabel,
+                                labelText: t.distributionReturnReason,
                                 border: const OutlineInputBorder(),
                                 isDense: true,
                               ),
+                              items: distributionReturnCodes
+                                  .map(
+                                    (c) => DropdownMenuItem(
+                                      value: c,
+                                      child: Text(distributionReturnReasonLabel(t, c)),
+                                    ),
+                                  )
+                                  .toList(),
+                              onChanged: (v) => setD(() => row.reasonCode = v ?? row.reasonCode),
                             ),
+                            if (row.reasonCode == 'other') ...[
+                              const SizedBox(height: 8),
+                              TextField(
+                                controller: row.noteCtl,
+                                decoration: InputDecoration(
+                                  labelText: t.distributionNotesLabel,
+                                  border: const OutlineInputBorder(),
+                                  isDense: true,
+                                ),
+                              ),
+                            ],
                           ],
                         ),
                       ),

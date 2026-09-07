@@ -19808,4 +19808,396 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get distributionTargetValue => 'Target value';
+
+  @override
+  String get distributionWizardTitle => 'Set up field distribution';
+
+  @override
+  String get distributionWizardHint =>
+      'Prepare territory, route, customers and visitor in a few steps.';
+
+  @override
+  String get distributionWizardStepMode => 'Sales model';
+
+  @override
+  String get distributionWizardStepWarehouse => 'Source warehouse';
+
+  @override
+  String get distributionWizardStepRoute => 'Territory & route';
+
+  @override
+  String get distributionWizardStepCustomers => 'Route customers';
+
+  @override
+  String get distributionWizardStepVisitor => 'Assign visitor';
+
+  @override
+  String get distributionWizardFinish => 'Finish setup';
+
+  @override
+  String get distributionModeVan => 'Van sales (stock on the vehicle)';
+
+  @override
+  String get distributionModePresell => 'Pre-sell (later delivery)';
+
+  @override
+  String get distributionModeBoth => 'Both models';
+
+  @override
+  String get distributionCustomer360Title => 'Customer card';
+
+  @override
+  String get distributionCreditAvailable => 'Available credit';
+
+  @override
+  String get distributionLastVisit => 'Last visit';
+
+  @override
+  String get distributionMustSell => 'Must-sell';
+
+  @override
+  String get distributionScanBarcode => 'Scan barcode';
+
+  @override
+  String get distributionBarcodeNotFound => 'No product matches this barcode';
+
+  @override
+  String get distributionAddSuggested => 'Add suggested order';
+
+  @override
+  String get distributionFocLine => 'Free of charge';
+
+  @override
+  String get distributionNearExpiry => 'Near expiry';
+
+  @override
+  String get distributionExpiredLot => 'Expired';
+
+  @override
+  String get distributionVanCapacity => 'Van capacity';
+
+  @override
+  String get distributionVanPlate => 'Plate';
+
+  @override
+  String get distributionVanMaxWeight => 'Max weight (kg)';
+
+  @override
+  String get distributionVanMaxVolume => 'Max volume (m³)';
+
+  @override
+  String get distributionLotCode => 'Lot code';
+
+  @override
+  String get distributionExpiryDate => 'Expiry date';
+
+  @override
+  String get distributionSignatureTitle => 'Recipient signature';
+
+  @override
+  String get distributionSignatureHint => 'Sign with finger or mouse';
+
+  @override
+  String get distributionSignatureClear => 'Clear signature';
+
+  @override
+  String get distributionPodPhoto => 'Delivery photo';
+
+  @override
+  String get distributionReasonClosed => 'Outlet closed';
+
+  @override
+  String get distributionReasonNoNeed => 'No stock need';
+
+  @override
+  String get distributionReasonCompetitor => 'Competitor offer';
+
+  @override
+  String get distributionReasonCredit => 'Credit / terms';
+
+  @override
+  String get distributionReasonNoDecision => 'No decision';
+
+  @override
+  String get distributionReasonOther => 'Other';
+
+  @override
+  String get distributionReturnExpired => 'Expired';
+
+  @override
+  String get distributionReturnDamaged => 'Damaged';
+
+  @override
+  String get distributionReturnCommercial => 'Commercial return';
+
+  @override
+  String get distributionReturnWrong => 'Wrong item';
+
+  @override
+  String get distributionReturnNearExpiry => 'Near expiry';
+
+  @override
+  String get distributionClassA => 'Class A — weekly';
+
+  @override
+  String get distributionClassB => 'Class B — every two weeks';
+
+  @override
+  String get distributionClassC => 'Class C — monthly';
+
+  @override
+  String get distributionFrequencyWeekly => 'Weekly';
+
+  @override
+  String get distributionFrequencyBiweekly => 'Biweekly';
+
+  @override
+  String get distributionFrequencyMonthly => 'Monthly';
+
+  @override
+  String get distributionCarriedOver => 'Carried over from a missed day';
+
+  @override
+  String get distributionNewOutlet => 'New field outlet';
+
+  @override
+  String get distributionNewOutletHint =>
+      'Capture name, location and customer class.';
+
+  @override
+  String get distributionOutletType => 'Outlet type';
+
+  @override
+  String get distributionOutletGrocery => 'Grocery';
+
+  @override
+  String get distributionOutletSupermarket => 'Supermarket';
+
+  @override
+  String get distributionOutletHoreca => 'HoReCa';
+
+  @override
+  String get distributionOutletKiosk => 'Kiosk';
+
+  @override
+  String get distributionOutletWholesale => 'Wholesale';
+
+  @override
+  String get distributionOutletOther => 'Other';
+
+  @override
+  String get distributionNavNeshan => 'Neshan';
+
+  @override
+  String get distributionNavGoogle => 'Google Maps';
+
+  @override
+  String get distributionNavWaze => 'Waze';
+
+  @override
+  String get distributionNavProvider => 'Navigation app';
+
+  @override
+  String get distributionCarryOver => 'Carry missed visits to the next day';
+
+  @override
+  String get distributionRequirePodSignature => 'Require POD signature';
+
+  @override
+  String get distributionRequirePodPhoto => 'Require POD photo';
+
+  @override
+  String get distributionAutoPromo => 'Auto-apply promotions';
+
+  @override
+  String get distributionPerfectStore => 'Perfect store score';
+
+  @override
+  String get distributionJointVisit => 'Joint visit with supervisor';
+
+  @override
+  String get distributionSupervisor => 'Accompanying supervisor';
+
+  @override
+  String get distributionScorecard => 'Daily scorecard';
+
+  @override
+  String get distributionTimeInStore => 'Time in store (min)';
+
+  @override
+  String get distributionLinesPerInvoice => 'Lines per invoice';
+
+  @override
+  String get distributionMissedVisits => 'Missed visits';
+
+  @override
+  String get distributionPartialDelivery => 'Partial delivery';
+
+  @override
+  String get distributionDeliveryFailed => 'Failed delivery';
+
+  @override
+  String get distributionOfflinePack => 'Download today\'s catalog';
+
+  @override
+  String get distributionOfflinePackDone =>
+      'Today\'s catalog saved on this device';
+
+  @override
+  String get distributionAssortment => 'Must-sell assortment';
+
+  @override
+  String get distributionAssortmentsTitle => 'Assortment & must-sell';
+
+  @override
+  String get distributionPriceList => 'Customer price list';
+
+  @override
+  String get distributionSetupNeeded =>
+      'Initial setup is incomplete. Run the wizard.';
+
+  @override
+  String get distributionStartWizard => 'Start setup';
+
+  @override
+  String get distributionOsa => 'On-shelf availability';
+
+  @override
+  String get distributionPlanogram => 'Planogram compliance';
+
+  @override
+  String get distributionShareOfShelf => 'Share of shelf %';
+
+  @override
+  String get distributionTodayOnlyHint => 'Today\'s plan and visits only';
+
+  @override
+  String get distributionDeliveryQty => 'Delivered qty';
+
+  @override
+  String get distributionOrderedQty => 'Ordered';
+
+  @override
+  String get distributionPrintInvoice => 'Print invoice';
+
+  @override
+  String get distributionFrequentProducts => 'This customer\'s frequent SKUs';
+
+  @override
+  String get distributionCustomerClass => 'Customer class';
+
+  @override
+  String get distributionVisitFrequency => 'Visit frequency';
+
+  @override
+  String get distributionOutletName => 'Outlet name';
+
+  @override
+  String get distributionOutletPhone => 'Mobile';
+
+  @override
+  String get distributionFailRefused => 'Delivery refused';
+
+  @override
+  String get distributionFailAddress => 'Wrong / missing address';
+
+  @override
+  String get distributionFailShortage => 'Load shortage';
+
+  @override
+  String get distributionMustSellMissing =>
+      'Must-sell items are not in the basket yet';
+
+  @override
+  String get distributionReasonRequired => 'Pick a standard reason';
+
+  @override
+  String get distributionPodSignatureRequired =>
+      'Recipient signature is required';
+
+  @override
+  String get distributionPodPhotoRequired => 'Delivery photo is required';
+
+  @override
+  String get distributionCapacityOver => 'Van is over capacity';
+
+  @override
+  String get distributionLotOptional => 'Lot (optional)';
+
+  @override
+  String get distributionNoExpiry => 'No expiry date';
+
+  @override
+  String get distributionVisitorHomeHint =>
+      'Today’s plan, next stop and selling — without admin tabs';
+
+  @override
+  String get distributionAssortmentCreate => 'New assortment';
+
+  @override
+  String get distributionAssortmentEmpty => 'No must-sell assortment yet';
+
+  @override
+  String get distributionMustSellPick => 'Must-sell products';
+
+  @override
+  String get distributionDeliveryLines => 'Order lines';
+
+  @override
+  String get distributionOsaOk => 'On-shelf availability is complete';
+
+  @override
+  String get distributionJointVisitHint =>
+      'The supervisor is recorded on this visit';
+
+  @override
+  String get distributionSetupWizardAgain => 'Setup wizard';
+
+  @override
+  String get distributionNavOpen => 'Navigate with Neshan / maps';
+
+  @override
+  String get distributionCycleOffset => 'Cycle offset (week/month)';
+
+  @override
+  String get distributionCycleOffsetHint =>
+      'Biweekly: 0 or 1. Monthly: week of month (0–4).';
+
+  @override
+  String get distributionWeightKg => 'Max weight (kg)';
+
+  @override
+  String get distributionVolumeM3 => 'Max volume (m³)';
+
+  @override
+  String get distributionCapacityUsed => 'Capacity used';
+
+  @override
+  String get distributionLotVariance => 'Lot vs physical stock variance';
+
+  @override
+  String get distributionLoadVariance => 'Load variance';
+
+  @override
+  String get distributionCommissionOnCollection =>
+      'Commission on collections (not sales)';
+
+  @override
+  String get distributionCommissionCoverage => 'Adjust by route coverage';
+
+  @override
+  String get distributionDaysOfCover => 'Days of cover';
+
+  @override
+  String get distributionNearExpiryDays => 'Near-expiry horizon (days)';
+
+  @override
+  String get distributionFefoHint =>
+      'Unload and sell by earliest expiry (FEFO)';
+
+  @override
+  String get distributionUnitWeightKg => 'Unit weight (kg)';
+
+  @override
+  String get distributionUnitVolumeM3 => 'Unit volume (m³)';
 }

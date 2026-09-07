@@ -22,6 +22,15 @@ class DistributionSettingsPayload(BaseModel):
 	map_tile_source: Optional[Literal["osm", "memaps"]] = None
 	memaps_api_key: Optional[str] = Field(None, max_length=255)
 	share_live_location: Optional[bool] = None
+	carry_over_missed_visits: Optional[bool] = None
+	carry_over_days: Optional[int] = Field(None, ge=1, le=31)
+	require_pod_signature: Optional[bool] = None
+	require_pod_photo: Optional[bool] = None
+	nav_provider: Optional[Literal["neshan", "google", "waze"]] = None
+	setup_completed: Optional[bool] = None
+	auto_apply_promotions: Optional[bool] = None
+	enable_perfect_store: Optional[bool] = None
+	near_expiry_days: Optional[int] = Field(None, ge=1, le=90)
 
 
 class TerritoryCreatePayload(BaseModel):
@@ -57,6 +66,9 @@ class RouteStopPayload(BaseModel):
 	person_id: int = Field(..., gt=0)
 	sort_order: int = 0
 	weekday: Optional[int] = Field(None, ge=0, le=6)
+	frequency: Optional[Literal["weekly", "biweekly", "monthly"]] = None
+	cycle_offset: Optional[int] = Field(None, ge=0, le=4)
+	customer_class: Optional[Literal["A", "B", "C"]] = None
 	notes: Optional[str] = None
 
 
@@ -76,12 +88,15 @@ class VisitStartPayload(BaseModel):
 	start_longitude: Optional[float] = None
 	geofence_override: Optional[bool] = None
 	geofence_override_reason: Optional[str] = Field(None, max_length=500)
+	supervisor_user_id: Optional[int] = Field(None, gt=0)
+	is_carried_over: Optional[bool] = None
 	extra_info: Optional[Dict[str, Any]] = None
 
 
 class VisitCompletePayload(BaseModel):
 	outcome: Literal["order", "no_order"]
 	no_order_reason: Optional[str] = None
+	no_order_reason_code: Optional[str] = Field(None, max_length=32)
 	document_id: Optional[int] = Field(None, gt=0)
 	deal_id: Optional[int] = Field(None, gt=0)
 	notes: Optional[str] = None
@@ -94,6 +109,9 @@ class VisitCompletePayload(BaseModel):
 	pod_confirmed: Optional[bool] = None
 	pod_signer_name: Optional[str] = Field(None, max_length=255)
 	pod_note: Optional[str] = Field(None, max_length=500)
+	pod_signature_png: Optional[str] = None
+	pod_photo_file_id: Optional[int] = Field(None, gt=0)
+	pod_signature_file_id: Optional[int] = Field(None, gt=0)
 
 
 class VisitCancelPayload(BaseModel):
@@ -110,7 +128,12 @@ class ReturnLinePayload(BaseModel):
 	product_id: int = Field(..., gt=0)
 	quantity: float = Field(..., gt=0)
 	reason: Optional[str] = Field(None, max_length=500)
+	reason_code: Optional[str] = Field(None, max_length=32)
 	unit: Optional[str] = Field(None, max_length=32)
+	lot_code: Optional[str] = Field(None, max_length=64)
+	expiry_date: Optional[str] = None
+	unit_weight_kg: Optional[float] = Field(None, ge=0)
+	unit_volume_m3: Optional[float] = Field(None, ge=0)
 
 	@field_validator("quantity")
 	@classmethod
@@ -140,6 +163,9 @@ class VanCreatePayload(BaseModel):
 	name: str = Field(..., min_length=1, max_length=255)
 	user_id: Optional[int] = Field(None, gt=0)
 	is_active: bool = True
+	plate_number: Optional[str] = Field(None, max_length=32)
+	max_weight_kg: Optional[float] = Field(None, ge=0)
+	max_volume_m3: Optional[float] = Field(None, ge=0)
 
 
 class VanLoadPayload(BaseModel):
@@ -156,6 +182,9 @@ class VanUpdatePayload(BaseModel):
 	name: Optional[str] = Field(None, min_length=1, max_length=255)
 	user_id: Optional[int] = Field(None, gt=0)
 	is_active: Optional[bool] = None
+	plate_number: Optional[str] = Field(None, max_length=32)
+	max_weight_kg: Optional[float] = Field(None, ge=0)
+	max_volume_m3: Optional[float] = Field(None, ge=0)
 
 
 class PersonLocationPayload(BaseModel):
@@ -262,6 +291,10 @@ class LoadPlanCreatePayload(BaseModel):
 	notes: Optional[str] = None
 
 
+class LoadPlanConfirmPayload(BaseModel):
+	actual_lines: Optional[List[ReturnLinePayload]] = None
+
+
 class CommissionRulePayload(BaseModel):
 	name: str = Field(..., min_length=1, max_length=255)
 	rule_type: str = "percent_of_sales"
@@ -295,3 +328,65 @@ class CustomerAssetPayload(BaseModel):
 	placed_at: Optional[str] = None
 	notes: Optional[str] = None
 	check_now: Optional[bool] = None
+
+
+class CustomerProfilePayload(BaseModel):
+	customer_class: Optional[Literal["A", "B", "C"]] = None
+	visit_frequency: Optional[Literal["weekly", "biweekly", "monthly"]] = None
+	cycle_offset: Optional[int] = Field(None, ge=0, le=4)
+	price_list_id: Optional[int] = Field(None, gt=0)
+	outlet_type: Optional[str] = Field(None, max_length=32)
+	assortment_id: Optional[int] = Field(None, gt=0)
+	storefront_photo_file_id: Optional[int] = Field(None, gt=0)
+	notes: Optional[str] = None
+
+
+class AssortmentPayload(BaseModel):
+	code: Optional[str] = Field(None, min_length=1, max_length=50)
+	name: Optional[str] = Field(None, min_length=1, max_length=255)
+	outlet_type: Optional[str] = Field(None, max_length=32)
+	product_ids: Optional[List[int]] = None
+	must_sell_product_ids: Optional[List[int]] = None
+	is_active: Optional[bool] = None
+	notes: Optional[str] = None
+
+
+class SetupWizardPayload(BaseModel):
+	enable_van_sales: bool = False
+	enable_presell: bool = True
+	enable_promotions: bool = True
+	default_source_warehouse_id: Optional[int] = Field(None, gt=0)
+	nav_provider: Optional[Literal["neshan", "google", "waze"]] = None
+	territory_name: Optional[str] = None
+	territory_code: Optional[str] = None
+	route_name: Optional[str] = None
+	route_code: Optional[str] = None
+	route_id: Optional[int] = Field(None, gt=0)
+	territory_id: Optional[int] = Field(None, gt=0)
+	person_ids: Optional[List[int]] = None
+	weekday: Optional[int] = Field(None, ge=0, le=6)
+	frequency: Optional[Literal["weekly", "biweekly", "monthly"]] = None
+	cycle_offset: Optional[int] = Field(None, ge=0, le=4)
+	customer_class: Optional[Literal["A", "B", "C"]] = None
+	visitor_user_id: Optional[int] = Field(None, gt=0)
+	valid_from: Optional[str] = None
+
+
+class NewOutletPayload(BaseModel):
+	name: str = Field(..., min_length=1, max_length=255)
+	mobile: Optional[str] = None
+	phone: Optional[str] = None
+	address: Optional[str] = None
+	city: Optional[str] = None
+	latitude: Optional[float] = None
+	longitude: Optional[float] = None
+	customer_class: Optional[Literal["A", "B", "C"]] = None
+	frequency: Optional[Literal["weekly", "biweekly", "monthly"]] = None
+	outlet_type: Optional[str] = None
+	price_list_id: Optional[int] = Field(None, gt=0)
+	assortment_id: Optional[int] = Field(None, gt=0)
+	storefront_photo_file_id: Optional[int] = Field(None, gt=0)
+	route_id: Optional[int] = Field(None, gt=0)
+	weekday: Optional[int] = Field(None, ge=0, le=6)
+	sort_order: Optional[int] = None
+	notes: Optional[str] = None

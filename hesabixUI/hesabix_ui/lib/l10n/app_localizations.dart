@@ -36304,6 +36304,768 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Target value'**
   String get distributionTargetValue;
+
+  /// No description provided for @distributionWizardTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Set up field distribution'**
+  String get distributionWizardTitle;
+
+  /// No description provided for @distributionWizardHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Prepare territory, route, customers and visitor in a few steps.'**
+  String get distributionWizardHint;
+
+  /// No description provided for @distributionWizardStepMode.
+  ///
+  /// In en, this message translates to:
+  /// **'Sales model'**
+  String get distributionWizardStepMode;
+
+  /// No description provided for @distributionWizardStepWarehouse.
+  ///
+  /// In en, this message translates to:
+  /// **'Source warehouse'**
+  String get distributionWizardStepWarehouse;
+
+  /// No description provided for @distributionWizardStepRoute.
+  ///
+  /// In en, this message translates to:
+  /// **'Territory & route'**
+  String get distributionWizardStepRoute;
+
+  /// No description provided for @distributionWizardStepCustomers.
+  ///
+  /// In en, this message translates to:
+  /// **'Route customers'**
+  String get distributionWizardStepCustomers;
+
+  /// No description provided for @distributionWizardStepVisitor.
+  ///
+  /// In en, this message translates to:
+  /// **'Assign visitor'**
+  String get distributionWizardStepVisitor;
+
+  /// No description provided for @distributionWizardFinish.
+  ///
+  /// In en, this message translates to:
+  /// **'Finish setup'**
+  String get distributionWizardFinish;
+
+  /// No description provided for @distributionModeVan.
+  ///
+  /// In en, this message translates to:
+  /// **'Van sales (stock on the vehicle)'**
+  String get distributionModeVan;
+
+  /// No description provided for @distributionModePresell.
+  ///
+  /// In en, this message translates to:
+  /// **'Pre-sell (later delivery)'**
+  String get distributionModePresell;
+
+  /// No description provided for @distributionModeBoth.
+  ///
+  /// In en, this message translates to:
+  /// **'Both models'**
+  String get distributionModeBoth;
+
+  /// No description provided for @distributionCustomer360Title.
+  ///
+  /// In en, this message translates to:
+  /// **'Customer card'**
+  String get distributionCustomer360Title;
+
+  /// No description provided for @distributionCreditAvailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Available credit'**
+  String get distributionCreditAvailable;
+
+  /// No description provided for @distributionLastVisit.
+  ///
+  /// In en, this message translates to:
+  /// **'Last visit'**
+  String get distributionLastVisit;
+
+  /// No description provided for @distributionMustSell.
+  ///
+  /// In en, this message translates to:
+  /// **'Must-sell'**
+  String get distributionMustSell;
+
+  /// No description provided for @distributionScanBarcode.
+  ///
+  /// In en, this message translates to:
+  /// **'Scan barcode'**
+  String get distributionScanBarcode;
+
+  /// No description provided for @distributionBarcodeNotFound.
+  ///
+  /// In en, this message translates to:
+  /// **'No product matches this barcode'**
+  String get distributionBarcodeNotFound;
+
+  /// No description provided for @distributionAddSuggested.
+  ///
+  /// In en, this message translates to:
+  /// **'Add suggested order'**
+  String get distributionAddSuggested;
+
+  /// No description provided for @distributionFocLine.
+  ///
+  /// In en, this message translates to:
+  /// **'Free of charge'**
+  String get distributionFocLine;
+
+  /// No description provided for @distributionNearExpiry.
+  ///
+  /// In en, this message translates to:
+  /// **'Near expiry'**
+  String get distributionNearExpiry;
+
+  /// No description provided for @distributionExpiredLot.
+  ///
+  /// In en, this message translates to:
+  /// **'Expired'**
+  String get distributionExpiredLot;
+
+  /// No description provided for @distributionVanCapacity.
+  ///
+  /// In en, this message translates to:
+  /// **'Van capacity'**
+  String get distributionVanCapacity;
+
+  /// No description provided for @distributionVanPlate.
+  ///
+  /// In en, this message translates to:
+  /// **'Plate'**
+  String get distributionVanPlate;
+
+  /// No description provided for @distributionVanMaxWeight.
+  ///
+  /// In en, this message translates to:
+  /// **'Max weight (kg)'**
+  String get distributionVanMaxWeight;
+
+  /// No description provided for @distributionVanMaxVolume.
+  ///
+  /// In en, this message translates to:
+  /// **'Max volume (m³)'**
+  String get distributionVanMaxVolume;
+
+  /// No description provided for @distributionLotCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Lot code'**
+  String get distributionLotCode;
+
+  /// No description provided for @distributionExpiryDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Expiry date'**
+  String get distributionExpiryDate;
+
+  /// No description provided for @distributionSignatureTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Recipient signature'**
+  String get distributionSignatureTitle;
+
+  /// No description provided for @distributionSignatureHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign with finger or mouse'**
+  String get distributionSignatureHint;
+
+  /// No description provided for @distributionSignatureClear.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear signature'**
+  String get distributionSignatureClear;
+
+  /// No description provided for @distributionPodPhoto.
+  ///
+  /// In en, this message translates to:
+  /// **'Delivery photo'**
+  String get distributionPodPhoto;
+
+  /// No description provided for @distributionReasonClosed.
+  ///
+  /// In en, this message translates to:
+  /// **'Outlet closed'**
+  String get distributionReasonClosed;
+
+  /// No description provided for @distributionReasonNoNeed.
+  ///
+  /// In en, this message translates to:
+  /// **'No stock need'**
+  String get distributionReasonNoNeed;
+
+  /// No description provided for @distributionReasonCompetitor.
+  ///
+  /// In en, this message translates to:
+  /// **'Competitor offer'**
+  String get distributionReasonCompetitor;
+
+  /// No description provided for @distributionReasonCredit.
+  ///
+  /// In en, this message translates to:
+  /// **'Credit / terms'**
+  String get distributionReasonCredit;
+
+  /// No description provided for @distributionReasonNoDecision.
+  ///
+  /// In en, this message translates to:
+  /// **'No decision'**
+  String get distributionReasonNoDecision;
+
+  /// No description provided for @distributionReasonOther.
+  ///
+  /// In en, this message translates to:
+  /// **'Other'**
+  String get distributionReasonOther;
+
+  /// No description provided for @distributionReturnExpired.
+  ///
+  /// In en, this message translates to:
+  /// **'Expired'**
+  String get distributionReturnExpired;
+
+  /// No description provided for @distributionReturnDamaged.
+  ///
+  /// In en, this message translates to:
+  /// **'Damaged'**
+  String get distributionReturnDamaged;
+
+  /// No description provided for @distributionReturnCommercial.
+  ///
+  /// In en, this message translates to:
+  /// **'Commercial return'**
+  String get distributionReturnCommercial;
+
+  /// No description provided for @distributionReturnWrong.
+  ///
+  /// In en, this message translates to:
+  /// **'Wrong item'**
+  String get distributionReturnWrong;
+
+  /// No description provided for @distributionReturnNearExpiry.
+  ///
+  /// In en, this message translates to:
+  /// **'Near expiry'**
+  String get distributionReturnNearExpiry;
+
+  /// No description provided for @distributionClassA.
+  ///
+  /// In en, this message translates to:
+  /// **'Class A — weekly'**
+  String get distributionClassA;
+
+  /// No description provided for @distributionClassB.
+  ///
+  /// In en, this message translates to:
+  /// **'Class B — every two weeks'**
+  String get distributionClassB;
+
+  /// No description provided for @distributionClassC.
+  ///
+  /// In en, this message translates to:
+  /// **'Class C — monthly'**
+  String get distributionClassC;
+
+  /// No description provided for @distributionFrequencyWeekly.
+  ///
+  /// In en, this message translates to:
+  /// **'Weekly'**
+  String get distributionFrequencyWeekly;
+
+  /// No description provided for @distributionFrequencyBiweekly.
+  ///
+  /// In en, this message translates to:
+  /// **'Biweekly'**
+  String get distributionFrequencyBiweekly;
+
+  /// No description provided for @distributionFrequencyMonthly.
+  ///
+  /// In en, this message translates to:
+  /// **'Monthly'**
+  String get distributionFrequencyMonthly;
+
+  /// No description provided for @distributionCarriedOver.
+  ///
+  /// In en, this message translates to:
+  /// **'Carried over from a missed day'**
+  String get distributionCarriedOver;
+
+  /// No description provided for @distributionNewOutlet.
+  ///
+  /// In en, this message translates to:
+  /// **'New field outlet'**
+  String get distributionNewOutlet;
+
+  /// No description provided for @distributionNewOutletHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Capture name, location and customer class.'**
+  String get distributionNewOutletHint;
+
+  /// No description provided for @distributionOutletType.
+  ///
+  /// In en, this message translates to:
+  /// **'Outlet type'**
+  String get distributionOutletType;
+
+  /// No description provided for @distributionOutletGrocery.
+  ///
+  /// In en, this message translates to:
+  /// **'Grocery'**
+  String get distributionOutletGrocery;
+
+  /// No description provided for @distributionOutletSupermarket.
+  ///
+  /// In en, this message translates to:
+  /// **'Supermarket'**
+  String get distributionOutletSupermarket;
+
+  /// No description provided for @distributionOutletHoreca.
+  ///
+  /// In en, this message translates to:
+  /// **'HoReCa'**
+  String get distributionOutletHoreca;
+
+  /// No description provided for @distributionOutletKiosk.
+  ///
+  /// In en, this message translates to:
+  /// **'Kiosk'**
+  String get distributionOutletKiosk;
+
+  /// No description provided for @distributionOutletWholesale.
+  ///
+  /// In en, this message translates to:
+  /// **'Wholesale'**
+  String get distributionOutletWholesale;
+
+  /// No description provided for @distributionOutletOther.
+  ///
+  /// In en, this message translates to:
+  /// **'Other'**
+  String get distributionOutletOther;
+
+  /// No description provided for @distributionNavNeshan.
+  ///
+  /// In en, this message translates to:
+  /// **'Neshan'**
+  String get distributionNavNeshan;
+
+  /// No description provided for @distributionNavGoogle.
+  ///
+  /// In en, this message translates to:
+  /// **'Google Maps'**
+  String get distributionNavGoogle;
+
+  /// No description provided for @distributionNavWaze.
+  ///
+  /// In en, this message translates to:
+  /// **'Waze'**
+  String get distributionNavWaze;
+
+  /// No description provided for @distributionNavProvider.
+  ///
+  /// In en, this message translates to:
+  /// **'Navigation app'**
+  String get distributionNavProvider;
+
+  /// No description provided for @distributionCarryOver.
+  ///
+  /// In en, this message translates to:
+  /// **'Carry missed visits to the next day'**
+  String get distributionCarryOver;
+
+  /// No description provided for @distributionRequirePodSignature.
+  ///
+  /// In en, this message translates to:
+  /// **'Require POD signature'**
+  String get distributionRequirePodSignature;
+
+  /// No description provided for @distributionRequirePodPhoto.
+  ///
+  /// In en, this message translates to:
+  /// **'Require POD photo'**
+  String get distributionRequirePodPhoto;
+
+  /// No description provided for @distributionAutoPromo.
+  ///
+  /// In en, this message translates to:
+  /// **'Auto-apply promotions'**
+  String get distributionAutoPromo;
+
+  /// No description provided for @distributionPerfectStore.
+  ///
+  /// In en, this message translates to:
+  /// **'Perfect store score'**
+  String get distributionPerfectStore;
+
+  /// No description provided for @distributionJointVisit.
+  ///
+  /// In en, this message translates to:
+  /// **'Joint visit with supervisor'**
+  String get distributionJointVisit;
+
+  /// No description provided for @distributionSupervisor.
+  ///
+  /// In en, this message translates to:
+  /// **'Accompanying supervisor'**
+  String get distributionSupervisor;
+
+  /// No description provided for @distributionScorecard.
+  ///
+  /// In en, this message translates to:
+  /// **'Daily scorecard'**
+  String get distributionScorecard;
+
+  /// No description provided for @distributionTimeInStore.
+  ///
+  /// In en, this message translates to:
+  /// **'Time in store (min)'**
+  String get distributionTimeInStore;
+
+  /// No description provided for @distributionLinesPerInvoice.
+  ///
+  /// In en, this message translates to:
+  /// **'Lines per invoice'**
+  String get distributionLinesPerInvoice;
+
+  /// No description provided for @distributionMissedVisits.
+  ///
+  /// In en, this message translates to:
+  /// **'Missed visits'**
+  String get distributionMissedVisits;
+
+  /// No description provided for @distributionPartialDelivery.
+  ///
+  /// In en, this message translates to:
+  /// **'Partial delivery'**
+  String get distributionPartialDelivery;
+
+  /// No description provided for @distributionDeliveryFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed delivery'**
+  String get distributionDeliveryFailed;
+
+  /// No description provided for @distributionOfflinePack.
+  ///
+  /// In en, this message translates to:
+  /// **'Download today\'\'s catalog'**
+  String get distributionOfflinePack;
+
+  /// No description provided for @distributionOfflinePackDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Today\'\'s catalog saved on this device'**
+  String get distributionOfflinePackDone;
+
+  /// No description provided for @distributionAssortment.
+  ///
+  /// In en, this message translates to:
+  /// **'Must-sell assortment'**
+  String get distributionAssortment;
+
+  /// No description provided for @distributionAssortmentsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Assortment & must-sell'**
+  String get distributionAssortmentsTitle;
+
+  /// No description provided for @distributionPriceList.
+  ///
+  /// In en, this message translates to:
+  /// **'Customer price list'**
+  String get distributionPriceList;
+
+  /// No description provided for @distributionSetupNeeded.
+  ///
+  /// In en, this message translates to:
+  /// **'Initial setup is incomplete. Run the wizard.'**
+  String get distributionSetupNeeded;
+
+  /// No description provided for @distributionStartWizard.
+  ///
+  /// In en, this message translates to:
+  /// **'Start setup'**
+  String get distributionStartWizard;
+
+  /// No description provided for @distributionOsa.
+  ///
+  /// In en, this message translates to:
+  /// **'On-shelf availability'**
+  String get distributionOsa;
+
+  /// No description provided for @distributionPlanogram.
+  ///
+  /// In en, this message translates to:
+  /// **'Planogram compliance'**
+  String get distributionPlanogram;
+
+  /// No description provided for @distributionShareOfShelf.
+  ///
+  /// In en, this message translates to:
+  /// **'Share of shelf %'**
+  String get distributionShareOfShelf;
+
+  /// No description provided for @distributionTodayOnlyHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Today\'\'s plan and visits only'**
+  String get distributionTodayOnlyHint;
+
+  /// No description provided for @distributionDeliveryQty.
+  ///
+  /// In en, this message translates to:
+  /// **'Delivered qty'**
+  String get distributionDeliveryQty;
+
+  /// No description provided for @distributionOrderedQty.
+  ///
+  /// In en, this message translates to:
+  /// **'Ordered'**
+  String get distributionOrderedQty;
+
+  /// No description provided for @distributionPrintInvoice.
+  ///
+  /// In en, this message translates to:
+  /// **'Print invoice'**
+  String get distributionPrintInvoice;
+
+  /// No description provided for @distributionFrequentProducts.
+  ///
+  /// In en, this message translates to:
+  /// **'This customer\'\'s frequent SKUs'**
+  String get distributionFrequentProducts;
+
+  /// No description provided for @distributionCustomerClass.
+  ///
+  /// In en, this message translates to:
+  /// **'Customer class'**
+  String get distributionCustomerClass;
+
+  /// No description provided for @distributionVisitFrequency.
+  ///
+  /// In en, this message translates to:
+  /// **'Visit frequency'**
+  String get distributionVisitFrequency;
+
+  /// No description provided for @distributionOutletName.
+  ///
+  /// In en, this message translates to:
+  /// **'Outlet name'**
+  String get distributionOutletName;
+
+  /// No description provided for @distributionOutletPhone.
+  ///
+  /// In en, this message translates to:
+  /// **'Mobile'**
+  String get distributionOutletPhone;
+
+  /// No description provided for @distributionFailRefused.
+  ///
+  /// In en, this message translates to:
+  /// **'Delivery refused'**
+  String get distributionFailRefused;
+
+  /// No description provided for @distributionFailAddress.
+  ///
+  /// In en, this message translates to:
+  /// **'Wrong / missing address'**
+  String get distributionFailAddress;
+
+  /// No description provided for @distributionFailShortage.
+  ///
+  /// In en, this message translates to:
+  /// **'Load shortage'**
+  String get distributionFailShortage;
+
+  /// No description provided for @distributionMustSellMissing.
+  ///
+  /// In en, this message translates to:
+  /// **'Must-sell items are not in the basket yet'**
+  String get distributionMustSellMissing;
+
+  /// No description provided for @distributionReasonRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick a standard reason'**
+  String get distributionReasonRequired;
+
+  /// No description provided for @distributionPodSignatureRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Recipient signature is required'**
+  String get distributionPodSignatureRequired;
+
+  /// No description provided for @distributionPodPhotoRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Delivery photo is required'**
+  String get distributionPodPhotoRequired;
+
+  /// No description provided for @distributionCapacityOver.
+  ///
+  /// In en, this message translates to:
+  /// **'Van is over capacity'**
+  String get distributionCapacityOver;
+
+  /// No description provided for @distributionLotOptional.
+  ///
+  /// In en, this message translates to:
+  /// **'Lot (optional)'**
+  String get distributionLotOptional;
+
+  /// No description provided for @distributionNoExpiry.
+  ///
+  /// In en, this message translates to:
+  /// **'No expiry date'**
+  String get distributionNoExpiry;
+
+  /// No description provided for @distributionVisitorHomeHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Today’s plan, next stop and selling — without admin tabs'**
+  String get distributionVisitorHomeHint;
+
+  /// No description provided for @distributionAssortmentCreate.
+  ///
+  /// In en, this message translates to:
+  /// **'New assortment'**
+  String get distributionAssortmentCreate;
+
+  /// No description provided for @distributionAssortmentEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No must-sell assortment yet'**
+  String get distributionAssortmentEmpty;
+
+  /// No description provided for @distributionMustSellPick.
+  ///
+  /// In en, this message translates to:
+  /// **'Must-sell products'**
+  String get distributionMustSellPick;
+
+  /// No description provided for @distributionDeliveryLines.
+  ///
+  /// In en, this message translates to:
+  /// **'Order lines'**
+  String get distributionDeliveryLines;
+
+  /// No description provided for @distributionOsaOk.
+  ///
+  /// In en, this message translates to:
+  /// **'On-shelf availability is complete'**
+  String get distributionOsaOk;
+
+  /// No description provided for @distributionJointVisitHint.
+  ///
+  /// In en, this message translates to:
+  /// **'The supervisor is recorded on this visit'**
+  String get distributionJointVisitHint;
+
+  /// No description provided for @distributionSetupWizardAgain.
+  ///
+  /// In en, this message translates to:
+  /// **'Setup wizard'**
+  String get distributionSetupWizardAgain;
+
+  /// No description provided for @distributionNavOpen.
+  ///
+  /// In en, this message translates to:
+  /// **'Navigate with Neshan / maps'**
+  String get distributionNavOpen;
+
+  /// No description provided for @distributionCycleOffset.
+  ///
+  /// In en, this message translates to:
+  /// **'Cycle offset (week/month)'**
+  String get distributionCycleOffset;
+
+  /// No description provided for @distributionCycleOffsetHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Biweekly: 0 or 1. Monthly: week of month (0–4).'**
+  String get distributionCycleOffsetHint;
+
+  /// No description provided for @distributionWeightKg.
+  ///
+  /// In en, this message translates to:
+  /// **'Max weight (kg)'**
+  String get distributionWeightKg;
+
+  /// No description provided for @distributionVolumeM3.
+  ///
+  /// In en, this message translates to:
+  /// **'Max volume (m³)'**
+  String get distributionVolumeM3;
+
+  /// No description provided for @distributionCapacityUsed.
+  ///
+  /// In en, this message translates to:
+  /// **'Capacity used'**
+  String get distributionCapacityUsed;
+
+  /// No description provided for @distributionLotVariance.
+  ///
+  /// In en, this message translates to:
+  /// **'Lot vs physical stock variance'**
+  String get distributionLotVariance;
+
+  /// No description provided for @distributionLoadVariance.
+  ///
+  /// In en, this message translates to:
+  /// **'Load variance'**
+  String get distributionLoadVariance;
+
+  /// No description provided for @distributionCommissionOnCollection.
+  ///
+  /// In en, this message translates to:
+  /// **'Commission on collections (not sales)'**
+  String get distributionCommissionOnCollection;
+
+  /// No description provided for @distributionCommissionCoverage.
+  ///
+  /// In en, this message translates to:
+  /// **'Adjust by route coverage'**
+  String get distributionCommissionCoverage;
+
+  /// No description provided for @distributionDaysOfCover.
+  ///
+  /// In en, this message translates to:
+  /// **'Days of cover'**
+  String get distributionDaysOfCover;
+
+  /// No description provided for @distributionNearExpiryDays.
+  ///
+  /// In en, this message translates to:
+  /// **'Near-expiry horizon (days)'**
+  String get distributionNearExpiryDays;
+
+  /// No description provided for @distributionFefoHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Unload and sell by earliest expiry (FEFO)'**
+  String get distributionFefoHint;
+
+  /// No description provided for @distributionUnitWeightKg.
+  ///
+  /// In en, this message translates to:
+  /// **'Unit weight (kg)'**
+  String get distributionUnitWeightKg;
+
+  /// No description provided for @distributionUnitVolumeM3.
+  ///
+  /// In en, this message translates to:
+  /// **'Unit volume (m³)'**
+  String get distributionUnitVolumeM3;
 }
 
 class _AppLocalizationsDelegate

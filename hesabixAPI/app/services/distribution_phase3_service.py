@@ -55,6 +55,15 @@ def extend_settings_dict(row: Any) -> Dict[str, Any]:
 			"map_tile_source": "osm",
 			"memaps_api_key": None,
 			"share_live_location": True,
+			"carry_over_missed_visits": True,
+			"carry_over_days": 7,
+			"require_pod_signature": False,
+			"require_pod_photo": False,
+			"nav_provider": "neshan",
+			"setup_completed": False,
+			"auto_apply_promotions": True,
+			"enable_perfect_store": True,
+			"near_expiry_days": 14,
 		}
 	key = getattr(row, "memaps_api_key", None)
 	key_s = str(key).strip() if key else None
@@ -73,6 +82,15 @@ def extend_settings_dict(row: Any) -> Dict[str, Any]:
 		"map_tile_source": normalize_map_tile_source(getattr(row, "map_tile_source", "osm")),
 		"memaps_api_key": key_s or None,
 		"share_live_location": bool(getattr(row, "share_live_location", True)),
+		"carry_over_missed_visits": bool(getattr(row, "carry_over_missed_visits", True)),
+		"carry_over_days": int(getattr(row, "carry_over_days", 7) or 7),
+		"require_pod_signature": bool(getattr(row, "require_pod_signature", False)),
+		"require_pod_photo": bool(getattr(row, "require_pod_photo", False)),
+		"nav_provider": str(getattr(row, "nav_provider", None) or "neshan"),
+		"setup_completed": bool(getattr(row, "setup_completed", False)),
+		"auto_apply_promotions": bool(getattr(row, "auto_apply_promotions", True)),
+		"enable_perfect_store": bool(getattr(row, "enable_perfect_store", True)),
+		"near_expiry_days": int(getattr(row, "near_expiry_days", 14) or 14),
 	}
 
 
@@ -134,6 +152,9 @@ def list_vans(db: Session, business_id: int, ctx: AuthContext) -> List[Dict[str,
 				"user_id": v.user_id,
 				"user_name": user_label(db, v.user_id),
 				"is_active": v.is_active,
+				"plate_number": getattr(v, "plate_number", None),
+				"max_weight_kg": float(v.max_weight_kg) if getattr(v, "max_weight_kg", None) else None,
+				"max_volume_m3": float(v.max_volume_m3) if getattr(v, "max_volume_m3", None) else None,
 			}
 		)
 	return out
@@ -150,6 +171,13 @@ def update_van(db: Session, business_id: int, van_id: int, payload: Dict[str, An
 		van.user_id = int(payload["user_id"]) if payload.get("user_id") else None
 	if "is_active" in payload:
 		van.is_active = bool(payload["is_active"])
+	if "plate_number" in payload:
+		raw = str(payload.get("plate_number") or "").strip()
+		van.plate_number = raw[:32] or None
+	if "max_weight_kg" in payload:
+		van.max_weight_kg = float(payload["max_weight_kg"]) if payload.get("max_weight_kg") else None
+	if "max_volume_m3" in payload:
+		van.max_volume_m3 = float(payload["max_volume_m3"]) if payload.get("max_volume_m3") else None
 	van.updated_at = datetime.utcnow()
 	db.commit()
 	db.refresh(van)
@@ -160,6 +188,9 @@ def update_van(db: Session, business_id: int, van_id: int, payload: Dict[str, An
 		"warehouse_id": van.warehouse_id,
 		"user_id": van.user_id,
 		"is_active": van.is_active,
+		"plate_number": getattr(van, "plate_number", None),
+		"max_weight_kg": float(van.max_weight_kg) if getattr(van, "max_weight_kg", None) else None,
+		"max_volume_m3": float(van.max_volume_m3) if getattr(van, "max_volume_m3", None) else None,
 	}
 
 
@@ -190,6 +221,9 @@ def create_van(db: Session, business_id: int, payload: Dict[str, Any]) -> Dict[s
 		code=code[:50],
 		name=name[:255],
 		is_active=bool(payload.get("is_active", True)),
+		plate_number=(str(payload.get("plate_number") or "").strip()[:32] or None),
+		max_weight_kg=float(payload["max_weight_kg"]) if payload.get("max_weight_kg") else None,
+		max_volume_m3=float(payload["max_volume_m3"]) if payload.get("max_volume_m3") else None,
 	)
 	db.add(van)
 	db.commit()
@@ -231,9 +265,31 @@ def get_van_stock(db: Session, business_id: int, van_id: int) -> Dict[str, Any]:
 					"unit_price": unit_price,
 					"tax_rate": tax_rate,
 					"is_sales_taxable": bool(getattr(p, "is_sales_taxable", False)),
+					"general_barcodes": getattr(p, "general_barcodes", None),
+					"code": p.code,
 				}
 			)
-	return {"van_id": van_id, "warehouse_id": van.warehouse_id, "items": items}
+	from app.services.distribution_field_ops_service import van_capacity_snapshot
+
+	cap = van_capacity_snapshot(db, business_id, van)
+	lot_by_pid: Dict[int, list] = {}
+	for lot in cap.get("lots") or []:
+		lot_by_pid.setdefault(int(lot["product_id"]), []).append(lot)
+	for it in items:
+		it["lots"] = lot_by_pid.get(int(it["product_id"]), [])
+		it["near_expiry"] = any(x.get("near_expiry") or x.get("expired") for x in it["lots"])
+		lot_qty = sum(float(x.get("quantity") or 0) for x in it["lots"])
+		it["lot_quantity"] = round(lot_qty, 3)
+		it["lot_variance"] = round(float(it["quantity"]) - lot_qty, 3)
+	return {
+		"van_id": van_id,
+		"warehouse_id": van.warehouse_id,
+		"items": items,
+		"capacity": cap,
+		"plate_number": getattr(van, "plate_number", None),
+		"max_weight_kg": float(van.max_weight_kg) if getattr(van, "max_weight_kg", None) else None,
+		"max_volume_m3": float(van.max_volume_m3) if getattr(van, "max_volume_m3", None) else None,
+	}
 
 
 def load_van(
@@ -288,6 +344,36 @@ def load_van(
 		},
 	)
 	post_warehouse_document(db, wh_doc.id)
+	from datetime import date as _date
+
+	from app.services.distribution_field_ops_service import add_van_lot, assert_van_capacity
+
+	for ln in lines:
+		if not isinstance(ln, dict):
+			continue
+		exp = None
+		raw_exp = ln.get("expiry_date")
+		if raw_exp:
+			try:
+				exp = _date.fromisoformat(str(raw_exp)[:10])
+			except ValueError:
+				exp = None
+		add_van_lot(
+			db,
+			business_id,
+			int(van.id),
+			int(ln.get("product_id") or 0),
+			float(ln.get("quantity") or 0),
+			lot_code=ln.get("lot_code"),
+			expiry_date=exp,
+			unit_weight_kg=float(ln["unit_weight_kg"]) if ln.get("unit_weight_kg") else None,
+			unit_volume_m3=float(ln["unit_volume_m3"]) if ln.get("unit_volume_m3") else None,
+		)
+	try:
+		assert_van_capacity(db, business_id, van)
+	except ApiError:
+		db.rollback()
+		raise
 	db.commit()
 	return {"van_id": van_id, "warehouse_document_id": wh_doc.id, "status": "posted"}
 
@@ -339,6 +425,10 @@ def unload_van(
 		},
 	)
 	post_warehouse_document(db, wh_doc.id)
+	from app.services.distribution_field_ops_service import consume_van_lots_fefo
+
+	for ln in wh_lines:
+		consume_van_lots_fefo(db, int(van.id), int(ln["product_id"]), float(ln["quantity"]))
 	db.commit()
 	return {"van_id": van_id, "warehouse_document_id": wh_doc.id, "status": "posted"}
 

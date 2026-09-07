@@ -211,6 +211,8 @@ def apply_promotions_to_lines(
 	*,
 	promotion_ids: Optional[List[int]] = None,
 	visitor_max_discount_percent: float = 0,
+	person_id: Optional[int] = None,
+	auto_apply: bool = True,
 ) -> Tuple[List[Dict[str, Any]], float, List[int]]:
 	"""اعمال پروموشن + سقف تخفیف ویزیتور روی خطوط. خروجی: خطوط، مجموع تخفیف، idهای اعمال‌شده."""
 	settings = _settings(db, business_id)
@@ -219,20 +221,37 @@ def apply_promotions_to_lines(
 		max_pct = min(max_pct, visitor_max_discount_percent) if max_pct > 0 else visitor_max_discount_percent
 
 	promos: List[DistributionTradePromotion] = []
-	if getattr(settings, "enable_promotions", False) and promotion_ids:
-		promos = (
-			db.query(DistributionTradePromotion)
-			.filter(
-				DistributionTradePromotion.business_id == business_id,
-				DistributionTradePromotion.id.in_([int(x) for x in promotion_ids]),
-				DistributionTradePromotion.is_active.is_(True),
+	if getattr(settings, "enable_promotions", False):
+		ids = [int(x) for x in (promotion_ids or []) if str(x).isdigit() or isinstance(x, int)]
+		if not ids and auto_apply and getattr(settings, "auto_apply_promotions", True):
+			today = business_today(business_id)
+			promos = (
+				db.query(DistributionTradePromotion)
+				.filter(
+					DistributionTradePromotion.business_id == business_id,
+					DistributionTradePromotion.is_active.is_(True),
+					DistributionTradePromotion.valid_from <= today,
+				)
+				.filter(
+					(DistributionTradePromotion.valid_to.is_(None)) | (DistributionTradePromotion.valid_to >= today)
+				)
+				.all()
 			)
-			.all()
-		)
+		elif ids:
+			promos = (
+				db.query(DistributionTradePromotion)
+				.filter(
+					DistributionTradePromotion.business_id == business_id,
+					DistributionTradePromotion.id.in_(ids),
+					DistributionTradePromotion.is_active.is_(True),
+				)
+				.all()
+			)
 
 	out: List[Dict[str, Any]] = []
 	discount_total = 0.0
 	applied: List[int] = []
+	foc_lines: List[Dict[str, Any]] = []
 
 	for ln in raw_lines:
 		if not isinstance(ln, dict):
@@ -241,6 +260,13 @@ def apply_promotions_to_lines(
 		pid = int(line.get("product_id") or 0)
 		qty = float(line.get("quantity") or 0)
 		unit = _money(line.get("unit_price"))
+		if unit <= 0 and pid > 0:
+			prod = db.query(Product).filter(Product.id == pid, Product.business_id == business_id).first()
+			if prod:
+				from app.services.distribution_field_ops_service import resolve_person_unit_price
+
+				unit = resolve_person_unit_price(db, business_id, prod, None, person_id)
+				line["unit_price"] = unit
 		manual_disc = _money(line.get("line_discount"))
 		promo_disc = 0.0
 
@@ -257,16 +283,22 @@ def apply_promotions_to_lines(
 				promo_disc += round(float(cfg.get("amount") or 0) * qty, 2)
 				applied.append(p.id)
 			elif p.mechanic == "foc":
-				# خرید X جایزه Y رایگان روی همان کالا
 				buy_q = float(cfg.get("buy_qty") or 0)
 				get_q = float(cfg.get("get_qty") or 0)
 				if buy_q > 0 and get_q > 0 and qty >= buy_q:
 					sets = int(qty // buy_q)
 					free = sets * get_q
-					promo_disc += round(free * unit, 2)
+					foc_lines.append({
+						"product_id": pid,
+						"product_name": line.get("product_name"),
+						"quantity": free,
+						"unit_price": 0,
+						"line_discount": 0,
+						"is_foc": True,
+						"promotion_id": p.id,
+					})
 					applied.append(p.id)
 			elif p.mechanic == "bxgy":
-				# Buy X Get Y — روی همان SKU مثل foc؛ در غیر این صورت تخفیف معادل get_qty × unit
 				buy_q = float(cfg.get("buy_qty") or cfg.get("buy") or 0)
 				get_q = float(cfg.get("get_qty") or cfg.get("get") or 0)
 				buy_pid = int(cfg.get("buy_product_id") or 0)
@@ -276,13 +308,17 @@ def apply_promotions_to_lines(
 				if buy_q > 0 and get_q > 0 and qty >= buy_q:
 					sets = int(qty // buy_q)
 					free = sets * get_q
-					if get_pid and get_pid != pid:
-						gp = db.query(Product).filter(Product.id == get_pid, Product.business_id == business_id).first()
-						from app.services.distribution_documents import _resolve_unit_price
-						gunit = _resolve_unit_price(db, business_id, gp, None) if gp else unit
-						promo_disc += round(free * gunit, 2)
-					else:
-						promo_disc += round(free * unit, 2)
+					gift_pid = get_pid or pid
+					gp = db.query(Product).filter(Product.id == gift_pid, Product.business_id == business_id).first()
+					foc_lines.append({
+						"product_id": gift_pid,
+						"product_name": gp.name if gp else line.get("product_name"),
+						"quantity": free,
+						"unit_price": 0,
+						"line_discount": 0,
+						"is_foc": True,
+						"promotion_id": p.id,
+					})
 					applied.append(p.id)
 
 		# سقف تخفیف دستی ویزیتور
@@ -304,6 +340,7 @@ def apply_promotions_to_lines(
 		discount_total += total_disc
 		out.append(line)
 
+	out.extend(foc_lines)
 	return out, round(discount_total, 2), sorted(set(applied))
 
 
@@ -380,6 +417,9 @@ def create_visit_order(
 		if not product:
 			raise ApiError("NOT_FOUND", f"Product {pid} not found", http_status=404)
 		unit = _resolve_unit_price(db, business_id, product, ln.get("unit_price"))
+		from app.services.distribution_field_ops_service import resolve_person_unit_price
+
+		unit = resolve_person_unit_price(db, business_id, product, ln.get("unit_price"), person_id)
 		priced.append({
 			"product_id": pid,
 			"product_name": product.name,
@@ -390,8 +430,11 @@ def create_visit_order(
 		})
 
 	promo_ids = payload.get("promotion_ids") if isinstance(payload.get("promotion_ids"), list) else []
+	from app.services.distribution_field_ops_service import apply_auto_promotions_if_needed
+
+	promo_ids = apply_auto_promotions_if_needed(db, business_id, [int(x) for x in promo_ids] if promo_ids else None)
 	priced, discount_total, applied = apply_promotions_to_lines(
-		db, business_id, priced, promotion_ids=[int(x) for x in promo_ids],
+		db, business_id, priced, promotion_ids=promo_ids, person_id=person_id,
 	)
 
 	net = 0.0
@@ -623,12 +666,15 @@ def suggested_order_for_person(
 			"total_invoices_scoped": n_invoices,
 		})
 	suggested.sort(key=lambda x: -float(x["suggested_qty"]))
-	return {
+	base = {
 		"person_id": person_id,
 		"based_on_invoices": n_invoices,
 		"lookback_days": lookback_days,
 		"lines": suggested[:40],
 	}
+	from app.services.distribution_field_ops_service import enhance_suggested_order
+
+	return enhance_suggested_order(db, business_id, person_id, base)
 
 
 
@@ -674,6 +720,12 @@ def stop_to_dict(s: DistributionDeliveryStop, db: Optional[Session] = None) -> D
 	}
 	if db is not None:
 		d["person_name"] = person_label(db, s.person_id)
+		if s.order_id:
+			order = db.query(DistributionVisitOrder).filter(DistributionVisitOrder.id == s.order_id).first()
+			if order:
+				d["order_lines"] = list(order.lines or [])
+				d["document_id"] = order.document_id
+				d["net_total"] = _money(order.net_total)
 	return d
 
 
@@ -933,20 +985,35 @@ def build_load_plan_from_orders(
 
 
 def load_plan_to_dict(p: DistributionLoadPlan) -> Dict[str, Any]:
+	lines = list(p.lines or [])
+	variance_count = 0
+	for ln in lines:
+		if not isinstance(ln, dict):
+			continue
+		delta = float(ln.get("variance_qty") or 0)
+		if abs(delta) > 1e-6:
+			variance_count += 1
 	return {
 		"id": p.id,
 		"plan_date": p.plan_date.isoformat(),
 		"warehouse_id": p.warehouse_id,
 		"van_id": p.van_id,
 		"status": p.status,
-		"lines": p.lines or [],
+		"lines": lines,
 		"order_ids": p.order_ids or [],
 		"notes": p.notes,
 		"confirmed_at": p.confirmed_at.isoformat() + "Z" if p.confirmed_at else None,
+		"variance_line_count": variance_count,
 	}
 
 
-def confirm_load_plan(db: Session, business_id: int, plan_id: int, user_id: int) -> Dict[str, Any]:
+def confirm_load_plan(
+	db: Session,
+	business_id: int,
+	plan_id: int,
+	user_id: int,
+	payload: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
 	"""تأیید موج بارگیری و بار زدن به ون در صورت وجود van_id."""
 	dist_svc._ensure_plugin(db, business_id)
 	from app.services.distribution_phase3_service import load_van
@@ -959,17 +1026,39 @@ def confirm_load_plan(db: Session, business_id: int, plan_id: int, user_id: int)
 	if plan.status != "draft":
 		raise ApiError("VALIDATION_ERROR", "Load plan already confirmed", http_status=400)
 
-	if plan.van_id and plan.lines:
+	actual_by_pid: Dict[int, float] = {}
+	for ln in (payload or {}).get("actual_lines") or []:
+		if not isinstance(ln, dict):
+			continue
+		pid = int(ln.get("product_id") or 0)
+		if pid <= 0:
+			continue
+		actual_by_pid[pid] = float(ln.get("quantity") or 0)
+
+	enriched = []
+	load_lines = []
+	for ln in plan.lines or []:
+		if not isinstance(ln, dict):
+			continue
+		pid = int(ln.get("product_id") or 0)
+		planned = float(ln.get("quantity") or 0)
+		loaded = actual_by_pid.get(pid, planned)
+		row = dict(ln)
+		row["planned_qty"] = planned
+		row["loaded_qty"] = loaded
+		row["quantity"] = loaded
+		row["variance_qty"] = round(loaded - planned, 3)
+		enriched.append(row)
+		if loaded > 0:
+			load_lines.append({"product_id": pid, "quantity": loaded})
+
+	if plan.van_id and load_lines:
 		load_van(
 			db,
 			business_id,
 			user_id,
 			int(plan.van_id),
-			[
-				{"product_id": ln["product_id"], "quantity": ln["quantity"]}
-				for ln in plan.lines
-				if isinstance(ln, dict)
-			],
+			load_lines,
 			source_warehouse_id=plan.warehouse_id,
 		)
 		for oid in plan.order_ids or []:
@@ -977,6 +1066,7 @@ def confirm_load_plan(db: Session, business_id: int, plan_id: int, user_id: int)
 			if order and order.status == "picking":
 				order.status = "loaded"
 
+	plan.lines = enriched
 	plan.status = "confirmed"
 	plan.confirmed_at = datetime.utcnow()
 	plan.updated_at = datetime.utcnow()
@@ -1326,14 +1416,40 @@ def compute_commission_run(
 
 	cfg = rule.config or {}
 	pct = float(cfg.get("percent") or 0)
-	commission = round(sales * pct / 100.0, 2)
+	base_amount = sales
+	collected = None
+	if bool(cfg.get("on_collection")):
+		from adapters.db.models.distribution import DistributionDailySettlement as _Sett
+
+		sett_rows = (
+			db.query(_Sett)
+			.filter(
+				_Sett.business_id == business_id,
+				_Sett.user_id == user_id,
+				_Sett.status == "confirmed",
+				_Sett.settlement_date >= period_start,
+				_Sett.settlement_date <= period_end,
+			)
+			.all()
+		)
+		collected = sum(
+			_money(s.cash_collected) + _money(s.cheque_collected) + _money(s.card_collected) + _money(s.other_collected)
+			for s in sett_rows
+		)
+		base_amount = collected
+	commission = round(base_amount * pct / 100.0, 2)
 	# tiered
 	tiers = cfg.get("tiers") if isinstance(cfg.get("tiers"), list) else None
 	if tiers:
 		commission = 0.0
 		for t in sorted(tiers, key=lambda x: float(x.get("min_sales") or 0)):
-			if sales >= float(t.get("min_sales") or 0):
-				commission = round(sales * float(t.get("percent") or 0) / 100.0, 2)
+			if base_amount >= float(t.get("min_sales") or 0):
+				commission = round(base_amount * float(t.get("percent") or 0) / 100.0, 2)
+	coverage_pct = None
+	if bool(cfg.get("coverage_factor")) and visits:
+		ordered = sum(1 for v in visits if v.outcome == "order")
+		coverage_pct = round(100.0 * ordered / max(1, len(visits)), 1)
+		commission = round(commission * (coverage_pct / 100.0), 2)
 
 	run = DistributionCommissionRun(
 		business_id=business_id,
@@ -1349,6 +1465,10 @@ def compute_commission_run(
 			"orders_delivered": len(orders),
 			"rule_type": rule.rule_type,
 			"percent_applied": pct,
+			"on_collection": bool(cfg.get("on_collection")),
+			"collected_amount": collected,
+			"coverage_percent": coverage_pct,
+			"base_amount": round(base_amount, 2),
 		},
 		created_by_user_id=actor_user_id,
 	)
@@ -1404,16 +1524,19 @@ def create_shelf_audit(db: Session, business_id: int, user_id: int, payload: Dic
 	if person_id <= 0 or not isinstance(answers, (dict, list)):
 		raise ApiError("VALIDATION_ERROR", "person_id and answers required", http_status=400)
 
-	# simple score: percent of true/yes answers
-	score = None
-	flat: List[Any] = []
-	if isinstance(answers, dict):
-		flat = list(answers.values())
-	else:
-		flat = answers
-	bools = [a for a in flat if isinstance(a, bool)]
-	if bools:
-		score = round(100.0 * sum(1 for a in bools if a) / len(bools), 1)
+	# simple score: percent of true/yes answers + perfect store weights
+	from app.services.distribution_field_ops_service import perfect_store_score
+
+	score = perfect_store_score(answers)
+	if score is None:
+		flat: List[Any] = []
+		if isinstance(answers, dict):
+			flat = list(answers.values())
+		else:
+			flat = answers
+		bools = [a for a in flat if isinstance(a, bool)]
+		if bools:
+			score = round(100.0 * sum(1 for a in bools if a) / len(bools), 1)
 
 	row = DistributionShelfAudit(
 		business_id=business_id,

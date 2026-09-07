@@ -8,6 +8,7 @@ import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 import '../invoice/product_combobox_widget.dart';
 import '../invoice/warehouse_combobox_widget.dart';
+import 'distribution_field_helpers.dart';
 import 'distribution_form_helpers.dart';
 
 /// شیت بارگیری یا تخلیهٔ ون: انتخاب انبار، افزودن قلم و ثبت انتقال.
@@ -50,11 +51,19 @@ class _Line {
     required this.productId,
     required this.productName,
     required this.quantity,
+    this.lotCode,
+    this.expiryDate,
+    this.unitWeightKg,
+    this.unitVolumeM3,
   });
 
   final int productId;
   final String productName;
   double quantity;
+  String? lotCode;
+  String? expiryDate;
+  double? unitWeightKg;
+  double? unitVolumeM3;
 }
 
 class _VanTransferSheet extends StatefulWidget {
@@ -86,14 +95,24 @@ class _VanTransferSheetState extends State<_VanTransferSheet> {
   Map<String, dynamic>? _product;
   int? _stockProductId;
   final TextEditingController _qtyCtl = TextEditingController(text: '1');
+  final TextEditingController _lotCtl = TextEditingController();
+  final TextEditingController _weightCtl = TextEditingController();
+  final TextEditingController _volumeCtl = TextEditingController();
+  DateTime? _expiry;
   Key _productPickerKey = UniqueKey();
   bool _saving = false;
 
   @override
   void dispose() {
     _qtyCtl.dispose();
+    _lotCtl.dispose();
+    _weightCtl.dispose();
+    _volumeCtl.dispose();
     super.dispose();
   }
+
+  String _iso(DateTime d) =>
+      '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
 
   double _parseQty() {
     final raw = _qtyCtl.text.trim().replaceAll(',', '.');
@@ -183,9 +202,11 @@ class _VanTransferSheetState extends State<_VanTransferSheet> {
     }
 
     setState(() {
+      final lot = _lotCtl.text.trim().isEmpty ? null : _lotCtl.text.trim();
+      final exp = _expiry == null ? null : _iso(_expiry!);
       _Line? existing;
       for (final l in _lines) {
-        if (l.productId == productId) {
+        if (l.productId == productId && l.lotCode == lot && l.expiryDate == exp) {
           existing = l;
           break;
         }
@@ -193,12 +214,26 @@ class _VanTransferSheetState extends State<_VanTransferSheet> {
       if (existing != null) {
         existing.quantity += qty;
       } else {
-        _lines.add(_Line(productId: productId, productName: productName, quantity: qty));
+        _lines.add(
+          _Line(
+            productId: productId,
+            productName: productName,
+            quantity: qty,
+            lotCode: lot,
+            expiryDate: exp,
+            unitWeightKg: double.tryParse(_weightCtl.text.trim().replaceAll(',', '.')),
+            unitVolumeM3: double.tryParse(_volumeCtl.text.trim().replaceAll(',', '.')),
+          ),
+        );
       }
       _product = null;
       _stockProductId = null;
       _productPickerKey = UniqueKey();
       _qtyCtl.text = '1';
+      _lotCtl.clear();
+      _weightCtl.clear();
+      _volumeCtl.clear();
+      _expiry = null;
     });
   }
 
@@ -235,6 +270,10 @@ class _VanTransferSheetState extends State<_VanTransferSheet> {
             (l) => <String, dynamic>{
               'product_id': l.productId,
               'quantity': l.quantity,
+              if (l.lotCode != null) 'lot_code': l.lotCode,
+              if (l.expiryDate != null) 'expiry_date': l.expiryDate,
+              if (l.unitWeightKg != null) 'unit_weight_kg': l.unitWeightKg,
+              if (l.unitVolumeM3 != null) 'unit_volume_m3': l.unitVolumeM3,
             },
           )
           .toList();
@@ -376,6 +415,93 @@ class _VanTransferSheetState extends State<_VanTransferSheet> {
                           onPlus: () => _setQty(_parseQty() + 1),
                           label: t.quantity,
                         ),
+                        if (widget.load) ...[
+                          const SizedBox(height: 10),
+                          TextField(
+                            controller: _lotCtl,
+                            decoration: InputDecoration(
+                              labelText: t.distributionLotOptional,
+                              border: const OutlineInputBorder(),
+                              isDense: true,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          OutlinedButton.icon(
+                            onPressed: () async {
+                              final now = DateTime.now();
+                              final picked = await showDatePicker(
+                                context: context,
+                                initialDate: _expiry ?? now,
+                                firstDate: now.subtract(const Duration(days: 1)),
+                                lastDate: now.add(const Duration(days: 365 * 5)),
+                              );
+                              if (picked != null) setState(() => _expiry = picked);
+                            },
+                            icon: const Icon(Icons.event_outlined),
+                            label: Text(
+                              _expiry == null ? t.distributionNoExpiry : '${t.distributionExpiryDate}: ${_iso(_expiry!)}',
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: TextField(
+                                  controller: _weightCtl,
+                                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                  decoration: InputDecoration(
+                                    labelText: t.distributionUnitWeightKg,
+                                    border: const OutlineInputBorder(),
+                                    isDense: true,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: TextField(
+                                  controller: _volumeCtl,
+                                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                  decoration: InputDecoration(
+                                    labelText: t.distributionUnitVolumeM3,
+                                    border: const OutlineInputBorder(),
+                                    isDense: true,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                        const SizedBox(height: 10),
+                        if (widget.load)
+                          OutlinedButton.icon(
+                            onPressed: () async {
+                              final code = await scanDistributionBarcode(context);
+                              if (code == null || code.isEmpty) return;
+                              try {
+                                final p = await widget.service.lookupBarcode(
+                                  businessId: widget.businessId,
+                                  barcode: code,
+                                );
+                                setState(() {
+                                  _product = {
+                                    'id': p['product_id'],
+                                    'name': p['product_name'],
+                                    'code': p['code'] ?? code,
+                                    'unit_price': p['unit_price'],
+                                  };
+                                });
+                              } catch (e) {
+                                if (mounted) {
+                                  SnackBarHelper.showError(
+                                    context,
+                                    message: ErrorExtractor.forContext(e, context),
+                                  );
+                                }
+                              }
+                            },
+                            icon: const Icon(Icons.qr_code_scanner),
+                            label: Text(t.distributionScanBarcode),
+                          ),
                         const SizedBox(height: 10),
                         FilledButton.icon(
                           onPressed: (!widget.load && widget.vanStockItems.isEmpty) ? null : _addLine,
@@ -422,6 +548,17 @@ class _VanTransferSheetState extends State<_VanTransferSheet> {
                                 ),
                               ],
                             ),
+                            if (line.lotCode != null || line.expiryDate != null)
+                              Padding(
+                                padding: const EdgeInsets.only(bottom: 4),
+                                child: Text(
+                                  [
+                                    if (line.lotCode != null) '${t.distributionLotOptional}: ${line.lotCode}',
+                                    if (line.expiryDate != null) '${t.distributionExpiryDate}: ${line.expiryDate}',
+                                  ].join(' · '),
+                                  style: theme.textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                                ),
+                              ),
                             if (!widget.load)
                               Padding(
                                 padding: const EdgeInsets.only(bottom: 4),

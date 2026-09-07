@@ -9,6 +9,7 @@ import '../../../l10n/app_localizations.dart';
 import '../../../models/person_model.dart';
 import '../../../services/distribution_service.dart';
 import '../../../services/distribution_offline_queue.dart';
+import '../../../services/distribution_offline_catalog.dart';
 import '../../../utils/distribution_location_helper.dart';
 import 'distribution_team_map_page.dart';
 import '../distribution_reports_dashboard_page.dart';
@@ -17,12 +18,17 @@ import '../../../utils/snackbar_helper.dart' show SnackBarHelper;
 import '../../../widgets/business_subpage_back_leading.dart';
 import '../../../widgets/distribution/distribution_form_helpers.dart';
 import '../../../widgets/distribution/distribution_setup_plan_sheet.dart';
+import '../../../widgets/distribution/distribution_setup_wizard_sheet.dart';
+import '../../../widgets/distribution/distribution_new_outlet_sheet.dart';
+import '../../../widgets/distribution/distribution_assortment_sheet.dart';
+import '../../../widgets/distribution/distribution_scorecard_card.dart';
 import '../../../widgets/distribution/distribution_map_marker.dart';
 import '../../../widgets/distribution/distribution_memaps_map.dart';
 import '../../../core/distribution_map_tiles.dart';
 import '../../../widgets/distribution/distribution_person_location_sheet.dart';
 import '../../../widgets/distribution/distribution_return_dialog.dart';
 import '../../../widgets/distribution/distribution_ui_helpers.dart';
+import '../../../widgets/distribution/distribution_field_helpers.dart';
 import '../../../widgets/distribution/distribution_visit_sheet.dart';
 import '../../../widgets/distribution/distribution_van_panel.dart';
 import '../../../widgets/distribution/distribution_settlement_panel.dart';
@@ -30,6 +36,7 @@ import '../../../widgets/distribution/distribution_targets_section.dart';
 import '../../../widgets/distribution/distribution_commercial_panel.dart';
 import '../../../widgets/invoice/person_combobox_widget.dart';
 import '../../../widgets/invoice/warehouse_combobox_widget.dart';
+import '../../../widgets/invoice/price_list_combobox_widget.dart';
 import '../../../widgets/jalali_date_picker.dart';
 import '../../../core/api_client.dart';
 import '../../../models/business_user_model.dart';
@@ -65,6 +72,13 @@ class _DistributionMainPageState extends State<DistributionMainPage>
   bool _enablePromotions = false;
   bool _enableSuggestedOrder = true;
   bool _shareLiveLocation = true;
+  bool _autoApplyPromotions = true;
+  bool _requirePodSignature = false;
+  bool _requirePodPhoto = false;
+  bool _enablePerfectStore = true;
+  bool _setupCompleted = true;
+  String _navProvider = 'neshan';
+  Map<String, dynamic>? _scorecard;
   bool? _liveGpsOk;
   final TextEditingController _memapsKeyCtl = TextEditingController();
   List<dynamic> _checklistTemplate = [];
@@ -100,22 +114,28 @@ class _DistributionMainPageState extends State<DistributionMainPage>
       widget.authStore.hasBusinessPermission('distribution', 'manage') ||
       widget.authStore.hasBusinessPermission('distribution', 'reports_team');
 
-  int get _tabCount {
-    var n = 3;
-    if (_canOperate) n += 3; // settlement + van + commercial
-    if (_canManage) n++;
-    return n;
-  }
+  int get _tabCount => _tabKeys.length;
 
   List<String> get _tabKeys {
     final keys = <String>['field', 'visits', 'returns'];
     if (_canOperate) {
       keys.add('settlement');
-      keys.add('van');
-      keys.add('commercial');
+      if (_enableVanSales) keys.add('van');
+      if (_enablePresell || _canManage) keys.add('commercial');
     }
     if (_canManage) keys.add('manage');
     return keys;
+  }
+
+  void _syncTabController() {
+    final n = _tabKeys.length;
+    if (_tabController.length == n) return;
+    final oldIndex = _tabController.index.clamp(0, n - 1);
+    _tabController.dispose();
+    _tabController = TabController(length: n, vsync: this, initialIndex: oldIndex);
+    _tabController.addListener(() {
+      if (!_tabController.indexIsChanging) _loadTab(_tabController.index);
+    });
   }
 
   @override
@@ -182,6 +202,12 @@ class _DistributionMainPageState extends State<DistributionMainPage>
       _enablePromotions = ds['enable_promotions'] == true;
       _enableSuggestedOrder = ds['enable_suggested_order'] != false;
       _shareLiveLocation = ds['share_live_location'] != false;
+      _autoApplyPromotions = ds['auto_apply_promotions'] != false;
+      _requirePodSignature = ds['require_pod_signature'] == true;
+      _requirePodPhoto = ds['require_pod_photo'] == true;
+      _enablePerfectStore = ds['enable_perfect_store'] != false;
+      _setupCompleted = ds['setup_completed'] == true;
+      _navProvider = (ds['nav_provider'] ?? 'neshan').toString();
       final tpl = ds['visit_checklist_template'];
       _checklistTemplate = tpl is List ? tpl : [];
       final key = (ds['memaps_api_key'] ?? '').toString();
@@ -213,7 +239,18 @@ class _DistributionMainPageState extends State<DistributionMainPage>
     if (index < 0 || index >= keys.length) return;
     switch (keys[index]) {
       case 'field':
-        await Future.wait([_refreshSummary(), _refreshPlan(), _refreshVisits(detectActiveOnly: true)]);
+        await Future.wait([
+          _refreshSummary(),
+          _refreshPlan(),
+          _refreshVisits(detectActiveOnly: true),
+          _refreshScorecard(),
+        ]);
+        if (_canManage && !_setupCompleted && mounted) {
+          await Future<void>.delayed(const Duration(milliseconds: 300));
+          if (!mounted) return;
+          final t = AppLocalizations.of(context);
+          SnackBarHelper.show(context, message: t.distributionSetupNeeded);
+        }
         break;
       case 'visits':
         await _refreshVisits();
@@ -233,6 +270,21 @@ class _DistributionMainPageState extends State<DistributionMainPage>
     }
   }
 
+  Future<void> _refreshScorecard() async {
+    if (!_canView) return;
+    try {
+      final now = DateTime.now();
+      final from = DateTime(now.year, now.month, now.day).subtract(const Duration(days: 6));
+      final d = await _svc.getScorecard(
+        businessId: widget.businessId,
+        fromDate: _iso(from),
+        toDate: _iso(now),
+        targetUserId: _teamTargetUserId,
+      );
+      if (mounted) setState(() => _scorecard = d['kpi'] is Map ? Map<String, dynamic>.from(d['kpi'] as Map) : d);
+    } catch (_) {}
+  }
+
   Future<void> _refreshSummary() async {
     if (!_canView) return;
     setState(() => _loadingSummary = true);
@@ -243,6 +295,8 @@ class _DistributionMainPageState extends State<DistributionMainPage>
           _summary = d;
           _applySettingsFromSummary();
         });
+        _syncTabController();
+        if (mounted) setState(() {});
         unawaited(_sendLiveHeartbeat());
       }
     } catch (e) {
@@ -381,6 +435,11 @@ class _DistributionMainPageState extends State<DistributionMainPage>
       enablePresell: _enablePresell,
       enableSuggestedOrder: _enableSuggestedOrder,
       enablePromotions: _enablePromotions,
+      autoApplyPromotions: _autoApplyPromotions,
+      requirePodSignature: _requirePodSignature,
+      requirePodPhoto: _requirePodPhoto,
+      enablePerfectStore: _enablePerfectStore,
+      navProvider: _navProvider,
       onOfflineEnqueue: (payload) {
         final hint = payload['op_hint']?.toString();
         if (hint == 'complete_visit_with_presell') {
@@ -590,6 +649,59 @@ class _DistributionMainPageState extends State<DistributionMainPage>
     }
   }
 
+  Future<int?> _pickSupervisorIfWanted() async {
+    final t = AppLocalizations.of(context);
+    List<BusinessUser> users = const [];
+    try {
+      users = (await BusinessUserService(ApiClient()).getBusinessUsers(widget.businessId)).users;
+    } catch (_) {
+      return null;
+    }
+    if (!mounted || users.isEmpty) return null;
+    int? selected;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setD) => AlertDialog(
+          title: Text(t.distributionJointVisit),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(t.distributionJointVisitHint),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<int?>(
+                value: selected,
+                isExpanded: true,
+                decoration: InputDecoration(
+                  labelText: t.distributionSupervisor,
+                  border: const OutlineInputBorder(),
+                ),
+                items: [
+                  const DropdownMenuItem<int?>(value: null, child: Text('—')),
+                  ...users
+                      .where((u) => u.userId != widget.authStore.currentUserId)
+                      .map(
+                        (u) => DropdownMenuItem<int?>(
+                          value: u.userId,
+                          child: Text(u.userName.isNotEmpty ? u.userName : '${u.userId}'),
+                        ),
+                      ),
+                ],
+                onChanged: (v) => setD(() => selected = v),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(t.cancel)),
+            FilledButton(onPressed: () => Navigator.pop(ctx, true), child: Text(t.distributionStartVisit)),
+          ],
+        ),
+      ),
+    );
+    if (ok != true) return null;
+    return selected;
+  }
+
   Future<void> _startVisitFromPlan(Map<String, dynamic> item) async {
     if (!_canOperate) return;
     if (_activeVisit != null) {
@@ -605,9 +717,14 @@ class _DistributionMainPageState extends State<DistributionMainPage>
       'person_id': item['person_id'],
       'route_id': item['route_id'],
       'route_stop_id': item['stop_id'],
+      if (item['carried_over'] == true) 'is_carried_over': true,
       if (loc.latitude != null) 'start_latitude': loc.latitude,
       if (loc.longitude != null) 'start_longitude': loc.longitude,
     };
+    if (_canManage) {
+      final users = await _pickSupervisorIfWanted();
+      if (users != null) payload['supervisor_user_id'] = users;
+    }
     try {
       final res = await _svc.startVisit(businessId: widget.businessId, payload: payload);
       if (!mounted) return;
@@ -770,8 +887,9 @@ class _DistributionMainPageState extends State<DistributionMainPage>
       Tab(text: t.distributionTabVisits, icon: const Icon(Icons.place_outlined)),
       Tab(text: t.distributionTabReturns, icon: const Icon(Icons.assignment_return_outlined)),
       if (_canOperate) Tab(text: t.distributionTabSettlement, icon: const Icon(Icons.account_balance_wallet_outlined)),
-      if (_canOperate) Tab(text: t.distributionTabVan, icon: const Icon(Icons.local_shipping)),
-      if (_canOperate) Tab(text: t.distributionTabCommercial, icon: const Icon(Icons.storefront_outlined)),
+      if (_canOperate && _enableVanSales) Tab(text: t.distributionTabVan, icon: const Icon(Icons.local_shipping)),
+      if (_canOperate && (_enablePresell || _canManage))
+        Tab(text: t.distributionTabCommercial, icon: const Icon(Icons.storefront_outlined)),
       if (_canManage) Tab(text: t.distributionTabManage, icon: const Icon(Icons.alt_route)),
     ];
 
@@ -788,14 +906,16 @@ class _DistributionMainPageState extends State<DistributionMainPage>
           canSettle: widget.authStore.hasBusinessPermission('distribution', 'settle') || _canManage,
           currentUserId: widget.authStore.currentUserId,
         ),
-      if (_canOperate) _vanTab(t),
-      if (_canOperate)
+      if (_canOperate && _enableVanSales) _vanTab(t),
+      if (_canOperate && (_enablePresell || _canManage))
         DistributionCommercialPanel(
           businessId: widget.businessId,
           service: _svc,
           calendarController: widget.calendarController,
           canManage: _canManage,
           canOperate: _canOperate,
+          requirePodSignature: _requirePodSignature,
+          requirePodPhoto: _requirePodPhoto,
         ),
       if (_canManage) _manageTab(t),
     ];
@@ -823,10 +943,37 @@ class _DistributionMainPageState extends State<DistributionMainPage>
               icon: Badge(label: Text('$_offlinePending'), child: const Icon(Icons.cloud_queue_outlined)),
             ),
           IconButton(
-            tooltip: t.distributionRefresh,
-            onPressed: () => _loadTab(_tabController.index),
-            icon: const Icon(Icons.refresh),
+            tooltip: t.distributionOfflinePack,
+            onPressed: () async {
+              try {
+                await DistributionOfflineCatalog.refresh(businessId: widget.businessId, service: _svc);
+                if (mounted) {
+                  SnackBarHelper.showSuccess(context, message: t.distributionOfflinePackDone);
+                }
+              } catch (e) {
+                if (mounted) {
+                  SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
+                }
+              }
+            },
+            icon: const Icon(Icons.cloud_download_outlined),
           ),
+          if (_canManage)
+            IconButton(
+              tooltip: t.distributionWizardTitle,
+              onPressed: () async {
+                final ok = await showDistributionSetupWizard(
+                  context: context,
+                  businessId: widget.businessId,
+                  service: _svc,
+                );
+                if (ok) {
+                  await _refreshSummary();
+                  await _refreshPlan();
+                }
+              },
+              icon: const Icon(Icons.auto_fix_high_outlined),
+            ),
         ],
         bottom: TabBar(
           controller: _tabController,
@@ -834,16 +981,33 @@ class _DistributionMainPageState extends State<DistributionMainPage>
           tabs: tabs,
         ),
       ),
-      floatingActionButton: _tabKeys[_tabController.index] == 'returns' && _canOperate
+      floatingActionButton: _canOperate &&
+              (_tabKeys[_tabController.index] == 'returns' || _tabKeys[_tabController.index] == 'field')
           ? FloatingActionButton.extended(
-              onPressed: () => showDistributionReturnDialog(
-                context: context,
-                businessId: widget.businessId,
-                service: _svc,
-                onSubmitted: _refreshReturns,
+              onPressed: _tabKeys[_tabController.index] == 'returns'
+                  ? () => showDistributionReturnDialog(
+                        context: context,
+                        businessId: widget.businessId,
+                        service: _svc,
+                        onSubmitted: _refreshReturns,
+                      )
+                  : () async {
+                      final planItems = (_dailyPlan?['items'] as List?) ?? [];
+                      final rid = planItems.isEmpty
+                          ? null
+                          : int.tryParse('${(planItems.first as Map)['route_id']}');
+                      final ok = await showDistributionNewOutletSheet(
+                        context: context,
+                        businessId: widget.businessId,
+                        service: _svc,
+                        routeId: rid,
+                      );
+                      if (ok) await _refreshPlan();
+                    },
+              icon: Icon(_tabKeys[_tabController.index] == 'returns' ? Icons.assignment_return : Icons.storefront_outlined),
+              label: Text(
+                _tabKeys[_tabController.index] == 'returns' ? t.distributionReturnCreate : t.distributionNewOutlet,
               ),
-              icon: const Icon(Icons.assignment_return),
-              label: Text(t.distributionReturnCreate),
             )
           : null,
       body: TabBarView(
@@ -960,6 +1124,37 @@ class _DistributionMainPageState extends State<DistributionMainPage>
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
+                  if (_canManage && !_setupCompleted)
+                    Card(
+                      color: cs.tertiaryContainer.withValues(alpha: 0.5),
+                      child: ListTile(
+                        leading: const Icon(Icons.auto_fix_high_outlined),
+                        title: Text(t.distributionSetupNeeded),
+                        trailing: FilledButton(
+                          onPressed: () async {
+                            final ok = await showDistributionSetupWizard(
+                              context: context,
+                              businessId: widget.businessId,
+                              service: _svc,
+                            );
+                            if (ok) {
+                              await _refreshSummary();
+                              await _refreshPlan();
+                            }
+                          },
+                          child: Text(t.distributionStartWizard),
+                        ),
+                      ),
+                    ),
+                  if (!_canManage)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Text(t.distributionVisitorHomeHint, style: theme.textTheme.bodySmall),
+                    ),
+                  if (_scorecard != null) ...[
+                    DistributionScorecardCard(kpi: _scorecard!),
+                    const SizedBox(height: 12),
+                  ],
                   Row(
                     children: [
                       Expanded(
@@ -999,6 +1194,13 @@ class _DistributionMainPageState extends State<DistributionMainPage>
                           visualDensity: VisualDensity.compact,
                           avatar: const Icon(Icons.assignment_return, size: 16),
                           label: Text('${t.distributionPendingReturns}: ${_summary['pending_return_requests'] ?? 0}'),
+                        ),
+                      if ((_dailyPlan?['carried_over_count'] ?? 0) is num &&
+                          ((_dailyPlan?['carried_over_count'] as num).toInt() > 0))
+                        Chip(
+                          visualDensity: VisualDensity.compact,
+                          avatar: const Icon(Icons.history, size: 16),
+                          label: Text('${t.distributionCarriedOver}: ${_dailyPlan?['carried_over_count']}'),
                         ),
                     ],
                   ),
@@ -1233,6 +1435,21 @@ class _DistributionMainPageState extends State<DistributionMainPage>
                                           '${item['route_code'] ?? ''} · ${item['route_name'] ?? ''}',
                                           style: theme.textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
                                         ),
+                                        if (item['carried_over'] == true)
+                                          Text(
+                                            t.distributionCarriedOver,
+                                            style: theme.textTheme.labelSmall?.copyWith(color: cs.tertiary),
+                                          ),
+                                        if (item['customer_class'] != null || item['frequency'] != null)
+                                          Text(
+                                            [
+                                              if (item['customer_class'] != null)
+                                                distributionClassLabel(t, item['customer_class']?.toString()),
+                                              if (item['frequency'] != null)
+                                                distributionFrequencyLabel(t, item['frequency']?.toString()),
+                                            ].join(' · '),
+                                            style: theme.textTheme.labelSmall,
+                                          ),
                                       ],
                                     ),
                                   ),
@@ -1256,7 +1473,7 @@ class _DistributionMainPageState extends State<DistributionMainPage>
                                     ),
                                   if (lat != null && lng != null)
                                     TextButton.icon(
-                                      onPressed: () => openDistributionMapsNavigation(lat, lng),
+                                      onPressed: () => openDistributionMapsNavigation(lat, lng, provider: _navProvider),
                                       icon: const Icon(Icons.navigation_outlined, size: 18),
                                       label: Text(t.distributionNavigate),
                                     ),
@@ -1427,6 +1644,62 @@ class _DistributionMainPageState extends State<DistributionMainPage>
             title: Text(t.distributionEnableSuggestedOrder),
             value: ds['enable_suggested_order'] != false,
             onChanged: (v) => persist({'enable_suggested_order': v}),
+          ),
+          SwitchListTile(
+            title: Text(t.distributionCarryOver),
+            value: ds['carry_over_missed_visits'] != false,
+            onChanged: (v) => persist({'carry_over_missed_visits': v}),
+          ),
+          SwitchListTile(
+            title: Text(t.distributionRequirePodSignature),
+            value: ds['require_pod_signature'] == true,
+            onChanged: (v) => persist({'require_pod_signature': v}),
+          ),
+          SwitchListTile(
+            title: Text(t.distributionRequirePodPhoto),
+            value: ds['require_pod_photo'] == true,
+            onChanged: (v) => persist({'require_pod_photo': v}),
+          ),
+          SwitchListTile(
+            title: Text(t.distributionAutoPromo),
+            value: ds['auto_apply_promotions'] != false,
+            onChanged: (v) => persist({'auto_apply_promotions': v}),
+          ),
+          SwitchListTile(
+            title: Text(t.distributionPerfectStore),
+            value: ds['enable_perfect_store'] != false,
+            onChanged: (v) => persist({'enable_perfect_store': v}),
+          ),
+          DropdownButtonFormField<String>(
+            value: (ds['nav_provider'] ?? 'neshan').toString(),
+            decoration: InputDecoration(
+              labelText: t.distributionNavProvider,
+              border: const OutlineInputBorder(),
+            ),
+            items: [
+              DropdownMenuItem(value: 'neshan', child: Text(t.distributionNavNeshan)),
+              DropdownMenuItem(value: 'google', child: Text(t.distributionNavGoogle)),
+              DropdownMenuItem(value: 'waze', child: Text(t.distributionNavWaze)),
+            ],
+            onChanged: (v) {
+              if (v != null) persist({'nav_provider': v});
+            },
+          ),
+          ListTile(
+            title: Text(t.distributionNearExpiryDays),
+            subtitle: Text('${ds['near_expiry_days'] ?? 14}'),
+            trailing: SizedBox(
+              width: 72,
+              child: TextField(
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(isDense: true, border: OutlineInputBorder()),
+                controller: TextEditingController(text: '${ds['near_expiry_days'] ?? 14}'),
+                onSubmitted: (v) {
+                  final n = int.tryParse(v.trim());
+                  if (n != null && n >= 1 && n <= 90) persist({'near_expiry_days': n});
+                },
+              ),
+            ),
           ),
           ListTile(
             title: Text(t.distributionVisitorMaxDiscount),
@@ -1721,6 +1994,16 @@ class _DistributionMainPageState extends State<DistributionMainPage>
                 onPressed: () => _showTerritoryDialog(t),
                 icon: const Icon(Icons.add),
                 label: Text(t.distributionTerritoryCreate),
+              ),
+              const SizedBox(width: 8),
+              FilledButton.tonalIcon(
+                onPressed: () => showDistributionAssortmentSheet(
+                  context: context,
+                  businessId: widget.businessId,
+                  service: _svc,
+                ),
+                icon: const Icon(Icons.star_outline),
+                label: Text(t.distributionAssortmentsTitle),
               ),
             ],
           ),
@@ -2082,6 +2365,10 @@ class _DistributionMainPageState extends State<DistributionMainPage>
         : '${stops.length + 1}';
     final sortCtl = TextEditingController(text: defaultSort);
     int? weekday = existing?['weekday'] is int ? existing!['weekday'] as int : int.tryParse('${existing?['weekday'] ?? ''}');
+    var frequency = (existing?['frequency'] ?? 'weekly').toString();
+    var cls = existing?['customer_class']?.toString();
+    final offsetCtl = TextEditingController(text: '${existing?['cycle_offset'] ?? 0}');
+    int? priceListId = int.tryParse('${existing?['price_list_id'] ?? ''}');
     await showDialog<void>(
       context: context,
       builder: (ctx) => StatefulBuilder(
@@ -2111,6 +2398,52 @@ class _DistributionMainPageState extends State<DistributionMainPage>
                 ],
                 onChanged: (v) => setD(() => weekday = v),
               ),
+              DropdownButtonFormField<String>(
+                value: frequency,
+                isExpanded: true,
+                decoration: InputDecoration(
+                  labelText: t.distributionVisitFrequency,
+                  border: const OutlineInputBorder(),
+                ),
+                items: [
+                  DropdownMenuItem(value: 'weekly', child: Text(t.distributionFrequencyWeekly)),
+                  DropdownMenuItem(value: 'biweekly', child: Text(t.distributionFrequencyBiweekly)),
+                  DropdownMenuItem(value: 'monthly', child: Text(t.distributionFrequencyMonthly)),
+                ],
+                onChanged: (v) => setD(() => frequency = v ?? 'weekly'),
+              ),
+              DropdownButtonFormField<String?>(
+                value: cls,
+                isExpanded: true,
+                decoration: InputDecoration(
+                  labelText: t.distributionCustomerClass,
+                  border: const OutlineInputBorder(),
+                ),
+                items: [
+                  const DropdownMenuItem<String?>(value: null, child: Text('—')),
+                  DropdownMenuItem(value: 'A', child: Text(t.distributionClassA)),
+                  DropdownMenuItem(value: 'B', child: Text(t.distributionClassB)),
+                  DropdownMenuItem(value: 'C', child: Text(t.distributionClassC)),
+                ],
+                onChanged: (v) => setD(() => cls = v),
+              ),
+              TextField(
+                controller: offsetCtl,
+                keyboardType: TextInputType.number,
+                decoration: InputDecoration(
+                  labelText: t.distributionCycleOffset,
+                  helperText: t.distributionCycleOffsetHint,
+                  helperMaxLines: 3,
+                  border: const OutlineInputBorder(),
+                ),
+              ),
+              PriceListComboboxWidget(
+                businessId: widget.businessId,
+                selectedPriceListId: priceListId,
+                label: t.distributionPriceList,
+                hintText: t.distributionPriceList,
+                onChanged: (p) => setD(() => priceListId = int.tryParse('${p?['id'] ?? ''}')),
+              ),
               TextField(
                 controller: sortCtl,
                 keyboardType: TextInputType.number,
@@ -2132,8 +2465,24 @@ class _DistributionMainPageState extends State<DistributionMainPage>
                       'person_id': person!.id,
                       'sort_order': int.tryParse(sortCtl.text.trim()) ?? 0,
                       'weekday': weekday,
+                      'frequency': frequency,
+                      'cycle_offset': int.tryParse(offsetCtl.text.trim()) ?? 0,
+                      if (cls != null) 'customer_class': cls,
                     },
                   );
+                  final pidSaved = person!.id;
+                  if (pidSaved != null) {
+                    await _svc.upsertCustomerProfile(
+                      businessId: widget.businessId,
+                      personId: pidSaved,
+                      payload: {
+                        'visit_frequency': frequency,
+                        'cycle_offset': int.tryParse(offsetCtl.text.trim()) ?? 0,
+                        if (cls != null) 'customer_class': cls,
+                        'price_list_id': priceListId,
+                      },
+                    );
+                  }
                   if (ctx.mounted) Navigator.pop(ctx);
                   await _loadStops(routeId);
                 } catch (e) {

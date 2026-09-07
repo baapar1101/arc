@@ -161,3 +161,114 @@ def test_offline_sync_supports_presell_composite():
 	src = inspect.getsource(process_offline_sync)
 	assert "complete_visit_with_presell" in src
 	assert "create_presell_order" in src
+
+
+def test_stop_due_on_frequencies():
+	from datetime import date
+	from app.services.distribution_field_ops_service import stop_due_on, week_of_month, iso_week_parity
+
+	thursday = date(2026, 9, 10)  # weekday 3
+	assert stop_due_on(thursday, weekday=3, frequency="weekly") is True
+	assert stop_due_on(thursday, weekday=2, frequency="weekly") is False
+	assert iso_week_parity(thursday) in (0, 1)
+	off = iso_week_parity(thursday)
+	assert stop_due_on(thursday, weekday=3, frequency="biweekly", cycle_offset=off) is True
+	assert stop_due_on(thursday, weekday=3, frequency="biweekly", cycle_offset=1 - off) is False
+	assert week_of_month(date(2026, 9, 1)) == 0
+	assert week_of_month(date(2026, 9, 10)) == 1
+	assert stop_due_on(date(2026, 9, 10), weekday=3, frequency="monthly", cycle_offset=1) is True
+
+
+def test_perfect_store_score_weights():
+	from app.services.distribution_field_ops_service import perfect_store_score
+
+	assert perfect_store_score(None) is None
+	score = perfect_store_score({
+		"osa": True,
+		"shelf_facing": True,
+		"price_tag": True,
+		"planogram": False,
+		"share_of_shelf": 50,
+	})
+	assert score is not None
+	assert 70 <= score <= 85
+
+
+def test_reason_catalog_codes():
+	from app.services.distribution_field_ops_service import reason_catalog
+
+	c = reason_catalog()
+	assert any(r["code"] == "closed" for r in c["no_order"])
+	assert any(r["code"] == "expired" for r in c["return"])
+	assert "weekly" in c["frequencies"]
+
+
+def test_extend_settings_has_field_ops_flags():
+	from app.services.distribution_phase3_service import extend_settings_dict
+
+	d = extend_settings_dict(None)
+	assert d["carry_over_missed_visits"] is True
+	assert d["nav_provider"] == "neshan"
+	assert d["auto_apply_promotions"] is True
+	assert d["require_pod_signature"] is False
+
+
+def test_previous_due_dates_weekly_lookback():
+	from datetime import date
+	from app.services.distribution_field_ops_service import previous_due_dates
+
+	thursday = date(2026, 9, 10)
+	prev = previous_due_dates(thursday, weekday=3, frequency="weekly", cycle_offset=0, lookback_days=14)
+	assert date(2026, 9, 3) in prev
+	assert date(2026, 8, 27) in prev
+	assert date(2026, 9, 4) not in prev
+
+
+def test_foc_appends_zero_price_free_line():
+	import inspect
+	from app.services.distribution_commercial_service import apply_promotions_to_lines
+
+	src = inspect.getsource(apply_promotions_to_lines)
+	assert "foc_lines.append" in src
+	assert "is_foc" in src
+	assert "unit_price" in src
+	assert "out.extend(foc_lines)" in src
+
+
+def test_commission_uses_collection_and_coverage():
+	import inspect
+	from app.services.distribution_commercial_service import compute_commission_run
+
+	src = inspect.getsource(compute_commission_run)
+	assert "on_collection" in src
+	assert "coverage_factor" in src
+	assert "collected_amount" in src
+
+
+def test_confirm_load_plan_accepts_actual_lines():
+	import inspect
+	from app.services.distribution_commercial_service import confirm_load_plan
+
+	src = inspect.getsource(confirm_load_plan)
+	assert "actual_lines" in src
+	assert "variance_qty" in src
+	assert "loaded_qty" in src
+
+
+def test_consume_van_lots_fefo_empty_when_no_lots():
+	from types import SimpleNamespace
+	from app.services.distribution_field_ops_service import consume_van_lots_fefo
+
+	class _Q:
+		def filter(self, *a, **k):
+			return self
+
+		def order_by(self, *a, **k):
+			return self
+
+		def all(self):
+			return []
+
+	db = SimpleNamespace(query=lambda *a, **k: _Q())
+	assert consume_van_lots_fefo(db, 1, 2, 5) == []
+

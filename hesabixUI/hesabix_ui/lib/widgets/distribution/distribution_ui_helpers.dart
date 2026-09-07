@@ -99,10 +99,28 @@ Widget distributionStatusChip(BuildContext context, AppLocalizations t, String? 
   );
 }
 
-Future<void> openDistributionMapsNavigation(double lat, double lng) async {
-  final uri = Uri.parse('https://www.google.com/maps/dir/?api=1&destination=$lat,$lng');
-  if (await canLaunchUrl(uri)) {
-    await launchUrl(uri, mode: LaunchMode.externalApplication);
+Future<void> openDistributionMapsNavigation(
+  double lat,
+  double lng, {
+  String provider = 'neshan',
+}) async {
+  final p = provider.trim().toLowerCase();
+  final uris = <Uri>[];
+  if (p == 'waze') {
+    uris.add(Uri.parse('https://waze.com/ul?ll=$lat,$lng&navigate=yes'));
+  } else if (p == 'google') {
+    uris.add(Uri.parse('https://www.google.com/maps/dir/?api=1&destination=$lat,$lng'));
+  } else {
+    uris.add(Uri.parse('https://nshn.ir/?lat=$lat&lng=$lng'));
+    uris.add(Uri.parse('neshan://search?lat=$lat&lng=$lng'));
+  }
+  uris.add(Uri.parse('geo:$lat,$lng'));
+  uris.add(Uri.parse('https://www.google.com/maps/dir/?api=1&destination=$lat,$lng'));
+  for (final uri in uris) {
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+      return;
+    }
   }
 }
 

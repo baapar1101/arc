@@ -6,11 +6,16 @@ import 'package:hesabix_ui/widgets/invoice/product_combobox_widget.dart';
 
 import '../../core/api_client.dart';
 import '../../services/business_storage_service.dart';
+import '../../services/bytes_export/bytes_export_service.dart';
 import '../../services/distribution_service.dart';
+import '../../services/invoice_service.dart';
 import '../../utils/distribution_location_helper.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
+import 'distribution_customer_360_card.dart';
+import 'distribution_field_helpers.dart';
 import 'distribution_form_helpers.dart';
+import 'distribution_signature_pad.dart';
 
 /// پایان ویزیت میدانی — ویزارد سه‌مرحله‌ای: نتیجه، فروش، تحویل.
 Future<void> showDistributionVisitCompleteSheet({
@@ -25,6 +30,11 @@ Future<void> showDistributionVisitCompleteSheet({
   bool enablePresell = false,
   bool enableSuggestedOrder = true,
   bool enablePromotions = false,
+  bool autoApplyPromotions = true,
+  bool requirePodSignature = false,
+  bool requirePodPhoto = false,
+  bool enablePerfectStore = true,
+  String navProvider = 'neshan',
   Future<void> Function(Map<String, dynamic> payload)? onOfflineEnqueue,
 }) async {
   final t = AppLocalizations.of(context);
@@ -34,8 +44,7 @@ Future<void> showDistributionVisitCompleteSheet({
   String saleMode = enableVanSales ? 'van' : (enablePresell ? 'presell' : 'invoice');
   int? linkedDocumentId;
   String? linkedDocumentLabel;
-  final dealCtl = TextEditingController();
-  final reasonCtl = TextEditingController();
+  String? noOrderCode;
   final noteCtl = TextEditingController();
   final checklistState = <String, bool>{};
   for (final raw in checklistTemplate) {
@@ -55,12 +64,17 @@ Future<void> showDistributionVisitCompleteSheet({
   Map<String, dynamic>? creditSummary;
   var loadingExtras = true;
   var submitting = false;
-  var podConfirmed = false;
+  var podConfirmed = requirePodSignature || requirePodPhoto;
   final podNameCtl = TextEditingController();
   final podNoteCtl = TextEditingController();
+  String? podSignaturePng;
+  int? podPhotoFileId;
   var shelfFacingOk = true;
   var shelfPriceOk = true;
   var shelfStockOk = true;
+  var osaOk = true;
+  var planogramOk = true;
+  double shareOfShelf = 70;
 
   Future<void> loadExtras(void Function(void Function()) setModal) async {
     try {
@@ -92,6 +106,12 @@ Future<void> showDistributionVisitCompleteSheet({
       if (enablePromotions) {
         futures.add(service.listPromotions(businessId: businessId).then((items) {
           activePromos = items.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+          if (autoApplyPromotions) {
+            for (final p in activePromos) {
+              final id = int.tryParse('${p['id']}');
+              if (id != null) selectedPromoIds.add(id);
+            }
+          }
         }));
       }
       await Future.wait(futures);
@@ -124,23 +144,55 @@ Future<void> showDistributionVisitCompleteSheet({
 
   Future<void> submitVisit(BuildContext sheetCtx, BuildContext rootCtx) async {
     if (!validateChecklist(rootCtx)) return;
-    if (outcome == 'order' && podConfirmed && podNameCtl.text.trim().length < 2) {
-      SnackBarHelper.showError(rootCtx, message: t.distributionPodSignerRequired);
-      return;
+    if (outcome == 'no_order') {
+      if (noOrderCode == null || noOrderCode!.isEmpty) {
+        SnackBarHelper.showError(rootCtx, message: t.distributionReasonRequired);
+        return;
+      }
+    }
+    if (outcome == 'order' && (requirePodSignature || requirePodPhoto || podConfirmed)) {
+      if (podNameCtl.text.trim().length < 2) {
+        SnackBarHelper.showError(rootCtx, message: t.distributionPodSignerRequired);
+        return;
+      }
+      if (requirePodSignature && (podSignaturePng == null || podSignaturePng!.length < 40)) {
+        SnackBarHelper.showError(rootCtx, message: t.distributionPodSignatureRequired);
+        return;
+      }
+      if (requirePodPhoto && podPhotoFileId == null && shelfPhotoFileId == null) {
+        SnackBarHelper.showError(rootCtx, message: t.distributionPodPhotoRequired);
+        return;
+      }
     }
     if (outcome == 'order' && creditBlocksVanSale() && (vanLines.isNotEmpty || (saleMode == 'presell' && presellLines.isNotEmpty))) {
       SnackBarHelper.showError(rootCtx, message: t.distributionCustomerCreditBlocked);
       return;
     }
 
+    final saleLines = saleMode == 'van' ? vanLines : presellLines;
+    final missingMust = suggestedLines
+        .where((s) => s['must_sell'] == true)
+        .where((s) => !saleLines.any((e) => e['product_id'] == int.tryParse('${s['product_id']}')))
+        .toList();
+    if (outcome == 'order' && missingMust.isNotEmpty && (saleMode == 'van' || saleMode == 'presell')) {
+      SnackBarHelper.showError(rootCtx, message: t.distributionMustSellMissing);
+      return;
+    }
+
     final endLoc = await readDistributionVisitLocation();
+    final extra = <String, dynamic>{
+      if (selectedPromoIds.isNotEmpty) 'promotion_ids': selectedPromoIds.toList(),
+      'lines_count': saleLines.length,
+      if (noOrderCode != null) 'no_order_reason_code': noOrderCode,
+    };
     final payload = <String, dynamic>{
       'outcome': outcome,
       if (linkedDocumentId != null) 'document_id': linkedDocumentId,
-      if (dealCtl.text.trim().isNotEmpty) 'deal_id': int.tryParse(dealCtl.text.trim()),
       if (noteCtl.text.trim().isNotEmpty) 'notes': noteCtl.text.trim(),
-      if (outcome == 'no_order' && reasonCtl.text.trim().isNotEmpty)
-        'no_order_reason': reasonCtl.text.trim(),
+      if (outcome == 'no_order') ...{
+        'no_order_reason_code': noOrderCode,
+        'no_order_reason': distributionNoOrderReasonLabel(t, noOrderCode ?? 'other'),
+      },
       if (endLoc.latitude != null) 'end_latitude': endLoc.latitude,
       if (endLoc.longitude != null) 'end_longitude': endLoc.longitude,
       if (checklistState.isNotEmpty) 'checklist_answers': checklistState,
@@ -157,11 +209,13 @@ Future<void> showDistributionVisitCompleteSheet({
               },
             )
             .toList(),
-      if (selectedPromoIds.isNotEmpty) 'extra_info': {'promotion_ids': selectedPromoIds.toList()},
-      if (outcome == 'order' && podConfirmed) ...{
+      'extra_info': extra,
+      if (outcome == 'order' && (podConfirmed || requirePodSignature || requirePodPhoto)) ...{
         'pod_confirmed': true,
         'pod_signer_name': podNameCtl.text.trim(),
         if (podNoteCtl.text.trim().isNotEmpty) 'pod_note': podNoteCtl.text.trim(),
+        if (podSignaturePng != null) 'pod_signature_png': podSignaturePng,
+        if (podPhotoFileId != null) 'pod_photo_file_id': podPhotoFileId,
       },
     };
 
@@ -207,19 +261,24 @@ Future<void> showDistributionVisitCompleteSheet({
             });
             if (personId != null) {
               try {
-                await service.createShelfAudit(
-                  businessId: businessId,
-                  payload: {
-                    'person_id': personId,
-                    'visit_id': visitId,
-                    'answers': {
-                      'facing_ok': shelfFacingOk,
-                      'price_ok': shelfPriceOk,
-                      'stock_ok': shelfStockOk,
-                    },
-                    if (shelfPhotoFileId != null) 'photo_file_ids': [shelfPhotoFileId],
-                  },
-                );
+          await service.createShelfAudit(
+            businessId: businessId,
+            payload: {
+              'person_id': personId,
+              'visit_id': visitId,
+              'answers': {
+                'facing_ok': shelfFacingOk,
+                'price_ok': shelfPriceOk,
+                'stock_ok': shelfStockOk,
+                'shelf_facing': shelfFacingOk,
+                'price_tag': shelfPriceOk,
+                'osa': osaOk,
+                'planogram': planogramOk,
+                'share_of_shelf': shareOfShelf,
+              },
+              if (shelfPhotoFileId != null) 'photo_file_ids': [shelfPhotoFileId],
+            },
+          );
               } catch (_) {}
             }
             if (sheetCtx.mounted) Navigator.pop(sheetCtx);
@@ -252,6 +311,11 @@ Future<void> showDistributionVisitCompleteSheet({
                 'facing_ok': shelfFacingOk,
                 'price_ok': shelfPriceOk,
                 'stock_ok': shelfStockOk,
+                'shelf_facing': shelfFacingOk,
+                'price_tag': shelfPriceOk,
+                'osa': osaOk,
+                'planogram': planogramOk,
+                'share_of_shelf': shareOfShelf,
               },
               if (shelfPhotoFileId != null) 'photo_file_ids': [shelfPhotoFileId],
             },
@@ -264,6 +328,22 @@ Future<void> showDistributionVisitCompleteSheet({
       onCompleted();
       if (rootCtx.mounted) {
         SnackBarHelper.showSuccess(rootCtx, message: t.distributionCompleteVisit);
+        final docId = payload['document_id'] is int
+            ? payload['document_id'] as int
+            : int.tryParse('${payload['document_id'] ?? ''}');
+        if (docId != null && docId > 0) {
+          try {
+            final bytes = await InvoiceService(apiClient: ApiClient()).downloadInvoicePdf(
+              businessId: businessId,
+              invoiceId: docId,
+            );
+            await BytesExportService.export(
+              bytes: bytes,
+              filename: 'distribution_invoice_$docId.pdf',
+              mimeType: 'application/pdf',
+            );
+          } catch (_) {}
+        }
       }
     } catch (e) {
       final msg = ErrorExtractor.forContext(e, rootCtx);
@@ -338,7 +418,8 @@ Future<void> showDistributionVisitCompleteSheet({
                                           '${selected!['unit_price'] != null ? ' · ${selected!['unit_price']}' : ''}',
                                   labelOf: (s) =>
                                       '${s['product_name']} · ${t.distributionVanStock}: ${s['quantity']}'
-                                      '${s['unit_price'] != null ? ' · ${s['unit_price']}' : ''}',
+                                      '${s['unit_price'] != null ? ' · ${s['unit_price']}' : ''}'
+                                      '${s['near_expiry'] == true ? ' · ${t.distributionNearExpiry}' : ''}',
                                   selectedOf: (s) =>
                                       selected != null &&
                                       int.tryParse('${s['product_id']}') ==
@@ -571,14 +652,18 @@ Future<void> showDistributionVisitCompleteSheet({
                       ],
                       if (outcome == 'no_order') ...[
                         const SizedBox(height: 16),
-                        TextField(
-                          controller: reasonCtl,
-                          maxLines: 2,
-                          decoration: InputDecoration(
-                            labelText: t.distributionNoOrderReason,
-                            border: const OutlineInputBorder(),
-                            alignLabelWithHint: true,
-                          ),
+                        Text(t.distributionNoOrderReason, style: theme.textTheme.titleSmall),
+                        const SizedBox(height: 8),
+                        Wrap(
+                          spacing: 6,
+                          runSpacing: 6,
+                          children: distributionNoOrderCodes.map((code) {
+                            return ChoiceChip(
+                              label: Text(distributionNoOrderReasonLabel(t, code)),
+                              selected: noOrderCode == code,
+                              onSelected: (_) => setModal(() => noOrderCode = code),
+                            );
+                          }).toList(),
                         ),
                       ],
                     ],
@@ -618,7 +703,32 @@ Future<void> showDistributionVisitCompleteSheet({
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      if (personId != null) ...[
+                      if (personId != null)
+                        DistributionCustomer360Card(
+                          businessId: businessId,
+                          personId: personId,
+                          service: service,
+                          navProvider: navProvider,
+                          onAddSuggested: suggestedLines.isEmpty
+                              ? null
+                              : () {
+                                  setModal(() {
+                                    final target = saleMode == 'van' ? vanLines : presellLines;
+                                    for (final s in suggestedLines) {
+                                      final pid = int.tryParse('${s['product_id']}');
+                                      if (pid == null) continue;
+                                      if (target.any((e) => e['product_id'] == pid)) continue;
+                                      target.add({
+                                        'product_id': pid,
+                                        'product_name': s['product_name'],
+                                        'quantity': s['suggested_qty'] ?? 1,
+                                        'unit_price': s['unit_price'],
+                                        if (s['must_sell'] == true) 'must_sell': true,
+                                      });
+                                    }
+                                  });
+                                },
+                        ),
                         if (enableVanSales || enablePresell) ...[
                           Text(t.distributionSaleMode, style: theme.textTheme.titleSmall),
                           const SizedBox(height: 8),
@@ -682,6 +792,7 @@ Future<void> showDistributionVisitCompleteSheet({
                           onPressed: () async {
                             await context.push('/business/$businessId/invoice/new?person_id=$personId');
                             try {
+                              if (personId == null) return;
                               final items = await service.listPersonInvoices(
                                 businessId: businessId,
                                 personId: personId,
@@ -766,6 +877,32 @@ Future<void> showDistributionVisitCompleteSheet({
                         if ((saleMode == 'presell' || saleMode == 'van') &&
                             suggestedLines.isNotEmpty) ...[
                           const SizedBox(height: 12),
+                          Text(t.distributionApplySuggestedOrder, style: theme.textTheme.titleSmall),
+                          const SizedBox(height: 6),
+                          ...suggestedLines.map((s) {
+                            final must = s['must_sell'] == true;
+                            final cover = s['days_of_cover'];
+                            return Card(
+                              margin: const EdgeInsets.only(bottom: 6),
+                              child: ListTile(
+                                dense: true,
+                                title: Text('${s['product_name'] ?? s['product_id']}'),
+                                subtitle: Text(
+                                  [
+                                    '× ${s['suggested_qty'] ?? 1}',
+                                    if (cover != null) '${t.distributionDaysOfCover}: $cover',
+                                    if (must) t.distributionMustSell,
+                                  ].join(' · '),
+                                ),
+                                trailing: must
+                                    ? Chip(
+                                        visualDensity: VisualDensity.compact,
+                                        label: Text(t.distributionMustSell),
+                                      )
+                                    : null,
+                              ),
+                            );
+                          }),
                           OutlinedButton.icon(
                             onPressed: () {
                               setModal(() {
@@ -778,6 +915,8 @@ Future<void> showDistributionVisitCompleteSheet({
                                     'product_id': pid,
                                     'product_name': s['product_name'],
                                     'quantity': s['suggested_qty'] ?? 1,
+                                    'unit_price': s['unit_price'],
+                                    if (s['must_sell'] == true) 'must_sell': true,
                                   });
                                 }
                               });
@@ -811,7 +950,6 @@ Future<void> showDistributionVisitCompleteSheet({
                             }).toList(),
                           ),
                         ],
-                      ],
                       if (enableVanSales && saleMode == 'van') ...[
                         const SizedBox(height: 22),
                         Text(t.distributionVanSaleFromStock, style: theme.textTheme.titleSmall),
@@ -862,6 +1000,50 @@ Future<void> showDistributionVisitCompleteSheet({
                             minimumSize: const Size.fromHeight(44),
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                           ),
+                        ),
+                        const SizedBox(height: 8),
+                        OutlinedButton.icon(
+                          onPressed: blocked
+                              ? null
+                              : () async {
+                                  final code = await scanDistributionBarcode(context);
+                                  if (code == null || code.isEmpty) return;
+                                  try {
+                                    final p = await service.lookupBarcode(
+                                      businessId: businessId,
+                                      barcode: code,
+                                      personId: personId,
+                                    );
+                                    final pid = int.tryParse('${p['product_id']}') ?? 0;
+                                    if (pid <= 0) return;
+                                    final stock = vanStock.cast<Map<String, dynamic>>().where(
+                                          (s) => int.tryParse('${s['product_id']}') == pid,
+                                        );
+                                    final avail = stock.isEmpty
+                                        ? 0.0
+                                        : (double.tryParse('${stock.first['quantity']}') ?? 0);
+                                    if (avail <= 0) {
+                                      SnackBarHelper.showError(context, message: t.distributionVanQtyExceedsStock);
+                                      return;
+                                    }
+                                    setModal(() {
+                                      vanLines.add({
+                                        'product_id': pid,
+                                        'product_name': p['product_name'],
+                                        'quantity': 1,
+                                        'unit_price': p['unit_price'],
+                                        'tax_rate': p['tax_rate'],
+                                      });
+                                    });
+                                  } catch (e) {
+                                    SnackBarHelper.showError(
+                                      context,
+                                      message: ErrorExtractor.forContext(e, context),
+                                    );
+                                  }
+                                },
+                          icon: const Icon(Icons.qr_code_scanner),
+                          label: Text(t.distributionScanBarcode),
                         ),
                       ],
                       if (enablePresell && saleMode == 'presell') ...[
@@ -968,6 +1150,37 @@ Future<void> showDistributionVisitCompleteSheet({
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                           ),
                         ),
+                        const SizedBox(height: 8),
+                        OutlinedButton.icon(
+                          onPressed: () async {
+                            final code = await scanDistributionBarcode(context);
+                            if (code == null || code.isEmpty) return;
+                            try {
+                              final p = await service.lookupBarcode(
+                                businessId: businessId,
+                                barcode: code,
+                                personId: personId,
+                              );
+                              final pid = int.tryParse('${p['product_id']}') ?? 0;
+                              if (pid <= 0) return;
+                              setModal(() {
+                                presellLines.add({
+                                  'product_id': pid,
+                                  'product_name': p['product_name'],
+                                  'quantity': 1,
+                                  'unit_price': p['unit_price'],
+                                });
+                              });
+                            } catch (e) {
+                              SnackBarHelper.showError(
+                                context,
+                                message: ErrorExtractor.forContext(e, context),
+                              );
+                            }
+                          },
+                          icon: const Icon(Icons.qr_code_scanner),
+                          label: Text(t.distributionScanBarcode),
+                        ),
                       ],
                       if (personId != null) ...[
                         const SizedBox(height: 16),
@@ -990,27 +1203,33 @@ Future<void> showDistributionVisitCompleteSheet({
                           value: shelfStockOk,
                           onChanged: (v) => setModal(() => shelfStockOk = v),
                         ),
-                      ],
-                      const SizedBox(height: 12),
-                      ExpansionTile(
-                        tilePadding: EdgeInsets.zero,
-                        childrenPadding: const EdgeInsets.only(bottom: 4),
-                        title: Text(
-                          t.distributionDealIdHint,
-                          style: theme.textTheme.bodyMedium,
-                        ),
-                        children: [
-                          TextField(
-                            controller: dealCtl,
-                            keyboardType: TextInputType.number,
-                            decoration: InputDecoration(
-                              labelText: t.distributionDealIdHint,
-                              border: const OutlineInputBorder(),
-                              isDense: true,
+                        if (enablePerfectStore) ...[
+                          SwitchListTile(
+                            contentPadding: EdgeInsets.zero,
+                            title: Text(t.distributionOsaOk),
+                            value: osaOk,
+                            onChanged: (v) => setModal(() => osaOk = v),
+                          ),
+                          SwitchListTile(
+                            contentPadding: EdgeInsets.zero,
+                            title: Text(t.distributionPlanogram),
+                            value: planogramOk,
+                            onChanged: (v) => setModal(() => planogramOk = v),
+                          ),
+                          ListTile(
+                            contentPadding: EdgeInsets.zero,
+                            title: Text(t.distributionShareOfShelf),
+                            subtitle: Slider(
+                              value: shareOfShelf,
+                              min: 0,
+                              max: 100,
+                              divisions: 20,
+                              label: '${shareOfShelf.round()}%',
+                              onChanged: (v) => setModal(() => shareOfShelf = v),
                             ),
                           ),
                         ],
-                      ),
+                      ],
                     ],
                   );
                 }
@@ -1049,6 +1268,41 @@ Future<void> showDistributionVisitCompleteSheet({
                               border: const OutlineInputBorder(),
                               isDense: true,
                             ),
+                          ),
+                          const SizedBox(height: 12),
+                          DistributionSignaturePad(
+                            onChanged: (v) => setModal(() => podSignaturePng = v),
+                          ),
+                          const SizedBox(height: 12),
+                          OutlinedButton.icon(
+                            onPressed: () async {
+                              final pick = await FilePicker.platform.pickFiles(
+                                type: FileType.image,
+                                withData: true,
+                              );
+                              if (pick == null || pick.files.isEmpty) return;
+                              final f = pick.files.first;
+                              if (f.bytes == null) return;
+                              try {
+                                final uploaded = await BusinessStorageService(ApiClient()).uploadFile(
+                                  businessId: businessId,
+                                  fileBytes: f.bytes!,
+                                  filename: f.name,
+                                  moduleContext: 'distribution',
+                                  contextId: '$visitId',
+                                );
+                                setModal(() => podPhotoFileId = uploaded['id'] as int?);
+                              } catch (e) {
+                                if (context.mounted) {
+                                  SnackBarHelper.showError(
+                                    context,
+                                    message: ErrorExtractor.forContext(e, context),
+                                  );
+                                }
+                              }
+                            },
+                            icon: Icon(podPhotoFileId != null ? Icons.check_circle_outline : Icons.photo_camera_outlined),
+                            label: Text(t.distributionPodPhoto),
                           ),
                           const SizedBox(height: 16),
                         ] else
@@ -1174,6 +1428,10 @@ Future<void> showDistributionVisitCompleteSheet({
                                     : () async {
                                         if (step == 0) {
                                           if (!validateChecklist(context)) return;
+                                          if (outcome == 'no_order' && (noOrderCode == null || noOrderCode!.isEmpty)) {
+                                            SnackBarHelper.showError(context, message: t.distributionReasonRequired);
+                                            return;
+                                          }
                                           setModal(() {
                                             step = outcome == 'no_order' ? 2 : 1;
                                           });
@@ -1227,8 +1485,6 @@ Future<void> showDistributionVisitCompleteSheet({
       },
     );
   } finally {
-    dealCtl.dispose();
-    reasonCtl.dispose();
     noteCtl.dispose();
     podNameCtl.dispose();
     podNoteCtl.dispose();

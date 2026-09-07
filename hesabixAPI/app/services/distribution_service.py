@@ -163,6 +163,7 @@ def _validate_return_lines(db: Session, business_id: int, lines: List[Dict[str, 
 				"product_name": getattr(product, "name", None) or getattr(product, "title", None),
 				"quantity": qty,
 				"reason": (str(ln.get("reason")).strip() if ln.get("reason") else None),
+				"reason_code": (str(ln.get("reason_code")).strip().lower() if ln.get("reason_code") else None),
 				"unit": (str(ln.get("unit")).strip() if ln.get("unit") else None),
 			}
 		)
@@ -275,6 +276,15 @@ def visit_to_dict(v: DistributionFieldVisit, person_name: Optional[str] = None) 
 		"end_longitude": _num(getattr(v, "end_longitude", None)),
 		"checklist_answers": getattr(v, "checklist_answers", None),
 		"shelf_photo_file_id": getattr(v, "shelf_photo_file_id", None),
+		"supervisor_user_id": getattr(v, "supervisor_user_id", None),
+		"no_order_reason_code": getattr(v, "no_order_reason_code", None),
+		"is_carried_over": bool(getattr(v, "is_carried_over", False)),
+		"pod_signature_file_id": getattr(v, "pod_signature_file_id", None),
+		"time_in_store_seconds": (
+			int((v.ended_at - v.started_at).total_seconds())
+			if v.started_at and v.ended_at
+			else None
+		),
 	}
 
 
@@ -566,6 +576,9 @@ def list_route_stops(db: Session, business_id: int, route_id: int, ctx: AuthCont
 				"person_name": persons.get(s.person_id),
 				"sort_order": s.sort_order,
 				"weekday": s.weekday,
+				"frequency": getattr(s, "frequency", None) or "weekly",
+				"cycle_offset": int(getattr(s, "cycle_offset", 0) or 0),
+				"customer_class": getattr(s, "customer_class", None),
 				"notes": s.notes,
 			}
 		)
@@ -592,6 +605,13 @@ def upsert_route_stop(db: Session, business_id: int, route_id: int, payload: Dic
 	else:
 		weekday = None
 	sort_order = int(payload.get("sort_order") or 0)
+	frequency = str(payload.get("frequency") or "weekly").strip().lower()
+	if frequency not in ("weekly", "biweekly", "monthly"):
+		frequency = "weekly"
+	cycle_offset = max(0, int(payload.get("cycle_offset") or 0))
+	customer_class = str(payload.get("customer_class") or "").strip().upper() or None
+	if customer_class and customer_class not in ("A", "B", "C"):
+		raise ApiError("VALIDATION_ERROR", "customer_class must be A|B|C", http_status=400)
 	if stop_id:
 		row = db.query(DistributionRouteStop).filter(DistributionRouteStop.id == int(stop_id), DistributionRouteStop.route_id == route_id).first()
 		if not row:
@@ -600,6 +620,9 @@ def upsert_route_stop(db: Session, business_id: int, route_id: int, payload: Dic
 		row.sort_order = sort_order
 		row.weekday = weekday
 		row.notes = payload.get("notes")
+		row.frequency = frequency
+		row.cycle_offset = cycle_offset
+		row.customer_class = customer_class
 		row.updated_at = datetime.utcnow()
 	else:
 		row = DistributionRouteStop(
@@ -608,6 +631,9 @@ def upsert_route_stop(db: Session, business_id: int, route_id: int, payload: Dic
 			sort_order=sort_order,
 			weekday=weekday,
 			notes=payload.get("notes"),
+			frequency=frequency,
+			cycle_offset=cycle_offset,
+			customer_class=customer_class,
 		)
 		db.add(row)
 	db.commit()
@@ -619,6 +645,9 @@ def upsert_route_stop(db: Session, business_id: int, route_id: int, payload: Dic
 		"person_name": pname,
 		"sort_order": row.sort_order,
 		"weekday": row.weekday,
+		"frequency": getattr(row, "frequency", None) or "weekly",
+		"cycle_offset": int(getattr(row, "cycle_offset", 0) or 0),
+		"customer_class": getattr(row, "customer_class", None),
 		"notes": row.notes,
 	}
 
@@ -781,7 +810,9 @@ def get_daily_plan(db: Session, business_id: int, target_user_id: int, plan_date
 				}
 			)
 	items.sort(key=lambda x: (x["route_code"], x["sort_order"], x["person_id"]))
-	return {"plan_date": plan_date.isoformat(), "user_id": target_user_id, "items": items}
+	from app.services.distribution_field_ops_service import enrich_daily_plan
+
+	return enrich_daily_plan(db, business_id, target_user_id, plan_date, items)
 
 
 def _active_visit(db: Session, business_id: int, user_id: int) -> Optional[DistributionFieldVisit]:
@@ -901,6 +932,8 @@ def start_visit(
 		start_latitude=_slat,
 		start_longitude=_slng,
 		extra_info=_extra or None,
+		supervisor_user_id=int(payload["supervisor_user_id"]) if payload.get("supervisor_user_id") else None,
+		is_carried_over=bool(payload.get("is_carried_over")),
 	)
 	db.add(v)
 	db.commit()
@@ -1021,10 +1054,21 @@ def complete_visit(
 	outcome = str(payload.get("outcome") or "").strip()
 	if outcome not in ("order", "no_order"):
 		raise ApiError("VALIDATION_ERROR", "outcome must be order | no_order", http_status=400)
+	reason_code = str(payload.get("no_order_reason_code") or "").strip().lower() or None
+	if outcome == "no_order":
+		from app.services.distribution_field_ops_service import NO_ORDER_REASONS
+
+		allowed = {r["code"] for r in NO_ORDER_REASONS}
+		if reason_code and reason_code not in allowed:
+			raise ApiError("VALIDATION_ERROR", "invalid no_order_reason_code", http_status=400)
+		if not reason_code and not str(payload.get("no_order_reason") or "").strip():
+			raise ApiError("VALIDATION_ERROR", "دلیل عدم سفارش را انتخاب کنید", http_status=400)
 	v.status = "completed"
 	v.ended_at = datetime.utcnow()
 	v.outcome = outcome
 	v.no_order_reason = (payload.get("no_order_reason") or None)
+	if reason_code:
+		v.no_order_reason_code = reason_code
 	if payload.get("document_id"):
 		doc_id = int(payload["document_id"])
 		_validate_document_for_business(db, business_id, doc_id, v.person_id)
@@ -1057,6 +1101,12 @@ def complete_visit(
 					"pod_signer_name required when pod_confirmed",
 					http_status=400,
 				)
+			settings_pod = get_or_create_distribution_settings(db, business_id)
+			sig = str(payload.get("pod_signature_png") or "").strip()
+			if getattr(settings_pod, "require_pod_signature", False) and len(sig) < 40 and not payload.get("pod_signature_file_id"):
+				raise ApiError("VALIDATION_ERROR", "امضای تحویل الزامی است", http_status=400)
+			if getattr(settings_pod, "require_pod_photo", False) and not payload.get("pod_photo_file_id") and not payload.get("shelf_photo_file_id"):
+				raise ApiError("VALIDATION_ERROR", "عکس تحویل الزامی است", http_status=400)
 			_base = dict(v.extra_info or {})
 			_base["pod"] = {
 				"confirmed": True,
@@ -1064,8 +1114,12 @@ def complete_visit(
 				"note": (str(payload.get("pod_note") or "").strip()[:500] or None),
 				"confirmed_at": datetime.utcnow().isoformat() + "Z",
 				"confirmed_by_user_id": user_id,
+				"signature_png": sig[:250000] if sig else None,
+				"photo_file_id": payload.get("pod_photo_file_id") or payload.get("shelf_photo_file_id"),
 			}
 			v.extra_info = _base
+			if payload.get("pod_signature_file_id"):
+				v.pod_signature_file_id = int(payload["pod_signature_file_id"])
 	_elat = payload.get("end_latitude")
 	_elng = payload.get("end_longitude")
 	if _elat is not None and str(_elat).strip() != "":
@@ -1087,13 +1141,15 @@ def complete_visit(
 			from app.services.distribution_documents import create_distribution_invoice
 			from app.services.invoice_service import INVOICE_SALES
 			from app.services.distribution_commercial_service import apply_promotions_to_lines
+			from app.services.distribution_field_ops_service import apply_auto_promotions_if_needed, consume_van_lots_fefo
 
 			promo_ids = None
 			ex = payload.get("extra_info") if isinstance(payload.get("extra_info"), dict) else {}
 			if isinstance(ex.get("promotion_ids"), list):
 				promo_ids = [int(x) for x in ex["promotion_ids"]]
+			promo_ids = apply_auto_promotions_if_needed(db, business_id, promo_ids)
 			van_lines, _disc, applied = apply_promotions_to_lines(
-				db, business_id, list(van_lines), promotion_ids=promo_ids,
+				db, business_id, list(van_lines), promotion_ids=promo_ids, person_id=int(v.person_id),
 			)
 			if applied:
 				_base = dict(v.extra_info or {})
@@ -1119,6 +1175,16 @@ def complete_visit(
 				v.document_id = int(inv["id"])
 				_base = dict(v.extra_info or {})
 				_base["van_sale_invoice_id"] = int(inv["id"])
+				_base["lines_count"] = len([ln for ln in van_lines if float(ln.get("quantity") or 0) > 0])
+				lots_used = []
+				for ln in van_lines:
+					if ln.get("is_foc"):
+						continue
+					lots_used.extend(
+						consume_van_lots_fefo(db, int(van.id), int(ln["product_id"]), float(ln["quantity"]))
+					)
+				if lots_used:
+					_base["van_lots_consumed"] = lots_used
 				v.extra_info = _base
 	v.updated_at = datetime.utcnow()
 
@@ -1459,6 +1525,25 @@ def update_distribution_settings(db: Session, business_id: int, payload: Dict[st
 		row.memaps_api_key = key[:255] if key else None
 	if "share_live_location" in payload:
 		row.share_live_location = bool(payload["share_live_location"])
+	if "carry_over_missed_visits" in payload:
+		row.carry_over_missed_visits = bool(payload["carry_over_missed_visits"])
+	if "carry_over_days" in payload:
+		row.carry_over_days = max(1, min(31, int(payload.get("carry_over_days") or 7)))
+	if "require_pod_signature" in payload:
+		row.require_pod_signature = bool(payload["require_pod_signature"])
+	if "require_pod_photo" in payload:
+		row.require_pod_photo = bool(payload["require_pod_photo"])
+	if "nav_provider" in payload:
+		nav = str(payload.get("nav_provider") or "neshan").strip().lower()
+		row.nav_provider = nav if nav in ("neshan", "google", "waze") else "neshan"
+	if "setup_completed" in payload:
+		row.setup_completed = bool(payload["setup_completed"])
+	if "auto_apply_promotions" in payload:
+		row.auto_apply_promotions = bool(payload["auto_apply_promotions"])
+	if "enable_perfect_store" in payload:
+		row.enable_perfect_store = bool(payload["enable_perfect_store"])
+	if "near_expiry_days" in payload:
+		row.near_expiry_days = max(1, min(90, int(payload.get("near_expiry_days") or 14)))
 	row.updated_at = datetime.utcnow()
 	db.commit()
 	db.refresh(row)

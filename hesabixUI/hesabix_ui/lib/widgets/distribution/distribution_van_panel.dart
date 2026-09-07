@@ -75,6 +75,9 @@ class _DistributionVanPanelState extends State<DistributionVanPanel> {
   Future<void> _showVanDialog({Map<String, dynamic>? existing}) async {
     final t = AppLocalizations.of(context);
     final nameCtl = TextEditingController(text: existing?['name']?.toString() ?? '');
+    final plateCtl = TextEditingController(text: existing?['plate_number']?.toString() ?? '');
+    final weightCtl = TextEditingController(text: existing?['max_weight_kg']?.toString() ?? '');
+    final volumeCtl = TextEditingController(text: existing?['max_volume_m3']?.toString() ?? '');
     int? userId = int.tryParse('${existing?['user_id'] ?? ''}');
     List<BusinessUser> users = const [];
     try {
@@ -96,6 +99,29 @@ class _DistributionVanPanelState extends State<DistributionVanPanel> {
                 autofocus: true,
                 decoration: InputDecoration(
                   labelText: t.distributionVanName,
+                  border: const OutlineInputBorder(),
+                ),
+              ),
+              TextField(
+                controller: plateCtl,
+                decoration: InputDecoration(
+                  labelText: t.distributionVanPlate,
+                  border: const OutlineInputBorder(),
+                ),
+              ),
+              TextField(
+                controller: weightCtl,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                decoration: InputDecoration(
+                  labelText: t.distributionWeightKg,
+                  border: const OutlineInputBorder(),
+                ),
+              ),
+              TextField(
+                controller: volumeCtl,
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                decoration: InputDecoration(
+                  labelText: t.distributionVolumeM3,
                   border: const OutlineInputBorder(),
                 ),
               ),
@@ -125,23 +151,26 @@ class _DistributionVanPanelState extends State<DistributionVanPanel> {
               onPressed: () async {
                 final name = nameCtl.text.trim();
                 if (name.isEmpty) return;
+                final payload = <String, dynamic>{
+                  'name': name,
+                  'user_id': userId,
+                  'plate_number': plateCtl.text.trim().isEmpty ? null : plateCtl.text.trim(),
+                  'max_weight_kg': double.tryParse(weightCtl.text.trim().replaceAll(',', '.')),
+                  'max_volume_m3': double.tryParse(volumeCtl.text.trim().replaceAll(',', '.')),
+                };
                 try {
                   if (editing) {
                     await widget.service.updateVan(
                       businessId: widget.businessId,
                       vanId: int.parse('${existing['id']}'),
-                      payload: {
-                        'name': name,
-                        'user_id': userId,
-                      },
+                      payload: payload,
                     );
                   } else {
                     await widget.service.createVan(
                       businessId: widget.businessId,
                       payload: {
                         'code': nextDistributionCode('VAN', _vans),
-                        'name': name,
-                        if (userId != null) 'user_id': userId,
+                        ...payload,
                       },
                     );
                   }
@@ -183,6 +212,51 @@ class _DistributionVanPanelState extends State<DistributionVanPanel> {
     return ((_myStock?['items'] as List?) ?? [])
         .map((raw) => Map<String, dynamic>.from(raw as Map))
         .toList();
+  }
+
+  Map<String, dynamic> get _capacity {
+    final cap = _myStock?['capacity'];
+    return cap is Map ? Map<String, dynamic>.from(cap) : <String, dynamic>{};
+  }
+
+  Widget _capacityCard(AppLocalizations t, ThemeData theme, ColorScheme cs) {
+    final cap = _capacity;
+    final plate = (_myStock?['plate_number'] ?? '').toString();
+    final weight = cap['weight_kg'];
+    final maxW = cap['max_weight_kg'] ?? _myStock?['max_weight_kg'];
+    final volume = cap['volume_m3'];
+    final maxV = cap['max_volume_m3'] ?? _myStock?['max_volume_m3'];
+    final wPct = cap['weight_util_percent'];
+    final vPct = cap['volume_util_percent'];
+    final over = cap['over_capacity'] == true;
+    final nearLots = cap['near_expiry_lots'] ?? 0;
+    if (plate.isEmpty && maxW == null && maxV == null && nearLots == 0 && weight == null) {
+      return const SizedBox.shrink();
+    }
+    return Card(
+      color: over ? cs.errorContainer.withValues(alpha: 0.45) : cs.surfaceContainerLow,
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(t.distributionVanCapacity, style: theme.textTheme.titleSmall),
+            const SizedBox(height: 6),
+            if (plate.isNotEmpty) Text('${t.distributionVanPlate}: $plate'),
+            if (maxW != null)
+              Text('${t.distributionCapacityUsed}: ${weight ?? 0} / $maxW kg${wPct != null ? ' ($wPct%)' : ''}'),
+            if (maxV != null)
+              Text('${t.distributionVolumeM3}: ${volume ?? 0} / $maxV${vPct != null ? ' ($vPct%)' : ''}'),
+            if (nearLots is num && nearLots > 0)
+              Text('${t.distributionNearExpiry}: $nearLots'),
+            const SizedBox(height: 4),
+            Text(t.distributionFefoHint, style: theme.textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
+            if (over)
+              Text(t.distributionCapacityOver, style: theme.textTheme.bodySmall?.copyWith(color: cs.error)),
+          ],
+        ),
+      ),
+    );
   }
 
   Future<void> _openTransfer({required bool load}) async {
@@ -357,6 +431,8 @@ class _DistributionVanPanelState extends State<DistributionVanPanel> {
             ),
           ],
           const SizedBox(height: 20),
+          _capacityCard(t, theme, cs),
+          const SizedBox(height: 12),
           Text(
             vanName == null ? t.distributionVanStock : '${t.distributionVanStock} · $vanName',
             style: theme.textTheme.titleMedium,
@@ -390,13 +466,25 @@ class _DistributionVanPanelState extends State<DistributionVanPanel> {
             )
           else
             ...items.map((m) {
+              final lots = (m['lots'] is List) ? m['lots'] as List : const [];
+              final near = m['near_expiry'] == true;
+              final variance = double.tryParse('${m['lot_variance'] ?? 0}') ?? 0;
+              final subtitleParts = <String>[
+                if (near) t.distributionNearExpiry,
+                if (lots.isNotEmpty) '${lots.length} lot',
+                if (variance.abs() > 0.001) '${t.distributionLotVariance}: ${variance.toStringAsFixed(1)}',
+              ];
               return Card(
                 child: ListTile(
                   leading: CircleAvatar(
-                    backgroundColor: cs.primaryContainer,
-                    child: Icon(Icons.inventory_2_outlined, color: cs.onPrimaryContainer),
+                    backgroundColor: near ? cs.errorContainer : cs.primaryContainer,
+                    child: Icon(
+                      near ? Icons.warning_amber_outlined : Icons.inventory_2_outlined,
+                      color: near ? cs.onErrorContainer : cs.onPrimaryContainer,
+                    ),
                   ),
                   title: Text(m['product_name']?.toString() ?? 'product ${m['product_id']}'),
+                  subtitle: subtitleParts.isEmpty ? null : Text(subtitleParts.join(' · ')),
                   trailing: Text(
                     '× ${m['quantity'] ?? 0}',
                     style: theme.textTheme.titleMedium,

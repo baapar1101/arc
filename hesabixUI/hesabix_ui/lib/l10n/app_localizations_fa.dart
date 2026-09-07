@@ -19707,4 +19707,393 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get distributionTargetValue => 'مقدار هدف';
+
+  @override
+  String get distributionWizardTitle => 'راه‌اندازی پخش مویرگی';
+
+  @override
+  String get distributionWizardHint =>
+      'در چند قدم مسیر، مشتری و ویزیتور را آماده کنید.';
+
+  @override
+  String get distributionWizardStepMode => 'مدل فروش';
+
+  @override
+  String get distributionWizardStepWarehouse => 'انبار مبدأ';
+
+  @override
+  String get distributionWizardStepRoute => 'قلمرو و مسیر';
+
+  @override
+  String get distributionWizardStepCustomers => 'مشتریان مسیر';
+
+  @override
+  String get distributionWizardStepVisitor => 'تخصیص ویزیتور';
+
+  @override
+  String get distributionWizardFinish => 'پایان راه‌اندازی';
+
+  @override
+  String get distributionModeVan => 'فروش ون (بار همراه ویزیتور)';
+
+  @override
+  String get distributionModePresell => 'پیش‌فروش (تحویل بعدی)';
+
+  @override
+  String get distributionModeBoth => 'هر دو مدل';
+
+  @override
+  String get distributionCustomer360Title => 'کارت مشتری';
+
+  @override
+  String get distributionCreditAvailable => 'اعتبار باقی‌مانده';
+
+  @override
+  String get distributionLastVisit => 'آخرین ویزیت';
+
+  @override
+  String get distributionMustSell => 'باید‌فروش';
+
+  @override
+  String get distributionScanBarcode => 'اسکن بارکد';
+
+  @override
+  String get distributionBarcodeNotFound => 'کالا با این بارکد یافت نشد';
+
+  @override
+  String get distributionAddSuggested => 'افزودن سفارش پیشنهادی';
+
+  @override
+  String get distributionFocLine => 'جایزه رایگان';
+
+  @override
+  String get distributionNearExpiry => 'نزدیک انقضا';
+
+  @override
+  String get distributionExpiredLot => 'منقضی';
+
+  @override
+  String get distributionVanCapacity => 'ظرفیت ون';
+
+  @override
+  String get distributionVanPlate => 'پلاک';
+
+  @override
+  String get distributionVanMaxWeight => 'سقف وزن (کیلو)';
+
+  @override
+  String get distributionVanMaxVolume => 'سقف حجم (متر مکعب)';
+
+  @override
+  String get distributionLotCode => 'شماره لات';
+
+  @override
+  String get distributionExpiryDate => 'تاریخ انقضا';
+
+  @override
+  String get distributionSignatureTitle => 'امضای گیرنده';
+
+  @override
+  String get distributionSignatureHint => 'با انگشت یا ماوس امضا کنید';
+
+  @override
+  String get distributionSignatureClear => 'پاک کردن امضا';
+
+  @override
+  String get distributionPodPhoto => 'عکس تحویل';
+
+  @override
+  String get distributionReasonClosed => 'فروشگاه بسته بود';
+
+  @override
+  String get distributionReasonNoNeed => 'نیازی به کالا نبود';
+
+  @override
+  String get distributionReasonCompetitor => 'رقیب تخفیف داد';
+
+  @override
+  String get distributionReasonCredit => 'نسیه / اعتبار';
+
+  @override
+  String get distributionReasonNoDecision => 'تصمیم نگرفت';
+
+  @override
+  String get distributionReasonOther => 'سایر';
+
+  @override
+  String get distributionReturnExpired => 'منقضی';
+
+  @override
+  String get distributionReturnDamaged => 'آسیب‌دیده';
+
+  @override
+  String get distributionReturnCommercial => 'مرجوعی تجاری';
+
+  @override
+  String get distributionReturnWrong => 'کالای اشتباه';
+
+  @override
+  String get distributionReturnNearExpiry => 'نزدیک انقضا';
+
+  @override
+  String get distributionClassA => 'کلاس A — هفتگی';
+
+  @override
+  String get distributionClassB => 'کلاس B — دو‌هفته‌یک‌بار';
+
+  @override
+  String get distributionClassC => 'کلاس C — ماهانه';
+
+  @override
+  String get distributionFrequencyWeekly => 'هفتگی';
+
+  @override
+  String get distributionFrequencyBiweekly => 'دو‌هفته‌یک‌بار';
+
+  @override
+  String get distributionFrequencyMonthly => 'ماهانه';
+
+  @override
+  String get distributionCarriedOver => 'عقب‌افتاده از روز قبل';
+
+  @override
+  String get distributionNewOutlet => 'مشتری جدید میدانی';
+
+  @override
+  String get distributionNewOutletHint =>
+      'نام، موقعیت و کلاس مشتری را ثبت کنید.';
+
+  @override
+  String get distributionOutletType => 'نوع فروشگاه';
+
+  @override
+  String get distributionOutletGrocery => 'خواربار';
+
+  @override
+  String get distributionOutletSupermarket => 'سوپرمارکت';
+
+  @override
+  String get distributionOutletHoreca => 'هتل/رستوران';
+
+  @override
+  String get distributionOutletKiosk => 'کیوسک';
+
+  @override
+  String get distributionOutletWholesale => 'عمده';
+
+  @override
+  String get distributionOutletOther => 'سایر';
+
+  @override
+  String get distributionNavNeshan => 'نشان';
+
+  @override
+  String get distributionNavGoogle => 'گوگل‌مپ';
+
+  @override
+  String get distributionNavWaze => 'ویز';
+
+  @override
+  String get distributionNavProvider => 'مسیریاب';
+
+  @override
+  String get distributionCarryOver => 'انتقال ویزیت ازدست‌رفته به روز بعد';
+
+  @override
+  String get distributionRequirePodSignature => 'امضای POD الزامی';
+
+  @override
+  String get distributionRequirePodPhoto => 'عکس POD الزامی';
+
+  @override
+  String get distributionAutoPromo => 'اعمال خودکار پروموشن';
+
+  @override
+  String get distributionPerfectStore => 'امتیاز فروشگاه کامل';
+
+  @override
+  String get distributionJointVisit => 'ویزیت مشترک با سوپروایزر';
+
+  @override
+  String get distributionSupervisor => 'سوپروایزر همراه';
+
+  @override
+  String get distributionScorecard => 'امتیاز روزانه';
+
+  @override
+  String get distributionTimeInStore => 'زمان حضور (دقیقه)';
+
+  @override
+  String get distributionLinesPerInvoice => 'قلم در فاکتور';
+
+  @override
+  String get distributionMissedVisits => 'ویزیت ازدست‌رفته';
+
+  @override
+  String get distributionPartialDelivery => 'تحویل جزئی';
+
+  @override
+  String get distributionDeliveryFailed => 'عدم تحویل';
+
+  @override
+  String get distributionOfflinePack => 'دانلود کاتالوگ روز';
+
+  @override
+  String get distributionOfflinePackDone => 'کاتالوگ روز روی دستگاه ذخیره شد';
+
+  @override
+  String get distributionAssortment => 'سبد اجباری';
+
+  @override
+  String get distributionAssortmentsTitle => 'سبد و باید‌فروش';
+
+  @override
+  String get distributionPriceList => 'لیست قیمت مشتری';
+
+  @override
+  String get distributionSetupNeeded =>
+      'راه‌اندازی اولیه انجام نشده. ویزارد را کامل کنید.';
+
+  @override
+  String get distributionStartWizard => 'شروع راه‌اندازی';
+
+  @override
+  String get distributionOsa => 'موجودی قفسه (OSA)';
+
+  @override
+  String get distributionPlanogram => 'انطباق پلانوگرام';
+
+  @override
+  String get distributionShareOfShelf => 'سهم قفسه ٪';
+
+  @override
+  String get distributionTodayOnlyHint => 'فقط برنامه و ویزیت امروز';
+
+  @override
+  String get distributionDeliveryQty => 'تعداد تحویلی';
+
+  @override
+  String get distributionOrderedQty => 'سفارش‌شده';
+
+  @override
+  String get distributionPrintInvoice => 'چاپ فاکتور';
+
+  @override
+  String get distributionFrequentProducts => 'کالاهای پرتکرار این مشتری';
+
+  @override
+  String get distributionCustomerClass => 'کلاس مشتری';
+
+  @override
+  String get distributionVisitFrequency => 'فرکانس ویزیت';
+
+  @override
+  String get distributionOutletName => 'نام فروشگاه';
+
+  @override
+  String get distributionOutletPhone => 'موبایل';
+
+  @override
+  String get distributionFailRefused => 'تحویل پذیرفته نشد';
+
+  @override
+  String get distributionFailAddress => 'آدرس نادرست / پیدا نشد';
+
+  @override
+  String get distributionFailShortage => 'کسری بار';
+
+  @override
+  String get distributionMustSellMissing =>
+      'کالاهای باید‌فروش هنوز به سبد اضافه نشده‌اند';
+
+  @override
+  String get distributionReasonRequired => 'دلیل استاندارد را انتخاب کنید';
+
+  @override
+  String get distributionPodSignatureRequired => 'امضای گیرنده الزامی است';
+
+  @override
+  String get distributionPodPhotoRequired => 'عکس تحویل الزامی است';
+
+  @override
+  String get distributionCapacityOver => 'ظرفیت ون پر شده است';
+
+  @override
+  String get distributionLotOptional => 'لات (اختیاری)';
+
+  @override
+  String get distributionNoExpiry => 'بدون تاریخ انقضا';
+
+  @override
+  String get distributionVisitorHomeHint =>
+      'برنامه امروز، ویزیت بعدی و فروش — بدون تب‌های مدیریت';
+
+  @override
+  String get distributionAssortmentCreate => 'سبد جدید';
+
+  @override
+  String get distributionAssortmentEmpty => 'هنوز سبد اجباری تعریف نشده است';
+
+  @override
+  String get distributionMustSellPick => 'کالاهای باید‌فروش';
+
+  @override
+  String get distributionDeliveryLines => 'اقلام سفارش';
+
+  @override
+  String get distributionOsaOk => 'موجودی قفسه کامل است';
+
+  @override
+  String get distributionJointVisitHint =>
+      'سوپروایزر همراه این ویزیت ثبت می‌شود';
+
+  @override
+  String get distributionSetupWizardAgain => 'ویزارد راه‌اندازی';
+
+  @override
+  String get distributionNavOpen => 'مسیریابی با نشان / نقشه';
+
+  @override
+  String get distributionCycleOffset => 'آفست چرخه (هفته/ماه)';
+
+  @override
+  String get distributionCycleOffsetHint =>
+      'برای دوهفته‌یک‌بار: ۰ یا ۱. برای ماهانه: هفتهٔ ماه (۰ تا ۴).';
+
+  @override
+  String get distributionWeightKg => 'حداکثر وزن (کیلوگرم)';
+
+  @override
+  String get distributionVolumeM3 => 'حداکثر حجم (متر مکعب)';
+
+  @override
+  String get distributionCapacityUsed => 'ظرفیت استفاده‌شده';
+
+  @override
+  String get distributionLotVariance => 'مغایرت لات و موجودی فیزیکی';
+
+  @override
+  String get distributionLoadVariance => 'مغایرت بارگیری';
+
+  @override
+  String get distributionCommissionOnCollection =>
+      'پورسانت بر اساس وصول (نه فروش)';
+
+  @override
+  String get distributionCommissionCoverage => 'تعدیل با پوشش مسیر';
+
+  @override
+  String get distributionDaysOfCover => 'روز پوشش';
+
+  @override
+  String get distributionNearExpiryDays => 'آستانه نزدیک‌به‌انقضا (روز)';
+
+  @override
+  String get distributionFefoHint => 'تخلیه و فروش از نزدیک‌ترین انقضا (FEFO)';
+
+  @override
+  String get distributionUnitWeightKg => 'وزن واحد (کیلو)';
+
+  @override
+  String get distributionUnitVolumeM3 => 'حجم واحد (متر مکعب)';
 }
