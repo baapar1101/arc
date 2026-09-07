@@ -15759,6 +15759,48 @@ class AppLocalizationsFa extends AppLocalizations {
   String get distributionVanStockEmpty => 'موجودی ون خالی است.';
 
   @override
+  String get distributionVanLoadHint =>
+      'کالا را از انبار انتخاب کنید، تعداد بزنید و به لیست اضافه کنید.';
+
+  @override
+  String get distributionVanUnloadHint =>
+      'کالا را از موجودی فعلی ون انتخاب کنید و به انبار برگردانید.';
+
+  @override
+  String get distributionVanTransferLines => 'اقلام انتقال';
+
+  @override
+  String get distributionVanPickProductFirst =>
+      'ابتدا کالا را از فهرست انتخاب کنید.';
+
+  @override
+  String get distributionVanLinesEmpty => 'هنوز قلمی به لیست اضافه نشده است.';
+
+  @override
+  String get distributionVanNoWarehouse => 'انبار را انتخاب کنید.';
+
+  @override
+  String get distributionVanConfirmLoad => 'ثبت بارگیری';
+
+  @override
+  String get distributionVanConfirmUnload => 'ثبت تخلیه';
+
+  @override
+  String get distributionVanLineAdded => 'قلم به لیست اضافه شد.';
+
+  @override
+  String get distributionVanQtyInvalid => 'تعداد باید بیشتر از صفر باشد.';
+
+  @override
+  String get distributionVanEmptyStockUnload =>
+      'موجودی ون خالی است؛ چیزی برای تخلیه نیست.';
+
+  @override
+  String distributionVanStockAvailable(String qty) {
+    return 'موجودی ون: $qty';
+  }
+
+  @override
   String get distributionDeleteStop => 'حذف توقف';
 
   @override
@@ -19184,6 +19226,63 @@ class AppLocalizationsFa extends AppLocalizations {
 
   @override
   String get distributionTeamMapEmpty => 'موقعیتی برای نمایش نیست.';
+
+  @override
+  String get distributionTeamMapEmptyHint =>
+      'وقتی ویزیتور صفحهٔ پخش را باز کند و دسترسی موقعیت را بدهد اینجا دیده می‌شود. پین ویزیتور GPS خود اوست، نه آدرس مشتری.';
+
+  @override
+  String get distributionShareLiveLocation => 'اشتراک موقعیت زنده ویزیتور';
+
+  @override
+  String get distributionShareLiveLocationHint =>
+      'تا وقتی صفحهٔ پخش باز است، ویزیتور موقعیت می‌فرستد تا مدیر روی نقشه تیم ببیند — حتی بدون ویزیت باز.';
+
+  @override
+  String get distributionLiveLocationVisitorHint =>
+      'تا وقتی این صفحه باز است موقعیت شما برای مدیر روی نقشه تیم نمایش داده می‌شود.';
+
+  @override
+  String get distributionLiveLocationGpsUnavailable =>
+      'موقعیت خاموش است یا دسترسی داده نشده؛ روی نقشه تیم دیده نمی‌شوید.';
+
+  @override
+  String get distributionLiveLocationDisabledBanner =>
+      'اشتراک موقعیت زنده در تنظیمات پخش خاموش است.';
+
+  @override
+  String get distributionPresenceOnline => 'آنلاین';
+
+  @override
+  String get distributionPresenceRecent => 'اخیراً دیده شده';
+
+  @override
+  String get distributionPresenceStale => 'آخرین موقعیت';
+
+  @override
+  String get distributionPresenceOffline => 'آفلاین';
+
+  @override
+  String get distributionPresenceNone => 'هنوز GPS ندارد';
+
+  @override
+  String get distributionTeamMapVisitors => 'ویزیتورها';
+
+  @override
+  String get distributionTeamMapCustomers => 'مشتریان';
+
+  @override
+  String get distributionTeamMapTrail => 'مسیر روز';
+
+  @override
+  String get distributionTeamMapNoTrail =>
+      'برای این روز مسیر حرکتی ثبت نشده است.';
+
+  @override
+  String get distributionTeamMapOnlineOnly => 'فقط آنلاین';
+
+  @override
+  String get distributionTeamMapShowCustomers => 'پین مشتری';
 
   @override
   String get distributionStatusUnknown => 'نامشخص';

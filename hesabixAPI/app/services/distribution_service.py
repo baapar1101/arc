@@ -945,9 +945,12 @@ def heartbeat_visit(
 	v.start_longitude = float(longitude)
 	v.updated_at = datetime.utcnow()
 	try:
-		from app.services.distribution_commercial_service import record_heartbeat_trail
+		from app.services.distribution_commercial_service import upsert_live_location
+		from app.services.distribution_phase3_service import extend_settings_dict
 
-		record_heartbeat_trail(db, business_id, user_id, visit_id, latitude, longitude)
+		settings = get_or_create_distribution_settings(db, business_id)
+		if bool(extend_settings_dict(settings).get("share_live_location", True)):
+			upsert_live_location(db, business_id, user_id, latitude, longitude, visit_id=visit_id, commit=False)
 	except Exception:
 		pass
 	db.commit()
@@ -1454,6 +1457,8 @@ def update_distribution_settings(db: Session, business_id: int, payload: Dict[st
 		raw_key = payload.get("memaps_api_key")
 		key = str(raw_key).strip() if raw_key is not None else ""
 		row.memaps_api_key = key[:255] if key else None
+	if "share_live_location" in payload:
+		row.share_live_location = bool(payload["share_live_location"])
 	row.updated_at = datetime.utcnow()
 	db.commit()
 	db.refresh(row)

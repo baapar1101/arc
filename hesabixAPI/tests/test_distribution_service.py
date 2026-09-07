@@ -58,6 +58,34 @@ def test_extend_settings_defaults():
 	assert d["visit_checklist_template"] == []
 	assert d["map_tile_source"] == "osm"
 	assert d["memaps_api_key"] is None
+	assert d["share_live_location"] is True
+
+
+def test_business_day_utc_bounds_covers_local_noon():
+	from datetime import datetime, time
+	from zoneinfo import ZoneInfo
+
+	from app.core.business_calendar import business_day_utc_bounds, business_timezone_name
+
+	day = date(2026, 9, 7)
+	start, end = business_day_utc_bounds(None, day)
+	tz = ZoneInfo(business_timezone_name(None))
+	local_noon = datetime.combine(day, time(12, 0), tzinfo=tz).astimezone(ZoneInfo("UTC")).replace(tzinfo=None)
+	assert start <= local_noon <= end
+	assert (end - start).total_seconds() >= 23 * 3600
+
+
+def test_presence_from_age_buckets():
+	from datetime import datetime, timedelta
+
+	from app.services.distribution_phase3_service import _presence_from_age
+
+	now = datetime.utcnow()
+	assert _presence_from_age(None) == "none"
+	assert _presence_from_age(now) == "online"
+	assert _presence_from_age(now - timedelta(minutes=5)) == "recent"
+	assert _presence_from_age(now - timedelta(hours=2)) == "stale"
+	assert _presence_from_age(now - timedelta(days=2)) == "offline"
 
 
 def test_normalize_map_tile_source():

@@ -10,6 +10,7 @@ import '../../services/distribution_service.dart';
 import '../../utils/distribution_location_helper.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
+import 'distribution_form_helpers.dart';
 
 /// پایان ویزیت میدانی — ویزارد سه‌مرحله‌ای: نتیجه، فروش، تحویل.
 Future<void> showDistributionVisitCompleteSheet({
@@ -328,36 +329,21 @@ Future<void> showDistributionVisitCompleteSheet({
                             child: Column(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                DropdownButtonFormField<int>(
-                                  value: selected == null
+                                DistributionChoiceField<Map<String, dynamic>>(
+                                  label: t.distributionSelectProduct,
+                                  items: vanStock,
+                                  selectedLabel: selected == null
                                       ? null
-                                      : int.tryParse('${selected!['product_id']}'),
-                                  isExpanded: true,
-                                  decoration: InputDecoration(
-                                    labelText: t.distributionSelectProduct,
-                                    border: const OutlineInputBorder(),
-                                  ),
-                                  items: vanStock
-                                      .map(
-                                        (s) => DropdownMenuItem(
-                                          value: int.tryParse('${s['product_id']}'),
-                                          child: Text(
-                                            '${s['product_name']} · ${t.distributionVanStock}: ${s['quantity']}'
-                                            '${s['unit_price'] != null ? ' · ${s['unit_price']}' : ''}',
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                        ),
-                                      )
-                                      .toList(),
-                                  onChanged: (id) {
-                                    setD(() {
-                                      selected = vanStock.firstWhere(
-                                        (s) => int.tryParse('${s['product_id']}') == id,
-                                        orElse: () => <String, dynamic>{},
-                                      );
-                                      if (selected!.isEmpty) selected = null;
-                                    });
-                                  },
+                                      : '${selected!['product_name']} · ${t.distributionVanStock}: ${selected!['quantity']}'
+                                          '${selected!['unit_price'] != null ? ' · ${selected!['unit_price']}' : ''}',
+                                  labelOf: (s) =>
+                                      '${s['product_name']} · ${t.distributionVanStock}: ${s['quantity']}'
+                                      '${s['unit_price'] != null ? ' · ${s['unit_price']}' : ''}',
+                                  selectedOf: (s) =>
+                                      selected != null &&
+                                      int.tryParse('${s['product_id']}') ==
+                                          int.tryParse('${selected!['product_id']}'),
+                                  onSelected: (s) => setD(() => selected = s),
                                 ),
                                 const SizedBox(height: 8),
                                 TextField(

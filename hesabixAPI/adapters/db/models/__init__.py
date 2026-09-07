@@ -219,6 +219,7 @@ from .distribution import (  # noqa: F401
 	DistributionSalesTarget,
 	DistributionDailySettlement,
 	DistributionVisitHeartbeat,
+	DistributionUserLiveLocation,
 	DistributionVisitOrder,
 	DistributionTradePromotion,
 	DistributionDeliveryTrip,

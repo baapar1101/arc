@@ -1,7 +1,9 @@
 import 'package:geolocator/geolocator.dart';
 
 /// مختصات شروع ویزیت؛ در صورت عدم دسترسی null برمی‌گرداند.
-Future<({double? latitude, double? longitude})> readDistributionVisitLocation() async {
+Future<({double? latitude, double? longitude})> readDistributionVisitLocation({
+  bool preferCached = false,
+}) async {
   try {
     final enabled = await Geolocator.isLocationServiceEnabled();
     if (!enabled) {
@@ -13,6 +15,15 @@ Future<({double? latitude, double? longitude})> readDistributionVisitLocation() 
     }
     if (permission == LocationPermission.denied || permission == LocationPermission.deniedForever) {
       return (latitude: null, longitude: null);
+    }
+    if (preferCached) {
+      final last = await Geolocator.getLastKnownPosition();
+      if (last != null) {
+        final age = DateTime.now().difference(last.timestamp);
+        if (age.abs() < const Duration(minutes: 2)) {
+          return (latitude: last.latitude, longitude: last.longitude);
+        }
+      }
     }
     final pos = await Geolocator.getCurrentPosition(
       locationSettings: const LocationSettings(

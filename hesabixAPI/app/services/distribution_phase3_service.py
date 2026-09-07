@@ -8,19 +8,22 @@ from datetime import date, datetime
 from typing import Any, Dict, List, Optional, Tuple
 
 from sqlalchemy.orm import Session
+from sqlalchemy import or_
 
 from adapters.db.models.distribution import (
 	DistributionFieldVisit,
 	DistributionOfflineSyncBatch,
 	DistributionRoute,
+	DistributionRouteAssignment,
 	DistributionRouteStop,
+	DistributionUserLiveLocation,
 	DistributionVan,
 )
 from adapters.db.models.person import Person
 from adapters.db.models.product import Product
 from adapters.db.models.warehouse import Warehouse
 from app.core.auth_dependency import AuthContext
-from app.core.business_calendar import business_today
+from app.core.business_calendar import business_day_utc_bounds, business_today
 from app.core.responses import ApiError
 from app.services import distribution_service as dist_svc
 from app.services.distribution_geo import check_geofence, haversine_meters, person_coords
@@ -51,6 +54,7 @@ def extend_settings_dict(row: Any) -> Dict[str, Any]:
 			"enable_suggested_order": True,
 			"map_tile_source": "osm",
 			"memaps_api_key": None,
+			"share_live_location": True,
 		}
 	key = getattr(row, "memaps_api_key", None)
 	key_s = str(key).strip() if key else None
@@ -68,6 +72,7 @@ def extend_settings_dict(row: Any) -> Dict[str, Any]:
 		"enable_suggested_order": bool(getattr(row, "enable_suggested_order", True)),
 		"map_tile_source": normalize_map_tile_source(getattr(row, "map_tile_source", "osm")),
 		"memaps_api_key": key_s or None,
+		"share_live_location": bool(getattr(row, "share_live_location", True)),
 	}
 
 
@@ -488,6 +493,32 @@ def optimize_route_plan(
 	return {"route_id": route_id, "plan_date": plan_date.isoformat(), "items": ordered, "optimized": True}
 
 
+def _parse_utc_ts(value: Any) -> Optional[datetime]:
+	if isinstance(value, datetime):
+		return value.replace(tzinfo=None) if value.tzinfo else value
+	if not value:
+		return None
+	raw = str(value).strip().replace("Z", "+00:00")
+	try:
+		dt = datetime.fromisoformat(raw)
+		return dt.replace(tzinfo=None) if dt.tzinfo else dt
+	except ValueError:
+		return None
+
+
+def _presence_from_age(updated_at: Optional[datetime]) -> str:
+	if updated_at is None:
+		return "none"
+	age = (datetime.utcnow() - updated_at).total_seconds()
+	if age <= 120:
+		return "online"
+	if age <= 15 * 60:
+		return "recent"
+	if age <= 24 * 3600:
+		return "stale"
+	return "offline"
+
+
 def get_team_map(
 	db: Session,
 	business_id: int,
@@ -500,60 +531,164 @@ def get_team_map(
 	from app.services.distribution_documents import user_label
 
 	d = plan_date or business_today(business_id)
-	start = datetime.combine(d, datetime.min.time())
-	end = datetime.combine(d, datetime.max.time())
-	rows = (
+	start_utc, end_utc = business_day_utc_bounds(business_id, d)
+	settings = dist_svc.get_or_create_distribution_settings(db, business_id)
+	share_live = bool(getattr(settings, "share_live_location", True))
+
+	user_ids: set[int] = set()
+	assigns = (
+		db.query(DistributionRouteAssignment.user_id)
+		.filter(
+			DistributionRouteAssignment.business_id == business_id,
+			DistributionRouteAssignment.valid_from <= d,
+			or_(
+				DistributionRouteAssignment.valid_to.is_(None),
+				DistributionRouteAssignment.valid_to >= d,
+			),
+		)
+		.distinct()
+		.all()
+	)
+	user_ids.update(int(r[0]) for r in assigns if r[0])
+	van_users = (
+		db.query(DistributionVan.user_id)
+		.filter(DistributionVan.business_id == business_id, DistributionVan.is_active.is_(True))
+		.all()
+	)
+	user_ids.update(int(r[0]) for r in van_users if r[0])
+
+	visits = (
 		db.query(DistributionFieldVisit)
 		.filter(
 			DistributionFieldVisit.business_id == business_id,
-			DistributionFieldVisit.started_at >= start,
-			DistributionFieldVisit.started_at <= end,
+			DistributionFieldVisit.started_at >= start_utc,
+			DistributionFieldVisit.started_at <= end_utc,
 		)
-		.order_by(DistributionFieldVisit.user_id.asc(), DistributionFieldVisit.started_at.desc())
+		.order_by(DistributionFieldVisit.started_at.desc())
 		.all()
 	)
-	by_user: Dict[int, Dict[str, Any]] = {}
-	for v in rows:
-		if v.user_id in by_user:
-			continue
-		extra = v.extra_info if isinstance(v.extra_info, dict) else {}
-		live = extra.get("live_location") if isinstance(extra.get("live_location"), dict) else {}
-		lat = None
-		lng = None
+	latest_visit: Dict[int, DistributionFieldVisit] = {}
+	in_progress: Dict[int, DistributionFieldVisit] = {}
+	for v in visits:
+		uid = int(v.user_id)
+		user_ids.add(uid)
+		if uid not in latest_visit:
+			latest_visit[uid] = v
+		if v.status == "in_progress" and uid not in in_progress:
+			in_progress[uid] = v
+
+	live_rows = (
+		db.query(DistributionUserLiveLocation)
+		.filter(DistributionUserLiveLocation.business_id == business_id)
+		.all()
+	)
+	live_by_user = {int(r.user_id): r for r in live_rows}
+	user_ids.update(live_by_user.keys())
+
+	visitors: List[Dict[str, Any]] = []
+	customers: List[Dict[str, Any]] = []
+	seen_customers: set[int] = set()
+
+	for uid in sorted(user_ids):
+		visit = in_progress.get(uid) or latest_visit.get(uid)
+		person = None
+		plats: Tuple[Optional[float], Optional[float]] = (None, None)
+		if visit:
+			person = db.query(Person).filter(Person.id == visit.person_id).first()
+			plats = person_coords(person) if person else (None, None)
+			if plats[0] is not None and plats[1] is not None and visit.person_id not in seen_customers:
+				seen_customers.add(int(visit.person_id))
+				customers.append(
+					{
+						"person_id": visit.person_id,
+						"person_name": (person.alias_name or "").strip() if person else None,
+						"latitude": plats[0],
+						"longitude": plats[1],
+						"user_id": uid,
+					}
+				)
+
+		live = live_by_user.get(uid)
+		lat = lng = None
 		loc_source = None
-		if live.get("latitude") is not None and live.get("longitude") is not None:
-			lat = float(live["latitude"])
-			lng = float(live["longitude"])
+		updated_at = None
+		if share_live and live is not None:
+			lat = float(live.latitude)
+			lng = float(live.longitude)
+			updated_at = live.recorded_at
 			loc_source = "live"
-		elif v.status == "completed" and v.end_latitude is not None:
-			lat = float(v.end_latitude)
-			lng = float(v.end_longitude) if v.end_longitude is not None else None
-			loc_source = "end"
-		elif v.start_latitude is not None:
-			lat = float(v.start_latitude)
-			lng = float(v.start_longitude) if v.start_longitude is not None else None
-			loc_source = "start"
-		person = db.query(Person).filter(Person.id == v.person_id).first()
-		plats = person_coords(person) if person else (None, None)
-		by_user[v.user_id] = {
-			"user_id": v.user_id,
-			"user_name": user_label(db, v.user_id),
-			"visit_id": v.id,
-			"status": v.status,
-			"person_id": v.person_id,
-			"person_name": (person.alias_name or "").strip() if person else None,
-			"visit_latitude": lat,
-			"visit_longitude": lng,
-			"location_source": loc_source,
-			"live_updated_at": live.get("updated_at"),
-			"customer_latitude": plats[0],
-			"customer_longitude": plats[1],
-			"started_at": v.started_at.isoformat() if v.started_at else None,
-			"pod": (extra.get("pod") if isinstance(extra.get("pod"), dict) else None),
+		elif visit:
+			extra = visit.extra_info if isinstance(visit.extra_info, dict) else {}
+			live_ex = extra.get("live_location") if isinstance(extra.get("live_location"), dict) else {}
+			if share_live and live_ex.get("latitude") is not None and live_ex.get("longitude") is not None:
+				lat = float(live_ex["latitude"])
+				lng = float(live_ex["longitude"])
+				updated_at = _parse_utc_ts(live_ex.get("updated_at"))
+				loc_source = "live"
+			elif visit.status == "completed" and visit.end_latitude is not None:
+				lat = float(visit.end_latitude)
+				lng = float(visit.end_longitude) if visit.end_longitude is not None else None
+				loc_source = "end"
+				updated_at = visit.ended_at or visit.updated_at
+			elif visit.start_latitude is not None:
+				lat = float(visit.start_latitude)
+				lng = float(visit.start_longitude) if visit.start_longitude is not None else None
+				loc_source = "start"
+				updated_at = visit.started_at
+
+		current = in_progress.get(uid)
+		started = current.started_at if current else (visit.started_at if visit else None)
+		visitors.append(
+			{
+				"user_id": uid,
+				"user_name": user_label(db, uid),
+				"latitude": lat,
+				"longitude": lng,
+				"location_source": loc_source,
+				"presence": _presence_from_age(updated_at),
+				"live_updated_at": updated_at.isoformat() + "Z" if updated_at else None,
+				"visit_id": current.id if current else (visit.id if visit else None),
+				"status": current.status if current else (visit.status if visit else None),
+				"person_id": (current.person_id if current else (visit.person_id if visit else None)),
+				"person_name": (person.alias_name or "").strip() if person else None,
+				"customer_latitude": plats[0],
+				"customer_longitude": plats[1],
+				"started_at": started.isoformat() + "Z" if started else None,
+			}
+		)
+
+	visitors.sort(
+		key=lambda x: (
+			{"online": 0, "recent": 1, "stale": 2, "offline": 3, "none": 4}.get(str(x["presence"]), 9),
+			(x["user_name"] or "").lower(),
+		)
+	)
+	markers = [
+		{
+			"user_id": v["user_id"],
+			"user_name": v["user_name"],
+			"visit_id": v["visit_id"],
+			"status": v["status"],
+			"person_id": v["person_id"],
+			"person_name": v["person_name"],
+			"visit_latitude": v["latitude"],
+			"visit_longitude": v["longitude"],
+			"location_source": v["location_source"],
+			"live_updated_at": v["live_updated_at"],
+			"customer_latitude": v["customer_latitude"],
+			"customer_longitude": v["customer_longitude"],
+			"started_at": v["started_at"],
+			"presence": v["presence"],
 		}
+		for v in visitors
+		if v["latitude"] is not None and v["longitude"] is not None
+	]
 	return {
 		"plan_date": d.isoformat(),
-		"markers": list(by_user.values()),
+		"share_live_location": share_live,
+		"visitors": visitors,
+		"customers": customers,
+		"markers": markers,
 		"generated_at": datetime.utcnow().isoformat() + "Z",
 	}
 

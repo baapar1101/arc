@@ -228,22 +228,68 @@ class _DistributionCommercialPanelState extends State<DistributionCommercialPane
   }
 
   Future<void> _createTripFromConfirmedOrders() async {
+    final t = AppLocalizations.of(context);
     final confirmed = _orders
         .where((o) => o is Map && (o['status'] == 'confirmed' || o['status'] == 'loaded' || o['status'] == 'picking'))
         .map((o) => int.tryParse('${(o as Map)['id']}') ?? 0)
         .where((id) => id > 0)
         .toList();
     if (confirmed.isEmpty) {
-      SnackBarHelper.showError(context, message: AppLocalizations.of(context).distributionNoOrdersForTrip);
+      SnackBarHelper.showError(context, message: t.distributionNoOrdersForTrip);
       return;
     }
+    List<dynamic> vans = const [];
+    try {
+      vans = await widget.service.listVans(businessId: widget.businessId);
+    } catch (_) {}
+    if (!mounted) return;
+    int? vanId = vans.isNotEmpty ? int.tryParse('${(vans.first as Map)['id']}') : null;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setD) => AlertDialog(
+          title: Text(t.distributionCreateTripFromOrders),
+          content: SizedBox(
+            width: 360,
+            child: DropdownButtonFormField<int?>(
+              value: vanId,
+              isExpanded: true,
+              decoration: InputDecoration(
+                labelText: t.distributionSelectVan,
+                border: const OutlineInputBorder(),
+              ),
+              items: [
+                const DropdownMenuItem<int?>(value: null, child: Text('—')),
+                ...vans.map((raw) {
+                  final m = Map<String, dynamic>.from(raw as Map);
+                  return DropdownMenuItem<int?>(
+                    value: int.tryParse('${m['id']}'),
+                    child: Text('${m['name'] ?? m['code'] ?? m['id']}'),
+                  );
+                }),
+              ],
+              onChanged: (v) => setD(() => vanId = v),
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(t.cancel)),
+            FilledButton(onPressed: () => Navigator.pop(ctx, true), child: Text(t.save)),
+          ],
+        ),
+      ),
+    );
+    if (ok != true) return;
     try {
       await widget.service.createDeliveryTrip(
         businessId: widget.businessId,
-        payload: {'trip_date': _iso(_day), 'order_ids': confirmed},
+        payload: {
+          'trip_date': _iso(_day),
+          'order_ids': confirmed,
+          if (vanId != null) 'van_id': vanId,
+        },
       );
       if (mounted) {
-        SnackBarHelper.showSuccess(context, message: AppLocalizations.of(context).distributionTripCreated);
+        SnackBarHelper.showSuccess(context, message: t.distributionTripCreated);
       }
       _tabs.animateTo(1);
       await _load();

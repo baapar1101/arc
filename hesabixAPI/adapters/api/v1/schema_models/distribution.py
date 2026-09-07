@@ -21,6 +21,7 @@ class DistributionSettingsPayload(BaseModel):
 	enable_suggested_order: Optional[bool] = None
 	map_tile_source: Optional[Literal["osm", "memaps"]] = None
 	memaps_api_key: Optional[str] = Field(None, max_length=255)
+	share_live_location: Optional[bool] = None
 
 
 class TerritoryCreatePayload(BaseModel):
@@ -102,6 +103,7 @@ class VisitCancelPayload(BaseModel):
 class VisitHeartbeatPayload(BaseModel):
 	latitude: float
 	longitude: float
+	visit_id: Optional[int] = Field(None, gt=0)
 
 
 class ReturnLinePayload(BaseModel):
@@ -247,6 +249,7 @@ class DeliveryStopCompletePayload(BaseModel):
 	pod_photo_file_id: Optional[int] = Field(None, gt=0)
 	latitude: Optional[float] = None
 	longitude: Optional[float] = None
+	warehouse_id: Optional[int] = Field(None, gt=0)
 	delivered_lines: Optional[List[Dict[str, Any]]] = None
 	failure_reason: Optional[str] = Field(None, max_length=255)
 

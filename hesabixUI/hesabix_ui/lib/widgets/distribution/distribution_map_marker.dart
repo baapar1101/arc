@@ -1,19 +1,31 @@
 import 'package:flutter/material.dart';
 
+enum DistributionMapMarkerKind { generic, visitor, customer }
+
 /// مارکر روی نقشهٔ پخش مویرگی.
 class DistributionMapMarker {
+  final String? id;
   final double lat;
   final double lng;
   final String label;
   final String? subtitle;
   final Color? color;
+  final IconData? icon;
+  final DistributionMapMarkerKind kind;
+  final bool selected;
+  final Object? payload;
 
   const DistributionMapMarker({
+    this.id,
     required this.lat,
     required this.lng,
     required this.label,
     this.subtitle,
     this.color,
+    this.icon,
+    this.kind = DistributionMapMarkerKind.generic,
+    this.selected = false,
+    this.payload,
   });
 
   static DistributionMapMarker? tryFromPayload(Map<String, dynamic> m) {

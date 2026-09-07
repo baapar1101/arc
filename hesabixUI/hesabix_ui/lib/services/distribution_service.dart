@@ -425,6 +425,35 @@ class DistributionService {
     return _dataMap(res.data);
   }
 
+  Future<Map<String, dynamic>> reportLiveLocation({
+    required int businessId,
+    required double latitude,
+    required double longitude,
+    int? visitId,
+  }) async {
+    final res = await _api.post<Map<String, dynamic>>(
+      '/api/v1/distribution/business/$businessId/live-location',
+      data: <String, dynamic>{
+        'latitude': latitude,
+        'longitude': longitude,
+        if (visitId != null) 'visit_id': visitId,
+      },
+    );
+    return _dataMap(res.data);
+  }
+
+  Future<Map<String, dynamic>> getUserDayTrail({
+    required int businessId,
+    required int userId,
+    String? day,
+  }) async {
+    final res = await _api.get<Map<String, dynamic>>(
+      '/api/v1/distribution/business/$businessId/users/$userId/day-trail',
+      query: <String, dynamic>{if (day != null) 'day': day},
+    );
+    return _dataMap(res.data);
+  }
+
   Future<Map<String, dynamic>> syncOffline({
     required int businessId,
     required String clientBatchId,

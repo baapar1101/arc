@@ -53,7 +53,8 @@ class DistributionMainPage extends StatefulWidget {
   State<DistributionMainPage> createState() => _DistributionMainPageState();
 }
 
-class _DistributionMainPageState extends State<DistributionMainPage> with SingleTickerProviderStateMixin {
+class _DistributionMainPageState extends State<DistributionMainPage>
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   late TabController _tabController;
   final DistributionService _svc = DistributionService();
   Timer? _heartbeatTimer;
@@ -63,6 +64,8 @@ class _DistributionMainPageState extends State<DistributionMainPage> with Single
   bool _enablePresell = false;
   bool _enablePromotions = false;
   bool _enableSuggestedOrder = true;
+  bool _shareLiveLocation = true;
+  bool? _liveGpsOk;
   final TextEditingController _memapsKeyCtl = TextEditingController();
   List<dynamic> _checklistTemplate = [];
   List<dynamic>? _optimizedPlanItems;
@@ -118,6 +121,7 @@ class _DistributionMainPageState extends State<DistributionMainPage> with Single
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _tabController = TabController(length: _tabCount, vsync: this);
     _tabController.addListener(() {
       if (!_tabController.indexIsChanging) _loadTab(_tabController.index);
@@ -125,23 +129,40 @@ class _DistributionMainPageState extends State<DistributionMainPage> with Single
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       await _refreshOfflineCount();
       await _loadTab(0);
-      _heartbeatTimer = Timer.periodic(const Duration(seconds: 45), (_) => _sendLiveHeartbeat());
+      _startLiveHeartbeat();
     });
   }
 
-  Future<void> _sendLiveHeartbeat() async {
-    final v = _activeVisit;
-    if (v == null || !_canOperate) return;
-    final id = int.tryParse('${v['id']}');
-    if (id == null) return;
+  void _startLiveHeartbeat() {
+    _heartbeatTimer?.cancel();
+    _heartbeatTimer = Timer.periodic(const Duration(seconds: 30), (_) => _sendLiveHeartbeat(preferCached: true));
+    _sendLiveHeartbeat();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _startLiveHeartbeat();
+    } else if (state == AppLifecycleState.paused || state == AppLifecycleState.hidden) {
+      _heartbeatTimer?.cancel();
+    }
+  }
+
+  Future<void> _sendLiveHeartbeat({bool preferCached = false}) async {
+    if (!_canOperate || !_shareLiveLocation) return;
     try {
-      final loc = await readDistributionVisitLocation();
-      if (loc.latitude == null || loc.longitude == null) return;
-      await _svc.visitHeartbeat(
+      final loc = await readDistributionVisitLocation(preferCached: preferCached);
+      if (loc.latitude == null || loc.longitude == null) {
+        if (mounted && _liveGpsOk != false) setState(() => _liveGpsOk = false);
+        return;
+      }
+      if (mounted && _liveGpsOk != true) setState(() => _liveGpsOk = true);
+      final visitId = int.tryParse('${_activeVisit?['id']}');
+      await _svc.reportLiveLocation(
         businessId: widget.businessId,
-        visitId: id,
         latitude: loc.latitude!,
         longitude: loc.longitude!,
+        visitId: visitId,
       );
     } catch (_) {
       // silent — موقعیت زنده بهترین‌تلاش است
@@ -160,6 +181,7 @@ class _DistributionMainPageState extends State<DistributionMainPage> with Single
       _enablePresell = ds['enable_presell'] == true;
       _enablePromotions = ds['enable_promotions'] == true;
       _enableSuggestedOrder = ds['enable_suggested_order'] != false;
+      _shareLiveLocation = ds['share_live_location'] != false;
       final tpl = ds['visit_checklist_template'];
       _checklistTemplate = tpl is List ? tpl : [];
       final key = (ds['memaps_api_key'] ?? '').toString();
@@ -171,6 +193,7 @@ class _DistributionMainPageState extends State<DistributionMainPage> with Single
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _heartbeatTimer?.cancel();
     _tabController.dispose();
     _memapsKeyCtl.dispose();
@@ -220,6 +243,7 @@ class _DistributionMainPageState extends State<DistributionMainPage> with Single
           _summary = d;
           _applySettingsFromSummary();
         });
+        unawaited(_sendLiveHeartbeat());
       }
     } catch (e) {
       if (mounted) SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
@@ -904,6 +928,32 @@ class _DistributionMainPageState extends State<DistributionMainPage> with Single
                 ),
               ),
             ),
+          if (_canOperate)
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                child: Card(
+                  color: _shareLiveLocation
+                      ? (_liveGpsOk == false ? cs.errorContainer.withValues(alpha: 0.55) : cs.surfaceContainerHighest)
+                      : cs.surfaceContainerHighest,
+                  child: ListTile(
+                    leading: Icon(
+                      !_shareLiveLocation
+                          ? Icons.location_off_outlined
+                          : (_liveGpsOk == false ? Icons.gps_off : Icons.my_location),
+                    ),
+                    title: Text(
+                      !_shareLiveLocation
+                          ? t.distributionLiveLocationDisabledBanner
+                          : (_liveGpsOk == false
+                              ? t.distributionLiveLocationGpsUnavailable
+                              : t.distributionLiveLocationVisitorHint),
+                      style: theme.textTheme.bodyMedium,
+                    ),
+                  ),
+                ),
+              ),
+            ),
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
@@ -1340,6 +1390,12 @@ class _DistributionMainPageState extends State<DistributionMainPage> with Single
               ),
             ),
           SwitchListTile(
+            title: Text(t.distributionShareLiveLocation),
+            subtitle: Text(t.distributionShareLiveLocationHint),
+            value: ds['share_live_location'] != false,
+            onChanged: (v) => persist({'share_live_location': v}),
+          ),
+          SwitchListTile(
             title: Text(t.distributionSharedRoutingCatalog),
             subtitle: Text(t.distributionSharedRoutingCatalogHint),
             value: ds['shared_routing_catalog'] == true,
@@ -1467,6 +1523,7 @@ class _DistributionMainPageState extends State<DistributionMainPage> with Single
       service: _svc,
       enableVanSales: _enableVanSales,
       canManage: _canManage,
+      authStore: widget.authStore,
     );
   }
 

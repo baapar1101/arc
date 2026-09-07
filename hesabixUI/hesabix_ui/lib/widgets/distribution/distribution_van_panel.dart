@@ -7,9 +7,9 @@ import 'package:hesabix_ui/services/business_user_service.dart';
 import 'package:hesabix_ui/services/distribution_service.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
 import 'package:hesabix_ui/utils/snackbar_helper.dart';
+import 'package:hesabix_ui/core/auth_store.dart';
 import 'package:hesabix_ui/widgets/distribution/distribution_form_helpers.dart';
-import 'package:hesabix_ui/widgets/invoice/product_combobox_widget.dart';
-import 'package:hesabix_ui/widgets/invoice/warehouse_combobox_widget.dart';
+import 'package:hesabix_ui/widgets/distribution/distribution_van_transfer_sheet.dart';
 
 /// تب ون: موجودی، ساخت، بارگیری و تخلیه.
 class DistributionVanPanel extends StatefulWidget {
@@ -17,6 +17,7 @@ class DistributionVanPanel extends StatefulWidget {
   final DistributionService service;
   final bool enableVanSales;
   final bool canManage;
+  final AuthStore? authStore;
 
   const DistributionVanPanel({
     super.key,
@@ -24,6 +25,7 @@ class DistributionVanPanel extends StatefulWidget {
     required this.service,
     required this.enableVanSales,
     required this.canManage,
+    this.authStore,
   });
 
   @override
@@ -162,128 +164,55 @@ class _DistributionVanPanelState extends State<DistributionVanPanel> {
     );
   }
 
-  Future<void> _showTransferDialog({required bool load}) async {
+  int? get _activeVanId {
+    final selected = _selectedVanId ?? _myStock?['van_id'];
+    if (selected is int) return selected;
+    return int.tryParse('$selected');
+  }
+
+  String? get _activeVanName {
+    final id = _activeVanId;
+    for (final raw in _vans) {
+      final m = Map<String, dynamic>.from(raw as Map);
+      if (m['id'] == id) return distributionEntityLabel(m);
+    }
+    return id != null ? '#$id' : null;
+  }
+
+  List<Map<String, dynamic>> get _stockItems {
+    return ((_myStock?['items'] as List?) ?? [])
+        .map((raw) => Map<String, dynamic>.from(raw as Map))
+        .toList();
+  }
+
+  Future<void> _openTransfer({required bool load}) async {
     final t = AppLocalizations.of(context);
-    final vanId = _selectedVanId ?? _myStock?['van_id'] as int?;
+    final vanId = _activeVanId;
     if (vanId == null) {
-      SnackBarHelper.showError(context, message: t.distributionVanStock);
+      SnackBarHelper.showError(context, message: t.distributionNoVanAssigned);
       return;
     }
-    int? warehouseId;
-    final lines = <Map<String, dynamic>>[];
-    Map<String, dynamic>? product;
-    final qtyCtl = TextEditingController(text: '1');
-
-    await showDialog<void>(
+    if (!load && _stockItems.isEmpty) {
+      SnackBarHelper.showError(context, message: t.distributionVanEmptyStockUnload);
+      return;
+    }
+    final saved = await showDistributionVanTransferSheet(
       context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (context, setD) => AlertDialog(
-          title: Text(load ? t.distributionVanLoad : t.distributionVanUnload),
-          content: SizedBox(
-            width: 400,
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  WarehouseComboboxWidget(
-                    businessId: widget.businessId,
-                    selectedWarehouseId: warehouseId,
-                    label: load ? t.distributionSourceWarehouse : t.distributionDestWarehouse,
-                    selectDefaultWhenUnset: true,
-                    onChanged: (id) => setD(() => warehouseId = id),
-                  ),
-                  const SizedBox(height: 8),
-                  ProductComboboxWidget(
-                    businessId: widget.businessId,
-                    label: t.distributionSelectProduct,
-                    onChanged: (p) => setD(() => product = p),
-                  ),
-                  const SizedBox(height: 8),
-                  TextField(
-                    controller: qtyCtl,
-                    keyboardType: TextInputType.number,
-                    decoration: InputDecoration(
-                      labelText: t.distributionReturnQuantity,
-                      border: const OutlineInputBorder(),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  OutlinedButton.icon(
-                    onPressed: () {
-                      if (product == null) return;
-                      final pid = product!['id'];
-                      setD(() {
-                        lines.add({
-                          'product_id': pid is int ? pid : int.parse('$pid'),
-                          'product_name': product!['name'] ?? product!['product_name'],
-                          'quantity': double.tryParse(qtyCtl.text) ?? 1,
-                        });
-                        product = null;
-                        qtyCtl.text = '1';
-                      });
-                    },
-                    icon: const Icon(Icons.add),
-                    label: Text(t.distributionReturnAddLine),
-                  ),
-                  ...lines.asMap().entries.map(
-                    (e) => ListTile(
-                      dense: true,
-                      title: Text(
-                        '${e.value['product_name'] ?? 'product ${e.value['product_id']}'}'
-                        ' × ${e.value['quantity']}',
-                      ),
-                      trailing: IconButton(
-                        icon: const Icon(Icons.delete_outline),
-                        onPressed: () => setD(() => lines.removeAt(e.key)),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: Text(t.cancel)),
-            FilledButton(
-              onPressed: lines.isEmpty
-                  ? null
-                  : () async {
-                      try {
-                        if (load) {
-                          await widget.service.loadVan(
-                            businessId: widget.businessId,
-                            vanId: vanId,
-                            lines: lines,
-                            sourceWarehouseId: warehouseId,
-                          );
-                        } else {
-                          await widget.service.unloadVan(
-                            businessId: widget.businessId,
-                            vanId: vanId,
-                            lines: lines,
-                            destWarehouseId: warehouseId,
-                          );
-                        }
-                        if (ctx.mounted) Navigator.pop(ctx);
-                        await _reload();
-                        if (mounted) {
-                          SnackBarHelper.showSuccess(context, message: t.distributionSettingsSaved);
-                        }
-                      } catch (e) {
-                        if (mounted) {
-                          SnackBarHelper.showError(
-                            context,
-                            message: ErrorExtractor.forContext(e, context),
-                          );
-                        }
-                      }
-                    },
-              child: Text(t.save),
-            ),
-          ],
-        ),
-      ),
+      businessId: widget.businessId,
+      service: widget.service,
+      vanId: vanId,
+      load: load,
+      vanName: _activeVanName,
+      authStore: widget.authStore,
+      vanStockItems: _stockItems,
     );
+    if (!mounted) return;
+    if (saved) {
+      await _reload();
+      if (mounted) {
+        SnackBarHelper.showSuccess(context, message: t.distributionSettingsSaved);
+      }
+    }
   }
 
   @override
@@ -300,8 +229,11 @@ class _DistributionVanPanelState extends State<DistributionVanPanel> {
     if (_loading && _myStock == null && _vans.isEmpty) {
       return const Center(child: CircularProgressIndicator());
     }
-    final vanId = _selectedVanId ?? _myStock?['van_id'];
-    final items = (_myStock?['items'] as List?) ?? [];
+    final vanId = _activeVanId;
+    final items = _stockItems;
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final vanName = _activeVanName;
 
     return RefreshIndicator(
       onRefresh: _reload,
@@ -374,30 +306,34 @@ class _DistributionVanPanelState extends State<DistributionVanPanel> {
           Row(
             children: [
               Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: () => _showTransferDialog(load: true),
-                  icon: const Icon(Icons.upload),
-                  label: Text(t.distributionVanLoad),
+                child: _VanActionCard(
+                  icon: Icons.north_east,
+                  color: cs.primary,
+                  title: t.distributionVanLoad,
+                  subtitle: t.distributionVanLoadHint,
+                  onTap: () => _openTransfer(load: true),
                 ),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 10),
               Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: () => _showTransferDialog(load: false),
-                  icon: const Icon(Icons.download),
-                  label: Text(t.distributionVanUnload),
+                child: _VanActionCard(
+                  icon: Icons.south_west,
+                  color: cs.tertiary,
+                  title: t.distributionVanUnload,
+                  subtitle: t.distributionVanUnloadHint,
+                  onTap: () => _openTransfer(load: false),
                 ),
               ),
             ],
           ),
           if (vanId != null) ...[
-            const SizedBox(height: 8),
+            const SizedBox(height: 10),
             OutlinedButton.icon(
               onPressed: () async {
                 try {
                   final bytes = await widget.service.downloadVanLoadingListPdf(
                     businessId: widget.businessId,
-                    vanId: int.parse('$vanId'),
+                    vanId: vanId,
                   );
                   await BytesExportService.export(
                     bytes: bytes,
@@ -420,10 +356,10 @@ class _DistributionVanPanelState extends State<DistributionVanPanel> {
               label: Text(t.distributionPrintLoadingList),
             ),
           ],
-          const SizedBox(height: 16),
+          const SizedBox(height: 20),
           Text(
-            vanId == null ? t.distributionVanStock : '${t.distributionVanStock} · #$vanId',
-            style: Theme.of(context).textTheme.titleMedium,
+            vanName == null ? t.distributionVanStock : '${t.distributionVanStock} · $vanName',
+            style: theme.textTheme.titleMedium,
           ),
           const SizedBox(height: 8),
           if (vanId == null)
@@ -434,21 +370,90 @@ class _DistributionVanPanelState extends State<DistributionVanPanel> {
               ),
             )
           else if (items.isEmpty)
-            Padding(
-              padding: const EdgeInsets.all(24),
-              child: Center(child: Text(t.distributionVanStockEmpty)),
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  children: [
+                    Icon(Icons.inventory_2_outlined, size: 40, color: cs.outline),
+                    const SizedBox(height: 8),
+                    Text(t.distributionVanStockEmpty, textAlign: TextAlign.center),
+                    const SizedBox(height: 12),
+                    FilledButton.tonalIcon(
+                      onPressed: () => _openTransfer(load: true),
+                      icon: const Icon(Icons.north_east),
+                      label: Text(t.distributionVanLoad),
+                    ),
+                  ],
+                ),
+              ),
             )
           else
-            ...items.map((raw) {
-              final m = Map<String, dynamic>.from(raw as Map);
+            ...items.map((m) {
               return Card(
                 child: ListTile(
+                  leading: CircleAvatar(
+                    backgroundColor: cs.primaryContainer,
+                    child: Icon(Icons.inventory_2_outlined, color: cs.onPrimaryContainer),
+                  ),
                   title: Text(m['product_name']?.toString() ?? 'product ${m['product_id']}'),
-                  trailing: Text('× ${m['quantity'] ?? 0}'),
+                  trailing: Text(
+                    '× ${m['quantity'] ?? 0}',
+                    style: theme.textTheme.titleMedium,
+                  ),
                 ),
               );
             }),
         ],
+      ),
+    );
+  }
+}
+
+class _VanActionCard extends StatelessWidget {
+  final IconData icon;
+  final Color color;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+
+  const _VanActionCard({
+    required this.icon,
+    required this.color,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Material(
+      color: color.withValues(alpha: 0.10),
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(14, 16, 14, 16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(icon, color: color),
+              const SizedBox(height: 10),
+              Text(title, style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
+              const SizedBox(height: 4),
+              Text(
+                subtitle,
+                maxLines: 3,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

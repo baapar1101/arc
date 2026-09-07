@@ -29186,6 +29186,78 @@ abstract class AppLocalizations {
   /// **'Van stock is empty.'**
   String get distributionVanStockEmpty;
 
+  /// No description provided for @distributionVanLoadHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick products from the warehouse, set quantity, and add them to the list.'**
+  String get distributionVanLoadHint;
+
+  /// No description provided for @distributionVanUnloadHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick products from current van stock and return them to the warehouse.'**
+  String get distributionVanUnloadHint;
+
+  /// No description provided for @distributionVanTransferLines.
+  ///
+  /// In en, this message translates to:
+  /// **'Transfer lines'**
+  String get distributionVanTransferLines;
+
+  /// No description provided for @distributionVanPickProductFirst.
+  ///
+  /// In en, this message translates to:
+  /// **'Select a product from the list first.'**
+  String get distributionVanPickProductFirst;
+
+  /// No description provided for @distributionVanLinesEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No lines have been added yet.'**
+  String get distributionVanLinesEmpty;
+
+  /// No description provided for @distributionVanNoWarehouse.
+  ///
+  /// In en, this message translates to:
+  /// **'Select a warehouse.'**
+  String get distributionVanNoWarehouse;
+
+  /// No description provided for @distributionVanConfirmLoad.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm load'**
+  String get distributionVanConfirmLoad;
+
+  /// No description provided for @distributionVanConfirmUnload.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm unload'**
+  String get distributionVanConfirmUnload;
+
+  /// No description provided for @distributionVanLineAdded.
+  ///
+  /// In en, this message translates to:
+  /// **'Line added to the list.'**
+  String get distributionVanLineAdded;
+
+  /// No description provided for @distributionVanQtyInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Quantity must be greater than zero.'**
+  String get distributionVanQtyInvalid;
+
+  /// No description provided for @distributionVanEmptyStockUnload.
+  ///
+  /// In en, this message translates to:
+  /// **'Van stock is empty; nothing to unload.'**
+  String get distributionVanEmptyStockUnload;
+
+  /// No description provided for @distributionVanStockAvailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Van stock: {qty}'**
+  String distributionVanStockAvailable(String qty);
+
   /// No description provided for @distributionDeleteStop.
   ///
   /// In en, this message translates to:
@@ -35308,6 +35380,108 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'No locations to show.'**
   String get distributionTeamMapEmpty;
+
+  /// No description provided for @distributionTeamMapEmptyHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Visitors appear here when they open Distribution and allow location. Pins are GPS of the visitor, not the customer address.'**
+  String get distributionTeamMapEmptyHint;
+
+  /// No description provided for @distributionShareLiveLocation.
+  ///
+  /// In en, this message translates to:
+  /// **'Share live visitor location'**
+  String get distributionShareLiveLocation;
+
+  /// No description provided for @distributionShareLiveLocationHint.
+  ///
+  /// In en, this message translates to:
+  /// **'While Distribution is open, visitors send GPS so managers can see them on the team map — even without an active visit.'**
+  String get distributionShareLiveLocationHint;
+
+  /// No description provided for @distributionLiveLocationVisitorHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Your location is shared with managers on the team map while this page is open.'**
+  String get distributionLiveLocationVisitorHint;
+
+  /// No description provided for @distributionLiveLocationGpsUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Location is off or permission was denied, so you will not appear on the team map.'**
+  String get distributionLiveLocationGpsUnavailable;
+
+  /// No description provided for @distributionLiveLocationDisabledBanner.
+  ///
+  /// In en, this message translates to:
+  /// **'Live location sharing is turned off in distribution settings.'**
+  String get distributionLiveLocationDisabledBanner;
+
+  /// No description provided for @distributionPresenceOnline.
+  ///
+  /// In en, this message translates to:
+  /// **'Online'**
+  String get distributionPresenceOnline;
+
+  /// No description provided for @distributionPresenceRecent.
+  ///
+  /// In en, this message translates to:
+  /// **'Recently seen'**
+  String get distributionPresenceRecent;
+
+  /// No description provided for @distributionPresenceStale.
+  ///
+  /// In en, this message translates to:
+  /// **'Last known'**
+  String get distributionPresenceStale;
+
+  /// No description provided for @distributionPresenceOffline.
+  ///
+  /// In en, this message translates to:
+  /// **'Offline'**
+  String get distributionPresenceOffline;
+
+  /// No description provided for @distributionPresenceNone.
+  ///
+  /// In en, this message translates to:
+  /// **'No GPS yet'**
+  String get distributionPresenceNone;
+
+  /// No description provided for @distributionTeamMapVisitors.
+  ///
+  /// In en, this message translates to:
+  /// **'Visitors'**
+  String get distributionTeamMapVisitors;
+
+  /// No description provided for @distributionTeamMapCustomers.
+  ///
+  /// In en, this message translates to:
+  /// **'Customers'**
+  String get distributionTeamMapCustomers;
+
+  /// No description provided for @distributionTeamMapTrail.
+  ///
+  /// In en, this message translates to:
+  /// **'Day trail'**
+  String get distributionTeamMapTrail;
+
+  /// No description provided for @distributionTeamMapNoTrail.
+  ///
+  /// In en, this message translates to:
+  /// **'No movement trail for this day.'**
+  String get distributionTeamMapNoTrail;
+
+  /// No description provided for @distributionTeamMapOnlineOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'Online only'**
+  String get distributionTeamMapOnlineOnly;
+
+  /// No description provided for @distributionTeamMapShowCustomers.
+  ///
+  /// In en, this message translates to:
+  /// **'Customer pins'**
+  String get distributionTeamMapShowCustomers;
 
   /// No description provided for @distributionStatusUnknown.
   ///

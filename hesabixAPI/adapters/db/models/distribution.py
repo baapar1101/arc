@@ -60,6 +60,12 @@ class DistributionBusinessSettings(Base):
 		nullable=True,
 		comment="کلید API می‌مپس؛ با ?key= یا هدر X-Memaps-Key ارسال می‌شود.",
 	)
+	share_live_location: Mapped[bool] = mapped_column(
+		Boolean,
+		nullable=False,
+		default=True,
+		comment="اگر True باشد موقعیت ویزیتور برای مدیر روی نقشه تیم دیده می‌شود.",
+	)
 	created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
 	updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
@@ -308,11 +314,31 @@ class DistributionVisitHeartbeat(Base):
 
 	id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
 	business_id: Mapped[int] = mapped_column(Integer, ForeignKey("businesses.id", ondelete="CASCADE"), index=True)
-	visit_id: Mapped[int] = mapped_column(Integer, ForeignKey("distribution_field_visits.id", ondelete="CASCADE"), index=True)
+	visit_id: Mapped[int | None] = mapped_column(
+		Integer, ForeignKey("distribution_field_visits.id", ondelete="CASCADE"), nullable=True, index=True
+	)
 	user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id", ondelete="CASCADE"))
 	latitude: Mapped[float] = mapped_column(Numeric(11, 8), nullable=False)
 	longitude: Mapped[float] = mapped_column(Numeric(11, 8), nullable=False)
 	recorded_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.utcnow)
+
+
+class DistributionUserLiveLocation(Base):
+	"""آخرین موقعیت شناخته‌شدهٔ ویزیتور، مستقل از ویزیت باز."""
+
+	__tablename__ = "distribution_user_live_locations"
+	__table_args__ = (UniqueConstraint("business_id", "user_id", name="uq_dist_user_live_location"),)
+
+	id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+	business_id: Mapped[int] = mapped_column(Integer, ForeignKey("businesses.id", ondelete="CASCADE"), index=True)
+	user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id", ondelete="CASCADE"), index=True)
+	visit_id: Mapped[int | None] = mapped_column(
+		Integer, ForeignKey("distribution_field_visits.id", ondelete="SET NULL"), nullable=True
+	)
+	latitude: Mapped[float] = mapped_column(Numeric(11, 8), nullable=False)
+	longitude: Mapped[float] = mapped_column(Numeric(11, 8), nullable=False)
+	recorded_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.utcnow)
+	updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
 
 class DistributionVisitOrder(Base):

@@ -15486,7 +15486,8 @@ class AppLocalizationsEn extends AppLocalizations {
       'Open Manage to add territories, routes and stops.';
 
   @override
-  String get distributionPlanAssigned => 'Visitor assigned. The field plan is ready.';
+  String get distributionPlanAssigned =>
+      'Visitor assigned. The field plan is ready.';
 
   @override
   String get distributionTerritoryEdit => 'Edit territory';
@@ -15511,7 +15512,8 @@ class AppLocalizationsEn extends AppLocalizations {
       'Delete this territory? Routes stay, but the territory link is removed.';
 
   @override
-  String get distributionDeleteStopConfirm => 'Remove this customer from the route?';
+  String get distributionDeleteStopConfirm =>
+      'Remove this customer from the route?';
 
   @override
   String get distributionDeletePromoConfirm => 'Delete this promotion?';
@@ -15837,6 +15839,48 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get distributionVanStockEmpty => 'Van stock is empty.';
+
+  @override
+  String get distributionVanLoadHint =>
+      'Pick products from the warehouse, set quantity, and add them to the list.';
+
+  @override
+  String get distributionVanUnloadHint =>
+      'Pick products from current van stock and return them to the warehouse.';
+
+  @override
+  String get distributionVanTransferLines => 'Transfer lines';
+
+  @override
+  String get distributionVanPickProductFirst =>
+      'Select a product from the list first.';
+
+  @override
+  String get distributionVanLinesEmpty => 'No lines have been added yet.';
+
+  @override
+  String get distributionVanNoWarehouse => 'Select a warehouse.';
+
+  @override
+  String get distributionVanConfirmLoad => 'Confirm load';
+
+  @override
+  String get distributionVanConfirmUnload => 'Confirm unload';
+
+  @override
+  String get distributionVanLineAdded => 'Line added to the list.';
+
+  @override
+  String get distributionVanQtyInvalid => 'Quantity must be greater than zero.';
+
+  @override
+  String get distributionVanEmptyStockUnload =>
+      'Van stock is empty; nothing to unload.';
+
+  @override
+  String distributionVanStockAvailable(String qty) {
+    return 'Van stock: $qty';
+  }
 
   @override
   String get distributionDeleteStop => 'Delete stop';
@@ -19285,6 +19329,62 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get distributionTeamMapEmpty => 'No locations to show.';
+
+  @override
+  String get distributionTeamMapEmptyHint =>
+      'Visitors appear here when they open Distribution and allow location. Pins are GPS of the visitor, not the customer address.';
+
+  @override
+  String get distributionShareLiveLocation => 'Share live visitor location';
+
+  @override
+  String get distributionShareLiveLocationHint =>
+      'While Distribution is open, visitors send GPS so managers can see them on the team map — even without an active visit.';
+
+  @override
+  String get distributionLiveLocationVisitorHint =>
+      'Your location is shared with managers on the team map while this page is open.';
+
+  @override
+  String get distributionLiveLocationGpsUnavailable =>
+      'Location is off or permission was denied, so you will not appear on the team map.';
+
+  @override
+  String get distributionLiveLocationDisabledBanner =>
+      'Live location sharing is turned off in distribution settings.';
+
+  @override
+  String get distributionPresenceOnline => 'Online';
+
+  @override
+  String get distributionPresenceRecent => 'Recently seen';
+
+  @override
+  String get distributionPresenceStale => 'Last known';
+
+  @override
+  String get distributionPresenceOffline => 'Offline';
+
+  @override
+  String get distributionPresenceNone => 'No GPS yet';
+
+  @override
+  String get distributionTeamMapVisitors => 'Visitors';
+
+  @override
+  String get distributionTeamMapCustomers => 'Customers';
+
+  @override
+  String get distributionTeamMapTrail => 'Day trail';
+
+  @override
+  String get distributionTeamMapNoTrail => 'No movement trail for this day.';
+
+  @override
+  String get distributionTeamMapOnlineOnly => 'Online only';
+
+  @override
+  String get distributionTeamMapShowCustomers => 'Customer pins';
 
   @override
   String get distributionStatusUnknown => 'Unknown';

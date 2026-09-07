@@ -37,6 +37,7 @@ class _ProductSearchSuggestionTile extends StatelessWidget {
     this.highlighted = false,
     this.showPurchaseInMetrics = true,
     this.showGeneralBarcodeLine = false,
+    this.commitOnPointerDown = false,
   });
 
   final Map<String, dynamic> item;
@@ -47,6 +48,8 @@ class _ProductSearchSuggestionTile extends StatelessWidget {
   final bool showPurchaseInMetrics;
   /// در موبایل false تا بارکد عمومی در نتایج نشان داده نشود.
   final bool showGeneralBarcodeLine;
+  /// در overlay دسکتاپ true تا کلیک موس قبل از بسته شدن لایه ثبت شود.
+  final bool commitOnPointerDown;
 
   @override
   Widget build(BuildContext context) {
@@ -83,7 +86,8 @@ class _ProductSearchSuggestionTile extends StatelessWidget {
     return Material(
       color: highlighted ? cs.primary.withValues(alpha: 0.08) : Colors.transparent,
       child: InkWell(
-        onTap: onTap,
+        onTap: commitOnPointerDown ? null : onTap,
+        onTapDown: commitOnPointerDown ? (_) => onTap() : null,
         mouseCursor: SystemMouseCursors.click,
         hoverColor: cs.primary.withValues(alpha: 0.06),
         child: Padding(
@@ -162,6 +166,7 @@ Widget _buildProductSuggestionsScrollArea({
   bool dense = false,
   bool showPurchaseInMetrics = true,
   bool showGeneralBarcodeLine = false,
+  bool commitOnPointerDown = false,
 }) {
   final theme = Theme.of(context);
   final colorScheme = theme.colorScheme;
@@ -231,6 +236,7 @@ Widget _buildProductSuggestionsScrollArea({
               highlighted: index == highlightedIndex,
               showPurchaseInMetrics: showPurchaseInMetrics,
               showGeneralBarcodeLine: showGeneralBarcodeLine,
+              commitOnPointerDown: commitOnPointerDown,
               onTap: () => onProductSelected(it),
             );
           },
@@ -317,6 +323,7 @@ class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
   OverlayEntry? _desktopOverlayEntry;
   double _desktopFieldWidth = 0;
   bool _suppressFieldNotifications = false;
+  bool _selectingFromOverlay = false;
   int _highlightedIndex = -1;
 
   // دسته‌بندی‌ها
@@ -509,10 +516,38 @@ class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
       }
     } else {
       Future.delayed(const Duration(milliseconds: 180), () {
-        if (!mounted || _fieldFocus.hasFocus) return;
+        if (!mounted || _fieldFocus.hasFocus || _selectingFromOverlay) return;
         _removeDesktopOverlay();
       });
     }
+  }
+
+  /// موقعیت فیلد نسبت به Overlay تا کلیک موس روی لیست پیشنهادها hit-test شود.
+  /// [CompositedTransformFollower] داخل دیالوگ/شیت اغلب رویداد موس را به مانع پشت لیست می‌دهد.
+  Rect? _desktopFieldRectInOverlay() {
+    final overlay = Overlay.maybeOf(context);
+    if (overlay == null) return null;
+    final overlayBox = overlay.context.findRenderObject();
+    final targetBox = context.findRenderObject();
+    if (overlayBox is! RenderBox || targetBox is! RenderBox) return null;
+    if (!overlayBox.hasSize || !targetBox.hasSize || !overlayBox.attached || !targetBox.attached) {
+      return null;
+    }
+    try {
+      final topLeft = targetBox.localToGlobal(Offset.zero, ancestor: overlayBox);
+      return topLeft & targetBox.size;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  void _selectFromOverlay(Map<String, dynamic> product) {
+    if (_selectingFromOverlay) return;
+    _selectingFromOverlay = true;
+    _select(product);
+    _removeDesktopOverlay();
+    _fieldFocus.unfocus();
+    _selectingFromOverlay = false;
   }
 
   void _removeDesktopOverlay() {
@@ -536,60 +571,93 @@ class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
   }
 
   Widget _buildDesktopOverlayStack(BuildContext overlayContext) {
-    final width = math.max(_desktopFieldWidth, 280.0);
     final cs = Theme.of(overlayContext).colorScheme;
+    final media = MediaQuery.sizeOf(overlayContext);
 
-    return Stack(
-      clipBehavior: Clip.none,
-      children: [
-        Positioned.fill(
-          child: GestureDetector(
-            behavior: HitTestBehavior.translucent,
-            onTapDown: (_) {
-              _fieldFocus.unfocus();
-              _removeDesktopOverlay();
-            },
+    return ValueListenableBuilder<_ProductPickerState>(
+      valueListenable: _pickerStateNotifier,
+      builder: (context, state, _) {
+        final overlayHeight = _desktopOverlayHeight(state);
+        final fieldRect = _desktopFieldRectInOverlay();
+        final width = math.max(fieldRect?.width ?? _desktopFieldWidth, 280.0);
+
+        final panel = TextFieldTapRegion(
+          child: Material(
+            elevation: 14,
+            surfaceTintColor: cs.surfaceTint,
+            color: cs.surfaceContainerHigh,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            clipBehavior: Clip.antiAlias,
+            shadowColor: Colors.black.withValues(alpha: 0.22),
+            child: SizedBox(
+              width: width,
+              height: overlayHeight,
+              child: _buildProductSuggestionsScrollArea(
+                context: context,
+                state: state,
+                scrollController: _overlayScrollController,
+                onProductSelected: _selectFromOverlay,
+                highlightedIndex: _highlightedIndex,
+                dense: true,
+                showPurchaseInMetrics: widget.authStore?.canViewPurchasePrice() ?? false,
+                showGeneralBarcodeLine: true,
+                commitOnPointerDown: true,
+              ),
+            ),
           ),
-        ),
-        CompositedTransformFollower(
-          link: _layerLink,
-          showWhenUnlinked: false,
-          followerAnchor: Alignment.topCenter,
-          targetAnchor: Alignment.bottomCenter,
-          offset: const Offset(0, 6),
-          child: ValueListenableBuilder<_ProductPickerState>(
-            valueListenable: _pickerStateNotifier,
-            builder: (context, state, _) {
-              final overlayHeight = _desktopOverlayHeight(state);
-              return Material(
-                elevation: 14,
-                surfaceTintColor: cs.surfaceTint,
-                color: cs.surfaceContainerHigh,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                clipBehavior: Clip.antiAlias,
-                shadowColor: Colors.black.withValues(alpha: 0.22),
-                child: SizedBox(
-                  width: width,
-                  height: overlayHeight,
-                  child: _buildProductSuggestionsScrollArea(
-                    context: context,
-                    state: state,
-                    scrollController: _overlayScrollController,
-                    onProductSelected: (p) {
-                      _select(p);
-                      _removeDesktopOverlay();
-                    },
-                    highlightedIndex: _highlightedIndex,
-                    dense: true,
-                    showPurchaseInMetrics: widget.authStore?.canViewPurchasePrice() ?? false,
-                    showGeneralBarcodeLine: true,
-                  ),
-                ),
-              );
-            },
-          ),
-        ),
-      ],
+        );
+
+        Widget dropdown;
+        if (fieldRect != null) {
+          var left = fieldRect.left;
+          if (left + width > media.width - 8) {
+            left = media.width - width - 8;
+          }
+          if (left < 8) left = 8;
+          var top = fieldRect.bottom + 6;
+          if (top + overlayHeight > media.height - 8) {
+            top = fieldRect.top - overlayHeight - 6;
+          }
+          if (top < 8) top = 8;
+          dropdown = Positioned(
+            left: left,
+            top: top,
+            width: width,
+            height: overlayHeight,
+            child: GestureDetector(
+              onTap: () {},
+              onTapDown: (_) {},
+              behavior: HitTestBehavior.opaque,
+              child: panel,
+            ),
+          );
+        } else {
+          dropdown = CompositedTransformFollower(
+            link: _layerLink,
+            showWhenUnlinked: false,
+            followerAnchor: Alignment.topCenter,
+            targetAnchor: Alignment.bottomCenter,
+            offset: const Offset(0, 6),
+            child: panel,
+          );
+        }
+
+        return Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Positioned.fill(
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () {
+                  _fieldFocus.unfocus();
+                  _removeDesktopOverlay();
+                },
+              ),
+            ),
+            dropdown,
+          ],
+        );
+      },
     );
   }
 
@@ -652,9 +720,7 @@ class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
   void _selectHighlightedOrFirst() {
     if (_items.isEmpty) return;
     final idx = (_highlightedIndex >= 0 && _highlightedIndex < _items.length) ? _highlightedIndex : 0;
-    _select(_items[idx]);
-    _removeDesktopOverlay();
-    _fieldFocus.unfocus();
+    _selectFromOverlay(_items[idx]);
   }
 
   KeyEventResult _onDesktopFieldKeyEvent(FocusNode node, KeyEvent event) {

@@ -18,16 +18,20 @@ from adapters.db.models.distribution import (
 	DistributionLoadPlan,
 	DistributionShelfAudit,
 	DistributionTradePromotion,
+	DistributionVan,
 	DistributionVisitHeartbeat,
 	DistributionVisitOrder,
+	DistributionUserLiveLocation,
 )
+from adapters.db.models.warehouse import Warehouse
 from adapters.db.models.document import Document
 from adapters.db.models.person import Person
 from adapters.db.models.product import Product
 from app.core.auth_dependency import AuthContext
-from app.core.business_calendar import business_today
+from app.core.business_calendar import business_day_utc_bounds, business_today
 from app.core.responses import ApiError
 from app.services import distribution_service as dist_svc
+from app.services.distribution_geo import haversine_meters
 from app.services.distribution_documents import create_distribution_invoice, document_net_amount, person_label, user_label
 
 
@@ -53,6 +57,64 @@ def _parse_date(value: Any, field: str = "date") -> date:
 
 def _settings(db: Session, business_id: int):
 	return dist_svc.get_or_create_distribution_settings(db, business_id)
+
+
+def _resolve_delivery_warehouse(
+	db: Session,
+	business_id: int,
+	*,
+	payload: Optional[Dict[str, Any]] = None,
+	trip: Optional[DistributionDeliveryTrip] = None,
+) -> Optional[int]:
+	"""انبار خروج کالا هنگام تحویل: payload → انبار ون مسیر → تنظیمات پخش → انبار پیش‌فرض/مرکزی."""
+	payload = payload or {}
+	raw = payload.get("warehouse_id")
+	if raw:
+		try:
+			wid = int(raw)
+			if wid > 0:
+				return wid
+		except (TypeError, ValueError):
+			pass
+
+	van_id = int(trip.van_id) if trip and trip.van_id else None
+	if van_id:
+		van = (
+			db.query(DistributionVan)
+			.filter(DistributionVan.id == van_id, DistributionVan.business_id == business_id)
+			.first()
+		)
+		if van and van.warehouse_id:
+			return int(van.warehouse_id)
+
+	settings = _settings(db, business_id)
+	default_src = getattr(settings, "default_source_warehouse_id", None)
+	if default_src:
+		return int(default_src)
+
+	default_wh = (
+		db.query(Warehouse)
+		.filter(Warehouse.business_id == business_id, Warehouse.is_default.is_(True))
+		.order_by(Warehouse.id.asc())
+		.first()
+	)
+	if default_wh:
+		return int(default_wh.id)
+
+	van_wh_ids = [
+		row[0]
+		for row in db.query(DistributionVan.warehouse_id)
+		.filter(DistributionVan.business_id == business_id)
+		.all()
+		if row[0]
+	]
+	q = db.query(Warehouse).filter(Warehouse.business_id == business_id)
+	if van_wh_ids:
+		central = q.filter(~Warehouse.id.in_(van_wh_ids)).order_by(Warehouse.id.asc()).first()
+		if central:
+			return int(central.id)
+	any_wh = q.order_by(Warehouse.id.asc()).first()
+	return int(any_wh.id) if any_wh else None
 
 
 # ---------------------------------------------------------------------------
@@ -620,10 +682,23 @@ def create_delivery_trip(db: Session, business_id: int, actor_user_id: int, payl
 	driver_id = int(payload.get("driver_user_id") or actor_user_id)
 	trip_date = _parse_date(payload.get("trip_date") or business_today(business_id))
 	order_ids = payload.get("order_ids") if isinstance(payload.get("order_ids"), list) else []
+	van_id = int(payload["van_id"]) if payload.get("van_id") else None
+	if not van_id:
+		driver_van = (
+			db.query(DistributionVan)
+			.filter(
+				DistributionVan.business_id == business_id,
+				DistributionVan.user_id == driver_id,
+				DistributionVan.is_active.is_(True),
+			)
+			.first()
+		)
+		if driver_van:
+			van_id = int(driver_van.id)
 	trip = DistributionDeliveryTrip(
 		business_id=business_id,
 		driver_user_id=driver_id,
-		van_id=int(payload["van_id"]) if payload.get("van_id") else None,
+		van_id=van_id,
 		trip_date=trip_date,
 		status="draft",
 		notes=(str(payload.get("notes") or "").strip() or None),
@@ -703,7 +778,6 @@ def complete_delivery_stop(
 	db: Session, business_id: int, stop_id: int, user_id: int, payload: Dict[str, Any],
 ) -> Dict[str, Any]:
 	from app.services.distribution_documents import finalize_distribution_proforma_invoice
-	from adapters.db.models.distribution import DistributionVan
 
 	dist_svc._ensure_plugin(db, business_id)
 	stop = (
@@ -718,19 +792,54 @@ def complete_delivery_stop(
 	if not stop:
 		raise ApiError("NOT_FOUND", "Stop not found", http_status=404)
 	if stop.status != "pending":
-		raise ApiError("VALIDATION_ERROR", "Stop already completed", http_status=400)
+		raise ApiError("VALIDATION_ERROR", "این توقف قبلاً تکمیل شده است.", http_status=400)
 	status = str(payload.get("status") or "delivered").strip()
 	if status not in ("delivered", "partial", "failed"):
-		raise ApiError("VALIDATION_ERROR", "status must be delivered|partial|failed", http_status=400)
+		raise ApiError("VALIDATION_ERROR", "وضعیت تحویل باید delivered یا partial یا failed باشد.", http_status=400)
+
+	signer = ""
+	delivered_lines = payload.get("delivered_lines")
+	order = None
+	if stop.order_id:
+		order = db.query(DistributionVisitOrder).filter(DistributionVisitOrder.id == stop.order_id).first()
+
+	if status in ("delivered", "partial"):
+		if not payload.get("pod_confirmed"):
+			raise ApiError("VALIDATION_ERROR", "تأیید تحویل (POD) الزامی است.", http_status=400)
+		signer = str(payload.get("pod_signer_name") or "").strip()
+		if len(signer) < 2:
+			raise ApiError("VALIDATION_ERROR", "نام گیرنده برای تأیید تحویل الزامی است.", http_status=400)
+		if order and order.document_id:
+			wh_id = _resolve_delivery_warehouse(db, business_id, payload=payload, trip=stop.trip)
+			if not wh_id:
+				raise ApiError(
+					"VALIDATION_ERROR",
+					"برای ثبت تحویل انبار مشخص نیست. ون مسیر را انتخاب کنید یا انبار پیش‌فرض پخش را در تنظیمات بگذارید.",
+					http_status=400,
+				)
+			raw = None
+			if isinstance(delivered_lines, list) and delivered_lines:
+				raw = delivered_lines
+			elif status == "delivered":
+				raw = list(order.lines or [])
+			finalize_distribution_proforma_invoice(
+				db,
+				business_id,
+				user_id,
+				document_id=int(order.document_id),
+				warehouse_id=int(wh_id),
+				raw_lines=raw,
+				meta={
+					"delivery_stop_id": stop.id,
+					"pod_signer": signer,
+					"delivery_status": status,
+				},
+			)
+
 	stop.status = status
 	stop.completed_at = datetime.utcnow()
 	stop.updated_at = datetime.utcnow()
 	if status in ("delivered", "partial"):
-		if not payload.get("pod_confirmed"):
-			raise ApiError("VALIDATION_ERROR", "pod_confirmed required for delivery", http_status=400)
-		signer = str(payload.get("pod_signer_name") or "").strip()
-		if len(signer) < 2:
-			raise ApiError("VALIDATION_ERROR", "pod_signer_name required", http_status=400)
 		stop.pod_confirmed = True
 		stop.pod_signer_name = signer[:255]
 		stop.pod_note = (str(payload.get("pod_note") or "").strip() or None)
@@ -740,48 +849,10 @@ def complete_delivery_stop(
 			stop.pod_latitude = float(payload["latitude"])
 		if payload.get("longitude") is not None:
 			stop.pod_longitude = float(payload["longitude"])
-		delivered_lines = payload.get("delivered_lines")
 		stop.delivered_qty_snapshot = delivered_lines
-		if stop.order_id:
-			order = db.query(DistributionVisitOrder).filter(DistributionVisitOrder.id == stop.order_id).first()
-			if order:
-				order.status = "delivered" if status == "delivered" else "out_for_delivery"
-				order.updated_at = datetime.utcnow()
-				# انبار تحویل: ون مسیر → یا payload → یا settings
-				wh_id = payload.get("warehouse_id")
-				trip = stop.trip
-				if not wh_id and trip and trip.van_id:
-					van = db.query(DistributionVan).filter(DistributionVan.id == int(trip.van_id)).first()
-					if van:
-						wh_id = van.warehouse_id
-				if not wh_id:
-					settings = _settings(db, business_id)
-					wh_id = getattr(settings, "default_source_warehouse_id", None)
-				if order.document_id:
-					raw = None
-					if isinstance(delivered_lines, list) and delivered_lines:
-						raw = delivered_lines
-					elif status == "delivered":
-						raw = list(order.lines or [])
-					if not wh_id:
-						raise ApiError(
-							"VALIDATION_ERROR",
-							"warehouse_id required to finalize delivery (assign van or default warehouse)",
-							http_status=400,
-						)
-					finalize_distribution_proforma_invoice(
-						db,
-						business_id,
-						user_id,
-						document_id=int(order.document_id),
-						warehouse_id=int(wh_id),
-						raw_lines=raw,
-						meta={
-							"delivery_stop_id": stop.id,
-							"pod_signer": signer,
-							"delivery_status": status,
-						},
-					)
+		if order:
+			order.status = "delivered" if status == "delivered" else "out_for_delivery"
+			order.updated_at = datetime.utcnow()
 	else:
 		stop.failure_reason = (str(payload.get("failure_reason") or "").strip()[:255] or "failed")
 		stop.pod_confirmed = False
@@ -924,21 +995,143 @@ def list_load_plans(db: Session, business_id: int, *, plan_date: Optional[date] 
 
 
 # ---------------------------------------------------------------------------
-# GPS trail
+# GPS trail + live location
 # ---------------------------------------------------------------------------
 
-def record_heartbeat_trail(
-	db: Session, business_id: int, user_id: int, visit_id: int, latitude: float, longitude: float,
-) -> None:
-	row = DistributionVisitHeartbeat(
-		business_id=business_id,
-		visit_id=visit_id,
-		user_id=user_id,
-		latitude=float(latitude),
-		longitude=float(longitude),
-		recorded_at=datetime.utcnow(),
+def _live_location_enabled(db: Session, business_id: int) -> bool:
+	settings = _settings(db, business_id)
+	return bool(getattr(settings, "share_live_location", True))
+
+
+def upsert_live_location(
+	db: Session,
+	business_id: int,
+	user_id: int,
+	latitude: float,
+	longitude: float,
+	*,
+	visit_id: Optional[int] = None,
+	commit: bool = False,
+) -> Dict[str, Any]:
+	"""آخرین نقطه ویزیتور را به‌روز می‌کند و در صورت جابه‌جایی معنادار به trail اضافه می‌کند."""
+	now = datetime.utcnow()
+	lat = float(latitude)
+	lng = float(longitude)
+	row = (
+		db.query(DistributionUserLiveLocation)
+		.filter(
+			DistributionUserLiveLocation.business_id == business_id,
+			DistributionUserLiveLocation.user_id == user_id,
+		)
+		.first()
 	)
-	db.add(row)
+	if row:
+		row.latitude = lat
+		row.longitude = lng
+		row.recorded_at = now
+		row.updated_at = now
+		if visit_id:
+			row.visit_id = int(visit_id)
+	else:
+		row = DistributionUserLiveLocation(
+			business_id=business_id,
+			user_id=user_id,
+			visit_id=int(visit_id) if visit_id else None,
+			latitude=lat,
+			longitude=lng,
+			recorded_at=now,
+			updated_at=now,
+		)
+		db.add(row)
+
+	last = (
+		db.query(DistributionVisitHeartbeat)
+		.filter(
+			DistributionVisitHeartbeat.business_id == business_id,
+			DistributionVisitHeartbeat.user_id == user_id,
+		)
+		.order_by(DistributionVisitHeartbeat.recorded_at.desc())
+		.first()
+	)
+	should_trail = True
+	if last is not None:
+		dist_m = haversine_meters(float(last.latitude), float(last.longitude), lat, lng)
+		age = (now - last.recorded_at).total_seconds() if last.recorded_at else 999
+		if dist_m is not None and dist_m < 20 and age < 90:
+			should_trail = False
+	if should_trail:
+		db.add(
+			DistributionVisitHeartbeat(
+				business_id=business_id,
+				visit_id=int(visit_id) if visit_id else None,
+				user_id=user_id,
+				latitude=lat,
+				longitude=lng,
+				recorded_at=now,
+			)
+		)
+	if commit:
+		db.commit()
+		db.refresh(row)
+	return {
+		"user_id": user_id,
+		"latitude": lat,
+		"longitude": lng,
+		"visit_id": int(visit_id) if visit_id else (int(row.visit_id) if row.visit_id else None),
+		"updated_at": now.isoformat() + "Z",
+	}
+
+
+def report_live_location(
+	db: Session,
+	business_id: int,
+	user_id: int,
+	latitude: float,
+	longitude: float,
+	visit_id: Optional[int] = None,
+) -> Dict[str, Any]:
+	dist_svc._ensure_plugin(db, business_id)
+	if not _live_location_enabled(db, business_id):
+		return {"skipped": True, "reason": "disabled"}
+	active_visit_id = int(visit_id) if visit_id else None
+	if active_visit_id:
+		v = (
+			db.query(DistributionFieldVisit)
+			.filter(
+				DistributionFieldVisit.id == active_visit_id,
+				DistributionFieldVisit.business_id == business_id,
+			)
+			.first()
+		)
+		if not v or int(v.user_id) != int(user_id) or v.status != "in_progress":
+			active_visit_id = None
+		else:
+			extra = dict(v.extra_info or {})
+			extra["live_location"] = {
+				"latitude": float(latitude),
+				"longitude": float(longitude),
+				"updated_at": datetime.utcnow().isoformat() + "Z",
+			}
+			v.extra_info = extra
+			v.start_latitude = float(latitude)
+			v.start_longitude = float(longitude)
+			v.updated_at = datetime.utcnow()
+	data = upsert_live_location(
+		db, business_id, user_id, latitude, longitude, visit_id=active_visit_id, commit=True,
+	)
+	data["skipped"] = False
+	return data
+
+
+def record_heartbeat_trail(
+	db: Session,
+	business_id: int,
+	user_id: int,
+	visit_id: Optional[int],
+	latitude: float,
+	longitude: float,
+) -> None:
+	upsert_live_location(db, business_id, user_id, latitude, longitude, visit_id=visit_id, commit=False)
 
 
 def get_visit_trail(db: Session, business_id: int, visit_id: int) -> Dict[str, Any]:
@@ -968,12 +1161,14 @@ def get_visit_trail(db: Session, business_id: int, visit_id: int) -> Dict[str, A
 
 def get_user_day_trail(db: Session, business_id: int, user_id: int, day: date) -> Dict[str, Any]:
 	dist_svc._ensure_plugin(db, business_id)
+	start, end = business_day_utc_bounds(business_id, day)
 	points = (
 		db.query(DistributionVisitHeartbeat)
 		.filter(
 			DistributionVisitHeartbeat.business_id == business_id,
 			DistributionVisitHeartbeat.user_id == user_id,
-			func.date(DistributionVisitHeartbeat.recorded_at) == day,
+			DistributionVisitHeartbeat.recorded_at >= start,
+			DistributionVisitHeartbeat.recorded_at <= end,
 		)
 		.order_by(DistributionVisitHeartbeat.recorded_at.asc())
 		.limit(5000)

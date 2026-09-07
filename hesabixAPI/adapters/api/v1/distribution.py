@@ -464,6 +464,29 @@ def visit_heartbeat(
 	return success_response(data, request)
 
 
+@router.post("/business/{business_id}/live-location")
+def report_live_location(
+	request: Request,
+	business_id: int = Path(..., gt=0),
+	body: VisitHeartbeatPayload = Body(...),
+	db: Session = Depends(get_db),
+	ctx: AuthContext = Depends(get_current_user),
+	_: None = Depends(locale_dependency),
+	__: None = Depends(require_business_access_dep),
+	___: None = Depends(require_distribution_operate_dep),
+) -> Dict[str, Any]:
+	_ensure_plugin(db, business_id)
+	uid = ctx.get_user_id()
+	if uid is None:
+		raise ApiError("UNAUTHORIZED", "", http_status=401)
+	from app.services import distribution_commercial_service as dist_c
+
+	data = dist_c.report_live_location(
+		db, business_id, uid, body.latitude, body.longitude, visit_id=body.visit_id,
+	)
+	return success_response(data, request)
+
+
 @router.get("/business/{business_id}/visits")
 def list_visits(
 	request: Request,
@@ -1354,12 +1377,14 @@ def user_day_trail(
 	user_id: int = Path(..., gt=0),
 	day: Optional[str] = Query(None),
 	db: Session = Depends(get_db),
-	_ctx: AuthContext = Depends(get_current_user),
+	ctx: AuthContext = Depends(get_current_user),
 	_: None = Depends(locale_dependency),
 	__: None = Depends(require_business_access_dep),
-	___: None = Depends(require_business_permission_dep("distribution", "reports_team")),
+	___: None = Depends(require_business_permission_dep("distribution", "view")),
 ) -> Dict[str, Any]:
 	_ensure_plugin(db, business_id)
+	if not dist_svc._can_see_full_distribution_catalog(ctx, business_id):
+		raise ApiError("FORBIDDEN", "Day trail requires manage or reports_team", http_status=403)
 	d = _parse_iso_date(day, "day") if day else business_today(business_id)
 	return success_response(dist_c.get_user_day_trail(db, business_id, user_id, d), request)
 

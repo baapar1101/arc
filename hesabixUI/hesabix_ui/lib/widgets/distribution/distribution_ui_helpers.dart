@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 /// برچسب فارسی/انگلیسی وضعیت ویزیت.
@@ -102,6 +103,51 @@ Future<void> openDistributionMapsNavigation(double lat, double lng) async {
   final uri = Uri.parse('https://www.google.com/maps/dir/?api=1&destination=$lat,$lng');
   if (await canLaunchUrl(uri)) {
     await launchUrl(uri, mode: LaunchMode.externalApplication);
+  }
+}
+
+String distributionPresenceLabel(AppLocalizations t, String? presence) {
+  switch (presence) {
+    case 'online':
+      return t.distributionPresenceOnline;
+    case 'recent':
+      return t.distributionPresenceRecent;
+    case 'stale':
+      return t.distributionPresenceStale;
+    case 'offline':
+      return t.distributionPresenceOffline;
+    default:
+      return t.distributionPresenceNone;
+  }
+}
+
+Color distributionPresenceColor(BuildContext context, String? presence) {
+  switch (presence) {
+    case 'online':
+      return SemanticColorResolver.positive(context);
+    case 'recent':
+      return SemanticColorResolver.info(context);
+    case 'stale':
+      return SemanticColorResolver.warning(context);
+    case 'offline':
+      return Theme.of(context).colorScheme.outline;
+    default:
+      return Theme.of(context).colorScheme.outlineVariant;
+  }
+}
+
+IconData distributionPresenceIcon(String? presence) {
+  switch (presence) {
+    case 'online':
+      return Icons.sensors;
+    case 'recent':
+      return Icons.schedule;
+    case 'stale':
+      return Icons.history;
+    case 'offline':
+      return Icons.sensors_off;
+    default:
+      return Icons.location_off_outlined;
   }
 }
 
