@@ -264,7 +264,11 @@ def upsert_opening_balance(
         if info.get("movement") != "in":
             info["movement"] = "in"
         if info.get("warehouse_id") is None:
-            raise ApiError("WAREHOUSE_REQUIRED", "warehouse_id برای خطوط موجودی الزامی است", http_status=400)
+            raise ApiError(
+                "WAREHOUSE_REQUIRED",
+                "برای خطوط موجودی تراز افتتاحیه، انتخاب انبار الزامی است",
+                http_status=400,
+            )
         cost_price = _norm_amount(info.get("cost_price"))
         if cost_price > 0:
             inventory_total_value += qty * cost_price
@@ -429,7 +433,11 @@ def preview_opening_balance(
         if info.get("movement") != "in":
             info["movement"] = "in"
         if info.get("warehouse_id") is None:
-            raise ApiError("WAREHOUSE_REQUIRED", "warehouse_id برای خطوط موجودی الزامی است", http_status=400)
+            raise ApiError(
+                "WAREHOUSE_REQUIRED",
+                "برای خطوط موجودی تراز افتتاحیه، انتخاب انبار الزامی است",
+                http_status=400,
+            )
         cost_price = _norm_amount(info.get("cost_price"))
         if cost_price > 0:
             inventory_total_value += qty * cost_price

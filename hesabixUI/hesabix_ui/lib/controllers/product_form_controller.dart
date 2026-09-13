@@ -66,6 +66,7 @@ class ProductFormController extends ChangeNotifier {
   String _openingBalanceCostPrice = '';
   double? _obInitialQuantity;
   double? _obInitialCostPrice;
+  int? _obInitialWarehouseId;
   bool _obInitialHadLine = false;
 
   ProductFormController({
@@ -148,21 +149,32 @@ class ProductFormController extends ChangeNotifier {
     _obInitialHadLine = data['has_opening_balance_line'] == true;
     _obInitialQuantity = null;
     _obInitialCostPrice = null;
+    _obInitialWarehouseId = null;
     if (pob is Map) {
       final qty = (pob['quantity'] as num?)?.toDouble();
       final cost = (pob['cost_price'] as num?)?.toDouble();
+      final wh = (pob['warehouse_id'] as num?)?.toInt();
+      if (wh != null) {
+        _obInitialWarehouseId = wh;
+      }
       if (qty != null && qty > 0) {
         _openingBalanceQuantity = formatNumberForInput(qty);
         _obInitialQuantity = qty;
+      } else if (_obInitialHadLine) {
+        // خط وجود دارد ولی مقدار قابل‌پارس نیست — از ارسال اشتباه clear جلوگیری کن
+        _obInitialHadLine = false;
       }
       if (cost != null && cost > 0) {
         _openingBalanceCostPrice = formatNumberForInput(cost);
         _obInitialCostPrice = cost;
       }
+    } else if (_obInitialHadLine) {
+      _obInitialHadLine = false;
     }
     if (!_obInitialHadLine) {
       _openingBalanceQuantity = '';
       _openingBalanceCostPrice = '';
+      _obInitialWarehouseId = null;
     }
   }
 
@@ -175,6 +187,7 @@ class ProductFormController extends ChangeNotifier {
         double.tryParse(rawQty.replaceAll(',', ''));
     if (qty == null || qty <= 0) return _obInitialHadLine;
     if (!_obInitialHadLine) return true;
+    if (_obInitialQuantity == null) return false;
 
     final rawCost = _openingBalanceCostPrice.trim();
     final cost = rawCost.isEmpty
@@ -186,16 +199,25 @@ class ProductFormController extends ChangeNotifier {
     return qty != _obInitialQuantity || cost != initialCost;
   }
 
+  int? _resolveOpeningBalanceWarehouseId() {
+    return _formData.defaultWarehouseId ?? _obInitialWarehouseId;
+  }
+
   ProductOpeningBalanceInput? buildOpeningBalanceInput() {
     if (!showOpeningBalanceSection) return null;
 
     final fiscalYearId = (_obEligibility?['fiscal_year_id'] as num?)?.toInt();
-    final warehouseId = _formData.defaultWarehouseId;
+    final warehouseId = _resolveOpeningBalanceWarehouseId();
 
     if (isEditingProduct) {
       if (!obEditable || !_openingBalanceChanged()) return null;
       final rawQty = _openingBalanceQuantity.trim();
       if (rawQty.isEmpty) {
+        if (warehouseId == null) {
+          throw FormatException(
+            'برای حذف تعداد اولیه، انبار پیش‌فرض کالا یا انبار ثبت‌شده در تراز افتتاحیه لازم است',
+          );
+        }
         return ProductOpeningBalanceInput(
           clear: true,
           warehouseId: warehouseId,
@@ -215,6 +237,9 @@ class ProductFormController extends ChangeNotifier {
               0.0);
       if (cost < 0) {
         throw FormatException('بهای تمام‌شده نمی‌تواند منفی باشد');
+      }
+      if (warehouseId == null) {
+        throw FormatException('برای ثبت تعداد اولیه، انتخاب انبار الزامی است');
       }
       return ProductOpeningBalanceInput(
         quantity: qty,

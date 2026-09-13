@@ -81,17 +81,84 @@ def _resolve_warehouse_id(
     ob: Any,
     *,
     default_warehouse_id: Optional[int],
+    fallback_warehouse_ids: Optional[List[Optional[int]]] = None,
 ) -> int:
     wh = getattr(ob, "warehouse_id", None)
     if wh is not None:
         return int(wh)
     if default_warehouse_id is not None:
         return int(default_warehouse_id)
+    for candidate in fallback_warehouse_ids or []:
+        if candidate is not None:
+            return int(candidate)
     raise ApiError(
         "WAREHOUSE_REQUIRED",
-        "برای ثبت تعداد اولیه، انتخاب انبار الزامی است",
+        "برای ثبت یا تغییر تعداد اولیه، انتخاب انبار الزامی است",
         http_status=400,
     )
+
+
+def _existing_product_ob_warehouse_id(
+    db: Session,
+    business_id: int,
+    product_id: int,
+    fiscal_year_id: Optional[int],
+) -> Optional[int]:
+    """انبار خط موجود تعداد اولیه همین کالا در سند افتتاحیه (در صورت وجود)."""
+    try:
+        fy_id, _, _ = _ensure_fiscal_year(db, business_id, fiscal_year_id)
+    except ApiError:
+        return None
+    doc = get_opening_balance(db, business_id, fy_id)
+    line = _extract_product_ob_line(doc, int(product_id), warehouse_id=None)
+    if not line:
+        return None
+    wid = line.get("warehouse_id")
+    return int(wid) if wid is not None else None
+
+
+def _ensure_inventory_lines_have_warehouse(
+    db: Session,
+    business_id: int,
+    inventory_lines: List[Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    """خطوط قدیمی بدون warehouse_id را با انبار پیش‌فرض کالا تکمیل می‌کند."""
+    missing_pids: List[int] = []
+    for ln in inventory_lines:
+        if _warehouse_id_from_line(ln) is None and ln.get("product_id") is not None:
+            missing_pids.append(int(ln["product_id"]))
+    if not missing_pids:
+        return inventory_lines
+
+    products = (
+        db.query(Product.id, Product.default_warehouse_id, Product.name)
+        .filter(
+            Product.business_id == int(business_id),
+            Product.id.in_(list(set(missing_pids))),
+        )
+        .all()
+    )
+    by_id = {int(p.id): p for p in products}
+
+    fixed: List[Dict[str, Any]] = []
+    for ln in inventory_lines:
+        info = dict(ln.get("extra_info") or {})
+        if info.get("warehouse_id") is not None or ln.get("product_id") is None:
+            fixed.append(ln)
+            continue
+        product = by_id.get(int(ln["product_id"]))
+        if product is None or product.default_warehouse_id is None:
+            name = getattr(product, "name", None) or ln.get("product_id")
+            raise ApiError(
+                "WAREHOUSE_REQUIRED",
+                f"برای خط موجودی کالای «{name}» در تراز افتتاحیه، انبار مشخص نیست. "
+                "ابتدا انبار پیش‌فرض کالا را تعیین کنید یا سند تراز افتتاحیه را اصلاح کنید.",
+                http_status=400,
+            )
+        info["warehouse_id"] = int(product.default_warehouse_id)
+        info.setdefault("movement", "in")
+        fixed.append({**ln, "extra_info": info})
+    return fixed
 
 
 def _validate_product_ob_prerequisites(
@@ -291,7 +358,9 @@ def _build_ob_payload_with_product_line(
         if line_wh is not None and line_wh in warehouse_ids_to_remove:
             continue
         filtered_inventory.append(ln)
-    inventory_lines = filtered_inventory
+    inventory_lines = _ensure_inventory_lines_have_warehouse(
+        db, business_id, filtered_inventory
+    )
 
     if not remove_line:
         qty_dec = Decimal(str(quantity or 0))
@@ -544,6 +613,23 @@ def update_product_with_opening_balance(
     """ویرایش کالا و در صورت درخواست، به‌روزرسانی تعداد اولیه در سند افتتاحیه."""
     ob = getattr(product_data, "opening_balance", None)
     existing_product = db.get(Product, product_id)
+    # قبل از update نگه‌دار — ممکن است payload انبار پیش‌فرض را null کند
+    prior_default_wh = (
+        int(existing_product.default_warehouse_id)
+        if existing_product is not None and existing_product.default_warehouse_id is not None
+        else None
+    )
+    if previous_warehouse_id is not None:
+        prior_default_wh = int(previous_warehouse_id)
+
+    existing_ob_wh = None
+    if ob is not None:
+        existing_ob_wh = _existing_product_ob_warehouse_id(
+            db,
+            business_id,
+            product_id,
+            getattr(ob, "fiscal_year_id", None),
+        )
 
     result = update_product_fn(db, product_id, business_id, product_data, user_id=user_id)
     if not result:
@@ -558,13 +644,15 @@ def update_product_with_opening_balance(
     )
 
     product_name = str((result.get("data") or {}).get("name") or "")
+    # بعد از update ممکن است default_warehouse_id پاک شده باشد؛ از prior/خط OB استفاده کن
     default_wh = (result.get("data") or {}).get("default_warehouse_id")
-    if default_wh is None and existing_product is not None:
-        default_wh = existing_product.default_warehouse_id
+    fallbacks = [prior_default_wh, existing_ob_wh, previous_warehouse_id]
 
     if getattr(ob, "clear", False):
-        wh_for_remove = previous_warehouse_id or _resolve_warehouse_id(
-            ob, default_warehouse_id=default_wh
+        wh_for_remove = _resolve_warehouse_id(
+            ob,
+            default_warehouse_id=default_wh,
+            fallback_warehouse_ids=fallbacks,
         )
         upsert_product_opening_balance_line(
             db,
@@ -581,7 +669,11 @@ def update_product_with_opening_balance(
         )
         msg = "کالا ویرایش شد و تعداد اولیه از سند تراز افتتاحیه حذف شد"
     else:
-        wh_id = _resolve_warehouse_id(ob, default_warehouse_id=default_wh)
+        wh_id = _resolve_warehouse_id(
+            ob,
+            default_warehouse_id=default_wh,
+            fallback_warehouse_ids=fallbacks,
+        )
         upsert_product_opening_balance_line(
             db,
             business_id,
