@@ -5,6 +5,7 @@ import 'package:hesabix_ui/widgets/data_table/data_table_config.dart';
 import 'package:hesabix_ui/services/list_filter_preferences_service.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
+import 'package:hesabix_ui/core/date_utils.dart';
 import 'package:hesabix_ui/widgets/date_input_field.dart';
 import 'package:hesabix_ui/models/person_model.dart';
 import 'package:hesabix_ui/models/account_model.dart';
@@ -367,7 +368,7 @@ class _KardexPageState extends State<KardexPage> {
 
   Map<String, dynamic> _additionalParams() {
     String? fmt(DateTime? d) =>
-        d == null ? null : d.toIso8601String().substring(0, 10);
+        d == null ? null : HesabixDateUtils.formatForApiDate(d);
     var personIds = _selectedPersons.map((p) => p.id).whereType<int>().toList();
     if (personIds.isEmpty && _initialPersonIds.isNotEmpty) {
       personIds = List<int>.from(_initialPersonIds);
@@ -464,8 +465,15 @@ class _KardexPageState extends State<KardexPage> {
         DateColumn(
           'document_date',
           t.documentDate,
-          formatter: (item) =>
-              (item as Map<String, dynamic>)['document_date']?.toString(),
+          formatter: (item) {
+            final m = item as Map<String, dynamic>;
+            return HesabixDateUtils.formatApiDateForDisplay(
+              m['document_date'] ?? m['document_date_formatted'],
+              widget.calendarController.isJalali,
+              rawValue: m['document_date_raw'],
+              fallback: '',
+            );
+          },
           filterType: ColumnFilterType.dateRange,
         ),
         TextColumn(

@@ -116,6 +116,19 @@ def _format_datetime_fields_impl(data: Any, request: Request, tz_name: str) -> A
 			parsed_dt = _try_parse_stored_utc_naive(value, key)
 			if parsed_dt is not None:
 				value = parsed_dt
+			elif (
+				isinstance(value, str)
+				and key in DATE_ONLY_FIELDS
+				and not key.endswith("_raw")
+				and not key.endswith("_formatted")
+			):
+				# سرویس‌هایی که تاریخ را از قبل isoformat کرده‌اند (مثل YYYY-MM-DD)
+				s = value.strip()
+				if s:
+					try:
+						value = date.fromisoformat(s[:10])
+					except ValueError:
+						pass
 
 			if isinstance(value, datetime):
 				utc_source = value

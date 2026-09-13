@@ -486,7 +486,8 @@ def _fetch_invoice_items(
                 "document_code": row.document_code,
                 "document_type": row.document_type,
                 "document_type_name": _document_type_label(row.document_type),
-                "document_date": row.document_date.isoformat(),
+                # date object تا format_datetime_fields بتواند جلالی/میلادی کند
+                "document_date": row.document_date,
                 "description": row.description,
                 "amount": net_amount,
                 "currency_code": row.currency_code,

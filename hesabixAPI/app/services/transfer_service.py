@@ -60,12 +60,11 @@ def _parse_iso_date(dt: str | datetime | date) -> date:
                     year_int = int(year)
                     month_int = int(month)
                     day_int = int(day)
-                    if year_int > 1500:
+                    # سال‌های شمسی معمول حدود ۱۲۰۰–۱۶۰۰؛ سال‌های میلادی معمولاً >= ۱۷۰۰
+                    if 1200 <= year_int <= 1600:
                         jalali_date = jdatetime.date(year_int, month_int, day_int)
-                        gregorian_date = jalali_date.togregorian()
-                        return gregorian_date
-                    else:
-                        return datetime.strptime(dt_str, '%Y/%m/%d').date()
+                        return jalali_date.togregorian()
+                    return datetime.strptime(dt_str, '%Y/%m/%d').date()
                 except (ValueError, jdatetime.JalaliDateError):
                     return datetime.strptime(dt_str, '%Y/%m/%d').date()
     except Exception:

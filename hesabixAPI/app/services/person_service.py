@@ -2547,7 +2547,8 @@ def get_people_transactions_report(
             'line_id': line.id,
             'document_id': doc.id,
             'document_code': doc.code,
-            'document_date': doc.document_date.isoformat(),
+            # date object تا format_datetime_fields بتواند جلالی/میلادی کند
+            'document_date': doc.document_date,
             'document_type': doc.document_type,
             'document_type_name': document_type_name,
             'person_id': line.person_id,

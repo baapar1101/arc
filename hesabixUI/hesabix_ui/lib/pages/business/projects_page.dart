@@ -166,7 +166,7 @@ class _ProjectsPageState extends State<ProjectsPage> {
                   icon: const Icon(Icons.cancel_outlined),
                 ),
               ],
-              selected: _selectedStatus != null ? {_selectedStatus} : <String?>{},
+              selected: {_selectedStatus},
               onSelectionChanged: (set) {
                 setState(() {
                   _selectedStatus = set.isEmpty ? null : set.first;

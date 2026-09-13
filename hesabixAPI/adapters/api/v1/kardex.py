@@ -45,6 +45,8 @@ async def list_kardex_lines_endpoint(
         key_payload = {
             "business_id": business_id,
             "query": query_dict,
+            # نتیجه شامل تاریخ‌های فرمت‌شده است؛ تقویم درخواست باید در کلید کش باشد
+            "calendar_type": getattr(getattr(request, "state", None), "calendar_type", None),
         }
         key_str = json.dumps(key_payload, sort_keys=True, ensure_ascii=False)
         key_hash = hashlib.sha256(key_str.encode("utf-8")).hexdigest()[:16]

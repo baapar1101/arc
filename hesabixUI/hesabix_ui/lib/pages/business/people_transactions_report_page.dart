@@ -140,11 +140,10 @@ class _PeopleTransactionsReportPageState extends State<PeopleTransactionsReportP
 
   String _formatDate(dynamic value) {
     if (value == null) return '';
-    
-    // استفاده از helper موجود
-    return HesabixDateUtils.formatForDisplay(
-      value is DateTime ? value : (value is String ? DateTime.tryParse(value) : null),
+    return HesabixDateUtils.formatApiDateForDisplay(
+      value,
       widget.calendarController.isJalali,
+      fallback: '',
     );
   }
 
@@ -164,8 +163,12 @@ class _PeopleTransactionsReportPageState extends State<PeopleTransactionsReportP
           'تاریخ سند',
           formatter: (item) {
             final m = item as Map<String, dynamic>;
-            final date = m['document_date'] ?? m['document_date_raw'] ?? m['document_date_formatted'];
-            return _formatDate(date);
+            return HesabixDateUtils.formatApiDateForDisplay(
+              m['document_date'] ?? m['document_date_formatted'],
+              widget.calendarController.isJalali,
+              rawValue: m['document_date_raw'],
+              fallback: '',
+            );
           },
         ),
         TextColumn(

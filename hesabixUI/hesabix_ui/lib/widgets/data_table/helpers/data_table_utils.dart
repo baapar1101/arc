@@ -1,5 +1,6 @@
 import 'package:intl/intl.dart';
 import 'package:data_table_2/data_table_2.dart';
+import 'package:hesabix_ui/core/date_utils.dart';
 import '../data_table_config.dart';
 
 /// Utility functions for data table
@@ -71,14 +72,16 @@ class DataTableUtils {
     }
     
     if (date == null) return value.toString();
-    
+
     if (isJalali) {
-      // TODO: Implement Jalali date formatting
-      return DateFormat(format ?? 'yyyy/MM/dd').format(date);
-    } else {
-      final pattern = format ?? (showTime ? 'yyyy/MM/dd HH:mm' : 'yyyy/MM/dd');
-      return DateFormat(pattern).format(date);
+      if (showTime) {
+        return HesabixDateUtils.formatDateTime(date, true);
+      }
+      return HesabixDateUtils.formatForDisplay(date, true);
     }
+
+    final pattern = format ?? (showTime ? 'yyyy/MM/dd HH:mm' : 'yyyy/MM/dd');
+    return DateFormat(pattern).format(date);
   }
 
   /// Get column width as double
