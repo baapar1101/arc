@@ -215,6 +215,21 @@ if index.is_file():
         t,
         count=1,
     )
+    # لودر اولیه: پیش‌فرض تم روشن = لوگوی رنگی؛ نسخه سفید جدا preload می‌شود
+    if 'href="images/logo-blue.png" as="image"' not in t:
+        t = t.replace(
+            '<link rel="preload" href="images/logo-light.png" as="image" type="image/png">',
+            '<link rel="preload" href="images/logo-blue.png" as="image" type="image/png">\n'
+            '  <link rel="preload" href="images/logo-light.png" as="image" type="image/png">',
+            1,
+        )
+    t = re.sub(
+        r'(class="loader-logo"\s*\n\s*src=")images/logo-light\.png(")',
+        r'\1images/logo-blue.png\2',
+        t,
+        count=1,
+    )
+    t = t.replace('src="images/logo-light.png"', 'src="images/logo-blue.png"', 1)
     index.write_text(t, encoding="utf-8")
     print("[branding] patched web/index.html names")
 
@@ -250,24 +265,11 @@ if loader.is_file():
         count=1,
     )
     t = re.sub(r"(logo\.alt\s*=\s*')Hesabix(')", rf"\1{en}\2", t, count=1)
-    # لوگوی رنگی کاستوم: در تم روشن هم خود تصویر نشان داده شود (بدون mask/tint)
-    if "HESABIX_BRAND_KEEP_LOGO_COLORS" not in t:
-        t = t.replace(
-            "logo.src = 'images/logo-light.png';",
-            "logo.src = 'images/logo-light.png';\n"
-            "      var HESABIX_BRAND_KEEP_LOGO_COLORS = true;",
-            1,
-        )
-    # dark branch already shows as-is; force light branch to same behavior when flag set
-    old_light = """} else {
-        // سیلوئت سفید مخفی؛ رنگ برند روی wrap با mask
-        logo.style.opacity = '0';
-        if (wrap) {
-          wrap.classList.add('loader-logo-wrap--tinted');
-          wrap.style.setProperty('--loader-logo-tint', readBrandFromStorage());
-        }
-      }"""
-    new_light = """} else if (typeof HESABIX_BRAND_KEEP_LOGO_COLORS !== 'undefined' && HESABIX_BRAND_KEEP_LOGO_COLORS) {
+    # تم روشن: logo-blue (رنگی) / تم تیره: logo-light (سفید) — بدون mask حسابیکس
+    old_logo_block = """    if (logo) {
+      logo.src = 'images/logo-light.png';
+      logo.alt = '%s';
+      if (dark) {
         logo.style.opacity = '1';
         logo.style.filter = 'none';
         if (wrap) {
@@ -281,9 +283,49 @@ if loader.is_file():
           wrap.classList.add('loader-logo-wrap--tinted');
           wrap.style.setProperty('--loader-logo-tint', readBrandFromStorage());
         }
+      }
+    }""" % en
+    # alt may still be Hesabix if the replace above did not run on a custom already-patched file
+    old_logo_block_hesabix = old_logo_block.replace("logo.alt = '%s';" % en, "logo.alt = 'Hesabix';")
+    new_logo_block = """    if (logo) {
+      logo.src = dark ? 'images/logo-light.png' : 'images/logo-blue.png';
+      logo.alt = '%s';
+      logo.style.opacity = '1';
+      logo.style.filter = 'none';
+      if (wrap) {
+        wrap.classList.remove('loader-logo-wrap--tinted');
+        wrap.style.removeProperty('--loader-logo-tint');
+      }
+    }""" % en
+    if old_logo_block in t:
+        t = t.replace(old_logo_block, new_logo_block, 1)
+    elif old_logo_block_hesabix in t:
+        t = t.replace(old_logo_block_hesabix, new_logo_block, 1)
+    else:
+        # fallback: just switch the asset by theme
+        t = t.replace(
+            "logo.src = 'images/logo-light.png';",
+            "logo.src = dark ? 'images/logo-light.png' : 'images/logo-blue.png';",
+            1,
+        )
+        old_light = """} else {
+        // سیلوئت سفید مخفی؛ رنگ برند روی wrap با mask
+        logo.style.opacity = '0';
+        if (wrap) {
+          wrap.classList.add('loader-logo-wrap--tinted');
+          wrap.style.setProperty('--loader-logo-tint', readBrandFromStorage());
+        }
       }"""
-    if old_light in t:
-        t = t.replace(old_light, new_light, 1)
+        new_light = """} else {
+        logo.style.opacity = '1';
+        logo.style.filter = 'none';
+        if (wrap) {
+          wrap.classList.remove('loader-logo-wrap--tinted');
+          wrap.style.removeProperty('--loader-logo-tint');
+        }
+      }"""
+        if old_light in t:
+            t = t.replace(old_light, new_light, 1)
     loader.write_text(t, encoding="utf-8")
     print("[branding] patched web/hesabix_web_loader.js names")
 PY
