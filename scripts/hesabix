@@ -40,7 +40,8 @@ Usage:
 
   -update           Run update (pull, migrate, restart, rebuild frontend, reload nginx)
                     First shows Python/Flutter mirrors and lets you pick (Enter keeps current)
-                    Custom UI branding from .deploy_env is applied automatically during web build
+                    Custom UI branding from .deploy_env is applied automatically during web build.
+                    Android APK uses the same pack when built with ./build_android.sh.
   -y, --yes         Skip the mirror prompt and use the saved selection
   -source URL       Override repo URL (default: from initial deploy)
   -branch NAME      Override branch (default: from initial deploy)
@@ -72,14 +73,15 @@ Usage:
       --storage NAME|URL         Flutter engine/storage host
       --flutter NAME             Set pub+storage from the same preset
 
-  -branding show    Show saved UI branding (logos/icons/app names for web build)
+  -branding show    Show saved UI branding (logos/icons/app names for web and Android)
   -branding set     Save custom branding pack path and optional names
       --dir PATH             Branding pack directory (default: /opt/hesabix/branding)
       --name-fa NAME         Persian app display name
       --name-en NAME         English app display name
       --rebuild              Rebuild and publish Flutter web after saving
   -branding default Reset to Hesabix logos and names [--rebuild]
-  -branding apply   Rebuild frontend with the currently saved branding
+  -branding apply   Rebuild Flutter web with the currently saved branding
+                    Android: ./build_android.sh (same .deploy_env; does not run from this command)
 
   -cli reload       Reload /usr/local/bin/hesabix from the deployed repo
 USAGE

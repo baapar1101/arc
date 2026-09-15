@@ -1,7 +1,7 @@
 import 'package:flutter/widgets.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 
-/// نام نمایشی محصول در بیلد وب — از `--dart-define` تزریق می‌شود.
+/// نام نمایشی محصول در بیلد وب و اندروید — از `--dart-define` تزریق می‌شود.
 ///
 /// اگر هر دو خالی باشند (حالت پیش‌فرض بیلد)، همان مقادیر l10n / حسابیکس استفاده می‌شود.
 class BrandConfig {

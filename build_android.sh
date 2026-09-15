@@ -46,6 +46,11 @@ INSTALL_DEPS=false
 AUTO_SETUP_ANDROID=false
 BOOTSTRAP_ONLY=false
 BUILD_FAILED=false
+# Optional CLI overrides for UI branding (else env / .deploy_env)
+BRANDING_MODE_CLI=""
+BRANDING_DIR_CLI=""
+APP_NAME_FA_CLI=""
+APP_NAME_EN_CLI=""
 # جزئیات خروجی: 0=ساکت، 1=flutter -v (پیش‌فرض)، 2=flutter -vv
 BUILD_ANDROID_VERBOSE="${BUILD_ANDROID_VERBOSE:-1}"
 # اگر 1 باشد، حافظه/هسته و آرگومان‌های Gradle به‌صورت خودکار تنظیم می‌شود (غیرفعال: 0)
@@ -74,7 +79,7 @@ HESABIX_CMDLINE_TOOLS_LINUX_ZIP_SHA1="${HESABIX_CMDLINE_TOOLS_LINUX_ZIP_SHA1:-d3
 
 print_usage() {
   cat <<EOF
-Usage: ./build_android.sh [--project <path>] [--mode <debug|profile|release>] [--api-base-url <url>] [--aab] [--no-aab] [--apk] [--no-apk] [--universal-apk] [--no-universal-apk] [--split-apk] [--no-split-apk] [--clean] [--install-deps] [--auto-setup-android] [--bootstrap-only] [--quiet] [--help]
+Usage: ./build_android.sh [--project <path>] [--mode <debug|profile|release>] [--api-base-url <url>] [--aab] [--no-aab] [--apk] [--no-apk] [--universal-apk] [--no-universal-apk] [--split-apk] [--no-split-apk] [--clean] [--install-deps] [--auto-setup-android] [--bootstrap-only] [--quiet] [--branding <default|custom>] [--branding-dir <path>] [--app-name-fa <name>] [--app-name-en <name>] [--help]
 
 Options:
   --project PATH     Flutter project path (contains pubspec.yaml). If not specified, will be auto-detected.
@@ -92,6 +97,10 @@ Options:
                      Try automatic Android toolchain setup (Java + SDK packages) on Debian/Ubuntu.
   --bootstrap-only   Only setup/check prerequisites; skip pub get, clean, and build steps.
   --quiet            خروجی کم‌حجم (معادل BUILD_ANDROID_VERBOSE=0).
+  --branding MODE    UI branding: default (Hesabix) or custom (default: from BRANDING_MODE env / .deploy_env).
+  --branding-dir DIR Branding pack directory (default: BRANDING_DIR or /opt/hesabix/branding).
+  --app-name-fa NAME Persian display name for custom branding (launcher + in-app).
+  --app-name-en NAME English display name for custom branding (launcher + in-app).
   -h, --help         Show help.
 
 Environment (optional overrides; defaults match deploy.sh Hesabix mirrors):
@@ -131,6 +140,7 @@ Usage examples:
   ./build_android.sh --project hesabixUI/hesabix_ui
   ./build_android.sh --aab --split-apk --no-universal-apk
   ./build_android.sh --api-base-url https://hsxn.hesabix.ir
+  ./build_android.sh --branding custom --branding-dir /opt/hesabix/branding
 EOF
 }
 
@@ -692,6 +702,18 @@ while [[ $# -gt 0 ]]; do
       BOOTSTRAP_ONLY=true; shift ;;
     --quiet)
       BUILD_ANDROID_VERBOSE=0; shift ;;
+    --branding)
+      [[ $# -ge 2 ]] || die "Value for --branding not provided"
+      BRANDING_MODE_CLI="$2"; shift 2 ;;
+    --branding-dir)
+      [[ $# -ge 2 ]] || die "Value for --branding-dir not provided"
+      BRANDING_DIR_CLI="$2"; shift 2 ;;
+    --app-name-fa)
+      [[ $# -ge 2 ]] || die "Value for --app-name-fa not provided"
+      APP_NAME_FA_CLI="$2"; shift 2 ;;
+    --app-name-en)
+      [[ $# -ge 2 ]] || die "Value for --app-name-en not provided"
+      APP_NAME_EN_CLI="$2"; shift 2 ;;
     -h|--help)
       print_usage; exit 0 ;;
     *)
@@ -719,6 +741,36 @@ echo "Build AAB: $BUILD_AAB"
 echo "Build APK: $BUILD_APK"
 echo "Universal APK: $BUILD_UNIVERSAL_APK"
 echo "Split APK: $BUILD_SPLIT_APK"
+
+# Load saved deploy branding when present. Keep CLI build flags (mode/API) intact.
+_SAVED_API_BASE_URL="$API_BASE_URL"
+_SAVED_MODE="$MODE"
+if [[ -r "${APP_ROOT:-/opt/hesabix}/.deploy_env" ]]; then
+  # shellcheck disable=SC1090
+  set -a
+  # shellcheck source=/dev/null
+  source "${APP_ROOT:-/opt/hesabix}/.deploy_env"
+  set +a
+fi
+API_BASE_URL="$_SAVED_API_BASE_URL"
+MODE="$_SAVED_MODE"
+unset _SAVED_API_BASE_URL _SAVED_MODE
+[[ -n "$BRANDING_MODE_CLI" ]] && export BRANDING_MODE_OVERRIDE="$BRANDING_MODE_CLI"
+[[ -n "$BRANDING_DIR_CLI" ]] && export BRANDING_DIR_OVERRIDE="$BRANDING_DIR_CLI"
+[[ -n "$APP_NAME_FA_CLI" ]] && export APP_NAME_FA_OVERRIDE="$APP_NAME_FA_CLI"
+[[ -n "$APP_NAME_EN_CLI" ]] && export APP_NAME_EN_OVERRIDE="$APP_NAME_EN_CLI"
+
+# shellcheck source=scripts/lib/hesabix_branding.sh
+BRANDING_LIB="${REPO_ROOT}/scripts/lib/hesabix_branding.sh"
+if [[ -r "$BRANDING_LIB" ]]; then
+  # shellcheck disable=SC1091
+  source "$BRANDING_LIB"
+else
+  warn "Branding library missing: $BRANDING_LIB (continuing without custom branding)"
+  hesabix_branding_apply() { :; }
+  hesabix_branding_restore() { :; }
+  hesabix_branding_append_dart_defines() { :; }
+fi
 
 cd "$APP_DIR"
 
@@ -1402,6 +1454,10 @@ if [ "$CLEAN_BUILD" = true ]; then
   flutter_run clean
 fi
 
+# Apply UI branding overlay (restored on EXIT so git tree stays clean)
+trap 'hesabix_branding_restore "$APP_DIR" || true' EXIT
+hesabix_branding_apply "$APP_DIR"
+
 # تنظیم موازی‌سازی و حافظه بر اساس CPU و RAM (برای Gradle از طریق flutter --android-project-arg)
 configure_build_resources() {
   AVAILABLE_CORES=$(nproc 2>/dev/null || echo 1)
@@ -1538,6 +1594,11 @@ configure_build_resources
 BUILD_FLAGS=("--$MODE")
 BUILD_FLAGS+=("--android-skip-build-dependency-validation")
 BUILD_FLAGS+=("--dart-define" "API_BASE_URL=$API_BASE_URL")
+DART_DEFINE_ARGS=()
+hesabix_branding_append_dart_defines DART_DEFINE_ARGS
+if [[ ${#DART_DEFINE_ARGS[@]} -gt 0 ]]; then
+  BUILD_FLAGS+=("${DART_DEFINE_ARGS[@]}")
+fi
 
 if [[ "${BUILD_ANDROID_SMART_RESOURCES:-1}" == "1" ]]; then
   BUILD_FLAGS+=(--android-project-arg "org.gradle.parallel=true")
@@ -1551,6 +1612,7 @@ echo ""
 echo "Build Configuration:"
 echo "  Mode: $MODE"
 echo "  API Base URL: $API_BASE_URL"
+echo "  Branding: ${BRANDING_MODE:-default}"
 echo "  Log detail: BUILD_ANDROID_VERBOSE=${BUILD_ANDROID_VERBOSE} (0=quiet, 1=-v, 2=-vv)"
 echo "  Smart CPU/RAM: BUILD_ANDROID_SMART_RESOURCES=${BUILD_ANDROID_SMART_RESOURCES}"
 echo "  CPU cores (nproc): ${AVAILABLE_CORES}"
@@ -1633,6 +1695,7 @@ echo ""
 echo "Build Configuration:"
 echo "  Mode: $MODE"
 echo "  API Base URL: $API_BASE_URL"
+echo "  Branding: ${BRANDING_MODE:-default}"
 echo ""
 
 if [ "$BUILD_AAB" = true ]; then

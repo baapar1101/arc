@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
-# Build-time UI branding overlay for Hesabix Flutter web.
+# Build-time UI branding overlay for Hesabix Flutter web and Android.
 #
 # Pack layout (flat or nested — first match wins):
 #   BRANDING_DIR/
 #     names.json                 # { "fa": "…", "en": "…" }  (optional)
 #     logo-light.png             # or logos/ / images/
 #     logo-blue.png              # optional
-#     Icon-192.png …             # or icons/
-#     favicon.ico / favicon.png  # optional
+#     Icon-192.png …             # or icons/  (Android launcher uses Icon-512)
+#     favicon.ico / favicon.png  # optional (web)
+#     ic_stat.png                # optional white silhouette for Android status bar
 #
 # Env / .deploy_env:
 #   BRANDING_MODE=default|custom   (empty → default)
@@ -15,6 +16,7 @@
 #   APP_NAME_FA=…  APP_NAME_EN=…
 #
 # When mode is default (or unset): no-op — Hesabix logos/names stay as in the repo.
+# Android APK applies the same pack via build_android.sh (overlay + dart-define + restore).
 
 # shellcheck shell=bash
 
@@ -331,6 +333,161 @@ if loader.is_file():
 PY
 }
 
+hesabix_branding_patch_android_names() {
+  local app_dir="$1"
+  local fa="$2"
+  local en="$3"
+  [[ -n "$fa" || -n "$en" ]] || return 0
+  local fa_use="${fa:-$en}"
+  local en_use="${en:-$fa}"
+  local values="$app_dir/android/app/src/main/res/values/strings.xml"
+  local values_fa="$app_dir/android/app/src/main/res/values-fa/strings.xml"
+  [[ -f "$values" || -f "$values_fa" ]] || return 0
+
+  python3 - "$values" "$values_fa" "$fa_use" "$en_use" <<'PY'
+import pathlib
+import re
+import sys
+import xml.sax.saxutils as xml_escape
+
+def patch(path: pathlib.Path, name: str) -> None:
+    if not path.is_file() or not name:
+        return
+    raw = path.read_text(encoding="utf-8")
+    escaped = xml_escape.escape(name)
+    updated, n = re.subn(
+        r'(<string\s+name="app_name">)[^<]*(</string>)',
+        rf"\1{escaped}\2",
+        raw,
+        count=1,
+    )
+    if n:
+        path.write_text(updated, encoding="utf-8")
+        print(f"[branding] patched {path.name} app_name")
+    else:
+        print(f"[branding] warn: app_name string not found in {path}", file=sys.stderr)
+
+values = pathlib.Path(sys.argv[1])
+values_fa = pathlib.Path(sys.argv[2])
+fa = sys.argv[3]
+en = sys.argv[4]
+patch(values, en)
+patch(values_fa, fa)
+PY
+}
+
+# Resize src onto dest in-place (dest must already exist). mode=fit|silhouette
+hesabix_branding_overlay_resized() {
+  local src="$1"
+  local dest="$2"
+  local backup_root="$3"
+  local app_dir="$4"
+  local mode="${5:-fit}"
+  [[ -f "$src" && -f "$dest" ]] || return 0
+  hesabix_branding_backup_file "$dest" "$backup_root" "$app_dir"
+  local dest_mode=""
+  dest_mode="$(stat -c '%a' "$dest" 2>/dev/null || true)"
+  if python3 - "$src" "$dest" "$mode" <<'PY'
+import sys
+from pathlib import Path
+
+try:
+    from PIL import Image
+except ImportError:
+    print("[branding] warn: Pillow not installed; skip image overlay", file=sys.stderr)
+    sys.exit(1)
+
+src_path = Path(sys.argv[1])
+dest_path = Path(sys.argv[2])
+mode = sys.argv[3]
+
+src = Image.open(src_path).convert("RGBA")
+with Image.open(dest_path) as current:
+    size = current.size
+
+def to_white_silhouette(im: Image.Image) -> Image.Image:
+    im = im.convert("RGBA")
+    _r, _g, _b, a = im.split()
+    amin, amax = a.getextrema()
+    if amin >= 250:
+        gray = im.convert("L")
+        a = gray.point(lambda p: 0 if p > 245 else 255)
+    white = Image.new("L", im.size, 255)
+    return Image.merge("RGBA", (white, white, white, a))
+
+if mode == "silhouette":
+    src = to_white_silhouette(src)
+
+fitted = src.resize(size, Image.Resampling.LANCZOS)
+tmp = dest_path.with_suffix(dest_path.suffix + ".tmp")
+fitted.save(tmp, "PNG")
+tmp.replace(dest_path)
+PY
+  then
+    [[ -n "$dest_mode" ]] && chmod "$dest_mode" "$dest" 2>/dev/null || true
+    echo "[branding] overlay: ${dest#"$app_dir"/}"
+  else
+    echo "[branding] warn: failed to overlay ${dest#"$app_dir"/}" >&2
+  fi
+}
+
+hesabix_branding_overlay_android_named() {
+  local app_dir="$1"
+  local src="$2"
+  local basename="$3"
+  local backup_root="$4"
+  local mode="${5:-fit}"
+  local res_root="$app_dir/android/app/src/main/res"
+  [[ -f "$src" && -d "$res_root" ]] || return 0
+  local dest
+  while IFS= read -r -d '' dest; do
+    hesabix_branding_overlay_resized "$src" "$dest" "$backup_root" "$app_dir" "$mode"
+  done < <(find "$res_root" -type f -name "$basename" -print0 2>/dev/null)
+}
+
+hesabix_branding_apply_android_icons() {
+  local app_dir="$1"
+  local pack_dir="$2"
+  local backup_root="$3"
+  local res_root="$app_dir/android/app/src/main/res"
+  [[ -d "$res_root" ]] || return 0
+
+  local launcher="" logo_light="" logo_blue="" stat=""
+  launcher="$(hesabix_branding_find_file "$pack_dir" "Icon-512.png" "icons" "." 2>/dev/null || true)"
+  [[ -n "$launcher" ]] || launcher="$(hesabix_branding_find_file "$pack_dir" "Icon-192.png" "icons" "." 2>/dev/null || true)"
+  [[ -n "$launcher" ]] || launcher="$(hesabix_branding_find_file "$pack_dir" "logo-light.png" "logos" "images" "." 2>/dev/null || true)"
+  [[ -n "$launcher" ]] || launcher="$(hesabix_branding_find_file "$pack_dir" "logo-blue.png" "logos" "images" "." 2>/dev/null || true)"
+
+  logo_light="$(hesabix_branding_find_file "$pack_dir" "logo-light.png" "logos" "images" "." 2>/dev/null || true)"
+  logo_blue="$(hesabix_branding_find_file "$pack_dir" "logo-blue.png" "logos" "images" "." 2>/dev/null || true)"
+  stat="$(hesabix_branding_find_file "$pack_dir" "ic_stat.png" "icons" "logos" "images" "." 2>/dev/null || true)"
+
+  if [[ -n "$launcher" ]]; then
+    echo "[branding] android launcher icons from $(basename "$launcher")"
+    hesabix_branding_overlay_android_named "$app_dir" "$launcher" "ic_launcher.png" "$backup_root" "fit"
+    hesabix_branding_overlay_android_named "$app_dir" "$launcher" "ic_launcher_foreground.png" "$backup_root" "fit"
+  fi
+
+  local large_dark="${logo_blue:-$logo_light}"
+  local large_light="${logo_light:-$logo_blue}"
+  if [[ -n "$large_dark" ]]; then
+    hesabix_branding_overlay_android_named "$app_dir" "$large_dark" "ic_hesabix_logo.png" "$backup_root" "fit"
+  fi
+  if [[ -n "$large_light" ]]; then
+    hesabix_branding_overlay_android_named "$app_dir" "$large_light" "ic_hesabix_logo_light.png" "$backup_root" "fit"
+  fi
+  # Native splash (launch_background.xml) uses ic_hesabix_logo / ic_hesabix_logo_light.
+
+  local stat_src="${stat:-$logo_light}"
+  [[ -n "$stat_src" ]] || stat_src="$logo_blue"
+  if [[ -n "$stat_src" ]]; then
+    local stat_mode="silhouette"
+    [[ -n "$stat" ]] && stat_mode="fit"
+    echo "[branding] android status-bar icon from $(basename "$stat_src") ($stat_mode)"
+    hesabix_branding_overlay_android_named "$app_dir" "$stat_src" "ic_stat_hesabix.png" "$backup_root" "$stat_mode"
+  fi
+}
+
 # Apply overlays to Flutter project sources (must restore after build).
 hesabix_branding_apply() {
   local app_dir="$1"
@@ -423,6 +580,13 @@ hesabix_branding_apply() {
   done
   hesabix_branding_patch_web_names "$app_dir" "${HESABIX_BRANDING_NAME_FA}" "${HESABIX_BRANDING_NAME_EN}"
 
+  # Android launcher name + native icons (only existing drawables; restore copies them back)
+  for f in android/app/src/main/res/values/strings.xml android/app/src/main/res/values-fa/strings.xml; do
+    [[ -f "$app_dir/$f" ]] && hesabix_branding_backup_file "$app_dir/$f" "$backup" "$app_dir"
+  done
+  hesabix_branding_patch_android_names "$app_dir" "${HESABIX_BRANDING_NAME_FA}" "${HESABIX_BRANDING_NAME_EN}"
+  hesabix_branding_apply_android_icons "$app_dir" "$dir" "$backup"
+
   _HESABIX_BRANDING_APPLIED=1
 }
 
@@ -448,7 +612,7 @@ hesabix_branding_restore() {
   while IFS= read -r -d '' rel; do
     rel="${rel#./}"
     mkdir -p "$(dirname "$app_dir/$rel")"
-    cp -f "$backup/$rel" "$app_dir/$rel"
+    cp -a "$backup/$rel" "$app_dir/$rel"
   done < <(cd "$backup" && find . -type f -print0)
   rm -rf "$backup" 2>/dev/null || true
   _HESABIX_BRANDING_BACKUP_DIR=""
@@ -576,7 +740,7 @@ hesabix_branding_show() {
   if [[ "$_HESABIX_BRANDING_EFFECTIVE_MODE" == "custom" && -d "${BRANDING_DIR:-}" ]]; then
     echo "  pack files:"
     local f
-    for f in logo-light.png logo-blue.png Icon-192.png Icon-512.png favicon.ico names.json; do
+    for f in logo-light.png logo-blue.png Icon-192.png Icon-512.png favicon.ico names.json ic_stat.png; do
       if hesabix_branding_find_file "${BRANDING_DIR}" "$f" "logos" "images" "icons" "meta" "." >/dev/null 2>&1; then
         echo "    ✓ $f"
       else
@@ -609,7 +773,8 @@ hesabix_branding_command() {
         hesabix_rebuild_frontend
       else
         echo "Saved. Next web build / hesabix -update will use Hesabix defaults."
-        echo "Rebuild now: sudo hesabix -branding apply"
+        echo "Android APK uses the same .deploy_env on the next ./build_android.sh."
+        echo "Rebuild web now: sudo hesabix -branding apply"
       fi
       return 0
       ;;
@@ -651,8 +816,9 @@ hesabix_branding_command() {
         source "${HESABIX_BRANDING_LIB_DIR}/hesabix_domains.sh"
         hesabix_rebuild_frontend
       else
-        echo "Saved. Apply on next build: sudo hesabix -branding apply"
+        echo "Saved. Apply web on next build: sudo hesabix -branding apply"
         echo "Or: sudo hesabix -update"
+        echo "Android APK: ./build_android.sh (reads the same .deploy_env branding)"
       fi
       return 0
       ;;
@@ -668,7 +834,8 @@ hesabix_branding_command() {
       echo "  hesabix -branding show" >&2
       echo "  hesabix -branding set --dir /opt/hesabix/branding [--name-fa …] [--name-en …] [--rebuild]" >&2
       echo "  hesabix -branding default [--rebuild]" >&2
-      echo "  hesabix -branding apply" >&2
+      echo "  hesabix -branding apply          # rebuild Flutter web only" >&2
+      echo "  Android APK uses the same pack: ./build_android.sh" >&2
       return 1
       ;;
   esac
