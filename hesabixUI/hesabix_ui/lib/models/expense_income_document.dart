@@ -1,3 +1,5 @@
+import '../core/date_utils.dart';
+
 /// مدل سند هزینه/درآمد
 class ExpenseIncomeDocument {
   final int id;
@@ -61,10 +63,18 @@ class ExpenseIncomeDocument {
   factory ExpenseIncomeDocument.fromJson(Map<String, dynamic> json) {
     // نوع سند
     final String docType = (json['document_type'] as String?) ?? 'expense';
-    // تاریخ سند
-    final DateTime docDate = _safeParseDate(json['document_date']) ?? DateTime.now();
+    // تاریخ سند — ترجیح با *_raw چون document_date ممکن است جلالی نمایشی باشد
+    final DateTime docDate = HesabixDateUtils.parseApiDate(
+          json['document_date'],
+          rawValue: json['document_date_raw'],
+        ) ??
+        DateTime.now();
     // registered_at ممکن است در پاسخ لیست نباشد؛ در این صورت از document_date استفاده می‌کنیم
-    final DateTime regAt = _safeParseDate(json['registered_at']) ?? docDate;
+    final DateTime regAt = HesabixDateUtils.parseApiDate(
+          json['registered_at'],
+          rawValue: json['registered_at_raw'],
+        ) ??
+        docDate;
 
     // خطوط آیتم: پشتیبانی از دو شکل different: item_lines (جدید) یا items (قدیمی/دیگر لیست‌ها)
     final List<ItemLine> parsedItemLines = (() {
@@ -112,7 +122,11 @@ class ExpenseIncomeDocument {
           final double amount = (debit.abs() > credit.abs() ? debit : credit).toDouble();
           final Map<String, dynamic> extra = (m['extra_info'] as Map<String, dynamic>?) ?? const {};
           final String txType = (extra['transaction_type'] as String?) ?? 'account';
-          final DateTime txDate = _safeParseDate(extra['transaction_date']) ?? docDate;
+          final DateTime txDate = HesabixDateUtils.parseApiDate(
+                extra['transaction_date'],
+                rawValue: extra['transaction_date_raw'],
+              ) ??
+              docDate;
           return CounterpartyLine(
             id: (m['id'] as int?) ?? 0,
             transactionType: txType,
@@ -198,19 +212,6 @@ class ExpenseIncomeDocument {
       'extra_info': extraInfo,
     };
   }
-}
-
-DateTime? _safeParseDate(dynamic value) {
-  if (value == null) return null;
-  if (value is DateTime) return value;
-  if (value is String && value.isNotEmpty) {
-    try {
-      return DateTime.parse(value);
-    } catch (_) {
-      return null;
-    }
-  }
-  return null;
 }
 
 /// خط آیتم (حساب هزینه/درآمد)

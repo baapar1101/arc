@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
 
+import '../config/brand_config.dart';
 import '../core/android_notification_keepalive_platform.dart';
 import '../core/android_notification_prefs.dart';
 import '../core/calendar_controller.dart';
@@ -134,7 +135,9 @@ class _AndroidSystemNotificationSettingsSectionState extends State<AndroidSystem
         ),
         const SizedBox(height: 4),
         Text(
-          'شخصی‌سازی ظاهر اعلان‌های دریافتی و اعلان دائمی پس‌زمینه (ساعت، تاریخ، برند و آیکون حسابیکس).',
+          BrandConfig.rebrand(
+            'شخصی‌سازی ظاهر اعلان‌های دریافتی و اعلان دائمی پس‌زمینه (ساعت، تاریخ، برند و آیکون حسابیکس).',
+          ),
           style: theme.textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
         ),
         const SizedBox(height: 12),
@@ -241,7 +244,7 @@ class _AndroidSystemNotificationSettingsSectionState extends State<AndroidSystem
         ),
         SwitchListTile.adaptive(
           contentPadding: EdgeInsets.zero,
-          title: const Text('نام برند «حسابیکس» در عنوان'),
+          title: Text('نام برند «${BrandConfig.displayName()}» در عنوان'),
           value: _showAppBrand,
           onChanged: (v) async {
             setState(() => _showAppBrand = v);
@@ -269,7 +272,9 @@ class _AndroidSystemNotificationSettingsSectionState extends State<AndroidSystem
         ),
         const SizedBox(height: 4),
         Text(
-          'آیکون اعلان: سیلوئت سفید حسابیکس در نوار وضعیت؛ لوگوی رنگی مطابق تم روشن/تاریک گوشی در پنل اعلان. Force Stop یا قاتل‌باتری برخی گوشی‌ها سرویس را متوقف می‌کند.',
+          BrandConfig.rebrand(
+            'آیکون اعلان: سیلوئت سفید حسابیکس در نوار وضعیت؛ لوگوی رنگی مطابق تم روشن/تاریک گوشی در پنل اعلان. Force Stop یا قاتل‌باتری برخی گوشی‌ها سرویس را متوقف می‌کند.',
+          ),
           style: theme.textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
         ),
       ],

@@ -490,6 +490,8 @@ def preview_import_from_legacy_api(
 ) -> dict:
     from app.services.business_service import check_business_creation_permission
     from app.services.legacy_import.preview_service import preview_legacy_import
+    from app.services.system_settings_service import assert_legacy_api_import_allowed
+    assert_legacy_api_import_allowed(db)
     can_create, error_message = check_business_creation_permission(db, ctx.get_user_id())
     if not can_create:
         raise ApiError(
@@ -518,6 +520,8 @@ async def import_business_from_legacy_api(
     from app.services.business_service import check_business_creation_permission
     from app.services.legacy_import.importer import LegacyBusinessImporter
     from app.services.legacy_import.preview_service import LegacyImportOptions
+    from app.services.system_settings_service import assert_legacy_api_import_allowed
+    assert_legacy_api_import_allowed(db)
     can_create, error_message = check_business_creation_permission(db, ctx.get_user_id())
     if not can_create:
         raise ApiError(

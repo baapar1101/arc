@@ -1,4 +1,4 @@
-"""API افزونه اتصال به آستریکس و ایزابل."""
+"""API افزونه اتصال به استریسک و ایزابل."""
 from __future__ import annotations
 
 from typing import Any, Dict, Optional

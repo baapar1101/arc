@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:permission_handler/permission_handler.dart';
 
+import '../../config/brand_config.dart';
 import '../../core/android_notification_keepalive_platform.dart';
 import '../../core/android_notification_prefs.dart';
 import '../system_notifications/android_notification_content_builder.dart';
@@ -28,7 +29,7 @@ class AndroidNotificationKeepAliveService {
     FlutterForegroundTask.init(
       androidNotificationOptions: AndroidNotificationOptions(
         channelId: 'hesabix_keepalive',
-        channelName: 'دریافت اعلان‌های حسابیکس',
+        channelName: BrandConfig.rebrand('دریافت اعلان‌های حسابیکس'),
         channelDescription: 'سرویس پس‌زمینه برای دریافت اعلان‌ها وقتی برنامه بسته است',
         channelImportance: NotificationChannelImportance.LOW,
         priority: NotificationPriority.LOW,

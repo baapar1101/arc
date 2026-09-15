@@ -1,6 +1,6 @@
 import '../../core/api_client.dart';
 
-/// کلاینت REST افزونه اتصال آستریکس/ایزابل.
+/// کلاینت REST افزونه اتصال استریسک/ایزابل.
 class TelephonyApi {
   TelephonyApi({ApiClient? apiClient}) : _api = apiClient ?? ApiClient();
 

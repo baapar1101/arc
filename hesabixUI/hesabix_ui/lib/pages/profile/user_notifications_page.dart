@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:hesabix_ui/config/brand_config.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
@@ -632,7 +633,7 @@ class _UserNotificationsPageState extends State<UserNotificationsPage> {
         enabled: _inapp,
         icon: Icons.notifications_active_outlined,
         title: t.notificationsChannelInApp,
-        description: t.notificationsChannelInAppDescription,
+        description: t.branded(t.notificationsChannelInAppDescription),
         onChanged: (v) => setState(() => _inapp = v),
         canEnable: true, // InApp همیشه قابل استفاده است
       ),

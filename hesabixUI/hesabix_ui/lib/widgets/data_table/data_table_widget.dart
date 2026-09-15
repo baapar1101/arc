@@ -4095,7 +4095,18 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
 
     // 4) Fallback: get property value from Map items by key
     final value = DataTableUtils.getCellValue(item, column.key);
-    final formattedValue = DataTableUtils.formatCellValue(value, column);
+    final rawValue = column is DateColumn
+        ? DataTableUtils.getCellValue(item, '${column.key}_raw')
+        : null;
+    final isJalali = widget.calendarController?.isJalali ??
+        ApiClient.getCalendarController()?.isJalali ??
+        false;
+    final formattedValue = DataTableUtils.formatCellValue(
+      value,
+      column,
+      isJalali: isJalali,
+      rawValue: rawValue,
+    );
     final overflow = _getOverflow(column);
     final align = _getTextAlign(column);
     final textWidget = Text(

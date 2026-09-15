@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:hesabix_ui/config/brand_config.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 
 import '../../core/android_update_platform.dart';
@@ -410,7 +411,7 @@ class AndroidUpdateFlow {
           useRootNavigator: true,
           builder: (ctx) => AlertDialog(
             title: Text(t.androidUpdatePermissionTitle),
-            content: Text(t.androidUpdatePermissionMessage),
+            content: Text(t.branded(t.androidUpdatePermissionMessage)),
             actions: [
               TextButton(
                 onPressed: () => Navigator.of(ctx).pop(false),
@@ -450,7 +451,7 @@ class AndroidUpdateFlow {
       if (context.mounted) {
         SnackBarHelper.showError(
           context,
-          message: t.androidUpdatePermissionMessage,
+          message: t.branded(t.androidUpdatePermissionMessage),
         );
       }
     } catch (e) {

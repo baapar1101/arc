@@ -7,10 +7,12 @@ import 'package:shamsi_date/shamsi_date.dart';
 
 import '../../core/calendar_controller.dart';
 import '../../core/date_utils.dart';
+import '../../core/api_client.dart';
 import '../../models/business_models.dart';
 import '../../services/business_api_service.dart';
 import '../../services/errors/api_error.dart';
 import '../../services/job_service.dart';
+import '../../services/legacy_api_import_public_config.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/responsive_helper.dart';
 import '../../utils/snackbar_helper.dart';
@@ -54,6 +56,8 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
   bool _isLoading = false;
   bool _showNameError = false;
   bool _legacyWizardOpen = false;
+  LegacyApiImportPublicConfig _legacyImportConfig =
+      const LegacyApiImportPublicConfig();
   List<Map<String, dynamic>> _currencies = [];
   String? _importJobId;
   int _importProgress = 0;
@@ -69,8 +73,15 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
     _loadCurrencies();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      _applyInitialFlow(widget.initialFlow);
+      _bootstrapInitialFlow();
     });
+  }
+
+  Future<void> _bootstrapInitialFlow() async {
+    final cfg = await LegacyApiImportPublicConfig.fetch(ApiClient());
+    if (!mounted) return;
+    setState(() => _legacyImportConfig = cfg);
+    _applyInitialFlow(widget.initialFlow);
   }
 
   void _applyInitialFlow(String? flow) {
@@ -231,6 +242,14 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
 
   Future<void> _openLegacyImport() async {
     if (_isLoading || _legacyWizardOpen) return;
+    if (!_legacyImportConfig.enabledForUsers) {
+      final t = AppLocalizations.of(context);
+      final msg = _legacyImportConfig.disabledMessage.trim().isNotEmpty
+          ? _legacyImportConfig.disabledMessage
+          : t.legacyApiImportUnavailableBody;
+      SnackBarHelper.showError(context, message: msg);
+      return;
+    }
     setState(() {
       _legacyWizardOpen = true;
       _isLoading = true;
@@ -655,6 +674,7 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
                           onCreateManually: _startManualWizard,
                           onImportBackup: _importFromBackup,
                           onImportLegacy: _openLegacyImport,
+                          showLegacyImport: _legacyImportConfig.enabledForUsers,
                         ),
                       ),
                     ),

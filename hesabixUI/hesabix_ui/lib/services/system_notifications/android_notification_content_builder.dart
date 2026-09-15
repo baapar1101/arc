@@ -2,6 +2,7 @@ import 'dart:ui' show Brightness, PlatformDispatcher;
 
 import 'package:shamsi_date/shamsi_date.dart';
 
+import '../../config/brand_config.dart';
 import '../../core/android_notification_prefs.dart';
 import '../../utils/announcement_navigation.dart';
 
@@ -32,7 +33,7 @@ class AndroidNotificationContentBuilder {
 
     final titleParts = <String>[];
     if (prefs['showAppBrand'] == true) {
-      titleParts.add('حسابیکس');
+      titleParts.add(BrandConfig.displayName());
     }
     titleParts.add(rawTitle.isEmpty ? 'اعلان' : rawTitle);
 
@@ -65,7 +66,7 @@ class AndroidNotificationContentBuilder {
     final prefs = await AndroidNotificationPrefs.snapshot();
     final ts = now ?? DateTime.now();
     final title = prefs['showAppBrand'] == true
-        ? 'حسابیکس · دریافت اعلان‌ها'
+        ? '${BrandConfig.displayName()} · دریافت اعلان‌ها'
         : 'دریافت اعلان‌ها';
 
     final parts = <String>['اتصال پس‌زمینه فعال است'];

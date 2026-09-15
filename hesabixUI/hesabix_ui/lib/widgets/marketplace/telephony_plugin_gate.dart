@@ -4,7 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../core/business_nav.dart';
 import '../../services/marketplace_service.dart';
 
-/// نمایش محتوا فقط وقتی افزونه آستریکس/ایزابل فعال است.
+/// نمایش محتوا فقط وقتی افزونه استریسک/ایزابل فعال است.
 class TelephonyPluginGate extends StatefulWidget {
   final int businessId;
   final Widget child;
@@ -91,7 +91,7 @@ class _TelephonyPluginGateState extends State<TelephonyPluginGate> {
                   ),
                   const SizedBox(height: 20),
                   Text(
-                    'افزونه اتصال به آستریکس و ایزابل فعال نیست',
+                    'افزونه اتصال به استریسک و ایزابل فعال نیست',
                     textAlign: TextAlign.center,
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
                   ),

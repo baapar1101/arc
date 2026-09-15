@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:hesabix_ui/config/brand_config.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/utils/date_formatters.dart' as date_formatters;
@@ -133,7 +134,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
     return DataTableConfig<Map<String, dynamic>>(
       endpoint: '/api/v1/users/search',
       title: 'مدیریت کاربران',
-      subtitle: 'نمایش، فیلتر و کنترل کاربران سیستم حسابیکس',
+      subtitle: BrandConfig.rebrand('نمایش، فیلتر و کنترل کاربران سیستم حسابیکس'),
       tableId: 'admin_users',
       showSearch: true,
       showFilters: true,

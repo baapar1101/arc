@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hesabix_ui/config/brand_config.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/core/auth_store.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
@@ -281,10 +282,10 @@ class _AISkillsMarketplacePageState extends State<AISkillsMarketplacePage>
         leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
         bottom: TabBar(
           controller: _tabController,
-          tabs: const [
-            Tab(text: 'جامعه'),
-            Tab(text: 'حسابیکس'),
-            Tab(text: 'Anthropic'),
+          tabs: [
+            const Tab(text: 'جامعه'),
+            Tab(text: BrandConfig.displayName()),
+            const Tab(text: 'Anthropic'),
           ],
         ),
         actions: [
@@ -333,8 +334,9 @@ class _AISkillsMarketplacePageState extends State<AISkillsMarketplacePage>
                           _officialItems,
                           isOfficial: true,
                           emptyTitle: 'مهارت رسمی یافت نشد',
-                          emptySubtitle:
-                              'مهارت‌های رسمی حسابیکس به‌زودی اینجا نمایش داده می‌شوند.',
+                          emptySubtitle: BrandConfig.rebrand(
+                            'مهارت‌های رسمی حسابیکس به‌زودی اینجا نمایش داده می‌شوند.',
+                          ),
                         ),
                         _buildAnthropicList(),
                       ],

@@ -10,6 +10,7 @@ import '../../services/support_tickets_public_config.dart';
 import '../../services/announcements_service.dart';
 import '../../services/support_service.dart';
 import 'package:go_router/go_router.dart';
+import 'package:hesabix_ui/config/brand_config.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../core/auth_store.dart';
@@ -896,7 +897,7 @@ class _ProfileDashboardPageState extends State<ProfileDashboardPage>
             ),
             const SizedBox(height: 6),
             Text(
-              t.businessesHubEmptySubtitle,
+              t.branded(t.businessesHubEmptySubtitle),
               style: theme.textTheme.bodySmall?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
                 height: 1.4,

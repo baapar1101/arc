@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""ثبت افزونه اتصال به آستریکس و ایزابل در بازار افزونه‌ها."""
+"""ثبت افزونه اتصال به استریسک و ایزابل در بازار افزونه‌ها."""
 
 import os
 import sys
@@ -32,7 +32,7 @@ def main() -> int:
 		plugin = db.query(MarketplacePlugin).filter(MarketplacePlugin.code == PLUGIN_CODE).first()
 		if plugin:
 			print("✓ افزونه از قبل وجود دارد — به‌روزرسانی...")
-			plugin.name = "اتصال به آستریکس و ایزابل"
+			plugin.name = "اتصال به استریسک و ایزابل"
 			plugin.description = DESCRIPTION
 			plugin.category = "integration"
 			plugin.is_active = True
@@ -42,7 +42,7 @@ def main() -> int:
 		else:
 			plugin = MarketplacePlugin(
 				code=PLUGIN_CODE,
-				name="اتصال به آستریکس و ایزابل",
+				name="اتصال به استریسک و ایزابل",
 				description=DESCRIPTION,
 				category="integration",
 				icon_url=None,
@@ -72,7 +72,7 @@ def main() -> int:
 				)
 
 		db.commit()
-		print(f"✓ افزونه آستریکس/ایزابل آماده شد (plugin_id={plugin_id}).")
+		print(f"✓ افزونه استریسک/ایزابل آماده شد (plugin_id={plugin_id}).")
 		return 0
 	except Exception as e:
 		db.rollback()

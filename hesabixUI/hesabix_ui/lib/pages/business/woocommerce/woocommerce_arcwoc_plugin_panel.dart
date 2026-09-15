@@ -10,6 +10,7 @@ import '../../../utils/snackbar_helper.dart';
 import '../../../widgets/data_table/data_table_config.dart';
 import '../../../widgets/data_table/data_table_widget.dart';
 import 'woocommerce_l10n_format.dart';
+import 'package:hesabix_ui/config/brand_config.dart';
 import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 String _prettyJson(Object? value) {
@@ -682,7 +683,7 @@ class _WooArcwocPluginSettingsPanelState
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    t.woocommerceSettingsArcwocPluginIntro,
+                    t.branded(t.woocommerceSettingsArcwocPluginIntro),
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
                 ],
@@ -704,7 +705,7 @@ class _WooArcwocPluginSettingsPanelState
         ),
         _sectionCard(
           context,
-          title: t.woocommerceControlConnectionTitle,
+          title: t.branded(t.woocommerceControlConnectionTitle),
           child: _connectionBlock(context, t),
         ),
         _sectionCard(

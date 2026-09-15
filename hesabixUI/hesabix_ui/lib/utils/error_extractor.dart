@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:dio/dio.dart' as dio;
 import 'package:flutter/widgets.dart' show BuildContext, Locale;
 
+import '../config/brand_config.dart';
 import '../core/api_client.dart';
 import '../l10n/app_localizations.dart';
 import '../services/errors/api_error.dart';
@@ -143,7 +144,7 @@ class ErrorExtractor {
         return t.apiErrorFileSizeExceeded;
 
       case 'LEGACY_ACCPRO_REQUIRED':
-        return t.apiErrorLegacyAccproRequired;
+        return t.branded(t.apiErrorLegacyAccproRequired);
 
       default:
         return null;

@@ -1,5 +1,5 @@
 # noqa: D100
-"""مدل‌های افزونه اتصال به آستریکس و ایزابل."""
+"""مدل‌های افزونه اتصال به استریسک و ایزابل."""
 from __future__ import annotations
 
 from datetime import datetime

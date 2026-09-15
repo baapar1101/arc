@@ -8724,6 +8724,29 @@ class AppLocalizationsEn extends AppLocalizations {
       'Support tickets are temporarily unavailable.';
 
   @override
+  String get legacyApiImportSectionTitle => 'Import from previous Hesabix';
+
+  @override
+  String get legacyApiImportAllowUsersLabel =>
+      'Allow users to import from previous Hesabix';
+
+  @override
+  String get legacyApiImportAllowUsersDescription =>
+      'When disabled, the import option is hidden on the new-business page and related API calls are blocked.';
+
+  @override
+  String get legacyApiImportDisabledNoticeLabel =>
+      'Notice text for users (when disabled)';
+
+  @override
+  String get legacyApiImportDisabledNoticeHint =>
+      'Leave blank to use the built-in default message.';
+
+  @override
+  String get legacyApiImportUnavailableBody =>
+      'Import from previous Hesabix is temporarily unavailable.';
+
+  @override
   String get unlimited => 'Unlimited';
 
   @override

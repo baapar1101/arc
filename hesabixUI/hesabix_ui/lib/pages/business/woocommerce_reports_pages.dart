@@ -3,6 +3,7 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/core/business_nav.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
+import 'package:hesabix_ui/config/brand_config.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/pages/business/woocommerce/woocommerce_l10n_format.dart';
 import 'package:hesabix_ui/services/woocommerce_integration_service.dart';
@@ -346,7 +347,7 @@ class _WooCommerceRecentOrdersReportPageState extends State<WooCommerceRecentOrd
         TextColumn('billing_email', t.woocommerceColumnBillingEmail),
         TextColumn(
           'hesabix_id',
-          t.woocommerceColumnHesabixId,
+          t.branded(t.woocommerceColumnHesabixId),
           sortable: false,
           formatter: (item) {
             if (item is! Map<String, dynamic>) return null;
@@ -502,7 +503,7 @@ class _WooCommerceCatalogReportPageState extends State<WooCommerceCatalogReportP
         ),
         TextColumn(
           'hesabix_id',
-          t.woocommerceColumnHesabixId,
+          t.branded(t.woocommerceColumnHesabixId),
           sortable: false,
           formatter: (item) {
             if (item is! Map<String, dynamic>) return null;

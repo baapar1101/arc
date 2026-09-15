@@ -1,3 +1,5 @@
+import '../core/date_utils.dart';
+
 class WarehouseInvoiceSourceDoc {
   final int id;
   final String code;
@@ -52,16 +54,14 @@ class WarehouseInvoiceSource {
     final docs = (json['warehouse_documents'] as List<dynamic>? ?? const [])
         .map((e) => WarehouseInvoiceSourceDoc.fromJson(Map<String, dynamic>.from(e as Map)))
         .toList();
-    DateTime? parsedDate;
-    final dateStr = json['document_date']?.toString();
-    if (dateStr != null && dateStr.isNotEmpty) {
-      parsedDate = DateTime.tryParse(dateStr);
-    }
     return WarehouseInvoiceSource(
       invoiceId: json['invoice_id'] as int,
       code: (json['code'] ?? '').toString(),
       invoiceType: (json['invoice_type'] ?? '').toString(),
-      documentDate: parsedDate,
+      documentDate: HesabixDateUtils.parseApiDate(
+        json['document_date'],
+        rawValue: json['document_date_raw'],
+      ),
       personName: json['person_name']?.toString(),
       netAmount: json['net_amount'] == null ? null : double.tryParse(json['net_amount'].toString()),
       warehouseState: (json['warehouse_state'] ?? 'missing').toString(),

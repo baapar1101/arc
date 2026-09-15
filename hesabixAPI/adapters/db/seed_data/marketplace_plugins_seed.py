@@ -167,7 +167,7 @@ _DEFAULT_PLUGINS: Tuple[_PluginSeed, ...] = (
 	),
 	_PluginSeed(
 		code="asterisk_issabel_connector",
-		name="اتصال به آستریکس و ایزابل",
+		name="اتصال به استریسک و ایزابل",
 		description=(
 			"یکپارچگی مرکز تلفن Issabel/Asterisk با حسابیکس: Screen Pop، Click-to-Call، "
 			"تاریخچه تماس، نگاشت داخلی کاربران، اعلان لحظه‌ای و ثبت خودکار در CRM. "

@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'package:hesabix_ui/config/app_config.dart';
+import 'package:hesabix_ui/config/brand_config.dart';
 import 'package:hesabix_ui/core/date_utils.dart';
 import 'package:hesabix_ui/models/invoice_type_model.dart';
 import 'package:hesabix_ui/services/public_invoice_share_service.dart';
@@ -415,7 +416,10 @@ class _PublicInvoiceShareLinkPageState extends State<PublicInvoiceShareLinkPage>
             const SizedBox(width: 12),
             Expanded(
               child: Text(
-                auth['message_fa']?.toString() ?? 'این فاکتور در سامانه حسابیکس (Hesabix) ثبت شده است.',
+                BrandConfig.rebrand(
+                  auth['message_fa']?.toString() ??
+                      'این فاکتور در سامانه حسابیکس (Hesabix) ثبت شده است.',
+                ),
                 style: theme.textTheme.bodyLarge?.copyWith(
                   fontWeight: FontWeight.w600,
                 ),

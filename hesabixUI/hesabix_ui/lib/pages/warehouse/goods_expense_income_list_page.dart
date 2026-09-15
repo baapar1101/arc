@@ -375,11 +375,12 @@ class _GoodsExpenseIncomeListPageState extends State<GoodsExpenseIncomeListPage>
           'تاریخ سند',
           formatter: (item) {
             final m = item as Map<String, dynamic>;
-            final raw = m['document_date'] as String?;
-            if (raw == null || raw.isEmpty) return '';
-            final dt = DateTime.tryParse(raw);
-            if (dt == null) return raw;
-            return HesabixDateUtils.formatForDisplay(dt, _calendarController?.isJalali ?? true);
+            return HesabixDateUtils.formatApiDateForDisplay(
+              m['document_date'],
+              _calendarController?.isJalali ?? true,
+              rawValue: m['document_date_raw'],
+              fallback: '',
+            );
           },
           showTime: false,
           width: ColumnWidth.small,

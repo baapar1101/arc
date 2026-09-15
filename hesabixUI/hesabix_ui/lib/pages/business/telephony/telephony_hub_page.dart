@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../config/brand_config.dart';
 import '../../../core/auth_store.dart';
 import '../../../core/business_nav.dart';
 import '../../../services/telephony/telephony_api.dart';
@@ -683,10 +684,13 @@ class _TelephonySettingsPageState extends State<TelephonySettingsPage> {
                         labelText: 'حالت endpoint',
                         helperText: 'relay = Softphone داخل اپ · desk = تلفن رومیزی · direct = PJSIP/WebRTC',
                       ),
-                      items: const [
-                        DropdownMenuItem(value: 'relay', child: Text('Relay (Softphone داخل حسابیکس)')),
-                        DropdownMenuItem(value: 'desk', child: Text('Desk (تلفن SIP خارجی)')),
-                        DropdownMenuItem(value: 'direct', child: Text('Direct (رجیستر مستقیم اختیاری)')),
+                      items: [
+                        DropdownMenuItem(
+                          value: 'relay',
+                          child: Text(BrandConfig.rebrand('Relay (Softphone داخل حسابیکس)')),
+                        ),
+                        const DropdownMenuItem(value: 'desk', child: Text('Desk (تلفن SIP خارجی)')),
+                        const DropdownMenuItem(value: 'direct', child: Text('Direct (رجیستر مستقیم اختیاری)')),
                       ],
                       onChanged: (v) => setLocal(() => mode = v ?? 'desk'),
                     ),
@@ -924,10 +928,12 @@ class _TelephonySettingsPageState extends State<TelephonySettingsPage> {
                         style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
                       ),
                       const SizedBox(height: 6),
-                      const Text(
-                        'این دستور کانکتور را از مخزن حسابیکس نصب می‌کند و دستور hesabix-pbx را می‌سازد. '
-                        'در ویزارد فقط کلید API (پروفایل ← کلیدهای API) را وارد کنید؛ کسب‌وکار و مرکز تلفن را از لیست انتخاب می‌کنید.',
-                        style: TextStyle(height: 1.4),
+                      Text(
+                        BrandConfig.rebrand(
+                          'این دستور کانکتور را از مخزن حسابیکس نصب می‌کند و دستور hesabix-pbx را می‌سازد. '
+                          'در ویزارد فقط کلید API (پروفایل ← کلیدهای API) را وارد کنید؛ کسب‌وکار و مرکز تلفن را از لیست انتخاب می‌کنید.',
+                        ),
+                        style: const TextStyle(height: 1.4),
                       ),
                       const SizedBox(height: 10),
                       SelectableText(

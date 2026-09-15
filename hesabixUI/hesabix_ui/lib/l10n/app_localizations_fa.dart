@@ -8674,6 +8674,29 @@ class AppLocalizationsFa extends AppLocalizations {
       'بخش تیکت‌های پشتیبانی موقتاً غیرفعال است.';
 
   @override
+  String get legacyApiImportSectionTitle => 'انتقال از حسابیکس قبلی';
+
+  @override
+  String get legacyApiImportAllowUsersLabel =>
+      'امکان انتقال داده از حسابیکس قبلی برای کاربران';
+
+  @override
+  String get legacyApiImportAllowUsersDescription =>
+      'در صورت غیرفعال، گزینه انتقال در صفحه کسب‌وکار جدید مخفی می‌شود و API مربوطه هم مسدود می‌گردد.';
+
+  @override
+  String get legacyApiImportDisabledNoticeLabel =>
+      'متن پیام برای کاربر (وقتی خاموش است)';
+
+  @override
+  String get legacyApiImportDisabledNoticeHint =>
+      'خالی بگذارید تا پیام پیش‌فرض سیستم استفاده شود.';
+
+  @override
+  String get legacyApiImportUnavailableBody =>
+      'انتقال از حسابیکس قبلی موقتاً غیرفعال است.';
+
+  @override
   String get unlimited => 'نامحدود';
 
   @override

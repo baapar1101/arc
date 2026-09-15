@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../config/brand_config.dart';
 import '../../../core/auth_store.dart';
 import '../../../core/business_nav.dart';
 import '../../../services/telephony/softphone_engine.dart';
@@ -144,7 +145,7 @@ class _TelephonySoftphonePageState extends State<TelephonySoftphonePage> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Softphone حسابیکس',
+                          BrandConfig.rebrand('Softphone حسابیکس'),
                           style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800),
                         ),
                         const SizedBox(height: 4),

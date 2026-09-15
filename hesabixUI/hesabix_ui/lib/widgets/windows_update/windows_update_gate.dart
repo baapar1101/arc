@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hesabix_ui/config/brand_config.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 
 import '../../core/windows_update_platform.dart';
@@ -316,7 +317,7 @@ class WindowsUpdateFlow {
       barrierDismissible: false,
       builder: (ctx) => AlertDialog(
         title: Text(t.windowsUpdateReadyToInstallTitle),
-        content: Text(t.windowsUpdateReadyToInstallMessage),
+        content: Text(t.branded(t.windowsUpdateReadyToInstallMessage)),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),

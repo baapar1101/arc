@@ -76,18 +76,29 @@ class BrandConfig {
     );
   }
 
-  /// جایگزینی نام محصول در متن‌های l10n که «حسابیکس / Hesabix» دارند.
-  static String rebrandText(AppLocalizations l10n, String input) {
-    if (!hasCustomName) return input;
-    final code = l10n.localeName;
-    final name = resolve(
-      languageCode: code.isNotEmpty ? code : 'en',
-      fallback: '',
+  /// نام برند برای زبان داده‌شده (بدون وابستگی به l10n).
+  static String displayName({String languageCode = 'fa'}) {
+    return resolve(
+      languageCode: languageCode,
+      fallback: languageCode.toLowerCase().startsWith('fa') ? 'حسابیکس' : 'Hesabix',
     );
+  }
+
+  /// جایگزینی «حسابیکس / Hesabix» وقتی ریبرندینگ فعال است.
+  static String rebrand(String input, {String languageCode = 'fa'}) {
+    if (!hasCustomName) return input;
+    final name = resolve(languageCode: languageCode, fallback: '');
     if (name.isEmpty) return input;
     return input
         .replaceAll('حسابیکس', name)
+        .replaceAll('حساب‌یکس', name)
         .replaceAll('Hesabix', name);
+  }
+
+  /// جایگزینی نام محصول در متن‌های l10n که «حسابیکس / Hesabix» دارند.
+  static String rebrandText(AppLocalizations l10n, String input) {
+    final code = l10n.localeName;
+    return rebrand(input, languageCode: code.isNotEmpty ? code : 'en');
   }
 
   static String welcomeTitle(AppLocalizations l10n) =>
@@ -98,4 +109,9 @@ class BrandConfig {
 
   static String brandTagline(AppLocalizations l10n) =>
       rebrandText(l10n, l10n.brandTagline);
+}
+
+/// میان‌بر برای جایگزینی برند در رشته‌های l10n.
+extension BrandAppLocalizations on AppLocalizations {
+  String branded(String input) => BrandConfig.rebrandText(this, input);
 }

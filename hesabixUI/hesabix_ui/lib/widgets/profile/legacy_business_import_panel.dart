@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hesabix_ui/config/brand_config.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/widgets/profile/legacy_import_wizard.dart';
 import 'package:hesabix_ui/widgets/profile/new_business/new_business_shared.dart';
@@ -45,8 +46,8 @@ class _LegacyBusinessImportPanelState extends State<LegacyBusinessImportPanel> {
       children: [
         NewBusinessChoiceCard(
           icon: Icons.cloud_sync_rounded,
-          title: t.newBusinessImportLegacyTitle,
-          subtitle: t.newBusinessImportLegacySubtitle,
+          title: t.branded(t.newBusinessImportLegacyTitle),
+          subtitle: t.branded(t.newBusinessImportLegacySubtitle),
           onTap: disabled ? null : _openWizard,
         ),
         if (_wizardOpen)

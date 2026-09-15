@@ -91,6 +91,7 @@ async def generate_captcha(request: Request, db: Session = Depends(get_db)) -> d
 async def get_public_auth_config(db: Session = Depends(get_db)) -> dict:
 	from app.services.system_settings_service import (
 		is_registration_enabled,
+		legacy_api_import_public_config_dict,
 		support_tickets_public_config_dict,
 		theme_public_config_dict,
 	)
@@ -101,6 +102,7 @@ async def get_public_auth_config(db: Session = Depends(get_db)) -> dict:
 		"enable_registration": True if is_first_user_bootstrap else is_registration_enabled(db),
 	}
 	data.update(support_tickets_public_config_dict(db))
+	data.update(legacy_api_import_public_config_dict(db))
 	data.update(theme_public_config_dict(db))
 	return success_response(data)
 

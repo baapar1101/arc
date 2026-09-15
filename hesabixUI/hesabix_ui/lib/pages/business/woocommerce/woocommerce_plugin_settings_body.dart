@@ -11,6 +11,7 @@ import '../../../utils/error_extractor.dart';
 import '../../../utils/snackbar_helper.dart';
 import 'woocommerce_arcwoc_plugin_panel.dart';
 import 'woocommerce_l10n_format.dart';
+import 'package:hesabix_ui/config/brand_config.dart';
 
 /// فرم تنظیمات پل ووکامرس + پنل تنظیمات کلی افزونهٔ ArcWOC.
 class WoocommercePluginSettingsBody extends StatefulWidget {
@@ -223,7 +224,7 @@ class _WoocommercePluginSettingsBodyState
         ),
         const SizedBox(height: 8),
         Text(
-          t.woocommerceSettingsBridgeIntroBody,
+          t.branded(t.woocommerceSettingsBridgeIntroBody),
           style: theme.textTheme.bodyMedium,
         ),
         const SizedBox(height: 12),
@@ -298,7 +299,7 @@ class _WoocommercePluginSettingsBodyState
         SwitchListTile(
           contentPadding: EdgeInsets.zero,
           title: Text(t.woocommerceSettingsPushStockOnWarehousePost),
-          subtitle: Text(t.woocommerceSettingsPushStockOnWarehousePostHelp),
+          subtitle: Text(t.branded(t.woocommerceSettingsPushStockOnWarehousePostHelp)),
           value: _pushStockOnWarehousePost,
           onChanged: !canManage
               ? null
@@ -358,7 +359,7 @@ class _WoocommercePluginSettingsBodyState
             child: ListTile(
               leading: const Icon(Icons.inventory_2_outlined),
               title: Text(t.woocommerceSettingsOpeningInventoryLinkTitle),
-              subtitle: Text(t.woocommerceSettingsOpeningInventoryLinkSubtitle),
+              subtitle: Text(t.branded(t.woocommerceSettingsOpeningInventoryLinkSubtitle)),
               trailing: const Icon(Icons.chevron_right),
               onTap: () => context.push(
                 context.businessPanelUrl(

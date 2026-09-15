@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:hesabix_ui/config/brand_config.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 
 import '../../core/windows_update_platform.dart';
@@ -56,7 +57,7 @@ Future<void> _confirmClose() async {
       context: ctx,
       builder: (dialogCtx) {
         return AlertDialog(
-          title: Text(t.windowsExitConfirmTitle),
+          title: Text(t.branded(t.windowsExitConfirmTitle)),
           content: Text(t.windowsExitConfirmMessage),
           actions: [
             TextButton(

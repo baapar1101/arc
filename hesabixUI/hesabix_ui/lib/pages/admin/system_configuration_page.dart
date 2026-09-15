@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
+import 'package:hesabix_ui/config/brand_config.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/utils/number_normalizer.dart';
 import '../../core/api_client.dart';
@@ -35,6 +36,8 @@ class _SystemConfigurationPageState extends State<SystemConfigurationPage> {
   bool _enableMaintenanceMode = false;
   bool _supportTicketsEnabled = true;
   final TextEditingController _supportTicketsDisabledMessageCtrl = TextEditingController();
+  bool _legacyApiImportEnabled = true;
+  final TextEditingController _legacyApiImportDisabledMessageCtrl = TextEditingController();
   String _supportBillingMode = 'free';
   int _supportFreeQuotaPerMonth = 2;
   int _supportGracePeriodDays = 3;
@@ -138,6 +141,7 @@ class _SystemConfigurationPageState extends State<SystemConfigurationPage> {
   @override
   void dispose() {
     _supportTicketsDisabledMessageCtrl.dispose();
+    _legacyApiImportDisabledMessageCtrl.dispose();
     _supportInvoicePrefixCtrl.dispose();
     super.dispose();
   }
@@ -152,7 +156,7 @@ class _SystemConfigurationPageState extends State<SystemConfigurationPage> {
       final data = await _service.getSystemConfiguration();
       if (mounted) {
         setState(() {
-          _appName = data['app_name']?.toString() ?? 'Hesabix';
+          _appName = data['app_name']?.toString() ?? BrandConfig.materialTitle;
           _appVersion = data['app_version']?.toString() ?? '1.0.23';
           _defaultLanguage = data['default_language']?.toString() ?? 'fa';
           _defaultTheme = data['default_theme']?.toString() ?? 'system';
@@ -174,6 +178,10 @@ class _SystemConfigurationPageState extends State<SystemConfigurationPage> {
           _supportTicketsEnabled = data['support_tickets_enabled'] as bool? ?? true;
           _supportTicketsDisabledMessageCtrl.text =
               data['support_tickets_disabled_message']?.toString() ?? '';
+          _legacyApiImportEnabled =
+              data['legacy_api_import_enabled'] as bool? ?? true;
+          _legacyApiImportDisabledMessageCtrl.text =
+              data['legacy_api_import_disabled_message']?.toString() ?? '';
           final billingMode = data['support_billing_mode']?.toString() ?? 'free';
           _supportBillingMode =
               const ['free', 'paid', 'hybrid'].contains(billingMode) ? billingMode : 'free';
@@ -523,6 +531,41 @@ class _SystemConfigurationPageState extends State<SystemConfigurationPage> {
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: theme.colorScheme.onSurfaceVariant,
                         ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 24),
+                _buildSectionCard(
+                  theme,
+                  t.legacyApiImportSectionTitle,
+                  Icons.cloud_sync_outlined,
+                  [
+                    _buildSwitchField(
+                      label: t.legacyApiImportAllowUsersLabel,
+                      value: _legacyApiImportEnabled,
+                      onChanged: (value) =>
+                          setState(() => _legacyApiImportEnabled = value),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Text(
+                        t.legacyApiImportAllowUsersDescription,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                    TextFormField(
+                      controller: _legacyApiImportDisabledMessageCtrl,
+                      minLines: 2,
+                      maxLines: 6,
+                      maxLength: 8192,
+                      decoration: InputDecoration(
+                        labelText: t.legacyApiImportDisabledNoticeLabel,
+                        hintText: t.legacyApiImportDisabledNoticeHint,
+                        border: const OutlineInputBorder(),
+                        alignLabelWithHint: true,
                       ),
                     ),
                   ],
@@ -1170,6 +1213,9 @@ class _SystemConfigurationPageState extends State<SystemConfigurationPage> {
         'enable_maintenance_mode': _enableMaintenanceMode,
         'support_tickets_enabled': _supportTicketsEnabled,
         'support_tickets_disabled_message': _supportTicketsDisabledMessageCtrl.text.trim(),
+        'legacy_api_import_enabled': _legacyApiImportEnabled,
+        'legacy_api_import_disabled_message':
+            _legacyApiImportDisabledMessageCtrl.text.trim(),
         'support_billing_mode': _supportBillingMode,
         'support_free_quota_per_month': _supportFreeQuotaPerMonth,
         'support_grace_period_days': _supportGracePeriodDays,

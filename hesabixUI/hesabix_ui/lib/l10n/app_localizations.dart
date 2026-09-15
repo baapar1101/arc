@@ -16140,6 +16140,42 @@ abstract class AppLocalizations {
   /// **'Support tickets are temporarily unavailable.'**
   String get supportTicketsUnavailableBody;
 
+  /// No description provided for @legacyApiImportSectionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Import from previous Hesabix'**
+  String get legacyApiImportSectionTitle;
+
+  /// No description provided for @legacyApiImportAllowUsersLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow users to import from previous Hesabix'**
+  String get legacyApiImportAllowUsersLabel;
+
+  /// No description provided for @legacyApiImportAllowUsersDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'When disabled, the import option is hidden on the new-business page and related API calls are blocked.'**
+  String get legacyApiImportAllowUsersDescription;
+
+  /// No description provided for @legacyApiImportDisabledNoticeLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Notice text for users (when disabled)'**
+  String get legacyApiImportDisabledNoticeLabel;
+
+  /// No description provided for @legacyApiImportDisabledNoticeHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Leave blank to use the built-in default message.'**
+  String get legacyApiImportDisabledNoticeHint;
+
+  /// No description provided for @legacyApiImportUnavailableBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Import from previous Hesabix is temporarily unavailable.'**
+  String get legacyApiImportUnavailableBody;
+
   /// No description provided for @unlimited.
   ///
   /// In en, this message translates to:

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hesabix_ui/config/brand_config.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 
 import '../../../utils/responsive_helper.dart';
@@ -10,6 +11,7 @@ class NewBusinessIntentView extends StatelessWidget {
   final VoidCallback onCreateManually;
   final VoidCallback onImportBackup;
   final VoidCallback onImportLegacy;
+  final bool showLegacyImport;
 
   const NewBusinessIntentView({
     super.key,
@@ -17,6 +19,7 @@ class NewBusinessIntentView extends StatelessWidget {
     required this.onCreateManually,
     required this.onImportBackup,
     required this.onImportLegacy,
+    this.showLegacyImport = true,
   });
 
   @override
@@ -32,8 +35,9 @@ class NewBusinessIntentView extends StatelessWidget {
         onCreateManually: onCreateManually,
         onImportBackup: onImportBackup,
         onImportLegacy: onImportLegacy,
+        showLegacyImport: showLegacyImport,
         title: t.newBusinessIntentTitle,
-        subtitle: t.newBusinessIntentSubtitle,
+        subtitle: t.branded(t.newBusinessIntentSubtitle),
       ),
     );
   }

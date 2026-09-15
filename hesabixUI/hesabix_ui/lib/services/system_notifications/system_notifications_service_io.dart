@@ -3,14 +3,15 @@ import 'dart:ui' show Color;
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:permission_handler/permission_handler.dart';
 
+import '../../config/brand_config.dart';
 import '../../core/android_notification_prefs.dart';
 import '../../core/android_system_notifications_platform.dart';
 import 'android_notification_content_builder.dart';
 import 'notification_payload_codec.dart';
 
 const String _kAndroidChannelId = 'hesabix_inapp_v2';
-const String _kAndroidChannelName = 'اعلان‌های حسابیکس';
-const String _kAndroidChannelDescription = 'اعلان‌های درون‌برنامه‌ای حسابیکس';
+String get _kAndroidChannelName => BrandConfig.rebrand('اعلان‌های حسابیکس');
+String get _kAndroidChannelDescription => BrandConfig.rebrand('اعلان‌های درون‌برنامه‌ای حسابیکس');
 
 /// Android system-tray notifications via flutter_local_notifications.
 class SystemNotificationsService {
@@ -39,7 +40,7 @@ class SystemNotificationsService {
     final androidPlugin =
         _plugin.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
     await androidPlugin?.createNotificationChannel(
-      const AndroidNotificationChannel(
+      AndroidNotificationChannel(
         _kAndroidChannelId,
         _kAndroidChannelName,
         description: _kAndroidChannelDescription,

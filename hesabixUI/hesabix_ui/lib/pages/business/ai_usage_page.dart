@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:hesabix_ui/config/brand_config.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/services/ai_service.dart';
 import 'package:hesabix_ui/models/ai_models.dart';
@@ -483,12 +484,12 @@ class _AIUsagePageState extends State<AIUsagePage> {
           'ارائه‌دهنده',
           width: ColumnWidth.small,
           filterType: ColumnFilterType.multiSelect,
-          filterOptions: const [
-            FilterOption(value: 'openai', label: 'OpenAI'),
-            FilterOption(value: 'azure', label: 'Azure OpenAI'),
-            FilterOption(value: 'anthropic', label: 'Anthropic'),
-            FilterOption(value: 'local', label: 'Local'),
-            FilterOption(value: 'hesabix', label: 'Hesabix'),
+          filterOptions: [
+            const FilterOption(value: 'openai', label: 'OpenAI'),
+            const FilterOption(value: 'azure', label: 'Azure OpenAI'),
+            const FilterOption(value: 'anthropic', label: 'Anthropic'),
+            const FilterOption(value: 'local', label: 'Local'),
+            FilterOption(value: 'hesabix', label: BrandConfig.displayName(languageCode: 'en')),
           ],
           formatter: (item) => _providerLabel((item as AIUsageLog).provider),
         ),
@@ -631,7 +632,7 @@ class _AIUsagePageState extends State<AIUsagePage> {
       case 'local':
         return 'مدل محلی';
       case 'hesabix':
-        return 'Hesabix';
+        return BrandConfig.displayName(languageCode: 'en');
       default:
         return provider ?? '-';
     }

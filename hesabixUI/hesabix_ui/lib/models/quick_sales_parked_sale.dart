@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 
+import '../core/date_utils.dart';
 import 'customer_model.dart';
 import 'invoice_line_item.dart';
 import 'invoice_transaction.dart';
@@ -208,8 +209,10 @@ class QuickSalesParkedSale {
           json['cash_follows_total'] != false && (payments.length <= 1),
       cashRegisterId: json['cash_register_id']?.toString(),
       warehouseId: _asInt(json['warehouse_id']),
-      documentDate:
-          DateTime.tryParse(json['document_date']?.toString() ?? '') ??
+      documentDate: HesabixDateUtils.parseApiDate(
+            json['document_date'],
+            rawValue: json['document_date_raw'],
+          ) ??
           DateTime.now(),
       documentDescription: json['document_description']?.toString() ?? '',
       globalDiscountType: json['global_discount_type']?.toString() ?? 'percent',

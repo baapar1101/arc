@@ -419,6 +419,15 @@ class SystemConfigurationPayload(BaseModel):
 		description="متن دلخواه مدیر؛ در صورت خالی نمایش پیش‌فرض در خطا و عمومی برای کاربر",
 		max_length=8192,
 	)
+	legacy_api_import_enabled: bool | None = Field(
+		default=None,
+		description="اگر False باشد گزینه انتقال از حسابیکس قبلی برای کاربران عادی مخفی و API مربوطه قطع می‌شود",
+	)
+	legacy_api_import_disabled_message: str | None = Field(
+		default=None,
+		description="متن دلخواه مدیر وقتی انتقال از حسابیکس قبلی غیرفعال است",
+		max_length=8192,
+	)
 	support_billing_mode: str | None = Field(default=None, description="free | paid | hybrid")
 	support_free_quota_per_month: int | None = None
 	support_grace_period_days: int | None = None
@@ -507,6 +516,8 @@ def set_system_configuration_endpoint(
 		enable_maintenance_mode=payload.enable_maintenance_mode,
 		support_tickets_enabled=payload.support_tickets_enabled,
 		support_tickets_disabled_message=payload.support_tickets_disabled_message,
+		legacy_api_import_enabled=payload.legacy_api_import_enabled,
+		legacy_api_import_disabled_message=payload.legacy_api_import_disabled_message,
 		support_billing_mode=payload.support_billing_mode,
 		support_free_quota_per_month=payload.support_free_quota_per_month,
 		support_grace_period_days=payload.support_grace_period_days,

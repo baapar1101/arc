@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hesabix_ui/config/brand_config.dart';
 import 'ai_chat_design.dart';
 
 class AIChatSuggestion {
@@ -105,7 +106,13 @@ class AIChatSuggestionChips extends StatelessWidget {
           _SuggestionChip(
             suggestion: s,
             enabled: enabled,
-            onTap: () => onSelected(s),
+            onTap: () => onSelected(
+              AIChatSuggestion(
+                label: s.label,
+                prompt: BrandConfig.rebrand(s.prompt),
+                icon: s.icon,
+              ),
+            ),
           ),
       ],
     );

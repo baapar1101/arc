@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import '../config/brand_config.dart';
 import '../core/api_client.dart';
 import '../models/email_models.dart';
 
@@ -41,14 +42,16 @@ class EmailService {
     _ensureApiClientInitialized();
     return sendEmail(SendEmailRequest(
       to: userEmail,
-      subject: 'خوش آمدید به حسابیکس',
-      body: 'سلام $userName،\n\nبه حسابیکس خوش آمدید! امیدواریم تجربه خوبی داشته باشید.\n\nبا احترام\nتیم حسابیکس',
-      htmlBody: '''
+      subject: BrandConfig.rebrand('خوش آمدید به حسابیکس'),
+      body: BrandConfig.rebrand(
+        'سلام $userName،\n\nبه حسابیکس خوش آمدید! امیدواریم تجربه خوبی داشته باشید.\n\nبا احترام\nتیم حسابیکس',
+      ),
+      htmlBody: BrandConfig.rebrand('''
         <h2>خوش آمدید به حسابیکس</h2>
         <p>سلام $userName،</p>
         <p>به حسابیکس خوش آمدید! امیدواریم تجربه خوبی داشته باشید.</p>
         <p>با احترام<br>تیم حسابیکس</p>
-      ''',
+      '''),
     ));
   }
 

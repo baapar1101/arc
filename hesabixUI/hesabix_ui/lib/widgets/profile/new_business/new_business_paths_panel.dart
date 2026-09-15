@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hesabix_ui/config/brand_config.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 
 import '../../../utils/responsive_helper.dart';
@@ -14,6 +15,7 @@ class NewBusinessPathsPanel extends StatelessWidget {
   final String subtitle;
   final bool compactSecondary;
   final bool emphasizeCreate;
+  final bool showLegacyImport;
 
   const NewBusinessPathsPanel({
     super.key,
@@ -25,6 +27,7 @@ class NewBusinessPathsPanel extends StatelessWidget {
     required this.subtitle,
     this.compactSecondary = true,
     this.emphasizeCreate = true,
+    this.showLegacyImport = true,
   });
 
   @override
@@ -55,13 +58,15 @@ class NewBusinessPathsPanel extends StatelessWidget {
       onTap: isLoading ? null : onImportBackup,
       compact: compactSecondary,
     );
-    final legacyCard = NewBusinessChoiceCard(
-      icon: Icons.cloud_sync_rounded,
-      title: t.newBusinessImportLegacyTitle,
-      subtitle: t.newBusinessImportLegacySubtitle,
-      onTap: isLoading ? null : onImportLegacy,
-      compact: compactSecondary,
-    );
+    final legacyCard = showLegacyImport
+        ? NewBusinessChoiceCard(
+            icon: Icons.cloud_sync_rounded,
+            title: t.branded(t.newBusinessImportLegacyTitle),
+            subtitle: t.branded(t.newBusinessImportLegacySubtitle),
+            onTap: isLoading ? null : onImportLegacy,
+            compact: compactSecondary,
+          )
+        : null;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -102,11 +107,13 @@ class NewBusinessPathsPanel extends StatelessWidget {
                       delay: const Duration(milliseconds: 70),
                       child: backupCard,
                     ),
-                    const SizedBox(height: 12),
-                    _StaggeredFade(
-                      delay: const Duration(milliseconds: 140),
-                      child: legacyCard,
-                    ),
+                    if (legacyCard != null) ...[
+                      const SizedBox(height: 12),
+                      _StaggeredFade(
+                        delay: const Duration(milliseconds: 140),
+                        child: legacyCard,
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -124,16 +131,18 @@ class NewBusinessPathsPanel extends StatelessWidget {
               onTap: isLoading ? null : onImportBackup,
             ),
           ),
-          const SizedBox(height: 14),
-          _StaggeredFade(
-            delay: const Duration(milliseconds: 140),
-            child: NewBusinessChoiceCard(
-              icon: Icons.cloud_sync_rounded,
-              title: t.newBusinessImportLegacyTitle,
-              subtitle: t.newBusinessImportLegacySubtitle,
-              onTap: isLoading ? null : onImportLegacy,
+          if (showLegacyImport) ...[
+            const SizedBox(height: 14),
+            _StaggeredFade(
+              delay: const Duration(milliseconds: 140),
+              child: NewBusinessChoiceCard(
+                icon: Icons.cloud_sync_rounded,
+                title: t.branded(t.newBusinessImportLegacyTitle),
+                subtitle: t.branded(t.newBusinessImportLegacySubtitle),
+                onTap: isLoading ? null : onImportLegacy,
+              ),
             ),
-          ),
+          ],
         ],
       ],
     );

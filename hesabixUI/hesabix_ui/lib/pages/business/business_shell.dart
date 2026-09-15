@@ -3727,7 +3727,7 @@ class _BusinessShellState extends State<BusinessShell> {
       }
     }
 
-    // مرکز تماس آستریکس/ایزابل
+    // مرکز تماس استریسک/ایزابل
     if (section == 'telephony') {
       if (!_showPluginGatedMenu(_isTelephonyPluginActive())) {
         return false;

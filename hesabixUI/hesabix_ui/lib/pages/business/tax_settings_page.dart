@@ -11,6 +11,7 @@ import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../widgets/business_subpage_back_leading.dart';
 import '../../widgets/marketplace/moadian_plugin_gate.dart';
+import 'package:hesabix_ui/config/brand_config.dart';
 import 'package:hesabix_ui/services/bytes_export/bytes_export_service.dart';
 import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
@@ -1515,6 +1516,7 @@ class _TaxSettingsPageState extends State<TaxSettingsPage> {
   }
 
   Widget _buildGuideIntro(AppLocalizations t, ColorScheme cs) {
+    String _b(String s) => BrandConfig.rebrandText(t, s);
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -1527,7 +1529,7 @@ class _TaxSettingsPageState extends State<TaxSettingsPage> {
             ),
             const SizedBox(height: 8),
             Text(
-              t.taxGuideIntroDescription,
+              _b(t.taxGuideIntroDescription),
               style: Theme.of(context).textTheme.bodyMedium,
             ),
             const SizedBox(height: 16),
@@ -1536,7 +1538,7 @@ class _TaxSettingsPageState extends State<TaxSettingsPage> {
               style: Theme.of(context).textTheme.titleSmall,
             ),
             const SizedBox(height: 8),
-            _buildGuideBullet(t.taxGuidePrereqItem1, cs),
+            _buildGuideBullet(_b(t.taxGuidePrereqItem1), cs),
             _buildGuideBullet(t.taxGuidePrereqItem2, cs),
             _buildGuideBullet(t.taxGuidePrereqItem3, cs),
           ],
@@ -1621,9 +1623,10 @@ class _TaxSettingsPageState extends State<TaxSettingsPage> {
   }
 
   List<_TaxGuideStep> _buildGuideSteps(AppLocalizations t) {
+    String _b(String s) => BrandConfig.rebrandText(t, s);
     return [
       _TaxGuideStep(
-        title: t.taxGuideStep1Title,
+        title: _b(t.taxGuideStep1Title),
         description: t.taxGuideStep1Description,
         bullets: [
           t.taxGuideStep1Bullet1,
@@ -1652,12 +1655,12 @@ class _TaxSettingsPageState extends State<TaxSettingsPage> {
         bullets: [
           t.taxGuideStep3Bullet1,
           t.taxGuideStep3Bullet2,
-          t.taxGuideStep3Bullet3,
+          _b(t.taxGuideStep3Bullet3),
         ],
         assetPaths: const ['assets/images/moadian/5.jpg'],
       ),
       _TaxGuideStep(
-        title: t.taxGuideStep4Title,
+        title: _b(t.taxGuideStep4Title),
         description: t.taxGuideStep4Description,
         bullets: [
           t.taxGuideStep4Bullet1,
@@ -1671,7 +1674,7 @@ class _TaxSettingsPageState extends State<TaxSettingsPage> {
         bullets: [
           t.taxGuideStep5Bullet1,
           t.taxGuideStep5Bullet2,
-          t.taxGuideStep5Bullet3,
+          _b(t.taxGuideStep5Bullet3),
         ],
         assetPaths: const ['assets/images/moadian/6.jpg'],
       ),

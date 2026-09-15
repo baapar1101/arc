@@ -67,6 +67,8 @@ SYSTEM_CONFIG_ENABLE_EMAIL_VERIFICATION = "system_config_enable_email_verificati
 SYSTEM_CONFIG_ENABLE_MAINTENANCE_MODE = "system_config_enable_maintenance_mode"
 SYSTEM_CONFIG_SUPPORT_TICKETS_ENABLED = "system_config_support_tickets_enabled"
 SYSTEM_CONFIG_SUPPORT_TICKETS_DISABLED_MESSAGE = "system_config_support_tickets_disabled_message"
+SYSTEM_CONFIG_LEGACY_API_IMPORT_ENABLED = "system_config_legacy_api_import_enabled"
+SYSTEM_CONFIG_LEGACY_API_IMPORT_DISABLED_MESSAGE = "system_config_legacy_api_import_disabled_message"
 SYSTEM_CONFIG_SESSION_TIMEOUT = "system_config_session_timeout"
 SYSTEM_CONFIG_MAX_FILE_SIZE = "system_config_max_file_size"
 SYSTEM_CONFIG_MAX_USERS = "system_config_max_users"
@@ -108,6 +110,8 @@ REDIS_CONFIG_PASSWORD = "redis_config_password"
 
 _SUPPORT_TICKETS_DISABLED_FALLBACK_MESSAGE_FA = "سیستم تیکت‌های پشتیبانی موقتاً غیرفعال است."
 MAX_SUPPORT_TICKETS_DISABLED_MESSAGE_LEN = 8192
+_LEGACY_API_IMPORT_DISABLED_FALLBACK_MESSAGE_FA = "انتقال از حسابیکس قبلی موقتاً غیرفعال است."
+MAX_LEGACY_API_IMPORT_DISABLED_MESSAGE_LEN = 8192
 
 
 def is_support_tickets_enabled_for_users(db: Session) -> bool:
@@ -145,6 +149,42 @@ def support_tickets_public_config_dict(db: Session) -> Dict[str, Any]:
 		"support_tickets_disabled_message": "" if enabled else get_support_tickets_disabled_user_message(db),
 		"support_billing_mode": billing.get("support_billing_mode"),
 		"support_free_quota_per_month": billing.get("support_free_quota_per_month"),
+	}
+
+
+def is_legacy_api_import_enabled(db: Session) -> bool:
+	"""انتقال از حسابیکس قبلی (API)؛ پیش‌فرض روشن تا استقرارهای موجود قطع نشوند."""
+	raw = _get_setting_bool(db, SYSTEM_CONFIG_LEGACY_API_IMPORT_ENABLED)
+	return True if raw is None else raw
+
+
+def get_legacy_api_import_disabled_user_message(db: Session) -> str:
+	obj = _get_setting(db, SYSTEM_CONFIG_LEGACY_API_IMPORT_DISABLED_MESSAGE)
+	if obj and obj.value_string and obj.value_string.strip():
+		text = obj.value_string.strip()
+		return text[:MAX_LEGACY_API_IMPORT_DISABLED_MESSAGE_LEN]
+	return _LEGACY_API_IMPORT_DISABLED_FALLBACK_MESSAGE_FA
+
+
+def assert_legacy_api_import_allowed(db: Session) -> None:
+	if is_legacy_api_import_enabled(db):
+		return
+	msg = get_legacy_api_import_disabled_user_message(db)
+	raise ApiError(
+		"LEGACY_API_IMPORT_DISABLED",
+		msg,
+		http_status=403,
+		details={"user_message": msg},
+	)
+
+
+def legacy_api_import_public_config_dict(db: Session) -> Dict[str, Any]:
+	enabled = is_legacy_api_import_enabled(db)
+	return {
+		"legacy_api_import_enabled": enabled,
+		"legacy_api_import_disabled_message": (
+			"" if enabled else get_legacy_api_import_disabled_user_message(db)
+		),
 	}
 
 
@@ -954,6 +994,16 @@ def get_system_configuration(db: Session) -> Dict[str, Any]:
 		support_disabled_msg_storage = support_disabled_msg_setting.value_string.strip()[
 			:MAX_SUPPORT_TICKETS_DISABLED_MESSAGE_LEN
 		]
+	legacy_import_disabled_msg_setting = _get_setting(
+		db, SYSTEM_CONFIG_LEGACY_API_IMPORT_DISABLED_MESSAGE
+	)
+	legacy_import_disabled_msg_storage = ""
+	if legacy_import_disabled_msg_setting and legacy_import_disabled_msg_setting.value_string:
+		legacy_import_disabled_msg_storage = (
+			legacy_import_disabled_msg_setting.value_string.strip()[
+				:MAX_LEGACY_API_IMPORT_DISABLED_MESSAGE_LEN
+			]
+		)
 
 	out = {
 		"app_name": (app_name.value_string if app_name and app_name.value_string else env.app_name),
@@ -999,6 +1049,8 @@ def get_system_configuration(db: Session) -> Dict[str, Any]:
 		"firewall_auto_ban_duration_sec": sec["firewall_auto_ban_duration_sec"],
 		"support_tickets_enabled": is_support_tickets_enabled_for_users(db),
 		"support_tickets_disabled_message": support_disabled_msg_storage,
+		"legacy_api_import_enabled": is_legacy_api_import_enabled(db),
+		"legacy_api_import_disabled_message": legacy_import_disabled_msg_storage,
 	}
 	from app.services.support.support_billing_settings import support_billing_settings_dict
 
@@ -1020,6 +1072,8 @@ def set_system_configuration(
 	enable_maintenance_mode: bool | None = None,
 	support_tickets_enabled: bool | None = None,
 	support_tickets_disabled_message: str | None = None,
+	legacy_api_import_enabled: bool | None = None,
+	legacy_api_import_disabled_message: str | None = None,
 	support_billing_mode: str | None = None,
 	support_free_quota_per_month: int | None = None,
 	support_grace_period_days: int | None = None,
@@ -1142,6 +1196,19 @@ def set_system_configuration(
 				http_status=400,
 			)
 		_upsert_setting_string(db, SYSTEM_CONFIG_SUPPORT_TICKETS_DISABLED_MESSAGE, text)
+
+	if legacy_api_import_enabled is not None:
+		_upsert_setting_bool(db, SYSTEM_CONFIG_LEGACY_API_IMPORT_ENABLED, legacy_api_import_enabled)
+
+	if legacy_api_import_disabled_message is not None:
+		text = str(legacy_api_import_disabled_message).strip()
+		if len(text) > MAX_LEGACY_API_IMPORT_DISABLED_MESSAGE_LEN:
+			raise ApiError(
+				"LEGACY_IMPORT_MESSAGE_TOO_LONG",
+				f"پیام غیرفعال‌سازی انتقال از حسابیکس قبلی حداکثر {MAX_LEGACY_API_IMPORT_DISABLED_MESSAGE_LEN} کاراکتر است",
+				http_status=400,
+			)
+		_upsert_setting_string(db, SYSTEM_CONFIG_LEGACY_API_IMPORT_DISABLED_MESSAGE, text)
 
 	from app.services.support.support_billing_settings import apply_support_billing_settings
 

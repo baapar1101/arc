@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:hesabix_ui/config/brand_config.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:intl/intl.dart';
 
@@ -200,7 +201,7 @@ class _AndroidUpdateSettingsPageState extends State<AndroidUpdateSettingsPage> {
                         ),
                         const SizedBox(height: 12),
                         Text(
-                          t.androidUpdateSettingsDescription,
+                          t.branded(t.androidUpdateSettingsDescription),
                           style: theme.textTheme.bodyMedium?.copyWith(
                             color: theme.colorScheme.onSurfaceVariant,
                           ),

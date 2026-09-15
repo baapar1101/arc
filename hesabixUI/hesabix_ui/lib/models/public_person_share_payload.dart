@@ -1,5 +1,4 @@
-import 'package:intl/intl.dart';
-
+import '../core/date_utils.dart';
 import 'person_share_link.dart';
 
 class PublicPersonSharePayload {
@@ -178,7 +177,10 @@ class PublicLedgerItem {
       documentCode: json['document_code']?.toString(),
       documentType: json['document_type']?.toString(),
       documentTypeName: json['document_type_name']?.toString(),
-      documentDate: _parseDate(json['document_date']),
+      documentDate: HesabixDateUtils.parseApiDate(
+        json['document_date'],
+        rawValue: json['document_date_raw'],
+      ),
       description: json['description']?.toString(),
       debit: _toDouble(json['debit']),
       credit: _toDouble(json['credit']),
@@ -192,9 +194,9 @@ class PublicLedgerItem {
     );
   }
 
-  String formattedDate() {
+  String formattedDate({bool jalali = true}) {
     if (documentDate == null) return '';
-    return DateFormat('yyyy/MM/dd').format(documentDate!);
+    return HesabixDateUtils.formatForDisplay(documentDate, jalali);
   }
 }
 
@@ -227,7 +229,10 @@ class PublicInvoiceItem {
       documentCode: json['document_code']?.toString(),
       documentType: json['document_type']?.toString(),
       documentTypeName: json['document_type_name']?.toString(),
-      documentDate: _parseDate(json['document_date']),
+      documentDate: HesabixDateUtils.parseApiDate(
+        json['document_date'],
+        rawValue: json['document_date_raw'],
+      ),
       description: json['description']?.toString(),
       amount: _toDouble(json['amount']),
       currencyCode: json['currency_code']?.toString(),
@@ -235,9 +240,9 @@ class PublicInvoiceItem {
     );
   }
 
-  String formattedDate() {
+  String formattedDate({bool jalali = true}) {
     if (documentDate == null) return '';
-    return DateFormat('yyyy/MM/dd').format(documentDate!);
+    return HesabixDateUtils.formatForDisplay(documentDate, jalali);
   }
 }
 
@@ -245,14 +250,5 @@ double? _toDouble(dynamic value) {
   if (value == null) return null;
   if (value is num) return value.toDouble();
   return double.tryParse(value.toString());
-}
-
-DateTime? _parseDate(dynamic value) {
-  if (value == null) return null;
-  try {
-    return DateTime.parse(value.toString()).toLocal();
-  } catch (_) {
-    return null;
-  }
 }
 

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../config/brand_config.dart';
 import '../../../core/api_client.dart';
 import '../../../core/auth_store.dart';
 import '../../../core/business_nav.dart';
@@ -356,7 +357,7 @@ class _HScriptStudioPageState extends State<HScriptStudioPage> {
 
     final current = _codeCtrl.text.trim();
     final prompt = StringBuffer()
-      ..writeln('کمک کن یک اسکریپت HScript برای گزارش سفارشی حسابیکس بنویسم/اصلاح کنم.')
+      ..writeln(BrandConfig.rebrand('کمک کن یک اسکریپت HScript برای گزارش سفارشی حسابیکس بنویسم/اصلاح کنم.'))
       ..writeln('درخواست کاربر: ${result.intent}')
       ..writeln()
       ..writeln('قواعد:')

@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:hesabix_ui/config/brand_config.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 
+import '../../core/api_client.dart';
+import '../../services/legacy_api_import_public_config.dart';
 import '../../utils/responsive_helper.dart';
 import 'new_business/new_business_paths_panel.dart';
 import 'new_business/new_business_shared.dart';
 
-class BusinessesEmptyState extends StatelessWidget {
+class BusinessesEmptyState extends StatefulWidget {
   final bool noSearchResults;
   final String? searchQuery;
   final VoidCallback? onClearSearch;
@@ -17,6 +20,26 @@ class BusinessesEmptyState extends StatelessWidget {
     this.searchQuery,
     this.onClearSearch,
   });
+
+  @override
+  State<BusinessesEmptyState> createState() => _BusinessesEmptyStateState();
+}
+
+class _BusinessesEmptyStateState extends State<BusinessesEmptyState> {
+  LegacyApiImportPublicConfig _legacyImportConfig =
+      const LegacyApiImportPublicConfig();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadLegacyImportConfig();
+  }
+
+  Future<void> _loadLegacyImportConfig() async {
+    final cfg = await LegacyApiImportPublicConfig.fetch(ApiClient());
+    if (!mounted) return;
+    setState(() => _legacyImportConfig = cfg);
+  }
 
   void _goFlow(BuildContext context, String flow) {
     context.go('/user/profile/new-business?flow=$flow');
@@ -31,7 +54,7 @@ class BusinessesEmptyState extends StatelessWidget {
     final isDesktop = ResponsiveHelper.isDesktop(context);
     final isTablet = ResponsiveHelper.isTablet(context);
 
-    if (noSearchResults) {
+    if (widget.noSearchResults) {
       return Center(
         child: Padding(
           padding: EdgeInsets.all(padding),
@@ -54,20 +77,21 @@ class BusinessesEmptyState extends StatelessWidget {
                       fontWeight: FontWeight.w600,
                     ),
                   ),
-                  if (searchQuery != null && searchQuery!.isNotEmpty) ...[
+                  if (widget.searchQuery != null &&
+                      widget.searchQuery!.isNotEmpty) ...[
                     const SizedBox(height: 8),
                     Text(
-                      t.businessesHubNoSearchResultsFor(searchQuery!),
+                      t.businessesHubNoSearchResultsFor(widget.searchQuery!),
                       textAlign: TextAlign.center,
                       style: theme.textTheme.bodyMedium?.copyWith(
                         color: cs.onSurfaceVariant,
                       ),
                     ),
                   ],
-                  if (onClearSearch != null) ...[
+                  if (widget.onClearSearch != null) ...[
                     const SizedBox(height: 20),
                     TextButton.icon(
-                      onPressed: onClearSearch,
+                      onPressed: widget.onClearSearch,
                       icon: const Icon(Icons.close_rounded, size: 18),
                       label: Text(t.businessesHubClearSearch),
                     ),
@@ -95,8 +119,9 @@ class BusinessesEmptyState extends StatelessWidget {
                     onCreateManually: () => _goFlow(context, 'create'),
                     onImportBackup: () => _goFlow(context, 'backup'),
                     onImportLegacy: () => _goFlow(context, 'legacy'),
+                    showLegacyImport: _legacyImportConfig.enabledForUsers,
                     title: t.businessesHubEmptyTitle,
-                    subtitle: t.businessesHubEmptySubtitle,
+                    subtitle: t.branded(t.businessesHubEmptySubtitle),
                   ),
                 ),
               ),
