@@ -65,7 +65,11 @@ String? _quickSalesDisplayProductBusinessCode(Map<String, dynamic> p) {
   }
 
   final code = (p['code']?.toString() ?? '').trim();
-          _searchByBarcode(value);
+  final productCode = (p['product_code']?.toString() ?? '').trim();
+  final tax = (p['tax_code']?.toString() ?? '').trim();
+  final tokens = parseGeneralBarcodeTokens(p['general_barcodes']?.toString());
+  final gb0 = tokens.isNotEmpty ? tokens.first.trim() : '';
+
   for (final candidate in [code, productCode, tax, gb0]) {
     if (!looksLikeInternalIdOnly(candidate)) return candidate;
   }
