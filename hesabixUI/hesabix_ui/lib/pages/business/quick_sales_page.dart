@@ -50,7 +50,11 @@ import 'package:hesabix_ui/services/bytes_export/bytes_export_service.dart';
 import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 /// کد کسب‌وکاری برای نمایش در فروش سریع: اگر [code] با [id] یکی باشد، از `product_code`، `tax_code` یا اولین بارکد عمومی استفاده می‌شود.
-          _searchByBarcode(value);
+String? _quickSalesDisplayProductBusinessCode(Map<String, dynamic> p) {
+  final idRaw = p['id'];
+  final idStr = idRaw == null
+      ? ''
+      : number_utils.toEnglishDigits(idRaw.toString().trim());
 
   bool looksLikeInternalIdOnly(String v) {
     final t = v.trim();
@@ -61,11 +65,7 @@ import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
   }
 
   final code = (p['code']?.toString() ?? '').trim();
-  final productCode = (p['product_code']?.toString() ?? '').trim();
-  final tax = (p['tax_code']?.toString() ?? '').trim();
-  final tokens = parseGeneralBarcodeTokens(p['general_barcodes']?.toString());
-  final gb0 = tokens.isNotEmpty ? tokens.first.trim() : '';
-
+          _searchByBarcode(value);
   for (final candidate in [code, productCode, tax, gb0]) {
     if (!looksLikeInternalIdOnly(candidate)) return candidate;
   }
@@ -4583,13 +4583,7 @@ class _QuickSalesPageState extends State<QuickSalesPage>
             ],
           ),
         ),
-        onSubmitted: (value) {
-          if (_barcodeOverlayEntry != null && _barcodeSuggestions.isNotEmpty) {
-            unawaited(_selectHighlightedBarcodeSuggestion());
-          } else {
-            _searchByBarcode(value);
-          }
-        },
+        onSubmitted: (value) => _searchByBarcode(value),
         onChanged: (value) {
           if (_lastFailedSearchQuery != null &&
               value != _lastFailedSearchQuery) {
