@@ -16,7 +16,7 @@ TEMPLATE_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__fi
 jinja_env = Environment(
     loader=FileSystemLoader(TEMPLATE_DIR),
     autoescape=select_autoescape(['html', 'xml']),
-    enable_async=True
+    enable_async=False
 )
 
 
