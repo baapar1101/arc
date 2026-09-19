@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:hesabix_ui/core/api_client.dart';
+import 'package:hesabix_ui/core/date_utils.dart';
 import 'package:hesabix_ui/models/expense_income_document.dart';
 
 import 'document_policy_guard.dart';
@@ -262,7 +263,11 @@ class ExpenseIncomeService {
   ExpenseIncomeDocument _mapApiToExpenseIncomeDocument(Map<String, dynamic> json) {
     final String documentType = (json['document_type'] as String?) ?? '';
     final bool isIncome = documentType == 'income';
-    final DateTime documentDate = DateTime.parse(json['document_date'] as String);
+    final DateTime documentDate = HesabixDateUtils.parseApiDate(
+          json['document_date'],
+          rawValue: json['document_date_raw'],
+        ) ??
+        DateTime.now();
     final int currencyId = (json['currency_id'] as num).toInt();
     final String code = json['code'] as String? ?? '';
     final int id = (json['id'] as num).toInt();
@@ -293,16 +298,17 @@ class ExpenseIncomeService {
           final Map<String, dynamic> extra = (line['extra_info'] as Map?)?.cast<String, dynamic>() ?? const {};
           final String txType = (line['transaction_type'] as String?) ??
               (extra['transaction_type'] as String?) ??
-              // fallback ساده
               (line['person_id'] != null ? 'person' : (line['account_id'] != null ? 'account' : 'bank'));
           final String txTypeName = _txTypeName(txType);
           final double debit = (line['debit'] as num?)?.toDouble() ?? 0.0;
           final double credit = (line['credit'] as num?)?.toDouble() ?? 0.0;
           final double amount = isIncome ? debit : credit;
           final String? transactionDateStr = (line['transaction_date'] as String?) ?? (extra['transaction_date'] as String?);
-          final DateTime txDate = transactionDateStr != null
-              ? DateTime.parse(transactionDateStr)
-              : documentDate;
+          final DateTime txDate = HesabixDateUtils.parseApiDate(
+                transactionDateStr,
+                rawValue: extra['transaction_date_raw'],
+              ) ??
+              documentDate;
           return CounterpartyLine(
             id: (line['id'] as num).toInt(),
             transactionType: txType,
@@ -327,7 +333,7 @@ class ExpenseIncomeService {
         })
         .toList();
 
-    final double totalAmount = itemLines.fold(0.0, (sum, it) => sum + (it.amount));
+    final double totalAmount = itemLines.fold(0.0, (sum, it) => sum + it.amount);
 
     return ExpenseIncomeDocument(
       id: id,
@@ -344,7 +350,6 @@ class ExpenseIncomeService {
       itemLinesCount: itemLines.length,
       counterpartyLinesCount: counterpartyLines.length,
       createdByName: null,
-      // بک‌اند create فعلاً registered_at برنمی‌گرداند؛ نزدیک‌ترین چیز زمان کنونی است
       registeredAt: DateTime.now(),
       extraInfo: null,
     );
