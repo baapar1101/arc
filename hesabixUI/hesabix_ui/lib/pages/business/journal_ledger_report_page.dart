@@ -38,6 +38,7 @@ class _JournalLedgerReportPageState extends State<JournalLedgerReportPage> {
   DateTime? _toDate;
   int? _selectedFiscalYearId;
   int? _selectedCurrencyId;
+  int? _rialCurrencyId;
   String? _selectedDocumentType;
   bool _includeProforma = false;
   
@@ -108,6 +109,7 @@ class _JournalLedgerReportPageState extends State<JournalLedgerReportPage> {
       if (!mounted) return;
       setState(() {
         _currencies = items;
+        _rialCurrencyId = _findRialCurrencyId(items);
         // پیش‌فرض: همه ارزها (= مبالغ پایه در بک‌اند)
         _selectedCurrencyId = null;
       });
@@ -162,24 +164,25 @@ class _JournalLedgerReportPageState extends State<JournalLedgerReportPage> {
     };
   }
 
-  bool _isSelectedCurrencyRial() {
-    if (_selectedCurrencyId == null) return false;
-    for (final currency in _currencies) {
-      if (currency['id'] == _selectedCurrencyId) {
-        final code = (currency['code'] ?? currency['name'] ?? '').toString().toUpperCase();
-        return code == 'IRR' || code == 'RIAL';
+  int? _findRialCurrencyId(List<Map<String, dynamic>> currencies) {
+    for (final currency in currencies) {
+      final code = (currency['code'] ?? currency['name'] ?? '').toString().toUpperCase();
+      if (code == 'IRR' || code == 'RIAL') {
+        final id = currency['id'];
+        if (id is int) return id;
       }
     }
-    return false;
+    return null;
   }
 
   Future<void> _exportElectronicBooks() async {
     if (_isExportingElectronic) return;
 
-    if (!_isSelectedCurrencyRial()) {
+    final rialCurrencyId = _rialCurrencyId;
+    if (rialCurrencyId == null) {
       SnackBarHelper.showError(
         context,
-        message: 'برای خروجی دفتر الکترونیکی باید ارز ریال (IRR) انتخاب شود.',
+        message: 'شناسه ارز ریال (IRR) برای خروجی دفتر الکترونیکی دریافت نشد.',
       );
       return;
     }
@@ -193,6 +196,7 @@ class _JournalLedgerReportPageState extends State<JournalLedgerReportPage> {
         '/api/v1/businesses/${widget.businessId}/reports/journal-ledger/export/electronic-books',
         data: {
           ..._additionalParams(),
+          'currency_id': rialCurrencyId,
           'format': 'auto',
         },
         options: Options(
