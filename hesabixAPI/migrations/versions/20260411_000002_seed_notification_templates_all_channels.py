@@ -54,10 +54,10 @@ def _templates_for_event(event_key: str) -> dict[str, dict[str, str | None]]:
 			},
 			"sms": {
 				"subject": "بازیابی رمز",
-				"body": "حسابیکس: بازیابی رمز. توکن {{ token }}",
+				"body": "مارک‌استریت: بازیابی رمز. توکن {{ token }}",
 			},
 			"email": {
-				"subject": "بازیابی کلمه عبور — حسابیکس",
+				"subject": "بازیابی کلمه عبور — مارک‌استریت",
 				"body": "سلام،\n\nبرای تنظیم مجدد رمز عبور از اطلاعات زیر استفاده کنید:\n\n{{ token }}\n\nاگر این درخواست از طرف شما نبوده، این ایمیل را نادیده بگیرید.",
 			},
 			"inapp": {
@@ -182,7 +182,7 @@ def _auth_otp_templates() -> list[dict]:
 	for ch in CHANNELS:
 		if ch == "sms":
 			subject = "ورود یک‌بارمصرف"
-			body = "کد ورود حسابیکس: {{ code }}\nاعتبار {{ expiry_minutes }} دقیقه."
+			body = "کد ورود مارک‌استریت: {{ code }}\nاعتبار {{ expiry_minutes }} دقیقه."
 		elif ch == "email":
 			subject = "کد ورود به حساب کاربری"
 			body = "کد ورود شما: {{ code }}\nاین کد تا {{ expiry_minutes }} دقیقه معتبر است.\n\nاگر شما درخواست نداده‌اید، این ایمیل را نادیده بگیرید."

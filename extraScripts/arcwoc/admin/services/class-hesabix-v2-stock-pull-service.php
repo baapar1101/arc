@@ -1,6 +1,6 @@
 <?php
 /**
- * کشش موجودی عددی حسابیکس → ووکامرس (چند انبار، جمع روی انبارهای انتخاب‌شده).
+ * کشش موجودی عددی مارک‌استریت → ووکامرس (چند انبار، جمع روی انبارهای انتخاب‌شده).
  *
  * @package    Hesabix_V2
  * @subpackage Hesabix_V2/admin/services
@@ -38,7 +38,7 @@ class Hesabix_V2_Stock_Pull_Service
 			'warehouse_ids' => array(),
 			'cron_minutes' => 15,
 			'force_manage_stock' => true,
-			// وقتی فعال است، موجودی با سفارش در ووکامرس کم نمی‌شود (مرجع: حسابیکس / کشش موجودی).
+			// وقتی فعال است، موجودی با سفارش در ووکامرس کم نمی‌شود (مرجع: مارک‌استریت / کشش موجودی).
 			'disable_wc_stock_reduction' => false,
 			// اگر حسابیکس ۰ گزارش کند ولی WC > 0 باشد، موجودی فروشگاه را صفر نکن (مگر force_zero).
 			'skip_zero_overwrite' => true,
@@ -122,7 +122,7 @@ class Hesabix_V2_Stock_Pull_Service
 		$schedules[self::SCHEDULE_KEY] = array(
 			'interval' => max(300, min(64800, $m * 60)),
 			/* translators: %d: interval in minutes */
-			'display' => sprintf(__('موجودی حسابیکس → ووک (%d دقیقه)', 'hesabix-v2'), $m),
+			'display' => sprintf(__('موجودی مارک‌استریت → ووک (%d دقیقه)', 'hesabix-v2'), $m),
 		);
 
 		return $schedules;
@@ -193,7 +193,7 @@ class Hesabix_V2_Stock_Pull_Service
 		if (!get_option('hesabix_v2_enabled')) {
 			return array(
 				'success' => false,
-				'message' => __('افزونه حسابیکس فعال نشده است.', 'hesabix-v2'),
+				'message' => __('افزونه مارک‌استریت فعال نشده است.', 'hesabix-v2'),
 				'execution_time' => microtime(true) - $start,
 			);
 		}
@@ -643,7 +643,7 @@ class Hesabix_V2_Stock_Pull_Service
 				$res = $api->inventory_stock_report($body, 90);
 
 				if (empty($res['success'])) {
-					$msg = isset($res['message']) ? (string) $res['message'] : __('خطا در گزارش موجودی حسابیکس', 'hesabix-v2');
+					$msg = isset($res['message']) ? (string) $res['message'] : __('خطا در گزارش موجودی مارک‌استریت', 'hesabix-v2');
 					return new WP_Error('hesabix_stock_api', $msg);
 				}
 

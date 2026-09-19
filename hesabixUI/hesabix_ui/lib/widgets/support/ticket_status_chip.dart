@@ -69,8 +69,12 @@ class TicketStatusChip extends StatelessWidget {
     final semantics = SemanticColorResolver.of(context);
     switch (status.name.toLowerCase()) {
       case 'باز':
+<<<<<<< HEAD
       case 'open':
         return semantics.info;
+=======
+        return Colors.grey;
+>>>>>>> github/Huma
       case 'در حال پیگیری':
       case 'in progress':
         return theme.colorScheme.tertiary;

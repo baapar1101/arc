@@ -157,7 +157,7 @@ class _DatabaseBackupPageState extends State<DatabaseBackupPage> {
   }
 
   Future<void> _pickRestoreFile() async {
-    final result = await FilePicker.platform.pickFiles(
+    final result = await FilePicker.pickFiles(
       type: FileType.custom,
       allowedExtensions: ['sql', 'gz'],
       withData: true,

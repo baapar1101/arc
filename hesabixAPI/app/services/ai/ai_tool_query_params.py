@@ -7,7 +7,10 @@ from __future__ import annotations
 from typing import Any, Dict, List, Optional
 
 from app.core.calendar import CalendarType
+<<<<<<< HEAD
 from app.services.ai.ai_constants import AI_LIST_TAKE_DEFAULT, AI_LIST_TAKE_MAX
+=======
+>>>>>>> github/Huma
 
 # یک FilterItem برای JSON Schema ابزارها
 _FILTER_ITEM_SCHEMA = {
@@ -88,7 +91,10 @@ def build_ai_list_query(
     for k in extra_keys or []:
         if k in kwargs and kwargs[k] is not None:
             raw[k] = kwargs[k]
+<<<<<<< HEAD
     _clamp_take_in_dict(raw)
+=======
+>>>>>>> github/Huma
     merged = merge_into_query_dict(raw, entity=entity, calendar_type=calendar_type)
     return _build_list_query(merged, entity=entity)
 

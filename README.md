@@ -347,11 +347,6 @@ This software is distributed under the **GNU General Public License v3.0 (GPL-3.
 
 Full license text: http://www.gnu.org/licenses/gpl-3.0.txt
 
-## Support
-
-- **Website**: https://hesabix.ir
-- **Support**: https://hesabix.ir/support
-- **Repository**: https://source.hesabix.ir/hesabix/arc.git
 
 ## Development
 

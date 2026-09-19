@@ -58,7 +58,7 @@ class Hesabix_V2_Invoice_Service
 	}
 
 	/**
-	 * حذف فاکتور حسابیکس، نگاشت، صف، و فلگ توقف خودکار؛ یادداشت روی سفارش.
+	 * حذف فاکتور مارک‌استریت، نگاشت، صف، و فلگ توقف خودکار؛ یادداشت روی سفارش.
 	 *
 	 * @param int $order_id
 	 * @return array{success:bool,message:string,already_gone?:bool}
@@ -85,7 +85,7 @@ class Hesabix_V2_Invoice_Service
 			$db->delete_mapping('order', $order_id);
 			return array(
 				'success' => true,
-				'message' => __('سفارشی در حسابیکس برای این سفارش ثبت نشده بود.', 'hesabix-v2'),
+				'message' => __('سفارشی در مارک‌استریت برای این سفارش ثبت نشده بود.', 'hesabix-v2'),
 				'already_gone' => true,
 			);
 		}
@@ -95,7 +95,7 @@ class Hesabix_V2_Invoice_Service
 		$res = $api->delete_invoice($invoice_id);
 
 		if (empty($res['success'])) {
-			$msg = isset($res['message']) ? (string) $res['message'] : __('حذف فاکتور در حسابیکس ناموفق بود.', 'hesabix-v2');
+			$msg = isset($res['message']) ? (string) $res['message'] : __('حذف فاکتور در مارک‌استریت ناموفق بود.', 'hesabix-v2');
 			return array(
 				'success' => false,
 				'message' => $msg,
@@ -110,7 +110,7 @@ class Hesabix_V2_Invoice_Service
 		$order->add_order_note(
 			sprintf(
 				/* translators: %d: Hesabix invoice id */
-				__('ارسال به حسابیکس لغو شد؛ فاکتور %d حذف شد.', 'hesabix-v2'),
+				__('ارسال به مارک‌استریت لغو شد؛ فاکتور %d حذف شد.', 'hesabix-v2'),
 				$invoice_id
 			)
 		);
@@ -123,7 +123,7 @@ class Hesabix_V2_Invoice_Service
 
 		return array(
 			'success' => true,
-			'message' => __('فاکتور در حسابیکس حذف و ارتباط در افزونه پاک شد.', 'hesabix-v2'),
+			'message' => __('فاکتور در مارک‌استریت حذف و ارتباط در افزونه پاک شد.', 'hesabix-v2'),
 		);
 	}
 }

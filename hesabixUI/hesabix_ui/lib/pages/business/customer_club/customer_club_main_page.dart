@@ -100,7 +100,7 @@ class _CustomerClubMainPageState extends State<CustomerClubMainPage> with Single
     if (s.isEmpty) return '';
     final parsed = DateTime.tryParse(s);
     if (parsed == null) return s;
-    return HesabixDateUtils.formatDateTime(parsed.toLocal(), _isJalaliCalendar);
+    return MarkStreetDateUtils.formatDateTime(parsed.toLocal(), _isJalaliCalendar);
   }
 
   String _transactionTypeLabel(AppLocalizations t, String? raw) {

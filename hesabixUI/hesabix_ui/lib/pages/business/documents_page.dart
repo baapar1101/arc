@@ -426,11 +426,11 @@ class _DocumentsPageState extends State<DocumentsPage> {
 
     if (_fromDate != null || _toDate != null) {
       final from = _fromDate != null
-          ? HesabixDateUtils.formatForDisplay(
+          ? MarkStreetDateUtils.formatForDisplay(
               _fromDate!, widget.calendarController.isJalali)
           : '—';
       final to = _toDate != null
-          ? HesabixDateUtils.formatForDisplay(
+          ? MarkStreetDateUtils.formatForDisplay(
               _toDate!, widget.calendarController.isJalali)
           : '—';
       chips.add(Chip(
@@ -660,8 +660,8 @@ class _DocumentsPageState extends State<DocumentsPage> {
         'business_id': widget.businessId,
         if (_selectedDocumentType != null)
           'document_type': _selectedDocumentType,
-        if (_fromDate != null) 'from_date': HesabixDateUtils.formatForApiDate(_fromDate!),
-        if (_toDate != null) 'to_date': HesabixDateUtils.formatForApiDate(_toDate!),
+        if (_fromDate != null) 'from_date': MarkStreetDateUtils.formatForApiDate(_fromDate!),
+        if (_toDate != null) 'to_date': MarkStreetDateUtils.formatForApiDate(_toDate!),
         if (_selectedFiscalYearId != null) 'fiscal_year_id': _selectedFiscalYearId,
         if (_selectedProjectId != null) 'project_id': _selectedProjectId,
         if (_filterPerson?.id != null) 'person_id': _filterPerson!.id,
@@ -671,9 +671,9 @@ class _DocumentsPageState extends State<DocumentsPage> {
         if (_selectedDocumentType != null)
           'document_type': _selectedDocumentType!,
         if (_fromDate != null)
-          'from_date': HesabixDateUtils.formatForApiDate(_fromDate!),
+          'from_date': MarkStreetDateUtils.formatForApiDate(_fromDate!),
         if (_toDate != null)
-          'to_date': HesabixDateUtils.formatForApiDate(_toDate!),
+          'to_date': MarkStreetDateUtils.formatForApiDate(_toDate!),
         if (_selectedFiscalYearId != null) 'fiscal_year_id': _selectedFiscalYearId,
         if (_selectedProjectId != null) 'project_id': _selectedProjectId,
         if (_filterPerson?.id != null) 'person_id': _filterPerson!.id,
@@ -724,7 +724,7 @@ class _DocumentsPageState extends State<DocumentsPage> {
           width: ColumnWidth.medium,
           // نمایش تاریخ بر اساس تقویم انتخاب‌شده‌ی کاربر در UI (نه متن برگشتی سرور).
           formatter: (item) =>
-              HesabixDateUtils.formatForDisplay(item.documentDate, widget.calendarController.isJalali),
+              MarkStreetDateUtils.formatForDisplay(item.documentDate, widget.calendarController.isJalali),
         ),
 
         // سال مالی

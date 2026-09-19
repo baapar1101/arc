@@ -37,13 +37,13 @@ class CheckSayadInquiryResultWidget extends ZohalResultWidget {
     final checkType = data['check_type']?.toString() ?? '';
     final serialNo = data['serial_no']?.toString() ?? '';
     final seriesNo = data['series_no']?.toString() ?? '';
-    final issueDate = HesabixDateUtils.formatApiDateForDisplay(
+    final issueDate = MarkStreetDateUtils.formatApiDateForDisplay(
       data['issue_date'],
       isJalali,
       rawValue: data['issue_date_raw'],
       fallback: '',
     );
-    final expirationDate = HesabixDateUtils.formatApiDateForDisplay(
+    final expirationDate = MarkStreetDateUtils.formatApiDateForDisplay(
       data['expiration_date'],
       isJalali,
       rawValue: data['expiration_date_raw'],

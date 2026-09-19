@@ -873,7 +873,7 @@ class _StockCountPageState extends State<StockCountPage> {
             readOnly: true,
             controller: TextEditingController(
               text: _asOfDate != null
-                  ? HesabixDateUtils.formatForDisplay(
+                  ? MarkStreetDateUtils.formatForDisplay(
                       _asOfDate,
                       widget.calendarController?.isJalali ??
                           ApiClient.getCalendarController()?.isJalali ??

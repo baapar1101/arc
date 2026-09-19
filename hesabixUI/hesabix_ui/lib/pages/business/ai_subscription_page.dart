@@ -588,7 +588,7 @@ class _SubscriptionHero extends StatelessWidget {
           if (subscription!.periodEnd != null) ...[
             const SizedBox(height: 12),
             Text(
-              'تاریخ انقضا: ${HesabixDateUtils.formatForDisplay(subscription!.periodEnd!.toLocal(), isJalali)}',
+              'تاریخ انقضا: ${MarkStreetDateUtils.formatForDisplay(subscription!.periodEnd!.toLocal(), isJalali)}',
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: theme.colorScheme.onPrimary.withValues(alpha: 0.9),
               ),
@@ -666,7 +666,7 @@ class _UsageSummary extends StatelessWidget {
                     avatar: Icon(Icons.hourglass_bottom,
                         size: 16, color: theme.colorScheme.primary),
                     label: Text(
-                      'تا ${HesabixDateUtils.formatForDisplay(
+                      'تا ${MarkStreetDateUtils.formatForDisplay(
                         subscription!.periodEnd!.toLocal(),
                         isJalali,
                       )}',

@@ -115,7 +115,7 @@ class _CrmNoteEditorDialogState extends State<CrmNoteEditorDialog> with SingleTi
       _titleCtrl.text = (e['title'] ?? '').toString();
       _bodyCtrl.text = (e['body'] ?? '').toString();
       final rawDay = (e['occurs_on_raw'] ?? '').toString();
-      _occursOn = rawDay.length >= 10 ? HesabixDateUtils.parseFromAPI(rawDay.substring(0, 10)) : null;
+      _occursOn = rawDay.length >= 10 ? MarkStreetDateUtils.parseFromAPI(rawDay.substring(0, 10)) : null;
       final sRaw = (e['starts_at_raw'] ?? e['starts_at'] ?? '').toString();
       _startAt = DateTime.tryParse(sRaw);
       final eRaw = (e['ends_at_raw'] ?? e['ends_at'] ?? '').toString();
@@ -306,7 +306,7 @@ class _CrmNoteEditorDialogState extends State<CrmNoteEditorDialog> with SingleTi
         'visibility': _visibility,
         'title': _titleCtrl.text.trim().isEmpty ? null : _titleCtrl.text.trim(),
         'body': _bodyCtrl.text.trim(),
-        if (mode == 'day_only' && _occursOn != null) 'occurs_on': HesabixDateUtils.formatForApiDate(_occursOn!),
+        if (mode == 'day_only' && _occursOn != null) 'occurs_on': MarkStreetDateUtils.formatForApiDate(_occursOn!),
         if (mode == 'meeting' && _startAt != null) 'starts_at': _startAt!.toIso8601String(),
         if (mode == 'meeting' && _endAt != null) 'ends_at': _endAt!.toIso8601String(),
         if (_leadId != null) 'lead_id': _leadId,
@@ -411,7 +411,7 @@ class _CrmNoteEditorDialogState extends State<CrmNoteEditorDialog> with SingleTi
     final raw = (m['created_at_raw'] ?? m['created_at'] ?? '').toString();
     final dt = DateTime.tryParse(raw);
     if (dt != null) {
-      return HesabixDateUtils.formatDateTime(dt, widget.calendarController.isJalali);
+      return MarkStreetDateUtils.formatDateTime(dt, widget.calendarController.isJalali);
     }
     return '';
   }
@@ -618,7 +618,7 @@ class _CrmNoteEditorDialogState extends State<CrmNoteEditorDialog> with SingleTi
     if (raw != null && raw.isNotEmpty) {
       final dt = DateTime.tryParse(raw);
       if (dt != null) {
-        return HesabixDateUtils.formatDateTime(dt, widget.calendarController.isJalali);
+        return MarkStreetDateUtils.formatDateTime(dt, widget.calendarController.isJalali);
       }
     }
     return (m['occurred_at'] ?? '').toString();
@@ -732,7 +732,7 @@ class _CrmNoteEditorDialogState extends State<CrmNoteEditorDialog> with SingleTi
               children: [
                 if (mode == 'day_only') ...[
                   Text(
-                    _occursOn == null ? '—' : HesabixDateUtils.formatForDisplay(_occursOn!, widget.calendarController.isJalali),
+                    _occursOn == null ? '—' : MarkStreetDateUtils.formatForDisplay(_occursOn!, widget.calendarController.isJalali),
                     style: theme.textTheme.titleMedium,
                   ),
                   const SizedBox(height: 8),
@@ -749,7 +749,7 @@ class _CrmNoteEditorDialogState extends State<CrmNoteEditorDialog> with SingleTi
                   Text(t.crmNotesMeetingStart, style: theme.textTheme.labelLarge),
                   const SizedBox(height: 4),
                   Text(
-                    _startAt == null ? '—' : HesabixDateUtils.formatDateTime(_startAt, widget.calendarController.isJalali),
+                    _startAt == null ? '—' : MarkStreetDateUtils.formatDateTime(_startAt, widget.calendarController.isJalali),
                     style: theme.textTheme.titleMedium,
                   ),
                   const SizedBox(height: 8),
@@ -774,7 +774,7 @@ class _CrmNoteEditorDialogState extends State<CrmNoteEditorDialog> with SingleTi
                   Text(t.crmNotesMeetingEnd, style: theme.textTheme.labelLarge),
                   const SizedBox(height: 4),
                   Text(
-                    _endAt == null ? '—' : HesabixDateUtils.formatDateTime(_endAt, widget.calendarController.isJalali),
+                    _endAt == null ? '—' : MarkStreetDateUtils.formatDateTime(_endAt, widget.calendarController.isJalali),
                     style: theme.textTheme.titleMedium,
                   ),
                   const SizedBox(height: 8),

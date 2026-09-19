@@ -14,6 +14,7 @@ from app.services.ai.ai_constants import (
 )
 from app.services.ai.ai_tool_index import get_tool_index
 
+<<<<<<< HEAD
 _TOOL_INDEX = get_tool_index()
 _CATEGORY_TOOLS = _TOOL_INDEX.category_tools
 _CORE_TOOL_NAMES = _TOOL_INDEX.core_names
@@ -21,6 +22,195 @@ _WRITE_TOOLS = _TOOL_INDEX.intent_write_names
 _WRITE_TOOL_COMPANIONS = _TOOL_INDEX.companions
 MEMORY_TOOL_NAMES = _CATEGORY_TOOLS.get("memory", frozenset())
 
+=======
+# همیشه در دسترس (پرس‌وجو و دادهٔ پایه)
+_CORE_TOOL_NAMES: frozenset[str] = frozenset({
+    "query_business_data",
+    "list_queryable_fields",
+    "resolve_date_range",
+    "get_business_info",
+    "get_business_dashboard",
+    "search_persons",
+    "get_person_balance",
+    "get_financial_summary",
+    "search_invoices",
+    "get_invoice_details",
+    "search_products",
+    "get_product_info",
+})
+
+# دسته → ابزارها
+_CATEGORY_TOOLS: dict[str, frozenset[str]] = {
+    "financial": frozenset({
+        "search_invoices",
+        "get_invoice_details",
+        "get_invoices_count",
+        "search_receipts_payments",
+        "get_sales_report",
+        "get_purchase_report",
+        "get_debtors_report",
+        "get_creditors_report",
+        "get_cash_flow",
+        "search_documents",
+        "get_document_details",
+        "list_bank_accounts",
+        "list_cash_registers",
+        "list_fiscal_years",
+        "get_current_fiscal_year",
+        "get_opening_balance",
+        "get_business_credit_settings",
+        "list_credit_installment_plans",
+        "get_person_credit",
+        "search_checks",
+        "get_check_details",
+        "search_transfers",
+        "search_expense_income",
+        "create_expense_income",
+        "update_invoice",
+        "delete_invoice",
+    }),
+    "warehouse": frozenset({
+        "search_warehouse_documents",
+        "get_warehouse_document_details",
+        "list_warehouses",
+        "get_warehouse_stock_summary",
+        "get_inventory_status",
+        "get_product_kardex",
+        "get_inventory_valuation",
+        "search_production_documents",
+        "list_boms",
+        "get_bom_details",
+    }),
+    "crm": frozenset({
+        "search_leads",
+        "get_lead_details",
+        "search_deals",
+        "get_deal_details",
+        "search_activities",
+        "get_crm_summary",
+        "get_pipeline_report",
+        "get_lead_funnel_report",
+        "create_lead",
+    }),
+    "customer_club": frozenset({
+        "get_customer_club_settings",
+        "list_customer_club_tiers",
+        "list_customer_club_ledger",
+        "get_customer_club_rfm_summary",
+        "search_customer_club_rfm_persons",
+        "adjust_customer_club_points",
+        "recalculate_customer_club_rfm",
+        "update_customer_club_settings",
+    }),
+    "tax": frozenset({
+        "get_tax_settings",
+        "search_tax_workspace",
+        "get_tax_data_quality",
+    }),
+    "projects": frozenset({
+        "search_projects",
+        "get_project_summary",
+    }),
+    "integration": frozenset({
+        "invoke_business_connector",
+        "list_woocommerce_orders",
+        "list_woocommerce_products",
+        "list_basalam_synced_invoices",
+        "list_basalam_product_conflicts",
+        "get_basalam_overview",
+        "list_basalam_dead_letter",
+    }),
+    "workflow": frozenset({
+        "list_workflow_trigger_catalog",
+        "list_workflow_action_catalog",
+        "list_workflow_builtin_nodes",
+        "get_workflow_component_schema",
+        "get_workflow_design_rules",
+        "validate_workflow_draft",
+        "get_workflow",
+        "create_workflow",
+        "update_workflow",
+        "delete_workflow",
+        "test_workflow",
+        "get_workflow_execution_debug",
+        "poll_workflow_execution",
+        "list_workflows",
+        "list_workflow_executions",
+        "execute_workflow",
+    }),
+    "misc": frozenset({
+        "get_quick_sales_settings",
+        "list_price_lists",
+        "search_activity_logs",
+        "search_repair_orders",
+        "get_repair_order_details",
+        "list_distribution_routes",
+        "search_warranty_codes",
+        "list_petty_cash",
+        "get_person_transactions",
+    }),
+    "agent": frozenset({
+        "create_session_plan",
+        "list_session_todos",
+        "update_session_todo",
+    }),
+    "people": frozenset({
+        "search_persons",
+        "get_customer_info",
+        "get_person_balance",
+        "get_person_transactions",
+        "create_person",
+        "update_person",
+        "delete_person",
+        "list_person_groups",
+    }),
+    "products_write": frozenset({
+        "search_products",
+        "get_product_info",
+        "create_product",
+        "update_product",
+        "search_categories",
+    }),
+    "query": frozenset({
+        "query_business_data",
+        "list_queryable_fields",
+        "resolve_date_range",
+        "batch_query_business_data",
+        "search_invoices",
+        "search_persons",
+        "search_products",
+        "search_checks",
+        "search_transfers",
+        "search_expense_income",
+        "search_documents",
+        "search_receipts_payments",
+        "search_warehouse_documents",
+    }),
+    "reports_meta": frozenset({
+        "get_report",
+        "list_available_reports",
+        "batch_query_business_data",
+        "export_business_data",
+        "get_debtors_report",
+        "get_creditors_report",
+        "get_sales_report",
+        "get_purchase_report",
+        "get_inventory_valuation",
+        "get_cash_flow",
+    }),
+    "report_templates": frozenset({
+        "list_report_templates",
+        "get_report_template",
+        "get_report_template_scope_catalog",
+        "set_default_report_template",
+        "publish_report_template",
+    }),
+    "marketplace": frozenset({
+        "list_marketplace_plugins",
+        "list_business_plugins",
+    }),
+}
+>>>>>>> github/Huma
 
 # کلیدواژهٔ فارسی/انگلیسی → دسته
 _KEYWORD_CATEGORIES: List[tuple[str, str]] = [

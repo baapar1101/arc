@@ -17,7 +17,7 @@ enum _LegacyImportStep {
   result,
 }
 
-/// ویزارد انتقال کسب‌وکار از نسخه قدیم حسابیکس.
+/// ویزارد انتقال کسب‌وکار از نسخه قدیم مارک‌استریت.
 class LegacyImportWizard extends StatefulWidget {
   const LegacyImportWizard({super.key});
 
@@ -34,7 +34,7 @@ class LegacyImportWizard extends StatefulWidget {
 }
 
 class _LegacyImportWizardState extends State<LegacyImportWizard> {
-  static const _defaultServer = 'https://app.hesabix.ir';
+  static const _defaultServer = 'https://tamastore.ir';
 
   final _serverController = TextEditingController(text: _defaultServer);
   final _apiKeyController = TextEditingController();
@@ -212,7 +212,11 @@ class _LegacyImportWizardState extends State<LegacyImportWizard> {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
+<<<<<<< HEAD
                       BrandConfig.rebrand('انتقال از حسابیکس قبلی'),
+=======
+                      'انتقال از مارک‌استریت قبلی',
+>>>>>>> github/Huma
                       style: theme.textTheme.titleLarge,
                     ),
                   ),
@@ -278,9 +282,13 @@ class _LegacyImportWizardState extends State<LegacyImportWizard> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
+<<<<<<< HEAD
               BrandConfig.rebrand(
                 'با کلید API از نسخه قدیم حسابیکس، کسب‌وکار جدیدی در این حساب کاربری ساخته می‌شود.',
               ),
+=======
+              'با کلید API از نسخه قدیم مارک‌استریت، کسب‌وکار جدیدی در این حساب کاربری ساخته می‌شود.',
+>>>>>>> github/Huma
               style: theme.textTheme.bodyMedium,
             ),
             const SizedBox(height: 16),

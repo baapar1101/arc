@@ -116,15 +116,19 @@ class _DailyPurchasesReportPageState extends State<DailyPurchasesReportPage> {
     if (value is String) {
       try {
         final dt = DateTime.parse(value);
+<<<<<<< HEAD
         return HesabixDateUtils.formatForDisplay(
           dt,
           widget.calendarController.isJalali,
         );
+=======
+        return MarkStreetDateUtils.formatForDisplay(dt, widget.calendarController.isJalali);
+>>>>>>> github/Huma
       } catch (_) {
         return value;
       }
     }
-    return HesabixDateUtils.formatForDisplay(
+    return MarkStreetDateUtils.formatForDisplay(
       value is DateTime ? value : null,
       widget.calendarController.isJalali,
     );

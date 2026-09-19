@@ -1234,7 +1234,7 @@ class _DistributionMainPageState extends State<DistributionMainPage>
                       }
                     },
                     icon: const Icon(Icons.calendar_month),
-                    label: Text(Hd.HesabixDateUtils.formatForDisplay(_planDay, _jalali)),
+                    label: Text(Hd.MarkStreetDateUtils.formatForDisplay(_planDay, _jalali)),
                   ),
                   if (_canManage) ...[
                     const SizedBox(width: 8),
@@ -1838,8 +1838,13 @@ class _DistributionMainPageState extends State<DistributionMainPage>
               ),
               title: Text(v['person_name']?.toString() ?? '${v['person_id']}'),
               subtitle: Text(
+<<<<<<< HEAD
                 '${distributionOutcomeLabel(t, v['outcome']?.toString())}\n'
                 '${Hd.HesabixDateUtils.formatDateTime(_parseDt(v['started_at']), _jalali)}',
+=======
+                '${_visitStatusLabel(t, status)} · ${v['outcome'] ?? ''}\n'
+                '${Hd.MarkStreetDateUtils.formatDateTime(_parseDt(v['started_at']), _jalali)}',
+>>>>>>> github/Huma
               ),
               isThreeLine: true,
               trailing: status == 'in_progress' && _canOperate
@@ -2604,7 +2609,34 @@ class _DistributionMainPageState extends State<DistributionMainPage>
                   ],
                 ],
               ),
+<<<<<<< HEAD
             ),
+=======
+              ListTile(
+                title: Text(Hd.MarkStreetDateUtils.formatForDisplay(from, _jalali)),
+                subtitle: const Text('valid_from'),
+                onTap: () async {
+                  final d = await showAdaptiveDatePicker(
+                    context: context,
+                    calendarController: widget.calendarController,
+                    initialDate: from,
+                  );
+                  if (d != null) setD(() => from = d);
+                },
+              ),
+              ListTile(
+                title: Text(to == null ? 'valid_to' : Hd.MarkStreetDateUtils.formatForDisplay(to!, _jalali)),
+                onTap: () async {
+                  final d = await showAdaptiveDatePicker(
+                    context: context,
+                    calendarController: widget.calendarController,
+                    initialDate: to ?? from,
+                  );
+                  setD(() => to = d);
+                },
+              ),
+            ],
+>>>>>>> github/Huma
           ),
           actions: [
             TextButton(onPressed: () => Navigator.pop(ctx), child: Text(t.cancel)),

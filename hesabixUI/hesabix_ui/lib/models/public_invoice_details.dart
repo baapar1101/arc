@@ -91,7 +91,7 @@ class PublicInvoiceDetails {
 
   String formattedDate({bool jalali = true}) {
     if (documentDate == null) return '';
-    return HesabixDateUtils.formatForDisplay(documentDate, jalali);
+    return MarkStreetDateUtils.formatForDisplay(documentDate, jalali);
   }
 }
 

@@ -124,7 +124,7 @@ class _TransferDetailsDialogState extends State<TransferDetailsDialog> {
                 children: [
                   Row(
                     children: [
-                      Chip(label: Text('تاریخ: ${HesabixDateUtils.formatForDisplay(date, widget.calendarController.isJalali)}')),
+                      Chip(label: Text('تاریخ: ${MarkStreetDateUtils.formatForDisplay(date, widget.calendarController.isJalali)}')),
                       const SizedBox(width: 8),
                       Chip(label: Text('مبلغ کل: $total $currencyCode')),
                     ],

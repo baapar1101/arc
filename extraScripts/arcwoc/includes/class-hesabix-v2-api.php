@@ -103,7 +103,7 @@ class Hesabix_V2_Api
 
 		if (get_option('hesabix_v2_debug_mode')) {
 			Hesabix_V2_Log_Service::debug(
-				__('درخواست ووکامرس → حسابیکس', 'hesabix-v2'),
+				__('درخواست ووکامرس → مارک‌استریت', 'hesabix-v2'),
 				array(
 					'entity_type' => 'hesabix_api',
 					'request' => array(
@@ -166,7 +166,7 @@ class Hesabix_V2_Api
 				$raw_preview = substr($raw_preview, 0, 8192) . "\n…[truncated in log]";
 			}
 			Hesabix_V2_Log_Service::debug(
-				__('پاسخ حسابیکس ← ووکامرس', 'hesabix-v2'),
+				__('پاسخ مارک‌استریت ← ووکامرس', 'hesabix-v2'),
 				array(
 					'entity_type' => 'hesabix_api',
 					'execution_time' => $execution_time,
@@ -254,7 +254,7 @@ class Hesabix_V2_Api
 		if (!is_array($result)) {
 			return __('پاسخ نامعتبر از سرور', 'hesabix-v2') . ($raw_body ? ' ' . mb_substr($raw_body, 0, 300) : '');
 		}
-		// ساختار خطای حسابیکس: { "success": false, "error": { "code": "...", "message": "...", "details": [...] } }
+		// ساختار خطای مارک‌استریت: { "success": false, "error": { "code": "...", "message": "...", "details": [...] } }
 		if (!empty($result['error']) && is_array($result['error'])) {
 			$err = $result['error'];
 			$msg = isset($err['message']) && is_string($err['message']) ? $err['message'] : '';
@@ -403,10 +403,10 @@ class Hesabix_V2_Api
 	}
 
 	/**
-	 * پس از احراز هویت موفق: کسب‌وکار انتخاب‌شده و سال جاری حسابیکس برای نمایش در پنل.
+	 * پس از احراز هویت موفق: کسب‌وکار انتخاب‌شده و سال جاری مارک‌استریت برای نمایش در پنل.
 	 *
 	 * @since 2.0.6
-	 * @param array $api_user بدنهٔ استاندارد کاربر حسابیکس (همان خروجی /auth/me).
+	 * @param array $api_user بدنهٔ استاندارد کاربر مارک‌استریت (همان خروجی /auth/me).
 	 * @return array{connection: array<string,mixed>}
 	 */
 	private function build_connection_snapshot_payload(array $api_user)
@@ -459,12 +459,12 @@ class Hesabix_V2_Api
 			if ($fy_payload !== null && $fy_payload !== array()) {
 				$connection['fiscal_year'] = $fy_payload;
 			} elseif (($fy_payload === null || $fy_payload === array()) && isset($fy_res['message']) && stripos((string) $fy_res['message'], 'NO_CURRENT') !== false) {
-				$connection['fiscal_year_note'] = __('برای این کسب‌وکار سال مالی جاری در حسابیکس تنظیم نشده است.', 'hesabix-v2');
+				$connection['fiscal_year_note'] = __('برای این کسب‌وکار سال مالی جاری در مارک‌استریت تنظیم نشده است.', 'hesabix-v2');
 			}
 		} else {
 			$connection['fiscal_year_note'] = isset($fy_res['message']) && $fy_res['message'] !== ''
 				? self::sanitize_connection_note_message((string) $fy_res['message'])
-				: __('بدون حق مشاهدهٔ سال مالی کسب‌وکار در حسابیکس؛ در صورت نیاز مجوز مشاهدهٔ سال مالی را به کلید برسانید.', 'hesabix-v2');
+				: __('بدون حق مشاهدهٔ سال مالی کسب‌وکار در مارک‌استریت؛ در صورت نیاز مجوز مشاهدهٔ سال مالی را به کلید برسانید.', 'hesabix-v2');
 		}
 
 		$connection['owner_display'] = $this->infer_owner_display($business_row, $api_user);
@@ -530,11 +530,11 @@ class Hesabix_V2_Api
 			}
 			return sprintf(__('شما — شناسه کاربر: %d', 'hesabix-v2'), $user_id);
 		}
-		return sprintf(__('شناسه کاربر مالک در حسابیکس: %d', 'hesabix-v2'), $owner_id);
+		return sprintf(__('شناسه کاربر مالک در مارک‌استریت: %d', 'hesabix-v2'), $owner_id);
 	}
 
 	/**
-	 * سال مالی جاری کسب‌وکار ( نیاز به مجوز fiscal_years.view در حسابیکس ).
+	 * سال مالی جاری کسب‌وکار ( نیاز به مجوز fiscal_years.view در مارک‌استریت ).
 	 *
 	 * @since 2.0.6
 	 * @param int $business_id
@@ -697,7 +697,7 @@ class Hesabix_V2_Api
 	}
 
 	/**
-	 * گزارش موجودی انبار (نیاز به دسترسی reports.view در حسابیکس).
+	 * گزارش موجودی انبار (نیاز به دسترسی reports.view در مارک‌استریت).
 	 * POST /products/businesses/{business_id}/reports/inventory-stock
 	 *
 	 * @since    3.3.2
@@ -845,7 +845,7 @@ class Hesabix_V2_Api
 	}
 
 	/**
-	 * ایجاد/ویرایش گروهی اشخاص (یک درخواست به API حسابیکس).
+	 * ایجاد/ویرایش گروهی اشخاص (یک درخواست به API مارک‌استریت).
 	 *
 	 * @since 3.4.0
 	 * @param array $body بدنه شامل items و اختیاری create_if_update_missing.

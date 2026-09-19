@@ -33,14 +33,14 @@ class Hesabix_V2_Sync_Service
 	const ERR_INVOICE_WAREHOUSE_PREFLIGHT = 94001;
 
 	/**
-	 * سقف اندازهٔ دسته AJAX ووکامرس در فرم همگام‌سازی دسته‌ای — با اندپوینت‌های bulk حسابیکس هم‌سو است.
+	 * سقف اندازهٔ دسته AJAX ووکامرس در فرم همگام‌سازی دسته‌ای — با اندپوینت‌های bulk مارک‌استریت هم‌سو است.
 	 *
 	 * @since 3.5.0
 	 */
 	public const BULK_WC_CHUNK_MAX_ITEMS = 1000;
 
 	/**
-	 * حداکثر آیتم در هر بدنهٔ bulk API حسابیکس (اشخاص / فاکتور / کالا).
+	 * حداکثر آیتم در هر بدنهٔ bulk API مارک‌استریت (اشخاص / فاکتور / کالا).
 	 *
 	 * @since 3.5.0
 	 */
@@ -277,6 +277,10 @@ class Hesabix_V2_Sync_Service
 
 			$wc_payload_for_log = $product_data;
 
+<<<<<<< HEAD
+=======
+			// اعمال تنظیمات همگام‌سازی قیمت و موجودی (API مارک‌استریت: base_sales_price، track_inventory)
+>>>>>>> github/Huma
 			$sync_settings = Hesabix_V2_Invoice_Helper::normalize_sync_settings(get_option('hesabix_v2_sync_settings', array()));
 
 			// Check if already synced
@@ -632,7 +636,7 @@ class Hesabix_V2_Sync_Service
 
 			if ($existing_mapping) {
 				$api_last_result = $this->api->update_person($existing_mapping['hesabix_id'], $customer_data);
-				// اگر شخص در حسابیکس حذف شده یا وجود ندارد، mapping را پاک کرده و دوباره ایجاد کن
+				// اگر شخص در مارک‌استریت حذف شده یا وجود ندارد، mapping را پاک کرده و دوباره ایجاد کن
 				$msg = isset($api_last_result['message']) ? (string) $api_last_result['message'] : '';
 				$is_not_found = $msg !== ''
 					&& (stripos($msg, 'not found') !== false
@@ -772,7 +776,7 @@ class Hesabix_V2_Sync_Service
 				return array(
 					'success' => true,
 					'hesabix_id' => $existing_pid,
-					'message' => __('مشتری مهمان (موجود در حسابیکس)', 'hesabix-v2'),
+					'message' => __('مشتری مهمان (موجود در مارک‌استریت)', 'hesabix-v2'),
 				);
 			}
 
@@ -921,7 +925,7 @@ class Hesabix_V2_Sync_Service
 
 				if (!$person_id) {
 					if (!$create_customer_on_order) {
-						throw new Exception(__('مشتری در حسابیکس وجود ندارد. گزینه «ایجاد مشتری از سفارش» را در تنظیمات فعال کنید.', 'hesabix-v2'));
+						throw new Exception(__('مشتری در مارک‌استریت وجود ندارد. گزینه «ایجاد مشتری از سفارش» را در تنظیمات فعال کنید.', 'hesabix-v2'));
 					}
 					$customer_result = $this->sync_customer($customer_id, $order_id);
 					if ($customer_result['success']) {
@@ -1095,7 +1099,7 @@ class Hesabix_V2_Sync_Service
 			$api_out = $this->api->bulk_upsert_invoices(array('items' => $items), $t_inv);
 
 			if (empty($api_out['success'])) {
-				$fatal = isset($api_out['message']) ? (string) $api_out['message'] : __('خطای bulk فاکتور در API حسابیکس', 'hesabix-v2');
+				$fatal = isset($api_out['message']) ? (string) $api_out['message'] : __('خطای bulk فاکتور در API مارک‌استریت', 'hesabix-v2');
 				foreach ($cref_to_oid as $oid_chunk) {
 					$res['failed']++;
 					$res['errors'][] = array('order_id' => (int) $oid_chunk, 'message' => $fatal);
@@ -1146,7 +1150,7 @@ class Hesabix_V2_Sync_Service
 						$meta_note = isset($cref_meta[ $cref ]) ? $cref_meta[ $cref ] : array();
 						if (!empty($meta_note['is_new_invoice'])) {
 							$oobj->add_order_note(
-								sprintf(__('فاکتور در حسابیکس ایجاد شد. شناسه: %d', 'hesabix-v2'), $hid)
+								sprintf(__('فاکتور در مارک‌استریت ایجاد شد. شناسه: %d', 'hesabix-v2'), $hid)
 							);
 						}
 						if (!empty($meta_note['fiscal_note'])) {
@@ -1233,7 +1237,7 @@ class Hesabix_V2_Sync_Service
 			if (class_exists('Hesabix_V2_Order_Sync_Meta')) {
 				Hesabix_V2_Order_Sync_Meta::set_or_update_order_system_note(
 					$order,
-					sprintf(__('همگام‌سازی حسابیکس متوقف شد (ارز): %s', 'hesabix-v2'), $gate['message'])
+					sprintf(__('همگام‌سازی مارک‌استریت متوقف شد (ارز): %s', 'hesabix-v2'), $gate['message'])
 				);
 			}
 
@@ -1296,7 +1300,7 @@ class Hesabix_V2_Sync_Service
 
 				if (!$person_id) {
 					if (!$create_customer_on_order) {
-						throw new Exception(__('مشتری در حسابیکس وجود ندارد. گزینه «ایجاد مشتری از سفارش» را در تنظیمات فعال کنید.', 'hesabix-v2'));
+						throw new Exception(__('مشتری در مارک‌استریت وجود ندارد. گزینه «ایجاد مشتری از سفارش» را در تنظیمات فعال کنید.', 'hesabix-v2'));
 					}
 					// Sync customer first
 					$customer_result = $this->sync_customer($customer_id, $order_id);
@@ -1401,7 +1405,7 @@ class Hesabix_V2_Sync_Service
 
 				if ($is_new_invoice) {
 					$order->add_order_note(
-						sprintf(__('فاکتور در حسابیکس ایجاد شد. شناسه: %d', 'hesabix-v2'), $hesabix_id)
+						sprintf(__('فاکتور در مارک‌استریت ایجاد شد. شناسه: %d', 'hesabix-v2'), $hesabix_id)
 					);
 				}
 				if (!empty($fiscal['note'])) {
@@ -1464,7 +1468,7 @@ class Hesabix_V2_Sync_Service
 					|| preg_match('/انبار/u', $hint_msg) === 1
 				) {
 					$elog['resolution_hint_fa'] = __(
-						'این پاسخ از API معمولاً یعنی حسابیکس برای خط انبارداری به warehouse_id نیاز داشته اما مقدار را نپذیرفته است. در تنظیمات افزونه، تب فاکتور، «انبار پیش‌فرض» و «انبار در خطوط فاکتور فروش» را بررسی کنید و payload ارسالی (json_body) را در همین رکورد لاگ ببینید.',
+						'این پاسخ از API معمولاً یعنی مارک‌استریت برای خط انبارداری به warehouse_id نیاز داشته اما مقدار را نپذیرفته است. در تنظیمات افزونه، تب فاکتور، «انبار پیش‌فرض» و «انبار در خطوط فاکتور فروش» را بررسی کنید و payload ارسالی (json_body) را در همین رکورد لاگ ببینید.',
 						'hesabix-v2'
 					);
 				}
@@ -1560,7 +1564,7 @@ class Hesabix_V2_Sync_Service
 				'entity_id' => $order->get_id(),
 				'wc_order_number' => $order->get_order_number(),
 				'detail_title_fa' => __(
-					'حسابیکس برای فاکتورهای با ثبت موجودی، برای هر خط خروج از انبار به warehouse_id نیاز دارد.',
+					'مارک‌استریت برای فاکتورهای با ثبت موجودی، برای هر خط خروج از انبار به warehouse_id نیاز دارد.',
 					'hesabix-v2'
 				),
 				'resolution' => 'invoice_warehouse_preflight',
@@ -1570,7 +1574,7 @@ class Hesabix_V2_Sync_Service
 				'resolved_warehouse_for_order' => $resolved_log,
 				'shipping_methods' => self::summarize_order_shipping_method_keys_for_log($order),
 				'hint_configure_fa' => __(
-					'مسیر پیشنهادی: حسابیکس ووکامرس ← تنظیمات ← تب فاکتور — «انبار پیش‌فرض» را انتخاب کنید، یا در بخش «انبار در خطوط فاکتور فروش» قانون منطبق با روش حمل یا منطقهٔ ارسال همین سفارش تعریف کنید.',
+					'مسیر پیشنهادی: مارک‌استریت ووکامرس ← تنظیمات ← تب فاکتور — «انبار پیش‌فرض» را انتخاب کنید، یا در بخش «انبار در خطوط فاکتور فروش» قانون منطبق با روش حمل یا منطقهٔ ارسال همین سفارش تعریف کنید.',
 					'hesabix-v2'
 				),
 				'lines_missing_warehouse_id' => $missing,
@@ -1582,7 +1586,7 @@ class Hesabix_V2_Sync_Service
 		);
 
 		$msg = __(
-			'ثبت موجودی برای فاکتور فعال است اما حسابیکس برای یک یا چند خط خروج از انبار warehouse_id دریافت نکرده است. در تنظیمات افزونه، تب فاکتور، انبار پیش‌فرض یا قوانین انبار را تکمیل کنید.',
+			'ثبت موجودی برای فاکتور فعال است اما مارک‌استریت برای یک یا چند خط خروج از انبار warehouse_id دریافت نکرده است. در تنظیمات افزونه، تب فاکتور، انبار پیش‌فرض یا قوانین انبار را تکمیل کنید.',
 			'hesabix-v2'
 		);
 
@@ -1833,7 +1837,7 @@ class Hesabix_V2_Sync_Service
 	}
 
 	/**
-	 * Bulk sync products via یک یا چند تماس bulk-upsert به API حسابیکس (ساده‌ها و واریانت‌ها).
+	 * Bulk sync products via یک یا چند تماس bulk-upsert به API مارک‌استریت (ساده‌ها و واریانت‌ها).
 	 *
 	 * @since    2.0.0
 	 * @param    array<int|string>    $product_ids شناسهٔ پست‌های والد منتشرشده در ووکامرس
@@ -2008,7 +2012,7 @@ class Hesabix_V2_Sync_Service
 			if (empty($api_res['success'])) {
 				$fatal = isset($api_res['message'])
 					? (string) $api_res['message']
-					: __('خطای bulk کالا در API حسابیکس', 'hesabix-v2');
+					: __('خطای bulk کالا در API مارک‌استریت', 'hesabix-v2');
 
 				Hesabix_V2_Log_Service::error(
 					'Product bulk-sync API chunk failed',
@@ -2384,7 +2388,7 @@ class Hesabix_V2_Sync_Service
 	}
 
 	/**
-	 * یک مرحله از واردات اشخاص حسابیکس → ووکامرس (چند صفحهٔ API در هر درخواست AJAX).
+	 * یک مرحله از واردات اشخاص مارک‌استریت → ووکامرس (چند صفحهٔ API در هر درخواست AJAX).
 	 *
 	 * @since 2.0.7
 	 * @param int  $skip ابتدای skip برای search_persons در این مرحله.

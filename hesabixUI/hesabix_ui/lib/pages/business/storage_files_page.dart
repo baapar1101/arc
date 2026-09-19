@@ -389,7 +389,7 @@ class _StorageFilesPageState extends State<StorageFilesPage> with SingleTickerPr
 
   Future<void> _uploadFile() async {
     try {
-      final result = await FilePicker.platform.pickFiles(
+      final result = await FilePicker.pickFiles(
         type: FileType.any,
         withData: true,
       );

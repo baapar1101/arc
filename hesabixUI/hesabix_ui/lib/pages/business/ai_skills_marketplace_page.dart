@@ -282,10 +282,17 @@ class _AISkillsMarketplacePageState extends State<AISkillsMarketplacePage>
         leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
         bottom: TabBar(
           controller: _tabController,
+<<<<<<< HEAD
           tabs: [
             const Tab(text: 'جامعه'),
             Tab(text: BrandConfig.displayName()),
             const Tab(text: 'Anthropic'),
+=======
+          tabs: const [
+            Tab(text: 'جامعه'),
+            Tab(text: 'مارک‌استریت'),
+            Tab(text: 'Anthropic'),
+>>>>>>> github/Huma
           ],
         ),
         actions: [
@@ -334,9 +341,14 @@ class _AISkillsMarketplacePageState extends State<AISkillsMarketplacePage>
                           _officialItems,
                           isOfficial: true,
                           emptyTitle: 'مهارت رسمی یافت نشد',
+<<<<<<< HEAD
                           emptySubtitle: BrandConfig.rebrand(
                             'مهارت‌های رسمی حسابیکس به‌زودی اینجا نمایش داده می‌شوند.',
                           ),
+=======
+                          emptySubtitle:
+                              'مهارت‌های رسمی مارک‌استریت به‌زودی اینجا نمایش داده می‌شوند.',
+>>>>>>> github/Huma
                         ),
                         _buildAnthropicList(),
                       ],

@@ -5,7 +5,12 @@ import '../../widgets/invoice/warehouse_combobox_widget.dart';
 import '../../widgets/warehouse/warehouse_location_dropdown.dart';
 import '../../widgets/document/document_details_dialog.dart';
 import '../../core/calendar_controller.dart';
+<<<<<<< HEAD
 import '../../core/date_utils.dart' show HesabixDateUtils;
+=======
+import '../../utils/web/web_utils.dart' as web_utils;
+import '../../core/date_utils.dart' show MarkStreetDateUtils;
+>>>>>>> github/Huma
 import '../../utils/error_extractor.dart';
 import '../../widgets/business_subpage_back_leading.dart';
 import 'package:hesabix_ui/services/bytes_export/bytes_export_service.dart';
@@ -162,7 +167,7 @@ class _WarehouseDocumentDetailsPageState extends State<WarehouseDocumentDetailsP
     if (dt == null) return iso;
     final cal = _calendarController;
     if (cal != null) {
-      return HesabixDateUtils.formatForDisplay(dt, cal.isJalali);
+      return MarkStreetDateUtils.formatForDisplay(dt, cal.isJalali);
     }
     final mm = dt.minute.toString().padLeft(2, '0');
     final hh = dt.hour.toString().padLeft(2, '0');
@@ -507,7 +512,7 @@ class _WarehouseDocumentDetailsPageState extends State<WarehouseDocumentDetailsP
                         _buildInfoRow(
                           theme,
                           'تاریخ حواله',
-                          HesabixDateUtils.formatForDisplay(
+                          MarkStreetDateUtils.formatForDisplay(
                             DateTime.tryParse(doc['document_date'] as String),
                             _calendarController!.isJalali,
                           ),

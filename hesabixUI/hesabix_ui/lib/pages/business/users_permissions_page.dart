@@ -542,7 +542,7 @@ class _UsersPermissionsPageState extends State<UsersPermissionsPage> {
                   child: Text(
                     _addMembershipEndDate == null
                         ? t.businessMembershipLimited
-                        : HesabixDateUtils.formatForDisplay(
+                        : MarkStreetDateUtils.formatForDisplay(
                             _addMembershipEndDate!,
                             widget.calendarController.isJalali,
                           ),
@@ -840,7 +840,7 @@ class _UsersPermissionsPageState extends State<UsersPermissionsPage> {
     if (d == null) {
       return t.businessMembershipUnlimited;
     }
-    final formatted = HesabixDateUtils.formatForDisplay(d, widget.calendarController.isJalali);
+    final formatted = MarkStreetDateUtils.formatForDisplay(d, widget.calendarController.isJalali);
     return t.businessMembershipUntil(formatted);
   }
 
@@ -1462,7 +1462,7 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
                 child: Text(
                   _membershipEndDate == null
                       ? t.businessMembershipLimited
-                      : HesabixDateUtils.formatForDisplay(
+                      : MarkStreetDateUtils.formatForDisplay(
                           _membershipEndDate!,
                           widget.calendarController.isJalali,
                         ),

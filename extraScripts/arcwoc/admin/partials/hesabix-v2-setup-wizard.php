@@ -12,7 +12,7 @@ if (!defined('WPINC')) {
 ?>
 
 <div class="wrap hesabix-v2-wrap hesabix-v2-setup-wizard">
-	<h1><?php _e('راه‌اندازی حسابیکس V2', 'hesabix-v2'); ?></h1>
+	<h1><?php _e('راه‌اندازی مارک‌استریت V2', 'hesabix-v2'); ?></h1>
 
 	<?php if (get_option('hesabix_v2_setup_completed') && get_option('hesabix_v2_api_key')): ?>
 		<div class="notice notice-warning hesabix-v2-setup-reconnect-note">
@@ -24,8 +24,8 @@ if (!defined('WPINC')) {
 	<div class="wizard-container">
 		<!-- Step 1: API Key -->
 		<div class="wizard-step" id="step-1" style="display: block;">
-			<h2><?php _e('مرحله 1: کلید API حسابیکس', 'hesabix-v2'); ?></h2>
-			<p><?php _e('کلید API خود را از پنل حسابیکس دریافت کرده و در کادر زیر وارد کنید. احراز هویت با استفاده از همین کلید انجام می‌شود.', 'hesabix-v2'); ?></p>
+			<h2><?php _e('مرحله 1: کلید API مارک‌استریت', 'hesabix-v2'); ?></h2>
+			<p><?php _e('کلید API خود را از پنل مارک‌استریت دریافت کرده و در کادر زیر وارد کنید. احراز هویت با استفاده از همین کلید انجام می‌شود.', 'hesabix-v2'); ?></p>
 			
 			<form id="api-key-form">
 				<table class="form-table">
@@ -40,7 +40,7 @@ if (!defined('WPINC')) {
 						<th><label for="api_key"><?php _e('کلید API', 'hesabix-v2'); ?></label></th>
 						<td>
 							<input type="password" id="api_key" name="api_key" class="regular-text" placeholder="ak_live_..." required dir="ltr">
-							<p class="description"><?php _e('کلید API با پیشوند ak_live_ یا ak_test_ (مثال: ak_live_xxx...). از پنل حسابیکس > تنظیمات > کلیدهای API قابل دریافت است.', 'hesabix-v2'); ?></p>
+							<p class="description"><?php _e('کلید API با پیشوند ak_live_ یا ak_test_ (مثال: ak_live_xxx...). از پنل مارک‌استریت > تنظیمات > کلیدهای API قابل دریافت است.', 'hesabix-v2'); ?></p>
 						</td>
 					</tr>
 				</table>
@@ -56,7 +56,7 @@ if (!defined('WPINC')) {
 		<!-- Step 2: Select Business -->
 		<div class="wizard-step" id="step-2" style="display: none;">
 			<h2><?php _e('مرحله 2: انتخاب کسب‌وکار', 'hesabix-v2'); ?></h2>
-			<p><?php esc_html_e('کسب‌وکار مورد نظر را انتخاب کنید. پس از اتمام راه‌اندازی، شناسهٔ سال مالی جاری از حسابیکس خوانده و در افزونه ذخیره می‌شود تا درخواست‌های API (از جمله تراز افتتاحیه) با هدر سال مالی درست ارسال شوند. برای این کار کلید API باید به سال مالی کسب‌وکار دسترسی مشاهده داشته باشد.', 'hesabix-v2'); ?></p>
+			<p><?php esc_html_e('کسب‌وکار مورد نظر را انتخاب کنید. پس از اتمام راه‌اندازی، شناسهٔ سال مالی جاری از مارک‌استریت خوانده و در افزونه ذخیره می‌شود تا درخواست‌های API (از جمله تراز افتتاحیه) با هدر سال مالی درست ارسال شوند. برای این کار کلید API باید به سال مالی کسب‌وکار دسترسی مشاهده داشته باشد.', 'hesabix-v2'); ?></p>
 			
 			<div id="businesses-list"></div>
 			
@@ -70,7 +70,7 @@ if (!defined('WPINC')) {
 		<!-- Step 3: Complete -->
 		<div class="wizard-step" id="step-3" style="display: none;">
 			<h2><?php _e('راه‌اندازی تکمیل شد!', 'hesabix-v2'); ?></h2>
-			<p><?php esc_html_e('افزونه با موفقیت راه‌اندازی شد. در صورت نیاز سال مالی ذخیره‌شده را در تنظیمات حسابیکس، تب «اتصال» (جزئیات اتصال یا تست اتصال) بررسی کنید.', 'hesabix-v2'); ?></p>
+			<p><?php esc_html_e('افزونه با موفقیت راه‌اندازی شد. در صورت نیاز سال مالی ذخیره‌شده را در تنظیمات مارک‌استریت، تب «اتصال» (جزئیات اتصال یا تست اتصال) بررسی کنید.', 'hesabix-v2'); ?></p>
 			
 			<p>
 				<a href="<?php echo admin_url('admin.php?page=hesabix-v2'); ?>" class="button button-primary">

@@ -219,7 +219,11 @@ class SnackBarHelper {
     show(
       context,
       message: message,
+<<<<<<< HEAD
       backgroundColor: SemanticColorResolver.info(context),
+=======
+      backgroundColor: Colors.grey,
+>>>>>>> github/Huma
       duration: duration,
     );
   }

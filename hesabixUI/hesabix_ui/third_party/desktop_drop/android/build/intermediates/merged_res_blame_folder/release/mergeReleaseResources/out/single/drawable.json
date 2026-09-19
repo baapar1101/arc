@@ -1,0 +1,18 @@
+[
+    {
+        "merged": "one.mixin.desktop.drop.desktop_drop-release-24:/drawable/notification_bg_low.xml",
+        "source": "one.mixin.desktop.drop.desktop_drop-core-1.13.1-19:/drawable/notification_bg_low.xml"
+    },
+    {
+        "merged": "one.mixin.desktop.drop.desktop_drop-release-24:/drawable/notification_icon_background.xml",
+        "source": "one.mixin.desktop.drop.desktop_drop-core-1.13.1-19:/drawable/notification_icon_background.xml"
+    },
+    {
+        "merged": "one.mixin.desktop.drop.desktop_drop-release-24:/drawable/notification_bg.xml",
+        "source": "one.mixin.desktop.drop.desktop_drop-core-1.13.1-19:/drawable/notification_bg.xml"
+    },
+    {
+        "merged": "one.mixin.desktop.drop.desktop_drop-release-24:/drawable/notification_tile_bg.xml",
+        "source": "one.mixin.desktop.drop.desktop_drop-core-1.13.1-19:/drawable/notification_tile_bg.xml"
+    }
+]

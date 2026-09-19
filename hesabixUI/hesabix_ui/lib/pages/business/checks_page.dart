@@ -96,7 +96,7 @@ class _ChecksPageState extends State<ChecksPage> {
 
   DataTableConfig<Map<String, dynamic>> _buildConfig(AppLocalizations t, BuildContext context) {
     String formatCheckDate(Map<String, dynamic> row, String key) {
-      return HesabixDateUtils.formatApiDateForDisplay(
+      return MarkStreetDateUtils.formatApiDateForDisplay(
         row[key],
         widget.calendarController.isJalali,
         rawValue: row['${key}_raw'],

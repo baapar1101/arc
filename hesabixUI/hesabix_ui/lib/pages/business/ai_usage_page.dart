@@ -484,12 +484,21 @@ class _AIUsagePageState extends State<AIUsagePage> {
           'ارائه‌دهنده',
           width: ColumnWidth.small,
           filterType: ColumnFilterType.multiSelect,
+<<<<<<< HEAD
           filterOptions: [
             const FilterOption(value: 'openai', label: 'OpenAI'),
             const FilterOption(value: 'azure', label: 'Azure OpenAI'),
             const FilterOption(value: 'anthropic', label: 'Anthropic'),
             const FilterOption(value: 'local', label: 'Local'),
             FilterOption(value: 'hesabix', label: BrandConfig.displayName(languageCode: 'en')),
+=======
+          filterOptions: const [
+            FilterOption(value: 'openai', label: 'OpenAI'),
+            FilterOption(value: 'azure', label: 'Azure OpenAI'),
+            FilterOption(value: 'anthropic', label: 'Anthropic'),
+            FilterOption(value: 'local', label: 'Local'),
+            FilterOption(value: 'hesabix', label: 'MarkStreet'),
+>>>>>>> github/Huma
           ],
           formatter: (item) => _providerLabel((item as AIUsageLog).provider),
         ),
@@ -632,7 +641,11 @@ class _AIUsagePageState extends State<AIUsagePage> {
       case 'local':
         return 'مدل محلی';
       case 'hesabix':
+<<<<<<< HEAD
         return BrandConfig.displayName(languageCode: 'en');
+=======
+        return 'MarkStreet';
+>>>>>>> github/Huma
       default:
         return provider ?? '-';
     }

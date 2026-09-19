@@ -23,7 +23,7 @@ import 'package:hesabix_ui/widgets/banking/currency_picker_widget.dart';
 import 'package:hesabix_ui/widgets/project/project_selector_widget.dart';
 import 'package:hesabix_ui/utils/invoice_payable_total.dart';
 import 'package:hesabix_ui/utils/number_formatters.dart' show formatWithThousands;
-import 'package:hesabix_ui/core/date_utils.dart' show HesabixDateUtils;
+import 'package:hesabix_ui/core/date_utils.dart' show MarkStreetDateUtils;
 import 'package:hesabix_ui/models/invoice_transaction.dart';
 import 'package:hesabix_ui/models/invoice_type_model.dart';
 import 'package:hesabix_ui/utils/number_normalizer.dart';
@@ -596,11 +596,11 @@ class _ReceiptsPaymentsListPageState extends State<ReceiptsPaymentsListPage> {
 
     if (_fromDate != null || _toDate != null) {
       final from = _fromDate != null
-          ? HesabixDateUtils.formatForDisplay(
+          ? MarkStreetDateUtils.formatForDisplay(
               _fromDate!, widget.calendarController.isJalali)
           : '—';
       final to = _toDate != null
-          ? HesabixDateUtils.formatForDisplay(
+          ? MarkStreetDateUtils.formatForDisplay(
               _toDate!, widget.calendarController.isJalali)
           : '—';
       chips.add(Chip(
@@ -946,8 +946,8 @@ class _ReceiptsPaymentsListPageState extends State<ReceiptsPaymentsListPage> {
       getExportParams: () => {
         'business_id': widget.businessId,
         'document_type': _selectedDocumentType,
-        if (_fromDate != null) 'from_date': HesabixDateUtils.formatForApiDate(_fromDate!),
-        if (_toDate != null) 'to_date': HesabixDateUtils.formatForApiDate(_toDate!),
+        if (_fromDate != null) 'from_date': MarkStreetDateUtils.formatForApiDate(_fromDate!),
+        if (_toDate != null) 'to_date': MarkStreetDateUtils.formatForApiDate(_toDate!),
         if (_selectedFiscalYearId != null) 'fiscal_year_id': _selectedFiscalYearId,
         if (_selectedProjectId != null) 'project_id': _selectedProjectId,
         if (_filterPerson?.id != null) 'person_id': _filterPerson!.id,
@@ -974,7 +974,7 @@ class _ReceiptsPaymentsListPageState extends State<ReceiptsPaymentsListPage> {
           'document_date',
           'تاریخ سند',
           width: ColumnWidth.medium,
-          formatter: (item) => HesabixDateUtils.formatForDisplay(item.documentDate, widget.calendarController.isJalali),
+          formatter: (item) => MarkStreetDateUtils.formatForDisplay(item.documentDate, widget.calendarController.isJalali),
         ),
         
         // مبلغ کل
@@ -1022,7 +1022,7 @@ class _ReceiptsPaymentsListPageState extends State<ReceiptsPaymentsListPage> {
           'registered_at',
           'تاریخ ثبت',
           width: ColumnWidth.medium,
-          formatter: (item) => HesabixDateUtils.formatForDisplay(item.registeredAt, widget.calendarController.isJalali),
+          formatter: (item) => MarkStreetDateUtils.formatForDisplay(item.registeredAt, widget.calendarController.isJalali),
         ),
         
         // پروژه
@@ -1084,8 +1084,8 @@ class _ReceiptsPaymentsListPageState extends State<ReceiptsPaymentsListPage> {
       },
       additionalParams: {
         'document_type': _selectedDocumentType,
-        if (_fromDate != null) 'from_date': HesabixDateUtils.formatForApiDate(_fromDate!),
-        if (_toDate != null) 'to_date': HesabixDateUtils.formatForApiDate(_toDate!),
+        if (_fromDate != null) 'from_date': MarkStreetDateUtils.formatForApiDate(_fromDate!),
+        if (_toDate != null) 'to_date': MarkStreetDateUtils.formatForApiDate(_toDate!),
         if (_selectedFiscalYearId != null) 'fiscal_year_id': _selectedFiscalYearId,
         if (_selectedProjectId != null) 'project_id': _selectedProjectId,
         if (_filterPerson?.id != null) 'person_id': _filterPerson!.id,
@@ -2780,7 +2780,7 @@ class _InstallmentInvoicePickerDialogState extends State<_InstallmentInvoicePick
                     final it = _results[i];
                     final code = (it['code']?.toString() ?? '-');
                     final desc = (it['description']?.toString() ?? '').trim();
-                    final docDate = HesabixDateUtils.formatApiDateForDisplay(
+                    final docDate = MarkStreetDateUtils.formatApiDateForDisplay(
                       it['document_date'],
                       widget.calendarController.isJalali,
                       rawValue: it['document_date_raw'],
@@ -3680,7 +3680,7 @@ class _PersonLineTileState extends State<_PersonLineTile> {
                         final code = invoice['code']?.toString() ?? '';
                         final total = _getInvoiceTotal(invoice);
                         final remaining = (invoice['_remaining'] as num?)?.toDouble() ?? (total - 0);
-                        final dateDisplay = HesabixDateUtils.formatApiDateForDisplay(
+                        final dateDisplay = MarkStreetDateUtils.formatApiDateForDisplay(
                           invoice['document_date'],
                           widget.calendarController.isJalali,
                           rawValue: invoice['document_date_raw'],
@@ -4038,7 +4038,7 @@ class _PersonLineTileState extends State<_PersonLineTile> {
                   if (dueStr != null && dueStr.isNotEmpty && dueStr != '-') {
                     try {
                       dueDate = DateTime.parse(dueStr);
-                      dueDisplay = HesabixDateUtils.formatForDisplay(dueDate, widget.calendarController.isJalali);
+                      dueDisplay = MarkStreetDateUtils.formatForDisplay(dueDate, widget.calendarController.isJalali);
                     } catch (_) {
                       dueDisplay = dueStr;
                     }
@@ -4327,8 +4327,8 @@ class _ReceiptPaymentViewDialogState extends State<ReceiptPaymentViewDialog> {
             ),
             const SizedBox(height: 12),
             _buildInfoRow('نوع سند', doc.documentTypeName),
-            _buildInfoRow('تاریخ سند', HesabixDateUtils.formatForDisplay(doc.documentDate, widget.calendarController.isJalali)),
-            _buildInfoRow('تاریخ ثبت', HesabixDateUtils.formatForDisplay(doc.registeredAt, widget.calendarController.isJalali)),
+            _buildInfoRow('تاریخ سند', MarkStreetDateUtils.formatForDisplay(doc.documentDate, widget.calendarController.isJalali)),
+            _buildInfoRow('تاریخ ثبت', MarkStreetDateUtils.formatForDisplay(doc.registeredAt, widget.calendarController.isJalali)),
             _buildInfoRow('ارز', doc.currencyCode ?? 'نامشخص'),
             _buildInfoRow('ایجادکننده', doc.createdByName ?? 'نامشخص'),
             _buildInfoRow('مبلغ کل', formatWithThousands(doc.totalAmount) + ' ${doc.currencyCode ?? 'ریال'}'),

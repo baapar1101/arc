@@ -974,7 +974,7 @@ class _ProductsPageState extends State<ProductsPage> {
       return;
     }
     
-    final result = await FilePicker.platform.pickFiles(
+    final result = await FilePicker.pickFiles(
       type: FileType.any,
       withData: true,
     );
@@ -2836,7 +2836,7 @@ class _ProductStockTabWidgetState extends State<_ProductStockTabWidget> {
                           readOnly: true,
                           controller: TextEditingController(
                             text: _stockAsOfDate != null
-                                ? HesabixDateUtils.formatForDisplay(
+                                ? MarkStreetDateUtils.formatForDisplay(
                                     _stockAsOfDate,
                                     ApiClient.getCalendarController()?.isJalali ?? true,
                                   )

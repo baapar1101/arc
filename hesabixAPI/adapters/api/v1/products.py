@@ -465,8 +465,13 @@ async def create_product_endpoint(
     "/business/{business_id}/bulk-upsert",
     summary="ایجاد/ویرایش گروهی کالا (یکپارچه‌سازی)",
     description=(
+<<<<<<< HEAD
         "بدنه: `{\"items\":[{\"client_ref?\":\"...\",\"product_id?\":null|int شناسه کالا در حسابیکس,"
         '"payload\":{ ... فیلدهای ایجاد/ویرایش مانند endpoint تکی، از جمله opening_balance }}],'
+=======
+        "بدنه: `{\"items\":[{\"client_ref?\":\"...\",\"product_id?\":null|int شناسه کالا در مارک‌استریت,"
+        '"payload\":{ ... فیلدهای ایجاد/ویرایش مانند endpoint تکی }}],'
+>>>>>>> github/Huma
         '\"create_if_update_missing\":true}`. حداکثر ۱۰۰۰ آیتم. خروجی: results با status در created|updated|failed.'
     ),
 )

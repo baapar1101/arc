@@ -1,6 +1,6 @@
 <?php
 /**
- * انتقال موجودی اولیه ووکامرس به تراز افتتاحیه حسابیکس (دسته‌ای + ادغام با سند موجود).
+ * انتقال موجودی اولیه ووکامرس به تراز افتتاحیه مارک‌استریت (دسته‌ای + ادغام با سند موجود).
  *
  * @package    Hesabix_V2
  * @subpackage Hesabix_V2/admin/services
@@ -106,7 +106,7 @@ class Hesabix_V2_Opening_Inventory_Service
 	}
 
 	/**
-	 * اگر سال مالی در وردپرس ذخیره نشده، سال جاری را از حسابیکس می‌گیرد و در option ذخیره می‌کند.
+	 * اگر سال مالی در وردپرس ذخیره نشده، سال جاری را از مارک‌استریت می‌گیرد و در option ذخیره می‌کند.
 	 *
 	 * @param Hesabix_V2_Api $api کلاینت با کلید و کسب‌وکار ذخیره‌شده.
 	 * @return int شناسهٔ سال مالی یا ۰ در صورت عدم دسترسی / نبود سال جاری.
@@ -319,7 +319,7 @@ class Hesabix_V2_Opening_Inventory_Service
 	public static function build_preview_payload(array $post_like)
 	{
 		if (!get_option('hesabix_v2_enabled')) {
-			return array('success' => false, 'message' => __('افزونه حسابیکس غیرفعال است.', 'hesabix-v2'));
+			return array('success' => false, 'message' => __('افزونه مارک‌استریت غیرفعال است.', 'hesabix-v2'));
 		}
 
 		$api = new Hesabix_V2_Api();
@@ -328,7 +328,7 @@ class Hesabix_V2_Opening_Inventory_Service
 			return array(
 				'success' => false,
 				'message' => __(
-					'سال مالی جاری از حسابیکس خوانده نشد. تب اتصال را باز کنید یا مجوز سال مالی را بررسی کنید.',
+					'سال مالی جاری از مارک‌استریت خوانده نشد. تب اتصال را باز کنید یا مجوز سال مالی را بررسی کنید.',
 					'hesabix-v2'
 				),
 			);
@@ -489,7 +489,7 @@ class Hesabix_V2_Opening_Inventory_Service
 	}
 
 	/**
-	 * بهای واحد برای خط موجودی (بعرض ارز حسابیکس).
+	 * بهای واحد برای خط موجودی (بعرض ارز مارک‌استریت).
 	 *
 	 * @param WC_Product $product
 	 * @param array      $options include_tax, cost_basis: regular|sale|zero
@@ -714,7 +714,7 @@ class Hesabix_V2_Opening_Inventory_Service
 		}
 
 		if (!get_option('hesabix_v2_enabled')) {
-			return array('success' => false, 'message' => __('افزونه حسابیکس غیرفعال است.', 'hesabix-v2'));
+			return array('success' => false, 'message' => __('افزونه مارک‌استریت غیرفعال است.', 'hesabix-v2'));
 		}
 
 		$api = new Hesabix_V2_Api();
@@ -723,7 +723,7 @@ class Hesabix_V2_Opening_Inventory_Service
 			return array(
 				'success' => false,
 				'message' => __(
-					'سال مالی جاری از حسابیکس خوانده نشد. اتصال و مجوز مشاهدهٔ سال مالی (fiscal_years.view) را بررسی کنید؛ سپس در تب اتصال یک‌بار «تست اتصال» بزنید یا صفحه را تازه کنید.',
+					'سال مالی جاری از مارک‌استریت خوانده نشد. اتصال و مجوز مشاهدهٔ سال مالی (fiscal_years.view) را بررسی کنید؛ سپس در تب اتصال یک‌بار «تست اتصال» بزنید یا صفحه را تازه کنید.',
 					'hesabix-v2'
 				),
 			);
@@ -817,7 +817,7 @@ class Hesabix_V2_Opening_Inventory_Service
 		if (is_array($ob)) {
 			$ei = isset($ob['extra_info']) && is_array($ob['extra_info']) ? $ob['extra_info'] : array();
 			if (!empty($ei['posted'])) {
-				return array('success' => false, 'message' => __('تراز افتتاحیه این سال مالی در حسابیکس نهایی شده؛ امکان ویرایش نیست.', 'hesabix-v2'));
+				return array('success' => false, 'message' => __('تراز افتتاحیه این سال مالی در مارک‌استریت نهایی شده؛ امکان ویرایش نیست.', 'hesabix-v2'));
 			}
 		}
 

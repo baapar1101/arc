@@ -2,7 +2,7 @@
 /**
  * Plugin Name:       Hesabix Web Chat
  * Plugin URI:        https://hesabix.ir
- * Description:       اتصال سایت وردپرس به چت وب CRM حسابیکس؛ ارتباط بازدیدکننده با کسب‌وکار از طریق API عمومی.
+ * Description:       اتصال سایت وردپرس به چت وب CRM مارک‌استریت؛ ارتباط بازدیدکننده با کسب‌وکار از طریق API عمومی.
  * Version:           1.1.72
  * Requires at least: 5.8
  * Requires PHP:      7.4

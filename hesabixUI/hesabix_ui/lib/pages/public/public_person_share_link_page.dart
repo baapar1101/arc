@@ -31,7 +31,7 @@ class _PublicPersonShareLinkPageState extends State<PublicPersonShareLinkPage> {
   bool _useJalaliCalendar = true;
 
   String _formatDate(DateTime? date) =>
-      HesabixDateUtils.formatForDisplay(date, _useJalaliCalendar);
+      MarkStreetDateUtils.formatForDisplay(date, _useJalaliCalendar);
 
   NumberFormat _numberFormat() => NumberFormat('#,##0', 'fa_IR');
 

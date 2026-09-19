@@ -79,7 +79,11 @@ class SplashScreen extends StatelessWidget {
             
             // App Name
             Text(
+<<<<<<< HEAD
               BrandConfig.appTitle(t),
+=======
+              'MarkStreet',
+>>>>>>> github/Huma
               style: theme.textTheme.headlineMedium?.copyWith(
                 fontWeight: FontWeight.bold,
                 color: colorScheme.onSurface,

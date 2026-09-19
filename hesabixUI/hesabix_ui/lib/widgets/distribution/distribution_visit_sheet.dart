@@ -441,6 +441,7 @@ Future<void> showDistributionVisitCompleteSheet({
                               ],
                             ),
                           ),
+<<<<<<< HEAD
                           actions: [
                             TextButton(onPressed: () => Navigator.pop(dctx), child: Text(t.cancel)),
                             FilledButton(
@@ -598,6 +599,72 @@ Future<void> showDistributionVisitCompleteSheet({
                             ),
                           ],
                         ),
+=======
+                        );
+                      },
+                      icon: const Icon(Icons.add),
+                      label: Text(t.distributionReturnAddLine),
+                    ),
+                    const SizedBox(height: 8),
+                  ],
+                  OutlinedButton.icon(
+                    onPressed: () async {
+                      final pick = await FilePicker.pickFiles(
+                        type: FileType.image,
+                        withData: true,
+                      );
+                      if (pick == null || pick.files.isEmpty) return;
+                      final f = pick.files.first;
+                      if (f.bytes == null) return;
+                      try {
+                        final uploaded = await BusinessStorageService(ApiClient()).uploadFile(
+                          businessId: businessId,
+                          fileBytes: f.bytes!,
+                          filename: f.name,
+                          moduleContext: 'distribution',
+                          contextId: '$visitId',
+                        );
+                        setModal(() => shelfPhotoFileId = uploaded['id'] as int?);
+                        if (context.mounted) {
+                          SnackBarHelper.showSuccess(context, message: t.distributionShelfPhoto);
+                        }
+                      } catch (e) {
+                        if (context.mounted) {
+                          SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
+                        }
+                      }
+                    },
+                    icon: const Icon(Icons.photo_camera_outlined),
+                    label: Text(
+                      shelfPhotoFileId != null ? '${t.distributionShelfPhoto} ✓' : t.distributionShelfPhoto,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: docCtl,
+                    keyboardType: TextInputType.number,
+                    decoration: InputDecoration(
+                      labelText: t.distributionDocumentIdHint,
+                      border: const OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: dealCtl,
+                    keyboardType: TextInputType.number,
+                    decoration: InputDecoration(
+                      labelText: t.distributionDealIdHint,
+                      border: const OutlineInputBorder(),
+                    ),
+                  ),
+                  if (outcome == 'no_order') ...[
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: reasonCtl,
+                      decoration: InputDecoration(
+                        labelText: t.distributionNoOrderReason,
+                        border: const OutlineInputBorder(),
+>>>>>>> github/Huma
                       ),
                     ),
                   );

@@ -318,7 +318,7 @@ API شما حالا:
 - 🌐 راهنماها: https://docs.hesabix.ir
 
 پشتیبانی:
-- ✉️ Email: support@hesabix.ir
+- ✉️ Email: support@markstreet.co
 - 💬 تلگرام: @hesabix_support
 - 🌐 وبسایت: https://hesabix.ir
 

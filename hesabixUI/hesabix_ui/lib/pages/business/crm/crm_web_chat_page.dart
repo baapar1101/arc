@@ -1121,9 +1121,17 @@ class _CrmWebChatPageState extends State<CrmWebChatPage> {
         fileId: fileId,
       );
       final name = originalName.isNotEmpty ? originalName : 'file';
+<<<<<<< HEAD
       final result = await BytesExportService.export(
         bytes: bytes,
         filename: name,
+=======
+      final ext = name.contains('.') ? name.split('.').last : 'bin';
+      await FileSaver.instance.saveFile(
+        name: name,
+        bytes: Uint8List.fromList(bytes),
+        fileExtension: ext,
+>>>>>>> github/Huma
       );
       if (mounted) {
         final t = AppLocalizations.of(context);
@@ -1338,7 +1346,7 @@ class _CrmWebChatPageState extends State<CrmWebChatPage> {
       return;
     }
     try {
-      final pick = await FilePicker.platform.pickFiles(withData: true, type: FileType.any, allowMultiple: false);
+      final pick = await FilePicker.pickFiles(withData: true, type: FileType.any, allowMultiple: false);
       if (pick == null || pick.files.isEmpty) return;
       final f = pick.files.first;
       final bytes = f.bytes;

@@ -6,7 +6,7 @@ import 'package:hesabix_ui/widgets/invoice/person_combobox_widget.dart';
 import 'package:hesabix_ui/models/person_model.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
-import 'package:hesabix_ui/core/date_utils.dart' show HesabixDateUtils;
+import 'package:hesabix_ui/core/date_utils.dart' show MarkStreetDateUtils;
 import 'package:hesabix_ui/widgets/date_input_field.dart';
 import 'package:hesabix_ui/services/invoice_service.dart';
 import 'package:hesabix_ui/services/currency_service.dart';
@@ -405,7 +405,7 @@ class _InstallmentsReportPageState extends State<InstallmentsReportPage> {
       children: pays.map((p) {
         final pm = p is Map<String, dynamic> ? p : <String, dynamic>{};
         final code = pm['document_code']?.toString() ?? '';
-        final d = HesabixDateUtils.formatApiDateForDisplay(
+        final d = MarkStreetDateUtils.formatApiDateForDisplay(
           pm['document_date'],
           widget.calendarController.isJalali,
           rawValue: pm['document_date_raw'],
@@ -719,7 +719,7 @@ class _InstallmentsReportPageState extends State<InstallmentsReportPage> {
     if (value is String) {
       if (value.isEmpty) return null;
       final head = value.length >= 10 ? value.substring(0, 10) : value;
-      final fromApi = HesabixDateUtils.parseFromAPI(head);
+      final fromApi = MarkStreetDateUtils.parseFromAPI(head);
       if (fromApi != null) return fromApi;
       return DateTime.tryParse(value);
     }
@@ -737,10 +737,14 @@ class _InstallmentsReportPageState extends State<InstallmentsReportPage> {
     if (value == null) return '-';
     final dt = _parseRowDate(value);
     if (dt != null) {
+<<<<<<< HEAD
       return HesabixDateUtils.formatForDisplay(
         dt,
         widget.calendarController.isJalali,
       );
+=======
+      return MarkStreetDateUtils.formatForDisplay(dt, widget.calendarController.isJalali);
+>>>>>>> github/Huma
     }
     if (value is String) {
       return value.isEmpty ? '-' : value;

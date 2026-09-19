@@ -180,10 +180,15 @@ class _SalesByProductReportPageState extends State<SalesByProductReportPage> {
 
   String _formatDate(dynamic value) {
     if (value == null) return '';
+<<<<<<< HEAD
     return HesabixDateUtils.formatForDisplay(
       value is DateTime
           ? value
           : (value is String ? DateTime.tryParse(value) : null),
+=======
+    return MarkStreetDateUtils.formatForDisplay(
+      value is DateTime ? value : (value is String ? DateTime.tryParse(value) : null),
+>>>>>>> github/Huma
       widget.calendarController.isJalali,
     );
   }

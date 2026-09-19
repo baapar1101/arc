@@ -4,10 +4,15 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../core/android_notification_prefs.dart';
 import '../core/api_client.dart';
+<<<<<<< HEAD
 import '../services/user_ui_preferences_service.dart';
 import '../utils/web/loader_prefs_sync.dart';
 import 'tokens/theme_catalog.dart';
 import 'dart:async';
+=======
+import '../services/admin_system_settings_service.dart';
+import 'tokens/color_schemes.dart';
+>>>>>>> github/Huma
 
 class ThemeController extends ChangeNotifier {
   static const String _modeKey = 'theme_mode';
@@ -15,9 +20,14 @@ class ThemeController extends ChangeNotifier {
   static const String _seedKey = 'theme_seed'; // legacy
 
   ThemeMode _mode = ThemeMode.system;
+<<<<<<< HEAD
   String _themeId = kDefaultThemeId;
   bool _modeFromUser = false;
   bool _themeIdFromUser = false;
+=======
+  // زمردی برند — با این مقدار پالت صریح دیزاین‌سیستم فعال می‌شود.
+  Color _seed = AppColorTokens.defaultSeed;
+>>>>>>> github/Huma
 
   ThemeMode get mode => _mode;
   String get themeId => _themeId;
@@ -56,6 +66,7 @@ class ThemeController extends ChangeNotifier {
         }
       }
     }
+<<<<<<< HEAD
 
     // پیش‌فرض ادمین از public-config (بدون نیاز به دسترسی ادمین)
     if (!_modeFromUser || !_themeIdFromUser) {
@@ -144,6 +155,21 @@ class ThemeController extends ChangeNotifier {
   Future<void> syncFromServerAfterLogin() async {
     await _hydrateFromUserPreferences(preferLocalOverrides: false);
     _syncLoader();
+=======
+    
+    // خاکستری خنثای قبلی به زمردی دیزاین‌سیستم مهاجرت می‌کند؛ رنگ‌های
+    // سفارشیِ کاربر دست‌نخورده می‌مانند.
+    const legacyNeutralSeed = Color(0xFF6B7280);
+    const defaultSeed = AppColorTokens.defaultSeed;
+
+    final seed = p.getInt(_seedKey);
+    if (seed != null) {
+      final loadedSeed = Color(seed);
+      _seed = loadedSeed == legacyNeutralSeed ? defaultSeed : loadedSeed;
+    } else {
+      _seed = defaultSeed;
+    }
+>>>>>>> github/Huma
     notifyListeners();
   }
 

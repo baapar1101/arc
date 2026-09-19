@@ -158,6 +158,7 @@ class _ProgressSplashScreenState extends State<ProgressSplashScreen>
                             letterSpacing: 1.2,
                           ),
                         ),
+<<<<<<< HEAD
                         const SizedBox(height: 10),
                         Text(
                           t.businessManagementPlatform,
@@ -185,6 +186,42 @@ class _ProgressSplashScreenState extends State<ProgressSplashScreen>
                           style: theme.textTheme.bodySmall?.copyWith(
                             color: colorScheme.onSurfaceVariant
                                 .withValues(alpha: 0.55),
+=======
+                      ),
+                      const SizedBox(height: 32),
+                    ],
+                    
+                    // App Name
+                    Text(
+                      'MarkStreet',
+                      style: theme.textTheme.headlineMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: colorScheme.onSurface,
+                        letterSpacing: 1.2,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    
+                    // Subtitle
+                    Text(
+                      AppLocalizations.of(context).businessManagementPlatform,
+                      style: theme.textTheme.bodyLarge?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                        fontWeight: FontWeight.w400,
+                      ),
+                    ),
+                    const SizedBox(height: 48),
+                    
+                    // Loading Indicator with Progress
+                    Column(
+                      children: [
+                        SizedBox(
+                          width: 40,
+                          height: 40,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 3,
+                            valueColor: AlwaysStoppedAnimation<Color>(primary),
+>>>>>>> github/Huma
                           ),
                         ),
                         const SizedBox(height: 24),

@@ -168,11 +168,21 @@ class MessageBubble extends StatelessWidget {
     );
   }
 
+<<<<<<< HEAD
   Color _bubbleColor(ThemeData theme, SupportSemanticColors colors, bool alignEnd, bool isInternal) {
     if (isInternal) return colors.internalNoteBg;
     if (alignEnd && !isOperator) return theme.colorScheme.primary;
     if (alignEnd && isOperator) return colors.agentBubbleBg;
     return colors.customerBubbleBg;
+=======
+  Color _getSenderColor(ThemeData theme) {
+    if (message.isFromOperator) {
+      return Colors.grey;
+    } else if (message.isFromSystem) {
+      return Colors.grey;
+    }
+    return theme.colorScheme.primary;
+>>>>>>> github/Huma
   }
 
   Color _borderColor(ThemeData theme, SupportSemanticColors colors, bool alignEnd, bool isInternal) {
@@ -229,7 +239,7 @@ class MessageBubble extends StatelessWidget {
     if (difference.isNegative) return l10n.justNow;
     if (difference.inDays > 0 || difference.inHours >= 24) {
       final isJalali = calendarController?.isJalali ?? true;
-      return date_utils.HesabixDateUtils.formatDateTime(localDateTime, isJalali);
+      return date_utils.MarkStreetDateUtils.formatDateTime(localDateTime, isJalali);
     }
     if (difference.inHours > 0) return l10n.hoursAgo(difference.inHours.toString());
     if (difference.inMinutes > 0) return l10n.minutesAgo(difference.inMinutes.toString());

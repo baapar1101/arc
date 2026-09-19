@@ -1,6 +1,6 @@
 <?php
 /**
- * REST Bridge برای خواندن سفارشات / محصولات / مشتریان توسط سرور حسابیکس.
+ * REST Bridge برای خواندن سفارشات / محصولات / مشتریان توسط سرور مارک‌استریت.
  *
  * @package Hesabix_V2
  * @since   3.6.0
@@ -517,7 +517,7 @@ class Hesabix_V2_Bridge_Rest
 	}
 
 	/**
-	 * خلاصهٔ نگاشت حسابیکس از جدول wp_hesabix_v2 (در صورت پیکربندی نشدن business_id خالی برمی‌گردد).
+	 * خلاصهٔ نگاشت مارک‌استریت از جدول wp_hesabix_v2 (در صورت پیکربندی نشدن business_id خالی برمی‌گردد).
 	 *
 	 * @param string   $entity_type   product|customer|order|variation|category
 	 * @param int      $wc_id
@@ -608,7 +608,7 @@ class Hesabix_V2_Bridge_Rest
 	}
 
 	/**
-	 * خلاصهٔ آماری برای گزارش در حسابیکس (تعداد سفارش به تفکیک وضعیت، محصولات، مشتریان).
+	 * خلاصهٔ آماری برای گزارش در مارک‌استریت (تعداد سفارش به تفکیک وضعیت، محصولات، مشتریان).
 	 *
 	 * @param WP_REST_Request $request
 	 * @return WP_REST_Response|WP_Error
@@ -1084,7 +1084,7 @@ class Hesabix_V2_Bridge_Rest
 	}
 
 	/**
-	 * تنظیمات افزونه (بدون کلید کامل API) برای نمایش از راه دور در حسابیکس.
+	 * تنظیمات افزونه (بدون کلید کامل API) برای نمایش از راه دور در مارک‌استریت.
 	 *
 	 * @param WP_REST_Request $request
 	 * @return WP_REST_Response
@@ -1264,7 +1264,7 @@ class Hesabix_V2_Bridge_Rest
 	}
 
 	/**
-	 * تست اتصال API حسابیکس از دید افزونه (بدون نمایش کلید).
+	 * تست اتصال API مارک‌استریت از دید افزونه (بدون نمایش کلید).
 	 *
 	 * @param WP_REST_Request $request
 	 * @return WP_REST_Response
@@ -1348,7 +1348,7 @@ class Hesabix_V2_Bridge_Rest
 	public static function route_control_sync_product($request)
 	{
 		if (!get_option('hesabix_v2_enabled')) {
-			return new WP_Error('plugin_disabled', __('افزونه حسابیکس غیرفعال است.', 'hesabix-v2'), array('status' => 400));
+			return new WP_Error('plugin_disabled', __('افزونه مارک‌استریت غیرفعال است.', 'hesabix-v2'), array('status' => 400));
 		}
 
 		$params         = self::read_json_body($request);
@@ -1382,7 +1382,7 @@ class Hesabix_V2_Bridge_Rest
 	public static function route_control_sync_orders($request)
 	{
 		if (!get_option('hesabix_v2_enabled')) {
-			return new WP_Error('plugin_disabled', __('افزونه حسابیکس غیرفعال است.', 'hesabix-v2'), array('status' => 400));
+			return new WP_Error('plugin_disabled', __('افزونه مارک‌استریت غیرفعال است.', 'hesabix-v2'), array('status' => 400));
 		}
 
 		$params = self::read_json_body($request);
@@ -1442,7 +1442,7 @@ class Hesabix_V2_Bridge_Rest
 	public static function route_control_sync_products($request)
 	{
 		if (!get_option('hesabix_v2_enabled')) {
-			return new WP_Error('plugin_disabled', __('افزونه حسابیکس غیرفعال است.', 'hesabix-v2'), array('status' => 400));
+			return new WP_Error('plugin_disabled', __('افزونه مارک‌استریت غیرفعال است.', 'hesabix-v2'), array('status' => 400));
 		}
 
 		$params = self::read_json_body($request);
@@ -1492,7 +1492,7 @@ class Hesabix_V2_Bridge_Rest
 	public static function route_control_sync_customers($request)
 	{
 		if (!get_option('hesabix_v2_enabled')) {
-			return new WP_Error('plugin_disabled', __('افزونه حسابیکس غیرفعال است.', 'hesabix-v2'), array('status' => 400));
+			return new WP_Error('plugin_disabled', __('افزونه مارک‌استریت غیرفعال است.', 'hesabix-v2'), array('status' => 400));
 		}
 
 		$params = self::read_json_body($request);
@@ -1596,7 +1596,7 @@ class Hesabix_V2_Bridge_Rest
 	public static function route_control_queue_process_once($request)
 	{
 		if (!get_option('hesabix_v2_enabled')) {
-			return new WP_Error('plugin_disabled', __('افزونه حسابیکس غیرفعال است.', 'hesabix-v2'), array('status' => 400));
+			return new WP_Error('plugin_disabled', __('افزونه مارک‌استریت غیرفعال است.', 'hesabix-v2'), array('status' => 400));
 		}
 
 		global $wpdb;
@@ -1674,7 +1674,7 @@ class Hesabix_V2_Bridge_Rest
 	public static function route_control_settings_patch($request)
 	{
 		if (!get_option('hesabix_v2_enabled')) {
-			return new WP_Error('plugin_disabled', __('افزونه حسابیکس غیرفعال است.', 'hesabix-v2'), array('status' => 400));
+			return new WP_Error('plugin_disabled', __('افزونه مارک‌استریت غیرفعال است.', 'hesabix-v2'), array('status' => 400));
 		}
 
 		$params  = self::read_json_body($request);
@@ -1906,7 +1906,7 @@ class Hesabix_V2_Bridge_Rest
 	public static function route_control_opening_inventory_status($request)
 	{
 		if (!get_option('hesabix_v2_enabled')) {
-			return new WP_Error('plugin_disabled', __('افزونه حسابیکس غیرفعال است.', 'hesabix-v2'), array('status' => 400));
+			return new WP_Error('plugin_disabled', __('افزونه مارک‌استریت غیرفعال است.', 'hesabix-v2'), array('status' => 400));
 		}
 
 		$uid     = self::opening_inventory_bridge_user_id();
@@ -1931,7 +1931,7 @@ class Hesabix_V2_Bridge_Rest
 	public static function route_control_opening_inventory_accounts($request)
 	{
 		if (!get_option('hesabix_v2_enabled')) {
-			return new WP_Error('plugin_disabled', __('افزونه حسابیکس غیرفعال است.', 'hesabix-v2'), array('status' => 400));
+			return new WP_Error('plugin_disabled', __('افزونه مارک‌استریت غیرفعال است.', 'hesabix-v2'), array('status' => 400));
 		}
 
 		$api = new Hesabix_V2_Api();
@@ -1992,7 +1992,7 @@ class Hesabix_V2_Bridge_Rest
 	public static function route_control_opening_inventory_preview($request)
 	{
 		if (!get_option('hesabix_v2_enabled')) {
-			return new WP_Error('plugin_disabled', __('افزونه حسابیکس غیرفعال است.', 'hesabix-v2'), array('status' => 400));
+			return new WP_Error('plugin_disabled', __('افزونه مارک‌استریت غیرفعال است.', 'hesabix-v2'), array('status' => 400));
 		}
 
 		$params = self::read_json_body($request);
@@ -2022,7 +2022,7 @@ class Hesabix_V2_Bridge_Rest
 	public static function route_control_opening_inventory_prepare($request)
 	{
 		if (!get_option('hesabix_v2_enabled')) {
-			return new WP_Error('plugin_disabled', __('افزونه حسابیکس غیرفعال است.', 'hesabix-v2'), array('status' => 400));
+			return new WP_Error('plugin_disabled', __('افزونه مارک‌استریت غیرفعال است.', 'hesabix-v2'), array('status' => 400));
 		}
 
 		$params   = self::read_json_body($request);
@@ -2043,7 +2043,7 @@ class Hesabix_V2_Bridge_Rest
 	public static function route_control_opening_inventory_batch($request)
 	{
 		if (!get_option('hesabix_v2_enabled')) {
-			return new WP_Error('plugin_disabled', __('افزونه حسابیکس غیرفعال است.', 'hesabix-v2'), array('status' => 400));
+			return new WP_Error('plugin_disabled', __('افزونه مارک‌استریت غیرفعال است.', 'hesabix-v2'), array('status' => 400));
 		}
 
 		$params = self::read_json_body($request);
@@ -2063,7 +2063,7 @@ class Hesabix_V2_Bridge_Rest
 	public static function route_control_opening_inventory_finalize($request)
 	{
 		if (!get_option('hesabix_v2_enabled')) {
-			return new WP_Error('plugin_disabled', __('افزونه حسابیکس غیرفعال است.', 'hesabix-v2'), array('status' => 400));
+			return new WP_Error('plugin_disabled', __('افزونه مارک‌استریت غیرفعال است.', 'hesabix-v2'), array('status' => 400));
 		}
 
 		$params = self::read_json_body($request);
@@ -2100,7 +2100,7 @@ class Hesabix_V2_Bridge_Rest
 	public static function route_control_opening_inventory_cancel($request)
 	{
 		if (!get_option('hesabix_v2_enabled')) {
-			return new WP_Error('plugin_disabled', __('افزونه حسابیکس غیرفعال است.', 'hesabix-v2'), array('status' => 400));
+			return new WP_Error('plugin_disabled', __('افزونه مارک‌استریت غیرفعال است.', 'hesabix-v2'), array('status' => 400));
 		}
 
 		$params = self::read_json_body($request);

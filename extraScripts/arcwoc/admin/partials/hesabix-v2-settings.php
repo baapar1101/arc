@@ -250,12 +250,12 @@ $hsx_post = ini_get('post_max_size') ?: '';
 			<div class="notice notice-warning hesabix-v2-connection-notes" role="region" aria-labelledby="hesabix-v2-connection-notes-title">
 				<p id="hesabix-v2-connection-notes-title"><strong><?php esc_html_e('نکات مهم', 'hesabix-v2'); ?></strong></p>
 				<ul class="hesabix-v2-connection-notes-list">
-					<li><?php esc_html_e('برای اتصال به API حسابیکس و فعال‌سازی این افزونه، باید کلید API و توکن ورود خود را در اینجا وارد کنید.', 'hesabix-v2'); ?></li>
-					<li><?php esc_html_e('برای یافتن توکن ورود و کلید API، در حسابیکس به مسیر تنظیمات حساب ← کلیدهای API مراجعه کنید.', 'hesabix-v2'); ?></li>
+					<li><?php esc_html_e('برای اتصال به API مارک‌استریت و فعال‌سازی این افزونه، باید کلید API و توکن ورود خود را در اینجا وارد کنید.', 'hesabix-v2'); ?></li>
+					<li><?php esc_html_e('برای یافتن توکن ورود و کلید API، در مارک‌استریت به مسیر تنظیمات حساب ← کلیدهای API مراجعه کنید.', 'hesabix-v2'); ?></li>
 					<li><?php esc_html_e('اگر می‌خواهید کسب‌وکار دیگری را به افزونه متصل کنید، ابتدا افزونه را حذف و مجدد نصب کنید تا ارتباطات کسب‌وکار قبلی پاک شود.', 'hesabix-v2'); ?></li>
 				</ul>
 				<p class="hesabix-v2-connection-notes-ark">
-					<?php esc_html_e('این نسخه برای اتصال به حسابیکس (صرفاً نسخهٔ آرک) طراحی شده است و به نسخه‌های دیگر از جمله نسخهٔ شادمان متصل نخواهد شد.', 'hesabix-v2'); ?>
+					<?php esc_html_e('این نسخه برای اتصال به مارک‌استریت (صرفاً نسخهٔ آرک) طراحی شده است و به نسخه‌های دیگر از جمله نسخهٔ شادمان متصل نخواهد شد.', 'hesabix-v2'); ?>
 				</p>
 			</div>
 
@@ -264,7 +264,7 @@ $hsx_post = ini_get('post_max_size') ?: '';
 				<th scope="row"><?php _e('آدرس سرور API', 'hesabix-v2'); ?></th>
 				<td>
 					<input type="url" name="api_base_url" id="api_base_url" value="<?php echo esc_attr($api_base_url); ?>" class="regular-text" dir="ltr">
-					<p class="description"><?php _e('آدرس پایه سرور API حسابیکس (مثال: https://hsxn.hesabix.ir/api/v1). مطابق مستندات OpenAPI در آدرس سرور باید مسیر /api/v1 قرار گیرد.', 'hesabix-v2'); ?></p>
+					<p class="description"><?php _e('آدرس پایه سرور API مارک‌استریت (مثال: https://hsxn.hesabix.ir/api/v1). مطابق مستندات OpenAPI در آدرس سرور باید مسیر /api/v1 قرار گیرد.', 'hesabix-v2'); ?></p>
 				</td>
 			</tr>
 			<tr>
@@ -303,8 +303,8 @@ $hsx_post = ini_get('post_max_size') ?: '';
 			</tr>
 		</table>
 
-		<h2 style="margin-top:1.5em;"><?php esc_html_e('پل REST برای حسابیکس', 'hesabix-v2'); ?></h2>
-		<p class="description"><?php esc_html_e('با این پل، سرور حسابیکس می‌تواند (با توکن) سفارشات، محصولات و مشتریان ووکامرس را بخواند. آدرس پایهٔ API:', 'hesabix-v2'); ?>
+		<h2 style="margin-top:1.5em;"><?php esc_html_e('پل REST برای مارک‌استریت', 'hesabix-v2'); ?></h2>
+		<p class="description"><?php esc_html_e('با این پل، سرور مارک‌استریت می‌تواند (با توکن) سفارشات، محصولات و مشتریان ووکامرس را بخواند. آدرس پایهٔ API:', 'hesabix-v2'); ?>
 			<code dir="ltr" style="user-select:all;"><?php echo esc_html(rtrim((string) $hsx_bridge_base, '/')); ?></code>
 		</p>
 		<table class="form-table">
@@ -313,7 +313,7 @@ $hsx_post = ini_get('post_max_size') ?: '';
 				<td>
 					<label>
 						<input type="checkbox" name="hesabix_v2_bridge_enabled" value="1" <?php checked($hsx_bridge_enabled); ?>>
-						<?php esc_html_e('اجازهٔ دسترسی با توکن (پس از ذخیره، توکن را در حسابیکس وارد کنید)', 'hesabix-v2'); ?>
+						<?php esc_html_e('اجازهٔ دسترسی با توکن (پس از ذخیره، توکن را در مارک‌استریت وارد کنید)', 'hesabix-v2'); ?>
 					</label>
 					<p class="description">
 						<?php
@@ -345,7 +345,11 @@ $hsx_post = ini_get('post_max_size') ?: '';
 						<input type="checkbox" name="auto_sync_products" value="1" <?php checked($sync_settings['auto_sync_products'] ?? false); ?>>
 						<?php _e('فعال', 'hesabix-v2'); ?>
 					</label>
+<<<<<<< HEAD
 					<p class="description"><?php _e('با ایجاد یا انتشار محصول جدید (وضعیت منتشرشده)، به‌طور خودکار به حسابیکس ارسال شود. پیش‌نویس و کپیِ منتشرنشده همگام نمی‌شوند.', 'hesabix-v2'); ?></p>
+=======
+					<p class="description"><?php _e('محصولات جدید به طور خودکار به مارک‌استریت ارسال شوند', 'hesabix-v2'); ?></p>
+>>>>>>> github/Huma
 				</td>
 			</tr>
 
@@ -361,6 +365,7 @@ $hsx_post = ini_get('post_max_size') ?: '';
 			</tr>
 
 			<tr>
+<<<<<<< HEAD
 				<th scope="row"><?php _e('سیاست به‌روزرسانی محصول از ووکامرس', 'hesabix-v2'); ?></th>
 				<td>
 					<?php
@@ -420,23 +425,26 @@ $hsx_post = ini_get('post_max_size') ?: '';
 
 			<tr class="hesabix-v2-product-sync-field-row">
 				<th scope="row"><?php _e('همگام‌سازی دستهٔ محصول با حسابیکس', 'hesabix-v2'); ?></th>
+=======
+				<th scope="row"><?php _e('همگام‌سازی دستهٔ محصول با مارک‌استریت', 'hesabix-v2'); ?></th>
+>>>>>>> github/Huma
 				<td>
 					<label>
 						<input type="checkbox" name="sync_product_categories" value="1" <?php checked(!isset($sync_settings['sync_product_categories']) || !empty($sync_settings['sync_product_categories'])); ?>>
 						<?php _e('فعال', 'hesabix-v2'); ?>
 					</label>
-					<p class="description"><?php _e('در صورت غیرفعال بودن، محصول بدون دستهٔ حسابیکس ارسال می‌شود.', 'hesabix-v2'); ?></p>
+					<p class="description"><?php _e('در صورت غیرفعال بودن، محصول بدون دستهٔ مارک‌استریت ارسال می‌شود.', 'hesabix-v2'); ?></p>
 				</td>
 			</tr>
 
 			<tr>
-				<th scope="row"><?php _e('تطبیق دسته با نام موجود در حسابیکس', 'hesabix-v2'); ?></th>
+				<th scope="row"><?php _e('تطبیق دسته با نام موجود در مارک‌استریت', 'hesabix-v2'); ?></th>
 				<td>
 					<label>
 						<input type="checkbox" name="sync_category_link_by_name_in_hesabix" value="1" <?php checked(!empty($sync_settings['sync_category_link_by_name_in_hesabix'])); ?>>
 						<?php _e('فعال', 'hesabix-v2'); ?>
 					</label>
-					<p class="description"><?php _e('اگر دستهٔ ووکامرس هنوز در افزونه نگاشت نشده باشد، قبل از ساخت رکورد جدید، درخت دسته‌های حسابیکس برای همان نام و همان والد جستجو می‌شود و در صورت انطباق، همان شناسه پیوند می‌خورد (برای جلوگیری از تکرار نام).', 'hesabix-v2'); ?></p>
+					<p class="description"><?php _e('اگر دستهٔ ووکامرس هنوز در افزونه نگاشت نشده باشد، قبل از ساخت رکورد جدید، درخت دسته‌های مارک‌استریت برای همان نام و همان والد جستجو می‌شود و در صورت انطباق، همان شناسه پیوند می‌خورد (برای جلوگیری از تکرار نام).', 'hesabix-v2'); ?></p>
 				</td>
 			</tr>
 
@@ -464,8 +472,13 @@ $hsx_post = ini_get('post_max_size') ?: '';
 				</td>
 			</tr>
 
+<<<<<<< HEAD
 			<tr class="hesabix-v2-product-sync-field-row">
 				<th scope="row"><?php _e('سیاست پرچم کنترل موجودی', 'hesabix-v2'); ?></th>
+=======
+			<tr>
+				<th scope="row"><?php _e('کنترل موجودی مارک‌استریت نسبت به ووکامرس', 'hesabix-v2'); ?></th>
+>>>>>>> github/Huma
 				<td>
 					<select name="track_inventory_policy" id="hesabix_v2_track_inventory_policy" class="regular-text">
 						<option value="wc" <?php selected(($sync_settings['track_inventory_policy'] ?? 'wc'), 'wc'); ?>>
@@ -481,7 +494,11 @@ $hsx_post = ini_get('post_max_size') ?: '';
 							<?php _e('همیشه خاموش', 'hesabix-v2'); ?>
 						</option>
 					</select>
+<<<<<<< HEAD
 					<p class="description"><?php _e('فقط هنگامی که گزینهٔ بالا فعال است اعمال می‌شود؛ در صورت غیرفعال بودن آن، کنترل موجودی در حسابیکس در همگام‌سازی خاموش می‌ماند.', 'hesabix-v2'); ?></p>
+=======
+					<p class="description"><?php _e('فقط هنگامی که «همگام‌سازی موجودی محصول» فعال است اعمال می‌شود؛ در صورت غیرفعال بودن آن، کنترل موجودی در مارک‌استریت در همگام‌سازی خاموش می‌ماند.', 'hesabix-v2'); ?></p>
+>>>>>>> github/Huma
 				</td>
 			</tr>
 			</tbody>
@@ -498,8 +515,8 @@ $hsx_post = ini_get('post_max_size') ?: '';
 						<?php
 						echo wp_kses_post(
 							sprintf(
-								/* translators: 1: opening <a>, 2: closing </a> — link wraps «صفحهٔ مشتریان و حسابیکس». */
-								__('برای مشاهدهٔ وضعیت هر مشتری و همگام‌سازی تکی یا گروهی با حسابیکس، به %1$sصفحهٔ مشتریان و حسابیکس%2$s بروید.', 'hesabix-v2'),
+								/* translators: 1: opening <a>, 2: closing </a> — link wraps «صفحهٔ مشتریان و مارک‌استریت». */
+								__('برای مشاهدهٔ وضعیت هر مشتری و همگام‌سازی تکی یا گروهی با مارک‌استریت، به %1$sصفحهٔ مشتریان و مارک‌استریت%2$s بروید.', 'hesabix-v2'),
 								'<a href="' . esc_url(admin_url('admin.php?page=hesabix-v2-customers')) . '">',
 								'</a>'
 							)
@@ -532,7 +549,7 @@ $hsx_post = ini_get('post_max_size') ?: '';
 						<?php _e('در هر بار فراخوانی خودکار پردازشگر صف (کرون هر ۵ دقیقه یا کرون دستی)، حداکثر این تعداد کار در صف همگام‌سازی یکی‌یکی انجام می‌شود؛ شامل سفارش، مشتری و محصولی که از طریق صف آمده باشند.', 'hesabix-v2'); ?>
 					</p>
 					<p class="description">
-						<?php _e('توجه: API حسابیکس در این افزونه هر فاکتور یا شخص را با یک درخواست جدا می‌فرستد؛ این عدد تنها ظرفیت «خالی‌کردن صف» در هر اجرا را زیاد می‌کند نه ادغام چند فاکتور در یک بدنهٔ HTTP.', 'hesabix-v2'); ?>
+						<?php _e('توجه: API مارک‌استریت در این افزونه هر فاکتور یا شخص را با یک درخواست جدا می‌فرستد؛ این عدد تنها ظرفیت «خالی‌کردن صف» در هر اجرا را زیاد می‌کند نه ادغام چند فاکتور در یک بدنهٔ HTTP.', 'hesabix-v2'); ?>
 					</p>
 					<p class="description">
 						<?php _e('برای مقادیر زیاد از کرون سیستم واقعی برای wp-cron استفاده کنید و در صورت تایم‌اوت PHP، عدد را کم کنید یا فاصلهٔ اجرای کرون را کمتر کنید.', 'hesabix-v2'); ?>
@@ -579,7 +596,7 @@ $hsx_post = ini_get('post_max_size') ?: '';
 							</label>
 						<?php endforeach; ?>
 					</fieldset>
-					<p class="description"><?php _e('هر وضعیتی که علامت بزنید، با رسیدن سفارش به همان وضعیت فاکتور در حسابیکس به‌روز می‌شود (در صورت وجود مپینگ، به‌روزرسانی).', 'hesabix-v2'); ?></p>
+					<p class="description"><?php _e('هر وضعیتی که علامت بزنید، با رسیدن سفارش به همان وضعیت فاکتور در مارک‌استریت به‌روز می‌شود (در صورت وجود مپینگ، به‌روزرسانی).', 'hesabix-v2'); ?></p>
 				</td>
 			</tr>
 
@@ -590,16 +607,16 @@ $hsx_post = ini_get('post_max_size') ?: '';
 						<input type="checkbox" name="create_customer_on_order" value="1" <?php checked($sync_settings['create_customer_on_order'] ?? false); ?>>
 						<?php _e('فعال', 'hesabix-v2'); ?>
 					</label>
-					<p class="description"><?php _e('اگر مشتری در حسابیکس وجود نداشت، ایجاد شود', 'hesabix-v2'); ?></p>
+					<p class="description"><?php _e('اگر مشتری در مارک‌استریت وجود نداشت، ایجاد شود', 'hesabix-v2'); ?></p>
 				</td>
 			</tr>
 
 			<tr>
-				<th scope="row"><?php _e('سفارش و بازهٔ سال مالی حسابیکس', 'hesabix-v2'); ?></th>
+				<th scope="row"><?php _e('سفارش و بازهٔ سال مالی مارک‌استریت', 'hesabix-v2'); ?></th>
 				<td>
 					<select name="order_fiscal_year_date_policy">
 						<option value="keep" <?php selected(($sync_settings['order_fiscal_year_date_policy'] ?? 'keep'), 'keep'); ?>>
-							<?php _e('بدون تغییر — تاریخ ایجاد سفارش ووکامرس همان تاریخ سند حسابیکس', 'hesabix-v2'); ?>
+							<?php _e('بدون تغییر — تاریخ ایجاد سفارش ووکامرس همان تاریخ سند مارک‌استریت', 'hesabix-v2'); ?>
 						</option>
 						<option value="clamp" <?php selected(($sync_settings['order_fiscal_year_date_policy'] ?? 'keep'), 'clamp'); ?>>
 							<?php _e('اصلاح به بازهٔ سال مالی جاری — اگر سفارش قبل از ابتدای سال باشد، تاریخ سند اولین روز سال؛ اگر بعد از انتهای سال باشد، آخرین روز سال (پرداخت‌های همراه فاکتور در صورت نیاز هم‌سو می‌شوند)', 'hesabix-v2'); ?>
@@ -608,7 +625,7 @@ $hsx_post = ini_get('post_max_size') ?: '';
 							<?php _e('عدم همگام‌سازی — اگر تاریخ سفارش خارج از سال مالی جاری باشد، فاکتور ارسال نمی‌شود', 'hesabix-v2'); ?>
 						</option>
 					</select>
-					<p class="description"><?php _e('بازهٔ سال از API سال مالی «جاری» حسابیکس خوانده می‌شود و حداکثر یک ساعت کش می‌شود. اگر دریافت بازه ممکن نباشد، رفتار «بدون تغییر» اعمال می‌شود و یک هشدار در لاگ ثبت می‌گردد.', 'hesabix-v2'); ?></p>
+					<p class="description"><?php _e('بازهٔ سال از API سال مالی «جاری» مارک‌استریت خوانده می‌شود و حداکثر یک ساعت کش می‌شود. اگر دریافت بازه ممکن نباشد، رفتار «بدون تغییر» اعمال می‌شود و یک هشدار در لاگ ثبت می‌گردد.', 'hesabix-v2'); ?></p>
 				</td>
 			</tr>
 		</table>
@@ -619,7 +636,7 @@ $hsx_post = ini_get('post_max_size') ?: '';
 			<h2 class="screen-reader-text"><?php esc_html_e('تنظیمات فاکتور', 'hesabix-v2'); ?></h2>
 		<table class="form-table">
 			<tr>
-				<th scope="row"><?php _e('نوع سند در حسابیکس', 'hesabix-v2'); ?></th>
+				<th scope="row"><?php _e('نوع سند در مارک‌استریت', 'hesabix-v2'); ?></th>
 				<td>
 					<label style="display:block;margin-bottom:6px;">
 						<input type="radio" name="invoice_doc_mode" value="final" <?php checked(empty($sync_settings['invoice_is_proforma'])); ?>>
@@ -629,17 +646,17 @@ $hsx_post = ini_get('post_max_size') ?: '';
 						<input type="radio" name="invoice_doc_mode" value="proforma" <?php checked(!empty($sync_settings['invoice_is_proforma'])); ?>>
 						<?php _e('پیش‌فاکتور / پیش‌نویس (is_proforma)', 'hesabix-v2'); ?>
 					</label>
-					<p class="description"><?php _e('برای قطعی‌شدن فروش و ثبت خودکار خروج انبار همسو با گزارش موجودی، گزینهٔ فاکتور قطعی را انتخاب کنید. برای پیش‌فاکتور، حسابیکس حواله انبار از روی همین فاکتور تا قبل از قطعی ایجاد نمی‌کند؛ با همگام‌سازی دوباره و ارسال is_proforma=false، فاکتور در حسابیکس قطعی و حواله طبق تنظیم کسب‌وکار ساخته می‌شود.', 'hesabix-v2'); ?></p>
+					<p class="description"><?php _e('برای قطعی‌شدن فروش و ثبت خودکار خروج انبار همسو با گزارش موجودی، گزینهٔ فاکتور قطعی را انتخاب کنید. برای پیش‌فاکتور، مارک‌استریت حواله انبار از روی همین فاکتور تا قبل از قطعی ایجاد نمی‌کند؛ با همگام‌سازی دوباره و ارسال is_proforma=false، فاکتور در مارک‌استریت قطعی و حواله طبق تنظیم کسب‌وکار ساخته می‌شود.', 'hesabix-v2'); ?></p>
 				</td>
 			</tr>
 			<tr class="hesabix-v2-proforma-finalize-settings">
-				<th scope="row"><?php _e('ارتقاء پیش‌فاکتور به قطعی در حسابیکس', 'hesabix-v2'); ?></th>
+				<th scope="row"><?php _e('ارتقاء پیش‌فاکتور به قطعی در مارک‌استریت', 'hesabix-v2'); ?></th>
 				<td>
 					<label style="display:block;margin-bottom:8px;">
 						<input type="checkbox" name="finalize_proforma_on_paid" value="1" <?php checked(!empty($sync_settings['finalize_proforma_on_paid'])); ?>>
 						<?php _e('وقتی سفارش در ووکامرس «پرداخت‌شده» شد، در همگام بعدی به‌صورت فاکتور قطعی به‌روزرسانی شود (هوک woocommerce_payment_complete؛ بدون نیاز به تیک «ارسال فاکتور: پس از پرداخت»)', 'hesabix-v2'); ?>
 					</label>
-					<p class="description" style="margin:8px 0 6px;"><?php _e('یا وقتی وضعیت سفارش به یکی از این موارد رسید تا با همگام‌سازی مجدد، فاکتور قطعی به حسابیکس فرستاده شود (حتی اگر آن وضعیت در لیست بالای «ارسال با تغییر وضعیت» انتخاب نشده باشد):', 'hesabix-v2'); ?></p>
+					<p class="description" style="margin:8px 0 6px;"><?php _e('یا وقتی وضعیت سفارش به یکی از این موارد رسید تا با همگام‌سازی مجدد، فاکتور قطعی به مارک‌استریت فرستاده شود (حتی اگر آن وضعیت در لیست بالای «ارسال با تغییر وضعیت» انتخاب نشده باشد):', 'hesabix-v2'); ?></p>
 					<fieldset style="max-height:220px;overflow:auto;border:1px solid #ccd0d4;padding:8px;">
 						<?php
 						$fp_sel = isset($sync_settings['finalize_proforma_order_statuses']) && is_array($sync_settings['finalize_proforma_order_statuses'])
@@ -662,21 +679,21 @@ $hsx_post = ini_get('post_max_size') ?: '';
 				<td>
 					<label>
 						<input type="checkbox" name="invoice_tag_website_enabled" value="1" <?php checked(!empty($sync_settings['invoice_tag_website_enabled'])); ?>>
-						<?php _e('اختصاص برچسب با نام زیر (در صورت نبود، در حسابیکس ساخته می‌شود)', 'hesabix-v2'); ?>
+						<?php _e('اختصاص برچسب با نام زیر (در صورت نبود، در مارک‌استریت ساخته می‌شود)', 'hesabix-v2'); ?>
 					</label>
 					<p>
 						<input type="text" name="invoice_tag_website_name" class="regular-text" value="<?php echo esc_attr($sync_settings['invoice_tag_website_name']); ?>">
 					</p>
-					<p class="description"><?php _e('پیش‌فرض «فروش سایت» با برچسب‌های اولیه حسابیکس هم‌خوان است؛ می‌توانید مثلاً «وب سایت» بگذارید.', 'hesabix-v2'); ?></p>
+					<p class="description"><?php _e('پیش‌فرض «فروش سایت» با برچسب‌های اولیه مارک‌استریت هم‌خوان است؛ می‌توانید مثلاً «وب سایت» بگذارید.', 'hesabix-v2'); ?></p>
 				</td>
 			</tr>
 			<tr>
 				<th scope="row"><?php _e('شناسه برچسب‌های اضافی', 'hesabix-v2'); ?></th>
 				<td>
 					<select name="invoice_extra_tag_ids[]" id="hesabix_v2_invoice_extra_tag_select" multiple size="8" class="regular-text hesabix-v2-invoice-extra-tags-select" dir="ltr" style="min-width:min(420px,100%);display:block;max-width:100%;"></select>
-					<button type="button" id="hesabix_v2_load_invoice_tags" class="button button-secondary" style="margin-top:8px;"><?php _e('بارگذاری فهرست برچسب‌ها از حسابیکس', 'hesabix-v2'); ?></button>
+					<button type="button" id="hesabix_v2_load_invoice_tags" class="button button-secondary" style="margin-top:8px;"><?php _e('بارگذاری فهرست برچسب‌ها از مارک‌استریت', 'hesabix-v2'); ?></button>
 					<span id="hesabix_v2_invoice_tags_status" class="description hesabix-v2-invoice-tags-status" style="margin-right:8px;" aria-live="polite"></span>
-					<p class="description"><?php _e('پس از بارگذاری، برچسب‌های حسابیکس در لیست نمایش داده می‌شوند؛ موارد دلخواه را انتخاب کنید (در ویندوز و لینوکس Ctrl، در مک ⌘ برای چند انتخاب). مقادیر ذخیره‌شده با بارگذاری خودکار صفحه اعمال می‌شوند.', 'hesabix-v2'); ?></p>
+					<p class="description"><?php _e('پس از بارگذاری، برچسب‌های مارک‌استریت در لیست نمایش داده می‌شوند؛ موارد دلخواه را انتخاب کنید (در ویندوز و لینوکس Ctrl، در مک ⌘ برای چند انتخاب). مقادیر ذخیره‌شده با بارگذاری خودکار صفحه اعمال می‌شوند.', 'hesabix-v2'); ?></p>
 				</td>
 			</tr>
 			<tr>
@@ -702,7 +719,7 @@ $hsx_post = ini_get('post_max_size') ?: '';
 							<option value="<?php echo esc_attr((string) $saved_shipping_adjustment_account_id); ?>" selected><?php echo esc_html(sprintf(__('حساب ذخیره‌شده #%d', 'hesabix-v2'), $saved_shipping_adjustment_account_id)); ?></option>
 						<?php endif; ?>
 					</select>
-					<button type="button" id="hesabix_v2_load_shipping_accounts" class="button button-secondary" style="margin-right:8px;"><?php _e('بارگذاری حساب‌ها از حسابیکس', 'hesabix-v2'); ?></button>
+					<button type="button" id="hesabix_v2_load_shipping_accounts" class="button button-secondary" style="margin-right:8px;"><?php _e('بارگذاری حساب‌ها از مارک‌استریت', 'hesabix-v2'); ?></button>
 					<span id="hesabix_v2_shipping_account_status" class="description" style="margin-right:8px;" aria-live="polite"></span>
 					<p class="description"><?php _e('پیشنهاد پیش‌فرض حساب «60104 — درآمد حمل کالا» است. اگر حساب انتخاب نشود، افزونه هنگام همگام‌سازی تلاش می‌کند همین حساب را از چارت حساب‌ها پیدا کند.', 'hesabix-v2'); ?></p>
 				</td>
@@ -799,12 +816,12 @@ $hsx_post = ini_get('post_max_size') ?: '';
 				</td>
 			</tr>
 			<tr>
-				<th scope="row"><?php _e('ارز فاکتور (حسابیکس)', 'hesabix-v2'); ?></th>
+				<th scope="row"><?php _e('ارز فاکتور (مارک‌استریت)', 'hesabix-v2'); ?></th>
 				<td>
 					<select name="hesabix_v2_currency_id" id="hesabix_v2_currency_id" class="regular-text">
-						<option value="0" <?php selected($saved_currency_id, 0); ?>><?php _e('ارز پیش‌فرض کسب‌وکار در حسابیکس', 'hesabix-v2'); ?></option>
+						<option value="0" <?php selected($saved_currency_id, 0); ?>><?php _e('ارز پیش‌فرض کسب‌وکار در مارک‌استریت', 'hesabix-v2'); ?></option>
 					</select>
-					<p class="description"><?php _e('لیست از حسابیکس بارگذاری می‌شود (همراه انبار و بانک). اگر ارز فروشگاه ووکامرس با ارز انتخاب‌شده یکی نباشد — به‌جز جفت تومان/ریال طبق تنظیمات — همگام‌سازی متوقف می‌شود.', 'hesabix-v2'); ?></p>
+					<p class="description"><?php _e('لیست از مارک‌استریت بارگذاری می‌شود (همراه انبار و بانک). اگر ارز فروشگاه ووکامرس با ارز انتخاب‌شده یکی نباشد — به‌جز جفت تومان/ریال طبق تنظیمات — همگام‌سازی متوقف می‌شود.', 'hesabix-v2'); ?></p>
 				</td>
 			</tr>
 			<tr>
@@ -813,9 +830,9 @@ $hsx_post = ini_get('post_max_size') ?: '';
 					<select name="hesabix_v2_default_warehouse_id" id="hesabix_v2_default_warehouse_id" class="regular-text">
 						<option value=""><?php _e('— انتخاب انبار —', 'hesabix-v2'); ?></option>
 					</select>
-					<button type="button" id="hesabix_v2_load_warehouses_banks" class="button button-secondary" style="margin-right: 8px;"><?php _e('بارگذاری از حسابیکس', 'hesabix-v2'); ?></button>
+					<button type="button" id="hesabix_v2_load_warehouses_banks" class="button button-secondary" style="margin-right: 8px;"><?php _e('بارگذاری از مارک‌استریت', 'hesabix-v2'); ?></button>
 					<span id="hesabix_v2_wh_bank_status" class="description"></span>
-					<p class="description"><?php _e('برای خروج از انبار در فاکتور فروش. هنگام باز شدن این صفه لیست از حسابیکس بارگذاری می‌شود؛ در صورت نیاز دکمه را دوباره بزنید.', 'hesabix-v2'); ?></p>
+					<p class="description"><?php _e('برای خروج از انبار در فاکتور فروش. هنگام باز شدن این صفه لیست از مارک‌استریت بارگذاری می‌شود؛ در صورت نیاز دکمه را دوباره بزنید.', 'hesabix-v2'); ?></p>
 				</td>
 			</tr>
 			<tr>
@@ -829,13 +846,13 @@ $hsx_post = ini_get('post_max_size') ?: '';
 						<input type="radio" name="invoice_wh_resolution" value="rules" <?php checked($inv_wh_cfg['resolution'], 'rules'); ?>>
 						<?php _e('اولویت طبق جدول (روش حمل، سپس منطقه ارسال، سپس پیش‌فرض)', 'hesabix-v2'); ?>
 					</label>
-					<p class="description"><?php _e('برای هر سفارش یک انبار واحد برای تمام اقلام فاکتور انتخاب می‌شود. قوانین به‌ترتیب از بالا به پایین ارزیابی می‌شوند؛ اولین تطبیق برنده است. شناسه منطقه را از فروشگاه ووکامرس ← تنظیمات ← حمل‌ونقل ببینید (۱، ۲، …؛ «مکان‌های تحت پوشش» معمولاً ۰). کمبوی انبار با همان بارگذاری «انبار و بانک» از حسابیکس پر می‌شود.', 'hesabix-v2'); ?></p>
+					<p class="description"><?php _e('برای هر سفارش یک انبار واحد برای تمام اقلام فاکتور انتخاب می‌شود. قوانین به‌ترتیب از بالا به پایین ارزیابی می‌شوند؛ اولین تطبیق برنده است. شناسه منطقه را از فروشگاه ووکامرس ← تنظیمات ← حمل‌ونقل ببینید (۱، ۲، …؛ «مکان‌های تحت پوشش» معمولاً ۰). کمبوی انبار با همان بارگذاری «انبار و بانک» از مارک‌استریت پر می‌شود.', 'hesabix-v2'); ?></p>
 					<table id="hesabix_v2_inv_wh_rules_table" class="widefat striped" style="max-width:720px;margin-top:10px;">
 						<thead>
 							<tr>
 								<th><?php _e('نوع', 'hesabix-v2'); ?></th>
 								<th><?php _e('کلید', 'hesabix-v2'); ?></th>
-								<th><?php _e('انبار (حسابیکس)', 'hesabix-v2'); ?></th>
+								<th><?php _e('انبار (مارک‌استریت)', 'hesabix-v2'); ?></th>
 							</tr>
 						</thead>
 						<tbody>
@@ -876,10 +893,10 @@ $hsx_post = ini_get('post_max_size') ?: '';
 				<td>
 					<label style="display:block;margin-bottom:8px;">
 						<input type="checkbox" name="stock_pull_enabled" value="1" <?php checked(!empty($stock_pull_opts['enabled'])); ?>>
-						<?php _e('زمان‌بندی خودکار از حسابیکس (Cron وردپرس)', 'hesabix-v2'); ?>
+						<?php _e('زمان‌بندی خودکار از مارک‌استریت (Cron وردپرس)', 'hesabix-v2'); ?>
 					</label>
 					<p class="description" style="margin-bottom:12px;">
-						<?php _e('موجودی قابل‌فروش ووکامرس از گزارش انبار حسابیکس محاسبه و روی هر محصول متصل به‌روز می‌شود. نیاز به دسترسی گزارش (reports.view) برای کلید API دارد. جمع از چند انبار طبق حالت زیر خواهد بود.', 'hesabix-v2'); ?>
+						<?php _e('موجودی قابل‌فروش ووکامرس از گزارش انبار مارک‌استریت محاسبه و روی هر محصول متصل به‌روز می‌شود. نیاز به دسترسی گزارش (reports.view) برای کلید API دارد. جمع از چند انبار طبق حالت زیر خواهد بود.', 'hesabix-v2'); ?>
 					</p>
 					<label style="display:inline-flex;align-items:center;gap:6px;margin-right:16px;margin-bottom:6px;">
 						<input type="radio" name="stock_pull_warehouse_scope" value="default" <?php checked($stock_pull_opts['warehouse_scope'], 'default'); ?>>
@@ -895,7 +912,7 @@ $hsx_post = ini_get('post_max_size') ?: '';
 					</label>
 					<p style="margin:10px 0 6px;"><?php _e('انتخاب انبارها برای حالت «انبارهای انتخابی»:', 'hesabix-v2'); ?></p>
 					<select name="stock_pull_warehouse_ids[]" id="hesabix_v2_stock_pull_wh_select" multiple size="6" style="min-width:280px;display:block;"></select>
-					<p class="description"><?php _e('پس از «بارگذاری از حسابیکس»، این لیست پر می‌شود (Ctrl برای چند انتخاب).', 'hesabix-v2'); ?></p>
+					<p class="description"><?php _e('پس از «بارگذاری از مارک‌استریت»، این لیست پر می‌شود (Ctrl برای چند انتخاب).', 'hesabix-v2'); ?></p>
 					<p style="margin-top:12px;">
 						<label>
 							<?php _e('فاصله اجرای Cron (دقیقه)', 'hesabix-v2'); ?>
@@ -909,7 +926,7 @@ $hsx_post = ini_get('post_max_size') ?: '';
 					</label>
 					<label style="display:block;margin:10px 0;">
 						<input type="checkbox" name="stock_pull_disable_wc_reduce" value="1" <?php checked(!empty($stock_pull_opts['disable_wc_stock_reduction'])); ?>>
-						<?php _e('کاهش خودکار موجودی ووکامرس هنگام سفارش را غیرفعال کن تا با خروج انبار حسابیکس تداخل نداشته باشد؛ بعد از هر سفارش تا اجرای «کشش موجودی» ممکن است عدد ویترین عقب بمانَد.', 'hesabix-v2'); ?>
+						<?php _e('کاهش خودکار موجودی ووکامرس هنگام سفارش را غیرفعال کن تا با خروج انبار مارک‌استریت تداخل نداشته باشد؛ بعد از هر سفارش تا اجرای «کشش موجودی» ممکن است عدد ویترین عقب بمانَد.', 'hesabix-v2'); ?>
 					</label>
 					<label style="display:block;margin:10px 0;">
 						<input type="checkbox" name="stock_pull_skip_zero_overwrite" value="1" <?php checked(!empty($stock_pull_opts['skip_zero_overwrite'])); ?>>
@@ -949,7 +966,7 @@ $hsx_post = ini_get('post_max_size') ?: '';
 						<input type="radio" name="hesabix_v2_invoice_payment_destination" value="cash_register" <?php checked($invoice_payment_destination, 'cash_register'); ?>>
 						<?php _e('صندوق', 'hesabix-v2'); ?>
 					</label>
-					<p class="description"><?php _e('برای سفارش‌های پرداخت‌شده، سند دریافت در حسابیکس به این مقصد ثبت می‌شود (فاکتور غیر پیش‌فاکتور). حساب انتخاب‌شده باید با ارز فاکتور هم‌خوان باشد.', 'hesabix-v2'); ?></p>
+					<p class="description"><?php _e('برای سفارش‌های پرداخت‌شده، سند دریافت در مارک‌استریت به این مقصد ثبت می‌شود (فاکتور غیر پیش‌فاکتور). حساب انتخاب‌شده باید با ارز فاکتور هم‌خوان باشد.', 'hesabix-v2'); ?></p>
 				</td>
 			</tr>
 			<tr class="hesabix-v2-pay-row hesabix-v2-pay-bank">
@@ -1395,7 +1412,7 @@ $hsx_post = ini_get('post_max_size') ?: '';
 					if (!$sel.find('option').length) {
 						var msg = '';
 						if (res.success && (!tags || !tags.length)) {
-							msg = '<?php echo esc_js(__('برچسبی در حسابیکس یافت نشد.', 'hesabix-v2')); ?>';
+							msg = '<?php echo esc_js(__('برچسبی در مارک‌استریت یافت نشد.', 'hesabix-v2')); ?>';
 						} else {
 							msg = (res.message && String(res.message)) ? String(res.message) : '<?php echo esc_js(__('دریافت برچسب‌ها ناموفق بود.', 'hesabix-v2')); ?>';
 						}
@@ -1546,7 +1563,7 @@ $hsx_post = ini_get('post_max_size') ?: '';
 		</div>
 
 		<div class="hesabix-v2-tab-panel" data-tab="opening_inv" hidden>
-			<h2 class="screen-reader-text"><?php esc_html_e('موجودی افتتاحیه ووکامرس در حسابیکس', 'hesabix-v2'); ?></h2>
+			<h2 class="screen-reader-text"><?php esc_html_e('موجودی افتتاحیه ووکامرس در مارک‌استریت', 'hesabix-v2'); ?></h2>
 			<?php if ($ob_inv_done) : ?>
 				<div class="notice notice-success inline"><p><?php esc_html_e('ثبت موجودی اولیه از ووکامرس به تراز افتتاحیه یک‌بار با موفقیت انجام شده است. این بخش غیرفعال است.', 'hesabix-v2'); ?></p></div>
 			<?php elseif (!get_option('hesabix_v2_enabled')) : ?>
@@ -1569,7 +1586,7 @@ $hsx_post = ini_get('post_max_size') ?: '';
 					#hesabix_v2_obinv_progress_wrap progress { width: min(420px, 100%); height: 18px; vertical-align: middle; margin-inline-start: 8px; }
 				</style>
 				<p class="description" style="max-width:50rem;">
-					<?php esc_html_e('کالاهای منتشرشده با مدیریت موجودی و تعداد › ۰ به‌صورت دسته‌ای در حسابیکس همگام، سپس در تراز افتتاحیهٔ همان سال مالی که از حسابیکس برای افزونه خوانده و ذخیره شده ادغام می‌شوند. در صورت خالی بودن سال مالی، با «بارگذاری حساب‌ها از حسابیکس» یا باز کردن تب اتصال دوباره همگام می‌شود. قبل از اجرا گزینه‌ها را ذخیره کنید و دسترسی API به opening_balance و chart_of_accounts را بررسی کنید.', 'hesabix-v2'); ?>
+					<?php esc_html_e('کالاهای منتشرشده با مدیریت موجودی و تعداد › ۰ به‌صورت دسته‌ای در مارک‌استریت همگام، سپس در تراز افتتاحیهٔ همان سال مالی که از مارک‌استریت برای افزونه خوانده و ذخیره شده ادغام می‌شوند. در صورت خالی بودن سال مالی، با «بارگذاری حساب‌ها از مارک‌استریت» یا باز کردن تب اتصال دوباره همگام می‌شود. قبل از اجرا گزینه‌ها را ذخیره کنید و دسترسی API به opening_balance و chart_of_accounts را بررسی کنید.', 'hesabix-v2'); ?>
 				</p>
 				<p class="description" style="max-width:50rem;">
 					<?php esc_html_e('توجه: سیاست تاریخ سفارش و سال مالی در تب «همگام‌سازی» فقط روی همگام‌سازی فاکتور سفارش اثر دارد؛ موجودی افتتاحیه جداگانه بر اساس سال مالی ذخیره‌شده در افزونه و API تراز افتتاحیه عمل می‌کند.', 'hesabix-v2'); ?>
@@ -1595,12 +1612,12 @@ $hsx_post = ini_get('post_max_size') ?: '';
 				<div class="hesabix-v2-obinv-checklist" id="hesabix_v2_obinv_checklist_wrap">
 					<h3><?php esc_html_e('پیش‌نیازها', 'hesabix-v2'); ?></h3>
 					<ul id="hesabix_v2_obinv_checklist" aria-label="<?php esc_attr_e('وضعیت پیش‌نیازهای اتصال و فاکتور', 'hesabix-v2'); ?>">
-						<li data-key="enabled" class="<?php echo !empty($ob_chk['enabled']) ? 'is-ok' : 'is-bad'; ?>"><?php esc_html_e('افزونهٔ حسابیکس فعال است', 'hesabix-v2'); ?></li>
+						<li data-key="enabled" class="<?php echo !empty($ob_chk['enabled']) ? 'is-ok' : 'is-bad'; ?>"><?php esc_html_e('افزونهٔ مارک‌استریت فعال است', 'hesabix-v2'); ?></li>
 						<li data-key="api_key" class="<?php echo !empty($ob_chk['api_key']) ? 'is-ok' : 'is-bad'; ?>"><?php esc_html_e('کلید API ذخیره شده است', 'hesabix-v2'); ?></li>
 						<li data-key="business" class="<?php echo !empty($ob_chk['business']) ? 'is-ok' : 'is-bad'; ?>"><?php esc_html_e('کسب‌وکار متصل است', 'hesabix-v2'); ?></li>
 						<li data-key="fiscal_year" class="<?php echo !empty($ob_chk['fiscal_year']) ? 'is-ok' : 'is-bad'; ?>"><?php esc_html_e('سال مالی جاری برای افزونه در دسترس است', 'hesabix-v2'); ?></li>
 						<li data-key="warehouse" class="<?php echo !empty($ob_chk['warehouse']) ? 'is-ok' : 'is-bad'; ?>"><?php esc_html_e('انبار: پیش‌فرض تب فاکتور یا شناسهٔ انبار در همین فرم', 'hesabix-v2'); ?></li>
-						<li data-key="currency" class="<?php echo !empty($ob_chk['currency']) ? 'is-ok' : 'is-bad'; ?>"><?php esc_html_e('ارز سند (از تب فاکتور / حسابیکس) قابل تشخیص است', 'hesabix-v2'); ?></li>
+						<li data-key="currency" class="<?php echo !empty($ob_chk['currency']) ? 'is-ok' : 'is-bad'; ?>"><?php esc_html_e('ارز سند (از تب فاکتور / مارک‌استریت) قابل تشخیص است', 'hesabix-v2'); ?></li>
 					</ul>
 				</div>
 				<div id="hesabix-v2-obinv-initial" hidden
@@ -1658,7 +1675,7 @@ $hsx_post = ini_get('post_max_size') ?: '';
 							<select name="ob_inv_inventory_account_id" id="ob_inv_inventory_account_id" class="regular-text hesabix-v2-obinv-accounts">
 								<option value="0"><?php esc_html_e('— انتخاب —', 'hesabix-v2'); ?></option>
 							</select>
-							<button type="button" class="button" id="hesabix_v2_obinv_load_accounts"><?php esc_html_e('بارگذاری حساب‌ها از حسابیکس', 'hesabix-v2'); ?></button>
+							<button type="button" class="button" id="hesabix_v2_obinv_load_accounts"><?php esc_html_e('بارگذاری حساب‌ها از مارک‌استریت', 'hesabix-v2'); ?></button>
 						</td>
 					</tr>
 					<tr>
@@ -1682,7 +1699,7 @@ $hsx_post = ini_get('post_max_size') ?: '';
 						<td>
 							<label>
 								<input type="checkbox" name="ob_inv_do_post" id="ob_inv_do_post" value="1" <?php checked(!empty($ob_inv_prefs['do_post'])); ?>>
-								<?php esc_html_e('پس از ذخیرهٔ کامل، سند تراز افتتاحیه در حسابیکس نهایی (قفل) شود.', 'hesabix-v2'); ?>
+								<?php esc_html_e('پس از ذخیرهٔ کامل، سند تراز افتتاحیه در مارک‌استریت نهایی (قفل) شود.', 'hesabix-v2'); ?>
 							</label>
 						</td>
 					</tr>

@@ -86,12 +86,12 @@ def send_verification_email(db: Session, user_id: int, email: str, token: str, b
 	
 	# ساخت محتوای ایمیل
 	user_name = f"{user.first_name or ''} {user.last_name or ''}".strip() or "کاربر گرامی"
-	subject = "تایید ایمیل حساب کاربری حسابیکس"
+	subject = "تایید ایمیل حساب کاربری مارک‌استریت"
 	
 	body_text = f"""
 سلام {user_name}،
 
-برای فعال‌سازی حساب کاربری خود در حسابیکس، لطفاً روی لینک زیر کلیک کنید:
+برای فعال‌سازی حساب کاربری خود در مارک‌استریت، لطفاً روی لینک زیر کلیک کنید:
 
 {verify_url}
 
@@ -100,7 +100,7 @@ def send_verification_email(db: Session, user_id: int, email: str, token: str, b
 اگر شما این درخواست را انجام نداده‌اید، لطفاً این ایمیل را نادیده بگیرید.
 
 با احترام
-تیم حسابیکس
+تیم مارک‌استریت
 """
 	
 	# رنگ برند از تم پیش‌فرض سیستم
@@ -123,7 +123,7 @@ def send_verification_email(db: Session, user_id: int, email: str, token: str, b
 	<div style="background-color: #f8f9fa; padding: 30px; border-radius: 10px; border: 1px solid #dee2e6;">
 		<h2 style="color: {brand_hex}; margin-top: 0;">تایید ایمیل حساب کاربری</h2>
 		<p>سلام {user_name}،</p>
-		<p>برای فعال‌سازی حساب کاربری خود در حسابیکس، لطفاً روی دکمه زیر کلیک کنید:</p>
+		<p>برای فعال‌سازی حساب کاربری خود در مارک‌استریت، لطفاً روی دکمه زیر کلیک کنید:</p>
 		<div style="text-align: center; margin: 30px 0;">
 			<a href="{verify_url}" style="background-color: {brand_hex}; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block; font-weight: bold;">تایید ایمیل</a>
 		</div>
@@ -132,7 +132,7 @@ def send_verification_email(db: Session, user_id: int, email: str, token: str, b
 		<p style="color: #666; font-size: 14px; margin-top: 30px;">این لینک تا 24 ساعت معتبر است.</p>
 		<p style="color: #666; font-size: 14px;">اگر شما این درخواست را انجام نداده‌اید، لطفاً این ایمیل را نادیده بگیرید.</p>
 		<hr style="border: none; border-top: 1px solid #dee2e6; margin: 30px 0;">
-		<p style="color: #999; font-size: 12px; text-align: center;">با احترام<br>تیم حسابیکس</p>
+		<p style="color: #999; font-size: 12px; text-align: center;">با احترام<br>تیم مارک‌استریت</p>
 	</div>
 </body>
 </html>

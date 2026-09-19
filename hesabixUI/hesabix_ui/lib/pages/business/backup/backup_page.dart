@@ -183,7 +183,7 @@ class _BusinessBackupPageState extends State<BusinessBackupPage> {
       await FileSaver.instance.saveFile(
         name: filename,
         bytes: bytes,
-        ext: 'hbx',
+        fileExtension: 'hbx',
         mimeType: MimeType.other,
       );
     } catch (e) {

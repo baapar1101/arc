@@ -127,7 +127,7 @@ class _BankAccountsTurnoverReportPageState extends State<BankAccountsTurnoverRep
 
   String _formatDate(dynamic value) {
     if (value == null) return '';
-    return HesabixDateUtils.formatForDisplay(
+    return MarkStreetDateUtils.formatForDisplay(
       value is DateTime ? value : (value is String ? DateTime.tryParse(value) : null),
       widget.calendarController.isJalali,
     );

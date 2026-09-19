@@ -1,8 +1,15 @@
+<<<<<<< HEAD
 // Injects mirror repos into pluginManagement and flutter_tools composite builds.
 // Loaded via: gradlew --init-script gradle/hesabix-mirror.init.gradle
+=======
+// Injects MarkStreet Gradle mirror into pluginManagement for every Gradle build in this invocation,
+// including composite builds (e.g. Flutter SDK includeBuild .../flutter_tools/gradle).
+// Loaded via: gradlew --init-script gradle/hesabix-mirror.init.gradle
+// Override base URL: env MARKSTREET_GRADLE_MIRROR or -Dhesabix.gradle.mirror=...
+>>>>>>> github/Huma
 
 def mirrorBase =
-    System.getenv("HESABIX_GRADLE_MIRROR") ?: System.getProperty("hesabix.gradle.mirror")
+    System.getenv("MARKSTREET_GRADLE_MIRROR") ?: System.getProperty("hesabix.gradle.mirror")
 if (mirrorBase == null || mirrorBase.trim().isEmpty()) {
     mirrorBase = "https://maven.myket.ir"
 }

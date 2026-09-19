@@ -316,7 +316,7 @@ msgid "at"
 msgstr "و ساعت"
 
 msgid "hesabixAccountingSystem"
-msgstr "سیستم حسابداری حسابیکس - Hesabix Accounting System"
+msgstr "سیستم حسابداری مارک‌استریت - Hesabix Accounting System"
 
 msgid "marketingReport"
 msgstr "گزارش بازاریابی"

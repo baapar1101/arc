@@ -38,7 +38,7 @@ do_action('hesabix_v2_before_product_sync', $product_id, $variation_id);
 // بعد از همگام‌سازی محصول
 do_action('hesabix_v2_after_product_sync', $product_id, $variation_id, $hesabix_id);
 
-// قبل از حذف محصول از حسابیکس
+// قبل از حذف محصول از مارک‌استریت
 do_action('hesabix_v2_before_product_delete', $product_id, $hesabix_id);
 
 // بعد از حذف محصول

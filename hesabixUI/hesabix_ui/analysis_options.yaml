@@ -1,28 +1,54 @@
-# This file configures the analyzer, which statically analyzes Dart code to
-# check for errors, warnings, and lints.
-#
-# The issues identified by the analyzer are surfaced in the UI of Dart-enabled
-# IDEs (https://dart.dev/tools#ides-and-editors). The analyzer can also be
-# invoked from the command line by running `flutter analyze`.
-
-# The following line activates a set of recommended lints for Flutter apps,
-# packages, and plugins designed to encourage good coding practices.
 include: package:flutter_lints/flutter.yaml
 
-linter:
-  # The lint rules applied to this project can be customized in the
-  # section below to disable rules from the `package:flutter_lints/flutter.yaml`
-  # included above or to enable additional rules. A list of all available lints
-  # and their documentation is published at https://dart.dev/lints.
-  #
-  # Instead of disabling a lint rule for the entire project in the
-  # section below, it can also be suppressed for a single line of code
-  # or a specific dart file by using the `// ignore: name_of_lint` and
-  # `// ignore_for_file: name_of_lint` syntax on the line or in the file
-  # producing the lint.
-  rules:
-    # avoid_print: false  # Uncomment to disable the `avoid_print` rule
-    # prefer_single_quotes: true  # Uncomment to enable the `prefer_single_quotes` rule
+analyzer:
+  # افزونهٔ قوانین M3. تا وقتی custom_lint و m3_lint در dev_dependencies
+  # نباشند بی‌اثر است — بخش «نصب» در README-m3.md.
+  # plugins:
+  #   - custom_lint
 
-# Additional information about this file can be found at
-# https://dart.dev/guides/language/analysis-options
+  errors:
+    # عمداً warning و نه error.
+    #
+    # با error، تعداد ۷۲۵ خطای موجود (withOpacity، surfaceVariant،
+    # DropdownButtonFormField.value) باعث می‌شود `flutter analyze` همیشه
+    # شکست بخورد و دروازهٔ CI بی‌معنا شود.
+    #
+    # نقشهٔ ارتقا:
+    #   deprecated_with_opacity صفر شد  →  این خط را error کن
+    deprecated_member_use: warning
+    deprecated_member_use_from_same_package: warning
+
+    unused_import: warning
+    unused_local_variable: warning
+    unnecessary_null_comparison: warning
+
+    # این‌ها واقعاً خطای منطقی‌اند و باید جلوی merge را بگیرند.
+    invalid_use_of_protected_member: error
+    must_call_super: error
+
+  exclude:
+    - "**/*.g.dart"
+    - "**/*.freezed.dart"
+    - "**/l10n/**"
+    - "third_party/**"
+    - "build/**"
+
+linter:
+  rules:
+    # --- مستقیماً به M3 مربوط‌اند ---------------------------------------
+    use_full_hex_values_for_flutter_colors: true
+    use_colored_box: true
+    use_decorated_box: true
+    sized_box_for_whitespace: true
+    avoid_unnecessary_containers: true
+
+    # --- کیفیت حین بازسازی ------------------------------------------------
+    sort_child_properties_last: true
+    unnecessary_parenthesis: true
+
+    # عمداً خاموش: روی این پایگاه کد ۳٬۲۵۳ هشدار info تولید می‌کنند و
+    # سیگنال واقعی را دفن می‌کنند. بعد از پایان مهاجرت M3 روشنشان کن.
+    prefer_relative_imports: false
+    prefer_const_constructors: false
+    prefer_const_literals_to_create_immutables: false
+    require_trailing_commas: false

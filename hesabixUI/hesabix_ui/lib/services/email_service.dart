@@ -42,6 +42,7 @@ class EmailService {
     _ensureApiClientInitialized();
     return sendEmail(SendEmailRequest(
       to: userEmail,
+<<<<<<< HEAD
       subject: BrandConfig.rebrand('خوش آمدید به حسابیکس'),
       body: BrandConfig.rebrand(
         'سلام $userName،\n\nبه حسابیکس خوش آمدید! امیدواریم تجربه خوبی داشته باشید.\n\nبا احترام\nتیم حسابیکس',
@@ -52,6 +53,16 @@ class EmailService {
         <p>به حسابیکس خوش آمدید! امیدواریم تجربه خوبی داشته باشید.</p>
         <p>با احترام<br>تیم حسابیکس</p>
       '''),
+=======
+      subject: 'خوش آمدید به مارک‌استریت',
+      body: 'سلام $userName،\n\nبه مارک‌استریت خوش آمدید! امیدواریم تجربه خوبی داشته باشید.\n\nبا احترام\nتیم مارک‌استریت',
+      htmlBody: '''
+        <h2>خوش آمدید به مارک‌استریت</h2>
+        <p>سلام $userName،</p>
+        <p>به مارک‌استریت خوش آمدید! امیدواریم تجربه خوبی داشته باشید.</p>
+        <p>با احترام<br>تیم مارک‌استریت</p>
+      ''',
+>>>>>>> github/Huma
     ));
   }
 

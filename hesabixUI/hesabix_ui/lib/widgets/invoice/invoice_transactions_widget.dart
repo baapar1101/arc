@@ -591,7 +591,7 @@ class _InvoiceTransactionsWidgetState extends State<InvoiceTransactionsWidget> {
             Expanded(
               child: _buildDetailRow(
                 'تاریخ:',
-                HesabixDateUtils.formatForDisplay(
+                MarkStreetDateUtils.formatForDisplay(
                   transaction.transactionDate,
                   widget.calendarController.isJalali == true,
                 ),

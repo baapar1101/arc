@@ -1,0 +1,133 @@
+name: Build Flutter iOS
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+    branches:
+      - main
+      - master
+
+permissions:
+  contents: read
+
+jobs:
+  build-ios:
+    name: Build iOS
+    runs-on: macos-latest
+
+    defaults:
+      run:
+        working-directory: hesabixUI/hesabix_ui
+
+    steps:
+      ########################################################################
+      # Checkout
+      ########################################################################
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      ########################################################################
+      # Flutter
+      ########################################################################
+      - name: Install Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Flutter Version
+        run: flutter --version
+
+      ########################################################################
+      # Cache Pub Packages
+      ########################################################################
+      - name: Cache Pub
+        uses: actions/cache@v4
+        with:
+          path: ~/.pub-cache
+          key: ${{ runner.os }}-pub-${{ hashFiles('hesabixUI/hesabix_ui/pubspec.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-pub-
+
+      ########################################################################
+      # Install Dependencies
+      ########################################################################
+      - name: Flutter Pub Get
+        run: flutter pub get
+
+      ########################################################################
+      # CocoaPods Cache
+      ########################################################################
+      - name: Cache CocoaPods
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cocoapods
+            hesabixUI/hesabix_ui/ios/Pods
+          key: ${{ runner.os }}-pods-${{ hashFiles('hesabixUI/hesabix_ui/ios/Podfile.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-pods-
+
+      ########################################################################
+      # Install CocoaPods
+      ########################################################################
+      - name: Install Pods
+        run: |
+          cd ios
+          pod repo update
+          pod install
+
+      ########################################################################
+      # Diagnostics
+      ########################################################################
+      - name: Doctor
+        run: flutter doctor -v
+
+      ########################################################################
+      # Static Analysis
+      ########################################################################
+      - name: Analyze
+        run: flutter analyze --no-fatal-warnings
+        continue-on-error: true
+
+      ########################################################################
+      # Tests
+      ########################################################################
+      - name: Run Tests
+        run: flutter test
+        continue-on-error: true
+
+      ########################################################################
+      # Build iOS
+      ########################################################################
+      - name: Build iOS (No Code Sign)
+        run: |
+          flutter build ios \
+            --release \
+            --no-codesign
+
+      ########################################################################
+      # Upload Build
+      ########################################################################
+      - name: Upload iOS Build
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-build
+          path: |
+            hesabixUI/hesabix_ui/build/ios/iphoneos
+
+      ########################################################################
+      # Upload Build Logs
+      ########################################################################
+      - name: Upload Build Logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-logs
+          path: |
+            ~/Library/Logs
+            hesabixUI/hesabix_ui/build

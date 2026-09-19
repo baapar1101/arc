@@ -9,7 +9,7 @@ enum VoiceWebCaptureMode {
   webmOpus,
 }
 
-extension type _HesabixVoiceCapture._(JSObject _) implements JSObject {
+extension type _MarkStreetVoiceCapture._(JSObject _) implements JSObject {
   external bool supportsWebmOpus();
   external JSPromise<JSAny?> start(
     web.AudioContext ctx,
@@ -21,8 +21,8 @@ extension type _HesabixVoiceCapture._(JSObject _) implements JSObject {
   external JSString getMode();
 }
 
-@JS('HesabixVoiceCapture')
-external _HesabixVoiceCapture get _hesabixVoiceCapture;
+@JS('MarkStreetVoiceCapture')
+external _MarkStreetVoiceCapture get _hesabixVoiceCapture;
 
 /// ضبط صوت وب از طریق `hesabix_voice_capture.js` (محلی، بدون API ابری).
 class VoiceWebCapture {

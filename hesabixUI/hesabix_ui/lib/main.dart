@@ -214,6 +214,7 @@ import 'core/calendar_controller.dart';
 import 'core/api_client.dart';
 import 'theme/theme_controller.dart';
 import 'theme/app_theme.dart';
+import 'theme/tokens/color_schemes.dart';
 import 'core/auth_store.dart';
 import 'core/mobile_launcher_prefs.dart';
 import 'core/mobile_launcher_nav.dart';
@@ -871,7 +872,13 @@ class _MyAppState extends State<MyApp> {
         ],
       );
 
+      // بدون تم صریح، صفحهٔ بارگذاری با تم پیش‌فرض خاکستری فلاتر رندر می‌شد
+      // و تا آمادن شدن کنترلرها با بقیهٔ رابط هم‌خوان نبود.
+      final loadingLocale = _controller?.locale ?? const Locale('fa');
+      final loadingSeed = _themeController?.seedColor ?? AppColorTokens.defaultSeed;
+
       return MaterialApp.router(
+<<<<<<< HEAD
         title: BrandConfig.materialTitle,
         routerConfig: loadingRouter,
         theme: _themeController == null
@@ -890,6 +897,22 @@ class _MyAppState extends State<MyApp> {
               ),
         themeMode: _themeController?.mode ?? ThemeMode.system,
         locale: _controller?.locale ?? const Locale('fa'),
+=======
+        title: 'MarkStreet',
+        routerConfig: loadingRouter,
+        locale: loadingLocale,
+        theme: AppTheme.build(
+          isDark: false,
+          locale: loadingLocale,
+          seed: loadingSeed,
+        ),
+        darkTheme: AppTheme.build(
+          isDark: true,
+          locale: loadingLocale,
+          seed: loadingSeed,
+        ),
+        themeMode: _themeController?.mode ?? ThemeMode.system,
+>>>>>>> github/Huma
         supportedLocales: const [Locale('en'), Locale('fa')],
         localizationsDelegates: const [
           AppLocalizations.delegate,
@@ -5806,6 +5829,7 @@ class _MyAppState extends State<MyApp> {
           child: UserActivityHeartbeat(
             authStore: _authStore!,
             child: MaterialApp.router(
+<<<<<<< HEAD
               title: BrandConfig.materialTitle,
               theme: AppTheme.build(
                 isDark: false,
@@ -5819,6 +5843,11 @@ class _MyAppState extends State<MyApp> {
               ),
               themeMode: themeController.mode,
               routerConfig: _router!,
+=======
+            title: 'MarkStreet',
+            theme: AppTheme.build(
+              isDark: false,
+>>>>>>> github/Huma
               locale: controller.locale,
               supportedLocales: AppLocalizations.supportedLocales,
               localizationsDelegates: const [

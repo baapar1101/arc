@@ -277,7 +277,7 @@ class _InventoryStockReportPageState extends State<InventoryStockReportPage> {
     if (_asOfDate != null) {
       // فرمت تاریخ بر اساس تقویم انتخاب شده
       final isJalali = widget.calendarController.isJalali;
-      final formattedDate = HesabixDateUtils.formatForDisplay(_asOfDate, isJalali);
+      final formattedDate = MarkStreetDateUtils.formatForDisplay(_asOfDate, isJalali);
       filters.add({
         'key': 'as_of_date',
         'label': 'تاریخ گزارش',

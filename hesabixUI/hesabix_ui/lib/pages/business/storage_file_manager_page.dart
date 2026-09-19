@@ -248,7 +248,7 @@ class _StorageFileManagerPageState extends State<StorageFileManagerPage> {
 
   Future<void> _uploadFile() async {
     try {
-      final result = await FilePicker.platform.pickFiles(
+      final result = await FilePicker.pickFiles(
         type: FileType.any,
         withData: true,
       );
@@ -540,12 +540,30 @@ class _StorageFileManagerPageState extends State<StorageFileManagerPage> {
         throw Exception('فایل خالی است');
       }
 
+<<<<<<< HEAD
       final result = await BytesExportService.export(
         bytes: bytes,
         filename: fileName,
         mimeType: mimeType,
       );
       if (mounted) BytesExportService.showFeedback(context, result);
+=======
+      if (kIsWeb) {
+        await web_utils.saveBytesAsFileWeb(bytes, fileName, mimeType: mimeType);
+      } else {
+        final uint8Bytes = bytes is Uint8List ? bytes : Uint8List.fromList(bytes);
+        final extension = _getFileExtension(fileName).replaceFirst('.', '');
+        final safeExt = extension.isEmpty ? 'bin' : extension;
+        await FileSaver.instance.saveFile(
+          name: fileName,
+          bytes: uint8Bytes,
+          fileExtension: safeExt,
+        );
+        if (mounted) {
+          SnackBarHelper.showSuccess(context, message: 'فایل با موفقیت ذخیره شد');
+        }
+      }
+>>>>>>> github/Huma
     } catch (e) {
       if (mounted) {
         SnackBarHelper.showError(

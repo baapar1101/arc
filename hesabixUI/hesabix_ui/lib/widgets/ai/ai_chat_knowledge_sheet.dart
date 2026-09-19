@@ -132,7 +132,7 @@ class _AIChatKnowledgeSheetState extends State<_AIChatKnowledgeSheet> {
   }
 
   Future<void> _uploadFile() async {
-    final result = await FilePicker.platform.pickFiles(withData: true);
+    final result = await FilePicker.pickFiles(withData: true);
     if (result == null || result.files.isEmpty) return;
     final file = result.files.first;
     final bytes = file.bytes;

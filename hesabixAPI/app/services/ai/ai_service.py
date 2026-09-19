@@ -1004,19 +1004,26 @@ class AIService(AIModelRouterMixin, AIUsageMeterMixin):
 
             todos_text, plan_block = self._session_todo_prompt_extras(session_id, user_query)
 
+<<<<<<< HEAD
             from app.services.ai.ai_calendar_prompt import (
                 build_calendar_context_prompt_block,
                 build_datetime_now_prompt_block,
             )
+=======
+            from app.services.ai.ai_calendar_prompt import build_calendar_context_prompt_block
+>>>>>>> github/Huma
 
             calendar_block = build_calendar_context_prompt_block(
                 self.ctx.get_calendar_type(),
                 business_id=int(bid),
             )
+<<<<<<< HEAD
             datetime_block = build_datetime_now_prompt_block(
                 self.ctx.get_calendar_type(),
                 business_id=int(bid),
             )
+=======
+>>>>>>> github/Huma
 
             parts: Dict[str, str] = {}
             identity_anchor = ""
@@ -1033,6 +1040,7 @@ class AIService(AIModelRouterMixin, AIUsageMeterMixin):
                 else:
                     parts[key] = result or ""
 
+<<<<<<< HEAD
             semi, dynamic, insights_text = split_runtime_prompt_parts(
                 {
                     "datetime": datetime_block,
@@ -1076,6 +1084,31 @@ class AIService(AIModelRouterMixin, AIUsageMeterMixin):
             runtime_sections=(datetime_block,) if datetime_block else (),
             role=role.value,
             business_id=None,
+=======
+            return trim_system_prompt_sections(
+                base_prompt
+                + business_info
+                + calendar_block
+                + execution_mode_prompt_block(execution_mode)
+                + plan_block,
+                [
+                    parts.get("memory", ""),
+                    parts.get("insights", ""),
+                    parts.get("knowledge", ""),
+                    parts.get("skills", ""),
+                    parts.get("connectors", ""),
+                    parts.get("attachments", ""),
+                    todos_text,
+                ],
+            )
+
+        from app.services.ai.ai_calendar_prompt import build_calendar_context_prompt_block
+
+        return trim_system_prompt(
+            base_prompt
+            + build_calendar_context_prompt_block(self.ctx.get_calendar_type())
+            + execution_mode_prompt_block(execution_mode)
+>>>>>>> github/Huma
         )
 
     async def build_system_prompt_stream(
@@ -1113,6 +1146,7 @@ class AIService(AIModelRouterMixin, AIUsageMeterMixin):
 
         business_id = session_business_id or self.business_id
         if not business_id:
+<<<<<<< HEAD
             from app.services.ai.ai_calendar_prompt import (
                 build_calendar_context_prompt_block,
                 build_datetime_now_prompt_block,
@@ -1135,6 +1169,15 @@ class AIService(AIModelRouterMixin, AIUsageMeterMixin):
                 "event": "prompt_ready",
                 "prompt": structured.full_text(),
                 "structured_prompt": structured,
+=======
+            from app.services.ai.ai_calendar_prompt import build_calendar_context_prompt_block
+
+            yield {
+                "event": "prompt_ready",
+                "prompt": base_prompt
+                + build_calendar_context_prompt_block(self.ctx.get_calendar_type())
+                + execution_mode_prompt_block(execution_mode),
+>>>>>>> github/Huma
             }
             return
 
@@ -1324,9 +1367,34 @@ class AIService(AIModelRouterMixin, AIUsageMeterMixin):
 
         todos_text, plan_block = self._session_todo_prompt_extras(session_id, user_query)
 
+<<<<<<< HEAD
         from app.services.ai.ai_calendar_prompt import (
             build_calendar_context_prompt_block,
             build_datetime_now_prompt_block,
+=======
+        from app.services.ai.ai_calendar_prompt import build_calendar_context_prompt_block
+
+        calendar_block = build_calendar_context_prompt_block(
+            self.ctx.get_calendar_type(),
+            business_id=int(bid),
+        )
+
+        final_prompt = trim_system_prompt_sections(
+            base_prompt
+            + business_info
+            + calendar_block
+            + execution_mode_prompt_block(execution_mode)
+            + plan_block,
+            [
+                parts.get("loading_memory", ""),
+                parts.get("loading_insights", ""),
+                parts.get("loading_knowledge", ""),
+                parts.get("loading_skills", ""),
+                parts.get("loading_connectors", ""),
+                parts.get("loading_attachments", ""),
+                parts.get("loading_session_todos", "") or todos_text,
+            ],
+>>>>>>> github/Huma
         )
 
         calendar_block = build_calendar_context_prompt_block(

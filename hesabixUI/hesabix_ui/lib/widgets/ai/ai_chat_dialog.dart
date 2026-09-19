@@ -9,7 +9,7 @@ import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/core/auth_store.dart';
 import 'package:hesabix_ui/core/business_route_paths.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
-import 'package:hesabix_ui/core/date_utils.dart' show HesabixDateUtils;
+import 'package:hesabix_ui/core/date_utils.dart' show MarkStreetDateUtils;
 import 'package:hesabix_ui/models/ai_models.dart';
 import 'package:hesabix_ui/models/ai_stream_event.dart';
 import 'package:hesabix_ui/models/ai_voice_models.dart';
@@ -740,7 +740,7 @@ class _AIChatDialogState extends State<AIChatDialog> {
     final time =
         '${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}';
     if (AIChatDesign.isCompactWidth(context)) return time;
-    return HesabixDateUtils.formatDateTime(local, _isJalali);
+    return MarkStreetDateUtils.formatDateTime(local, _isJalali);
   }
 
   Future<void> _showMessageActions(AIChatMessage msg) {
@@ -1234,7 +1234,12 @@ class _AIChatDialogState extends State<AIChatDialog> {
   }
 
   Future<void> _pickAndUploadAttachment() async {
+<<<<<<< HEAD
     final result = await FilePicker.platform.pickFiles(
+=======
+    if (!await _ensureSession()) return;
+    final result = await FilePicker.pickFiles(
+>>>>>>> github/Huma
       type: FileType.custom,
       allowedExtensions: [
         'txt',

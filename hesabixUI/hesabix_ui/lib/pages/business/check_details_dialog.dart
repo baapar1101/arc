@@ -114,7 +114,7 @@ class _CheckDetailsDialogState extends State<CheckDetailsDialog> with SingleTick
 
   Future<void> _attachFile() async {
     try {
-      final result = await FilePicker.platform.pickFiles(type: FileType.any, withData: true);
+      final result = await FilePicker.pickFiles(type: FileType.any, withData: true);
 
       if (result == null || result.files.isEmpty) return;
 
@@ -820,7 +820,7 @@ class _CheckDetailsDialogState extends State<CheckDetailsDialog> with SingleTick
   }
 
   String _formatDate(dynamic value, {dynamic rawValue}) {
-    return HesabixDateUtils.formatApiDateForDisplay(value, widget.calendarController.isJalali, rawValue: rawValue);
+    return MarkStreetDateUtils.formatApiDateForDisplay(value, widget.calendarController.isJalali, rawValue: rawValue);
   }
 
   String _formatStatus(String status) {

@@ -490,6 +490,20 @@ class _SupportPageState extends State<SupportPage> with WidgetsBindingObserver {
     }
   }
 
+<<<<<<< HEAD
+=======
+  String _formatTicketDate(DateTime dateTime) {
+    try {
+      final isJalali = widget.calendarController?.isJalali ??
+          ApiClient.getCalendarController()?.isJalali ??
+          true;
+      return MarkStreetDateUtils.formatDateTime(dateTime, isJalali);
+    } catch (_) {
+      return DateFormatters.formatServerDateTime(dateTime.toIso8601String());
+    }
+  }
+
+>>>>>>> github/Huma
   int _getOpenTicketsCount() {
     final openStatusIds = _statuses.where((s) => !s.isFinal).map((s) => s.id).toSet();
     return _tickets.where((t) => openStatusIds.contains(t.statusId)).length;

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
-import 'package:hesabix_ui/core/date_utils.dart' show HesabixDateUtils;
+import 'package:hesabix_ui/core/date_utils.dart' show MarkStreetDateUtils;
 import 'package:hesabix_ui/widgets/data_table/data_table_config.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table_widget.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
@@ -124,7 +124,7 @@ class _NotificationModerationQueuePageState
     final dt = DateTime.tryParse(raw);
     if (dt == null) return raw.length >= 19 ? raw.substring(0, 19).replaceAll('T', ' ') : raw;
     final isJalali = _calendarController?.isJalali ?? true;
-    return HesabixDateUtils.formatDateTime(dt, isJalali);
+    return MarkStreetDateUtils.formatDateTime(dt, isJalali);
   }
 
   String _statusLabel(String? status) {

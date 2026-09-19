@@ -1939,7 +1939,7 @@ class _WarehouseDocumentFormDialogState
           widget.calendarController ??
           ApiClient.getCalendarController();
       final isJalali = cc?.isJalali ?? true;
-      final errorMessage = HesabixDateUtils.formatIsoDatesInPlainText(
+      final errorMessage = MarkStreetDateUtils.formatIsoDatesInPlainText(
         extracted,
         isJalali,
       );

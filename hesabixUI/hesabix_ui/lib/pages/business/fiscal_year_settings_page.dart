@@ -71,7 +71,7 @@ class _FiscalYearSettingsPageState extends State<FiscalYearSettingsPage> {
   String _autoTitle() {
     if (_endDate == null || _calendarController == null) return '';
     final isJalali = _calendarController!.isJalali;
-    final endStr = HesabixDateUtils.formatForDisplay(_endDate, isJalali);
+    final endStr = MarkStreetDateUtils.formatForDisplay(_endDate, isJalali);
     return 'سال مالی منتهی به $endStr';
   }
 
@@ -268,8 +268,8 @@ class _FiscalYearSettingsPageState extends State<FiscalYearSettingsPage> {
   }
 
   String? _overlapErrorFor(DateTime start, DateTime end) {
-    final s = HesabixDateUtils.toDateOnlyLocal(start);
-    final e = HesabixDateUtils.toDateOnlyLocal(end);
+    final s = MarkStreetDateUtils.toDateOnlyLocal(start);
+    final e = MarkStreetDateUtils.toDateOnlyLocal(end);
     final sid = _currentFiscalYear?['id'];
     final currentId = sid is int ? sid : int.tryParse('$sid');
     for (final row in _fiscalYearsForBounds) {
@@ -281,8 +281,8 @@ class _FiscalYearSettingsPageState extends State<FiscalYearSettingsPage> {
       final os = _dateFromFiscalRow(row, 'start_date');
       final oe = _dateFromFiscalRow(row, 'end_date');
       if (os == null || oe == null) continue;
-      final os0 = HesabixDateUtils.toDateOnlyLocal(os);
-      final oe0 = HesabixDateUtils.toDateOnlyLocal(oe);
+      final os0 = MarkStreetDateUtils.toDateOnlyLocal(os);
+      final oe0 = MarkStreetDateUtils.toDateOnlyLocal(oe);
       if (!_rangesOverlap(s, e, os0, oe0)) continue;
       final title = row['title']?.toString() ?? 'سال مالی دیگر';
       return 'بازهٔ انتخاب‌شده با سال مالی «$title» همپوشانی دارد.';
@@ -300,14 +300,14 @@ class _FiscalYearSettingsPageState extends State<FiscalYearSettingsPage> {
     for (final row in _fiscalYearsForBounds) {
       final s = _dateFromFiscalRow(row, 'start_date');
       final e = _dateFromFiscalRow(row, 'end_date');
-      if (s != null) seeds.add(HesabixDateUtils.toDateOnlyLocal(s));
-      if (e != null) seeds.add(HesabixDateUtils.toDateOnlyLocal(e));
+      if (s != null) seeds.add(MarkStreetDateUtils.toDateOnlyLocal(s));
+      if (e != null) seeds.add(MarkStreetDateUtils.toDateOnlyLocal(e));
     }
     if (_startDate != null) {
-      seeds.add(HesabixDateUtils.toDateOnlyLocal(_startDate!));
+      seeds.add(MarkStreetDateUtils.toDateOnlyLocal(_startDate!));
     }
     if (_endDate != null) {
-      seeds.add(HesabixDateUtils.toDateOnlyLocal(_endDate!));
+      seeds.add(MarkStreetDateUtils.toDateOnlyLocal(_endDate!));
     }
     var lo = seeds.reduce((a, b) => a.isBefore(b) ? a : b);
     var hi = seeds.reduce((a, b) => a.isAfter(b) ? a : b);
@@ -507,7 +507,7 @@ class _FiscalYearSettingsPageState extends State<FiscalYearSettingsPage> {
                                           _startDate = d;
                                           if (_startDate != null) {
                                             final suggestedEnd =
-                                                HesabixDateUtils.fiscalYearInclusiveEndFromStart(
+                                                MarkStreetDateUtils.fiscalYearInclusiveEndFromStart(
                                               _startDate!,
                                               _calendarController!.isJalali,
                                             );

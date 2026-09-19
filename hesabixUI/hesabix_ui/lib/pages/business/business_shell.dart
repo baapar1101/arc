@@ -1279,11 +1279,15 @@ class _BusinessShellState extends State<BusinessShell> {
     }
   }
 
+<<<<<<< HEAD
   bool _isPayrollPluginActive() => _isPluginCodeLicensed('payroll');
 
   bool _isTelephonyPluginActive() => _isPluginCodeLicensed('asterisk_issabel_connector');
 
   bool _isWooCommerceHesabixPluginActive() {
+=======
+  bool _isWooCommerceMarkStreetPluginActive() {
+>>>>>>> github/Huma
     try {
       final plug = _businessPlugins.firstWhere(
         (plugin) => plugin['plugin_code'] == 'woocommerce_hesabix',
@@ -2623,7 +2627,7 @@ class _BusinessShellState extends State<BusinessShell> {
 
     // نوار دوم: تب‌ها یا نام کسب‌وکار / تاریخ (فقط دسکتاپ)
     final bool isJalali = widget.calendarController?.isJalali ?? true;
-    final String dateTimeStr = HesabixDateUtils.formatDateTimeWithWeekday(
+    final String dateTimeStr = MarkStreetDateUtils.formatDateTimeWithWeekday(
       DateTime.now(),
       isJalali,
       t.localeName,
@@ -3664,7 +3668,7 @@ class _BusinessShellState extends State<BusinessShell> {
     final section = _sectionForMenuItem(item, t);
 
     if (item.path != null && item.path!.contains('/woocommerce')) {
-      if (!_isWooCommerceHesabixPluginActive()) {
+      if (!_isWooCommerceMarkStreetPluginActive()) {
         return false;
       }
       if (widget.authStore.currentBusiness?.isOwner == true) {

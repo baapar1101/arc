@@ -120,7 +120,7 @@ class _CreditorsReportPageState extends State<CreditorsReportPage> {
     if (value == null) return '';
     
     // استفاده از helper موجود
-    return HesabixDateUtils.formatForDisplay(
+    return MarkStreetDateUtils.formatForDisplay(
       value is DateTime ? value : (value is String ? DateTime.tryParse(value) : null),
       widget.calendarController.isJalali,
     );

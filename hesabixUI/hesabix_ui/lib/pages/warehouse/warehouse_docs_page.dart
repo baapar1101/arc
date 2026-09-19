@@ -10,7 +10,7 @@ import '../../widgets/data_table/data_table_widget.dart';
 import '../../widgets/data_table/data_table_config.dart';
 import '../../models/warehouse_document_model.dart';
 import '../../core/calendar_controller.dart';
-import '../../core/date_utils.dart' show HesabixDateUtils;
+import '../../core/date_utils.dart' show MarkStreetDateUtils;
 import '../../utils/error_extractor.dart';
 import '../../l10n/app_localizations.dart';
 import '../../utils/snackbar_helper.dart';
@@ -620,7 +620,7 @@ class _WarehouseDocsPageState extends State<WarehouseDocsPage> {
               formatter: (item) {
                 final doc = item as WarehouseDocument;
                 if (doc.documentDate == null) return '';
-                return HesabixDateUtils.formatForDisplay(
+                return MarkStreetDateUtils.formatForDisplay(
                   doc.documentDate,
                   _calendarController?.isJalali ?? false,
                 );

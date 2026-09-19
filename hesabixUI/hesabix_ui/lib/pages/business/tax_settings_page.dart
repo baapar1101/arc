@@ -900,12 +900,28 @@ class _TaxSettingsPageState extends State<TaxSettingsPage> {
     final bytes = utf8.encode(trimmed);
 
     try {
+<<<<<<< HEAD
       final result = await BytesExportService.export(
         bytes: bytes,
         filename: safeName,
         mimeType: 'text/plain',
       );
       if (mounted) BytesExportService.showFeedback(context, result);
+=======
+      if (kIsWeb) {
+        await web_utils.saveBytesAsFileWeb(
+          bytes,
+          safeName,
+          mimeType: 'text/plain',
+        );
+      } else {
+        await FileSaver.instance.saveFile(
+          name: safeName,
+          bytes: Uint8List.fromList(bytes),
+          fileExtension: _extractExtension(safeName),
+        );
+      }
+>>>>>>> github/Huma
     } catch (e) {
       if (mounted) {
         SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));

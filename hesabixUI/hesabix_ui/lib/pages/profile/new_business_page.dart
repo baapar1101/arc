@@ -112,6 +112,7 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
 
   void _onCalendarChanged() {
     if (_businessData.fiscalYears.isEmpty) return;
+<<<<<<< HEAD
     final fiscal = _businessData.fiscalYears.first;
     if (fiscal.endDate == null) return;
     if (_isAutoFiscalTitle(fiscal.title)) {
@@ -174,6 +175,19 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
     }
     if (_fiscalTitleController.text != fiscal.title) {
       _fiscalTitleController.text = fiscal.title;
+=======
+    final fiscal = _businessData.fiscalYears[_fiscalTabIndex];
+    if (fiscal.endDate != null) {
+      const autoPrefix = 'سال مالی منتهی به';
+      if (fiscal.title.trim().isEmpty || fiscal.title.trim().startsWith(autoPrefix)) {
+        setState(() {
+          final isJalali = widget.calendarController.isJalali;
+          final endStr = MarkStreetDateUtils.formatForDisplay(fiscal.endDate, isJalali);
+          fiscal.title = '$autoPrefix $endStr';
+          _fiscalTitleController.text = fiscal.title;
+        });
+      }
+>>>>>>> github/Huma
     }
   }
 
@@ -269,7 +283,7 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
   Future<void> _importFromBackup() async {
     final t = AppLocalizations.of(context);
     try {
-      final result = await FilePicker.platform.pickFiles(
+      final result = await FilePicker.pickFiles(
         type: FileType.custom,
         allowedExtensions: const ['hbx'],
         withData: true,
@@ -415,6 +429,176 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
     }
   }
 
+<<<<<<< HEAD
+=======
+  Widget _buildFiscalStep() {
+    if (_businessData.fiscalYears.isEmpty) {
+      _businessData.fiscalYears.add(FiscalYearData(isLast: true));
+    }
+    final fiscal = _businessData.fiscalYears[_fiscalTabIndex];
+
+    String autoTitle() {
+      final isJalali = widget.calendarController.isJalali;
+      final end = fiscal.endDate;
+      if (end == null) return fiscal.title;
+      final endStr = MarkStreetDateUtils.formatForDisplay(end, isJalali);
+      return 'سال مالی منتهی به $endStr';
+    }
+
+    final padding = ResponsiveHelper.getPadding(context);
+    final spacing = ResponsiveHelper.responsiveValue(
+      context,
+      mobile: 16.0,
+      tablet: 20.0,
+      desktop: 24.0,
+    );
+
+    return Center(
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxWidth: ResponsiveHelper.getCardMaxWidth(context),
+        ),
+        child: Padding(
+          padding: EdgeInsets.all(padding),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'سال مالی',
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              SizedBox(height: spacing),
+              Container(
+                padding: EdgeInsets.all(padding),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.surface,
+                  borderRadius: BorderRadius.circular(
+                    ResponsiveHelper.responsiveValue(
+                      context,
+                      mobile: 12.0,
+                      tablet: 14.0,
+                      desktop: 16.0,
+                    ),
+                  ),
+                  border: Border.all(
+                    color: Theme.of(context).dividerColor.withValues(alpha: 0.3),
+                  ),
+                ),
+                child: Column(
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: DateInputField(
+                            value: fiscal.startDate,
+                            labelText: 'تاریخ شروع *',
+                            lastDate: fiscal.endDate,
+                            calendarController: widget.calendarController,
+                            onChanged: (d) {
+                              setState(() {
+                                fiscal.startDate = d;
+                                if (fiscal.startDate != null) {
+                                  fiscal.endDate = MarkStreetDateUtils.fiscalYearInclusiveEndFromStart(
+                                    fiscal.startDate!,
+                                    widget.calendarController.isJalali,
+                                  );
+                                  fiscal.title = autoTitle();
+                                  _fiscalTitleController.text = fiscal.title;
+                                }
+                              });
+                            },
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: DateInputField(
+                            value: fiscal.endDate,
+                            labelText: 'تاریخ پایان *',
+                            firstDate: fiscal.startDate,
+                            calendarController: widget.calendarController,
+                            onChanged: (d) {
+                              setState(() {
+                                fiscal.endDate = d;
+                                if (fiscal.title.trim().isEmpty || fiscal.title.startsWith('سال مالی منتهی به')) {
+                                  fiscal.title = autoTitle();
+                                  _fiscalTitleController.text = fiscal.title;
+                                }
+                              });
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    TextFormField(
+                      controller: _fiscalTitleController,
+                      decoration: const InputDecoration(
+                        labelText: 'عنوان سال مالی *',
+                        border: OutlineInputBorder(),
+                      ),
+                      onChanged: (v) {
+                        setState(() {
+                          fiscal.title = v;
+                        });
+                      },
+                    ),
+                  ],
+                ),
+              ),
+              SizedBox(height: spacing * 0.5),
+              Align(
+                alignment: Alignment.centerRight,
+                child: Text(
+                  'پرکردن عنوان، تاریخ شروع و پایان الزامی است.',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
+                      ),
+                ),
+              )
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+  void _nextStep() {
+    if (_currentStep < 4) {
+      setState(() {
+        _currentStep++;
+      });
+      _pageController.nextPage(
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+      );
+    }
+  }
+
+  void _previousStep() {
+    if (_currentStep > 0) {
+      setState(() {
+        _currentStep--;
+      });
+      _pageController.previousPage(
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+      );
+    }
+  }
+
+  void _goToStep(int step) {
+    setState(() {
+      _currentStep = step;
+    });
+    _pageController.animateToPage(
+      step,
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeInOut,
+    );
+  }
+
+>>>>>>> github/Huma
   bool _canGoToNextStep() {
     switch (_currentStep) {
       case 0:

@@ -479,7 +479,7 @@ async def import_business_from_backup(
 @router.post(
     "/import-from-legacy-api/preview",
     summary="پیش‌نمایش انتقال از نسخه قدیم (API)",
-    description="اعتبارسنجی کلید API و نمایش حجم داده‌های قابل انتقال از حسابیکس نسخه قدیم",
+    description="اعتبارسنجی کلید API و نمایش حجم داده‌های قابل انتقال از مارک‌استریت نسخه قدیم",
     response_model=SuccessResponse,
 )
 def preview_import_from_legacy_api(

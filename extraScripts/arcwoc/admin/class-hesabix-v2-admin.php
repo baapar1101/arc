@@ -58,7 +58,7 @@ class Hesabix_V2_Admin
 	}
 
 	/**
-	 * هشدار هم‌خوان نبودن ارز ووکامرس با ارز فاکتور حسابیکس (کل ادمین، برای مدیر فروشگاه).
+	 * هشدار هم‌خوان نبودن ارز ووکامرس با ارز فاکتور مارک‌استریت (کل ادمین، برای مدیر فروشگاه).
 	 *
 	 * @return void
 	 */
@@ -274,13 +274,14 @@ class Hesabix_V2_Admin
 						'warn_change_business_cancel' => __('انصراف', 'hesabix-v2'),
 						'lbl_linked_business' => __('کسب‌وکار متصل', 'hesabix-v2'),
 						'lbl_business_id' => __('شناسه کسب‌وکار', 'hesabix-v2'),
-						'lbl_owner' => __('مالک در حسابیکس', 'hesabix-v2'),
+						'lbl_owner' => __('مالک در مارک‌استریت', 'hesabix-v2'),
 						'lbl_your_role' => __('نقش شما', 'hesabix-v2'),
 						'lbl_owner_suffix' => __('مالک', 'hesabix-v2'),
 						'lbl_field' => __('زمینه فعالیت', 'hesabix-v2'),
 						'lbl_type' => __('نوع شخصیت', 'hesabix-v2'),
-						'lbl_fiscal_current' => __('سال مالی جاری حسابیکس', 'hesabix-v2'),
+						'lbl_fiscal_current' => __('سال مالی جاری مارک‌استریت', 'hesabix-v2'),
 						'lbl_fiscal_dates' => __('بازه', 'hesabix-v2'),
+<<<<<<< HEAD
 						'lbl_api_key_owner' => __('صاحب کلید API در حسابیکس', 'hesabix-v2'),
 						'profit_refreshing' => __('در حال دریافت سود…', 'hesabix-v2'),
 						'profit_refreshed' => __('سود به‌روز شد', 'hesabix-v2'),
@@ -288,6 +289,9 @@ class Hesabix_V2_Admin
 						'mp_active' => __('لایسنس فعال است — صفحه تازه‌سازی می‌شود.', 'hesabix-v2'),
 						'mp_inactive' => __('لایسنس هنوز فعال نیست.', 'hesabix-v2'),
 						'mp_dismissed' => __('بنر برای دو هفته پنهان شد.', 'hesabix-v2'),
+=======
+						'lbl_api_key_owner' => __('صاحب کلید API در مارک‌استریت', 'hesabix-v2'),
+>>>>>>> github/Huma
 					),
 				)
 			);
@@ -312,14 +316,19 @@ class Hesabix_V2_Admin
 						'strings' => array(
 							'genericError' => __('عملیات ناموفق بود.', 'hesabix-v2'),
 							'requestFailed' => __('خطا در ارتباط با سرور.', 'hesabix-v2'),
-							'confirmSync' => __('ارسال یا به‌روزرسانی این سفارش در حسابیکس انجام شود؟', 'hesabix-v2'),
-							'confirmUnsync' => __('فاکتور این سفارش در حسابیکس حذف و پیوند افزونه پاک شود؟ این کار برگشت‌پذیر نیست.', 'hesabix-v2'),
+							'confirmSync' => __('ارسال یا به‌روزرسانی این سفارش در مارک‌استریت انجام شود؟', 'hesabix-v2'),
+							'confirmUnsync' => __('فاکتور این سفارش در مارک‌استریت حذف و پیوند افزونه پاک شود؟ این کار برگشت‌پذیر نیست.', 'hesabix-v2'),
 							'confirmBulkSync' => __('برای همهٔ سفارش‌های انتخاب‌شده ارسال یا به‌روزرسانی انجام شود؟', 'hesabix-v2'),
 							'confirmBulkUnsync' => __('برای همهٔ موارد انتخاب‌شده لغو ارسال (حذف فاکتور) انجام شود؟', 'hesabix-v2'),
+<<<<<<< HEAD
 							'confirmPause' => __('همگام‌سازی خودکار این سفارش متوقف شود؟ (فاکتورهای دستی در حسابیکس با به‌روزرسانی خودکار بازنویسی نمی‌شوند.)', 'hesabix-v2'),
 							'confirmResume' => __('همگام‌سازی خودکار دوباره فعال شود؟ در رویدادهای بعدی، محتوای ووکامرس ممکن است فاکتور حسابیکس را به‌روز کند.', 'hesabix-v2'),
 							'confirmBulkProfit' => __('سود فاکتور برای سفارش‌های انتخاب‌شده از حسابیکس دریافت شود؟', 'hesabix-v2'),
 							'profitRefreshing' => __('در حال دریافت سود…', 'hesabix-v2'),
+=======
+							'confirmPause' => __('همگام‌سازی خودکار این سفارش متوقف شود؟ (فاکتورهای دستی در مارک‌استریت با به‌روزرسانی خودکار بازنویسی نمی‌شوند.)', 'hesabix-v2'),
+							'confirmResume' => __('همگام‌سازی خودکار دوباره فعال شود؟ در رویدادهای بعدی، محتوای ووکامرس ممکن است فاکتور مارک‌استریت را به‌روز کند.', 'hesabix-v2'),
+>>>>>>> github/Huma
 						),
 					)
 				);
@@ -346,8 +355,8 @@ class Hesabix_V2_Admin
 						'strings' => array(
 							'genericError' => __('عملیات ناموفق بود.', 'hesabix-v2'),
 							'requestFailed' => __('خطا در ارتباط با سرور.', 'hesabix-v2'),
-							'confirmSync' => __('این مشتری با حسابیکس همگام شود؟ در صورت وجود نگاشت، اطلاعات به‌روز می‌شود.', 'hesabix-v2'),
-							'confirmBulkSync' => __('برای تمام مشتریان انتخاب‌شده همگام‌سازی با حسابیکس انجام شود؟', 'hesabix-v2'),
+							'confirmSync' => __('این مشتری با مارک‌استریت همگام شود؟ در صورت وجود نگاشت، اطلاعات به‌روز می‌شود.', 'hesabix-v2'),
+							'confirmBulkSync' => __('برای تمام مشتریان انتخاب‌شده همگام‌سازی با مارک‌استریت انجام شود؟', 'hesabix-v2'),
 						),
 					)
 				);
@@ -375,6 +384,7 @@ class Hesabix_V2_Admin
 						'strings' => array(
 							'genericError' => __('عملیات ناموفق بود.', 'hesabix-v2'),
 							'requestFailed' => __('خطا در ارتباط با سرور.', 'hesabix-v2'),
+<<<<<<< HEAD
 							'confirmSync' => __('این محصول (و در صورت متغیر بودن، واریانت‌ها) با حسابیکس همگام شود؟', 'hesabix-v2'),
 							'confirmBulkSync' => __('برای تمام محصولات انتخاب‌شده همگام‌سازی با حسابیکس انجام شود؟', 'hesabix-v2'),
 							'orphanScanning' => __('در حال اسکن…', 'hesabix-v2'),
@@ -384,6 +394,10 @@ class Hesabix_V2_Admin
 							'orphanTierHigh' => __('بالا', 'hesabix-v2'),
 							'orphanTierMedium' => __('متوسط', 'hesabix-v2'),
 							'orphanDone' => __('عملیات تمام شد.', 'hesabix-v2'),
+=======
+							'confirmSync' => __('این محصول (و در صورت متغیر بودن، واریانت‌ها) با مارک‌استریت همگام شود؟', 'hesabix-v2'),
+							'confirmBulkSync' => __('برای تمام محصولات انتخاب‌شده همگام‌سازی با مارک‌استریت انجام شود؟', 'hesabix-v2'),
+>>>>>>> github/Huma
 						),
 					)
 				);
@@ -488,8 +502,8 @@ class Hesabix_V2_Admin
 		}
 
 		add_menu_page(
-			__('حسابیکس V2', 'hesabix-v2'),
-			__('حسابیکس V2', 'hesabix-v2'),
+			__('مارک‌استریت V2', 'hesabix-v2'),
+			__('مارک‌استریت V2', 'hesabix-v2'),
 			'manage_woocommerce',
 			'hesabix-v2',
 			array($this, 'display_dashboard'),
@@ -535,8 +549,8 @@ class Hesabix_V2_Admin
 
 		add_submenu_page(
 			'hesabix-v2',
-			__('سفارش‌ها و حسابیکس', 'hesabix-v2'),
-			__('سفارش‌ها و حسابیکس', 'hesabix-v2'),
+			__('سفارش‌ها و مارک‌استریت', 'hesabix-v2'),
+			__('سفارش‌ها و مارک‌استریت', 'hesabix-v2'),
 			'manage_woocommerce',
 			'hesabix-v2-orders',
 			array($this, 'display_orders')
@@ -544,7 +558,7 @@ class Hesabix_V2_Admin
 
 		add_submenu_page(
 			'hesabix-v2',
-			__('مشتریان و حسابیکس', 'hesabix-v2'),
+			__('مشتریان و مارک‌استریت', 'hesabix-v2'),
 			__('مشتریان', 'hesabix-v2'),
 			'manage_woocommerce',
 			'hesabix-v2-customers',
@@ -553,7 +567,7 @@ class Hesabix_V2_Admin
 
 		add_submenu_page(
 			'hesabix-v2',
-			__('محصولات و حسابیکس', 'hesabix-v2'),
+			__('محصولات و مارک‌استریت', 'hesabix-v2'),
 			__('محصولات', 'hesabix-v2'),
 			'manage_woocommerce',
 			'hesabix-v2-products',
@@ -691,7 +705,7 @@ class Hesabix_V2_Admin
 	}
 
 	/**
-	 * فهرست سفارش‌ها، وضعیت حسابیکس، ارسال/لغو دستی
+	 * فهرست سفارش‌ها، وضعیت مارک‌استریت، ارسال/لغو دستی
 	 *
 	 * @return void
 	 */
@@ -708,7 +722,7 @@ class Hesabix_V2_Admin
 	}
 
 	/**
-	 * فهرست مشتریان و همگام‌سازی شخص با حسابیکس.
+	 * فهرست مشتریان و همگام‌سازی شخص با مارک‌استریت.
 	 *
 	 * @since      3.3.5
 	 * @return void
@@ -726,7 +740,7 @@ class Hesabix_V2_Admin
 	}
 
 	/**
-	 * فهرست محصولات والد و همگام‌سازی کالا با حسابیکس.
+	 * فهرست محصولات والد و همگام‌سازی کالا با مارک‌استریت.
 	 *
 	 * @return void
 	 */
@@ -1249,7 +1263,7 @@ class Hesabix_V2_Admin
 	}
 
 	/**
-	 * همگام‌سازی سفارش در پس‌زمینه (صف Cron) تا درخواست ادمین/چک‌اوت به‌خاطر کندی API حسابیکس 504 ندهد.
+	 * همگام‌سازی سفارش در پس‌زمینه (صف Cron) تا درخواست ادمین/چک‌اوت به‌خاطر کندی API مارک‌استریت 504 ندهد.
 	 *
 	 * @param int $order_id
 	 * @return void
@@ -1396,7 +1410,7 @@ class Hesabix_V2_Admin
 			}
 			add_meta_box(
 				'hesabix_v2_order_sync_panel',
-				__('حسابیکس — همگام‌سازی', 'hesabix-v2'),
+				__('مارک‌استریت — همگام‌سازی', 'hesabix-v2'),
 				array($this, 'render_order_hesabix_meta_box'),
 				$screen,
 				'side',
@@ -1442,14 +1456,18 @@ class Hesabix_V2_Admin
 			}
 		}
 
+<<<<<<< HEAD
 		echo '<p><strong>' . esc_html__('وضعیت حسابیکس:', 'hesabix-v2') . '</strong> ' . esc_html($hx_status) . '</p>';
 
 		if (class_exists('Hesabix_V2_Invoice_Profit_Service')) {
 			echo Hesabix_V2_Invoice_Profit_Service::render_meta_box_block($order); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped inside service
 		}
 
+=======
+		echo '<p><strong>' . esc_html__('وضعیت مارک‌استریت:', 'hesabix-v2') . '</strong> ' . esc_html($hx_status) . '</p>';
+>>>>>>> github/Huma
 		echo '<p class="description">' . esc_html__(
-			'اگر فاکتور را در حسابیکس دستی ویرایش کرده‌اید، با فعال کردن گزینهٔ زیر از بازنویسی خودکار توسط ووکامرس جلوگیری کنید.',
+			'اگر فاکتور را در مارک‌استریت دستی ویرایش کرده‌اید، با فعال کردن گزینهٔ زیر از بازنویسی خودکار توسط ووکامرس جلوگیری کنید.',
 			'hesabix-v2'
 		) . '</p>';
 		echo '<p><label><input type="checkbox" name="hesabix_v2_pause_auto_sync" value="1" ' . checked($paused, true, false) . ' /> ';
@@ -1490,7 +1508,7 @@ class Hesabix_V2_Admin
 	}
 
 	/**
-	 * AJAX: ارسال/به‌روزرسانی دستهٔ کوچک سفارش‌ها در حسابیکس
+	 * AJAX: ارسال/به‌روزرسانی دستهٔ کوچک سفارش‌ها در مارک‌استریت
 	 *
 	 * @return void
 	 */
@@ -1500,7 +1518,7 @@ class Hesabix_V2_Admin
 		$this->ajax_require_manage_wc();
 
 		if (!get_option('hesabix_v2_enabled')) {
-			wp_send_json_error(array('message' => __('افزونه حسابیکس غیرفعال است.', 'hesabix-v2')));
+			wp_send_json_error(array('message' => __('افزونه مارک‌استریت غیرفعال است.', 'hesabix-v2')));
 		}
 
 		$raw = isset($_POST['order_ids']) ? wp_unslash($_POST['order_ids']) : array();
@@ -1555,7 +1573,7 @@ class Hesabix_V2_Admin
 	}
 
 	/**
-	 * AJAX: همگام‌سازی دستهٔ مشتریان (bulk API حسابیکس).
+	 * AJAX: همگام‌سازی دستهٔ مشتریان (bulk API مارک‌استریت).
 	 *
 	 * @since      3.3.5
 	 * @return void
@@ -1566,7 +1584,7 @@ class Hesabix_V2_Admin
 		$this->ajax_require_manage_wc();
 
 		if (!get_option('hesabix_v2_enabled')) {
-			wp_send_json_error(array('message' => __('افزونه حسابیکس غیرفعال است.', 'hesabix-v2')));
+			wp_send_json_error(array('message' => __('افزونه مارک‌استریت غیرفعال است.', 'hesabix-v2')));
 		}
 
 		$raw = isset($_POST['customer_ids']) ? wp_unslash($_POST['customer_ids']) : array();
@@ -1624,7 +1642,7 @@ class Hesabix_V2_Admin
 	}
 
 	/**
-	 * AJAX: همگام‌سازی دستهٔ محصولات والد با API bulk حسابیکس.
+	 * AJAX: همگام‌سازی دستهٔ محصولات والد با API bulk مارک‌استریت.
 	 *
 	 * @return void
 	 */
@@ -1634,7 +1652,7 @@ class Hesabix_V2_Admin
 		$this->ajax_require_manage_wc();
 
 		if (!get_option('hesabix_v2_enabled')) {
-			wp_send_json_error(array('message' => __('افزونه حسابیکس غیرفعال است.', 'hesabix-v2')));
+			wp_send_json_error(array('message' => __('افزونه مارک‌استریت غیرفعال است.', 'hesabix-v2')));
 		}
 
 		$raw = isset($_POST['product_ids']) ? wp_unslash($_POST['product_ids']) : array();
@@ -1772,7 +1790,7 @@ class Hesabix_V2_Admin
 		$this->ajax_require_manage_wc();
 
 		if (!get_option('hesabix_v2_enabled')) {
-			wp_send_json_error(array('message' => __('افزونه حسابیکس غیرفعال است.', 'hesabix-v2')));
+			wp_send_json_error(array('message' => __('افزونه مارک‌استریت غیرفعال است.', 'hesabix-v2')));
 		}
 
 		$raw = isset($_POST['order_ids']) ? wp_unslash($_POST['order_ids']) : array();
@@ -2119,7 +2137,7 @@ class Hesabix_V2_Admin
 	}
 
 	/**
-	 * AJAX: لیست برچسب‌های فاکتور از حسابیکس (برای مرجع در تنظیمات)
+	 * AJAX: لیست برچسب‌های فاکتور از مارک‌استریت (برای مرجع در تنظیمات)
 	 */
 	public function ajax_get_invoice_tags()
 	{
@@ -2168,7 +2186,7 @@ class Hesabix_V2_Admin
 	}
 
 	/**
-	 * بعد از به‌روزرسانی مشتری ووکامرس یا پروفایل وردپرس (همگام با حسابیکس در صورت فعال بودن تنظیمات).
+	 * بعد از به‌روزرسانی مشتری ووکامرس یا پروفایل وردپرس (همگام با مارک‌استریت در صورت فعال بودن تنظیمات).
 	 *
 	 * هوک‌ها: {@see profile_update}، {@see woocommerce_update_customer} (آدرس/جزئیات از حساب کاربری من).
 	 *
@@ -2390,7 +2408,7 @@ class Hesabix_V2_Admin
 			'pending_job' => Hesabix_V2_Opening_Inventory_Service::get_pending_job_summary_for_user(get_current_user_id()),
 			'strings' => array(
 				'loadAccounts' => __('در حال بارگذاری حساب‌ها…', 'hesabix-v2'),
-				'accountsError' => __('خطا در دریافت حساب‌ها از حسابیکس.', 'hesabix-v2'),
+				'accountsError' => __('خطا در دریافت حساب‌ها از مارک‌استریت.', 'hesabix-v2'),
 				'confirmTitle' => __('تأیید قبل از ثبت موجودی افتتاحیه', 'hesabix-v2'),
 				'confirmIntro' => __('پس از اتمام موفق، این بخش دیگر در دسترس نخواهد بود. موارد زیر را بررسی کنید:', 'hesabix-v2'),
 				'running' => __('در حال پردازش دسته‌ها…', 'hesabix-v2'),
@@ -2398,14 +2416,14 @@ class Hesabix_V2_Admin
 				'needInventoryAccount' => __('حساب موجودی (کالا) را انتخاب کنید.', 'hesabix-v2'),
 				'needEquity' => __('حساب حقوق صاحبان سهام را انتخاب کنید.', 'hesabix-v2'),
 				'needWarehouse' => __('انبار پیش‌فرض در تب فاکتور یا شناسه انبار در همین صفحه لازم است.', 'hesabix-v2'),
-				'needFiscalYear' => __('سال مالی جاری در حسابیکس برای این کسب‌وکار در دسترس نیست. تب اتصال را باز کنید یا «بارگذاری حساب‌ها از حسابیکس» را بزنید؛ در صورت نیاز مجوز سال مالی را به کلید API بدهید.', 'hesabix-v2'),
+				'needFiscalYear' => __('سال مالی جاری در مارک‌استریت برای این کسب‌وکار در دسترس نیست. تب اتصال را باز کنید یا «بارگذاری حساب‌ها از مارک‌استریت» را بزنید؛ در صورت نیاز مجوز سال مالی را به کلید API بدهید.', 'hesabix-v2'),
 				'needCurrency' => __('ارز فاکتور/سند را در تب فاکتور تنظیم کنید.', 'hesabix-v2'),
 				'genericFail' => __('عملیات ناموفق بود.', 'hesabix-v2'),
 				'requestFail' => __('خطا در ارتباط با سرور.', 'hesabix-v2'),
 				'taxYes' => __('بله — مالیات بر ارزش افزوده در بهای واحد لحاظ شود', 'hesabix-v2'),
 				'taxNo' => __('خیر — بهای واحد بدون مالیات (خالص)', 'hesabix-v2'),
-				'postYes' => __('بله، سند تراز افتتاحیه در حسابیکس نهایی شود', 'hesabix-v2'),
-				'postNo' => __('خیر، فقط ذخیره شود (نهایی‌سازی بعداً در حسابیکس)', 'hesabix-v2'),
+				'postYes' => __('بله، سند تراز افتتاحیه در مارک‌استریت نهایی شود', 'hesabix-v2'),
+				'postNo' => __('خیر، فقط ذخیره شود (نهایی‌سازی بعداً در مارک‌استریت)', 'hesabix-v2'),
 				'autoBalYes' => __('بله، اختلاف تراز به حساب حقوق صاحبان سهام بسته شود', 'hesabix-v2'),
 				'autoBalNo' => __('خیر، بستن خودکار غیرفعال', 'hesabix-v2'),
 				'done' => __('انجام شد.', 'hesabix-v2'),
@@ -2414,7 +2432,7 @@ class Hesabix_V2_Admin
 				'previewTitle' => __('پیش‌نمایش اقلام', 'hesabix-v2'),
 				'previewTotal' => __('تعداد اقلام قابل ثبت', 'hesabix-v2'),
 				'previewBatches' => __('تخمین تعداد دسته با اندازهٔ فعلی', 'hesabix-v2'),
-				'previewPostedWarn' => __('تراز افتتاحیهٔ این سال در حسابیکس قبلاً نهایی شده؛ ویرایش ممکن نیست.', 'hesabix-v2'),
+				'previewPostedWarn' => __('تراز افتتاحیهٔ این سال در مارک‌استریت قبلاً نهایی شده؛ ویرایش ممکن نیست.', 'hesabix-v2'),
 				'previewColProduct' => __('کالا', 'hesabix-v2'),
 				'previewColQty' => __('موجودی', 'hesabix-v2'),
 				'previewColCost' => __('بهای واحد', 'hesabix-v2'),
@@ -2422,14 +2440,14 @@ class Hesabix_V2_Admin
 				'copyLog' => __('کپی لاگ', 'hesabix-v2'),
 				'copyLogDone' => __('متن لاگ در حافظه کپی شد.', 'hesabix-v2'),
 				'copyLogEmpty' => __('لاگی برای کپی وجود ندارد.', 'hesabix-v2'),
-				'confirmPostDanger' => __('گزینهٔ «نهایی‌سازی سند» فعال است؛ سند تراز افتتاحیه در حسابیکس قفل می‌شود. برای ادامه، عبارت زیر را دقیقاً در پنجرهٔ بعدی وارد کنید:', 'hesabix-v2'),
+				'confirmPostDanger' => __('گزینهٔ «نهایی‌سازی سند» فعال است؛ سند تراز افتتاحیه در مارک‌استریت قفل می‌شود. برای ادامه، عبارت زیر را دقیقاً در پنجرهٔ بعدی وارد کنید:', 'hesabix-v2'),
 				'confirmPostMismatch' => __('عبارت واردشده با مورد نیاز یکسان نیست؛ اجرا لغو شد.', 'hesabix-v2'),
-				'chkEnabled' => __('افزونهٔ حسابیکس فعال است', 'hesabix-v2'),
+				'chkEnabled' => __('افزونهٔ مارک‌استریت فعال است', 'hesabix-v2'),
 				'chkApiKey' => __('کلید API ذخیره شده است', 'hesabix-v2'),
 				'chkBusiness' => __('کسب‌وکار متصل است', 'hesabix-v2'),
 				'chkFiscalYear' => __('سال مالی جاری برای افزونه در دسترس است', 'hesabix-v2'),
 				'chkWarehouse' => __('انبار: پیش‌فرض تب فاکتور یا شناسهٔ انبار در همین فرم', 'hesabix-v2'),
-				'chkCurrency' => __('ارز سند (از تب فاکتور / حسابیکس) قابل تشخیص است', 'hesabix-v2'),
+				'chkCurrency' => __('ارز سند (از تب فاکتور / مارک‌استریت) قابل تشخیص است', 'hesabix-v2'),
 				'pendingBatch' => __('نشست نیمه‌تمام: %1$d از %2$d قلم پردازش شده؛ با «شروع ثبت…» ادامه دهید.', 'hesabix-v2'),
 				'pendingFinalize' => __('نشست نیمه‌تمام: دسته‌ها ذخیره شده‌اند؛ فقط نهایی‌سازی مانده. با «شروع ثبت…» ادامه دهید.', 'hesabix-v2'),
 				'cancelRun' => __('توقف امن پس از دستهٔ جاری', 'hesabix-v2'),
@@ -2596,7 +2614,7 @@ class Hesabix_V2_Admin
 	}
 
 	/**
-	 * AJAX: همگام‌سازی مشتریان (وکامرس → حسابیکس)، دسته‌ای با offset.
+	 * AJAX: همگام‌سازی مشتریان (وکامرس → مارک‌استریت)، دسته‌ای با offset.
 	 *
 	 * @since 2.0.0
 	 */
@@ -2672,7 +2690,7 @@ class Hesabix_V2_Admin
 	}
 
 	/**
-	 * AJAX: واردات اشخاص (مشتری‌سان) از حسابیکس به ووکامرس (مرحله‌ای با skip).
+	 * AJAX: واردات اشخاص (مشتری‌سان) از مارک‌استریت به ووکامرس (مرحله‌ای با skip).
 	 *
 	 * @since 2.0.1
 	 */
@@ -2852,7 +2870,7 @@ class Hesabix_V2_Admin
 	}
 
 	/**
-	 * AJAX: کشش موجودی حسابیکس → ووکامرس (هم‌اکنون)
+	 * AJAX: کشش موجودی مارک‌استریت → ووکامرس (هم‌اکنون)
 	 *
 	 * @since 3.3.2
 	 */
@@ -2864,7 +2882,7 @@ class Hesabix_V2_Admin
 		if (!get_option('hesabix_v2_enabled')) {
 			wp_send_json(array(
 				'success' => false,
-				'message' => __('ابتدا اتصال به حسابیکس را تکمیل کنید.', 'hesabix-v2'),
+				'message' => __('ابتدا اتصال به مارک‌استریت را تکمیل کنید.', 'hesabix-v2'),
 			));
 		}
 
@@ -2944,7 +2962,7 @@ class Hesabix_V2_Admin
 			$message = is_string($err) ? $err : __('کلید API نامعتبر است.', 'hesabix-v2');
 		}
 		if (empty($message)) {
-			$message = __('کلید API نامعتبر است یا منقضی شده. لطفاً از پنل حسابیکس کلید جدید دریافت کنید.', 'hesabix-v2');
+			$message = __('کلید API نامعتبر است یا منقضی شده. لطفاً از پنل مارک‌استریت کلید جدید دریافت کنید.', 'hesabix-v2');
 		}
 
 		wp_send_json(array('success' => false, 'message' => $message));
@@ -3042,7 +3060,7 @@ class Hesabix_V2_Admin
 			array(
 				'token'   => $plain,
 				'message' => __(
-					'توکن جدید ایجاد شد. آن را در حسابیکس ذخیره کنید؛ پس از بستن صفحه دیگر نمایش داده نمی‌شود.',
+					'توکن جدید ایجاد شد. آن را در مارک‌استریت ذخیره کنید؛ پس از بستن صفحه دیگر نمایش داده نمی‌شود.',
 					'hesabix-v2'
 				),
 			)

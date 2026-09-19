@@ -1796,6 +1796,47 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
     return out;
   }
 
+<<<<<<< HEAD
+=======
+  // Cross-platform save using conditional FileSaver
+  Future<void> _saveBytesToDownloads(dynamic data, String filename) async {
+    Uint8List bytes;
+    if (data is List<int>) {
+      bytes = Uint8List.fromList(data);
+    } else if (data is Uint8List) {
+      bytes = data;
+    } else {
+      throw Exception('Unsupported binary data type: ${data.runtimeType}');
+    }
+
+    // Use file_saver package for cross-platform file saving
+    try {
+      final fileSaver = FileSaver.instance;
+      final extension = filename.split('.').last;
+      await fileSaver.saveFile(name: filename, bytes: bytes, fileExtension: extension);
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  // Platform-specific download functions for Linux
+  Future<void> _downloadPdf(dynamic data, String filename) async {
+    try {
+      await _saveBytesToDownloads(data, filename);
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+  Future<void> _downloadExcel(dynamic data, String filename) async {
+    try {
+      await _saveBytesToDownloads(data, filename);
+    } catch (e) {
+      rethrow;
+    }
+  }
+
+>>>>>>> github/Huma
   // Cache for measured text widths to reduce TextPainter.layout calls
   final Map<String, double> _textWidthCache = <String, double>{};
 

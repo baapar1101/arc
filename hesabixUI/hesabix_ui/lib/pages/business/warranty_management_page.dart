@@ -323,7 +323,7 @@ class _WarrantyManagementPageState extends State<WarrantyManagementPage> {
           showTime: true,
           formatter: (item) {
             final code = item as WarrantyCode;
-            return HesabixDateUtils.formatDateTime(
+            return MarkStreetDateUtils.formatDateTime(
               code.generatedAt,
               widget.calendarController.isJalali,
             );
@@ -336,7 +336,7 @@ class _WarrantyManagementPageState extends State<WarrantyManagementPage> {
           formatter: (item) {
             final code = item as WarrantyCode;
             if (code.activatedAt == null) return '-';
-            return HesabixDateUtils.formatDateTime(
+            return MarkStreetDateUtils.formatDateTime(
               code.activatedAt!,
               widget.calendarController.isJalali,
             );
@@ -349,7 +349,7 @@ class _WarrantyManagementPageState extends State<WarrantyManagementPage> {
           formatter: (item) {
             final code = item as WarrantyCode;
             if (code.expiresAt == null) return '-';
-            return HesabixDateUtils.formatDateTime(
+            return MarkStreetDateUtils.formatDateTime(
               code.expiresAt!,
               widget.calendarController.isJalali,
             );

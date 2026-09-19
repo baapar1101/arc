@@ -10,7 +10,7 @@
 class Hesabix_V2_Mapper
 {
 	/**
-	 * کش مسطح درخت دسته‌های حسابیکس برای تطبیق نام (هر درخواست PHP).
+	 * کش مسطح درخت دسته‌های مارک‌استریت برای تطبیق نام (هر درخواست PHP).
 	 *
 	 * @var array<int, array{id:int,parent_id:?int,label:string}>|null
 	 */
@@ -133,7 +133,7 @@ class Hesabix_V2_Mapper
 	}
 
 	/**
-	 * مقدار track_inventory حسابیکس بر اساس سیاست انتخابی (وقتی همگام‌سازی موجودی روشن باشد).
+	 * مقدار track_inventory مارک‌استریت بر اساس سیاست انتخابی (وقتی همگام‌سازی موجودی روشن باشد).
 	 *
 	 * @param WC_Product $product محصول ساده یا واریانت.
 	 * @param string     $policy  یکی از: wc، physical_always، always_on، always_off
@@ -363,7 +363,7 @@ class Hesabix_V2_Mapper
 	}
 
 	/**
-	 * اعمال دادهٔ شخص حسابیکس روی مشتری ووکامرس + متای کاربر.
+	 * اعمال دادهٔ شخص مارک‌استریت روی مشتری ووکامرس + متای کاربر.
 	 *
 	 * @param int   $user_id
 	 * @param array $person ردیف شخص از API (مثل items[])
@@ -543,7 +543,7 @@ class Hesabix_V2_Mapper
 	 * @param    WC_Order    $order
 	 * @param    int         $person_id
 	 * @param    float|null  $amount_factor   ضریب مبلغ (مثلاً ۱۰ برای تومان→ریال).
-	 * @param    int|null    $invoice_currency_id شناسهٔ ارز در حسابیکس؛ اگر تهی باشد از تنظیمات/پیش‌فرض حل می‌شود.
+	 * @param    int|null    $invoice_currency_id شناسهٔ ارز در مارک‌استریت؛ اگر تهی باشد از تنظیمات/پیش‌فرض حل می‌شود.
 	 * @param    array|null  $date_overrides      اختیاری: `document_date` (Y-m-d)، `payment_date_ymd` (Y-m-d برای بخش تاریخ transaction_date پرداخت).
 	 * @return   array
 	 */
@@ -571,7 +571,7 @@ class Hesabix_V2_Mapper
 		$db_service = new Hesabix_V2_DB_Service();
 		$warehouse_id = Hesabix_V2_Invoice_Warehouse_Service::resolve_warehouse_id_for_order($order);
 
-		// Add order items (فرمت API حسابیکس: lines[].product_id, quantity, extra_info)
+		// Add order items (فرمت API مارک‌استریت: lines[].product_id, quantity, extra_info)
 		foreach ($order->get_items() as $item) {
 			$product = $item->get_product();
 			if (!$product) {
@@ -735,7 +735,7 @@ class Hesabix_V2_Mapper
 			$header_tax_total = 0;
 		}
 
-		// حسابیکس مبلغ قطعی فاکتور را از gross − discount + tax می‌گیرد؛ پرداخت افزونه از round(order_total).
+		// مارک‌استریت مبلغ قطعی فاکتور را از gross − discount + tax می‌گیرد؛ پرداخت افزونه از round(order_total).
 		// گرد کردن جداگانه ممکن است ۱–۲ واحد اختلاف بدهد؛ gross را در حد تحمل اصلاح می‌کنیم.
 		$gross_r = (int) round($gross, 0);
 		$discount_r = (int) round($order_discount, 0);
@@ -936,7 +936,7 @@ class Hesabix_V2_Mapper
 	}
 
 	/**
-	 * پرداخت‌های همراه فاکتور (سند دریافت در حسابیکس) فقط برای فاکتور قطعی و سفارش پرداخت‌شده.
+	 * پرداخت‌های همراه فاکتور (سند دریافت در مارک‌استریت) فقط برای فاکتور قطعی و سفارش پرداخت‌شده.
 	 *
 	 * @param WC_Order $order
 	 * @param bool     $is_proforma
@@ -1037,7 +1037,7 @@ class Hesabix_V2_Mapper
 	}
 
 	/**
-	 * انتخاب یک ترم product_cat برای همگام با حسابیکس (چند دسته: اصلی SEO یا عمیق‌ترین شاخه).
+	 * انتخاب یک ترم product_cat برای همگام با مارک‌استریت (چند دسته: اصلی SEO یا عمیق‌ترین شاخه).
 	 *
 	 * @since 2.0.8
 	 * @param WC_Product $product
@@ -1107,7 +1107,7 @@ class Hesabix_V2_Mapper
 	}
 
 	/**
-	 * ذخیرهٔ اسنپ‌شات ووکامرس/حسابیکس برای تشخیص تغییر بعدی نام یا والد.
+	 * ذخیرهٔ اسنپ‌شات ووکامرس/مارک‌استریت برای تشخیص تغییر بعدی نام یا والد.
 	 *
 	 * @since 2.0.8
 	 * @param Hesabix_V2_DB_Service $db
@@ -1140,7 +1140,7 @@ class Hesabix_V2_Mapper
 	}
 
 	/**
-	 * اگر نام یا والد ترم در ووکامرس عوض شده، دستهٔ متناظر در حسابیکس را به‌روز یا جابه‌جا کن.
+	 * اگر نام یا والد ترم در ووکامرس عوض شده، دستهٔ متناظر در مارک‌استریت را به‌روز یا جابه‌جا کن.
 	 *
 	 * @since 2.0.8
 	 * @param int                   $wc_category_id
@@ -1254,7 +1254,7 @@ class Hesabix_V2_Mapper
 			return null;
 		}
 
-		// تطبیق والد ووکامرس با دستهٔ والد در حسابیکس (در صورت وجود)
+		// تطبیق والد ووکامرس با دستهٔ والد در مارک‌استریت (در صورت وجود)
 		$parent_hesabix_id = null;
 		if (!empty($term->parent) && (int) $term->parent > 0) {
 			$parent_hesabix_id = self::get_or_create_category_mapping((int) $term->parent);
@@ -1347,7 +1347,7 @@ class Hesabix_V2_Mapper
 				if (count($errors) < 40) {
 					$errors[] = array(
 						'wc_category_id' => (int) $tid,
-						'message' => __('ایجاد/تطبیق دسته در حسابیکس ناموفق بود', 'hesabix-v2'),
+						'message' => __('ایجاد/تطبیق دسته در مارک‌استریت ناموفق بود', 'hesabix-v2'),
 					);
 				}
 			}
@@ -1464,7 +1464,7 @@ class Hesabix_V2_Mapper
 	}
 
 	/**
-	 * فهرست مسطح دسته‌های حسابیکس از درخت API.
+	 * فهرست مسطح دسته‌های مارک‌استریت از درخت API.
 	 *
 	 * @since 2.0.8
 	 * @return array<int, array{id:int,parent_id:?int,label:string}>
@@ -1516,7 +1516,7 @@ class Hesabix_V2_Mapper
 	}
 
 	/**
-	 * پیدا کردن شناسهٔ دسته در حسابیکس با نام و والد (بدون ساخت رکورد جدید).
+	 * پیدا کردن شناسهٔ دسته در مارک‌استریت با نام و والد (بدون ساخت رکورد جدید).
 	 *
 	 * @since 2.0.8
 	 * @param string   $wc_term_name
@@ -1571,7 +1571,7 @@ class Hesabix_V2_Mapper
 	}
 
 	/**
-	 * شناسه حساب درآمد حمل کالا در حسابیکس؛ اولویت با تنظیم کاربر، سپس حساب پیش‌فرض 60104.
+	 * شناسه حساب درآمد حمل کالا در مارک‌استریت؛ اولویت با تنظیم کاربر، سپس حساب پیش‌فرض 60104.
 	 *
 	 * @return int
 	 */
@@ -1610,7 +1610,7 @@ class Hesabix_V2_Mapper
 	}
 
 	/**
-	 * استخراج آرایه حساب‌ها از پاسخ‌های مختلف API حسابیکس.
+	 * استخراج آرایه حساب‌ها از پاسخ‌های مختلف API مارک‌استریت.
 	 *
 	 * @param array $res
 	 * @return array<int, array<string, mixed>>
@@ -1663,7 +1663,7 @@ class Hesabix_V2_Mapper
 			return $shipping_product_id;
 		}
 
-		// Create shipping product (فرمت API حسابیکس: name، item_type، main_unit، base_sales_price)
+		// Create shipping product (فرمت API مارک‌استریت: name، item_type، main_unit، base_sales_price)
 		$api = new Hesabix_V2_Api();
 		$result = $api->create_product(array(
 			'name' => 'هزینه حمل و نقل',

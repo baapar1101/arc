@@ -140,8 +140,15 @@ class _PeopleTransactionsReportPageState extends State<PeopleTransactionsReportP
 
   String _formatDate(dynamic value) {
     if (value == null) return '';
+<<<<<<< HEAD
     return HesabixDateUtils.formatApiDateForDisplay(
       value,
+=======
+    
+    // استفاده از helper موجود
+    return MarkStreetDateUtils.formatForDisplay(
+      value is DateTime ? value : (value is String ? DateTime.tryParse(value) : null),
+>>>>>>> github/Huma
       widget.calendarController.isJalali,
       fallback: '',
     );

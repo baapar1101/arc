@@ -578,7 +578,7 @@ await api.post('/products/bulk-delete', {
 
 ## 📞 پشتیبانی
 
-- **ایمیل**: support@hesabix.ir
+- **ایمیل**: support@markstreet.co
 - **مستندات**: https://docs.hesabix.ir
 - **وضعیت سرویس**: https://status.hesabix.ir
 - **تلگرام**: @hesabix_support

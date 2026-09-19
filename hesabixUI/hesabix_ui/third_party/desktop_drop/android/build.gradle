@@ -7,7 +7,6 @@ version '1.0-SNAPSHOT'
 // از project صریح در allprojects و از project در buildscript برای رسیدن به gradle.properties ریشه استفاده می‌شود.
 
 buildscript {
-    ext.kotlin_version = '1.9.10'
     repositories {
         maven { MavenArtifactRepository repo ->
             def p = new Properties()
@@ -42,7 +41,6 @@ buildscript {
 
     dependencies {
         classpath 'com.android.tools.build:gradle:7.4.2'
-        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
     }
 }
 
@@ -81,7 +79,6 @@ rootProject.allprojects { proj ->
 }
 
 apply plugin: 'com.android.library'
-apply plugin: 'kotlin-android'
 
 android {
     // Conditional for compatibility with AGP <4.2.
@@ -96,8 +93,10 @@ android {
         targetCompatibility JavaVersion.VERSION_1_8
     }
 
+    // بدون این، کاتلین jvmTarget را از JDK اجراکنندهٔ گریدل می‌گیرد (۲۱) و با
+    // compileOptions بالا (۱٫۸) تناقض می‌سازد. همان الگوی android/app/build.gradle.kts.
     kotlinOptions {
-        jvmTarget = '1.8'
+        jvmTarget = JavaVersion.VERSION_1_8.toString()
     }
 
     sourceSets {
@@ -110,5 +109,4 @@ android {
 }
 
 dependencies {
-    implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk7:$kotlin_version"
 }

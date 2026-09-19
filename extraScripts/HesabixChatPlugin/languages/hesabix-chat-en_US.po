@@ -21,10 +21,10 @@ msgstr "Chat with support"
 msgid "پشتیبانی"
 msgstr "Support"
 
-msgid "چت حسابیکس"
+msgid "چت مارک‌استریت"
 msgstr "Hesabix chat"
 
-msgid "اتصال به سرور حسابیکس: آدرس پایه API و کلید عمومی ویجت چت را از پنل CRM > چت وب وارد کنید. دامنه سایت وردپرس باید در «دامنه‌های مجاز» همان ویجت ثبت شده باشد."
+msgid "اتصال به سرور مارک‌استریت: آدرس پایه API و کلید عمومی ویجت چت را از پنل CRM > چت وب وارد کنید. دامنه سایت وردپرس باید در «دامنه‌های مجاز» همان ویجت ثبت شده باشد."
 msgstr "Connect to Hesabix: enter the API base URL and the chat widget public key from the CRM &gt; Web chat panel. Your WordPress site domain must be listed in that widget’s “allowed domains” (allowed origins)."
 
 msgid "آدرس پایه API (سرور)"
@@ -213,16 +213,16 @@ msgstr "A small square or wide logo (e.g. 64px) works well. It appears beside th
 msgid "رنگ اصلی (دکمه و هدر)"
 msgstr "Primary color (button and header)"
 
-msgid "به‌روزرسانی افزونه چت حسابیکس"
+msgid "به‌روزرسانی افزونه چت مارک‌استریت"
 msgstr "Hesabix Web Chat update"
 
-msgid "افزونهٔ «چت حسابیکس» را الان نسخهٔ %1$s دارید؛ نسخهٔ %2$s در منبع به‌روزرسانی موجود است. از تنظیمات افزونه و تب «به‌روزرسانی افزونه» می‌توانید آن را نصب کنید."
+msgid "افزونهٔ «چت مارک‌استریت» را الان نسخهٔ %1$s دارید؛ نسخهٔ %2$s در منبع به‌روزرسانی موجود است. از تنظیمات افزونه و تب «به‌روزرسانی افزونه» می‌توانید آن را نصب کنید."
 msgstr "Your installed Hesabix Web Chat version is %1$s; source version %2$s is available. Open the plugin settings and the “Plugin update” tab to install it."
 
-msgid "نسخهٔ %2$s «چت حسابیکس» در منبع منتشر شده؛ نصب‌شدهٔ شما %1$s است، اما نسخهٔ وردپرس یا PHP با الزامات اعلام‌شده جور نیست. از تب «به‌روزرسانی افزونه» جزئیات را ببینید."
+msgid "نسخهٔ %2$s «چت مارک‌استریت» در منبع منتشر شده؛ نصب‌شدهٔ شما %1$s است، اما نسخهٔ وردپرس یا PHP با الزامات اعلام‌شده جور نیست. از تب «به‌روزرسانی افزونه» جزئیات را ببینید."
 msgstr "%2$s Hesabix Web Chat is offered by the remote source while you still have %1$s installed — your WordPress or PHP version doesn’t meet the stated requirements; see details on the “Plugin update” tab."
 
-msgid "نسخهٔ %2$s «چت حسابیکس» در منبع دیده می‌شود (شما %1$s). اگر ابزار نصب در دسترس نباشد از تب «به‌روزرسانی افزونه» کمک بگیرید."
+msgid "نسخهٔ %2$s «چت مارک‌استریت» در منبع دیده می‌شود (شما %1$s). اگر ابزار نصب در دسترس نباشد از تب «به‌روزرسانی افزونه» کمک بگیرید."
 msgstr "%2$s Hesabix Web Chat is visible on the source (your site has %1$s). If automated install isn’t available, open the “Plugin update” tab for guidance."
 
 msgid "رفتن به به‌روزرسانی افزونه"

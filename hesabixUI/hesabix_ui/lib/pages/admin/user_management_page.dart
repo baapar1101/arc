@@ -134,7 +134,11 @@ class _UserManagementPageState extends State<UserManagementPage> {
     return DataTableConfig<Map<String, dynamic>>(
       endpoint: '/api/v1/users/search',
       title: 'مدیریت کاربران',
+<<<<<<< HEAD
       subtitle: BrandConfig.rebrand('نمایش، فیلتر و کنترل کاربران سیستم حسابیکس'),
+=======
+      subtitle: 'نمایش، فیلتر و کنترل کاربران سیستم مارک‌استریت',
+>>>>>>> github/Huma
       tableId: 'admin_users',
       showSearch: true,
       showFilters: true,

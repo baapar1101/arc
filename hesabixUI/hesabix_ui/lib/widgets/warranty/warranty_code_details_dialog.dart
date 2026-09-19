@@ -76,21 +76,21 @@ class WarrantyCodeDetailsDialog extends StatelessWidget {
                       context,
                       theme,
                       t.warrantyGeneratedAt,
-                      HesabixDateUtils.formatDateTime(warrantyCode.generatedAt, calendarController.isJalali),
+                      MarkStreetDateUtils.formatDateTime(warrantyCode.generatedAt, calendarController.isJalali),
                     ),
                     if (warrantyCode.activatedAt != null)
                       _buildInfoRow(
                         context,
                         theme,
                         t.warrantyActivatedAt,
-                        HesabixDateUtils.formatDateTime(warrantyCode.activatedAt!, calendarController.isJalali),
+                        MarkStreetDateUtils.formatDateTime(warrantyCode.activatedAt!, calendarController.isJalali),
                       ),
                     if (warrantyCode.expiresAt != null)
                       _buildInfoRow(
                         context,
                         theme,
                         t.warrantyExpiresAt,
-                        HesabixDateUtils.formatDateTime(warrantyCode.expiresAt!, calendarController.isJalali),
+                        MarkStreetDateUtils.formatDateTime(warrantyCode.expiresAt!, calendarController.isJalali),
                       ),
                     _buildInfoRow(
                       context,

@@ -8,24 +8,33 @@ class AppConfig {
     defaultValue: '',
   );
 
+  /// بک‌اند پیش‌فرض. مسیرها خودشان `/api/v1/...` را دارند، پس اینجا فقط
+  /// origin نوشته می‌شود — نه `/api/v1`، وگرنه دو بار تکرار می‌شود.
+  static const String defaultApiBaseUrl = 'https://tamastore.ir';
+
+  /// هاست‌هایی که یعنی «در حال توسعهٔ محلی هستیم».
+  static const Set<String> _devHosts = {'localhost', '127.0.0.1', '::1'};
+
   /// API Base URL
   ///
   /// - اگر با `--dart-define=API_BASE_URL=...` مقداردهی شود همان استفاده می‌شود.
-  /// - در وب اگر مقداردهی نشده باشد، از همان origin فعلی استفاده می‌کنیم (به شرط اینکه
-  ///   روی reverse proxy مسیرهای `/api/*` و `/ws/*` به بک‌اند پاس داده شوند).
-  /// - در غیر وب، پیش‌فرض `http://localhost:8000` است.
+  /// - در وب وقتی از یک هاست محلی سرو می‌شویم، بک‌اند محلی وجود ندارد؛ پس به
+  ///   [defaultApiBaseUrl] وصل می‌شویم تا بشود صفحات را با دادهٔ واقعی دید.
+  /// - در وبِ منتشرشده از همان origin استفاده می‌شود (reverse proxy مسیرهای
+  ///   `/api/*` و `/ws/*` را به بک‌اند پاس می‌دهد).
   static String get apiBaseUrl {
     final v = _envApiBaseUrl.trim();
     if (v.isNotEmpty) return v;
 
     if (kIsWeb) {
       final u = Uri.base;
-      // مثال: http://localhost:8080 یا https://arc.hesabix.ir
-      // در این حالت انتظار داریم reverse proxy مسیرهای api/ws را route کند.
+      // توسعهٔ محلی: origin ما یک سرور استاتیک است و API ندارد.
+      if (_devHosts.contains(u.host)) return defaultApiBaseUrl;
+      // مثال: https://arc.hesabix.ir — پشت reverse proxy.
       return u.origin;
     }
 
-    return 'http://localhost:8000';
+    return defaultApiBaseUrl;
   }
 
   static const String _envAppPublicUrl = String.fromEnvironment(

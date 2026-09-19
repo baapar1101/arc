@@ -418,7 +418,7 @@ String _formatLoanFacilityDateLabel(CalendarController calendar, dynamic apiValu
   if (apiValue == null) return '—';
   final raw = apiValue.toString().trim();
   if (raw.isEmpty) return '—';
-  return HesabixDateUtils.formatApiDateForDisplay(apiValue, calendar.isJalali, fallback: '—');
+  return MarkStreetDateUtils.formatApiDateForDisplay(apiValue, calendar.isJalali, fallback: '—');
 }
 
 double _roundMoney(double value, int moneyDecimalPlaces) {

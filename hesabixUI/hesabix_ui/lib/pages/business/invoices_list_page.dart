@@ -11,7 +11,7 @@ import 'package:hesabix_ui/models/invoice_list_item.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table_widget.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table_config.dart';
 import 'package:hesabix_ui/widgets/date_input_field.dart';
-import 'package:hesabix_ui/core/date_utils.dart' show HesabixDateUtils;
+import 'package:hesabix_ui/core/date_utils.dart' show MarkStreetDateUtils;
 import 'package:hesabix_ui/utils/number_formatters.dart' show formatWithThousands;
 import 'package:hesabix_ui/widgets/document/document_details_dialog.dart';
 import 'package:hesabix_ui/widgets/invoice/invoice_pdf_print_flow.dart';
@@ -605,10 +605,10 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
 
     if (_fromDate != null || _toDate != null) {
       final from = _fromDate != null
-          ? HesabixDateUtils.formatForDisplay(_fromDate!, widget.calendarController.isJalali)
+          ? MarkStreetDateUtils.formatForDisplay(_fromDate!, widget.calendarController.isJalali)
           : '—';
       final to = _toDate != null
-          ? HesabixDateUtils.formatForDisplay(_toDate!, widget.calendarController.isJalali)
+          ? MarkStreetDateUtils.formatForDisplay(_toDate!, widget.calendarController.isJalali)
           : '—';
       chips.add(Chip(
         label: Text('${t.documentDate}: $from → $to'),
@@ -1044,8 +1044,8 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
         pageSizeOptions: const [10, 20, 50, 100],
         additionalParams: {
           'document_type': _selectedInvoiceType,
-          if (_fromDate != null) 'from_date': HesabixDateUtils.formatForApiDate(_fromDate!),
-          if (_toDate != null) 'to_date': HesabixDateUtils.formatForApiDate(_toDate!),
+          if (_fromDate != null) 'from_date': MarkStreetDateUtils.formatForApiDate(_fromDate!),
+          if (_toDate != null) 'to_date': MarkStreetDateUtils.formatForApiDate(_toDate!),
           if (_isProforma != null) 'is_proforma': _isProforma,
           if (_selectedFiscalYearId != null) 'fiscal_year_id': _selectedFiscalYearId,
           if (_selectedProjectId != null) 'project_id': _selectedProjectId,
@@ -1250,7 +1250,7 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
           'document_date',
           t.documentDate,
           width: ColumnWidth.medium,
-          formatter: (item) => HesabixDateUtils.formatForDisplay(item.documentDate, widget.calendarController.isJalali),
+          formatter: (item) => MarkStreetDateUtils.formatForDisplay(item.documentDate, widget.calendarController.isJalali),
         ),
         // مبلغ کل
         TextColumn(
@@ -1421,8 +1421,8 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
       },
       additionalParams: {
         'document_type': _selectedInvoiceType,
-        if (_fromDate != null) 'from_date': HesabixDateUtils.formatForApiDate(_fromDate!),
-        if (_toDate != null) 'to_date': HesabixDateUtils.formatForApiDate(_toDate!),
+        if (_fromDate != null) 'from_date': MarkStreetDateUtils.formatForApiDate(_fromDate!),
+        if (_toDate != null) 'to_date': MarkStreetDateUtils.formatForApiDate(_toDate!),
         if (_isProforma != null) 'is_proforma': _isProforma,
         if (_selectedFiscalYearId != null) 'fiscal_year_id': _selectedFiscalYearId,
         if (_selectedProjectId != null) 'project_id': _selectedProjectId,
@@ -1505,7 +1505,7 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
     final remainingStr = invoice.remainingAmount != null
         ? '${formatWithThousands(invoice.remainingAmount!, decimalPlaces: 2)} ${invoice.currencyCode ?? 'ریال'}'
         : null;
-    final dateText = HesabixDateUtils.formatForDisplay(invoice.documentDate, widget.calendarController.isJalali);
+    final dateText = MarkStreetDateUtils.formatForDisplay(invoice.documentDate, widget.calendarController.isJalali);
     final typeText = (invoice.documentTypeName).trim().isNotEmpty ? invoice.documentTypeName : _invoiceTypeLabel(t, invoice.documentType);
     final counterparty = (invoice.counterparty == null || invoice.counterparty!.trim().isEmpty) ? t.unknown : invoice.counterparty!;
     final project = invoice.projectName ?? '-';

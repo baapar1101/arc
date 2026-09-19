@@ -3,7 +3,7 @@ import 'package:hesabix_ui/models/credit_models.dart';
 import 'package:hesabix_ui/services/credit_api_service.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/core/api_client.dart';
-import 'package:hesabix_ui/core/date_utils.dart' show HesabixDateUtils;
+import 'package:hesabix_ui/core/date_utils.dart' show MarkStreetDateUtils;
 import '../../utils/snackbar_helper.dart';
 import '../../widgets/business_subpage_back_leading.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
@@ -641,7 +641,7 @@ class _InstallmentPlanDialogState extends State<InstallmentPlanDialog> {
     for (int i = 0; i < showCount; i++) {
       final due = DateTime.now().add(Duration(days: periodDays * i));
       final total = perPrincipal + perInterest;
-      final dueDisplay = HesabixDateUtils.formatForDisplay(due.toLocal(), isJalali);
+      final dueDisplay = MarkStreetDateUtils.formatForDisplay(due.toLocal(), isJalali);
       previewRows.add(
         Row(
           children: [

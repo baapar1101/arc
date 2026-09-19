@@ -218,7 +218,7 @@ class _NotificationHistoryPageState extends State<NotificationHistoryPage> {
                 final date = DateTime.tryParse(createdAt);
                 if (date == null) return createdAt;
                 // استفاده از formatDateTime برای نمایش تاریخ و زمان
-                return HesabixDateUtils.formatDateTime(date, widget.calendarController.isJalali);
+                return MarkStreetDateUtils.formatDateTime(date, widget.calendarController.isJalali);
               },
             ),
             CustomColumn(
@@ -358,7 +358,7 @@ class _NotificationDetailsDialog extends StatelessWidget {
                     if (createdAt != null)
                       _buildDetailRow(
                         'تاریخ و زمان',
-                        HesabixDateUtils.formatDateTime(
+                        MarkStreetDateUtils.formatDateTime(
                           DateTime.tryParse(createdAt),
                           calendarController.isJalali,
                         ),
