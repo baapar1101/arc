@@ -120,6 +120,7 @@ def get_quick_sales_settings(db: Session, business_id: int) -> Dict[str, Any]:
             "default_price_list_id": None,
             "auto_print": False,
             "print_template_id": None,
+            "print_paper_size": "80mm",
             "enable_warehouse_document": True,
             "warehouse_document_type": "posted",
             "auto_post_warehouse": True,
@@ -143,6 +144,7 @@ def get_quick_sales_settings(db: Session, business_id: int) -> Dict[str, Any]:
         "default_price_list_id": int(obj.default_price_list_id) if obj.default_price_list_id else None,
         "auto_print": bool(obj.auto_print),
         "print_template_id": int(obj.print_template_id) if obj.print_template_id else None,
+        "print_paper_size": (getattr(obj, "print_paper_size", None) or "80mm"),
         "enable_warehouse_document": bool(getattr(obj, 'enable_warehouse_document', True)),
         "warehouse_document_type": str(getattr(obj, 'warehouse_document_type', 'posted')),
         "auto_post_warehouse": bool(obj.auto_post_warehouse),
@@ -248,6 +250,15 @@ def update_quick_sales_settings(db: Session, business_id: int, payload: Dict[str
     if "print_template_id" in payload:
         template_id = payload.get("print_template_id")
         obj.print_template_id = int(template_id) if template_id is not None else None
+
+    if "print_paper_size" in payload:
+        from app.services.pdf.page_size import is_receipt_paper
+
+        raw = payload.get("print_paper_size")
+        size = str(raw).strip() if raw not in (None, "") else None
+        if size and size not in ("A4", "A5", "A6") and not is_receipt_paper(size):
+            raise ApiError("INVALID_PAPER_SIZE", "سایز کاغذ چاپ نامعتبر است", http_status=400)
+        obj.print_paper_size = size
     
     if "enable_warehouse_document" in payload:
         obj.enable_warehouse_document = bool(payload.get("enable_warehouse_document"))

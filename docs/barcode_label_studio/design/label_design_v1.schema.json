@@ -1,0 +1,239 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hesabix.local/schemas/label_design_v1.json",
+  "title": "Hesabix Label Design v1",
+  "type": "object",
+  "required": ["schema_version", "canvas", "elements"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "type": "integer",
+      "const": 1
+    },
+    "canvas": {
+      "type": "object",
+      "required": ["width_mm", "height_mm"],
+      "additionalProperties": false,
+      "properties": {
+        "width_mm": { "type": "number", "exclusiveMinimum": 0, "maximum": 500 },
+        "height_mm": { "type": "number", "exclusiveMinimum": 0, "maximum": 500 },
+        "grid_mm": { "type": "number", "exclusiveMinimum": 0, "default": 1 },
+        "snap_to_grid": { "type": "boolean", "default": true },
+        "guides_mm": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "vertical": {
+              "type": "array",
+              "items": { "type": "number" }
+            },
+            "horizontal": {
+              "type": "array",
+              "items": { "type": "number" }
+            }
+          }
+        },
+        "dpi": {
+          "type": "integer",
+          "enum": [203, 300, 600],
+          "default": 300
+        }
+      }
+    },
+    "elements": {
+      "type": "array",
+      "maxItems": 50,
+      "items": { "$ref": "#/$defs/element" }
+    }
+  },
+  "$defs": {
+    "elementBase": {
+      "type": "object",
+      "required": ["id", "type", "x_mm", "y_mm", "w_mm", "h_mm"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "type": {
+          "type": "string",
+          "enum": ["text", "barcode", "qr", "datamatrix", "image", "shape", "line"]
+        },
+        "name": { "type": "string", "maxLength": 120 },
+        "x_mm": { "type": "number" },
+        "y_mm": { "type": "number" },
+        "w_mm": { "type": "number", "exclusiveMinimum": 0 },
+        "h_mm": { "type": "number", "exclusiveMinimum": 0 },
+        "rotation_deg": { "type": "number", "default": 0 },
+        "z_index": { "type": "integer", "default": 0 },
+        "locked": { "type": "boolean", "default": false },
+        "visible": { "type": "boolean", "default": true },
+        "props": { "type": "object" }
+      }
+    },
+    "contentMode": {
+      "type": "string",
+      "enum": ["fixed", "binding"]
+    },
+    "bindingKey": {
+      "type": "string",
+      "maxLength": 128,
+      "description": "e.g. product.name, product.general_barcode, instance.serial"
+    },
+    "element": {
+      "allOf": [
+        { "$ref": "#/$defs/elementBase" },
+        {
+          "oneOf": [
+            { "$ref": "#/$defs/textElement" },
+            { "$ref": "#/$defs/barcodeElement" },
+            { "$ref": "#/$defs/qrElement" },
+            { "$ref": "#/$defs/datamatrixElement" },
+            { "$ref": "#/$defs/imageElement" },
+            { "$ref": "#/$defs/shapeElement" },
+            { "$ref": "#/$defs/lineElement" }
+          ]
+        }
+      ]
+    },
+    "textElement": {
+      "type": "object",
+      "properties": {
+        "type": { "const": "text" },
+        "props": {
+          "type": "object",
+          "required": ["content_mode"],
+          "additionalProperties": false,
+          "properties": {
+            "content_mode": { "$ref": "#/$defs/contentMode" },
+            "text": { "type": "string", "maxLength": 2000 },
+            "binding": { "$ref": "#/$defs/bindingKey" },
+            "font_family": {
+              "type": "string",
+              "enum": ["YekanBakhFaNum", "Vazirmatn"],
+              "default": "YekanBakhFaNum"
+            },
+            "font_size_pt": { "type": "number", "minimum": 4, "maximum": 72, "default": 9 },
+            "font_weight": { "type": "string", "enum": ["normal", "bold"], "default": "normal" },
+            "align": { "type": "string", "enum": ["left", "center", "right"], "default": "center" },
+            "valign": { "type": "string", "enum": ["top", "middle", "bottom"], "default": "middle" },
+            "color": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$", "default": "#000000" },
+            "rtl": { "type": "boolean", "default": true },
+            "wrap": { "type": "boolean", "default": true }
+          }
+        }
+      }
+    },
+    "barcodeElement": {
+      "type": "object",
+      "properties": {
+        "type": { "const": "barcode" },
+        "props": {
+          "type": "object",
+          "required": ["symbology", "content_mode"],
+          "additionalProperties": false,
+          "properties": {
+            "symbology": {
+              "type": "string",
+              "enum": ["code128", "code39", "code93", "ean8", "ean13", "codabar"]
+            },
+            "content_mode": { "$ref": "#/$defs/contentMode" },
+            "value": { "type": "string", "maxLength": 256 },
+            "binding": { "$ref": "#/$defs/bindingKey" },
+            "show_text": { "type": "boolean", "default": true },
+            "text_size_pt": { "type": "number", "minimum": 4, "maximum": 24, "default": 7 },
+            "quiet_zone_mm": { "type": "number", "minimum": 0, "maximum": 10, "default": 1 }
+          }
+        }
+      }
+    },
+    "qrElement": {
+      "type": "object",
+      "properties": {
+        "type": { "const": "qr" },
+        "props": {
+          "type": "object",
+          "required": ["content_mode"],
+          "additionalProperties": false,
+          "properties": {
+            "content_mode": { "$ref": "#/$defs/contentMode" },
+            "value": { "type": "string", "maxLength": 2048 },
+            "binding": { "$ref": "#/$defs/bindingKey" },
+            "ecc": { "type": "string", "enum": ["L", "M", "Q", "H"], "default": "M" },
+            "quiet_zone_mm": { "type": "number", "minimum": 0, "maximum": 10, "default": 1 }
+          }
+        }
+      }
+    },
+    "datamatrixElement": {
+      "type": "object",
+      "properties": {
+        "type": { "const": "datamatrix" },
+        "props": {
+          "type": "object",
+          "required": ["content_mode"],
+          "additionalProperties": false,
+          "properties": {
+            "content_mode": { "$ref": "#/$defs/contentMode" },
+            "value": { "type": "string", "maxLength": 2048 },
+            "binding": { "$ref": "#/$defs/bindingKey" },
+            "quiet_zone_mm": { "type": "number", "minimum": 0, "maximum": 10, "default": 1 }
+          }
+        }
+      }
+    },
+    "imageElement": {
+      "type": "object",
+      "properties": {
+        "type": { "const": "image" },
+        "props": {
+          "type": "object",
+          "required": ["source"],
+          "additionalProperties": false,
+          "properties": {
+            "source": {
+              "type": "string",
+              "enum": ["upload", "product.image", "business.logo"]
+            },
+            "file_id": { "type": "string", "maxLength": 64 },
+            "data_uri": { "type": "string", "maxLength": 3000000 },
+            "fit": {
+              "type": "string",
+              "enum": ["contain", "cover", "fill"],
+              "default": "contain"
+            },
+            "opacity": { "type": "number", "minimum": 0, "maximum": 1, "default": 1 }
+          }
+        }
+      }
+    },
+    "shapeElement": {
+      "type": "object",
+      "properties": {
+        "type": { "const": "shape" },
+        "props": {
+          "type": "object",
+          "required": ["shape"],
+          "additionalProperties": false,
+          "properties": {
+            "shape": { "type": "string", "enum": ["rect", "ellipse"] },
+            "stroke": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$", "default": "#000000" },
+            "fill": { "type": ["string", "null"], "pattern": "^#[0-9A-Fa-f]{6}$" },
+            "stroke_width_mm": { "type": "number", "minimum": 0, "maximum": 5, "default": 0.3 }
+          }
+        }
+      }
+    },
+    "lineElement": {
+      "type": "object",
+      "properties": {
+        "type": { "const": "line" },
+        "props": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "stroke": { "type": "string", "pattern": "^#[0-9A-Fa-f]{6}$", "default": "#000000" },
+            "stroke_width_mm": { "type": "number", "minimum": 0, "maximum": 5, "default": 0.3 }
+          }
+        }
+      }
+    }
+  }
+}

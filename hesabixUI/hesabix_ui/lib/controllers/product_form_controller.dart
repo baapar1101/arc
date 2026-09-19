@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import '../models/product_form_data.dart';
 import '../services/product_service.dart';
+import '../services/opening_balance_service.dart';
 import '../services/category_service.dart';
+import '../services/catalog_spec_field_service.dart';
 import '../services/product_attribute_service.dart';
 import '../services/tax_service.dart';
 import '../services/price_list_service.dart';
@@ -11,6 +13,9 @@ import '../core/api_client.dart';
 import '../utils/error_extractor.dart';
 import '../utils/product_form_auto_save.dart';
 import '../utils/product_form_validator.dart';
+import '../utils/number_normalizer.dart';
+import '../utils/catalog_business_contact_validator.dart';
+import '../services/business_api_service.dart';
 
 class ProductFormController extends ChangeNotifier {
   final int businessId;
@@ -19,10 +24,12 @@ class ProductFormController extends ChangeNotifier {
   late final ProductService _productService;
   late final CategoryService _categoryService;
   late final ProductAttributeService _attributeService;
+  late final CatalogSpecFieldService _catalogSpecFieldService;
   late final TaxService _taxService;
   late final PriceListService _priceListService;
   late final CurrencyService _currencyService;
   late final WarehouseService _warehouseService;
+  late final OpeningBalanceService _openingBalanceService;
 
   ProductFormData _formData = ProductFormData();
   bool _isLoading = false;
@@ -34,6 +41,7 @@ class ProductFormController extends ChangeNotifier {
   // Reference data
   List<Map<String, dynamic>> _categories = [];
   List<Map<String, dynamic>> _attributes = [];
+  List<Map<String, dynamic>> _catalogSpecFields = [];
   List<Map<String, dynamic>> _taxTypes = [];
   List<Map<String, dynamic>> _taxUnits = [];
   List<Map<String, dynamic>> _priceLists = [];
@@ -51,6 +59,16 @@ class ProductFormController extends ChangeNotifier {
   final ProductFormAutoSave _autoSave = ProductFormAutoSave();
   bool _autoSaveEnabled = true;
 
+  // Opening balance (تعداد اولیه در سند افتتاحیه)
+  Map<String, dynamic>? _obEligibility;
+  bool _obEligibilityLoading = false;
+  String _openingBalanceQuantity = '';
+  String _openingBalanceCostPrice = '';
+  double? _obInitialQuantity;
+  double? _obInitialCostPrice;
+  int? _obInitialWarehouseId;
+  bool _obInitialHadLine = false;
+
   ProductFormController({
     required this.businessId,
     ApiClient? apiClient,
@@ -62,10 +80,12 @@ class ProductFormController extends ChangeNotifier {
     _productService = ProductService(apiClient: _apiClient);
     _categoryService = CategoryService(_apiClient);
     _attributeService = ProductAttributeService(apiClient: _apiClient);
+    _catalogSpecFieldService = CatalogSpecFieldService(apiClient: _apiClient);
     _taxService = TaxService(apiClient: _apiClient);
     _priceListService = PriceListService(apiClient: _apiClient);
     _currencyService = CurrencyService(_apiClient);
     _warehouseService = WarehouseService();
+    _openingBalanceService = OpeningBalanceService(_apiClient);
   }
 
   // Getters
@@ -76,12 +96,186 @@ class ProductFormController extends ChangeNotifier {
   int? get lastCreatedProductId => _lastCreatedProductId;
   List<Map<String, dynamic>> get categories => _categories;
   List<Map<String, dynamic>> get attributes => _attributes;
+  List<Map<String, dynamic>> get catalogSpecFields => _catalogSpecFields;
   List<Map<String, dynamic>> get taxTypes => _taxTypes;
   List<Map<String, dynamic>> get taxUnits => _taxUnits;
   List<Map<String, dynamic>> get priceLists => _priceLists;
   List<Map<String, dynamic>> get currencies => _currencies;
   List<Map<String, dynamic>> get warehouses => _warehouses;
   List<Map<String, dynamic>> get draftPriceItems => List.unmodifiable(_draftPriceItems);
+
+  Map<String, dynamic>? get obEligibility => _obEligibility;
+  bool get obEligibilityLoading => _obEligibilityLoading;
+  String get openingBalanceQuantity => _openingBalanceQuantity;
+  String get openingBalanceCostPrice => _openingBalanceCostPrice;
+  bool get obEditable => _obEligibility?['editable'] == true;
+  /// نمایش بخش تعداد اولیه — حتی بدون دسترسی ویرایش (فقط‌خواندنی با هشدار).
+  bool get showOpeningBalanceSection {
+    if (_formData.itemType != 'کالا' || !_formData.trackInventory) return false;
+    return _obEligibility != null || _obEligibilityLoading;
+  }
+
+  void setOpeningBalanceQuantity(String value) {
+    _openingBalanceQuantity = value;
+    notifyListeners();
+  }
+
+  void setOpeningBalanceCostPrice(String value) {
+    _openingBalanceCostPrice = value;
+    notifyListeners();
+  }
+
+  Future<void> loadOpeningBalanceEligibility({int? productId}) async {
+    _obEligibilityLoading = true;
+    notifyListeners();
+    try {
+      final data = await _openingBalanceService.fetchProductLineEligibility(
+        businessId: businessId,
+        productId: productId ?? _editingProductId,
+        warehouseId: _formData.defaultWarehouseId,
+      );
+      _obEligibility = data;
+      _applyOpeningBalanceFromEligibility(data);
+    } catch (_) {
+      _obEligibility = null;
+    } finally {
+      _obEligibilityLoading = false;
+      notifyListeners();
+    }
+  }
+
+  void _applyOpeningBalanceFromEligibility(Map<String, dynamic> data) {
+    final pob = data['product_opening_balance'];
+    _obInitialHadLine = data['has_opening_balance_line'] == true;
+    _obInitialQuantity = null;
+    _obInitialCostPrice = null;
+    _obInitialWarehouseId = null;
+    if (pob is Map) {
+      final qty = (pob['quantity'] as num?)?.toDouble();
+      final cost = (pob['cost_price'] as num?)?.toDouble();
+      final wh = (pob['warehouse_id'] as num?)?.toInt();
+      if (wh != null) {
+        _obInitialWarehouseId = wh;
+      }
+      if (qty != null && qty > 0) {
+        _openingBalanceQuantity = formatNumberForInput(qty);
+        _obInitialQuantity = qty;
+      } else if (_obInitialHadLine) {
+        // خط وجود دارد ولی مقدار قابل‌پارس نیست — از ارسال اشتباه clear جلوگیری کن
+        _obInitialHadLine = false;
+      }
+      if (cost != null && cost > 0) {
+        _openingBalanceCostPrice = formatNumberForInput(cost);
+        _obInitialCostPrice = cost;
+      }
+    } else if (_obInitialHadLine) {
+      _obInitialHadLine = false;
+    }
+    if (!_obInitialHadLine) {
+      _openingBalanceQuantity = '';
+      _openingBalanceCostPrice = '';
+      _obInitialWarehouseId = null;
+    }
+  }
+
+  bool _openingBalanceChanged() {
+    if (!obEditable || !showOpeningBalanceSection) return false;
+    final rawQty = _openingBalanceQuantity.trim();
+    if (!_obInitialHadLine && rawQty.isEmpty) return false;
+    if (_obInitialHadLine && rawQty.isEmpty) return true;
+    final qty = parseFormattedDouble(rawQty) ??
+        double.tryParse(rawQty.replaceAll(',', ''));
+    if (qty == null || qty <= 0) return _obInitialHadLine;
+    if (!_obInitialHadLine) return true;
+    if (_obInitialQuantity == null) return false;
+
+    final rawCost = _openingBalanceCostPrice.trim();
+    final cost = rawCost.isEmpty
+        ? 0.0
+        : (parseFormattedDouble(rawCost) ??
+            double.tryParse(rawCost.replaceAll(',', '')) ??
+            0.0);
+    final initialCost = _obInitialCostPrice ?? 0.0;
+    return qty != _obInitialQuantity || cost != initialCost;
+  }
+
+  int? _resolveOpeningBalanceWarehouseId() {
+    return _formData.defaultWarehouseId ?? _obInitialWarehouseId;
+  }
+
+  ProductOpeningBalanceInput? buildOpeningBalanceInput() {
+    if (!showOpeningBalanceSection) return null;
+
+    final fiscalYearId = (_obEligibility?['fiscal_year_id'] as num?)?.toInt();
+    final warehouseId = _resolveOpeningBalanceWarehouseId();
+
+    if (isEditingProduct) {
+      if (!obEditable || !_openingBalanceChanged()) return null;
+      final rawQty = _openingBalanceQuantity.trim();
+      if (rawQty.isEmpty) {
+        if (warehouseId == null) {
+          throw FormatException(
+            'برای حذف تعداد اولیه، انبار پیش‌فرض کالا یا انبار ثبت‌شده در تراز افتتاحیه لازم است',
+          );
+        }
+        return ProductOpeningBalanceInput(
+          clear: true,
+          warehouseId: warehouseId,
+          fiscalYearId: fiscalYearId,
+        );
+      }
+      final qty = parseFormattedDouble(rawQty) ??
+          double.tryParse(rawQty.replaceAll(',', ''));
+      if (qty == null || qty <= 0) {
+        throw FormatException('تعداد اولیه باید بزرگتر از صفر باشد');
+      }
+      final rawCost = _openingBalanceCostPrice.trim();
+      final cost = rawCost.isEmpty
+          ? 0.0
+          : (parseFormattedDouble(rawCost) ??
+              double.tryParse(rawCost.replaceAll(',', '')) ??
+              0.0);
+      if (cost < 0) {
+        throw FormatException('بهای تمام‌شده نمی‌تواند منفی باشد');
+      }
+      if (warehouseId == null) {
+        throw FormatException('برای ثبت تعداد اولیه، انتخاب انبار الزامی است');
+      }
+      return ProductOpeningBalanceInput(
+        quantity: qty,
+        costPrice: cost,
+        warehouseId: warehouseId,
+        fiscalYearId: fiscalYearId,
+      );
+    }
+
+    if (!obEditable) return null;
+    final rawQty = _openingBalanceQuantity.trim();
+    if (rawQty.isEmpty) return null;
+    final qty = parseFormattedDouble(rawQty) ??
+        double.tryParse(rawQty.replaceAll(',', ''));
+    if (qty == null || qty <= 0) {
+      throw FormatException('تعداد اولیه باید بزرگتر از صفر باشد');
+    }
+    final rawCost = _openingBalanceCostPrice.trim();
+    final cost = rawCost.isEmpty
+        ? (_formData.basePurchasePrice?.toDouble() ?? 0.0)
+        : (parseFormattedDouble(rawCost) ??
+            double.tryParse(rawCost.replaceAll(',', '')) ??
+            0.0);
+    if (cost < 0) {
+      throw FormatException('بهای تمام‌شده نمی‌تواند منفی باشد');
+    }
+    if (warehouseId == null) {
+      throw FormatException('برای ثبت تعداد اولیه، انتخاب انبار الزامی است');
+    }
+    return ProductOpeningBalanceInput(
+      quantity: qty,
+      costPrice: cost,
+      warehouseId: warehouseId,
+      fiscalYearId: fiscalYearId,
+    );
+  }
 
   void addOrUpdateDraftPriceItem(Map<String, dynamic> item) {
     final String key = (
@@ -196,6 +390,7 @@ class ProductFormController extends ChangeNotifier {
       
       _clearError();
       notifyListeners();
+      await loadOpeningBalanceEligibility(productId: _editingProductId);
     } catch (e) {
       _setError(ErrorExtractor.userMessage(e));
     } finally {
@@ -212,14 +407,17 @@ class ProductFormController extends ChangeNotifier {
         _attributeService.search(businessId: businessId, limit: 100)
             .then((res) => List<Map<String, dynamic>>.from(res['items'] ?? const []))
             .catchError((_) => <Map<String, dynamic>>[]),
+        _catalogSpecFieldService.list(businessId: businessId, activeOnly: true)
+            .catchError((_) => <Map<String, dynamic>>[]),
         _taxService.getTaxTypes().catchError((_) => <Map<String, dynamic>>[]),
         _taxService.getTaxUnits().catchError((_) => <Map<String, dynamic>>[]),
       ]);
       
       _categories = results[0] as List<Map<String, dynamic>>;
       _attributes = results[1] as List<Map<String, dynamic>>;
-      _taxTypes = results[2] as List<Map<String, dynamic>>;
-      _taxUnits = results[3] as List<Map<String, dynamic>>;
+      _catalogSpecFields = results[2] as List<Map<String, dynamic>>;
+      _taxTypes = results[3] as List<Map<String, dynamic>>;
+      _taxUnits = results[4] as List<Map<String, dynamic>>;
     } catch (e) {
       throw Exception('خطا در بارگذاری اطلاعات مرجع: $e');
     }
@@ -232,6 +430,18 @@ class ProductFormController extends ChangeNotifier {
       notifyListeners();
     } catch (e) {
       // Silently fail - categories will be refreshed on next form load
+    }
+  }
+
+  Future<void> refreshCatalogSpecFields() async {
+    try {
+      _catalogSpecFields = await _catalogSpecFieldService.list(
+        businessId: businessId,
+        activeOnly: true,
+      );
+      notifyListeners();
+    } catch (e) {
+      // Silently fail - templates refresh on next form load
     }
   }
 
@@ -290,15 +500,20 @@ class ProductFormController extends ChangeNotifier {
 
   // Update form data
   void updateFormData(ProductFormData newData) {
+    final warehouseChanged = newData.defaultWarehouseId != _formData.defaultWarehouseId;
+    final trackChanged = newData.trackInventory != _formData.trackInventory;
     _formData = newData;
     _clearError();
-    
+
     // Auto-save (فقط برای فرم جدید)
     if (_autoSaveEnabled && _editingProductId == null) {
       _autoSave.saveFormData(businessId, null, newData);
     }
-    
+
     notifyListeners();
+    if (warehouseChanged || trackChanged) {
+      loadOpeningBalanceEligibility(productId: _editingProductId);
+    }
   }
 
   // Validate form
@@ -321,6 +536,24 @@ class ProductFormController extends ChangeNotifier {
     return isValid;
   }
 
+  Future<bool> _ensureCatalogBusinessContactReady() async {
+    if (!_formData.isPublicCatalog) return true;
+    try {
+      final business = await BusinessApiService.getBusiness(businessId);
+      final message = CatalogBusinessContactValidator.blockingMessage(business);
+      if (message.isNotEmpty) {
+        _setError(message);
+        return false;
+      }
+      return true;
+    } catch (e) {
+      _setError(
+        'بارگذاری اطلاعات تماس کسب‌وکار ناموفق بود. قبل از انتشار در شبکهٔ تأمین، تنظیمات کسب‌وکار را بررسی کنید.',
+      );
+      return false;
+    }
+  }
+
   // Submit form (create new product only). For editing, call updateProduct.
   Future<bool> submitForm() async {
     if (!_formData.name.trim().isNotEmpty) {
@@ -328,9 +561,24 @@ class ProductFormController extends ChangeNotifier {
       return false;
     }
 
+    if (!await _ensureCatalogBusinessContactReady()) {
+      return false;
+    }
+
     _setLoading(true);
     try {
+      ProductOpeningBalanceInput? openingBalanceInput;
+      try {
+        openingBalanceInput = buildOpeningBalanceInput();
+      } catch (e) {
+        _setError(e is FormatException ? e.message : ErrorExtractor.userMessage(e));
+        return false;
+      }
+
       final payload = _formData.toPayload();
+      if (openingBalanceInput != null) {
+        payload['opening_balance'] = openingBalanceInput.toJson();
+      }
       // Check duplicate code if provided
       if (!_formData.autoGenerateCode) {
         final trimmedCode = _formData.code?.trim();
@@ -384,6 +632,10 @@ class ProductFormController extends ChangeNotifier {
       return false;
     }
 
+    if (!await _ensureCatalogBusinessContactReady()) {
+      return false;
+    }
+
     _setLoading(true);
     try {
       // بررسی تغییر از bulk به unique
@@ -418,7 +670,18 @@ class ProductFormController extends ChangeNotifier {
         }
       }
       
+      ProductOpeningBalanceInput? openingBalanceInput;
+      try {
+        openingBalanceInput = buildOpeningBalanceInput();
+      } catch (e) {
+        _setError(e is FormatException ? e.message : ErrorExtractor.userMessage(e));
+        return false;
+      }
+
       final payload = _formData.toPayload();
+      if (openingBalanceInput != null) {
+        payload['opening_balance'] = openingBalanceInput.toJson();
+      }
       // Pre-check duplicate code before sending
       if (!_formData.autoGenerateCode) {
         final trimmedCode = _formData.code?.trim();

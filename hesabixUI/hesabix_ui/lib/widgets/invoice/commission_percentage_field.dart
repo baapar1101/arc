@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 
 import '../../utils/number_normalizer.dart';
 
+import 'invoice_form_layout.dart';
+
 class CommissionPercentageField extends StatefulWidget {
   final double? initialValue;
   final Function(double?) onChanged;
@@ -80,25 +82,21 @@ class _CommissionPercentageFieldState extends State<CommissionPercentageField> {
         const EnglishDigitsFormatter(),
         FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
       ],
-      decoration: InputDecoration(
-        labelText: widget.label,
-        hintText: widget.hintText,
-        suffixText: '%',
-        suffixStyle: Theme.of(context).textTheme.bodyMedium?.copyWith(
-          color: Theme.of(context).colorScheme.primary,
-          fontWeight: FontWeight.w500,
-        ),
-        prefixIcon: Icon(
-          Icons.percent,
-          color: Theme.of(context).colorScheme.primary,
-        ),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(8),
-        ),
-        errorText: _errorText,
-        errorStyle: TextStyle(
-          color: Theme.of(context).colorScheme.error,
-          fontSize: 12,
+      decoration: InvoiceFormFieldMetrics.mergeDecoration(
+        context,
+        InputDecoration(
+          labelText: widget.label,
+          hintText: widget.hintText,
+          suffixText: '%',
+          suffixStyle: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: Theme.of(context).colorScheme.primary,
+                fontWeight: FontWeight.w500,
+              ),
+          errorText: _errorText,
+          errorStyle: TextStyle(
+            color: Theme.of(context).colorScheme.error,
+            fontSize: 12,
+          ),
         ),
       ),
       onChanged: _validateAndUpdate,

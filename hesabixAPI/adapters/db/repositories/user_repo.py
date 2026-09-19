@@ -156,10 +156,16 @@ class UserRepository(BaseRepository[User]):
 	
 	def get_support_operators(self) -> List[User]:
 		"""دریافت لیست تمام اپراتورهای پشتیبانی فعال"""
-		from sqlalchemy import cast, Boolean
+		from sqlalchemy import cast, or_
+		from sqlalchemy.dialects.postgresql import JSONB
+		permissions = cast(User.app_permissions, JSONB)
 		stmt = select(User).where(
-			cast(User.app_permissions['support_operator'], Boolean) == True
-		).where(User.is_active == True)
+			User.is_active == True,
+			or_(
+				permissions.contains({"support_operator": True}),
+				permissions.contains({"superadmin": True}),
+			),
+		)
 		return list(self.db.execute(stmt).scalars().all())
 	
 	def is_support_operator(self, user_id: int) -> bool:
@@ -180,8 +186,13 @@ class UserRepository(BaseRepository[User]):
 			parts = [p for p in [user.first_name, user.last_name] if p]
 			full_name = " ".join(parts) if parts else None
 		
-		# تعیین status از is_active
-		status = "active" if user.is_active else "inactive"
+		# تعیین status از is_active و وضعیت تأیید
+		if not user.is_active:
+			status = "inactive"
+		elif not user.email_verified and not user.mobile_verified:
+			status = "pending"
+		else:
+			status = "active"
 		
 		# تعیین role از app_permissions
 		role = "user"
@@ -259,5 +270,11 @@ class UserRepository(BaseRepository[User]):
 			})
 		
 		return result
+
+	def query_admin_list(self, query_info: QueryInfo) -> tuple[list[User], int]:
+		"""لیست کاربران برای پنل مدیریت با فیلدهای مجازی UI."""
+		from app.services.user_list_query_service import query_users_admin
+
+		return query_users_admin(self.db, query_info)
 
 

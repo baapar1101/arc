@@ -46,10 +46,14 @@ def _cols(items: List[tuple[str, str, str, str]]) -> List[Dict[str, Any]]:
 
 def _invoice_detail_columns() -> List[Dict[str, Any]]:
 	return _cols([
-		("product_name", "شرح", "", "32%"),
-		("quantity", "تعداد", "", "10%"),
-		("unit_price", "فی", "money", "14%"),
-		("line_total", "مبلغ", "money", "14%"),
+		("product_name", "شرح", "", "24%"),
+		("quantity", "تعداد", "", "8%"),
+		("unit_price", "فی", "money", "12%"),
+		("discount", "تخفیف", "money", "10%"),
+		("amount_before_discount", "جمع بدون تخفیف", "money", "12%"),
+		("amount_before_tax", "جمع بدون مالیات", "money", "12%"),
+		("tax_amount", "مالیات", "money", "10%"),
+		("line_total", "مبلغ", "money", "12%"),
 	])
 
 
@@ -57,6 +61,7 @@ def _invoice_detail_totals() -> List[Dict[str, Any]]:
 	return [
 		{"key": "subtotal", "title": "جمع اقلام", "expr": "invoice.subtotal", "visible": True, "format": "money"},
 		{"key": "discount", "title": "تخفیف", "expr": "invoice.discount_total", "visible": True, "format": "money"},
+		{"key": "amount_without_tax", "title": "مبلغ بدون مالیات", "expr": "invoice.amount_without_tax", "visible": True, "format": "money"},
 		{"key": "tax", "title": "مالیات", "expr": "invoice.tax_total", "visible": True, "format": "money"},
 		{"key": "payable", "title": "قابل پرداخت", "expr": "invoice.payable_total", "visible": True, "format": "money", "emphasis": True},
 	]
@@ -72,6 +77,44 @@ def _design_base(family_id: str, layout: str, theme: Dict[str, Any], **extra: An
 		"custom_css": "",
 		**extra,
 	}
+
+
+def _invoice_receipt_columns() -> List[Dict[str, Any]]:
+	return _cols([
+		("product_name", "کالا", "", "52%"),
+		("quantity_display", "تعداد", "", "18%"),
+		("line_total", "مبلغ", "money", "30%"),
+	])
+
+
+def _invoice_receipt_design(
+	family_id: str,
+	theme: Dict[str, Any],
+	sections: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+	base_sections = {
+		"show_seller_info": False,
+		"show_buyer_info": True,
+		"show_payments": True,
+		"show_footer_note": True,
+		"show_qr": False,
+		"show_signatures": False,
+		"show_seller_signature": False,
+		"show_buyer_signature": False,
+		"show_print_time": True,
+		"show_preparer": False,
+		"show_unit_price": True,
+	}
+	if sections:
+		base_sections.update(sections)
+	return _design_base(
+		family_id,
+		"invoice_receipt",
+		theme,
+		sections=base_sections,
+		table={"items_var": "lines", "striped": False, "bordered": False, "columns": _invoice_receipt_columns()},
+		totals={"rows": _invoice_detail_totals()},
+	)
 
 
 def _invoice_detail_design(family_id: str, theme: Dict[str, Any], sections: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
@@ -272,6 +315,8 @@ _FAMILIES: List[TemplateFamily] = [
 	TemplateFamily("invoice_classic", "invoices", "detail", "فاکتور کلاسیک", "Classic Invoice", "چیدمان سنتی با حاشیه و جدول مشخص", "#1e3a5f", ("فاکتور", "رسمی"), "invoice_detail"),
 	TemplateFamily("invoice_modern", "invoices", "detail", "فاکتور مدرن", "Modern Invoice", "سربرگ رنگی و فضای سفید بیشتر", "#2563eb", ("فاکتور", "مدرن"), "invoice_detail"),
 	TemplateFamily("invoice_compact", "invoices", "detail", "فاکتور فشرده", "Compact Invoice", "فونت کوچک‌تر برای اقلام زیاد", "#0f766e", ("فاکتور", "فشرده"), "invoice_detail"),
+	TemplateFamily("invoice_receipt_simple", "invoices", "receipt", "فیش ساده", "Simple Receipt", "چیدمان باریک حرارتی: کالا، تعداد، مبلغ", "#111827", ("فیش", "حرارتی"), "invoice_receipt"),
+	TemplateFamily("invoice_receipt_branded", "invoices", "receipt", "فیش با لوگو و QR", "Branded Receipt", "فیش حرارتی با لوگو و کد تأیید", "#0f766e", ("فیش", "QR"), "invoice_receipt"),
 	TemplateFamily("list_standard", "invoices", "list", "لیست استاندارد", "Standard List", "جدول خوانا برای لیست فاکتورها", "#475569", ("لیست",), "generic_list"),
 	TemplateFamily("list_modern", "invoices", "list", "لیست مدرن", "Modern List", "لیست با سربرگ رنگی", "#7c3aed", ("لیست", "مدرن"), "generic_list"),
 	# receipts_payments
@@ -300,6 +345,15 @@ _DEFAULT_DESIGNS: Dict[str, Dict[str, Any]] = {
 		_theme("#0f766e", "#14b8a6", base=9),
 		{"show_payments": False},
 	),
+	"invoice_receipt_simple": _invoice_receipt_design(
+		"invoice_receipt_simple",
+		_theme("#111827", "#374151", base=9),
+	),
+	"invoice_receipt_branded": _invoice_receipt_design(
+		"invoice_receipt_branded",
+		_theme("#0f766e", "#14b8a6", base=9),
+		{"show_qr": True},
+	),
 	"list_standard": _generic_list_design("list_standard", _theme("#475569", "#64748b"), _LIST_COLS_INVOICE),
 	"list_modern": _generic_list_design("list_modern", _theme("#7c3aed", "#8b5cf6"), _LIST_COLS_INVOICE, modern_header=True),
 	"rp_list_standard": _generic_list_design("rp_list_standard", _theme("#0369a1", "#0284c7"), _LIST_COLS_RP),
@@ -317,6 +371,7 @@ _DEFAULT_DESIGNS: Dict[str, Dict[str, Any]] = {
 def default_family_for_scope(module_key: str, subtype: Optional[str]) -> Optional[str]:
 	mapping = {
 		("invoices", "detail"): "invoice_classic",
+		("invoices", "receipt"): "invoice_receipt_simple",
 		("invoices", "list"): "list_standard",
 		("receipts_payments", "detail"): "rp_detail_classic",
 		("receipts_payments", "list"): "rp_list_standard",

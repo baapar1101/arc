@@ -28,8 +28,12 @@ import 'package:hesabix_ui/core/date_utils.dart';
 import 'package:hesabix_ui/widgets/jalali_date_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:hesabix_ui/widgets/person/person_balances_by_currency_card.dart';
+import 'package:hesabix_ui/utils/currency_display_utils.dart';
+import 'package:hesabix_ui/utils/number_formatters.dart';
 import '../../utils/snackbar_helper.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 String? _firstNonEmptyPersonMobile(Person? p) {
   if (p == null) return null;
@@ -72,12 +76,9 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
   CalendarController? _calendarController;
   bool _loadingCalendar = false;
   Future<void>? _calendarLoadInFlight;
-  double? _summaryDebit;
-  double? _summaryCredit;
-  double? _summaryBalance;
-  String? _summaryStatus;
-  bool _loadingSummary = false;
-  String? _summaryError;
+  Map<String, dynamic>? _balancesByCurrency;
+  bool _loadingBalancesByCurrency = false;
+  String? _balancesByCurrencyError;
   int? _currentFiscalYearId;
   String? _currentFiscalYearName;
   bool _loadingFiscalYear = false;
@@ -90,6 +91,7 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
   int? _selectedExpiryHours = 168;
   bool _includeLedger = true;
   bool _includeInvoices = true;
+  bool _includeInvoiceLines = true;
   int _documentsLimit = 50;
   int _activitiesRefreshKey = 0;
   final TextEditingController _maxViewsController = TextEditingController();
@@ -109,7 +111,7 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
     );
     _loadPersonDetails();
     _ensureCalendarController();
-    _initFinancialContext();
+    _loadFiscalYearInfo();
     _loadShareLinkStatus();
   }
 
@@ -150,12 +152,6 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
     return MarkStreetDateUtils.formatForDisplay(date.toLocal(), isJalali);
   }
 
-  Future<void> _initFinancialContext() async {
-    await _loadFiscalYearInfo();
-    if (!mounted) return;
-    await _loadFinancialSummary();
-  }
-
   Future<void> _loadFiscalYearInfo() async {
     setState(() {
       _loadingFiscalYear = true;
@@ -164,10 +160,18 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
       final service = BusinessDashboardService(ApiClient());
       final items = await service.listFiscalYears(widget.businessId);
       Map<String, dynamic>? current;
-      if (items.isNotEmpty) {
+      final boundId = ApiClient.boundFiscalYearId;
+      if (boundId != null && items.isNotEmpty) {
+        try {
+          current = items.firstWhere((fy) => (fy['id'] as num?)?.toInt() == boundId);
+        } catch (_) {
+          current = null;
+        }
+      }
+      if (current == null && items.isNotEmpty) {
         try {
           current = items.firstWhere(
-            (fy) => fy['is_last'] == true || fy['isLast'] == true,
+            (fy) => fy['is_last'] == true || fy['isLast'] == true || fy['is_current'] == true,
           );
         } catch (_) {
           current = items.first;
@@ -175,7 +179,7 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
       }
       if (!mounted) return;
       setState(() {
-        _currentFiscalYearId = current?['id'] as int?;
+        _currentFiscalYearId = (current?['id'] as num?)?.toInt() ?? boundId;
         _currentFiscalYearName = current?['title']?.toString() ?? current?['name']?.toString();
       });
       _refreshKardexTable();
@@ -197,34 +201,46 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
     });
   }
 
-  Future<void> _loadFinancialSummary() async {
-    if (_person?.id == null) return;
-    setState(() {
-      _loadingSummary = true;
-      _summaryError = null;
-    });
-    try {
-      final result = await _fetchLedgerTotals(_person!.id!, _currentFiscalYearId);
-      if (!mounted) return;
-      setState(() {
-        _summaryDebit = result.debit;
-        _summaryCredit = result.credit;
-        _summaryBalance = result.balance;
-        _summaryStatus = result.status;
-        _loadingSummary = false;
-      });
-    } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _summaryError = ErrorExtractor.forContext(e, context);
-        _loadingSummary = false;
-      });
+  String get _baseCurrencyUnit {
+    final c = widget.authStore.currentBusiness?.defaultCurrency;
+    if (c == null) return 'ریال';
+    final symbol = c.symbol.trim();
+    if (symbol.isNotEmpty) return symbol;
+    final code = c.code.trim();
+    if (code.isNotEmpty) return code;
+    final title = c.title.trim();
+    return title.isNotEmpty ? title : 'ریال';
+  }
+
+  String? _documentCurrencyUnit(Map<String, dynamic> item) {
+    final id = (item['document_currency_id'] as num?)?.toInt();
+    final list = widget.authStore.currentBusiness?.currencies ?? const [];
+    if (id != null) {
+      for (final c in list) {
+        if (c.id == id) {
+          final symbol = c.symbol.trim();
+          if (symbol.isNotEmpty) return symbol;
+          final code = c.code.trim();
+          if (code.isNotEmpty) return code;
+          if (c.title.trim().isNotEmpty) return c.title.trim();
+        }
+      }
     }
+    final sym = item['currency_symbol']?.toString().trim();
+    if (sym != null && sym.isNotEmpty) return sym;
+    final code = item['currency_code']?.toString().trim();
+    if (code != null && code.isNotEmpty) return code;
+    return null;
+  }
+
+  int _nativeDecimalPlaces(Map<String, dynamic> item) {
+    return (item['currency_decimal_places'] as num?)?.toInt() ?? 2;
   }
 
   void _applyShareLinkOptions(PersonShareLink link) {
     _includeLedger = link.options.includeLedger;
     _includeInvoices = link.options.includeInvoices;
+    _includeInvoiceLines = link.options.includeInvoiceLines;
     _documentsLimit = link.options.documentsLimit;
     _maxViewsController.text = link.maxViewCount?.toString() ?? '';
     final remaining = link.remainingHours;
@@ -281,6 +297,7 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
       final options = PersonShareLinkOptionsModel(
         includeLedger: _includeLedger,
         includeInvoices: _includeInvoices,
+        includeInvoiceLines: _includeInvoiceLines,
         documentsLimit: _documentsLimit,
       );
       final link = await _personService.createPersonShareLink(
@@ -322,6 +339,7 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
         _selectedExpiryHours = 168;
         _includeLedger = true;
         _includeInvoices = true;
+        _includeInvoiceLines = true;
         _documentsLimit = 50;
       });
       SnackBarHelper.show(context, message: AppLocalizations.of(context).personShareLinkRevoked);
@@ -447,74 +465,6 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
     }
   }
 
-  Future<_FinancialSummaryResult> _fetchLedgerTotals(int personId, int? fiscalYearId) async {
-    final api = ApiClient();
-    const pageSize = 250;
-    int skip = 0;
-    double totalDebit = 0;
-    double totalCredit = 0;
-    while (true) {
-      final payload = <String, dynamic>{
-        'take': pageSize,
-        'skip': skip,
-        'sort_desc': false,
-        'sort_by': 'document_date',
-        'person_ids': [personId],
-        'match_mode': 'any',
-        'result_scope': 'lines_matching',
-      };
-      if (fiscalYearId != null) {
-        payload['fiscal_year_id'] = fiscalYearId;
-      }
-      final response = await api.post<Map<String, dynamic>>(
-        '/api/v1/kardex/businesses/${widget.businessId}/lines',
-        data: payload,
-      );
-      final body = response.data;
-      if (body is! Map<String, dynamic> || body['success'] != true) {
-        final message = body?['message']?.toString() ?? 'خطا در دریافت اطلاعات کاردکس';
-        throw Exception(message);
-      }
-      final data = body['data'] as Map<String, dynamic>? ?? const {};
-      final items = (data['items'] as List?) ?? const [];
-      for (final raw in items) {
-        if (raw is Map<String, dynamic>) {
-          final debitVal = raw['debit'];
-          final creditVal = raw['credit'];
-          if (debitVal is num) {
-            totalDebit += debitVal.toDouble();
-          } else if (debitVal != null) {
-            totalDebit += double.tryParse('$debitVal') ?? 0;
-          }
-          if (creditVal is num) {
-            totalCredit += creditVal.toDouble();
-          } else if (creditVal != null) {
-            totalCredit += double.tryParse('$creditVal') ?? 0;
-          }
-        }
-      }
-      if (items.length < pageSize) {
-        break;
-      }
-      skip += pageSize;
-    }
-    final balance = totalCredit - totalDebit;
-    final status = _resolveStatus(totalDebit, totalCredit, balance);
-    return _FinancialSummaryResult(
-      debit: totalDebit,
-      credit: totalCredit,
-      balance: balance,
-      status: status,
-    );
-  }
-
-  String _resolveStatus(double debit, double credit, double balance) {
-    if (debit == 0 && credit == 0) return 'بدون تراکنش';
-    if (balance > 0) return 'بستانکار';
-    if (balance < 0) return 'بدهکار';
-    return 'بالانس';
-  }
-
   Future<void> _loadPersonDetails() async {
     final personId = widget.person.id;
     if (personId == null) return;
@@ -529,12 +479,38 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
         _person = data;
         _loadingDetails = false;
       });
+      // مانده per currency فقط برای چندارزی
+      if (widget.authStore.isMultiCurrency) {
+        _loadBalancesByCurrency(personId);
+      }
     } catch (e) {
       if (!mounted) return;
       setState(() {
         _detailsError =
             'خطا در بارگذاری اطلاعات شخص: ${ErrorExtractor.forContext(e, context)}';
         _loadingDetails = false;
+      });
+    }
+  }
+
+  Future<void> _loadBalancesByCurrency(int personId) async {
+    if (!widget.authStore.isMultiCurrency) return;
+    setState(() {
+      _loadingBalancesByCurrency = true;
+      _balancesByCurrencyError = null;
+    });
+    try {
+      final data = await _personService.getPersonBalancesByCurrency(personId);
+      if (!mounted) return;
+      setState(() {
+        _balancesByCurrency = data;
+        _loadingBalancesByCurrency = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _balancesByCurrencyError = ErrorExtractor.forContext(e, context);
+        _loadingBalancesByCurrency = false;
       });
     }
   }
@@ -600,12 +576,15 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
 
   Widget _buildHeader(ThemeData theme) {
     final balance = _person?.balance ?? 0;
-    final balanceColor = balance > 0
-        ? Colors.green
-        : balance < 0
-            ? Colors.red
-            : theme.colorScheme.onSurfaceVariant;
-    final formatter = NumberFormat('#,##0');
+    final rawStatus = _person?.status;
+    final statusText = personBalanceStatusLabel(rawStatus);
+    final balanceColor = _statusColor(statusText.isNotEmpty ? statusText : personBalanceStatusFromSignedAmount(balance));
+    final balanceLabel = formatPersonNetBalanceDisplay(
+      balance: balance,
+      status: rawStatus,
+      unit: _baseCurrencyUnit,
+      decimalPlaces: 0,
+    );
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
@@ -615,62 +594,74 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
           bottom: BorderSide(color: theme.dividerColor),
         ),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          CircleAvatar(
-            radius: 24,
-            backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.1),
-            child: Text(
-              (_person?.aliasName ?? '?').isNotEmpty ? (_person?.aliasName ?? '?')[0] : '?',
-              style: theme.textTheme.titleMedium?.copyWith(color: theme.colorScheme.primary),
-            ),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  _person?.displayName ?? 'بدون نام',
-                  style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+          Row(
+            children: [
+              CircleAvatar(
+                radius: 24,
+                backgroundColor: theme.colorScheme.primary.withValues(alpha: 0.1),
+                child: Text(
+                  (_person?.aliasName ?? '?').isNotEmpty ? (_person?.aliasName ?? '?')[0] : '?',
+                  style: theme.textTheme.titleMedium?.copyWith(color: theme.colorScheme.primary),
                 ),
-                const SizedBox(height: 4),
-                Wrap(
-                  spacing: 12,
-                  runSpacing: 4,
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    if (_person?.code != null)
-                      _buildHeaderChip('کد: ${_person!.code}', theme),
-                    _buildHeaderChip(
-                      'تراز: ${formatter.format(balance)}',
-                      theme,
-                      icon: Icons.account_balance,
-                      iconColor: balanceColor,
+                    Text(
+                      _person?.displayName ?? 'بدون نام',
+                      style: theme.textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
                     ),
-                    if ((_person?.status ?? '').isNotEmpty)
-                      _buildHeaderChip('وضعیت: ${_person!.status}', theme, icon: Icons.circle, iconColor: balanceColor),
-                    if (_loadingDetails)
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: const [
-                          SizedBox(
-                            width: 14,
-                            height: 14,
-                            child: CircularProgressIndicator(strokeWidth: 2),
+                    const SizedBox(height: 4),
+                    Wrap(
+                      spacing: 12,
+                      runSpacing: 4,
+                      children: [
+                        if (_person?.code != null)
+                          _buildHeaderChip('کد: ${_person!.code}', theme),
+                        _buildHeaderChip(
+                          balanceLabel,
+                          theme,
+                          icon: Icons.account_balance,
+                          iconColor: balanceColor,
+                        ),
+                        if (_currentFiscalYearName != null)
+                          _buildHeaderChip(_currentFiscalYearName!, theme),
+                        if (_loadingDetails)
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: const [
+                              SizedBox(
+                                width: 14,
+                                height: 14,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              ),
+                              SizedBox(width: 6),
+                              Text('در حال بروزرسانی...'),
+                            ],
                           ),
-                          SizedBox(width: 6),
-                          Text('در حال بروزرسانی...'),
-                        ],
-                      ),
+                      ],
+                    ),
                   ],
                 ),
-              ],
+              ),
+              IconButton(
+                onPressed: () => Navigator.of(context).pop(),
+                icon: const Icon(Icons.close),
+              ),
+            ],
+          ),
+          if (widget.authStore.isMultiCurrency)
+            PersonBalancesByCurrencyCard(
+              isMultiCurrency: true,
+              payload: _balancesByCurrency,
+              loading: _loadingBalancesByCurrency,
+              error: _balancesByCurrencyError,
             ),
-          ),
-          IconButton(
-            onPressed: () => Navigator.of(context).pop(),
-            icon: const Icon(Icons.close),
-          ),
         ],
       ),
     );
@@ -682,7 +673,7 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.error_outline, color: Colors.red, size: 48),
+            Icon(Icons.error_outline, color: SemanticColorResolver.negative(context), size: 48),
             const SizedBox(height: 12),
             Text(_detailsError!),
             const SizedBox(height: 12),
@@ -773,6 +764,14 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
       return const Center(child: Text('این شخص شناسه معتبر ندارد.'));
     }
 
+    final statusText = personBalanceStatusLabel(_person?.status);
+    final balanceLabel = formatPersonNetBalanceDisplay(
+      balance: _person?.balance ?? 0,
+      status: _person?.status,
+      unit: _baseCurrencyUnit,
+    );
+    final isMc = widget.authStore.isMultiCurrency;
+
     return Column(
       children: [
         Container(
@@ -784,43 +783,75 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
               bottom: BorderSide(color: theme.dividerColor),
             ),
           ),
-          child: Row(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                'لیست اسناد مرتبط با شخص',
-                style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
-              ),
-              const SizedBox(width: 12),
-              if (_currentFiscalYearName != null)
-                Chip(
-                  label: Text(
-                    _currentFiscalYearName!,
-                    style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600),
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'معین جامع طرف‌حساب (ریز خرید/فروش + دریافت/پرداخت)',
+                      style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+                    ),
                   ),
-                  side: BorderSide(color: theme.colorScheme.outlineVariant),
-                  backgroundColor: theme.colorScheme.surface,
-                )
-              else
+                  if (_currentFiscalYearName != null)
+                    Chip(
+                      label: Text(
+                        _currentFiscalYearName!,
+                        style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600),
+                      ),
+                      side: BorderSide(color: theme.colorScheme.outlineVariant),
+                      backgroundColor: theme.colorScheme.surface,
+                    )
+                  else
+                    Text(
+                      'سال مالی انتخاب‌شده',
+                      style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                    ),
+                  if (_loadingFiscalYear) ...[
+                    const SizedBox(width: 8),
+                    const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                  ],
+                  IconButton(
+                    tooltip: 'بروزرسانی کارت حساب',
+                    onPressed: () {
+                      _loadPersonDetails();
+                      _refreshKardexTable();
+                    },
+                    icon: const Icon(Icons.refresh),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              Wrap(
+                spacing: 12,
+                runSpacing: 6,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  Text(
+                    'مانده این سال: $balanceLabel',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: _statusColor(statusText),
+                    ),
+                  ),
+                  Text(
+                    'تراز متحرک از ابتدای سال است؛ مانده نهایی همین عدد بالاست.',
+                    style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                  ),
+                ],
+              ),
+              if (isMc) ...[
+                const SizedBox(height: 4),
                 Text(
-                  'سال مالی جاری',
+                  'ستون بدهکار/بستانکار و تراز متحرک به $_baseCurrencyUnit (ارز پایه) است. فی و تعداد به ارز همان سند است.',
                   style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
                 ),
-              if (_loadingFiscalYear) ...[
-                const SizedBox(width: 8),
-                const SizedBox(
-                  width: 18,
-                  height: 18,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                ),
               ],
-              const Spacer(),
-              IconButton(
-                tooltip: 'بروزرسانی کارت حساب',
-                onPressed: () {
-                  _refreshKardexTable();
-                },
-                icon: const Icon(Icons.refresh),
-              ),
             ],
           ),
         ),
@@ -829,9 +860,24 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
             key: _kardexTableKey,
             config: _buildKardexConfig(t),
             fromJson: (json) => json,
+            calendarController: _calendarController,
           ),
         ),
       ],
+    );
+  }
+
+  bool get _isJalaliCalendar =>
+      _calendarController?.isJalali ??
+      ApiClient.getCalendarController()?.isJalali ??
+      true;
+
+  String _formatKardexDocumentDate(Map<String, dynamic> item) {
+    return HesabixDateUtils.formatApiDateForDisplay(
+      item['document_date'] ?? item['document_date_formatted'],
+      _isJalaliCalendar,
+      rawValue: item['document_date_raw'],
+      fallback: '',
     );
   }
 
@@ -853,9 +899,46 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
       );
     }
 
+    String formatQty(dynamic value) {
+      if (value == null) return '';
+      final n = tryParseAmount(value);
+      if (n == null || n == 0) return '';
+      return formatWithThousands(n, decimalPlaces: n == n.roundToDouble() ? 0 : 2);
+    }
+
+    String formatSide(Map<String, dynamic> item, String field) {
+      final amount = tryParseAmount(item[field]);
+      if (amount == null || amount == 0) return '';
+      if (!widget.authStore.isMultiCurrency) {
+        return formatWithThousands(amount, decimalPlaces: 0);
+      }
+      return formatReportLedgerAmount(
+        amount: amount,
+        amountsInBase: true,
+        nativeAmount: item['${field}_native'],
+        documentCurrencyUnit: _documentCurrencyUnit(item),
+        baseUnit: _baseCurrencyUnit,
+        baseDecimalPlaces: 0,
+        nativeDecimalPlaces: _nativeDecimalPlaces(item),
+      );
+    }
+
+    String formatUnitPrice(Map<String, dynamic> item) {
+      final price = tryParseAmount(item['unit_price']);
+      if (price == null || price == 0) return '';
+      if (!widget.authStore.isMultiCurrency) {
+        return formatWithThousands(price, decimalPlaces: price == price.roundToDouble() ? 0 : 2);
+      }
+      return formatAmountWithCurrencyUnit(
+        price,
+        unit: _documentCurrencyUnit(item) ?? '',
+        decimalPlaces: _nativeDecimalPlaces(item),
+      );
+    }
+
     return DataTableConfig<Map<String, dynamic>>(
-      endpoint: '/api/v1/kardex/businesses/${widget.businessId}/lines',
-      title: t.kardexDocuments,
+      endpoint: '/api/v1/persons/businesses/${widget.businessId}/reports/people-transactions',
+      title: t.reportsPeopleTransactionsTitle,
       showActiveFilters: false,
       showClearFiltersButton: false,
       showColumnSearch: false,
@@ -864,7 +947,7 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
       showBackButton: false,
       additionalParams: {
         'person_ids': [widget.person.id],
-        'result_scope': 'lines_matching',
+        'detail_level': 'comprehensive',
         if (_currentFiscalYearId != null) 'fiscal_year_id': _currentFiscalYearId,
       },
       columns: [
@@ -872,7 +955,7 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
           'document_date',
           t.documentDate,
           filterType: ColumnFilterType.dateRange,
-          formatter: (item) => (item as Map<String, dynamic>)['document_date']?.toString(),
+          formatter: (item) => _formatKardexDocumentDate(item as Map<String, dynamic>),
         ),
         TextColumn(
           'document_code',
@@ -880,7 +963,7 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
           formatter: (item) => (item as Map<String, dynamic>)['document_code']?.toString(),
         ),
         TextColumn(
-          'document_type',
+          'document_type_name',
           t.documentType,
           formatter: (item) {
             final map = item as Map<String, dynamic>;
@@ -888,14 +971,27 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
           },
         ),
         TextColumn(
-          'check_number',
-          'شماره چک',
-          width: ColumnWidth.medium,
+          'product_name',
+          'کالا/خدمت',
+          width: ColumnWidth.large,
           formatter: (item) {
-            final map = item as Map<String, dynamic>;
-            final cn = map['check_number']?.toString();
-            return (cn != null && cn.isNotEmpty) ? cn : '-';
+            final m = item as Map<String, dynamic>;
+            final name = m['product_name']?.toString();
+            final code = m['product_code']?.toString();
+            if (name == null || name.isEmpty) return '';
+            if (code != null && code.isNotEmpty) return '$code — $name';
+            return name;
           },
+        ),
+        NumberColumn(
+          'quantity',
+          t.quantity,
+          formatter: (item) => formatQty((item as Map<String, dynamic>)['quantity']),
+        ),
+        NumberColumn(
+          'unit_price',
+          'فی',
+          formatter: (item) => formatUnitPrice(item as Map<String, dynamic>),
         ),
         TextColumn(
           'description',
@@ -906,28 +1002,29 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
         NumberColumn(
           'debit',
           t.debit,
-          formatter: (item) => (item as Map<String, dynamic>)['debit']?.toString(),
+          formatter: (item) => formatSide(item as Map<String, dynamic>, 'debit'),
         ),
         NumberColumn(
           'credit',
           t.credit,
-          formatter: (item) => (item as Map<String, dynamic>)['credit']?.toString(),
+          formatter: (item) => formatSide(item as Map<String, dynamic>, 'credit'),
         ),
         CustomColumn(
-          'running_amount',
+          'running_balance',
           t.runningAmount,
           builder: (item, _) {
-            final value = (item as Map<String, dynamic>)['running_amount'];
-            final double amount = (value is num) ? value.toDouble() : double.tryParse('$value') ?? 0;
-            final color = amount > 0
-                ? Colors.green[700]
-                : amount < 0
-                    ? Colors.red[700]
-                    : null;
+            final map = item as Map<String, dynamic>;
+            final amount = tryParseAmount(map['running_balance']) ?? 0;
+            final status = personBalanceStatusFromSignedAmount(amount);
+            final color = _statusColor(status);
             return Text(
-              amount == amount.roundToDouble() ? amount.toStringAsFixed(0) : amount.toStringAsFixed(2),
+              formatPersonRunningBalanceDisplay(
+                runningBalance: amount,
+                unit: widget.authStore.isMultiCurrency ? _baseCurrencyUnit : '',
+              ),
               style: TextStyle(
                 color: color,
+                fontWeight: FontWeight.w600,
                 fontFeatures: const [FontFeature.tabularFigures()],
               ),
             );
@@ -945,8 +1042,8 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
           ],
         ),
       ],
-      searchFields: const ['document_code', 'document_type', 'description'],
-      defaultPageSize: 10,
+      searchFields: const ['document_code', 'document_type_name', 'description', 'product_name'],
+      defaultPageSize: 25,
     );
   }
 
@@ -1081,11 +1178,11 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
   Color _getStatusColor(WarrantyStatus status, ThemeData theme) {
     switch (status) {
       case WarrantyStatus.activated:
-        return Colors.green;
+        return SemanticColorResolver.positive(context);
       case WarrantyStatus.expired:
-        return Colors.orange;
+        return SemanticColorResolver.warning(context);
       case WarrantyStatus.revoked:
-        return Colors.red;
+        return SemanticColorResolver.negative(context);
       default:
         return theme.colorScheme.primary;
     }
@@ -1615,7 +1712,7 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
     Color statusColor;
     switch (link.status) {
       case 'فعال':
-        statusColor = Colors.green[700] ?? theme.colorScheme.primary;
+        statusColor = SemanticColorResolver.positive(context);
         break;
       case 'منقضی':
         statusColor = theme.colorScheme.error;
@@ -1816,6 +1913,13 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
               subtitle: Text(t.personShareIncludeLedgerSubtitle),
               onChanged: (value) => setState(() => _includeLedger = value),
             ),
+            if (_includeLedger)
+              SwitchListTile.adaptive(
+                value: _includeInvoiceLines,
+                title: const Text('ریز اقلام خرید/فروش در کارت حساب'),
+                subtitle: const Text('نمایش کالا، تعداد و فی همراه دریافت و پرداخت'),
+                onChanged: (value) => setState(() => _includeInvoiceLines = value),
+              ),
             SwitchListTile.adaptive(
               value: _includeInvoices,
               title: Text(t.personShareIncludeInvoices),
@@ -1879,8 +1983,9 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
   }
 
   Widget _buildFinancialSummaryCard(ThemeData theme) {
-    final formatter = NumberFormat('#,##0');
-    final statusText = _summaryStatus ?? _person?.status ?? 'نامشخص';
+    final statusText = personBalanceStatusLabel(_person?.status);
+    final balance = _person?.balance;
+    final unit = _baseCurrencyUnit;
     return Card(
       margin: EdgeInsets.zero,
       child: Padding(
@@ -1891,10 +1996,10 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
             Row(
               children: [
                 Text(
-                  'خلاصه وضعیت مالی سال جاری',
+                  'خلاصه وضعیت مالی',
                   style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
                 ),
-                const SizedBox(width: 12),
+                SizedBox(width: 12),
                 if (_currentFiscalYearName != null)
                   Chip(
                     label: Text(_currentFiscalYearName!),
@@ -1903,37 +2008,42 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
                   )
                 else
                   Text(
-                    'سال مالی جاری',
+                    'سال مالی انتخاب‌شده',
                     style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
                   ),
                 const Spacer(),
                 IconButton(
                   tooltip: 'تازه‌سازی خلاصه مالی',
-                  onPressed: _loadingSummary ? null : _loadFinancialSummary,
-                  icon: _loadingSummary
+                  onPressed: _loadingDetails ? null : _loadPersonDetails,
+                  icon: _loadingDetails
                       ? const SizedBox(
                           width: 18,
                           height: 18,
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
-                      : const Icon(Icons.refresh),
+                      : Icon(Icons.refresh),
                 ),
               ],
             ),
+            const SizedBox(height: 4),
+            Text(
+              'مبالغ به $unit (ارز پایه) در همین سال مالی است.',
+              style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+            ),
             const SizedBox(height: 12),
-            if (_summaryError != null)
+            if (_detailsError != null)
               Row(
                 children: [
                   Expanded(
                     child: Text(
-                      _summaryError!,
+                      _detailsError!,
                       style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.error),
                     ),
                   ),
-                  TextButton(onPressed: _loadFinancialSummary, child: const Text('تلاش مجدد')),
+                  TextButton(onPressed: _loadPersonDetails, child: const Text('تلاش مجدد')),
                 ],
               )
-            else if (_loadingSummary && _summaryDebit == null && _summaryCredit == null)
+            else if (_loadingDetails && _person?.totalDebit == null && _person?.totalCredit == null)
               const LinearProgressIndicator()
             else
               Wrap(
@@ -1943,32 +2053,31 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
                   _buildSummaryStat(
                     theme,
                     label: 'جمع بدهکار',
-                    value: _summaryDebit,
+                    display: _person?.totalDebit == null
+                        ? '-'
+                        : formatAmountWithCurrencyUnit(_person!.totalDebit, unit: unit, decimalPlaces: 0),
                     color: theme.colorScheme.error,
                     icon: Icons.south_west,
-                    formatter: formatter,
                   ),
                   _buildSummaryStat(
                     theme,
                     label: 'جمع بستانکار',
-                    value: _summaryCredit,
-                    color: Colors.green[700],
+                    display: _person?.totalCredit == null
+                        ? '-'
+                        : formatAmountWithCurrencyUnit(_person!.totalCredit, unit: unit, decimalPlaces: 0),
+                    color: SemanticColorResolver.positive(context),
                     icon: Icons.north_east,
-                    formatter: formatter,
                   ),
                   _buildSummaryStat(
                     theme,
-                    label: 'تراز',
-                    value: _summaryBalance ?? _person?.balance,
-                    color: _summaryBalance == null
-                        ? theme.colorScheme.primary
-                        : (_summaryBalance! > 0
-                            ? Colors.green[700]
-                            : _summaryBalance! < 0
-                                ? theme.colorScheme.error
-                                : theme.colorScheme.primary),
+                    label: 'مانده',
+                    display: formatPersonNetBalanceDisplay(
+                      balance: balance ?? 0,
+                      status: _person?.status,
+                      unit: unit,
+                    ),
+                    color: _statusColor(statusText),
                     icon: Icons.account_balance_wallet,
-                    formatter: formatter,
                   ),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
@@ -1987,7 +2096,7 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
                           children: [
                             Text('وضعیت', style: theme.textTheme.bodySmall),
                             Text(
-                              statusText,
+                              statusText.isEmpty ? 'نامشخص' : statusText,
                               style: theme.textTheme.titleSmall?.copyWith(
                                 color: _statusColor(statusText),
                                 fontWeight: FontWeight.w700,
@@ -2009,12 +2118,10 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
   Widget _buildSummaryStat(
     ThemeData theme, {
     required String label,
-    required double? value,
+    required String display,
     required Color? color,
     required IconData icon,
-    required NumberFormat formatter,
   }) {
-    final display = value == null ? '-' : formatter.format(value);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
@@ -2046,15 +2153,15 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
   }
 
   Color _statusColor(String status) {
-    switch (status) {
+    switch (personBalanceStatusLabel(status)) {
       case 'بستانکار':
-        return Colors.green[700] ?? Colors.green;
+        return SemanticColorResolver.positive(context);
       case 'بدهکار':
-        return Colors.red;
+        return SemanticColorResolver.negative(context);
       case 'بدون تراکنش':
         return Colors.blueGrey;
-      case 'بالانس':
-        return Colors.orange;
+      case 'تسویه':
+        return SemanticColorResolver.warning(context);
       default:
         return Colors.blueGrey;
     }
@@ -2216,7 +2323,7 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
         return AlertDialog(
           title: Row(
             children: [
-              const Icon(Icons.warning_amber_rounded, color: Colors.orange),
+              Icon(Icons.warning_amber_rounded, color: SemanticColorResolver.warning(context)),
               const SizedBox(width: 8),
               const Text('محدودیت فضای ذخیره‌سازی'),
             ],
@@ -2262,7 +2369,7 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
             value,
             style: theme.textTheme.bodyMedium?.copyWith(
               fontWeight: highlight ? FontWeight.w600 : FontWeight.normal,
-              color: isError ? Colors.red : theme.colorScheme.onSurface,
+              color: isError ? SemanticColorResolver.negative(context) : theme.colorScheme.onSurface,
             ),
           ),
         ],
@@ -2307,19 +2414,5 @@ class _InfoTile extends StatelessWidget {
       ),
     );
   }
-}
-
-class _FinancialSummaryResult {
-  final double debit;
-  final double credit;
-  final double balance;
-  final String status;
-
-  const _FinancialSummaryResult({
-    required this.debit,
-    required this.credit,
-    required this.balance,
-    required this.status,
-  });
 }
 

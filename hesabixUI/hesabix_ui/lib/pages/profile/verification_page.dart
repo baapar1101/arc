@@ -12,6 +12,7 @@ import '../../utils/number_normalizer.dart' show toEnglishDigits, EnglishDigitsF
 import '../../services/errors/api_error.dart';
 import 'package:dio/dio.dart';
 import '../../utils/error_extractor.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 class VerificationPage extends StatefulWidget {
   const VerificationPage({super.key});
@@ -702,7 +703,7 @@ class _VerificationSectionState extends State<_VerificationSection> {
               Row(
                 children: [
                   Icon(widget.icon, color: colorScheme.primary),
-                  const SizedBox(width: 12),
+                  SizedBox(width: 12),
                   Expanded(
                     child: Text(
                       widget.title,
@@ -714,30 +715,30 @@ class _VerificationSectionState extends State<_VerificationSection> {
                   if (widget.verified)
                     Icon(
                       Icons.check_circle,
-                      color: Colors.green,
+                      color: SemanticColorResolver.positive(context),
                       size: 24,
                     )
                   else
                     Icon(
                       Icons.warning,
-                      color: Colors.orange,
+                      color: SemanticColorResolver.warning(context),
                       size: 24,
                     ),
                 ],
               ),
-              const SizedBox(height: 16),
+              SizedBox(height: 16),
               if (widget.verified)
                 Text(
                   '✅ تایید شده',
                   style: theme.textTheme.bodyLarge?.copyWith(
-                    color: Colors.green,
+                    color: SemanticColorResolver.positive(context),
                   ),
                 )
               else
                 Text(
                   '⚠️ تایید نشده',
                   style: theme.textTheme.bodyLarge?.copyWith(
-                    color: Colors.orange,
+                    color: SemanticColorResolver.warning(context),
                   ),
                 ),
               const SizedBox(height: 8),

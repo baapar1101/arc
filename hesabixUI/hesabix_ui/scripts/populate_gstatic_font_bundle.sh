@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # فایل‌های woff2 را در assets/gstatic_font_bundle/s/ می‌ریزد (فهرست کامل موتور Flutter Web).
+# شامل shardهای واقعی notocoloremoji — فقط در زمان populate (نه در runtime مرورگر).
 # ایران / تحریم: GSTATIC_BASE_URL برای آینه؛ POPULATE_FONT_PARALLEL؛ اجرای مجدد = resume.
 set -euo pipefail
 
@@ -28,7 +29,6 @@ while IFS= read -r line || [ -n "$line" ]; do
   line="${line%$'\r'}"
   [[ "$line" =~ ^# ]] && continue
   [[ -z "${line// }" ]] && continue
-  [[ "$line" == notocoloremoji/* ]] && continue
   if [ ! -s "$BUNDLE_S/$line" ]; then
     printf '%s\n' "$line"
   fi
@@ -62,7 +62,6 @@ while IFS= read -r line || [ -n "$line" ]; do
   line="${line%$'\r'}"
   [[ "$line" =~ ^# ]] && continue
   [[ -z "${line// }" ]] && continue
-  [[ "$line" == notocoloremoji/* ]] && continue
   if [ ! -s "$BUNDLE_S/$line" ]; then
     echo "[missing] $line" >&2
     missing=$((missing + 1))

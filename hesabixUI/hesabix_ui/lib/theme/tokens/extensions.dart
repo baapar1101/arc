@@ -1,10 +1,18 @@
 import 'package:flutter/material.dart';
 
+<<<<<<< HEAD
+import 'semantic_colors.dart';
+import 'theme_catalog.dart';
+
+export 'semantic_colors.dart';
+export 'theme_catalog.dart';
+=======
 import 'color_schemes.dart';
 
 // ---------------------------------------------------------------------------
 // فاصله — شبکهٔ ۴dp متریال
 // ---------------------------------------------------------------------------
+>>>>>>> github/Huma
 
 @immutable
 class AppSpacing extends ThemeExtension<AppSpacing> {
@@ -507,6 +515,20 @@ extension AppThemeExtensions on BuildContext {
 
   AppShellColors get shellColors =>
       Theme.of(this).extension<AppShellColors>() ??
+<<<<<<< HEAD
+      AppShellColors.fromScheme(Theme.of(this).colorScheme, isDark: Theme.of(this).brightness == Brightness.dark);
+  AppSemanticColors get appSemantics {
+    final existing = Theme.of(this).extension<AppSemanticColors>();
+    if (existing != null) return existing;
+    final scheme = Theme.of(this).colorScheme;
+    final isDark = Theme.of(this).brightness == Brightness.dark;
+    return AppSemanticColors.fromDefinition(
+      themeDefinitionById(kDefaultThemeId),
+      isDark: isDark,
+      scheme: scheme,
+    );
+  }
+=======
       AppShellColors.fromScheme(
         Theme.of(this).colorScheme,
         isDark: Theme.of(this).brightness == Brightness.dark,
@@ -515,4 +537,5 @@ extension AppThemeExtensions on BuildContext {
   /// کلاس اندازهٔ پنجرهٔ فعلی. جایگزین بررسی دستی عرض.
   WindowSizeClass get windowSize =>
       WindowSizeClass.fromWidth(MediaQuery.sizeOf(this).width);
+>>>>>>> github/Huma
 }

@@ -1,0 +1,293 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<DOCUMENT Type="Advanced Installer" CreateVersion="23.1" version="23.1" Modules="professional" RootPath="." Language="en" Id="{F7DBA254-B703-4F4C-A159-798D1EDA5AD5}">
+  <COMPONENT cid="caphyon.advinst.msicomp.MsiPropsComponent">
+    <ROW Property="AI_BITMAP_DISPLAY_MODE" Value="0"/>
+    <ROW Property="ALLUSERS" Value="1"/>
+    <ROW Property="ARPCOMMENTS" Value="This installer database contains the logic and data required to install [|ProductName]." ValueLocId="*"/>
+    <ROW Property="Manufacturer" Value="Hesabix"/>
+    <ROW Property="ProductCode" Value="1033:{51DBC188-3F19-470F-8824-5464342859EE} " Type="16"/>
+    <ROW Property="ProductLanguage" Value="1033"/>
+    <ROW Property="ProductName" Value="Hesabix"/>
+    <ROW Property="ProductVersion" Value="70.14.100" Options="32"/>
+    <ROW Property="SecureCustomProperties" Value="OLDPRODUCTS;AI_NEWERPRODUCTFOUND"/>
+    <ROW Property="UpgradeCode" Value="{8D87905B-7578-4FBE-9D3E-22475278DB71}"/>
+    <ROW Property="WindowsType9X" MultiBuildValue="DefaultBuild:Windows 9x/ME" ValueLocId="-"/>
+    <ROW Property="WindowsType9XDisplay" MultiBuildValue="DefaultBuild:Windows 9x/ME" ValueLocId="-"/>
+    <ROW Property="WindowsTypeNT40" MultiBuildValue="DefaultBuild:Windows NT 4.0" ValueLocId="-"/>
+    <ROW Property="WindowsTypeNT40Display" MultiBuildValue="DefaultBuild:Windows NT 4.0" ValueLocId="-"/>
+    <ROW Property="WindowsTypeNT50" MultiBuildValue="DefaultBuild:Windows 2000" ValueLocId="-"/>
+    <ROW Property="WindowsTypeNT50Display" MultiBuildValue="DefaultBuild:Windows 2000" ValueLocId="-"/>
+    <ROW Property="WindowsTypeNT5X" MultiBuildValue="DefaultBuild:Windows XP/2003" ValueLocId="-"/>
+    <ROW Property="WindowsTypeNT5XDisplay" MultiBuildValue="DefaultBuild:Windows XP/2003" ValueLocId="-"/>
+    <ROW Property="WindowsTypeNT60" MultiBuildValue="DefaultBuild:Windows Vista/Server 2008" ValueLocId="-"/>
+    <ROW Property="WindowsTypeNT60Display" MultiBuildValue="DefaultBuild:Windows Vista/Server 2008" ValueLocId="-"/>
+  </COMPONENT>
+  <COMPONENT cid="caphyon.advinst.msicomp.MsiDirsComponent">
+    <ROW Directory="APPDIR" Directory_Parent="TARGETDIR" DefaultDir="APPDIR:." IsPseudoRoot="1" DirectoryOptions="3"/>
+    <ROW Directory="DesktopFolder" Directory_Parent="TARGETDIR" DefaultDir="DESKTO~1|DesktopFolder" IsPseudoRoot="1"/>
+    <ROW Directory="SHORTCUTDIR" Directory_Parent="TARGETDIR" DefaultDir="SHORTC~1|SHORTCUTDIR" IsPseudoRoot="1"/>
+    <ROW Directory="TARGETDIR" DefaultDir="SourceDir"/>
+    <ROW Directory="assets_1_Dir" Directory_Parent="cupertino_icons_Dir" DefaultDir="assets" DirectoryOptions="3"/>
+    <ROW Directory="assets_2_Dir" Directory_Parent="lib_Dir" DefaultDir="assets" DirectoryOptions="3"/>
+    <ROW Directory="assets_Dir" Directory_Parent="flutter_assets_Dir" DefaultDir="assets" DirectoryOptions="3"/>
+    <ROW Directory="cupertino_icons_Dir" Directory_Parent="packages_Dir" DefaultDir="CUPERT~1|cupertino_icons" DirectoryOptions="3"/>
+    <ROW Directory="data_Dir" Directory_Parent="APPDIR" DefaultDir="data" DirectoryOptions="3"/>
+    <ROW Directory="flutter_assets_Dir" Directory_Parent="data_Dir" DefaultDir="FLUTTE~1|flutter_assets" DirectoryOptions="3"/>
+    <ROW Directory="flutter_local_notifications_web_Dir" Directory_Parent="packages_Dir" DefaultDir="FLUTTE~1|flutter_local_notifications_web" DirectoryOptions="3"/>
+    <ROW Directory="flutter_map_Dir" Directory_Parent="packages_Dir" DefaultDir="FLUTTE~2|flutter_map" DirectoryOptions="3"/>
+    <ROW Directory="flutter_sound_web_Dir" Directory_Parent="packages_Dir" DefaultDir="FLUTTE~3|flutter_sound_web" DirectoryOptions="3"/>
+    <ROW Directory="fonts_1_Dir" Directory_Parent="flutter_assets_Dir" DefaultDir="fonts" DirectoryOptions="3"/>
+    <ROW Directory="fonts_Dir" Directory_Parent="assets_Dir" DefaultDir="fonts" DirectoryOptions="3"/>
+    <ROW Directory="howler_Dir" Directory_Parent="flutter_sound_web_Dir" DefaultDir="howler" DirectoryOptions="3"/>
+    <ROW Directory="images_Dir" Directory_Parent="assets_Dir" DefaultDir="images" DirectoryOptions="3"/>
+    <ROW Directory="lib_Dir" Directory_Parent="flutter_map_Dir" DefaultDir="lib" DirectoryOptions="3"/>
+    <ROW Directory="packages_Dir" Directory_Parent="flutter_assets_Dir" DefaultDir="packages" DirectoryOptions="3"/>
+    <ROW Directory="shaders_Dir" Directory_Parent="flutter_assets_Dir" DefaultDir="shaders" DirectoryOptions="3"/>
+    <ROW Directory="src_Dir" Directory_Parent="flutter_sound_web_Dir" DefaultDir="src" DirectoryOptions="3"/>
+    <ROW Directory="web_Dir" Directory_Parent="flutter_local_notifications_web_Dir" DefaultDir="web" DirectoryOptions="3"/>
+  </COMPONENT>
+  <COMPONENT cid="caphyon.advinst.msicomp.SideBySideGuidComponent">
+    <ROW Component="APPDIR" Value="{6688E997-31FE-43D7-B335-B55F21146C27}"/>
+    <ROW Component="ProductInformation" Value="{4E98685A-A271-430F-A25E-6C9880DEC868}"/>
+  </COMPONENT>
+  <COMPONENT cid="caphyon.advinst.msicomp.MsiCompsComponent">
+    <ROW Component="AssetManifest.bin" ComponentId="{85561CF9-AF01-46AB-9C9F-7352ADD3779F}" Directory_="flutter_assets_Dir" Attributes="0" KeyPath="AssetManifest.bin" Type="0"/>
+    <ROW Component="CupertinoIcons.ttf" ComponentId="{94DF94FE-CD35-4FB7-BE11-F8EBA6F75F1D}" Directory_="assets_1_Dir" Attributes="0" Type="0"/>
+    <ROW Component="MaterialIconsRegular.otf" ComponentId="{A3E90E51-F718-42FA-9B13-2050867388CB}" Directory_="fonts_1_Dir" Attributes="0" KeyPath="MaterialIconsRegular.otf" Type="0"/>
+    <ROW Component="ProductInformation" ComponentId="{4E98685A-A271-430F-A25E-6C9880DEC868}" Directory_="APPDIR" Attributes="4" KeyPath="Version"/>
+    <ROW Component="RobotoBold.ttf" ComponentId="{11583852-66D0-4407-B1D2-029962C7360C}" Directory_="fonts_Dir" Attributes="0" Type="0"/>
+    <ROW Component="SHORTCUTDIR" ComponentId="{B370BF54-81D9-482D-8A4E-6CB2138DA988}" Directory_="SHORTCUTDIR" Attributes="0"/>
+    <ROW Component="app.so" ComponentId="{F28A5791-C55E-445C-98F3-AF80DB14853F}" Directory_="data_Dir" Attributes="0" KeyPath="app.so" Type="0"/>
+    <ROW Component="connectivity_plus_plugin.dll" ComponentId="{81423CA0-7D9C-4481-B940-2E4798966ED8}" Directory_="APPDIR" Attributes="256" KeyPath="connectivity_plus_plugin.dll"/>
+    <ROW Component="dartjni.dll" ComponentId="{AC9D5193-3113-4BAE-83BA-F0EAC061534F}" Directory_="APPDIR" Attributes="256" KeyPath="dartjni.dll"/>
+    <ROW Component="desktop_drop_plugin.dll" ComponentId="{2C23DAEA-FCED-4688-8A4A-8C8A1AB05C9A}" Directory_="APPDIR" Attributes="256" KeyPath="desktop_drop_plugin.dll"/>
+    <ROW Component="favicon.ico.backup" ComponentId="{9B868EB3-4CA8-48F4-A865-CEBCDCE87768}" Directory_="images_Dir" Attributes="0" KeyPath="favicon.ico.backup" Type="0"/>
+    <ROW Component="file_saver_plugin.dll" ComponentId="{9A91E381-C494-491E-B689-6CF9D25EDA1E}" Directory_="APPDIR" Attributes="256" KeyPath="file_saver_plugin.dll"/>
+    <ROW Component="file_selector_windows_plugin.dll" ComponentId="{85EAAAB9-6CAB-4A08-B9D1-ED0A5025FC8A}" Directory_="APPDIR" Attributes="256" KeyPath="file_selector_windows_plugin.dll"/>
+    <ROW Component="flutter_local_notifications_windows.dll" ComponentId="{515E1236-B6F8-4982-98F3-7C3BC74CCAEF}" Directory_="APPDIR" Attributes="256" KeyPath="flutter_local_notifications_windows.dll"/>
+    <ROW Component="flutter_map_logo.png" ComponentId="{E3166F7A-BC39-4A4A-8579-DEEA917148EA}" Directory_="assets_2_Dir" Attributes="0" KeyPath="flutter_map_logo.png" Type="0"/>
+    <ROW Component="flutter_secure_storage_windows_plugin.dll" ComponentId="{D430E955-C74F-4F89-9313-7CB7A8E88A82}" Directory_="APPDIR" Attributes="256" KeyPath="flutter_secure_storage_windows_plugin.dll"/>
+    <ROW Component="flutter_sound.js" ComponentId="{8B7B26B4-561B-435A-83DE-50E546C40F6A}" Directory_="src_Dir" Attributes="0" KeyPath="flutter_sound.js" Type="0"/>
+    <ROW Component="flutter_sound_plugin.dll" ComponentId="{46ED770B-C9DA-47AC-82B3-4467E1149693}" Directory_="APPDIR" Attributes="256" KeyPath="flutter_sound_plugin.dll"/>
+    <ROW Component="flutter_windows.dll" ComponentId="{B23BE4F8-4D31-457E-AB8F-A219851091F2}" Directory_="APPDIR" Attributes="256" KeyPath="flutter_windows.dll"/>
+    <ROW Component="geolocator_windows_plugin.dll" ComponentId="{B0DE6FDA-4071-4FBA-B808-5A8AA741CF74}" Directory_="APPDIR" Attributes="256" KeyPath="geolocator_windows_plugin.dll"/>
+    <ROW Component="hesabix_ui.exe" ComponentId="{0E80D726-9F5E-4A37-A667-D2EBA77D75C4}" Directory_="APPDIR" Attributes="256" KeyPath="hesabix_ui.exe"/>
+    <ROW Component="howler.js" ComponentId="{BE62AED9-D9B3-4BA2-ABE9-943C6664710E}" Directory_="howler_Dir" Attributes="0" KeyPath="howler.js" Type="0"/>
+    <ROW Component="ink_sparkle.frag" ComponentId="{CD577660-FE68-4D06-A020-01FA1B48B2EE}" Directory_="shaders_Dir" Attributes="0" KeyPath="ink_sparkle.frag" Type="0"/>
+    <ROW Component="local_auth_windows_plugin.dll" ComponentId="{F68EC451-C330-4BBD-B2BF-6029DE287309}" Directory_="APPDIR" Attributes="256" KeyPath="local_auth_windows_plugin.dll"/>
+    <ROW Component="native_assets.json" ComponentId="{94BA78E5-7D03-471C-8306-4D60EEE3D921}" Directory_="APPDIR" Attributes="0" KeyPath="native_assets.json" Type="0"/>
+    <ROW Component="notifications_service_worker.js" ComponentId="{A3240955-802C-49B1-88B0-FD1B4A1D571E}" Directory_="web_Dir" Attributes="0" KeyPath="notifications_service_worker.js" Type="0"/>
+    <ROW Component="pdfium.dll" ComponentId="{E034C087-E7A8-45DD-95D5-C6AA1D34FD70}" Directory_="APPDIR" Attributes="256" KeyPath="pdfium.dll"/>
+    <ROW Component="permission_handler_windows_plugin.dll" ComponentId="{9377BA01-1A6F-4E0D-B078-B172C845D3D5}" Directory_="APPDIR" Attributes="256" KeyPath="permission_handler_windows_plugin.dll"/>
+    <ROW Component="printing_plugin.dll" ComponentId="{83490788-2F8F-4F6E-852A-2287990DB88E}" Directory_="APPDIR" Attributes="256" KeyPath="printing_plugin.dll"/>
+    <ROW Component="share_plus_plugin.dll" ComponentId="{90FE7DF1-4746-4030-B62A-45AD3F2BE92B}" Directory_="APPDIR" Attributes="256" KeyPath="share_plus_plugin.dll"/>
+    <ROW Component="url_launcher_windows_plugin.dll" ComponentId="{FC5AAD66-71CB-4EC1-80FF-BFA332F03CF2}" Directory_="APPDIR" Attributes="256" KeyPath="url_launcher_windows_plugin.dll"/>
+  </COMPONENT>
+  <COMPONENT cid="caphyon.advinst.msicomp.MsiFeatsComponent">
+    <ROW Feature="MainFeature" Title="MainFeature" Description="Description" Display="1" Level="1" Directory_="APPDIR" Attributes="0"/>
+    <ATTRIBUTE name="CurrentFeature" value="MainFeature"/>
+  </COMPONENT>
+  <COMPONENT cid="caphyon.advinst.msicomp.MsiFilesComponent">
+    <ROW File="connectivity_plus_plugin.dll" Component_="connectivity_plus_plugin.dll" FileName="CONNEC~1.DLL|connectivity_plus_plugin.dll" Version="65535.65535.65535.65535" Attributes="0" SourcePath="..\..\hesabixUI\hesabix_ui\build\windows\x64\runner\Release\connectivity_plus_plugin.dll" SelfReg="false"/>
+    <ROW File="dartjni.dll" Component_="dartjni.dll" FileName="dartjni.dll" Version="65535.65535.65535.65535" Attributes="0" SourcePath="..\..\hesabixUI\hesabix_ui\build\windows\x64\runner\Release\dartjni.dll" SelfReg="false"/>
+    <ROW File="app.so" Component_="app.so" FileName="app.so" Version="65535.65535.65535.65535" Attributes="0" SourcePath="..\..\hesabixUI\hesabix_ui\build\windows\x64\runner\Release\data\app.so" SelfReg="false"/>
+    <ROW File="AssetManifest.bin" Component_="AssetManifest.bin" FileName="ASSETM~1.BIN|AssetManifest.bin" Version="65535.65535.65535.65535" Attributes="0" SourcePath="..\..\hesabixUI\hesabix_ui\build\windows\x64\runner\Release\data\flutter_assets\AssetManifest.bin" SelfReg="false"/>
+    <ROW File="RobotoBold.ttf" Component_="RobotoBold.ttf" FileName="ROBOTO~1.TTF|Roboto-Bold.ttf" Version="65535.65535.65535.65535" Attributes="0" SourcePath="..\..\hesabixUI\hesabix_ui\build\windows\x64\runner\Release\data\flutter_assets\assets\fonts\Roboto-Bold.ttf" SelfReg="false"/>
+    <ROW File="RobotoRegular.ttf" Component_="RobotoBold.ttf" FileName="ROBOTO~2.TTF|Roboto-Regular.ttf" Version="65535.65535.65535.65535" Attributes="0" SourcePath="..\..\hesabixUI\hesabix_ui\build\windows\x64\runner\Release\data\flutter_assets\assets\fonts\Roboto-Regular.ttf" SelfReg="false"/>
+    <ROW File="VazirmatnBold.ttf" Component_="RobotoBold.ttf" FileName="VAZIRM~1.TTF|Vazirmatn-Bold.ttf" Version="65535.65535.65535.65535" Attributes="0" SourcePath="..\..\hesabixUI\hesabix_ui\build\windows\x64\runner\Release\data\flutter_assets\assets\fonts\Vazirmatn-Bold.ttf" SelfReg="false"/>
+    <ROW File="VazirmatnRegular.ttf" Component_="RobotoBold.ttf" FileName="VAZIRM~2.TTF|Vazirmatn-Regular.ttf" Version="65535.65535.65535.65535" Attributes="0" SourcePath="..\..\hesabixUI\hesabix_ui\build\windows\x64\runner\Release\data\flutter_assets\assets\fonts\Vazirmatn-Regular.ttf" SelfReg="false"/>
+    <ROW File="YekanBakhFaNumBlack.ttf" Component_="RobotoBold.ttf" FileName="YEKANB~1.TTF|YekanBakhFaNum-Black.ttf" Version="65535.65535.65535.65535" Attributes="0" SourcePath="..\..\hesabixUI\hesabix_ui\build\windows\x64\runner\Release\data\flutter_assets\assets\fonts\YekanBakhFaNum-Black.ttf" SelfReg="false"/>
+    <ROW File="YekanBakhFaNumBold.ttf" Component_="RobotoBold.ttf" FileName="YEKANB~2.TTF|YekanBakhFaNum-Bold.ttf" Version="65535.65535.65535.65535" Attributes="0" SourcePath="..\..\hesabixUI\hesabix_ui\build\windows\x64\runner\Release\data\flutter_assets\assets\fonts\YekanBakhFaNum-Bold.ttf" SelfReg="false"/>
+    <ROW File="YekanBakhFaNumExtraBold.ttf" Component_="RobotoBold.ttf" FileName="YEKANB~3.TTF|YekanBakhFaNum-ExtraBold.ttf" Version="65535.65535.65535.65535" Attributes="0" SourcePath="..\..\hesabixUI\hesabix_ui\build\windows\x64\runner\Release\data\flutter_assets\assets\fonts\YekanBakhFaNum-ExtraBold.ttf" SelfReg="false"/>
+    <ROW File="YekanBakhFaNumLight.ttf" Component_="RobotoBold.ttf" FileName="YEKANB~4.TTF|YekanBakhFaNum-Light.ttf" Version="65535.65535.65535.65535" Attributes="0" SourcePath="..\..\hesabixUI\hesabix_ui\build\windows\x64\runner\Release\data\flutter_assets\assets\fonts\YekanBakhFaNum-Light.ttf" SelfReg="false"/>
+    <ROW File="YekanBakhFaNumRegular.ttf" Component_="RobotoBold.ttf" FileName="YEKANB~5.TTF|YekanBakhFaNum-Regular.ttf" Version="65535.65535.65535.65535" Attributes="0" SourcePath="..\..\hesabixUI\hesabix_ui\build\windows\x64\runner\Release\data\flutter_assets\assets\fonts\YekanBakhFaNum-Regular.ttf" SelfReg="false"/>
+    <ROW File="YekanBakhFaNumSemiBold.ttf" Component_="RobotoBold.ttf" FileName="YEKANB~6.TTF|YekanBakhFaNum-SemiBold.ttf" Version="65535.65535.65535.65535" Attributes="0" SourcePath="..\..\hesabixUI\hesabix_ui\build\windows\x64\runner\Release\data\flutter_assets\assets\fonts\YekanBakhFaNum-SemiBold.ttf" SelfReg="false"/>
+    <ROW File="YekanBakhFaNumThin.ttf" Component_="RobotoBold.ttf" FileName="YEKANB~7.TTF|YekanBakhFaNum-Thin.ttf" Version="65535.65535.65535.65535" Attributes="0" SourcePath="..\..\hesabixUI\hesabix_ui\build\windows\x64\runner\Release\data\flutter_assets\assets\fonts\YekanBakhFaNum-Thin.ttf" SelfReg="false"/>
+    <ROW File="favicon.ico.backup" Component_="favicon.ico.backup" FileName="FAVICO~1.BAC|favicon.ico.backup" Version="65535.65535.65535.65535" Attributes="0" SourcePath="..\..\hesabixUI\hesabix_ui\build\windows\x64\runner\Release\data\flutter_assets\assets\images\favicon.ico.backup" SelfReg="false"/>
+    <ROW File="logoblue.png" Component_="favicon.ico.backup" FileName="LOGO-B~1.PNG|logo-blue.png" Version="65535.65535.65535.65535" Attributes="0" SourcePath="..\..\hesabixUI\hesabix_ui\build\windows\x64\runner\Release\data\flutter_assets\assets\images\logo-blue.png" SelfReg="false"/>
+    <ROW File="logolight.png" Component_="favicon.ico.backup" FileName="LOGO-L~1.PNG|logo-light.png" Version="65535.65535.65535.65535" Attributes="0" SourcePath="..\..\hesabixUI\hesabix_ui\build\windows\x64\runner\Release\data\flutter_assets\assets\images\logo-light.png" SelfReg="false"/>
+    <ROW File="logolight.svg" Component_="favicon.ico.backup" FileName="LOGO-L~1.SVG|logo-light.svg" Version="65535.65535.65535.65535" Attributes="0" SourcePath="..\..\hesabixUI\hesabix_ui\build\windows\x64\runner\Release\data\flutter_assets\assets\images\logo-light.svg" SelfReg="false"/>
+    <ROW File="logo.png" Component_="favicon.ico.backup" FileName="logo.png" Version="65535.65535.65535.65535" Attributes="0" SourcePath="..\..\hesabixUI\hesabix_ui\build\windows\x64\runner\Release\data\flutter_assets\assets\images\logo.png" SelfReg="false"/>
+    <ROW File="logo32.png" Component_="favicon.ico.backup" FileName="logo32.png" Version="65535.65535.65535.65535" Attributes="0" SourcePath="..\..\hesabixUI\hesabix_ui\build\windows\x64\runner\Release\data\flutter_assets\assets\images\logo32.png" SelfReg="false"/>
+    <ROW File="FontManifest.json" Component_="AssetManifest.bin" FileName="FONTMA~1.JSO|FontManifest.json" Version="65535.65535.65535.65535" Attributes="0" SourcePath="..\..\hesabixUI\hesabix_ui\build\windows\x64\runner\Release\data\flutter_assets\FontManifest.json" SelfReg="false"/>
+    <ROW File="MaterialIconsRegular.otf" Component_="MaterialIconsRegular.otf" FileName="MATERI~1.OTF|MaterialIcons-Regular.otf" Version="65535.65535.65535.65535" Attributes="0" SourcePath="..\..\hesabixUI\hesabix_ui\build\windows\x64\runner\Release\data\flutter_assets\fonts\MaterialIcons-Regular.otf" SelfReg="false"/>
+    <ROW File="NativeAssetsManifest.json" Component_="AssetManifest.bin" FileName="NATIVE~1.JSO|NativeAssetsManifest.json" Version="65535.65535.65535.65535" Attributes="0" SourcePath="..\..\hesabixUI\hesabix_ui\build\windows\x64\runner\Release\data\flutter_assets\NativeAssetsManifest.json" SelfReg="false"/>
+    <ROW File="NOTICES.Z" Component_="AssetManifest.bin" FileName="NOTICES.Z" Version="65535.65535.65535.65535" Attributes="0" SourcePath="..\..\hesabixUI\hesabix_ui\build\windows\x64\runner\Release\data\flutter_assets\NOTICES.Z" SelfReg="false"/>
+    <ROW File="CupertinoIcons.ttf" Component_="CupertinoIcons.ttf" FileName="CUPERT~1.TTF|CupertinoIcons.ttf" Version="65535.65535.65535.65535" Attributes="0" SourcePath="..\..\hesabixUI\hesabix_ui\build\windows\x64\runner\Release\data\flutter_assets\packages\cupertino_icons\assets\CupertinoIcons.ttf" SelfReg="false"/>
+    <ROW File="notifications_service_worker.js" Component_="notifications_service_worker.js" FileName="NOTIFI~1.JS|notifications_service_worker.js" Version="65535.65535.65535.65535" Attributes="0" SourcePath="..\..\hesabixUI\hesabix_ui\build\windows\x64\runner\Release\data\flutter_assets\packages\flutter_local_notifications_web\web\notifications_service_worker.js" SelfReg="false"/>
+    <ROW File="flutter_map_logo.png" Component_="flutter_map_logo.png" FileName="FLUTTE~1.PNG|flutter_map_logo.png" Version="65535.65535.65535.65535" Attributes="0" SourcePath="..\..\hesabixUI\hesabix_ui\build\windows\x64\runner\Release\data\flutter_assets\packages\flutter_map\lib\assets\flutter_map_logo.png" SelfReg="false"/>
+    <ROW File="howler.js" Component_="howler.js" FileName="howler.js" Version="65535.65535.65535.65535" Attributes="0" SourcePath="..\..\hesabixUI\hesabix_ui\build\windows\x64\runner\Release\data\flutter_assets\packages\flutter_sound_web\howler\howler.js" SelfReg="false"/>
+    <ROW File="flutter_sound.js" Component_="flutter_sound.js" FileName="FLUTTE~1.JS|flutter_sound.js" Version="65535.65535.65535.65535" Attributes="0" SourcePath="..\..\hesabixUI\hesabix_ui\build\windows\x64\runner\Release\data\flutter_assets\packages\flutter_sound_web\src\flutter_sound.js" SelfReg="false"/>
+    <ROW File="flutter_sound_player.js" Component_="flutter_sound.js" FileName="FLUTTE~2.JS|flutter_sound_player.js" Version="65535.65535.65535.65535" Attributes="0" SourcePath="..\..\hesabixUI\hesabix_ui\build\windows\x64\runner\Release\data\flutter_assets\packages\flutter_sound_web\src\flutter_sound_player.js" SelfReg="false"/>
+    <ROW File="flutter_sound_recorder.js" Component_="flutter_sound.js" FileName="FLUTTE~3.JS|flutter_sound_recorder.js" Version="65535.65535.65535.65535" Attributes="0" SourcePath="..\..\hesabixUI\hesabix_ui\build\windows\x64\runner\Release\data\flutter_assets\packages\flutter_sound_web\src\flutter_sound_recorder.js" SelfReg="false"/>
+    <ROW File="flutter_sound_stream_processor.js" Component_="flutter_sound.js" FileName="FLUTTE~4.JS|flutter_sound_stream_processor.js" Version="65535.65535.65535.65535" Attributes="0" SourcePath="..\..\hesabixUI\hesabix_ui\build\windows\x64\runner\Release\data\flutter_assets\packages\flutter_sound_web\src\flutter_sound_stream_processor.js" SelfReg="false"/>
+    <ROW File="ink_sparkle.frag" Component_="ink_sparkle.frag" FileName="INK_SP~1.FRA|ink_sparkle.frag" Version="65535.65535.65535.65535" Attributes="0" SourcePath="..\..\hesabixUI\hesabix_ui\build\windows\x64\runner\Release\data\flutter_assets\shaders\ink_sparkle.frag" SelfReg="false"/>
+    <ROW File="stretch_effect.frag" Component_="ink_sparkle.frag" FileName="STRETC~1.FRA|stretch_effect.frag" Version="65535.65535.65535.65535" Attributes="0" SourcePath="..\..\hesabixUI\hesabix_ui\build\windows\x64\runner\Release\data\flutter_assets\shaders\stretch_effect.frag" SelfReg="false"/>
+    <ROW File="icudtl.dat" Component_="app.so" FileName="icudtl.dat" Version="65535.65535.65535.65535" Attributes="0" SourcePath="..\..\hesabixUI\hesabix_ui\build\windows\x64\runner\Release\data\icudtl.dat" SelfReg="false"/>
+    <ROW File="desktop_drop_plugin.dll" Component_="desktop_drop_plugin.dll" FileName="DESKTO~1.DLL|desktop_drop_plugin.dll" Version="65535.65535.65535.65535" Attributes="0" SourcePath="..\..\hesabixUI\hesabix_ui\build\windows\x64\runner\Release\desktop_drop_plugin.dll" SelfReg="false"/>
+    <ROW File="file_saver_plugin.dll" Component_="file_saver_plugin.dll" FileName="FILE_S~1.DLL|file_saver_plugin.dll" Version="65535.65535.65535.65535" Attributes="0" SourcePath="..\..\hesabixUI\hesabix_ui\build\windows\x64\runner\Release\file_saver_plugin.dll" SelfReg="false"/>
+    <ROW File="file_selector_windows_plugin.dll" Component_="file_selector_windows_plugin.dll" FileName="FILE_S~2.DLL|file_selector_windows_plugin.dll" Version="65535.65535.65535.65535" Attributes="0" SourcePath="..\..\hesabixUI\hesabix_ui\build\windows\x64\runner\Release\file_selector_windows_plugin.dll" SelfReg="false"/>
+    <ROW File="flutter_local_notifications_windows.dll" Component_="flutter_local_notifications_windows.dll" FileName="FLUTTE~1.DLL|flutter_local_notifications_windows.dll" Version="65535.65535.65535.65535" Attributes="0" SourcePath="..\..\hesabixUI\hesabix_ui\build\windows\x64\runner\Release\flutter_local_notifications_windows.dll" SelfReg="false"/>
+    <ROW File="flutter_secure_storage_windows_plugin.dll" Component_="flutter_secure_storage_windows_plugin.dll" FileName="FLUTTE~2.DLL|flutter_secure_storage_windows_plugin.dll" Version="65535.65535.65535.65535" Attributes="0" SourcePath="..\..\hesabixUI\hesabix_ui\build\windows\x64\runner\Release\flutter_secure_storage_windows_plugin.dll" SelfReg="false"/>
+    <ROW File="flutter_sound_plugin.dll" Component_="flutter_sound_plugin.dll" FileName="FLUTTE~3.DLL|flutter_sound_plugin.dll" Version="65535.65535.65535.65535" Attributes="0" SourcePath="..\..\hesabixUI\hesabix_ui\build\windows\x64\runner\Release\flutter_sound_plugin.dll" SelfReg="false"/>
+    <ROW File="flutter_windows.dll" Component_="flutter_windows.dll" FileName="FLUTTE~4.DLL|flutter_windows.dll" Version="65535.65535.65535.65535" Attributes="0" SourcePath="..\..\hesabixUI\hesabix_ui\build\windows\x64\runner\Release\flutter_windows.dll" SelfReg="false"/>
+    <ROW File="geolocator_windows_plugin.dll" Component_="geolocator_windows_plugin.dll" FileName="GEOLOC~1.DLL|geolocator_windows_plugin.dll" Version="65535.65535.65535.65535" Attributes="0" SourcePath="..\..\hesabixUI\hesabix_ui\build\windows\x64\runner\Release\geolocator_windows_plugin.dll" SelfReg="false"/>
+    <ROW File="hesabix_ui.exe" Component_="hesabix_ui.exe" FileName="HESABI~1.EXE|hesabix_ui.exe" Version="65535.65535.65535.65535" Attributes="0" SourcePath="..\..\hesabixUI\hesabix_ui\build\windows\x64\runner\Release\hesabix_ui.exe" SelfReg="false"/>
+    <ROW File="local_auth_windows_plugin.dll" Component_="local_auth_windows_plugin.dll" FileName="LOCAL_~1.DLL|local_auth_windows_plugin.dll" Version="65535.65535.65535.65535" Attributes="0" SourcePath="..\..\hesabixUI\hesabix_ui\build\windows\x64\runner\Release\local_auth_windows_plugin.dll" SelfReg="false"/>
+    <ROW File="native_assets.json" Component_="native_assets.json" FileName="NATIVE~1.JSO|native_assets.json" Version="65535.65535.65535.65535" Attributes="0" SourcePath="..\..\hesabixUI\hesabix_ui\build\windows\x64\runner\Release\native_assets.json" SelfReg="false"/>
+    <ROW File="pdfium.dll" Component_="pdfium.dll" FileName="pdfium.dll" Version="65535.65535.65535.65535" Attributes="0" SourcePath="..\..\hesabixUI\hesabix_ui\build\windows\x64\runner\Release\pdfium.dll" SelfReg="false"/>
+    <ROW File="permission_handler_windows_plugin.dll" Component_="permission_handler_windows_plugin.dll" FileName="PERMIS~1.DLL|permission_handler_windows_plugin.dll" Version="65535.65535.65535.65535" Attributes="0" SourcePath="..\..\hesabixUI\hesabix_ui\build\windows\x64\runner\Release\permission_handler_windows_plugin.dll" SelfReg="false"/>
+    <ROW File="printing_plugin.dll" Component_="printing_plugin.dll" FileName="PRINTI~1.DLL|printing_plugin.dll" Version="65535.65535.65535.65535" Attributes="0" SourcePath="..\..\hesabixUI\hesabix_ui\build\windows\x64\runner\Release\printing_plugin.dll" SelfReg="false"/>
+    <ROW File="share_plus_plugin.dll" Component_="share_plus_plugin.dll" FileName="SHARE_~1.DLL|share_plus_plugin.dll" Version="65535.65535.65535.65535" Attributes="0" SourcePath="..\..\hesabixUI\hesabix_ui\build\windows\x64\runner\Release\share_plus_plugin.dll" SelfReg="false"/>
+    <ROW File="url_launcher_windows_plugin.dll" Component_="url_launcher_windows_plugin.dll" FileName="URL_LA~1.DLL|url_launcher_windows_plugin.dll" Version="65535.65535.65535.65535" Attributes="0" SourcePath="..\..\hesabixUI\hesabix_ui\build\windows\x64\runner\Release\url_launcher_windows_plugin.dll" SelfReg="false"/>
+  </COMPONENT>
+  <COMPONENT cid="caphyon.advinst.msicomp.BootstrOptComponent">
+    <ROW BootstrOptKey="GlobalOptions" DownloadFolder="[AppDataFolder][|Manufacturer]\[|ProductName]\prerequisites" Options="2"/>
+  </COMPONENT>
+  <COMPONENT cid="caphyon.advinst.msicomp.BuildComponent">
+    <ROW BuildKey="DefaultBuild" BuildName="DefaultBuild" BuildOrder="1" BuildType="0" PackageFolder="dist" PackageFileName="hesabix-windows.70.14.100" Languages="en" InstallationType="4" UseLargeSchema="true"/>
+  </COMPONENT>
+  <COMPONENT cid="caphyon.advinst.msicomp.DictionaryComponent">
+    <ROW Path="&lt;AI_DICTS&gt;ui.ail"/>
+    <ROW Path="&lt;AI_DICTS&gt;ui_en.ail"/>
+  </COMPONENT>
+  <COMPONENT cid="caphyon.advinst.msicomp.FragmentComponent">
+    <ROW Fragment="CommonUI.aip" Path="&lt;AI_FRAGS&gt;CommonUI.aip"/>
+    <ROW Fragment="FolderDlg.aip" Path="&lt;AI_THEMES&gt;classic\fragments\FolderDlg.aip"/>
+    <ROW Fragment="MaintenanceTypeDlg.aip" Path="&lt;AI_THEMES&gt;classic\fragments\MaintenanceTypeDlg.aip"/>
+    <ROW Fragment="MaintenanceWelcomeDlg.aip" Path="&lt;AI_THEMES&gt;classic\fragments\MaintenanceWelcomeDlg.aip"/>
+    <ROW Fragment="SequenceDialogs.aip" Path="&lt;AI_THEMES&gt;classic\fragments\SequenceDialogs.aip"/>
+    <ROW Fragment="Sequences.aip" Path="&lt;AI_FRAGS&gt;Sequences.aip"/>
+    <ROW Fragment="StaticUIStrings.aip" Path="&lt;AI_FRAGS&gt;StaticUIStrings.aip"/>
+    <ROW Fragment="Themes.aip" Path="&lt;AI_FRAGS&gt;Themes.aip"/>
+    <ROW Fragment="UI.aip" Path="&lt;AI_THEMES&gt;classic\fragments\UI.aip"/>
+    <ROW Fragment="Validation.aip" Path="&lt;AI_FRAGS&gt;Validation.aip"/>
+    <ROW Fragment="VerifyRemoveDlg.aip" Path="&lt;AI_THEMES&gt;classic\fragments\VerifyRemoveDlg.aip"/>
+    <ROW Fragment="VerifyRepairDlg.aip" Path="&lt;AI_THEMES&gt;classic\fragments\VerifyRepairDlg.aip"/>
+    <ROW Fragment="WelcomeDlg.aip" Path="&lt;AI_THEMES&gt;classic\fragments\WelcomeDlg.aip"/>
+  </COMPONENT>
+  <COMPONENT cid="caphyon.advinst.msicomp.MsiBinaryComponent">
+    <ROW Name="aicustact.dll" SourcePath="&lt;AI_CUSTACTS&gt;aicustact.dll"/>
+  </COMPONENT>
+  <COMPONENT cid="caphyon.advinst.msicomp.MsiControlEventComponent">
+    <ROW Dialog_="WelcomeDlg" Control_="Next" Event="NewDialog" Argument="FolderDlg" Condition="AI_INSTALL" Ordering="1"/>
+    <ROW Dialog_="FolderDlg" Control_="Next" Event="NewDialog" Argument="VerifyReadyDlg" Condition="AI_INSTALL" Ordering="201"/>
+    <ROW Dialog_="FolderDlg" Control_="Back" Event="NewDialog" Argument="WelcomeDlg" Condition="AI_INSTALL" Ordering="1"/>
+    <ROW Dialog_="MaintenanceWelcomeDlg" Control_="Next" Event="NewDialog" Argument="MaintenanceTypeDlg" Condition="AI_MAINT" Ordering="99"/>
+    <ROW Dialog_="VerifyReadyDlg" Control_="Install" Event="EndDialog" Argument="Return" Condition="AI_MAINT" Ordering="198"/>
+    <ROW Dialog_="VerifyReadyDlg" Control_="Back" Event="NewDialog" Argument="CustomizeDlg" Condition="AI_MAINT" Ordering="202"/>
+    <ROW Dialog_="VerifyReadyDlg" Control_="Install" Event="EndDialog" Argument="Return" Condition="AI_INSTALL" Ordering="197"/>
+    <ROW Dialog_="VerifyReadyDlg" Control_="Back" Event="NewDialog" Argument="FolderDlg" Condition="AI_INSTALL" Ordering="201"/>
+    <ROW Dialog_="CustomizeDlg" Control_="Next" Event="NewDialog" Argument="VerifyReadyDlg" Condition="AI_MAINT" Ordering="101"/>
+    <ROW Dialog_="CustomizeDlg" Control_="Back" Event="NewDialog" Argument="MaintenanceTypeDlg" Condition="AI_MAINT" Ordering="1"/>
+    <ROW Dialog_="MaintenanceTypeDlg" Control_="ChangeButton" Event="NewDialog" Argument="CustomizeDlg" Condition="AI_MAINT" Ordering="501"/>
+    <ROW Dialog_="MaintenanceTypeDlg" Control_="Back" Event="NewDialog" Argument="MaintenanceWelcomeDlg" Condition="AI_MAINT" Ordering="1"/>
+    <ROW Dialog_="MaintenanceTypeDlg" Control_="RemoveButton" Event="NewDialog" Argument="VerifyRemoveDlg" Condition="AI_MAINT AND InstallMode=&quot;Remove&quot;" Ordering="601"/>
+    <ROW Dialog_="VerifyRemoveDlg" Control_="Back" Event="NewDialog" Argument="MaintenanceTypeDlg" Condition="AI_MAINT AND InstallMode=&quot;Remove&quot;" Ordering="1"/>
+    <ROW Dialog_="MaintenanceTypeDlg" Control_="RepairButton" Event="NewDialog" Argument="VerifyRepairDlg" Condition="AI_MAINT AND InstallMode=&quot;Repair&quot;" Ordering="601"/>
+    <ROW Dialog_="VerifyRepairDlg" Control_="Back" Event="NewDialog" Argument="MaintenanceTypeDlg" Condition="AI_MAINT AND InstallMode=&quot;Repair&quot;" Ordering="1"/>
+    <ROW Dialog_="VerifyRepairDlg" Control_="Repair" Event="EndDialog" Argument="Return" Condition="AI_MAINT AND InstallMode=&quot;Repair&quot;" Ordering="399" Options="1"/>
+    <ROW Dialog_="VerifyRemoveDlg" Control_="Remove" Event="EndDialog" Argument="Return" Condition="AI_MAINT AND InstallMode=&quot;Remove&quot;" Ordering="299" Options="1"/>
+    <ROW Dialog_="PatchWelcomeDlg" Control_="Next" Event="NewDialog" Argument="VerifyReadyDlg" Condition="AI_PATCH" Ordering="201"/>
+    <ROW Dialog_="ResumeDlg" Control_="Install" Event="EndDialog" Argument="Return" Condition="AI_RESUME" Ordering="299"/>
+    <ROW Dialog_="VerifyReadyDlg" Control_="Install" Event="EndDialog" Argument="Return" Condition="AI_PATCH" Ordering="199"/>
+    <ROW Dialog_="VerifyReadyDlg" Control_="Back" Event="NewDialog" Argument="PatchWelcomeDlg" Condition="AI_PATCH" Ordering="203"/>
+  </COMPONENT>
+  <COMPONENT cid="caphyon.advinst.msicomp.MsiCreateFolderComponent">
+    <ROW Directory_="SHORTCUTDIR" Component_="SHORTCUTDIR" ManualDelete="false"/>
+  </COMPONENT>
+  <COMPONENT cid="caphyon.advinst.msicomp.MsiCustActComponent">
+    <ROW Action="AI_DOWNGRADE" Type="19" Target="4010"/>
+    <ROW Action="AI_DpiContentScale" Type="1" Source="aicustact.dll" Target="DpiContentScale"/>
+    <ROW Action="AI_EnableDebugLog" Type="321" Source="aicustact.dll" Target="EnableDebugLog"/>
+    <ROW Action="AI_InstallModeCheck" Type="1" Source="aicustact.dll" Target="UpdateInstallMode" WithoutSeq="true"/>
+    <ROW Action="AI_PREPARE_UPGRADE" Type="65" Source="aicustact.dll" Target="PrepareUpgrade"/>
+    <ROW Action="AI_PRESERVE_INSTALL_TYPE" Type="65" Source="aicustact.dll" Target="PreserveInstallType"/>
+    <ROW Action="AI_RESTORE_LOCATION" Type="65" Source="aicustact.dll" Target="RestoreLocation"/>
+    <ROW Action="AI_ResolveKnownFolders" Type="1" Source="aicustact.dll" Target="AI_ResolveKnownFolders"/>
+    <ROW Action="AI_SHOW_LOG" Type="65" Source="aicustact.dll" Target="LaunchLogFile" WithoutSeq="true"/>
+    <ROW Action="AI_STORE_LOCATION" Type="51" Source="ARPINSTALLLOCATION" Target="[APPDIR]"/>
+    <ROW Action="SET_APPDIR" Type="307" Source="APPDIR" Target="[ProgramFilesFolder][Manufacturer]\[ProductName]" MultiBuildTarget="DefaultBuild:[ProgramFiles64Folder][Manufacturer]\[ProductName]"/>
+    <ROW Action="SET_SHORTCUTDIR" Type="307" Source="SHORTCUTDIR" Target="[ProgramMenuFolder][ProductName]"/>
+    <ROW Action="SET_TARGETDIR_TO_APPDIR" Type="51" Source="TARGETDIR" Target="[APPDIR]"/>
+  </COMPONENT>
+  <COMPONENT cid="caphyon.advinst.msicomp.MsiFeatCompsComponent">
+    <ROW Feature_="MainFeature" Component_="ProductInformation"/>
+    <ROW Feature_="MainFeature" Component_="connectivity_plus_plugin.dll"/>
+    <ROW Feature_="MainFeature" Component_="dartjni.dll"/>
+    <ROW Feature_="MainFeature" Component_="app.so"/>
+    <ROW Feature_="MainFeature" Component_="AssetManifest.bin"/>
+    <ROW Feature_="MainFeature" Component_="RobotoBold.ttf"/>
+    <ROW Feature_="MainFeature" Component_="favicon.ico.backup"/>
+    <ROW Feature_="MainFeature" Component_="MaterialIconsRegular.otf"/>
+    <ROW Feature_="MainFeature" Component_="CupertinoIcons.ttf"/>
+    <ROW Feature_="MainFeature" Component_="notifications_service_worker.js"/>
+    <ROW Feature_="MainFeature" Component_="flutter_map_logo.png"/>
+    <ROW Feature_="MainFeature" Component_="howler.js"/>
+    <ROW Feature_="MainFeature" Component_="flutter_sound.js"/>
+    <ROW Feature_="MainFeature" Component_="ink_sparkle.frag"/>
+    <ROW Feature_="MainFeature" Component_="desktop_drop_plugin.dll"/>
+    <ROW Feature_="MainFeature" Component_="file_saver_plugin.dll"/>
+    <ROW Feature_="MainFeature" Component_="file_selector_windows_plugin.dll"/>
+    <ROW Feature_="MainFeature" Component_="flutter_local_notifications_windows.dll"/>
+    <ROW Feature_="MainFeature" Component_="flutter_secure_storage_windows_plugin.dll"/>
+    <ROW Feature_="MainFeature" Component_="flutter_sound_plugin.dll"/>
+    <ROW Feature_="MainFeature" Component_="flutter_windows.dll"/>
+    <ROW Feature_="MainFeature" Component_="geolocator_windows_plugin.dll"/>
+    <ROW Feature_="MainFeature" Component_="hesabix_ui.exe"/>
+    <ROW Feature_="MainFeature" Component_="local_auth_windows_plugin.dll"/>
+    <ROW Feature_="MainFeature" Component_="native_assets.json"/>
+    <ROW Feature_="MainFeature" Component_="pdfium.dll"/>
+    <ROW Feature_="MainFeature" Component_="permission_handler_windows_plugin.dll"/>
+    <ROW Feature_="MainFeature" Component_="printing_plugin.dll"/>
+    <ROW Feature_="MainFeature" Component_="share_plus_plugin.dll"/>
+    <ROW Feature_="MainFeature" Component_="url_launcher_windows_plugin.dll"/>
+    <ROW Feature_="MainFeature" Component_="SHORTCUTDIR"/>
+  </COMPONENT>
+  <COMPONENT cid="caphyon.advinst.msicomp.MsiIconsComponent">
+    <ROW Name="hesabix_ui.exe" SourcePath="..\..\hesabixUI\hesabix_ui\build\windows\x64\runner\Release\hesabix_ui.exe" Index="0"/>
+  </COMPONENT>
+  <COMPONENT cid="caphyon.advinst.msicomp.MsiInstExSeqComponent">
+    <ROW Action="AI_DOWNGRADE" Condition="AI_NEWERPRODUCTFOUND AND (UILevel &lt;&gt; 5)" Sequence="210"/>
+    <ROW Action="AI_RESTORE_LOCATION" Condition="APPDIR=&quot;&quot;" Sequence="749"/>
+    <ROW Action="AI_STORE_LOCATION" Condition="(Not Installed) OR REINSTALL" Sequence="1501"/>
+    <ROW Action="AI_PREPARE_UPGRADE" Condition="AI_UPGRADE=&quot;No&quot; AND (Not Installed)" Sequence="1399"/>
+    <ROW Action="AI_ResolveKnownFolders" Sequence="52"/>
+    <ROW Action="AI_EnableDebugLog" Sequence="51"/>
+  </COMPONENT>
+  <COMPONENT cid="caphyon.advinst.msicomp.MsiInstallUISequenceComponent">
+    <ROW Action="AI_PRESERVE_INSTALL_TYPE" Sequence="199"/>
+    <ROW Action="AI_RESTORE_LOCATION" Condition="APPDIR=&quot;&quot;" Sequence="749"/>
+    <ROW Action="AI_ResolveKnownFolders" Sequence="53"/>
+    <ROW Action="AI_DpiContentScale" Sequence="52"/>
+    <ROW Action="AI_EnableDebugLog" Sequence="51"/>
+  </COMPONENT>
+  <COMPONENT cid="caphyon.advinst.msicomp.MsiLaunchConditionsComponent">
+    <ROW Condition="((VersionNT &lt;&gt; 501) AND (VersionNT &lt;&gt; 502))" Description="[ProductName] cannot be installed on [WindowsTypeNT5XDisplay]." DescriptionLocId="AI.LaunchCondition.NoNT5X" IsPredefined="true" Builds="DefaultBuild"/>
+    <ROW Condition="(VersionNT &lt;&gt; 400)" Description="[ProductName] cannot be installed on [WindowsTypeNT40Display]." DescriptionLocId="AI.LaunchCondition.NoNT40" IsPredefined="true" Builds="DefaultBuild"/>
+    <ROW Condition="(VersionNT &lt;&gt; 500)" Description="[ProductName] cannot be installed on [WindowsTypeNT50Display]." DescriptionLocId="AI.LaunchCondition.NoNT50" IsPredefined="true" Builds="DefaultBuild"/>
+    <ROW Condition="(VersionNT &lt;&gt; 600)" Description="[ProductName] cannot be installed on [WindowsTypeNT60Display]." DescriptionLocId="AI.LaunchCondition.NoNT60" IsPredefined="true" Builds="DefaultBuild"/>
+    <ROW Condition="VersionNT" Description="[ProductName] cannot be installed on [WindowsType9XDisplay]." DescriptionLocId="AI.LaunchCondition.No9X" IsPredefined="true" Builds="DefaultBuild"/>
+  </COMPONENT>
+  <COMPONENT cid="caphyon.advinst.msicomp.MsiRegsComponent">
+    <ROW Registry="Manufacturer" Root="-1" Key="Software\[Manufacturer]" Name="\"/>
+    <ROW Registry="Path" Root="-1" Key="Software\[Manufacturer]\[ProductName]" Name="Path" Value="[APPDIR]" Component_="ProductInformation"/>
+    <ROW Registry="ProductName" Root="-1" Key="Software\[Manufacturer]\[ProductName]" Name="\"/>
+    <ROW Registry="Software" Root="-1" Key="Software" Name="\"/>
+    <ROW Registry="Version" Root="-1" Key="Software\[Manufacturer]\[ProductName]" Name="Version" Value="[ProductVersion]" Component_="ProductInformation"/>
+  </COMPONENT>
+  <COMPONENT cid="caphyon.advinst.msicomp.MsiShortsComponent">
+    <ROW Shortcut="Hesabix" Directory_="SHORTCUTDIR" Name="Hesabix" Component_="hesabix_ui.exe" Target="[#hesabix_ui.exe]" Hotkey="0" Icon_="hesabix_ui.exe" IconIndex="0" ShowCmd="1" WkDir="APPDIR"/>
+    <ROW Shortcut="Hesabix_1" Directory_="DesktopFolder" Name="Hesabix" Component_="hesabix_ui.exe" Target="[#hesabix_ui.exe]" Hotkey="0" Icon_="hesabix_ui.exe" IconIndex="0" ShowCmd="1" WkDir="APPDIR"/>
+  </COMPONENT>
+  <COMPONENT cid="caphyon.advinst.msicomp.MsiThemeComponent">
+    <ATTRIBUTE name="UsedTheme" value="classic"/>
+  </COMPONENT>
+  <COMPONENT cid="caphyon.advinst.msicomp.MsiUpgradeComponent">
+    <ROW UpgradeCode="[|UpgradeCode]" VersionMin="0.0.1" VersionMax="[|ProductVersion]" Attributes="257" ActionProperty="OLDPRODUCTS"/>
+    <ROW UpgradeCode="[|UpgradeCode]" VersionMin="[|ProductVersion]" Attributes="2" ActionProperty="AI_NEWERPRODUCTFOUND"/>
+  </COMPONENT>
+  <COMPONENT cid="caphyon.advinst.msicomp.SynchronizedFolderComponent">
+    <ROW Directory_="APPDIR" SourcePath="..\..\hesabixUI\hesabix_ui\build\windows\x64\runner\Release" Feature="MainFeature"/>
+  </COMPONENT>
+</DOCUMENT>

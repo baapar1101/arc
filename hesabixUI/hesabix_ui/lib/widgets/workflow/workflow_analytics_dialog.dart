@@ -5,6 +5,7 @@ import '../../l10n/app_localizations.dart';
 import '../../services/workflow_service.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 
 /// دیالوگ نمایش آمار و تحلیل workflow
@@ -270,7 +271,7 @@ class _WorkflowAnalyticsDialogState extends State<WorkflowAnalyticsDialog> with 
                     icon: Icons.play_circle_outline,
                     label: t.workflowTotalExecutions,
                     value: totalExecutions.toString(),
-                    color: Colors.blue,
+                    color: SemanticColorResolver.info(context),
                   ),
                 ),
                 Expanded(
@@ -278,7 +279,7 @@ class _WorkflowAnalyticsDialogState extends State<WorkflowAnalyticsDialog> with 
                     icon: Icons.check_circle_outline,
                     label: t.workflowSuccessful,
                     value: successful.toString(),
-                    color: Colors.green,
+                    color: SemanticColorResolver.positive(context),
                   ),
                 ),
                 Expanded(
@@ -286,7 +287,7 @@ class _WorkflowAnalyticsDialogState extends State<WorkflowAnalyticsDialog> with 
                     icon: Icons.error_outline,
                     label: t.workflowFailed,
                     value: failed.toString(),
-                    color: Colors.red,
+                    color: SemanticColorResolver.negative(context),
                   ),
                 ),
                 Expanded(
@@ -294,7 +295,7 @@ class _WorkflowAnalyticsDialogState extends State<WorkflowAnalyticsDialog> with 
                     icon: Icons.timer_outlined,
                     label: t.workflowAvgTime,
                     value: '${avgDuration.toStringAsFixed(2)}s',
-                    color: Colors.orange,
+                    color: SemanticColorResolver.warning(context),
                   ),
                 ),
               ],
@@ -358,12 +359,12 @@ class _WorkflowAnalyticsDialogState extends State<WorkflowAnalyticsDialog> with 
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.check_circle_outline, size: 64, color: Colors.green[400]),
-            const SizedBox(height: 16),
+            Icon(Icons.check_circle_outline, size: 64, color: SemanticColorResolver.positive(context)),
+            SizedBox(height: 16),
             Text(
               AppLocalizations.of(context).workflowNoErrorsRecorded,
               style: TextStyle(
-                color: Colors.green[700],
+                color: SemanticColorResolver.positive(context),
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
               ),
@@ -386,7 +387,7 @@ class _WorkflowAnalyticsDialogState extends State<WorkflowAnalyticsDialog> with 
             },
             options: const [7, 14, 30, 60, 90],
           ),
-          const SizedBox(height: 24),
+          SizedBox(height: 24),
           
           // Summary Cards
           Row(
@@ -396,16 +397,16 @@ class _WorkflowAnalyticsDialogState extends State<WorkflowAnalyticsDialog> with 
                   icon: Icons.error,
                   title: t.workflowTotalErrors,
                   value: totalErrors.toString(),
-                  color: Colors.red,
+                  color: SemanticColorResolver.negative(context),
                 ),
               ),
-              const SizedBox(width: 16),
+              SizedBox(width: 16),
               Expanded(
                 child: _buildSummaryCard(
                   icon: Icons.category,
                   title: t.workflowErrorTypes,
                   value: uniqueErrorTypes.toString(),
-                  color: Colors.orange,
+                  color: SemanticColorResolver.warning(context),
                 ),
               ),
             ],
@@ -543,18 +544,18 @@ class _WorkflowAnalyticsDialogState extends State<WorkflowAnalyticsDialog> with 
       margin: const EdgeInsets.only(bottom: 12),
       child: ListTile(
         leading: CircleAvatar(
-          backgroundColor: Colors.red[100],
+          backgroundColor: SemanticColorResolver.negative(context).withValues(alpha: 0.18),
           child: Text(
             count.toString(),
             style: TextStyle(
-              color: Colors.red[900],
+              color: SemanticColorResolver.negative(context),
               fontWeight: FontWeight.bold,
             ),
           ),
         ),
         title: Text(
           errorType,
-          style: const TextStyle(fontWeight: FontWeight.bold),
+          style: TextStyle(fontWeight: FontWeight.bold),
         ),
         subtitle: lastOccurrence != null
             ? Text('آخرین رخداد: ${_formatDateTime(lastOccurrence)}')
@@ -562,13 +563,13 @@ class _WorkflowAnalyticsDialogState extends State<WorkflowAnalyticsDialog> with 
         trailing: Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
           decoration: BoxDecoration(
-            color: Colors.red[50],
+            color: SemanticColorResolver.negative(context).withValues(alpha: 0.12),
             borderRadius: BorderRadius.circular(12),
           ),
           child: Text(
             '${percentage.toStringAsFixed(1)}%',
             style: TextStyle(
-              color: Colors.red[900],
+              color: SemanticColorResolver.negative(context),
               fontWeight: FontWeight.bold,
             ),
           ),
@@ -615,9 +616,9 @@ class _WorkflowAnalyticsDialogState extends State<WorkflowAnalyticsDialog> with 
   }
 
   Color _getSuccessRateColor(double rate) {
-    if (rate >= 95) return Colors.green;
-    if (rate >= 80) return Colors.orange;
-    return Colors.red;
+    if (rate >= 95) return SemanticColorResolver.positive(context);
+    if (rate >= 80) return SemanticColorResolver.warning(context);
+    return SemanticColorResolver.negative(context);
   }
 
   String _formatDateTime(String dateTime) {

@@ -22,7 +22,7 @@ def _sample_invoice_context() -> dict:
 			"payable_total": 990,
 		},
 		"lines": [
-			{"product_name": "A", "quantity": 1, "unit_price": 1000, "line_total": 1000},
+			{"product_name": "A", "quantity": 1, "quantity_display": "1", "unit_price": 1000, "line_total": 1000},
 		],
 		"buyer": {"name": "خریدار"},
 		"seller": {"name": "فروشنده"},
@@ -30,6 +30,13 @@ def _sample_invoice_context() -> dict:
 		"generated_at": "now",
 		"issuer_name": "user",
 		"is_fa": True,
+		"show_line_discount_column": True,
+		"show_line_tax_column": True,
+		"show_line_amount_before_discount_column": True,
+		"show_line_amount_before_tax_column": True,
+		"show_summary_discount": True,
+		"show_summary_tax": True,
+		"show_summary_amount_without_tax": True,
 	}
 
 
@@ -38,6 +45,13 @@ def test_gallery_lists_invoice_families():
 	ids = {i["id"] for i in items}
 	assert "invoice_classic" in ids
 	assert "invoice_modern" in ids
+
+
+def test_gallery_lists_invoice_receipt_families():
+	items = list_gallery_items(module_key="invoices", subtype="receipt")
+	ids = {i["id"] for i in items}
+	assert "invoice_receipt_simple" in ids
+	assert "invoice_receipt_branded" in ids
 
 
 def test_validate_v2_design_accepts_default_classic():
@@ -54,6 +68,25 @@ def test_compile_and_render_invoice_classic():
 	assert "<table" in html
 	assert "lines" in html
 	env = SandboxedEnvironment(loader=BaseLoader(), autoescape=True)
+	env.filters["money"] = lambda value, *args, **kwargs: str(value if value is not None else "")
+	env.filters["date"] = lambda value, *args, **kwargs: str(value if value is not None else "")
+	full = f"<style>{css}</style>{header}{html}{footer}"
+	rendered = env.from_string(full).render(**_sample_invoice_context())
+	assert "INV-1" in rendered
+	assert "A" in rendered
+
+
+def test_compile_and_render_invoice_receipt():
+	design = default_design_for_family("invoice_receipt_simple")
+	assert design is not None
+	out = validate_v2_design("invoices", "receipt", design)
+	assert out["errors"] == []
+	html, css, header, footer = compile_v2_design_to_jinja_html(design)
+	assert "rt-receipt-items" in html
+	assert "lines" in html
+	env = SandboxedEnvironment(loader=BaseLoader(), autoescape=True)
+	env.filters["money"] = lambda value, *args, **kwargs: str(value if value is not None else "")
+	env.filters["date"] = lambda value, *args, **kwargs: str(value if value is not None else "")
 	full = f"<style>{css}</style>{header}{html}{footer}"
 	rendered = env.from_string(full).render(**_sample_invoice_context())
 	assert "INV-1" in rendered
@@ -89,6 +122,7 @@ def test_gallery_covers_all_scopes():
 	modules = {(i["module_key"], i.get("subtype")) for i in items}
 	assert ("receipts_payments", "detail") in modules
 	assert ("warehouse_documents", "postal_label") in modules
+	assert ("invoices", "receipt") in modules
 
 
 def test_compile_postal_label():

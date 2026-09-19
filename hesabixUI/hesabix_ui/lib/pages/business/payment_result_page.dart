@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 /// صفحه نمایش نتیجه پرداخت
 /// این صفحه وقتی از طریق Deep Link باز می‌شود نمایش داده می‌شود
@@ -56,8 +57,8 @@ class _PaymentResultPageState extends State<PaymentResultPage>
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: isSuccess
-                ? [Colors.green.shade400, Colors.green.shade700]
-                : [Colors.red.shade400, Colors.red.shade700],
+                ? [SemanticColorResolver.positive(context), SemanticColorResolver.positive(context)]
+                : [SemanticColorResolver.negative(context), SemanticColorResolver.negative(context)],
           ),
         ),
         child: SafeArea(
@@ -87,7 +88,7 @@ class _PaymentResultPageState extends State<PaymentResultPage>
                       child: Icon(
                         isSuccess ? Icons.check : Icons.close,
                         size: 80,
-                        color: isSuccess ? Colors.green : Colors.red,
+                        color: isSuccess ? SemanticColorResolver.positive(context) : SemanticColorResolver.negative(context),
                       ),
                     ),
                   ),
@@ -166,7 +167,7 @@ class _PaymentResultPageState extends State<PaymentResultPage>
                             style: ElevatedButton.styleFrom(
                               padding: const EdgeInsets.symmetric(vertical: 16),
                               backgroundColor: Colors.white,
-                              foregroundColor: Colors.red,
+                              foregroundColor: SemanticColorResolver.negative(context),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(12),
                               ),
@@ -191,7 +192,7 @@ class _PaymentResultPageState extends State<PaymentResultPage>
                             padding: const EdgeInsets.symmetric(vertical: 16),
                             backgroundColor: Colors.white,
                             foregroundColor:
-                                isSuccess ? Colors.green : Colors.grey,
+                                isSuccess ? SemanticColorResolver.positive(context) : Colors.grey,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12),
                             ),

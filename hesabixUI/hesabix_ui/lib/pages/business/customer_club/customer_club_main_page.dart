@@ -10,7 +10,9 @@ import '../../../services/customer_club_service.dart';
 import '../../../utils/error_extractor.dart';
 import '../../../utils/snackbar_helper.dart';
 import '../../../widgets/invoice/person_combobox_widget.dart';
+import '../../../widgets/business_subpage_back_leading.dart';
 import 'customer_club_analytics_tab.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 /// صفحهٔ اصلی باشگاه مشتریان (تراکنش‌ها و در صورت مجوز اصلاح دستی). تنظیمات در مسیر جدا است.
 class CustomerClubMainPage extends StatefulWidget {
@@ -122,7 +124,7 @@ class _CustomerClubMainPageState extends State<CustomerClubMainPage> with Single
 
   Color _deltaColor(ThemeData theme, num? delta) {
     if (delta == null) return theme.colorScheme.onSurface;
-    if (delta > 0) return Colors.green.shade700;
+    if (delta > 0) return SemanticColorResolver.positive(context);
     if (delta < 0) return theme.colorScheme.error;
     return theme.colorScheme.onSurface;
   }
@@ -236,7 +238,7 @@ class _CustomerClubMainPageState extends State<CustomerClubMainPage> with Single
       SnackBarHelper.show(
         context,
         message: t.customerClubAdjustmentSaved,
-        backgroundColor: Colors.green,
+        backgroundColor: SemanticColorResolver.positive(context),
         action: SnackBarAction(
           label: t.customerClubViewLedgerAction,
           onPressed: () {
@@ -263,6 +265,7 @@ class _CustomerClubMainPageState extends State<CustomerClubMainPage> with Single
     return Scaffold(
       appBar: AppBar(
         title: Text(t.customerClubTitle),
+        leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
         bottom: TabBar(
           controller: _tabController,
           tabs: [

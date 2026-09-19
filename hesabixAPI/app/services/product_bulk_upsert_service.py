@@ -1,5 +1,6 @@
 """
-ایجاد/ویرایش گروهی کالا برای یکپارچه‌سازی (مثل ووکامرس).
+ایجاد/ویرایش گروهی کالا برای یکپارچه‌سازی (مثل ووکامرس / مهاجرت هلو).
+موجودی اولیه در صورت ارسال، از مسیر create/update_with_opening_balance اعمال می‌شود.
 """
 
 from typing import Any, Dict, List, Optional
@@ -13,10 +14,15 @@ from adapters.db.models.product import Product
 from app.core.auth_dependency import AuthContext
 from app.core.permissions import has_business_permission_for_business
 from app.core.responses import ApiError
+from app.services.product_opening_balance_service import (
+    create_product_with_opening_balance,
+    update_product_with_opening_balance,
+)
 from app.services.product_service import (
     create_product,
-    update_product,
+    delete_product,
     invalidate_products_cache,
+    update_product,
 )
 
 MAX_BULK_PRODUCT_ITEMS = 1000
@@ -28,6 +34,11 @@ def _api_err(ae: ApiError) -> Dict[str, str]:
         p = d.get("error") or {}
         return {"code": str(p.get("code") or "API_ERROR"), "message": str(p.get("message") or str(ae))}
     return {"code": "API_ERROR", "message": str(ae)}
+
+
+def _payload_has_opening_balance(payload: Dict[str, Any]) -> bool:
+    ob = payload.get("opening_balance")
+    return isinstance(ob, dict)
 
 
 def bulk_upsert_products_integration(
@@ -50,6 +61,25 @@ def bulk_upsert_products_integration(
     create_if_update_missing = bool(body.get("create_if_update_missing", True))
     can_add = has_business_permission_for_business(auth_context, db, business_id, "products", "add")
     can_edit = has_business_permission_for_business(auth_context, db, business_id, "products", "edit")
+    can_edit_ob = has_business_permission_for_business(
+        auth_context, db, business_id, "opening_balance", "edit"
+    )
+    user_id = auth_context.get_user_id()
+
+    def _create_product_deferred(session: Session, bid: int, pdata: Any) -> Dict[str, Any]:
+        return create_product(session, bid, pdata, defer_cache_invalidation=True)
+
+    def _update_product_deferred(
+        session: Session,
+        pid: int,
+        bid: int,
+        pdata: Any,
+        *,
+        user_id: Optional[int] = None,
+    ) -> Optional[Dict[str, Any]]:
+        return update_product(
+            session, pid, bid, pdata, defer_cache_invalidation=True, user_id=user_id
+        )
 
     results: List[Dict[str, Any]] = []
     any_success = False
@@ -62,13 +92,28 @@ def bulk_upsert_products_integration(
             base["client_ref"] = None
 
         if not isinstance(raw, dict):
-            results.append({**base, "status": "failed", "product_id": None, "error_code": "INVALID_ITEM", "message": "آیتم نامعتبر"})
+            results.append(
+                {**base, "status": "failed", "product_id": None, "error_code": "INVALID_ITEM", "message": "آیتم نامعتبر"}
+            )
             continue
 
         payload = raw.get("payload")
         if not isinstance(payload, dict):
             results.append(
                 {**base, "status": "failed", "product_id": None, "error_code": "INVALID_PAYLOAD", "message": "payload الزامی است"}
+            )
+            continue
+
+        wants_ob = _payload_has_opening_balance(payload)
+        if wants_ob and not can_edit_ob:
+            results.append(
+                {
+                    **base,
+                    "status": "failed",
+                    "product_id": None,
+                    "error_code": "OPENING_BALANCE_PERMISSION_REQUIRED",
+                    "message": "برای ثبت تعداد اولیه به دسترسی ویرایش تراز افتتاحیه نیاز است",
+                }
             )
             continue
 
@@ -115,13 +160,29 @@ def bulk_upsert_products_integration(
                     results.append(_row("failed", None, "VALIDATION_ERROR", str(ve)))
                     continue
                 try:
-                    out = update_product(
-                        db,
-                        hesabix_product_id,
-                        business_id,
-                        p_upd,
-                        defer_cache_invalidation=True,
-                    )
+                    if wants_ob:
+                        existing = db.get(Product, hesabix_product_id)
+                        previous_warehouse_id = (
+                            existing.default_warehouse_id if existing is not None else None
+                        )
+                        out = update_product_with_opening_balance(
+                            db,
+                            business_id,
+                            user_id,
+                            hesabix_product_id,
+                            p_upd,
+                            update_product_fn=_update_product_deferred,
+                            previous_warehouse_id=previous_warehouse_id,
+                        )
+                    else:
+                        out = update_product(
+                            db,
+                            hesabix_product_id,
+                            business_id,
+                            p_upd,
+                            defer_cache_invalidation=True,
+                            user_id=user_id,
+                        )
                 except ApiError as ae:
                     e = _api_err(ae)
                     results.append(_row("failed", None, e["code"], e["message"]))
@@ -133,7 +194,9 @@ def bulk_upsert_products_integration(
                 if out and isinstance(out.get("data"), dict):
                     nid = out["data"].get("id")
                     any_success = True
-                    results.append(_row("updated", int(nid) if nid is not None else hesabix_product_id, None, None))
+                    results.append(
+                        _row("updated", int(nid) if nid is not None else hesabix_product_id, None, None)
+                    )
                     continue
                 if out is None and create_if_update_missing:
                     need_create = True
@@ -151,7 +214,17 @@ def bulk_upsert_products_integration(
                 results.append(_row("failed", None, "VALIDATION_ERROR", str(ve)))
                 continue
             try:
-                cr = create_product(db, business_id, p_new, defer_cache_invalidation=True)
+                if wants_ob:
+                    cr = create_product_with_opening_balance(
+                        db,
+                        business_id,
+                        user_id,
+                        p_new,
+                        create_product_fn=_create_product_deferred,
+                        delete_product_fn=delete_product,
+                    )
+                else:
+                    cr = create_product(db, business_id, p_new, defer_cache_invalidation=True)
                 pdata = cr.get("data") or {}
                 nid = pdata.get("id")
                 any_success = True

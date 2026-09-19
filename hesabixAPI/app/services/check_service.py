@@ -63,7 +63,7 @@ def _get_business_fiscal_year(db: Session, business_id: int) -> FiscalYear:
     return fy
 
 
-def create_check(db: Session, business_id: int, user_id: int, data: Dict[str, Any]) -> Dict[str, Any]:
+def create_check(db: Session, business_id: int, user_id: int, data: Dict[str, Any], *, commit: bool = True) -> Dict[str, Any]:
     try:
         ctype = str(data.get('type', '')).lower()
         if ctype not in ("received", "transferred"):
@@ -215,21 +215,26 @@ def create_check(db: Session, business_id: int, user_id: int, data: Dict[str, An
                 "source": "check_create",
                 "check_id": obj.id,
                 "check_type": ctype,
+                **(data.get("extra_info") if isinstance(data.get("extra_info"), dict) else {}),
             },
         )
         obj.last_action_document_id = created_document_id
-        try:
-            db.commit()
-        except Exception:
-            db.rollback()
-            raise
-        db.refresh(obj)
+        if commit:
+            try:
+                db.commit()
+            except Exception:
+                db.rollback()
+                raise
+            db.refresh(obj)
+        else:
+            db.flush()
 
         result = check_to_dict(db, obj)
         result["document_id"] = created_document_id
         return result
     except Exception:
-        db.rollback()
+        if commit:
+            db.rollback()
         raise
 
 

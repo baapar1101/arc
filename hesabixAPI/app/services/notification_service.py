@@ -402,6 +402,13 @@ class NotificationService:
 				# اعلان DB فقط اگر outbox تازه باشد (retry روی همان ردیف اعلان تکراری نسازد)
 				if reuse_outbox is None:
 					try:
+						from app.services.support.notification_helpers import resolve_announcement_navigation
+
+						nav = resolve_announcement_navigation(event_key, context)
+						nav_deep_link = nav.get("deep_link")
+						nav_ticket_id = nav.get("ticket_id")
+						nav_event_key = nav.get("event_key") or event_key
+
 						audience_filters: Optional[Dict[str, Any]] = {"allowed_user_ids": [user_id]}
 						if event_key.startswith("support."):
 							if event_key == "support.ticket_status_changed":
@@ -418,6 +425,9 @@ class NotificationService:
 							starts_at=None,
 							ends_at=None,
 							audience_filters=audience_filters,
+							deep_link=str(nav_deep_link) if nav_deep_link else None,
+							ticket_id=int(nav_ticket_id) if nav_ticket_id else None,
+							event_key=str(nav_event_key) if nav_event_key else None,
 							created_by=None,
 						)
 						self.db.add(a)
@@ -435,12 +445,25 @@ class NotificationService:
 						self.db.commit()
 					except Exception:
 						pass
+				deep_link = context.get("deep_link") or context.get("action_url")
+				ticket_id_val = context.get("ticket_id")
+				event_key_val = event_key
+				if not deep_link or not ticket_id_val:
+					from app.services.support.notification_helpers import resolve_announcement_navigation
+
+					nav = resolve_announcement_navigation(event_key, context)
+					deep_link = deep_link or nav.get("deep_link")
+					ticket_id_val = ticket_id_val or nav.get("ticket_id")
+					event_key_val = nav.get("event_key") or event_key
 				ok = self.inapp.push_realtime(
 					user_id=user_id,
 					title=title_inapp,
 					body=ws_body,
 					level="info",
 					announcement_id=announcement_id,
+					deep_link=str(deep_link) if deep_link else None,
+					ticket_id=int(ticket_id_val) if ticket_id_val else None,
+					event_key=str(event_key_val) if event_key_val else None,
 				)
 				self._log_attempt(outbox_id=outbox.id, channel=channel, success=ok, error_message=None if ok else "inapp_failed")
 				outbox.status = "sent" if ok else "failed"

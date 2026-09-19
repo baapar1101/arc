@@ -8,6 +8,7 @@ import '../../core/calendar_controller.dart';
 import '../../widgets/date_input_field.dart';
 import '../../core/date_utils.dart';
 import 'package:shamsi_date/shamsi_date.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 class FiscalYearSettingsPage extends StatefulWidget {
   final int businessId;
@@ -397,7 +398,7 @@ class _FiscalYearSettingsPageState extends State<FiscalYearSettingsPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('ویرایش سال مالی جاری'),
+        title: Text('ویرایش سال مالی جاری'),
         leading: businessSubpageBackLeading(context, widget.businessId),
         backgroundColor: cs.surface,
         foregroundColor: cs.onSurface,
@@ -410,7 +411,7 @@ class _FiscalYearSettingsPageState extends State<FiscalYearSettingsPage> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Icon(Icons.error_outline, size: 64, color: cs.error),
-                      const SizedBox(height: 16),
+                      SizedBox(height: 16),
                       Text(
                         'خطا در بارگذاری داده‌ها',
                         style: TextStyle(color: cs.error, fontSize: 18),
@@ -439,7 +440,7 @@ class _FiscalYearSettingsPageState extends State<FiscalYearSettingsPage> {
                       children: [
                         Card(
                           color: _currentFiscalYear == null 
-                              ? Colors.orange.shade50 
+                              ? SemanticColorResolver.warning(context).withValues(alpha: 0.12) 
                               : cs.primaryContainer,
                           child: Padding(
                             padding: const EdgeInsets.all(16),
@@ -450,10 +451,10 @@ class _FiscalYearSettingsPageState extends State<FiscalYearSettingsPage> {
                                       ? Icons.warning_amber_rounded 
                                       : Icons.info_outline, 
                                   color: _currentFiscalYear == null 
-                                      ? Colors.orange.shade900 
+                                      ? SemanticColorResolver.warning(context) 
                                       : cs.onPrimaryContainer,
                                 ),
-                                const SizedBox(width: 12),
+                                SizedBox(width: 12),
                                 Expanded(
                                   child: Text(
                                     _currentFiscalYear == null
@@ -461,7 +462,7 @@ class _FiscalYearSettingsPageState extends State<FiscalYearSettingsPage> {
                                         : 'شما می‌توانید عنوان و تاریخ‌های سال مالی جاری را ویرایش کنید. توجه داشته باشید که تغییر این اطلاعات ممکن است بر روی گزارش‌ها تأثیر بگذارد.',
                                     style: TextStyle(
                                       color: _currentFiscalYear == null 
-                                          ? Colors.orange.shade900 
+                                          ? SemanticColorResolver.warning(context) 
                                           : cs.onPrimaryContainer,
                                     ),
                                   ),

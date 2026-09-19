@@ -9,6 +9,7 @@ import '../../services/person_group_service.dart';
 import '../../services/person_service.dart';
 import 'person_groups_manage_dialog.dart';
 import '../../services/credit_api_service.dart';
+import '../../services/opening_balance_service.dart';
 import '../../utils/number_normalizer.dart';
 import '../../services/business_dashboard_service.dart';
 import '../../models/business_dashboard_models.dart';
@@ -16,12 +17,15 @@ import '../../core/api_client.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../utils/responsive_helper.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 class PersonFormDialog extends StatefulWidget {
   final int businessId;
   final Person? person; // null برای افزودن، مقدار برای ویرایش
   final VoidCallback? onSuccess;
   final String? initialAliasName; // مقدار اولیه برای نام مستعار
+  /// انواع پیش‌فرض شخص هنگام افزودن (مثلاً کارمند از combobox حقوق).
+  final List<PersonType>? initialPersonTypes;
 
   const PersonFormDialog({
     super.key,
@@ -29,6 +33,7 @@ class PersonFormDialog extends StatefulWidget {
     this.person,
     this.onSuccess,
     this.initialAliasName,
+    this.initialPersonTypes,
   });
 
   @override
@@ -38,6 +43,7 @@ class PersonFormDialog extends StatefulWidget {
 class _PersonFormDialogState extends State<PersonFormDialog> {
   final _formKey = GlobalKey<FormState>();
   final _personService = PersonService();
+  final _openingBalanceService = OpeningBalanceService(ApiClient());
   final _personGroupService = PersonGroupService();
   final _businessDashboardService = BusinessDashboardService(ApiClient());
   List<PersonGroup> _personGroups = [];
@@ -100,6 +106,21 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
   String _creditCheckMode = 'inherit'; // inherit | enabled | disabled
   String? _creditCurrencyLabel;
 
+  // مانده افتتاحیه (سند تراز افتتاحیه سال جاری)
+  bool _obEligibilityLoading = false;
+  Map<String, dynamic>? _obEligibility;
+  final _openingBalanceAmountController = TextEditingController();
+  String _openingBalanceType = 'debit';
+  bool _obInitialHadLine = false;
+  double? _obInitialAmount;
+  String? _obInitialType;
+
+  /// نمایش تب مانده افتتاحیه — حتی بدون دسترسی ویرایش (فقط‌خواندنی با هشدار).
+  bool get _showOpeningBalanceTab =>
+      _obEligibility != null || _obEligibilityLoading;
+
+  bool get _obEditable => _obEligibility?['editable'] == true;
+
   /// خالی = بدون پیشوند (هم‌نام با API)
   static const List<String> _personNamePrefixChoices = [
     '',
@@ -124,6 +145,7 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
     super.initState();
     _initializeForm();
     Future.microtask(_loadPersonGroups);
+    Future.microtask(_loadOpeningBalanceEligibility);
     _aliasAndNameFieldsListener = () {
       if (mounted) setState(() {});
     };
@@ -194,9 +216,16 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
       _commissionPostInInvoiceDocument = person.commissionPostInInvoiceDocument;
       _selectedPersonGroupId = person.personGroupId;
     } else {
-      // برای افزودن شخص جدید، نوع شخص به صورت پیش‌فرض "مشتری" انتخاب می‌شود
-      _selectedPersonTypes.add(PersonType.customer);
-      _selectedPersonType = PersonType.customer;
+      final initial = widget.initialPersonTypes;
+      if (initial != null && initial.isNotEmpty) {
+        _selectedPersonTypes
+          ..clear()
+          ..addAll(initial);
+        _selectedPersonType = initial.first;
+      } else {
+        _selectedPersonTypes.add(PersonType.customer);
+        _selectedPersonType = PersonType.customer;
+      }
       
       if (widget.initialAliasName != null && widget.initialAliasName!.isNotEmpty) {
         // اگر مقدار اولیه برای نام مستعار داریم
@@ -406,7 +435,104 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
     _commissionSalesAmountController.dispose();
     _commissionSalesReturnAmountController.dispose();
     _creditLimitController.dispose();
+    _openingBalanceAmountController.dispose();
     super.dispose();
+  }
+
+  Future<void> _loadOpeningBalanceEligibility() async {
+    setState(() => _obEligibilityLoading = true);
+    try {
+      final data = await _openingBalanceService.fetchPersonLineEligibility(
+        businessId: widget.businessId,
+        personId: widget.person?.id,
+      );
+      if (!mounted) return;
+      setState(() {
+        _obEligibility = data;
+        _obEligibilityLoading = false;
+        _applyOpeningBalanceFromEligibility(data);
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _obEligibility = null;
+        _obEligibilityLoading = false;
+      });
+    }
+  }
+
+  void _applyOpeningBalanceFromEligibility(Map<String, dynamic> data) {
+    final pob = data['person_opening_balance'];
+    _obInitialHadLine = data['has_opening_balance_line'] == true;
+    _obInitialAmount = null;
+    _obInitialType = null;
+    if (pob is Map) {
+      final amount = (pob['amount'] as num?)?.toDouble();
+      final type = pob['balance_type'] as String? ?? 'debit';
+      if (amount != null && amount > 0) {
+        _openingBalanceAmountController.text =
+            formatNumberForInput(amount, decimalPlaces: 0);
+        _openingBalanceType = type;
+        _obInitialAmount = amount;
+        _obInitialType = type;
+      }
+    }
+    if (!_obInitialHadLine) {
+      _openingBalanceAmountController.clear();
+      _openingBalanceType = 'debit';
+    }
+  }
+
+  bool _openingBalanceChanged() {
+    if (!_obEditable || !_showOpeningBalanceTab) return false;
+    final raw = _openingBalanceAmountController.text.trim();
+    if (!_obInitialHadLine && raw.isEmpty) return false;
+    if (_obInitialHadLine && raw.isEmpty) return true;
+    final amount = parseFormattedDouble(raw) ??
+        double.tryParse(raw.replaceAll(',', ''));
+    if (amount == null || amount <= 0) return _obInitialHadLine;
+    if (!_obInitialHadLine) return true;
+    return amount != _obInitialAmount || _openingBalanceType != _obInitialType;
+  }
+
+  PersonOpeningBalanceInput? _buildOpeningBalanceInput(AppLocalizations t) {
+    if (!_showOpeningBalanceTab) return null;
+
+    if (widget.person != null) {
+      if (!_obEditable || !_openingBalanceChanged()) return null;
+      final raw = _openingBalanceAmountController.text.trim();
+      if (raw.isEmpty) {
+        return PersonOpeningBalanceInput(
+          clear: true,
+          balanceType: _openingBalanceType,
+          fiscalYearId: (_obEligibility?['fiscal_year_id'] as num?)?.toInt(),
+        );
+      }
+      final amount = parseFormattedDouble(raw) ??
+          double.tryParse(raw.replaceAll(',', ''));
+      if (amount == null || amount <= 0) {
+        throw FormatException(t.personOpeningBalanceAmountRequired);
+      }
+      return PersonOpeningBalanceInput(
+        amount: amount,
+        balanceType: _openingBalanceType,
+        fiscalYearId: (_obEligibility?['fiscal_year_id'] as num?)?.toInt(),
+      );
+    }
+
+    if (!_obEditable) return null;
+    final raw = _openingBalanceAmountController.text.trim();
+    if (raw.isEmpty) return null;
+    final amount = parseFormattedDouble(raw) ??
+        double.tryParse(raw.replaceAll(',', ''));
+    if (amount == null || amount <= 0) {
+      throw FormatException(t.personOpeningBalanceAmountRequired);
+    }
+    return PersonOpeningBalanceInput(
+      amount: amount,
+      balanceType: _openingBalanceType,
+      fiscalYearId: (_obEligibility?['fiscal_year_id'] as num?)?.toInt(),
+    );
   }
 
   Future<void> _savePerson() async {
@@ -422,6 +548,14 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
     }
 
     if (!_formKey.currentState!.validate()) return;
+
+    PersonOpeningBalanceInput? openingBalanceInput;
+    try {
+      openingBalanceInput = _buildOpeningBalanceInput(t);
+    } catch (e) {
+      SnackBarHelper.showError(context, message: e.toString());
+      return;
+    }
 
     setState(() {
       _isLoading = true;
@@ -486,6 +620,7 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
               ? _commissionPostInInvoiceDocument
               : null,
           personGroupId: _selectedPersonGroupId,
+          openingBalance: openingBalanceInput,
         );
 
         final created = await _personService.createPerson(
@@ -560,6 +695,8 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
               : null,
           personGroupId: _selectedPersonGroupId,
           socialContacts: _socialContactsForApi(),
+          bankAccounts: _bankAccounts,
+          openingBalance: openingBalanceInput,
         );
 
         final updated = await _personService.updatePerson(
@@ -587,9 +724,11 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
         Navigator.of(context).pop(resultPerson);
         SnackBarHelper.showSuccess(
           context,
-          message: widget.person == null 
-            ? AppLocalizations.of(context).personCreatedSuccessfully
-            : AppLocalizations.of(context).personUpdatedSuccessfully,
+          message: widget.person == null
+              ? (openingBalanceInput != null
+                  ? '${AppLocalizations.of(context).personCreatedSuccessfully} — ${AppLocalizations.of(context).personOpeningBalanceSaved}'
+                  : AppLocalizations.of(context).personCreatedSuccessfully)
+              : _successMessageForUpdate(openingBalanceInput),
         );
       }
     } catch (e) {
@@ -695,7 +834,6 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
                     Tab(text: t.personEconomicInfo),
                     Tab(text: t.personContactInfo),
                     Tab(text: t.personBankInfo),
-                    Tab(text: t.creditTabTitle),
                   ];
                   final views = <Widget>[
                     SingleChildScrollView(
@@ -722,13 +860,27 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
                         child: _buildBankAccountsSection(t, isMobile),
                       ),
                     ),
+                  ];
+                  if (_showOpeningBalanceTab) {
+                    tabs.add(Tab(text: t.personOpeningBalanceTabTitle));
+                    views.add(
+                      SingleChildScrollView(
+                        child: Padding(
+                          padding: EdgeInsets.symmetric(horizontal: isMobile ? 4 : 8, vertical: 8),
+                          child: _buildOpeningBalanceSection(t),
+                        ),
+                      ),
+                    );
+                  }
+                  tabs.add(Tab(text: t.creditTabTitle));
+                  views.add(
                     SingleChildScrollView(
                       child: Padding(
                         padding: EdgeInsets.symmetric(horizontal: isMobile ? 4 : 8, vertical: 8),
                         child: _buildCreditOverrideSection(),
                       ),
                     ),
-                  ];
+                  );
                   if (hasCommissionTab) {
                     tabs.add(Tab(text: t.commissionSalePercentLabel));
                     views.add(
@@ -1054,6 +1206,159 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
         ),
       ],
     );
+  }
+
+  String _successMessageForUpdate(PersonOpeningBalanceInput? ob) {
+    final t = AppLocalizations.of(context);
+    if (ob == null) return t.personUpdatedSuccessfully;
+    if (ob.clear) {
+      return '${t.personUpdatedSuccessfully} — ${t.personOpeningBalanceRemoved}';
+    }
+    return '${t.personUpdatedSuccessfully} — ${t.personOpeningBalanceUpdated}';
+  }
+
+  Widget _buildOpeningBalanceSection(AppLocalizations t) {
+    final fyTitle = _obEligibility?['fiscal_year_title']?.toString();
+    final statusMessage = _obEligibility?['message']?.toString();
+    final loading = _obEligibilityLoading;
+    final readonly = !loading && _obEligibility != null && !_obEditable;
+    final readonlyWarning = _openingBalanceReadonlyWarning(t, statusMessage);
+    return FutureBuilder<String?>(
+      future: _getCurrencyLabel(),
+      builder: (context, snapshot) {
+        final currencyLabel = snapshot.data;
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              t.personOpeningBalanceSectionTitle,
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+            SizedBox(height: 8),
+            if (loading)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 8),
+                child: LinearProgressIndicator(),
+              ),
+            if (fyTitle != null && fyTitle.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Text('${t.personOpeningBalanceFiscalYear}: $fyTitle'),
+              ),
+            if (readonly)
+              Container(
+                width: double.infinity,
+                margin: const EdgeInsets.only(bottom: 12),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: SemanticColorResolver.warning(context).withValues(alpha: 0.12),
+                  border: Border.all(color: SemanticColorResolver.warning(context).withValues(alpha: 0.35)),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(
+                      Icons.lock_outline,
+                      size: 18,
+                      color: SemanticColorResolver.warning(context),
+                    ),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        readonlyWarning,
+                        style: TextStyle(
+                          color: SemanticColorResolver.warning(context),
+                          fontSize: 13,
+                          height: 1.35,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              )
+            else ...[
+              if (statusMessage != null && statusMessage.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Text(
+                    statusMessage,
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ),
+              Text(
+                t.personOpeningBalanceHint,
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ],
+            if (_obEditable && _obInitialHadLine) ...[
+              const SizedBox(height: 8),
+              Text(
+                t.personOpeningBalanceClearHint,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+              ),
+            ],
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: _openingBalanceAmountController,
+              readOnly: readonly || loading,
+              decoration: InputDecoration(
+                labelText: t.personOpeningBalanceAmountLabel,
+                border: const OutlineInputBorder(),
+                suffixText: currencyLabel,
+              ),
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              inputFormatters: (readonly || loading)
+                  ? null
+                  : [
+                      FilteringTextInputFormatter.allow(RegExp(r'[0-9.,]')),
+                    ],
+              validator: (value) {
+                if (readonly || loading) return null;
+                final raw = (value ?? '').trim();
+                if (raw.isEmpty) return null;
+                final amount = parseFormattedDouble(raw) ??
+                    double.tryParse(raw.replaceAll(',', ''));
+                if (amount == null || amount <= 0) {
+                  return t.personOpeningBalanceAmountRequired;
+                }
+                return null;
+              },
+            ),
+            const SizedBox(height: 16),
+            Text(t.personOpeningBalanceTypeLabel, style: const TextStyle(fontWeight: FontWeight.w600)),
+            const SizedBox(height: 8),
+            RadioListTile<String>(
+              title: Text(t.personOpeningBalanceTypeDebit),
+              value: 'debit',
+              groupValue: _openingBalanceType,
+              onChanged: (readonly || loading)
+                  ? null
+                  : (v) => setState(() => _openingBalanceType = v ?? 'debit'),
+              contentPadding: EdgeInsets.zero,
+            ),
+            RadioListTile<String>(
+              title: Text(t.personOpeningBalanceTypeCredit),
+              value: 'credit',
+              groupValue: _openingBalanceType,
+              onChanged: (readonly || loading)
+                  ? null
+                  : (v) => setState(() => _openingBalanceType = v ?? 'credit'),
+              contentPadding: EdgeInsets.zero,
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  String _openingBalanceReadonlyWarning(AppLocalizations t, String? statusMessage) {
+    if (statusMessage != null && statusMessage.trim().isNotEmpty) {
+      return statusMessage.trim();
+    }
+    return t.personOpeningBalanceReadonlyBanner;
   }
 
   Widget _buildCreditOverrideSection() {
@@ -2075,7 +2380,7 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
                 ),
                 IconButton(
                   onPressed: () => _removeSocialRow(index),
-                  icon: const Icon(Icons.delete, color: Colors.red),
+                  icon: Icon(Icons.delete, color: SemanticColorResolver.negative(context)),
                 ),
               ],
             ),
@@ -2193,7 +2498,7 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
                     alignment: Alignment.centerLeft,
                     child: IconButton(
                       onPressed: () => _removeBankAccount(index),
-                      icon: const Icon(Icons.delete, color: Colors.red),
+                      icon: Icon(Icons.delete, color: SemanticColorResolver.negative(context)),
                     ),
                   ),
                 ],
@@ -2213,7 +2518,7 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
                   SizedBox(width: spacing),
                   IconButton(
                     onPressed: () => _removeBankAccount(index),
-                    icon: const Icon(Icons.delete, color: Colors.red),
+                    icon: Icon(Icons.delete, color: SemanticColorResolver.negative(context)),
                   ),
                 ],
               ),

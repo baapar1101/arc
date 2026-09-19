@@ -29,8 +29,71 @@ logger = structlog.get_logger(__name__)
 EXTRA_INFO_KEY = "woocommerce_hesabix"
 BRIDGE_HEADER = "X-Hesabix-Bridge-Token"
 BRIDGE_REST_PREFIX = "/wp-json/hesabix/v1"
+# برخی هاست‌ها (مثل LiteSpeed/WAF) User-Agent پیش‌فرض httpx را بلاک می‌کنند → 403 HTML.
+BRIDGE_USER_AGENT = "Hesabix-WooBridge/1.0 (+https://hesabix.ir)"
 # پیشوند توکن ذخیره‌شدهٔ رمزشده (توکن‌های بدون این پیشوند به‌صورت متن سادهٔ قدیمی در نظر گرفته می‌شوند)
 _WOOCOMMERCE_TOKEN_STORE_PREFIX = "wootok1:"
+
+
+def _bridge_request_headers(*, token: str, content_type: Optional[str] = None) -> Dict[str, str]:
+	headers = {
+		BRIDGE_HEADER: token,
+		"Accept": "application/json",
+		"User-Agent": BRIDGE_USER_AGENT,
+	}
+	if content_type:
+		headers["Content-Type"] = content_type
+	return headers
+
+
+def _raise_bridge_http_error(resp: httpx.Response, *, business_id: int, path: str) -> None:
+	"""تبدیل پاسخ خطای HTTP پل به ApiError با پیام دقیق‌تر برای 403های WAF."""
+	body_preview = (resp.text or "")[:500]
+	is_html = "<html" in body_preview.lower() or "<!doctype" in body_preview.lower()
+	if resp.status_code == 401:
+		logger.warning(
+			"woocommerce_bridge_unauthorized",
+			business_id=int(business_id),
+			path=path,
+		)
+		raise ApiError(
+			"WOOCOMMERCE_BRIDGE_UNAUTHORIZED",
+			"توکن پل نامعتبر است یا پل در وردپرس غیرفعال است.",
+			http_status=401,
+		)
+	if resp.status_code == 403:
+		logger.warning(
+			"woocommerce_bridge_forbidden",
+			business_id=int(business_id),
+			path=path,
+			html_block=is_html,
+			body_len=len(resp.text or ""),
+		)
+		if is_html:
+			raise ApiError(
+				"WOOCOMMERCE_BRIDGE_HOST_FORBIDDEN",
+				"هاست فروشگاه درخواست را مسدود کرده است (فایروال/WAF). مسیر پل یا IP سرور حسابیکس را در لیست سفید قرار دهید.",
+				http_status=502,
+				details={"body_preview": body_preview},
+			)
+		raise ApiError(
+			"WOOCOMMERCE_BRIDGE_FORBIDDEN",
+			"پل REST در وردپرس غیرفعال است.",
+			http_status=403,
+		)
+	logger.warning(
+		"woocommerce_bridge_http_error",
+		business_id=int(business_id),
+		path=path,
+		status_code=resp.status_code,
+		body_len=len(resp.text or ""),
+	)
+	raise ApiError(
+		"WOOCOMMERCE_BRIDGE_HTTP",
+		f"پاسخ فروشگاه: HTTP {resp.status_code}",
+		http_status=502,
+		details={"body_preview": body_preview},
+	)
 
 
 def _json_loads_safe(value: Optional[str]) -> Dict[str, Any]:
@@ -133,6 +196,8 @@ def _default_settings() -> Dict[str, Any]:
 		"store_base_url": "",
 		"bridge_token": "",
 		"updated_at": None,
+		# پس از قطعی حواله انبار، موجودی به ووکامرس پوش شود (از طریق پل ArcWOC).
+		"push_stock_to_wc_on_warehouse_post": True,
 	}
 
 
@@ -167,6 +232,14 @@ def _normalize_settings(payload: Dict[str, Any], previous: Optional[Dict[str, An
 			base["bridge_token"] = str(prev.get("bridge_token") or "")
 		else:
 			base["bridge_token"] = tok_s
+
+	if "push_stock_to_wc_on_warehouse_post" in payload:
+		base["push_stock_to_wc_on_warehouse_post"] = bool(payload.get("push_stock_to_wc_on_warehouse_post"))
+	elif "push_stock_to_wc_on_warehouse_post" not in base:
+		base["push_stock_to_wc_on_warehouse_post"] = True
+	else:
+		base["push_stock_to_wc_on_warehouse_post"] = bool(base.get("push_stock_to_wc_on_warehouse_post"))
+
 	base["updated_at"] = datetime.utcnow().isoformat()
 	return base
 
@@ -267,12 +340,13 @@ def _bridge_get(db: Session, business_id: int, path: str, params: Dict[str, Any]
 	enforce_woocommerce_bridge_rate_limit(int(business_id), path or "/")
 	store, token = _load_bridge_credentials(db, business_id)
 	url = store + BRIDGE_REST_PREFIX + path
-	headers = {BRIDGE_HEADER: token, "Accept": "application/json"}
+	headers = _bridge_request_headers(token=token)
 	try:
 		with httpx.Client(
 			timeout=45.0,
 			follow_redirects=True,
 			verify=woocommerce_bridge_tls_verify_enabled(),
+			headers={"User-Agent": BRIDGE_USER_AGENT},
 		) as client:
 			resp = client.get(url, headers=headers, params=params)
 	except httpx.RequestError as exc:
@@ -288,34 +362,8 @@ def _bridge_get(db: Session, business_id: int, path: str, params: Dict[str, Any]
 			http_status=502,
 		) from exc
 
-	if resp.status_code == 401:
-		logger.warning(
-			"woocommerce_bridge_unauthorized",
-			business_id=int(business_id),
-			path=path,
-		)
-		raise ApiError("WOOCOMMERCE_BRIDGE_UNAUTHORIZED", "توکن پل نامعتبر است یا پل در وردپرس غیرفعال است.", http_status=401)
-	if resp.status_code == 403:
-		logger.warning(
-			"woocommerce_bridge_forbidden",
-			business_id=int(business_id),
-			path=path,
-		)
-		raise ApiError("WOOCOMMERCE_BRIDGE_FORBIDDEN", "پل REST در وردپرس غیرفعال است.", http_status=403)
 	if resp.status_code >= 400:
-		logger.warning(
-			"woocommerce_bridge_http_error",
-			business_id=int(business_id),
-			path=path,
-			status_code=resp.status_code,
-			body_len=len(resp.text or ""),
-		)
-		raise ApiError(
-			"WOOCOMMERCE_BRIDGE_HTTP",
-			f"پاسخ فروشگاه: HTTP {resp.status_code}",
-			http_status=502,
-			details={"body_preview": (resp.text or "")[:500]},
-		)
+		_raise_bridge_http_error(resp, business_id=int(business_id), path=path)
 
 	try:
 		data = resp.json()
@@ -344,13 +392,14 @@ def _bridge_post(
 	enforce_woocommerce_bridge_rate_limit(int(business_id), path or "/")
 	store, token = _load_bridge_credentials(db, business_id)
 	url = store + BRIDGE_REST_PREFIX + path
-	headers = {BRIDGE_HEADER: token, "Accept": "application/json", "Content-Type": "application/json"}
+	headers = _bridge_request_headers(token=token, content_type="application/json")
 	payload = json_body if isinstance(json_body, dict) else {}
 	try:
 		with httpx.Client(
 			timeout=timeout_sec,
 			follow_redirects=True,
 			verify=woocommerce_bridge_tls_verify_enabled(),
+			headers={"User-Agent": BRIDGE_USER_AGENT},
 		) as client:
 			resp = client.post(url, headers=headers, json=payload)
 	except httpx.RequestError as exc:
@@ -366,24 +415,8 @@ def _bridge_post(
 			http_status=502,
 		) from exc
 
-	if resp.status_code == 401:
-		raise ApiError("WOOCOMMERCE_BRIDGE_UNAUTHORIZED", "توکن پل نامعتبر است یا پل در وردپرس غیرفعال است.", http_status=401)
-	if resp.status_code == 403:
-		raise ApiError("WOOCOMMERCE_BRIDGE_FORBIDDEN", "پل REST در وردپرس غیرفعال است.", http_status=403)
 	if resp.status_code >= 400:
-		logger.warning(
-			"woocommerce_bridge_http_error",
-			business_id=int(business_id),
-			path=path,
-			status_code=resp.status_code,
-			body_len=len(resp.text or ""),
-		)
-		raise ApiError(
-			"WOOCOMMERCE_BRIDGE_HTTP",
-			f"پاسخ فروشگاه: HTTP {resp.status_code}",
-			http_status=502,
-			details={"body_preview": (resp.text or "")[:500]},
-		)
+		_raise_bridge_http_error(resp, business_id=int(business_id), path=path)
 
 	try:
 		data = resp.json()
@@ -632,6 +665,33 @@ def post_control_settings_patch(db: Session, business_id: int, payload: Dict[str
 		business_id=business_id,
 		path="/control/settings/patch",
 	)
+
+
+def post_control_stock_pull_run(db: Session, business_id: int, payload: Dict[str, Any]) -> Dict[str, Any]:
+	body = payload if isinstance(payload, dict) else {}
+	# پاسخ پل بعد از unwrap همان نتیجهٔ execute_pull است (success/message/updated/…).
+	return _unwrap_bridge_body(
+		_bridge_post(db, business_id, "/control/stock-pull/run", body, timeout_sec=180.0),
+		business_id=business_id,
+		path="/control/stock-pull/run",
+	)
+
+
+def control_stock_status(db: Session, business_id: int) -> Dict[str, Any]:
+	return _unwrap_bridge_body(
+		_bridge_get(db, business_id, "/control/stock-status", {}),
+		business_id=business_id,
+		path="/control/stock-status",
+	)
+
+
+def control_stock_conflicts(db: Session, business_id: int, *, limit: int = 25) -> Dict[str, Any]:
+	raw = _unwrap_bridge_body(
+		_bridge_get(db, business_id, "/control/stock-conflicts", {"limit": max(5, min(100, int(limit)))}),
+		business_id=business_id,
+		path="/control/stock-conflicts",
+	)
+	return raw if isinstance(raw, dict) else {"raw": raw}
 
 
 def control_opening_inventory_status(db: Session, business_id: int) -> Dict[str, Any]:

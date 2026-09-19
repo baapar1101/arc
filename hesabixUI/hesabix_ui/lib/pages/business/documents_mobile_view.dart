@@ -15,6 +15,8 @@ import 'package:hesabix_ui/widgets/date_input_field.dart';
 import 'package:hesabix_ui/widgets/project/project_selector_widget.dart';
 import 'package:hesabix_ui/widgets/invoice/person_combobox_widget.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
+import 'package:hesabix_ui/widgets/business_subpage_back_leading.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 /// نمای موبایل برای لیست اسناد (نمایش کارت‌ها + فیلتر BottomSheet + سرچ + Load more)
 class DocumentsMobileView extends StatefulWidget {
@@ -420,15 +422,15 @@ class _DocumentsMobileViewState extends State<DocumentsMobileView> {
   Color _typeColor(String type) {
     switch (type) {
       case 'manual':
-        return Colors.blue;
+        return SemanticColorResolver.info(context);
       case 'expense':
-        return Colors.red;
+        return SemanticColorResolver.negative(context);
       case 'income':
-        return Colors.green;
+        return SemanticColorResolver.positive(context);
       case 'receipt':
         return Colors.teal;
       case 'payment':
-        return Colors.orange;
+        return SemanticColorResolver.warning(context);
       case 'transfer':
         return Colors.purple;
       case 'invoice':
@@ -659,12 +661,12 @@ class _DocumentsMobileViewState extends State<DocumentsMobileView> {
                     style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
                     textDirection: TextDirection.ltr,
                   ),
-                  const SizedBox(width: 8),
+                  SizedBox(width: 8),
                   IconButton(
                     visualDensity: VisualDensity.compact,
                     tooltip: 'عملیات',
                     onPressed: () => _openDocActions(doc),
-                    icon: const Icon(Icons.more_vert),
+                    icon: Icon(Icons.more_vert),
                   ),
                 ],
               ),
@@ -691,13 +693,13 @@ class _DocumentsMobileViewState extends State<DocumentsMobileView> {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
-                      color: doc.isProforma ? Colors.orange.withValues(alpha: 0.10) : Colors.green.withValues(alpha: 0.10),
+                      color: doc.isProforma ? SemanticColorResolver.warning(context).withValues(alpha: 0.10) : SemanticColorResolver.positive(context).withValues(alpha: 0.10),
                       borderRadius: BorderRadius.circular(999),
                     ),
                     child: Text(
                       doc.statusText,
                       style: theme.textTheme.bodySmall?.copyWith(
-                        color: doc.isProforma ? Colors.orange : Colors.green,
+                        color: doc.isProforma ? SemanticColorResolver.warning(context) : SemanticColorResolver.positive(context),
                         fontWeight: FontWeight.w700,
                       ),
                     ),
@@ -762,6 +764,7 @@ class _DocumentsMobileViewState extends State<DocumentsMobileView> {
       backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
         title: Text(_selectionMode ? '${_selectedIds.length} انتخاب شد' : 'اسناد حسابداری'),
+        leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
         actions: _selectionMode
             ? [
                 IconButton(

@@ -311,7 +311,7 @@ def _resolve_profile_support_tickets(
         query_info = QueryInfo(
             take=limit,
             skip=0,
-            sort_by="updated_at",
+            sort_by="last_message_at",
             sort_desc=True,
             search=None,
             search_fields=None,
@@ -320,11 +320,14 @@ def _resolve_profile_support_tickets(
         
         formatted_items = []
         for ticket in tickets:
+            from app.services.support.ticket_engagement_service import ticket_last_activity_at
+            activity_at = ticket_last_activity_at(ticket)
             formatted_items.append({
                 "id": ticket.id,
                 "subject": ticket.title,
                 "status": ticket.status.name if ticket.status else "",
-                "updated_at": ticket.updated_at.isoformat() if ticket.updated_at else "",
+                "updated_at": activity_at.isoformat() if activity_at else "",
+                "last_message_at": ticket.last_message_at.isoformat() if ticket.last_message_at else "",
             })
         
         return {"items": formatted_items}

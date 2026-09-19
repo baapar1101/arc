@@ -9,7 +9,22 @@ from sqlalchemy.orm import Session
 
 from adapters.db.models.account import Account
 
+from app.services.expense_income_service import _get_fixed_account_by_code
+
 logger = logging.getLogger(__name__)
+
+# نگاشت code حساب قدیم (hesabdari_table) به کد حساب ثابت جدید
+_LEGACY_REF_CODE_TO_FIXED: dict[str, str] = {
+    "3": "10401",
+    "8": "20201",
+    "5": "10203",
+    "121": "10202",
+    "122": "10201",
+    "123": "10202",
+    "124": "10201",
+    "125": "10403",
+    "137": "10102",
+}
 
 # حساب‌های پیش‌فرض چارت عمومی (business_id IS NULL)
 FALLBACK_EXPENSE_ACCOUNT_CODE = "70401"  # خرید خدمات
@@ -85,6 +100,13 @@ class LegacyChartResolver:
         for code in candidates:
             if not code:
                 continue
+            fixed = _LEGACY_REF_CODE_TO_FIXED.get(code)
+            if fixed:
+                try:
+                    acc = _get_fixed_account_by_code(self.db, fixed)
+                    return int(acc.id)
+                except Exception:
+                    pass
             if code in self._by_code:
                 return int(self._by_code[code].id)
 

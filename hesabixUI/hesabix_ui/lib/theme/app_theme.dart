@@ -10,9 +10,9 @@ class AppTheme {
   static ThemeData build({
     required bool isDark,
     required Locale locale,
-    required Color seed,
+    required AppThemeDefinition themeDef,
   }) {
-    final scheme = AppColorTokens.schemeFromSeed(seed, dark: isDark);
+    final scheme = AppColorTokens.schemeForTheme(themeDef, dark: isDark);
     final isFa = locale.languageCode.toLowerCase() == 'fa';
 
     final textTheme = isFa
@@ -27,7 +27,15 @@ class AppTheme {
     const motion = AppMotion();
     final semantic = AppSemanticColors.fromScheme(scheme);
     final shellColors = AppShellColors.fromScheme(scheme, isDark: isDark);
+<<<<<<< HEAD
+    final semantics = AppSemanticColors.fromDefinition(
+      themeDef,
+      isDark: isDark,
+      scheme: scheme,
+    );
+=======
     final surfaces = AppSurfaces.fromScheme(scheme);
+>>>>>>> github/Huma
 
     return ThemeData(
       useMaterial3: true,
@@ -100,8 +108,35 @@ class AppTheme {
         motion,
         semantic,
         shellColors,
+<<<<<<< HEAD
+        semantics,
+=======
         surfaces,
+>>>>>>> github/Huma
       ],
+    );
+  }
+
+  /// سازگاری با فراخوانی‌های قدیمی مبتنی بر seed.
+  static ThemeData buildFromSeed({
+    required bool isDark,
+    required Locale locale,
+    required Color seed,
+  }) {
+    return build(
+      isDark: isDark,
+      locale: locale,
+      themeDef: AppThemeDefinition(
+        id: 'custom_seed',
+        labelFa: 'سفارشی',
+        labelEn: 'Custom',
+        primary: seed,
+        secondary: const Color(0xFF5A6A7A),
+        positive: const Color(0xFF2E7D32),
+        negative: const Color(0xFFB3261E),
+        warning: const Color(0xFFF0B92A),
+        seedOnly: true,
+      ),
     );
   }
 }

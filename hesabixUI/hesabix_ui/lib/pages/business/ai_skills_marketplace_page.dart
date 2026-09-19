@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hesabix_ui/config/brand_config.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/core/auth_store.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
@@ -10,6 +11,7 @@ import 'package:hesabix_ui/widgets/ai/ai_chat_design.dart';
 import 'package:hesabix_ui/widgets/ai/ai_empty_state.dart';
 import 'package:hesabix_ui/widgets/ai/ai_skill_marketplace_card.dart';
 import 'package:hesabix_ui/widgets/ai/ai_skill_purchase_confirm_dialog.dart';
+import 'package:hesabix_ui/widgets/business_subpage_back_leading.dart';
 
 /// مارکت‌پلیس مهارت‌های AI
 class AISkillsMarketplacePage extends StatefulWidget {
@@ -277,12 +279,20 @@ class _AISkillsMarketplacePageState extends State<AISkillsMarketplacePage>
     return Scaffold(
       appBar: AppBar(
         title: const Text('مارکت‌پلیس مهارت‌های AI'),
+        leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
         bottom: TabBar(
           controller: _tabController,
+<<<<<<< HEAD
+          tabs: [
+            const Tab(text: 'جامعه'),
+            Tab(text: BrandConfig.displayName()),
+            const Tab(text: 'Anthropic'),
+=======
           tabs: const [
             Tab(text: 'جامعه'),
             Tab(text: 'مارک‌استریت'),
             Tab(text: 'Anthropic'),
+>>>>>>> github/Huma
           ],
         ),
         actions: [
@@ -331,8 +341,14 @@ class _AISkillsMarketplacePageState extends State<AISkillsMarketplacePage>
                           _officialItems,
                           isOfficial: true,
                           emptyTitle: 'مهارت رسمی یافت نشد',
+<<<<<<< HEAD
+                          emptySubtitle: BrandConfig.rebrand(
+                            'مهارت‌های رسمی حسابیکس به‌زودی اینجا نمایش داده می‌شوند.',
+                          ),
+=======
                           emptySubtitle:
                               'مهارت‌های رسمی مارک‌استریت به‌زودی اینجا نمایش داده می‌شوند.',
+>>>>>>> github/Huma
                         ),
                         _buildAnthropicList(),
                       ],

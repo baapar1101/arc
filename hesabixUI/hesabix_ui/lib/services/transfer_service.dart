@@ -18,6 +18,8 @@ class TransferService {
     required Map<String, dynamic> destination,
     required double amount,
     double? commission,
+    double? destinationAmount,
+    double? fxRate,
     String? description,
     Map<String, dynamic>? extraInfo,
   }) async {
@@ -49,6 +51,9 @@ class TransferService {
       'destination_id': destination['id'],
       'total_amount': amount,
       if (commission != null && commission > 0) 'commission': commission,
+      if (destinationAmount != null && destinationAmount > 0)
+        'destination_amount': destinationAmount,
+      if (fxRate != null && fxRate > 0) 'fx_rate': fxRate,
       if (description != null && description.isNotEmpty) 'description': description,
       if (extraInfo != null) 'extra_info': extraInfo,
     };

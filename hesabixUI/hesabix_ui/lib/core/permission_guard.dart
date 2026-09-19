@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'auth_store.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 class PermissionGuard {
   static bool checkSuperAdminAccess(AuthStore authStore) {
@@ -15,9 +16,9 @@ class PermissionGuard {
     return Builder(
       builder: (context) => Scaffold(
         appBar: AppBar(
-          title: const Text('دسترسی غیرمجاز'),
-          backgroundColor: Colors.red[50],
-          foregroundColor: Colors.red[800],
+          title: Text('دسترسی غیرمجاز'),
+          backgroundColor: SemanticColorResolver.negative(context).withValues(alpha: 0.12),
+          foregroundColor: SemanticColorResolver.negative(context),
         ),
         body: Center(
           child: Padding(
@@ -28,18 +29,18 @@ class PermissionGuard {
                 Icon(
                   Icons.block,
                   size: 80,
-                  color: Colors.red[400],
+                  color: SemanticColorResolver.negative(context),
                 ),
-                const SizedBox(height: 24),
+                SizedBox(height: 24),
                 Text(
                   'دسترسی غیرمجاز',
                   style: TextStyle(
                     fontSize: 24,
                     fontWeight: FontWeight.bold,
-                    color: Colors.red[800],
+                    color: SemanticColorResolver.negative(context),
                   ),
                 ),
-                const SizedBox(height: 16),
+                SizedBox(height: 16),
                 Text(
                   'شما دسترسی لازم برای مشاهده این صفحه را ندارید.',
                   style: TextStyle(
@@ -51,10 +52,10 @@ class PermissionGuard {
                 const SizedBox(height: 32),
                 ElevatedButton.icon(
                   onPressed: () => context.go('/user/profile/dashboard'),
-                  icon: const Icon(Icons.home),
+                  icon: Icon(Icons.home),
                   label: const Text('بازگشت به داشبورد'),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.red[600],
+                    backgroundColor: SemanticColorResolver.negative(context),
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(
                       horizontal: 24,

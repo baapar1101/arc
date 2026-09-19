@@ -16,6 +16,7 @@ from adapters.db.models.bank_account import BankAccount
 from adapters.db.models.cash_register import CashRegister
 from adapters.db.models.petty_cash import PettyCash
 from adapters.db.models.product import Product
+from adapters.db.models.currency import Currency
 from app.services.opening_balance_service import _find_existing_ob_document
 from adapters.db.repositories.document_repository import DocumentRepository
 
@@ -242,10 +243,23 @@ def get_general_ledger_report(
     if date_from_obj:
         date_before_from = date_from_obj - timedelta(days=1)
         
-        opening_query = db.query(
-            func.coalesce(func.sum(DocumentLine.debit), 0).label('total_debit'),
-            func.coalesce(func.sum(DocumentLine.credit), 0).label('total_credit')
-        ).join(
+        if currency_id is None:
+            opening_query = db.query(
+                func.coalesce(
+                    func.sum(func.coalesce(DocumentLine.debit_base, DocumentLine.debit)),
+                    0,
+                ).label('total_debit'),
+                func.coalesce(
+                    func.sum(func.coalesce(DocumentLine.credit_base, DocumentLine.credit)),
+                    0,
+                ).label('total_credit'),
+            )
+        else:
+            opening_query = db.query(
+                func.coalesce(func.sum(DocumentLine.debit), 0).label('total_debit'),
+                func.coalesce(func.sum(DocumentLine.credit), 0).label('total_credit'),
+            )
+        opening_query = opening_query.join(
             Document, DocumentLine.document_id == Document.id
         ).filter(
             and_(
@@ -403,12 +417,31 @@ def get_general_ledger_report(
     running_balance = opening_balance
     total_debit = Decimal(0)
     total_credit = Decimal(0)
+    use_base_amounts = currency_id is None
     
     accounts_map = {acc.id: acc for acc in accounts}
+
+    currency_ids = {int(doc.currency_id) for _, doc in all_lines if doc.currency_id}
+    currencies_map: Dict[int, Dict[str, Any]] = {}
+    if currency_ids:
+        for cur in db.query(Currency).filter(Currency.id.in_(list(currency_ids))).all():
+            currencies_map[int(cur.id)] = {
+                'code': cur.code or '',
+                'symbol': cur.symbol or cur.code or '',
+                'decimal_places': int(getattr(cur, 'decimal_places', None) or 0),
+            }
     
     for line, doc in all_lines:
-        debit = Decimal(str(line.debit or 0))
-        credit = Decimal(str(line.credit or 0))
+        if use_base_amounts:
+            debit = Decimal(str(line.debit_base if line.debit_base is not None else line.debit or 0))
+            credit = Decimal(str(line.credit_base if line.credit_base is not None else line.credit or 0))
+            native_debit = Decimal(str(line.debit or 0))
+            native_credit = Decimal(str(line.credit or 0))
+        else:
+            debit = Decimal(str(line.debit or 0))
+            credit = Decimal(str(line.credit or 0))
+            native_debit = debit
+            native_credit = credit
         
         # به‌روزرسانی مانده تجمعی: بدهکار اضافه می‌کند، بستانکار کم می‌کند
         running_balance = running_balance + debit - credit
@@ -450,6 +483,7 @@ def get_general_ledger_report(
             counterpart_code = product['code'] or ''
         
         document_type_name = _get_document_type_name(doc.document_type)
+        cur_meta = currencies_map.get(int(doc.currency_id), {}) if doc.currency_id else {}
         
         items.append({
             'document_id': doc.id,
@@ -467,6 +501,13 @@ def get_general_ledger_report(
             'counterpart_code': counterpart_code,
             'debit': float(debit),
             'credit': float(credit),
+            'native_debit': float(native_debit),
+            'native_credit': float(native_credit),
+            'document_currency_id': int(doc.currency_id) if doc.currency_id else None,
+            'document_currency_code': cur_meta.get('code'),
+            'document_currency_symbol': cur_meta.get('symbol'),
+            'document_currency_decimal_places': cur_meta.get('decimal_places', 0),
+            'amounts_in_base': use_base_amounts,
             'balance': float(running_balance),
             'balance_type': balance_type,
             'description': line.description or doc.description or '',
@@ -495,6 +536,7 @@ def get_general_ledger_report(
             'total_credit': float(total_credit),
             'closing_balance': float(closing_balance),
             'closing_balance_type': closing_balance_type,
+            'amounts_in_base': use_base_amounts,
         },
         'pagination': {
             'total': total,

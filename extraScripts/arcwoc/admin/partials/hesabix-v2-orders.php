@@ -13,6 +13,12 @@ if (!defined('WPINC')) {
 <div class="wrap hesabix-v2-wrap hesabix-v2-orders-page">
 	<h1><?php echo esc_html(get_admin_page_title()); ?></h1>
 
+	<?php
+	if (class_exists('Hesabix_V2_Marketplace_License')) {
+		Hesabix_V2_Marketplace_License::render_admin_notices('orders');
+	}
+	?>
+
 	<?php if (!get_option('hesabix_v2_enabled')) : ?>
 		<div class="notice notice-warning"><p><?php esc_html_e('افزونه مارک‌استریت غیرفعال است. آن را از تنظیمات فعال کنید.', 'hesabix-v2'); ?></p></div>
 	<?php endif; ?>
@@ -23,14 +29,23 @@ if (!defined('WPINC')) {
 		</p>
 		<ul class="hesabix-v2-connection-notes-list" style="margin-top:8px;">
 			<li><?php esc_html_e('«توقف خودکار» فقط رویدادهای خودکار (چک‌اوت، پرداخت، تغییر وضعیت و صف پس‌زمینه) را رد می‌کند؛ دکمهٔ ارسال دستی همچنان کار می‌کند.', 'hesabix-v2'); ?></li>
+<<<<<<< HEAD
+			<li><?php esc_html_e('با «از سرگیری خودکار»، در چرخهٔ بعدی دوباره همان قوانین تنظیمات افزونه اعمال می‌شود؛ در صورت ویرایش دستی در حسابیکس، ممکن است دادهٔ ووکامرس فاکتور را بازنویسی کند.', 'hesabix-v2'); ?></li>
+			<li><?php esc_html_e('«لغو ارسال» فاکتور را در حسابیکس حذف می‌کند (در صورت پذیرش API). اسناد جانبی بسته به قوانین حسابیکس است.', 'hesabix-v2'); ?></li>
+			<li><?php esc_html_e('ستون «سود» همان سود نهایی فاکتور در حسابیکس است و پس از همگام‌سازی یا با دکمهٔ تازه‌سازی به‌روز می‌شود.', 'hesabix-v2'); ?></li>
+=======
 			<li><?php esc_html_e('با «از سرگیری خودکار»، در چرخهٔ بعدی دوباره همان قوانین تنظیمات افزونه اعمال می‌شود؛ در صورت ویرایش دستی در مارک‌استریت، ممکن است دادهٔ ووکامرس فاکتور را بازنویسی کند.', 'hesabix-v2'); ?></li>
 			<li><?php esc_html_e('«لغو ارسال» فاکتور را در مارک‌استریت حذف می‌کند (در صورت پذیرش API). اسناد جانبی بسته به قوانین مارک‌استریت است.', 'hesabix-v2'); ?></li>
+>>>>>>> github/Huma
 		</ul>
 	</div>
 
 	<div class="hesabix-v2-orders-toolbar hesabix-v2-card" style="margin:12px 0;display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
 		<button type="button" class="button button-primary" id="hesabix-v2-bulk-sync" <?php disabled(!get_option('hesabix_v2_enabled')); ?>>
 			<?php esc_html_e('ارسال / به‌روزرسانی انتخاب‌شده‌ها', 'hesabix-v2'); ?>
+		</button>
+		<button type="button" class="button" id="hesabix-v2-bulk-profit" <?php disabled(!get_option('hesabix_v2_enabled')); ?>>
+			<?php esc_html_e('دریافت سود انتخاب‌شده‌ها', 'hesabix-v2'); ?>
 		</button>
 		<button type="button" class="button" id="hesabix-v2-bulk-unsync" <?php disabled(!get_option('hesabix_v2_enabled')); ?>>
 			<?php esc_html_e('لغو ارسال انتخاب‌شده‌ها', 'hesabix-v2'); ?>

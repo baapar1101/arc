@@ -1444,30 +1444,42 @@ def apply_default_policies_to_business(
 	db: Session,
 	business_id: int,
 	user_id: int | None = None,
+	*,
+	commit: bool = True,
 ) -> List[Dict[str, Any]]:
 	"""
-	اعمال خودکار سیاست‌های پیش‌فرض به یک کسب‌وکار جدید
+	اعمال خودکار سیاست‌های پیش‌فرض به یک کسب‌وکار جدید.
+	برای هر policy_type موجود، درج تکراری انجام نمی‌شود.
 	"""
 	default_policies = get_default_document_policies(db)
 	if not default_policies:
 		return []
-	
-	applied = []
-	currency_id, _ = _get_wallet_currency(db)
-	
+
+	existing_types = {
+		row[0]
+		for row in db.query(DocumentUsagePolicy.policy_type)
+		.filter(DocumentUsagePolicy.business_id == int(business_id))
+		.all()
+	}
+
+	applied: List[DocumentUsagePolicy] = []
+
 	for policy_def in default_policies:
 		if not policy_def.get("is_active", True):
 			continue
-		
+
 		policy_type = policy_def.get("policy_type")
+		if not policy_type or policy_type in existing_types:
+			continue
+
 		title = policy_def.get("title", "")
 		priority = int(policy_def.get("priority", 100))
 		config = dict(policy_def.get("config") or {})
-		
+
 		# اطمینان از استفاده از ارز کیف‌پول
 		if policy_type in {"per_document", "subscription", "volume"}:
 			config = _attach_wallet_currency(config, db)
-		
+
 		policy = DocumentUsagePolicy(
 			business_id=int(business_id),
 			policy_type=policy_type,
@@ -1482,13 +1494,79 @@ def apply_default_policies_to_business(
 		)
 		db.add(policy)
 		applied.append(policy)
-	
+		existing_types.add(policy_type)
+
 	if applied:
 		db.flush()
-		db.commit()
+		if commit:
+			db.commit()
 		for policy in applied:
 			db.refresh(policy)
-	
+
 	return [_serialize_policy(p) for p in applied]
+
+
+def backfill_missing_default_document_policies(
+	db: Session,
+	*,
+	batch_size: int = 200,
+	business_ids: List[int] | None = None,
+) -> Dict[str, Any]:
+	"""
+	اعمال سیاست‌های پیش‌فرض برای کسب‌وکارهایی که هنوز همهٔ انواع پیش‌فرض را ندارند.
+	"""
+	from adapters.db.models.business import Business
+
+	default_policies = get_default_document_policies(db)
+	expected_types = {
+		p.get("policy_type")
+		for p in default_policies
+		if p.get("is_active", True) and p.get("policy_type")
+	}
+	if not expected_types:
+		return {"processed": 0, "updated": 0, "skipped": 0, "errors": []}
+
+	query = db.query(Business.id, Business.owner_id).filter(Business.deleted_at.is_(None))
+	if business_ids:
+		query = query.filter(Business.id.in_([int(b) for b in business_ids]))
+
+	rows = query.order_by(Business.id.asc()).all()
+	processed = 0
+	updated = 0
+	skipped = 0
+	errors: List[Dict[str, Any]] = []
+
+	for business_id, owner_id in rows:
+		processed += 1
+		try:
+			created = apply_default_policies_to_business(
+				db,
+				int(business_id),
+				user_id=int(owner_id) if owner_id else None,
+				commit=True,
+			)
+			if created:
+				updated += 1
+			else:
+				skipped += 1
+		except Exception as exc:
+			db.rollback()
+			errors.append({"business_id": int(business_id), "error": str(exc)})
+
+		if batch_size > 0 and processed % batch_size == 0:
+			logger.info(
+				"document_policy_backfill_progress",
+				processed=processed,
+				updated=updated,
+				skipped=skipped,
+				errors=len(errors),
+			)
+
+	return {
+		"processed": processed,
+		"updated": updated,
+		"skipped": skipped,
+		"errors": errors,
+	}
 
 

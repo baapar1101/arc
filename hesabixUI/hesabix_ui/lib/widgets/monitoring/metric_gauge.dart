@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 class MetricGauge extends StatelessWidget {
   final double value;
@@ -17,18 +18,19 @@ class MetricGauge extends StatelessWidget {
     this.color,
   });
 
-  Color get _statusColor {
+  Color _statusColor(BuildContext context) {
     if (color != null) return color!;
     final percent = (value / maxValue) * 100;
-    if (percent < 50) return Colors.green;
-    if (percent < 80) return Colors.orange;
-    return Colors.red;
+    if (percent < 50) return SemanticColorResolver.positive(context);
+    if (percent < 80) return SemanticColorResolver.warning(context);
+    return SemanticColorResolver.negative(context);
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final percent = ((value / maxValue) * 100).clamp(0.0, 100.0);
+    final statusColor = _statusColor(context);
 
     return Card(
       elevation: 2,
@@ -56,7 +58,7 @@ class MetricGauge extends StatelessWidget {
                       value: percent / 100,
                       strokeWidth: 12,
                       backgroundColor: Colors.grey[200],
-                      valueColor: AlwaysStoppedAnimation<Color>(_statusColor),
+                      valueColor: AlwaysStoppedAnimation<Color>(statusColor),
                     ),
                   ),
                   Column(
@@ -66,7 +68,7 @@ class MetricGauge extends StatelessWidget {
                         '${percent.toStringAsFixed(1)}$unit',
                         style: theme.textTheme.headlineSmall?.copyWith(
                           fontWeight: FontWeight.bold,
-                          color: _statusColor,
+                          color: statusColor,
                         ),
                       ),
                       Text(

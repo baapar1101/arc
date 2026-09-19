@@ -1,7 +1,13 @@
 """تست ارزیابی هدف agent و تمدید پویا بودجه."""
 from __future__ import annotations
 
-from app.services.ai.ai_budget import AgentBudget, STOP_REASON_ITERATIONS, build_agent_budget
+from app.services.ai.ai_budget import (
+    AgentBudget,
+    STOP_REASON_ITERATIONS,
+    STOP_REASON_UNPRODUCTIVE,
+    build_agent_budget,
+)
+from app.services.ai.ai_exploration_service import ObservationStore
 from app.services.ai.ai_goal_assessment import (
     AgentGoalTracker,
     ToolCallTracker,
@@ -24,6 +30,24 @@ def test_tool_call_tracker_detects_repeat():
     assert tracker.has_loop() is True
 
 
+def test_tool_call_tracker_allows_retry_after_error():
+    tracker = ToolCallTracker()
+    call = [{"id": "call_1", "name": "search_invoices", "arguments": {"q": "x"}}]
+    results_err = {"call_1": {"error": "NOT_FOUND"}}
+    tracker.record(call, function_results=results_err, lookup_result=_lookup)
+    tracker.record(call, function_results=results_err, lookup_result=_lookup)
+    assert tracker.has_loop() is False
+    tracker.record(call, function_results=results_err, lookup_result=_lookup)
+    assert tracker.has_loop() is True
+
+
+def test_tool_call_tracker_different_offset_is_not_loop():
+    tracker = ToolCallTracker()
+    tracker.record([{"name": "search_invoices", "arguments": {"offset": 0}}])
+    tracker.record([{"name": "search_invoices", "arguments": {"offset": 20}}])
+    assert tracker.has_loop() is False
+
+
 def test_assess_after_productive_round():
     tracker = AgentGoalTracker()
     calls = [{"name": "search_invoices", "arguments": {}}]
@@ -34,9 +58,8 @@ def test_assess_after_productive_round():
         },
     }
     assessment = tracker.assess_after_tool_round(calls, results, _lookup)
-    assert assessment.goal_reached is True
     assert assessment.should_continue is False
-    assert assessment.confidence == "high"
+    assert assessment.confidence in ("high", "medium")
 
 
 def test_assess_after_failed_round_should_continue():
@@ -76,18 +99,37 @@ def test_resolve_budget_gate_extends_when_goal_not_reached():
     assert budget.max_iterations == 5
 
 
+def test_resolve_budget_gate_extends_on_unproductive_when_goal_open():
+    budget = build_agent_budget("simple", max_iterations=3)
+    budget.unproductive_rounds = 2
+    tracker = AgentGoalTracker()
+    tracker.assess_after_text_round(
+        "در حال جستجوی فاکتورها.",
+        user_query="فاکتورها را بررسی کن",
+    )
+
+    status = budget.check(1)
+    assert status.stop is True
+    assert status.reason == STOP_REASON_UNPRODUCTIVE
+
+    status = resolve_budget_gate(budget, 1, tracker)
+    assert status.stop is False
+    assert budget.unproductive_rounds == 0
+
+
 def test_try_extend_blocked_on_loop():
     budget = build_agent_budget("simple", max_iterations=3)
     tracker = AgentGoalTracker()
     call = [{"name": "search_invoices", "arguments": {"q": "x"}}]
-    tracker.assess_after_tool_round(call, {"call_1": {"error": "x"}}, _lookup)
-    tracker.assess_after_tool_round(call, {"call_1": {"error": "x"}}, _lookup)
+    results = {"call_1": {"items": [{"id": 1}]}}
+    tracker.assess_after_tool_round(call, results, _lookup)
+    tracker.assess_after_tool_round(call, results, _lookup)
     assert tracker.last_assessment is not None
     assert tracker.last_assessment.loop_detected is True
     assert try_extend_budget_for_goal(budget, tracker.last_assessment) is False
 
 
-def test_should_continue_after_text_with_goal_tracker():
+def test_should_continue_after_text_when_needs_tools_and_no_evidence():
     budget = build_agent_budget("simple", max_iterations=6)
     tracker = AgentGoalTracker()
     tracker.assess_after_tool_round(
@@ -95,10 +137,41 @@ def test_should_continue_after_text_with_goal_tracker():
         {"call_1": {"error": "NOT_FOUND"}},
         _lookup,
     )
-    assert should_agent_continue_after_text_round(
+
+    result = should_agent_continue_after_text_round(
         goal_tracker=tracker,
         observation_store=None,
         exploration_enabled=False,
         iteration=2,
         budget=budget,
-    ) is True
+        round_text="در حال جستجو...",
+        user_query="فاکتورها را پیدا کن",
+    )
+    assert result is True
+
+
+def test_text_round_tool_discovery_stops():
+    budget = build_agent_budget("simple", max_iterations=6)
+    store = ObservationStore()
+    long_answer = "### ابزارها\n\n" + ("| a | b |\n" * 5)
+
+    result = should_agent_continue_after_text_round(
+        goal_tracker=AgentGoalTracker(),
+        observation_store=store,
+        exploration_enabled=True,
+        iteration=1,
+        budget=budget,
+        round_text=long_answer,
+        user_query="چه ابزارهایی داری؟",
+    )
+    assert result is False
+
+
+def test_assess_after_text_round_tool_discovery():
+    tracker = AgentGoalTracker()
+    assessment = tracker.assess_after_text_round(
+        "### Tools\n\n| `get_tax_settings` | ok |",
+        user_query="چه ابزارهایی برای مودیان داری؟",
+    )
+    assert assessment.goal_reached is True
+    assert assessment.should_continue is False

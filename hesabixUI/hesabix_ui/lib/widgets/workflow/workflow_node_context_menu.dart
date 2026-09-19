@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../models/workflow_editor_models.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 /// Context Menu برای node ها
 class WorkflowNodeContextMenu extends StatelessWidget {
@@ -39,8 +40,8 @@ class WorkflowNodeContextMenu extends StatelessWidget {
         PopupMenuItem<String>(
           value: 'edit',
           child: ListTile(
-            leading: const Icon(Icons.edit),
-            title: const Text('ویرایش'),
+            leading: Icon(Icons.edit),
+            title: Text('ویرایش'),
             contentPadding: EdgeInsets.zero,
             visualDensity: VisualDensity.compact,
           ),
@@ -75,8 +76,8 @@ class WorkflowNodeContextMenu extends StatelessWidget {
         PopupMenuItem<String>(
           value: 'delete',
           child: ListTile(
-            leading: const Icon(Icons.delete, color: Colors.red),
-            title: const Text('حذف', style: TextStyle(color: Colors.red)),
+            leading: Icon(Icons.delete, color: SemanticColorResolver.negative(context)),
+            title: Text('حذف', style: TextStyle(color: SemanticColorResolver.negative(context))),
             contentPadding: EdgeInsets.zero,
             visualDensity: VisualDensity.compact,
           ),
@@ -115,8 +116,8 @@ class WorkflowNodeContextMenu extends StatelessWidget {
         PopupMenuItem(
           value: 'edit',
           child: ListTile(
-            leading: const Icon(Icons.edit),
-            title: const Text('ویرایش'),
+            leading: Icon(Icons.edit),
+            title: Text('ویرایش'),
             contentPadding: EdgeInsets.zero,
             visualDensity: VisualDensity.compact,
           ),
@@ -135,8 +136,8 @@ class WorkflowNodeContextMenu extends StatelessWidget {
         PopupMenuItem(
           value: 'delete',
           child: ListTile(
-            leading: const Icon(Icons.delete, color: Colors.red),
-            title: const Text('حذف', style: TextStyle(color: Colors.red)),
+            leading: Icon(Icons.delete, color: SemanticColorResolver.negative(context)),
+            title: Text('حذف', style: TextStyle(color: SemanticColorResolver.negative(context))),
             contentPadding: EdgeInsets.zero,
             visualDensity: VisualDensity.compact,
           ),

@@ -10,6 +10,26 @@ const List<String> kReportTemplatePaperSizeOptions = [
   'Legal',
 ];
 
+/// سایزهای فیش پرینتر برای قالب فاکتور (عرض ثابت، ارتفاع تکه‌تکه).
+const List<String> kInvoiceReceiptPaperSizeOptions = [
+  '60mm',
+  '80mm',
+  '100mm',
+];
+
+String reportTemplatePaperSizeLabel(String value) {
+  switch (value) {
+    case '60mm':
+      return '۶ سانتی‌متر (فیش)';
+    case '80mm':
+      return '۸ سانتی‌متر (فیش)';
+    case '100mm':
+      return '۱۰ سانتی‌متر (فیش)';
+    default:
+      return value;
+  }
+}
+
 /// سایزهای رایج برای برچسب مرسوله پستی (حواله انبار).
 const List<String> kWarehousePostalLabelPaperOptions = [
   'A6',

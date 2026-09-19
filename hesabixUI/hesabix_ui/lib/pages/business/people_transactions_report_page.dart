@@ -13,15 +13,19 @@ import 'package:hesabix_ui/widgets/data_table/helpers/data_table_utils.dart';
 import 'package:hesabix_ui/core/date_utils.dart';
 import 'package:hesabix_ui/widgets/invoice/person_combobox_widget.dart';
 import 'package:hesabix_ui/models/person_model.dart';
+import 'package:hesabix_ui/services/person_service.dart';
+import 'package:hesabix_ui/core/hesabix_back.dart';
 
 class PeopleTransactionsReportPage extends StatefulWidget {
   final int businessId;
   final CalendarController calendarController;
+  final int? initialPersonId;
   
   const PeopleTransactionsReportPage({
     super.key,
     required this.businessId,
     required this.calendarController,
+    this.initialPersonId,
   });
 
   @override
@@ -36,6 +40,8 @@ class _PeopleTransactionsReportPageState extends State<PeopleTransactionsReportP
   int? _selectedCurrencyId;
   Person? _selectedPerson;
   String? _selectedDocumentType;
+  /// summary = مبلغ کل فاکتور؛ comprehensive = ریز اقلام خرید/فروش + دریافت/پرداخت
+  String _detailLevel = 'comprehensive';
   
   // Fiscal years and currencies
   List<Map<String, dynamic>> _fiscalYears = [];
@@ -46,6 +52,21 @@ class _PeopleTransactionsReportPageState extends State<PeopleTransactionsReportP
     super.initState();
     _loadFiscalYears();
     _loadCurrencies();
+    _hydrateInitialPerson();
+  }
+
+  Future<void> _hydrateInitialPerson() async {
+    final id = widget.initialPersonId;
+    if (id == null) return;
+    try {
+      final person = await PersonService().getPerson(id);
+      if (!mounted) return;
+      setState(() {
+        _selectedPerson = person;
+      });
+    } catch (_) {
+      // ignore
+    }
   }
 
   Future<void> _loadFiscalYears() async {
@@ -76,14 +97,8 @@ class _PeopleTransactionsReportPageState extends State<PeopleTransactionsReportP
       if (!mounted) return;
       setState(() {
         _currencies = items;
-        // انتخاب ارز پیش‌فرض
-        if (items.isNotEmpty) {
-          final defaultCurrency = items.firstWhere(
-            (c) => c['is_default'] == true,
-            orElse: () => items.first,
-          );
-          _selectedCurrencyId = defaultCurrency['id'] as int?;
-        }
+        // قرارداد چندارزی: null = همه ارزها → معادل پایه
+        _selectedCurrencyId = null;
       });
     } catch (_) {
       // ignore errors
@@ -106,6 +121,7 @@ class _PeopleTransactionsReportPageState extends State<PeopleTransactionsReportP
       if (_selectedCurrencyId != null) 'currency_id': _selectedCurrencyId,
       if (_selectedPerson != null) 'person_ids': [_selectedPerson!.id],
       if (_selectedDocumentType != null) 'document_type': _selectedDocumentType,
+      'detail_level': _detailLevel,
     };
   }
 
@@ -115,17 +131,31 @@ class _PeopleTransactionsReportPageState extends State<PeopleTransactionsReportP
     return DataTableUtils.formatNumber(n);
   }
 
+  String _formatOptionalNumber(dynamic value) {
+    if (value == null) return '';
+    final n = value is num ? value.toDouble() : double.tryParse(value.toString());
+    if (n == null) return '';
+    return DataTableUtils.formatNumber(n);
+  }
+
   String _formatDate(dynamic value) {
     if (value == null) return '';
+<<<<<<< HEAD
+    return HesabixDateUtils.formatApiDateForDisplay(
+      value,
+=======
     
     // استفاده از helper موجود
     return MarkStreetDateUtils.formatForDisplay(
       value is DateTime ? value : (value is String ? DateTime.tryParse(value) : null),
+>>>>>>> github/Huma
       widget.calendarController.isJalali,
+      fallback: '',
     );
   }
 
   DataTableConfig<Map<String, dynamic>> _buildTableConfig(AppLocalizations t) {
+    final isComprehensive = _detailLevel == 'comprehensive';
     return DataTableConfig<Map<String, dynamic>>(
       endpoint: '/api/v1/persons/businesses/${widget.businessId}/reports/people-transactions',
       businessId: widget.businessId,
@@ -140,8 +170,12 @@ class _PeopleTransactionsReportPageState extends State<PeopleTransactionsReportP
           'تاریخ سند',
           formatter: (item) {
             final m = item as Map<String, dynamic>;
-            final date = m['document_date'] ?? m['document_date_raw'] ?? m['document_date_formatted'];
-            return _formatDate(date);
+            return HesabixDateUtils.formatApiDateForDisplay(
+              m['document_date'] ?? m['document_date_formatted'],
+              widget.calendarController.isJalali,
+              rawValue: m['document_date_raw'],
+              fallback: '',
+            );
           },
         ),
         TextColumn(
@@ -165,6 +199,31 @@ class _PeopleTransactionsReportPageState extends State<PeopleTransactionsReportP
           'نوع سند',
           formatter: (item) => (item as Map<String, dynamic>)['document_type_name']?.toString() ?? '',
         ),
+        if (isComprehensive)
+          TextColumn(
+            'product_name',
+            'کالا/خدمت',
+            formatter: (item) {
+              final m = item as Map<String, dynamic>;
+              final name = m['product_name']?.toString();
+              final code = m['product_code']?.toString();
+              if (name == null || name.isEmpty) return '';
+              if (code != null && code.isNotEmpty) return '$code — $name';
+              return name;
+            },
+          ),
+        if (isComprehensive)
+          NumberColumn(
+            'quantity',
+            'تعداد',
+            formatter: (item) => _formatOptionalNumber((item as Map<String, dynamic>)['quantity']),
+          ),
+        if (isComprehensive)
+          NumberColumn(
+            'unit_price',
+            'فی',
+            formatter: (item) => _formatOptionalNumber((item as Map<String, dynamic>)['unit_price']),
+          ),
         NumberColumn(
           'debit',
           'بدهکار',
@@ -186,7 +245,7 @@ class _PeopleTransactionsReportPageState extends State<PeopleTransactionsReportP
           formatter: (item) => (item as Map<String, dynamic>)['description']?.toString() ?? '',
         ),
       ],
-      searchFields: const ['document_code', 'person_name', 'description'],
+      searchFields: const ['document_code', 'person_name', 'description', 'product_name'],
       defaultPageSize: 20,
       additionalParams: _additionalParams(),
       showExportButtons: true,
@@ -209,10 +268,7 @@ class _PeopleTransactionsReportPageState extends State<PeopleTransactionsReportP
     return Scaffold(
       backgroundColor: cs.surface,
       appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.pop(),
-        ),
+        leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
         title: Text(t.reportsPeopleTransactionsTitle),
         actions: [
           IconButton(
@@ -232,6 +288,7 @@ class _PeopleTransactionsReportPageState extends State<PeopleTransactionsReportP
               child: Wrap(
                 spacing: 16,
                 runSpacing: 16,
+                crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
                   // Fiscal Year
                   SizedBox(
@@ -296,18 +353,23 @@ class _PeopleTransactionsReportPageState extends State<PeopleTransactionsReportP
                   // Currency
                   SizedBox(
                     width: 200,
-                    child: DropdownButtonFormField<int>(
+                    child: DropdownButtonFormField<int?>(
                       value: _selectedCurrencyId,
                       decoration: InputDecoration(
                         labelText: 'واحد پول',
                         border: const OutlineInputBorder(),
                         contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
                       ),
-                      items: _currencies.map((curr) {
+                      items: [
+                        const DropdownMenuItem<int?>(
+                          value: null,
+                          child: Text('همه ارزها (معادل پایه)'),
+                        ),
+                        ..._currencies.map((curr) {
                         final code = curr['code']?.toString() ?? '';
                         final name = curr['name']?.toString() ?? '';
                         final displayText = code.isNotEmpty ? '$code - $name' : name;
-                        return DropdownMenuItem<int>(
+                        return DropdownMenuItem<int?>(
                           value: curr['id'] as int?,
                           child: Text(
                             displayText,
@@ -315,7 +377,8 @@ class _PeopleTransactionsReportPageState extends State<PeopleTransactionsReportP
                             maxLines: 1,
                           ),
                         );
-                      }).toList(),
+                      }),
+                      ],
                       onChanged: (value) {
                         setState(() {
                           _selectedCurrencyId = value;
@@ -439,6 +502,35 @@ class _PeopleTransactionsReportPageState extends State<PeopleTransactionsReportP
                       },
                     ),
                   ),
+
+                  SizedBox(
+                    width: 260,
+                    child: DropdownButtonFormField<String>(
+                      value: _detailLevel,
+                      decoration: const InputDecoration(
+                        labelText: 'سطح جزئیات',
+                        border: OutlineInputBorder(),
+                        contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                      ),
+                      items: const [
+                        DropdownMenuItem<String>(
+                          value: 'comprehensive',
+                          child: Text('معین جامع (ریز اقلام)'),
+                        ),
+                        DropdownMenuItem<String>(
+                          value: 'summary',
+                          child: Text('خلاصه (مبلغ کل سند)'),
+                        ),
+                      ],
+                      onChanged: (value) {
+                        if (value == null) return;
+                        setState(() {
+                          _detailLevel = value;
+                        });
+                        _refreshData();
+                      },
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -454,6 +546,7 @@ class _PeopleTransactionsReportPageState extends State<PeopleTransactionsReportP
                   _selectedCurrencyId,
                   _selectedPerson?.id,
                   _selectedDocumentType,
+                  _detailLevel,
                   _fromDate?.toIso8601String(),
                   _toDate?.toIso8601String(),
                 }.toString()),
@@ -468,4 +561,3 @@ class _PeopleTransactionsReportPageState extends State<PeopleTransactionsReportP
     );
   }
 }
-

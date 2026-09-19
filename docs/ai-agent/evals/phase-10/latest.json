@@ -1,0 +1,98 @@
+{
+  "dataset_version": "2026-08-19.v1",
+  "index": {
+    "kind": "inverted_keyword_v1",
+    "tools": 180,
+    "postings": 522,
+    "build_ms": 15.352,
+    "memory_bytes_est": 120048
+  },
+  "candidate_recall": [
+    {
+      "n": 20,
+      "queries": 443,
+      "candidate_recall": 0.9458,
+      "latency_p50_ms": 0.758,
+      "latency_p95_ms": 0.999,
+      "avg_latency_ms": 0.757
+    },
+    {
+      "n": 50,
+      "queries": 443,
+      "candidate_recall": 0.9865,
+      "latency_p50_ms": 0.841,
+      "latency_p95_ms": 1.137,
+      "avg_latency_ms": 0.826
+    },
+    {
+      "n": 100,
+      "queries": 443,
+      "candidate_recall": 0.9887,
+      "latency_p50_ms": 0.848,
+      "latency_p95_ms": 1.338,
+      "avg_latency_ms": 0.881
+    },
+    {
+      "n": 200,
+      "queries": 443,
+      "candidate_recall": 0.9887,
+      "latency_p50_ms": 0.858,
+      "latency_p95_ms": 1.347,
+      "avg_latency_ms": 0.892
+    }
+  ],
+  "chosen_candidate_n": 100,
+  "target_candidate_recall": 0.99,
+  "indexed_final": [
+    {
+      "k": 10,
+      "candidate_n": 100,
+      "recall": 0.9503,
+      "mrr": 0.7831,
+      "ndcg": 0.8012
+    },
+    {
+      "k": 15,
+      "candidate_n": 100,
+      "recall": 0.9707,
+      "mrr": 0.7845,
+      "ndcg": 0.8086
+    },
+    {
+      "k": 20,
+      "candidate_n": 100,
+      "recall": 0.9774,
+      "mrr": 0.7849,
+      "ndcg": 0.811
+    }
+  ],
+  "baseline_final": [
+    {
+      "k": 10,
+      "recall": 0.9549
+    },
+    {
+      "k": 15,
+      "recall": 0.9752
+    },
+    {
+      "k": 20,
+      "recall": 0.9819
+    }
+  ],
+  "no_match": {
+    "queries": 30,
+    "empty_candidate_set": 15,
+    "empty_rate": 0.5
+  },
+  "flags": {
+    "INDEXED_CANDIDATE_RETRIEVAL": false,
+    "VECTOR_CANDIDATE_RETRIEVAL": false,
+    "CANDIDATE_RETRIEVAL_N": 100,
+    "HYBRID_TOOL_DISCOVERY": false,
+    "ADAPTIVE_DISCOVERY_K": false,
+    "ADAPTIVE_K_ROLLOUT_PERCENT": 0,
+    "PROGRESSIVE_SCHEMA_LOADING": false
+  },
+  "note": "Candidate retrieval is opt-in. Production still ranks the full authorized set at K=48/128. Vector ANN is not production."
+}

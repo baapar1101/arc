@@ -1,12 +1,22 @@
 import 'dart:convert';
+
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:hesabix_ui/core/api_client.dart';
+import 'package:hesabix_ui/services/support_service.dart';
 import 'package:hesabix_ui/models/response_template.dart';
 
 class ResponseTemplatesService {
   static const String _keyPrefix = 'operator_response_templates_';
 
-  /// Get all saved templates
+  /// Get templates from server, fallback to local defaults
   static Future<List<ResponseTemplate>> getTemplates() async {
+    try {
+      final server = await SupportService(ApiClient()).getResponseTemplates();
+      if (server.isNotEmpty) {
+        return server.map((t) => ResponseTemplate(name: t.name, content: t.content)).toList();
+      }
+    } catch (_) {}
+
     try {
       final prefs = await SharedPreferences.getInstance();
       final key = '${_keyPrefix}list';

@@ -48,7 +48,7 @@ def verify_user_management_page_access(ctx: AuthContext = Depends(get_current_us
 	دریافت لیست کاربران با قابلیت فیلتر، جستجو، مرتب‌سازی و صفحه‌بندی.
 	
 	### نکات:
-	- نیاز به مجوز `user_management` در سطح اپلیکیشن دارد
+	- نیاز به سوپرادمین یا مجوز `system_settings` یا `user_management` دارد
 	- Rate Limit: 500 request در دقیقه (عمومی برای تمام endpoint ها)
 	- نتایج به مدت 60 ثانیه cache می‌شوند (Cache key بر اساس query parameters و user_id ایجاد می‌شود)
 	- برای جستجوی ساده از `GET /users` استفاده کنید
@@ -136,11 +136,10 @@ def verify_user_management_page_access(ctx: AuthContext = Depends(get_current_us
 		}
 	}
 )
-@require_user_management()
 def list_users(
 	request: Request,
 	query_info: QueryInfo = Body(..., description="پارامترهای جستجو، فیلتر، مرتب‌سازی و صفحه‌بندی"),
-	ctx: AuthContext = Depends(get_current_user),
+	ctx: AuthContext = Depends(verify_user_management_page_access),
 	db: Session = Depends(get_db)
 ):
 	"""
@@ -225,58 +224,10 @@ def list_users(
 	```
 	"""
 	repo = UserRepository(db)
-	
-	# تبدیل فیلترهای status و role به فیلترهای واقعی
-	if query_info.filters:
-		from adapters.api.v1.schemas import FilterItem
-		from adapters.db.models.user import User
-		from sqlalchemy import or_, and_
-		
-		# ایجاد یک QueryInfo جدید با فیلترهای تبدیل شده
-		converted_filters = []
-		for f in query_info.filters:
-			if f.property == "status":
-				# تبدیل status به is_active
-				if f.operator == "=":
-					is_active = f.value == "active"
-					converted_filters.append(FilterItem(property="is_active", operator="=", value=is_active))
-				elif f.operator == "in" and isinstance(f.value, list):
-					# اگر active در لیست باشد، is_active = True
-					has_active = "active" in f.value
-					has_inactive = any(s in ["inactive", "suspended"] for s in f.value)
-					if has_active and not has_inactive:
-						converted_filters.append(FilterItem(property="is_active", operator="=", value=True))
-					elif has_inactive and not has_active:
-						converted_filters.append(FilterItem(property="is_active", operator="=", value=False))
-					# اگر هر دو وجود دارند، فیلتر نکنیم
-				else:
-					converted_filters.append(f)
-			elif f.property == "role":
-				# فیلتر role باید بعد از دریافت داده‌ها اعمال شود
-				# برای حالا، فیلتر را نادیده می‌گیریم
-				pass
-			else:
-				converted_filters.append(f)
-		
-		# ایجاد QueryInfo جدید
-		from adapters.api.v1.schemas import QueryInfo
-		modified_query_info = QueryInfo(
-			sort_by=query_info.sort_by,
-			sort_desc=query_info.sort_desc,
-			take=query_info.take,
-			skip=query_info.skip,
-			search=query_info.search,
-			search_fields=query_info.search_fields,
-			filters=converted_filters if converted_filters else None
-		)
-		users, total = repo.query_with_filters(modified_query_info)
-	else:
-		users, total = repo.query_with_filters(query_info)
-	
-	# کش لیست کاربران مدیریت‌شده
+
+	# کش لیست کاربران مدیریت‌شده (قبل از کوئری DB)
 	cache = get_cache()
 	cache_key = None
-
 	if cache.enabled:
 		import json, hashlib
 		key_payload = {
@@ -297,41 +248,9 @@ def list_users(
 		cached = cache.get(cache_key)
 		if cached is not None:
 			return success_response(cached, request)
-	
-	# اعمال فیلتر role بعد از دریافت داده‌ها
-	if query_info.filters:
-		role_filters = [f for f in query_info.filters if f.property == "role"]
-		if role_filters:
-			filtered_users = []
-			for user in users:
-				# تعیین role از app_permissions
-				role = "user"
-				if user.app_permissions:
-					if user.app_permissions.get("superadmin"):
-						role = "admin"
-					elif user.app_permissions.get("operator"):
-						role = "operator"
-					elif user.app_permissions.get("supervisor"):
-						role = "supervisor"
-				
-				# بررسی تطابق با فیلتر
-				matches = True
-				for rf in role_filters:
-					if rf.operator == "=":
-						matches = role == rf.value
-					elif rf.operator == "in" and isinstance(rf.value, list):
-						matches = role in rf.value
-					else:
-						matches = False
-					if not matches:
-						break
-				
-				if matches:
-					filtered_users.append(user)
-			
-			users = filtered_users
-			total = len(filtered_users)
-	
+
+	users, total = repo.query_admin_list(query_info)
+
 	# تبدیل User objects به dictionary با اطلاعات اضافی
 	user_dicts = [repo.to_dict(user, include_extended=True) for user in users]
 	

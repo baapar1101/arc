@@ -24,6 +24,22 @@ class DocumentLine(Base):
 	quantity: Mapped[Decimal | None] = mapped_column(Numeric(18, 6), nullable=True, default=0)
 	debit: Mapped[Decimal] = mapped_column(Numeric(18, 2), nullable=False, default=0)
 	credit: Mapped[Decimal] = mapped_column(Numeric(18, 2), nullable=False, default=0)
+	# تسعیر به ارز پایه (nullable برای سازگاری با اسناد قدیمی / تک‌ارزی)
+	exchange_rate: Mapped[Decimal | None] = mapped_column(
+		Numeric(24, 10),
+		nullable=True,
+		comment="۱ واحد ارز سند = exchange_rate × ارز پایه",
+	)
+	debit_base: Mapped[Decimal | None] = mapped_column(
+		Numeric(24, 6),
+		nullable=True,
+		comment="بدهکار به ارز پایه",
+	)
+	credit_base: Mapped[Decimal | None] = mapped_column(
+		Numeric(24, 6),
+		nullable=True,
+		comment="بستانکار به ارز پایه",
+	)
 	description: Mapped[str | None] = mapped_column(Text, nullable=True)
 	extra_info: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 	developer_data: Mapped[dict | None] = mapped_column(JSON, nullable=True)

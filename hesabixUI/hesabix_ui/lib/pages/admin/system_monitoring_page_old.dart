@@ -6,6 +6,7 @@ import '../../core/api_client.dart';
 import '../../services/monitoring_service.dart';
 import '../../widgets/loading_indicator.dart';
 import '../../utils/error_extractor.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 class SystemMonitoringPage extends StatefulWidget {
   const SystemMonitoringPage({super.key});
@@ -79,7 +80,7 @@ class _SystemMonitoringPageState extends State<SystemMonitoringPage> {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text('خطا در بارگذاری داده‌ها: $err'),
-              backgroundColor: Colors.red,
+              backgroundColor: SemanticColorResolver.negative(context),
             ),
           );
         }
@@ -106,9 +107,9 @@ class _SystemMonitoringPageState extends State<SystemMonitoringPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('مانیتورینگ سیستم'),
+        title: Text('مانیتورینگ سیستم'),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
+          icon: Icon(Icons.arrow_back),
           onPressed: () => context.go('/user/profile/system-settings'),
         ),
         actions: [
@@ -133,7 +134,7 @@ class _SystemMonitoringPageState extends State<SystemMonitoringPage> {
                     children: [
                       Text(
                         'خطا در بارگذاری داده‌ها',
-                        style: TextStyle(color: Colors.red),
+                        style: TextStyle(color: SemanticColorResolver.negative(context)),
                       ),
                       const SizedBox(height: 16),
                       ElevatedButton(
@@ -196,7 +197,7 @@ class _SystemMonitoringPageState extends State<SystemMonitoringPage> {
                 Icons.memory,
               ),
             ),
-            const SizedBox(width: 12),
+            SizedBox(width: 12),
             Expanded(
               child: _buildMetricCard(
                 theme,
@@ -226,7 +227,7 @@ class _SystemMonitoringPageState extends State<SystemMonitoringPage> {
                 theme,
                 'شبکه',
                 '${_formatBytes(network['bytes_recv'] as int? ?? 0)}/s',
-                Colors.blue,
+                SemanticColorResolver.info(context),
                 Icons.network_check,
               ),
             ),
@@ -356,19 +357,19 @@ class _SystemMonitoringPageState extends State<SystemMonitoringPage> {
   }
 
   Color _getStatusColor(double percent) {
-    if (percent < 50) return Colors.green;
-    if (percent < 80) return Colors.orange;
-    return Colors.red;
+    if (percent < 50) return SemanticColorResolver.positive(context);
+    if (percent < 80) return SemanticColorResolver.warning(context);
+    return SemanticColorResolver.negative(context);
   }
 
   Color _getServiceStatusColor(String status) {
     switch (status.toLowerCase()) {
       case 'online':
-        return Colors.green;
+        return SemanticColorResolver.positive(context);
       case 'offline':
-        return Colors.red;
+        return SemanticColorResolver.negative(context);
       case 'degraded':
-        return Colors.orange;
+        return SemanticColorResolver.warning(context);
       case 'disabled':
         return Colors.grey;
       default:

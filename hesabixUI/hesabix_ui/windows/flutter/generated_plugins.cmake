@@ -3,12 +3,14 @@
 #
 
 list(APPEND FLUTTER_PLUGIN_LIST
+  connectivity_plus
   desktop_drop
   file_saver
   file_selector_windows
   flutter_secure_storage_windows
   flutter_sound
   geolocator_windows
+  local_auth_windows
   permission_handler_windows
   printing
   share_plus
@@ -16,6 +18,7 @@ list(APPEND FLUTTER_PLUGIN_LIST
 )
 
 list(APPEND FLUTTER_FFI_PLUGIN_LIST
+  flutter_local_notifications_windows
   jni
 )
 

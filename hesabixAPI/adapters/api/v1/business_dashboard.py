@@ -60,10 +60,18 @@ router = APIRouter(prefix="/business", tags=["business-dashboard"])
                                 "member_count": 5
                             },
                             "statistics": {
-                                "total_sales": 1000000.0,
+                                "total_sales": 14900000.0,
                                 "total_purchases": 500000.0,
                                 "active_members": 5,
-                                "recent_transactions": 25
+                                "recent_transactions": 12,
+                                "fiscal_year_id": 1,
+                                "currency": {
+                                    "id": 1,
+                                    "code": "IRR",
+                                    "title": "ریال",
+                                    "symbol": "ریال",
+                                    "decimal_places": 0
+                                }
                             },
                             "recent_activities": [
                                 {
@@ -308,6 +316,17 @@ def get_business_info_with_permissions(
             "invoices": {"add": True, "edit": True, "view": True, "draft": True, "delete": True},
             "people_transactions": {"add": True, "edit": True, "view": True, "draft": True, "delete": True},
             "expenses_income": {"add": True, "edit": True, "view": True, "draft": True, "delete": True},
+            "goods_expense_income": {
+                "add": True,
+                "edit": True,
+                "view": True,
+                "delete": True,
+                "submit": True,
+                "allocate": True,
+                "post": True,
+                "cancel": True,
+                "change_unit_cost": True,
+            },
             "transfers": {"add": True, "edit": True, "view": True, "draft": True, "delete": True},
             "checks": {"add": True, "edit": True, "view": True, "delete": True, "return": True, "collect": True, "transfer": True},
             "accounting_documents": {"add": True, "edit": True, "view": True, "draft": True, "delete": True},
@@ -606,7 +625,9 @@ def post_dashboard_widgets_data(
     دریافت داده‌های dashboard widgets
     به صورت خودکار تصمیم می‌گیرد که از background job استفاده کند یا نه
     """
-    from fastapi import Query
+    import json
+    import hashlib
+
     cache = get_cache()
     widget_keys = payload.get("widget_keys") or []
     filters = dict(payload.get("filters") or {})
@@ -618,22 +639,33 @@ def post_dashboard_widgets_data(
         except (ValueError, TypeError):
             pass
     calendar_type = ctx.calendar_type if hasattr(ctx, 'calendar_type') else "gregorian"
-    use_queue = payload.get("use_queue", False)  # پارامتر اختیاری از payload
+    use_queue = bool(payload.get("use_queue", False))
 
-    # تصمیم‌گیری خودکار: اگر تعداد widget ها زیاد است یا query های سنگین داریم، از queue استفاده کن
-    # ویجت‌های سنگین: top_selling_products, sales_bar_chart
+    # کش همیشه قبل از صف — warm load نباید منتظر job بماند
+    widgets_part = ",".join(sorted(str(k) for k in widget_keys))
+    filters_json = json.dumps(filters, sort_keys=True, ensure_ascii=False)
+    filters_hash = hashlib.sha256(filters_json.encode("utf-8")).hexdigest()[:16]
+    cache_key = (
+        f"dashboard_data:{business_id}:{ctx.get_user_id()}:"
+        f"{calendar_type}:{widgets_part}:{filters_hash}"
+    )
+    if cache.enabled:
+        cached = cache.get(cache_key)
+        if cached is not None:
+            return success_response(cached, request)
+
+    # فقط ویجت‌های واقعاً سنگین (یا درخواست صریح) وارد صف می‌شوند.
+    # آستانهٔ قدیمی «>5 ویجت» باعث می‌شد تقریباً هر لود سرد queue شود.
     heavy_widgets = {"top_selling_products", "sales_bar_chart"}
     has_heavy_widgets = any(key in heavy_widgets for key in widget_keys)
-    use_background = use_queue or len(widget_keys) > 5 or has_heavy_widgets
-    
+    use_background = use_queue or has_heavy_widgets
+
     if use_background:
-        # استفاده از background job برای پردازش
         from app.core.queue import get_queue_service, QUEUE_DEFAULT
         from app.services.jobs.dashboard_job import process_dashboard_widgets_job
-        
+
         queue_service = get_queue_service()
         if queue_service and queue_service.enabled:
-            # ایجاد job در queue
             job = queue_service.enqueue(
                 process_dashboard_widgets_job,
                 business_id=business_id,
@@ -641,33 +673,20 @@ def post_dashboard_widgets_data(
                 widget_keys=[str(k) for k in widget_keys],
                 filters=filters,
                 calendar_type=calendar_type,
+                cache_key=cache_key,
                 queue_name=QUEUE_DEFAULT,
-                timeout=300,  # 5 دقیقه timeout
-                result_ttl=3600,  # نتیجه را 1 ساعت نگه دار
+                timeout=300,
+                result_ttl=3600,
             )
-            
+
             if job:
                 return success_response({
                     "job_id": job.id,
                     "status": "queued",
                     "message": "Dashboard widgets are being processed in background. Use GET /api/v1/jobs/{job_id} to check status."
                 }, request)
-        
+
         # اگر queue در دسترس نبود، به صورت sync اجرا کن (fallback)
-    
-    # اجرای sync برای query های سریع
-    # توجه: FastAPI خودش session را مدیریت می‌کند، نیازی به close دستی نیست
-    cache_key = None
-    if cache.enabled and not use_background:
-        # ساخت کلید کش بر اساس بیزنس، کاربر، نوع تقویم، ویجت‌ها و فیلترها
-        import json, hashlib
-        widgets_part = ",".join(sorted(str(k) for k in widget_keys))
-        filters_json = json.dumps(filters, sort_keys=True, ensure_ascii=False)
-        filters_hash = hashlib.sha256(filters_json.encode("utf-8")).hexdigest()[:16]
-        cache_key = f"dashboard_data:{business_id}:{ctx.get_user_id()}:{calendar_type}:{widgets_part}:{filters_hash}"
-        cached = cache.get(cache_key)
-        if cached is not None:
-            return success_response(cached, request)
 
     data = get_widgets_batch_data(
         db=db,
@@ -680,7 +699,7 @@ def post_dashboard_widgets_data(
     )
     formatted = format_datetime_fields(data, request)
 
-    if cache.enabled and cache_key:
+    if cache.enabled:
         cache.set(cache_key, formatted, ttl=30)
 
     return success_response(formatted, request)

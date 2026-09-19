@@ -3,7 +3,6 @@ import 'dart:typed_data';
 
 import 'package:desktop_drop/desktop_drop.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:file_saver/file_saver.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -23,7 +22,9 @@ import 'package:hesabix_ui/utils/error_extractor.dart';
 import 'package:hesabix_ui/utils/snackbar_helper.dart';
 import 'package:hesabix_ui/pages/business/crm/crm_operator_voice.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
+import 'package:hesabix_ui/core/hesabix_back.dart';
 import 'package:hesabix_ui/widgets/permission/permission_widgets.dart';
+import 'package:hesabix_ui/services/bytes_export/bytes_export_service.dart';
 
 /// صندوق ورودی چت وب (ویجت جاسازی‌شده در سایت مشتری).
 class CrmWebChatPage extends StatefulWidget {
@@ -1120,15 +1121,25 @@ class _CrmWebChatPageState extends State<CrmWebChatPage> {
         fileId: fileId,
       );
       final name = originalName.isNotEmpty ? originalName : 'file';
+<<<<<<< HEAD
+      final result = await BytesExportService.export(
+        bytes: bytes,
+        filename: name,
+=======
       final ext = name.contains('.') ? name.split('.').last : 'bin';
       await FileSaver.instance.saveFile(
         name: name,
         bytes: Uint8List.fromList(bytes),
         fileExtension: ext,
+>>>>>>> github/Huma
       );
       if (mounted) {
         final t = AppLocalizations.of(context);
-        SnackBarHelper.show(context, message: t.crmWebChatFileSaved);
+        BytesExportService.showFeedback(
+          context,
+          result,
+          successOverride: t.crmWebChatFileSaved,
+        );
       }
     } catch (e) {
       if (mounted) {
@@ -1569,22 +1580,22 @@ class _CrmWebChatPageState extends State<CrmWebChatPage> {
     final screenW = MediaQuery.sizeOf(context).width;
     final wide = screenW >= 720;
 
-    return Scaffold(
+    return HesabixBackInterceptor(
+      onWillPop: () async {
+        final isWide = MediaQuery.sizeOf(context).width >= 720;
+        if (!isWide && _selectedConvId != null && !_mobileShowList) {
+          setState(() => _mobileShowList = true);
+          return false;
+        }
+        return true;
+      },
+      child: Scaffold(
       appBar: AppBar(
         title: Text(
           t.crmWebChatPageTitle,
           style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
         ),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () {
-            if (!wide && _selectedConvId != null && !_mobileShowList) {
-              setState(() => _mobileShowList = true);
-            } else {
-              context.go('/business/${widget.businessId}/crm/dashboard');
-            }
-          },
-        ),
+        leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
@@ -1596,6 +1607,7 @@ class _CrmWebChatPageState extends State<CrmWebChatPage> {
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _buildMainBody(theme, t, cs, wide: wide),
+    ),
     );
   }
 

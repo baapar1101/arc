@@ -1,11 +1,13 @@
 from __future__ import annotations
 
-from typing import Dict, Any, List, Callable, Optional, Set
+import hashlib
+import json
+from typing import Dict, Any, List, Callable, Optional, Set, Tuple
 from dataclasses import dataclass
 from enum import Enum
 from sqlalchemy.orm import Session
 from app.core.auth_dependency import AuthContext
-import json
+from app.services.ai.ai_handler_convention import wrap_registry_service_func
 
 
 class AIRole(str, Enum):
@@ -32,6 +34,37 @@ class AIFunction:
     risk_level: str = "safe"          # safe / medium / high
     is_readonly: bool = True          # قابل کش شدن — عملیات read-only
     is_agent_internal: bool = False   # state داخلی agent — در حالت تحلیلگر هم مجاز
+    # ---- Metadata واحد Discovery / Intent / Security (منبع: Tool Manifest) ----
+    domains: Tuple[str, ...] = ()
+    capability: str = "misc"
+    namespace: str = ""
+    aliases: Tuple[str, ...] = ()
+    keywords: Tuple[str, ...] = ()
+    examples: Tuple[str, ...] = ()
+    companion_tools: Tuple[str, ...] = ()
+    is_core: bool = False
+    intent_write: bool = False
+    always_confirm: bool = False
+    side_effect: str = "none"
+    permission_policy: str = "required"
+    enabled: bool = True
+    deprecated: bool = False
+    replacement: Optional[str] = None
+    version: str = "1"
+    schema_version: str = "1"
+
+    def search_text(self) -> str:
+        parts = [
+            self.name,
+            self.description or "",
+            self.capability,
+            self.namespace,
+            *self.domains,
+            *self.aliases,
+            *self.keywords,
+            *self.examples,
+        ]
+        return " ".join(part for part in parts if part)
 
 
 def _has_filter_property(query: Dict[str, Any], prop: str) -> bool:
@@ -133,11 +166,21 @@ class AIFunctionRegistry:
         )
 
         register_session_todo_functions(self)
+        from app.services.ai.ai_function_extensions_subagent import (
+            register_subagent_functions,
+        )
+
+        register_subagent_functions(self)
         from app.services.ai.ai_function_extensions_workflow import (
             register_workflow_ai_functions,
         )
 
         register_workflow_ai_functions(self)
+        from app.services.ai.ai_function_extensions_hscript import (
+            register_hscript_ai_functions,
+        )
+
+        register_hscript_ai_functions(self)
         # External HTTP connectors
         self._register_connector_functions()
     
@@ -186,9 +229,10 @@ class AIFunctionRegistry:
             description=(
                 "جستجو و فیلتر فاکتورها (QueryInfo: search, search_fields, filters با عملگر = > < * in). "
                 "list_queryable_fields(entity=invoice) برای ستون‌های مجاز. "
-                "نتیجه: items + pagination.total."
+                "نتیجه: items + pagination.total. take حداکثر ۱۰۰."
             ),
             parameters_schema=ai_list_parameters_schema(
+                entity="invoice",
                 extra_properties={
                     "document_type": {
                         "type": "string",
@@ -330,65 +374,52 @@ class AIFunctionRegistry:
         
         # اضافه کردن create_invoice
         def create_invoice_wrapper(args: Dict[str, Any], context: Dict[str, Any]) -> Any:
-            """Wrapper برای ایجاد فاکتور"""
+            """Wrapper برای ایجاد فاکتور — نگاشت unit_price/person_id به قرارداد سرویس."""
+            from app.services.ai.ai_tool_payloads import build_create_invoice_payload
             from app.services.invoice_service import create_invoice
-            
+
             db: Session = context["db"]
             user_context: AuthContext = context["user_context"]
             business_id = args.get("business_id") or context.get("business_id")
             user_id = user_context.get_user_id()
-            
-            # ساخت data dict از args
-            data = {
-                "invoice_type": args.get("invoice_type"),
-                "document_date": args.get("document_date"),
-                "currency_id": args.get("currency_id"),
-                "person_id": args.get("person_id"),
-                "description": args.get("description"),
-                "lines": args.get("lines", []),
-                "extra_info": args.get("extra_info", {})
-            }
-            
+            data = build_create_invoice_payload(
+                args, db=db, business_id=business_id
+            )
+            if data.get("invoice_type") in {
+                "invoice_sales",
+                "invoice_purchase",
+                "invoice_sales_return",
+                "invoice_purchase_return",
+            } and not data.get("person_id"):
+                raise ValueError(
+                    "person_id الزامی است. ابتدا search_persons را صدا بزن و id عددی شخص را بفرست."
+                )
+            if not data.get("currency_id"):
+                raise ValueError(
+                    "currency_id مشخص نیست. list_currencies را صدا بزن یا ارز پیش‌فرض کسب‌وکار را تنظیم کنید."
+                )
+            if not data.get("invoice_type"):
+                raise ValueError(
+                    "invoice_type الزامی است: invoice_sales، invoice_purchase، "
+                    "invoice_sales_return یا invoice_purchase_return."
+                )
             return create_invoice(db, business_id, user_id, data)
-        
+
+        from app.services.ai.ai_tool_payloads import (
+            CREATE_INVOICE_DESCRIPTION,
+            CREATE_INVOICE_PARAMETERS_SCHEMA,
+        )
+
         self.register(AIFunction(
             name="create_invoice",
-            description="ایجاد یک فاکتور جدید (فروش، خرید و غیره). شناسه کسب‌وکار به صورت خودکار از جلسه گفت‌وگو گرفته می‌شود.",
-            parameters_schema={
-                "type": "object",
-                "properties": {
-                    "invoice_type": {
-                        "type": "string",
-                        "enum": ["invoice_sales", "invoice_purchase", "invoice_sales_return", "invoice_purchase_return"],
-                        "description": "نوع فاکتور"
-                    },
-                    "document_date": {"type": "string", "format": "date", "description": "تاریخ فاکتور"},
-                    "currency_id": {"type": "integer", "description": "شناسه ارز"},
-                    "person_id": {"type": "integer", "description": "شناسه مشتری/تامین‌کننده (برای فاکتورهای طرف شخص)"},
-                    "description": {"type": "string", "description": "توضیحات (اختیاری)"},
-                    "lines": {
-                        "type": "array",
-                        "description": "اقلام فاکتور",
-                        "items": {
-                            "type": "object",
-                            "properties": {
-                                "product_id": {"type": "integer", "description": "شناسه محصول"},
-                                "quantity": {"type": "number", "description": "تعداد"},
-                                "unit_price": {"type": "number", "description": "قیمت واحد"},
-                                "description": {"type": "string", "description": "توضیحات (اختیاری)"}
-                            },
-                            "required": ["product_id", "quantity", "unit_price"]
-                        }
-                    }
-                },
-                "required": ["invoice_type", "document_date", "currency_id", "lines"]
-            },
-            handler=create_invoice_wrapper,
+            description=CREATE_INVOICE_DESCRIPTION,
+            parameters_schema=CREATE_INVOICE_PARAMETERS_SCHEMA,
+            handler=self._create_handler(create_invoice_wrapper),
             allowed_roles={AIRole.USER, AIRole.BUSINESS_OWNER, AIRole.OPERATOR, AIRole.ADMIN},
             required_permissions=["invoices.write"],
             category="invoices",
             requires_approval=True,
-            risk_level="high",
+            risk_level="medium",
             is_readonly=False,
         ))
     
@@ -418,9 +449,10 @@ class AIFunctionRegistry:
             name="search_products",
             description=(
                 "جستجو در کالا/خدمات با QueryInfo (filters, search_fields). "
-                "list_queryable_fields(entity=product)."
+                "list_queryable_fields(entity=product). take حداکثر ۱۰۰."
             ),
             parameters_schema=ai_list_parameters_schema(
+                entity="product",
                 extra_properties={
                     "category_id": {"type": "integer", "description": "فیلتر دسته‌بندی"},
                     "item_type": {
@@ -441,17 +473,30 @@ class AIFunctionRegistry:
             category="products"
         ))
         
+        def get_product_info_wrapper(db, business_id, user_id=None, product_id=None, **kwargs):
+            """get_product امضای user_id ندارد — wrapper آرگومان‌های جلسه را می‌بلعد."""
+            pid = product_id if product_id is not None else kwargs.get("id")
+            if pid is None:
+                raise ValueError("product_id الزامی است. از search_products فیلد id را بردار.")
+            data = get_product(db, int(pid), int(business_id))
+            if not data:
+                raise ValueError(f"کالا/خدمت {pid} در این کسب‌وکار یافت نشد.")
+            return data
+
         self.register(AIFunction(
             name="get_product_info",
-            description="دریافت اطلاعات کامل یک محصول یا کالا. شناسه کسب‌وکار به صورت خودکار از جلسه گفت‌وگو گرفته می‌شود.",
+            description=(
+                "دریافت اطلاعات کامل یک کالا یا خدمت با شناسه عددی. "
+                "product_id را از search_products بگیر. شناسه کسب‌وکار از جلسه تزریق می‌شود."
+            ),
             parameters_schema={
                 "type": "object",
                 "properties": {
-                    "product_id": {"type": "integer", "description": "شناسه محصول"}
+                    "product_id": {"type": "integer", "description": "شناسه عددی کالا/خدمت از search_products"}
                 },
                 "required": ["product_id"]
             },
-            handler=self._create_handler(get_product),
+            handler=self._create_handler(get_product_info_wrapper),
             allowed_roles={AIRole.USER, AIRole.BUSINESS_OWNER, AIRole.OPERATOR, AIRole.ADMIN},
             required_permissions=["inventory.read"],
             category="products"
@@ -537,7 +582,6 @@ class AIFunctionRegistry:
         from app.services.person_service import get_person_by_id, search_persons, calculate_person_balance
         from app.services.person_service import get_debtors_report, get_creditors_report
         from app.services.person_service import create_person, update_person
-        from adapters.api.v1.schema_models.person import PersonCreateRequest, PersonUpdateRequest
         
         def get_person_wrapper(db, business_id, person_id, user_id, **kwargs):
             """Wrapper برای دریافت اطلاعات شخص"""
@@ -573,8 +617,13 @@ class AIFunctionRegistry:
                 q["take"] = limit
             pt = kwargs.get("person_type")
             if pt and pt != "both" and not _has_filter_property(q, "person_types"):
+                from app.services.ai.ai_tool_payloads import normalize_person_type_value
+                try:
+                    pt_value = normalize_person_type_value(pt)
+                except ValueError:
+                    pt_value = pt
                 flt = list(q.get("filters") or [])
-                flt.append({"property": "person_types", "operator": "*", "value": pt})
+                flt.append({"property": "person_types", "operator": "*", "value": pt_value})
                 q["filters"] = flt
             return get_persons_by_business(
                 db,
@@ -587,13 +636,23 @@ class AIFunctionRegistry:
             name="search_persons",
             description=(
                 "جستجو در اشخاص با QueryInfo (filters, search_fields). "
-                "list_queryable_fields(entity=person). پاسخ: items + pagination."
+                "list_queryable_fields(entity=person). پاسخ: items + pagination. take حداکثر ۱۰۰."
             ),
             parameters_schema=ai_list_parameters_schema(
+                entity="person",
                 extra_properties={
                     "person_type": {
                         "type": "string",
-                        "enum": ["customer", "supplier", "both"],
+                        "enum": [
+                            "customer",
+                            "supplier",
+                            "marketer",
+                            "employee",
+                            "partner",
+                            "seller",
+                            "shareholder",
+                            "both",
+                        ],
                         "description": "نوع شخص (یا فیلتر person_types)",
                     },
                     "page": {"type": "integer", "description": "شماره صفحه (جایگزین skip)"},
@@ -636,63 +695,65 @@ class AIFunctionRegistry:
             category="persons"
         ))
         
-        # اضافه کردن create_person
-        def create_person_wrapper(args: Dict[str, Any], context: Dict[str, Any]) -> Any:
-            """Wrapper برای ایجاد شخص"""
-            from adapters.api.v1.schema_models.person import PersonCreateRequest
-            from adapters.db.models.person import PersonType
-            
+        # اضافه کردن create_person / update_person — هم‌تراز با فرم UI
+        def _ensure_person_opening_balance_permission(
+            context: Dict[str, Any],
+            business_id: int,
+            opening_balance: Any,
+        ) -> None:
+            if not opening_balance:
+                return
+            from app.core.permissions import has_business_permission_for_business
+            from app.core.responses import ApiError
+
+            user_context: AuthContext = context["user_context"]
             db: Session = context["db"]
+            if not has_business_permission_for_business(
+                user_context, db, int(business_id), "opening_balance", "edit"
+            ):
+                raise ApiError(
+                    "OPENING_BALANCE_PERMISSION_REQUIRED",
+                    "برای ثبت مانده افتتاحیه به دسترسی ویرایش تراز افتتاحیه نیاز است",
+                    http_status=403,
+                )
+
+        def create_person_wrapper(args: Dict[str, Any], context: Dict[str, Any]) -> Any:
+            """Wrapper برای ایجاد شخص با تمام فیلدهای فرم UI."""
+            from adapters.api.v1.schema_models.person import PersonCreateRequest
+            from app.services.ai.ai_tool_payloads import build_create_person_payload
+            from app.services.person_opening_balance_service import create_person_with_opening_balance
+            from app.services.person_service import delete_person
+
+            db: Session = context["db"]
+            user_context: AuthContext = context["user_context"]
             business_id = args.get("business_id") or context.get("business_id")
-            
-            # تبدیل person_type از string به PersonType enum
-            person_type_enum = None
-            person_types_list = None
-            if args.get("person_type"):
-                person_type_str = args.get("person_type").lower()
-                if person_type_str == "customer":
-                    person_type_enum = PersonType.CUSTOMER
-                    person_types_list = [PersonType.CUSTOMER]
-                elif person_type_str == "supplier":
-                    person_type_enum = PersonType.SUPPLIER
-                    person_types_list = [PersonType.SUPPLIER]
-            
-            # ساخت PersonCreateRequest از args
-            # alias_name required است، از name استفاده می‌کنیم
-            name = args.get("name", "")
-            alias_name = name if name else "نامشخص"
-            
-            person_data = PersonCreateRequest(
-                alias_name=alias_name,
-                first_name=args.get("name"),
-                code=args.get("code"),
-                phone=args.get("phone"),
-                email=args.get("email"),
-                address=args.get("address"),
-                economic_id=args.get("tax_id"),  # economic_id معادل tax_id است
-                person_type=person_type_enum,
-                person_types=person_types_list
+            person_data = PersonCreateRequest(**build_create_person_payload(args))
+            _ensure_person_opening_balance_permission(
+                context, business_id, getattr(person_data, "opening_balance", None)
             )
-            
+            if person_data.opening_balance is not None:
+                return create_person_with_opening_balance(
+                    db,
+                    business_id,
+                    user_context.get_user_id(),
+                    person_data,
+                    create_person_fn=create_person,
+                    delete_person_fn=delete_person,
+                )
             return create_person(db, business_id, person_data)
-        
+
+        from app.services.ai.ai_tool_payloads import (
+            CREATE_PERSON_DESCRIPTION,
+            CREATE_PERSON_PARAMETERS_SCHEMA,
+            UPDATE_PERSON_DESCRIPTION,
+            UPDATE_PERSON_PARAMETERS_SCHEMA,
+        )
+
         self.register(AIFunction(
             name="create_person",
-            description="ایجاد یک مشتری یا تامین‌کننده جدید. شناسه کسب‌وکار به صورت خودکار از جلسه گفت‌وگو گرفته می‌شود.",
-            parameters_schema={
-                "type": "object",
-                "properties": {
-                    "name": {"type": "string", "description": "نام شخص"},
-                    "person_type": {"type": "string", "enum": ["customer", "supplier"], "description": "نوع شخص"},
-                    "phone": {"type": "string", "description": "تلفن (اختیاری)"},
-                    "email": {"type": "string", "format": "email", "description": "ایمیل (اختیاری)"},
-                    "address": {"type": "string", "description": "آدرس (اختیاری)"},
-                    "tax_id": {"type": "string", "description": "شناسه ملی/کد اقتصادی (اختیاری)"},
-                    "code": {"type": "integer", "description": "کد شخص (اختیاری - در غیر این صورت خودکار تولید می‌شود)"}
-                },
-                "required": ["name", "person_type"]
-            },
-            handler=create_person_wrapper,
+            description=CREATE_PERSON_DESCRIPTION,
+            parameters_schema=CREATE_PERSON_PARAMETERS_SCHEMA,
+            handler=self._create_handler(create_person_wrapper),
             allowed_roles={AIRole.USER, AIRole.BUSINESS_OWNER, AIRole.OPERATOR, AIRole.ADMIN},
             required_permissions=["persons.write"],
             category="persons",
@@ -700,55 +761,40 @@ class AIFunctionRegistry:
             risk_level="medium",
             is_readonly=False,
         ))
-        
-        # اضافه کردن update_person
+
         def update_person_wrapper(args: Dict[str, Any], context: Dict[str, Any]) -> Any:
-            """Wrapper برای ویرایش شخص"""
+            """Wrapper برای ویرایش شخص با تمام فیلدهای فرم UI."""
             from adapters.api.v1.schema_models.person import PersonUpdateRequest
-            
+            from app.services.ai.ai_tool_payloads import build_update_person_payload
+            from app.services.person_opening_balance_service import update_person_with_opening_balance
+
             db: Session = context["db"]
+            user_context: AuthContext = context["user_context"]
             business_id = args.get("business_id") or context.get("business_id")
             person_id = args.get("person_id")
-            
             if not person_id:
-                raise ValueError("person_id is required")
-            
-            # ساخت PersonUpdateRequest از args
-            # فقط فیلدهایی که ارائه شده‌اند را set می‌کنیم
-            update_data = {}
-            if args.get("name"):
-                update_data["alias_name"] = args.get("name")
-                update_data["first_name"] = args.get("name")
-            if args.get("phone"):
-                update_data["phone"] = args.get("phone")
-            if args.get("email"):
-                update_data["email"] = args.get("email")
-            if args.get("address"):
-                update_data["address"] = args.get("address")
-            if args.get("tax_id"):
-                update_data["economic_id"] = args.get("tax_id")  # economic_id معادل tax_id است
-            
-            person_data = PersonUpdateRequest(**update_data)
-            
-            # ترتیب صحیح: update_person(db, person_id, business_id, person_data)
+                raise ValueError("person_id الزامی است.")
+
+            person_data = PersonUpdateRequest(**build_update_person_payload(args))
+            _ensure_person_opening_balance_permission(
+                context, business_id, getattr(person_data, "opening_balance", None)
+            )
+            if person_data.opening_balance is not None:
+                return update_person_with_opening_balance(
+                    db,
+                    business_id,
+                    user_context.get_user_id(),
+                    person_id,
+                    person_data,
+                    update_person_fn=update_person,
+                )
             return update_person(db, person_id, business_id, person_data)
-        
+
         self.register(AIFunction(
             name="update_person",
-            description="ویرایش اطلاعات یک مشتری یا تامین‌کننده. شناسه کسب‌وکار به صورت خودکار از جلسه گفت‌وگو گرفته می‌شود.",
-            parameters_schema={
-                "type": "object",
-                "properties": {
-                    "person_id": {"type": "integer", "description": "شناسه شخص"},
-                    "name": {"type": "string", "description": "نام جدید (اختیاری)"},
-                    "phone": {"type": "string", "description": "تلفن جدید (اختیاری)"},
-                    "email": {"type": "string", "format": "email", "description": "ایمیل جدید (اختیاری)"},
-                    "address": {"type": "string", "description": "آدرس جدید (اختیاری)"},
-                    "tax_id": {"type": "string", "description": "شناسه ملی/کد اقتصادی جدید (اختیاری)"}
-                },
-                "required": ["person_id"]
-            },
-            handler=update_person_wrapper,
+            description=UPDATE_PERSON_DESCRIPTION,
+            parameters_schema=UPDATE_PERSON_PARAMETERS_SCHEMA,
+            handler=self._create_handler(update_person_wrapper),
             allowed_roles={AIRole.USER, AIRole.BUSINESS_OWNER, AIRole.OPERATOR, AIRole.ADMIN},
             required_permissions=["persons.write"],
             category="persons",
@@ -878,9 +924,10 @@ class AIFunctionRegistry:
             name="search_receipts_payments",
             description=(
                 "جستجو در دریافت/پرداخت با QueryInfo (filters, search_fields). "
-                "type=receipt|payment. فیلترهای ستونی در filters[]"
+                "type=receipt|payment. فیلترهای ستونی در filters[]. take حداکثر ۱۰۰."
             ),
             parameters_schema=ai_list_parameters_schema(
+                entity="document",
                 extra_properties={
                     "type": {
                         "type": "string",
@@ -903,58 +950,28 @@ class AIFunctionRegistry:
         
         # اضافه کردن create_receipt_payment
         def create_receipt_payment_wrapper(args: Dict[str, Any], context: Dict[str, Any]) -> Any:
-            """Wrapper برای ایجاد دریافت/پرداخت"""
+            """Wrapper برای ایجاد دریافت/پرداخت — نگاشت bank_id نه کدینگ."""
+            from app.services.ai.ai_tool_payloads import build_create_receipt_payment_payload
+
             db: Session = context["db"]
             user_context: AuthContext = context["user_context"]
             business_id = args.get("business_id") or context.get("business_id")
             user_id = user_context.get_user_id()
-            
-            # ساخت person_lines و account_lines از پارامترها
-            person_lines = []
-            if args.get("person_id") and args.get("amount"):
-                person_lines.append({
-                    "person_id": args.get("person_id"),
-                    "amount": float(args.get("amount", 0)),
-                    "description": args.get("description", "")
-                })
-            
-            account_lines = []
-            if args.get("account_id") and args.get("amount"):
-                account_lines.append({
-                    "account_id": args.get("account_id"),
-                    "amount": float(args.get("amount", 0)),
-                    "description": args.get("description", "")
-                })
-            
-            data = {
-                "document_type": args.get("type"),  # "receipt" or "payment"
-                "document_date": args.get("document_date"),
-                "currency_id": args.get("currency_id"),
-                "description": args.get("description", ""),
-                "person_lines": person_lines if person_lines else args.get("person_lines", []),
-                "account_lines": account_lines if account_lines else args.get("account_lines", []),
-                "extra_info": args.get("extra_info", {})
-            }
-            
+            data = build_create_receipt_payment_payload(
+                args, db=db, business_id=business_id
+            )
             return create_receipt_payment(db, business_id, user_id, data)
-        
+
+        from app.services.ai.ai_tool_payloads import (
+            CREATE_RECEIPT_PAYMENT_DESCRIPTION,
+            CREATE_RECEIPT_PAYMENT_PARAMETERS_SCHEMA,
+        )
+
         self.register(AIFunction(
             name="create_receipt_payment",
-            description="ثبت دریافت یا پرداخت نقدی/بانکی. شناسه کسب‌وکار به صورت خودکار از جلسه گفت‌وگو گرفته می‌شود.",
-            parameters_schema={
-                "type": "object",
-                "properties": {
-                    "type": {"type": "string", "enum": ["receipt", "payment"], "description": "نوع: دریافت یا پرداخت"},
-                    "document_date": {"type": "string", "format": "date", "description": "تاریخ سند"},
-                    "currency_id": {"type": "integer", "description": "شناسه ارز"},
-                    "person_id": {"type": "integer", "description": "شناسه شخص (اختیاری)"},
-                    "amount": {"type": "number", "description": "مبلغ"},
-                    "account_id": {"type": "integer", "description": "شناسه حساب بانکی/نقدی"},
-                    "description": {"type": "string", "description": "توضیحات (اختیاری)"}
-                },
-                "required": ["type", "document_date", "currency_id", "amount", "account_id"]
-            },
-            handler=create_receipt_payment_wrapper,
+            description=CREATE_RECEIPT_PAYMENT_DESCRIPTION,
+            parameters_schema=CREATE_RECEIPT_PAYMENT_PARAMETERS_SCHEMA,
+            handler=self._create_handler(create_receipt_payment_wrapper),
             allowed_roles={AIRole.USER, AIRole.BUSINESS_OWNER, AIRole.OPERATOR, AIRole.ADMIN},
             required_permissions=["receipts_payments.write"],
             category="financial",
@@ -1237,7 +1254,7 @@ class AIFunctionRegistry:
                 "from_date": kwargs.get("from_date"),
                 "to_date": kwargs.get("to_date"),
                 "fiscal_year_id": kwargs.get("fiscal_year_id"),
-                "take": 1000,
+                "take": 100,
                 "skip": 0
             }
             
@@ -1246,7 +1263,7 @@ class AIFunctionRegistry:
                 "from_date": kwargs.get("from_date"),
                 "to_date": kwargs.get("to_date"),
                 "fiscal_year_id": kwargs.get("fiscal_year_id"),
-                "take": 1000,
+                "take": 100,
                 "skip": 0
             }
             
@@ -1673,6 +1690,7 @@ class AIFunctionRegistry:
                 },
                 handler=invoke_connector_handler,
                 allowed_roles={AIRole.USER, AIRole.BUSINESS_OWNER, AIRole.ADMIN},
+                required_permissions=["settings.view"],
                 business_context_required=True,
                 category="integration",
             )
@@ -1683,7 +1701,14 @@ class AIFunctionRegistry:
         ایجاد wrapper برای service function ها
         این wrapper context (db, user_context) را اضافه می‌کند
         و business_id را از session inject می‌کند (امنیت)
+
+        دو قرارداد پشتیبانی می‌شود:
+        - سبک قدیمی: ``fn(db, business_id, user_id, **kwargs)``
+        - سبک (args, context): ``fn(args, context)`` — مثلاً create_session_plan
         """
+<<<<<<< HEAD
+        return wrap_registry_service_func(service_func)
+=======
         def handler(args: Dict[str, Any], context: Dict[str, Any]) -> Any:
             db: Session = context["db"]
             user_context: AuthContext = context["user_context"]
@@ -1751,14 +1776,24 @@ class AIFunctionRegistry:
                 raise
         
         return handler
+>>>>>>> github/Huma
     
     def register(self, func: AIFunction):
-        """ثبت function جدید"""
-        self._functions[func.name] = func
+        """ثبت function جدید و اتصال Metadata Manifest."""
+        from app.services.ai.ai_tool_index import bind_manifest
+
+        bound = bind_manifest(func)
+        self._functions[bound.name] = bound
 
     def get_function(self, name: str) -> Optional[AIFunction]:
         """دریافت AIFunction با نام — None اگر وجود نداشته باشد."""
         return self._functions.get(name)
+
+    def iter_functions(self) -> List[AIFunction]:
+        return list(self._functions.values())
+
+    def function_names(self) -> List[str]:
+        return list(self._functions.keys())
     
     def _detect_user_role(
         self,
@@ -1794,6 +1829,73 @@ class AIFunctionRegistry:
         
         return roles
     
+    def _authorized_functions(
+        self,
+        context: Dict[str, Any],
+        filter_by_category: Optional[str] = None,
+    ) -> List["AIFunction"]:
+        """Functionهای مجاز tenant/role/permission — بدون ساخت JSON Schema."""
+        user_context: AuthContext = context["user_context"]
+        business_id = context.get("business_id")
+        user_roles = self._detect_user_role(user_context, business_id)
+        from app.services.ai.ai_permission_policy import catalog_permission_allows
+
+        out: List[AIFunction] = []
+        for func in self._functions.values():
+            if not (func.allowed_roles & user_roles):
+                continue
+            if not catalog_permission_allows(func, user_context, business_id):
+                continue
+            if func.business_context_required and not business_id:
+                continue
+            if filter_by_category and func.category != filter_by_category:
+                continue
+            out.append(func)
+        return out
+
+    def get_authorized_function_names(
+        self,
+        context: Dict[str, Any],
+        filter_by_category: Optional[str] = None,
+    ) -> List[str]:
+        return [func.name for func in self._authorized_functions(context, filter_by_category)]
+
+    def build_openai_tool_definition(self, name: str) -> Optional[Dict[str, Any]]:
+        func = self._functions.get(name)
+        if func is None:
+            return None
+        return {
+            "type": "function",
+            "function": {
+                "name": func.name,
+                "description": func.description,
+                "parameters": func.parameters_schema,
+            },
+        }
+
+    def schema_version_for(self, name: str) -> str:
+        """Cache key: declared schema_version + hash of description/parameters.
+
+        Authors should bump `schema_version` when the contract changes.
+        The content hash still invalidates the cache if the JSON drifts
+        without a manual bump.
+        """
+        func = self._functions.get(name)
+        if func is None:
+            return "0"
+        declared = str(getattr(func, "schema_version", None) or "1")
+        payload = json.dumps(
+            {
+                "description": getattr(func, "description", None),
+                "parameters": getattr(func, "parameters_schema", None),
+            },
+            sort_keys=True,
+            ensure_ascii=False,
+            default=str,
+        )
+        digest = hashlib.sha256(payload.encode("utf-8")).hexdigest()[:12]
+        return f"{declared}.{digest}"
+
     def get_function_definitions(
         self,
         context: Dict[str, Any],
@@ -1803,44 +1905,11 @@ class AIFunctionRegistry:
         دریافت لیست function definitions برای OpenAI
         فقط function هایی که کاربر دسترسی دارد را برمی‌گرداند
         """
-        user_context: AuthContext = context["user_context"]
-        business_id = context.get("business_id")
-        
-        # تشخیص نقش کاربر
-        user_roles = self._detect_user_role(user_context, business_id)
-        
         definitions = []
-        for func in self._functions.values():
-            # بررسی نقش
-            if not (func.allowed_roles & user_roles):
-                continue
-            
-            # بررسی دسترسی‌های دقیق‌تر
-            if func.required_permissions:
-                from app.services.ai.ai_permission_map import has_any_ai_tool_permission
-
-                if not has_any_ai_tool_permission(
-                    user_context, func.required_permissions, business_id=business_id
-                ):
-                    continue
-            
-            # بررسی نیاز به business context
-            if func.business_context_required and not business_id:
-                continue
-            
-            # فیلتر بر اساس دسته‌بندی
-            if filter_by_category and func.category != filter_by_category:
-                continue
-            
-            definitions.append({
-                "type": "function",
-                "function": {
-                    "name": func.name,
-                    "description": func.description,
-                    "parameters": func.parameters_schema
-                }
-            })
-        
+        for func in self._authorized_functions(context, filter_by_category):
+            built = self.build_openai_tool_definition(func.name)
+            if built:
+                definitions.append(built)
         return definitions
     
     def call_function(
@@ -1890,16 +1959,10 @@ class AIFunctionRegistry:
                 f"Required roles: {func.allowed_roles}"
             )
         
-        # بررسی دسترسی‌های دقیق‌تر
-        if func.required_permissions:
-            from app.services.ai.ai_permission_map import has_any_ai_tool_permission
+        from app.services.ai.ai_permission_policy import catalog_permission_allows
 
-            if not has_any_ai_tool_permission(
-                user_context,
-                func.required_permissions,
-                business_id=effective_business_id,
-            ):
-                raise PermissionError(f"User does not have required permissions for {name}")
+        if not catalog_permission_allows(func, user_context, effective_business_id):
+            raise PermissionError(f"User does not have required permissions for {name}")
         
         # بررسی business context
         if func.business_context_required and not effective_business_id:

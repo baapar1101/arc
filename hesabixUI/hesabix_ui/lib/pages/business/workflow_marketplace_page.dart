@@ -11,6 +11,7 @@ import '../../services/workflow_marketplace_service.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../utils/responsive_helper.dart';
+import '../../widgets/business_subpage_back_leading.dart';
 
 /// مخزن ورک‌فلو: مرور، نصب و مدیریت انتشار
 class WorkflowMarketplacePage extends StatefulWidget {
@@ -395,6 +396,7 @@ class _WorkflowMarketplacePageState extends State<WorkflowMarketplacePage> with 
     return Scaffold(
       appBar: AppBar(
         title: Text(t.workflowMarketplaceTitle),
+        leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
         bottom: TabBar(
           controller: _tabController,
           tabs: [

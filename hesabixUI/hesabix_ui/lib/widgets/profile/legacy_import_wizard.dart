@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:hesabix_ui/config/brand_config.dart';
 import 'package:hesabix_ui/services/business_api_service.dart';
 import 'package:hesabix_ui/services/job_service.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
@@ -211,7 +212,11 @@ class _LegacyImportWizardState extends State<LegacyImportWizard> {
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
+<<<<<<< HEAD
+                      BrandConfig.rebrand('انتقال از حسابیکس قبلی'),
+=======
                       'انتقال از مارک‌استریت قبلی',
+>>>>>>> github/Huma
                       style: theme.textTheme.titleLarge,
                     ),
                   ),
@@ -277,7 +282,13 @@ class _LegacyImportWizardState extends State<LegacyImportWizard> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
+<<<<<<< HEAD
+              BrandConfig.rebrand(
+                'با کلید API از نسخه قدیم حسابیکس، کسب‌وکار جدیدی در این حساب کاربری ساخته می‌شود.',
+              ),
+=======
               'با کلید API از نسخه قدیم مارک‌استریت، کسب‌وکار جدیدی در این حساب کاربری ساخته می‌شود.',
+>>>>>>> github/Huma
               style: theme.textTheme.bodyMedium,
             ),
             const SizedBox(height: 16),

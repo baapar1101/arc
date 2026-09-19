@@ -63,8 +63,40 @@ class BusinessPrintSettings(Base):
     show_seller_signature_area: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="1")
     show_buyer_signature_area: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="1")
 
+    # مقیاس نمایش مهر و امضا در PDF نسبت به اندازهٔ پایه قالب (۱۰۰ = رفتار پیش‌فرض)
+    # بازهٔ مجاز در لایه سرویس: ۵۰ تا ۲۰۰
+    stamp_scale_percent: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=100, server_default="100"
+    )
+    signature_scale_percent: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=100, server_default="100"
+    )
+
     # متن ثابت انتهای فاکتور (پاورقی قابل تنظیم برای این نوع سند)
     footer_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    # نمایش ستون‌ها/ردیف‌های مالیات و تخفیف: smart | always | never
+    line_discount_display: Mapped[str] = mapped_column(
+        String(16), nullable=False, default="smart", server_default="smart"
+    )
+    line_tax_display: Mapped[str] = mapped_column(
+        String(16), nullable=False, default="smart", server_default="smart"
+    )
+    line_amount_before_discount_display: Mapped[str] = mapped_column(
+        String(16), nullable=False, default="smart", server_default="smart"
+    )
+    line_amount_before_tax_display: Mapped[str] = mapped_column(
+        String(16), nullable=False, default="smart", server_default="smart"
+    )
+    summary_discount_display: Mapped[str] = mapped_column(
+        String(16), nullable=False, default="smart", server_default="smart"
+    )
+    summary_tax_display: Mapped[str] = mapped_column(
+        String(16), nullable=False, default="smart", server_default="smart"
+    )
+    summary_amount_without_tax_display: Mapped[str] = mapped_column(
+        String(16), nullable=False, default="smart", server_default="smart"
+    )
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.utcnow, nullable=False

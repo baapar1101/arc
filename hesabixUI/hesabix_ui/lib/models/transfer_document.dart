@@ -1,3 +1,5 @@
+import '../core/date_utils.dart';
+
 /// مدل سند انتقال
 class TransferDocument {
   final int id;
@@ -36,8 +38,16 @@ class TransferDocument {
     return TransferDocument(
       id: json['id'] as int,
       code: (json['code'] ?? '').toString(),
-      documentDate: DateTime.tryParse((json['document_date'] ?? '').toString()) ?? DateTime.now(),
-      registeredAt: DateTime.tryParse((json['registered_at'] ?? '').toString()) ?? DateTime.now(),
+      documentDate: HesabixDateUtils.parseApiDate(
+            json['document_date'],
+            rawValue: json['document_date_raw'],
+          ) ??
+          DateTime.now(),
+      registeredAt: HesabixDateUtils.parseApiDate(
+            json['registered_at'],
+            rawValue: json['registered_at_raw'],
+          ) ??
+          DateTime.now(),
       totalAmount: (json['total_amount'] as num?)?.toDouble() ?? 0,
       currencyCode: json['currency_code']?.toString(),
       createdByName: (json['created_by_name'] ?? '') as String?,

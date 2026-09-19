@@ -19,7 +19,27 @@ def _default_preferences() -> Dict[str, Any]:
 		# long_press_new_tab: کلیک معمولی فقط تب فعال را عوض می‌کند؛ لانگ‌پرس منطق بالا را اعمال می‌کند
 		"business_panel_sidebar_tab_behavior": "reuse_across_tabs",
 		"business_panel_tabs": {},
+		# theme_id / theme_mode فقط وقتی کاربر صریحاً انتخاب کند ذخیره می‌شوند
+		# تا پیش‌فرض ادمین برای کاربران جدید حفظ بماند
 	}
+
+
+_ALLOWED_THEME_IDS = frozenset({"classic_blue", "turquoise_sea", "emerald_forest", "warm_copper"})
+_ALLOWED_THEME_MODES = frozenset({"system", "light", "dark"})
+
+
+def _normalize_theme_id(raw: Any, fallback: str | None = None) -> str | None:
+	value = str(raw or "").strip().lower()
+	if value in _ALLOWED_THEME_IDS:
+		return value
+	return fallback
+
+
+def _normalize_theme_mode(raw: Any, fallback: str | None = None) -> str | None:
+	value = str(raw or "").strip().lower()
+	if value in _ALLOWED_THEME_MODES:
+		return value
+	return fallback
 
 
 def _normalize_tabs_payload(raw: Any) -> Dict[str, Any]:
@@ -36,8 +56,12 @@ def _normalize_tabs_payload(raw: Any) -> Dict[str, Any]:
 		paths_raw = entry.get("paths") or []
 		if not isinstance(paths_raw, list):
 			continue
-		paths: List[str] = []
-		for p in paths_raw[:_MAX_TABS_PER_BUSINESS]:
+		pinned_raw = entry.get("pinned")
+		if not isinstance(pinned_raw, list):
+			pinned_raw = []
+		# (path, pinned) — پین با ایندکس مسیر هم‌تراز می‌ماند حتی بعد از فیلتر/dedupe
+		paired: List[Tuple[str, bool]] = []
+		for i, p in enumerate(paths_raw[:_MAX_TABS_PER_BUSINESS]):
 			if not isinstance(p, str):
 				continue
 			p = p.strip()
@@ -46,15 +70,18 @@ def _normalize_tabs_payload(raw: Any) -> Dict[str, Any]:
 			ok, pbid, _ = _parse_business_path(p)
 			if not ok or pbid != bid:
 				continue
-			paths.append(p)
+			is_pinned = bool(pinned_raw[i]) if i < len(pinned_raw) else False
+			paired.append((p, is_pinned))
 		# حذف تکراری با حفظ ترتیب
 		seen = set()
 		uniq: List[str] = []
-		for p in paths:
+		uniq_pinned: List[bool] = []
+		for p, is_pinned in paired:
 			if p in seen:
 				continue
 			seen.add(p)
 			uniq.append(p)
+			uniq_pinned.append(bool(is_pinned))
 		active = entry.get("active_path")
 		active_str = str(active).strip() if active is not None else None
 		if active_str and not active_str.startswith("/"):
@@ -66,7 +93,11 @@ def _normalize_tabs_payload(raw: Any) -> Dict[str, Any]:
 		else:
 			active_str = uniq[-1] if uniq else None
 		if uniq:
-			out[str(bid)] = {"paths": uniq, "active_path": active_str}
+			out[str(bid)] = {
+				"paths": uniq,
+				"active_path": active_str,
+				"pinned": uniq_pinned,
+			}
 	return out
 
 
@@ -94,6 +125,15 @@ def get_user_ui_preferences(db: Session, user_id: int) -> Dict[str, Any]:
 		data["business_panel_sidebar_tab_behavior"] = base["business_panel_sidebar_tab_behavior"]
 	tabs = _normalize_tabs_payload(stored.get("business_panel_tabs"))
 	data["business_panel_tabs"] = tabs
+	# فقط اگر کاربر قبلاً تم را صریحاً ذخیره کرده باشد برگردان
+	if "theme_id" in stored:
+		tid = _normalize_theme_id(stored.get("theme_id"))
+		if tid is not None:
+			data["theme_id"] = tid
+	if "theme_mode" in stored:
+		tmode = _normalize_theme_mode(stored.get("theme_mode"))
+		if tmode is not None:
+			data["theme_mode"] = tmode
 	return data
 
 
@@ -102,7 +142,8 @@ def save_user_ui_preferences(db: Session, user_id: int, payload: Dict[str, Any])
 	row = db.query(UserUiPreferences).filter(UserUiPreferences.user_id == user_id).first()
 
 	base = _default_preferences()
-	current = get_user_ui_preferences(db, user_id) if row else base
+	current = get_user_ui_preferences(db, user_id) if row else dict(base)
+	stored_raw = dict(row.preferences) if row is not None and isinstance(row.preferences, dict) else {}
 
 	mode = payload.get("business_panel_navigation")
 	if mode is None:
@@ -121,11 +162,30 @@ def save_user_ui_preferences(db: Session, user_id: int, payload: Dict[str, Any])
 	else:
 		tabs = current["business_panel_tabs"]
 
-	next_prefs = {
+	next_prefs: Dict[str, Any] = {
 		"business_panel_navigation": mode,
 		"business_panel_sidebar_tab_behavior": sidebar_behavior,
 		"business_panel_tabs": tabs,
 	}
+
+	# تم فقط وقتی در payload باشد یا قبلاً توسط کاربر ذخیره شده باشد حفظ می‌شود
+	if "theme_id" in payload:
+		tid = _normalize_theme_id(payload.get("theme_id"), "classic_blue")
+		if tid is not None:
+			next_prefs["theme_id"] = tid
+	elif "theme_id" in stored_raw:
+		tid = _normalize_theme_id(stored_raw.get("theme_id"))
+		if tid is not None:
+			next_prefs["theme_id"] = tid
+
+	if "theme_mode" in payload:
+		tmode = _normalize_theme_mode(payload.get("theme_mode"), "system")
+		if tmode is not None:
+			next_prefs["theme_mode"] = tmode
+	elif "theme_mode" in stored_raw:
+		tmode = _normalize_theme_mode(stored_raw.get("theme_mode"))
+		if tmode is not None:
+			next_prefs["theme_mode"] = tmode
 
 	if row is None:
 		row = UserUiPreferences(user_id=user_id, preferences=next_prefs, created_at=now, updated_at=now)

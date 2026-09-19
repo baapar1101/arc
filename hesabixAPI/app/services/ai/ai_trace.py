@@ -4,6 +4,7 @@ Agent trace — زنجیرهٔ مراحل قابل نمایش برای کارب�
 from __future__ import annotations
 
 import json
+import re
 import uuid
 from typing import Any, Dict, List, Optional
 
@@ -72,6 +73,8 @@ def trace_step(
     trace_id: Optional[str] = None,
     visibility: str = TRACE_VISIBILITY_USER,
     retry_attempt: Optional[int] = None,
+    subagent_id: Optional[str] = None,
+    parent_step_id: Optional[str] = None,
 ) -> Dict[str, Any]:
     resolved_layer = layer or layer_for_kind(kind)
     payload: Dict[str, Any] = {
@@ -115,6 +118,10 @@ def trace_step(
         payload["hypothesis"] = hypothesis
     if confidence:
         payload["confidence"] = confidence
+    if subagent_id:
+        payload["subagent_id"] = subagent_id
+    if parent_step_id:
+        payload["parent_step_id"] = parent_step_id
     return payload
 
 
@@ -167,43 +174,9 @@ def format_planned_tools(function_calls: List[Dict[str, Any]]) -> str:
 
 def summarize_tool_result_for_llm(function_name: str, result: Any) -> str:
     """خلاصهٔ فشرده برای قرار دادن در پیام role=tool (کاهش توکن)."""
-    if result is None:
-        return "نتیجه‌ای برنگشت."
-    if isinstance(result, dict):
-        if result.get("error") == "APPROVAL_REQUIRED":
-            return json.dumps(result, ensure_ascii=False)
-        if "error" in result:
-            return json.dumps({"error": result.get("error"), "message": result.get("message")}, ensure_ascii=False)
-        compact: Dict[str, Any] = {}
-        for key in ("message", "summary", "description", "total", "pagination"):
-            if key in result:
-                compact[key] = result[key]
-        for key in ("items", "data", "results", "invoices", "products", "persons"):
-            items = result.get(key)
-            if isinstance(items, list):
-                compact[key] = items[:15]
-                compact[f"{key}_total"] = (
-                    (result.get("pagination") or {}).get("total")
-                    if isinstance(result.get("pagination"), dict)
-                    else len(items)
-                )
-                if len(items) > 15:
-                    compact[f"{key}_truncated"] = True
-                break
-        if compact:
-            return json.dumps(compact, ensure_ascii=False)
-        text = json.dumps(result, ensure_ascii=False)
-        if len(text) > 4000:
-            return text[:4000] + "…"
-        return text
-    if isinstance(result, list):
-        preview = result[:15]
-        payload: Dict[str, Any] = {"items": preview, "total": len(result)}
-        if len(result) > 15:
-            payload["truncated"] = True
-        return json.dumps(payload, ensure_ascii=False)
-    text = str(result)
-    return text[:4000] + ("…" if len(text) > 4000 else "")
+    from app.services.ai.ai_tool_result import compact_tool_result_for_llm
+
+    return compact_tool_result_for_llm(function_name, result)
 
 
 def summarize_tool_result(function_name: str, result: Any) -> str:
@@ -345,23 +318,23 @@ def extract_result_count(result: Any) -> Optional[int]:
 
 
 def extract_citations_from_result(result: Any) -> List[str]:
-    """استخراج منابع/citation از نتیجه tool برای explainability."""
-    citations: List[str] = []
-    if not isinstance(result, dict):
-        return citations
+    """استخراج منابع/citation از نتیجه tool برای trace UI."""
+    from app.services.ai.ai_citation_service import format_citation_lines
+    from app.services.ai.ai_tool_result import (
+        extract_record_citations,
+        extract_record_list,
+        unwrap_registry_result,
+    )
 
-    for item in (result.get("items") or result.get("data") or []):
-        if not isinstance(item, dict):
-            continue
-        ref = item.get("code") or item.get("number") or item.get("id")
-        name = item.get("name") or item.get("title") or ""
-        if ref and name:
-            citations.append(f"{name} (#{ref})")
-        elif ref:
-            citations.append(f"#{ref}")
-        if len(citations) >= 5:
-            break
-    return citations
+    payload = unwrap_registry_result(result)
+    refs: List[Dict[str, Any]] = []
+    if isinstance(payload, dict) and isinstance(payload.get("citations"), list):
+        refs = [dict(x) for x in payload["citations"] if isinstance(x, dict)]
+    if not refs:
+        records, _ = extract_record_list(payload)
+        refs = extract_record_citations(records, limit=5)
+    lines = format_citation_lines(refs[:5])
+    return [line.lstrip("- ").strip() for line in lines if line.strip()]
 
 
 def split_trace_layers(
@@ -377,14 +350,35 @@ def split_trace_layers(
     return trace_steps, reasoning
 
 
+def finalize_trace_steps_for_persist(
+    trace_steps: Optional[List[Dict[str, Any]]],
+) -> List[Dict[str, Any]]:
+    """بستن stepهای active و پاک‌سازی body_markdown قبل از ذخیره در DB."""
+    if not trace_steps:
+        return []
+    from app.services.ai.ai_content_sanitize import sanitize_assistant_content
+
+    finalized: List[Dict[str, Any]] = []
+    for step in trace_steps:
+        record = dict(step)
+        if record.get("state") == "active":
+            record["state"] = "done"
+        body = record.get("body_markdown")
+        if isinstance(body, str) and body:
+            record["body_markdown"] = sanitize_assistant_content(body)
+        finalized.append(record)
+    return finalized
+
+
 def merge_trace_into_function_results(
     function_results: Optional[Dict[str, Any]],
     trace_steps: List[Dict[str, Any]],
 ) -> Dict[str, Any]:
     merged = dict(function_results or {})
-    if trace_steps:
-        merged[TRACE_AGENT_KEY] = trace_steps
-        _, reasoning = split_trace_layers(trace_steps)
+    finalized = finalize_trace_steps_for_persist(trace_steps)
+    if finalized:
+        merged[TRACE_AGENT_KEY] = finalized
+        _, reasoning = split_trace_layers(finalized)
         if reasoning:
             merged[TRACE_REASONING_KEY] = reasoning
     return merged
@@ -399,3 +393,147 @@ def extract_trace_from_function_results(
     if isinstance(trace, list):
         return trace
     return []
+
+
+# اولویت استخراج متن نهایی از trace — فقط answer (Phase 1: answer-channel gate).
+#
+# قبلاً "explored" هم fallback بود و خلاصهٔ خام ابزارها (Markdown با ####)
+# می‌توانست به‌جای پاسخ نهایی نمایش داده شود. explored/thought شواهد خام هستند،
+# نه پاسخ نهایی؛ برای تولید پاسخ باید یک synthesis واقعی (LLM یا answer step)
+# روی آن‌ها انجام شود — به extract_explored_context_for_synthesis نگاه کنید.
+TRACE_CONTENT_FALLBACK_KINDS: tuple[str, ...] = (
+    "answer",
+)
+
+
+def _is_valid_trace_answer_fallback(body: str, kind: str, *, min_body_len: int) -> bool:
+    if not body:
+        return False
+    return len(body) >= min_body_len
+
+
+def extract_final_content_from_trace(
+    trace_steps: Optional[List[Dict[str, Any]]],
+    *,
+    min_body_len: int = 20,
+) -> str:
+    """متن قابل‌نمایش از trace agent (برای persist و fallback پاسخ).
+
+    فقط از گام‌های kind="answer" استفاده می‌کند؛ narrative/explored/thought
+    هرگز مستقیماً پاسخ نهایی نمی‌شوند (Phase 1 — answer channel gate).
+    """
+    if not trace_steps:
+        return ""
+    from app.services.ai.ai_content_sanitize import sanitize_assistant_content
+
+    for kind in TRACE_CONTENT_FALLBACK_KINDS:
+        for step in reversed(trace_steps):
+            if step.get("kind") != kind:
+                continue
+            body = sanitize_assistant_content(
+                (step.get("body_markdown") or "").strip()
+            )
+            if _is_valid_trace_answer_fallback(body, kind, min_body_len=min_body_len):
+                return body
+    return ""
+
+
+def extract_explored_context_for_synthesis(
+    trace_steps: Optional[List[Dict[str, Any]]],
+    *,
+    max_chars: int = 6000,
+) -> str:
+    """خلاصهٔ explored/thought/narrative مفید برای ساخت prompt سنتز نهایی.
+
+    برخلاف extract_final_content_from_trace، این تابع صرفاً برای تغذیهٔ یک
+    نوبت اضافی LLM (force-synthesis) استفاده می‌شود، نه نمایش مستقیم به کاربر.
+    narrativeهای وضعیت («در حال…») عمداً حذف می‌شوند.
+    """
+    if not trace_steps:
+        return ""
+    from app.services.ai.ai_content_sanitize import sanitize_assistant_content
+    from app.services.ai.ai_premature_answer import looks_like_status_narrative
+
+    parts: List[str] = []
+    total = 0
+    for step in trace_steps:
+        kind = step.get("kind")
+        if kind not in ("explored", "thought", "narrative"):
+            continue
+        body = sanitize_assistant_content((step.get("body_markdown") or "").strip())
+        if not body:
+            continue
+        if kind == "narrative" and looks_like_status_narrative(body):
+            continue
+        parts.append(body)
+        total += len(body)
+        if total >= max_chars:
+            break
+    joined = "\n\n".join(parts)
+    return joined[:max_chars]
+
+
+def extract_usable_narrative_for_answer(
+    trace_steps: Optional[List[Dict[str, Any]]],
+    *,
+    min_body_len: int = 40,
+) -> str:
+    """آخرین narrative قابل‌قبول به‌عنوان پاسخ (نه status مثل «در حال…»).
+
+    برای بازیابی وقتی wall-clock/budget قطع می‌شود ولی مدل قبلاً خلاصهٔ
+    واقعی نوشته و فقط kind=answer ثبت نشده (مثل session 750).
+    """
+    if not trace_steps:
+        return ""
+    from app.services.ai.ai_content_sanitize import sanitize_assistant_content
+    from app.services.ai.ai_premature_answer import looks_like_status_narrative
+
+    for step in reversed(trace_steps):
+        if step.get("kind") != "narrative":
+            continue
+        body = sanitize_assistant_content(
+            (step.get("body_markdown") or "").strip()
+        )
+        if len(body) < min_body_len:
+            continue
+        if looks_like_status_narrative(body):
+            continue
+        return body
+    return ""
+
+
+def trace_has_unanswered_evidence(
+    trace_steps: Optional[List[Dict[str, Any]]],
+) -> bool:
+    """آیا trace شواهد ابزار (explored/thought) دارد اما هنوز answer نهایی ندارد؟"""
+    if not trace_steps:
+        return False
+    has_answer = any(step.get("kind") == "answer" for step in trace_steps)
+    if has_answer:
+        return False
+    return any(step.get("kind") in ("explored", "thought") for step in trace_steps)
+
+
+def merge_accumulated_and_trace_content(
+    accumulated_content: str,
+    trace_steps: Optional[List[Dict[str, Any]]],
+) -> str:
+    """ترکیب متن stream شده با fallback از trace."""
+    from app.services.ai.ai_deliverable_answer import is_deliverable_answer
+
+    text = (accumulated_content or "").strip()
+    has_tool_evidence = bool(trace_steps) and any(
+        step.get("kind") in ("explored", "thought", "tool", "narrative")
+        for step in trace_steps
+    )
+    if text and is_deliverable_answer(
+        text,
+        needs_tools=has_tool_evidence,
+        has_tool_evidence=has_tool_evidence,
+    ):
+        return accumulated_content
+    synthesized = extract_final_content_from_trace(trace_steps)
+    if synthesized:
+        return synthesized
+    usable = extract_usable_narrative_for_answer(trace_steps)
+    return usable or (accumulated_content or "")

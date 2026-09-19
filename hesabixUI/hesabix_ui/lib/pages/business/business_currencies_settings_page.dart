@@ -2,15 +2,22 @@ import 'package:flutter/material.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/services/currency_service.dart';
 import 'package:hesabix_ui/core/api_client.dart';
+import 'package:hesabix_ui/core/auth_store.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../widgets/business_subpage_back_leading.dart';
 import 'dart:ui' as ui;
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 class BusinessCurrenciesSettingsPage extends StatefulWidget {
   final int businessId;
+  final AuthStore? authStore;
 
-  const BusinessCurrenciesSettingsPage({super.key, required this.businessId});
+  const BusinessCurrenciesSettingsPage({
+    super.key,
+    required this.businessId,
+    this.authStore,
+  });
 
   @override
   State<BusinessCurrenciesSettingsPage> createState() => _BusinessCurrenciesSettingsPageState();
@@ -85,7 +92,29 @@ class _BusinessCurrenciesSettingsPageState extends State<BusinessCurrenciesSetti
     }
   }
 
+  Future<void> _syncAuthStoreCurrencies() async {
+    final store = widget.authStore;
+    if (store == null || store.currentBusiness?.id != widget.businessId) return;
+    try {
+      final businessCurrencies = await _currencyService.listBusinessCurrencies(
+        businessId: widget.businessId,
+      );
+      Map<String, dynamic>? defaultCurrency;
+      for (final c in businessCurrencies) {
+        if (c['is_default'] == true) {
+          defaultCurrency = c;
+          break;
+        }
+      }
+      await store.refreshCurrentBusinessCurrencies(
+        currencies: businessCurrencies,
+        defaultCurrency: defaultCurrency,
+      );
+    } catch (_) {}
+  }
+
   Future<void> _addCurrency(int currencyId) async {
+    final wasFirstSecondary = _businessCurrencies.isEmpty;
     try {
       await _currencyService.addBusinessCurrency(
         businessId: widget.businessId,
@@ -94,9 +123,13 @@ class _BusinessCurrenciesSettingsPageState extends State<BusinessCurrenciesSetti
       
       // بارگذاری مجدد لیست ارزها
       await _loadCurrencies();
+      await _syncAuthStoreCurrencies();
       
       if (mounted) {
         SnackBarHelper.show(context, message: 'ارز با موفقیت اضافه شد');
+        if (wasFirstSecondary && _businessCurrencies.isNotEmpty) {
+          await _showMultiCurrencyOnboarding();
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -108,6 +141,90 @@ class _BusinessCurrenciesSettingsPageState extends State<BusinessCurrenciesSetti
     }
   }
 
+  Future<void> _showMultiCurrencyOnboarding() async {
+    if (!mounted) return;
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) {
+        final theme = Theme.of(ctx);
+        return AlertDialog(
+          title: const Text('چندارزی فعال شد'),
+          content: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'از این لحظه قابلیت‌های ارزی در نوار ابزار، فاکتور، پرداخت، انتقال بانکی، اشخاص و گزارش‌ها ظاهر می‌شود.',
+                  style: theme.textTheme.bodyMedium,
+                ),
+                const SizedBox(height: 14),
+                _onboardingStep(
+                  theme,
+                  Icons.currency_exchange,
+                  '۱. نرخ مرجع روز',
+                  'از چیپ «نرخ ارز» در نوار ابزار بالا، نرخ را دستی ثبت کنید یا از اسنپ‌شات مرکزی بگیرید.',
+                ),
+                _onboardingStep(
+                  theme,
+                  Icons.receipt_long,
+                  '۲. فاکتور و پرداخت',
+                  'در فاکتور ارز و نرخ را انتخاب کنید؛ پرداخت می‌تواند با ارز دیگر و نرخ جداگانه ثبت شود.',
+                ),
+                _onboardingStep(
+                  theme,
+                  Icons.filter_alt_outlined,
+                  '۳. اسناد و گزارش‌ها',
+                  'در بالای صفحه فیلتر ارز (یا «همه ارزها») را بزنید تا اسناد ارزی شفاف بمانند.',
+                ),
+                _onboardingStep(
+                  theme,
+                  Icons.people_outline,
+                  '۴. اشخاص',
+                  'مانده هر ارز جداگانه و جمع معادل پایه در جزئیات شخص نمایش داده می‌شود.',
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('بعداً'),
+            ),
+            FilledButton.icon(
+              onPressed: () => Navigator.pop(ctx),
+              icon: const Icon(Icons.check),
+              label: const Text('متوجه شدم'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _onboardingStep(ThemeData theme, IconData icon, String title, String body) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 22, color: theme.colorScheme.primary),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
+                const SizedBox(height: 2),
+                Text(body, style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _removeCurrency(int currencyId, String currencyTitle) async {
     // بررسی استفاده در اسناد
     try {
@@ -117,14 +234,24 @@ class _BusinessCurrenciesSettingsPageState extends State<BusinessCurrenciesSetti
       );
       
       if (usage['is_used'] == true) {
-        final count = usage['document_count'] as int;
+        final blockers = (usage['blockers'] as List?)
+                ?.map((e) => e.toString())
+                .where((e) => e.isNotEmpty)
+                .toList() ??
+            const <String>[];
+        final count = usage['document_count'] as int? ?? usage['total'] as int? ?? 0;
+        final detail = blockers.isNotEmpty
+            ? blockers.join('\n• ')
+            : 'این ارز در $count مورد استفاده شده و قابل حذف نیست.';
         if (mounted) {
           await showDialog(
             context: context,
             builder: (context) => AlertDialog(
               title: const Text('امکان حذف وجود ندارد'),
               content: Text(
-                'این ارز در $count سند حسابداری استفاده شده و قابل حذف نیست.',
+                blockers.isNotEmpty
+                    ? 'این ارز قابل حذف نیست:\n• $detail'
+                    : detail,
               ),
               actions: [
                 TextButton(
@@ -167,6 +294,7 @@ class _BusinessCurrenciesSettingsPageState extends State<BusinessCurrenciesSetti
       
       // بارگذاری مجدد لیست ارزها
       await _loadCurrencies();
+      await _syncAuthStoreCurrencies();
       
       if (mounted) {
         SnackBarHelper.show(context, message: 'ارز با موفقیت حذف شد');
@@ -355,11 +483,11 @@ class _BusinessCurrenciesSettingsPageState extends State<BusinessCurrenciesSetti
                   ),
                 ),
               ),
-              const SizedBox(height: 16),
+              SizedBox(height: 16),
             ] else ...[
               // بخش انتخاب ارز پیش‌فرض (اگر ارز پیش‌فرض وجود نداشته باشد)
               Card(
-                color: Colors.orange.shade50,
+                color: SemanticColorResolver.warning(context).withValues(alpha: 0.12),
                 child: Padding(
                   padding: const EdgeInsets.all(16),
                   child: Column(
@@ -367,25 +495,25 @@ class _BusinessCurrenciesSettingsPageState extends State<BusinessCurrenciesSetti
                     children: [
                       Row(
                         children: [
-                          Icon(Icons.warning_amber_rounded, color: Colors.orange.shade900, size: 24),
-                          const SizedBox(width: 12),
+                          Icon(Icons.warning_amber_rounded, color: SemanticColorResolver.warning(context), size: 24),
+                          SizedBox(width: 12),
                           Expanded(
                             child: Text(
                               'کسب‌وکار شما ارز پیش‌فرض تنظیم نکرده است',
                               style: TextStyle(
                                 fontWeight: FontWeight.w600,
-                                color: Colors.orange.shade900,
+                                color: SemanticColorResolver.warning(context),
                                 fontSize: 16,
                               ),
                             ),
                           ),
                         ],
                       ),
-                      const SizedBox(height: 12),
+                      SizedBox(height: 12),
                       Text(
                         'لطفاً یک ارز پیش‌فرض انتخاب کنید تا بتوانید سند حسابداری ثبت کنید.',
                         style: TextStyle(
-                          color: Colors.orange.shade900,
+                          color: SemanticColorResolver.warning(context),
                           fontSize: 13,
                         ),
                       ),
@@ -413,7 +541,7 @@ class _BusinessCurrenciesSettingsPageState extends State<BusinessCurrenciesSetti
                                 });
                               },
                       ),
-                      const SizedBox(height: 16),
+                      SizedBox(height: 16),
                       SizedBox(
                         width: double.infinity,
                         child: FilledButton.icon(
@@ -426,10 +554,10 @@ class _BusinessCurrenciesSettingsPageState extends State<BusinessCurrenciesSetti
                                   height: 16,
                                   child: CircularProgressIndicator(strokeWidth: 2),
                                 )
-                              : const Icon(Icons.check),
+                              : Icon(Icons.check),
                           label: Text(_savingDefaultCurrency ? 'در حال ذخیره...' : 'تنظیم ارز پیش‌فرض'),
                           style: FilledButton.styleFrom(
-                            backgroundColor: Colors.orange.shade700,
+                            backgroundColor: SemanticColorResolver.warning(context),
                             foregroundColor: Colors.white,
                             padding: const EdgeInsets.symmetric(vertical: 16),
                           ),

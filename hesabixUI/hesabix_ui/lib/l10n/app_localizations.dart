@@ -212,6 +212,60 @@ abstract class AppLocalizations {
   /// **'Theme'**
   String get theme;
 
+  /// No description provided for @colorTheme.
+  ///
+  /// In en, this message translates to:
+  /// **'Color theme'**
+  String get colorTheme;
+
+  /// No description provided for @colorThemeDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a color palette applied across the whole app.'**
+  String get colorThemeDescription;
+
+  /// No description provided for @themeModeLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Light / Dark mode'**
+  String get themeModeLabel;
+
+  /// No description provided for @defaultColorTheme.
+  ///
+  /// In en, this message translates to:
+  /// **'Default color theme'**
+  String get defaultColorTheme;
+
+  /// No description provided for @defaultColorThemeHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Applied for users who have not chosen a color theme yet.'**
+  String get defaultColorThemeHint;
+
+  /// No description provided for @themeClassicBlue.
+  ///
+  /// In en, this message translates to:
+  /// **'Classic Blue'**
+  String get themeClassicBlue;
+
+  /// No description provided for @themeTurquoiseSea.
+  ///
+  /// In en, this message translates to:
+  /// **'Turquoise Sea'**
+  String get themeTurquoiseSea;
+
+  /// No description provided for @themeEmeraldForest.
+  ///
+  /// In en, this message translates to:
+  /// **'Emerald Forest'**
+  String get themeEmeraldForest;
+
+  /// No description provided for @themeWarmCopper.
+  ///
+  /// In en, this message translates to:
+  /// **'Warm Copper'**
+  String get themeWarmCopper;
+
   /// No description provided for @system.
   ///
   /// In en, this message translates to:
@@ -247,6 +301,120 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Manage your finances anywhere, anytime with confidence.'**
   String get brandTagline;
+
+  /// No description provided for @authSignInTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign in'**
+  String get authSignInTitle;
+
+  /// No description provided for @authSignInSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter your account details to continue.'**
+  String get authSignInSubtitle;
+
+  /// No description provided for @authSignUpTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Create account'**
+  String get authSignUpTitle;
+
+  /// No description provided for @authSignUpStepContactHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter your email or mobile number. At least one is required.'**
+  String get authSignUpStepContactHint;
+
+  /// No description provided for @authForgotTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset password'**
+  String get authForgotTitle;
+
+  /// No description provided for @authForgotSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter your account identifier to receive a reset code.'**
+  String get authForgotSubtitle;
+
+  /// No description provided for @authNoAccount.
+  ///
+  /// In en, this message translates to:
+  /// **'Do not have an account?'**
+  String get authNoAccount;
+
+  /// No description provided for @authHaveAccount.
+  ///
+  /// In en, this message translates to:
+  /// **'Already have an account?'**
+  String get authHaveAccount;
+
+  /// No description provided for @authOrDivider.
+  ///
+  /// In en, this message translates to:
+  /// **'or'**
+  String get authOrDivider;
+
+  /// No description provided for @authBackToSignIn.
+  ///
+  /// In en, this message translates to:
+  /// **'Back to sign in'**
+  String get authBackToSignIn;
+
+  /// No description provided for @authBackPreviousStep.
+  ///
+  /// In en, this message translates to:
+  /// **'Previous step'**
+  String get authBackPreviousStep;
+
+  /// No description provided for @authTrustCloud.
+  ///
+  /// In en, this message translates to:
+  /// **'Cloud access from any device'**
+  String get authTrustCloud;
+
+  /// No description provided for @authTrustEncrypted.
+  ///
+  /// In en, this message translates to:
+  /// **'Your data is encrypted'**
+  String get authTrustEncrypted;
+
+  /// No description provided for @authTrustSupport.
+  ///
+  /// In en, this message translates to:
+  /// **'Support at every step'**
+  String get authTrustSupport;
+
+  /// No description provided for @authStepContact.
+  ///
+  /// In en, this message translates to:
+  /// **'Contact'**
+  String get authStepContact;
+
+  /// No description provided for @authStepProfile.
+  ///
+  /// In en, this message translates to:
+  /// **'Profile'**
+  String get authStepProfile;
+
+  /// No description provided for @authStepSecurity.
+  ///
+  /// In en, this message translates to:
+  /// **'Security'**
+  String get authStepSecurity;
+
+  /// No description provided for @authContinue.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue'**
+  String get authContinue;
+
+  /// No description provided for @authChannelUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Unavailable'**
+  String get authChannelUnavailable;
 
   /// No description provided for @captcha.
   ///
@@ -2216,6 +2384,30 @@ abstract class AppLocalizations {
   /// **'Export error'**
   String get exportError;
 
+  /// No description provided for @exportDownloadStarted.
+  ///
+  /// In en, this message translates to:
+  /// **'Download started'**
+  String get exportDownloadStarted;
+
+  /// No description provided for @exportFileSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'File saved'**
+  String get exportFileSaved;
+
+  /// No description provided for @exportFileSavedToPath.
+  ///
+  /// In en, this message translates to:
+  /// **'File saved: {path}'**
+  String exportFileSavedToPath(String path);
+
+  /// No description provided for @exportFileShared.
+  ///
+  /// In en, this message translates to:
+  /// **'File ready to share'**
+  String get exportFileShared;
+
   /// No description provided for @export.
   ///
   /// In en, this message translates to:
@@ -2510,6 +2702,294 @@ abstract class AppLocalizations {
   /// **'1234567890'**
   String get nationalIdExample;
 
+  /// No description provided for @newBusinessIntentTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'How would you like to start?'**
+  String get newBusinessIntentTitle;
+
+  /// No description provided for @newBusinessIntentSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Create a new business in a few steps, or bring your data from a backup or the previous Hesabix.'**
+  String get newBusinessIntentSubtitle;
+
+  /// No description provided for @newBusinessCreateManuallyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Create new business'**
+  String get newBusinessCreateManuallyTitle;
+
+  /// No description provided for @newBusinessCreateManuallySubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Set up name, type, currency, and fiscal year — you can add the rest later.'**
+  String get newBusinessCreateManuallySubtitle;
+
+  /// No description provided for @newBusinessImportBackupTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore from backup'**
+  String get newBusinessImportBackupTitle;
+
+  /// No description provided for @newBusinessImportBackupSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Upload a .hbx file to recreate a business from backup.'**
+  String get newBusinessImportBackupSubtitle;
+
+  /// No description provided for @newBusinessImportLegacyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Transfer from previous Hesabix'**
+  String get newBusinessImportLegacyTitle;
+
+  /// No description provided for @newBusinessImportLegacySubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Connect to the previous version and migrate with live progress.'**
+  String get newBusinessImportLegacySubtitle;
+
+  /// No description provided for @newBusinessIdentityStepTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Business identity'**
+  String get newBusinessIdentityStepTitle;
+
+  /// No description provided for @newBusinessIdentityStepSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a name and what kind of business this is.'**
+  String get newBusinessIdentityStepSubtitle;
+
+  /// No description provided for @newBusinessFinancialStepTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Currency & fiscal year'**
+  String get newBusinessFinancialStepTitle;
+
+  /// No description provided for @newBusinessFinancialStepSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Set the default currency and your first fiscal year.'**
+  String get newBusinessFinancialStepSubtitle;
+
+  /// No description provided for @newBusinessReviewStepTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Review & create'**
+  String get newBusinessReviewStepTitle;
+
+  /// No description provided for @newBusinessReviewStepSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm the details. Optional contact and legal info can be completed later in settings.'**
+  String get newBusinessReviewStepSubtitle;
+
+  /// No description provided for @newBusinessCurrencyAndFiscal.
+  ///
+  /// In en, this message translates to:
+  /// **'Currency & fiscal year'**
+  String get newBusinessCurrencyAndFiscal;
+
+  /// No description provided for @defaultCurrency.
+  ///
+  /// In en, this message translates to:
+  /// **'Default currency'**
+  String get defaultCurrency;
+
+  /// No description provided for @extraCurrencies.
+  ///
+  /// In en, this message translates to:
+  /// **'Additional currencies'**
+  String get extraCurrencies;
+
+  /// No description provided for @selectCurrencies.
+  ///
+  /// In en, this message translates to:
+  /// **'Select currencies…'**
+  String get selectCurrencies;
+
+  /// No description provided for @searchCurrencyHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Search by name or code…'**
+  String get searchCurrencyHint;
+
+  /// No description provided for @fiscalYearTitleLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Fiscal year title'**
+  String get fiscalYearTitleLabel;
+
+  /// No description provided for @fiscalStartDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Start date'**
+  String get fiscalStartDate;
+
+  /// No description provided for @fiscalEndDate.
+  ///
+  /// In en, this message translates to:
+  /// **'End date'**
+  String get fiscalEndDate;
+
+  /// No description provided for @fiscalYearRequiredHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Title, start date, and end date are required.'**
+  String get fiscalYearRequiredHint;
+
+  /// No description provided for @fiscalYearEndingTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Fiscal year ending {date}'**
+  String fiscalYearEndingTitle(String date);
+
+  /// No description provided for @newBusinessNameHint.
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. Aria Trading Co.'**
+  String get newBusinessNameHint;
+
+  /// No description provided for @newBusinessOptionalDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'Optional details'**
+  String get newBusinessOptionalDetails;
+
+  /// No description provided for @newBusinessOptionalDetailsHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Contact, location, and legal IDs — you can skip these for now.'**
+  String get newBusinessOptionalDetailsHint;
+
+  /// No description provided for @newBusinessCompleteLaterHint.
+  ///
+  /// In en, this message translates to:
+  /// **'You can finish contact and legal details anytime from business settings.'**
+  String get newBusinessCompleteLaterHint;
+
+  /// No description provided for @newBusinessEditSection.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit'**
+  String get newBusinessEditSection;
+
+  /// No description provided for @newBusinessBackToOptions.
+  ///
+  /// In en, this message translates to:
+  /// **'Back to options'**
+  String get newBusinessBackToOptions;
+
+  /// No description provided for @newBusinessReadyToCreate.
+  ///
+  /// In en, this message translates to:
+  /// **'Everything looks good. Create your business when you are ready.'**
+  String get newBusinessReadyToCreate;
+
+  /// No description provided for @newBusinessLivePreview.
+  ///
+  /// In en, this message translates to:
+  /// **'Preview'**
+  String get newBusinessLivePreview;
+
+  /// No description provided for @newBusinessSampleDataShort.
+  ///
+  /// In en, this message translates to:
+  /// **'Include sample data'**
+  String get newBusinessSampleDataShort;
+
+  /// No description provided for @newBusinessAllOptions.
+  ///
+  /// In en, this message translates to:
+  /// **'All start options'**
+  String get newBusinessAllOptions;
+
+  /// No description provided for @verificationRequiredTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Verification required'**
+  String get verificationRequiredTitle;
+
+  /// No description provided for @verificationRequiredBody.
+  ///
+  /// In en, this message translates to:
+  /// **'To verify your email and mobile number, go to account settings.'**
+  String get verificationRequiredBody;
+
+  /// No description provided for @verificationLater.
+  ///
+  /// In en, this message translates to:
+  /// **'Later'**
+  String get verificationLater;
+
+  /// No description provided for @verificationGo.
+  ///
+  /// In en, this message translates to:
+  /// **'Go to verification'**
+  String get verificationGo;
+
+  /// No description provided for @importBackupEmptyFile.
+  ///
+  /// In en, this message translates to:
+  /// **'The selected file is empty'**
+  String get importBackupEmptyFile;
+
+  /// No description provided for @importBackupHs60Unsupported.
+  ///
+  /// In en, this message translates to:
+  /// **'The .hs60 format is not supported yet. This will be added later.'**
+  String get importBackupHs60Unsupported;
+
+  /// No description provided for @importBackupProcessing.
+  ///
+  /// In en, this message translates to:
+  /// **'Processing…'**
+  String get importBackupProcessing;
+
+  /// No description provided for @importBackupSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Business created successfully from backup'**
+  String get importBackupSuccess;
+
+  /// No description provided for @importBackupPartialSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Import finished; some documents were skipped ({count})'**
+  String importBackupPartialSuccess(int count);
+
+  /// No description provided for @importBackupFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to import backup file'**
+  String get importBackupFailed;
+
+  /// No description provided for @importBackupSelectFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to select file'**
+  String get importBackupSelectFailed;
+
+  /// No description provided for @importBackupStatusFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to check import status'**
+  String get importBackupStatusFailed;
+
+  /// No description provided for @importBackupPleaseWait.
+  ///
+  /// In en, this message translates to:
+  /// **'Please wait'**
+  String get importBackupPleaseWait;
+
+  /// No description provided for @importBackupInProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'Importing from backup…'**
+  String get importBackupInProgress;
+
   /// No description provided for @company.
   ///
   /// In en, this message translates to:
@@ -2683,6 +3163,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Support Tickets'**
   String get supportTickets;
+
+  /// No description provided for @supportTicketCopyAll.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy ticket text'**
+  String get supportTicketCopyAll;
+
+  /// No description provided for @supportTicketCopyMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy message'**
+  String get supportTicketCopyMessage;
+
+  /// No description provided for @supportTicketCopyRequest.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy initial request'**
+  String get supportTicketCopyRequest;
 
   /// No description provided for @ticketCreatedAt.
   ///
@@ -4046,6 +4544,12 @@ abstract class AppLocalizations {
   /// **'Loading authentication...'**
   String get loadingAuthentication;
 
+  /// No description provided for @loadingStepOfTotal.
+  ///
+  /// In en, this message translates to:
+  /// **'Step {current} of {total}'**
+  String loadingStepOfTotal(int current, int total);
+
   /// No description provided for @businessManagementPlatform.
   ///
   /// In en, this message translates to:
@@ -4117,6 +4621,210 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Create your first business'**
   String get createFirstBusiness;
+
+  /// No description provided for @businessesHubSearchHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Search businesses…'**
+  String get businessesHubSearchHint;
+
+  /// No description provided for @businessesHubDeletionPending.
+  ///
+  /// In en, this message translates to:
+  /// **'Pending deletion'**
+  String get businessesHubDeletionPending;
+
+  /// No description provided for @businessesHubRestore.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore'**
+  String get businessesHubRestore;
+
+  /// No description provided for @businessesHubRestoring.
+  ///
+  /// In en, this message translates to:
+  /// **'Restoring…'**
+  String get businessesHubRestoring;
+
+  /// No description provided for @businessesHubLeave.
+  ///
+  /// In en, this message translates to:
+  /// **'Leave'**
+  String get businessesHubLeave;
+
+  /// No description provided for @businessesHubDefaultCurrency.
+  ///
+  /// In en, this message translates to:
+  /// **'Default currency'**
+  String get businessesHubDefaultCurrency;
+
+  /// No description provided for @businessesHubNoSearchResults.
+  ///
+  /// In en, this message translates to:
+  /// **'No results found'**
+  String get businessesHubNoSearchResults;
+
+  /// No description provided for @businessesHubNoSearchResultsFor.
+  ///
+  /// In en, this message translates to:
+  /// **'No results for \"{query}\"'**
+  String businessesHubNoSearchResultsFor(String query);
+
+  /// No description provided for @businessesHubClearSearch.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear search'**
+  String get businessesHubClearSearch;
+
+  /// No description provided for @businessesHubActiveBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'Current'**
+  String get businessesHubActiveBadge;
+
+  /// No description provided for @businessesHubCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} businesses'**
+  String businessesHubCount(int count);
+
+  /// No description provided for @businessesHubSortTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Sort'**
+  String get businessesHubSortTooltip;
+
+  /// No description provided for @businessesHubSortRecent.
+  ///
+  /// In en, this message translates to:
+  /// **'Recently used'**
+  String get businessesHubSortRecent;
+
+  /// No description provided for @businessesHubSortName.
+  ///
+  /// In en, this message translates to:
+  /// **'Name'**
+  String get businessesHubSortName;
+
+  /// No description provided for @businessesHubSortCreated.
+  ///
+  /// In en, this message translates to:
+  /// **'Newest'**
+  String get businessesHubSortCreated;
+
+  /// No description provided for @businessesHubOpenSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Settings'**
+  String get businessesHubOpenSettings;
+
+  /// No description provided for @businessesHubEmptyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'No businesses yet'**
+  String get businessesHubEmptyTitle;
+
+  /// No description provided for @businessesHubEmptySubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Create a new business, restore a .hbx backup, or transfer from the previous Hesabix.'**
+  String get businessesHubEmptySubtitle;
+
+  /// No description provided for @businessesHubImportLegacy.
+  ///
+  /// In en, this message translates to:
+  /// **'Import from legacy version'**
+  String get businessesHubImportLegacy;
+
+  /// No description provided for @businessesHubDaysRemaining.
+  ///
+  /// In en, this message translates to:
+  /// **'{days} days until permanent deletion'**
+  String businessesHubDaysRemaining(int days);
+
+  /// No description provided for @businessesHubHoursRemaining.
+  ///
+  /// In en, this message translates to:
+  /// **'{hours} hours until permanent deletion'**
+  String businessesHubHoursRemaining(int hours);
+
+  /// No description provided for @businessesHubDeadlineExpired.
+  ///
+  /// In en, this message translates to:
+  /// **'Recovery deadline has passed'**
+  String get businessesHubDeadlineExpired;
+
+  /// No description provided for @businessesHubRestoreConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore business'**
+  String get businessesHubRestoreConfirmTitle;
+
+  /// No description provided for @businessesHubRestoreConfirmMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Are you sure you want to restore \"{name}\"?\n\nYour access will be restored after recovery.'**
+  String businessesHubRestoreConfirmMessage(String name);
+
+  /// No description provided for @businessesHubRestoreSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Business restored successfully'**
+  String get businessesHubRestoreSuccess;
+
+  /// No description provided for @businessesHubRestoreFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Restore failed: {error}'**
+  String businessesHubRestoreFailed(String error);
+
+  /// No description provided for @businessesHubLeaveConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Leave business'**
+  String get businessesHubLeaveConfirmTitle;
+
+  /// No description provided for @businessesHubLeaveConfirmMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Are you sure you want to leave \"{name}\"?\n\nYour access will be removed.'**
+  String businessesHubLeaveConfirmMessage(String name);
+
+  /// No description provided for @businessesHubLeaveFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Leave failed: {error}'**
+  String businessesHubLeaveFailed(String error);
+
+  /// No description provided for @businessesHubLoadMoreFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to load more'**
+  String get businessesHubLoadMoreFailed;
+
+  /// No description provided for @businessesHubSearchShortcut.
+  ///
+  /// In en, this message translates to:
+  /// **'Press / to search'**
+  String get businessesHubSearchShortcut;
+
+  /// No description provided for @businessesSwitcherContinue.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue'**
+  String get businessesSwitcherContinue;
+
+  /// No description provided for @businessesSwitcherSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Select a workspace to continue'**
+  String get businessesSwitcherSubtitle;
+
+  /// No description provided for @mobileLauncherChooseModeHint.
+  ///
+  /// In en, this message translates to:
+  /// **'This choice is saved. Long-press a business to change it later.'**
+  String get mobileLauncherChooseModeHint;
 
   /// No description provided for @accessDenied.
   ///
@@ -6768,6 +7476,12 @@ abstract class AppLocalizations {
   /// **'Could not leave the business. Please try again.'**
   String get apiErrorBusinessUsersLeaveFailed;
 
+  /// No description provided for @apiErrorLegacyAccproRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'To complete this action, enable or renew the Advanced Accounting add-on in your legacy Hesabix account.'**
+  String get apiErrorLegacyAccproRequired;
+
   /// No description provided for @apiErrorNoFiscalYearForDate.
   ///
   /// In en, this message translates to:
@@ -6791,6 +7505,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Document number conflict. Please try again.'**
   String get apiErrorDocumentCodeRace;
+
+  /// No description provided for @apiErrorNoActiveStoragePlan.
+  ///
+  /// In en, this message translates to:
+  /// **'This business has no active storage plan. Activate a storage plan before uploading files.'**
+  String get apiErrorNoActiveStoragePlan;
+
+  /// No description provided for @apiErrorStorageLimitExceeded.
+  ///
+  /// In en, this message translates to:
+  /// **'Not enough storage space. The file exceeds your remaining storage limit.'**
+  String get apiErrorStorageLimitExceeded;
+
+  /// No description provided for @apiErrorFileSizeExceeded.
+  ///
+  /// In en, this message translates to:
+  /// **'The file exceeds the maximum allowed size.'**
+  String get apiErrorFileSizeExceeded;
 
   /// No description provided for @byteUnitB.
   ///
@@ -7752,6 +8484,60 @@ abstract class AppLocalizations {
   /// **'Warnings'**
   String get importWarningsTitle;
 
+  /// No description provided for @productImportHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Internal IDs are not required. Copy a category path like \"Raw materials > Plastics\" from the template\'\'s Categories sheet. An empty cell on update means do not change that field.'**
+  String get productImportHint;
+
+  /// No description provided for @productImportHowToTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'How do I fill the file?'**
+  String get productImportHowToTitle;
+
+  /// No description provided for @productImportHowToBody.
+  ///
+  /// In en, this message translates to:
+  /// **'1) Download the template.\n2) Fill only the Products sheet; other sheets list existing values.\n3) Edit or delete the sample row.\n4) Run a dry-run review, then import for real.'**
+  String get productImportHowToBody;
+
+  /// No description provided for @productImportEmptyCellHint.
+  ///
+  /// In en, this message translates to:
+  /// **'On update, an empty cell keeps the current value. Write No explicitly to turn a flag off.'**
+  String get productImportEmptyCellHint;
+
+  /// No description provided for @productImportMissingCategory.
+  ///
+  /// In en, this message translates to:
+  /// **'If a category is missing'**
+  String get productImportMissingCategory;
+
+  /// No description provided for @productImportMissingAttribute.
+  ///
+  /// In en, this message translates to:
+  /// **'If an attribute is missing'**
+  String get productImportMissingAttribute;
+
+  /// No description provided for @productImportPolicyInsert.
+  ///
+  /// In en, this message translates to:
+  /// **'New products only'**
+  String get productImportPolicyInsert;
+
+  /// No description provided for @productImportPolicyUpdate.
+  ///
+  /// In en, this message translates to:
+  /// **'Update existing only'**
+  String get productImportPolicyUpdate;
+
+  /// No description provided for @productImportPolicyUpsert.
+  ///
+  /// In en, this message translates to:
+  /// **'Create new and update existing'**
+  String get productImportPolicyUpsert;
+
   /// No description provided for @personImportSuccess.
   ///
   /// In en, this message translates to:
@@ -7853,6 +8639,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Code must be numeric'**
   String get codeMustBeNumeric;
+
+  /// No description provided for @codeMinLength.
+  ///
+  /// In en, this message translates to:
+  /// **'Code must be at least 3 digits'**
+  String get codeMinLength;
+
+  /// No description provided for @codeRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Code is required'**
+  String get codeRequired;
 
   /// No description provided for @integerNoDecimal.
   ///
@@ -8913,7 +9711,7 @@ abstract class AppLocalizations {
   /// No description provided for @bulkProductPricesSheetSubtitle.
   ///
   /// In en, this message translates to:
-  /// **'Edit base prices in a table; each page is saved separately.'**
+  /// **'Edit base and list prices in a spreadsheet. Product columns stay pinned; save applies to this page only.'**
   String get bulkProductPricesSheetSubtitle;
 
   /// No description provided for @bulkProductPricesSheetSave.
@@ -9041,6 +9839,42 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'List prices'**
   String get bulkProductPricesSheetPriceListPrices;
+
+  /// No description provided for @bulkProductPricesSheetUnsavedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Unsaved price changes'**
+  String get bulkProductPricesSheetUnsavedTitle;
+
+  /// No description provided for @bulkProductPricesSheetUnsavedMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'This page has edits that are not saved yet. Discard them and continue?'**
+  String get bulkProductPricesSheetUnsavedMessage;
+
+  /// No description provided for @bulkProductPricesSheetDiscardChanges.
+  ///
+  /// In en, this message translates to:
+  /// **'Discard'**
+  String get bulkProductPricesSheetDiscardChanges;
+
+  /// No description provided for @bulkProductPricesSheetDirtyCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} unsaved'**
+  String bulkProductPricesSheetDirtyCount(int count);
+
+  /// No description provided for @bulkProductPricesSheetNoPriceLists.
+  ///
+  /// In en, this message translates to:
+  /// **'No price lists yet'**
+  String get bulkProductPricesSheetNoPriceLists;
+
+  /// No description provided for @bulkProductPricesSheetHelpTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Excel import and export help'**
+  String get bulkProductPricesSheetHelpTooltip;
 
   /// No description provided for @preview.
   ///
@@ -9300,6 +10134,66 @@ abstract class AppLocalizations {
   /// **'Selected items deleted successfully'**
   String get productsDeletedSuccessfully;
 
+  /// No description provided for @personsDeletedSuccessfully.
+  ///
+  /// In en, this message translates to:
+  /// **'Selected persons deleted successfully'**
+  String get personsDeletedSuccessfully;
+
+  /// No description provided for @bulkDeleteResultTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Bulk delete result'**
+  String get bulkDeleteResultTitle;
+
+  /// No description provided for @bulkDeleteDeletedLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Deleted:'**
+  String get bulkDeleteDeletedLabel;
+
+  /// No description provided for @bulkDeleteSkippedLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not delete:'**
+  String get bulkDeleteSkippedLabel;
+
+  /// No description provided for @bulkDeleteSkippedDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'Items that could not be deleted:'**
+  String get bulkDeleteSkippedDetails;
+
+  /// No description provided for @bulkDeletePartialSnack.
+  ///
+  /// In en, this message translates to:
+  /// **'{deleted} deleted; {skipped} could not be deleted'**
+  String bulkDeletePartialSnack(int deleted, int skipped);
+
+  /// No description provided for @bulkDeleteFailedSnack.
+  ///
+  /// In en, this message translates to:
+  /// **'No items could be deleted'**
+  String get bulkDeleteFailedSnack;
+
+  /// No description provided for @bulkDeletePartialWithSample.
+  ///
+  /// In en, this message translates to:
+  /// **'{deleted} deleted; {skipped} could not be deleted: {sample}'**
+  String bulkDeletePartialWithSample(int deleted, int skipped, String sample);
+
+  /// No description provided for @bulkDeleteFailedWithSample.
+  ///
+  /// In en, this message translates to:
+  /// **'No items could be deleted: {sample}'**
+  String bulkDeleteFailedWithSample(String sample);
+
+  /// No description provided for @bulkDeleteAndMore.
+  ///
+  /// In en, this message translates to:
+  /// **'... and {count} more'**
+  String bulkDeleteAndMore(int count);
+
   /// No description provided for @noRowsSelectedError.
   ///
   /// In en, this message translates to:
@@ -9521,6 +10415,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Invoices/Detail'**
   String get presetInvoicesDetail;
+
+  /// No description provided for @presetInvoicesReceipt.
+  ///
+  /// In en, this message translates to:
+  /// **'Invoices/Receipt printer'**
+  String get presetInvoicesReceipt;
 
   /// No description provided for @presetReceiptsPaymentsList.
   ///
@@ -10767,13 +11667,13 @@ abstract class AppLocalizations {
   /// No description provided for @reportsPeopleTransactionsTitle.
   ///
   /// In en, this message translates to:
-  /// **'People transactions'**
+  /// **'Party subsidiary ledger'**
   String get reportsPeopleTransactionsTitle;
 
   /// No description provided for @reportsPeopleTransactionsSubtitle.
   ///
   /// In en, this message translates to:
-  /// **'Detailed receipts and payments by person'**
+  /// **'Invoice line items with receipts and payments per person'**
   String get reportsPeopleTransactionsSubtitle;
 
   /// No description provided for @reportsItemMovementsTitle.
@@ -10953,7 +11853,7 @@ abstract class AppLocalizations {
   /// No description provided for @reportsTrialBalanceSubtitle.
   ///
   /// In en, this message translates to:
-  /// **'2/4/6/8-column balance'**
+  /// **'2/4/6/8-column balance at multiple levels'**
   String get reportsTrialBalanceSubtitle;
 
   /// No description provided for @reportsGeneralLedgerTitle.
@@ -11021,6 +11921,42 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Account tree structure with balances and transaction details'**
   String get reportsAccountsReviewSubtitle;
+
+  /// No description provided for @reportsBalanceSheetTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Balance sheet'**
+  String get reportsBalanceSheetTitle;
+
+  /// No description provided for @reportsBalanceSheetSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Statement of financial position — assets, liabilities and equity'**
+  String get reportsBalanceSheetSubtitle;
+
+  /// No description provided for @reportsFinancialPackageTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Financial reports package'**
+  String get reportsFinancialPackageTitle;
+
+  /// No description provided for @reportsFinancialPackageSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Trial balance, balance sheet and P&L in one view'**
+  String get reportsFinancialPackageSubtitle;
+
+  /// No description provided for @exportFinancialPackagePdf.
+  ///
+  /// In en, this message translates to:
+  /// **'Combined PDF (financial package)'**
+  String get exportFinancialPackagePdf;
+
+  /// No description provided for @exportFinancialPackageExcel.
+  ///
+  /// In en, this message translates to:
+  /// **'Combined Excel (financial package)'**
+  String get exportFinancialPackageExcel;
 
   /// No description provided for @reportsPnlCumulativeSubtitle.
   ///
@@ -12666,6 +13602,108 @@ abstract class AppLocalizations {
   /// **'Credit'**
   String get creditTabTitle;
 
+  /// No description provided for @personOpeningBalanceTabTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Opening balance'**
+  String get personOpeningBalanceTabTitle;
+
+  /// No description provided for @personOpeningBalanceSectionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Opening balance (opening document)'**
+  String get personOpeningBalanceSectionTitle;
+
+  /// No description provided for @personOpeningBalanceAmountLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Balance amount'**
+  String get personOpeningBalanceAmountLabel;
+
+  /// No description provided for @personOpeningBalanceTypeLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Balance type'**
+  String get personOpeningBalanceTypeLabel;
+
+  /// No description provided for @personOpeningBalanceTypeDebit.
+  ///
+  /// In en, this message translates to:
+  /// **'Debit (person owes the business)'**
+  String get personOpeningBalanceTypeDebit;
+
+  /// No description provided for @personOpeningBalanceTypeCredit.
+  ///
+  /// In en, this message translates to:
+  /// **'Credit (business owes the person)'**
+  String get personOpeningBalanceTypeCredit;
+
+  /// No description provided for @personOpeningBalanceHint.
+  ///
+  /// In en, this message translates to:
+  /// **'The balance is recorded in the fiscal year opening document, not on the person profile.'**
+  String get personOpeningBalanceHint;
+
+  /// No description provided for @personOpeningBalanceFiscalYear.
+  ///
+  /// In en, this message translates to:
+  /// **'Fiscal year'**
+  String get personOpeningBalanceFiscalYear;
+
+  /// No description provided for @personOpeningBalanceAmountRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Opening balance amount must be greater than zero'**
+  String get personOpeningBalanceAmountRequired;
+
+  /// No description provided for @personOpeningBalanceSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Balance recorded in the opening document'**
+  String get personOpeningBalanceSaved;
+
+  /// No description provided for @personOpeningBalanceNotEligiblePosted.
+  ///
+  /// In en, this message translates to:
+  /// **'Opening balance is finalized; initial balance cannot be set from this form.'**
+  String get personOpeningBalanceNotEligiblePosted;
+
+  /// No description provided for @personOpeningBalanceNotEligibleOtherDocs.
+  ///
+  /// In en, this message translates to:
+  /// **'Other documents exist in this fiscal year; use invoice, receipt/payment, or manual entry.'**
+  String get personOpeningBalanceNotEligibleOtherDocs;
+
+  /// No description provided for @personOpeningBalanceNotEligibleNoPermission.
+  ///
+  /// In en, this message translates to:
+  /// **'Editing opening balance permission is required to set an opening balance.'**
+  String get personOpeningBalanceNotEligibleNoPermission;
+
+  /// No description provided for @personOpeningBalanceReadonlyBanner.
+  ///
+  /// In en, this message translates to:
+  /// **'Opening balance is read-only and cannot be edited.'**
+  String get personOpeningBalanceReadonlyBanner;
+
+  /// No description provided for @personOpeningBalanceClearHint.
+  ///
+  /// In en, this message translates to:
+  /// **'To remove the opening balance line, clear the amount and save.'**
+  String get personOpeningBalanceClearHint;
+
+  /// No description provided for @personOpeningBalanceUpdated.
+  ///
+  /// In en, this message translates to:
+  /// **'Opening balance updated in the opening document'**
+  String get personOpeningBalanceUpdated;
+
+  /// No description provided for @personOpeningBalanceRemoved.
+  ///
+  /// In en, this message translates to:
+  /// **'Opening balance removed from the opening document'**
+  String get personOpeningBalanceRemoved;
+
   /// No description provided for @creditPersonPolicyTitle.
   ///
   /// In en, this message translates to:
@@ -14127,26 +15165,218 @@ abstract class AppLocalizations {
   /// No description provided for @taxHelpNoteValidateBeforeSend.
   ///
   /// In en, this message translates to:
-  /// **'Validate invoices before sending'**
+  /// **'Validate invoices before sending; validation errors prevent platform rejection'**
   String get taxHelpNoteValidateBeforeSend;
 
   /// No description provided for @taxHelpNoteFailedInDLQ.
   ///
   /// In en, this message translates to:
-  /// **'Failed invoices are stored in the error queue'**
+  /// **'Failed invoices show actionable error details on this page'**
   String get taxHelpNoteFailedInDLQ;
 
   /// No description provided for @taxHelpNoteTimeline.
   ///
   /// In en, this message translates to:
-  /// **'You can view the change history of each invoice'**
+  /// **'Submission window is usually about 12 days from issue date; do not recreate old invoices unless the tax authority extends the window'**
   String get taxHelpNoteTimeline;
 
   /// No description provided for @taxHelpNoteExport.
   ///
   /// In en, this message translates to:
-  /// **'You can export sending reports'**
+  /// **'Each product VAT rate must match its stuffid code (e.g. 10%, not 0 unless exempt)'**
   String get taxHelpNoteExport;
+
+  /// No description provided for @taxHelpNoteType1vs2.
+  ///
+  /// In en, this message translates to:
+  /// **'Type 1 needs full buyer identity (valid economic code, or natural national ID plus postal code); otherwise the invoice is sent automatically as type 2 without buyer fields'**
+  String get taxHelpNoteType1vs2;
+
+  /// No description provided for @taxHelpNoteConnection.
+  ///
+  /// In en, this message translates to:
+  /// **'If connection is down, check Moadian settings and run a connection test first'**
+  String get taxHelpNoteConnection;
+
+  /// No description provided for @taxKpiAll.
+  ///
+  /// In en, this message translates to:
+  /// **'All'**
+  String get taxKpiAll;
+
+  /// No description provided for @taxKpiQueue.
+  ///
+  /// In en, this message translates to:
+  /// **'Ready to send'**
+  String get taxKpiQueue;
+
+  /// No description provided for @taxKpiPending.
+  ///
+  /// In en, this message translates to:
+  /// **'Queued'**
+  String get taxKpiPending;
+
+  /// No description provided for @taxKpiFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed'**
+  String get taxKpiFailed;
+
+  /// No description provided for @taxKpiSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Submitted'**
+  String get taxKpiSuccess;
+
+  /// No description provided for @taxHealthChecking.
+  ///
+  /// In en, this message translates to:
+  /// **'Checking connection…'**
+  String get taxHealthChecking;
+
+  /// No description provided for @taxHealthConnected.
+  ///
+  /// In en, this message translates to:
+  /// **'Moadian connected'**
+  String get taxHealthConnected;
+
+  /// No description provided for @taxHealthDisconnected.
+  ///
+  /// In en, this message translates to:
+  /// **'Moadian disconnected'**
+  String get taxHealthDisconnected;
+
+  /// No description provided for @taxHealthUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Connection status'**
+  String get taxHealthUnknown;
+
+  /// No description provided for @taxSettingsOpen.
+  ///
+  /// In en, this message translates to:
+  /// **'Moadian settings'**
+  String get taxSettingsOpen;
+
+  /// No description provided for @taxEmptyStateTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Workspace is empty'**
+  String get taxEmptyStateTitle;
+
+  /// No description provided for @taxEmptyStateHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Add sales invoices from the invoice list to this workspace, then review and submit here.'**
+  String get taxEmptyStateHint;
+
+  /// No description provided for @taxEmptyStateGoInvoices.
+  ///
+  /// In en, this message translates to:
+  /// **'Go to invoices'**
+  String get taxEmptyStateGoInvoices;
+
+  /// No description provided for @taxStickySelected.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} selected'**
+  String taxStickySelected(int count);
+
+  /// No description provided for @taxStickySend.
+  ///
+  /// In en, this message translates to:
+  /// **'Send'**
+  String get taxStickySend;
+
+  /// No description provided for @taxFixNow.
+  ///
+  /// In en, this message translates to:
+  /// **'Fix now'**
+  String get taxFixNow;
+
+  /// No description provided for @taxErrorPlaybookWhat.
+  ///
+  /// In en, this message translates to:
+  /// **'What does this mean?'**
+  String get taxErrorPlaybookWhat;
+
+  /// No description provided for @taxErrorPlaybookHow.
+  ///
+  /// In en, this message translates to:
+  /// **'What should you do?'**
+  String get taxErrorPlaybookHow;
+
+  /// No description provided for @taxPreflightTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Preflight check'**
+  String get taxPreflightTitle;
+
+  /// No description provided for @taxPreflightChecking.
+  ///
+  /// In en, this message translates to:
+  /// **'Validating invoices…'**
+  String get taxPreflightChecking;
+
+  /// No description provided for @taxPreflightOk.
+  ///
+  /// In en, this message translates to:
+  /// **'All selected invoices are ready to send.'**
+  String get taxPreflightOk;
+
+  /// No description provided for @taxPreflightIssues.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} invoices have issues and will not be sent until fixed.'**
+  String taxPreflightIssues(int count);
+
+  /// No description provided for @taxPreflightContinueValid.
+  ///
+  /// In en, this message translates to:
+  /// **'Send valid ones ({count})'**
+  String taxPreflightContinueValid(int count);
+
+  /// No description provided for @taxPreflightCancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get taxPreflightCancel;
+
+  /// No description provided for @taxMobileQuickActions.
+  ///
+  /// In en, this message translates to:
+  /// **'Quick actions'**
+  String get taxMobileQuickActions;
+
+  /// No description provided for @taxOpenInvoice.
+  ///
+  /// In en, this message translates to:
+  /// **'Open invoice'**
+  String get taxOpenInvoice;
+
+  /// No description provided for @taxStatusCancelled.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancelled'**
+  String get taxStatusCancelled;
+
+  /// No description provided for @taxHealthDetailsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Moadian connection status'**
+  String get taxHealthDetailsTitle;
+
+  /// No description provided for @taxHealthGoSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Open settings'**
+  String get taxHealthGoSettings;
+
+  /// No description provided for @taxHealthRetry.
+  ///
+  /// In en, this message translates to:
+  /// **'Retry test'**
+  String get taxHealthRetry;
 
   /// No description provided for @taxOperationSuccess.
   ///
@@ -14909,6 +16139,42 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Support tickets are temporarily unavailable.'**
   String get supportTicketsUnavailableBody;
+
+  /// No description provided for @legacyApiImportSectionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Import from previous Hesabix'**
+  String get legacyApiImportSectionTitle;
+
+  /// No description provided for @legacyApiImportAllowUsersLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow users to import from previous Hesabix'**
+  String get legacyApiImportAllowUsersLabel;
+
+  /// No description provided for @legacyApiImportAllowUsersDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'When disabled, the import option is hidden on the new-business page and related API calls are blocked.'**
+  String get legacyApiImportAllowUsersDescription;
+
+  /// No description provided for @legacyApiImportDisabledNoticeLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Notice text for users (when disabled)'**
+  String get legacyApiImportDisabledNoticeLabel;
+
+  /// No description provided for @legacyApiImportDisabledNoticeHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Leave blank to use the built-in default message.'**
+  String get legacyApiImportDisabledNoticeHint;
+
+  /// No description provided for @legacyApiImportUnavailableBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Import from previous Hesabix is temporarily unavailable.'**
+  String get legacyApiImportUnavailableBody;
 
   /// No description provided for @unlimited.
   ///
@@ -18204,6 +19470,30 @@ abstract class AppLocalizations {
   /// **'No products in this category'**
   String get categoryTreeNoProductsInCategory;
 
+  /// No description provided for @categoryTreeIncludeSubcategoriesLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Include subcategories'**
+  String get categoryTreeIncludeSubcategoriesLabel;
+
+  /// No description provided for @categoryTreeDirectMembersOnlyLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Direct members only'**
+  String get categoryTreeDirectMembersOnlyLabel;
+
+  /// No description provided for @categoryTreeIncludesSubcategoriesHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Includes products from subcategories'**
+  String get categoryTreeIncludesSubcategoriesHint;
+
+  /// No description provided for @categoryTreeDirectMembersOnlyHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Only products in this category'**
+  String get categoryTreeDirectMembersOnlyHint;
+
   /// No description provided for @categoryDescriptionHint.
   ///
   /// In en, this message translates to:
@@ -18486,6 +19776,768 @@ abstract class AppLocalizations {
   /// **'Text input is disabled during an active voice session.'**
   String get aiVoiceTextBlockedWhileActive;
 
+  /// No description provided for @aiChatApprovalNeedsOpenSession.
+  ///
+  /// In en, this message translates to:
+  /// **'To approve this action, open the same conversation where the assistant asked for confirmation.'**
+  String get aiChatApprovalNeedsOpenSession;
+
+  /// No description provided for @aiChatWriteApprovalNotFound.
+  ///
+  /// In en, this message translates to:
+  /// **'No active conversation or pending write was found. Open the conversation where the assistant requested approval.'**
+  String get aiChatWriteApprovalNotFound;
+
+  /// No description provided for @aiChatSendFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not send the message: {error}'**
+  String aiChatSendFailed(String error);
+
+  /// No description provided for @aiChatComposerHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Message the assistant…'**
+  String get aiChatComposerHint;
+
+  /// No description provided for @aiChatComposerHintDesktop.
+  ///
+  /// In en, this message translates to:
+  /// **'Message the assistant… (Enter to send, Shift+Enter for a new line)'**
+  String get aiChatComposerHintDesktop;
+
+  /// No description provided for @aiChatComposerSemanticsLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Assistant message field'**
+  String get aiChatComposerSemanticsLabel;
+
+  /// No description provided for @aiChatStopGenerating.
+  ///
+  /// In en, this message translates to:
+  /// **'Stop generating'**
+  String get aiChatStopGenerating;
+
+  /// No description provided for @aiChatAttachFile.
+  ///
+  /// In en, this message translates to:
+  /// **'Attach file'**
+  String get aiChatAttachFile;
+
+  /// No description provided for @aiChatSendMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Send message'**
+  String get aiChatSendMessage;
+
+  /// No description provided for @aiChatSendingMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Sending message'**
+  String get aiChatSendingMessage;
+
+  /// No description provided for @aiChatSendDisabledHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Write a message first'**
+  String get aiChatSendDisabledHint;
+
+  /// No description provided for @aiChatAssistantTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'AI assistant'**
+  String get aiChatAssistantTitle;
+
+  /// No description provided for @aiChatConversationFallbackTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Chat'**
+  String get aiChatConversationFallbackTitle;
+
+  /// No description provided for @aiChatHistoryTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Conversations'**
+  String get aiChatHistoryTooltip;
+
+  /// No description provided for @aiChatNewConversation.
+  ///
+  /// In en, this message translates to:
+  /// **'New chat'**
+  String get aiChatNewConversation;
+
+  /// No description provided for @aiChatStop.
+  ///
+  /// In en, this message translates to:
+  /// **'Stop'**
+  String get aiChatStop;
+
+  /// No description provided for @aiChatResponding.
+  ///
+  /// In en, this message translates to:
+  /// **'Responding…'**
+  String get aiChatResponding;
+
+  /// No description provided for @aiChatClose.
+  ///
+  /// In en, this message translates to:
+  /// **'Close'**
+  String get aiChatClose;
+
+  /// No description provided for @aiChatEmptyAssistantReply.
+  ///
+  /// In en, this message translates to:
+  /// **'No reply was received from the assistant. This is often an AI service or account-credit issue.'**
+  String get aiChatEmptyAssistantReply;
+
+  /// No description provided for @aiChatCopied.
+  ///
+  /// In en, this message translates to:
+  /// **'Copied'**
+  String get aiChatCopied;
+
+  /// No description provided for @aiChatGenerationStopped.
+  ///
+  /// In en, this message translates to:
+  /// **'Response generation stopped'**
+  String get aiChatGenerationStopped;
+
+  /// No description provided for @aiChatFeedbackSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Feedback saved'**
+  String get aiChatFeedbackSaved;
+
+  /// No description provided for @aiChatFeedbackThanks.
+  ///
+  /// In en, this message translates to:
+  /// **'Thanks for the positive feedback'**
+  String get aiChatFeedbackThanks;
+
+  /// No description provided for @aiChatFeedbackFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not save feedback: {error}'**
+  String aiChatFeedbackFailed(String error);
+
+  /// No description provided for @aiChatSessionsLoadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load conversations: {error}'**
+  String aiChatSessionsLoadFailed(String error);
+
+  /// No description provided for @aiChatStartConversationFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not start the conversation: {error}'**
+  String aiChatStartConversationFailed(String error);
+
+  /// No description provided for @aiChatMessagesLoadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load messages: {error}'**
+  String aiChatMessagesLoadFailed(String error);
+
+  /// No description provided for @aiChatEmptyFile.
+  ///
+  /// In en, this message translates to:
+  /// **'The file is empty or could not be read'**
+  String get aiChatEmptyFile;
+
+  /// No description provided for @aiChatAttachmentAdded.
+  ///
+  /// In en, this message translates to:
+  /// **'Attachment added'**
+  String get aiChatAttachmentAdded;
+
+  /// No description provided for @aiChatAttachmentUploadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not upload the attachment: {error}'**
+  String aiChatAttachmentUploadFailed(String error);
+
+  /// No description provided for @aiChatConversationDeleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Conversation deleted'**
+  String get aiChatConversationDeleted;
+
+  /// No description provided for @aiChatDeleteConversationFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not delete the conversation: {error}'**
+  String aiChatDeleteConversationFailed(String error);
+
+  /// No description provided for @aiChatMessageUpdated.
+  ///
+  /// In en, this message translates to:
+  /// **'Message updated'**
+  String get aiChatMessageUpdated;
+
+  /// No description provided for @aiChatEditFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not edit: {error}'**
+  String aiChatEditFailed(String error);
+
+  /// No description provided for @aiChatForkOpened.
+  ///
+  /// In en, this message translates to:
+  /// **'Conversation branch opened'**
+  String get aiChatForkOpened;
+
+  /// No description provided for @aiChatForkFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not branch the conversation: {error}'**
+  String aiChatForkFailed(String error);
+
+  /// No description provided for @aiChatExportEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'The conversation is empty'**
+  String get aiChatExportEmpty;
+
+  /// No description provided for @aiChatExportFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not export: {error}'**
+  String aiChatExportFailed(String error);
+
+  /// No description provided for @aiChatRegenerateNeedsAssistant.
+  ///
+  /// In en, this message translates to:
+  /// **'The last message must be from the assistant'**
+  String get aiChatRegenerateNeedsAssistant;
+
+  /// No description provided for @aiChatRegenerateFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not regenerate: {error}'**
+  String aiChatRegenerateFailed(String error);
+
+  /// No description provided for @aiChatActionFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'{label} failed: {error}'**
+  String aiChatActionFailed(String label, String error);
+
+  /// No description provided for @aiChatErrorLabelReply.
+  ///
+  /// In en, this message translates to:
+  /// **'Reply'**
+  String get aiChatErrorLabelReply;
+
+  /// No description provided for @aiChatErrorLabelEdit.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit'**
+  String get aiChatErrorLabelEdit;
+
+  /// No description provided for @aiChatErrorLabelRegenerate.
+  ///
+  /// In en, this message translates to:
+  /// **'Regenerate'**
+  String get aiChatErrorLabelRegenerate;
+
+  /// No description provided for @aiChatErrorLabelSend.
+  ///
+  /// In en, this message translates to:
+  /// **'Send message'**
+  String get aiChatErrorLabelSend;
+
+  /// No description provided for @aiChatUnknownError.
+  ///
+  /// In en, this message translates to:
+  /// **'Unknown error'**
+  String get aiChatUnknownError;
+
+  /// No description provided for @aiChatVoiceStartFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not start voice chat: {error}'**
+  String aiChatVoiceStartFailed(String error);
+
+  /// No description provided for @aiChatVoiceTimeout.
+  ///
+  /// In en, this message translates to:
+  /// **'The voice session closed after a timeout. Please try again.'**
+  String get aiChatVoiceTimeout;
+
+  /// No description provided for @aiChatVoiceSttFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Speech recognition failed: {error}'**
+  String aiChatVoiceSttFailed(String error);
+
+  /// No description provided for @aiChatVoiceEmptyTranscript.
+  ///
+  /// In en, this message translates to:
+  /// **'No speech was recognized. Please try again.'**
+  String get aiChatVoiceEmptyTranscript;
+
+  /// No description provided for @aiChatVoiceForbidden.
+  ///
+  /// In en, this message translates to:
+  /// **'You do not have access to this business.'**
+  String get aiChatVoiceForbidden;
+
+  /// No description provided for @aiChatVoiceError.
+  ///
+  /// In en, this message translates to:
+  /// **'Error: {error}'**
+  String aiChatVoiceError(String error);
+
+  /// No description provided for @aiVoiceFeedbackTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'AI voice quality'**
+  String get aiVoiceFeedbackTitle;
+
+  /// No description provided for @aiVoiceFeedbackBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Rate the quality of the spoken reply so it can improve over time.'**
+  String get aiVoiceFeedbackBody;
+
+  /// No description provided for @aiVoiceFeedbackCommentLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Comment (optional)'**
+  String get aiVoiceFeedbackCommentLabel;
+
+  /// No description provided for @aiVoiceFeedbackLater.
+  ///
+  /// In en, this message translates to:
+  /// **'Later'**
+  String get aiVoiceFeedbackLater;
+
+  /// No description provided for @aiVoiceFeedbackSubmit.
+  ///
+  /// In en, this message translates to:
+  /// **'Submit'**
+  String get aiVoiceFeedbackSubmit;
+
+  /// No description provided for @aiVoiceSettingsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Settings'**
+  String get aiVoiceSettingsTitle;
+
+  /// No description provided for @aiVoiceImproveQualityTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Improve voice quality'**
+  String get aiVoiceImproveQualityTitle;
+
+  /// No description provided for @aiVoiceImproveQualitySubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Help improve the voice experience by sending anonymous data.'**
+  String get aiVoiceImproveQualitySubtitle;
+
+  /// No description provided for @aiMemoryTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Assistant memory'**
+  String get aiMemoryTitle;
+
+  /// No description provided for @aiMemoryIntro.
+  ///
+  /// In en, this message translates to:
+  /// **'The assistant keeps lasting context between chats. Standing policies are yours; identity and preferences are learned quietly. Live numbers always come from your books.'**
+  String get aiMemoryIntro;
+
+  /// No description provided for @aiMemoryUpdatedAt.
+  ///
+  /// In en, this message translates to:
+  /// **'Last updated: {when}'**
+  String aiMemoryUpdatedAt(String when);
+
+  /// No description provided for @aiMemoryInstructionsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Standing instructions'**
+  String get aiMemoryInstructionsTitle;
+
+  /// No description provided for @aiMemoryInstructionsHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Things the assistant should always keep in mind.'**
+  String get aiMemoryInstructionsHint;
+
+  /// No description provided for @aiMemoryInstructionsExample.
+  ///
+  /// In en, this message translates to:
+  /// **'Example: speak amounts in toman; keep reports short and tabular…'**
+  String get aiMemoryInstructionsExample;
+
+  /// No description provided for @aiMemoryMaxChars.
+  ///
+  /// In en, this message translates to:
+  /// **'Maximum {count} characters'**
+  String aiMemoryMaxChars(int count);
+
+  /// No description provided for @aiMemorySaveInstructions.
+  ///
+  /// In en, this message translates to:
+  /// **'Save instructions'**
+  String get aiMemorySaveInstructions;
+
+  /// No description provided for @aiMemoryLearnedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'What I have learned'**
+  String get aiMemoryLearnedTitle;
+
+  /// No description provided for @aiMemoryLearnedIntro.
+  ///
+  /// In en, this message translates to:
+  /// **'Learned across conversations. Edit or delete anything — you own this memory.'**
+  String get aiMemoryLearnedIntro;
+
+  /// No description provided for @aiMemoryLearnedEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing lasting has been learned yet. After a few chats, names, preferences and work context appear here.'**
+  String get aiMemoryLearnedEmpty;
+
+  /// No description provided for @aiMemoryClearAll.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear all'**
+  String get aiMemoryClearAll;
+
+  /// No description provided for @aiMemoryLoadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load memory: {error}'**
+  String aiMemoryLoadFailed(String error);
+
+  /// No description provided for @aiMemorySaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Instructions saved'**
+  String get aiMemorySaved;
+
+  /// No description provided for @aiMemoryCleared.
+  ///
+  /// In en, this message translates to:
+  /// **'Memory cleared'**
+  String get aiMemoryCleared;
+
+  /// No description provided for @aiMemoryItemUpdated.
+  ///
+  /// In en, this message translates to:
+  /// **'Item updated'**
+  String get aiMemoryItemUpdated;
+
+  /// No description provided for @aiMemoryDeleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Deleted'**
+  String get aiMemoryDeleted;
+
+  /// No description provided for @aiMemoryError.
+  ///
+  /// In en, this message translates to:
+  /// **'Error: {error}'**
+  String aiMemoryError(String error);
+
+  /// No description provided for @aiMemoryClearTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear memory'**
+  String get aiMemoryClearTitle;
+
+  /// No description provided for @aiMemoryClearBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Standing instructions and everything the assistant has learned will be removed. Continue?'**
+  String get aiMemoryClearBody;
+
+  /// No description provided for @aiMemoryClearConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear'**
+  String get aiMemoryClearConfirm;
+
+  /// No description provided for @aiMemoryEditTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit memory'**
+  String get aiMemoryEditTitle;
+
+  /// No description provided for @aiMemoryEditHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Learned fact text'**
+  String get aiMemoryEditHint;
+
+  /// No description provided for @aiMemoryDeleteItemTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete this item?'**
+  String get aiMemoryDeleteItemTitle;
+
+  /// No description provided for @aiMemorySourceAuto.
+  ///
+  /// In en, this message translates to:
+  /// **'Automatic learning'**
+  String get aiMemorySourceAuto;
+
+  /// No description provided for @aiMemorySourceAssistant.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved by the assistant'**
+  String get aiMemorySourceAssistant;
+
+  /// No description provided for @aiMemorySourceFeedback.
+  ///
+  /// In en, this message translates to:
+  /// **'From your feedback'**
+  String get aiMemorySourceFeedback;
+
+  /// No description provided for @aiMemorySourceUser.
+  ///
+  /// In en, this message translates to:
+  /// **'Edited by you'**
+  String get aiMemorySourceUser;
+
+  /// No description provided for @aiMemorySourceProfile.
+  ///
+  /// In en, this message translates to:
+  /// **'From your account'**
+  String get aiMemorySourceProfile;
+
+  /// No description provided for @aiMemorySourceCurator.
+  ///
+  /// In en, this message translates to:
+  /// **'Remembered from chat'**
+  String get aiMemorySourceCurator;
+
+  /// No description provided for @aiMemoryKindIdentity.
+  ///
+  /// In en, this message translates to:
+  /// **'Identity'**
+  String get aiMemoryKindIdentity;
+
+  /// No description provided for @aiMemoryKindPreference.
+  ///
+  /// In en, this message translates to:
+  /// **'Preference'**
+  String get aiMemoryKindPreference;
+
+  /// No description provided for @aiMemoryKindContext.
+  ///
+  /// In en, this message translates to:
+  /// **'Context'**
+  String get aiMemoryKindContext;
+
+  /// No description provided for @aiMemoryKindGoal.
+  ///
+  /// In en, this message translates to:
+  /// **'Goal'**
+  String get aiMemoryKindGoal;
+
+  /// No description provided for @aiMemoryKindConstraint.
+  ///
+  /// In en, this message translates to:
+  /// **'Constraint'**
+  String get aiMemoryKindConstraint;
+
+  /// No description provided for @aiMemoryLearnedCount.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} remembered items'**
+  String aiMemoryLearnedCount(int count);
+
+  /// No description provided for @aiMemoryPinToMemory.
+  ///
+  /// In en, this message translates to:
+  /// **'Remember this'**
+  String get aiMemoryPinToMemory;
+
+  /// No description provided for @aiMemoryPinned.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved to assistant memory'**
+  String get aiMemoryPinned;
+
+  /// No description provided for @aiMemoryPoliciesCardTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Your policies'**
+  String get aiMemoryPoliciesCardTitle;
+
+  /// No description provided for @aiKnowledgeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Business knowledge base'**
+  String get aiKnowledgeTitle;
+
+  /// No description provided for @aiKnowledgeIntro.
+  ///
+  /// In en, this message translates to:
+  /// **'Related documents are searched and added to context when answering your question.'**
+  String get aiKnowledgeIntro;
+
+  /// No description provided for @aiKnowledgeNewDocument.
+  ///
+  /// In en, this message translates to:
+  /// **'New document'**
+  String get aiKnowledgeNewDocument;
+
+  /// No description provided for @aiKnowledgeTitleLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Title'**
+  String get aiKnowledgeTitleLabel;
+
+  /// No description provided for @aiKnowledgeBodyLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Body'**
+  String get aiKnowledgeBodyLabel;
+
+  /// No description provided for @aiKnowledgeUntitled.
+  ///
+  /// In en, this message translates to:
+  /// **'Untitled'**
+  String get aiKnowledgeUntitled;
+
+  /// No description provided for @aiKnowledgeAdded.
+  ///
+  /// In en, this message translates to:
+  /// **'Document added'**
+  String get aiKnowledgeAdded;
+
+  /// No description provided for @aiKnowledgeUploaded.
+  ///
+  /// In en, this message translates to:
+  /// **'File uploaded'**
+  String get aiKnowledgeUploaded;
+
+  /// No description provided for @aiKnowledgeReindexResult.
+  ///
+  /// In en, this message translates to:
+  /// **'Reindexed: {documents} documents, {chunks} chunks'**
+  String aiKnowledgeReindexResult(Object documents, Object chunks);
+
+  /// No description provided for @aiKnowledgeEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No documents have been added yet.'**
+  String get aiKnowledgeEmpty;
+
+  /// No description provided for @aiKnowledgeText.
+  ///
+  /// In en, this message translates to:
+  /// **'Text'**
+  String get aiKnowledgeText;
+
+  /// No description provided for @aiKnowledgeFile.
+  ///
+  /// In en, this message translates to:
+  /// **'File'**
+  String get aiKnowledgeFile;
+
+  /// No description provided for @aiKnowledgeReindex.
+  ///
+  /// In en, this message translates to:
+  /// **'Reindex'**
+  String get aiKnowledgeReindex;
+
+  /// No description provided for @aiKnowledgeDocSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'{chars} characters · {status}'**
+  String aiKnowledgeDocSubtitle(int chars, String status);
+
+  /// No description provided for @aiKnowledgeSemantic.
+  ///
+  /// In en, this message translates to:
+  /// **'Semantic search'**
+  String get aiKnowledgeSemantic;
+
+  /// No description provided for @aiKnowledgeSemanticChunks.
+  ///
+  /// In en, this message translates to:
+  /// **'Semantic search ({chunks} chunks)'**
+  String aiKnowledgeSemanticChunks(int chunks);
+
+  /// No description provided for @aiKnowledgeIndexFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Index failed — keyword search'**
+  String get aiKnowledgeIndexFailed;
+
+  /// No description provided for @aiKnowledgeKeyword.
+  ///
+  /// In en, this message translates to:
+  /// **'Keyword search'**
+  String get aiKnowledgeKeyword;
+
+  /// No description provided for @aiKnowledgeKeywordChunks.
+  ///
+  /// In en, this message translates to:
+  /// **'Keyword search ({chunks} chunks)'**
+  String aiKnowledgeKeywordChunks(int chunks);
+
+  /// No description provided for @aiKnowledgeLoadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Error: {error}'**
+  String aiKnowledgeLoadFailed(String error);
+
+  /// No description provided for @aiChatApprovalTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm action'**
+  String get aiChatApprovalTitle;
+
+  /// No description provided for @aiChatApprovalDismiss.
+  ///
+  /// In en, this message translates to:
+  /// **'Reject'**
+  String get aiChatApprovalDismiss;
+
+  /// No description provided for @aiChatApprovalConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Approve and run'**
+  String get aiChatApprovalConfirm;
+
+  /// No description provided for @aiChatApprovalSending.
+  ///
+  /// In en, this message translates to:
+  /// **'Sending…'**
+  String get aiChatApprovalSending;
+
+  /// No description provided for @aiChatApprovalBannerLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Write approval required'**
+  String get aiChatApprovalBannerLabel;
+
+  /// No description provided for @aiChatApprovalSecurityNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Only the operations listed here will run; parameters cannot change without another confirmation.'**
+  String get aiChatApprovalSecurityNote;
+
+  /// No description provided for @aiChatApprovalBodySingle.
+  ///
+  /// In en, this message translates to:
+  /// **'The assistant wants to change business data.'**
+  String get aiChatApprovalBodySingle;
+
+  /// No description provided for @aiChatApprovalBodyMultiple.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} operations are waiting for your approval.'**
+  String aiChatApprovalBodyMultiple(int count);
+
   /// No description provided for @aiVoiceDummyTtsWarning.
   ///
   /// In en, this message translates to:
@@ -18516,6 +20568,288 @@ abstract class AppLocalizations {
   /// **'Start voice chat'**
   String get aiVoiceStartMic;
 
+  /// No description provided for @aiVoiceStartCall.
+  ///
+  /// In en, this message translates to:
+  /// **'Start voice call'**
+  String get aiVoiceStartCall;
+
+  /// No description provided for @aiVoiceDictate.
+  ///
+  /// In en, this message translates to:
+  /// **'Dictate'**
+  String get aiVoiceDictate;
+
+  /// No description provided for @aiVoiceDictateStop.
+  ///
+  /// In en, this message translates to:
+  /// **'Stop dictation'**
+  String get aiVoiceDictateStop;
+
+  /// No description provided for @aiVoiceReadAloud.
+  ///
+  /// In en, this message translates to:
+  /// **'Read aloud'**
+  String get aiVoiceReadAloud;
+
+  /// No description provided for @aiVoiceStopReading.
+  ///
+  /// In en, this message translates to:
+  /// **'Stop reading'**
+  String get aiVoiceStopReading;
+
+  /// No description provided for @aiVoicePickStt.
+  ///
+  /// In en, this message translates to:
+  /// **'Speech recognition'**
+  String get aiVoicePickStt;
+
+  /// No description provided for @aiVoicePickTts.
+  ///
+  /// In en, this message translates to:
+  /// **'Voice'**
+  String get aiVoicePickTts;
+
+  /// No description provided for @aiVoiceCloudDisabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Cloud audio is disabled for this business.'**
+  String get aiVoiceCloudDisabled;
+
+  /// No description provided for @aiVoiceDictationFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not transcribe audio: {error}'**
+  String aiVoiceDictationFailed(String error);
+
+  /// No description provided for @aiVoiceListeningDictate.
+  ///
+  /// In en, this message translates to:
+  /// **'Listening… tap to insert text'**
+  String get aiVoiceListeningDictate;
+
+  /// No description provided for @settingsAIVoiceModels.
+  ///
+  /// In en, this message translates to:
+  /// **'AI Voice models'**
+  String get settingsAIVoiceModels;
+
+  /// No description provided for @settingsAIVoiceModelsDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage STT/TTS engines (local and API providers)'**
+  String get settingsAIVoiceModelsDescription;
+
+  /// No description provided for @aiVoiceAdminEdit.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit voice model'**
+  String get aiVoiceAdminEdit;
+
+  /// No description provided for @aiVoiceAdminNew.
+  ///
+  /// In en, this message translates to:
+  /// **'New voice model'**
+  String get aiVoiceAdminNew;
+
+  /// No description provided for @aiVoiceAdminCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Code'**
+  String get aiVoiceAdminCode;
+
+  /// No description provided for @aiVoiceAdminName.
+  ///
+  /// In en, this message translates to:
+  /// **'Display name'**
+  String get aiVoiceAdminName;
+
+  /// No description provided for @aiVoiceAdminKind.
+  ///
+  /// In en, this message translates to:
+  /// **'Kind'**
+  String get aiVoiceAdminKind;
+
+  /// No description provided for @aiVoiceAdminProvider.
+  ///
+  /// In en, this message translates to:
+  /// **'Provider'**
+  String get aiVoiceAdminProvider;
+
+  /// No description provided for @aiVoiceAdminModelId.
+  ///
+  /// In en, this message translates to:
+  /// **'API / local model id'**
+  String get aiVoiceAdminModelId;
+
+  /// No description provided for @aiVoiceAdminApiBaseUrl.
+  ///
+  /// In en, this message translates to:
+  /// **'API base URL'**
+  String get aiVoiceAdminApiBaseUrl;
+
+  /// No description provided for @aiVoiceAdminApiKey.
+  ///
+  /// In en, this message translates to:
+  /// **'API key'**
+  String get aiVoiceAdminApiKey;
+
+  /// No description provided for @aiVoiceAdminApiKeyHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Leave empty to keep the current key. Saved in provider credentials, not in the model row.'**
+  String get aiVoiceAdminApiKeyHint;
+
+  /// No description provided for @aiVoiceAdminAudioEndpoint.
+  ///
+  /// In en, this message translates to:
+  /// **'Speech API'**
+  String get aiVoiceAdminAudioEndpoint;
+
+  /// No description provided for @aiVoiceAdminAudioAuto.
+  ///
+  /// In en, this message translates to:
+  /// **'Auto (transcriptions, then translations)'**
+  String get aiVoiceAdminAudioAuto;
+
+  /// No description provided for @aiVoiceAdminAudioTranscriptions.
+  ///
+  /// In en, this message translates to:
+  /// **'transcriptions (keep language)'**
+  String get aiVoiceAdminAudioTranscriptions;
+
+  /// No description provided for @aiVoiceAdminAudioTranslations.
+  ///
+  /// In en, this message translates to:
+  /// **'translations (ParsPack / OpenAI sample)'**
+  String get aiVoiceAdminAudioTranslations;
+
+  /// No description provided for @aiVoiceAdminCloudHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Cloud STT/TTS need a base URL and API key. Local Whisper does not.'**
+  String get aiVoiceAdminCloudHint;
+
+  /// No description provided for @aiVoiceAdminVoiceId.
+  ///
+  /// In en, this message translates to:
+  /// **'Voice id'**
+  String get aiVoiceAdminVoiceId;
+
+  /// No description provided for @aiVoiceAdminDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Description'**
+  String get aiVoiceAdminDescription;
+
+  /// No description provided for @aiVoiceAdminDefault.
+  ///
+  /// In en, this message translates to:
+  /// **'Default'**
+  String get aiVoiceAdminDefault;
+
+  /// No description provided for @aiVoiceAdminActive.
+  ///
+  /// In en, this message translates to:
+  /// **'Active'**
+  String get aiVoiceAdminActive;
+
+  /// No description provided for @aiVoiceAdminCancel.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get aiVoiceAdminCancel;
+
+  /// No description provided for @aiVoiceAdminSave.
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get aiVoiceAdminSave;
+
+  /// No description provided for @aiVoiceAdminCreate.
+  ///
+  /// In en, this message translates to:
+  /// **'Create'**
+  String get aiVoiceAdminCreate;
+
+  /// No description provided for @aiVoiceAdminSeed.
+  ///
+  /// In en, this message translates to:
+  /// **'Seed from server settings'**
+  String get aiVoiceAdminSeed;
+
+  /// No description provided for @aiVoiceAdminEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No voice models yet'**
+  String get aiVoiceAdminEmpty;
+
+  /// No description provided for @aiVoiceAdminAllowCloud.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow sending audio to cloud providers'**
+  String get aiVoiceAdminAllowCloud;
+
+  /// No description provided for @aiVoiceAdminAllowCloudHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Businesses must still opt in. Local Whisper/Piper stay available.'**
+  String get aiVoiceAdminAllowCloudHint;
+
+  /// No description provided for @aiVoiceAdminTest.
+  ///
+  /// In en, this message translates to:
+  /// **'Test'**
+  String get aiVoiceAdminTest;
+
+  /// No description provided for @aiVoiceAdminTestOk.
+  ///
+  /// In en, this message translates to:
+  /// **'Voice adapter test succeeded'**
+  String get aiVoiceAdminTestOk;
+
+  /// No description provided for @aiVoiceAdminRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Required'**
+  String get aiVoiceAdminRequired;
+
+  /// No description provided for @aiVoiceKindStt.
+  ///
+  /// In en, this message translates to:
+  /// **'Speech to text'**
+  String get aiVoiceKindStt;
+
+  /// No description provided for @aiVoiceKindTts.
+  ///
+  /// In en, this message translates to:
+  /// **'Text to speech'**
+  String get aiVoiceKindTts;
+
+  /// No description provided for @aiVoiceBusinessAllowCloud.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow cloud speech for this business'**
+  String get aiVoiceBusinessAllowCloud;
+
+  /// No description provided for @aiVoiceBusinessAllowCloudHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Audio is sent to a cloud provider. The system-wide policy must also be on.'**
+  String get aiVoiceBusinessAllowCloudHint;
+
+  /// No description provided for @aiVoiceDictationEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No speech was recognized. Try again.'**
+  String get aiVoiceDictationEmpty;
+
+  /// No description provided for @aiVoiceReadAloudFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not play audio: {error}'**
+  String aiVoiceReadAloudFailed(String error);
+
   /// No description provided for @aiStatusElapsed.
   ///
   /// In en, this message translates to:
@@ -18527,6 +20861,60 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Running tool'**
   String get aiToolGeneric;
+
+  /// No description provided for @aiToolSpawnSubagent.
+  ///
+  /// In en, this message translates to:
+  /// **'Spawn subagent'**
+  String get aiToolSpawnSubagent;
+
+  /// No description provided for @aiToolAwaitSubagent.
+  ///
+  /// In en, this message translates to:
+  /// **'Await subagent'**
+  String get aiToolAwaitSubagent;
+
+  /// No description provided for @aiToolCancelSubagent.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel subagent'**
+  String get aiToolCancelSubagent;
+
+  /// No description provided for @aiSubagentLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Subagent'**
+  String get aiSubagentLabel;
+
+  /// No description provided for @aiSubagentStatusRunning.
+  ///
+  /// In en, this message translates to:
+  /// **'Running'**
+  String get aiSubagentStatusRunning;
+
+  /// No description provided for @aiSubagentStatusCompleted.
+  ///
+  /// In en, this message translates to:
+  /// **'Completed'**
+  String get aiSubagentStatusCompleted;
+
+  /// No description provided for @aiSubagentStatusCancelled.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancelled'**
+  String get aiSubagentStatusCancelled;
+
+  /// No description provided for @aiSubagentStatusFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed'**
+  String get aiSubagentStatusFailed;
+
+  /// No description provided for @aiSubagentWorking.
+  ///
+  /// In en, this message translates to:
+  /// **'Starting work…'**
+  String get aiSubagentWorking;
 
   /// No description provided for @aiToolGetBusinessInfo.
   ///
@@ -18831,7 +21219,7 @@ abstract class AppLocalizations {
   /// No description provided for @aiToolGetPersonTransactions.
   ///
   /// In en, this message translates to:
-  /// **'Person transactions'**
+  /// **'Comprehensive person ledger'**
   String get aiToolGetPersonTransactions;
 
   /// No description provided for @aiToolSearchProjects.
@@ -19056,6 +21444,42 @@ abstract class AppLocalizations {
   /// **'Not helpful'**
   String get aiActionThumbsDown;
 
+  /// No description provided for @aiActionShare.
+  ///
+  /// In en, this message translates to:
+  /// **'Share'**
+  String get aiActionShare;
+
+  /// No description provided for @aiActionApplyHScript.
+  ///
+  /// In en, this message translates to:
+  /// **'Apply to HScript studio'**
+  String get aiActionApplyHScript;
+
+  /// No description provided for @aiActionEditResend.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit and resend'**
+  String get aiActionEditResend;
+
+  /// No description provided for @aiActionEditAssistantText.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit reply text'**
+  String get aiActionEditAssistantText;
+
+  /// No description provided for @aiActionEditAndRegenerate.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit and regenerate'**
+  String get aiActionEditAndRegenerate;
+
+  /// No description provided for @aiActionFork.
+  ///
+  /// In en, this message translates to:
+  /// **'Branch from here'**
+  String get aiActionFork;
+
   /// No description provided for @aiStatusAgentProgress.
   ///
   /// In en, this message translates to:
@@ -19092,6 +21516,48 @@ abstract class AppLocalizations {
   /// **'Reasoning & analysis steps'**
   String get aiReasoningPanelTitle;
 
+  /// No description provided for @aiReasoningBudgetTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Analysis budget'**
+  String get aiReasoningBudgetTitle;
+
+  /// No description provided for @aiReasoningToolsUsedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Tools used'**
+  String get aiReasoningToolsUsedTitle;
+
+  /// No description provided for @aiTraceReasoning.
+  ///
+  /// In en, this message translates to:
+  /// **'Thinking…'**
+  String get aiTraceReasoning;
+
+  /// No description provided for @aiConfidenceHigh.
+  ///
+  /// In en, this message translates to:
+  /// **'High confidence'**
+  String get aiConfidenceHigh;
+
+  /// No description provided for @aiConfidenceMedium.
+  ///
+  /// In en, this message translates to:
+  /// **'Needs review'**
+  String get aiConfidenceMedium;
+
+  /// No description provided for @aiConfidenceLow.
+  ///
+  /// In en, this message translates to:
+  /// **'Insufficient data'**
+  String get aiConfidenceLow;
+
+  /// No description provided for @aiStatusAwaitingApproval.
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for your approval to proceed'**
+  String get aiStatusAwaitingApproval;
+
   /// No description provided for @aiAnswerPanelTitle.
   ///
   /// In en, this message translates to:
@@ -19115,6 +21581,132 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Dismiss'**
   String get aiErrorRecoveryDismiss;
+
+  /// No description provided for @aiContinueAnalysis.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue analysis'**
+  String get aiContinueAnalysis;
+
+  /// No description provided for @aiContinueAnalysisHint.
+  ///
+  /// In en, this message translates to:
+  /// **'The analysis stopped early. Continue from the same run without repeating completed tools.'**
+  String get aiContinueAnalysisHint;
+
+  /// No description provided for @aiContinueAnalysisDismiss.
+  ///
+  /// In en, this message translates to:
+  /// **'Not now'**
+  String get aiContinueAnalysisDismiss;
+
+  /// No description provided for @aiStreamStallError.
+  ///
+  /// In en, this message translates to:
+  /// **'The connection dropped. Your reply so far is saved.'**
+  String get aiStreamStallError;
+
+  /// No description provided for @aiStreamEmptyError.
+  ///
+  /// In en, this message translates to:
+  /// **'The reply did not finish because the connection closed.'**
+  String get aiStreamEmptyError;
+
+  /// No description provided for @aiStreamAvailabilityCheckFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Cannot send right now: {error}'**
+  String aiStreamAvailabilityCheckFailed(String error);
+
+  /// No description provided for @aiContinueAfterRefreshHint.
+  ///
+  /// In en, this message translates to:
+  /// **'The previous analysis was left unfinished. You can continue from the same point.'**
+  String get aiContinueAfterRefreshHint;
+
+  /// No description provided for @aiResumingPreviousRun.
+  ///
+  /// In en, this message translates to:
+  /// **'Resuming the previous reply...'**
+  String get aiResumingPreviousRun;
+
+  /// No description provided for @aiCrmAssistantTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Smart assistant'**
+  String get aiCrmAssistantTitle;
+
+  /// No description provided for @aiCrmSummarizeAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Summary and next step'**
+  String get aiCrmSummarizeAction;
+
+  /// No description provided for @aiCrmStopAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Stop'**
+  String get aiCrmStopAction;
+
+  /// No description provided for @aiTicketAssistantTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'AI assistance'**
+  String get aiTicketAssistantTitle;
+
+  /// No description provided for @aiTicketAssistantHintExpanded.
+  ///
+  /// In en, this message translates to:
+  /// **'The assistant is ready. Get a suggestion or send an automatic reply.'**
+  String get aiTicketAssistantHintExpanded;
+
+  /// No description provided for @aiTicketAssistantHintCollapsed.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap to show the assistant and AI actions.'**
+  String get aiTicketAssistantHintCollapsed;
+
+  /// No description provided for @aiTicketSuggestReply.
+  ///
+  /// In en, this message translates to:
+  /// **'Suggest a reply'**
+  String get aiTicketSuggestReply;
+
+  /// No description provided for @aiTicketAutoReply.
+  ///
+  /// In en, this message translates to:
+  /// **'Automatic reply'**
+  String get aiTicketAutoReply;
+
+  /// No description provided for @aiTicketAutoReplyConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Automatic reply'**
+  String get aiTicketAutoReplyConfirmTitle;
+
+  /// No description provided for @aiTicketAutoReplyConfirmBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Should the assistant reply to this ticket automatically?'**
+  String get aiTicketAutoReplyConfirmBody;
+
+  /// No description provided for @aiTicketSuggestionLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'AI suggestion'**
+  String get aiTicketSuggestionLabel;
+
+  /// No description provided for @aiTicketUseSuggestion.
+  ///
+  /// In en, this message translates to:
+  /// **'Use this reply'**
+  String get aiTicketUseSuggestion;
+
+  /// No description provided for @aiTicketSuggestFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not get a suggestion: {error}'**
+  String aiTicketSuggestFailed(String error);
 
   /// No description provided for @aiConversationNavTitle.
   ///
@@ -19353,7 +21945,7 @@ abstract class AppLocalizations {
   /// No description provided for @personShareIncludeLedgerSubtitle.
   ///
   /// In en, this message translates to:
-  /// **'List of person account transactions'**
+  /// **'Person account transactions including invoice line items'**
   String get personShareIncludeLedgerSubtitle;
 
   /// No description provided for @personShareIncludeInvoices.
@@ -19515,8 +22107,182 @@ abstract class AppLocalizations {
   /// No description provided for @quickSalesAutoCreateReceiptSwitchHint.
   ///
   /// In en, this message translates to:
-  /// **'Record a separate receipt with the invoice (cash register payment)'**
+  /// **'Record cash, bank, or check receipts with the invoice. Any remainder stays on the customer account.'**
   String get quickSalesAutoCreateReceiptSwitchHint;
+
+  /// No description provided for @quickSalesPayCashRegister.
+  ///
+  /// In en, this message translates to:
+  /// **'Cash register'**
+  String get quickSalesPayCashRegister;
+
+  /// No description provided for @quickSalesPayCashRegisterHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Select cash register'**
+  String get quickSalesPayCashRegisterHint;
+
+  /// No description provided for @quickSalesPayBank.
+  ///
+  /// In en, this message translates to:
+  /// **'Bank'**
+  String get quickSalesPayBank;
+
+  /// No description provided for @quickSalesPayBankHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Select bank account'**
+  String get quickSalesPayBankHint;
+
+  /// No description provided for @quickSalesPayCheck.
+  ///
+  /// In en, this message translates to:
+  /// **'Check'**
+  String get quickSalesPayCheck;
+
+  /// No description provided for @quickSalesPayCheckHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Select or add a received check'**
+  String get quickSalesPayCheckHint;
+
+  /// No description provided for @quickSalesPayAmount.
+  ///
+  /// In en, this message translates to:
+  /// **'Amount'**
+  String get quickSalesPayAmount;
+
+  /// No description provided for @quickSalesPayAddCash.
+  ///
+  /// In en, this message translates to:
+  /// **'+ Cash'**
+  String get quickSalesPayAddCash;
+
+  /// No description provided for @quickSalesPayAddBank.
+  ///
+  /// In en, this message translates to:
+  /// **'+ Bank'**
+  String get quickSalesPayAddBank;
+
+  /// No description provided for @quickSalesPayAddCheck.
+  ///
+  /// In en, this message translates to:
+  /// **'+ Check'**
+  String get quickSalesPayAddCheck;
+
+  /// No description provided for @quickSalesPayFillRemaining.
+  ///
+  /// In en, this message translates to:
+  /// **'Fill remaining'**
+  String get quickSalesPayFillRemaining;
+
+  /// No description provided for @quickSalesPayRemoveLine.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove this payment'**
+  String get quickSalesPayRemoveLine;
+
+  /// No description provided for @quickSalesPayPaidLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Paid'**
+  String get quickSalesPayPaidLabel;
+
+  /// No description provided for @quickSalesPayRemainingLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Remaining'**
+  String get quickSalesPayRemainingLabel;
+
+  /// No description provided for @quickSalesPaySettled.
+  ///
+  /// In en, this message translates to:
+  /// **'Fully settled'**
+  String get quickSalesPaySettled;
+
+  /// No description provided for @quickSalesPayPartialStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Remainder stays on the customer account'**
+  String get quickSalesPayPartialStatus;
+
+  /// No description provided for @quickSalesPayOverpaid.
+  ///
+  /// In en, this message translates to:
+  /// **'Payments exceed the invoice total'**
+  String get quickSalesPayOverpaid;
+
+  /// No description provided for @quickSalesPayRemainingCustomerHint.
+  ///
+  /// In en, this message translates to:
+  /// **'The remainder is recorded as credit on this customer.'**
+  String get quickSalesPayRemainingCustomerHint;
+
+  /// No description provided for @quickSalesPayRemainingAnonymousHint.
+  ///
+  /// In en, this message translates to:
+  /// **'The remainder will be on the walk-in customer. Choose a real customer for credit sales.'**
+  String get quickSalesPayRemainingAnonymousHint;
+
+  /// No description provided for @quickSalesPayShareRemaining.
+  ///
+  /// In en, this message translates to:
+  /// **'Send a link for the remainder'**
+  String get quickSalesPayShareRemaining;
+
+  /// No description provided for @quickSalesPayShareRemainingHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Send an online payment link only for the unpaid amount'**
+  String get quickSalesPayShareRemainingHint;
+
+  /// No description provided for @quickSalesPaySelectCashRegister.
+  ///
+  /// In en, this message translates to:
+  /// **'Select a cash register for the cash payment'**
+  String get quickSalesPaySelectCashRegister;
+
+  /// No description provided for @quickSalesPaySelectBank.
+  ///
+  /// In en, this message translates to:
+  /// **'Select a bank account for the bank payment'**
+  String get quickSalesPaySelectBank;
+
+  /// No description provided for @quickSalesPaySelectCheck.
+  ///
+  /// In en, this message translates to:
+  /// **'Select or add a check for the check payment'**
+  String get quickSalesPaySelectCheck;
+
+  /// No description provided for @quickSalesPayOverpaidError.
+  ///
+  /// In en, this message translates to:
+  /// **'Payments exceed the invoice total. Adjust the amounts.'**
+  String get quickSalesPayOverpaidError;
+
+  /// No description provided for @quickSalesPayNeedDestination.
+  ///
+  /// In en, this message translates to:
+  /// **'Each payment line needs a cash register, bank, or check'**
+  String get quickSalesPayNeedDestination;
+
+  /// No description provided for @quickSalesPaySameTypeHint.
+  ///
+  /// In en, this message translates to:
+  /// **'You can add several receipts of the same type, for example two bank or card payments. Each line creates its own receipt document.'**
+  String get quickSalesPaySameTypeHint;
+
+  /// No description provided for @quickSalesCheckoutDetails.
+  ///
+  /// In en, this message translates to:
+  /// **'Document details'**
+  String get quickSalesCheckoutDetails;
+
+  /// No description provided for @quickSalesCheckoutWarehouseRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'A warehouse is required to post stock'**
+  String get quickSalesCheckoutWarehouseRequired;
 
   /// No description provided for @quickSalesShareSectionTitle.
   ///
@@ -19647,7 +22413,7 @@ abstract class AppLocalizations {
   /// No description provided for @quickSalesSettingsShareDefaultsHint.
   ///
   /// In en, this message translates to:
-  /// **'Applied on the quick sales page when \"Create receipt document\" is off'**
+  /// **'Used on the quick sales page when receipt is off, or when sharing a remaining balance'**
   String get quickSalesSettingsShareDefaultsHint;
 
   /// No description provided for @quickSalesSettingsShareExpiryLabel.
@@ -19673,6 +22439,78 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'30 days'**
   String get quickSalesSettingsShareExpiry30Days;
+
+  /// No description provided for @quickSalesParkedNewSale.
+  ///
+  /// In en, this message translates to:
+  /// **'New sale'**
+  String get quickSalesParkedNewSale;
+
+  /// No description provided for @quickSalesParkedNewSaleTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Hold the current cart and start another sale (Ctrl+N)'**
+  String get quickSalesParkedNewSaleTooltip;
+
+  /// No description provided for @quickSalesParkedNewSaleAlreadyEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'The current cart is already empty. Add items or choose a customer first.'**
+  String get quickSalesParkedNewSaleAlreadyEmpty;
+
+  /// No description provided for @quickSalesParkedMaxReached.
+  ///
+  /// In en, this message translates to:
+  /// **'You can keep at most {count} open sales. Finish or discard one first.'**
+  String quickSalesParkedMaxReached(int count);
+
+  /// No description provided for @quickSalesParkedSaleFallback.
+  ///
+  /// In en, this message translates to:
+  /// **'Sale {index}'**
+  String quickSalesParkedSaleFallback(int index);
+
+  /// No description provided for @quickSalesParkedSaleEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'Empty'**
+  String get quickSalesParkedSaleEmpty;
+
+  /// No description provided for @quickSalesParkedSaleSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} items · {amount}'**
+  String quickSalesParkedSaleSubtitle(int count, String amount);
+
+  /// No description provided for @quickSalesParkedDiscardTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Discard this sale'**
+  String get quickSalesParkedDiscardTooltip;
+
+  /// No description provided for @quickSalesParkedDiscardTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Discard this sale?'**
+  String get quickSalesParkedDiscardTitle;
+
+  /// No description provided for @quickSalesParkedDiscardBody.
+  ///
+  /// In en, this message translates to:
+  /// **'This held sale and its items will be removed. This cannot be undone.'**
+  String get quickSalesParkedDiscardBody;
+
+  /// No description provided for @quickSalesParkedDiscardConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Discard'**
+  String get quickSalesParkedDiscardConfirm;
+
+  /// No description provided for @quickSalesParkedAnonymousCustomer.
+  ///
+  /// In en, this message translates to:
+  /// **'Walk-in customer'**
+  String get quickSalesParkedAnonymousCustomer;
 
   /// No description provided for @settingsRedisCache.
   ///
@@ -20003,6 +22841,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Decimal places, rounding, add or remove currencies'**
   String get settingsCurrenciesAdminDescription;
+
+  /// No description provided for @settingsFxProvidersAdmin.
+  ///
+  /// In en, this message translates to:
+  /// **'FX rate providers'**
+  String get settingsFxProvidersAdmin;
+
+  /// No description provided for @settingsFxProvidersAdminDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'API keys and centralized rate fetch (BRS, Mesghal, …)'**
+  String get settingsFxProvidersAdminDescription;
 
   /// No description provided for @settingsPaymentGateways.
   ///
@@ -21000,6 +23850,894 @@ abstract class AppLocalizations {
   /// **'Customer Club'**
   String get customerClubMenu;
 
+  /// No description provided for @payrollTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Payroll'**
+  String get payrollTitle;
+
+  /// No description provided for @payrollMenu.
+  ///
+  /// In en, this message translates to:
+  /// **'Payroll'**
+  String get payrollMenu;
+
+  /// No description provided for @payrollPluginNotActive.
+  ///
+  /// In en, this message translates to:
+  /// **'The payroll add-on is not active for this business. Activate it from the plugin marketplace.'**
+  String get payrollPluginNotActive;
+
+  /// No description provided for @businessSettingsPayroll.
+  ///
+  /// In en, this message translates to:
+  /// **'Payroll'**
+  String get businessSettingsPayroll;
+
+  /// No description provided for @businessSettingsPayrollDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Payroll items, account mapping, and calculation rules'**
+  String get businessSettingsPayrollDescription;
+
+  /// No description provided for @payrollPermissionManage.
+  ///
+  /// In en, this message translates to:
+  /// **'Manage payroll settings and items'**
+  String get payrollPermissionManage;
+
+  /// No description provided for @payrollPermissionOperate.
+  ///
+  /// In en, this message translates to:
+  /// **'Create and edit payroll documents and runs'**
+  String get payrollPermissionOperate;
+
+  /// No description provided for @payrollPermissionPost.
+  ///
+  /// In en, this message translates to:
+  /// **'Post payroll accounting documents'**
+  String get payrollPermissionPost;
+
+  /// No description provided for @payrollPermissionApprove.
+  ///
+  /// In en, this message translates to:
+  /// **'Approve and finalize payroll runs'**
+  String get payrollPermissionApprove;
+
+  /// No description provided for @payrollDashboardActiveEmployees.
+  ///
+  /// In en, this message translates to:
+  /// **'Active employees'**
+  String get payrollDashboardActiveEmployees;
+
+  /// No description provided for @payrollDashboardDraftRuns.
+  ///
+  /// In en, this message translates to:
+  /// **'Draft payroll runs'**
+  String get payrollDashboardDraftRuns;
+
+  /// No description provided for @payrollItemsTab.
+  ///
+  /// In en, this message translates to:
+  /// **'Payroll items'**
+  String get payrollItemsTab;
+
+  /// No description provided for @payrollEmployeesTab.
+  ///
+  /// In en, this message translates to:
+  /// **'Employees'**
+  String get payrollEmployeesTab;
+
+  /// No description provided for @payrollRunsTab.
+  ///
+  /// In en, this message translates to:
+  /// **'Payroll documents'**
+  String get payrollRunsTab;
+
+  /// No description provided for @payrollSettingsTab.
+  ///
+  /// In en, this message translates to:
+  /// **'Payroll settings'**
+  String get payrollSettingsTab;
+
+  /// No description provided for @payrollNoRunsYet.
+  ///
+  /// In en, this message translates to:
+  /// **'No payroll documents yet.'**
+  String get payrollNoRunsYet;
+
+  /// No description provided for @payrollNoItemsYet.
+  ///
+  /// In en, this message translates to:
+  /// **'No payroll items defined.'**
+  String get payrollNoItemsYet;
+
+  /// No description provided for @payrollNoEmployeesYet.
+  ///
+  /// In en, this message translates to:
+  /// **'No employees registered.'**
+  String get payrollNoEmployeesYet;
+
+  /// No description provided for @payrollItemKindEarning.
+  ///
+  /// In en, this message translates to:
+  /// **'Earnings'**
+  String get payrollItemKindEarning;
+
+  /// No description provided for @payrollItemKindDeduction.
+  ///
+  /// In en, this message translates to:
+  /// **'Deductions'**
+  String get payrollItemKindDeduction;
+
+  /// No description provided for @payrollItemKindEmployerCost.
+  ///
+  /// In en, this message translates to:
+  /// **'Employer cost'**
+  String get payrollItemKindEmployerCost;
+
+  /// No description provided for @payrollSettingsEnabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable payroll module'**
+  String get payrollSettingsEnabled;
+
+  /// No description provided for @payrollSettingsEnabledDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'When disabled, new payroll documents cannot be created.'**
+  String get payrollSettingsEnabledDescription;
+
+  /// No description provided for @payrollSettingsItemsDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'The items below can be used in payroll documents. Map each item to a chart of accounts entry.'**
+  String get payrollSettingsItemsDescription;
+
+  /// No description provided for @payrollItemCategories.
+  ///
+  /// In en, this message translates to:
+  /// **'Item categories'**
+  String get payrollItemCategories;
+
+  /// No description provided for @payrollSystemItem.
+  ///
+  /// In en, this message translates to:
+  /// **'System'**
+  String get payrollSystemItem;
+
+  /// No description provided for @payrollDefaultAccounts.
+  ///
+  /// In en, this message translates to:
+  /// **'Default accounts'**
+  String get payrollDefaultAccounts;
+
+  /// No description provided for @payrollDefaultAccountsHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Used when an item has no dedicated account mapping.'**
+  String get payrollDefaultAccountsHint;
+
+  /// No description provided for @payrollAccountWagesPayable.
+  ///
+  /// In en, this message translates to:
+  /// **'Wages payable'**
+  String get payrollAccountWagesPayable;
+
+  /// No description provided for @payrollAccountExpense.
+  ///
+  /// In en, this message translates to:
+  /// **'Payroll expense'**
+  String get payrollAccountExpense;
+
+  /// No description provided for @payrollAccountTaxPayable.
+  ///
+  /// In en, this message translates to:
+  /// **'Payroll tax payable'**
+  String get payrollAccountTaxPayable;
+
+  /// No description provided for @payrollAccountInsurancePayable.
+  ///
+  /// In en, this message translates to:
+  /// **'Insurance payable'**
+  String get payrollAccountInsurancePayable;
+
+  /// No description provided for @payrollAddItem.
+  ///
+  /// In en, this message translates to:
+  /// **'Add payroll item'**
+  String get payrollAddItem;
+
+  /// No description provided for @payrollEditItem.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit payroll item'**
+  String get payrollEditItem;
+
+  /// No description provided for @payrollItemName.
+  ///
+  /// In en, this message translates to:
+  /// **'Item name'**
+  String get payrollItemName;
+
+  /// No description provided for @payrollItemKindLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Item type'**
+  String get payrollItemKindLabel;
+
+  /// No description provided for @payrollSelectAccount.
+  ///
+  /// In en, this message translates to:
+  /// **'Select chart of accounts entry'**
+  String get payrollSelectAccount;
+
+  /// No description provided for @payrollCalculationType.
+  ///
+  /// In en, this message translates to:
+  /// **'Calculation type'**
+  String get payrollCalculationType;
+
+  /// No description provided for @payrollCalcManual.
+  ///
+  /// In en, this message translates to:
+  /// **'Manual'**
+  String get payrollCalcManual;
+
+  /// No description provided for @payrollCalcFixed.
+  ///
+  /// In en, this message translates to:
+  /// **'Fixed amount'**
+  String get payrollCalcFixed;
+
+  /// No description provided for @payrollCalcPercentBase.
+  ///
+  /// In en, this message translates to:
+  /// **'Percent of base salary'**
+  String get payrollCalcPercentBase;
+
+  /// No description provided for @payrollDefaultAmount.
+  ///
+  /// In en, this message translates to:
+  /// **'Default amount'**
+  String get payrollDefaultAmount;
+
+  /// No description provided for @payrollPercentValue.
+  ///
+  /// In en, this message translates to:
+  /// **'Percent'**
+  String get payrollPercentValue;
+
+  /// No description provided for @payrollShowOnPayslip.
+  ///
+  /// In en, this message translates to:
+  /// **'Show on payslip'**
+  String get payrollShowOnPayslip;
+
+  /// No description provided for @payrollAddEmployee.
+  ///
+  /// In en, this message translates to:
+  /// **'Add employee'**
+  String get payrollAddEmployee;
+
+  /// No description provided for @payrollEditEmployee.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit employee'**
+  String get payrollEditEmployee;
+
+  /// No description provided for @payrollEmployeeCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Employee code'**
+  String get payrollEmployeeCode;
+
+  /// No description provided for @payrollJobTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Job title'**
+  String get payrollJobTitle;
+
+  /// No description provided for @payrollBaseSalary.
+  ///
+  /// In en, this message translates to:
+  /// **'Base salary'**
+  String get payrollBaseSalary;
+
+  /// No description provided for @payrollEmploymentType.
+  ///
+  /// In en, this message translates to:
+  /// **'Employment type'**
+  String get payrollEmploymentType;
+
+  /// No description provided for @payrollEmploymentFullTime.
+  ///
+  /// In en, this message translates to:
+  /// **'Full-time'**
+  String get payrollEmploymentFullTime;
+
+  /// No description provided for @payrollEmploymentPartTime.
+  ///
+  /// In en, this message translates to:
+  /// **'Part-time'**
+  String get payrollEmploymentPartTime;
+
+  /// No description provided for @payrollEmploymentContract.
+  ///
+  /// In en, this message translates to:
+  /// **'Contract'**
+  String get payrollEmploymentContract;
+
+  /// No description provided for @payrollInsuranceNumber.
+  ///
+  /// In en, this message translates to:
+  /// **'Insurance number'**
+  String get payrollInsuranceNumber;
+
+  /// No description provided for @payrollTaxId.
+  ///
+  /// In en, this message translates to:
+  /// **'Tax ID'**
+  String get payrollTaxId;
+
+  /// No description provided for @payrollHireDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Hire date'**
+  String get payrollHireDate;
+
+  /// No description provided for @payrollTerminationDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Termination date'**
+  String get payrollTerminationDate;
+
+  /// No description provided for @payrollPeriodStartDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Period start date'**
+  String get payrollPeriodStartDate;
+
+  /// No description provided for @payrollPeriodEndDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Period end date'**
+  String get payrollPeriodEndDate;
+
+  /// No description provided for @payrollEmployeePersonHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Only persons marked as employee are listed.'**
+  String get payrollEmployeePersonHint;
+
+  /// No description provided for @payrollEmployeeDepartment.
+  ///
+  /// In en, this message translates to:
+  /// **'Department'**
+  String get payrollEmployeeDepartment;
+
+  /// No description provided for @payrollNewRun.
+  ///
+  /// In en, this message translates to:
+  /// **'New payroll document'**
+  String get payrollNewRun;
+
+  /// No description provided for @payrollEditRun.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit payroll document'**
+  String get payrollEditRun;
+
+  /// No description provided for @payrollRunTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Document title'**
+  String get payrollRunTitle;
+
+  /// No description provided for @payrollRunDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Document date'**
+  String get payrollRunDate;
+
+  /// No description provided for @payrollPeriod.
+  ///
+  /// In en, this message translates to:
+  /// **'Payroll period'**
+  String get payrollPeriod;
+
+  /// No description provided for @payrollSelectEmployees.
+  ///
+  /// In en, this message translates to:
+  /// **'Select at least one employee.'**
+  String get payrollSelectEmployees;
+
+  /// No description provided for @payrollFinalizeRun.
+  ///
+  /// In en, this message translates to:
+  /// **'Finalize'**
+  String get payrollFinalizeRun;
+
+  /// No description provided for @payrollRunFinalized.
+  ///
+  /// In en, this message translates to:
+  /// **'Payroll document finalized.'**
+  String get payrollRunFinalized;
+
+  /// No description provided for @payrollDeleteRunConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete this payroll document?'**
+  String get payrollDeleteRunConfirm;
+
+  /// No description provided for @payrollStatusDraft.
+  ///
+  /// In en, this message translates to:
+  /// **'Draft'**
+  String get payrollStatusDraft;
+
+  /// No description provided for @payrollStatusFinalized.
+  ///
+  /// In en, this message translates to:
+  /// **'Finalized'**
+  String get payrollStatusFinalized;
+
+  /// No description provided for @payrollStatusPendingApproval.
+  ///
+  /// In en, this message translates to:
+  /// **'Pending approval'**
+  String get payrollStatusPendingApproval;
+
+  /// No description provided for @payrollStatusCancelled.
+  ///
+  /// In en, this message translates to:
+  /// **'Cancelled'**
+  String get payrollStatusCancelled;
+
+  /// No description provided for @payrollGrossTotal.
+  ///
+  /// In en, this message translates to:
+  /// **'Gross'**
+  String get payrollGrossTotal;
+
+  /// No description provided for @payrollDeductionTotal.
+  ///
+  /// In en, this message translates to:
+  /// **'Deductions'**
+  String get payrollDeductionTotal;
+
+  /// No description provided for @payrollNetTotal.
+  ///
+  /// In en, this message translates to:
+  /// **'Net pay'**
+  String get payrollNetTotal;
+
+  /// No description provided for @payrollNetAmount.
+  ///
+  /// In en, this message translates to:
+  /// **'Net'**
+  String get payrollNetAmount;
+
+  /// No description provided for @payrollCreateRun.
+  ///
+  /// In en, this message translates to:
+  /// **'Create payroll document'**
+  String get payrollCreateRun;
+
+  /// No description provided for @payrollPeriodsTab.
+  ///
+  /// In en, this message translates to:
+  /// **'Payroll periods'**
+  String get payrollPeriodsTab;
+
+  /// No description provided for @payrollAddPeriod.
+  ///
+  /// In en, this message translates to:
+  /// **'New period'**
+  String get payrollAddPeriod;
+
+  /// No description provided for @payrollPeriodYear.
+  ///
+  /// In en, this message translates to:
+  /// **'Year'**
+  String get payrollPeriodYear;
+
+  /// No description provided for @payrollPeriodMonth.
+  ///
+  /// In en, this message translates to:
+  /// **'Month'**
+  String get payrollPeriodMonth;
+
+  /// No description provided for @payrollClosePeriod.
+  ///
+  /// In en, this message translates to:
+  /// **'Close period'**
+  String get payrollClosePeriod;
+
+  /// No description provided for @payrollClosePeriodConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'After closing, new payroll documents cannot be created for this month. Continue?'**
+  String get payrollClosePeriodConfirm;
+
+  /// No description provided for @payrollPeriodClosed.
+  ///
+  /// In en, this message translates to:
+  /// **'Period closed.'**
+  String get payrollPeriodClosed;
+
+  /// No description provided for @payrollPeriodStatusOpen.
+  ///
+  /// In en, this message translates to:
+  /// **'Open'**
+  String get payrollPeriodStatusOpen;
+
+  /// No description provided for @payrollPeriodStatusClosed.
+  ///
+  /// In en, this message translates to:
+  /// **'Closed'**
+  String get payrollPeriodStatusClosed;
+
+  /// No description provided for @payrollNoPeriodsYet.
+  ///
+  /// In en, this message translates to:
+  /// **'No payroll periods defined yet.'**
+  String get payrollNoPeriodsYet;
+
+  /// No description provided for @payrollDepartmentsTab.
+  ///
+  /// In en, this message translates to:
+  /// **'Departments'**
+  String get payrollDepartmentsTab;
+
+  /// No description provided for @payrollAddDepartment.
+  ///
+  /// In en, this message translates to:
+  /// **'Add department'**
+  String get payrollAddDepartment;
+
+  /// No description provided for @payrollEditDepartment.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit department'**
+  String get payrollEditDepartment;
+
+  /// No description provided for @payrollDepartmentCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Department code'**
+  String get payrollDepartmentCode;
+
+  /// No description provided for @payrollDepartmentName.
+  ///
+  /// In en, this message translates to:
+  /// **'Department name'**
+  String get payrollDepartmentName;
+
+  /// No description provided for @payrollSortOrder.
+  ///
+  /// In en, this message translates to:
+  /// **'Sort order'**
+  String get payrollSortOrder;
+
+  /// No description provided for @payrollImportEmployeesHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Excel must include person_id or person_code and employee_code.'**
+  String get payrollImportEmployeesHint;
+
+  /// No description provided for @payrollImportCreated.
+  ///
+  /// In en, this message translates to:
+  /// **'Created'**
+  String get payrollImportCreated;
+
+  /// No description provided for @payrollImportUpdated.
+  ///
+  /// In en, this message translates to:
+  /// **'Updated'**
+  String get payrollImportUpdated;
+
+  /// No description provided for @payrollImportErrorCount.
+  ///
+  /// In en, this message translates to:
+  /// **'Errors'**
+  String get payrollImportErrorCount;
+
+  /// No description provided for @payrollImportRunLines.
+  ///
+  /// In en, this message translates to:
+  /// **'Import amounts from Excel'**
+  String get payrollImportRunLines;
+
+  /// No description provided for @payrollImportRunLinesHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Fill employee_code and item:item_code columns.'**
+  String get payrollImportRunLinesHint;
+
+  /// No description provided for @payrollImportUpdatedLines.
+  ///
+  /// In en, this message translates to:
+  /// **'Updated lines'**
+  String get payrollImportUpdatedLines;
+
+  /// No description provided for @payrollDownloadPayslip.
+  ///
+  /// In en, this message translates to:
+  /// **'Download payslip PDF'**
+  String get payrollDownloadPayslip;
+
+  /// No description provided for @payrollCopyRun.
+  ///
+  /// In en, this message translates to:
+  /// **'Copy document'**
+  String get payrollCopyRun;
+
+  /// No description provided for @payrollCopyRunSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'New document created from copy.'**
+  String get payrollCopyRunSuccess;
+
+  /// No description provided for @payrollDepartmentSummary.
+  ///
+  /// In en, this message translates to:
+  /// **'Summary by department'**
+  String get payrollDepartmentSummary;
+
+  /// No description provided for @payrollPayslipSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Payslip PDF saved.'**
+  String get payrollPayslipSaved;
+
+  /// No description provided for @payrollStatusApproved.
+  ///
+  /// In en, this message translates to:
+  /// **'Approved'**
+  String get payrollStatusApproved;
+
+  /// No description provided for @payrollStatusPosted.
+  ///
+  /// In en, this message translates to:
+  /// **'Posted to accounting'**
+  String get payrollStatusPosted;
+
+  /// No description provided for @payrollApproveRun.
+  ///
+  /// In en, this message translates to:
+  /// **'Approve payroll'**
+  String get payrollApproveRun;
+
+  /// No description provided for @payrollRunApproved.
+  ///
+  /// In en, this message translates to:
+  /// **'Payroll document approved.'**
+  String get payrollRunApproved;
+
+  /// No description provided for @payrollPostAccounting.
+  ///
+  /// In en, this message translates to:
+  /// **'Post accounting entry'**
+  String get payrollPostAccounting;
+
+  /// No description provided for @payrollPostAccountingConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'An accrual journal entry will be created. Continue?'**
+  String get payrollPostAccountingConfirm;
+
+  /// No description provided for @payrollPostedSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Payroll accounting entry posted.'**
+  String get payrollPostedSuccess;
+
+  /// No description provided for @payrollPostPayment.
+  ///
+  /// In en, this message translates to:
+  /// **'Post payment entry'**
+  String get payrollPostPayment;
+
+  /// No description provided for @payrollPostPaymentHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Select the bank or cash account for payment.'**
+  String get payrollPostPaymentHint;
+
+  /// No description provided for @payrollPaymentAccount.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment account'**
+  String get payrollPaymentAccount;
+
+  /// No description provided for @payrollPaymentPosted.
+  ///
+  /// In en, this message translates to:
+  /// **'Payroll payment entry posted.'**
+  String get payrollPaymentPosted;
+
+  /// No description provided for @payrollAccountingLinks.
+  ///
+  /// In en, this message translates to:
+  /// **'Related accounting documents'**
+  String get payrollAccountingLinks;
+
+  /// No description provided for @payrollLinkAccrual.
+  ///
+  /// In en, this message translates to:
+  /// **'Accrual entry'**
+  String get payrollLinkAccrual;
+
+  /// No description provided for @payrollLinkPayment.
+  ///
+  /// In en, this message translates to:
+  /// **'Payment entry'**
+  String get payrollLinkPayment;
+
+  /// No description provided for @payrollDashboardPendingApprovals.
+  ///
+  /// In en, this message translates to:
+  /// **'Pending approval'**
+  String get payrollDashboardPendingApprovals;
+
+  /// No description provided for @payrollRejectRun.
+  ///
+  /// In en, this message translates to:
+  /// **'Reject payroll run'**
+  String get payrollRejectRun;
+
+  /// No description provided for @payrollRejectReason.
+  ///
+  /// In en, this message translates to:
+  /// **'Rejection reason (optional)'**
+  String get payrollRejectReason;
+
+  /// No description provided for @payrollRunRejected.
+  ///
+  /// In en, this message translates to:
+  /// **'Payroll run returned to draft.'**
+  String get payrollRunRejected;
+
+  /// No description provided for @payrollReportsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Payroll reports'**
+  String get payrollReportsTitle;
+
+  /// No description provided for @payrollReportsFilters.
+  ///
+  /// In en, this message translates to:
+  /// **'Report filters'**
+  String get payrollReportsFilters;
+
+  /// No description provided for @payrollStatutorySummary.
+  ///
+  /// In en, this message translates to:
+  /// **'Insurance & tax summary'**
+  String get payrollStatutorySummary;
+
+  /// No description provided for @payrollItemSummaryReport.
+  ///
+  /// In en, this message translates to:
+  /// **'Item breakdown'**
+  String get payrollItemSummaryReport;
+
+  /// No description provided for @payrollEmployeeSummaryReport.
+  ///
+  /// In en, this message translates to:
+  /// **'Employee breakdown'**
+  String get payrollEmployeeSummaryReport;
+
+  /// No description provided for @payrollPeriodOverviewReport.
+  ///
+  /// In en, this message translates to:
+  /// **'Monthly period overview'**
+  String get payrollPeriodOverviewReport;
+
+  /// No description provided for @payrollInsuranceEmployee.
+  ///
+  /// In en, this message translates to:
+  /// **'Employee insurance'**
+  String get payrollInsuranceEmployee;
+
+  /// No description provided for @payrollInsuranceEmployer.
+  ///
+  /// In en, this message translates to:
+  /// **'Employer insurance'**
+  String get payrollInsuranceEmployer;
+
+  /// No description provided for @payrollTaxTotal.
+  ///
+  /// In en, this message translates to:
+  /// **'Total tax'**
+  String get payrollTaxTotal;
+
+  /// No description provided for @payrollStatutoryRules.
+  ///
+  /// In en, this message translates to:
+  /// **'Insurance & tax rules'**
+  String get payrollStatutoryRules;
+
+  /// No description provided for @payrollStatutoryRulesHint.
+  ///
+  /// In en, this message translates to:
+  /// **'When enabled, insurance and tax items are computed from eligible earnings.'**
+  String get payrollStatutoryRulesHint;
+
+  /// No description provided for @payrollStatutoryEnabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Auto insurance & tax calculation'**
+  String get payrollStatutoryEnabled;
+
+  /// No description provided for @payrollInsuranceEmployeeRate.
+  ///
+  /// In en, this message translates to:
+  /// **'Employee insurance rate (%)'**
+  String get payrollInsuranceEmployeeRate;
+
+  /// No description provided for @payrollInsuranceEmployerRate.
+  ///
+  /// In en, this message translates to:
+  /// **'Employer insurance rate (%)'**
+  String get payrollInsuranceEmployerRate;
+
+  /// No description provided for @payrollInsuranceUnemploymentRate.
+  ///
+  /// In en, this message translates to:
+  /// **'Employer unemployment rate (%)'**
+  String get payrollInsuranceUnemploymentRate;
+
+  /// No description provided for @payrollTaxFlatRate.
+  ///
+  /// In en, this message translates to:
+  /// **'Flat tax rate (%)'**
+  String get payrollTaxFlatRate;
+
+  /// No description provided for @payrollTaxExemption.
+  ///
+  /// In en, this message translates to:
+  /// **'Tax exemption amount'**
+  String get payrollTaxExemption;
+
+  /// No description provided for @payrollCalcStatutory.
+  ///
+  /// In en, this message translates to:
+  /// **'Statutory (insurance/tax)'**
+  String get payrollCalcStatutory;
+
+  /// No description provided for @payrollWorkflowSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Workflow'**
+  String get payrollWorkflowSettings;
+
+  /// No description provided for @payrollRequireApproval.
+  ///
+  /// In en, this message translates to:
+  /// **'Require approval before finalize'**
+  String get payrollRequireApproval;
+
+  /// No description provided for @payrollRequireApprovalHint.
+  ///
+  /// In en, this message translates to:
+  /// **'After finalize, the run stays in pending approval status.'**
+  String get payrollRequireApprovalHint;
+
+  /// No description provided for @payrollAutoPostOnFinalize.
+  ///
+  /// In en, this message translates to:
+  /// **'Auto-post accounting on finalize'**
+  String get payrollAutoPostOnFinalize;
+
+  /// No description provided for @payrollAutoPostOnFinalizeHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Accounting errors do not roll back finalization.'**
+  String get payrollAutoPostOnFinalizeHint;
+
   /// No description provided for @customerClubTabLedger.
   ///
   /// In en, this message translates to:
@@ -21995,6 +25733,722 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'View and manage connected devices to your account'**
   String get accountSettingsLoginSessionsDescription;
+
+  /// No description provided for @accountSettingsBiometricLockTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Fingerprint Login'**
+  String get accountSettingsBiometricLockTitle;
+
+  /// No description provided for @accountSettingsBiometricLockDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Lock the app with fingerprint when returning to the app'**
+  String get accountSettingsBiometricLockDescription;
+
+  /// No description provided for @accountSettingsAndroidUpdateTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'App Update'**
+  String get accountSettingsAndroidUpdateTitle;
+
+  /// No description provided for @accountSettingsAndroidUpdateDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Check, download and install new Android releases'**
+  String get accountSettingsAndroidUpdateDescription;
+
+  /// No description provided for @androidUpdateSettingsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'App Update'**
+  String get androidUpdateSettingsTitle;
+
+  /// No description provided for @androidUpdateSettingsDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'New versions are fetched from official Hesabix releases. This feature is Android-only.'**
+  String get androidUpdateSettingsDescription;
+
+  /// No description provided for @androidUpdateUnsupported.
+  ///
+  /// In en, this message translates to:
+  /// **'Automatic updates are only supported on the Android app.'**
+  String get androidUpdateUnsupported;
+
+  /// No description provided for @androidUpdateInstalledVersion.
+  ///
+  /// In en, this message translates to:
+  /// **'Installed version'**
+  String get androidUpdateInstalledVersion;
+
+  /// No description provided for @androidUpdateLatestVersion.
+  ///
+  /// In en, this message translates to:
+  /// **'Latest published version'**
+  String get androidUpdateLatestVersion;
+
+  /// No description provided for @androidUpdateAvailableBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'New version'**
+  String get androidUpdateAvailableBadge;
+
+  /// No description provided for @androidUpdateLastChecked.
+  ///
+  /// In en, this message translates to:
+  /// **'Last checked'**
+  String get androidUpdateLastChecked;
+
+  /// No description provided for @androidUpdateAutoCheckTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Check on startup'**
+  String get androidUpdateAutoCheckTitle;
+
+  /// No description provided for @androidUpdateAutoCheckSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Look for a new version after the app opens'**
+  String get androidUpdateAutoCheckSubtitle;
+
+  /// No description provided for @androidUpdateAutoDownloadTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Prompt download when found'**
+  String get androidUpdateAutoDownloadTitle;
+
+  /// No description provided for @androidUpdateAutoDownloadSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'When a new version is found, show an update notice ready for download'**
+  String get androidUpdateAutoDownloadSubtitle;
+
+  /// No description provided for @androidUpdateCheckNow.
+  ///
+  /// In en, this message translates to:
+  /// **'Check for updates'**
+  String get androidUpdateCheckNow;
+
+  /// No description provided for @androidUpdateDownloadAndInstall.
+  ///
+  /// In en, this message translates to:
+  /// **'Download & install'**
+  String get androidUpdateDownloadAndInstall;
+
+  /// No description provided for @androidUpdateOpenPermissionSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Unknown apps install settings'**
+  String get androidUpdateOpenPermissionSettings;
+
+  /// No description provided for @androidUpdateInfoTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Note'**
+  String get androidUpdateInfoTitle;
+
+  /// No description provided for @androidUpdateInfoBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Final install requires your confirmation in the Android system installer. Downloads continue in the background and progress is shown in the system notification.'**
+  String get androidUpdateInfoBody;
+
+  /// No description provided for @androidUpdateAvailableTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Update available'**
+  String get androidUpdateAvailableTitle;
+
+  /// No description provided for @androidUpdateAvailableMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Version {latest} is available. Your current version: {current}'**
+  String androidUpdateAvailableMessage(String latest, String current);
+
+  /// No description provided for @androidUpdateChangelogTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Release notes'**
+  String get androidUpdateChangelogTitle;
+
+  /// No description provided for @androidUpdateApkSizeHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Approximate file size: {size}'**
+  String androidUpdateApkSizeHint(String size);
+
+  /// No description provided for @androidUpdateLater.
+  ///
+  /// In en, this message translates to:
+  /// **'Later'**
+  String get androidUpdateLater;
+
+  /// No description provided for @androidUpdateAutoDownloadStarting.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm to start a background download. You can leave the app while it completes.'**
+  String get androidUpdateAutoDownloadStarting;
+
+  /// No description provided for @androidUpdateDownloadingTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Downloading update'**
+  String get androidUpdateDownloadingTitle;
+
+  /// No description provided for @androidUpdateDownloadingPreparing.
+  ///
+  /// In en, this message translates to:
+  /// **'Preparing download…'**
+  String get androidUpdateDownloadingPreparing;
+
+  /// No description provided for @androidUpdateDownloadProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'{percent}% — {received} of {total}'**
+  String androidUpdateDownloadProgress(
+    int percent,
+    String received,
+    String total,
+  );
+
+  /// No description provided for @androidUpdateDownloadCancelled.
+  ///
+  /// In en, this message translates to:
+  /// **'Download cancelled'**
+  String get androidUpdateDownloadCancelled;
+
+  /// No description provided for @androidUpdateDownloadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Download failed: {error}'**
+  String androidUpdateDownloadFailed(String error);
+
+  /// No description provided for @androidUpdateUpToDate.
+  ///
+  /// In en, this message translates to:
+  /// **'You are on the latest version'**
+  String get androidUpdateUpToDate;
+
+  /// No description provided for @androidUpdateCheckFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Update check failed. Please check your internet connection.'**
+  String get androidUpdateCheckFailed;
+
+  /// No description provided for @androidUpdatePermissionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Install permission required'**
+  String get androidUpdatePermissionTitle;
+
+  /// No description provided for @androidUpdatePermissionMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'To install the new version, allow Hesabix to install unknown apps.'**
+  String get androidUpdatePermissionMessage;
+
+  /// No description provided for @androidUpdatePermissionReturnHint.
+  ///
+  /// In en, this message translates to:
+  /// **'After enabling the permission, tap Download & install again.'**
+  String get androidUpdatePermissionReturnHint;
+
+  /// No description provided for @androidUpdateInstallStarted.
+  ///
+  /// In en, this message translates to:
+  /// **'System installer opened. Please confirm the install.'**
+  String get androidUpdateInstallStarted;
+
+  /// No description provided for @androidUpdateInstallFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not start install: {error}'**
+  String androidUpdateInstallFailed(String error);
+
+  /// No description provided for @androidUpdateDownloadingSheetTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Downloading new version'**
+  String get androidUpdateDownloadingSheetTitle;
+
+  /// No description provided for @androidUpdateDownloadingBackgroundHint.
+  ///
+  /// In en, this message translates to:
+  /// **'You can leave the app or switch to another one. Download progress will appear in the system notification.'**
+  String get androidUpdateDownloadingBackgroundHint;
+
+  /// No description provided for @androidUpdateContinueInBackground.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue in background'**
+  String get androidUpdateContinueInBackground;
+
+  /// No description provided for @androidUpdateBackgroundNotificationRunning.
+  ///
+  /// In en, this message translates to:
+  /// **'Downloading update'**
+  String get androidUpdateBackgroundNotificationRunning;
+
+  /// No description provided for @androidUpdateBackgroundNotificationComplete.
+  ///
+  /// In en, this message translates to:
+  /// **'Download complete'**
+  String get androidUpdateBackgroundNotificationComplete;
+
+  /// No description provided for @androidUpdateBackgroundNotificationError.
+  ///
+  /// In en, this message translates to:
+  /// **'Download failed'**
+  String get androidUpdateBackgroundNotificationError;
+
+  /// No description provided for @androidUpdateBackgroundNotificationPaused.
+  ///
+  /// In en, this message translates to:
+  /// **'Download paused'**
+  String get androidUpdateBackgroundNotificationPaused;
+
+  /// No description provided for @androidUpdateBackgroundNotificationCanceled.
+  ///
+  /// In en, this message translates to:
+  /// **'Download canceled'**
+  String get androidUpdateBackgroundNotificationCanceled;
+
+  /// No description provided for @androidUpdateDownloadCompleteTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Update ready to install'**
+  String get androidUpdateDownloadCompleteTitle;
+
+  /// No description provided for @androidUpdateDownloadCompleteMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Version {version} downloaded successfully.'**
+  String androidUpdateDownloadCompleteMessage(String version);
+
+  /// No description provided for @androidUpdateInstallNow.
+  ///
+  /// In en, this message translates to:
+  /// **'Install now'**
+  String get androidUpdateInstallNow;
+
+  /// No description provided for @androidUpdateApkSizeHintBackground.
+  ///
+  /// In en, this message translates to:
+  /// **'Approximate size: {size} — download continues in the background'**
+  String androidUpdateApkSizeHintBackground(String size);
+
+  /// No description provided for @accountSettingsWindowsUpdateTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'App Update (Windows)'**
+  String get accountSettingsWindowsUpdateTitle;
+
+  /// No description provided for @accountSettingsWindowsUpdateDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'Check, download and install new Windows releases'**
+  String get accountSettingsWindowsUpdateDescription;
+
+  /// No description provided for @windowsUpdateSettingsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'App Update'**
+  String get windowsUpdateSettingsTitle;
+
+  /// No description provided for @windowsUpdateSettingsDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'New versions are fetched from official Hesabix releases. This feature is Windows-only.'**
+  String get windowsUpdateSettingsDescription;
+
+  /// No description provided for @windowsUpdateUnsupported.
+  ///
+  /// In en, this message translates to:
+  /// **'Automatic updates are only supported on the Windows desktop app.'**
+  String get windowsUpdateUnsupported;
+
+  /// No description provided for @windowsUpdateInstalledVersion.
+  ///
+  /// In en, this message translates to:
+  /// **'Installed version'**
+  String get windowsUpdateInstalledVersion;
+
+  /// No description provided for @windowsUpdateLatestVersion.
+  ///
+  /// In en, this message translates to:
+  /// **'Latest published version'**
+  String get windowsUpdateLatestVersion;
+
+  /// No description provided for @windowsUpdateAvailableBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'New version'**
+  String get windowsUpdateAvailableBadge;
+
+  /// No description provided for @windowsUpdateLastChecked.
+  ///
+  /// In en, this message translates to:
+  /// **'Last checked'**
+  String get windowsUpdateLastChecked;
+
+  /// No description provided for @windowsUpdateAutoCheckTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Check on startup'**
+  String get windowsUpdateAutoCheckTitle;
+
+  /// No description provided for @windowsUpdateAutoCheckSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Look for a new version after the app opens'**
+  String get windowsUpdateAutoCheckSubtitle;
+
+  /// No description provided for @windowsUpdateAutoDownloadTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Prompt download when found'**
+  String get windowsUpdateAutoDownloadTitle;
+
+  /// No description provided for @windowsUpdateAutoDownloadSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'When a new version is found, show an update notice ready for download'**
+  String get windowsUpdateAutoDownloadSubtitle;
+
+  /// No description provided for @windowsUpdateCheckNow.
+  ///
+  /// In en, this message translates to:
+  /// **'Check for updates'**
+  String get windowsUpdateCheckNow;
+
+  /// No description provided for @windowsUpdateDownloadAndInstall.
+  ///
+  /// In en, this message translates to:
+  /// **'Download & install'**
+  String get windowsUpdateDownloadAndInstall;
+
+  /// No description provided for @windowsUpdateInfoTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Note'**
+  String get windowsUpdateInfoTitle;
+
+  /// No description provided for @windowsUpdateInfoBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Updates are installed via an MSI/setup package (Advanced Installer). Windows may ask for administrator approval (UAC). The app version should match the release tag (e.g. 70.9.911).'**
+  String get windowsUpdateInfoBody;
+
+  /// No description provided for @windowsUpdateAvailableTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Update available'**
+  String get windowsUpdateAvailableTitle;
+
+  /// No description provided for @windowsUpdateAvailableMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Version {latest} is available. Your current version: {current}'**
+  String windowsUpdateAvailableMessage(String latest, String current);
+
+  /// No description provided for @windowsUpdateChangelogTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Release notes'**
+  String get windowsUpdateChangelogTitle;
+
+  /// No description provided for @windowsUpdateInstallerSizeHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Approximate file size: {size}'**
+  String windowsUpdateInstallerSizeHint(String size);
+
+  /// No description provided for @windowsExitConfirmTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Close Hesabix Arc'**
+  String get windowsExitConfirmTitle;
+
+  /// No description provided for @windowsExitConfirmMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Are you sure you want to close the application?'**
+  String get windowsExitConfirmMessage;
+
+  /// No description provided for @windowsExitConfirmAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Close'**
+  String get windowsExitConfirmAction;
+
+  /// No description provided for @windowsUpdateInstallWillCloseApp.
+  ///
+  /// In en, this message translates to:
+  /// **'The app will close after the installer starts so files can be replaced.'**
+  String get windowsUpdateInstallWillCloseApp;
+
+  /// No description provided for @windowsUpdateLater.
+  ///
+  /// In en, this message translates to:
+  /// **'Later'**
+  String get windowsUpdateLater;
+
+  /// No description provided for @windowsUpdateAutoDownloadStarting.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm to start download and install.'**
+  String get windowsUpdateAutoDownloadStarting;
+
+  /// No description provided for @windowsUpdateDownloadingTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Downloading update'**
+  String get windowsUpdateDownloadingTitle;
+
+  /// No description provided for @windowsUpdateDownloadingPreparing.
+  ///
+  /// In en, this message translates to:
+  /// **'Preparing download…'**
+  String get windowsUpdateDownloadingPreparing;
+
+  /// No description provided for @windowsUpdateDownloadProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'{percent}% — {received} of {total}'**
+  String windowsUpdateDownloadProgress(
+    int percent,
+    String received,
+    String total,
+  );
+
+  /// No description provided for @windowsUpdateDownloadCancelled.
+  ///
+  /// In en, this message translates to:
+  /// **'Download cancelled'**
+  String get windowsUpdateDownloadCancelled;
+
+  /// No description provided for @windowsUpdateDownloadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Download failed: {error}'**
+  String windowsUpdateDownloadFailed(String error);
+
+  /// No description provided for @windowsUpdateUpToDate.
+  ///
+  /// In en, this message translates to:
+  /// **'You are on the latest version'**
+  String get windowsUpdateUpToDate;
+
+  /// No description provided for @windowsUpdateCheckFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Update check failed. Please check your internet connection.'**
+  String get windowsUpdateCheckFailed;
+
+  /// No description provided for @windowsUpdateReadyToInstallTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Ready to install'**
+  String get windowsUpdateReadyToInstallTitle;
+
+  /// No description provided for @windowsUpdateReadyToInstallMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'The installer will open next. Confirm UAC if prompted. Hesabix will close so the update can finish.'**
+  String get windowsUpdateReadyToInstallMessage;
+
+  /// No description provided for @windowsUpdateLaunchInstaller.
+  ///
+  /// In en, this message translates to:
+  /// **'Install now'**
+  String get windowsUpdateLaunchInstaller;
+
+  /// No description provided for @windowsUpdateInstallStarted.
+  ///
+  /// In en, this message translates to:
+  /// **'Installer started. Confirm the install if Windows asks.'**
+  String get windowsUpdateInstallStarted;
+
+  /// No description provided for @windowsUpdateInstallFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not start install: {error}'**
+  String windowsUpdateInstallFailed(String error);
+
+  /// No description provided for @biometricOptInTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Fingerprint Login'**
+  String get biometricOptInTitle;
+
+  /// No description provided for @biometricOptInMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Would you like to use your fingerprint to unlock the app from now on? You can change this anytime in account settings.'**
+  String get biometricOptInMessage;
+
+  /// No description provided for @biometricOptInEnable.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable'**
+  String get biometricOptInEnable;
+
+  /// No description provided for @biometricOptInNotNow.
+  ///
+  /// In en, this message translates to:
+  /// **'Not now'**
+  String get biometricOptInNotNow;
+
+  /// No description provided for @biometricOptInAuthReason.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm your fingerprint to enable fingerprint login'**
+  String get biometricOptInAuthReason;
+
+  /// No description provided for @biometricLockTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'App Locked'**
+  String get biometricLockTitle;
+
+  /// No description provided for @biometricLockSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Scan your fingerprint to continue'**
+  String get biometricLockSubtitle;
+
+  /// No description provided for @biometricLockAuthReason.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm your fingerprint to access your account'**
+  String get biometricLockAuthReason;
+
+  /// No description provided for @biometricLockRetry.
+  ///
+  /// In en, this message translates to:
+  /// **'Try again'**
+  String get biometricLockRetry;
+
+  /// No description provided for @biometricLockAuthenticating.
+  ///
+  /// In en, this message translates to:
+  /// **'Authenticating…'**
+  String get biometricLockAuthenticating;
+
+  /// No description provided for @biometricLockSignInWithPassword.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign in with password'**
+  String get biometricLockSignInWithPassword;
+
+  /// No description provided for @biometricLockAttemptsRemaining.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} attempt(s) remaining'**
+  String biometricLockAttemptsRemaining(int count);
+
+  /// No description provided for @biometricSettingsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Fingerprint Login'**
+  String get biometricSettingsTitle;
+
+  /// No description provided for @biometricSettingsDescription.
+  ///
+  /// In en, this message translates to:
+  /// **'When enabled, you must confirm your fingerprint each time you open the app or return from the background.'**
+  String get biometricSettingsDescription;
+
+  /// No description provided for @biometricSettingsToggleTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable fingerprint lock'**
+  String get biometricSettingsToggleTitle;
+
+  /// No description provided for @biometricSettingsToggleSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Fingerprint will be required when returning to the app'**
+  String get biometricSettingsToggleSubtitle;
+
+  /// No description provided for @biometricSettingsUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Fingerprint sensor is not available or not set up on this device'**
+  String get biometricSettingsUnavailable;
+
+  /// No description provided for @biometricSettingsEnableReason.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm your fingerprint to enable'**
+  String get biometricSettingsEnableReason;
+
+  /// No description provided for @biometricSettingsEnableFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Fingerprint verification failed'**
+  String get biometricSettingsEnableFailed;
+
+  /// No description provided for @biometricSettingsEnabledSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Fingerprint login enabled'**
+  String get biometricSettingsEnabledSuccess;
+
+  /// No description provided for @biometricSettingsDisabledSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Fingerprint login disabled'**
+  String get biometricSettingsDisabledSuccess;
+
+  /// No description provided for @biometricSettingsAvailableMethods.
+  ///
+  /// In en, this message translates to:
+  /// **'Available methods'**
+  String get biometricSettingsAvailableMethods;
+
+  /// No description provided for @biometricSettingsInfoTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Security note'**
+  String get biometricSettingsInfoTitle;
+
+  /// No description provided for @biometricSettingsInfoBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Fingerprint only locks access to the app. Initial sign-in or switching accounts still requires your password.'**
+  String get biometricSettingsInfoBody;
+
+  /// No description provided for @biometricTypeFingerprint.
+  ///
+  /// In en, this message translates to:
+  /// **'Fingerprint'**
+  String get biometricTypeFingerprint;
+
+  /// No description provided for @biometricTypeFace.
+  ///
+  /// In en, this message translates to:
+  /// **'Face recognition'**
+  String get biometricTypeFace;
+
+  /// No description provided for @biometricTypeIris.
+  ///
+  /// In en, this message translates to:
+  /// **'Iris'**
+  String get biometricTypeIris;
+
+  /// No description provided for @biometricTypeWeak.
+  ///
+  /// In en, this message translates to:
+  /// **'Weak biometric'**
+  String get biometricTypeWeak;
+
+  /// No description provided for @biometricTypeStrong.
+  ///
+  /// In en, this message translates to:
+  /// **'Strong biometric'**
+  String get biometricTypeStrong;
 
   /// No description provided for @accountSettingsChangePasswordDescription.
   ///
@@ -23514,6 +27968,12 @@ abstract class AppLocalizations {
   /// **'Customer, pipeline stage, and financial details.'**
   String get crmDealFormSubtitle;
 
+  /// No description provided for @crmDealProbabilityUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'The assistant could not extract a valid probability. The field was left unchanged.'**
+  String get crmDealProbabilityUnavailable;
+
   /// No description provided for @crmConvertLeadTitle.
   ///
   /// In en, this message translates to:
@@ -24042,6 +28502,144 @@ abstract class AppLocalizations {
   /// **'No route plan for this date.'**
   String get distributionNoPlan;
 
+  /// No description provided for @distributionNoPlanHint.
+  ///
+  /// In en, this message translates to:
+  /// **'The daily plan is built from a route assigned to a visitor. Create a territory and route, add customers as stops, then assign the visitor — or use Set up plan.'**
+  String get distributionNoPlanHint;
+
+  /// No description provided for @distributionSetupPlan.
+  ///
+  /// In en, this message translates to:
+  /// **'Set up plan'**
+  String get distributionSetupPlan;
+
+  /// No description provided for @distributionSetupPlanHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose a visitor and a route. Stops on that route for this weekday become today’s field plan.'**
+  String get distributionSetupPlanHint;
+
+  /// No description provided for @distributionAssignAndShowPlan.
+  ///
+  /// In en, this message translates to:
+  /// **'Assign and show plan'**
+  String get distributionAssignAndShowPlan;
+
+  /// No description provided for @distributionSelectRoute.
+  ///
+  /// In en, this message translates to:
+  /// **'Route'**
+  String get distributionSelectRoute;
+
+  /// No description provided for @distributionNoRoutesYet.
+  ///
+  /// In en, this message translates to:
+  /// **'No routes yet. Create a territory and a route in Manage first.'**
+  String get distributionNoRoutesYet;
+
+  /// No description provided for @distributionGoToManage.
+  ///
+  /// In en, this message translates to:
+  /// **'Go to Manage'**
+  String get distributionGoToManage;
+
+  /// No description provided for @distributionGoToManageHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Open Manage to add territories, routes and stops.'**
+  String get distributionGoToManageHint;
+
+  /// No description provided for @distributionPlanAssigned.
+  ///
+  /// In en, this message translates to:
+  /// **'Visitor assigned. The field plan is ready.'**
+  String get distributionPlanAssigned;
+
+  /// No description provided for @distributionTerritoryEdit.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit territory'**
+  String get distributionTerritoryEdit;
+
+  /// No description provided for @distributionRouteEdit.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit route'**
+  String get distributionRouteEdit;
+
+  /// No description provided for @distributionStopEdit.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit stop'**
+  String get distributionStopEdit;
+
+  /// No description provided for @distributionVanEdit.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit van'**
+  String get distributionVanEdit;
+
+  /// No description provided for @distributionVanName.
+  ///
+  /// In en, this message translates to:
+  /// **'Van name'**
+  String get distributionVanName;
+
+  /// No description provided for @distributionDeleteTerritory.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete territory'**
+  String get distributionDeleteTerritory;
+
+  /// No description provided for @distributionDeleteTerritoryConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete this territory? Routes stay, but the territory link is removed.'**
+  String get distributionDeleteTerritoryConfirm;
+
+  /// No description provided for @distributionDeleteStopConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove this customer from the route?'**
+  String get distributionDeleteStopConfirm;
+
+  /// No description provided for @distributionDeletePromoConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete this promotion?'**
+  String get distributionDeletePromoConfirm;
+
+  /// No description provided for @distributionDeleteTargetConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete this sales target?'**
+  String get distributionDeleteTargetConfirm;
+
+  /// No description provided for @distributionAssetTypeCooler.
+  ///
+  /// In en, this message translates to:
+  /// **'Cooler'**
+  String get distributionAssetTypeCooler;
+
+  /// No description provided for @distributionAssetTypeFreezer.
+  ///
+  /// In en, this message translates to:
+  /// **'Freezer'**
+  String get distributionAssetTypeFreezer;
+
+  /// No description provided for @distributionAssetTypeShelf.
+  ///
+  /// In en, this message translates to:
+  /// **'Shelf'**
+  String get distributionAssetTypeShelf;
+
+  /// No description provided for @distributionAssetTypeOther.
+  ///
+  /// In en, this message translates to:
+  /// **'Other'**
+  String get distributionAssetTypeOther;
+
   /// No description provided for @distributionStartVisit.
   ///
   /// In en, this message translates to:
@@ -24528,11 +29126,383 @@ abstract class AppLocalizations {
   /// **'Settings saved.'**
   String get distributionSettingsSaved;
 
+  /// No description provided for @distributionMapSectionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Map tiles'**
+  String get distributionMapSectionTitle;
+
+  /// No description provided for @distributionMapTileSource.
+  ///
+  /// In en, this message translates to:
+  /// **'Tile source'**
+  String get distributionMapTileSource;
+
+  /// No description provided for @distributionMapTileSourceHint.
+  ///
+  /// In en, this message translates to:
+  /// **'OpenStreetMap is free and worldwide. MeMaps is an Iranian tile server and requires an API key from memaps.ir.'**
+  String get distributionMapTileSourceHint;
+
+  /// No description provided for @distributionMapTileSourceOsm.
+  ///
+  /// In en, this message translates to:
+  /// **'OpenStreetMap (free, worldwide)'**
+  String get distributionMapTileSourceOsm;
+
+  /// No description provided for @distributionMapTileSourceMemaps.
+  ///
+  /// In en, this message translates to:
+  /// **'MeMaps (Iran, API key required)'**
+  String get distributionMapTileSourceMemaps;
+
+  /// No description provided for @distributionMemapsApiKey.
+  ///
+  /// In en, this message translates to:
+  /// **'MeMaps API key'**
+  String get distributionMemapsApiKey;
+
+  /// No description provided for @distributionMemapsApiKeyHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Create a key in the memaps.ir panel. Tile requests send it as ?key= or the X-Memaps-Key header.'**
+  String get distributionMemapsApiKeyHint;
+
+  /// No description provided for @distributionMemapsApiKeyMissing.
+  ///
+  /// In en, this message translates to:
+  /// **'MeMaps tiles need an API key. Add it in distribution settings, or switch to OpenStreetMap.'**
+  String get distributionMemapsApiKeyMissing;
+
   /// No description provided for @distributionNotesLabel.
   ///
   /// In en, this message translates to:
   /// **'Notes'**
   String get distributionNotesLabel;
+
+  /// No description provided for @distributionVanCreate.
+  ///
+  /// In en, this message translates to:
+  /// **'Create van'**
+  String get distributionVanCreate;
+
+  /// No description provided for @distributionVanUnload.
+  ///
+  /// In en, this message translates to:
+  /// **'Unload van'**
+  String get distributionVanUnload;
+
+  /// No description provided for @distributionSelectVisitor.
+  ///
+  /// In en, this message translates to:
+  /// **'Select visitor'**
+  String get distributionSelectVisitor;
+
+  /// No description provided for @distributionSourceWarehouse.
+  ///
+  /// In en, this message translates to:
+  /// **'Source warehouse'**
+  String get distributionSourceWarehouse;
+
+  /// No description provided for @distributionDestWarehouse.
+  ///
+  /// In en, this message translates to:
+  /// **'Destination warehouse'**
+  String get distributionDestWarehouse;
+
+  /// No description provided for @distributionNoVanAssigned.
+  ///
+  /// In en, this message translates to:
+  /// **'No van is assigned to you.'**
+  String get distributionNoVanAssigned;
+
+  /// No description provided for @distributionVanStockEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'Van stock is empty.'**
+  String get distributionVanStockEmpty;
+
+  /// No description provided for @distributionVanLoadHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick products from the warehouse, set quantity, and add them to the list.'**
+  String get distributionVanLoadHint;
+
+  /// No description provided for @distributionVanUnloadHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick products from current van stock and return them to the warehouse.'**
+  String get distributionVanUnloadHint;
+
+  /// No description provided for @distributionVanTransferLines.
+  ///
+  /// In en, this message translates to:
+  /// **'Transfer lines'**
+  String get distributionVanTransferLines;
+
+  /// No description provided for @distributionVanPickProductFirst.
+  ///
+  /// In en, this message translates to:
+  /// **'Select a product from the list first.'**
+  String get distributionVanPickProductFirst;
+
+  /// No description provided for @distributionVanLinesEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No lines have been added yet.'**
+  String get distributionVanLinesEmpty;
+
+  /// No description provided for @distributionVanNoWarehouse.
+  ///
+  /// In en, this message translates to:
+  /// **'Select a warehouse.'**
+  String get distributionVanNoWarehouse;
+
+  /// No description provided for @distributionVanConfirmLoad.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm load'**
+  String get distributionVanConfirmLoad;
+
+  /// No description provided for @distributionVanConfirmUnload.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm unload'**
+  String get distributionVanConfirmUnload;
+
+  /// No description provided for @distributionVanLineAdded.
+  ///
+  /// In en, this message translates to:
+  /// **'Line added to the list.'**
+  String get distributionVanLineAdded;
+
+  /// No description provided for @distributionVanQtyInvalid.
+  ///
+  /// In en, this message translates to:
+  /// **'Quantity must be greater than zero.'**
+  String get distributionVanQtyInvalid;
+
+  /// No description provided for @distributionVanEmptyStockUnload.
+  ///
+  /// In en, this message translates to:
+  /// **'Van stock is empty; nothing to unload.'**
+  String get distributionVanEmptyStockUnload;
+
+  /// No description provided for @distributionVanStockAvailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Van stock: {qty}'**
+  String distributionVanStockAvailable(String qty);
+
+  /// No description provided for @distributionDeleteStop.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete stop'**
+  String get distributionDeleteStop;
+
+  /// No description provided for @distributionDeleteAssignment.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove assignment'**
+  String get distributionDeleteAssignment;
+
+  /// No description provided for @distributionApplyOptimize.
+  ///
+  /// In en, this message translates to:
+  /// **'Apply & save order'**
+  String get distributionApplyOptimize;
+
+  /// No description provided for @distributionOfflinePartial.
+  ///
+  /// In en, this message translates to:
+  /// **'Some offline actions failed.'**
+  String get distributionOfflinePartial;
+
+  /// No description provided for @distributionVisitStayHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Visit started; complete it when you finish with the customer.'**
+  String get distributionVisitStayHint;
+
+  /// No description provided for @distributionSalesLinked.
+  ///
+  /// In en, this message translates to:
+  /// **'Linked sales'**
+  String get distributionSalesLinked;
+
+  /// No description provided for @distributionCoveragePercent.
+  ///
+  /// In en, this message translates to:
+  /// **'Route coverage'**
+  String get distributionCoveragePercent;
+
+  /// No description provided for @distributionChecklistAddItem.
+  ///
+  /// In en, this message translates to:
+  /// **'Add checklist item'**
+  String get distributionChecklistAddItem;
+
+  /// No description provided for @distributionDefaultWarehouse.
+  ///
+  /// In en, this message translates to:
+  /// **'Default load warehouse'**
+  String get distributionDefaultWarehouse;
+
+  /// No description provided for @distributionOpenInvoiceKeepVisit.
+  ///
+  /// In en, this message translates to:
+  /// **'Invoice (visit stays open)'**
+  String get distributionOpenInvoiceKeepVisit;
+
+  /// No description provided for @distributionTabSettlement.
+  ///
+  /// In en, this message translates to:
+  /// **'Daily settlement'**
+  String get distributionTabSettlement;
+
+  /// No description provided for @distributionExpectedSales.
+  ///
+  /// In en, this message translates to:
+  /// **'Expected sales today'**
+  String get distributionExpectedSales;
+
+  /// No description provided for @distributionCashCollected.
+  ///
+  /// In en, this message translates to:
+  /// **'Cash collected'**
+  String get distributionCashCollected;
+
+  /// No description provided for @distributionChequeCollected.
+  ///
+  /// In en, this message translates to:
+  /// **'Cheques collected'**
+  String get distributionChequeCollected;
+
+  /// No description provided for @distributionCardCollected.
+  ///
+  /// In en, this message translates to:
+  /// **'Card / POS'**
+  String get distributionCardCollected;
+
+  /// No description provided for @distributionOtherCollected.
+  ///
+  /// In en, this message translates to:
+  /// **'Other collected'**
+  String get distributionOtherCollected;
+
+  /// No description provided for @distributionSettlementExpenses.
+  ///
+  /// In en, this message translates to:
+  /// **'Day expenses'**
+  String get distributionSettlementExpenses;
+
+  /// No description provided for @distributionSettlementVariance.
+  ///
+  /// In en, this message translates to:
+  /// **'Variance'**
+  String get distributionSettlementVariance;
+
+  /// No description provided for @distributionCreateReceiptOnConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Create cash receipt on confirm'**
+  String get distributionCreateReceiptOnConfirm;
+
+  /// No description provided for @distributionCashRegister.
+  ///
+  /// In en, this message translates to:
+  /// **'Cash register'**
+  String get distributionCashRegister;
+
+  /// No description provided for @distributionCashRegisterRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Select a cash register to create a receipt.'**
+  String get distributionCashRegisterRequired;
+
+  /// No description provided for @distributionSaveDraft.
+  ///
+  /// In en, this message translates to:
+  /// **'Save draft'**
+  String get distributionSaveDraft;
+
+  /// No description provided for @distributionConfirmSettlement.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm settlement'**
+  String get distributionConfirmSettlement;
+
+  /// No description provided for @distributionSettlementConfirmed.
+  ///
+  /// In en, this message translates to:
+  /// **'Settlement confirmed'**
+  String get distributionSettlementConfirmed;
+
+  /// No description provided for @distributionPrintSettlement.
+  ///
+  /// In en, this message translates to:
+  /// **'Print settlement'**
+  String get distributionPrintSettlement;
+
+  /// No description provided for @distributionPrintDailyPlan.
+  ///
+  /// In en, this message translates to:
+  /// **'Print daily plan'**
+  String get distributionPrintDailyPlan;
+
+  /// No description provided for @distributionPrintLoadingList.
+  ///
+  /// In en, this message translates to:
+  /// **'Print loading list'**
+  String get distributionPrintLoadingList;
+
+  /// No description provided for @distributionPdfExported.
+  ///
+  /// In en, this message translates to:
+  /// **'PDF exported'**
+  String get distributionPdfExported;
+
+  /// No description provided for @distributionTargetsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Visitor sales targets'**
+  String get distributionTargetsTitle;
+
+  /// No description provided for @distributionTargetCreate.
+  ///
+  /// In en, this message translates to:
+  /// **'New target'**
+  String get distributionTargetCreate;
+
+  /// No description provided for @distributionTargetPeriodType.
+  ///
+  /// In en, this message translates to:
+  /// **'Period type'**
+  String get distributionTargetPeriodType;
+
+  /// No description provided for @distributionTargetPeriodDay.
+  ///
+  /// In en, this message translates to:
+  /// **'Daily'**
+  String get distributionTargetPeriodDay;
+
+  /// No description provided for @distributionTargetPeriodMonth.
+  ///
+  /// In en, this message translates to:
+  /// **'Monthly'**
+  String get distributionTargetPeriodMonth;
+
+  /// No description provided for @distributionTargetAmount.
+  ///
+  /// In en, this message translates to:
+  /// **'Target amount'**
+  String get distributionTargetAmount;
+
+  /// No description provided for @distributionTargetsEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No targets defined yet.'**
+  String get distributionTargetsEmpty;
 
   /// No description provided for @reportsDistributionSection.
   ///
@@ -26206,6 +31176,54 @@ abstract class AppLocalizations {
   /// **'Plugin settings updated'**
   String get woocommerceControlSettingsApplied;
 
+  /// No description provided for @woocommerceControlStockTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Inventory sync status'**
+  String get woocommerceControlStockTitle;
+
+  /// No description provided for @woocommerceControlStockSourceLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Source of truth'**
+  String get woocommerceControlStockSourceLabel;
+
+  /// No description provided for @woocommerceControlStockPullNow.
+  ///
+  /// In en, this message translates to:
+  /// **'Pull stock to WooCommerce'**
+  String get woocommerceControlStockPullNow;
+
+  /// No description provided for @woocommerceControlStockConflicts.
+  ///
+  /// In en, this message translates to:
+  /// **'Check stock conflicts'**
+  String get woocommerceControlStockConflicts;
+
+  /// No description provided for @woocommerceControlStockPullDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Stock pull finished: {message}'**
+  String woocommerceControlStockPullDone(String message);
+
+  /// No description provided for @woocommerceControlStockConflictsDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Conflicts found: {count}'**
+  String woocommerceControlStockConflictsDone(String count);
+
+  /// No description provided for @woocommerceSettingsPushStockOnWarehousePost.
+  ///
+  /// In en, this message translates to:
+  /// **'After posting a warehouse document, push stock to WooCommerce'**
+  String get woocommerceSettingsPushStockOnWarehousePost;
+
+  /// No description provided for @woocommerceSettingsPushStockOnWarehousePostHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Requires an active bridge and “accept remote push” in the plugin. Store source of truth should be Hesabix.'**
+  String get woocommerceSettingsPushStockOnWarehousePostHelp;
+
   /// No description provided for @woocommerceControlQueueProcessDone.
   ///
   /// In en, this message translates to:
@@ -27021,6 +32039,288 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Reference time for the rate and behavior when no rate exists (base vs. foreign currency)'**
   String get settingsInvoiceFxPolicySubtitle;
+
+  /// No description provided for @settingsFxAutoSyncTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Automatic FX rate sync'**
+  String get settingsFxAutoSyncTitle;
+
+  /// No description provided for @settingsFxAutoSyncSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Schedule revaluation rates from the central snapshot with per-currency offsets'**
+  String get settingsFxAutoSyncSubtitle;
+
+  /// No description provided for @fxAutoSyncTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Automatic FX rate sync'**
+  String get fxAutoSyncTitle;
+
+  /// No description provided for @fxAutoSyncHeroTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Rates that keep up with the market'**
+  String get fxAutoSyncHeroTitle;
+
+  /// No description provided for @fxAutoSyncIntro.
+  ///
+  /// In en, this message translates to:
+  /// **'Pull the central market snapshot on a schedule, apply your margin (percent or amount), and write revaluation rates automatically. Single-currency businesses never see this.'**
+  String get fxAutoSyncIntro;
+
+  /// No description provided for @fxAutoSyncSingleCurrencyHint.
+  ///
+  /// In en, this message translates to:
+  /// **'This feature is only available for multi-currency businesses. Add a secondary currency first.'**
+  String get fxAutoSyncSingleCurrencyHint;
+
+  /// No description provided for @fxAutoSyncEnableLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable automatic sync'**
+  String get fxAutoSyncEnableLabel;
+
+  /// No description provided for @fxAutoSyncSourceHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Source: central system snapshot (not a direct API call per business)'**
+  String get fxAutoSyncSourceHint;
+
+  /// No description provided for @fxAutoSyncScheduleMode.
+  ///
+  /// In en, this message translates to:
+  /// **'Schedule'**
+  String get fxAutoSyncScheduleMode;
+
+  /// No description provided for @fxAutoSyncModeInterval.
+  ///
+  /// In en, this message translates to:
+  /// **'Every N hours'**
+  String get fxAutoSyncModeInterval;
+
+  /// No description provided for @fxAutoSyncModeDaily.
+  ///
+  /// In en, this message translates to:
+  /// **'Daily times'**
+  String get fxAutoSyncModeDaily;
+
+  /// No description provided for @fxAutoSyncIntervalLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Interval'**
+  String get fxAutoSyncIntervalLabel;
+
+  /// No description provided for @fxAutoSyncEveryNHours.
+  ///
+  /// In en, this message translates to:
+  /// **'Every {hours} hours'**
+  String fxAutoSyncEveryNHours(int hours);
+
+  /// No description provided for @fxAutoSyncAddTimeLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Add time (HH:MM)'**
+  String get fxAutoSyncAddTimeLabel;
+
+  /// No description provided for @fxAutoSyncAddTime.
+  ///
+  /// In en, this message translates to:
+  /// **'Add'**
+  String get fxAutoSyncAddTime;
+
+  /// No description provided for @fxAutoSyncInvalidTime.
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid time. Use HH:MM (e.g. 09:00).'**
+  String get fxAutoSyncInvalidTime;
+
+  /// No description provided for @fxAutoSyncTimezoneHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Times are evaluated in timezone: {tz}'**
+  String fxAutoSyncTimezoneHint(String tz);
+
+  /// No description provided for @fxAutoSyncOptionsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Safety options'**
+  String get fxAutoSyncOptionsTitle;
+
+  /// No description provided for @fxAutoSyncSkipUnchanged.
+  ///
+  /// In en, this message translates to:
+  /// **'Skip if rate barely changed'**
+  String get fxAutoSyncSkipUnchanged;
+
+  /// No description provided for @fxAutoSyncMinChangePercent.
+  ///
+  /// In en, this message translates to:
+  /// **'Minimum change to write (%)'**
+  String get fxAutoSyncMinChangePercent;
+
+  /// No description provided for @fxAutoSyncBlockStale.
+  ///
+  /// In en, this message translates to:
+  /// **'Block when snapshot is stale'**
+  String get fxAutoSyncBlockStale;
+
+  /// No description provided for @fxAutoSyncStaleHours.
+  ///
+  /// In en, this message translates to:
+  /// **'Stale after (hours)'**
+  String get fxAutoSyncStaleHours;
+
+  /// No description provided for @fxAutoSyncOffsetsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Per-currency offsets'**
+  String get fxAutoSyncOffsetsTitle;
+
+  /// No description provided for @fxAutoSyncOffsetsHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Preview uses your current form values (draft). Save to persist schedule and offsets.'**
+  String get fxAutoSyncOffsetsHint;
+
+  /// No description provided for @fxAutoSyncRefreshPreview.
+  ///
+  /// In en, this message translates to:
+  /// **'Refresh preview'**
+  String get fxAutoSyncRefreshPreview;
+
+  /// No description provided for @fxAutoSyncNoSecondaryCurrencies.
+  ///
+  /// In en, this message translates to:
+  /// **'No secondary currencies found.'**
+  String get fxAutoSyncNoSecondaryCurrencies;
+
+  /// No description provided for @fxAutoSyncOffsetType.
+  ///
+  /// In en, this message translates to:
+  /// **'Offset type'**
+  String get fxAutoSyncOffsetType;
+
+  /// No description provided for @fxAutoSyncOffsetNone.
+  ///
+  /// In en, this message translates to:
+  /// **'None'**
+  String get fxAutoSyncOffsetNone;
+
+  /// No description provided for @fxAutoSyncOffsetPercent.
+  ///
+  /// In en, this message translates to:
+  /// **'Percent'**
+  String get fxAutoSyncOffsetPercent;
+
+  /// No description provided for @fxAutoSyncOffsetAmount.
+  ///
+  /// In en, this message translates to:
+  /// **'Fixed amount'**
+  String get fxAutoSyncOffsetAmount;
+
+  /// No description provided for @fxAutoSyncOffsetDirection.
+  ///
+  /// In en, this message translates to:
+  /// **'Direction'**
+  String get fxAutoSyncOffsetDirection;
+
+  /// No description provided for @fxAutoSyncOffsetUp.
+  ///
+  /// In en, this message translates to:
+  /// **'Above market (+)'**
+  String get fxAutoSyncOffsetUp;
+
+  /// No description provided for @fxAutoSyncOffsetDown.
+  ///
+  /// In en, this message translates to:
+  /// **'Below market (−)'**
+  String get fxAutoSyncOffsetDown;
+
+  /// No description provided for @fxAutoSyncOffsetValue.
+  ///
+  /// In en, this message translates to:
+  /// **'Value'**
+  String get fxAutoSyncOffsetValue;
+
+  /// No description provided for @fxAutoSyncRefRate.
+  ///
+  /// In en, this message translates to:
+  /// **'Reference rate'**
+  String get fxAutoSyncRefRate;
+
+  /// No description provided for @fxAutoSyncFinalRate.
+  ///
+  /// In en, this message translates to:
+  /// **'Final rate after offset'**
+  String get fxAutoSyncFinalRate;
+
+  /// No description provided for @fxAutoSyncPreviewSavedHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Live draft preview from the central snapshot.'**
+  String get fxAutoSyncPreviewSavedHint;
+
+  /// No description provided for @fxAutoSyncRunNow.
+  ///
+  /// In en, this message translates to:
+  /// **'Run now'**
+  String get fxAutoSyncRunNow;
+
+  /// No description provided for @fxAutoSyncRunDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Sync finished'**
+  String get fxAutoSyncRunDone;
+
+  /// No description provided for @fxAutoSyncStatusActive.
+  ///
+  /// In en, this message translates to:
+  /// **'Schedule active'**
+  String get fxAutoSyncStatusActive;
+
+  /// No description provided for @fxAutoSyncStatusInactive.
+  ///
+  /// In en, this message translates to:
+  /// **'Schedule off'**
+  String get fxAutoSyncStatusInactive;
+
+  /// No description provided for @fxAutoSyncLastRun.
+  ///
+  /// In en, this message translates to:
+  /// **'Last run'**
+  String get fxAutoSyncLastRun;
+
+  /// No description provided for @fxAutoSyncNextRun.
+  ///
+  /// In en, this message translates to:
+  /// **'Next run'**
+  String get fxAutoSyncNextRun;
+
+  /// No description provided for @fxAutoSyncLoadError.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to load auto-sync settings: {error}'**
+  String fxAutoSyncLoadError(String error);
+
+  /// No description provided for @fxAutoSyncSaveError.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to save auto-sync settings: {error}'**
+  String fxAutoSyncSaveError(String error);
+
+  /// No description provided for @fxAutoSyncPreviewError.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to load preview: {error}'**
+  String fxAutoSyncPreviewError(String error);
+
+  /// No description provided for @fxAutoSyncRunError.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to run sync: {error}'**
+  String fxAutoSyncRunError(String error);
 
   /// No description provided for @fxRevaluationSettingsTitle.
   ///
@@ -27952,6 +33252,48 @@ abstract class AppLocalizations {
   /// **'List all tabs'**
   String get businessPanelTabListTooltip;
 
+  /// No description provided for @businessPanelTabPin.
+  ///
+  /// In en, this message translates to:
+  /// **'Pin tab'**
+  String get businessPanelTabPin;
+
+  /// No description provided for @businessPanelTabUnpin.
+  ///
+  /// In en, this message translates to:
+  /// **'Unpin tab'**
+  String get businessPanelTabUnpin;
+
+  /// No description provided for @businessPanelTabPinnedCloseTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Pinned tab'**
+  String get businessPanelTabPinnedCloseTitle;
+
+  /// No description provided for @businessPanelTabPinnedCloseMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'This tab is pinned. Closing it will remove it from the tab bar. Are you sure?'**
+  String get businessPanelTabPinnedCloseMessage;
+
+  /// No description provided for @businessPanelTabPinnedCloseConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Close tab'**
+  String get businessPanelTabPinnedCloseConfirm;
+
+  /// No description provided for @businessPanelTabClosePinnedTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Pinned tab — confirmation required to close'**
+  String get businessPanelTabClosePinnedTooltip;
+
+  /// No description provided for @businessPanelTabPinnedKeptSnackbar.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} pinned tab(s) kept'**
+  String businessPanelTabPinnedKeptSnackbar(int count);
+
   /// No description provided for @businessPanelTabRouteProjects.
   ///
   /// In en, this message translates to:
@@ -28144,6 +33486,120 @@ abstract class AppLocalizations {
   /// **'Quick sales'**
   String get mobileLauncherQuickSalesTile;
 
+  /// No description provided for @mobileLauncherNewInvoiceTile.
+  ///
+  /// In en, this message translates to:
+  /// **'New invoice'**
+  String get mobileLauncherNewInvoiceTile;
+
+  /// No description provided for @mobileLauncherSwitchBusiness.
+  ///
+  /// In en, this message translates to:
+  /// **'Switch business'**
+  String get mobileLauncherSwitchBusiness;
+
+  /// No description provided for @mobileLauncherTapToSwitchBusiness.
+  ///
+  /// In en, this message translates to:
+  /// **'Tap to switch business'**
+  String get mobileLauncherTapToSwitchBusiness;
+
+  /// No description provided for @mobileLauncherSummarySales.
+  ///
+  /// In en, this message translates to:
+  /// **'Total sales'**
+  String get mobileLauncherSummarySales;
+
+  /// No description provided for @mobileLauncherSummaryRecent.
+  ///
+  /// In en, this message translates to:
+  /// **'Recent transactions'**
+  String get mobileLauncherSummaryRecent;
+
+  /// No description provided for @mobileLauncherNoTiles.
+  ///
+  /// In en, this message translates to:
+  /// **'No shortcuts are available for your role. Open the full panel or ask an admin for access.'**
+  String get mobileLauncherNoTiles;
+
+  /// No description provided for @mobileLauncherLivePreview.
+  ///
+  /// In en, this message translates to:
+  /// **'Live preview'**
+  String get mobileLauncherLivePreview;
+
+  /// No description provided for @mobileLauncherTileDensitySection.
+  ///
+  /// In en, this message translates to:
+  /// **'Tile density'**
+  String get mobileLauncherTileDensitySection;
+
+  /// No description provided for @mobileLauncherTileDensityHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose how many shortcuts appear in each row.'**
+  String get mobileLauncherTileDensityHint;
+
+  /// No description provided for @mobileLauncherDensityComfortable.
+  ///
+  /// In en, this message translates to:
+  /// **'Comfortable'**
+  String get mobileLauncherDensityComfortable;
+
+  /// No description provided for @mobileLauncherDensityCompact.
+  ///
+  /// In en, this message translates to:
+  /// **'Compact'**
+  String get mobileLauncherDensityCompact;
+
+  /// No description provided for @mobileLauncherBusinessesLoadError.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not load businesses.'**
+  String get mobileLauncherBusinessesLoadError;
+
+  /// No description provided for @mobileLauncherNoBusinesses.
+  ///
+  /// In en, this message translates to:
+  /// **'No businesses found.'**
+  String get mobileLauncherNoBusinesses;
+
+  /// No description provided for @businessShellMoreToolsTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'More tools'**
+  String get businessShellMoreToolsTooltip;
+
+  /// No description provided for @businessShellAiChatTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Quick AI chat'**
+  String get businessShellAiChatTooltip;
+
+  /// No description provided for @businessShellCalculatorTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Calculator'**
+  String get businessShellCalculatorTooltip;
+
+  /// No description provided for @businessShellBackToLauncher.
+  ///
+  /// In en, this message translates to:
+  /// **'Back to launcher'**
+  String get businessShellBackToLauncher;
+
+  /// No description provided for @businessShellHideSidebarTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Hide sidebar'**
+  String get businessShellHideSidebarTooltip;
+
+  /// No description provided for @businessShellShowSidebarTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Show sidebar'**
+  String get businessShellShowSidebarTooltip;
+
   /// No description provided for @dataTableHelpMenu.
   ///
   /// In en, this message translates to:
@@ -28327,13 +33783,13 @@ abstract class AppLocalizations {
   /// No description provided for @productPublicCatalogTitle.
   ///
   /// In en, this message translates to:
-  /// **'Public product catalog'**
+  /// **'Supply network catalog'**
   String get productPublicCatalogTitle;
 
   /// No description provided for @productPublicCatalogSubtitle.
   ///
   /// In en, this message translates to:
-  /// **'When enabled, product name/description and contact info (if allowed in business settings) are exposed via the public catalog API.'**
+  /// **'When enabled, catalog profile fields (summary, expert review, specifications, contact) are exposed via the public catalog API.'**
   String get productPublicCatalogSubtitle;
 
   /// No description provided for @publicCatalogShowContactTitle.
@@ -28857,6 +34313,2795 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Failed to load plugins. Integrations and modules may be incomplete.'**
   String get businessSettingsPluginsLoadFailed;
+
+  /// No description provided for @barcodeLabelsMenu.
+  ///
+  /// In en, this message translates to:
+  /// **'Labels & barcodes'**
+  String get barcodeLabelsMenu;
+
+  /// No description provided for @barcodeLabelPluginNotActive.
+  ///
+  /// In en, this message translates to:
+  /// **'The barcode label studio add-on is not active for this business.'**
+  String get barcodeLabelPluginNotActive;
+
+  /// No description provided for @barcodeLabelPluginNotActiveHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Start a trial or purchase the add-on from the plugin marketplace.'**
+  String get barcodeLabelPluginNotActiveHint;
+
+  /// No description provided for @barcodeLabelCreateTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'New label template'**
+  String get barcodeLabelCreateTitle;
+
+  /// No description provided for @barcodeLabelCreateSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Start from a preset or a blank canvas.'**
+  String get barcodeLabelCreateSubtitle;
+
+  /// No description provided for @barcodeLabelBlankCanvas.
+  ///
+  /// In en, this message translates to:
+  /// **'Blank canvas'**
+  String get barcodeLabelBlankCanvas;
+
+  /// No description provided for @barcodeLabelBlankCanvasHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Start from scratch in the design studio'**
+  String get barcodeLabelBlankCanvasHint;
+
+  /// No description provided for @barcodeLabelNewTemplate.
+  ///
+  /// In en, this message translates to:
+  /// **'New template'**
+  String get barcodeLabelNewTemplate;
+
+  /// No description provided for @barcodeLabelSearchHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Search templates…'**
+  String get barcodeLabelSearchHint;
+
+  /// No description provided for @barcodeLabelFilterAll.
+  ///
+  /// In en, this message translates to:
+  /// **'All'**
+  String get barcodeLabelFilterAll;
+
+  /// No description provided for @barcodeLabelFilterPublished.
+  ///
+  /// In en, this message translates to:
+  /// **'Published'**
+  String get barcodeLabelFilterPublished;
+
+  /// No description provided for @barcodeLabelFilterDraft.
+  ///
+  /// In en, this message translates to:
+  /// **'Draft'**
+  String get barcodeLabelFilterDraft;
+
+  /// No description provided for @barcodeLabelFilterArchived.
+  ///
+  /// In en, this message translates to:
+  /// **'Archived'**
+  String get barcodeLabelFilterArchived;
+
+  /// No description provided for @barcodeLabelEmptyTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'No templates yet'**
+  String get barcodeLabelEmptyTitle;
+
+  /// No description provided for @barcodeLabelEmptyBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Start with a preset and design scannable product labels.'**
+  String get barcodeLabelEmptyBody;
+
+  /// No description provided for @barcodeLabelStartWithPreset.
+  ///
+  /// In en, this message translates to:
+  /// **'Start with a preset'**
+  String get barcodeLabelStartWithPreset;
+
+  /// No description provided for @barcodeLabelDefaultBadge.
+  ///
+  /// In en, this message translates to:
+  /// **'Default'**
+  String get barcodeLabelDefaultBadge;
+
+  /// No description provided for @barcodeLabelDefaultSet.
+  ///
+  /// In en, this message translates to:
+  /// **'Default template set'**
+  String get barcodeLabelDefaultSet;
+
+  /// No description provided for @barcodeLabelPublished.
+  ///
+  /// In en, this message translates to:
+  /// **'Template published'**
+  String get barcodeLabelPublished;
+
+  /// No description provided for @barcodeLabelSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Template saved'**
+  String get barcodeLabelSaved;
+
+  /// No description provided for @barcodeLabelPreviewPdf.
+  ///
+  /// In en, this message translates to:
+  /// **'Preview PDF'**
+  String get barcodeLabelPreviewPdf;
+
+  /// No description provided for @barcodeLabelPublish.
+  ///
+  /// In en, this message translates to:
+  /// **'Publish'**
+  String get barcodeLabelPublish;
+
+  /// No description provided for @barcodeLabelSetDefault.
+  ///
+  /// In en, this message translates to:
+  /// **'Set as default'**
+  String get barcodeLabelSetDefault;
+
+  /// No description provided for @barcodeLabelDuplicate.
+  ///
+  /// In en, this message translates to:
+  /// **'Duplicate'**
+  String get barcodeLabelDuplicate;
+
+  /// No description provided for @barcodeLabelStudioTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Label studio'**
+  String get barcodeLabelStudioTitle;
+
+  /// No description provided for @barcodeLabelUntitled.
+  ///
+  /// In en, this message translates to:
+  /// **'Untitled template'**
+  String get barcodeLabelUntitled;
+
+  /// No description provided for @barcodeLabelToolText.
+  ///
+  /// In en, this message translates to:
+  /// **'Text'**
+  String get barcodeLabelToolText;
+
+  /// No description provided for @barcodeLabelToolBarcode.
+  ///
+  /// In en, this message translates to:
+  /// **'Barcode'**
+  String get barcodeLabelToolBarcode;
+
+  /// No description provided for @barcodeLabelToolImage.
+  ///
+  /// In en, this message translates to:
+  /// **'Image'**
+  String get barcodeLabelToolImage;
+
+  /// No description provided for @barcodeLabelToolShape.
+  ///
+  /// In en, this message translates to:
+  /// **'Shape'**
+  String get barcodeLabelToolShape;
+
+  /// No description provided for @barcodeLabelToolLine.
+  ///
+  /// In en, this message translates to:
+  /// **'Line'**
+  String get barcodeLabelToolLine;
+
+  /// No description provided for @barcodeLabelLayers.
+  ///
+  /// In en, this message translates to:
+  /// **'Layers'**
+  String get barcodeLabelLayers;
+
+  /// No description provided for @barcodeLabelProperties.
+  ///
+  /// In en, this message translates to:
+  /// **'Properties'**
+  String get barcodeLabelProperties;
+
+  /// No description provided for @barcodeLabelNoSelection.
+  ///
+  /// In en, this message translates to:
+  /// **'No element selected'**
+  String get barcodeLabelNoSelection;
+
+  /// No description provided for @barcodeLabelBinding.
+  ///
+  /// In en, this message translates to:
+  /// **'Data field'**
+  String get barcodeLabelBinding;
+
+  /// No description provided for @barcodeLabelSymbology.
+  ///
+  /// In en, this message translates to:
+  /// **'Symbology'**
+  String get barcodeLabelSymbology;
+
+  /// No description provided for @barcodeLabelPermissionDesign.
+  ///
+  /// In en, this message translates to:
+  /// **'Design and manage label templates'**
+  String get barcodeLabelPermissionDesign;
+
+  /// No description provided for @barcodeLabelPermissionPrint.
+  ///
+  /// In en, this message translates to:
+  /// **'Print labels with templates'**
+  String get barcodeLabelPermissionPrint;
+
+  /// No description provided for @barcodeLabelPrintJobTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Print labels with template'**
+  String get barcodeLabelPrintJobTitle;
+
+  /// No description provided for @barcodeLabelSelectTemplate.
+  ///
+  /// In en, this message translates to:
+  /// **'Label template'**
+  String get barcodeLabelSelectTemplate;
+
+  /// No description provided for @barcodeLabelQtyAll.
+  ///
+  /// In en, this message translates to:
+  /// **'Qty for all'**
+  String get barcodeLabelQtyAll;
+
+  /// No description provided for @barcodeLabelApplyQty.
+  ///
+  /// In en, this message translates to:
+  /// **'Apply'**
+  String get barcodeLabelApplyQty;
+
+  /// No description provided for @barcodeLabelPrintItems.
+  ///
+  /// In en, this message translates to:
+  /// **'Print items'**
+  String get barcodeLabelPrintItems;
+
+  /// No description provided for @barcodeLabelSavePdf.
+  ///
+  /// In en, this message translates to:
+  /// **'Save PDF'**
+  String get barcodeLabelSavePdf;
+
+  /// No description provided for @barcodeLabelSystemPrint.
+  ///
+  /// In en, this message translates to:
+  /// **'Print'**
+  String get barcodeLabelSystemPrint;
+
+  /// No description provided for @barcodeLabelPrintWebHint.
+  ///
+  /// In en, this message translates to:
+  /// **'On web, the PDF is saved — print it from your browser.'**
+  String get barcodeLabelPrintWebHint;
+
+  /// No description provided for @barcodeLabelNoPublishedTemplates.
+  ///
+  /// In en, this message translates to:
+  /// **'No published templates. Create and publish one in the studio first.'**
+  String get barcodeLabelNoPublishedTemplates;
+
+  /// No description provided for @barcodeLabelPreviewEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'Preview unavailable'**
+  String get barcodeLabelPreviewEmpty;
+
+  /// No description provided for @barcodeLabelPrintTotal.
+  ///
+  /// In en, this message translates to:
+  /// **'Total labels: {count}'**
+  String barcodeLabelPrintTotal(int count);
+
+  /// No description provided for @barcodeLabelAdvancedPrint.
+  ///
+  /// In en, this message translates to:
+  /// **'Advanced label print'**
+  String get barcodeLabelAdvancedPrint;
+
+  /// No description provided for @barcodeLabelPrintWithTemplate.
+  ///
+  /// In en, this message translates to:
+  /// **'Print general barcodes with template…'**
+  String get barcodeLabelPrintWithTemplate;
+
+  /// No description provided for @barcodeLabelPrintUniqueWithTemplate.
+  ///
+  /// In en, this message translates to:
+  /// **'Print unique units with template…'**
+  String get barcodeLabelPrintUniqueWithTemplate;
+
+  /// No description provided for @barcodeLabelExcelPrintTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Print from Excel'**
+  String get barcodeLabelExcelPrintTitle;
+
+  /// No description provided for @barcodeLabelExcelPrintHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick a CSV/Excel file with columns code, barcode, name, qty.'**
+  String get barcodeLabelExcelPrintHint;
+
+  /// No description provided for @barcodeLabelPickExcel.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose file'**
+  String get barcodeLabelPickExcel;
+
+  /// No description provided for @barcodeLabelExcelReadFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not read the file'**
+  String get barcodeLabelExcelReadFailed;
+
+  /// No description provided for @barcodeLabelExcelReady.
+  ///
+  /// In en, this message translates to:
+  /// **'{rows} valid rows · {labels} labels'**
+  String barcodeLabelExcelReady(int rows, int labels);
+
+  /// No description provided for @barcodeLabelExcelErrors.
+  ///
+  /// In en, this message translates to:
+  /// **'Row errors:'**
+  String get barcodeLabelExcelErrors;
+
+  /// No description provided for @barcodeLabelExcelRowError.
+  ///
+  /// In en, this message translates to:
+  /// **'Row {line}: missing {field}'**
+  String barcodeLabelExcelRowError(int line, String field);
+
+  /// No description provided for @barcodeLabelContinueToPrint.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue to print'**
+  String get barcodeLabelContinueToPrint;
+
+  /// No description provided for @barcodeLabelSerialPrintTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Serial print'**
+  String get barcodeLabelSerialPrintTitle;
+
+  /// No description provided for @barcodeLabelSerialPrintHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Define a number range to generate serial barcodes.'**
+  String get barcodeLabelSerialPrintHint;
+
+  /// No description provided for @barcodeLabelSerialPrefix.
+  ///
+  /// In en, this message translates to:
+  /// **'Prefix'**
+  String get barcodeLabelSerialPrefix;
+
+  /// No description provided for @barcodeLabelSerialSuffix.
+  ///
+  /// In en, this message translates to:
+  /// **'Suffix'**
+  String get barcodeLabelSerialSuffix;
+
+  /// No description provided for @barcodeLabelSerialStart.
+  ///
+  /// In en, this message translates to:
+  /// **'From'**
+  String get barcodeLabelSerialStart;
+
+  /// No description provided for @barcodeLabelSerialEnd.
+  ///
+  /// In en, this message translates to:
+  /// **'To'**
+  String get barcodeLabelSerialEnd;
+
+  /// No description provided for @barcodeLabelSerialPad.
+  ///
+  /// In en, this message translates to:
+  /// **'Pad length'**
+  String get barcodeLabelSerialPad;
+
+  /// No description provided for @barcodeLabelSerialQtyEach.
+  ///
+  /// In en, this message translates to:
+  /// **'Qty each'**
+  String get barcodeLabelSerialQtyEach;
+
+  /// No description provided for @barcodeLabelSerialPreview.
+  ///
+  /// In en, this message translates to:
+  /// **'Value count: {count}'**
+  String barcodeLabelSerialPreview(int count);
+
+  /// No description provided for @barcodeLabelSerialItem.
+  ///
+  /// In en, this message translates to:
+  /// **'Generated serial'**
+  String get barcodeLabelSerialItem;
+
+  /// No description provided for @barcodeLabelSerialInvalidRange.
+  ///
+  /// In en, this message translates to:
+  /// **'Invalid start/end range'**
+  String get barcodeLabelSerialInvalidRange;
+
+  /// No description provided for @barcodeLabelSerialTooMany.
+  ///
+  /// In en, this message translates to:
+  /// **'Maximum 10000 labels per job'**
+  String get barcodeLabelSerialTooMany;
+
+  /// No description provided for @barcodeLabelPrintersTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Roll printer profiles'**
+  String get barcodeLabelPrintersTitle;
+
+  /// No description provided for @barcodeLabelPrinterAdd.
+  ///
+  /// In en, this message translates to:
+  /// **'Add profile'**
+  String get barcodeLabelPrinterAdd;
+
+  /// No description provided for @barcodeLabelPrinterEdit.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit profile'**
+  String get barcodeLabelPrinterEdit;
+
+  /// No description provided for @barcodeLabelPrinterName.
+  ///
+  /// In en, this message translates to:
+  /// **'Printer name'**
+  String get barcodeLabelPrinterName;
+
+  /// No description provided for @barcodeLabelPrinterMode.
+  ///
+  /// In en, this message translates to:
+  /// **'Print mode'**
+  String get barcodeLabelPrinterMode;
+
+  /// No description provided for @barcodeLabelPrinterConnection.
+  ///
+  /// In en, this message translates to:
+  /// **'Connection'**
+  String get barcodeLabelPrinterConnection;
+
+  /// No description provided for @barcodeLabelPrinterHost.
+  ///
+  /// In en, this message translates to:
+  /// **'Host / IP'**
+  String get barcodeLabelPrinterHost;
+
+  /// No description provided for @barcodeLabelPrinterPort.
+  ///
+  /// In en, this message translates to:
+  /// **'Port'**
+  String get barcodeLabelPrinterPort;
+
+  /// No description provided for @barcodeLabelPrinterWidthMm.
+  ///
+  /// In en, this message translates to:
+  /// **'Label width (mm)'**
+  String get barcodeLabelPrinterWidthMm;
+
+  /// No description provided for @barcodeLabelPrinterHeightMm.
+  ///
+  /// In en, this message translates to:
+  /// **'Label height (mm)'**
+  String get barcodeLabelPrinterHeightMm;
+
+  /// No description provided for @barcodeLabelPrinterDpi.
+  ///
+  /// In en, this message translates to:
+  /// **'DPI'**
+  String get barcodeLabelPrinterDpi;
+
+  /// No description provided for @barcodeLabelPrinterEnabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Enabled'**
+  String get barcodeLabelPrinterEnabled;
+
+  /// No description provided for @barcodeLabelPrinterDisabled.
+  ///
+  /// In en, this message translates to:
+  /// **'Disabled'**
+  String get barcodeLabelPrinterDisabled;
+
+  /// No description provided for @barcodeLabelPrinterSetActive.
+  ///
+  /// In en, this message translates to:
+  /// **'Set active'**
+  String get barcodeLabelPrinterSetActive;
+
+  /// No description provided for @barcodeLabelPrintersSaved.
+  ///
+  /// In en, this message translates to:
+  /// **'Printer profiles saved'**
+  String get barcodeLabelPrintersSaved;
+
+  /// No description provided for @barcodeLabelPrintersEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No profiles yet. Add one for roll printing.'**
+  String get barcodeLabelPrintersEmpty;
+
+  /// No description provided for @barcodeLabelPrintersWebBanner.
+  ///
+  /// In en, this message translates to:
+  /// **'Raw roll/Zebra printing is limited on web; use Windows or Android for best results.'**
+  String get barcodeLabelPrintersWebBanner;
+
+  /// No description provided for @barcodeLabelPrintersSpikeNote.
+  ///
+  /// In en, this message translates to:
+  /// **'ZPL/ESC-POS is experimental and needs real-hardware validation. Stable path today: PDF spooler at label size.'**
+  String get barcodeLabelPrintersSpikeNote;
+
+  /// No description provided for @barcodeLabelSelectPrinter.
+  ///
+  /// In en, this message translates to:
+  /// **'Printer profile'**
+  String get barcodeLabelSelectPrinter;
+
+  /// No description provided for @barcodeLabelRollPrint.
+  ///
+  /// In en, this message translates to:
+  /// **'Roll print'**
+  String get barcodeLabelRollPrint;
+
+  /// No description provided for @barcodeLabelNoPrinterProfile.
+  ///
+  /// In en, this message translates to:
+  /// **'No active printer profile selected'**
+  String get barcodeLabelNoPrinterProfile;
+
+  /// No description provided for @barcodeLabelPrinterZplNeedsTcp.
+  ///
+  /// In en, this message translates to:
+  /// **'For ZPL, set TCP connection and Host in the profile'**
+  String get barcodeLabelPrinterZplNeedsTcp;
+
+  /// No description provided for @barcodeLabelPrinterZplSent.
+  ///
+  /// In en, this message translates to:
+  /// **'ZPL sent to printer'**
+  String get barcodeLabelPrinterZplSent;
+
+  /// No description provided for @barcodeLabelPrinterEscPosFallback.
+  ///
+  /// In en, this message translates to:
+  /// **'ESC/POS not spiked yet; printing via roll PDF'**
+  String get barcodeLabelPrinterEscPosFallback;
+
+  /// No description provided for @barcodeLabelPrinterUnsupportedMode.
+  ///
+  /// In en, this message translates to:
+  /// **'Unsupported printer mode'**
+  String get barcodeLabelPrinterUnsupportedMode;
+
+  /// No description provided for @barcodeLabelPrintFromProductForm.
+  ///
+  /// In en, this message translates to:
+  /// **'Print with label template'**
+  String get barcodeLabelPrintFromProductForm;
+
+  /// No description provided for @barcodeLabelCanvasSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Canvas & print'**
+  String get barcodeLabelCanvasSettings;
+
+  /// No description provided for @barcodeLabelCanvasWidth.
+  ///
+  /// In en, this message translates to:
+  /// **'Design width (mm)'**
+  String get barcodeLabelCanvasWidth;
+
+  /// No description provided for @barcodeLabelCanvasHeight.
+  ///
+  /// In en, this message translates to:
+  /// **'Design height (mm)'**
+  String get barcodeLabelCanvasHeight;
+
+  /// No description provided for @barcodeLabelPrintLayout.
+  ///
+  /// In en, this message translates to:
+  /// **'Print layout'**
+  String get barcodeLabelPrintLayout;
+
+  /// No description provided for @barcodeLabelPrintLayoutSheet.
+  ///
+  /// In en, this message translates to:
+  /// **'Sheet (A4, grid)'**
+  String get barcodeLabelPrintLayoutSheet;
+
+  /// No description provided for @barcodeLabelPrintLayoutRoll.
+  ///
+  /// In en, this message translates to:
+  /// **'Roll / thermal (one label per page)'**
+  String get barcodeLabelPrintLayoutRoll;
+
+  /// No description provided for @barcodeLabelPaperSize.
+  ///
+  /// In en, this message translates to:
+  /// **'Paper size'**
+  String get barcodeLabelPaperSize;
+
+  /// No description provided for @barcodeLabelPaperCustom.
+  ///
+  /// In en, this message translates to:
+  /// **'Custom size'**
+  String get barcodeLabelPaperCustom;
+
+  /// No description provided for @barcodeLabelPaperWidth.
+  ///
+  /// In en, this message translates to:
+  /// **'Paper width (mm)'**
+  String get barcodeLabelPaperWidth;
+
+  /// No description provided for @barcodeLabelPaperHeight.
+  ///
+  /// In en, this message translates to:
+  /// **'Paper height (mm)'**
+  String get barcodeLabelPaperHeight;
+
+  /// No description provided for @barcodeLabelOrientation.
+  ///
+  /// In en, this message translates to:
+  /// **'Orientation'**
+  String get barcodeLabelOrientation;
+
+  /// No description provided for @barcodeLabelPortrait.
+  ///
+  /// In en, this message translates to:
+  /// **'Portrait'**
+  String get barcodeLabelPortrait;
+
+  /// No description provided for @barcodeLabelLandscape.
+  ///
+  /// In en, this message translates to:
+  /// **'Landscape'**
+  String get barcodeLabelLandscape;
+
+  /// No description provided for @barcodeLabelSheetColumns.
+  ///
+  /// In en, this message translates to:
+  /// **'Columns'**
+  String get barcodeLabelSheetColumns;
+
+  /// No description provided for @barcodeLabelSheetRows.
+  ///
+  /// In en, this message translates to:
+  /// **'Rows'**
+  String get barcodeLabelSheetRows;
+
+  /// No description provided for @barcodeLabelRollModeHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Roll mode uses the design area size only; paper height is not fixed.'**
+  String get barcodeLabelRollModeHint;
+
+  /// No description provided for @barcodeLabelPreviewData.
+  ///
+  /// In en, this message translates to:
+  /// **'Preview test data'**
+  String get barcodeLabelPreviewData;
+
+  /// No description provided for @barcodeLabelPreviewDataHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Add elements with data bindings to edit preview values here.'**
+  String get barcodeLabelPreviewDataHint;
+
+  /// No description provided for @barcodeLabelRotation.
+  ///
+  /// In en, this message translates to:
+  /// **'Rotation (°)'**
+  String get barcodeLabelRotation;
+
+  /// No description provided for @barcodeLabelRotate90.
+  ///
+  /// In en, this message translates to:
+  /// **'Rotate 90°'**
+  String get barcodeLabelRotate90;
+
+  /// No description provided for @barcodeLabelContentMode.
+  ///
+  /// In en, this message translates to:
+  /// **'Content source'**
+  String get barcodeLabelContentMode;
+
+  /// No description provided for @barcodeLabelContentBinding.
+  ///
+  /// In en, this message translates to:
+  /// **'Data field'**
+  String get barcodeLabelContentBinding;
+
+  /// No description provided for @barcodeLabelContentFixed.
+  ///
+  /// In en, this message translates to:
+  /// **'Fixed text'**
+  String get barcodeLabelContentFixed;
+
+  /// No description provided for @barcodeLabelFixedValue.
+  ///
+  /// In en, this message translates to:
+  /// **'Text value'**
+  String get barcodeLabelFixedValue;
+
+  /// No description provided for @barcodeLabelShowBarcodeText.
+  ///
+  /// In en, this message translates to:
+  /// **'Show barcode text below'**
+  String get barcodeLabelShowBarcodeText;
+
+  /// No description provided for @barcodeLabelPrintSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Print settings'**
+  String get barcodeLabelPrintSettings;
+
+  /// No description provided for @barcodeLabelBlankCanvasDialogTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'New blank label'**
+  String get barcodeLabelBlankCanvasDialogTitle;
+
+  /// No description provided for @barcodeLabelBlankCanvasDialogHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Set the design area size. For thermal printers use roll mode — only width and label height matter.'**
+  String get barcodeLabelBlankCanvasDialogHint;
+
+  /// No description provided for @barcodeLabelStartDesign.
+  ///
+  /// In en, this message translates to:
+  /// **'Start designing'**
+  String get barcodeLabelStartDesign;
+
+  /// No description provided for @barcodeLabelPrinterSizeMatch.
+  ///
+  /// In en, this message translates to:
+  /// **'Printer profile matches design ({width}×{height} mm)'**
+  String barcodeLabelPrinterSizeMatch(String width, String height);
+
+  /// No description provided for @barcodeLabelPrinterSizeMismatch.
+  ///
+  /// In en, this message translates to:
+  /// **'Printer {pw}×{ph} mm · design {dw}×{dh} mm — output uses design size'**
+  String barcodeLabelPrinterSizeMismatch(
+    String pw,
+    String ph,
+    String dw,
+    String dh,
+  );
+
+  /// No description provided for @barcodeLabelLivePreview.
+  ///
+  /// In en, this message translates to:
+  /// **'Live PDF preview'**
+  String get barcodeLabelLivePreview;
+
+  /// No description provided for @barcodeLabelApplyPrinterSize.
+  ///
+  /// In en, this message translates to:
+  /// **'Match printer size ({width}×{height} mm)'**
+  String barcodeLabelApplyPrinterSize(String width, String height);
+
+  /// No description provided for @barcodeLabelImageSource.
+  ///
+  /// In en, this message translates to:
+  /// **'Image source'**
+  String get barcodeLabelImageSource;
+
+  /// No description provided for @barcodeLabelImageBusinessLogo.
+  ///
+  /// In en, this message translates to:
+  /// **'Business logo'**
+  String get barcodeLabelImageBusinessLogo;
+
+  /// No description provided for @barcodeLabelImageProduct.
+  ///
+  /// In en, this message translates to:
+  /// **'Product image'**
+  String get barcodeLabelImageProduct;
+
+  /// No description provided for @barcodeLabelImageUpload.
+  ///
+  /// In en, this message translates to:
+  /// **'Uploaded image'**
+  String get barcodeLabelImageUpload;
+
+  /// No description provided for @barcodeLabelPickImage.
+  ///
+  /// In en, this message translates to:
+  /// **'Choose image file'**
+  String get barcodeLabelPickImage;
+
+  /// No description provided for @barcodeLabelImageFit.
+  ///
+  /// In en, this message translates to:
+  /// **'Image fit'**
+  String get barcodeLabelImageFit;
+
+  /// No description provided for @barcodeLabelImageFitContain.
+  ///
+  /// In en, this message translates to:
+  /// **'Contain'**
+  String get barcodeLabelImageFitContain;
+
+  /// No description provided for @barcodeLabelImageFitCover.
+  ///
+  /// In en, this message translates to:
+  /// **'Cover'**
+  String get barcodeLabelImageFitCover;
+
+  /// No description provided for @barcodeLabelImageFitFill.
+  ///
+  /// In en, this message translates to:
+  /// **'Fill'**
+  String get barcodeLabelImageFitFill;
+
+  /// No description provided for @barcodeLabelPrinterEscPosSent.
+  ///
+  /// In en, this message translates to:
+  /// **'ESC/POS sent to printer'**
+  String get barcodeLabelPrinterEscPosSent;
+
+  /// No description provided for @distributionVisitCompleteHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Record the visit outcome; pick an invoice or sell from van stock.'**
+  String get distributionVisitCompleteHint;
+
+  /// No description provided for @distributionLinkInvoice.
+  ///
+  /// In en, this message translates to:
+  /// **'Link sales invoice'**
+  String get distributionLinkInvoice;
+
+  /// No description provided for @distributionSelectInvoice.
+  ///
+  /// In en, this message translates to:
+  /// **'Select invoice'**
+  String get distributionSelectInvoice;
+
+  /// No description provided for @distributionNoInvoiceLink.
+  ///
+  /// In en, this message translates to:
+  /// **'No invoice link'**
+  String get distributionNoInvoiceLink;
+
+  /// No description provided for @distributionNoRecentInvoices.
+  ///
+  /// In en, this message translates to:
+  /// **'No recent invoices for this customer.'**
+  String get distributionNoRecentInvoices;
+
+  /// No description provided for @distributionLinkedDocument.
+  ///
+  /// In en, this message translates to:
+  /// **'Linked document'**
+  String get distributionLinkedDocument;
+
+  /// No description provided for @distributionRemaining.
+  ///
+  /// In en, this message translates to:
+  /// **'Remaining'**
+  String get distributionRemaining;
+
+  /// No description provided for @distributionVanSaleFromStock.
+  ///
+  /// In en, this message translates to:
+  /// **'Sell from van stock'**
+  String get distributionVanSaleFromStock;
+
+  /// No description provided for @distributionVanSaleFromStockHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick SKUs from current van stock; invoice uses price and tax.'**
+  String get distributionVanSaleFromStockHint;
+
+  /// No description provided for @distributionVanQtyExceedsStock.
+  ///
+  /// In en, this message translates to:
+  /// **'Quantity exceeds van stock.'**
+  String get distributionVanQtyExceedsStock;
+
+  /// No description provided for @distributionVarianceMustBeZero.
+  ///
+  /// In en, this message translates to:
+  /// **'Variance must be zero, or manager must allow variance.'**
+  String get distributionVarianceMustBeZero;
+
+  /// No description provided for @distributionVarianceOverrideManageOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'Variance override requires manage permission.'**
+  String get distributionVarianceOverrideManageOnly;
+
+  /// No description provided for @distributionBankRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Select a bank account for card collection.'**
+  String get distributionBankRequired;
+
+  /// No description provided for @distributionBankForCard.
+  ///
+  /// In en, this message translates to:
+  /// **'Bank account (card)'**
+  String get distributionBankForCard;
+
+  /// No description provided for @distributionCreateReceiptHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Cash/card receipts allocate to the day\'\'s visit invoices.'**
+  String get distributionCreateReceiptHint;
+
+  /// No description provided for @distributionAllowVariance.
+  ///
+  /// In en, this message translates to:
+  /// **'Allow confirm with variance'**
+  String get distributionAllowVariance;
+
+  /// No description provided for @distributionAllowVarianceHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Only managers can confirm settlements with variance.'**
+  String get distributionAllowVarianceHint;
+
+  /// No description provided for @distributionDraftAwaitingConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Draft saved; final confirm needs settle/manage.'**
+  String get distributionDraftAwaitingConfirm;
+
+  /// No description provided for @distributionSaveDraftOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'Draft only'**
+  String get distributionSaveDraftOnly;
+
+  /// No description provided for @distributionConfirmNeedsManager.
+  ///
+  /// In en, this message translates to:
+  /// **'Final settlement confirm needs settle or manage.'**
+  String get distributionConfirmNeedsManager;
+
+  /// No description provided for @distributionGeofenceOverrideManageOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'Geofence override is manage-only.'**
+  String get distributionGeofenceOverrideManageOnly;
+
+  /// No description provided for @distributionGeofenceOverrideReason.
+  ///
+  /// In en, this message translates to:
+  /// **'Override reason'**
+  String get distributionGeofenceOverrideReason;
+
+  /// No description provided for @distributionPermissionSettle.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm daily settlement'**
+  String get distributionPermissionSettle;
+
+  /// No description provided for @distributionPermissionApproveReturns.
+  ///
+  /// In en, this message translates to:
+  /// **'Approve distribution returns'**
+  String get distributionPermissionApproveReturns;
+
+  /// No description provided for @distributionSourceInvoice.
+  ///
+  /// In en, this message translates to:
+  /// **'Source invoice for return'**
+  String get distributionSourceInvoice;
+
+  /// No description provided for @distributionSettlementsReport.
+  ///
+  /// In en, this message translates to:
+  /// **'Settlements'**
+  String get distributionSettlementsReport;
+
+  /// No description provided for @distributionOrderRate.
+  ///
+  /// In en, this message translates to:
+  /// **'Order rate'**
+  String get distributionOrderRate;
+
+  /// No description provided for @distributionVarianceAbs.
+  ///
+  /// In en, this message translates to:
+  /// **'Abs. variance total'**
+  String get distributionVarianceAbs;
+
+  /// No description provided for @distributionCustomerCredit.
+  ///
+  /// In en, this message translates to:
+  /// **'Customer credit'**
+  String get distributionCustomerCredit;
+
+  /// No description provided for @distributionCustomerCreditBlocked.
+  ///
+  /// In en, this message translates to:
+  /// **'Customer credit limit exceeded or blocked; van sale not allowed.'**
+  String get distributionCustomerCreditBlocked;
+
+  /// No description provided for @distributionAvailableCredit.
+  ///
+  /// In en, this message translates to:
+  /// **'Available credit'**
+  String get distributionAvailableCredit;
+
+  /// No description provided for @distributionCreditLimit.
+  ///
+  /// In en, this message translates to:
+  /// **'Credit limit'**
+  String get distributionCreditLimit;
+
+  /// No description provided for @distributionPodTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Proof of delivery (POD)'**
+  String get distributionPodTitle;
+
+  /// No description provided for @distributionPodHint.
+  ///
+  /// In en, this message translates to:
+  /// **'If goods were delivered, record the recipient name.'**
+  String get distributionPodHint;
+
+  /// No description provided for @distributionPodConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Delivery confirmed'**
+  String get distributionPodConfirm;
+
+  /// No description provided for @distributionPodSignerName.
+  ///
+  /// In en, this message translates to:
+  /// **'Receiver name'**
+  String get distributionPodSignerName;
+
+  /// No description provided for @distributionPodNote.
+  ///
+  /// In en, this message translates to:
+  /// **'Delivery note'**
+  String get distributionPodNote;
+
+  /// No description provided for @distributionPodSignerRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Receiver name is required'**
+  String get distributionPodSignerRequired;
+
+  /// No description provided for @distributionLiveRefresh.
+  ///
+  /// In en, this message translates to:
+  /// **'Live'**
+  String get distributionLiveRefresh;
+
+  /// No description provided for @distributionLastUpdated.
+  ///
+  /// In en, this message translates to:
+  /// **'Last updated'**
+  String get distributionLastUpdated;
+
+  /// No description provided for @distributionLiveAt.
+  ///
+  /// In en, this message translates to:
+  /// **'Live location'**
+  String get distributionLiveAt;
+
+  /// No description provided for @distributionTeamMapEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No locations to show.'**
+  String get distributionTeamMapEmpty;
+
+  /// No description provided for @distributionTeamMapEmptyHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Visitors appear here when they open Distribution and allow location. Pins are GPS of the visitor, not the customer address.'**
+  String get distributionTeamMapEmptyHint;
+
+  /// No description provided for @distributionShareLiveLocation.
+  ///
+  /// In en, this message translates to:
+  /// **'Share live visitor location'**
+  String get distributionShareLiveLocation;
+
+  /// No description provided for @distributionShareLiveLocationHint.
+  ///
+  /// In en, this message translates to:
+  /// **'While Distribution is open, visitors send GPS so managers can see them on the team map — even without an active visit.'**
+  String get distributionShareLiveLocationHint;
+
+  /// No description provided for @distributionLiveLocationVisitorHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Your location is shared with managers on the team map while this page is open.'**
+  String get distributionLiveLocationVisitorHint;
+
+  /// No description provided for @distributionLiveLocationGpsUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Location is off or permission was denied, so you will not appear on the team map.'**
+  String get distributionLiveLocationGpsUnavailable;
+
+  /// No description provided for @distributionLiveLocationDisabledBanner.
+  ///
+  /// In en, this message translates to:
+  /// **'Live location sharing is turned off in distribution settings.'**
+  String get distributionLiveLocationDisabledBanner;
+
+  /// No description provided for @distributionPresenceOnline.
+  ///
+  /// In en, this message translates to:
+  /// **'Online'**
+  String get distributionPresenceOnline;
+
+  /// No description provided for @distributionPresenceRecent.
+  ///
+  /// In en, this message translates to:
+  /// **'Recently seen'**
+  String get distributionPresenceRecent;
+
+  /// No description provided for @distributionPresenceStale.
+  ///
+  /// In en, this message translates to:
+  /// **'Last known'**
+  String get distributionPresenceStale;
+
+  /// No description provided for @distributionPresenceOffline.
+  ///
+  /// In en, this message translates to:
+  /// **'Offline'**
+  String get distributionPresenceOffline;
+
+  /// No description provided for @distributionPresenceNone.
+  ///
+  /// In en, this message translates to:
+  /// **'No GPS yet'**
+  String get distributionPresenceNone;
+
+  /// No description provided for @distributionTeamMapVisitors.
+  ///
+  /// In en, this message translates to:
+  /// **'Visitors'**
+  String get distributionTeamMapVisitors;
+
+  /// No description provided for @distributionTeamMapCustomers.
+  ///
+  /// In en, this message translates to:
+  /// **'Customers'**
+  String get distributionTeamMapCustomers;
+
+  /// No description provided for @distributionTeamMapTrail.
+  ///
+  /// In en, this message translates to:
+  /// **'Day trail'**
+  String get distributionTeamMapTrail;
+
+  /// No description provided for @distributionTeamMapNoTrail.
+  ///
+  /// In en, this message translates to:
+  /// **'No movement trail for this day.'**
+  String get distributionTeamMapNoTrail;
+
+  /// No description provided for @distributionTeamMapOnlineOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'Online only'**
+  String get distributionTeamMapOnlineOnly;
+
+  /// No description provided for @distributionTeamMapShowCustomers.
+  ///
+  /// In en, this message translates to:
+  /// **'Customer pins'**
+  String get distributionTeamMapShowCustomers;
+
+  /// No description provided for @distributionStatusUnknown.
+  ///
+  /// In en, this message translates to:
+  /// **'Unknown'**
+  String get distributionStatusUnknown;
+
+  /// No description provided for @distributionReturnPending.
+  ///
+  /// In en, this message translates to:
+  /// **'Pending'**
+  String get distributionReturnPending;
+
+  /// No description provided for @distributionReturnApproved.
+  ///
+  /// In en, this message translates to:
+  /// **'Approved'**
+  String get distributionReturnApproved;
+
+  /// No description provided for @distributionReturnRejected.
+  ///
+  /// In en, this message translates to:
+  /// **'Rejected'**
+  String get distributionReturnRejected;
+
+  /// No description provided for @distributionDayProgress.
+  ///
+  /// In en, this message translates to:
+  /// **'Today\'\'s progress'**
+  String get distributionDayProgress;
+
+  /// No description provided for @distributionStopsRemaining.
+  ///
+  /// In en, this message translates to:
+  /// **'Remaining'**
+  String get distributionStopsRemaining;
+
+  /// No description provided for @distributionStopsDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Done'**
+  String get distributionStopsDone;
+
+  /// No description provided for @distributionNextStop.
+  ///
+  /// In en, this message translates to:
+  /// **'Next stop'**
+  String get distributionNextStop;
+
+  /// No description provided for @distributionCallCustomer.
+  ///
+  /// In en, this message translates to:
+  /// **'Call'**
+  String get distributionCallCustomer;
+
+  /// No description provided for @distributionNavigate.
+  ///
+  /// In en, this message translates to:
+  /// **'Navigate'**
+  String get distributionNavigate;
+
+  /// No description provided for @distributionCompleteVisitCta.
+  ///
+  /// In en, this message translates to:
+  /// **'Complete visit'**
+  String get distributionCompleteVisitCta;
+
+  /// No description provided for @distributionVisitWizardStepOutcome.
+  ///
+  /// In en, this message translates to:
+  /// **'Outcome'**
+  String get distributionVisitWizardStepOutcome;
+
+  /// No description provided for @distributionVisitWizardStepSale.
+  ///
+  /// In en, this message translates to:
+  /// **'Sale / invoice'**
+  String get distributionVisitWizardStepSale;
+
+  /// No description provided for @distributionVisitWizardStepDelivery.
+  ///
+  /// In en, this message translates to:
+  /// **'Delivery & docs'**
+  String get distributionVisitWizardStepDelivery;
+
+  /// No description provided for @distributionVisitWizardNext.
+  ///
+  /// In en, this message translates to:
+  /// **'Continue'**
+  String get distributionVisitWizardNext;
+
+  /// No description provided for @distributionVisitWizardBack.
+  ///
+  /// In en, this message translates to:
+  /// **'Back'**
+  String get distributionVisitWizardBack;
+
+  /// No description provided for @distributionVisitWizardFinish.
+  ///
+  /// In en, this message translates to:
+  /// **'Finish visit'**
+  String get distributionVisitWizardFinish;
+
+  /// No description provided for @distributionBackToVisit.
+  ///
+  /// In en, this message translates to:
+  /// **'Visit stays open after invoice'**
+  String get distributionBackToVisit;
+
+  /// No description provided for @distributionEmptyVisits.
+  ///
+  /// In en, this message translates to:
+  /// **'No visits in this range.'**
+  String get distributionEmptyVisits;
+
+  /// No description provided for @distributionEmptyVisitsHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Start today\'\'s plan from the Field tab.'**
+  String get distributionEmptyVisitsHint;
+
+  /// No description provided for @distributionEmptyReturns.
+  ///
+  /// In en, this message translates to:
+  /// **'No return requests yet.'**
+  String get distributionEmptyReturns;
+
+  /// No description provided for @distributionFilterAll.
+  ///
+  /// In en, this message translates to:
+  /// **'All'**
+  String get distributionFilterAll;
+
+  /// No description provided for @distributionFilterPending.
+  ///
+  /// In en, this message translates to:
+  /// **'Pending'**
+  String get distributionFilterPending;
+
+  /// No description provided for @distributionGoToField.
+  ///
+  /// In en, this message translates to:
+  /// **'Go to Field'**
+  String get distributionGoToField;
+
+  /// No description provided for @distributionGoToReports.
+  ///
+  /// In en, this message translates to:
+  /// **'Performance report'**
+  String get distributionGoToReports;
+
+  /// No description provided for @distributionOfflineQueued.
+  ///
+  /// In en, this message translates to:
+  /// **'Saved to offline queue — will sync when online'**
+  String get distributionOfflineQueued;
+
+  /// No description provided for @distributionOfflineQueueTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Offline queue'**
+  String get distributionOfflineQueueTitle;
+
+  /// No description provided for @distributionVarianceFormula.
+  ///
+  /// In en, this message translates to:
+  /// **'Variance = collections − expected − expenses'**
+  String get distributionVarianceFormula;
+
+  /// No description provided for @distributionCashPrefillHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Cash defaults to expected sales; adjust if needed.'**
+  String get distributionCashPrefillHint;
+
+  /// No description provided for @distributionManageSectionRoutes.
+  ///
+  /// In en, this message translates to:
+  /// **'Routes & stops'**
+  String get distributionManageSectionRoutes;
+
+  /// No description provided for @distributionManageSectionSettings.
+  ///
+  /// In en, this message translates to:
+  /// **'Distribution settings'**
+  String get distributionManageSectionSettings;
+
+  /// No description provided for @distributionAssignmentFrom.
+  ///
+  /// In en, this message translates to:
+  /// **'Valid from'**
+  String get distributionAssignmentFrom;
+
+  /// No description provided for @distributionAssignmentTo.
+  ///
+  /// In en, this message translates to:
+  /// **'Valid to'**
+  String get distributionAssignmentTo;
+
+  /// No description provided for @distributionHubToday.
+  ///
+  /// In en, this message translates to:
+  /// **'Today'**
+  String get distributionHubToday;
+
+  /// No description provided for @distributionMoreActions.
+  ///
+  /// In en, this message translates to:
+  /// **'More'**
+  String get distributionMoreActions;
+
+  /// No description provided for @distributionStopDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Done'**
+  String get distributionStopDone;
+
+  /// No description provided for @distributionStopCurrent.
+  ///
+  /// In en, this message translates to:
+  /// **'Current'**
+  String get distributionStopCurrent;
+
+  /// No description provided for @distributionStopPending.
+  ///
+  /// In en, this message translates to:
+  /// **'Todo'**
+  String get distributionStopPending;
+
+  /// No description provided for @distributionLiveAutoRefresh.
+  ///
+  /// In en, this message translates to:
+  /// **'Auto refresh'**
+  String get distributionLiveAutoRefresh;
+
+  /// No description provided for @distributionViewQueue.
+  ///
+  /// In en, this message translates to:
+  /// **'View queue'**
+  String get distributionViewQueue;
+
+  /// No description provided for @distributionTargetOnField.
+  ///
+  /// In en, this message translates to:
+  /// **'Your sales target'**
+  String get distributionTargetOnField;
+
+  /// No description provided for @distributionTabCommercial.
+  ///
+  /// In en, this message translates to:
+  /// **'Commercial'**
+  String get distributionTabCommercial;
+
+  /// No description provided for @distributionTabOrders.
+  ///
+  /// In en, this message translates to:
+  /// **'Orders'**
+  String get distributionTabOrders;
+
+  /// No description provided for @distributionTabDelivery.
+  ///
+  /// In en, this message translates to:
+  /// **'Delivery'**
+  String get distributionTabDelivery;
+
+  /// No description provided for @distributionTabLoadPlan.
+  ///
+  /// In en, this message translates to:
+  /// **'Load plan'**
+  String get distributionTabLoadPlan;
+
+  /// No description provided for @distributionTabPromos.
+  ///
+  /// In en, this message translates to:
+  /// **'Promotions'**
+  String get distributionTabPromos;
+
+  /// No description provided for @distributionTabKpiCommission.
+  ///
+  /// In en, this message translates to:
+  /// **'KPI'**
+  String get distributionTabKpiCommission;
+
+  /// No description provided for @distributionPresellOrdersHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Pre-sell orders waiting for warehouse load and delivery.'**
+  String get distributionPresellOrdersHint;
+
+  /// No description provided for @distributionCreateTripFromOrders.
+  ///
+  /// In en, this message translates to:
+  /// **'Create delivery trip'**
+  String get distributionCreateTripFromOrders;
+
+  /// No description provided for @distributionNoOrders.
+  ///
+  /// In en, this message translates to:
+  /// **'No pre-sell orders yet'**
+  String get distributionNoOrders;
+
+  /// No description provided for @distributionOrderStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Status'**
+  String get distributionOrderStatus;
+
+  /// No description provided for @distributionNetTotal.
+  ///
+  /// In en, this message translates to:
+  /// **'Net'**
+  String get distributionNetTotal;
+
+  /// No description provided for @distributionConfirmOrder.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm'**
+  String get distributionConfirmOrder;
+
+  /// No description provided for @distributionOrderConfirmed.
+  ///
+  /// In en, this message translates to:
+  /// **'Order confirmed'**
+  String get distributionOrderConfirmed;
+
+  /// No description provided for @distributionNoOrdersForTrip.
+  ///
+  /// In en, this message translates to:
+  /// **'No confirmed orders to put on a trip'**
+  String get distributionNoOrdersForTrip;
+
+  /// No description provided for @distributionTripCreated.
+  ///
+  /// In en, this message translates to:
+  /// **'Delivery trip created'**
+  String get distributionTripCreated;
+
+  /// No description provided for @distributionNoTrips.
+  ///
+  /// In en, this message translates to:
+  /// **'No delivery trips for this day'**
+  String get distributionNoTrips;
+
+  /// No description provided for @distributionTrip.
+  ///
+  /// In en, this message translates to:
+  /// **'Trip'**
+  String get distributionTrip;
+
+  /// No description provided for @distributionStartTrip.
+  ///
+  /// In en, this message translates to:
+  /// **'Start'**
+  String get distributionStartTrip;
+
+  /// No description provided for @distributionDeliver.
+  ///
+  /// In en, this message translates to:
+  /// **'Deliver'**
+  String get distributionDeliver;
+
+  /// No description provided for @distributionDeliveryPodTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Proof of delivery'**
+  String get distributionDeliveryPodTitle;
+
+  /// No description provided for @distributionMarkDelivered.
+  ///
+  /// In en, this message translates to:
+  /// **'Mark delivered'**
+  String get distributionMarkDelivered;
+
+  /// No description provided for @distributionMarkFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Could not deliver'**
+  String get distributionMarkFailed;
+
+  /// No description provided for @distributionDeliveredOk.
+  ///
+  /// In en, this message translates to:
+  /// **'Delivery recorded'**
+  String get distributionDeliveredOk;
+
+  /// No description provided for @distributionBuildLoadPlan.
+  ///
+  /// In en, this message translates to:
+  /// **'Build load plan from orders'**
+  String get distributionBuildLoadPlan;
+
+  /// No description provided for @distributionLoadPlanHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Aggregates confirmed pre-sell lines into a picking wave.'**
+  String get distributionLoadPlanHint;
+
+  /// No description provided for @distributionNoLoadPlans.
+  ///
+  /// In en, this message translates to:
+  /// **'No load plans'**
+  String get distributionNoLoadPlans;
+
+  /// No description provided for @distributionLoadPlan.
+  ///
+  /// In en, this message translates to:
+  /// **'Load plan'**
+  String get distributionLoadPlan;
+
+  /// No description provided for @distributionSkuLines.
+  ///
+  /// In en, this message translates to:
+  /// **'SKU lines'**
+  String get distributionSkuLines;
+
+  /// No description provided for @distributionConfirmLoad.
+  ///
+  /// In en, this message translates to:
+  /// **'Confirm & load van'**
+  String get distributionConfirmLoad;
+
+  /// No description provided for @distributionLoadPlanCreated.
+  ///
+  /// In en, this message translates to:
+  /// **'Load plan created'**
+  String get distributionLoadPlanCreated;
+
+  /// No description provided for @distributionLoadPlanConfirmed.
+  ///
+  /// In en, this message translates to:
+  /// **'Load plan confirmed'**
+  String get distributionLoadPlanConfirmed;
+
+  /// No description provided for @distributionManageOnly.
+  ///
+  /// In en, this message translates to:
+  /// **'Only managers can edit this section'**
+  String get distributionManageOnly;
+
+  /// No description provided for @distributionPromoCreate.
+  ///
+  /// In en, this message translates to:
+  /// **'New promotion'**
+  String get distributionPromoCreate;
+
+  /// No description provided for @distributionPromoCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Code'**
+  String get distributionPromoCode;
+
+  /// No description provided for @distributionPromoName.
+  ///
+  /// In en, this message translates to:
+  /// **'Name'**
+  String get distributionPromoName;
+
+  /// No description provided for @distributionPromoPercent.
+  ///
+  /// In en, this message translates to:
+  /// **'Discount %'**
+  String get distributionPromoPercent;
+
+  /// No description provided for @distributionNoPromos.
+  ///
+  /// In en, this message translates to:
+  /// **'No promotions'**
+  String get distributionNoPromos;
+
+  /// No description provided for @distributionKpiPackTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Distribution KPI pack'**
+  String get distributionKpiPackTitle;
+
+  /// No description provided for @distributionKpiCoverage.
+  ///
+  /// In en, this message translates to:
+  /// **'Coverage'**
+  String get distributionKpiCoverage;
+
+  /// No description provided for @distributionKpiStrike.
+  ///
+  /// In en, this message translates to:
+  /// **'Strike rate'**
+  String get distributionKpiStrike;
+
+  /// No description provided for @distributionKpiDropSize.
+  ///
+  /// In en, this message translates to:
+  /// **'Drop size'**
+  String get distributionKpiDropSize;
+
+  /// No description provided for @distributionKpiPresell.
+  ///
+  /// In en, this message translates to:
+  /// **'Pre-sell orders'**
+  String get distributionKpiPresell;
+
+  /// No description provided for @distributionKpiSales.
+  ///
+  /// In en, this message translates to:
+  /// **'Linked sales'**
+  String get distributionKpiSales;
+
+  /// No description provided for @distributionKpiShelf.
+  ///
+  /// In en, this message translates to:
+  /// **'Shelf score'**
+  String get distributionKpiShelf;
+
+  /// No description provided for @distributionCommissionTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Commission runs'**
+  String get distributionCommissionTitle;
+
+  /// No description provided for @distributionNoCommissionRuns.
+  ///
+  /// In en, this message translates to:
+  /// **'No commission runs yet'**
+  String get distributionNoCommissionRuns;
+
+  /// No description provided for @distributionEnablePresell.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable pre-sell orders'**
+  String get distributionEnablePresell;
+
+  /// No description provided for @distributionEnablePresellHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Visitor takes order for later delivery (separate from van sale).'**
+  String get distributionEnablePresellHint;
+
+  /// No description provided for @distributionEnablePromotions.
+  ///
+  /// In en, this message translates to:
+  /// **'Enable trade promotions'**
+  String get distributionEnablePromotions;
+
+  /// No description provided for @distributionEnableSuggestedOrder.
+  ///
+  /// In en, this message translates to:
+  /// **'Suggested order from history'**
+  String get distributionEnableSuggestedOrder;
+
+  /// No description provided for @distributionVisitorMaxDiscount.
+  ///
+  /// In en, this message translates to:
+  /// **'Visitor max discount %'**
+  String get distributionVisitorMaxDiscount;
+
+  /// No description provided for @distributionSaleMode.
+  ///
+  /// In en, this message translates to:
+  /// **'Sale type'**
+  String get distributionSaleMode;
+
+  /// No description provided for @distributionSaleModeVan.
+  ///
+  /// In en, this message translates to:
+  /// **'Van'**
+  String get distributionSaleModeVan;
+
+  /// No description provided for @distributionSaleModePresell.
+  ///
+  /// In en, this message translates to:
+  /// **'Pre-sell'**
+  String get distributionSaleModePresell;
+
+  /// No description provided for @distributionSaleModeInvoice.
+  ///
+  /// In en, this message translates to:
+  /// **'Invoice'**
+  String get distributionSaleModeInvoice;
+
+  /// No description provided for @distributionApplySuggestedOrder.
+  ///
+  /// In en, this message translates to:
+  /// **'Apply suggested order'**
+  String get distributionApplySuggestedOrder;
+
+  /// No description provided for @distributionApplyPromos.
+  ///
+  /// In en, this message translates to:
+  /// **'Apply promotions'**
+  String get distributionApplyPromos;
+
+  /// No description provided for @distributionPresellLinesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Pre-sell lines'**
+  String get distributionPresellLinesTitle;
+
+  /// No description provided for @distributionPresellLinesHint.
+  ///
+  /// In en, this message translates to:
+  /// **'These items will be delivered later — not taken from van stock.'**
+  String get distributionPresellLinesHint;
+
+  /// No description provided for @distributionProductId.
+  ///
+  /// In en, this message translates to:
+  /// **'Product ID'**
+  String get distributionProductId;
+
+  /// No description provided for @distributionProductNameOptional.
+  ///
+  /// In en, this message translates to:
+  /// **'Product name (optional)'**
+  String get distributionProductNameOptional;
+
+  /// No description provided for @distributionChequeItemsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Cheque details'**
+  String get distributionChequeItemsTitle;
+
+  /// No description provided for @distributionChequeItemsHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Each cheque becomes a received check document on confirm.'**
+  String get distributionChequeItemsHint;
+
+  /// No description provided for @distributionChequePersonId.
+  ///
+  /// In en, this message translates to:
+  /// **'Customer ID'**
+  String get distributionChequePersonId;
+
+  /// No description provided for @distributionChequeAmount.
+  ///
+  /// In en, this message translates to:
+  /// **'Amount'**
+  String get distributionChequeAmount;
+
+  /// No description provided for @distributionChequeNumber.
+  ///
+  /// In en, this message translates to:
+  /// **'Cheque no.'**
+  String get distributionChequeNumber;
+
+  /// No description provided for @distributionChequeDueDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Due date'**
+  String get distributionChequeDueDate;
+
+  /// No description provided for @distributionAddChequeItem.
+  ///
+  /// In en, this message translates to:
+  /// **'Add cheque'**
+  String get distributionAddChequeItem;
+
+  /// No description provided for @distributionChequeItemsRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Add cheque details when cheque amount > 0'**
+  String get distributionChequeItemsRequired;
+
+  /// No description provided for @distributionChequeItemsMismatch.
+  ///
+  /// In en, this message translates to:
+  /// **'Cheque lines total must match cheque collected'**
+  String get distributionChequeItemsMismatch;
+
+  /// No description provided for @distributionLineDiscount.
+  ///
+  /// In en, this message translates to:
+  /// **'Line discount'**
+  String get distributionLineDiscount;
+
+  /// No description provided for @distributionShelfAuditTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Shelf audit'**
+  String get distributionShelfAuditTitle;
+
+  /// No description provided for @distributionShelfFacingOk.
+  ///
+  /// In en, this message translates to:
+  /// **'Facing is correct'**
+  String get distributionShelfFacingOk;
+
+  /// No description provided for @distributionShelfPriceOk.
+  ///
+  /// In en, this message translates to:
+  /// **'Price label is correct'**
+  String get distributionShelfPriceOk;
+
+  /// No description provided for @distributionShelfStockOk.
+  ///
+  /// In en, this message translates to:
+  /// **'Shelf stock is adequate'**
+  String get distributionShelfStockOk;
+
+  /// No description provided for @distributionSelectVan.
+  ///
+  /// In en, this message translates to:
+  /// **'Select van'**
+  String get distributionSelectVan;
+
+  /// No description provided for @distributionSelectWarehouse.
+  ///
+  /// In en, this message translates to:
+  /// **'Select source warehouse'**
+  String get distributionSelectWarehouse;
+
+  /// No description provided for @distributionTabShelfAssets.
+  ///
+  /// In en, this message translates to:
+  /// **'Shelf & assets'**
+  String get distributionTabShelfAssets;
+
+  /// No description provided for @distributionCommissionRulesTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Commission rules'**
+  String get distributionCommissionRulesTitle;
+
+  /// No description provided for @distributionCommissionRuleCreate.
+  ///
+  /// In en, this message translates to:
+  /// **'New rule'**
+  String get distributionCommissionRuleCreate;
+
+  /// No description provided for @distributionCommissionPercent.
+  ///
+  /// In en, this message translates to:
+  /// **'Commission %'**
+  String get distributionCommissionPercent;
+
+  /// No description provided for @distributionCommissionCompute.
+  ///
+  /// In en, this message translates to:
+  /// **'Compute commission'**
+  String get distributionCommissionCompute;
+
+  /// No description provided for @distributionCommissionComputed.
+  ///
+  /// In en, this message translates to:
+  /// **'Commission computed'**
+  String get distributionCommissionComputed;
+
+  /// No description provided for @distributionNoCommissionRules.
+  ///
+  /// In en, this message translates to:
+  /// **'No commission rules yet'**
+  String get distributionNoCommissionRules;
+
+  /// No description provided for @distributionAssetsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Customer assets'**
+  String get distributionAssetsTitle;
+
+  /// No description provided for @distributionAssetCreate.
+  ///
+  /// In en, this message translates to:
+  /// **'Register asset'**
+  String get distributionAssetCreate;
+
+  /// No description provided for @distributionAssetType.
+  ///
+  /// In en, this message translates to:
+  /// **'Asset type'**
+  String get distributionAssetType;
+
+  /// No description provided for @distributionAssetCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Asset code'**
+  String get distributionAssetCode;
+
+  /// No description provided for @distributionNoAssets.
+  ///
+  /// In en, this message translates to:
+  /// **'No assets registered'**
+  String get distributionNoAssets;
+
+  /// No description provided for @distributionNoShelfAudits.
+  ///
+  /// In en, this message translates to:
+  /// **'No shelf audits yet'**
+  String get distributionNoShelfAudits;
+
+  /// No description provided for @distributionTargetMetric.
+  ///
+  /// In en, this message translates to:
+  /// **'Target metric'**
+  String get distributionTargetMetric;
+
+  /// No description provided for @distributionMetricAmount.
+  ///
+  /// In en, this message translates to:
+  /// **'Sales amount'**
+  String get distributionMetricAmount;
+
+  /// No description provided for @distributionMetricVisits.
+  ///
+  /// In en, this message translates to:
+  /// **'Visit count'**
+  String get distributionMetricVisits;
+
+  /// No description provided for @distributionMetricSkuQty.
+  ///
+  /// In en, this message translates to:
+  /// **'SKU quantity'**
+  String get distributionMetricSkuQty;
+
+  /// No description provided for @distributionMetricCoverage.
+  ///
+  /// In en, this message translates to:
+  /// **'Coverage %'**
+  String get distributionMetricCoverage;
+
+  /// No description provided for @distributionTargetValue.
+  ///
+  /// In en, this message translates to:
+  /// **'Target value'**
+  String get distributionTargetValue;
+
+  /// No description provided for @distributionWizardTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Set up field distribution'**
+  String get distributionWizardTitle;
+
+  /// No description provided for @distributionWizardHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Prepare territory, route, customers and visitor in a few steps.'**
+  String get distributionWizardHint;
+
+  /// No description provided for @distributionWizardStepMode.
+  ///
+  /// In en, this message translates to:
+  /// **'Sales model'**
+  String get distributionWizardStepMode;
+
+  /// No description provided for @distributionWizardStepWarehouse.
+  ///
+  /// In en, this message translates to:
+  /// **'Source warehouse'**
+  String get distributionWizardStepWarehouse;
+
+  /// No description provided for @distributionWizardStepRoute.
+  ///
+  /// In en, this message translates to:
+  /// **'Territory & route'**
+  String get distributionWizardStepRoute;
+
+  /// No description provided for @distributionWizardStepCustomers.
+  ///
+  /// In en, this message translates to:
+  /// **'Route customers'**
+  String get distributionWizardStepCustomers;
+
+  /// No description provided for @distributionWizardStepVisitor.
+  ///
+  /// In en, this message translates to:
+  /// **'Assign visitor'**
+  String get distributionWizardStepVisitor;
+
+  /// No description provided for @distributionWizardFinish.
+  ///
+  /// In en, this message translates to:
+  /// **'Finish setup'**
+  String get distributionWizardFinish;
+
+  /// No description provided for @distributionModeVan.
+  ///
+  /// In en, this message translates to:
+  /// **'Van sales (stock on the vehicle)'**
+  String get distributionModeVan;
+
+  /// No description provided for @distributionModePresell.
+  ///
+  /// In en, this message translates to:
+  /// **'Pre-sell (later delivery)'**
+  String get distributionModePresell;
+
+  /// No description provided for @distributionModeBoth.
+  ///
+  /// In en, this message translates to:
+  /// **'Both models'**
+  String get distributionModeBoth;
+
+  /// No description provided for @distributionCustomer360Title.
+  ///
+  /// In en, this message translates to:
+  /// **'Customer card'**
+  String get distributionCustomer360Title;
+
+  /// No description provided for @distributionCreditAvailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Available credit'**
+  String get distributionCreditAvailable;
+
+  /// No description provided for @distributionLastVisit.
+  ///
+  /// In en, this message translates to:
+  /// **'Last visit'**
+  String get distributionLastVisit;
+
+  /// No description provided for @distributionMustSell.
+  ///
+  /// In en, this message translates to:
+  /// **'Must-sell'**
+  String get distributionMustSell;
+
+  /// No description provided for @distributionScanBarcode.
+  ///
+  /// In en, this message translates to:
+  /// **'Scan barcode'**
+  String get distributionScanBarcode;
+
+  /// No description provided for @distributionBarcodeNotFound.
+  ///
+  /// In en, this message translates to:
+  /// **'No product matches this barcode'**
+  String get distributionBarcodeNotFound;
+
+  /// No description provided for @distributionAddSuggested.
+  ///
+  /// In en, this message translates to:
+  /// **'Add suggested order'**
+  String get distributionAddSuggested;
+
+  /// No description provided for @distributionFocLine.
+  ///
+  /// In en, this message translates to:
+  /// **'Free of charge'**
+  String get distributionFocLine;
+
+  /// No description provided for @distributionNearExpiry.
+  ///
+  /// In en, this message translates to:
+  /// **'Near expiry'**
+  String get distributionNearExpiry;
+
+  /// No description provided for @distributionExpiredLot.
+  ///
+  /// In en, this message translates to:
+  /// **'Expired'**
+  String get distributionExpiredLot;
+
+  /// No description provided for @distributionVanCapacity.
+  ///
+  /// In en, this message translates to:
+  /// **'Van capacity'**
+  String get distributionVanCapacity;
+
+  /// No description provided for @distributionVanPlate.
+  ///
+  /// In en, this message translates to:
+  /// **'Plate'**
+  String get distributionVanPlate;
+
+  /// No description provided for @distributionVanMaxWeight.
+  ///
+  /// In en, this message translates to:
+  /// **'Max weight (kg)'**
+  String get distributionVanMaxWeight;
+
+  /// No description provided for @distributionVanMaxVolume.
+  ///
+  /// In en, this message translates to:
+  /// **'Max volume (m³)'**
+  String get distributionVanMaxVolume;
+
+  /// No description provided for @distributionLotCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Lot code'**
+  String get distributionLotCode;
+
+  /// No description provided for @distributionExpiryDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Expiry date'**
+  String get distributionExpiryDate;
+
+  /// No description provided for @distributionSignatureTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Recipient signature'**
+  String get distributionSignatureTitle;
+
+  /// No description provided for @distributionSignatureHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign with finger or mouse'**
+  String get distributionSignatureHint;
+
+  /// No description provided for @distributionSignatureClear.
+  ///
+  /// In en, this message translates to:
+  /// **'Clear signature'**
+  String get distributionSignatureClear;
+
+  /// No description provided for @distributionPodPhoto.
+  ///
+  /// In en, this message translates to:
+  /// **'Delivery photo'**
+  String get distributionPodPhoto;
+
+  /// No description provided for @distributionReasonClosed.
+  ///
+  /// In en, this message translates to:
+  /// **'Outlet closed'**
+  String get distributionReasonClosed;
+
+  /// No description provided for @distributionReasonNoNeed.
+  ///
+  /// In en, this message translates to:
+  /// **'No stock need'**
+  String get distributionReasonNoNeed;
+
+  /// No description provided for @distributionReasonCompetitor.
+  ///
+  /// In en, this message translates to:
+  /// **'Competitor offer'**
+  String get distributionReasonCompetitor;
+
+  /// No description provided for @distributionReasonCredit.
+  ///
+  /// In en, this message translates to:
+  /// **'Credit / terms'**
+  String get distributionReasonCredit;
+
+  /// No description provided for @distributionReasonNoDecision.
+  ///
+  /// In en, this message translates to:
+  /// **'No decision'**
+  String get distributionReasonNoDecision;
+
+  /// No description provided for @distributionReasonOther.
+  ///
+  /// In en, this message translates to:
+  /// **'Other'**
+  String get distributionReasonOther;
+
+  /// No description provided for @distributionReturnExpired.
+  ///
+  /// In en, this message translates to:
+  /// **'Expired'**
+  String get distributionReturnExpired;
+
+  /// No description provided for @distributionReturnDamaged.
+  ///
+  /// In en, this message translates to:
+  /// **'Damaged'**
+  String get distributionReturnDamaged;
+
+  /// No description provided for @distributionReturnCommercial.
+  ///
+  /// In en, this message translates to:
+  /// **'Commercial return'**
+  String get distributionReturnCommercial;
+
+  /// No description provided for @distributionReturnWrong.
+  ///
+  /// In en, this message translates to:
+  /// **'Wrong item'**
+  String get distributionReturnWrong;
+
+  /// No description provided for @distributionReturnNearExpiry.
+  ///
+  /// In en, this message translates to:
+  /// **'Near expiry'**
+  String get distributionReturnNearExpiry;
+
+  /// No description provided for @distributionClassA.
+  ///
+  /// In en, this message translates to:
+  /// **'Class A — weekly'**
+  String get distributionClassA;
+
+  /// No description provided for @distributionClassB.
+  ///
+  /// In en, this message translates to:
+  /// **'Class B — every two weeks'**
+  String get distributionClassB;
+
+  /// No description provided for @distributionClassC.
+  ///
+  /// In en, this message translates to:
+  /// **'Class C — monthly'**
+  String get distributionClassC;
+
+  /// No description provided for @distributionFrequencyWeekly.
+  ///
+  /// In en, this message translates to:
+  /// **'Weekly'**
+  String get distributionFrequencyWeekly;
+
+  /// No description provided for @distributionFrequencyBiweekly.
+  ///
+  /// In en, this message translates to:
+  /// **'Biweekly'**
+  String get distributionFrequencyBiweekly;
+
+  /// No description provided for @distributionFrequencyMonthly.
+  ///
+  /// In en, this message translates to:
+  /// **'Monthly'**
+  String get distributionFrequencyMonthly;
+
+  /// No description provided for @distributionCarriedOver.
+  ///
+  /// In en, this message translates to:
+  /// **'Carried over from a missed day'**
+  String get distributionCarriedOver;
+
+  /// No description provided for @distributionNewOutlet.
+  ///
+  /// In en, this message translates to:
+  /// **'New field outlet'**
+  String get distributionNewOutlet;
+
+  /// No description provided for @distributionNewOutletHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Capture name, location and customer class.'**
+  String get distributionNewOutletHint;
+
+  /// No description provided for @distributionOutletType.
+  ///
+  /// In en, this message translates to:
+  /// **'Outlet type'**
+  String get distributionOutletType;
+
+  /// No description provided for @distributionOutletGrocery.
+  ///
+  /// In en, this message translates to:
+  /// **'Grocery'**
+  String get distributionOutletGrocery;
+
+  /// No description provided for @distributionOutletSupermarket.
+  ///
+  /// In en, this message translates to:
+  /// **'Supermarket'**
+  String get distributionOutletSupermarket;
+
+  /// No description provided for @distributionOutletHoreca.
+  ///
+  /// In en, this message translates to:
+  /// **'HoReCa'**
+  String get distributionOutletHoreca;
+
+  /// No description provided for @distributionOutletKiosk.
+  ///
+  /// In en, this message translates to:
+  /// **'Kiosk'**
+  String get distributionOutletKiosk;
+
+  /// No description provided for @distributionOutletWholesale.
+  ///
+  /// In en, this message translates to:
+  /// **'Wholesale'**
+  String get distributionOutletWholesale;
+
+  /// No description provided for @distributionOutletOther.
+  ///
+  /// In en, this message translates to:
+  /// **'Other'**
+  String get distributionOutletOther;
+
+  /// No description provided for @distributionNavNeshan.
+  ///
+  /// In en, this message translates to:
+  /// **'Neshan'**
+  String get distributionNavNeshan;
+
+  /// No description provided for @distributionNavGoogle.
+  ///
+  /// In en, this message translates to:
+  /// **'Google Maps'**
+  String get distributionNavGoogle;
+
+  /// No description provided for @distributionNavWaze.
+  ///
+  /// In en, this message translates to:
+  /// **'Waze'**
+  String get distributionNavWaze;
+
+  /// No description provided for @distributionNavProvider.
+  ///
+  /// In en, this message translates to:
+  /// **'Navigation app'**
+  String get distributionNavProvider;
+
+  /// No description provided for @distributionCarryOver.
+  ///
+  /// In en, this message translates to:
+  /// **'Carry missed visits to the next day'**
+  String get distributionCarryOver;
+
+  /// No description provided for @distributionRequirePodSignature.
+  ///
+  /// In en, this message translates to:
+  /// **'Require POD signature'**
+  String get distributionRequirePodSignature;
+
+  /// No description provided for @distributionRequirePodPhoto.
+  ///
+  /// In en, this message translates to:
+  /// **'Require POD photo'**
+  String get distributionRequirePodPhoto;
+
+  /// No description provided for @distributionAutoPromo.
+  ///
+  /// In en, this message translates to:
+  /// **'Auto-apply promotions'**
+  String get distributionAutoPromo;
+
+  /// No description provided for @distributionPerfectStore.
+  ///
+  /// In en, this message translates to:
+  /// **'Perfect store score'**
+  String get distributionPerfectStore;
+
+  /// No description provided for @distributionJointVisit.
+  ///
+  /// In en, this message translates to:
+  /// **'Joint visit with supervisor'**
+  String get distributionJointVisit;
+
+  /// No description provided for @distributionSupervisor.
+  ///
+  /// In en, this message translates to:
+  /// **'Accompanying supervisor'**
+  String get distributionSupervisor;
+
+  /// No description provided for @distributionScorecard.
+  ///
+  /// In en, this message translates to:
+  /// **'Daily scorecard'**
+  String get distributionScorecard;
+
+  /// No description provided for @distributionTimeInStore.
+  ///
+  /// In en, this message translates to:
+  /// **'Time in store (min)'**
+  String get distributionTimeInStore;
+
+  /// No description provided for @distributionLinesPerInvoice.
+  ///
+  /// In en, this message translates to:
+  /// **'Lines per invoice'**
+  String get distributionLinesPerInvoice;
+
+  /// No description provided for @distributionMissedVisits.
+  ///
+  /// In en, this message translates to:
+  /// **'Missed visits'**
+  String get distributionMissedVisits;
+
+  /// No description provided for @distributionPartialDelivery.
+  ///
+  /// In en, this message translates to:
+  /// **'Partial delivery'**
+  String get distributionPartialDelivery;
+
+  /// No description provided for @distributionDeliveryFailed.
+  ///
+  /// In en, this message translates to:
+  /// **'Failed delivery'**
+  String get distributionDeliveryFailed;
+
+  /// No description provided for @distributionOfflinePack.
+  ///
+  /// In en, this message translates to:
+  /// **'Download today\'\'s catalog'**
+  String get distributionOfflinePack;
+
+  /// No description provided for @distributionOfflinePackDone.
+  ///
+  /// In en, this message translates to:
+  /// **'Today\'\'s catalog saved on this device'**
+  String get distributionOfflinePackDone;
+
+  /// No description provided for @distributionAssortment.
+  ///
+  /// In en, this message translates to:
+  /// **'Must-sell assortment'**
+  String get distributionAssortment;
+
+  /// No description provided for @distributionAssortmentsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Assortment & must-sell'**
+  String get distributionAssortmentsTitle;
+
+  /// No description provided for @distributionPriceList.
+  ///
+  /// In en, this message translates to:
+  /// **'Customer price list'**
+  String get distributionPriceList;
+
+  /// No description provided for @distributionSetupNeeded.
+  ///
+  /// In en, this message translates to:
+  /// **'Initial setup is incomplete. Run the wizard.'**
+  String get distributionSetupNeeded;
+
+  /// No description provided for @distributionStartWizard.
+  ///
+  /// In en, this message translates to:
+  /// **'Start setup'**
+  String get distributionStartWizard;
+
+  /// No description provided for @distributionOsa.
+  ///
+  /// In en, this message translates to:
+  /// **'On-shelf availability'**
+  String get distributionOsa;
+
+  /// No description provided for @distributionPlanogram.
+  ///
+  /// In en, this message translates to:
+  /// **'Planogram compliance'**
+  String get distributionPlanogram;
+
+  /// No description provided for @distributionShareOfShelf.
+  ///
+  /// In en, this message translates to:
+  /// **'Share of shelf %'**
+  String get distributionShareOfShelf;
+
+  /// No description provided for @distributionTodayOnlyHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Today\'\'s plan and visits only'**
+  String get distributionTodayOnlyHint;
+
+  /// No description provided for @distributionDeliveryQty.
+  ///
+  /// In en, this message translates to:
+  /// **'Delivered qty'**
+  String get distributionDeliveryQty;
+
+  /// No description provided for @distributionOrderedQty.
+  ///
+  /// In en, this message translates to:
+  /// **'Ordered'**
+  String get distributionOrderedQty;
+
+  /// No description provided for @distributionPrintInvoice.
+  ///
+  /// In en, this message translates to:
+  /// **'Print invoice'**
+  String get distributionPrintInvoice;
+
+  /// No description provided for @distributionFrequentProducts.
+  ///
+  /// In en, this message translates to:
+  /// **'This customer\'\'s frequent SKUs'**
+  String get distributionFrequentProducts;
+
+  /// No description provided for @distributionCustomerClass.
+  ///
+  /// In en, this message translates to:
+  /// **'Customer class'**
+  String get distributionCustomerClass;
+
+  /// No description provided for @distributionVisitFrequency.
+  ///
+  /// In en, this message translates to:
+  /// **'Visit frequency'**
+  String get distributionVisitFrequency;
+
+  /// No description provided for @distributionOutletName.
+  ///
+  /// In en, this message translates to:
+  /// **'Outlet name'**
+  String get distributionOutletName;
+
+  /// No description provided for @distributionOutletPhone.
+  ///
+  /// In en, this message translates to:
+  /// **'Mobile'**
+  String get distributionOutletPhone;
+
+  /// No description provided for @distributionFailRefused.
+  ///
+  /// In en, this message translates to:
+  /// **'Delivery refused'**
+  String get distributionFailRefused;
+
+  /// No description provided for @distributionFailAddress.
+  ///
+  /// In en, this message translates to:
+  /// **'Wrong / missing address'**
+  String get distributionFailAddress;
+
+  /// No description provided for @distributionFailShortage.
+  ///
+  /// In en, this message translates to:
+  /// **'Load shortage'**
+  String get distributionFailShortage;
+
+  /// No description provided for @distributionMustSellMissing.
+  ///
+  /// In en, this message translates to:
+  /// **'Must-sell items are not in the basket yet'**
+  String get distributionMustSellMissing;
+
+  /// No description provided for @distributionReasonRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Pick a standard reason'**
+  String get distributionReasonRequired;
+
+  /// No description provided for @distributionPodSignatureRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Recipient signature is required'**
+  String get distributionPodSignatureRequired;
+
+  /// No description provided for @distributionPodPhotoRequired.
+  ///
+  /// In en, this message translates to:
+  /// **'Delivery photo is required'**
+  String get distributionPodPhotoRequired;
+
+  /// No description provided for @distributionCapacityOver.
+  ///
+  /// In en, this message translates to:
+  /// **'Van is over capacity'**
+  String get distributionCapacityOver;
+
+  /// No description provided for @distributionLotOptional.
+  ///
+  /// In en, this message translates to:
+  /// **'Lot (optional)'**
+  String get distributionLotOptional;
+
+  /// No description provided for @distributionNoExpiry.
+  ///
+  /// In en, this message translates to:
+  /// **'No expiry date'**
+  String get distributionNoExpiry;
+
+  /// No description provided for @distributionVisitorHomeHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Today’s plan, next stop and selling — without admin tabs'**
+  String get distributionVisitorHomeHint;
+
+  /// No description provided for @distributionAssortmentCreate.
+  ///
+  /// In en, this message translates to:
+  /// **'New assortment'**
+  String get distributionAssortmentCreate;
+
+  /// No description provided for @distributionAssortmentEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No must-sell assortment yet'**
+  String get distributionAssortmentEmpty;
+
+  /// No description provided for @distributionMustSellPick.
+  ///
+  /// In en, this message translates to:
+  /// **'Must-sell products'**
+  String get distributionMustSellPick;
+
+  /// No description provided for @distributionDeliveryLines.
+  ///
+  /// In en, this message translates to:
+  /// **'Order lines'**
+  String get distributionDeliveryLines;
+
+  /// No description provided for @distributionOsaOk.
+  ///
+  /// In en, this message translates to:
+  /// **'On-shelf availability is complete'**
+  String get distributionOsaOk;
+
+  /// No description provided for @distributionJointVisitHint.
+  ///
+  /// In en, this message translates to:
+  /// **'The supervisor is recorded on this visit'**
+  String get distributionJointVisitHint;
+
+  /// No description provided for @distributionSetupWizardAgain.
+  ///
+  /// In en, this message translates to:
+  /// **'Setup wizard'**
+  String get distributionSetupWizardAgain;
+
+  /// No description provided for @distributionNavOpen.
+  ///
+  /// In en, this message translates to:
+  /// **'Navigate with Neshan / maps'**
+  String get distributionNavOpen;
+
+  /// No description provided for @distributionCycleOffset.
+  ///
+  /// In en, this message translates to:
+  /// **'Cycle offset (week/month)'**
+  String get distributionCycleOffset;
+
+  /// No description provided for @distributionCycleOffsetHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Biweekly: 0 or 1. Monthly: week of month (0–4).'**
+  String get distributionCycleOffsetHint;
+
+  /// No description provided for @distributionWeightKg.
+  ///
+  /// In en, this message translates to:
+  /// **'Max weight (kg)'**
+  String get distributionWeightKg;
+
+  /// No description provided for @distributionVolumeM3.
+  ///
+  /// In en, this message translates to:
+  /// **'Max volume (m³)'**
+  String get distributionVolumeM3;
+
+  /// No description provided for @distributionCapacityUsed.
+  ///
+  /// In en, this message translates to:
+  /// **'Capacity used'**
+  String get distributionCapacityUsed;
+
+  /// No description provided for @distributionLotVariance.
+  ///
+  /// In en, this message translates to:
+  /// **'Lot vs physical stock variance'**
+  String get distributionLotVariance;
+
+  /// No description provided for @distributionLoadVariance.
+  ///
+  /// In en, this message translates to:
+  /// **'Load variance'**
+  String get distributionLoadVariance;
+
+  /// No description provided for @distributionCommissionOnCollection.
+  ///
+  /// In en, this message translates to:
+  /// **'Commission on collections (not sales)'**
+  String get distributionCommissionOnCollection;
+
+  /// No description provided for @distributionCommissionCoverage.
+  ///
+  /// In en, this message translates to:
+  /// **'Adjust by route coverage'**
+  String get distributionCommissionCoverage;
+
+  /// No description provided for @distributionDaysOfCover.
+  ///
+  /// In en, this message translates to:
+  /// **'Days of cover'**
+  String get distributionDaysOfCover;
+
+  /// No description provided for @distributionNearExpiryDays.
+  ///
+  /// In en, this message translates to:
+  /// **'Near-expiry horizon (days)'**
+  String get distributionNearExpiryDays;
+
+  /// No description provided for @distributionFefoHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Unload and sell by earliest expiry (FEFO)'**
+  String get distributionFefoHint;
+
+  /// No description provided for @distributionUnitWeightKg.
+  ///
+  /// In en, this message translates to:
+  /// **'Unit weight (kg)'**
+  String get distributionUnitWeightKg;
+
+  /// No description provided for @distributionUnitVolumeM3.
+  ///
+  /// In en, this message translates to:
+  /// **'Unit volume (m³)'**
+  String get distributionUnitVolumeM3;
 }
 
 class _AppLocalizationsDelegate

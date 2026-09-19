@@ -2,10 +2,13 @@ import 'package:flutter/material.dart';
 
 import '../../l10n/app_localizations.dart';
 import '../../models/ai_models.dart';
+import '../../models/ai_voice_models.dart';
 import '../../services/voice/voice_phase.dart';
 import 'ai_chat_design.dart';
+import 'ai_chat_enter_to_send.dart';
 import 'ai_chat_execution_mode_chip.dart';
 import 'ai_chat_model_chip.dart';
+import 'ai_chat_voice_chip.dart';
 import 'voice_status_label.dart';
 
 enum AIChatComposerPlacement { center, bottom }
@@ -82,6 +85,9 @@ class AIChatComposer extends StatefulWidget {
   final Map<String, dynamic>? voiceStatusEvent;
   final VoidCallback onSend;
   final VoidCallback? onMic;
+  final VoidCallback? onDictate;
+  final bool dictating;
+  final bool dictateBusy;
   final VoidCallback? onStopVoice;
   final VoidCallback? onStopGenerating;
   final VoidCallback? onAttach;
@@ -92,6 +98,12 @@ class AIChatComposer extends StatefulWidget {
   final String? modelPricingHint;
   final String executionMode;
   final ValueChanged<String>? onExecutionModeChanged;
+  final List<AIVoiceModelItem> sttModels;
+  final List<AIVoiceModelItem> ttsModels;
+  final String? selectedSttCode;
+  final String? selectedTtsCode;
+  final ValueChanged<String>? onSttChanged;
+  final ValueChanged<String>? onTtsChanged;
 
   const AIChatComposer({
     super.key,
@@ -106,6 +118,9 @@ class AIChatComposer extends StatefulWidget {
     this.voiceStatusEvent,
     required this.onSend,
     this.onMic,
+    this.onDictate,
+    this.dictating = false,
+    this.dictateBusy = false,
     this.onStopVoice,
     this.onStopGenerating,
     this.onAttach,
@@ -116,6 +131,12 @@ class AIChatComposer extends StatefulWidget {
     this.modelPricingHint,
     this.executionMode = 'analyzer',
     this.onExecutionModeChanged,
+    this.sttModels = const [],
+    this.ttsModels = const [],
+    this.selectedSttCode,
+    this.selectedTtsCode,
+    this.onSttChanged,
+    this.onTtsChanged,
   });
 
   @override
@@ -241,7 +262,6 @@ class _AIChatComposerState extends State<AIChatComposer> {
   bool get _canSend =>
       !widget.disabled &&
       !widget.sending &&
-      !widget.voiceActive &&
       _hasText;
 
   @override
@@ -251,6 +271,9 @@ class _AIChatComposerState extends State<AIChatComposer> {
     final l10n = AppLocalizations.of(context);
     final compact = AIChatDesign.isCompactWidth(context);
     final isCenter = widget.placement == AIChatComposerPlacement.center;
+    final composerHint = compact
+        ? l10n.aiChatComposerHint
+        : l10n.aiChatComposerHintDesktop;
     final voiceLabel = voiceStatusLabel(
       l10n,
       widget.voicePhase,
@@ -310,6 +333,29 @@ class _AIChatComposerState extends State<AIChatComposer> {
                         ),
                       ],
                     ),
+                  )
+                else if (widget.dictating)
+                  Padding(
+                    padding: EdgeInsets.fromLTRB(
+                      compact ? 14 : 18,
+                      10,
+                      compact ? 14 : 18,
+                      0,
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(Icons.mic_rounded, size: 18, color: scheme.primary),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            l10n.aiVoiceListeningDictate,
+                            style: theme.textTheme.labelLarge?.copyWith(
+                              color: scheme.primary,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.end,
@@ -317,33 +363,43 @@ class _AIChatComposerState extends State<AIChatComposer> {
                     Expanded(
                       child: Semantics(
                         textField: true,
-                        label: 'متن پیام دستیار هوشمند',
-                        child: TextField(
-                          controller: widget.controller,
+                        label: l10n.aiChatComposerSemanticsLabel,
+                        child: AIChatEnterToSend(
                           focusNode: widget.focusNode,
-                          enabled: !widget.disabled && !widget.voiceActive,
-                          minLines: 1,
-                          maxLines: isCenter ? 4 : 6,
-                          textInputAction: TextInputAction.newline,
-                          style: theme.textTheme.bodyLarge,
-                          decoration: InputDecoration(
-                            hintText: 'پیام خود را بنویسید...',
-                            hintStyle: TextStyle(
-                              color: scheme.onSurfaceVariant.withValues(
-                                alpha: 0.65,
+                          enabled: _canSend,
+                          onSend: widget.onSend,
+                          onEnterOverride: _slashSuggestions.isNotEmpty
+                              ? () => _selectSlashCommand(
+                                    _slashSuggestions.first,
+                                  )
+                              : null,
+                          child: TextField(
+                            controller: widget.controller,
+                            focusNode: widget.focusNode,
+                            enabled: !widget.disabled,
+                            minLines: 1,
+                            maxLines: isCenter ? 4 : 6,
+                            textInputAction: TextInputAction.newline,
+                            style: theme.textTheme.bodyLarge,
+                            decoration: InputDecoration(
+                              hintText: composerHint,
+                              hintStyle: TextStyle(
+                                color: scheme.onSurfaceVariant.withValues(
+                                  alpha: 0.65,
+                                ),
+                              ),
+                              border: InputBorder.none,
+                              contentPadding: EdgeInsets.fromLTRB(
+                                compact ? 16 : 20,
+                                compact ? 14 : 16,
+                                4,
+                                compact ? 10 : 12,
                               ),
                             ),
-                            border: InputBorder.none,
-                            contentPadding: EdgeInsets.fromLTRB(
-                              compact ? 16 : 20,
-                              compact ? 14 : 16,
-                              4,
-                              compact ? 10 : 12,
-                            ),
+                            onSubmitted: (_) {
+                              if (_canSend) widget.onSend();
+                            },
                           ),
-                          onSubmitted: (_) {
-                            if (_canSend) widget.onSend();
-                          },
                         ),
                       ),
                     ),
@@ -351,7 +407,7 @@ class _AIChatComposerState extends State<AIChatComposer> {
                       padding: const EdgeInsets.only(left: 2, right: 6, bottom: 6),
                       child: widget.onStopGenerating != null
                           ? IconButton(
-                              tooltip: 'توقف تولید پاسخ',
+                              tooltip: l10n.aiChatStopGenerating,
                               visualDensity: VisualDensity.compact,
                               onPressed: widget.onStopGenerating,
                               icon: Icon(
@@ -378,7 +434,7 @@ class _AIChatComposerState extends State<AIChatComposer> {
                     children: [
                       if (widget.onAttach != null)
                         IconButton(
-                          tooltip: 'پیوست فایل',
+                          tooltip: l10n.aiChatAttachFile,
                           visualDensity: VisualDensity.compact,
                           onPressed: widget.disabled || widget.sending
                               ? null
@@ -388,9 +444,38 @@ class _AIChatComposerState extends State<AIChatComposer> {
                             color: scheme.onSurfaceVariant,
                           ),
                         ),
+                      if (widget.onDictate != null && !widget.voiceActive)
+                        IconButton(
+                          tooltip: widget.dictating
+                              ? l10n.aiVoiceDictateStop
+                              : l10n.aiVoiceDictate,
+                          visualDensity: VisualDensity.compact,
+                          onPressed: widget.disabled ||
+                                  widget.sending ||
+                                  widget.dictateBusy
+                              ? null
+                              : widget.onDictate,
+                          icon: widget.dictateBusy
+                              ? SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: scheme.primary,
+                                  ),
+                                )
+                              : Icon(
+                                  widget.dictating
+                                      ? Icons.mic_rounded
+                                      : Icons.mic_none_rounded,
+                                  color: widget.dictating
+                                      ? scheme.primary
+                                      : scheme.onSurfaceVariant,
+                                ),
+                        ),
                       if (widget.onMic != null && !widget.voiceActive)
                         IconButton(
-                          tooltip: l10n.aiVoiceStartMic,
+                          tooltip: l10n.aiVoiceStartCall,
                           visualDensity: VisualDensity.compact,
                           onPressed: widget.disabled || widget.voiceStarting
                               ? null
@@ -405,7 +490,7 @@ class _AIChatComposerState extends State<AIChatComposer> {
                                   ),
                                 )
                               : Icon(
-                                  Icons.mic_none_rounded,
+                                  Icons.headphones_rounded,
                                   color: scheme.onSurfaceVariant,
                                 ),
                         ),
@@ -440,6 +525,26 @@ class _AIChatComposerState extends State<AIChatComposer> {
                             onChanged: widget.onModelChanged,
                             pricingHint: widget.modelPricingHint,
                             compact: true,
+                          ),
+                        ),
+                      if (widget.sttModels.isNotEmpty)
+                        Flexible(
+                          child: AIChatVoicePickChip(
+                            kind: 'stt',
+                            items: widget.sttModels,
+                            selectedCode: widget.selectedSttCode,
+                            enabled: !widget.disabled && !widget.sending,
+                            onChanged: widget.onSttChanged,
+                          ),
+                        ),
+                      if (widget.ttsModels.isNotEmpty)
+                        Flexible(
+                          child: AIChatVoicePickChip(
+                            kind: 'tts',
+                            items: widget.ttsModels,
+                            selectedCode: widget.selectedTtsCode,
+                            enabled: !widget.disabled && !widget.sending,
+                            onChanged: widget.onTtsChanged,
                           ),
                         ),
                     ],
@@ -583,13 +688,14 @@ class _SendButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
+    final l10n = AppLocalizations.of(context);
 
     return Semantics(
       button: true,
       enabled: enabled,
-      label: sending ? 'در حال ارسال پیام' : 'ارسال پیام',
+      label: sending ? l10n.aiChatSendingMessage : l10n.aiChatSendMessage,
       child: Tooltip(
-        message: enabled ? 'ارسال پیام' : 'ابتدا پیام را بنویسید',
+        message: enabled ? l10n.aiChatSendMessage : l10n.aiChatSendDisabledHint,
         child: Material(
           color: enabled ? scheme.primary : scheme.surfaceContainerHighest,
           borderRadius: BorderRadius.circular(20),

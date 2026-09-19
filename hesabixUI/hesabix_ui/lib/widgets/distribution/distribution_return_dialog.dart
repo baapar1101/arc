@@ -7,15 +7,17 @@ import 'package:hesabix_ui/widgets/invoice/product_combobox_widget.dart';
 import '../../services/distribution_service.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
+import 'distribution_field_helpers.dart';
 
 class _ReturnLineRow {
   Map<String, dynamic>? product;
   final TextEditingController qtyCtl = TextEditingController(text: '1');
-  final TextEditingController reasonCtl = TextEditingController();
+  String reasonCode = 'damaged';
+  final TextEditingController noteCtl = TextEditingController();
 
   void dispose() {
     qtyCtl.dispose();
-    reasonCtl.dispose();
+    noteCtl.dispose();
   }
 
   Map<String, dynamic> toPayload() {
@@ -23,7 +25,11 @@ class _ReturnLineRow {
     return {
       'product_id': pid is int ? pid : int.parse('$pid'),
       'quantity': double.tryParse(qtyCtl.text.trim().replaceAll(',', '.')) ?? 1,
-      if (reasonCtl.text.trim().isNotEmpty) 'reason': reasonCtl.text.trim(),
+      'reason_code': reasonCode,
+      'reason': [
+        reasonCode,
+        if (noteCtl.text.trim().isNotEmpty) noteCtl.text.trim(),
+      ].join(' · '),
     };
   }
 }
@@ -33,12 +39,41 @@ Future<void> showDistributionReturnDialog({
   required int businessId,
   required DistributionService service,
   Person? initialPerson,
+  int? visitId,
   required VoidCallback onSubmitted,
 }) async {
   final t = AppLocalizations.of(context);
   Person? person = initialPerson;
   final lines = <_ReturnLineRow>[_ReturnLineRow()];
   final noteCtl = TextEditingController();
+  List<Map<String, dynamic>> invoices = const [];
+  int? sourceDocumentId;
+
+  Future<void> loadInvoices(void Function(void Function()) setD) async {
+    if (person == null) {
+      setD(() {
+        invoices = const [];
+        sourceDocumentId = null;
+      });
+      return;
+    }
+    try {
+      final personId = person!.id;
+      if (personId == null) {
+        setD(() {
+          invoices = const [];
+          sourceDocumentId = null;
+        });
+        return;
+      }
+      final items = await service.listPersonInvoices(businessId: businessId, personId: personId);
+      setD(() {
+        invoices = items.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+      });
+    } catch (_) {
+      setD(() => invoices = const []);
+    }
+  }
 
   await showDialog<void>(
     context: context,
@@ -58,8 +93,34 @@ Future<void> showDistributionReturnDialog({
                     label: t.distributionSelectPerson,
                     hintText: t.distributionSelectPerson,
                     isRequired: true,
-                    onChanged: (p) => setD(() => person = p),
+                    onChanged: (p) async {
+                      setD(() => person = p);
+                      await loadInvoices(setD);
+                    },
                   ),
+                  const SizedBox(height: 12),
+                  if (person != null)
+                    DropdownButtonFormField<int?>(
+                      value: sourceDocumentId,
+                      isExpanded: true,
+                      decoration: InputDecoration(
+                        labelText: t.distributionSourceInvoice,
+                        border: const OutlineInputBorder(),
+                      ),
+                      items: [
+                        DropdownMenuItem<int?>(value: null, child: Text(t.distributionNoInvoiceLink)),
+                        ...invoices.map(
+                          (inv) => DropdownMenuItem<int?>(
+                            value: int.tryParse('${inv['id']}'),
+                            child: Text(
+                              '${inv['code'] ?? inv['id']} · ${inv['net'] ?? ''}',
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ),
+                      ],
+                      onChanged: (v) => setD(() => sourceDocumentId = v),
+                    ),
                   const SizedBox(height: 12),
                   ...lines.asMap().entries.map((e) {
                     final i = e.key;
@@ -90,42 +151,57 @@ Future<void> showDistributionReturnDialog({
                                     ),
                                   ),
                                 ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  flex: 2,
-                                  child: TextField(
-                                    controller: row.reasonCtl,
-                                    decoration: InputDecoration(
-                                      labelText: t.distributionReturnReason,
-                                      border: const OutlineInputBorder(),
-                                      isDense: true,
-                                    ),
-                                  ),
-                                ),
                                 if (lines.length > 1)
                                   IconButton(
+                                    icon: const Icon(Icons.delete_outline),
                                     onPressed: () {
                                       setD(() {
-                                        row.dispose();
+                                        lines[i].dispose();
                                         lines.removeAt(i);
                                       });
                                     },
-                                    icon: const Icon(Icons.delete_outline),
                                   ),
                               ],
                             ),
+                            const SizedBox(height: 8),
+                            DropdownButtonFormField<String>(
+                              value: row.reasonCode,
+                              isExpanded: true,
+                              decoration: InputDecoration(
+                                labelText: t.distributionReturnReason,
+                                border: const OutlineInputBorder(),
+                                isDense: true,
+                              ),
+                              items: distributionReturnCodes
+                                  .map(
+                                    (c) => DropdownMenuItem(
+                                      value: c,
+                                      child: Text(distributionReturnReasonLabel(t, c)),
+                                    ),
+                                  )
+                                  .toList(),
+                              onChanged: (v) => setD(() => row.reasonCode = v ?? row.reasonCode),
+                            ),
+                            if (row.reasonCode == 'other') ...[
+                              const SizedBox(height: 8),
+                              TextField(
+                                controller: row.noteCtl,
+                                decoration: InputDecoration(
+                                  labelText: t.distributionNotesLabel,
+                                  border: const OutlineInputBorder(),
+                                  isDense: true,
+                                ),
+                              ),
+                            ],
                           ],
                         ),
                       ),
                     );
                   }),
-                  Align(
-                    alignment: AlignmentDirectional.centerStart,
-                    child: TextButton.icon(
-                      onPressed: () => setD(() => lines.add(_ReturnLineRow())),
-                      icon: const Icon(Icons.add),
-                      label: Text(t.distributionReturnAddLine),
-                    ),
+                  TextButton.icon(
+                    onPressed: () => setD(() => lines.add(_ReturnLineRow())),
+                    icon: const Icon(Icons.add),
+                    label: Text(t.distributionReturnAddLine),
                   ),
                   TextField(
                     controller: noteCtl,
@@ -157,6 +233,8 @@ Future<void> showDistributionReturnDialog({
                     businessId: businessId,
                     payload: <String, dynamic>{
                       'person_id': person!.id,
+                      if (visitId != null) 'visit_id': visitId,
+                      if (sourceDocumentId != null) 'source_document_id': sourceDocumentId,
                       'lines': validLines.map((r) => r.toPayload()).toList(),
                       if (noteCtl.text.trim().isNotEmpty) 'notes': noteCtl.text.trim(),
                     },

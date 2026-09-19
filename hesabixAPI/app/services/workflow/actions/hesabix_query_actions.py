@@ -30,98 +30,14 @@ def _search_warehouse_documents_internal(
     db: Session, business_id: int, body: Dict[str, Any]
 ) -> Dict[str, Any]:
     """همان منطق جستجوی حواله انبار (بدون cache و بدون request)."""
-    from adapters.db.models.warehouse_document import WarehouseDocument
-    from app.services.warehouse_service import warehouse_document_to_dict
-    from app.services.transfer_service import _parse_iso_date as _parse_date
-    from app.services.sort_resolution import effective_sort_specs
-    from adapters.api.v1.schemas import QueryInfo
+    from app.services.warehouse_service import (
+        apply_warehouse_documents_sort,
+        warehouse_document_to_dict,
+        warehouse_documents_filtered_query,
+    )
 
-    q = db.query(WarehouseDocument).filter(WarehouseDocument.business_id == business_id)
-
-    doc_type = body.get("doc_type")
-    if isinstance(doc_type, str) and doc_type:
-        q = q.filter(WarehouseDocument.doc_type == doc_type)
-    elif isinstance(body.get("doc_type"), list):
-        dtl = body.get("doc_type")
-        if dtl:
-            q = q.filter(WarehouseDocument.doc_type.in_(dtl))
-
-    status = body.get("status")
-    if isinstance(status, str) and status:
-        q = q.filter(WarehouseDocument.status == status)
-    elif isinstance(body.get("status"), list):
-        sl = body.get("status")
-        if sl:
-            q = q.filter(WarehouseDocument.status.in_(sl))
-
-    source_document_id = body.get("source_document_id")
-    if isinstance(source_document_id, int):
-        q = q.filter(WarehouseDocument.source_document_id == source_document_id)
-
-    source_type = body.get("source_type")
-    if isinstance(source_type, str) and source_type:
-        q = q.filter(WarehouseDocument.source_type == source_type)
-
-    from_date, to_date = body.get("from_date"), body.get("to_date")
-    try:
-        if isinstance(from_date, str) and from_date:
-            q = q.filter(WarehouseDocument.document_date >= _parse_date(from_date))
-        if isinstance(to_date, str) and to_date:
-            q = q.filter(WarehouseDocument.document_date <= _parse_date(to_date))
-    except Exception:
-        pass
-
-    warehouse_id = body.get("warehouse_id")
-    warehouse_ids = body.get("warehouse_ids")
-    if warehouse_id:
-        q = q.filter(
-            or_(
-                WarehouseDocument.warehouse_id_from == int(warehouse_id),
-                WarehouseDocument.warehouse_id_to == int(warehouse_id),
-            )
-        )
-    elif isinstance(warehouse_ids, list) and warehouse_ids:
-        wh_ids = [int(w) for w in warehouse_ids if w]
-        if wh_ids:
-            q = q.filter(
-                or_(
-                    WarehouseDocument.warehouse_id_from.in_(wh_ids),
-                    WarehouseDocument.warehouse_id_to.in_(wh_ids),
-                )
-            )
-
-    search = body.get("search")
-    if isinstance(search, str) and search.strip():
-        st = f"%{search.strip()}%"
-        q = q.filter(WarehouseDocument.code.like(st))
-
-    _WH_SORT_ALLOWED = frozenset({"code", "doc_type", "status", "created_at", "document_date"})
-
-    def _wh_sort_col(name: str):
-        if name == "code":
-            return WarehouseDocument.code
-        if name == "doc_type":
-            return WarehouseDocument.doc_type
-        if name == "status":
-            return WarehouseDocument.status
-        if name == "created_at":
-            return WarehouseDocument.created_at
-        return WarehouseDocument.document_date
-
-    _qi = QueryInfo.model_validate({
-        "take": int(body.get("take", 20) or 20),
-        "skip": int(body.get("skip", 0) or 0),
-        "sort_by": body.get("sort_by"),
-        "sort_desc": bool(body.get("sort_desc", True)),
-        "sort": body.get("sort") if isinstance(body.get("sort"), list) else None,
-    })
-    _specs = effective_sort_specs(_qi, allowed=_WH_SORT_ALLOWED, default_when_empty=("document_date", True))
-    _order_parts = []
-    for _n, _d in _specs:
-        _c = _wh_sort_col(_n)
-        _order_parts.append(_c.desc() if _d else _c.asc())
-    _order_parts.append(WarehouseDocument.id.desc())
-    q = q.order_by(*_order_parts)
+    q = warehouse_documents_filtered_query(db, business_id, body)
+    q = apply_warehouse_documents_sort(q, body)
 
     take = int(body.get("take") or 20)
     skip = int(body.get("skip") or 0)

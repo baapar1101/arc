@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 import 'package:dio/dio.dart';
 import 'package:intl/intl.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
-import 'package:hesabix_ui/utils/web/web_utils.dart' as web_utils;
 import 'package:hesabix_ui/widgets/invoice/person_combobox_widget.dart';
 import 'package:hesabix_ui/models/person_model.dart';
 import 'package:hesabix_ui/core/api_client.dart';
@@ -11,9 +9,11 @@ import 'package:hesabix_ui/core/calendar_controller.dart';
 import 'package:hesabix_ui/core/date_utils.dart' show MarkStreetDateUtils;
 import 'package:hesabix_ui/widgets/date_input_field.dart';
 import 'package:hesabix_ui/services/invoice_service.dart';
+import 'package:hesabix_ui/services/currency_service.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
-
+import 'package:hesabix_ui/widgets/business_subpage_back_leading.dart';
+import 'package:hesabix_ui/services/bytes_export/bytes_export_service.dart';
 
 class InstallmentsReportPage extends StatefulWidget {
   final int businessId;
@@ -43,7 +43,11 @@ class _SummaryTile {
 }
 
 class _SummaryCard extends StatelessWidget {
-  const _SummaryCard({required this.title, required this.value, this.compact = false});
+  const _SummaryCard({
+    required this.title,
+    required this.value,
+    this.compact = false,
+  });
 
   final String title;
   final String value;
@@ -61,13 +65,18 @@ class _SummaryCard extends StatelessWidget {
             title,
             maxLines: compact ? 2 : null,
             overflow: TextOverflow.ellipsis,
-            style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.outline),
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.outline,
+            ),
           ),
           const SizedBox(height: 4),
           Text(
             value,
-            style: (compact ? theme.textTheme.titleSmall : theme.textTheme.titleMedium)
-                ?.copyWith(fontWeight: FontWeight.bold),
+            style:
+                (compact
+                        ? theme.textTheme.titleSmall
+                        : theme.textTheme.titleMedium)
+                    ?.copyWith(fontWeight: FontWeight.bold),
           ),
         ],
       ),
@@ -77,7 +86,9 @@ class _SummaryCard extends StatelessWidget {
 
 class _InstallmentsReportPageState extends State<InstallmentsReportPage> {
   List<Map<String, dynamic>> _fiscalYears = <Map<String, dynamic>>[];
+  List<Map<String, dynamic>> _currencies = <Map<String, dynamic>>[];
   int? _selectedFiscalYearId;
+  int? _selectedCurrencyId;
   Person? _selectedPerson;
   int? _selectedInvoiceId;
   String? _status; // pending|partial|paid|overdue
@@ -91,6 +102,7 @@ class _InstallmentsReportPageState extends State<InstallmentsReportPage> {
   int _pageSize = 50;
   int _currentPage = 1;
   static const List<int> _pageSizeOptions = <int>[25, 50, 100, 200];
+
   /// نمای پرونده (گروه فاکتور) در مقابل جدول تخت اقساط
   bool _viewPortfolios = true;
   String? _bucket;
@@ -102,9 +114,13 @@ class _InstallmentsReportPageState extends State<InstallmentsReportPage> {
   bool _isMobileWidth(double w) => w < _mobileBreakpoint;
 
   String? _extractFilenameFromContentDisposition(String? contentDisposition) {
-    if (contentDisposition == null || contentDisposition.trim().isEmpty) return null;
+    if (contentDisposition == null || contentDisposition.trim().isEmpty)
+      return null;
     // Try RFC5987 filename*=
-    final starMatch = RegExp(r"filename\*\s*=\s*utf-8''([^;]+)", caseSensitive: false).firstMatch(contentDisposition);
+    final starMatch = RegExp(
+      r"filename\*\s*=\s*utf-8''([^;]+)",
+      caseSensitive: false,
+    ).firstMatch(contentDisposition);
     if (starMatch != null) {
       final raw = starMatch.group(1);
       if (raw != null && raw.isNotEmpty) {
@@ -116,10 +132,16 @@ class _InstallmentsReportPageState extends State<InstallmentsReportPage> {
       }
     }
     // Fallback: filename="..."
-    final quoted = RegExp(r'filename\s*=\s*"([^"]+)"', caseSensitive: false).firstMatch(contentDisposition);
+    final quoted = RegExp(
+      r'filename\s*=\s*"([^"]+)"',
+      caseSensitive: false,
+    ).firstMatch(contentDisposition);
     if (quoted != null) return quoted.group(1);
     // Fallback: filename=...
-    final plain = RegExp(r'filename\s*=\s*([^;]+)', caseSensitive: false).firstMatch(contentDisposition);
+    final plain = RegExp(
+      r'filename\s*=\s*([^;]+)',
+      caseSensitive: false,
+    ).firstMatch(contentDisposition);
     if (plain != null) return plain.group(1)?.trim();
     return null;
   }
@@ -127,7 +149,10 @@ class _InstallmentsReportPageState extends State<InstallmentsReportPage> {
   bool _looksLikeXlsx(List<int> bytes) {
     // XLSX is a ZIP container; signature: PK\x03\x04
     if (bytes.length < 4) return false;
-    return bytes[0] == 0x50 && bytes[1] == 0x4B && bytes[2] == 0x03 && bytes[3] == 0x04;
+    return bytes[0] == 0x50 &&
+        bytes[1] == 0x4B &&
+        bytes[2] == 0x03 &&
+        bytes[3] == 0x04;
   }
 
   ({String filename, String mimeType}) _resolveDownloadMeta({
@@ -158,7 +183,8 @@ class _InstallmentsReportPageState extends State<InstallmentsReportPage> {
       final name = headerFilename ?? '$fallbackBaseName.xlsx';
       return (
         filename: name,
-        mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        mimeType:
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       );
     }
 
@@ -171,6 +197,7 @@ class _InstallmentsReportPageState extends State<InstallmentsReportPage> {
   void initState() {
     super.initState();
     _loadFiscalYears();
+    _loadCurrencies();
   }
 
   Widget _buildTableArea(AppLocalizations t) {
@@ -200,9 +227,13 @@ class _InstallmentsReportPageState extends State<InstallmentsReportPage> {
                   child: DataTable(
                     showCheckboxColumn: false,
                     columns: _buildTableColumns(t),
-                    rows: _items.map((row) => _buildDataRow(row, t, theme)).toList(),
+                    rows: _items
+                        .map((row) => _buildDataRow(row, t, theme))
+                        .toList(),
                     columnSpacing: 36,
-                    headingTextStyle: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+                    headingTextStyle: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
                     dataTextStyle: theme.textTheme.bodyMedium,
                   ),
                 ),
@@ -235,30 +266,67 @@ class _InstallmentsReportPageState extends State<InstallmentsReportPage> {
                       DataColumn(label: Text(t.installmentsTableMobile)),
                       DataColumn(label: Text(t.installmentsGroupedNextDue)),
                       DataColumn(label: Text(t.installmentsGroupedWorstStatus)),
-                      DataColumn(numeric: true, label: Text(t.installmentsGroupedInstallments)),
-                      DataColumn(numeric: true, label: Text(t.installmentsGroupedPaidCount)),
-                      DataColumn(numeric: true, label: Text(t.installmentsGroupedOverdueCount)),
-                      DataColumn(numeric: true, label: Text(t.installmentsGroupedRemainingSum)),
+                      DataColumn(
+                        numeric: true,
+                        label: Text(t.installmentsGroupedInstallments),
+                      ),
+                      DataColumn(
+                        numeric: true,
+                        label: Text(t.installmentsGroupedPaidCount),
+                      ),
+                      DataColumn(
+                        numeric: true,
+                        label: Text(t.installmentsGroupedOverdueCount),
+                      ),
+                      DataColumn(
+                        numeric: true,
+                        label: Text(t.installmentsGroupedRemainingSum),
+                      ),
                     ],
                     rows: _groupedItems.map((row) {
                       final invId = (row['invoice_id'] as num?)?.toInt() ?? 0;
                       return DataRow(
                         onSelectChanged: (_) => _openInstallmentDetail(invId),
                         cells: [
-                          DataCell(Text(row['invoice_code']?.toString() ?? '-')),
+                          DataCell(
+                            Text(row['invoice_code']?.toString() ?? '-'),
+                          ),
                           DataCell(Text(row['person_name']?.toString() ?? '-')),
-                          DataCell(Text(row['person_mobile']?.toString() ?? '-')),
-                          DataCell(Text(_formatDateValue(row, 'next_due_date'))),
-                          DataCell(_buildStatusChip(row['worst_status']?.toString(), t, theme)),
-                          DataCell(Text(row['installment_count']?.toString() ?? '-')),
-                          DataCell(Text(row['paid_installment_count']?.toString() ?? '-')),
-                          DataCell(Text(row['overdue_installment_count']?.toString() ?? '-')),
+                          DataCell(
+                            Text(row['person_mobile']?.toString() ?? '-'),
+                          ),
+                          DataCell(
+                            Text(_formatDateValue(row, 'next_due_date')),
+                          ),
+                          DataCell(
+                            _buildStatusChip(
+                              row['worst_status']?.toString(),
+                              t,
+                              theme,
+                            ),
+                          ),
+                          DataCell(
+                            Text(row['installment_count']?.toString() ?? '-'),
+                          ),
+                          DataCell(
+                            Text(
+                              row['paid_installment_count']?.toString() ?? '-',
+                            ),
+                          ),
+                          DataCell(
+                            Text(
+                              row['overdue_installment_count']?.toString() ??
+                                  '-',
+                            ),
+                          ),
                           DataCell(Text(_formatNumber(row['remaining_sum']))),
                         ],
                       );
                     }).toList(),
                     columnSpacing: 28,
-                    headingTextStyle: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+                    headingTextStyle: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
                     dataTextStyle: theme.textTheme.bodyMedium,
                   ),
                 ),
@@ -299,7 +367,9 @@ class _InstallmentsReportPageState extends State<InstallmentsReportPage> {
             width: 118,
             child: Text(
               label,
-              style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.outline),
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.outline,
+              ),
             ),
           ),
           Expanded(child: Text(value, style: theme.textTheme.bodyMedium)),
@@ -308,16 +378,27 @@ class _InstallmentsReportPageState extends State<InstallmentsReportPage> {
     );
   }
 
-  Widget _installmentPaymentsContent(AppLocalizations t, ThemeData theme, Map<String, dynamic> it) {
+  Widget _installmentPaymentsContent(
+    AppLocalizations t,
+    ThemeData theme,
+    Map<String, dynamic> it,
+  ) {
     final pays = (it['payments'] as List?) ?? const [];
     final stRow = it['status']?.toString();
     final paidRow = (it['paid_amount'] as num?)?.toDouble() ?? 0;
-    final paidEvidence = paidRow > 0.009 || stRow == 'partial' || stRow == 'paid';
+    final paidEvidence =
+        paidRow > 0.009 || stRow == 'partial' || stRow == 'paid';
     if (pays.isEmpty && paidEvidence) {
-      return Text(t.installmentsPaymentsDetailMissing, style: theme.textTheme.bodySmall);
+      return Text(
+        t.installmentsPaymentsDetailMissing,
+        style: theme.textTheme.bodySmall,
+      );
     }
     if (pays.isEmpty) {
-      return Text(t.installmentsNoPaymentsYet, style: theme.textTheme.bodySmall);
+      return Text(
+        t.installmentsNoPaymentsYet,
+        style: theme.textTheme.bodySmall,
+      );
     }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -338,7 +419,11 @@ class _InstallmentsReportPageState extends State<InstallmentsReportPage> {
     );
   }
 
-  Widget _buildScheduleNarrowCard(AppLocalizations t, ThemeData theme, Map<String, dynamic> it) {
+  Widget _buildScheduleNarrowCard(
+    AppLocalizations t,
+    ThemeData theme,
+    Map<String, dynamic> it,
+  ) {
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
       child: Padding(
@@ -350,19 +435,40 @@ class _InstallmentsReportPageState extends State<InstallmentsReportPage> {
               children: [
                 Text(
                   '#${it['seq']?.toString() ?? '-'}',
-                  style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
                 const Spacer(),
                 _buildStatusChip(it['status']?.toString(), t, theme),
               ],
             ),
             const SizedBox(height: 8),
-            _kvLine(t.installmentsTableDueDate, _formatDateValue(it, 'due_date'), theme),
-            _kvLine(t.installmentsTableTotal, _formatNumber(it['total']), theme),
-            _kvLine(t.installmentsTablePaid, _formatNumber(it['paid_amount']), theme),
-            _kvLine(t.installmentsTableRemaining, _formatNumber(it['remaining']), theme),
+            _kvLine(
+              t.installmentsTableDueDate,
+              _formatDateValue(it, 'due_date'),
+              theme,
+            ),
+            _kvLine(
+              t.installmentsTableTotal,
+              _formatNumber(it['total']),
+              theme,
+            ),
+            _kvLine(
+              t.installmentsTablePaid,
+              _formatNumber(it['paid_amount']),
+              theme,
+            ),
+            _kvLine(
+              t.installmentsTableRemaining,
+              _formatNumber(it['remaining']),
+              theme,
+            ),
             const SizedBox(height: 8),
-            Text(t.installmentsPaymentsColumn, style: theme.textTheme.labelSmall),
+            Text(
+              t.installmentsPaymentsColumn,
+              style: theme.textTheme.labelSmall,
+            ),
             const SizedBox(height: 4),
             _installmentPaymentsContent(t, theme, it),
           ],
@@ -389,7 +495,9 @@ class _InstallmentsReportPageState extends State<InstallmentsReportPage> {
                   Expanded(
                     child: Text(
                       row['invoice_code']?.toString() ?? '-',
-                      style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -397,17 +505,43 @@ class _InstallmentsReportPageState extends State<InstallmentsReportPage> {
                 ],
               ),
               const SizedBox(height: 8),
-              _kvLine(t.installmentsTablePerson, row['person_name']?.toString() ?? '-', theme),
+              _kvLine(
+                t.installmentsTablePerson,
+                row['person_name']?.toString() ?? '-',
+                theme,
+              ),
               if ((row['person_mobile']?.toString() ?? '').isNotEmpty)
-                _kvLine(t.installmentsTableMobile, row['person_mobile']?.toString() ?? '-', theme),
-              _kvLine(t.installmentsGroupedNextDue, _formatDateValue(row, 'next_due_date'), theme),
-              _kvLine(t.installmentsGroupedInstallments, row['installment_count']?.toString() ?? '-', theme),
-              _kvLine(t.installmentsGroupedPaidCount, row['paid_installment_count']?.toString() ?? '-', theme),
-              _kvLine(t.installmentsGroupedOverdueCount, row['overdue_installment_count']?.toString() ?? '-', theme),
+                _kvLine(
+                  t.installmentsTableMobile,
+                  row['person_mobile']?.toString() ?? '-',
+                  theme,
+                ),
+              _kvLine(
+                t.installmentsGroupedNextDue,
+                _formatDateValue(row, 'next_due_date'),
+                theme,
+              ),
+              _kvLine(
+                t.installmentsGroupedInstallments,
+                row['installment_count']?.toString() ?? '-',
+                theme,
+              ),
+              _kvLine(
+                t.installmentsGroupedPaidCount,
+                row['paid_installment_count']?.toString() ?? '-',
+                theme,
+              ),
+              _kvLine(
+                t.installmentsGroupedOverdueCount,
+                row['overdue_installment_count']?.toString() ?? '-',
+                theme,
+              ),
               const SizedBox(height: 4),
               Text(
                 '${t.installmentsGroupedRemainingSum}: ${_formatNumber(row['remaining_sum'])}',
-                style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+                style: theme.textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ],
           ),
@@ -416,7 +550,10 @@ class _InstallmentsReportPageState extends State<InstallmentsReportPage> {
     );
   }
 
-  Widget _buildFlatInstallmentCard(AppLocalizations t, Map<String, dynamic> row) {
+  Widget _buildFlatInstallmentCard(
+    AppLocalizations t,
+    Map<String, dynamic> row,
+  ) {
     final theme = Theme.of(context);
     final invId = (row['invoice_id'] as num?)?.toInt() ?? 0;
     return Card(
@@ -433,24 +570,66 @@ class _InstallmentsReportPageState extends State<InstallmentsReportPage> {
                   Expanded(
                     child: Text(
                       '${row['invoice_code']?.toString() ?? '-'} · ${t.installmentsTableInstallment} ${row['seq']?.toString() ?? '-'}',
-                      style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
                   ),
                   _buildStatusChip(row['status']?.toString(), t, theme),
                 ],
               ),
               const SizedBox(height: 8),
-              _kvLine(t.installmentsTablePerson, row['person_name']?.toString() ?? '-', theme),
+              _kvLine(
+                t.installmentsTablePerson,
+                row['person_name']?.toString() ?? '-',
+                theme,
+              ),
               if ((row['person_mobile']?.toString() ?? '').isNotEmpty)
-                _kvLine(t.installmentsTableMobile, row['person_mobile']?.toString() ?? '-', theme),
-              _kvLine(t.installmentsTableDueDate, _formatDateValue(row, 'due_date'), theme),
-              _kvLine(t.installmentsTablePrincipal, _formatNumber(row['principal']), theme),
-              _kvLine(t.installmentsTableInterest, _formatNumber(row['interest']), theme),
-              _kvLine(t.installmentsTableTotal, _formatNumber(row['total']), theme),
-              _kvLine(t.installmentsTablePaid, _formatNumber(row['paid_amount']), theme),
-              _kvLine(t.installmentsTableRemaining, _formatNumber(row['remaining']), theme),
-              _kvLine(t.installmentsTableLateFee, _formatNumber(row['late_fee_amount']), theme),
-              _kvLine(t.installmentsTableOverdueDays, row['overdue_days']?.toString() ?? '-', theme),
+                _kvLine(
+                  t.installmentsTableMobile,
+                  row['person_mobile']?.toString() ?? '-',
+                  theme,
+                ),
+              _kvLine(
+                t.installmentsTableDueDate,
+                _formatDateValue(row, 'due_date'),
+                theme,
+              ),
+              _kvLine(
+                t.installmentsTablePrincipal,
+                _formatNumber(row['principal']),
+                theme,
+              ),
+              _kvLine(
+                t.installmentsTableInterest,
+                _formatNumber(row['interest']),
+                theme,
+              ),
+              _kvLine(
+                t.installmentsTableTotal,
+                _formatNumber(row['total']),
+                theme,
+              ),
+              _kvLine(
+                t.installmentsTablePaid,
+                _formatNumber(row['paid_amount']),
+                theme,
+              ),
+              _kvLine(
+                t.installmentsTableRemaining,
+                _formatNumber(row['remaining']),
+                theme,
+              ),
+              _kvLine(
+                t.installmentsTableLateFee,
+                _formatNumber(row['late_fee_amount']),
+                theme,
+              ),
+              _kvLine(
+                t.installmentsTableOverdueDays,
+                row['overdue_days']?.toString() ?? '-',
+                theme,
+              ),
             ],
           ),
         ),
@@ -458,7 +637,11 @@ class _InstallmentsReportPageState extends State<InstallmentsReportPage> {
     );
   }
 
-  DataRow _buildDataRow(Map<String, dynamic> row, AppLocalizations t, ThemeData theme) {
+  DataRow _buildDataRow(
+    Map<String, dynamic> row,
+    AppLocalizations t,
+    ThemeData theme,
+  ) {
     final invId = (row['invoice_id'] as num?)?.toInt() ?? 0;
     return DataRow(
       onSelectChanged: (_) => _openInstallmentDetail(invId),
@@ -485,7 +668,10 @@ class _InstallmentsReportPageState extends State<InstallmentsReportPage> {
     return Chip(
       label: Text(_statusLabel(t, status)),
       backgroundColor: color.withOpacity(0.15),
-      labelStyle: theme.textTheme.bodySmall?.copyWith(color: color, fontWeight: FontWeight.w600),
+      labelStyle: theme.textTheme.bodySmall?.copyWith(
+        color: color,
+        fontWeight: FontWeight.w600,
+      ),
       padding: const EdgeInsets.symmetric(horizontal: 8),
     );
   }
@@ -538,7 +724,8 @@ class _InstallmentsReportPageState extends State<InstallmentsReportPage> {
       return DateTime.tryParse(value);
     }
     if (value is Map) {
-      final raw = value['date_only'] ?? value['formatted'] ?? value['date_time'];
+      final raw =
+          value['date_only'] ?? value['formatted'] ?? value['date_time'];
       if (raw == null) return null;
       return _parseRowDate(raw);
     }
@@ -550,7 +737,14 @@ class _InstallmentsReportPageState extends State<InstallmentsReportPage> {
     if (value == null) return '-';
     final dt = _parseRowDate(value);
     if (dt != null) {
+<<<<<<< HEAD
+      return HesabixDateUtils.formatForDisplay(
+        dt,
+        widget.calendarController.isJalali,
+      );
+=======
       return MarkStreetDateUtils.formatForDisplay(dt, widget.calendarController.isJalali);
+>>>>>>> github/Huma
     }
     if (value is String) {
       return value.isEmpty ? '-' : value;
@@ -559,7 +753,8 @@ class _InstallmentsReportPageState extends State<InstallmentsReportPage> {
   }
 
   Widget _buildPagination(AppLocalizations t, {bool compact = false}) {
-    final total = (_pagination?['total'] as num?)?.toInt() ??
+    final total =
+        (_pagination?['total'] as num?)?.toInt() ??
         (_viewPortfolios ? _groupedItems.length : _items.length);
     final totalPages = total == 0 ? 1 : ((total - 1) ~/ _pageSize) + 1;
     final canGoPrev = _currentPage > 1;
@@ -605,12 +800,16 @@ class _InstallmentsReportPageState extends State<InstallmentsReportPage> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     IconButton(
-                      onPressed: !_loading && canGoPrev ? () => _changePage(_currentPage - 1) : null,
+                      onPressed: !_loading && canGoPrev
+                          ? () => _changePage(_currentPage - 1)
+                          : null,
                       icon: const Icon(Icons.chevron_right),
                       tooltip: t.page,
                     ),
                     IconButton(
-                      onPressed: !_loading && hasNext ? () => _changePage(_currentPage + 1) : null,
+                      onPressed: !_loading && hasNext
+                          ? () => _changePage(_currentPage + 1)
+                          : null,
                       icon: const Icon(Icons.chevron_left),
                       tooltip: t.page,
                     ),
@@ -621,7 +820,10 @@ class _InstallmentsReportPageState extends State<InstallmentsReportPage> {
                   children: [
                     Expanded(
                       flex: 2,
-                      child: Text(t.installmentsRowsPerPage, style: Theme.of(context).textTheme.bodySmall),
+                      child: Text(
+                        t.installmentsRowsPerPage,
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
                     ),
                     Expanded(flex: 3, child: pageSizeDropdown),
                   ],
@@ -642,11 +844,15 @@ class _InstallmentsReportPageState extends State<InstallmentsReportPage> {
           const SizedBox(width: 8),
           pageSizeDropdown,
           IconButton(
-            onPressed: !_loading && canGoPrev ? () => _changePage(_currentPage - 1) : null,
+            onPressed: !_loading && canGoPrev
+                ? () => _changePage(_currentPage - 1)
+                : null,
             icon: const Icon(Icons.chevron_right),
           ),
           IconButton(
-            onPressed: !_loading && hasNext ? () => _changePage(_currentPage + 1) : null,
+            onPressed: !_loading && hasNext
+                ? () => _changePage(_currentPage + 1)
+                : null,
             icon: const Icon(Icons.chevron_left),
           ),
         ],
@@ -663,12 +869,12 @@ class _InstallmentsReportPageState extends State<InstallmentsReportPage> {
   }
 
   List<_StatusOption> _statusOptions(AppLocalizations t) => <_StatusOption>[
-        _StatusOption(null, t.installmentsStatusAll),
-        _StatusOption('pending', t.installmentsStatusPending),
-        _StatusOption('partial', t.installmentsStatusPartial),
-        _StatusOption('overdue', t.installmentsStatusOverdue),
-        _StatusOption('paid', t.installmentsStatusPaid),
-      ];
+    _StatusOption(null, t.installmentsStatusAll),
+    _StatusOption('pending', t.installmentsStatusPending),
+    _StatusOption('partial', t.installmentsStatusPartial),
+    _StatusOption('overdue', t.installmentsStatusOverdue),
+    _StatusOption('paid', t.installmentsStatusPaid),
+  ];
 
   void _clearInvoiceSelection() {
     setState(() {
@@ -749,9 +955,13 @@ class _InstallmentsReportPageState extends State<InstallmentsReportPage> {
   Map<String, dynamic> _buildSearchBody({required bool includePaging}) {
     final body = <String, dynamic>{
       if (_status != null && _status!.isNotEmpty) 'status': _status,
-      if (_fromDate != null) 'due_from': _fromDate!.toIso8601String().split('T').first,
-      if (_toDate != null) 'due_to': _toDate!.toIso8601String().split('T').first,
-      if (_selectedFiscalYearId != null) 'fiscal_year_id': _selectedFiscalYearId,
+      if (_fromDate != null)
+        'due_from': _fromDate!.toIso8601String().split('T').first,
+      if (_toDate != null)
+        'due_to': _toDate!.toIso8601String().split('T').first,
+      if (_selectedFiscalYearId != null)
+        'fiscal_year_id': _selectedFiscalYearId,
+      if (_selectedCurrencyId != null) 'currency_id': _selectedCurrencyId,
       if (_selectedPerson != null) 'person_id': _selectedPerson!.id,
       if (_selectedInvoiceId != null) 'invoice_id': _selectedInvoiceId,
       if (_bucket != null && _bucket!.isNotEmpty) 'bucket': _bucket,
@@ -789,20 +999,28 @@ class _InstallmentsReportPageState extends State<InstallmentsReportPage> {
           content: SizedBox(
             width: contentWidth,
             child: FutureBuilder<Map<String, dynamic>>(
-              future: InvoiceService(apiClient: widget.apiClient).getInstallmentPlan(
-                businessId: widget.businessId,
-                invoiceId: invoiceId,
-              ),
+              future: InvoiceService(apiClient: widget.apiClient)
+                  .getInstallmentPlan(
+                    businessId: widget.businessId,
+                    invoiceId: invoiceId,
+                  ),
               builder: (context, snap) {
                 if (snap.connectionState != ConnectionState.done) {
-                  return const SizedBox(height: 160, child: Center(child: CircularProgressIndicator()));
+                  return const SizedBox(
+                    height: 160,
+                    child: Center(child: CircularProgressIndicator()),
+                  );
                 }
                 if (snap.hasError) {
                   return Text('${snap.error}');
                 }
                 final data = snap.data ?? const <String, dynamic>{};
-                final plan = (data['plan'] is Map<String, dynamic>) ? data['plan'] as Map<String, dynamic> : const <String, dynamic>{};
-                final sched = (plan['schedule'] as List?)?.cast<Map<String, dynamic>>() ?? const <Map<String, dynamic>>[];
+                final plan = (data['plan'] is Map<String, dynamic>)
+                    ? data['plan'] as Map<String, dynamic>
+                    : const <String, dynamic>{};
+                final sched =
+                    (plan['schedule'] as List?)?.cast<Map<String, dynamic>>() ??
+                    const <Map<String, dynamic>>[];
                 return SingleChildScrollView(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -810,31 +1028,64 @@ class _InstallmentsReportPageState extends State<InstallmentsReportPage> {
                       SelectableText('${data['invoice_code'] ?? ''}'),
                       const SizedBox(height: 12),
                       if (useNarrowSchedule)
-                        ...sched.map((it) => _buildScheduleNarrowCard(t, theme, it))
+                        ...sched.map(
+                          (it) => _buildScheduleNarrowCard(t, theme, it),
+                        )
                       else
                         SingleChildScrollView(
                           scrollDirection: Axis.horizontal,
                           child: DataTable(
                             showCheckboxColumn: false,
                             columns: [
-                              DataColumn(label: Text(t.installmentsTableInstallment)),
-                              DataColumn(label: Text(t.installmentsTableDueDate)),
-                              DataColumn(label: Text(t.installmentsTableStatus)),
-                              DataColumn(numeric: true, label: Text(t.installmentsTableTotal)),
-                              DataColumn(numeric: true, label: Text(t.installmentsTablePaid)),
-                              DataColumn(numeric: true, label: Text(t.installmentsTableRemaining)),
-                              DataColumn(label: Text(t.installmentsPaymentsColumn)),
+                              DataColumn(
+                                label: Text(t.installmentsTableInstallment),
+                              ),
+                              DataColumn(
+                                label: Text(t.installmentsTableDueDate),
+                              ),
+                              DataColumn(
+                                label: Text(t.installmentsTableStatus),
+                              ),
+                              DataColumn(
+                                numeric: true,
+                                label: Text(t.installmentsTableTotal),
+                              ),
+                              DataColumn(
+                                numeric: true,
+                                label: Text(t.installmentsTablePaid),
+                              ),
+                              DataColumn(
+                                numeric: true,
+                                label: Text(t.installmentsTableRemaining),
+                              ),
+                              DataColumn(
+                                label: Text(t.installmentsPaymentsColumn),
+                              ),
                             ],
                             rows: sched.map((it) {
                               return DataRow(
                                 cells: [
                                   DataCell(Text(it['seq']?.toString() ?? '-')),
-                                  DataCell(Text(_formatDateValue(it, 'due_date'))),
-                                  DataCell(_buildStatusChip(it['status']?.toString(), t, theme)),
+                                  DataCell(
+                                    Text(_formatDateValue(it, 'due_date')),
+                                  ),
+                                  DataCell(
+                                    _buildStatusChip(
+                                      it['status']?.toString(),
+                                      t,
+                                      theme,
+                                    ),
+                                  ),
                                   DataCell(Text(_formatNumber(it['total']))),
-                                  DataCell(Text(_formatNumber(it['paid_amount']))),
-                                  DataCell(Text(_formatNumber(it['remaining']))),
-                                  DataCell(_installmentPaymentsContent(t, theme, it)),
+                                  DataCell(
+                                    Text(_formatNumber(it['paid_amount'])),
+                                  ),
+                                  DataCell(
+                                    Text(_formatNumber(it['remaining'])),
+                                  ),
+                                  DataCell(
+                                    _installmentPaymentsContent(t, theme, it),
+                                  ),
                                 ],
                               );
                             }).toList(),
@@ -847,7 +1098,10 @@ class _InstallmentsReportPageState extends State<InstallmentsReportPage> {
             ),
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx), child: Text(t.close)),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: Text(t.close),
+            ),
           ],
         );
       },
@@ -860,18 +1114,36 @@ class _InstallmentsReportPageState extends State<InstallmentsReportPage> {
         '/api/v1/business/${widget.businessId}/fiscal-years',
       );
       final data = Map<String, dynamic>.from(resp.data?['data'] ?? {});
-      final items = (data['items'] as List?)?.cast<Map<String, dynamic>>() ?? const <Map<String, dynamic>>[];
+      final items =
+          (data['items'] as List?)?.cast<Map<String, dynamic>>() ??
+          const <Map<String, dynamic>>[];
       setState(() {
         _fiscalYears = items;
-        _selectedFiscalYearId = items.firstWhere(
-          (e) => (e['is_current'] == true),
-          orElse: () => (items.isNotEmpty ? items.first : const <String, dynamic>{}),
-        )['id'] as int?;
+        _selectedFiscalYearId =
+            items.firstWhere(
+                  (e) => (e['is_current'] == true),
+                  orElse: () => (items.isNotEmpty
+                      ? items.first
+                      : const <String, dynamic>{}),
+                )['id']
+                as int?;
       });
       if (mounted) {
         await _fetch(resetPage: true);
       }
     } catch (_) {}
+  }
+
+  Future<void> _loadCurrencies() async {
+    try {
+      final items = await CurrencyService(
+        widget.apiClient,
+      ).listBusinessCurrencies(businessId: widget.businessId);
+      if (!mounted) return;
+      setState(() => _currencies = items);
+    } catch (_) {
+      // The report remains usable in base-equivalent mode if currencies cannot load.
+    }
   }
 
   Future<void> _fetch({bool resetPage = false}) async {
@@ -887,10 +1159,18 @@ class _InstallmentsReportPageState extends State<InstallmentsReportPage> {
         data: body,
       );
       final data = Map<String, dynamic>.from(res.data?['data'] ?? const {});
-      final items = (data['items'] as List?)?.cast<Map<String, dynamic>>() ?? const <Map<String, dynamic>>[];
-      final grouped = (data['grouped_items'] as List?)?.cast<Map<String, dynamic>>() ?? const <Map<String, dynamic>>[];
-      final pagination = (data['pagination'] is Map<String, dynamic>) ? Map<String, dynamic>.from(data['pagination'] as Map) : <String, dynamic>{};
-      final stats = (data['stats'] is Map<String, dynamic>) ? Map<String, dynamic>.from(data['stats'] as Map) : <String, dynamic>{};
+      final items =
+          (data['items'] as List?)?.cast<Map<String, dynamic>>() ??
+          const <Map<String, dynamic>>[];
+      final grouped =
+          (data['grouped_items'] as List?)?.cast<Map<String, dynamic>>() ??
+          const <Map<String, dynamic>>[];
+      final pagination = (data['pagination'] is Map<String, dynamic>)
+          ? Map<String, dynamic>.from(data['pagination'] as Map)
+          : <String, dynamic>{};
+      final stats = (data['stats'] is Map<String, dynamic>)
+          ? Map<String, dynamic>.from(data['stats'] as Map)
+          : <String, dynamic>{};
       setState(() {
         _items = items;
         _groupedItems = grouped;
@@ -917,6 +1197,7 @@ class _InstallmentsReportPageState extends State<InstallmentsReportPage> {
     return Scaffold(
       appBar: AppBar(
         title: Text(t.installmentsReportTitle),
+        leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
         actions: [
           IconButton(
             onPressed: _loading ? null : () => _fetch(),
@@ -940,7 +1221,9 @@ class _InstallmentsReportPageState extends State<InstallmentsReportPage> {
   }
 
   Widget _buildMobileBody(AppLocalizations t) {
-    final hasRows = _viewPortfolios ? _groupedItems.isNotEmpty : _items.isNotEmpty;
+    final hasRows = _viewPortfolios
+        ? _groupedItems.isNotEmpty
+        : _items.isNotEmpty;
     return CustomScrollView(
       slivers: [
         SliverToBoxAdapter(child: _buildFilters(t, compact: true)),
@@ -964,32 +1247,26 @@ class _InstallmentsReportPageState extends State<InstallmentsReportPage> {
           SliverPadding(
             padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
             sliver: SliverList(
-              delegate: SliverChildBuilderDelegate(
-                (context, index) {
-                  final row = _groupedItems[index];
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: _buildPortfolioCard(t, row),
-                  );
-                },
-                childCount: _groupedItems.length,
-              ),
+              delegate: SliverChildBuilderDelegate((context, index) {
+                final row = _groupedItems[index];
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: _buildPortfolioCard(t, row),
+                );
+              }, childCount: _groupedItems.length),
             ),
           )
         else
           SliverPadding(
             padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
             sliver: SliverList(
-              delegate: SliverChildBuilderDelegate(
-                (context, index) {
-                  final row = _items[index];
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: _buildFlatInstallmentCard(t, row),
-                  );
-                },
-                childCount: _items.length,
-              ),
+              delegate: SliverChildBuilderDelegate((context, index) {
+                final row = _items[index];
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: _buildFlatInstallmentCard(t, row),
+                );
+              }, childCount: _items.length),
             ),
           ),
         if (!_loading && hasRows) ...[
@@ -1046,10 +1323,12 @@ class _InstallmentsReportPageState extends State<InstallmentsReportPage> {
         DropdownButtonFormField<int>(
           value: _selectedFiscalYearId,
           items: _fiscalYears
-              .map((fy) => DropdownMenuItem<int>(
-                    value: fy['id'] as int?,
-                    child: Text('${fy['title'] ?? ''}'),
-                  ))
+              .map(
+                (fy) => DropdownMenuItem<int>(
+                  value: fy['id'] as int?,
+                  child: Text('${fy['title'] ?? ''}'),
+                ),
+              )
               .toList(),
           onChanged: (v) => setState(() => _selectedFiscalYearId = v),
           decoration: InputDecoration(
@@ -1060,13 +1339,51 @@ class _InstallmentsReportPageState extends State<InstallmentsReportPage> {
         220,
       ),
       sized(
+        DropdownButtonFormField<int?>(
+          value: _selectedCurrencyId,
+          items: <DropdownMenuItem<int?>>[
+            const DropdownMenuItem<int?>(
+              value: null,
+              child: Text('همه ارزها (معادل پایه)'),
+            ),
+            ..._currencies.map((currency) {
+              final id = (currency['id'] as num?)?.toInt();
+              final title = (currency['title'] ?? currency['code'] ?? '')
+                  .toString();
+              final code = (currency['code'] ?? '').toString();
+              final label = code.isNotEmpty && title != code
+                  ? '$title ($code)'
+                  : title;
+              return DropdownMenuItem<int?>(
+                value: id,
+                child: Text(label.isEmpty ? '-' : label),
+              );
+            }),
+          ],
+          onChanged: (value) {
+            setState(() {
+              _selectedCurrencyId = value;
+              _currentPage = 1;
+            });
+            _fetch(resetPage: true);
+          },
+          decoration: const InputDecoration(
+            labelText: 'ارز',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        240,
+      ),
+      sized(
         DropdownButtonFormField<String?>(
           value: _status,
           items: _statusOptions(t)
-              .map((opt) => DropdownMenuItem<String?>(
-                    value: opt.value,
-                    child: Text(opt.label),
-                  ))
+              .map(
+                (opt) => DropdownMenuItem<String?>(
+                  value: opt.value,
+                  child: Text(opt.label),
+                ),
+              )
               .toList(),
           onChanged: (v) => setState(() => _status = v),
           decoration: InputDecoration(
@@ -1080,10 +1397,22 @@ class _InstallmentsReportPageState extends State<InstallmentsReportPage> {
         DropdownButtonFormField<String?>(
           value: _bucket,
           items: <DropdownMenuItem<String?>>[
-            DropdownMenuItem<String?>(value: null, child: Text(t.installmentsBucketAll)),
-            DropdownMenuItem<String?>(value: 'unpaid', child: Text(t.installmentsBucketUnpaid)),
-            DropdownMenuItem<String?>(value: 'upcoming', child: Text(t.installmentsBucketUpcoming)),
-            DropdownMenuItem<String?>(value: 'overdue_only', child: Text(t.installmentsBucketOverdueOnly)),
+            DropdownMenuItem<String?>(
+              value: null,
+              child: Text(t.installmentsBucketAll),
+            ),
+            DropdownMenuItem<String?>(
+              value: 'unpaid',
+              child: Text(t.installmentsBucketUnpaid),
+            ),
+            DropdownMenuItem<String?>(
+              value: 'upcoming',
+              child: Text(t.installmentsBucketUpcoming),
+            ),
+            DropdownMenuItem<String?>(
+              value: 'overdue_only',
+              child: Text(t.installmentsBucketOverdueOnly),
+            ),
           ],
           onChanged: (v) => setState(() => _bucket = v),
           decoration: InputDecoration(
@@ -1185,7 +1514,10 @@ class _InstallmentsReportPageState extends State<InstallmentsReportPage> {
     );
   }
 
-  Widget _buildFilterActionButtons(AppLocalizations t, {required bool fullWidth}) {
+  Widget _buildFilterActionButtons(
+    AppLocalizations t, {
+    required bool fullWidth,
+  }) {
     final searchBtn = FilledButton.icon(
       onPressed: _loading ? null : () => _fetch(resetPage: true),
       icon: const Icon(Icons.search),
@@ -1244,7 +1576,9 @@ class _InstallmentsReportPageState extends State<InstallmentsReportPage> {
                     child: _buildViewModeChips(t),
                   ),
                   Theme(
-                    data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+                    data: Theme.of(
+                      context,
+                    ).copyWith(dividerColor: Colors.transparent),
                     child: ExpansionTile(
                       title: Text(t.filtersAndSearch),
                       initiallyExpanded: false,
@@ -1266,10 +1600,7 @@ class _InstallmentsReportPageState extends State<InstallmentsReportPage> {
                   ),
                 ],
               )
-            : Padding(
-                padding: const EdgeInsets.all(16),
-                child: desktopBody,
-              ),
+            : Padding(padding: const EdgeInsets.all(16), child: desktopBody),
       ),
     );
   }
@@ -1284,29 +1615,26 @@ class _InstallmentsReportPageState extends State<InstallmentsReportPage> {
         data: body,
         responseType: ResponseType.bytes,
         options: Options(
-          headers: {'Accept': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, text/csv'},
+          headers: {
+            'Accept':
+                'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, text/csv',
+          },
         ),
       );
       final data = resp.data ?? <int>[];
-      if (kIsWeb) {
-        final meta = _resolveDownloadMeta(
-          response: resp,
-          data: data,
-          fallbackBaseName: 'installments_${widget.businessId}',
-          fallbackExt: 'xlsx',
-          fallbackMime: 'application/octet-stream',
-        );
-        await web_utils.saveBytesAsFileWeb(
-          data,
-          meta.filename,
-          mimeType: meta.mimeType,
-        );
-      } else {
-        if (mounted) {
-          final t = AppLocalizations.of(context);
-          SnackBarHelper.show(context, message: t.installmentsExportWebOnly);
-        }
-      }
+      final meta = _resolveDownloadMeta(
+        response: resp,
+        data: data,
+        fallbackBaseName: 'installments_${widget.businessId}',
+        fallbackExt: 'xlsx',
+        fallbackMime: 'application/octet-stream',
+      );
+      final result = await BytesExportService.export(
+        bytes: data,
+        filename: meta.filename,
+        mimeType: meta.mimeType,
+      );
+      if (mounted) BytesExportService.showFeedback(context, result);
     } catch (e) {
       if (!mounted) return;
       final t = AppLocalizations.of(context);
@@ -1329,30 +1657,22 @@ class _InstallmentsReportPageState extends State<InstallmentsReportPage> {
         '/api/v1/invoices/business/${widget.businessId}/installments/export/pdf',
         data: body,
         responseType: ResponseType.bytes,
-        options: Options(
-          headers: {'Accept': 'application/pdf'},
-        ),
+        options: Options(headers: {'Accept': 'application/pdf'}),
       );
       final data = resp.data ?? <int>[];
-      if (kIsWeb) {
-        final meta = _resolveDownloadMeta(
-          response: resp,
-          data: data,
-          fallbackBaseName: 'installments_${widget.businessId}',
-          fallbackExt: 'pdf',
-          fallbackMime: 'application/pdf',
-        );
-        await web_utils.saveBytesAsFileWeb(
-          data,
-          meta.filename,
-          mimeType: meta.mimeType,
-        );
-      } else {
-        if (mounted) {
-          final t = AppLocalizations.of(context);
-          SnackBarHelper.show(context, message: t.installmentsExportWebOnly);
-        }
-      }
+      final meta = _resolveDownloadMeta(
+        response: resp,
+        data: data,
+        fallbackBaseName: 'installments_${widget.businessId}',
+        fallbackExt: 'pdf',
+        fallbackMime: 'application/pdf',
+      );
+      final result = await BytesExportService.export(
+        bytes: data,
+        filename: meta.filename,
+        mimeType: meta.mimeType,
+      );
+      if (mounted) BytesExportService.showFeedback(context, result);
     } catch (e) {
       if (!mounted) return;
       final t = AppLocalizations.of(context);
@@ -1393,7 +1713,9 @@ class _InstallmentsReportPageState extends State<InstallmentsReportPage> {
                   search: q.text.trim().isEmpty ? null : q.text.trim(),
                   filters: filters.isEmpty ? null : filters,
                 );
-                final items = (data['items'] as List?)?.cast<Map<String, dynamic>>() ?? const <Map<String, dynamic>>[];
+                final items =
+                    (data['items'] as List?)?.cast<Map<String, dynamic>>() ??
+                    const <Map<String, dynamic>>[];
                 setStateDialog(() {
                   results = items;
                 });
@@ -1407,6 +1729,7 @@ class _InstallmentsReportPageState extends State<InstallmentsReportPage> {
                 });
               }
             }
+
             return AlertDialog(
               title: Text(t.installmentsInvoicePickerTitle),
               content: SizedBox(
@@ -1450,7 +1773,10 @@ class _InstallmentsReportPageState extends State<InstallmentsReportPage> {
                 ),
               ),
               actions: [
-                TextButton(onPressed: () => Navigator.pop(ctx), child: Text(t.cancel)),
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: Text(t.cancel),
+                ),
               ],
             );
           },
@@ -1469,6 +1795,3 @@ class _InstallmentsReportPageState extends State<InstallmentsReportPage> {
     });
   }
 }
-
-
-

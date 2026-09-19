@@ -9,6 +9,7 @@ import 'workflow_timeline_dialog.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../utils/workflow_log_clipboard.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 
 /// Panel برای نمایش تاریخچه اجرای workflow
@@ -261,17 +262,17 @@ class _WorkflowExecutionHistoryPanelState extends State<WorkflowExecutionHistory
     switch (status) {
       case 'تکمیل شده':
       case 'completed':
-        statusColor = Colors.green;
+        statusColor = SemanticColorResolver.positive(context);
         statusIcon = Icons.check_circle;
         break;
       case 'ناموفق':
       case 'failed':
-        statusColor = Colors.red;
+        statusColor = SemanticColorResolver.negative(context);
         statusIcon = Icons.error;
         break;
       case 'در حال اجرا':
       case 'running':
-        statusColor = Colors.blue;
+        statusColor = SemanticColorResolver.info(context);
         statusIcon = Icons.sync;
         break;
       default:
@@ -309,7 +310,7 @@ class _WorkflowExecutionHistoryPanelState extends State<WorkflowExecutionHistory
             Row(
               children: [
                 Icon(statusIcon, size: 16, color: statusColor),
-                const SizedBox(width: 8),
+                SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     status,
@@ -335,7 +336,7 @@ class _WorkflowExecutionHistoryPanelState extends State<WorkflowExecutionHistory
               Text(
                 execution['error_message'].toString(),
                 style: theme.textTheme.bodySmall?.copyWith(
-                  color: Colors.red,
+                  color: SemanticColorResolver.negative(context),
                 ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
@@ -409,7 +410,7 @@ class _WorkflowExecutionHistoryPanelState extends State<WorkflowExecutionHistory
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 _buildDetailRow('وضعیت', _selectedExecution!['status']?.toString() ?? ''),
-                const SizedBox(height: 8),
+                SizedBox(height: 8),
                 if (_selectedExecution!['started_at'] != null)
                   _buildDetailRow(
                     'شروع',
@@ -427,19 +428,19 @@ class _WorkflowExecutionHistoryPanelState extends State<WorkflowExecutionHistory
                   Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: Colors.red.withOpacity(0.1),
+                      color: SemanticColorResolver.negative(context).withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(4),
                     ),
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Icon(Icons.error, size: 16, color: Colors.red),
-                        const SizedBox(width: 8),
+                        Icon(Icons.error, size: 16, color: SemanticColorResolver.negative(context)),
+                        SizedBox(width: 8),
                         Expanded(
                           child: Text(
                             _selectedExecution!['error_message'].toString(),
                             style: theme.textTheme.bodySmall?.copyWith(
-                              color: Colors.red,
+                              color: SemanticColorResolver.negative(context),
                             ),
                           ),
                         ),
@@ -527,15 +528,15 @@ class _WorkflowExecutionHistoryPanelState extends State<WorkflowExecutionHistory
     IconData levelIcon;
     switch (level.toLowerCase()) {
       case 'error':
-        levelColor = Colors.red;
+        levelColor = SemanticColorResolver.negative(context);
         levelIcon = Icons.error;
         break;
       case 'warning':
-        levelColor = Colors.orange;
+        levelColor = SemanticColorResolver.warning(context);
         levelIcon = Icons.warning;
         break;
       case 'info':
-        levelColor = Colors.blue;
+        levelColor = SemanticColorResolver.info(context);
         levelIcon = Icons.info;
         break;
       default:

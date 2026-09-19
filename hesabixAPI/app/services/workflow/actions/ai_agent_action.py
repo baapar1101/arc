@@ -126,6 +126,14 @@ class AIAgentAction(ActionHandler):
                     ),
                     "required": False,
                 },
+                "allow_writes": {
+                    "type": "boolean",
+                    "description": (
+                        "اجازهٔ دیدن ابزارهای نوشتنی. حتی در این حالت اجرا بدون تأیید کاربر انجام نمی‌شود."
+                    ),
+                    "default": False,
+                    "required": False,
+                },
                 "max_iterations": {
                     "type": "integer",
                     "description": "حداکثر چرخه فراخوانی توابع",
@@ -277,7 +285,8 @@ class AIAgentAction(ActionHandler):
             category = config.get("tools_category") if tools_mode == "category" else None
             tools = ai_service.get_available_functions(
                 category=category,
-                session_business_id=business_id
+                session_business_id=business_id,
+                channel="workflow",
             )
             if not isinstance(tools, list):
                 tools = [tools] if tools else []
@@ -287,17 +296,22 @@ class AIAgentAction(ActionHandler):
                 if allow_names:
                     tools = [t for t in tools if t.get("function", {}).get("name") in allow_names]
 
-            from app.services.ai.ai_workflow_agent_policy import merge_workflow_agent_denylist
+            from app.services.ai.ai_workflow_agent_policy import (
+                filter_workflow_agent_tools,
+                merge_workflow_agent_denylist,
+            )
 
             user_deny = None
             if config.get("tools_denylist"):
                 user_deny = {n.strip() for n in config["tools_denylist"].split(",") if n.strip()}
             denylist = merge_workflow_agent_denylist(user_deny)
-            if tools and denylist:
-                tools = [
-                    t for t in tools
-                    if t.get("function", {}).get("name") not in denylist
-                ]
+            allow_writes = bool(config.get("allow_writes"))
+            tools = filter_workflow_agent_tools(
+                tools,
+                denylist=denylist,
+                allow_writes=allow_writes,
+                registry=registry,
+            )
         else:
             use_function_calling = False
 
@@ -314,7 +328,9 @@ class AIAgentAction(ActionHandler):
                 max_tokens_override=max_tokens,
                 temperature_override=temperature,
                 session_business_id=business_id,
-                max_iterations=max_iterations
+                max_iterations=max_iterations,
+                execution_mode="analyzer" if not config.get("allow_writes") else "supervised",
+                approve_writes=False,
             )
         except ApiError:
             raise
@@ -368,6 +384,10 @@ class AIAgentAction(ActionHandler):
             "content": content,
             "usage": usage,
         }
+        if response.get("_function_calls"):
+            result["function_calls"] = response.get("_function_calls")
+        if response.get("awaiting_approval"):
+            result["awaiting_approval"] = True
         if parsed is not None:
             result["parsed"] = parsed
             result["response"] = parsed

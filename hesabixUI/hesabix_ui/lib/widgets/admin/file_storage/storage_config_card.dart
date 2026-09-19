@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 class StorageConfigCard extends StatelessWidget {
   final Map<String, dynamic> config;
@@ -58,16 +59,16 @@ class StorageConfigCard extends StatelessWidget {
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: _getStorageColor(storageType).withValues(alpha: 0.1),
+                      color: _getStorageColor(context, storageType).withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Icon(
                       _getStorageIcon(storageType),
-                      color: _getStorageColor(storageType),
+                      color: _getStorageColor(context, storageType),
                       size: 28,
                     ),
                   ),
-                  const SizedBox(width: 16),
+                  SizedBox(width: 16),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -124,7 +125,7 @@ class StorageConfigCard extends StatelessWidget {
                                 vertical: 4,
                               ),
                               decoration: BoxDecoration(
-                                color: _getStorageColor(storageType),
+                                color: _getStorageColor(context, storageType),
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               child: Text(
@@ -142,7 +143,7 @@ class StorageConfigCard extends StatelessWidget {
                                 vertical: 4,
                               ),
                               decoration: BoxDecoration(
-                                color: isActive ? Colors.green : Colors.red,
+                                color: isActive ? SemanticColorResolver.positive(context) : SemanticColorResolver.negative(context),
                                 borderRadius: BorderRadius.circular(8),
                               ),
                     child: Text(
@@ -161,7 +162,7 @@ class StorageConfigCard extends StatelessWidget {
                 ],
               ),
               
-              const SizedBox(height: 20),
+              SizedBox(height: 20),
               
               // Configuration details
               _buildConfigDetails(context, config),
@@ -197,7 +198,7 @@ class StorageConfigCard extends StatelessWidget {
                       icon: Icons.star,
                       label: l10n.setAsDefault,
                       onPressed: onSetDefault!,
-                      color: Colors.orange,
+                      color: SemanticColorResolver.warning(context),
                     ),
                   ],
                   if (onDelete != null) ...[
@@ -469,12 +470,12 @@ class StorageConfigCard extends StatelessWidget {
     }
   }
 
-  Color _getStorageColor(String storageType) {
+  Color _getStorageColor(BuildContext context, String storageType) {
     switch (storageType) {
       case 'local':
-        return Colors.blue;
+        return SemanticColorResolver.info(context);
       case 'ftp':
-        return Colors.green;
+        return SemanticColorResolver.positive(context);
       default:
         return Colors.grey;
     }

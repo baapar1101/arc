@@ -8,6 +8,8 @@ import '../../core/api_client.dart';
 import '../../models/business_dashboard_models.dart';
 import '../../services/business_dashboard_service.dart';
 import '../../services/business_menu_preferences_service.dart';
+import '../../theme/theme_controller.dart';
+import '../../widgets/theme_palette_switcher.dart';
 
 /// کلیدهای جداکننده در [business_shell] — همیشه در rootOrder حفظ می‌شوند.
 const String _sepPracticalTools = 'sep_practical_tools';
@@ -16,7 +18,9 @@ const String _sepServicesPlugins = 'sep_services_plugins';
 const String _sepOthers = 'sep_others';
 
 class AppearanceSettingsPage extends StatefulWidget {
-  const AppearanceSettingsPage({super.key});
+  final ThemeController? themeController;
+
+  const AppearanceSettingsPage({super.key, this.themeController});
 
   @override
   State<AppearanceSettingsPage> createState() => _AppearanceSettingsPageState();
@@ -99,6 +103,8 @@ class _AppearanceSettingsPageState extends State<AppearanceSettingsPage> {
     'group:ai': ['ai/chat', 'ai/subscription', 'ai/usage'],
     'group:crm': [
       'crm/dashboard',
+      'crm/tasks',
+      'crm/customer-360',
       'crm/notes-calendar',
       'crm/web-chat',
       'crm/process-definitions',
@@ -106,6 +112,7 @@ class _AppearanceSettingsPageState extends State<AppearanceSettingsPage> {
       'crm/deals',
       'crm/activities',
       'crm/reports',
+      'crm/sequences',
     ],
   };
 
@@ -161,6 +168,8 @@ class _AppearanceSettingsPageState extends State<AppearanceSettingsPage> {
     'ai/subscription': 'اشتراک AI',
     'ai/usage': 'آمار استفاده',
     'crm/dashboard': 'داشبورد CRM',
+    'crm/tasks': 'صف کار',
+    'crm/customer-360': 'نمای ۳۶۰ مشتری',
     'crm/notes-calendar': 'یادداشت‌ها و تقویم',
     'crm/web-chat': 'چت وب',
     'crm/process-definitions': 'فرایندها و مراحل قیف',
@@ -168,6 +177,7 @@ class _AppearanceSettingsPageState extends State<AppearanceSettingsPage> {
     'crm/deals': 'فرصت‌های فروش',
     'crm/activities': 'فعالیت‌ها',
     'crm/reports': 'گزارشات CRM',
+    'crm/sequences': 'توالی‌های خودکار',
   };
 
   /// نگاشت کلیدهای قدیمی (در صورت ذخیره قبلی) به کلیدهای فعلی.
@@ -403,6 +413,20 @@ class _AppearanceSettingsPageState extends State<AppearanceSettingsPage> {
           children: [
             Text(t.appearanceSettingsPageTitle, style: theme.textTheme.headlineSmall),
             const SizedBox(height: 8),
+            if (widget.themeController != null) ...[
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: ListenableBuilder(
+                    listenable: widget.themeController!,
+                    builder: (context, _) => ThemePalettePicker(
+                      controller: widget.themeController!,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+            ],
             if (_error != null)
               Padding(
                 padding: const EdgeInsets.only(bottom: 12),

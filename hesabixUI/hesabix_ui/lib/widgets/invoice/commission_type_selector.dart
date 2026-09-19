@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'invoice_form_layout.dart';
+
 enum CommissionType {
   percentage('درصدی'),
   amount('مبلغی');
@@ -14,6 +16,7 @@ class CommissionTypeSelector extends StatefulWidget {
   final bool isRequired;
   final String label;
   final String hintText;
+  final bool compact;
 
   const CommissionTypeSelector({
     super.key,
@@ -22,6 +25,7 @@ class CommissionTypeSelector extends StatefulWidget {
     this.isRequired = false,
     this.label = 'نوع کارمزد',
     this.hintText = 'انتخاب نوع کارمزد',
+    this.compact = false,
   });
 
   @override
@@ -68,6 +72,7 @@ class _CommissionTypeSelectorState extends State<CommissionTypeSelector> {
 
     return DropdownButtonFormField<CommissionType>(
       initialValue: _selectedType,
+      isDense: widget.compact,
       onChanged: (CommissionType? newValue) {
         if (newValue != null) {
           _selectType(newValue);
@@ -75,20 +80,27 @@ class _CommissionTypeSelectorState extends State<CommissionTypeSelector> {
           _clearSelection();
         }
       },
-      decoration: InputDecoration(
-        labelText: widget.label,
-        hintText: widget.hintText,
-        border: const OutlineInputBorder(),
-        prefixIcon: _selectedType != null
-            ? Icon(_getTypeIcon(_selectedType!))
-            : const Icon(Icons.toggle_on_outlined),
-        suffixIcon: _selectedType != null && !widget.isRequired
-            ? IconButton(
-                icon: const Icon(Icons.clear),
-                onPressed: _clearSelection,
-                iconSize: 18,
-              )
-            : null,
+      decoration: InvoiceFormFieldMetrics.mergeDecoration(
+        context,
+        InputDecoration(
+          labelText: widget.label,
+          hintText: widget.hintText,
+          prefixIcon: widget.compact
+              ? null
+              : (_selectedType != null
+                  ? Icon(_getTypeIcon(_selectedType!), size: 20)
+                  : const Icon(Icons.toggle_on_outlined, size: 20)),
+          suffixIcon: _selectedType != null && !widget.isRequired
+              ? IconButton(
+                  icon: const Icon(Icons.clear),
+                  onPressed: _clearSelection,
+                  iconSize: 18,
+                  padding: EdgeInsets.zero,
+                  constraints: InvoiceFormFieldMetrics.compactSuffixIconConstraints,
+                )
+              : null,
+          suffixIconConstraints: InvoiceFormFieldMetrics.compactSuffixIconConstraints,
+        ),
       ),
       items: CommissionType.values.map((CommissionType type) {
         return DropdownMenuItem<CommissionType>(

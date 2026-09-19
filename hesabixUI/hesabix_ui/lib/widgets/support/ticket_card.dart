@@ -5,6 +5,7 @@ import 'package:hesabix_ui/core/date_utils.dart' as date_utils;
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'ticket_status_chip.dart';
 import 'priority_indicator.dart';
+import 'sla_indicator.dart';
 
 class TicketCard extends StatelessWidget {
   final SupportTicket ticket;
@@ -25,9 +26,9 @@ class TicketCard extends StatelessWidget {
     final theme = Theme.of(context);
     
     return Container(
-      margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 12),
+      margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
             color: theme.colorScheme.shadow.withValues(alpha: 0.08),
@@ -38,14 +39,14 @@ class TicketCard extends StatelessWidget {
       ),
       child: Material(
         color: theme.colorScheme.surface,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(12),
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(12),
           child: Container(
             padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(12),
               border: Border.all(
                 color: theme.colorScheme.outline.withValues(alpha: 0.1),
                 width: 1,
@@ -69,7 +70,7 @@ class TicketCard extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(width: 12),
-                    TicketStatusChip(status: ticket.status!),
+                    if (ticket.status != null) TicketStatusChip(status: ticket.status!),
                   ],
                 ),
                 
@@ -104,6 +105,10 @@ class TicketCard extends StatelessWidget {
                         priority: ticket.priority!,
                         isSmall: true,
                       ),
+                      const SizedBox(width: 8),
+                    ],
+                    if (!ticket.isClosedFinal) ...[
+                      SlaIndicator(slaStatus: ticket.slaStatus),
                       const SizedBox(width: 8),
                     ],
                     const Spacer(),

@@ -1,22 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:uuid/uuid.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import '../../core/auth_store.dart';
 import '../../core/calendar_controller.dart';
 import '../../widgets/permission/access_denied_page.dart';
-import '../../widgets/invoice/invoice_type_combobox.dart';
-import '../../widgets/invoice/code_field_widget.dart';
-import '../../widgets/invoice/customer_combobox_widget.dart';
-import '../../widgets/invoice/person_combobox_widget.dart';
-import '../../widgets/date_input_field.dart';
-import '../../widgets/banking/currency_picker_widget.dart';
-import '../../widgets/project/project_selector_widget.dart';
-import '../../widgets/invoice/invoice_tags_field.dart';
-import '../../constants/frequent_description_scope.dart';
-import '../../widgets/inputs/frequent_description_text_field.dart';
+import '../../widgets/invoice/invoice_info_form.dart';
 import '../../widgets/invoice/line_items_table.dart';
 import '../../widgets/invoice/invoice_transactions_widget.dart';
+import '../../widgets/invoice/invoice_fx_dual_totals_banner.dart';
 import '../../utils/number_formatters.dart';
 import '../../models/invoice_type_model.dart';
 import '../../models/customer_model.dart';
@@ -36,13 +27,15 @@ import '../../services/business_api_service.dart';
 import '../../services/currency_service.dart';
 import '../../services/business_currency_rate_service.dart';
 import '../../utils/currency_display_utils.dart';
-import '../../widgets/invoice/invoice_fx_rate_field.dart';
+import '../../utils/invoice_payment_tx_from_receipt.dart';
+import '../../utils/number_normalizer.dart';
 import '../../widgets/invoice/invoice_installments_editor.dart';
 import '../../widgets/invoice/keep_alive_tab_child.dart';
 import '../../widgets/invoice/invoice_adjustments_form.dart';
 import '../../models/account_model.dart';
 import '../../services/account_service.dart';
 import 'business_shell_side_nav_scope.dart';
+import '../../widgets/business_subpage_back_leading.dart';
 
 
 class EditInvoicePage extends StatefulWidget {
@@ -92,6 +85,21 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
   /// none | draft | posted
   String _invoiceWarehouseReleaseMode = 'draft';
 
+  // قیود مالیاتی / مودیان (از API)
+  bool _taxTypeChangeAllowed = true;
+  String? _taxTypeChangeBlockReason;
+  bool _taxHeaderLocked = false;
+  bool _isInTaxWorkspace = false;
+  String? _taxStatus;
+  String? _taxTrackingCode;
+
+  List<InvoiceType>? get _taxAllowedInvoiceTypes {
+    if (_isInTaxWorkspace && _taxTypeChangeAllowed && !_taxHeaderLocked) {
+      return const [InvoiceType.sales, InvoiceType.salesReturn];
+    }
+    return null;
+  }
+
   // طرف حساب (فروش/برگشت فروش: مشتری؛ خرید/برگشت خرید: تامین‌کننده)
   Customer? _selectedCustomer;
   Person? _selectedSupplier;
@@ -133,6 +141,43 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
     final c = _selectedCurrencyId;
     if (b == null || c == null) return false;
     return c != b;
+  }
+
+  double? get _previewFxRate {
+    if (!_showInvoiceFxField || !widget.authStore.isMultiCurrency) return null;
+    if (_manualFxRateId != null) {
+      for (final row in _fxRateRows) {
+        if ((row['id'] as num?)?.toInt() == _manualFxRateId) {
+          return parseJsonDoubleOrNull(row['rate']);
+        }
+      }
+    }
+    // نرخ ذخیره‌شده روی سند
+    final fx = _originalExtraInfo['fx'];
+    if (fx is Map && fx['skipped'] != true && fx['rate'] != null) {
+      return parseJsonDoubleOrNull(fx['rate']);
+    }
+    if (_fxRateRows.isEmpty) return null;
+    return parseJsonDoubleOrNull(_fxRateRows.first['rate']);
+  }
+
+  String get _baseCurrencyUnitLabel {
+    final defId = _defaultBusinessCurrencyId;
+    return currencyUnitLabelForBusinessCurrencyIdOrNull(defId, _businessCurrenciesCache) ??
+        'پایه';
+  }
+
+  int get _baseCurrencyDecimalPlaces {
+    final defId = _defaultBusinessCurrencyId;
+    final cache = _businessCurrenciesCache;
+    if (defId == null || cache == null) return 0;
+    for (final raw in cache) {
+      final c = Map<String, dynamic>.from(raw as Map);
+      if ((c['id'] as num?)?.toInt() == defId) {
+        return (c['decimal_places'] as num?)?.toInt() ?? 0;
+      }
+    }
+    return 0;
   }
 
   bool get _invoiceTypeSupportsAdjustments =>
@@ -391,6 +436,16 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
       final String typeValue = docType.startsWith('invoice_') ? docType.substring('invoice_'.length) : docType;
       _selectedInvoiceType = InvoiceType.fromValue(typeValue) ?? InvoiceType.sales;
 
+      _taxTypeChangeAllowed = item['tax_type_change_allowed'] != false;
+      _taxTypeChangeBlockReason = item['tax_type_change_block_reason']?.toString();
+      if (_taxTypeChangeBlockReason != null && _taxTypeChangeBlockReason!.trim().isEmpty) {
+        _taxTypeChangeBlockReason = null;
+      }
+      _taxHeaderLocked = item['tax_header_locked'] == true;
+      _isInTaxWorkspace = item['is_in_tax_workspace'] == true;
+      _taxStatus = item['tax_status']?.toString();
+      _taxTrackingCode = item['tax_tracking_code']?.toString();
+
       _invoiceNumber = item['code']?.toString();
       _isProforma = item['is_proforma'] == true;
       _invoiceDate = DateTime.tryParse(item['document_date']?.toString() ?? '') ?? DateTime.now();
@@ -605,138 +660,20 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
     
     try {
       final receiptPaymentService = ReceiptPaymentService(ApiClient());
-      final List<InvoiceTransaction> transactions = [];
-      final Set<int> processedDocIds = {}; // برای جلوگیری از تکرار
-      
-      // 1. بارگذاری از لینک‌های مستقیم (receipt_payment_document_ids)
       final links = _originalExtraInfo['links'] as Map<String, dynamic>?;
-      if (links != null) {
-        final receiptPaymentIds = links['receipt_payment_document_ids'] as List<dynamic>?;
-        if (receiptPaymentIds != null && receiptPaymentIds.isNotEmpty) {
-          for (final id in receiptPaymentIds) {
-            try {
-              final docId = id is int ? id : int.tryParse(id.toString());
-              if (docId == null || processedDocIds.contains(docId)) continue;
-              
-              final doc = await receiptPaymentService.getById(docId);
-              if (doc == null) continue;
-              
-              processedDocIds.add(docId);
-              
-              // تبدیل سند دریافت/پرداخت به InvoiceTransaction
-              for (final accountLine in doc.accountLines) {
-                if (accountLine.transactionType == null) continue;
-                
-                final transactionType = TransactionType.fromValue(accountLine.transactionType ?? '');
-                if (transactionType == null) continue;
-                
-                final transaction = InvoiceTransaction(
-                  id: const Uuid().v4(), // ID موقت برای ویرایش
-                  type: transactionType,
-                  amount: accountLine.amount,
-                  transactionDate: accountLine.transactionDate ?? doc.documentDate,
-                  description: accountLine.description,
-                  commission: accountLine.commission,
-                  // استخراج اطلاعات اضافی (تبدیل int به String)
-                  bankId: accountLine.extraInfo?['bank_id']?.toString(),
-                  bankName: accountLine.extraInfo?['bank_name'] as String?,
-                  cashRegisterId: accountLine.extraInfo?['cash_register_id']?.toString(),
-                  cashRegisterName: accountLine.extraInfo?['cash_register_name'] as String?,
-                  pettyCashId: accountLine.extraInfo?['petty_cash_id']?.toString(),
-                  pettyCashName: accountLine.extraInfo?['petty_cash_name'] as String?,
-                  checkId: accountLine.extraInfo?['check_id']?.toString(),
-                  checkNumber: accountLine.extraInfo?['check_number'] as String?,
-                  personId: accountLine.extraInfo?['person_id']?.toString(),
-                  personName: accountLine.extraInfo?['person_name'] as String?,
-                  accountId: accountLine.accountId.toString(),
-                  accountName: accountLine.accountName,
-                );
-                transactions.add(transaction);
-              }
-            } catch (e) {
-              // اگر خطا رخ داد، ادامه بده
-            }
-          }
-        }
+      final paymentDocs = await receiptPaymentService.listPaymentDocumentsForInvoice(
+        businessId: widget.businessId,
+        invoiceId: widget.invoiceId,
+        invoiceLinks: links,
+      );
+
+      final List<InvoiceTransaction> transactions = [];
+      for (final doc in paymentDocs) {
+        transactions.addAll(invoiceTransactionsFromReceiptPaymentDoc(doc));
       }
       
-      // 2. جستجوی اسناد دریافت/پرداخت که به این فاکتور لینک شده‌اند
-      // (از طریق extra_info.invoice_id در person_lines)
-      try {
-        final receiptPaymentList = await receiptPaymentService.listReceiptsPayments(
-          businessId: widget.businessId,
-          skip: 0,
-          take: 1000, // محدود کردن به 1000 رکورد
-        );
-        
-        final items = (receiptPaymentList['items'] as List<dynamic>?) ?? [];
-        for (final item in items) {
-          try {
-            final docId = (item['id'] as num?)?.toInt();
-            if (docId == null || processedDocIds.contains(docId)) continue;
-            
-            // بررسی person_lines برای invoice_id
-            final personLines = item['person_lines'] as List<dynamic>?;
-            if (personLines == null) continue;
-            
-            bool hasInvoiceLink = false;
-            for (final pl in personLines) {
-              final extraInfo = pl['extra_info'] as Map<String, dynamic>?;
-              if (extraInfo != null) {
-                final invoiceId = extraInfo['invoice_id'];
-                if (invoiceId is int && invoiceId == widget.invoiceId) {
-                  hasInvoiceLink = true;
-                  break;
-                } else if (invoiceId is num && invoiceId.toInt() == widget.invoiceId) {
-                  hasInvoiceLink = true;
-                  break;
-                }
-              }
-            }
-            
-            if (!hasInvoiceLink) continue;
-            
-            // دریافت جزئیات کامل سند
-            final doc = await receiptPaymentService.getById(docId);
-            if (doc == null) continue;
-            
-            processedDocIds.add(docId);
-            
-            // تبدیل سند دریافت/پرداخت به InvoiceTransaction
-            for (final accountLine in doc.accountLines) {
-              if (accountLine.transactionType == null) continue;
-              
-              final transactionType = TransactionType.fromValue(accountLine.transactionType ?? '');
-              if (transactionType == null) continue;
-              
-              final transaction = InvoiceTransaction(
-                id: const Uuid().v4(), // ID موقت برای ویرایش
-                type: transactionType,
-                amount: accountLine.amount,
-                transactionDate: accountLine.transactionDate ?? doc.documentDate,
-                description: accountLine.description,
-                commission: accountLine.commission,
-                bankId: accountLine.extraInfo?['bank_id']?.toString(),
-                bankName: accountLine.extraInfo?['bank_name'] as String?,
-                cashRegisterId: accountLine.extraInfo?['cash_register_id']?.toString(),
-                cashRegisterName: accountLine.extraInfo?['cash_register_name'] as String?,
-                pettyCashId: accountLine.extraInfo?['petty_cash_id']?.toString(),
-                pettyCashName: accountLine.extraInfo?['petty_cash_name'] as String?,
-                checkId: accountLine.extraInfo?['check_id']?.toString(),
-                checkNumber: accountLine.extraInfo?['check_number'] as String?,
-                personId: accountLine.extraInfo?['person_id']?.toString(),
-                personName: accountLine.extraInfo?['person_name'] as String?,
-                accountId: accountLine.accountId.toString(),
-                accountName: accountLine.accountName,
-              );
-              transactions.add(transaction);
-            }
-          } catch (e) {
-          }
-        }
-      } catch (e) {
-      }
-      
+      transactions.sort((a, b) => a.transactionDate.compareTo(b.transactionDate));
+
       if (mounted) {
         setState(() {
           _transactions = transactions;
@@ -861,6 +798,7 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
     return Scaffold(
       appBar: AppBar(
         title: Text(t.editInvoiceTitle),
+        leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
         actions: [
           IconButton(
             tooltip: t.saveChangesTooltip,
@@ -917,261 +855,141 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
     );
   }
 
+  Widget _buildTaxConstraintBanner() {
+    final reason = _taxTypeChangeBlockReason?.trim();
+    final inWorkspaceHint = _isInTaxWorkspace &&
+        !_taxHeaderLocked &&
+        _taxTypeChangeAllowed &&
+        reason == null;
+    if ((reason == null || reason.isEmpty) && !inWorkspaceHint) {
+      return const SizedBox.shrink();
+    }
+
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isError = _taxHeaderLocked;
+    final bg = isError
+        ? colorScheme.errorContainer.withValues(alpha: 0.35)
+        : colorScheme.primaryContainer.withValues(alpha: 0.35);
+    final fg = isError ? colorScheme.onErrorContainer : colorScheme.onPrimaryContainer;
+    final icon = isError ? Icons.lock_outline : Icons.info_outline;
+
+    final lines = <String>[];
+    if (reason != null && reason.isNotEmpty) {
+      lines.add(reason);
+    } else if (inWorkspaceHint) {
+      lines.add(
+        'این فاکتور در کارپوشه مالیاتی است. فقط «فروش» و «برگشت از فروش» مجازند؛ '
+        'برای تغییر به نوع دیگر ابتدا از کارپوشه خارج کنید.',
+      );
+    }
+    if (_taxTrackingCode != null && _taxTrackingCode!.trim().isNotEmpty) {
+      lines.add('کد رهگیری مودیان: ${_taxTrackingCode!.trim()}');
+    } else if (_taxStatus != null && _taxStatus!.trim().isNotEmpty) {
+      lines.add('وضعیت مالیاتی: ${_taxStatus!.trim()}');
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Material(
+        color: bg,
+        borderRadius: BorderRadius.circular(8),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(icon, color: fg, size: 22),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  lines.join('\n'),
+                  style: theme.textTheme.bodyMedium?.copyWith(color: fg, height: 1.45),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildInvoiceInfoTab() {
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       child: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 1600),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              LayoutBuilder(
-                builder: (context, constraints) {
-                  final t = AppLocalizations.of(context);
-                  final isMobile = ResponsiveHelper.isMobile(context);
-                  if (isMobile) {
-                    // موبایل: Column layout
-                    return Column(
-                      children: [
-                        InvoiceTypeCombobox(
-                          selectedType: _selectedInvoiceType,
-                          onTypeChanged: _handleInvoiceTypeChanged,
-                          isDraft: _isProforma,
-                          onDraftChanged: _handleDraftChanged,
-                          isRequired: true,
-                          label: 'نوع فاکتور',
-                          hintText: 'انتخاب نوع فاکتور',
-                        ),
-                        const SizedBox(height: 12),
-                        CodeFieldWidget(
-                          initialValue: _invoiceNumber,
-                          onChanged: (number) {
-                            setState(() {
-                              _invoiceNumber = number;
-                            });
-                          },
-                          isRequired: true,
-                          label: 'شماره فاکتور',
-                          hintText: 'مثال: INV-20240410-0001',
-                          autoGenerateCode: false,
-                          invoiceDocumentCode: true,
-                        ),
-                        const SizedBox(height: 12),
-                        DateInputField(
-                          value: _invoiceDate,
-                          labelText: 'تاریخ فاکتور *',
-                          hintText: 'انتخاب تاریخ فاکتور',
-                          calendarController: widget.calendarController,
-                          onChanged: (date) {
-                            setState(() {
-                              _invoiceDate = date;
-                            });
-                          },
-                        ),
-                        const SizedBox(height: 12),
-                        DateInputField(
-                          value: _dueDate ?? _invoiceDate,
-                          labelText: 'تاریخ سررسید',
-                          hintText: 'انتخاب تاریخ سررسید',
-                          calendarController: widget.calendarController,
-                          onChanged: (date) {
-                            setState(() {
-                              _dueDate = date;
-                            });
-                          },
-                        ),
-                        const SizedBox(height: 12),
-                        InvoiceFxRateField(
-                          show: _showInvoiceFxField,
-                          loading: _loadingFxRates,
-                          manualRateId: _manualFxRateId,
-                          rateRows: _fxRateRows,
-                          onChanged: (v) => setState(() => _manualFxRateId = v),
-                        ),
-                        const SizedBox(height: 16),
-                        FrequentDescriptionTextField(
-                          businessId: widget.businessId,
-                          scope: FrequentDescriptionScope.invoice,
-                          controller: _invoiceTitleController,
-                          onChanged: (value) {
-                            setState(() {
-                              _invoiceTitle = value.trim().isEmpty ? null : value.trim();
-                            });
-                          },
-                          decoration: InputDecoration(
-                            labelText: t.invoiceHeaderDescriptionLabel,
-                            hintText: t.invoiceHeaderDescriptionHint,
-                            border: const OutlineInputBorder(),
-                          ),
-                          textInputAction: TextInputAction.next,
-                          maxLines: 3,
-                        ),
-                      ],
-                    );
-                  } else {
-                    // دسکتاپ/تبلت: Row layout
-                    return Column(
-                      children: [
-                        // سطر اول
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Expanded(
-                              child: InvoiceTypeCombobox(
-                                selectedType: _selectedInvoiceType,
-                                onTypeChanged: _handleInvoiceTypeChanged,
-                                isDraft: _isProforma,
-                                onDraftChanged: _handleDraftChanged,
-                                isRequired: true,
-                                label: 'نوع فاکتور',
-                                hintText: 'انتخاب نوع فاکتور',
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: CodeFieldWidget(
-                                initialValue: _invoiceNumber,
-                                onChanged: (number) {
-                                  setState(() {
-                                    _invoiceNumber = number;
-                                  });
-                                },
-                                isRequired: true,
-                                label: 'شماره فاکتور',
-                                hintText: 'مثال: INV-20240410-0001',
-                                autoGenerateCode: false,
-                                invoiceDocumentCode: true,
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: DateInputField(
-                                value: _invoiceDate,
-                                labelText: 'تاریخ فاکتور *',
-                                hintText: 'انتخاب تاریخ فاکتور',
-                                calendarController: widget.calendarController,
-                                onChanged: (date) {
-                                  setState(() {
-                                    _invoiceDate = date;
-                                  });
-                                },
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: CurrencyPickerWidget(
-                                businessId: widget.businessId,
-                                selectedCurrencyId: _selectedCurrencyId,
-                                onChanged: (currencyId) {
-                                  setState(() {
-                                    _selectedCurrencyId = currencyId;
-                                    _manualFxRateId = null;
-                                    _applyCurrencyMetaFromCache();
-                                    _recalculateTotals();
-                                  });
-                                  _reloadFxRates();
-                                },
-                                label: 'ارز فاکتور',
-                                hintText: 'انتخاب ارز فاکتور',
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: ProjectSelectorWidget(
-                                businessId: widget.businessId,
-                                apiClient: ApiClient(),
-                                selectedProjectId: _selectedProjectId,
-                                onChanged: (projectId) {
-                                  setState(() {
-                                    _selectedProjectId = projectId;
-                                  });
-                                },
-                                allowNull: true,
-                                labelText: 'پروژه (اختیاری)',
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        InvoiceTagsField(
-                          businessId: widget.businessId,
-                          apiClient: ApiClient(),
-                          selectedTagIds: _selectedTagIds,
-                          onChanged: (v) => setState(() => _selectedTagIds = v),
-                        ),
-                        const SizedBox(height: 8),
-                        InvoiceFxRateField(
-                          show: _showInvoiceFxField,
-                          loading: _loadingFxRates,
-                          manualRateId: _manualFxRateId,
-                          rateRows: _fxRateRows,
-                          onChanged: (v) => setState(() => _manualFxRateId = v),
-                        ),
-                        const SizedBox(height: 16),
-                        DateInputField(
-                          value: _dueDate ?? _invoiceDate,
-                          labelText: 'تاریخ سررسید',
-                          hintText: 'انتخاب تاریخ سررسید',
-                          calendarController: widget.calendarController,
-                          onChanged: (date) {
-                            setState(() {
-                              _dueDate = date;
-                            });
-                          },
-                        ),
-                        const SizedBox(height: 16),
-                        // طرف حساب فقط نمایشی در صورت امکان
-                        if (_selectedInvoiceType == InvoiceType.sales || _selectedInvoiceType == InvoiceType.salesReturn)
-                          CustomerComboboxWidget(
-                            selectedCustomer: _selectedCustomer,
-                            onCustomerChanged: (c) => setState(() => _selectedCustomer = c),
-                            businessId: widget.businessId,
-                            authStore: widget.authStore,
-                            isRequired: false,
-                            label: 'طرف حساب',
-                            hintText: _selectedCustomer?.name ?? 'انتخاب طرف حساب',
-                            showFinancialBalance: true,
-                          ),
-                        if (_selectedInvoiceType == InvoiceType.purchase || _selectedInvoiceType == InvoiceType.purchaseReturn) ...[
-                          const SizedBox(height: 16),
-                          PersonComboboxWidget(
-                            businessId: widget.businessId,
-                            showFinancialBalance: true,
-                            selectedPerson: _selectedSupplier,
-                            onChanged: (p) => setState(() => _selectedSupplier = p),
-                            isRequired: false,
-                            label: 'تامین‌کننده',
-                            hintText: 'انتخاب تامین‌کننده',
-                            personTypes: const ['تامین‌کننده', 'فروشنده'],
-                            searchHint: 'جست‌وجو در تامین‌کنندگان...',
-                          ),
-                        ],
-                        const SizedBox(height: 16),
-                        FrequentDescriptionTextField(
-                          businessId: widget.businessId,
-                          scope: FrequentDescriptionScope.invoice,
-                          controller: _invoiceTitleController,
-                          onChanged: (value) {
-                            setState(() {
-                              _invoiceTitle = value.trim().isEmpty ? null : value.trim();
-                            });
-                          },
-                          decoration: InputDecoration(
-                            labelText: t.invoiceHeaderDescriptionLabel,
-                            hintText: t.invoiceHeaderDescriptionHint,
-                            border: const OutlineInputBorder(),
-                          ),
-                          textInputAction: TextInputAction.next,
-                          maxLines: 3,
-                        ),
-                      ],
-                    );
-                  }
-                },
-              ),
-              const SizedBox(height: 24),
-            ],
+          child: InvoiceInfoForm(
+            header: _buildTaxConstraintBanner(),
+            businessId: widget.businessId,
+            authStore: widget.authStore,
+            calendarController: widget.calendarController,
+            selectedInvoiceType: _selectedInvoiceType,
+            onInvoiceTypeChanged: _handleInvoiceTypeChanged,
+            isDraft: _isProforma,
+            onDraftChanged: _handleDraftChanged,
+            enableDraftToggle: !_taxHeaderLocked,
+            enableTypeChange: _taxTypeChangeAllowed,
+            allowedInvoiceTypes: _taxAllowedInvoiceTypes,
+            invoiceNumber: _invoiceNumber,
+            onInvoiceNumberChanged: (number) {
+              setState(() => _invoiceNumber = number);
+            },
+            autoGenerateInvoiceNumber: false,
+            onAutoGenerateInvoiceNumberChanged: (_) {},
+            showAutoGenerateToggle: false,
+            invoiceDate: _invoiceDate,
+            onInvoiceDateChanged: (date) {
+              setState(() => _invoiceDate = date);
+            },
+            dueDate: _dueDate ?? _invoiceDate,
+            onDueDateChanged: (date) {
+              setState(() => _dueDate = date);
+            },
+            selectedCustomer: _selectedCustomer,
+            onCustomerChanged: (c) => setState(() => _selectedCustomer = c),
+            selectedSupplier: _selectedSupplier,
+            onSupplierChanged: (p) => setState(() => _selectedSupplier = p),
+            selectedCurrencyId: _selectedCurrencyId,
+            onCurrencyChanged: (currencyId) {
+              setState(() {
+                _selectedCurrencyId = currencyId;
+                _manualFxRateId = null;
+                _applyCurrencyMetaFromCache();
+                _recalculateTotals();
+              });
+              _reloadFxRates();
+            },
+            currencyUnitLabel: _invoiceCurrencyUnitLabel,
+            showFxRateField: _showInvoiceFxField,
+            loadingFxRates: _loadingFxRates,
+            manualFxRateId: _manualFxRateId,
+            fxRateRows: _fxRateRows,
+            onFxRateChanged: (v) => setState(() => _manualFxRateId = v),
+            selectedProjectId: _selectedProjectId,
+            onProjectChanged: (projectId) {
+              setState(() => _selectedProjectId = projectId);
+            },
+            selectedTagIds: _selectedTagIds,
+            onTagsChanged: (v) => setState(() => _selectedTagIds = v),
+            showSellerCommissionSection: false,
+            selectedSeller: null,
+            onSellerChanged: (_) {},
+            commissionType: null,
+            onCommissionTypeChanged: (_) {},
+            commissionPercentage: null,
+            onCommissionPercentageChanged: (_) {},
+            commissionAmount: null,
+            onCommissionAmountChanged: (_) {},
+            invoiceReference: null,
+            onInvoiceReferenceChanged: (_) {},
+            invoiceTitleController: _invoiceTitleController,
+            onInvoiceTitleChanged: (value) {
+              setState(() {
+                _invoiceTitle = value.trim().isEmpty ? null : value.trim();
+              });
+            },
           ),
         ),
       ),
@@ -1204,6 +1022,7 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
                     businessId: widget.businessId,
                     authStore: widget.authStore,
                     selectedCurrencyId: _selectedCurrencyId,
+                    defaultCurrencyId: _defaultBusinessCurrencyId,
                     currencyDecimalPlaces: _invoiceCurrencyDecimalPlaces,
                     currencyUnitLabel: _invoiceCurrencyUnitLabel,
                     invoiceType: (_selectedInvoiceType?.value ?? 'sales'),
@@ -1303,6 +1122,21 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
                       Text('مالیات اضافات/کسورات: ${formatWithThousands(_adjustmentsTaxSum, decimalPlaces: _invoiceCurrencyDecimalPlaces)}', style: Theme.of(context).textTheme.bodyMedium),
                     ],
                     Text('${t.invoiceSummaryTotal}: ${formatWithThousands(_invoiceGrandTotal, decimalPlaces: _invoiceCurrencyDecimalPlaces)}', style: Theme.of(context).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w600)),
+                    if (widget.authStore.isMultiCurrency &&
+                        _showInvoiceFxField &&
+                        _previewFxRate != null &&
+                        _previewFxRate! > 0)
+                      InvoiceFxDualTotalsBanner(
+                        isMultiCurrency: true,
+                        showDual: true,
+                        foreignPayable: _invoiceGrandTotal.toDouble(),
+                        basePayable: _invoiceGrandTotal.toDouble() * _previewFxRate!,
+                        rate: _previewFxRate!,
+                        foreignCurrencyLabel: _invoiceCurrencyUnitLabel,
+                        baseCurrencyLabel: _baseCurrencyUnitLabel,
+                        foreignDecimalPlaces: _invoiceCurrencyDecimalPlaces,
+                        baseDecimalPlaces: _baseCurrencyDecimalPlaces,
+                      ),
                   ],
                 ),
               ),
@@ -1347,6 +1181,7 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
             selectedCurrencyId: _selectedCurrencyId,
             authStore: widget.authStore,
             invoiceTotal: _invoiceGrandTotal,
+            invoiceFxRate: _previewFxRate,
           ),
         ),
       ),
@@ -1679,7 +1514,15 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
     
     // تراکنش‌های پرداخت برای فاکتور قطعی؛ همیشه آرایه بفرست تا حذف همهٔ تراکنش‌ها در سرور اعمال شود
     if (!_isProforma) {
-      payload['payments'] = _transactions.map((t) => t.toJson()).toList();
+      payload['payments'] = _transactions
+          .map(
+            (t) => t.toPaymentPayload(
+              invoiceCurrencyId: _selectedCurrencyId,
+              baseCurrencyId: _defaultBusinessCurrencyId,
+              invoiceFxRate: _previewFxRate,
+            ),
+          )
+          .toList();
     }
 
     return payload;

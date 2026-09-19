@@ -4,6 +4,8 @@
 # تعداد مسیر: 724 (+ roboto زیر)
 # بازتولید: bash scripts/extract_flutter_gstatic_font_paths.sh
 # پر کردن باندل: bash scripts/populate_gstatic_font_bundle.sh
+# sync به web: bash scripts/sync_font_fallback_mirror.sh
+# ایموجی: shardهای واقعی notocoloremoji در باندل (نه stub یکسان)؛ runtime بدون fonts.gstatic.com
 #
 # Roboto برای CanvasKit / fallback اضطراری (در font_fallback_data نیست)
 roboto/v32/KFOmCnqEu92Fr1Me4GZLCzYlKw.woff2

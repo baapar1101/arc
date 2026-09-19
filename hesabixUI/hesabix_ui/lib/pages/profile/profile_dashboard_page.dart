@@ -10,6 +10,7 @@ import '../../services/support_tickets_public_config.dart';
 import '../../services/announcements_service.dart';
 import '../../services/support_service.dart';
 import 'package:go_router/go_router.dart';
+import 'package:hesabix_ui/config/brand_config.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../core/auth_store.dart';
@@ -17,6 +18,7 @@ import '../../core/mobile_launcher_prefs.dart';
 import '../../core/calendar_controller.dart';
 import '../../core/date_utils.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
+import 'package:hesabix_ui/utils/announcement_navigation.dart';
 import 'package:hesabix_ui/utils/responsive_helper.dart';
 import '../../theme/tokens/extensions.dart';
 import '../../widgets/support/ticket_details_dialog.dart';
@@ -34,23 +36,27 @@ class ProfileDashboardPage extends StatefulWidget {
   State<ProfileDashboardPage> createState() => _ProfileDashboardPageState();
 }
 
-typedef ProfileWidgetBuilder = Widget Function(
-  BuildContext,
-  dynamic,
-  DashboardLayoutItem, {
-  VoidCallback? onRefresh,
-});
+typedef ProfileWidgetBuilder =
+    Widget Function(
+      BuildContext,
+      dynamic,
+      DashboardLayoutItem, {
+      VoidCallback? onRefresh,
+    });
 
-class _ProfileDashboardPageState extends State<ProfileDashboardPage> with WidgetsBindingObserver {
+class _ProfileDashboardPageState extends State<ProfileDashboardPage>
+    with WidgetsBindingObserver {
   late final ProfileDashboardService _service;
   DashboardLayoutProfile? _layout;
   Map<String, dynamic> _data = <String, dynamic>{};
   bool _loading = true;
+  bool _widgetsLoading = false;
   String? _error;
   bool _editMode = false;
   final Set<int> _annBusyIds = <int>{};
   bool _annOnlyUnread = false;
-  SupportTicketsPublicConfig _supportPublic = const SupportTicketsPublicConfig();
+  SupportTicketsPublicConfig _supportPublic =
+      const SupportTicketsPublicConfig();
 
   @override
   void initState() {
@@ -86,18 +92,8 @@ class _ProfileDashboardPageState extends State<ProfileDashboardPage> with Widget
       if (!mounted) return;
       Map<String, dynamic> nextData = _data;
       if (layout != null) {
-        final keys = layout.items.where((e) => !e.hidden).map((e) => e.key).toList();
-        var data = await _service.getWidgetsBatchData(
-          widgetKeys: keys,
-          filters: _dashboardFilters(keys),
-        );
-        data = await _service.hydrateSpecialWidgets(
-          data,
-          keys,
-          onlyUnread: _annOnlyUnread,
-        );
+        nextData = await _fetchWidgetData(layout);
         if (!mounted) return;
-        nextData = data;
       }
       setState(() {
         _supportPublic = supportCfg;
@@ -108,9 +104,11 @@ class _ProfileDashboardPageState extends State<ProfileDashboardPage> with Widget
     } catch (_) {}
   }
 
-  double _getPadding(BuildContext context) => ResponsiveHelper.getPadding(context);
+  double _getPadding(BuildContext context) =>
+      ResponsiveHelper.getPadding(context);
 
-  double _getGridSpacing(BuildContext context) => ResponsiveHelper.getGridSpacing(context);
+  double _getGridSpacing(BuildContext context) =>
+      ResponsiveHelper.getGridSpacing(context);
 
   double _getMinTileUnit(BuildContext context) {
     final bp = ResponsiveHelper.breakpoint(context);
@@ -131,11 +129,16 @@ class _ProfileDashboardPageState extends State<ProfileDashboardPage> with Widget
   }
 
   /// عرض هر ستون گرید — بدون floor اجباری که باعث فضای خالی کناری می‌شود.
-  double _computeColumnUnit(double totalWidth, int crossAxisCount, BuildContext context) {
+  double _computeColumnUnit(
+    double totalWidth,
+    int crossAxisCount,
+    BuildContext context,
+  ) {
     final spacing = _getGridSpacing(context);
     final minTileUnit = _getMinTileUnit(context);
     if (crossAxisCount <= 0 || totalWidth <= 0) return minTileUnit;
-    final naturalUnit = (totalWidth - (crossAxisCount - 1) * spacing) / crossAxisCount;
+    final naturalUnit =
+        (totalWidth - (crossAxisCount - 1) * spacing) / crossAxisCount;
     if (naturalUnit <= 0) return minTileUnit;
     if (_isMobile(context)) return naturalUnit;
     return naturalUnit;
@@ -165,12 +168,14 @@ class _ProfileDashboardPageState extends State<ProfileDashboardPage> with Widget
   Future<void> _openBusinessFromDashboard(int businessId) async {
     final t = AppLocalizations.of(context);
     if (!_isMobile(context)) {
-      await MobileLauncherPrefs.clearResumeLauncher(widget.authStore.currentUserId);
+      await MobileLauncherPrefs.clearResumeLauncher(
+        widget.authStore.currentUserId,
+      );
       if (!mounted) return;
       context.go('/business/$businessId/dashboard');
       return;
     }
-    await showModalBottomSheet<void>(
+    final mode = await showModalBottomSheet<MobileBusinessEntryMode>(
       context: context,
       showDragHandle: true,
       builder: (sheetCtx) {
@@ -191,27 +196,16 @@ class _ProfileDashboardPageState extends State<ProfileDashboardPage> with Widget
                 ListTile(
                   leading: const Icon(Icons.dashboard_outlined),
                   title: Text(t.mobileLauncherModeStandard),
-                  onTap: () async {
-                    Navigator.of(sheetCtx).pop();
-                    await MobileLauncherPrefs.clearResumeLauncher(
-                      widget.authStore.currentUserId,
-                    );
-                    if (!mounted) return;
-                    context.go('/business/$businessId/dashboard');
-                  },
+                  onTap: () => Navigator.of(
+                    sheetCtx,
+                  ).pop(MobileBusinessEntryMode.standard),
                 ),
                 ListTile(
                   leading: const Icon(Icons.apps_outlined),
                   title: Text(t.mobileLauncherModeLauncher),
-                  onTap: () async {
-                    Navigator.of(sheetCtx).pop();
-                    await MobileLauncherPrefs.setResumeLauncher(
-                      widget.authStore.currentUserId,
-                      businessId,
-                    );
-                    if (!mounted) return;
-                    context.go(MobileLauncherPrefs.launcherHomePath(businessId));
-                  },
+                  onTap: () => Navigator.of(
+                    sheetCtx,
+                  ).pop(MobileBusinessEntryMode.launcher),
                 ),
               ],
             ),
@@ -219,6 +213,27 @@ class _ProfileDashboardPageState extends State<ProfileDashboardPage> with Widget
         );
       },
     );
+    if (!mounted || mode == null) return;
+    if (mode == MobileBusinessEntryMode.standard) {
+      await MobileLauncherPrefs.clearResumeLauncher(
+        widget.authStore.currentUserId,
+      );
+      if (!mounted) return;
+      context.go('/business/$businessId/dashboard');
+      return;
+    }
+    await MobileLauncherPrefs.setPreferredEntryMode(
+      widget.authStore.currentUserId,
+      MobileBusinessEntryMode.launcher,
+    );
+    await MobileLauncherPrefs.setResumeLauncher(
+      widget.authStore.currentUserId,
+      businessId,
+    );
+    if (!mounted) return;
+    await Future<void>.delayed(Duration.zero);
+    if (!mounted) return;
+    context.go(MobileLauncherPrefs.launcherHomePath(businessId));
   }
 
   Future<void> _openTicketDetail(int ticketId) async {
@@ -235,7 +250,10 @@ class _ProfileDashboardPageState extends State<ProfileDashboardPage> with Widget
       );
     } catch (e) {
       if (!mounted) return;
-      SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
+      SnackBarHelper.showError(
+        context,
+        message: ErrorExtractor.forContext(e, context),
+      );
     }
   }
 
@@ -244,66 +262,101 @@ class _ProfileDashboardPageState extends State<ProfileDashboardPage> with Widget
       setState(() {
         _loading = true;
         _error = null;
+        _data = <String, dynamic>{};
+        _widgetsLoading = false;
       });
-      final supportCfg = await SupportTicketsPublicConfig.fetch(ApiClient());
-      final defs = await _service.getWidgetDefinitions();
+
+      // فاز A: ساختار شل به‌صورت موازی (config + definitions)
+      final boot = await Future.wait<Object>([
+        SupportTicketsPublicConfig.fetch(ApiClient()),
+        _service.getWidgetDefinitions(),
+      ]);
+      final supportCfg = boot[0] as SupportTicketsPublicConfig;
+      final defs = boot[1] as DashboardDefinitionsResponse;
       if (!context.mounted) return;
       final ctx = context;
-      final bp = ResponsiveHelper.breakpointFromWidth(MediaQuery.of(ctx).size.width);
+      final bp = ResponsiveHelper.breakpointFromWidth(
+        MediaQuery.of(ctx).size.width,
+      );
       var layout = await _service.getLayoutProfile(breakpoint: bp);
       final existingKeys = layout.items.map((e) => e.key).toSet();
-      final missingDefaults = defs.items.where((d) => !existingKeys.contains(d.key)).toList();
+      final missingDefaults = defs.items
+          .where((d) => !existingKeys.contains(d.key))
+          .toList();
       if (missingDefaults.isNotEmpty) {
         final items = List<DashboardLayoutItem>.from(layout.items);
-        int maxOrder = items.fold<int>(0, (acc, it) => it.order > acc ? it.order : acc);
+        int maxOrder = items.fold<int>(
+          0,
+          (acc, it) => it.order > acc ? it.order : acc,
+        );
         for (final d in missingDefaults) {
           final dflt = d.defaults[bp] ?? const <String, int>{};
-          final colSpan = (dflt['colSpan'] ?? (layout.columns / 2).floor()).clamp(1, layout.columns);
+          final colSpan = (dflt['colSpan'] ?? (layout.columns / 2).floor())
+              .clamp(1, layout.columns);
           final rowSpan = dflt['rowSpan'] ?? 2;
-          items.add(DashboardLayoutItem(key: d.key, order: ++maxOrder, colSpan: colSpan, rowSpan: rowSpan, hidden: false));
+          items.add(
+            DashboardLayoutItem(
+              key: d.key,
+              order: ++maxOrder,
+              colSpan: colSpan,
+              rowSpan: rowSpan,
+              hidden: false,
+            ),
+          );
         }
         layout = await _service.putLayoutProfile(breakpoint: bp, items: items);
       }
-      final keys = layout.items.where((e) => !e.hidden).map((e) => e.key).toList();
-      var data = await _service.getWidgetsBatchData(
-        widgetKeys: keys,
-        filters: _dashboardFilters(keys),
-      );
-      data = await _service.hydrateSpecialWidgets(
-        data,
-        keys,
-        onlyUnread: _annOnlyUnread,
-      );
+
+      // Progressive paint: چیدمان را فوری نشان بده؛ ویجت‌ها تا رسیدن داده spinner دارند
       if (!mounted) return;
       setState(() {
         _layout = layout;
-        _data = data;
-        _loading = false;
         _supportPublic = supportCfg;
+        _loading = false;
+        _widgetsLoading = true;
+      });
+
+      // فاز B: دادهٔ ویجت‌ها (hydrate فقط در صورت نبود دادهٔ قابل‌استفاده از batch)
+      final data = await _fetchWidgetData(layout);
+      if (!mounted) return;
+      setState(() {
+        _data = data;
+        _widgetsLoading = false;
       });
     } catch (e) {
       if (!mounted) return;
       setState(() {
         _error = ErrorExtractor.forContext(e, context);
         _loading = false;
+        _widgetsLoading = false;
       });
     }
+  }
+
+  Future<Map<String, dynamic>> _fetchWidgetData(
+    DashboardLayoutProfile layout,
+  ) async {
+    final keys = layout.items
+        .where((e) => !e.hidden)
+        .map((e) => e.key)
+        .toList();
+    var data = await _service.getWidgetsBatchData(
+      widgetKeys: keys,
+      filters: _dashboardFilters(keys),
+    );
+    data = await _service.hydrateSpecialWidgets(
+      data,
+      keys,
+      onlyUnread: _annOnlyUnread,
+    );
+    return data;
   }
 
   Future<void> _reloadDataOnly() async {
     try {
       final layout = _layout;
       if (layout == null) return;
-      final keys = layout.items.where((e) => !e.hidden).map((e) => e.key).toList();
-      var data = await _service.getWidgetsBatchData(
-        widgetKeys: keys,
-        filters: _dashboardFilters(keys),
-      );
-      data = await _service.hydrateSpecialWidgets(
-        data,
-        keys,
-        onlyUnread: _annOnlyUnread,
-      );
+      final data = await _fetchWidgetData(layout);
       if (!mounted) return;
       setState(() {
         _data = data;
@@ -317,11 +370,9 @@ class _ProfileDashboardPageState extends State<ProfileDashboardPage> with Widget
         widgetKeys: [key],
         filters: _dashboardFilters([key]),
       );
-      data = await _service.hydrateSpecialWidgets(
-        data,
-        [key],
-        onlyUnread: _annOnlyUnread,
-      );
+      data = await _service.hydrateSpecialWidgets(data, [
+        key,
+      ], onlyUnread: _annOnlyUnread);
       if (!mounted) return;
       setState(() {
         if (data.containsKey(key)) {
@@ -335,7 +386,9 @@ class _ProfileDashboardPageState extends State<ProfileDashboardPage> with Widget
 
   Future<void> _reloadAnnouncements({required bool onlyUnread}) async {
     try {
-      final ann = await AnnouncementsService(ApiClient()).listAnnouncements(page: 1, limit: 5, onlyUnread: onlyUnread);
+      final ann = await AnnouncementsService(
+        ApiClient(),
+      ).listAnnouncements(page: 1, limit: 5, onlyUnread: onlyUnread);
       final items = (ann['items'] as List? ?? const <dynamic>[])
           .map<Map<String, dynamic>>((e) => Map<String, dynamic>.from(e as Map))
           .toList();
@@ -402,9 +455,16 @@ class _ProfileDashboardPageState extends State<ProfileDashboardPage> with Widget
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.error, size: 56, color: Theme.of(context).colorScheme.error),
+              Icon(
+                Icons.error,
+                size: 56,
+                color: Theme.of(context).colorScheme.error,
+              ),
               const SizedBox(height: 12),
-              Text(t.profileDashboardLoadError(_error!), textAlign: TextAlign.center),
+              Text(
+                t.profileDashboardLoadError(_error!),
+                textAlign: TextAlign.center,
+              ),
               const SizedBox(height: 12),
               ElevatedButton(onPressed: _loadAll, child: Text(t.retry)),
             ],
@@ -414,71 +474,86 @@ class _ProfileDashboardPageState extends State<ProfileDashboardPage> with Widget
     }
 
     final layout = _layout!;
-    final items = List<DashboardLayoutItem>.from(layout.items)..sort((a, b) => a.order.compareTo(b.order));
+    final items = List<DashboardLayoutItem>.from(layout.items)
+      ..sort((a, b) => a.order.compareTo(b.order));
     final visible = items.where((e) => !e.hidden).toList();
     final crossAxisCount = layout.columns;
 
     return Container(
       color: dashBg,
-      child: Padding(
-        padding: EdgeInsets.all(padding),
-        child: Column(
-          children: [
-            _buildHeaderRow(t),
-            SizedBox(height: _isMobile(context) ? 12 : 16),
-            Expanded(
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  final totalWidth = constraints.maxWidth;
-                  final spacing = _getGridSpacing(context);
-                  final unit = _computeColumnUnit(totalWidth, crossAxisCount, context);
-                  final children = _buildGridChildren(
-                    visible: visible,
-                    crossAxisCount: crossAxisCount,
-                    totalWidth: totalWidth,
-                    unit: unit,
-                    spacing: spacing,
-                  );
-                  if (!_editMode) {
-                    return SingleChildScrollView(
-                      child: Wrap(
-                        spacing: spacing,
-                        runSpacing: spacing,
-                        children: children,
-                      ),
-                    );
-                  }
-                  return SingleChildScrollView(
-                    child: ReorderableWrap(
-                      spacing: spacing,
-                      runSpacing: spacing,
-                      needsLongPressDraggable: true,
-                      onReorder: (oldIndex, newIndex) {
-                        final list = List<DashboardLayoutItem>.from(visible);
-                        final moved = list.removeAt(oldIndex);
-                        list.insert(newIndex, moved);
-                        final profile = _layout!;
-                        final newItems = <DashboardLayoutItem>[];
-                        final visibleKeys = list.map((e) => e.key).toSet();
-                        newItems.addAll(list);
-                        for (final it in profile.items) {
-                          if (!visibleKeys.contains(it.key) && !it.hidden) continue;
-                          if (it.hidden) newItems.add(it);
+      child: Column(
+        children: [
+          if (_widgetsLoading)
+            LinearProgressIndicator(
+              minHeight: 2,
+              backgroundColor: Theme.of(
+                context,
+              ).colorScheme.surfaceContainerHighest,
+            ),
+          Expanded(
+            child: Padding(
+              padding: EdgeInsets.all(padding),
+              child: Column(
+                children: [
+                  _buildHeaderRow(t),
+                  SizedBox(height: _isMobile(context) ? 12 : 16),
+                  Expanded(
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        final totalWidth = constraints.maxWidth;
+                        final spacing = _getGridSpacing(context);
+                        final unit = _computeColumnUnit(
+                          totalWidth,
+                          crossAxisCount,
+                          context,
+                        );
+                        final children = _buildGridChildren(
+                          visible: visible,
+                          crossAxisCount: crossAxisCount,
+                          totalWidth: totalWidth,
+                          unit: unit,
+                          spacing: spacing,
+                        );
+                        if (!_editMode) {
+                          return SingleChildScrollView(
+                            child: Wrap(
+                              spacing: spacing,
+                              runSpacing: spacing,
+                              children: children,
+                            ),
+                          );
                         }
-                        _reindexAndSave(newItems);
+                        return SingleChildScrollView(
+                          child: ReorderableWrap(
+                            spacing: spacing,
+                            runSpacing: spacing,
+                            needsLongPressDraggable: true,
+                            onReorder: (oldIndex, newIndex) {
+                              final list = List<DashboardLayoutItem>.from(
+                                visible,
+                              );
+                              final moved = list.removeAt(oldIndex);
+                              list.insert(newIndex, moved);
+                              final hidden = items
+                                  .where((e) => e.hidden)
+                                  .toList();
+                              _reindexAndSave([...list, ...hidden]);
+                            },
+                            children: children,
+                          ),
+                        );
                       },
-                      children: children,
                     ),
-                  );
-                },
+                  ),
+                  if (_editMode) ...[
+                    const SizedBox(height: 12),
+                    _buildHiddenSection(t),
+                  ],
+                ],
               ),
             ),
-            if (_editMode) ...[
-              const SizedBox(height: 12),
-              _buildHiddenSection(t),
-            ],
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -488,7 +563,9 @@ class _ProfileDashboardPageState extends State<ProfileDashboardPage> with Widget
     final headerStyle = _getHeaderTextStyle(context);
 
     final editToggleButton = IconButton(
-      tooltip: _editMode ? t.profileDashboardExitEdit : t.profileDashboardEditLayout,
+      tooltip: _editMode
+          ? t.profileDashboardExitEdit
+          : t.profileDashboardEditLayout,
       onPressed: () => setState(() => _editMode = !_editMode),
       icon: Icon(_editMode ? Icons.check : Icons.edit),
       iconSize: isMobile ? 20 : 24,
@@ -496,12 +573,7 @@ class _ProfileDashboardPageState extends State<ProfileDashboardPage> with Widget
 
     return Row(
       children: [
-        Expanded(
-          child: Text(
-            t.profileDashboardTitle,
-            style: headerStyle,
-          ),
-        ),
+        Expanded(child: Text(t.profileDashboardTitle, style: headerStyle)),
         editToggleButton,
       ],
     );
@@ -518,7 +590,10 @@ class _ProfileDashboardPageState extends State<ProfileDashboardPage> with Widget
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(t.profileDashboardHiddenWidgets, style: Theme.of(context).textTheme.titleSmall),
+            Text(
+              t.profileDashboardHiddenWidgets,
+              style: Theme.of(context).textTheme.titleSmall,
+            ),
             const SizedBox(height: 8),
             Wrap(
               spacing: 8,
@@ -543,7 +618,13 @@ class _ProfileDashboardPageState extends State<ProfileDashboardPage> with Widget
     if (data == null) {
       return _buildCard(
         title: _titleForKey(item.key, l10n),
-        child: const Center(child: SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2))),
+        child: const Center(
+          child: SizedBox(
+            width: 24,
+            height: 24,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+        ),
       );
     }
     final builder = _widgetFactory[item.key];
@@ -564,13 +645,58 @@ class _ProfileDashboardPageState extends State<ProfileDashboardPage> with Widget
               if (v == 'hide') _hideItem(item, hidden: true);
             },
             itemBuilder: (context) => [
-              PopupMenuItem(value: 'w+1', child: Row(children: [const Icon(Icons.open_in_full, size: 18), const SizedBox(width: 8), Text(l10n.profileDashboardIncreaseWidth)])),
-              PopupMenuItem(value: 'w-1', child: Row(children: [const Icon(Icons.close_fullscreen, size: 18), const SizedBox(width: 8), Text(l10n.profileDashboardDecreaseWidth)])),
+              PopupMenuItem(
+                value: 'w+1',
+                child: Row(
+                  children: [
+                    const Icon(Icons.open_in_full, size: 18),
+                    const SizedBox(width: 8),
+                    Text(l10n.profileDashboardIncreaseWidth),
+                  ],
+                ),
+              ),
+              PopupMenuItem(
+                value: 'w-1',
+                child: Row(
+                  children: [
+                    const Icon(Icons.close_fullscreen, size: 18),
+                    const SizedBox(width: 8),
+                    Text(l10n.profileDashboardDecreaseWidth),
+                  ],
+                ),
+              ),
               const PopupMenuDivider(),
-              PopupMenuItem(value: 'up', child: Row(children: [const Icon(Icons.arrow_upward, size: 18), const SizedBox(width: 8), Text(l10n.profileDashboardMoveUp)])),
-              PopupMenuItem(value: 'down', child: Row(children: [const Icon(Icons.arrow_downward, size: 18), const SizedBox(width: 8), Text(l10n.profileDashboardMoveDown)])),
+              PopupMenuItem(
+                value: 'up',
+                child: Row(
+                  children: [
+                    const Icon(Icons.arrow_upward, size: 18),
+                    const SizedBox(width: 8),
+                    Text(l10n.profileDashboardMoveUp),
+                  ],
+                ),
+              ),
+              PopupMenuItem(
+                value: 'down',
+                child: Row(
+                  children: [
+                    const Icon(Icons.arrow_downward, size: 18),
+                    const SizedBox(width: 8),
+                    Text(l10n.profileDashboardMoveDown),
+                  ],
+                ),
+              ),
               const PopupMenuDivider(),
-              PopupMenuItem(value: 'hide', child: Row(children: [const Icon(Icons.visibility_off, size: 18), const SizedBox(width: 8), Text(l10n.profileDashboardHide)])),
+              PopupMenuItem(
+                value: 'hide',
+                child: Row(
+                  children: [
+                    const Icon(Icons.visibility_off, size: 18),
+                    const SizedBox(width: 8),
+                    Text(l10n.profileDashboardHide),
+                  ],
+                ),
+              ),
             ],
             icon: const Icon(Icons.tune),
           )
@@ -582,7 +708,12 @@ class _ProfileDashboardPageState extends State<ProfileDashboardPage> with Widget
     final card = _buildCard(
       title: _titleForKey(item.key, l10n),
       trailing: trailing,
-      child: builder(context, data, item, onRefresh: () => _reloadWidget(item.key)),
+      child: builder(
+        context,
+        data,
+        item,
+        onRefresh: () => _reloadWidget(item.key),
+      ),
     );
     return card;
   }
@@ -667,7 +798,9 @@ class _ProfileDashboardPageState extends State<ProfileDashboardPage> with Widget
       final t = AppLocalizations.of(context);
       SnackBarHelper.showError(
         context,
-        message: t.profileDashboardLayoutSaveFailed(ErrorExtractor.forContext(e, context)),
+        message: t.profileDashboardLayoutSaveFailed(
+          ErrorExtractor.forContext(e, context),
+        ),
       );
     }
   }
@@ -685,13 +818,18 @@ class _ProfileDashboardPageState extends State<ProfileDashboardPage> with Widget
     }
   }
 
-  Map<String, ProfileWidgetBuilder> get _widgetFactory => <String, ProfileWidgetBuilder>{
+  Map<String, ProfileWidgetBuilder> get _widgetFactory =>
+      <String, ProfileWidgetBuilder>{
         'profile_recent_businesses': _recentBusinessesWidget,
         'profile_announcements': _announcementsWidget,
         'profile_support_tickets': _supportTicketsWidget,
       };
 
-  Widget _buildCard({required String title, Widget? trailing, required Widget child}) {
+  Widget _buildCard({
+    required String title,
+    Widget? trailing,
+    required Widget child,
+  }) {
     final theme = Theme.of(context);
     return Card(
       clipBehavior: Clip.antiAlias,
@@ -703,7 +841,9 @@ class _ProfileDashboardPageState extends State<ProfileDashboardPage> with Widget
             decoration: BoxDecoration(
               color: theme.colorScheme.surfaceContainerHighest,
               border: Border(
-                bottom: BorderSide(color: theme.dividerColor.withValues(alpha: 0.08)),
+                bottom: BorderSide(
+                  color: theme.dividerColor.withValues(alpha: 0.08),
+                ),
               ),
             ),
             child: Row(
@@ -711,7 +851,9 @@ class _ProfileDashboardPageState extends State<ProfileDashboardPage> with Widget
                 Expanded(
                   child: Text(
                     title,
-                    style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
                 if (trailing != null) trailing,
@@ -724,25 +866,55 @@ class _ProfileDashboardPageState extends State<ProfileDashboardPage> with Widget
     );
   }
 
-  Widget _recentBusinessesWidget(BuildContext context, dynamic data, DashboardLayoutItem item, {VoidCallback? onRefresh}) {
+  Widget _recentBusinessesWidget(
+    BuildContext context,
+    dynamic data,
+    DashboardLayoutItem item, {
+    VoidCallback? onRefresh,
+  }) {
     final theme = Theme.of(context);
     final t = AppLocalizations.of(context);
-    final items = (data is Map && data['items'] is List) ? List<Map<String, dynamic>>.from(data['items'] as List) : const <Map<String, dynamic>>[];
+    final items = (data is Map && data['items'] is List)
+        ? List<Map<String, dynamic>>.from(data['items'] as List)
+        : const <Map<String, dynamic>>[];
     if (items.isEmpty) {
       return Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           children: [
-            Text(
-              t.profileDashboardNoBusinesses,
-              style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-              textAlign: TextAlign.center,
+            Icon(
+              Icons.storefront_outlined,
+              size: 36,
+              color: theme.colorScheme.primary.withValues(alpha: 0.85),
             ),
             const SizedBox(height: 12),
+            Text(
+              t.profileDashboardNoBusinesses,
+              style: theme.textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w600,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 6),
+            Text(
+              t.branded(t.businessesHubEmptySubtitle),
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+                height: 1.4,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 14),
             FilledButton.icon(
-              onPressed: () => context.go('/user/profile/new-business'),
-              icon: const Icon(Icons.add_business),
+              onPressed: () =>
+                  context.go('/user/profile/new-business?flow=create'),
+              icon: const Icon(Icons.add_business_rounded),
               label: Text(t.profileDashboardCreateBusiness),
+            ),
+            const SizedBox(height: 4),
+            TextButton(
+              onPressed: () => context.go('/user/profile/new-business'),
+              child: Text(t.newBusinessAllOptions),
             ),
           ],
         ),
@@ -762,7 +934,11 @@ class _ProfileDashboardPageState extends State<ProfileDashboardPage> with Widget
           dense: true,
           leading: const Icon(Icons.business),
           title: Text(name),
-          subtitle: Text(isOwner ? t.owner : (role.isNotEmpty ? role : t.profileDashboardMemberRole)),
+          subtitle: Text(
+            isOwner
+                ? t.owner
+                : (role.isNotEmpty ? role : t.profileDashboardMemberRole),
+          ),
           trailing: TextButton.icon(
             onPressed: () async {
               final id = it['id'];
@@ -783,10 +959,17 @@ class _ProfileDashboardPageState extends State<ProfileDashboardPage> with Widget
     );
   }
 
-  Widget _announcementsWidget(BuildContext context, dynamic data, DashboardLayoutItem item, {VoidCallback? onRefresh}) {
+  Widget _announcementsWidget(
+    BuildContext context,
+    dynamic data,
+    DashboardLayoutItem item, {
+    VoidCallback? onRefresh,
+  }) {
     final theme = Theme.of(context);
     final t = AppLocalizations.of(context);
-    final items = (data is Map && data['items'] is List) ? List<Map<String, dynamic>>.from(data['items'] as List) : const <Map<String, dynamic>>[];
+    final items = (data is Map && data['items'] is List)
+        ? List<Map<String, dynamic>>.from(data['items'] as List)
+        : const <Map<String, dynamic>>[];
     if (items.isEmpty) {
       return Padding(
         padding: const EdgeInsets.all(16.0),
@@ -794,7 +977,9 @@ class _ProfileDashboardPageState extends State<ProfileDashboardPage> with Widget
           children: [
             Text(
               t.profileDashboardNoAnnouncements,
-              style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 12),
@@ -828,7 +1013,10 @@ class _ProfileDashboardPageState extends State<ProfileDashboardPage> with Widget
                 onPressed: () async {
                   await _reloadAnnouncements(onlyUnread: _annOnlyUnread);
                   if (!context.mounted) return;
-                  SnackBarHelper.show(context, message: t.profileDashboardAnnouncementsRefreshed);
+                  SnackBarHelper.show(
+                    context,
+                    message: t.profileDashboardAnnouncementsRefreshed,
+                  );
                 },
                 icon: const Icon(Icons.refresh, size: 18),
                 label: Text(t.refresh),
@@ -854,20 +1042,71 @@ class _ProfileDashboardPageState extends State<ProfileDashboardPage> with Widget
             final pinned = (it['is_pinned'] ?? false) == true;
             final isRead = (it['is_read'] ?? false) == true;
             final timeRaw = it['updated_at'] ?? it['time'];
-            final time = timeRaw is Map ? (timeRaw['formatted'] ?? timeRaw['date_only'] ?? timeRaw.toString()) : '${timeRaw ?? ''}';
+            final time = timeRaw is Map
+                ? (timeRaw['formatted'] ??
+                      timeRaw['date_only'] ??
+                      timeRaw.toString())
+                : '${timeRaw ?? ''}';
             final annId = (id is int) ? id : int.tryParse('$id');
             final busy = annId != null && _annBusyIds.contains(annId);
             return ListTile(
               dense: true,
-              leading: Icon(pinned ? Icons.push_pin : Icons.notifications, color: pinned ? theme.colorScheme.primary : null),
+              onTap: () async {
+                await AnnouncementNavigation.handleTap(
+                  context,
+                  it,
+                  isSupportOperator: widget.authStore.canAccessSupportOperator,
+                  onMarkedRead: (id) async {
+                    if (_annOnlyUnread) {
+                      final current =
+                          (_data['profile_announcements'] as Map?)?['items'];
+                      if (current is List) {
+                        setState(() {
+                          current.removeWhere(
+                            (e) =>
+                                AnnouncementNavigation.parseAnnouncementId(
+                                  (e as Map)['id'],
+                                ) ==
+                                id,
+                          );
+                        });
+                      }
+                    } else {
+                      await _reloadAnnouncements(onlyUnread: _annOnlyUnread);
+                    }
+                  },
+                );
+              },
+              leading: Icon(
+                pinned ? Icons.push_pin : Icons.notifications,
+                color: pinned ? theme.colorScheme.primary : null,
+              ),
               title: Row(
                 children: [
                   if (!isRead)
-                    Container(width: 8, height: 8, margin: const EdgeInsetsDirectional.only(end: 8), decoration: BoxDecoration(color: theme.colorScheme.primary, shape: BoxShape.circle)),
-                  Expanded(child: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis)),
+                    Container(
+                      width: 8,
+                      height: 8,
+                      margin: const EdgeInsetsDirectional.only(end: 8),
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.primary,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                  Expanded(
+                    child: Text(
+                      title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
                 ],
               ),
-              subtitle: Text(body, maxLines: 2, overflow: TextOverflow.ellipsis),
+              subtitle: Text(
+                body,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
               trailing: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
@@ -876,65 +1115,106 @@ class _ProfileDashboardPageState extends State<ProfileDashboardPage> with Widget
                       padding: const EdgeInsetsDirectional.only(end: 8),
                       child: Text(
                         _formatNotificationTime(time),
-                        style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
                       ),
                     ),
                   if (!isRead)
                     IconButton(
                       tooltip: t.profileDashboardMarkAsRead,
-                      icon: busy ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.done_all, size: 20),
+                      icon: busy
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.done_all, size: 20),
                       onPressed: busy
                           ? null
                           : () async {
-                            try {
-                              if (annId == null) return;
-                              setState(() => _annBusyIds.add(annId));
-                              await _markAnnouncementRead(annId);
-                              if (_annOnlyUnread) {
-                                final current = (_data['profile_announcements'] as Map?)?['items'];
-                                if (current is List) {
-                                  final nextItems = current
-                                      .where((e) {
-                                        if (e is! Map) return true;
-                                        final eid = e['id'];
-                                        final parsed = eid is int ? eid : int.tryParse('$eid');
-                                        return parsed != annId;
-                                      })
-                                      .map<Map<String, dynamic>>((e) => Map<String, dynamic>.from(e as Map))
-                                      .toList();
-                                  setState(() {
-                                    _data['profile_announcements'] = {'items': nextItems};
-                                  });
-                                  if (nextItems.isEmpty) {
-                                    await _reloadAnnouncements(onlyUnread: true);
-                                  }
-                                }
-                              } else {
-                                setState(() {
-                                  final current = (_data['profile_announcements'] as Map?)?['items'];
+                              try {
+                                if (annId == null) return;
+                                setState(() => _annBusyIds.add(annId));
+                                await _markAnnouncementRead(annId);
+                                if (_annOnlyUnread) {
+                                  final current =
+                                      (_data['profile_announcements']
+                                          as Map?)?['items'];
                                   if (current is List) {
-                                    final nextItems = current.map<Map<String, dynamic>>((e) {
-                                      final map = Map<String, dynamic>.from(e as Map);
-                                      final eid = map['id'];
-                                      final parsed = eid is int ? eid : int.tryParse('$eid');
-                                      if (parsed == annId) {
-                                        map['is_read'] = true;
-                                      }
-                                      return map;
-                                    }).toList();
-                                    _data['profile_announcements'] = {'items': nextItems};
+                                    final nextItems = current
+                                        .where((e) {
+                                          if (e is! Map) return true;
+                                          final eid = e['id'];
+                                          final parsed = eid is int
+                                              ? eid
+                                              : int.tryParse('$eid');
+                                          return parsed != annId;
+                                        })
+                                        .map<Map<String, dynamic>>(
+                                          (e) => Map<String, dynamic>.from(
+                                            e as Map,
+                                          ),
+                                        )
+                                        .toList();
+                                    setState(() {
+                                      _data['profile_announcements'] = {
+                                        'items': nextItems,
+                                      };
+                                    });
+                                    if (nextItems.isEmpty) {
+                                      await _reloadAnnouncements(
+                                        onlyUnread: true,
+                                      );
+                                    }
                                   }
-                                });
+                                } else {
+                                  setState(() {
+                                    final current =
+                                        (_data['profile_announcements']
+                                            as Map?)?['items'];
+                                    if (current is List) {
+                                      final nextItems = current
+                                          .map<Map<String, dynamic>>((e) {
+                                            final map =
+                                                Map<String, dynamic>.from(
+                                                  e as Map,
+                                                );
+                                            final eid = map['id'];
+                                            final parsed = eid is int
+                                                ? eid
+                                                : int.tryParse('$eid');
+                                            if (parsed == annId) {
+                                              map['is_read'] = true;
+                                            }
+                                            return map;
+                                          })
+                                          .toList();
+                                      _data['profile_announcements'] = {
+                                        'items': nextItems,
+                                      };
+                                    }
+                                  });
+                                }
+                                if (!context.mounted) return;
+                                SnackBarHelper.show(
+                                  context,
+                                  message: t.profileDashboardMarkedAsRead,
+                                );
+                              } catch (e) {
+                                if (!context.mounted) return;
+                                SnackBarHelper.showError(
+                                  context,
+                                  message: ErrorExtractor.forContext(
+                                    e,
+                                    context,
+                                  ),
+                                );
+                              } finally {
+                                if (mounted && annId != null)
+                                  setState(() => _annBusyIds.remove(annId));
                               }
-                              if (!context.mounted) return;
-                              SnackBarHelper.show(context, message: t.profileDashboardMarkedAsRead);
-                            } catch (e) {
-                              if (!context.mounted) return;
-                              SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
-                            } finally {
-                              if (mounted && annId != null) setState(() => _annBusyIds.remove(annId));
-                            }
-                          },
+                            },
                     ),
                 ],
               ),
@@ -945,9 +1225,16 @@ class _ProfileDashboardPageState extends State<ProfileDashboardPage> with Widget
     );
   }
 
-  Widget _supportTicketsWidget(BuildContext context, dynamic data, DashboardLayoutItem item, {VoidCallback? onRefresh}) {
+  Widget _supportTicketsWidget(
+    BuildContext context,
+    dynamic data,
+    DashboardLayoutItem item, {
+    VoidCallback? onRefresh,
+  }) {
     final theme = Theme.of(context);
-    final items = (data is Map && data['items'] is List) ? List<Map<String, dynamic>>.from(data['items'] as List) : const <Map<String, dynamic>>[];
+    final items = (data is Map && data['items'] is List)
+        ? List<Map<String, dynamic>>.from(data['items'] as List)
+        : const <Map<String, dynamic>>[];
     final t = AppLocalizations.of(context);
     if (!_supportPublic.enabledForUsers) {
       final msg = _supportPublic.disabledMessage.trim().isEmpty
@@ -958,7 +1245,10 @@ class _ProfileDashboardPageState extends State<ProfileDashboardPage> with Widget
         child: SelectableText(
           msg,
           textAlign: TextAlign.center,
-          style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant, height: 1.35),
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+            height: 1.35,
+          ),
         ),
       );
     }
@@ -972,7 +1262,9 @@ class _ProfileDashboardPageState extends State<ProfileDashboardPage> with Widget
               children: [
                 Text(
                   t.profileDashboardNoTickets,
-                  style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 12),
@@ -1004,10 +1296,16 @@ class _ProfileDashboardPageState extends State<ProfileDashboardPage> with Widget
                 title: Text(subject),
                 subtitle: Text('شناسه: $id • وضعیت: $status'),
                 trailing: Text(
-                  updatedAt.isNotEmpty ? DateFormatters.formatServerDateTime(updatedAt) : '',
-                  style: theme.textTheme.labelSmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                  updatedAt.isNotEmpty
+                      ? DateFormatters.formatServerDateTime(updatedAt)
+                      : '',
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
                 ),
-                onTap: ticketId != null ? () => _openTicketDetail(ticketId) : null,
+                onTap: ticketId != null
+                    ? () => _openTicketDetail(ticketId)
+                    : null,
               );
             },
           ),
@@ -1051,7 +1349,14 @@ class _ProfileDashboardPageState extends State<ProfileDashboardPage> with Widget
     try {
       final dateTime = DateTime.tryParse(timeStr);
       if (dateTime != null) {
+<<<<<<< HEAD
+        return HesabixDateUtils.formatDateTime(
+          dateTime,
+          widget.calendarController.isJalali,
+        );
+=======
         return MarkStreetDateUtils.formatDateTime(dateTime, widget.calendarController.isJalali);
+>>>>>>> github/Huma
       }
       return DateFormatters.formatServerDateTime(timeStr);
     } catch (_) {
@@ -1063,7 +1368,11 @@ class _ProfileDashboardPageState extends State<ProfileDashboardPage> with Widget
 class _ProfileDashboardSkeleton {
   static Widget header(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    return _ShimmerBox(height: 28, width: 180, color: cs.surfaceContainerHighest);
+    return _ShimmerBox(
+      height: 28,
+      width: 180,
+      color: cs.surfaceContainerHighest,
+    );
   }
 
   static Widget grid(BuildContext context) {
@@ -1074,7 +1383,10 @@ class _ProfileDashboardSkeleton {
       children: List.generate(count, (i) {
         return Padding(
           padding: EdgeInsets.only(bottom: i < count - 1 ? 12 : 0),
-          child: _ShimmerBox(height: isMobile ? 140 : 180, color: cs.surfaceContainerHighest),
+          child: _ShimmerBox(
+            height: isMobile ? 140 : 180,
+            color: cs.surfaceContainerHighest,
+          ),
         );
       }),
     );
@@ -1092,14 +1404,17 @@ class _ShimmerBox extends StatefulWidget {
   State<_ShimmerBox> createState() => _ShimmerBoxState();
 }
 
-class _ShimmerBoxState extends State<_ShimmerBox> with SingleTickerProviderStateMixin {
+class _ShimmerBoxState extends State<_ShimmerBox>
+    with SingleTickerProviderStateMixin {
   late AnimationController _controller;
 
   @override
   void initState() {
     super.initState();
-    _controller = AnimationController(vsync: this, duration: const Duration(milliseconds: 1200))
-      ..repeat(reverse: true);
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1200),
+    )..repeat(reverse: true);
   }
 
   @override
@@ -1113,10 +1428,7 @@ class _ShimmerBoxState extends State<_ShimmerBox> with SingleTickerProviderState
     return AnimatedBuilder(
       animation: _controller,
       builder: (context, child) {
-        return Opacity(
-          opacity: 0.45 + _controller.value * 0.35,
-          child: child,
-        );
+        return Opacity(opacity: 0.45 + _controller.value * 0.35, child: child);
       },
       child: Container(
         height: widget.height,

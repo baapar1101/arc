@@ -1,0 +1,329 @@
+{% extends "pdf/base.html" %}
+{% block content %}
+  <style>
+    @page {
+      margin: 3mm 2.5mm 5mm 2.5mm;
+      @bottom-left { content: none; }
+      @bottom-right { content: none; }
+      @top-center {
+        content: "ادامه فاکتور";
+        font-size: 7px;
+        color: #666;
+      }
+    }
+    @page :first {
+      @top-center { content: none; }
+    }
+
+    .receipt {
+      font-size: 9px;
+      line-height: 1.35;
+      color: #111;
+    }
+
+    .receipt .r-center { text-align: center; }
+    .receipt .r-muted { color: #555; }
+    .receipt .r-strong { font-weight: 700; }
+
+    .receipt .r-logo {
+      display: block;
+      margin: 0 auto 4px auto;
+      max-height: 28px;
+      max-width: 72px;
+      object-fit: contain;
+    }
+
+    .receipt .r-biz {
+      font-size: 11px;
+      font-weight: 700;
+      margin: 0 0 2px 0;
+    }
+
+    .receipt .r-title {
+      font-size: 10px;
+      font-weight: 700;
+      margin: 0 0 2px 0;
+    }
+
+    .receipt .r-rule {
+      border: none;
+      border-top: 1px dashed #222;
+      margin: 5px 0;
+    }
+
+    .receipt .r-rule-solid {
+      border: none;
+      border-top: 1px solid #111;
+      margin: 5px 0;
+    }
+
+    .receipt .r-line {
+      margin: 1px 0;
+    }
+
+    .receipt table.items {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+      box-shadow: none !important;
+      font-size: 8.5px;
+      line-height: 1.25;
+    }
+
+    .receipt table.items thead {
+      background: #111 !important;
+      color: #fff !important;
+      display: table-header-group;
+    }
+
+    .receipt table.items th,
+    .receipt table.items td {
+      border: none;
+      border-bottom: 1px dotted #bbb;
+      padding: 3px 2px;
+      vertical-align: top;
+      white-space: normal;
+      overflow-wrap: anywhere;
+      word-break: break-word;
+    }
+
+    .receipt table.items thead th {
+      font-size: 7.5px;
+      font-weight: 700;
+      letter-spacing: 0;
+      text-transform: none;
+      padding: 3px 2px;
+    }
+
+    .receipt table.items tbody tr {
+      page-break-inside: avoid;
+      break-inside: avoid;
+      background: transparent !important;
+    }
+
+    .receipt table.items .c-name { width: 52%; text-align: {{ 'right' if is_fa else 'left' }}; }
+    .receipt table.items .c-qty { width: 18%; text-align: center; }
+    .receipt table.items .c-amt { width: 30%; text-align: {{ 'left' if is_fa else 'right' }}; }
+
+    .receipt .item-name { font-weight: 700; }
+    .receipt .item-meta {
+      font-size: 7.5px;
+      color: #444;
+      margin-top: 1px;
+    }
+
+    .receipt .r-totals {
+      width: 100%;
+      border-collapse: collapse;
+      box-shadow: none !important;
+      margin-top: 4px;
+      page-break-inside: avoid;
+    }
+
+    .receipt .r-totals td {
+      border: none;
+      padding: 2px 0;
+      font-size: 9px;
+    }
+
+    .receipt .r-totals .lbl { text-align: {{ 'right' if is_fa else 'left' }}; }
+    .receipt .r-totals .val {
+      text-align: {{ 'left' if is_fa else 'right' }};
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .receipt .r-totals tr.pay td {
+      font-size: 11px;
+      border-top: 1px solid #111;
+      padding-top: 5px;
+    }
+
+    .receipt .r-adj {
+      font-size: 8px;
+      margin: 1px 0;
+    }
+
+    .receipt .r-qr {
+      text-align: center;
+      margin-top: 6px;
+      page-break-inside: avoid;
+    }
+
+    .receipt .r-qr img {
+      width: 64px;
+      height: 64px;
+      object-fit: contain;
+    }
+
+    .receipt .r-stamp {
+      display: block;
+      margin: 6px auto 0 auto;
+      max-height: 36px;
+      max-width: 56px;
+      object-fit: contain;
+    }
+
+    .receipt .r-foot {
+      text-align: center;
+      font-size: 7.5px;
+      color: #555;
+      margin-top: 6px;
+      page-break-inside: avoid;
+    }
+  </style>
+
+  <div class="receipt">
+    {% if business_logo_data_uri %}
+      <img class="r-logo" src="{{ business_logo_data_uri }}" alt="" />
+    {% endif %}
+    <div class="r-center r-biz">{{ business_name or seller.name or '' }}</div>
+    <div class="r-center r-title">
+      {{ title_text or invoice.title or ('فاکتور' if is_fa else 'Invoice') }}
+      {% if invoice.is_proforma %}
+        — {{ 'پیش‌فاکتور' if is_fa else 'Proforma' }}
+      {% endif %}
+    </div>
+    <div class="r-center r-muted">
+      <span class="r-strong">{{ invoice.code or '-' }}</span>
+      {% if invoice.issue_date %} · {{ invoice.issue_date }}{% endif %}
+    </div>
+    {% if invoice.invoice_type_name %}
+      <div class="r-center r-muted">{{ invoice.invoice_type_name }}</div>
+    {% endif %}
+
+    <hr class="r-rule" />
+
+    {% if buyer and (buyer.name or buyer.mobile or buyer.phone) %}
+      <div class="r-line">
+        <span class="r-strong">{{ 'خریدار' if is_fa else 'Buyer' }}:</span>
+        {{ buyer.name or '-' }}
+      </div>
+      {% if buyer.mobile or buyer.phone %}
+        <div class="r-line r-muted">{{ buyer.mobile or buyer.phone }}</div>
+      {% endif %}
+    {% endif %}
+
+    <hr class="r-rule" />
+
+    <table class="items">
+      <thead>
+        <tr>
+          <th class="c-name">{{ 'کالا' if is_fa else 'Item' }}</th>
+          <th class="c-qty">{{ 'تعداد' if is_fa else 'Qty' }}</th>
+          <th class="c-amt">{{ 'مبلغ' if is_fa else 'Amount' }}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for line in lines or [] %}
+          <tr>
+            <td class="c-name">
+              <div class="item-name">
+                {% if line.product_code %}{{ line.product_code }} — {% endif %}{{ line.product_name or '-' }}
+              </div>
+              {% if line.description %}
+                <div class="item-meta">{{ line.description }}</div>
+              {% endif %}
+              {% if line.unit_price %}
+                <div class="item-meta">{{ (line.unit_price or 0) | format_amount(0) | ltr | safe }}{% if line.unit_display %} / {{ line.unit_display }}{% endif %}</div>
+              {% endif %}
+            </td>
+            <td class="c-qty">{{ line.quantity_display | default(line.quantity, true) | ltr | safe }}</td>
+            <td class="c-amt">{{ (line.line_total or 0) | format_amount(0) | ltr | safe }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    {% set _adj_rows = (invoice.invoice_adjustments | default([], true)) or [] %}
+    {% if _adj_rows|length > 0 %}
+      <hr class="r-rule" />
+      {% for r in _adj_rows %}
+        <div class="r-adj">
+          {{ r.kind_label or r.kind }}{% if r.description %}: {{ r.description }}{% endif %}
+          — {{ (r.total or 0) | format_amount(0) | ltr | safe }}
+        </div>
+      {% endfor %}
+    {% endif %}
+
+    <hr class="r-rule-solid" />
+
+    <table class="r-totals">
+      <tr>
+        <td class="lbl">{{ 'جمع اقلام' if is_fa else 'Subtotal' }}</td>
+        <td class="val">{{ (invoice.amount_before_discount_and_tax or invoice.subtotal or 0) | format_amount(0) | ltr | safe }}</td>
+      </tr>
+      {% if show_summary_discount | default(invoice.discount_total) %}
+        {% if invoice.show_discount_breakdown %}
+          <tr>
+            <td class="lbl">{{ invoice.discount_line_label | default(('تخفیف سطری' if is_fa else 'Line discount')) }}</td>
+            <td class="val">{{ (invoice.line_discount_total or 0) | format_amount(0) | ltr | safe }}</td>
+          </tr>
+          <tr>
+            <td class="lbl">{{ invoice.discount_global_label | default(('تخفیف کلی' if is_fa else 'Invoice discount')) }}</td>
+            <td class="val">
+              {% if invoice.global_discount_display %}
+                {{ invoice.global_discount_display | ltr | safe }}
+              {% else %}
+                {{ (invoice.global_discount_amount or 0) | format_amount(0) | ltr | safe }}
+              {% endif %}
+            </td>
+          </tr>
+        {% else %}
+          <tr>
+            <td class="lbl">{{ invoice.discount_summary_label | default(('تخفیف' if is_fa else 'Discount')) }}</td>
+            <td class="val">
+              {% if invoice.discount_summary_display %}
+                {{ invoice.discount_summary_display | ltr | safe }}
+              {% else %}
+                {{ (invoice.discount_total or 0) | format_amount(0) | ltr | safe }}
+              {% endif %}
+            </td>
+          </tr>
+        {% endif %}
+      {% endif %}
+      {% if show_summary_tax | default(invoice.tax_total) %}
+        <tr>
+          <td class="lbl">{{ 'مالیات' if is_fa else 'Tax' }}</td>
+          <td class="val">{{ (invoice.tax_total or 0) | format_amount(0) | ltr | safe }}</td>
+        </tr>
+      {% endif %}
+      {% set _final_payable = (invoice.final_payable_total | default(invoice.payable_total, true)) | default(0, true) %}
+      <tr class="pay">
+        <td class="lbl">{{ 'قابل پرداخت' if is_fa else 'Payable' }}</td>
+        <td class="val">{{ _final_payable | format_amount(0) | ltr | safe }}</td>
+      </tr>
+    </table>
+
+    {% if payments %}
+      <hr class="r-rule" />
+      {% for p in payments %}
+        <div class="r-line r-muted">
+          {{ p.method_name | default('-') }} — {{ (p.amount or 0) | format_amount(0) | ltr | safe }}
+        </div>
+      {% endfor %}
+    {% endif %}
+
+    {% if invoice_footer_note %}
+      <hr class="r-rule" />
+      <div class="r-center r-muted">{{ invoice_footer_note }}</div>
+    {% endif %}
+
+    {% if show_invoice_verify_qr and invoice_verify_qr_data_uri %}
+      <div class="r-qr">
+        <img src="{{ invoice_verify_qr_data_uri }}" alt="QR" />
+      </div>
+    {% endif %}
+
+    {% if business_stamp_data_uri %}
+      <img class="r-stamp" src="{{ business_stamp_data_uri }}" alt="" />
+    {% endif %}
+
+    <div class="r-foot">
+      {% if show_footer_print_time | default(true) %}{{ generated_at or '' }}{% endif %}
+      {% if show_footer_preparer | default(true) and issuer_name %}
+        {% if show_footer_print_time | default(true) %} · {% endif %}{{ issuer_name }}
+      {% endif %}
+    </div>
+  </div>
+{% endblock %}

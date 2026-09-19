@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:hesabix_ui/config/brand_config.dart';
+import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/widgets/profile/legacy_import_wizard.dart';
+import 'package:hesabix_ui/widgets/profile/new_business/new_business_shared.dart';
 
 /// کارت ورود به ویزارد انتقال از نسخه قدیم مارک‌استریت.
 class LegacyBusinessImportPanel extends StatefulWidget {
@@ -36,9 +39,18 @@ class _LegacyBusinessImportPanelState extends State<LegacyBusinessImportPanel> {
 
   @override
   Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context);
     final disabled = widget.isLoading || _wizardOpen;
+
     return Stack(
       children: [
+<<<<<<< HEAD
+        NewBusinessChoiceCard(
+          icon: Icons.cloud_sync_rounded,
+          title: t.branded(t.newBusinessImportLegacyTitle),
+          subtitle: t.branded(t.newBusinessImportLegacySubtitle),
+          onTap: disabled ? null : _openWizard,
+=======
         Card(
           elevation: 2,
           child: InkWell(
@@ -96,14 +108,22 @@ class _LegacyBusinessImportPanelState extends State<LegacyBusinessImportPanel> {
               ),
             ),
           ),
+>>>>>>> github/Huma
         ),
         if (_wizardOpen)
           Positioned.fill(
             child: AbsorbPointer(
-              child: Container(
+              child: DecoratedBox(
                 decoration: BoxDecoration(
                   color: Colors.black.withValues(alpha: 0.04),
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(18),
+                ),
+                child: const Center(
+                  child: SizedBox(
+                    width: 22,
+                    height: 22,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
                 ),
               ),
             ),

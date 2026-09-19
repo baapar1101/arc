@@ -892,7 +892,24 @@ def update_expense_income(
     document.currency_id = int(currency_id)
     document.fiscal_year_id = fiscal_year.id
     document.description = (data.get("description") or "").strip() or None
-    document.extra_info = data.get("extra_info") if isinstance(data.get("extra_info"), dict) else None
+    if "extra_info" in data:
+        document.extra_info = data.get("extra_info") if isinstance(data.get("extra_info"), dict) else None
+    if "project_id" in data:
+        project_id = data.get("project_id")
+        if project_id:
+            from adapters.db.models.project import Project
+            project = db.query(Project).filter(
+                and_(
+                    Project.id == int(project_id),
+                    Project.business_id == document.business_id,
+                    Project.is_active == True,
+                )
+            ).first()
+            if not project:
+                raise ApiError("PROJECT_NOT_FOUND", "پروژه یافت نشد یا غیرفعال است", http_status=404)
+            document.project_id = int(project_id)
+        else:
+            document.project_id = None
     
     # سطرهای حساب‌های هزینه/درآمد
     for line in item_lines:

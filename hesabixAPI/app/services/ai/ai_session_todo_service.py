@@ -14,6 +14,7 @@ from sqlalchemy import and_, select
 from sqlalchemy.orm import Session
 
 from adapters.db.models.ai_session_todo import AISessionTodo, AISessionTodoStatus
+from app.services.ai.ai_constants import PROVIDERS_WITH_FORCED_TOOLS
 from app.services.ai.ai_session_todo_events import emit_session_todo_sse
 from app.services.ai.ai_tool_intent import estimate_query_complexity
 
@@ -275,6 +276,38 @@ def create_session_plan(
     return all_rows
 
 
+def apply_user_todo_status(
+    db: Session,
+    session_id: int,
+    todo_id: str,
+    status: str,
+) -> List[AISessionTodo]:
+    """رد یا تأیید آیتم باز توسط کاربر — فقط skipped/done از pending/in_progress."""
+    wanted = _normalize_status(status)
+    if wanted not in (AISessionTodoStatus.SKIPPED, AISessionTodoStatus.DONE):
+        raise ValueError("فقط رد کردن یا انجام‌شده برای تصمیم کاربر مجاز است")
+    public_id = (todo_id or "").strip()
+    if not public_id:
+        raise ValueError("شناسه آیتم الزامی است")
+    row = db.scalar(
+        select(AISessionTodo).where(
+            and_(
+                AISessionTodo.session_id == session_id,
+                AISessionTodo.public_id == public_id,
+            )
+        )
+    )
+    if row is None:
+        raise ValueError("آیتم برنامه یافت نشد")
+    if row.status not in (
+        AISessionTodoStatus.PENDING,
+        AISessionTodoStatus.IN_PROGRESS,
+    ):
+        raise ValueError("فقط آیتم باز را می‌توان رد یا تأیید کرد")
+    update_session_todo(db, session_id, todo_id=public_id, status=wanted)
+    return list_session_todos(db, session_id)
+
+
 def update_session_todo(
     db: Session,
     session_id: int,
@@ -394,7 +427,17 @@ def should_expose_session_plan_tools(
     return False
 
 
-def session_plan_tools_prompt_block() -> str:
+def session_plan_tools_prompt_block(*, require_first: bool = False) -> str:
+    if require_first:
+        return (
+            "\n\n[ابزار برنامهٔ کاری جلسه — الزامی]\n"
+            "این سوال چندمرحله‌ای است. اگر برنامهٔ باز در بالا نیست، "
+            "اولین فراخوانی ابزار باید create_session_plan باشد "
+            "(۳ تا ۸ آیتم کوتاه و عملیاتی با linked_tool در صورت امکان). "
+            "سپس ابزارهای داده را طبق همان برنامه صدا بزن.\n"
+            "قبل از شروع هر آیتم وضعیت را in_progress و پس از اتمام done کن.\n"
+            "حداکثر ۲۰ آیتم."
+        )
     return (
         "\n\n[ابزار برنامهٔ کاری جلسه]\n"
         "برای سناریوهای چندمرحله‌ای (بیش از ۲ ابزار، گزارش ترکیبی، تحلیل زنجیره‌ای) "
@@ -403,6 +446,39 @@ def session_plan_tools_prompt_block() -> str:
         "برای سوالات ساده یک‌مرحله‌ای نیازی به ساخت برنامه نیست.\n"
         "حداکثر ۲۰ آیتم؛ عنوان‌ها کوتاه و عملیاتی باشند."
     )
+
+
+def required_plan_tool_choice(
+    *,
+    complexity: str,
+    iteration: int,
+    has_open_todos: bool,
+    plan_tool_available: bool,
+    provider_type: Optional[str],
+) -> Optional[Dict[str, Any]]:
+    """نوبت اول سوال complex بدون برنامهٔ باز: مدل را به create_session_plan مجبور کن."""
+    if (
+        complexity == "complex"
+        and iteration == 1
+        and not has_open_todos
+        and plan_tool_available
+        and (provider_type or "").strip().lower() in PROVIDERS_WITH_FORCED_TOOLS
+    ):
+        return {
+            "type": "function",
+            "function": {"name": "create_session_plan"},
+        }
+    return None
+
+
+def tools_include_name(tools: Optional[List[Dict[str, Any]]], name: str) -> bool:
+    if not tools or not name:
+        return False
+    for item in tools:
+        fn = (item.get("function") or {}).get("name") if isinstance(item, dict) else None
+        if fn == name:
+            return True
+    return False
 
 
 def merge_todos_into_function_results(

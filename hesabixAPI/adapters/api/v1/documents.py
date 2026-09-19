@@ -13,6 +13,11 @@ from adapters.db.models.document import Document
 from app.core.auth_dependency import get_current_user, AuthContext
 from app.core.permissions import require_business_access, require_business_management_dep, require_business_permission_dep, require_business_permission_by_entity_dep
 from app.core.responses import success_response, format_datetime_fields, ApiError
+from app.core.datetime_utils import (
+	export_filename_timestamp,
+	format_generated_at_for_pdf,
+	resolve_calendar_type_for_request,
+)
 from app.core.cache import get_cache
 from app.core.response_cache import cache_response
 from app.services.document_service import (
@@ -27,10 +32,20 @@ from app.services.document_service import (
 )
 from app.services.invoice_service import get_daily_sales_report, get_monthly_sales_report, get_top_customers_report, get_daily_purchases_report, get_top_suppliers_report, get_materials_consumption_report, get_production_report
 from app.services.trial_balance_service import get_trial_balance_report
+from app.services.balance_sheet_service import get_balance_sheet_report
+from app.services.balance_sheet_export_service import balance_sheet_excel_response, balance_sheet_pdf_response
+from app.services.financial_package_service import get_financial_package_report
+from app.services.financial_package_export_service import (
+    financial_package_excel_response,
+    financial_package_pdf_response,
+)
 from app.services.general_ledger_service import get_general_ledger_report
 from app.services.pnl_service import get_pnl_period_report, get_pnl_cumulative_report
+from app.services.pnl_export_service import pnl_excel_response, pnl_pdf_response
 from app.services.account_review_service import get_accounts_review_report
 from app.services.journal_ledger_service import get_journal_ledger_report
+from app.services.journal_ledger_electronic_export_service import export_electronic_journal_books
+from app.services.general_ledger_electronic_export_service import export_electronic_general_ledger_books
 from app.core.cache import get_cache
 from app.core.i18n import negotiate_locale
 from app.services.pdf.template_renderer import render_template, load_farsi_font_data_uris
@@ -202,7 +217,8 @@ async def export_documents_pdf_endpoint(
     # Locale
     locale = negotiate_locale(request.headers.get("Accept-Language"))
     is_fa = locale == "fa"
-    now = datetime.datetime.now().strftime('%Y/%m/%d %H:%M')
+    calendar_type = resolve_calendar_type_for_request(request, is_fa)
+    now = format_generated_at_for_pdf(business_id, calendar_type)
     title_text = "لیست اسناد حسابداری" if is_fa else "Documents List"
     label_biz = "کسب و کار" if is_fa else "Business"
     label_date = "تاریخ تولید" if is_fa else "Generated Date"
@@ -291,7 +307,7 @@ async def export_documents_pdf_endpoint(
         },
     )
     pdf_bytes = HTML(string=html_content).write_pdf(font_config=FontConfiguration())
-    filename = f"documents_{business_id}_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+    filename = f"documents_{business_id}_{export_filename_timestamp(business_id)}.pdf"
     return Response(
         content=pdf_bytes,
         media_type="application/pdf",
@@ -567,7 +583,14 @@ async def get_document_pdf_endpoint(
     # Locale
     locale = negotiate_locale(request.headers.get("Accept-Language"))
     is_fa = locale == "fa"
-    now_dt = datetime.datetime.now()
+    from app.core.datetime_utils import (
+        localize_assumed_utc_naive_for_display,
+        resolve_display_timezone_name,
+    )
+    from app.core.business_calendar import business_now
+
+    tz_name = resolve_display_timezone_name(business_id)
+    now_dt = business_now(business_id).replace(tzinfo=None)
 
     # فونت فارسی (data URI) برای خروجی بهتر در PDF
     fa_font_url_regular, fa_font_url_bold = load_farsi_font_data_uris()
@@ -634,6 +657,9 @@ async def get_document_pdf_endpoint(
                 reg_dt = reg_raw
             else:
                 reg_dt = datetime.datetime.fromisoformat(str(reg_raw).replace("Z", "+00:00"))
+                if reg_dt.tzinfo is not None:
+                    reg_dt = reg_dt.astimezone(datetime.timezone.utc).replace(tzinfo=None)
+            reg_dt = localize_assumed_utc_naive_for_display(reg_dt, tz_name)
             reg_fmt = CalendarConverter.format_datetime(reg_dt, calendar_type)
             registered_at_display = _trim_seconds(reg_fmt.get("formatted"))
         except Exception:
@@ -897,7 +923,7 @@ async def get_document_pdf_endpoint(
 
     def _slugify(text: str) -> str:
         return re.sub(r"[^A-Za-z0-9_-]+", "_", (text or "")).strip("_") or "document"
-    filename = f"document_{_slugify(doc.get('code'))}_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+    filename = f"document_{_slugify(doc.get('code'))}_{export_filename_timestamp(business_id)}.pdf"
 
     return Response(
         content=pdf_bytes,
@@ -1081,6 +1107,86 @@ async def update_manual_document_endpoint(
         request=request,
         message="MANUAL_DOCUMENT_UPDATED"
     )
+
+
+@router.post(
+    "/businesses/{business_id}/reports/cash-flow",
+    summary="صورت جریان وجوه نقد",
+    description="گردش حساب‌های نقدی/بانک/تنخواه با قرارداد چندارزی (بدون فیلتر = معادل پایه)",
+)
+@require_business_access("business_id")
+async def cash_flow_report_endpoint(
+    request: Request,
+    business_id: int,
+    body: Dict[str, Any] = Body(default={}),
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    if not ctx.can_read_section("reports"):
+        raise ApiError("FORBIDDEN", "Missing business permission: reports.read", http_status=403)
+
+    from app.services.cash_flow_report_service import get_cash_flow_report
+
+    fiscal_year_id = body.get("fiscal_year_id")
+    if fiscal_year_id is not None:
+        try:
+            fiscal_year_id = int(fiscal_year_id)
+        except (ValueError, TypeError):
+            fiscal_year_id = None
+    currency_id = body.get("currency_id")
+    if currency_id is not None:
+        try:
+            currency_id = int(currency_id)
+        except (ValueError, TypeError):
+            currency_id = None
+
+    result = get_cash_flow_report(
+        db,
+        business_id,
+        fiscal_year_id=fiscal_year_id,
+        currency_id=currency_id,
+        date_from=body.get("date_from"),
+        date_to=body.get("date_to"),
+        include_indirect=bool(body.get("include_indirect", True)),
+    )
+    return success_response(data=result, request=request, message="گزارش جریان وجوه دریافت شد")
+
+
+@router.post(
+    "/businesses/{business_id}/reports/fx-revaluation",
+    summary="گزارش تسعیر ارز",
+    description="اسناد تسعیر پایان‌دوره و پیش‌نمایش موقعیت‌های ارزی باز",
+)
+@require_business_access("business_id")
+async def fx_revaluation_report_endpoint(
+    request: Request,
+    business_id: int,
+    body: Dict[str, Any] = Body(default={}),
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    if not ctx.can_read_section("reports"):
+        raise ApiError("FORBIDDEN", "Missing business permission: reports.read", http_status=403)
+
+    from app.services.cash_flow_report_service import get_fx_revaluation_report
+
+    fiscal_year_id = body.get("fiscal_year_id")
+    if fiscal_year_id is not None:
+        try:
+            fiscal_year_id = int(fiscal_year_id)
+        except (ValueError, TypeError):
+            fiscal_year_id = None
+
+    result = get_fx_revaluation_report(
+        db,
+        business_id,
+        fiscal_year_id=fiscal_year_id,
+        date_from=body.get("date_from"),
+        date_to=body.get("date_to"),
+        skip=int(body.get("skip", 0) or 0),
+        take=int(body.get("take", 50) or 50),
+    )
+    return success_response(data=result, request=request, message="گزارش تسعیر ارز دریافت شد")
 
 
 @router.post(
@@ -1794,7 +1900,7 @@ async def export_top_suppliers_report_excel(
         base += f"_{slugify(biz_name)}"
     if selected_only:
         base += "_selected"
-    filename = f"{base}_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+    filename = f"{base}_{export_filename_timestamp(business_id)}.xlsx"
     content = buffer.getvalue()
     
     return Response(
@@ -2210,7 +2316,7 @@ async def export_daily_purchases_report_excel(
         base += f"_{slugify(biz_name)}"
     if selected_only:
         base += "_selected"
-    filename = f"{base}_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+    filename = f"{base}_{export_filename_timestamp(business_id)}.xlsx"
     content = buffer.getvalue()
     
     return Response(
@@ -2440,13 +2546,7 @@ async def export_daily_purchases_report_pdf(
         paper_size = None
         orientation = None
 
-    generated_at = datetime.datetime.now().strftime("%Y/%m/%d %H:%M")
-    if is_fa:
-        try:
-            out = CalendarConverter.format_datetime(datetime.datetime.now(), calendar_type)
-            generated_at = str(out.get("formatted") or generated_at)
-        except Exception:
-            pass
+    generated_at = format_generated_at_for_pdf(business_id, calendar_type)
 
     title_text = "گزارش خرید روزانه" if is_fa else "Daily Purchases Report"
     try:
@@ -2498,7 +2598,7 @@ async def export_daily_purchases_report_pdf(
         base += f"_{slugify(business_name)}"
     if selected_only:
         base += "_selected"
-    filename = f"{base}_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+    filename = f"{base}_{export_filename_timestamp(business_id)}.pdf"
 
     return Response(
         content=pdf_bytes,
@@ -2711,6 +2811,150 @@ async def production_report_endpoint(
     )
 
 
+def _parse_fiscal_year_id(request: Request, body: Dict[str, Any]) -> int | None:
+    fiscal_year_id = None
+    fy_header = request.headers.get("X-Fiscal-Year-ID")
+    if fy_header:
+        try:
+            fiscal_year_id = int(fy_header)
+        except (ValueError, TypeError):
+            pass
+    if body.get("fiscal_year_id"):
+        try:
+            fiscal_year_id = int(body["fiscal_year_id"])
+        except (ValueError, TypeError):
+            pass
+    return fiscal_year_id
+
+
+def _parse_trial_balance_body(request: Request, body: Dict[str, Any]) -> Dict[str, Any]:
+    fiscal_year_id = _parse_fiscal_year_id(request, body)
+    currency_id = body.get("currency_id")
+    if currency_id is not None:
+        try:
+            currency_id = int(currency_id)
+        except (ValueError, TypeError):
+            currency_id = None
+
+    project_id = body.get("project_id")
+    if project_id is not None:
+        try:
+            project_id = int(project_id)
+        except (ValueError, TypeError):
+            project_id = None
+
+    account_ids = body.get("account_ids")
+    if account_ids is not None and not isinstance(account_ids, list):
+        account_ids = None
+    if account_ids:
+        try:
+            account_ids = [int(aid) for aid in account_ids if aid is not None]
+        except (ValueError, TypeError):
+            account_ids = None
+
+    try:
+        column_mode = int(body.get("column_mode", 8))
+        if column_mode not in (2, 4, 6, 8):
+            column_mode = 8
+    except (ValueError, TypeError):
+        column_mode = 8
+
+    display_mode = body.get("display_mode", "flat")
+    if display_mode not in ("flat", "tree"):
+        display_mode = "flat"
+
+    try:
+        account_level = int(body.get("account_level", 4))
+        if account_level not in (1, 2, 3, 4):
+            account_level = 4
+    except (ValueError, TypeError):
+        account_level = 4
+
+    skip = body.get("skip", 0)
+    take = body.get("take", 50)
+    try:
+        skip = int(skip)
+        take = int(take)
+        if take > 500:
+            take = 500
+        if take < 1:
+            take = 50
+        if skip < 0:
+            skip = 0
+    except (ValueError, TypeError):
+        skip = 0
+        take = 50
+
+    return {
+        "fiscal_year_id": fiscal_year_id,
+        "date_from": body.get("date_from"),
+        "date_to": body.get("date_to"),
+        "currency_id": currency_id,
+        "account_type": body.get("account_type"),
+        "account_ids": account_ids,
+        "project_id": project_id,
+        "include_zero_balance": bool(body.get("include_zero_balance", False)),
+        "column_mode": column_mode,
+        "display_mode": display_mode,
+        "account_level": account_level,
+        "skip": skip,
+        "take": take,
+    }
+
+
+def _parse_balance_sheet_body(request: Request, body: Dict[str, Any]) -> Dict[str, Any]:
+    fiscal_year_id = _parse_fiscal_year_id(request, body)
+    currency_id = body.get("currency_id")
+    if currency_id is not None:
+        try:
+            currency_id = int(currency_id)
+        except (ValueError, TypeError):
+            currency_id = None
+
+    project_id = body.get("project_id")
+    if project_id is not None:
+        try:
+            project_id = int(project_id)
+        except (ValueError, TypeError):
+            project_id = None
+
+    try:
+        account_level = int(body.get("account_level", 4))
+        if account_level not in (1, 2, 3, 4):
+            account_level = 4
+    except (ValueError, TypeError):
+        account_level = 4
+
+    compare_mode = body.get("compare_mode")
+    if compare_mode is not None:
+        compare_mode = str(compare_mode).strip() or None
+
+    return {
+        "fiscal_year_id": fiscal_year_id,
+        "date_from": body.get("date_from"),
+        "date_to": body.get("date_to"),
+        "currency_id": currency_id,
+        "project_id": project_id,
+        "include_zero_balance": bool(body.get("include_zero_balance", False)),
+        "account_level": account_level,
+        "compare_prior_period": bool(body.get("compare_prior_period", False)),
+        "compare_mode": compare_mode,
+        "include_base_equivalent": bool(body.get("include_base_equivalent", False)),
+    }
+
+
+def _parse_financial_package_body(request: Request, body: Dict[str, Any]) -> Dict[str, Any]:
+    params = _parse_balance_sheet_body(request, body)
+    try:
+        column_mode = int(body.get("column_mode", 8))
+        if column_mode not in (2, 4, 6, 8):
+            column_mode = 8
+    except (ValueError, TypeError):
+        column_mode = 8
+    params["column_mode"] = column_mode
+    return params
+
+
 @router.post(
     "/businesses/{business_id}/reports/trial-balance",
     summary="گزارش تراز آزمایشی",
@@ -2751,6 +2995,33 @@ async def trial_balance_report_endpoint(
     account_type = body.get('account_type')
     account_ids = body.get('account_ids')
     include_zero_balance = body.get('include_zero_balance', False)
+    project_id = body.get('project_id')
+    column_mode = body.get('column_mode', 8)
+    display_mode = body.get('display_mode', 'flat')
+    account_level = body.get('account_level', 4)
+
+    if project_id is not None:
+        try:
+            project_id = int(project_id)
+        except (ValueError, TypeError):
+            project_id = None
+
+    try:
+        column_mode = int(column_mode)
+        if column_mode not in (2, 4, 6, 8):
+            column_mode = 8
+    except (ValueError, TypeError):
+        column_mode = 8
+
+    if display_mode not in ('flat', 'tree'):
+        display_mode = 'flat'
+
+    try:
+        account_level = int(account_level)
+        if account_level not in (1, 2, 3, 4):
+            account_level = 4
+    except (ValueError, TypeError):
+        account_level = 4
     
     if currency_id is not None:
         try:
@@ -2792,9 +3063,14 @@ async def trial_balance_report_endpoint(
         date_to=date_to,
         account_type=account_type,
         account_ids=account_ids,
+        project_id=project_id,
         include_zero_balance=include_zero_balance,
+        column_mode=column_mode,
+        display_mode=display_mode,
+        account_level=account_level,
         skip=skip,
         take=take,
+        include_base_equivalent=bool(body.get("include_base_equivalent", False)),
     )
     
     items = result.get('items', [])
@@ -2838,49 +3114,18 @@ async def export_trial_balance_report_excel(
     if not ctx.can_read_section("reports"):
         raise ApiError("FORBIDDEN", "Missing business permission: reports.read", http_status=403)
 
-    # دریافت سال مالی از header یا body
-    fiscal_year_id = None
-    fy_header = request.headers.get('X-Fiscal-Year-ID')
-    if fy_header:
-        try:
-            fiscal_year_id = int(fy_header)
-        except (ValueError, TypeError):
-            pass
-
-    if body.get('fiscal_year_id'):
-        try:
-            fiscal_year_id = int(body['fiscal_year_id'])
-        except (ValueError, TypeError):
-            pass
-
-    # استخراج پارامترها از body
-    date_from = body.get('date_from')
-    date_to = body.get('date_to')
-    currency_id = body.get('currency_id')
-    account_type = body.get('account_type')
-    account_ids = body.get('account_ids')
-    include_zero_balance = bool(body.get('include_zero_balance', False))
-    project_id = body.get('project_id')
-
-    if currency_id is not None:
-        try:
-            currency_id = int(currency_id)
-        except (ValueError, TypeError):
-            currency_id = None
-
-    if project_id is not None:
-        try:
-            project_id = int(project_id)
-        except (ValueError, TypeError):
-            project_id = None
-
-    if account_ids is not None and not isinstance(account_ids, list):
-        account_ids = None
-    if account_ids:
-        try:
-            account_ids = [int(aid) for aid in account_ids if aid is not None]
-        except (ValueError, TypeError):
-            account_ids = None
+    params = _parse_trial_balance_body(request, body)
+    fiscal_year_id = params["fiscal_year_id"]
+    date_from = params["date_from"]
+    date_to = params["date_to"]
+    currency_id = params["currency_id"]
+    account_type = params["account_type"]
+    account_ids = params["account_ids"]
+    include_zero_balance = params["include_zero_balance"]
+    project_id = params["project_id"]
+    column_mode = params["column_mode"]
+    display_mode = params["display_mode"]
+    account_level = params["account_level"]
 
     # برای export، همه رکوردها را بدون pagination می‌گیریم
     max_export_records = 10000
@@ -2895,11 +3140,14 @@ async def export_trial_balance_report_excel(
         account_ids=account_ids,
         project_id=project_id,
         include_zero_balance=include_zero_balance,
+        column_mode=column_mode,
+        display_mode=display_mode,
+        account_level=account_level,
         skip=0,
         take=max_export_records,
     )
 
-    items = result.get('items', [])
+    items = result.get('items', []) or result.get('accounts', [])
     items = [format_datetime_fields(item, request) for item in items]
 
     # Handle selected rows
@@ -3192,7 +3440,7 @@ async def export_trial_balance_report_excel(
         base += f"_{slugify(biz_name)}"
     if selected_only:
         base += "_selected"
-    filename = f"{base}_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+    filename = f"{base}_{export_filename_timestamp(business_id)}.xlsx"
     content = buffer.getvalue()
 
     return Response(
@@ -3240,49 +3488,18 @@ async def export_trial_balance_report_pdf(
     logger = logging.getLogger(__name__)
     debug_font = str(request.headers.get("X-Debug-Pdf-Font", "") or "").strip().lower() in ("1", "true", "yes", "y", "on")
 
-    # دریافت سال مالی از header یا body
-    fiscal_year_id = None
-    fy_header = request.headers.get('X-Fiscal-Year-ID')
-    if fy_header:
-        try:
-            fiscal_year_id = int(fy_header)
-        except (ValueError, TypeError):
-            pass
-
-    if body.get('fiscal_year_id'):
-        try:
-            fiscal_year_id = int(body['fiscal_year_id'])
-        except (ValueError, TypeError):
-            pass
-
-    # استخراج پارامترها از body
-    date_from = body.get('date_from')
-    date_to = body.get('date_to')
-    currency_id = body.get('currency_id')
-    account_type = body.get('account_type')
-    account_ids = body.get('account_ids')
-    include_zero_balance = bool(body.get('include_zero_balance', False))
-    project_id = body.get('project_id')
-
-    if currency_id is not None:
-        try:
-            currency_id = int(currency_id)
-        except (ValueError, TypeError):
-            currency_id = None
-
-    if project_id is not None:
-        try:
-            project_id = int(project_id)
-        except (ValueError, TypeError):
-            project_id = None
-
-    if account_ids is not None and not isinstance(account_ids, list):
-        account_ids = None
-    if account_ids:
-        try:
-            account_ids = [int(aid) for aid in account_ids if aid is not None]
-        except (ValueError, TypeError):
-            account_ids = None
+    params = _parse_trial_balance_body(request, body)
+    fiscal_year_id = params["fiscal_year_id"]
+    date_from = params["date_from"]
+    date_to = params["date_to"]
+    currency_id = params["currency_id"]
+    account_type = params["account_type"]
+    account_ids = params["account_ids"]
+    include_zero_balance = params["include_zero_balance"]
+    project_id = params["project_id"]
+    column_mode = params["column_mode"]
+    display_mode = params["display_mode"]
+    account_level = params["account_level"]
 
     # برای export، همه رکوردها را بدون pagination می‌گیریم
     max_export_records = 10000
@@ -3297,11 +3514,14 @@ async def export_trial_balance_report_pdf(
         account_ids=account_ids,
         project_id=project_id,
         include_zero_balance=include_zero_balance,
+        column_mode=column_mode,
+        display_mode=display_mode,
+        account_level=account_level,
         skip=0,
         take=max_export_records,
     )
 
-    items = result.get('items', [])
+    items = result.get('items', []) or result.get('accounts', [])
     items = [format_datetime_fields(item, request) for item in items]
 
     # Handle selected rows
@@ -3639,12 +3859,7 @@ async def export_trial_balance_report_pdf(
         cal_header = (request.headers.get("X-Calendar-Type", "jalali") or "jalali").lower()
         calendar_type = "jalali" if cal_header in ["jalali", "persian", "shamsi"] else "gregorian"
     
-    try:
-        from app.core.calendar import CalendarConverter
-        formatted_now = CalendarConverter.format_datetime(datetime.datetime.now(), calendar_type)
-        now = formatted_now.get("formatted") or formatted_now.get("date_time") or datetime.datetime.now().strftime('%Y/%m/%d %H:%M')
-    except Exception:
-        now = datetime.datetime.now().strftime('%Y/%m/%d %H:%M')
+    now = format_generated_at_for_pdf(business_id, calendar_type)
 
     # Build filters summary (show selected filters in PDF)
     filters: list[tuple[str, str]] = []
@@ -3935,7 +4150,7 @@ async def export_trial_balance_report_pdf(
         base += f"_{slugify(business_name)}"
     if selected_only:
         base += "_selected"
-    filename = f"{base}_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+    filename = f"{base}_{export_filename_timestamp(business_id)}.pdf"
 
     return Response(
         content=pdf_bytes,
@@ -4305,7 +4520,7 @@ async def export_general_ledger_report_excel(
         base += f"_{slugify(biz_name)}"
     if selected_only:
         base += "_selected"
-    filename = f"{base}_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+    filename = f"{base}_{export_filename_timestamp(business_id)}.xlsx"
 
     return Response(
         content=content,
@@ -4315,6 +4530,66 @@ async def export_general_ledger_report_excel(
             "Content-Length": str(len(content)),
             "Access-Control-Expose-Headers": "Content-Disposition",
         },
+    )
+
+
+@router.post(
+    "/businesses/{business_id}/reports/general-ledger/export/electronic-books",
+    summary="خروجی دفتر کل الکترونیکی (سازمان امور مالیاتی)",
+    description=(
+        "خروجی Excel یا CSV دفتر کل مطابق قالب سامانه دفاتر تجاری الکترونیکی. "
+        "شامل حساب کل، معین و تفصیلی به‌همراه گردش بدهکار/بستانکار و تاریخ گردش."
+    ),
+)
+@require_business_access("business_id")
+async def export_general_ledger_electronic_books(
+    request: Request,
+    business_id: int,
+    body: Dict[str, Any] = Body(default={}),
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """خروجی دفتر کل الکترونیکی برای بارگذاری در سامانه مالیاتی"""
+    if not ctx.can_read_section("reports"):
+        raise ApiError("FORBIDDEN", "Missing business permission: reports.read", http_status=403)
+
+    fiscal_year_id = None
+    fy_header = request.headers.get("X-Fiscal-Year-ID")
+    if fy_header:
+        try:
+            fiscal_year_id = int(fy_header)
+        except (ValueError, TypeError):
+            pass
+
+    if body.get("fiscal_year_id"):
+        try:
+            fiscal_year_id = int(body["fiscal_year_id"])
+        except (ValueError, TypeError):
+            pass
+
+    date_from = body.get("date_from")
+    date_to = body.get("date_to")
+    currency_id = body.get("currency_id")
+    document_type = body.get("document_type")
+    include_proforma = body.get("include_proforma", False)
+    export_format = body.get("format", "auto")
+
+    if currency_id is not None:
+        try:
+            currency_id = int(currency_id)
+        except (ValueError, TypeError):
+            currency_id = None
+
+    return export_electronic_general_ledger_books(
+        db,
+        business_id=business_id,
+        fiscal_year_id=fiscal_year_id,
+        currency_id=currency_id,
+        date_from=date_from,
+        date_to=date_to,
+        document_type=document_type,
+        include_proforma=include_proforma,
+        export_format=str(export_format),
     )
 
 
@@ -4593,12 +4868,7 @@ async def export_general_ledger_report_pdf(
     headers_html = "".join(f"<th>{esc(h)}</th>" for h in headers)
 
     # Date report (calendar-aware)
-    try:
-        from app.core.calendar import CalendarConverter
-        formatted_now = CalendarConverter.format_datetime(datetime.datetime.now(), calendar_type)
-        now_str = formatted_now.get("formatted") or formatted_now.get("date_time") or datetime.datetime.now().strftime("%Y/%m/%d %H:%M")
-    except Exception:
-        now_str = datetime.datetime.now().strftime("%Y/%m/%d %H:%M")
+    now_str = format_generated_at_for_pdf(business_id, calendar_type)
 
     title_text = "گزارش دفتر کل" if is_fa else "General Ledger Report"
     label_biz = "نام کسب‌وکار" if is_fa else "Business Name"
@@ -4757,7 +5027,7 @@ async def export_general_ledger_report_pdf(
         base += f"_{slugify(business_name)}"
     if selected_only:
         base += "_selected"
-    filename = f"{base}_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+    filename = f"{base}_{export_filename_timestamp(business_id)}.pdf"
 
     return Response(
         content=pdf_bytes,
@@ -4808,6 +5078,11 @@ async def pnl_period_report_endpoint(
     date_to = body.get('date_to')
     currency_id = body.get('currency_id')
     project_id = body.get('project_id')  # 🆕 فیلتر پروژه
+    include_zero_balance = bool(body.get('include_zero_balance', False))
+    compare_prior_period = bool(body.get('compare_prior_period', False))
+    compare_mode = body.get('compare_mode')
+    if compare_mode is not None:
+        compare_mode = str(compare_mode).strip() or None
     
     if currency_id is not None:
         try:
@@ -4846,8 +5121,12 @@ async def pnl_period_report_endpoint(
         date_from=date_from,
         date_to=date_to,
         project_id=project_id,  # 🆕 پاس دادن به سرویس
+        include_zero_balance=include_zero_balance,
+        compare_prior_period=compare_prior_period,
+        compare_mode=compare_mode,
         skip=skip,
         take=take,
+        include_base_equivalent=bool(body.get("include_base_equivalent", False)),
     )
     
     locale = negotiate_locale(request.headers.get("Accept-Language"))
@@ -4855,6 +5134,381 @@ async def pnl_period_report_endpoint(
         data=result,
         message="PnL Period report retrieved successfully" if locale != 'fa' else "گزارش سود و زیان دوره‌ای با موفقیت دریافت شد",
         request=request
+    )
+
+
+def _parse_pnl_period_export_params(request: Request, body: Dict[str, Any]) -> Dict[str, Any]:
+    """استخراج پارامترهای مشترک خروجی/گزارش سود و زیان دوره‌ای."""
+    fiscal_year_id = None
+    fy_header = request.headers.get("X-Fiscal-Year-ID")
+    if fy_header:
+        try:
+            fiscal_year_id = int(fy_header)
+        except (ValueError, TypeError):
+            pass
+    if body.get("fiscal_year_id"):
+        try:
+            fiscal_year_id = int(body["fiscal_year_id"])
+        except (ValueError, TypeError):
+            pass
+
+    currency_id = body.get("currency_id")
+    if currency_id is not None:
+        try:
+            currency_id = int(currency_id)
+        except (ValueError, TypeError):
+            currency_id = None
+
+    project_id = body.get("project_id")
+    if project_id is not None:
+        try:
+            project_id = int(project_id)
+        except (ValueError, TypeError):
+            project_id = None
+
+    return {
+        "fiscal_year_id": fiscal_year_id,
+        "date_from": body.get("date_from"),
+        "date_to": body.get("date_to"),
+        "currency_id": currency_id,
+        "project_id": project_id,
+        "include_zero_balance": bool(body.get("include_zero_balance", False)),
+        "compare_prior_period": bool(body.get("compare_prior_period", False)),
+        "compare_mode": (str(body.get("compare_mode")).strip() or None) if body.get("compare_mode") is not None else None,
+    }
+
+
+@router.post(
+    "/businesses/{business_id}/reports/pnl-period/export/excel",
+    summary="خروجی Excel گزارش سود و زیان دوره‌ای",
+    description="خروجی Excel گزارش سود و زیان دوره‌ای (درآمد، هزینه، سود/زیان خالص)",
+)
+@require_business_access("business_id")
+async def export_pnl_period_report_excel(
+    request: Request,
+    business_id: int,
+    body: Dict[str, Any] = Body(default={}),
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_dep("reports", "export")),
+):
+    """خروجی Excel گزارش سود و زیان دوره‌ای"""
+    if not ctx.can_read_section("reports"):
+        raise ApiError("FORBIDDEN", "Missing business permission: reports.read", http_status=403)
+
+    params = _parse_pnl_period_export_params(request, body)
+    result = get_pnl_period_report(
+        db=db,
+        business_id=business_id,
+        fiscal_year_id=params["fiscal_year_id"],
+        currency_id=params["currency_id"],
+        date_from=params["date_from"],
+        date_to=params["date_to"],
+        project_id=params["project_id"],
+        include_zero_balance=params["include_zero_balance"],
+        compare_prior_period=params["compare_prior_period"],
+        compare_mode=params.get("compare_mode"),
+        skip=0,
+        take=10000,
+    )
+    locale = negotiate_locale(request.headers.get("Accept-Language"))
+    return pnl_excel_response(
+        result,
+        db=db,
+        business_id=business_id,
+        filename_prefix="pnl_period",
+        is_fa=locale == "fa",
+        export_filename_timestamp=export_filename_timestamp,
+    )
+
+
+@router.post(
+    "/businesses/{business_id}/reports/pnl-period/export/pdf",
+    summary="خروجی PDF گزارش سود و زیان دوره‌ای",
+    description="خروجی PDF گزارش سود و زیان دوره‌ای (درآمد، هزینه، سود/زیان خالص)",
+)
+@require_business_access("business_id")
+async def export_pnl_period_report_pdf(
+    request: Request,
+    business_id: int,
+    body: Dict[str, Any] = Body(default={}),
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_dep("reports", "export")),
+):
+    """خروجی PDF گزارش سود و زیان دوره‌ای"""
+    if not ctx.can_read_section("reports"):
+        raise ApiError("FORBIDDEN", "Missing business permission: reports.read", http_status=403)
+
+    params = _parse_pnl_period_export_params(request, body)
+    result = get_pnl_period_report(
+        db=db,
+        business_id=business_id,
+        fiscal_year_id=params["fiscal_year_id"],
+        currency_id=params["currency_id"],
+        date_from=params["date_from"],
+        date_to=params["date_to"],
+        project_id=params["project_id"],
+        include_zero_balance=params["include_zero_balance"],
+        compare_prior_period=params["compare_prior_period"],
+        compare_mode=params.get("compare_mode"),
+        skip=0,
+        take=10000,
+    )
+    locale = negotiate_locale(request.headers.get("Accept-Language"))
+    calendar_type = resolve_calendar_type_for_request(request)
+    generated_at = format_generated_at_for_pdf(business_id, calendar_type)
+    return pnl_pdf_response(
+        result,
+        db=db,
+        business_id=business_id,
+        filename_prefix="pnl_period",
+        is_fa=locale == "fa",
+        report_title_fa="گزارش سود و زیان دوره‌ای",
+        report_title_en="Period Profit & Loss Report",
+        generated_at=generated_at,
+        fiscal_year_id=params["fiscal_year_id"],
+        date_from=params["date_from"],
+        date_to=params["date_to"],
+        currency_id=params["currency_id"],
+        project_id=params["project_id"],
+        export_filename_timestamp=export_filename_timestamp,
+        load_farsi_font_data_uris=load_farsi_font_data_uris,
+    )
+
+
+@router.post(
+    "/businesses/{business_id}/reports/balance-sheet",
+    summary="گزارش ترازنامه",
+    description="صورت وضعیت مالی (ترازنامه) با طبقه‌بندی دارایی، بدهی و حقوق صاحبان سهام",
+)
+@require_business_access("business_id")
+async def balance_sheet_report_endpoint(
+    request: Request,
+    business_id: int,
+    body: Dict[str, Any] = Body(default={}),
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """گزارش ترازنامه (صورت وضعیت مالی)"""
+    if not ctx.can_read_section("reports"):
+        raise ApiError("FORBIDDEN", "Missing business permission: reports.read", http_status=403)
+
+    params = _parse_balance_sheet_body(request, body)
+    result = get_balance_sheet_report(
+        db=db,
+        business_id=business_id,
+        fiscal_year_id=params["fiscal_year_id"],
+        currency_id=params["currency_id"],
+        date_from=params["date_from"],
+        date_to=params["date_to"],
+        project_id=params["project_id"],
+        include_zero_balance=params["include_zero_balance"],
+        account_level=params["account_level"],
+        compare_prior_period=params["compare_prior_period"],
+        compare_mode=params["compare_mode"],
+        include_base_equivalent=params["include_base_equivalent"],
+    )
+
+    locale = negotiate_locale(request.headers.get("Accept-Language"))
+    return success_response(
+        data=result,
+        message="Balance sheet report retrieved successfully" if locale != "fa" else "گزارش ترازنامه با موفقیت دریافت شد",
+        request=request,
+    )
+
+
+@router.post(
+    "/businesses/{business_id}/reports/balance-sheet/export/excel",
+    summary="خروجی Excel گزارش ترازنامه",
+)
+@require_business_access("business_id")
+async def export_balance_sheet_report_excel(
+    request: Request,
+    business_id: int,
+    body: Dict[str, Any] = Body(default={}),
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_dep("reports", "export")),
+):
+    if not ctx.can_read_section("reports"):
+        raise ApiError("FORBIDDEN", "Missing business permission: reports.read", http_status=403)
+
+    params = _parse_balance_sheet_body(request, body)
+    result = get_balance_sheet_report(
+        db=db,
+        business_id=business_id,
+        fiscal_year_id=params["fiscal_year_id"],
+        currency_id=params["currency_id"],
+        date_from=params["date_from"],
+        date_to=params["date_to"],
+        project_id=params["project_id"],
+        include_zero_balance=params["include_zero_balance"],
+        account_level=params["account_level"],
+        compare_prior_period=params["compare_prior_period"],
+        compare_mode=params["compare_mode"],
+        include_base_equivalent=params["include_base_equivalent"],
+    )
+    locale = negotiate_locale(request.headers.get("Accept-Language"))
+    return balance_sheet_excel_response(
+        result,
+        db=db,
+        business_id=business_id,
+        filename_prefix="balance_sheet",
+        is_fa=locale == "fa",
+        export_filename_timestamp=export_filename_timestamp,
+    )
+
+
+@router.post(
+    "/businesses/{business_id}/reports/balance-sheet/export/pdf",
+    summary="خروجی PDF گزارش ترازنامه",
+)
+@require_business_access("business_id")
+async def export_balance_sheet_report_pdf(
+    request: Request,
+    business_id: int,
+    body: Dict[str, Any] = Body(default={}),
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_dep("reports", "export")),
+):
+    if not ctx.can_read_section("reports"):
+        raise ApiError("FORBIDDEN", "Missing business permission: reports.read", http_status=403)
+
+    params = _parse_balance_sheet_body(request, body)
+    result = get_balance_sheet_report(
+        db=db,
+        business_id=business_id,
+        fiscal_year_id=params["fiscal_year_id"],
+        currency_id=params["currency_id"],
+        date_from=params["date_from"],
+        date_to=params["date_to"],
+        project_id=params["project_id"],
+        include_zero_balance=params["include_zero_balance"],
+        account_level=params["account_level"],
+        compare_prior_period=params["compare_prior_period"],
+        compare_mode=params["compare_mode"],
+        include_base_equivalent=params["include_base_equivalent"],
+    )
+    locale = negotiate_locale(request.headers.get("Accept-Language"))
+    calendar_type = resolve_calendar_type_for_request(request)
+    generated_at = format_generated_at_for_pdf(business_id, calendar_type)
+    return balance_sheet_pdf_response(
+        result,
+        db=db,
+        business_id=business_id,
+        filename_prefix="balance_sheet",
+        is_fa=locale == "fa",
+        report_title_fa="گزارش ترازنامه (صورت وضعیت مالی)",
+        report_title_en="Balance Sheet Report",
+        generated_at=generated_at,
+        fiscal_year_id=params["fiscal_year_id"],
+        date_from=params["date_from"],
+        date_to=params["date_to"],
+        currency_id=params["currency_id"],
+        project_id=params["project_id"],
+        account_level=params["account_level"],
+        export_filename_timestamp=export_filename_timestamp,
+        load_farsi_font_data_uris=load_farsi_font_data_uris,
+    )
+
+
+@router.post(
+    "/businesses/{business_id}/reports/financial-package/export/pdf",
+    summary="خروجی PDF یکجای بسته گزارش‌های مالی",
+    description="تراز آزمایشی، صورت سود و زیان و ترازنامه در یک فایل PDF",
+)
+@require_business_access("business_id")
+async def export_financial_package_report_pdf(
+    request: Request,
+    business_id: int,
+    body: Dict[str, Any] = Body(default={}),
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_dep("reports", "export")),
+):
+    if not ctx.can_read_section("reports"):
+        raise ApiError("FORBIDDEN", "Missing business permission: reports.read", http_status=403)
+
+    params = _parse_financial_package_body(request, body)
+    package = get_financial_package_report(
+        db=db,
+        business_id=business_id,
+        fiscal_year_id=params["fiscal_year_id"],
+        currency_id=params["currency_id"],
+        date_from=params["date_from"],
+        date_to=params["date_to"],
+        project_id=params["project_id"],
+        include_zero_balance=params["include_zero_balance"],
+        account_level=params["account_level"],
+        column_mode=params["column_mode"],
+        compare_prior_period=params["compare_prior_period"],
+        compare_mode=params["compare_mode"],
+        include_base_equivalent=params.get("include_base_equivalent", False),
+    )
+    locale = negotiate_locale(request.headers.get("Accept-Language"))
+    calendar_type = resolve_calendar_type_for_request(request)
+    generated_at = format_generated_at_for_pdf(business_id, calendar_type)
+    return financial_package_pdf_response(
+        package,
+        db=db,
+        business_id=business_id,
+        is_fa=locale == "fa",
+        generated_at=generated_at,
+        fiscal_year_id=params["fiscal_year_id"],
+        date_from=params["date_from"],
+        date_to=params["date_to"],
+        currency_id=params["currency_id"],
+        project_id=params["project_id"],
+        account_level=params["account_level"],
+        column_mode=params["column_mode"],
+        export_filename_timestamp=export_filename_timestamp,
+        load_farsi_font_data_uris=load_farsi_font_data_uris,
+    )
+
+
+@router.post(
+    "/businesses/{business_id}/reports/financial-package/export/excel",
+    summary="خروجی Excel یکجای بسته گزارش‌های مالی",
+    description="تراز آزمایشی، صورت سود و زیان و ترازنامه در یک فایل Excel با چند برگه",
+)
+@require_business_access("business_id")
+async def export_financial_package_report_excel(
+    request: Request,
+    business_id: int,
+    body: Dict[str, Any] = Body(default={}),
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_dep("reports", "export")),
+):
+    if not ctx.can_read_section("reports"):
+        raise ApiError("FORBIDDEN", "Missing business permission: reports.read", http_status=403)
+
+    params = _parse_financial_package_body(request, body)
+    package = get_financial_package_report(
+        db=db,
+        business_id=business_id,
+        fiscal_year_id=params["fiscal_year_id"],
+        currency_id=params["currency_id"],
+        date_from=params["date_from"],
+        date_to=params["date_to"],
+        project_id=params["project_id"],
+        include_zero_balance=params["include_zero_balance"],
+        account_level=params["account_level"],
+        column_mode=params["column_mode"],
+        compare_prior_period=params["compare_prior_period"],
+        compare_mode=params["compare_mode"],
+        include_base_equivalent=params.get("include_base_equivalent", False),
+    )
+    locale = negotiate_locale(request.headers.get("Accept-Language"))
+    return financial_package_excel_response(
+        package,
+        db=db,
+        business_id=business_id,
+        is_fa=locale == "fa",
+        column_mode=params["column_mode"],
+        export_filename_timestamp=export_filename_timestamp,
     )
 
 
@@ -4895,6 +5549,11 @@ async def pnl_cumulative_report_endpoint(
     date_to = body.get('date_to')  # فقط date_to (date_from همیشه ابتدای سال مالی است)
     currency_id = body.get('currency_id')
     project_id = body.get('project_id')  # 🆕 فیلتر پروژه
+    include_zero_balance = bool(body.get('include_zero_balance', False))
+    compare_prior_period = bool(body.get('compare_prior_period', False))
+    compare_mode = body.get('compare_mode')
+    if compare_mode is not None:
+        compare_mode = str(compare_mode).strip() or None
     
     if currency_id is not None:
         try:
@@ -4932,6 +5591,9 @@ async def pnl_cumulative_report_endpoint(
         currency_id=currency_id,
         date_to=date_to,
         project_id=project_id,  # 🆕 پاس دادن به سرویس
+        include_zero_balance=include_zero_balance,
+        compare_prior_period=compare_prior_period,
+        compare_mode=compare_mode,
         skip=skip,
         take=take,
     )
@@ -4941,6 +5603,144 @@ async def pnl_cumulative_report_endpoint(
         data=result,
         message="PnL Cumulative report retrieved successfully" if locale != 'fa' else "گزارش سود و زیان تجمعی با موفقیت دریافت شد",
         request=request
+    )
+
+
+def _parse_pnl_cumulative_export_params(request: Request, body: Dict[str, Any]) -> Dict[str, Any]:
+    """استخراج پارامترهای مشترک خروجی/گزارش سود و زیان تجمعی."""
+    fiscal_year_id = None
+    fy_header = request.headers.get("X-Fiscal-Year-ID")
+    if fy_header:
+        try:
+            fiscal_year_id = int(fy_header)
+        except (ValueError, TypeError):
+            pass
+    if body.get("fiscal_year_id"):
+        try:
+            fiscal_year_id = int(body["fiscal_year_id"])
+        except (ValueError, TypeError):
+            pass
+
+    currency_id = body.get("currency_id")
+    if currency_id is not None:
+        try:
+            currency_id = int(currency_id)
+        except (ValueError, TypeError):
+            currency_id = None
+
+    project_id = body.get("project_id")
+    if project_id is not None:
+        try:
+            project_id = int(project_id)
+        except (ValueError, TypeError):
+            project_id = None
+
+    return {
+        "fiscal_year_id": fiscal_year_id,
+        "date_to": body.get("date_to"),
+        "currency_id": currency_id,
+        "project_id": project_id,
+        "include_zero_balance": bool(body.get("include_zero_balance", False)),
+        "compare_prior_period": bool(body.get("compare_prior_period", False)),
+        "compare_mode": (str(body.get("compare_mode")).strip() or None) if body.get("compare_mode") is not None else None,
+    }
+
+
+@router.post(
+    "/businesses/{business_id}/reports/pnl-cumulative/export/excel",
+    summary="خروجی Excel گزارش سود و زیان تجمعی",
+    description="خروجی Excel گزارش سود و زیان تجمعی از ابتدای سال مالی",
+)
+@require_business_access("business_id")
+async def export_pnl_cumulative_report_excel(
+    request: Request,
+    business_id: int,
+    body: Dict[str, Any] = Body(default={}),
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_dep("reports", "export")),
+):
+    """خروجی Excel گزارش سود و زیان تجمعی"""
+    if not ctx.can_read_section("reports"):
+        raise ApiError("FORBIDDEN", "Missing business permission: reports.read", http_status=403)
+
+    params = _parse_pnl_cumulative_export_params(request, body)
+    result = get_pnl_cumulative_report(
+        db=db,
+        business_id=business_id,
+        fiscal_year_id=params["fiscal_year_id"],
+        currency_id=params["currency_id"],
+        date_to=params["date_to"],
+        project_id=params["project_id"],
+        include_zero_balance=params["include_zero_balance"],
+        compare_prior_period=params["compare_prior_period"],
+        compare_mode=params.get("compare_mode"),
+        skip=0,
+        take=10000,
+    )
+    locale = negotiate_locale(request.headers.get("Accept-Language"))
+    return pnl_excel_response(
+        result,
+        db=db,
+        business_id=business_id,
+        filename_prefix="pnl_cumulative",
+        is_fa=locale == "fa",
+        export_filename_timestamp=export_filename_timestamp,
+    )
+
+
+@router.post(
+    "/businesses/{business_id}/reports/pnl-cumulative/export/pdf",
+    summary="خروجی PDF گزارش سود و زیان تجمعی",
+    description="خروجی PDF گزارش سود و زیان تجمعی از ابتدای سال مالی",
+)
+@require_business_access("business_id")
+async def export_pnl_cumulative_report_pdf(
+    request: Request,
+    business_id: int,
+    body: Dict[str, Any] = Body(default={}),
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_dep("reports", "export")),
+):
+    """خروجی PDF گزارش سود و زیان تجمعی"""
+    if not ctx.can_read_section("reports"):
+        raise ApiError("FORBIDDEN", "Missing business permission: reports.read", http_status=403)
+
+    params = _parse_pnl_cumulative_export_params(request, body)
+    result = get_pnl_cumulative_report(
+        db=db,
+        business_id=business_id,
+        fiscal_year_id=params["fiscal_year_id"],
+        currency_id=params["currency_id"],
+        date_to=params["date_to"],
+        project_id=params["project_id"],
+        include_zero_balance=params["include_zero_balance"],
+        compare_prior_period=params["compare_prior_period"],
+        compare_mode=params.get("compare_mode"),
+        skip=0,
+        take=10000,
+    )
+    summary = result.get("summary") or {}
+    locale = negotiate_locale(request.headers.get("Accept-Language"))
+    calendar_type = resolve_calendar_type_for_request(request)
+    generated_at = format_generated_at_for_pdf(business_id, calendar_type)
+    return pnl_pdf_response(
+        result,
+        db=db,
+        business_id=business_id,
+        filename_prefix="pnl_cumulative",
+        is_fa=locale == "fa",
+        report_title_fa="گزارش سود و زیان تجمعی",
+        report_title_en="Cumulative Profit & Loss Report",
+        generated_at=generated_at,
+        fiscal_year_id=params["fiscal_year_id"],
+        date_from=summary.get("date_from"),
+        date_to=summary.get("date_to") or params["date_to"],
+        currency_id=params["currency_id"],
+        project_id=params["project_id"],
+        export_filename_timestamp=export_filename_timestamp,
+        load_farsi_font_data_uris=load_farsi_font_data_uris,
     )
 
 
@@ -5275,7 +6075,7 @@ async def export_accounts_review_report_excel(
     def slugify(text: str) -> str:
         return re.sub(r"[^A-Za-z0-9_-]+", "_", str(text)).strip("_")
 
-    filename = f"accounts_review_{slugify(biz_name) or business_id}_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+    filename = f"accounts_review_{slugify(biz_name) or business_id}_{export_filename_timestamp(business_id)}.xlsx"
     content = buffer.getvalue()
 
     return Response(
@@ -5482,12 +6282,7 @@ async def export_accounts_review_report_pdf(
     if not calendar_type:
         cal_header = (request.headers.get("X-Calendar-Type", "jalali") or "jalali").lower()
         calendar_type = "jalali" if cal_header in ["jalali", "persian", "shamsi"] else "gregorian"
-    try:
-        from app.core.calendar import CalendarConverter
-        formatted_now = CalendarConverter.format_datetime(datetime.datetime.now(), calendar_type)
-        now = formatted_now.get("formatted") or formatted_now.get("date_time") or datetime.datetime.now().strftime("%Y/%m/%d %H:%M")
-    except Exception:
-        now = datetime.datetime.now().strftime("%Y/%m/%d %H:%M")
+    now = format_generated_at_for_pdf(business_id, calendar_type)
 
     filters = []
     fy_obj = None
@@ -5607,7 +6402,7 @@ async def export_accounts_review_report_pdf(
     def slugify(text: str) -> str:
         return re.sub(r"[^A-Za-z0-9_-]+", "_", str(text)).strip("_")
 
-    filename = f"accounts_review_{slugify(business_name) or business_id}_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+    filename = f"accounts_review_{slugify(business_name) or business_id}_{export_filename_timestamp(business_id)}.pdf"
 
     return Response(
         content=pdf_bytes,
@@ -6160,7 +6955,7 @@ async def export_journal_ledger_report_excel(
         base += f"_{slugify(biz_name)}"
     if selected_only:
         base += "_selected"
-    filename = f"{base}_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+    filename = f"{base}_{export_filename_timestamp(business_id)}.xlsx"
     content = buffer.getvalue()
     
     return Response(
@@ -6171,6 +6966,66 @@ async def export_journal_ledger_report_excel(
             "Content-Length": str(len(content)),
             "Access-Control-Expose-Headers": "Content-Disposition",
         },
+    )
+
+
+@router.post(
+    "/businesses/{business_id}/reports/journal-ledger/export/electronic-books",
+    summary="خروجی دفتر روزنامه الکترونیکی (سازمان امور مالیاتی)",
+    description=(
+        "خروجی Excel یا CSV دفتر روزنامه مطابق قالب سامانه دفاتر تجاری الکترونیکی. "
+        "ستون‌ها، ترتیب و فرمت تاریخ/مبالغ ریالی مطابق استاندارد رسمی است."
+    ),
+)
+@require_business_access("business_id")
+async def export_journal_ledger_electronic_books(
+    request: Request,
+    business_id: int,
+    body: Dict[str, Any] = Body(default={}),
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """خروجی دفتر روزنامه الکترونیکی برای بارگذاری در سامانه مالیاتی"""
+    if not ctx.can_read_section("reports"):
+        raise ApiError("FORBIDDEN", "Missing business permission: reports.read", http_status=403)
+
+    fiscal_year_id = None
+    fy_header = request.headers.get("X-Fiscal-Year-ID")
+    if fy_header:
+        try:
+            fiscal_year_id = int(fy_header)
+        except (ValueError, TypeError):
+            pass
+
+    if body.get("fiscal_year_id"):
+        try:
+            fiscal_year_id = int(body["fiscal_year_id"])
+        except (ValueError, TypeError):
+            pass
+
+    date_from = body.get("date_from")
+    date_to = body.get("date_to")
+    currency_id = body.get("currency_id")
+    document_type = body.get("document_type")
+    include_proforma = body.get("include_proforma", False)
+    export_format = body.get("format", "auto")
+
+    if currency_id is not None:
+        try:
+            currency_id = int(currency_id)
+        except (ValueError, TypeError):
+            currency_id = None
+
+    return export_electronic_journal_books(
+        db,
+        business_id=business_id,
+        fiscal_year_id=fiscal_year_id,
+        currency_id=currency_id,
+        date_from=date_from,
+        date_to=date_to,
+        document_type=document_type,
+        include_proforma=include_proforma,
+        export_format=str(export_format),
     )
 
 
@@ -6445,7 +7300,8 @@ async def export_journal_ledger_report_pdf(
         business_name = ""
     
     # Prepare data for HTML
-    now = datetime.datetime.now().strftime('%Y/%m/%d %H:%M')
+    calendar_type = resolve_calendar_type_for_request(request, is_fa)
+    now = format_generated_at_for_pdf(business_id, calendar_type)
     title_text = "گزارش دفتر روزنامه" if is_fa else "Journal Ledger Report"
     label_biz = "کسب و کار" if is_fa else "Business"
     label_date = "تاریخ تولید" if is_fa else "Generated Date"
@@ -6769,7 +7625,7 @@ async def export_journal_ledger_report_pdf(
         base += f"_{slugify(business_name)}"
     if selected_only:
         base += "_selected"
-    filename = f"{base}_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+    filename = f"{base}_{export_filename_timestamp(business_id)}.pdf"
     
     return Response(
         content=pdf_bytes,
@@ -6780,4 +7636,9 @@ async def export_journal_ledger_report_pdf(
             "Access-Control-Expose-Headers": "Content-Disposition",
         },
     )
+
+
+from adapters.api.v1.report_list_exports import register_document_list_exports
+
+register_document_list_exports(router)
 

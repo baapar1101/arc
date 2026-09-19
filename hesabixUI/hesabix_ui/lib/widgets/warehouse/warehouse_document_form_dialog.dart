@@ -23,6 +23,7 @@ import '../../l10n/app_localizations.dart';
 import '../../core/api_client.dart';
 import '../../core/date_utils.dart';
 import '../../utils/warehouse_invoice_lines.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 class WarehouseDocumentFormDialog extends StatefulWidget {
   final int businessId;
@@ -1429,7 +1430,7 @@ class _WarehouseDocumentFormDialogState
           line['product_id'] != null &&
           _isProductUnique(line['product_id'] as int))
         IconButton(
-          icon: const Icon(Icons.qr_code_scanner, size: 20),
+          icon: Icon(Icons.qr_code_scanner, size: 20),
           onPressed: () => _registerUniqueProductInstances(index),
           tooltip: 'ثبت اطلاعات کالاهای یونیک',
           color: Theme.of(context).colorScheme.primary,
@@ -1440,7 +1441,7 @@ class _WarehouseDocumentFormDialogState
           line['product_id'] != null &&
           _isProductUnique(line['product_id'] as int))
         IconButton(
-          icon: const Icon(Icons.checklist, size: 20),
+          icon: Icon(Icons.checklist, size: 20),
           onPressed: () => _selectUniqueProductInstances(index),
           tooltip: _docType == 'transfer'
               ? 'انتخاب کالاهای یونیک از انبار مبدا'
@@ -1458,7 +1459,7 @@ class _WarehouseDocumentFormDialogState
         IconButton(
           icon: const Icon(Icons.delete_outline),
           onPressed: () => _removeLine(index),
-          color: Colors.red,
+          color: SemanticColorResolver.negative(context),
         ),
     ];
 
@@ -1520,11 +1521,11 @@ class _WarehouseDocumentFormDialogState
     }
     if (!_isPosted) {
       entries.add(
-        const PopupMenuItem(
+        PopupMenuItem(
           value: 'delete',
           child: ListTile(
             contentPadding: EdgeInsets.zero,
-            leading: Icon(Icons.delete_outline, color: Colors.red),
+            leading: Icon(Icons.delete_outline, color: SemanticColorResolver.negative(context)),
             title: Text('حذف خط'),
           ),
         ),
@@ -1621,18 +1622,10 @@ class _WarehouseDocumentFormDialogState
         final attrIds = (product['attribute_ids'] as List<dynamic>?) ?? [];
         if (attrIds.isNotEmpty) {
           try {
-            final result = await _attributeService.search(
+            final productAttrs = await _attributeService.getByIds(
               businessId: widget.businessId,
-              limit: 1000, // دریافت همه ویژگی‌ها
+              ids: attrIds,
             );
-            final allAttributes = (result['items'] as List<dynamic>?) ?? [];
-            final productAttrs = allAttributes
-                .where((attr) {
-                  final attrId = attr['id'] as int?;
-                  return attrId != null && attrIds.contains(attrId);
-                })
-                .map((attr) => Map<String, dynamic>.from(attr as Map))
-                .toList();
             _productAttributesCache[productId] = productAttrs;
           } catch (e) {
             debugPrint('Error loading product attributes: $e');

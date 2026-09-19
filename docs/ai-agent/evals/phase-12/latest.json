@@ -1,0 +1,323 @@
+{
+  "canary": {
+    "INDEXED_CANDIDATE_RETRIEVAL": false,
+    "INDEXED_CANDIDATE_ROLLOUT_PERCENT": 5,
+    "INDEXED_CANDIDATE_FALLBACK": true,
+    "INDEXED_CANDIDATE_KILL_SWITCH": false,
+    "min_live_samples": 500
+  },
+  "other_planes": {
+    "ADAPTIVE_DISCOVERY_K": false,
+    "ADAPTIVE_K_ROLLOUT_PERCENT": 0,
+    "HYBRID_TOOL_DISCOVERY": false,
+    "PROGRESSIVE_SCHEMA_LOADING": false
+  },
+  "gold": {
+    "candidate_recall": [
+      {
+        "n": 20,
+        "queries": 443,
+        "candidate_recall": 0.9549,
+        "latency_p50_ms": 0.87,
+        "latency_p95_ms": 1.283,
+        "avg_latency_ms": 0.887
+      },
+      {
+        "n": 50,
+        "queries": 443,
+        "candidate_recall": 0.9955,
+        "latency_p50_ms": 0.862,
+        "latency_p95_ms": 1.84,
+        "avg_latency_ms": 0.918
+      },
+      {
+        "n": 100,
+        "queries": 443,
+        "candidate_recall": 1.0,
+        "latency_p50_ms": 0.849,
+        "latency_p95_ms": 1.302,
+        "avg_latency_ms": 0.867
+      },
+      {
+        "n": 200,
+        "queries": 443,
+        "candidate_recall": 1.0,
+        "latency_p50_ms": 0.837,
+        "latency_p95_ms": 1.328,
+        "avg_latency_ms": 0.866
+      }
+    ],
+    "indexed_final": [
+      {
+        "k": 10,
+        "candidate_n": 100,
+        "recall": 0.9616,
+        "mrr": 0.7931,
+        "ndcg": 0.8091
+      },
+      {
+        "k": 15,
+        "candidate_n": 100,
+        "recall": 0.9819,
+        "mrr": 0.7945,
+        "ndcg": 0.8166
+      },
+      {
+        "k": 20,
+        "candidate_n": 100,
+        "recall": 0.9887,
+        "mrr": 0.7948,
+        "ndcg": 0.8191
+      },
+      {
+        "k": 48,
+        "candidate_n": 100,
+        "recall": 0.9887,
+        "mrr": 0.7947,
+        "ndcg": 0.8233
+      }
+    ],
+    "baseline_final": [
+      {
+        "k": 10,
+        "recall": 0.9616
+      },
+      {
+        "k": 15,
+        "recall": 0.9819
+      },
+      {
+        "k": 20,
+        "recall": 0.9887
+      },
+      {
+        "k": 48,
+        "recall": 0.9887
+      }
+    ],
+    "latency": [
+      {
+        "size": 180,
+        "control_p50_ms": 8.714,
+        "control_p95_ms": 9.093,
+        "indexed_p50_ms": 3.637,
+        "indexed_p95_ms": 4.337
+      },
+      {
+        "size": 1200,
+        "control_p50_ms": 20.429,
+        "control_p95_ms": 23.074,
+        "indexed_p50_ms": 4.306,
+        "indexed_p95_ms": 4.644
+      },
+      {
+        "size": 5000,
+        "control_p50_ms": 60.278,
+        "control_p95_ms": 61.425,
+        "indexed_p50_ms": 4.787,
+        "indexed_p95_ms": 5.393
+      },
+      {
+        "size": 10000,
+        "control_p50_ms": 117.374,
+        "control_p95_ms": 136.86,
+        "indexed_p50_ms": 6.805,
+        "indexed_p95_ms": 7.306
+      }
+    ]
+  },
+  "live": {
+    "counters": {},
+    "control": {
+      "requests": 0,
+      "average_k": 0.0,
+      "p50_k": 0,
+      "p95_k": 0,
+      "avg_schema_tokens": 0,
+      "avg_latency_ms": 0.0
+    },
+    "experiment": {
+      "requests": 0,
+      "average_k": 0.0,
+      "p50_k": 0,
+      "p95_k": 0,
+      "avg_schema_tokens": 0,
+      "avg_latency_ms": 0.0
+    },
+    "indexed_control": {
+      "requests": 0,
+      "indexed_requests": 0,
+      "fallback_requests": 0,
+      "fallback_rate": null,
+      "avg_candidate_count": 0.0,
+      "discovery_latency": {
+        "p50": 0,
+        "p95": 0,
+        "p99": 0,
+        "avg_ms": 0.0
+      },
+      "request_latency": {
+        "p50": 0,
+        "p95": 0,
+        "p99": 0
+      },
+      "task_completion_rate": null,
+      "fallback_reasons": {},
+      "by_channel": {},
+      "by_mutation": {},
+      "high_risk_requests": 0
+    },
+    "indexed_experiment": {
+      "requests": 0,
+      "indexed_requests": 0,
+      "fallback_requests": 0,
+      "fallback_rate": null,
+      "avg_candidate_count": 0.0,
+      "discovery_latency": {
+        "p50": 0,
+        "p95": 0,
+        "p99": 0,
+        "avg_ms": 0.0
+      },
+      "request_latency": {
+        "p50": 0,
+        "p95": 0,
+        "p99": 0
+      },
+      "task_completion_rate": null,
+      "fallback_reasons": {},
+      "by_channel": {},
+      "by_mutation": {},
+      "high_risk_requests": 0
+    },
+    "k_histogram": {
+      "10": 0,
+      "15": 0,
+      "20": 0,
+      "fallback": 0
+    },
+    "by_channel": {},
+    "high_risk_requests": {},
+    "rediscovery_queued": 0,
+    "rediscovery_recovered": 0,
+    "rediscovery_recovery_rate": null,
+    "discovery_success_without_rediscovery": null,
+    "task_completion": null,
+    "live_requests": 0,
+    "min_live_samples": 500,
+    "decision": "HOLD",
+    "indexed_min_live_samples": 500,
+    "indexed_decision": "HOLD",
+    "candidate_index_hit": 0,
+    "candidate_index_empty": 0,
+    "indexed_candidate_fallback": 0,
+    "candidate_index_fallback": 0,
+    "indexed_retrieval_miss": 0,
+    "index_consistency_failure": 0,
+    "unauthorized_candidate": 0,
+    "unauthorized_rediscovery": 0,
+    "comparison": {
+      "task_completion": {
+        "control": {
+          "n": 0,
+          "rate": null,
+          "ci95": [
+            null,
+            null
+          ]
+        },
+        "experiment": {
+          "n": 0,
+          "rate": null,
+          "ci95": [
+            null,
+            null
+          ]
+        },
+        "delta": null,
+        "ci_overlap": null,
+        "enough_for_significance": false
+      },
+      "fallback_rate": {
+        "control": {
+          "n": 0,
+          "rate": null,
+          "ci95": [
+            null,
+            null
+          ]
+        },
+        "experiment": {
+          "n": 0,
+          "rate": null,
+          "ci95": [
+            null,
+            null
+          ]
+        },
+        "delta": null,
+        "ci_overlap": null,
+        "enough_for_significance": false
+      },
+      "indexed_retrieval_miss": {
+        "control": {
+          "n": 0,
+          "rate": null,
+          "ci95": [
+            null,
+            null
+          ]
+        },
+        "experiment": {
+          "n": 0,
+          "rate": null,
+          "ci95": [
+            null,
+            null
+          ]
+        },
+        "delta": null,
+        "ci_overlap": null,
+        "enough_for_significance": false
+      },
+      "tool_success": {
+        "control": {
+          "n": 0,
+          "rate": null,
+          "ci95": [
+            null,
+            null
+          ]
+        },
+        "experiment": {
+          "n": 0,
+          "rate": null,
+          "ci95": [
+            null,
+            null
+          ]
+        },
+        "delta": null,
+        "ci_overlap": null,
+        "enough_for_significance": false
+      }
+    },
+    "indexed_promotion": {
+      "decision": "HOLD",
+      "case": "insufficient_samples",
+      "reason": "need_500_per_arm",
+      "control_requests": 0,
+      "experiment_requests": 0,
+      "min_samples": 500
+    }
+  },
+  "promotion": {
+    "decision": "HOLD",
+    "case": "insufficient_samples",
+    "reason": "need_500_per_arm",
+    "control_requests": 0,
+    "experiment_requests": 0,
+    "min_samples": 500
+  },
+  "note": "Rollout is 5%. Promotion requires 500 live discovery requests per arm. This process snapshot is not production traffic."
+}

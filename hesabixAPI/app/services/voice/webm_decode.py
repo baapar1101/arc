@@ -18,6 +18,7 @@ class WebmOpusStreamDecoder:
 		self._buffer = bytearray()
 		self._av = None
 		self._resampler = None
+		self._emitted_bytes = 0
 
 	def _ensure_av(self):
 		if self._av is not None:
@@ -33,46 +34,51 @@ class WebmOpusStreamDecoder:
 	def reset(self) -> None:
 		self._buffer.clear()
 		self._resampler = None
+		self._emitted_bytes = 0
 
 	def feed(self, chunk: bytes) -> bytes:
-		"""chunk جدید را می‌خورد؛ در صورت موفقیت PCM16 برمی‌گرداند وگرنه b''."""
+		"""chunk جدید را می‌خورد؛ فقط PCM تازه‌decode‌شده را برمی‌گرداند."""
 		if not chunk:
 			return b""
 		self._ensure_av()
 		self._buffer.extend(chunk)
-		# حداقل اندازه برای تلاش decode
 		if len(self._buffer) < 32:
+			return b""
+		if len(self._buffer) > 2 * 1024 * 1024:
+			logger.warning("webm buffer overflow, reset")
+			self.reset()
 			return b""
 
 		try:
 			pcm = self._decode_buffer(bytes(self._buffer))
-			self._buffer.clear()
-			return pcm
 		except Exception as exc:
-			# chunk ناقص WebM — منتظر chunk بعدی می‌مانیم (تا سقف)
 			logger.debug("webm decode not ready: %s", exc)
-			if len(self._buffer) > 512 * 1024:
-				self._buffer = self._buffer[-128 * 1024 :]
 			return b""
+		if len(pcm) <= self._emitted_bytes:
+			return b""
+		new_pcm = pcm[self._emitted_bytes :]
+		self._emitted_bytes = len(pcm)
+		return new_pcm
 
 	def _decode_buffer(self, data: bytes) -> bytes:
 		av = self._av
 		import numpy as np  # type: ignore
 
 		out_pcm = bytearray()
+		resampler = None
 		with av.open(io.BytesIO(data), format="webm") as container:
 			audio_stream = next((s for s in container.streams if s.type == "audio"), None)
 			if audio_stream is None:
 				return b""
 
 			for frame in container.decode(audio=0):
-				if self._resampler is None:
-					self._resampler = av.audio.resampler.AudioResampler(
+				if resampler is None:
+					resampler = av.audio.resampler.AudioResampler(
 						format="s16",
 						layout="mono",
 						rate=self.target_sample_rate_hz,
 					)
-				for resampled in self._resampler.resample(frame):
+				for resampled in resampler.resample(frame):
 					arr = resampled.to_ndarray()
 					if arr.size == 0:
 						continue

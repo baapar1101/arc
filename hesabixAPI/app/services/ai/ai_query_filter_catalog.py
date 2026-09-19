@@ -41,6 +41,36 @@ class EntityQuerySpec:
     flat_filters: Tuple[str, ...] = ()  # from_date, person_id, ...
 
 
+# حدس‌های رایج مدل → property کاتالوگ؛ None یعنی از search استفاده شود نه filters
+FILTER_PROPERTY_ALIASES: Dict[str, Dict[str, Optional[str]]] = {
+    "invoice": {
+        "sale_date": "document_date",
+        "invoice_date": "document_date",
+        "date": "document_date",
+        "customer_id": None,
+        "id": None,
+    },
+    "person": {
+        "id": None,
+        "type": "person_types",
+        "person_type": "person_types",
+        "name": "alias_name",
+    },
+    "document": {
+        "amount": None,
+        "date": "document_date",
+        "id": None,
+    },
+    "check": {
+        "person_id": None,
+        "id": None,
+    },
+    "product": {
+        "id": None,
+    },
+}
+
+
 ENTITY_QUERY_SPECS: Dict[str, EntityQuerySpec] = {
     "invoice": EntityQuerySpec(
         entity="invoice",
@@ -83,6 +113,7 @@ ENTITY_QUERY_SPECS: Dict[str, EntityQuerySpec] = {
             FieldSpec("mobile", "موبایل", "string"),
             FieldSpec("email", "ایمیل", "string"),
             FieldSpec("national_id", "کد ملی", "string"),
+            FieldSpec("code", "کد شخص", "string"),
             FieldSpec("person_types", "نوع شخص", "string", notes='مثلاً customer — عملگر * یا in'),
             FieldSpec("is_active", "فعال", "boolean", operators=("=",)),
             FieldSpec("balance", "مانده", "number", notes="نیاز به materialization در سرویس"),
@@ -176,6 +207,21 @@ ENTITY_QUERY_SPECS: Dict[str, EntityQuerySpec] = {
 
 def get_entity_query_spec(entity: str) -> Optional[EntityQuerySpec]:
     return ENTITY_QUERY_SPECS.get((entity or "").strip().lower())
+
+
+def resolve_filter_property(entity: Optional[str], prop: str) -> str:
+    """Alias رایج را به property کاتالوگ تبدیل می‌کند؛ خالی یعنی باید از search استفاده شود."""
+    key = (entity or "").strip().lower()
+    aliases = FILTER_PROPERTY_ALIASES.get(key) or {}
+    if prop in aliases:
+        mapped = aliases[prop]
+        if mapped is None:
+            raise ValueError(
+                f"فیلتر '{prop}' برای entity '{entity}' مجاز نیست. "
+                f"برای پیدا کردن رکورد از پارامتر search استفاده کن، نه filters.property={prop}."
+            )
+        return mapped
+    return prop
 
 
 def list_catalog_entities() -> List[str]:

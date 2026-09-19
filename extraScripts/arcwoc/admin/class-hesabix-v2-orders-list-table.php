@@ -61,7 +61,12 @@ class Hesabix_V2_Orders_List_Table extends WP_List_Table
 			'status' => __('وضعیت', 'hesabix-v2'),
 			'customer' => __('خریدار', 'hesabix-v2'),
 			'total' => __('مبلغ', 'hesabix-v2'),
+<<<<<<< HEAD
+			'profit' => __('سود', 'hesabix-v2'),
+			'hesabix' => __('حسابیکس', 'hesabix-v2'),
+=======
 			'hesabix' => __('مارک‌استریت', 'hesabix-v2'),
+>>>>>>> github/Huma
 			'pause' => __('همگام خودکار', 'hesabix-v2'),
 			'actions' => __('عملیات', 'hesabix-v2'),
 		);
@@ -77,15 +82,58 @@ class Hesabix_V2_Orders_List_Table extends WP_List_Table
 	}
 
 	/**
+	 * فقط سفارش فروشگاه (نه برگشت وجه / refund).
+	 *
+	 * @param mixed $item
+	 * @return bool
+	 */
+	private static function is_listable_shop_order($item)
+	{
+		if (!$item instanceof WC_Order) {
+			return false;
+		}
+		// WC_Order_Refund / Admin Overrides\OrderRefund هم از WC_Order ارث می‌برند.
+		if (is_a($item, 'WC_Order_Refund')) {
+			return false;
+		}
+		$type = method_exists($item, 'get_type') ? (string) $item->get_type() : '';
+		if ($type === 'shop_order_refund') {
+			return false;
+		}
+		return true;
+	}
+
+	/**
+	 * @param mixed $item
+	 * @return string
+	 */
+	private static function safe_edit_order_url($item)
+	{
+		if ($item instanceof WC_Order && method_exists($item, 'get_edit_order_url')) {
+			$url = $item->get_edit_order_url();
+			if (is_string($url) && $url !== '') {
+				return $url;
+			}
+		}
+		$id = ($item instanceof WC_Order) ? (int) $item->get_id() : 0;
+		if ($id > 0) {
+			return admin_url('post.php?post=' . $id . '&action=edit');
+		}
+		return '';
+	}
+
+	/**
 	 * @param WC_Order $item
 	 * @return string
 	 */
 	protected function column_order($item)
 	{
-		$edit = $item->get_edit_order_url();
+		$edit = self::safe_edit_order_url($item);
 		$num = $item->get_order_number();
-		$link = sprintf('<a href="%s"><strong>#%s</strong></a>', esc_url($edit), esc_html((string) $num));
-		return $link;
+		if ($edit === '') {
+			return '<strong>#' . esc_html((string) $num) . '</strong>';
+		}
+		return sprintf('<a href="%s"><strong>#%s</strong></a>', esc_url($edit), esc_html((string) $num));
 	}
 
 	/**
@@ -136,6 +184,18 @@ class Hesabix_V2_Orders_List_Table extends WP_List_Table
 	protected function column_total($item)
 	{
 		return wp_kses_post($item->get_formatted_order_total());
+	}
+
+	/**
+	 * @param WC_Order $item
+	 * @return string
+	 */
+	protected function column_profit($item)
+	{
+		if (!class_exists('Hesabix_V2_Invoice_Profit_Service')) {
+			return '—';
+		}
+		return Hesabix_V2_Invoice_Profit_Service::render_list_cell($item);
 	}
 
 	/**
@@ -269,6 +329,43 @@ class Hesabix_V2_Orders_List_Table extends WP_List_Table
 	}
 
 	/**
+	 * آرگومان پایهٔ فهرست: فقط shop_order تا refund داخل لیست نیاید (HPOS).
+	 *
+	 * @param array<string,mixed> $extra
+	 * @return array<string,mixed>
+	 */
+	private static function shop_order_query_args(array $extra = array())
+	{
+		$base = array(
+			'type' => 'shop_order',
+			'limit' => 20,
+			'paginate' => true,
+			'orderby' => 'date',
+			'order' => 'DESC',
+			'status' => self::order_statuses_for_list_query(),
+		);
+		return array_merge($base, $extra);
+	}
+
+	/**
+	 * @param mixed $orders
+	 * @return array<int,WC_Order>
+	 */
+	private static function filter_shop_orders($orders)
+	{
+		if (!is_array($orders)) {
+			return array();
+		}
+		$out = array();
+		foreach ($orders as $order) {
+			if (self::is_listable_shop_order($order)) {
+				$out[] = $order;
+			}
+		}
+		return $out;
+	}
+
+	/**
 	 * @return void
 	 */
 	public function prepare_items()
@@ -313,10 +410,8 @@ class Hesabix_V2_Orders_List_Table extends WP_List_Table
 					$offset
 				)
 			);
-			$this->items = array_values(
-				array_filter(
-					array_map('wc_get_order', array_map('intval', $wc_ids))
-				)
+			$this->items = self::filter_shop_orders(
+				array_map('wc_get_order', array_map('intval', $wc_ids))
 			);
 		} elseif ($filter === 'not_synced') {
 			// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
@@ -328,38 +423,39 @@ class Hesabix_V2_Orders_List_Table extends WP_List_Table
 				)
 			);
 			$mapped = array_map('intval', $mapped);
-			$args = array(
-				'limit' => $per_page,
-				'page' => $current_page,
-				'paginate' => true,
-				'orderby' => 'date',
-				'order' => 'DESC',
-				'status' => self::order_statuses_for_list_query(),
+			$args = self::shop_order_query_args(
+				array(
+					'limit' => $per_page,
+					'page' => $current_page,
+				)
 			);
 			if (!empty($mapped)) {
 				$args['exclude'] = $mapped;
 			}
 			$query = wc_get_orders($args);
 			if (is_object($query) && isset($query->orders)) {
-				$this->items = $query->orders;
+				$this->items = self::filter_shop_orders($query->orders);
 				$total_items = (int) $query->total;
 			} else {
-				$this->items = is_array($query) ? $query : array();
+				$this->items = self::filter_shop_orders(is_array($query) ? $query : array());
 				$total_items = count($this->items);
 			}
 		} else {
 			$query = wc_get_orders(
-				array(
-					'limit' => $per_page,
-					'page' => $current_page,
-					'paginate' => true,
-					'orderby' => 'date',
-					'order' => 'DESC',
-					'status' => self::order_statuses_for_list_query(),
+				self::shop_order_query_args(
+					array(
+						'limit' => $per_page,
+						'page' => $current_page,
+					)
 				)
 			);
-			$this->items = $query->orders;
-			$total_items = (int) $query->total;
+			if (is_object($query) && isset($query->orders)) {
+				$this->items = self::filter_shop_orders($query->orders);
+				$total_items = (int) $query->total;
+			} else {
+				$this->items = self::filter_shop_orders(is_array($query) ? $query : array());
+				$total_items = count($this->items);
+			}
 		}
 
 		$this->set_pagination_args(

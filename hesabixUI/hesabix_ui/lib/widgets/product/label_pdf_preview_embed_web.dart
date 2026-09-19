@@ -94,10 +94,19 @@ class _LabelPdfPreviewEmbedState extends State<LabelPdfPreviewEmbed> {
       debugPrint('LabelPdfPreviewEmbed: $e\n$st');
       if (!mounted || seq != _seq) return;
       setState(() {
-        _error = e;
+        _error = _friendlyPreviewError(e);
         _loading = false;
       });
     }
+  }
+
+  String _friendlyPreviewError(Object e) {
+    final raw = e.toString();
+    if (raw.contains('show_line_discount') || raw.contains('doscount') || raw.contains('is undefined')) {
+      return 'خطای داخلی رندر پیش‌نمایش. لطفاً تنظیمات چاپ را بررسی کنید یا دوباره تلاش کنید.';
+    }
+    if (raw.length > 180) return '${raw.substring(0, 180)}…';
+    return raw;
   }
 
   void _revokeBlob() {

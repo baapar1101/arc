@@ -5,6 +5,16 @@ from abc import ABC, abstractmethod
 import json
 import logging
 
+from app.services.ai.ai_prompt_cache import (
+    build_anthropic_system_blocks,
+    anthropic_request_cache_control,
+    extract_prompt_cache_policy,
+    normalize_anthropic_usage,
+    normalize_openai_usage,
+    openai_supports_prompt_cache,
+    split_system_messages_for_provider,
+)
+
 logger = logging.getLogger(__name__)
 
 # خروجی بیشتر از این در بسیاری از gatewayها (vLLM و مشابه) رد می‌شود؛ حتی اگر
@@ -58,6 +68,7 @@ class AIProviderBase(ABC):
         temperature: float,
         tools: Optional[List[Dict[str, Any]]] = None,
         reasoning_effort: Optional[str] = None,
+        tool_choice: Optional[Any] = None,
     ) -> AsyncGenerator[Dict[str, Any], None]:
         """
         ارسال درخواست chat completion به صورت streaming
@@ -76,15 +87,23 @@ class OpenAIProvider(AIProviderBase):
         super().__init__(api_key, api_base_url or "https://api.openai.com/v1")
         try:
             import openai
+
+            from app.services.ai.ai_constants import (
+                AI_PROVIDER_STREAM_TIMEOUT_SEC,
+                AI_PROVIDER_TIMEOUT_SEC,
+            )
+
             # استفاده از sync client برای non-streaming
             self.client = openai.OpenAI(
                 api_key=api_key,
-                base_url=api_base_url or None
+                base_url=api_base_url or None,
+                timeout=AI_PROVIDER_TIMEOUT_SEC,
             )
             # استفاده از async client برای streaming
             self.async_client = openai.AsyncOpenAI(
                 api_key=api_key,
-                base_url=api_base_url or None
+                base_url=api_base_url or None,
+                timeout=AI_PROVIDER_STREAM_TIMEOUT_SEC,
             )
         except ImportError:
             raise ImportError("openai package is required. Install it with: pip install openai")
@@ -148,25 +167,55 @@ class OpenAIProvider(AIProviderBase):
         temperature: float,
         tools: Optional[List[Dict[str, Any]]],
         reasoning_effort: Optional[str],
+        provider_extra: Optional[Dict[str, Any]] = None,
         *,
         stream: bool = False,
+        tool_choice: Optional[Any] = None,
     ) -> Dict[str, Any]:
         """ساخت پارامترهای درخواست با پشتیبانی از مدل‌های reasoning.
 
         مدل‌های reasoning (o-series/gpt-5) به‌جای `max_tokens` از
         `max_completion_tokens` استفاده می‌کنند، `temperature` را نمی‌پذیرند و
         پارامتر `reasoning_effort` را قبول دارند.
+
+        tool_choice: برای نوبت اول وقتی سوال قطعاً به ابزار نیاز دارد
+        ("required" یا object تابع خاص مثل create_session_plan) تا مدل بدون
+        tool_call متن ننویسد. فقط وقتی tools موجود باشد اعمال می‌شود.
         """
         if max_tokens > _MAX_SAFE_CHAT_OUTPUT_TOKENS:
             max_tokens = _MAX_SAFE_CHAT_OUTPUT_TOKENS
 
+        from app.services.ai.chat_message_builder import repair_llm_tool_messages
+
+        api_messages = repair_llm_tool_messages(
+            [
+                {k: v for k, v in msg.items() if not str(k).startswith("_")}
+                for msg in messages
+            ]
+        )
+        cache_policy = extract_prompt_cache_policy(provider_extra)
+        if cache_policy:
+            api_messages = split_system_messages_for_provider(api_messages, cache_policy)
+
         kwargs: Dict[str, Any] = {
             "model": model,
-            "messages": messages,
+            "messages": api_messages,
             "tools": tools if tools else None,
         }
         if stream:
             kwargs["stream"] = True
+        if tool_choice and tools:
+            kwargs["tool_choice"] = tool_choice
+
+        if (
+            cache_policy
+            and cache_policy.cache_key
+            and openai_supports_prompt_cache(self.api_base_url)
+        ):
+            kwargs["prompt_cache_key"] = cache_policy.cache_key
+            retention = (cache_policy.openai_retention or "").strip()
+            if retention and retention not in ("in_memory", "default"):
+                kwargs["prompt_cache_retention"] = retention
 
         if reasoning_effort:
             kwargs["reasoning_effort"] = reasoning_effort
@@ -184,13 +233,20 @@ class OpenAIProvider(AIProviderBase):
         temperature: float,
         tools: Optional[List[Dict[str, Any]]] = None,
         reasoning_effort: Optional[str] = None,
+        provider_extra: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         """ارسال درخواست به OpenAI"""
         try:
             from app.services.ai.ai_retry_policy import sync_retry_llm
 
             request_kwargs = self._build_request_kwargs(
-                messages, model, max_tokens, temperature, tools, reasoning_effort
+                messages,
+                model,
+                max_tokens,
+                temperature,
+                tools,
+                reasoning_effort,
+                provider_extra,
             )
 
             def _call():
@@ -199,8 +255,11 @@ class OpenAIProvider(AIProviderBase):
             response = sync_retry_llm(_call)
             
             message = response.choices[0].message
-            usage = response.usage
+            usage = normalize_openai_usage(response.usage)
             
+            valid_tool_calls = [
+                fc for fc in (message.tool_calls or []) if (fc.function.name or "").strip()
+            ]
             result = {
                 "message": {
                     "role": message.role,
@@ -211,14 +270,10 @@ class OpenAIProvider(AIProviderBase):
                             "name": fc.function.name,
                             "arguments": json.loads(fc.function.arguments)
                         }
-                        for fc in (message.tool_calls or [])
-                    ] if message.tool_calls else None
+                        for fc in valid_tool_calls
+                    ] if valid_tool_calls else None
                 },
-                "usage": {
-                    "input_tokens": usage.prompt_tokens,
-                    "output_tokens": usage.completion_tokens,
-                    "total_tokens": usage.total_tokens
-                }
+                "usage": usage.to_usage_dict(),
             }
             
             return result
@@ -238,6 +293,8 @@ class OpenAIProvider(AIProviderBase):
         temperature: float,
         tools: Optional[List[Dict[str, Any]]] = None,
         reasoning_effort: Optional[str] = None,
+        provider_extra: Optional[Dict[str, Any]] = None,
+        tool_choice: Optional[Any] = None,
     ) -> AsyncGenerator[Dict[str, Any], None]:
         """ارسال درخواست به OpenAI به صورت streaming با async client"""
         try:
@@ -250,7 +307,9 @@ class OpenAIProvider(AIProviderBase):
                 temperature,
                 tools,
                 reasoning_effort,
+                provider_extra,
                 stream=True,
+                tool_choice=tool_choice,
             )
 
             async def _open_stream():
@@ -261,6 +320,7 @@ class OpenAIProvider(AIProviderBase):
             stream = await async_retry_llm(_open_stream)
             
             accumulated_content = ""
+            accumulated_reasoning = ""
             final_usage = None
             tool_calls_accumulator = {}  # برای جمع‌آوری tool_calls از chunks مختلف
             tool_planning_sent = False
@@ -268,11 +328,7 @@ class OpenAIProvider(AIProviderBase):
             async for chunk in stream:
                 # بررسی usage (معمولاً در chunk آخر می‌آید)
                 if chunk.usage:
-                    final_usage = {
-                        "input_tokens": chunk.usage.prompt_tokens,
-                        "output_tokens": chunk.usage.completion_tokens,
-                        "total_tokens": chunk.usage.total_tokens
-                    }
+                    final_usage = normalize_openai_usage(chunk.usage).to_usage_dict()
                 
                 # بررسی content chunks
                 if chunk.choices and len(chunk.choices) > 0:
@@ -284,6 +340,17 @@ class OpenAIProvider(AIProviderBase):
                         yield {
                             "delta": {
                                 "content": delta.content
+                            },
+                            "usage": None,
+                            "done": False
+                        }
+
+                    reasoning_piece = getattr(delta, "reasoning_content", None) or ""
+                    if reasoning_piece:
+                        accumulated_reasoning += reasoning_piece
+                        yield {
+                            "delta": {
+                                "reasoning_content": reasoning_piece
                             },
                             "usage": None,
                             "done": False
@@ -336,35 +403,70 @@ class OpenAIProvider(AIProviderBase):
                 function_calls = []
                 for index in sorted(tool_calls_accumulator.keys()):
                     tc = tool_calls_accumulator[index]
+                    function_name = (tc["function"]["name"] or "").strip()
+                    if not function_name:
+                        # tool_call بدون نام معتبر — احتمالاً stream ناقص/خراب؛
+                        # اضافه کردنش باعث خطای provider در نوبت بعد می‌شود.
+                        continue
                     try:
                         arguments = json.loads(tc["function"]["arguments"]) if tc["function"]["arguments"] else {}
                     except json.JSONDecodeError:
                         arguments = {}
-                    
-                    function_name = tc["function"]["name"]
+
                     tool_call_id = tc.get("id", f"call_{index}")
                     tool_call_id_map[function_name] = tool_call_id
-                    
+
                     function_calls.append({
                         "id": tool_call_id,
                         "name": function_name,
                         "arguments": arguments
                     })
+                if not function_calls:
+                    function_calls = None
             
             # ارسال chunk نهایی با usage و function_calls
             yield {
                 "delta": {
-                    "content": ""
+                    "content": "",
+                    "reasoning_content": "",
                 },
                 "usage": final_usage,
                 "function_calls": function_calls,
                 "tool_call_id_map": tool_call_id_map,  # برای استفاده در ai_service
+                "reasoning_content_full": accumulated_reasoning or None,
                 "done": True
             }
             
         except Exception as e:
             logger.error(f"OpenAI streaming API error: {e}", exc_info=True)
             self._raise_mapped_api_error(e, model=model)
+
+
+def map_tool_choice_for_anthropic(
+    tool_choice: Any, *, has_tools: bool
+) -> Optional[Dict[str, Any]]:
+    """تبدیل tool_choice سبک OpenAI به Messages API آنتروپیک."""
+    if not has_tools or not tool_choice:
+        return None
+    if tool_choice == "required":
+        return {"type": "any"}
+    if tool_choice == "auto":
+        return {"type": "auto"}
+    if tool_choice == "none":
+        return {"type": "none"}
+    if isinstance(tool_choice, dict):
+        kind = (tool_choice.get("type") or "").strip().lower()
+        if kind == "function":
+            name = ((tool_choice.get("function") or {}).get("name") or "").strip()
+            if name:
+                return {"type": "tool", "name": name}
+        if kind in ("auto", "any", "tool", "none"):
+            mapped = {"type": kind}
+            name = (tool_choice.get("name") or "").strip()
+            if kind == "tool" and name:
+                mapped["name"] = name
+            return mapped
+    return None
 
 
 def _openai_tools_to_anthropic(tools: Optional[List[Dict[str, Any]]]) -> Optional[List[Dict[str, Any]]]:
@@ -460,7 +562,12 @@ def _anthropic_blocks_to_openai_result(content_blocks: Any) -> tuple[str, Option
             text_parts.append(getattr(block, "text", None) or (block.get("text") if isinstance(block, dict) else ""))
         elif btype == "tool_use":
             bid = getattr(block, "id", None) or (block.get("id") if isinstance(block, dict) else None)
-            name = getattr(block, "name", None) or (block.get("name") if isinstance(block, dict) else "unknown")
+            name = getattr(block, "name", None) or (block.get("name") if isinstance(block, dict) else None)
+            name = (name or "").strip()
+            if not name:
+                # tool_use بدون نام معتبر — نادیده گرفته می‌شود تا در نوبت
+                # بعدی به‌عنوان فراخوانی ناقص به provider ارسال نشود.
+                continue
             inp = getattr(block, "input", None) if hasattr(block, "input") else block.get("input")
             function_calls.append(
                 {
@@ -526,11 +633,22 @@ class AnthropicProvider(AIProviderBase):
         tools: Optional[List[Dict[str, Any]]],
         provider_extra: Optional[Dict[str, Any]] = None,
         reasoning_effort: Optional[str] = None,
+        *,
+        tool_choice: Optional[Any] = None,
     ) -> Dict[str, Any]:
         if max_tokens > _MAX_SAFE_CHAT_OUTPUT_TOKENS:
             max_tokens = _MAX_SAFE_CHAT_OUTPUT_TOKENS
+        cache_policy = extract_prompt_cache_policy(provider_extra)
         system_message, anthropic_messages = _openai_messages_to_anthropic(messages)
-        anthropic_tools = _openai_tools_to_anthropic(tools)
+        from app.services.ai.ai_provider_context import (
+            apply_anthropic_tool_cache,
+            extract_provider_context_policy,
+        )
+
+        anthropic_tools = apply_anthropic_tool_cache(
+            _openai_tools_to_anthropic(tools),
+            extract_provider_context_policy(provider_extra),
+        )
         kwargs: Dict[str, Any] = {
             "model": model,
             "max_tokens": max_tokens,
@@ -554,10 +672,28 @@ class AnthropicProvider(AIProviderBase):
                     "type": "enabled",
                     "budget_tokens": budget,
                 }
-        if system_message:
+        system_blocks = (
+            build_anthropic_system_blocks(cache_policy)
+            if cache_policy
+            else None
+        )
+        if system_blocks:
+            kwargs["system"] = system_blocks
+        elif system_message:
             kwargs["system"] = system_message
         if anthropic_tools:
             kwargs["tools"] = anthropic_tools
+            mapped_choice = map_tool_choice_for_anthropic(
+                tool_choice, has_tools=True
+            )
+            if mapped_choice:
+                kwargs["tool_choice"] = mapped_choice
+        auto_ctrl = anthropic_request_cache_control(
+            cache_policy,
+            has_conversation=bool(anthropic_messages),
+        ) if cache_policy else None
+        if auto_ctrl:
+            kwargs["cache_control"] = auto_ctrl
         return self._apply_skills_extra(kwargs, provider_extra)
 
     def chat_completion(
@@ -583,17 +719,14 @@ class AnthropicProvider(AIProviderBase):
                 )
             )
             content, function_calls = _anthropic_blocks_to_openai_result(response.content)
+            usage = normalize_anthropic_usage(response.usage)
             return {
                 "message": {
                     "role": "assistant",
                     "content": content,
                     "function_calls": function_calls,
                 },
-                "usage": {
-                    "input_tokens": response.usage.input_tokens,
-                    "output_tokens": response.usage.output_tokens,
-                    "total_tokens": response.usage.input_tokens + response.usage.output_tokens,
-                },
+                "usage": usage.to_usage_dict(),
             }
         except Exception as e:
             logger.error(f"Anthropic API error: {e}", exc_info=True)
@@ -611,6 +744,7 @@ class AnthropicProvider(AIProviderBase):
         tools: Optional[List[Dict[str, Any]]] = None,
         provider_extra: Optional[Dict[str, Any]] = None,
         reasoning_effort: Optional[str] = None,
+        tool_choice: Optional[Any] = None,
     ) -> AsyncGenerator[Dict[str, Any], None]:
         kwargs = self._build_request_kwargs(
             messages,
@@ -620,6 +754,7 @@ class AnthropicProvider(AIProviderBase):
             tools,
             provider_extra,
             reasoning_effort,
+            tool_choice=tool_choice,
         )
         try:
             accumulated_text = ""
@@ -663,21 +798,13 @@ class AnthropicProvider(AIProviderBase):
                     elif etype == "message_delta":
                         usage = getattr(event, "usage", None)
                         if usage:
-                            final_usage = {
-                                "input_tokens": getattr(usage, "input_tokens", 0),
-                                "output_tokens": getattr(usage, "output_tokens", 0),
-                                "total_tokens": getattr(usage, "input_tokens", 0)
-                                + getattr(usage, "output_tokens", 0),
-                            }
+                            final_usage = normalize_anthropic_usage(usage).to_usage_dict()
 
                 final_message = await stream.get_final_message()
                 if final_usage is None and final_message.usage:
-                    final_usage = {
-                        "input_tokens": final_message.usage.input_tokens,
-                        "output_tokens": final_message.usage.output_tokens,
-                        "total_tokens": final_message.usage.input_tokens
-                        + final_message.usage.output_tokens,
-                    }
+                    final_usage = normalize_anthropic_usage(
+                        final_message.usage
+                    ).to_usage_dict()
 
             function_calls = None
             if tool_blocks:
@@ -777,8 +904,9 @@ class LocalProvider(AIProviderBase):
         temperature: float,
         tools: Optional[List[Dict[str, Any]]] = None,
         reasoning_effort: Optional[str] = None,
+        tool_choice: Optional[Any] = None,
     ) -> AsyncGenerator[Dict[str, Any], None]:
-        """ارسال درخواست به مدل محلی به صورت streaming"""
+        """ارسال درخواست به مدل محلی به صورت streaming (tool_choice پشتیبانی نمی‌شود)"""
         import httpx
         import asyncio
         

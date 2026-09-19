@@ -1,6 +1,19 @@
-import 'dart:typed_data';
 import 'dart:js_interop';
+import 'dart:typed_data';
+
+import 'package:hesabix_ui/core/app_init_progress.dart';
 import 'package:web/web.dart' as web;
+
+@JS('window.__hesabixSignalAppReady')
+external void _hesabixSignalAppReady();
+
+@JS('window.__hesabixLoaderUI.setInitProgress')
+external void _setWebInitProgress(
+  JSNumber percent,
+  JSNumber currentStep,
+  JSNumber totalSteps,
+  JSString? statusKey,
+);
 
 /// آدرس object URL برای استفاده در iframe یا پنجره جدید؛ بعد از استفاده [revokeBlobUrl] را صدا بزنید.
 String createObjectUrlFromBytes(
@@ -55,3 +68,27 @@ void setLocalStorageValue(String key, String value) {
   } catch (_) {}
 }
 
+/// به‌روزرسانی لودر HTML در فاز init داخل Flutter (۹۶–۱۰۰٪).
+void notifyWebInitProgress({
+  required double initProgress,
+  required int currentStep,
+  required int totalSteps,
+  String? statusKey,
+}) {
+  try {
+    final percent = AppInitPhase.webPercentFromInitProgress(initProgress);
+    _setWebInitProgress(
+      percent.toJS,
+      currentStep.toJS,
+      totalSteps.toJS,
+      (statusKey ?? '').toJS,
+    );
+  } catch (_) {}
+}
+
+/// پنهان کردن لودر HTML پس از آماده‌شدن Flutter.
+void notifyWebAppReady() {
+  try {
+    _hesabixSignalAppReady();
+  } catch (_) {}
+}

@@ -8,11 +8,15 @@ import 'package:hesabix_ui/config/app_config.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/core/auth_store.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
+import 'package:hesabix_ui/services/business_user_service.dart';
 import 'package:hesabix_ui/services/crm_chat_service.dart';
+import 'package:hesabix_ui/services/crm_service.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
 import 'package:hesabix_ui/utils/snackbar_helper.dart';
+import 'package:hesabix_ui/widgets/crm/crm_section_card.dart';
 import 'package:hesabix_ui/widgets/crm/crm_web_chat_widget_form_dialog.dart';
 import 'package:hesabix_ui/widgets/permission/permission_widgets.dart';
+import 'package:hesabix_ui/core/hesabix_back.dart';
 
 /// تنظیمات CRM سطح کسب‌وکار (مثلاً ارسال فایل در چت وب و ویجت‌های چت).
 class BusinessCrmSettingsPage extends StatefulWidget {
@@ -33,17 +37,38 @@ class BusinessCrmSettingsPage extends StatefulWidget {
 
 class _BusinessCrmSettingsPageState extends State<BusinessCrmSettingsPage> {
   late final CrmChatService _svc;
+  late final CrmService _crm;
   bool _loading = true;
   bool _allowFiles = false;
   bool _allowVoice = false;
   bool _saving = false;
   List<dynamic> _widgets = [];
 
+  final TextEditingController _leadSlaCtrl = TextEditingController();
+  final TextEditingController _staleDealCtrl = TextEditingController();
+  bool _autoAssignEnabled = false;
+  bool _followUpNotifyEnabled = false;
+  final Set<int> _autoAssignUserIds = {};
+  List<Map<String, dynamic>> _businessUsers = [];
+  bool _savingAutomation = false;
+
+  List<Map<String, dynamic>> _tags = [];
+  List<Map<String, dynamic>> _wonReasons = [];
+  List<Map<String, dynamic>> _lostReasons = [];
+
   @override
   void initState() {
     super.initState();
     _svc = CrmChatService(apiClient: widget.apiClient);
+    _crm = CrmService(apiClient: widget.apiClient);
     _load();
+  }
+
+  @override
+  void dispose() {
+    _leadSlaCtrl.dispose();
+    _staleDealCtrl.dispose();
+    super.dispose();
   }
 
   static String _embedSnippet(AppLocalizations t, String apiBase, String publicKey) {
@@ -139,6 +164,7 @@ class _BusinessCrmSettingsPageState extends State<BusinessCrmSettingsPage> {
         _widgets = w;
         _loading = false;
       });
+      await _loadAutomation();
     } catch (e) {
       if (!mounted) return;
       setState(() => _loading = false);
@@ -153,6 +179,167 @@ class _BusinessCrmSettingsPageState extends State<BusinessCrmSettingsPage> {
   Future<void> _setAllowFiles(bool v) async => _persistCrmFlags(files: v, voice: _allowVoice);
 
   Future<void> _setAllowVoice(bool v) async => _persistCrmFlags(files: _allowFiles, voice: v);
+
+  Future<void> _loadAutomation() async {
+    try {
+      final results = await Future.wait([
+        _crm.getAutomationSettings(businessId: widget.businessId),
+        _crm.listTags(businessId: widget.businessId),
+        _crm.listCloseReasons(businessId: widget.businessId, reasonType: 'won'),
+        _crm.listCloseReasons(businessId: widget.businessId, reasonType: 'lost'),
+      ]);
+      List<Map<String, dynamic>> users = [];
+      try {
+        final res = await BusinessUserService(widget.apiClient).getBusinessUsers(widget.businessId);
+        users = res.users.map((u) => <String, dynamic>{'id': u.userId, 'name': u.userName}).toList();
+      } catch (_) {}
+      if (!mounted) return;
+      final s = results[0] as Map<String, dynamic>;
+      setState(() {
+        _leadSlaCtrl.text = (s['lead_sla_hours'] as num?)?.toInt().toString() ?? '';
+        _staleDealCtrl.text = (s['stale_deal_days'] as num?)?.toInt().toString() ?? '';
+        _autoAssignEnabled = s['auto_assign_enabled'] == true;
+        _followUpNotifyEnabled = s['follow_up_notify_enabled'] == true;
+        _autoAssignUserIds
+          ..clear()
+          ..addAll(((s['auto_assign_user_ids'] as List?) ?? []).map((e) => (e as num).toInt()));
+        _businessUsers = users;
+        _tags = (results[1] as List).cast<Map<String, dynamic>>();
+        _wonReasons = (results[2] as List).cast<Map<String, dynamic>>();
+        _lostReasons = (results[3] as List).cast<Map<String, dynamic>>();
+      });
+    } catch (_) {}
+  }
+
+  Future<void> _saveAutomation() async {
+    if (!widget.authStore.canWriteSection('crm')) {
+      SnackBarHelper.show(context, message: 'مجوز نوشتن CRM ندارید', isError: true);
+      return;
+    }
+    setState(() => _savingAutomation = true);
+    try {
+      await _crm.updateAutomationSettings(
+        businessId: widget.businessId,
+        leadSlaHours: int.tryParse(_leadSlaCtrl.text.trim()),
+        autoAssignEnabled: _autoAssignEnabled,
+        autoAssignUserIds: _autoAssignUserIds.toList(),
+        followUpNotifyEnabled: _followUpNotifyEnabled,
+        staleDealDays: int.tryParse(_staleDealCtrl.text.trim()),
+      );
+      if (!mounted) return;
+      SnackBarHelper.show(context, message: 'تنظیمات اتوماسیون ذخیره شد');
+    } catch (e) {
+      if (mounted) SnackBarHelper.show(context, message: 'خطا: ${ErrorExtractor.forContext(e, context)}', isError: true);
+    } finally {
+      if (mounted) setState(() => _savingAutomation = false);
+    }
+  }
+
+  Future<void> _addTagDialog() async {
+    final nameCtrl = TextEditingController();
+    final colorCtrl = TextEditingController();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('برچسب جدید'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'نام *', border: OutlineInputBorder())),
+            const SizedBox(height: 12),
+            TextField(controller: colorCtrl, decoration: const InputDecoration(labelText: 'رنگ (مثلاً #4CAF50)', border: OutlineInputBorder())),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('انصراف')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('افزودن')),
+        ],
+      ),
+    );
+    final name = nameCtrl.text.trim();
+    final color = colorCtrl.text.trim();
+    nameCtrl.dispose();
+    colorCtrl.dispose();
+    if (ok != true || name.isEmpty) return;
+    try {
+      await _crm.createTag(businessId: widget.businessId, name: name, color: color.isEmpty ? null : color);
+      final tags = await _crm.listTags(businessId: widget.businessId);
+      if (!mounted) return;
+      setState(() => _tags = tags);
+      SnackBarHelper.show(context, message: 'برچسب اضافه شد');
+    } catch (e) {
+      if (mounted) SnackBarHelper.show(context, message: 'خطا: ${ErrorExtractor.forContext(e, context)}', isError: true);
+    }
+  }
+
+  Future<void> _deleteTag(int id) async {
+    try {
+      await _crm.deleteTag(businessId: widget.businessId, tagId: id);
+      if (!mounted) return;
+      setState(() => _tags = _tags.where((t) => (t['id'] as num?)?.toInt() != id).toList());
+    } catch (e) {
+      if (mounted) SnackBarHelper.show(context, message: 'خطا: ${ErrorExtractor.forContext(e, context)}', isError: true);
+    }
+  }
+
+  Future<void> _addCloseReasonDialog(String reasonType) async {
+    final codeCtrl = TextEditingController();
+    final nameCtrl = TextEditingController();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(reasonType == 'won' ? 'دلیل برد جدید' : 'دلیل باخت جدید'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(controller: codeCtrl, decoration: const InputDecoration(labelText: 'کد * (لاتین)', border: OutlineInputBorder())),
+            const SizedBox(height: 12),
+            TextField(controller: nameCtrl, decoration: const InputDecoration(labelText: 'نام *', border: OutlineInputBorder())),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('انصراف')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('افزودن')),
+        ],
+      ),
+    );
+    final code = codeCtrl.text.trim();
+    final name = nameCtrl.text.trim();
+    codeCtrl.dispose();
+    nameCtrl.dispose();
+    if (ok != true || code.isEmpty || name.isEmpty) return;
+    try {
+      await _crm.createCloseReason(businessId: widget.businessId, reasonType: reasonType, code: code, name: name);
+      final reasons = await _crm.listCloseReasons(businessId: widget.businessId, reasonType: reasonType);
+      if (!mounted) return;
+      setState(() {
+        if (reasonType == 'won') {
+          _wonReasons = reasons;
+        } else {
+          _lostReasons = reasons;
+        }
+      });
+      SnackBarHelper.show(context, message: 'دلیل اضافه شد');
+    } catch (e) {
+      if (mounted) SnackBarHelper.show(context, message: 'خطا: ${ErrorExtractor.forContext(e, context)}', isError: true);
+    }
+  }
+
+  Future<void> _deleteCloseReason(String reasonType, int id) async {
+    try {
+      await _crm.deleteCloseReason(businessId: widget.businessId, reasonId: id);
+      if (!mounted) return;
+      setState(() {
+        if (reasonType == 'won') {
+          _wonReasons = _wonReasons.where((r) => (r['id'] as num?)?.toInt() != id).toList();
+        } else {
+          _lostReasons = _lostReasons.where((r) => (r['id'] as num?)?.toInt() != id).toList();
+        }
+      });
+    } catch (e) {
+      if (mounted) SnackBarHelper.show(context, message: 'خطا: ${ErrorExtractor.forContext(e, context)}', isError: true);
+    }
+  }
 
   Future<void> _createWidgetDialog() async {
     if (!widget.authStore.canManageCrmWebChatWidgets()) {
@@ -295,6 +482,38 @@ class _BusinessCrmSettingsPageState extends State<BusinessCrmSettingsPage> {
     }
   }
 
+  Widget _buildReasonList(String reasonType, List<Map<String, dynamic>> reasons, bool canWrite) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (reasons.isEmpty)
+          const Padding(padding: EdgeInsets.symmetric(vertical: 4), child: Text('دلیلی تعریف نشده است.'))
+        else
+          ...reasons.map((r) {
+            final id = (r['id'] as num?)?.toInt();
+            return ListTile(
+              dense: true,
+              contentPadding: EdgeInsets.zero,
+              title: Text(r['name']?.toString() ?? ''),
+              subtitle: Text(r['code']?.toString() ?? ''),
+              trailing: (canWrite && id != null)
+                  ? IconButton(icon: const Icon(Icons.delete_outline), onPressed: () => _deleteCloseReason(reasonType, id))
+                  : null,
+            );
+          }),
+        const SizedBox(height: 8),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: OutlinedButton.icon(
+            onPressed: canWrite ? () => _addCloseReasonDialog(reasonType) : null,
+            icon: const Icon(Icons.add),
+            label: const Text('افزودن دلیل'),
+          ),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (!widget.authStore.canReadSection('crm')) {
@@ -310,10 +529,7 @@ class _BusinessCrmSettingsPageState extends State<BusinessCrmSettingsPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('تنظیمات CRM'),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.go('/business/${widget.businessId}/settings'),
-        ),
+        leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
@@ -345,6 +561,132 @@ class _BusinessCrmSettingsPageState extends State<BusinessCrmSettingsPage> {
                       ],
                     ),
                   ),
+                ),
+                const SizedBox(height: 16),
+                CrmSectionCard(
+                  title: 'اتوماسیون فروش',
+                  subtitle: 'قوانین SLA، تخصیص خودکار و پیگیری‌ها.',
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              controller: _leadSlaCtrl,
+                              enabled: canWrite,
+                              keyboardType: TextInputType.number,
+                              decoration: const InputDecoration(labelText: 'مهلت SLA سرنخ (ساعت)', isDense: true, border: OutlineInputBorder()),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: TextField(
+                              controller: _staleDealCtrl,
+                              enabled: canWrite,
+                              keyboardType: TextInputType.number,
+                              decoration: const InputDecoration(labelText: 'روزهای رکود معامله', isDense: true, border: OutlineInputBorder()),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      SwitchListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: const Text('تخصیص خودکار سرنخ‌ها'),
+                        value: _autoAssignEnabled,
+                        onChanged: canWrite ? (v) => setState(() => _autoAssignEnabled = v) : null,
+                      ),
+                      if (_autoAssignEnabled && _businessUsers.isNotEmpty) ...[
+                        const Padding(
+                          padding: EdgeInsets.only(top: 4, bottom: 8),
+                          child: Align(alignment: Alignment.centerRight, child: Text('کاربران مجاز برای تخصیص:')),
+                        ),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: _businessUsers.map((u) {
+                            final id = (u['id'] as num?)?.toInt();
+                            if (id == null) return const SizedBox.shrink();
+                            final selected = _autoAssignUserIds.contains(id);
+                            return FilterChip(
+                              label: Text(u['name']?.toString() ?? '#$id'),
+                              selected: selected,
+                              onSelected: canWrite
+                                  ? (v) => setState(() {
+                                        if (v) {
+                                          _autoAssignUserIds.add(id);
+                                        } else {
+                                          _autoAssignUserIds.remove(id);
+                                        }
+                                      })
+                                  : null,
+                            );
+                          }).toList(),
+                        ),
+                        const SizedBox(height: 8),
+                      ],
+                      SwitchListTile(
+                        contentPadding: EdgeInsets.zero,
+                        title: const Text('اعلان پیگیری‌ها'),
+                        value: _followUpNotifyEnabled,
+                        onChanged: canWrite ? (v) => setState(() => _followUpNotifyEnabled = v) : null,
+                      ),
+                      const SizedBox(height: 8),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: FilledButton.icon(
+                          onPressed: (!canWrite || _savingAutomation) ? null : _saveAutomation,
+                          icon: _savingAutomation
+                              ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                              : const Icon(Icons.save_outlined),
+                          label: const Text('ذخیره تنظیمات اتوماسیون'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                CrmSectionCard(
+                  title: 'برچسب‌ها',
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      if (_tags.isEmpty)
+                        const Padding(padding: EdgeInsets.symmetric(vertical: 4), child: Text('برچسبی تعریف نشده است.'))
+                      else
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: _tags.map((t) {
+                            final id = (t['id'] as num?)?.toInt();
+                            return Chip(
+                              label: Text(t['name']?.toString() ?? ''),
+                              onDeleted: (canWrite && id != null) ? () => _deleteTag(id) : null,
+                            );
+                          }).toList(),
+                        ),
+                      const SizedBox(height: 8),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: OutlinedButton.icon(
+                          onPressed: canWrite ? _addTagDialog : null,
+                          icon: const Icon(Icons.add),
+                          label: const Text('افزودن برچسب'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                CrmSectionCard(
+                  title: 'دلایل برد',
+                  child: _buildReasonList('won', _wonReasons, canWrite),
+                ),
+                const SizedBox(height: 16),
+                CrmSectionCard(
+                  title: 'دلایل باخت',
+                  child: _buildReasonList('lost', _lostReasons, canWrite),
                 ),
                 if (widget.authStore.canViewCrmWebChat()) ...[
                   const SizedBox(height: 16),

@@ -162,10 +162,14 @@ class BusinessStorageService {
   Future<List<int>> downloadFile({
     required int businessId,
     required String fileId,
+    Duration receiveTimeout = const Duration(minutes: 5),
   }) async {
     final res = await _api.get<List<int>>(
       '/api/v1/business/$businessId/storage/files/$fileId/download',
-      options: dio.Options(responseType: dio.ResponseType.bytes),
+      options: dio.Options(
+        responseType: dio.ResponseType.bytes,
+        receiveTimeout: receiveTimeout,
+      ),
     );
     return res.data ?? [];
   }

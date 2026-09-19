@@ -10,8 +10,10 @@ import 'package:hesabix_ui/widgets/jalali_date_picker.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
 import 'package:hesabix_ui/utils/snackbar_helper.dart';
 import 'package:hesabix_ui/widgets/permission/permission_widgets.dart';
+import 'package:hesabix_ui/core/hesabix_back.dart';
 import 'package:intl/intl.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 /// صفحه گزارشات CRM
 class CrmReportsPage extends StatefulWidget {
@@ -41,6 +43,8 @@ class _CrmReportsPageState extends State<CrmReportsPage> with SingleTickerProvid
   List<dynamic> _employeeData = [];
   bool _employeeRestrictedToSelf = false;
   List<dynamic> _salesTrendData = [];
+  List<dynamic> _lostReasonsData = [];
+  List<dynamic> _wonReasonsData = [];
   List<Map<String, dynamic>> _processDefs = [];
   Map<String, dynamic> _weightedForecast = {};
   String? _pipelineFromDate;
@@ -51,7 +55,7 @@ class _CrmReportsPageState extends State<CrmReportsPage> with SingleTickerProvid
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 6, vsync: this);
+    _tabController = TabController(length: 8, vsync: this);
     _tabController.addListener(() {
       if (_tabController.index != _currentTab) {
         setState(() => _currentTab = _tabController.index);
@@ -120,6 +124,8 @@ class _CrmReportsPageState extends State<CrmReportsPage> with SingleTickerProvid
         _crmService.getEmployeePerformanceReport(businessId: widget.businessId),
         _crmService.getSalesTrendReport(businessId: widget.businessId, months: 6),
         _crmService.getWeightedForecast(businessId: widget.businessId, processDefinitionId: pipelineDefId),
+        _crmService.getLostReasonsReport(businessId: widget.businessId),
+        _crmService.getWonReasonsReport(businessId: widget.businessId),
       ]);
       if (!mounted) return;
       final empRes = futures[4] is Map ? Map<String, dynamic>.from(futures[4] as Map) : null;
@@ -132,6 +138,8 @@ class _CrmReportsPageState extends State<CrmReportsPage> with SingleTickerProvid
         _employeeRestrictedToSelf = empRes?['restricted_to_self'] == true;
         _salesTrendData = futures[5] is List ? List<dynamic>.from(futures[5] as List) : [];
         _weightedForecast = futures[6] is Map ? Map<String, dynamic>.from(futures[6] as Map) : {};
+        _lostReasonsData = futures[7] is List ? List<dynamic>.from(futures[7] as List) : [];
+        _wonReasonsData = futures[8] is List ? List<dynamic>.from(futures[8] as List) : [];
         _loading = false;
       });
     } catch (e) {
@@ -152,10 +160,7 @@ class _CrmReportsPageState extends State<CrmReportsPage> with SingleTickerProvid
     return Scaffold(
       appBar: AppBar(
         title: const Text('گزارشات CRM'),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.canPop() ? context.pop() : null,
-        ),
+        leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
@@ -173,6 +178,8 @@ class _CrmReportsPageState extends State<CrmReportsPage> with SingleTickerProvid
             Tab(text: 'منابع'),
             Tab(text: 'عملکرد کارمندان'),
             Tab(text: 'روند فروش'),
+            Tab(text: 'دلایل برد'),
+            Tab(text: 'دلایل باخت'),
           ],
         ),
       ),
@@ -203,9 +210,89 @@ class _CrmReportsPageState extends State<CrmReportsPage> with SingleTickerProvid
                       _buildLeadSourcesTab(),
                       _buildEmployeePerformanceTab(),
                       _buildSalesTrendTab(),
+                      _buildCloseReasonsTab(_wonReasonsData, isWon: true),
+                      _buildCloseReasonsTab(_lostReasonsData, isWon: false),
                     ],
                   ),
                 ),
+    );
+  }
+
+  Widget _buildCloseReasonsTab(List<dynamic> data, {required bool isWon}) {
+    if (data.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(isWon ? Icons.emoji_events_outlined : Icons.sentiment_dissatisfied_outlined, size: 64, color: Theme.of(context).colorScheme.outline),
+            const SizedBox(height: 16),
+            const Text('داده‌ای موجود نیست.'),
+          ],
+        ),
+      );
+    }
+    final formatter = NumberFormat('#,##0');
+    final totalCount = data.fold<int>(0, (s, e) => s + ((e['count'] as num?)?.toInt() ?? 0));
+    return SingleChildScrollView(
+      physics: const AlwaysScrollableScrollPhysics(),
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          LayoutBuilder(
+            builder: (context, box) {
+              final h = box.maxWidth < 400 ? 200.0 : 240.0;
+              return SizedBox(
+                height: h,
+                child: PieChart(
+                  PieChartData(
+                    sectionsSpace: 2,
+                    centerSpaceRadius: box.maxWidth < 400 ? 32 : 40,
+                    sections: List.generate(data.length, (i) {
+                      final cnt = (data[i]['count'] as num?) ?? 0;
+                      final pct = totalCount > 0 ? (cnt / totalCount * 100) : 0;
+                      return PieChartSectionData(
+                        value: cnt.toDouble(),
+                        title: '${pct.toStringAsFixed(0)}%',
+                        color: _chartColor(i),
+                      );
+                    }),
+                  ),
+                ),
+              );
+            },
+          ),
+          const SizedBox(height: 24),
+          Card(
+            clipBehavior: Clip.antiAlias,
+            child: LayoutBuilder(
+              builder: (context, box) {
+                return SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(minWidth: box.maxWidth),
+                    child: DataTable(
+                      columns: const [
+                        DataColumn(label: Text('دلیل')),
+                        DataColumn(label: Text('تعداد')),
+                        DataColumn(label: Text('مبلغ (ریال)')),
+                      ],
+                      rows: data.map<DataRow>((e) {
+                        final amt = (e['total_amount'] as num?) ?? 0;
+                        return DataRow(cells: [
+                          DataCell(Text(e['reason_name']?.toString() ?? e['reason_code']?.toString() ?? 'نامشخص')),
+                          DataCell(Text('${e['count'] ?? 0}')),
+                          DataCell(Text(formatter.format(amt))),
+                        ]);
+                      }).toList(),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -729,7 +816,7 @@ class _CrmReportsPageState extends State<CrmReportsPage> with SingleTickerProvid
   }
 
   Color _chartColor(int i) {
-    final colors = [Colors.blue, Colors.green, Colors.orange, Colors.purple, Colors.teal, Colors.pink];
+    final colors = [SemanticColorResolver.info(context), SemanticColorResolver.positive(context), SemanticColorResolver.warning(context), Colors.purple, Colors.teal, Colors.pink];
     return colors[i % colors.length];
   }
 

@@ -27,6 +27,13 @@ def upgrade() -> None:
         sa.Column("tier", sa.String(50), nullable=True),
         sa.Column("supports_tools", sa.Boolean(), nullable=False, server_default=sa.text("true")),
         sa.Column("max_tokens_default", sa.Integer(), nullable=False, server_default="4000"),
+        sa.Column(
+            "supports_reasoning",
+            sa.Boolean(),
+            nullable=False,
+            server_default=sa.text("false"),
+        ),
+        sa.Column("reasoning_effort", sa.String(20), nullable=True),
         sa.Column("reference_input_cost_per_1k", sa.Numeric(18, 4), nullable=True),
         sa.Column("reference_output_cost_per_1k", sa.Numeric(18, 4), nullable=True),
         sa.Column("is_active", sa.Boolean(), nullable=False, server_default=sa.text("true")),

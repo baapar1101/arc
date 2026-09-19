@@ -23,6 +23,7 @@ import '../../utils/invoice_line_preferences.dart';
 import '../money/amount_field_words_tooltip.dart';
 import '../../constants/frequent_description_scope.dart';
 import '../inputs/frequent_description_text_field.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 void _invoiceLineAttrsLog(String message) {
   if (kDebugMode) {
@@ -33,6 +34,8 @@ void _invoiceLineAttrsLog(String message) {
 class InvoiceLineItemsTable extends StatefulWidget {
   final int businessId;
   final int? selectedCurrencyId; // از تب ارز فاکتور
+  /// ارز پایه کسب‌وکار؛ برای تشخیص اینکه قیمت پایه (ریال) قابل استفاده است یا نه.
+  final int? defaultCurrencyId;
   /// تعداد اعشار نمایش/ورود مبلغ (از تنظیمات ارز؛ ۰ = مثل ریال).
   final int currencyDecimalPlaces;
   /// واحد پول برای tooltip «مبلغ به حروف» (قیمت واحد، تخفیف مبلغی، مبلغ مالیات).
@@ -50,6 +53,7 @@ class InvoiceLineItemsTable extends StatefulWidget {
     super.key,
     required this.businessId,
     this.selectedCurrencyId,
+    this.defaultCurrencyId,
     this.currencyDecimalPlaces = 2,
     this.currencyUnitLabel = 'ریال',
     this.onChanged,
@@ -759,19 +763,48 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
     super.dispose();
   }
   
-  /// بارگذاری اطلاعات کامل کالاها (شامل attribute_ids) برای نمایش یونیک و ویژگی خط
+  /// بارگذاری اطلاعات کامل کالاها (شامل attribute_ids) برای نمایش یونیک و ویژگی خط.
+  /// فی ذخیره‌شدهٔ فاکتور (کپی/ویرایش، منبع manual) حفظ می‌شود.
   Future<void> _loadProductInfosForInitialRows() async {
     final ids = _rows.map((e) => e.productId).whereType<int>().toSet();
     _invoiceLineAttrsLog('loadProductInfosForInitialRows productIds=$ids rowCount=${_rows.length}');
     for (final pid in ids) {
       await _loadProductInfo(pid, force: true);
     }
-    await _coerceRowsIfUnitPriceLocked();
+    _hydrateProductMetadataWithoutChangingUnitPrice();
     if (mounted) {
       setState(() {});
       _syncAllDescriptionControllersFromRows();
     }
     _invoiceLineAttrsLog('loadProductInfosForInitialRows done');
+  }
+
+  /// واحد، ضریب تبدیل و قیمت پایه را از کالا پر می‌کند؛ [InvoiceLineItem.unitPrice] را عوض نمی‌کند.
+  void _hydrateProductMetadataWithoutChangingUnitPrice() {
+    for (var i = 0; i < _rows.length; i++) {
+      final item = _rows[i];
+      final pid = item.productId;
+      if (pid == null) continue;
+      final p = _productCache[pid];
+      if (p == null) continue;
+      _rows[i] = item.copyWith(
+        productCode: item.productCode ?? p['code']?.toString(),
+        productName: item.productName ?? p['name']?.toString(),
+        mainUnit: item.mainUnit ?? p['main_unit']?.toString(),
+        secondaryUnit: item.secondaryUnit ?? p['secondary_unit']?.toString(),
+        unitConversionFactor:
+            item.unitConversionFactor ?? _toNum(p['unit_conversion_factor'], fallback: 1),
+        baseSalesPriceMainUnit:
+            item.baseSalesPriceMainUnit ?? _toNum(p['base_sales_price']),
+        basePurchasePriceMainUnit: item.basePurchasePriceMainUnit ??
+            (p['base_purchase_price'] != null ? _toNum(p['base_purchase_price']) : null),
+        salesPriceFxMainUnit: item.salesPriceFxMainUnit ??
+            (p['sales_price_fx'] != null ? _toNum(p['sales_price_fx']) : null),
+        purchasePriceFxMainUnit: item.purchasePriceFxMainUnit ??
+            (p['purchase_price_fx'] != null ? _toNum(p['purchase_price_fx']) : null),
+        priceFxCurrencyId: item.priceFxCurrencyId ?? _toInt(p['price_fx_currency_id']),
+      );
+    }
   }
 
   @override
@@ -785,7 +818,7 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
       _lineAddQiPendingSince = null;
     }
     if (oldWidget.selectedCurrencyId != widget.selectedCurrencyId) {
-      // ارز تغییر کرده: لازم است قیمت‌های بر اساس لیست قیمت مجدد ارزیابی شوند
+      // ارز تغییر کرده: قیمت‌های لیست/پایه را دوباره بگیر؛ فی دستی (از جمله کپی فاکتور) حفظ می‌شود.
       _recalculateAllUnitPrices();
       // invalidate inline price list cache if currency changed
       _inlinePriceList = null;
@@ -834,10 +867,12 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
   // لیست قیمت سراسری حذف شده است؛ انتخاب قیمت از داخل سلول انجام می‌شود
 
   Future<void> _recalculateAllUnitPrices() async {
-    // برای هر ردیف، اگر منبع قیمت «priceList» است سعی کن قیمت مناسب را بارگذاری/تبدیل کنی
+    // فقط ردیف‌هایی که منبع‌شان لیست قیمت یا قیمت پایه است؛ فی دستی دست‌نخورده می‌ماند.
     for (int i = 0; i < _rows.length; i++) {
       final it = _rows[i];
+      if (it.unitPriceSource == 'manual') continue;
       final updated = await _resolveUnitPrice(it, preferManual: false);
+      if (!mounted) return;
       setState(() => _rows[i] = updated);
     }
     _notify();
@@ -878,19 +913,81 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
       }
     }
 
-    // fallback: قیمت پایه محصول بر اساس نوع فاکتور (فرض: روی واحد اصلی)
+    // اگر ارز فاکتور با ارز قیمت ارزی کالا یکی باشد، قیمت ارزی را اولویت بده
+    final fxPrice = _fxPriceOfProduct(item, widget.selectedCurrencyId);
+    if (fxPrice != null) {
+      final converted = _convertFromMain(fxPrice, item);
+      return item.copyWith(unitPriceSource: 'base', unitPrice: converted);
+    }
+
+    // قیمت پایه معمولاً به ارز پایه کسب‌وکار است؛ در فاکتور ارزی بدون قیمت FX صفر بگذار
+    if (_invoiceUsesForeignCurrency) {
+      return item.copyWith(unitPriceSource: 'base', unitPrice: 0);
+    }
+
+    // fallback: قیمت پایه محصول بر اساس نوع فاکتور (فرض: روی واحد اصلی؛ معمولاً ارز پایه/ریال)
     final basePrice = _basePriceOfProduct(item);
     final converted = _convertFromMain(basePrice, item);
     return item.copyWith(unitPriceSource: 'base', unitPrice: converted);
+  }
+
+  bool get _invoiceUsesForeignCurrency {
+    final selected = widget.selectedCurrencyId;
+    final def = widget.defaultCurrencyId;
+    if (selected == null || def == null) return false;
+    return selected != def;
+  }
+
+  /// قیمت ارزی تعریف‌شده روی کالا، فقط وقتی ارز فاکتور با ارز قیمت ارزی کالا یکی باشد.
+  num? _fxPriceOfProduct(InvoiceLineItem item, int? invoiceCurrencyId) {
+    if (invoiceCurrencyId == null) return null;
+
+    int? fxCurrencyId = item.priceFxCurrencyId;
+    num? salesFx = item.salesPriceFxMainUnit;
+    num? purchaseFx = item.purchasePriceFxMainUnit;
+
+    // اگر روی ردیف نبود، از کش کالا بخوان (مثلاً ردیف‌های لودشده در ویرایش)
+    if (fxCurrencyId == null && item.productId != null) {
+      final p = _productCache[item.productId!];
+      if (p != null) {
+        fxCurrencyId = _toInt(p['price_fx_currency_id']);
+        if (p['sales_price_fx'] != null) salesFx = _toNum(p['sales_price_fx']);
+        if (p['purchase_price_fx'] != null) purchaseFx = _toNum(p['purchase_price_fx']);
+      }
+    }
+
+    if (fxCurrencyId == null || fxCurrencyId != invoiceCurrencyId) return null;
+    if (widget.invoiceType == 'purchase' || widget.invoiceType == 'purchase_return') {
+      return purchaseFx;
+    }
+    return salesFx;
   }
 
   num _basePriceOfProduct(InvoiceLineItem item) {
     // انتخاب قیمت پایه متناسب با نوع فاکتور: فروش/خرید
     // قیمت‌های پایه فرضاً بر واحد اصلی هستند
     if (widget.invoiceType == 'purchase' || widget.invoiceType == 'purchase_return') {
-      return item.basePurchasePriceMainUnit ?? 0;
+      final fromItem = item.basePurchasePriceMainUnit;
+      if (fromItem != null) return fromItem;
+      final pid = item.productId;
+      if (pid != null) {
+        final p = _productCache[pid];
+        if (p != null && p['base_purchase_price'] != null) {
+          return _toNum(p['base_purchase_price']);
+        }
+      }
+      return 0;
     }
-    return item.baseSalesPriceMainUnit ?? 0;
+    final fromItem = item.baseSalesPriceMainUnit;
+    if (fromItem != null) return fromItem;
+    final pid = item.productId;
+    if (pid != null) {
+      final p = _productCache[pid];
+      if (p != null && p['base_sales_price'] != null) {
+        return _toNum(p['base_sales_price']);
+      }
+    }
+    return 0;
   }
 
   String? _noteForInvoiceType(String invoiceType, {String? salesNote, String? purchaseNote}) {
@@ -1298,7 +1395,7 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
                   size: 22,
                   color: theme.colorScheme.onSurfaceVariant,
                 ),
-                const SizedBox(width: 6),
+                SizedBox(width: 6),
                 Expanded(
                   child: Text(
                     'ردیف ${index + 1}',
@@ -1317,7 +1414,7 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
                     children: [
                       if (index > 0)
                         IconButton(
-                          icon: const Icon(Icons.keyboard_arrow_up),
+                          icon: Icon(Icons.keyboard_arrow_up),
                           onPressed: () => _reorderRows(index, index - 1),
                           tooltip: 'جابجایی به بالا',
                           iconSize: 20,
@@ -1352,7 +1449,7 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
                         onPressed: () => _removeRow(index),
                         tooltip: 'حذف',
                         iconSize: 20,
-                        color: Colors.red,
+                        color: SemanticColorResolver.negative(context),
                         padding: EdgeInsets.zero,
                         constraints: const BoxConstraints(
                           minWidth: 36,
@@ -1479,25 +1576,24 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
             const SizedBox(height: 4),
             SizedBox(
               height: fieldHeight,
-              child: Tooltip(
-                message: _allowManualInvoiceUnitPrice ? t.unitPricePickHint : t.unitPriceReadOnlyFieldHint,
-                child: _UnitPriceCell(
-                  businessId: widget.businessId,
-                  invoiceType: widget.invoiceType,
-                  currencyId: widget.selectedCurrencyId,
-                  currencyDecimalPlaces: widget.currencyDecimalPlaces,
-                  currencyUnitLabel: widget.currencyUnitLabel,
-                  item: item,
-                  allowManualUnitPriceEdit: _allowManualInvoiceUnitPrice,
-                  onChanged: (src, price) {
-                    final validatedPrice = price < 0 ? 0 : price;
-                    _updateRow(index, item.copyWith(unitPriceSource: src, unitPrice: validatedPrice));
-                  },
-                  resolver: () => _resolveUnitPrice(item, preferManual: _allowManualInvoiceUnitPrice),
-                  unitTitleResolver: (u) => _unitTitle(item, u),
-                  focusNode: _focusNodesForLine(item.lineKey)?['unitPrice'],
-                  onFieldSubmitted: () => _moveToNextField(index, 'unitPrice'),
-                ),
+              // راهنمای فیلد روی آیکون لیست / Semantics است؛ Tooltip بیرونی با
+              // AmountFieldWordsTooltip داخل سلول تداخل می‌کرد.
+              child: _UnitPriceCell(
+                businessId: widget.businessId,
+                invoiceType: widget.invoiceType,
+                currencyId: widget.selectedCurrencyId,
+                currencyDecimalPlaces: widget.currencyDecimalPlaces,
+                currencyUnitLabel: widget.currencyUnitLabel,
+                item: item,
+                allowManualUnitPriceEdit: _allowManualInvoiceUnitPrice,
+                onChanged: (src, price) {
+                  final validatedPrice = price < 0 ? 0 : price;
+                  _updateRow(index, item.copyWith(unitPriceSource: src, unitPrice: validatedPrice));
+                },
+                resolver: () => _resolveUnitPrice(item, preferManual: _allowManualInvoiceUnitPrice),
+                unitTitleResolver: (u) => _unitTitle(item, u),
+                focusNode: _focusNodesForLine(item.lineKey)?['unitPrice'],
+                onFieldSubmitted: () => _moveToNextField(index, 'unitPrice'),
               ),
             ),
             const SizedBox(height: 12),
@@ -1588,25 +1684,25 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
             ),
             // سطر سوم: نمایش instance های انتخاب شده (فقط برای کالاهای یونیک)
             if (_shouldShowInstanceSelector(item)) ...[
-              const SizedBox(height: 12),
+              SizedBox(height: 12),
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.blue[50],
+                  color: SemanticColorResolver.info(context).withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(4),
-                  border: Border.all(color: Colors.blue[200]!),
+                  border: Border.all(color: SemanticColorResolver.info(context).withValues(alpha: 0.35)!),
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.qr_code_scanner, size: 20, color: Colors.blue[700]),
-                    const SizedBox(width: 8),
+                    Icon(Icons.qr_code_scanner, size: 20, color: SemanticColorResolver.info(context)),
+                    SizedBox(width: 8),
                     Expanded(
                       child: item.selectedInstanceIds != null && item.selectedInstanceIds!.isNotEmpty
                           ? Text(
                               '${item.selectedInstanceIds!.length} کالای یونیک انتخاب شده',
                               style: TextStyle(
                                 fontSize: 14,
-                                color: Colors.blue[900],
+                                color: SemanticColorResolver.info(context),
                                 fontWeight: FontWeight.w500,
                               ),
                             )
@@ -1614,7 +1710,7 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
                               'برای انتخاب کالاهای یونیک کلیک کنید',
                               style: TextStyle(
                                 fontSize: 14,
-                                color: Colors.blue[700],
+                                color: SemanticColorResolver.info(context),
                                 fontStyle: FontStyle.italic,
                               ),
                             ),
@@ -1750,29 +1846,28 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
                 flex: 3,
                 child: SizedBox(
                   height: fieldHeight,
-                  child: Tooltip(
-                    message: _allowManualInvoiceUnitPrice ? t.unitPricePickHint : t.unitPriceReadOnlyFieldHint,
-                    child: _UnitPriceCell(
-                      businessId: widget.businessId,
-                      invoiceType: widget.invoiceType,
-                      currencyId: widget.selectedCurrencyId,
-                      currencyDecimalPlaces: widget.currencyDecimalPlaces,
-                      currencyUnitLabel: widget.currencyUnitLabel,
-                      item: item,
-                      allowManualUnitPriceEdit: _allowManualInvoiceUnitPrice,
-                      onChanged: (src, price) {
-                        final validatedPrice = price < 0 ? 0 : price;
-                        _updateRow(index, item.copyWith(unitPriceSource: src, unitPrice: validatedPrice));
-                      },
-                      resolver: () => _resolveUnitPrice(item, preferManual: _allowManualInvoiceUnitPrice),
-                      unitTitleResolver: (u) => _unitTitle(item, u),
-                      focusNode: _focusNodesForLine(item.lineKey)?['unitPrice'],
-                      onFieldSubmitted: () => _moveToNextField(index, 'unitPrice'),
-                    ),
+                  // راهنمای فیلد روی آیکون لیست / Semantics است؛ Tooltip بیرونی با
+                  // AmountFieldWordsTooltip داخل سلول تداخل می‌کرد.
+                  child: _UnitPriceCell(
+                    businessId: widget.businessId,
+                    invoiceType: widget.invoiceType,
+                    currencyId: widget.selectedCurrencyId,
+                    currencyDecimalPlaces: widget.currencyDecimalPlaces,
+                    currencyUnitLabel: widget.currencyUnitLabel,
+                    item: item,
+                    allowManualUnitPriceEdit: _allowManualInvoiceUnitPrice,
+                    onChanged: (src, price) {
+                      final validatedPrice = price < 0 ? 0 : price;
+                      _updateRow(index, item.copyWith(unitPriceSource: src, unitPrice: validatedPrice));
+                    },
+                    resolver: () => _resolveUnitPrice(item, preferManual: _allowManualInvoiceUnitPrice),
+                    unitTitleResolver: (u) => _unitTitle(item, u),
+                    focusNode: _focusNodesForLine(item.lineKey)?['unitPrice'],
+                    onFieldSubmitted: () => _moveToNextField(index, 'unitPrice'),
                   ),
                 ),
               ),
-              const SizedBox(width: 8),
+              SizedBox(width: 8),
               // مبلغ کل
               Expanded(
                 flex: 2,
@@ -1802,8 +1897,8 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
               // دکمه حذف
               IconButton(
                 onPressed: () => _removeRow(index),
-                icon: const Icon(Icons.delete_outline),
-                color: Colors.red,
+                icon: Icon(Icons.delete_outline),
+                color: SemanticColorResolver.negative(context),
                 tooltip: 'حذف',
                 iconSize: 24,
               ),
@@ -1876,7 +1971,7 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
           ),
           // سطر سوم: نمایش instance های انتخاب شده (فقط برای کالاهای یونیک)
           if (_shouldShowInstanceSelector(item)) ...[
-            const SizedBox(height: 8),
+            SizedBox(height: 8),
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -1885,21 +1980,21 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
                   child: Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: Colors.blue[50],
+                      color: SemanticColorResolver.info(context).withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(4),
-                      border: Border.all(color: Colors.blue[200]!),
+                      border: Border.all(color: SemanticColorResolver.info(context).withValues(alpha: 0.35)!),
                     ),
                     child: Row(
                       children: [
-                        Icon(Icons.qr_code_scanner, size: 18, color: Colors.blue[700]),
-                        const SizedBox(width: 8),
+                        Icon(Icons.qr_code_scanner, size: 18, color: SemanticColorResolver.info(context)),
+                        SizedBox(width: 8),
                         Expanded(
                           child: item.selectedInstanceIds != null && item.selectedInstanceIds!.isNotEmpty
                               ? Text(
                                   '${item.selectedInstanceIds!.length} کالای یونیک انتخاب شده',
                                   style: TextStyle(
                                     fontSize: 13,
-                                    color: Colors.blue[900],
+                                    color: SemanticColorResolver.info(context),
                                     fontWeight: FontWeight.w500,
                                   ),
                                 )
@@ -1907,7 +2002,7 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
                                   'برای انتخاب کالاهای یونیک کلیک کنید',
                                   style: TextStyle(
                                     fontSize: 13,
-                                    color: Colors.blue[700],
+                                    color: SemanticColorResolver.info(context),
                                     fontStyle: FontStyle.italic,
                                   ),
                                 ),
@@ -1965,6 +2060,9 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
           selectedUnit: null,
           unitPriceSource: 'base',
           unitPrice: 0,
+          salesPriceFxMainUnit: null,
+          purchasePriceFxMainUnit: null,
+          priceFxCurrencyId: null,
           extraInfo: cleanedExtra.isEmpty ? null : cleanedExtra,
         );
       });
@@ -2004,26 +2102,35 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
       metadata.remove('line_custom_attributes');
     }
 
-    // ذخیره اطلاعات کالا در cache برای بررسی یونیک بودن
+    // ذخیره اطلاعات کالا در cache برای بررسی یونیک بودن؛ سپس جزئیات کامل (شامل قیمت ارزی) را بگیر
     if (productId != null) {
       _productCache[productId] = Map<String, dynamic>.from(p);
       await _loadProductInfo(productId, force: true);
     }
-    
+    final productData = (productId != null ? _productCache[productId] : null) ?? p;
+
     final updated = item.copyWith(
       productId: productId,
-      productCode: p['code']?.toString(),
-      productName: p['name']?.toString(),
+      productCode: productData['code']?.toString(),
+      productName: productData['name']?.toString(),
       mainUnit: mainUnit,
       secondaryUnit: secondaryUnit,
-      unitConversionFactor: _toNum(p['unit_conversion_factor'], fallback: 1),
+      unitConversionFactor: _toNum(productData['unit_conversion_factor'], fallback: 1),
       selectedUnit: mainUnit,
-      baseSalesPriceMainUnit: _toNum(p['base_sales_price']),
-      basePurchasePriceMainUnit:
-          p['base_purchase_price'] != null ? _toNum(p['base_purchase_price']) : null,
+      baseSalesPriceMainUnit: _toNum(productData['base_sales_price']),
+      basePurchasePriceMainUnit: productData['base_purchase_price'] != null
+          ? _toNum(productData['base_purchase_price'])
+          : null,
+      salesPriceFxMainUnit: productData['sales_price_fx'] != null
+          ? _toNum(productData['sales_price_fx'])
+          : null,
+      purchasePriceFxMainUnit: productData['purchase_price_fx'] != null
+          ? _toNum(productData['purchase_price_fx'])
+          : null,
+      priceFxCurrencyId: _toInt(productData['price_fx_currency_id']),
       taxRate: taxRate,
-      minOrderQty: _toInt(p['min_order_qty']),
-      trackInventory: p['track_inventory'] == true,
+      minOrderQty: _toInt(productData['min_order_qty']),
+      trackInventory: productData['track_inventory'] == true,
       warehouseId: item.warehouseId ?? defaultWarehouseId,
       extraInfo: metadata.isEmpty ? null : metadata,
       description: shouldReplaceDescription ? (autoDescription ?? '') : item.description,
@@ -2071,10 +2178,10 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
           children: [
             if (item.mainUnit?.isNotEmpty == true)
               ListTile(
-                leading: const Icon(Icons.straighten),
+                leading: Icon(Icons.straighten),
                 title: Text(item.mainUnit!),
                 subtitle: Text(AppLocalizations.of(context).mainUnitLabel),
-                trailing: (item.selectedUnit == item.mainUnit) ? const Icon(Icons.check, color: Colors.green) : null,
+                trailing: (item.selectedUnit == item.mainUnit) ? Icon(Icons.check, color: SemanticColorResolver.positive(context)) : null,
                 onTap: () {
                   onChanged(item.mainUnit);
                   Navigator.of(context).pop();
@@ -2082,10 +2189,10 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
               ),
             if (item.secondaryUnit?.isNotEmpty == true)
               ListTile(
-                leading: const Icon(Icons.inventory_2),
+                leading: Icon(Icons.inventory_2),
                 title: Text(item.secondaryUnit!),
                 subtitle: Text(AppLocalizations.of(context).secondaryUnitLabel),
-                trailing: (item.selectedUnit == item.secondaryUnit) ? const Icon(Icons.check, color: Colors.green) : null,
+                trailing: (item.selectedUnit == item.secondaryUnit) ? Icon(Icons.check, color: SemanticColorResolver.positive(context)) : null,
                 onTap: () {
                   onChanged(item.secondaryUnit);
                   Navigator.of(context).pop();
@@ -2266,7 +2373,9 @@ class _DiscountCellState extends State<_DiscountCell> {
         ),
       ),
     );
-    final fieldOrTooltip = _type == 'amount'
+    // فقط وقتی معادل حروف فعال نیست Tooltip متریال بگذار؛ وگرنه دو حباب روی هم می‌افتند.
+    final useWordsTooltip = _type == 'amount';
+    final fieldOrWords = useWordsTooltip
         ? AmountFieldWordsTooltip(
             controller: _ctrl,
             currencyUnit: widget.currencyUnitLabel,
@@ -2275,12 +2384,12 @@ class _DiscountCellState extends State<_DiscountCell> {
         : field;
     return SizedBox(
       height: fieldHeight,
-      child: isMobile
-          ? fieldOrTooltip
+      child: isMobile || useWordsTooltip
+          ? fieldOrWords
           : Tooltip(
               message: t.discountTypeAndValue,
               waitDuration: const Duration(milliseconds: 400),
-              child: fieldOrTooltip,
+              child: fieldOrWords,
             ),
     );
   }
@@ -2508,40 +2617,63 @@ class _UnitPriceCellState extends State<_UnitPriceCell> {
   late TextEditingController _ctrl;
   final bool _loading = false;
   final PriceListService _pls = PriceListService(apiClient: ApiClient());
-  late FocusNode _focusNode;
-  bool _isUserTyping = false;
+  late final FocusNode _internalFocusNode;
+  bool _syncingFromModel = false;
 
+  /// برای ارز بدون اعشار (مثل ریال) null؛ وگرنه تعداد اعشار ارز.
   int? get _priceFormatDp => widget.currencyDecimalPlaces > 0 ? widget.currencyDecimalPlaces : null;
+
+  bool get _allowDecimal => widget.currencyDecimalPlaces > 0;
+
+  FocusNode get _effectiveFocusNode => widget.focusNode ?? _internalFocusNode;
 
   @override
   void initState() {
     super.initState();
     _ctrl = TextEditingController(text: formatNumberForInput(widget.item.unitPrice, decimalPlaces: _priceFormatDp));
-    _focusNode = FocusNode();
+    _internalFocusNode = FocusNode();
+    _effectiveFocusNode.addListener(_onFocusChange);
+  }
+
+  void _onFocusChange() {
+    if (!_effectiveFocusNode.hasFocus && mounted && widget.allowManualUnitPriceEdit) {
+      // هنگام خروج از فیلد، مقدار را مطابق اعشار ارز نرمال کن
+      final price = parseFormattedDouble(_ctrl.text) ?? 0;
+      final normalized = price < 0 ? 0 : price;
+      _syncingFromModel = true;
+      _ctrl.text = formatNumberForInput(normalized, decimalPlaces: _priceFormatDp);
+      _syncingFromModel = false;
+      if (normalized != widget.item.unitPrice || widget.item.unitPriceSource != 'manual') {
+        widget.onChanged('manual', normalized);
+      }
+    }
   }
 
   @override
   void didUpdateWidget(covariant _UnitPriceCell oldWidget) {
     super.didUpdateWidget(oldWidget);
-    // فقط اگر کاربر در حال تایپ نیست، مقدار را به‌روزرسانی کن
+    if (oldWidget.focusNode != widget.focusNode) {
+      final oldNode = oldWidget.focusNode ?? _internalFocusNode;
+      oldNode.removeListener(_onFocusChange);
+      _effectiveFocusNode.addListener(_onFocusChange);
+    }
+    // حین تایپ متن کنترلر را بازنویسی نکن — باعث حذف نقطه اعشار می‌شود
+    if (_effectiveFocusNode.hasFocus || _syncingFromModel) return;
     final lineChanged = oldWidget.item.lineKey != widget.item.lineKey;
     final dpChanged = oldWidget.currencyDecimalPlaces != widget.currencyDecimalPlaces;
-    if (lineChanged && !_isUserTyping) {
-      _ctrl.text = formatNumberForInput(widget.item.unitPrice, decimalPlaces: _priceFormatDp);
-      return;
-    }
-    if (((oldWidget.item.unitPrice != widget.item.unitPrice ||
-            oldWidget.item.unitPriceSource != widget.item.unitPriceSource ||
-            dpChanged) &&
-        !_isUserTyping)) {
+    if (lineChanged ||
+        oldWidget.item.unitPrice != widget.item.unitPrice ||
+        oldWidget.item.unitPriceSource != widget.item.unitPriceSource ||
+        dpChanged) {
       _ctrl.text = formatNumberForInput(widget.item.unitPrice, decimalPlaces: _priceFormatDp);
     }
   }
 
   @override
   void dispose() {
+    _effectiveFocusNode.removeListener(_onFocusChange);
     _ctrl.dispose();
-    _focusNode.dispose();
+    _internalFocusNode.dispose();
     super.dispose();
   }
 
@@ -2562,56 +2694,62 @@ class _UnitPriceCellState extends State<_UnitPriceCell> {
     final fieldPadding = ResponsiveHelper.isMobile(context)
         ? const EdgeInsets.symmetric(horizontal: 16, vertical: 12)
         : const EdgeInsets.symmetric(horizontal: 12, vertical: 10);
-    
-    // استفاده از focusNode خارجی اگر موجود باشد، در غیر این صورت از داخلی
-    final effectiveFocusNode = widget.focusNode ?? _focusNode;
-    
+
+    final fieldHint = locked ? t.unitPriceReadOnlyFieldHint : t.unitPricePickHint;
+
     return SizedBox(
       height: fieldHeight,
       child: AmountFieldWordsTooltip(
         controller: _ctrl,
         currencyUnit: widget.currencyUnitLabel,
-        child: TextFormField(
-          controller: _ctrl,
-          focusNode: effectiveFocusNode,
-          readOnly: locked,
-          showCursor: !locked,
-          enableInteractiveSelection: !locked,
-          style: locked
-              ? theme.textTheme.bodyLarge?.copyWith(color: colorScheme.onSurfaceVariant)
-              : theme.textTheme.bodyLarge,
-          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-          inputFormatters: const [
-            EnglishDigitsFormatter(),
-            ThousandsSeparatorInputFormatter(allowDecimal: true),
-          ],
-          onChanged: widget.allowManualUnitPriceEdit
-              ? (v) {
-                  _isUserTyping = true;
-                  final price = parseFormattedDouble(v) ?? 0;
-                  widget.onChanged('manual', price < 0 ? 0 : price);
-                  // بعد از یک فریم، فلگ را ریست کن
-                  WidgetsBinding.instance.addPostFrameCallback((_) {
-                    if (mounted) {
-                      _isUserTyping = false;
-                    }
-                  });
-                }
-              : null,
-          onFieldSubmitted: (_) => widget.onFieldSubmitted?.call(),
-          textInputAction: TextInputAction.next,
-          decoration: InputDecoration(
-            border: const OutlineInputBorder(),
-            contentPadding: fieldPadding,
-            filled: locked,
-            fillColor: locked ? colorScheme.surfaceContainerHighest : null,
-            suffixIcon: _loading
-                ? const Padding(padding: EdgeInsets.all(8), child: SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)))
-                : IconButton(
-                    tooltip: t.pricePickFromList,
-                    icon: const Icon(Icons.list_alt_outlined),
-                    onPressed: () => _openPricePicker(context),
-                  ),
+        child: Semantics(
+          hint: fieldHint,
+          child: TextFormField(
+            controller: _ctrl,
+            focusNode: _effectiveFocusNode,
+            readOnly: locked,
+            showCursor: !locked,
+            enableInteractiveSelection: !locked,
+            style: locked
+                ? theme.textTheme.bodyLarge?.copyWith(color: colorScheme.onSurfaceVariant)
+                : theme.textTheme.bodyLarge,
+            keyboardType: TextInputType.numberWithOptions(decimal: _allowDecimal),
+            inputFormatters: [
+              const EnglishDigitsFormatter(),
+              ThousandsSeparatorInputFormatter(
+                allowDecimal: _allowDecimal,
+                maxDecimalPlaces: _allowDecimal ? widget.currencyDecimalPlaces : 0,
+              ),
+            ],
+            onChanged: widget.allowManualUnitPriceEdit
+                ? (v) {
+                    final price = parseFormattedDouble(v) ?? 0;
+                    widget.onChanged('manual', price < 0 ? 0 : price);
+                  }
+                : null,
+            onFieldSubmitted: (_) => widget.onFieldSubmitted?.call(),
+            textInputAction: TextInputAction.next,
+            decoration: InputDecoration(
+              border: const OutlineInputBorder(),
+              contentPadding: fieldPadding,
+              filled: locked,
+              fillColor: locked ? colorScheme.surfaceContainerHighest : null,
+              suffixIcon: _loading
+                  ? const Padding(
+                      padding: EdgeInsets.all(8),
+                      child: SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                    )
+                  : IconButton(
+                      // راهنمای رفتار فیلد اینجا می‌ماند تا با AmountFieldWordsTooltip تداخل نکند.
+                      tooltip: locked ? t.unitPriceReadOnlyFieldHint : t.pricePickFromList,
+                      icon: const Icon(Icons.list_alt_outlined),
+                      onPressed: () => _openPricePicker(context),
+                    ),
+            ),
           ),
         ),
       ),

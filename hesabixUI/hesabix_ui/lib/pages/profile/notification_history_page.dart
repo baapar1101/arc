@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table.dart';
 import 'package:hesabix_ui/core/date_utils.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 class NotificationHistoryPage extends StatefulWidget {
   final CalendarController calendarController;
@@ -58,12 +59,12 @@ class _NotificationHistoryPageState extends State<NotificationHistoryPage> {
                 switch (channel) {
                   case 'email':
                     icon = Icons.email_outlined;
-                    color = Colors.blue;
+                    color = SemanticColorResolver.info(context);
                     label = 'ایمیل';
                     break;
                   case 'sms':
                     icon = Icons.sms_outlined;
-                    color = Colors.green;
+                    color = SemanticColorResolver.positive(context);
                     label = 'پیامک';
                     break;
                   case 'telegram':
@@ -78,7 +79,7 @@ class _NotificationHistoryPageState extends State<NotificationHistoryPage> {
                     break;
                   case 'inapp':
                     icon = Icons.notifications_active_outlined;
-                    color = Colors.orange;
+                    color = SemanticColorResolver.warning(context);
                     label = 'درون برنامه';
                     break;
                   default:
@@ -125,18 +126,18 @@ class _NotificationHistoryPageState extends State<NotificationHistoryPage> {
 
                 switch (status) {
                   case 'sent':
-                    bgColor = Colors.green.shade100;
-                    textColor = Colors.green.shade900;
+                    bgColor = SemanticColorResolver.positive(context).withValues(alpha: 0.18);
+                    textColor = SemanticColorResolver.positive(context);
                     label = 'ارسال شده';
                     break;
                   case 'failed':
-                    bgColor = Colors.red.shade100;
-                    textColor = Colors.red.shade900;
+                    bgColor = SemanticColorResolver.negative(context).withValues(alpha: 0.18);
+                    textColor = SemanticColorResolver.negative(context);
                     label = 'ناموفق';
                     break;
                   case 'pending':
-                    bgColor = Colors.orange.shade100;
-                    textColor = Colors.orange.shade900;
+                    bgColor = SemanticColorResolver.warning(context).withValues(alpha: 0.18);
+                    textColor = SemanticColorResolver.warning(context);
                     label = 'در انتظار';
                     break;
                   default:
@@ -240,15 +241,15 @@ class _NotificationHistoryPageState extends State<NotificationHistoryPage> {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.error_outline, size: 16, color: Colors.red),
-                        const SizedBox(width: 4),
+                        Icon(Icons.error_outline, size: 16, color: SemanticColorResolver.negative(context)),
+                        SizedBox(width: 4),
                         Flexible(
                           child: Text(
                             errorMessage.length > 30
                                 ? '${errorMessage.substring(0, 30)}...'
                                 : errorMessage,
                             style: TextStyle(
-                              color: Colors.red.shade700,
+                              color: SemanticColorResolver.negative(context),
                               fontSize: 12,
                             ),
                             maxLines: 1,
@@ -339,12 +340,12 @@ class _NotificationDetailsDialog extends StatelessWidget {
                   ),
                 ),
                 IconButton(
-                  icon: const Icon(Icons.close),
+                  icon: Icon(Icons.close),
                   onPressed: () => Navigator.of(context).pop(),
                 ),
               ],
             ),
-            const SizedBox(height: 16),
+            SizedBox(height: 16),
             Expanded(
               child: SingleChildScrollView(
                 child: Column(
@@ -370,20 +371,20 @@ class _NotificationDetailsDialog extends StatelessWidget {
                         'پیام خطا:',
                         style: theme.textTheme.titleSmall?.copyWith(
                           fontWeight: FontWeight.bold,
-                          color: Colors.red,
+                          color: SemanticColorResolver.negative(context),
                         ),
                       ),
-                      const SizedBox(height: 4),
+                      SizedBox(height: 4),
                       Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: Colors.red.shade50,
+                          color: SemanticColorResolver.negative(context).withValues(alpha: 0.12),
                           borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Colors.red.shade200),
+                          border: Border.all(color: SemanticColorResolver.negative(context).withValues(alpha: 0.35)),
                         ),
                         child: Text(
                           errorMessage,
-                          style: TextStyle(color: Colors.red.shade900),
+                          style: TextStyle(color: SemanticColorResolver.negative(context)),
                         ),
                       ),
                     ],
@@ -402,7 +403,7 @@ class _NotificationDetailsDialog extends StatelessWidget {
                         color: colorScheme.surfaceContainerHighest,
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: _buildPayloadContent(payload, eventKey),
+                      child: _buildPayloadContent(context, payload, eventKey),
                     ),
                   ],
                 ),
@@ -451,7 +452,7 @@ class _NotificationDetailsDialog extends StatelessWidget {
     );
   }
 
-  Widget _buildPayloadContent(Map<String, dynamic> payload, String eventKey) {
+  Widget _buildPayloadContent(BuildContext context, Map<String, dynamic> payload, String eventKey) {
     if (eventKey == 'auth.otp_login' || eventKey == 'auth.password_reset') {
       final code = payload['code'] as String?;
       final expiryMinutes = payload['expiry_minutes'] as int?;
@@ -467,13 +468,13 @@ class _NotificationDetailsDialog extends StatelessWidget {
                 fontSize: 14,
               ),
             ),
-            const SizedBox(height: 8),
+            SizedBox(height: 8),
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.blue.shade50,
+                color: SemanticColorResolver.info(context).withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.blue.shade200),
+                border: Border.all(color: SemanticColorResolver.info(context).withValues(alpha: 0.35)),
               ),
               child: SelectableText(
                 code,
@@ -481,7 +482,7 @@ class _NotificationDetailsDialog extends StatelessWidget {
                   fontSize: 24,
                   fontWeight: FontWeight.bold,
                   letterSpacing: 4,
-                  color: Colors.blue.shade900,
+                  color: SemanticColorResolver.info(context),
                   fontFamily: 'monospace',
                 ),
               ),

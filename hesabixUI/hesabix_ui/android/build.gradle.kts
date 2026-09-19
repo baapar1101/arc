@@ -1,12 +1,14 @@
 val hesabixGradleMirror: String =
     providers.gradleProperty("hesabix.gradle.mirror")
-        .orElse("https://gradle.mirror.hesabix.ir")
+        .orElse("https://maven.myket.ir")
         .get()
         .trimEnd('/')
 
 // مخازن: اول آینهٔ داخلی (upstream: Maven مایکت)؛ در صورت خطای شبکه، Maven Central و google به‌عنوان fallback.
 allprojects {
     repositories {
+        // Myket: androidx/* و com/* بدون پیشوند android/maven2
+        maven { url = uri("https://maven.myket.ir/") }
         maven { url = uri("${hesabixGradleMirror}/android/maven2/") }
         maven { url = uri("${hesabixGradleMirror}/maven2/") }
         maven { url = uri("${hesabixGradleMirror}/gradle-plugins/") }
@@ -30,6 +32,8 @@ subprojects {
     afterEvaluate {
         if (project.hasProperty("android")) {
             repositories {
+                maven { url = uri("https://maven.myket.ir/") }
+                maven { url = uri("${hesabixGradleMirror}/") }
                 maven { url = uri("${hesabixGradleMirror}/android/maven2/") }
                 maven { url = uri("${hesabixGradleMirror}/maven2/") }
                 maven { url = uri("${hesabixGradleMirror}/gradle-plugins/") }
@@ -44,6 +48,8 @@ subprojects {
 
     buildscript {
         repositories {
+            maven { url = uri("https://maven.myket.ir/") }
+            maven { url = uri("${hesabixGradleMirror}/") }
             maven { url = uri("${hesabixGradleMirror}/android/maven2/") }
             maven { url = uri("${hesabixGradleMirror}/maven2/") }
             maven { url = uri("${hesabixGradleMirror}/gradle-plugins/") }

@@ -38,6 +38,7 @@ from app.services.person_service import (
     create_person,
     get_person_by_id,
     get_persons_by_business,
+    calculate_person_balances_by_currency,
     update_person,
     delete_person,
     get_person_summary,
@@ -45,6 +46,12 @@ from app.services.person_service import (
     get_creditors_report,
     get_people_transactions_report,
 )
+from app.services.person_opening_balance_service import (
+    create_person_with_opening_balance,
+    get_person_opening_balance_eligibility,
+    update_person_with_opening_balance,
+)
+from app.core.permissions import has_business_permission_for_business
 from app.services.person_bulk_upsert_service import bulk_upsert_persons_integration
 from app.services.person_share_link_service import (
     create_share_link as create_person_share_link_service,
@@ -169,7 +176,8 @@ async def bulk_delete_persons_endpoint(
     "/businesses/{business_id}/persons/bulk-upsert",
     summary="ایجاد/ویرایش گروهی اشخاص (یکپارچه‌سازی)",
     description=(
-        "بدنه شامل `items`: آرایه‌ای از {client_ref?, person_id?, payload}؛ payload همان فیلدهای ایجاد/ویرایش شخص؛ "
+        "بدنه شامل `items`: آرایه‌ای از {client_ref?, person_id?, payload}؛ payload همان فیلدهای ایجاد/ویرایش شخص "
+        "(از جمله `opening_balance` در صورت نیاز)؛ "
         "می‌توانید `create_if_update_missing` برای ایجاد پس از نبودن شخص ارسال کنید (پیش‌فرض true). "
         "حداکثر ۱۰۰۰ آیتم در هر درخواست. خروجی: results[{index, client_ref?, status, person_id?, ...}] و summary."
     ),
@@ -229,7 +237,25 @@ async def create_person_endpoint(
     _: None = Depends(require_business_access_dep),
 ):
     """ایجاد شخص جدید برای کسب و کار"""
-    result = create_person(db, business_id, person_data)
+    if person_data.opening_balance is not None:
+        if not has_business_permission_for_business(
+            auth_context, db, business_id, "opening_balance", "edit"
+        ):
+            raise ApiError(
+                "OPENING_BALANCE_PERMISSION_REQUIRED",
+                "برای ثبت مانده افتتاحیه به دسترسی ویرایش تراز افتتاحیه نیاز است",
+                http_status=403,
+            )
+        result = create_person_with_opening_balance(
+            db,
+            business_id,
+            auth_context.get_user_id(),
+            person_data,
+            create_person_fn=create_person,
+            delete_person_fn=delete_person,
+        )
+    else:
+        result = create_person(db, business_id, person_data)
     return success_response(
         data=format_datetime_fields(result['data'], request),
         request=request,
@@ -381,9 +407,11 @@ async def export_persons_excel(
             fiscal_year_id = fiscal_year.id
     
     # Build query dict similar to list endpoint from flat body
+    take_value = min(int(body.get("take", 1000) or 1000), 10000)
+    skip_value = max(int(body.get("skip", 0) or 0), 0)
     query_dict = {
-        "take": int(body.get("take", 20)),
-        "skip": int(body.get("skip", 0)),
+        "take": take_value,
+        "skip": skip_value,
         "sort_by": body.get("sort_by"),
         "sort_desc": bool(body.get("sort_desc", False)),
         "sort": body.get("sort") if isinstance(body.get("sort"), list) else None,
@@ -551,9 +579,11 @@ async def export_persons_pdf(
             fiscal_year_id = fiscal_year.id
     
     # Build query dict from flat body
+    take_value = min(int(body.get("take", 1000) or 1000), 10000)
+    skip_value = max(int(body.get("skip", 0) or 0), 0)
     query_dict = {
-        "take": int(body.get("take", 20)),
-        "skip": int(body.get("skip", 0)),
+        "take": take_value,
+        "skip": skip_value,
         "sort_by": body.get("sort_by"),
         "sort_desc": bool(body.get("sort_desc", False)),
         "sort": body.get("sort") if isinstance(body.get("sort"), list) else None,
@@ -943,6 +973,50 @@ async def get_person_endpoint(
     )
 
 
+@router.get(
+    "/persons/{person_id}/balances-by-currency",
+    summary="مانده شخص به تفکیک ارز",
+    description=(
+        "مانده بومی شخص در هر ارز + معادل ارز پایه. "
+        "برای کسب‌وکار تک‌ارزی معمولاً یک ردیف (ارز پایه) برمی‌گردد."
+    ),
+    response_model=SuccessResponse,
+)
+async def get_person_balances_by_currency_endpoint(
+    request: Request,
+    person_id: int,
+    db: Session = Depends(get_db),
+    auth_context: AuthContext = Depends(get_current_user),
+    _: None = Depends(require_business_permission_by_entity_dep("people", "view", Person, "person_id")),
+):
+    person = db.query(Person).filter(Person.id == person_id).first()
+    if not person:
+        raise HTTPException(status_code=404, detail="شخص یافت نشد")
+
+    fiscal_year_id = None
+    fy_header = request.headers.get("X-Fiscal-Year-ID")
+    if fy_header:
+        try:
+            fiscal_year_id = int(fy_header)
+        except (ValueError, TypeError):
+            pass
+    if not fiscal_year_id:
+        fiscal_year = db.query(FiscalYear).filter(
+            and_(FiscalYear.business_id == person.business_id, FiscalYear.is_last == True)
+        ).first()
+        if fiscal_year:
+            fiscal_year_id = fiscal_year.id
+
+    data = calculate_person_balances_by_currency(
+        db, person_id, fiscal_year_id=fiscal_year_id
+    )
+    return success_response(
+        data=data,
+        request=request,
+        message="مانده به تفکیک ارز با موفقیت دریافت شد",
+    )
+
+
 @router.put("/persons/{person_id}",
     summary="ویرایش شخص",
     description="ویرایش اطلاعات یک شخص",
@@ -969,8 +1043,26 @@ async def update_person_endpoint(
     person = db.query(Person).filter(Person.id == person_id).first()
     if not person:
         raise HTTPException(status_code=404, detail="شخص یافت نشد")
-    
-    result = update_person(db, person_id, person.business_id, person_data)
+
+    if person_data.opening_balance is not None:
+        if not has_business_permission_for_business(
+            auth_context, db, person.business_id, "opening_balance", "edit"
+        ):
+            raise ApiError(
+                "OPENING_BALANCE_PERMISSION_REQUIRED",
+                "برای تغییر مانده افتتاحیه به دسترسی ویرایش تراز افتتاحیه نیاز است",
+                http_status=403,
+            )
+        result = update_person_with_opening_balance(
+            db,
+            person.business_id,
+            auth_context.get_user_id(),
+            person_id,
+            person_data,
+            update_person_fn=update_person,
+        )
+    else:
+        result = update_person(db, person_id, person.business_id, person_data)
     if not result:
         raise HTTPException(status_code=404, detail="شخص یافت نشد")
     
@@ -1552,6 +1644,134 @@ async def debtors_report_endpoint(
         data=result,
         request=request,
         message="گزارش بدهکاران با موفقیت دریافت شد",
+    )
+
+
+@router.post(
+    "/businesses/{business_id}/reports/ar-aging",
+    summary="گزارش سن بدهی مشتریان (AR Aging)",
+)
+@router.post(
+    "/businesses/{business_id}/reports/ap-aging",
+    summary="گزارش سن بستانکاری تامین‌کنندگان (AP Aging)",
+)
+async def ar_ap_aging_report_endpoint(
+    request: Request,
+    business_id: int,
+    body: Dict[str, Any] = Body(default={}),
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    """گزارش سن بدهی/بستانکاری با قرارداد چندارزی (بدون فیلتر = معادل پایه)."""
+    if not ctx.can_read_section("reports"):
+        raise ApiError("FORBIDDEN", "Missing business permission: reports.read", http_status=403)
+
+    from app.services.ar_ap_aging_service import get_ar_ap_aging_report
+
+    path = request.url.path
+    mode = "ap" if path.rstrip("/").endswith("ap-aging") else "ar"
+
+    fiscal_year_id = None
+    fy_header = request.headers.get("X-Fiscal-Year-ID")
+    if fy_header:
+        try:
+            fiscal_year_id = int(fy_header)
+        except (ValueError, TypeError):
+            pass
+    if body.get("fiscal_year_id"):
+        try:
+            fiscal_year_id = int(body["fiscal_year_id"])
+        except (ValueError, TypeError):
+            pass
+
+    currency_id = body.get("currency_id")
+    if currency_id is not None:
+        try:
+            currency_id = int(currency_id)
+        except (ValueError, TypeError):
+            currency_id = None
+
+    min_balance = body.get("min_balance")
+    if min_balance is not None:
+        try:
+            min_balance = float(min_balance)
+        except (ValueError, TypeError):
+            min_balance = None
+
+    person_ids = body.get("person_ids")
+    if person_ids is not None and not isinstance(person_ids, list):
+        person_ids = None
+
+    result = get_ar_ap_aging_report(
+        db,
+        business_id,
+        mode=mode,  # type: ignore[arg-type]
+        fiscal_year_id=fiscal_year_id,
+        currency_id=currency_id,
+        as_of=body.get("as_of") or body.get("date_to"),
+        person_ids=person_ids,
+        search=body.get("search"),
+        min_balance=min_balance,
+        skip=int(body.get("skip", 0) or 0),
+        take=int(body.get("take", 50) or 50),
+    )
+    result["items"] = [format_datetime_fields(item, request) for item in result["items"]]
+    label = "سن بستانکاری" if mode == "ap" else "سن بدهی"
+    return success_response(
+        data=result,
+        request=request,
+        message=f"گزارش {label} با موفقیت دریافت شد",
+    )
+
+
+@router.post(
+    "/businesses/{business_id}/reports/person-balances-by-currency",
+    summary="مانده اشخاص به تفکیک ارز",
+    description="مانده بومی هر شخص در هر ارز سند + معادل ارز پایه (با رعایت تسویه بین‌ارزی و تسعیر)",
+)
+async def person_balances_by_currency_report_endpoint(
+    request: Request,
+    business_id: int,
+    body: Dict[str, Any] = Body(default={}),
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    if not ctx.can_read_section("reports"):
+        raise ApiError("FORBIDDEN", "Missing business permission: reports.read", http_status=403)
+
+    from app.services.person_balances_by_currency_report_service import (
+        get_person_balances_by_currency_report,
+    )
+
+    fiscal_year_id = body.get("fiscal_year_id")
+    if fiscal_year_id is not None:
+        try:
+            fiscal_year_id = int(fiscal_year_id)
+        except (ValueError, TypeError):
+            fiscal_year_id = None
+
+    person_ids = body.get("person_ids")
+    if person_ids is not None and not isinstance(person_ids, list):
+        person_ids = None
+
+    only_with_balance = body.get("only_with_balance", True)
+    if isinstance(only_with_balance, str):
+        only_with_balance = only_with_balance.lower() not in ("0", "false", "no")
+
+    result = get_person_balances_by_currency_report(
+        db,
+        business_id,
+        fiscal_year_id=fiscal_year_id,
+        person_ids=person_ids,
+        search=body.get("search"),
+        only_with_balance=bool(only_with_balance),
+        skip=int(body.get("skip", 0) or 0),
+        take=int(body.get("take", 50) or 50),
+    )
+    return success_response(
+        data=result,
+        request=request,
+        message="گزارش مانده اشخاص به تفکیک ارز دریافت شد",
     )
 
 
@@ -3400,9 +3620,22 @@ async def export_creditors_report_pdf(
     )
 
 
+def _people_tx_detail_level_from_body(body: Dict[str, Any]) -> str:
+    """خواندن detail_level از body؛ پیش‌فرض summary برای سازگاری عقب‌رو."""
+    from app.services.person_service import _normalize_people_tx_detail_level
+
+    raw = body.get("detail_level")
+    if raw is None and body.get("include_invoice_lines") is True:
+        raw = "comprehensive"
+    return _normalize_people_tx_detail_level(raw if isinstance(raw, str) else None)
+
+
 @router.post("/businesses/{business_id}/reports/people-transactions",
-    summary="گزارش تراکنش‌های اشخاص",
-    description="گزارش ریز دریافت‌ها و پرداخت‌ها به تفکیک شخص",
+    summary="گزارش تراکنش‌های اشخاص / معین طرف‌حساب",
+    description=(
+        "گردش حساب اشخاص شامل فاکتور خرید/فروش و دریافت/پرداخت. "
+        "با detail_level=comprehensive ریز اقلام فاکتور نیز نمایش داده می‌شود."
+    ),
 )
 @require_business_access("business_id")
 async def people_transactions_report_endpoint(
@@ -3462,6 +3695,7 @@ async def people_transactions_report_endpoint(
         document_type = None
     
     search = body.get('search')
+    detail_level = _people_tx_detail_level_from_body(body)
     
     # Pagination
     skip = body.get('skip', 0)
@@ -3491,6 +3725,7 @@ async def people_transactions_report_endpoint(
         search=search,
         skip=skip,
         take=take,
+        detail_level=detail_level,
     )
     
     items = result.get('items', [])
@@ -3576,6 +3811,7 @@ async def export_people_transactions_report_excel(
         document_type = None
 
     search = body.get('search')
+    detail_level = _people_tx_detail_level_from_body(body)
 
     max_export_records = 10000
     result = get_people_transactions_report(
@@ -3590,6 +3826,7 @@ async def export_people_transactions_report_excel(
         search=search,
         skip=0,
         take=max_export_records,
+        detail_level=detail_level,
     )
 
     items = result.get('items', [])
@@ -3738,12 +3975,17 @@ async def export_people_transactions_report_excel(
             ('document_code', 'کد سند' if is_fa else 'Document Code'),
             ('person_name', 'نام شخص' if is_fa else 'Person Name'),
             ('document_type_name', 'نوع سند' if is_fa else 'Document Type'),
+            ('product_name', 'کالا/خدمت' if is_fa else 'Product/Service'),
+            ('quantity', 'تعداد' if is_fa else 'Quantity'),
+            ('unit_price', 'فی' if is_fa else 'Unit Price'),
             ('debit', 'بدهکار' if is_fa else 'Debit'),
             ('credit', 'بستانکار' if is_fa else 'Credit'),
             ('running_balance', 'تراز متحرک' if is_fa else 'Running Balance'),
             ('description', 'توضیحات' if is_fa else 'Description'),
         ]
         for key, label in default_columns:
+            if detail_level != 'comprehensive' and key in ('product_name', 'quantity', 'unit_price'):
+                continue
             if items and (key in items[0] or key == 'person_name'):
                 keys.append(key)
                 headers.append(label)
@@ -3791,7 +4033,7 @@ async def export_people_transactions_report_excel(
                     f"{item.get('first_name', '')} {item.get('last_name', '')}".strip()
                 )
 
-            if key in ['debit', 'credit', 'running_balance'] and value:
+            if key in ['debit', 'credit', 'running_balance', 'quantity', 'unit_price', 'line_amount'] and value:
                 try:
                     num_value = float(value) if not isinstance(value, (int, float)) else value
                     value = num_value
@@ -3940,6 +4182,7 @@ async def export_people_transactions_report_pdf(
         document_type = None
     
     search = body.get('search')
+    detail_level = _people_tx_detail_level_from_body(body)
     
     # برای export، همه رکوردها را بدون pagination می‌گیریم
     max_export_records = 10000
@@ -3955,6 +4198,7 @@ async def export_people_transactions_report_pdf(
         search=search,
         skip=0,
         take=max_export_records,
+        detail_level=detail_level,
     )
     
     items = result.get('items', [])
@@ -4104,12 +4348,17 @@ async def export_people_transactions_report_pdf(
             ('document_code', 'کد سند' if is_fa else 'Document Code'),
             ('person_name', 'نام شخص' if is_fa else 'Person Name'),
             ('document_type_name', 'نوع سند' if is_fa else 'Document Type'),
+            ('product_name', 'کالا/خدمت' if is_fa else 'Product/Service'),
+            ('quantity', 'تعداد' if is_fa else 'Quantity'),
+            ('unit_price', 'فی' if is_fa else 'Unit Price'),
             ('debit', 'بدهکار' if is_fa else 'Debit'),
             ('credit', 'بستانکار' if is_fa else 'Credit'),
             ('running_balance', 'تراز متحرک' if is_fa else 'Running Balance'),
             ('description', 'توضیحات' if is_fa else 'Description'),
         ]
         for key, label in default_columns:
+            if detail_level != 'comprehensive' and key in ('product_name', 'quantity', 'unit_price'):
+                continue
             if items and (key in items[0] or key == 'person_name'):
                 keys.append(key)
                 headers.append(label)
@@ -4150,7 +4399,7 @@ async def export_people_transactions_report_pdf(
                 )
             
             # Format numbers
-            if key in ['debit', 'credit', 'running_balance'] and value:
+            if key in ['debit', 'credit', 'running_balance', 'quantity', 'unit_price', 'line_amount'] and value:
                 try:
                     num_value = float(value) if not isinstance(value, (int, float)) else value
                     # Format with thousand separators

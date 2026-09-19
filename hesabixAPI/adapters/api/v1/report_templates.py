@@ -584,8 +584,10 @@ async def preview_report_template(
 	})()  # شیء موقت شبیه ReportTemplate
 	try:
 		html = ReportTemplateService.render_with_template(temp, context)
+	except ApiError:
+		raise
 	except Exception as e:
-		raise ApiError("TEMPLATE_ERROR", f"Render error: {e}", http_status=400)
+		raise ApiError("TEMPLATE_ERROR", f"Render error: {e}", http_status=400) from e
 	try:
 		pdf_bytes = HTML(string=html).write_pdf(font_config=FontConfiguration())
 		return {
@@ -594,7 +596,7 @@ async def preview_report_template(
 			"html": html,
 		}
 	except Exception as e:
-		raise ApiError("PDF_ERROR", f"PDF generation error: {e}", http_status=400)
+		raise ApiError("PDF_ERROR", f"PDF generation error: {e}", http_status=400) from e
 
 
 @router.post(
@@ -636,8 +638,10 @@ async def preview_report_template_pdf(
 	})()  # شیء موقت شبیه ReportTemplate
 	try:
 		html = ReportTemplateService.render_with_template(temp, context)
+	except ApiError:
+		raise
 	except Exception as e:
-		raise ApiError("TEMPLATE_ERROR", f"Render error: {e}", http_status=400)
+		raise ApiError("TEMPLATE_ERROR", f"Render error: {e}", http_status=400) from e
 	try:
 		pdf_bytes = HTML(string=html).write_pdf(font_config=FontConfiguration())
 		return Response(
@@ -650,7 +654,7 @@ async def preview_report_template_pdf(
 			},
 		)
 	except Exception as e:
-		raise ApiError("PDF_ERROR", f"PDF generation error: {e}", http_status=400)
+		raise ApiError("PDF_ERROR", f"PDF generation error: {e}", http_status=400) from e
 
 @router.get(
 	"/business/{business_id}/schema",
@@ -686,11 +690,14 @@ async def report_template_schema(
 			{"name": "items", "desc": "لیست فاکتورها"},
 			{"name": "table_headers_html", "desc": "HTML آماده هدر جدول"},
 			{"name": "table_rows_html", "desc": "HTML آماده ردیف‌های جدول"},
+			{"name": "business_name", "desc": "نام کسب‌وکار"},
+			{"name": "business_logo_data_uri", "desc": "لوگوی کسب‌وکار (data URI)"},
 		]
 		data["sample_context"].update(
 			{
 				"title_text": "لیست فاکتورها",
 				"business_name": "نمونه کسب‌وکار",
+				"business_logo_data_uri": "",
 				"items": [
 					{"code": "INV-1001", "title": "فاکتور فروش ۱", "issue_date": "1403/10/01", "payable_total": 1035500},
 					{"code": "INV-1002", "title": "فاکتور فروش ۲", "issue_date": "1403/10/02", "payable_total": 2500000},
@@ -698,7 +705,7 @@ async def report_template_schema(
 				"is_fa": True,
 			}
 		)
-	elif module_key == "invoices" and (subtype or "") == "detail":
+	elif module_key == "invoices" and (subtype or "") in ("detail", "receipt"):
 		data["keys"] += [
 			{"name": "invoice", "desc": "شیء فاکتور"},
 			{"name": "lines", "desc": "آیتم‌های فاکتور"},
@@ -713,6 +720,8 @@ async def report_template_schema(
 			{
 				"title_text": "فاکتور فروش",
 				"business_name": "نمونه کسب‌وکار",
+				"business_logo_data_uri": "",
+				"invoice_date_jalali": "1403/10/01",
 				"invoice": {
 					"code": "INV-1001",
 					"issue_date": "1403/10/01",
@@ -724,13 +733,19 @@ async def report_template_schema(
 				"lines": [
 					{
 						"product_name": "کالای نمونه ۱",
+						"product_code": "P-1",
 						"quantity": 2,
+						"quantity_display": "2",
+						"unit_display": "عدد",
 						"unit_price": 250000,
 						"line_total": 500000,
 					},
 					{
 						"product_name": "کالای نمونه ۲",
+						"product_code": "P-2",
 						"quantity": 1,
+						"quantity_display": "1",
+						"unit_display": "عدد",
 						"unit_price": 500000,
 						"line_total": 500000,
 					},
@@ -796,6 +811,8 @@ async def report_template_schema(
 		data["sample_context"].update(
 			{
 				"title_text": "سند انتقال",
+				"business_name": "نمونه کسب‌وکار",
+				"business_logo_data_uri": "",
 				"code": "TR-20240101-0001",
 				"document_date": "1403/10/01",
 				"total_amount": 1000000,
@@ -806,6 +823,7 @@ async def report_template_schema(
 				"destination_type_name": "صندوق",
 				"destination_name": "صندوق اصلی",
 				"generated_at": "1403/10/01 12:00",
+				"description": "انتقال نمونه",
 				"is_fa": True,
 			}
 		)
@@ -820,6 +838,8 @@ async def report_template_schema(
 		data["sample_context"].update(
 			{
 				"title_text": "رسید دریافت",
+				"business_name": "نمونه کسب‌وکار",
+				"business_logo_data_uri": "",
 				"code": "RP-1001",
 				"document_date": "1403/10/01",
 				"description": "دریافت نقدی",
@@ -837,6 +857,8 @@ async def report_template_schema(
 		data["sample_context"].update(
 			{
 				"title_text": "لیست دریافت/پرداخت",
+				"business_name": "نمونه کسب‌وکار",
+				"business_logo_data_uri": "",
 				"items": [
 					{"code": "RP-1001", "document_date": "1403/10/01", "total_amount": 2500000, "description": "دریافت نقدی"},
 				],
@@ -853,6 +875,8 @@ async def report_template_schema(
 		data["sample_context"].update(
 			{
 				"title_text": "سند حسابداری",
+				"business_name": "نمونه کسب‌وکار",
+				"business_logo_data_uri": "",
 				"code": "DOC-100",
 				"description": "سند نمونه",
 				"document": {"code": "DOC-100", "document_type_name": "سند روزنامه"},
@@ -872,6 +896,8 @@ async def report_template_schema(
 		data["sample_context"].update(
 			{
 				"title_text": "لیست اسناد",
+				"business_name": "نمونه کسب‌وکار",
+				"business_logo_data_uri": "",
 				"items": [
 					{"code": "DOC-100", "document_date": "1403/10/01", "document_type_name": "روزنامه", "total_debit": 1000000},
 				],
@@ -883,6 +909,8 @@ async def report_template_schema(
 		data["sample_context"].update(
 			{
 				"title_text": "لیست هزینه و درآمد",
+				"business_name": "نمونه کسب‌وکار",
+				"business_logo_data_uri": "",
 				"items": [
 					{"code": "EI-01", "document_date": "1403/10/01", "amount": 500000, "description": "هزینه اداری"},
 				],
@@ -900,6 +928,8 @@ async def report_template_schema(
 		data["sample_context"].update(
 			{
 				"title_text": "لیست انتقالات",
+				"business_name": "نمونه کسب‌وکار",
+				"business_logo_data_uri": "",
 				"items": [
 					{"code": "TR-001", "document_date": "1403/10/01", "total_amount": 1000000, "description": "انتقال بانک به صندوق"},
 				],

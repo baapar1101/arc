@@ -87,6 +87,8 @@ final class Shabake_Tamin_Public_Catalog {
 			'categoryId'            => null,
 			'province'              => null,
 			'city'                  => null,
+			'brand'                 => null,
+			'brandFilters'          => true,
 		);
 	}
 

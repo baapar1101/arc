@@ -1,11 +1,12 @@
 from __future__ import annotations
 
-from typing import Dict, Any
+from typing import Any, Dict
 from datetime import datetime
 
 from sqlalchemy.orm import Session
 
 from adapters.db.models.tax_setting import TaxSetting
+from app.integrations.moadian.client import uses_moadian_v2
 from app.services.encryption_service import encrypt_private_key, decrypt_private_key
 
 
@@ -71,9 +72,15 @@ def upsert_tax_setting(
             # اگر رمزنگاری ناموفق بود، به صورت plain text ذخیره می‌شود (fallback)
             setting.private_key = private_key
     
-    setting.public_key = payload.get("public_key")
-    setting.certificate = payload.get("certificate")
-    setting.certificate_request = payload.get("certificate_request")
+    pub = payload.get("public_key")
+    if pub is not None and str(pub).strip():
+        setting.public_key = str(pub).strip()
+    cert = payload.get("certificate")
+    if cert is not None and str(cert).strip():
+        setting.certificate = str(cert).strip()
+    csr = payload.get("certificate_request")
+    if csr is not None and str(csr).strip():
+        setting.certificate_request = str(csr).strip()
     setting.sandbox_mode = bool(payload.get("sandbox_mode", False))
     setting.updated_at = now
 
@@ -87,6 +94,67 @@ def upsert_tax_setting(
         except Exception:
             pass
     
+    return setting
+
+
+def validate_tax_setting_complete(setting: TaxSetting | None) -> list[str]:
+    """فیلدهای الزامی برای اتصال (v1: کلید خصوصی؛ v2: علاوه بر آن گواهی PEM)."""
+    if setting is None:
+        return ["tax_memory_id", "economic_code", "private_key"]
+    missing: list[str] = []
+    if not (setting.tax_memory_id or "").strip():
+        missing.append("tax_memory_id")
+    if not (setting.economic_code or "").strip():
+        missing.append("economic_code")
+    if not (setting.private_key or "").strip():
+        missing.append("private_key")
+    if uses_moadian_v2(setting) and not (setting.certificate or "").strip():
+        missing.append("certificate")
+    return missing
+
+
+def merge_tax_setting_for_test(
+    stored: TaxSetting | None,
+    payload: Any | None,
+    *,
+    business_id: int,
+) -> TaxSetting:
+    """
+    ادغام تنظیمات DB با مقادیر فرم UI برای تست اتصال بدون ذخیره اجباری.
+    یک نمونه جدا (detached) برمی‌گرداند تا رکورد DB تغییر نکند.
+    """
+    setting = TaxSetting(business_id=int(business_id))
+    if stored is not None:
+        setting.tax_memory_id = stored.tax_memory_id
+        setting.economic_code = stored.economic_code
+        setting.private_key = stored.private_key
+        setting.public_key = stored.public_key
+        setting.certificate = stored.certificate
+        setting.certificate_request = stored.certificate_request
+        setting.sandbox_mode = bool(stored.sandbox_mode)
+
+    if payload is None:
+        return setting
+
+    def _pick(new_val: Any, old_val: Any) -> Any:
+        if new_val is None:
+            return old_val
+        if isinstance(new_val, str) and not new_val.strip():
+            return old_val
+        return new_val
+
+    setting.tax_memory_id = _pick(getattr(payload, "tax_memory_id", None), setting.tax_memory_id)
+    setting.economic_code = _pick(getattr(payload, "economic_code", None), setting.economic_code)
+    setting.private_key = _pick(getattr(payload, "private_key", None), setting.private_key)
+    setting.public_key = _pick(getattr(payload, "public_key", None), setting.public_key)
+    setting.certificate = _pick(getattr(payload, "certificate", None), setting.certificate)
+    setting.certificate_request = _pick(
+        getattr(payload, "certificate_request", None),
+        setting.certificate_request,
+    )
+    sandbox = getattr(payload, "sandbox_mode", None)
+    if sandbox is not None:
+        setting.sandbox_mode = bool(sandbox)
     return setting
 
 

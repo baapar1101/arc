@@ -6,7 +6,7 @@
 from __future__ import annotations
 
 from decimal import Decimal, ROUND_HALF_UP
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Tuple, Optional
 
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
@@ -37,6 +37,34 @@ def total_with_tax_from_totals_dict(totals: Dict[str, Any]) -> Decimal:
     adj_n = Decimal(str(totals.get("adjustments_net", 0)))
     adj_t = Decimal(str(totals.get("adjustments_tax", 0)))
     return _money_quant(gross - discount + tax + adj_n + adj_t)
+
+
+def payable_total_from_totals_dict(totals: Dict[str, Any]) -> Decimal:
+    """
+    مبلغ قابل پرداخت/دریافت فاکتور (مبنای مانده و سقف تخصیص دریافت/پرداخت).
+
+    net = جمع خالص ردیف‌های کالا/خدمت (پس از تخفیف، شامل مالیات خطی).
+    adjustments_net / adjustments_tax = اضافات و کسورات فاکتور با علامت.
+    """
+    if not isinstance(totals, dict):
+        return Decimal(0)
+    if "net" in totals:
+        net = Decimal(str(totals.get("net", 0)))
+        adj_n = Decimal(str(totals.get("adjustments_net", 0)))
+        adj_t = Decimal(str(totals.get("adjustments_tax", 0)))
+        return _money_quant(net + adj_n + adj_t)
+    return total_with_tax_from_totals_dict(totals)
+
+
+def payable_total_from_extra_info(extra_info: Any) -> Optional[Decimal]:
+    if not isinstance(extra_info, dict):
+        return None
+    totals = extra_info.get("totals")
+    if not isinstance(totals, dict):
+        return None
+    if "net" not in totals and "gross" not in totals:
+        return None
+    return payable_total_from_totals_dict(totals)
 
 
 def _validate_account_for_business(db: Session, business_id: int, account_id: int) -> Account:

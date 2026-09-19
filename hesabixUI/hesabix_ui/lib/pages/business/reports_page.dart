@@ -23,6 +23,7 @@ class ReportsPage extends StatefulWidget {
 
   final int businessId;
   final AuthStore authStore;
+
   /// اگر ست شود، پس از بارگذاری افزونه‌ها سکشن متناظر در فهرست گزارش‌ها انتخاب می‌شود (مثلاً [kReportsSectionWooCommerce]).
   final String? initialSectionId;
 
@@ -211,7 +212,10 @@ class _ReportsPageState extends State<ReportsPage> {
   Future<void> _saveFavorites() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(_favoritesPrefsKey(), jsonEncode(_favorites.toList()..sort()));
+      await prefs.setString(
+        _favoritesPrefsKey(),
+        jsonEncode(_favorites.toList()..sort()),
+      );
     } catch (_) {}
   }
 
@@ -262,7 +266,9 @@ class _ReportsPageState extends State<ReportsPage> {
     };
 
     final isSearching = _query.isNotEmpty;
-    final filteredItems = isSearching ? _filterItems(allItems, query: _query) : allItems;
+    final filteredItems = isSearching
+        ? _filterItems(allItems, query: _query)
+        : allItems;
 
     final sectionTitleByItemKey = <String, String>{
       for (final s in data)
@@ -281,7 +287,11 @@ class _ReportsPageState extends State<ReportsPage> {
                     pinned: true,
                     delegate: _PinnedHeaderDelegate(
                       height: isSearching ? 64 : 120,
-                      child: _buildDesktopPinnedHeader(context, data, isSearching: isSearching),
+                      child: _buildDesktopPinnedHeader(
+                        context,
+                        data,
+                        isSearching: isSearching,
+                      ),
                     ),
                   )
                 else ...[
@@ -296,7 +306,10 @@ class _ReportsPageState extends State<ReportsPage> {
                       title: t.reportsFavoritesTitle,
                       icon: Icons.star_outline,
                       emptyMessage: t.reportsFavoritesEmptyMessage,
-                      items: _favorites.map((k) => itemsByKey[k]).whereType<_ReportLink>().toList(),
+                      items: _favorites
+                          .map((k) => itemsByKey[k])
+                          .whereType<_ReportLink>()
+                          .toList(),
                     ),
                   ),
                   const SliverToBoxAdapter(child: SizedBox(height: 12)),
@@ -306,7 +319,10 @@ class _ReportsPageState extends State<ReportsPage> {
                       title: t.reportsRecentTitle,
                       icon: Icons.history,
                       emptyMessage: t.reportsRecentEmptyMessage,
-                      items: _recent.map((k) => itemsByKey[k]).whereType<_ReportLink>().toList(),
+                      items: _recent
+                          .map((k) => itemsByKey[k])
+                          .whereType<_ReportLink>()
+                          .toList(),
                     ),
                   ),
                   const SliverToBoxAdapter(child: SizedBox(height: 16)),
@@ -314,12 +330,18 @@ class _ReportsPageState extends State<ReportsPage> {
 
                 if (isSearching) ...[
                   SliverToBoxAdapter(
-                    child: _buildSearchResultsHeader(context, count: filteredItems.length),
+                    child: _buildSearchResultsHeader(
+                      context,
+                      count: filteredItems.length,
+                    ),
                   ),
                   const SliverToBoxAdapter(child: SizedBox(height: 8)),
                   if (filteredItems.isEmpty)
                     SliverToBoxAdapter(
-                      child: _buildEmptyState(context, message: t.reportsSearchNoResults),
+                      child: _buildEmptyState(
+                        context,
+                        message: t.reportsSearchNoResults,
+                      ),
                     )
                   else
                     SliverList(
@@ -413,10 +435,7 @@ class _ReportsPageState extends State<ReportsPage> {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 24),
       child: Center(
-        child: Text(
-          message,
-          style: TextStyle(color: cs.onSurfaceVariant),
-        ),
+        child: Text(message, style: TextStyle(color: cs.onSurfaceVariant)),
       ),
     );
   }
@@ -439,7 +458,10 @@ class _ReportsPageState extends State<ReportsPage> {
               children: [
                 Icon(icon, color: cs.primary),
                 const SizedBox(width: 8),
-                Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
+                Text(
+                  title,
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                ),
               ],
             ),
             const SizedBox(height: 8),
@@ -456,7 +478,11 @@ class _ReportsPageState extends State<ReportsPage> {
                 children: [
                   for (int i = 0; i < items.length; i++) ...[
                     _buildReportTile(context, items[i], wrapInCard: false),
-                    if (i != items.length - 1) Divider(color: cs.outlineVariant.withValues(alpha: 0.5), height: 1),
+                    if (i != items.length - 1)
+                      Divider(
+                        color: cs.outlineVariant.withValues(alpha: 0.5),
+                        height: 1,
+                      ),
                   ],
                 ],
               ),
@@ -478,7 +504,10 @@ class _ReportsPageState extends State<ReportsPage> {
         child: ExpansionTile(
           initiallyExpanded: section.initiallyExpanded,
           leading: Icon(section.icon, color: cs.primary),
-          title: Text(section.title, style: const TextStyle(fontWeight: FontWeight.w700)),
+          title: Text(
+            section.title,
+            style: const TextStyle(fontWeight: FontWeight.w700),
+          ),
           subtitle: Text(
             t.reportsSectionCount(section.items.length),
             style: TextStyle(color: cs.onSurfaceVariant, fontSize: 12),
@@ -487,7 +516,11 @@ class _ReportsPageState extends State<ReportsPage> {
             Padding(
               padding: const EdgeInsets.only(left: 8, right: 8, bottom: 12),
               child: columns == 1
-                  ? Column(children: section.items.map((e) => _buildReportTile(context, e)).toList())
+                  ? Column(
+                      children: section.items
+                          .map((e) => _buildReportTile(context, e))
+                          .toList(),
+                    )
                   : GridView.builder(
                       shrinkWrap: true,
                       physics: const NeverScrollableScrollPhysics(),
@@ -498,7 +531,8 @@ class _ReportsPageState extends State<ReportsPage> {
                         crossAxisSpacing: 8,
                         childAspectRatio: 3.2,
                       ),
-                      itemBuilder: (ctx, i) => _buildReportCardCompact(ctx, section.items[i]),
+                      itemBuilder: (ctx, i) =>
+                          _buildReportCardCompact(ctx, section.items[i]),
                     ),
             ),
           ],
@@ -520,7 +554,9 @@ class _ReportsPageState extends State<ReportsPage> {
     final iconColor = canOpen ? cs.primary : disabledFg;
     return InkWell(
       borderRadius: BorderRadius.circular(12),
-      onTap: canOpen ? () => _openReport(context, item) : () => _showAccessDenied(context, t),
+      onTap: canOpen
+          ? () => _openReport(context, item)
+          : () => _showAccessDenied(context, t),
       child: Container(
         decoration: BoxDecoration(
           color: cs.surface,
@@ -554,13 +590,21 @@ class _ReportsPageState extends State<ReportsPage> {
               ),
             ),
             if (!canOpen) ...[
-              Tooltip(message: t.accessDenied, child: Icon(Icons.lock_outline, color: disabledFg)),
+              Tooltip(
+                message: t.accessDenied,
+                child: Icon(Icons.lock_outline, color: disabledFg),
+              ),
               const SizedBox(width: 6),
             ],
             IconButton(
-              tooltip: _favorites.contains(item.key) ? t.reportsRemoveFromFavorites : t.reportsAddToFavorites,
+              tooltip: _favorites.contains(item.key)
+                  ? t.reportsRemoveFromFavorites
+                  : t.reportsAddToFavorites,
               onPressed: canOpen ? () => _toggleFavorite(item.key) : null,
-              icon: Icon(_favorites.contains(item.key) ? Icons.star : Icons.star_border, color: cs.primary),
+              icon: Icon(
+                _favorites.contains(item.key) ? Icons.star : Icons.star_border,
+                color: cs.primary,
+              ),
             ),
           ],
         ),
@@ -568,7 +612,11 @@ class _ReportsPageState extends State<ReportsPage> {
     );
   }
 
-  Widget _buildReportTile(BuildContext context, _ReportLink item, {bool wrapInCard = true}) {
+  Widget _buildReportTile(
+    BuildContext context,
+    _ReportLink item, {
+    bool wrapInCard = true,
+  }) {
     final cs = Theme.of(context).colorScheme;
     final t = AppLocalizations.of(context);
     final canOpen = _canOpen(item);
@@ -578,38 +626,59 @@ class _ReportsPageState extends State<ReportsPage> {
       enabled: canOpen,
       dense: !wrapInCard,
       contentPadding: wrapInCard ? null : EdgeInsets.zero,
-      leading: Icon(item.icon, color: canOpen ? cs.primary : cs.onSurfaceVariant.withValues(alpha: 0.8)),
+      leading: Icon(
+        item.icon,
+        color: canOpen
+            ? cs.primary
+            : cs.onSurfaceVariant.withValues(alpha: 0.8),
+      ),
       title: Text(
         item.title,
         style: TextStyle(
           fontWeight: FontWeight.w600,
-          color: canOpen ? cs.onSurface : cs.onSurfaceVariant.withValues(alpha: 0.9),
+          color: canOpen
+              ? cs.onSurface
+              : cs.onSurfaceVariant.withValues(alpha: 0.9),
         ),
       ),
-      subtitle: Text(item.subtitle, style: TextStyle(color: cs.onSurfaceVariant, fontSize: 12)),
+      subtitle: Text(
+        item.subtitle,
+        style: TextStyle(color: cs.onSurfaceVariant, fontSize: 12),
+      ),
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           if (!canOpen) ...[
-            Tooltip(message: t.accessDenied, child: Icon(Icons.lock_outline, size: 18, color: cs.onSurfaceVariant)),
+            Tooltip(
+              message: t.accessDenied,
+              child: Icon(
+                Icons.lock_outline,
+                size: 18,
+                color: cs.onSurfaceVariant,
+              ),
+            ),
             const SizedBox(width: 6),
           ],
           IconButton(
-            tooltip: _favorites.contains(item.key) ? t.reportsRemoveFromFavorites : t.reportsAddToFavorites,
+            tooltip: _favorites.contains(item.key)
+                ? t.reportsRemoveFromFavorites
+                : t.reportsAddToFavorites,
             onPressed: canOpen ? () => _toggleFavorite(item.key) : null,
-            icon: Icon(_favorites.contains(item.key) ? Icons.star : Icons.star_border, color: cs.primary),
+            icon: Icon(
+              _favorites.contains(item.key) ? Icons.star : Icons.star_border,
+              color: cs.primary,
+            ),
           ),
           Icon(chevron, size: 18, color: cs.onSurfaceVariant),
         ],
       ),
-      onTap: canOpen ? () => _openReport(context, item) : () => _showAccessDenied(context, t),
+      onTap: canOpen
+          ? () => _openReport(context, item)
+          : () => _showAccessDenied(context, t),
     );
 
     if (!wrapInCard) return tile;
-    return Card(
-      margin: const EdgeInsets.only(bottom: 8),
-      child: tile,
-    );
+    return Card(margin: const EdgeInsets.only(bottom: 8), child: tile);
   }
 
   void _openReport(BuildContext context, _ReportLink item) {
@@ -625,7 +694,10 @@ class _ReportsPageState extends State<ReportsPage> {
     context.go(target);
   }
 
-  Widget _buildSectionChips(BuildContext context, List<_ReportSection> sections) {
+  Widget _buildSectionChips(
+    BuildContext context,
+    List<_ReportSection> sections,
+  ) {
     final t = AppLocalizations.of(context);
     final cs = Theme.of(context).colorScheme;
 
@@ -650,11 +722,7 @@ class _ReportsPageState extends State<ReportsPage> {
 
     return Align(
       alignment: Alignment.centerLeft,
-      child: Wrap(
-        spacing: 8,
-        runSpacing: 8,
-        children: chips,
-      ),
+      child: Wrap(spacing: 8, runSpacing: 8, children: chips),
     );
   }
 
@@ -676,8 +744,14 @@ class _ReportsPageState extends State<ReportsPage> {
               tooltip: t.reportsSortTooltip,
               onSelected: (v) => setState(() => _desktopSort = v),
               itemBuilder: (ctx) => [
-                PopupMenuItem(value: _DesktopSort.recommended, child: Text(t.reportsSortDefault)),
-                PopupMenuItem(value: _DesktopSort.alphabetical, child: Text(t.reportsSortAlphabetical)),
+                PopupMenuItem(
+                  value: _DesktopSort.recommended,
+                  child: Text(t.reportsSortDefault),
+                ),
+                PopupMenuItem(
+                  value: _DesktopSort.alphabetical,
+                  child: Text(t.reportsSortAlphabetical),
+                ),
               ],
               child: Container(
                 height: 48,
@@ -714,22 +788,34 @@ class _ReportsPageState extends State<ReportsPage> {
           count: sorted.length,
         ),
         const SizedBox(height: 8),
-        _buildDesktopAllGrid(context, sorted, sectionTitleByItemKey: sectionTitleByItemKey),
+        _buildDesktopAllGrid(
+          context,
+          sorted,
+          sectionTitleByItemKey: sectionTitleByItemKey,
+        ),
       ];
     }
 
-    final s = sections.where((e) => e.id == selected).cast<_ReportSection?>().firstWhere(
-          (e) => e != null,
-          orElse: () => null,
-        );
+    final s = sections
+        .where((e) => e.id == selected)
+        .cast<_ReportSection?>()
+        .firstWhere((e) => e != null, orElse: () => null);
     if (s == null) {
       return <Widget>[
-        _buildEmptyState(context, message: AppLocalizations.of(context).reportsSearchNoResults),
+        _buildEmptyState(
+          context,
+          message: AppLocalizations.of(context).reportsSearchNoResults,
+        ),
       ];
     }
     final sorted = _sortForDesktop(s.items);
     return <Widget>[
-      _buildDesktopSectionHeader(context, title: s.title, icon: s.icon, count: sorted.length),
+      _buildDesktopSectionHeader(
+        context,
+        title: s.title,
+        icon: s.icon,
+        count: sorted.length,
+      ),
       const SizedBox(height: 8),
       _buildDesktopSectionGrid(context, sorted),
     ];
@@ -738,7 +824,9 @@ class _ReportsPageState extends State<ReportsPage> {
   List<_ReportLink> _sortForDesktop(List<_ReportLink> items) {
     if (_desktopSort == _DesktopSort.recommended) return items;
     final copy = items.toList(growable: false);
-    copy.sort((a, b) => _normalizeQuery(a.title).compareTo(_normalizeQuery(b.title)));
+    copy.sort(
+      (a, b) => _normalizeQuery(a.title).compareTo(_normalizeQuery(b.title)),
+    );
     return copy;
   }
 
@@ -771,7 +859,10 @@ class _ReportsPageState extends State<ReportsPage> {
     );
   }
 
-  Widget _buildDesktopSectionGrid(BuildContext context, List<_ReportLink> items) {
+  Widget _buildDesktopSectionGrid(
+    BuildContext context,
+    List<_ReportLink> items,
+  ) {
     final width = MediaQuery.of(context).size.width;
     final columns = width >= 1200 ? 3 : 2;
     return GridView.builder(
@@ -808,13 +899,18 @@ class _ReportsPageState extends State<ReportsPage> {
       itemBuilder: (ctx, i) {
         final it = items[i];
         final sec = sectionTitleByItemKey[it.key];
-        final subtitle = (sec == null || sec.isEmpty) ? it.subtitle : '$sec • ${it.subtitle}';
+        final subtitle = (sec == null || sec.isEmpty)
+            ? it.subtitle
+            : '$sec • ${it.subtitle}';
         return _buildReportCardCompact(ctx, it, subtitleOverride: subtitle);
       },
     );
   }
 
-  List<_ReportLink> _filterItems(List<_ReportLink> items, {required String query}) {
+  List<_ReportLink> _filterItems(
+    List<_ReportLink> items, {
+    required String query,
+  }) {
     final q = _normalizeQuery(query);
     final t = AppLocalizations.of(context);
     return items.where((e) {
@@ -834,13 +930,17 @@ class _ReportsPageState extends State<ReportsPage> {
     }
     // در سایر زبان‌ها، کلیدواژه‌های فارسی را حذف می‌کنیم تا جستجو طبیعی‌تر باشد
     final faChars = RegExp(r'[\u0600-\u06FF]');
-    return item.keywords.where((k) => !faChars.hasMatch(k)).toList(growable: false);
+    return item.keywords
+        .where((k) => !faChars.hasMatch(k))
+        .toList(growable: false);
   }
 
   bool _canOpen(_ReportLink item) {
     if (item.marketplacePluginCode != null) {
       if (!_marketplacePluginsResolved) return false;
-      if (!_activeMarketplacePluginCodes.contains(item.marketplacePluginCode!)) {
+      if (!_activeMarketplacePluginCodes.contains(
+        item.marketplacePluginCode!,
+      )) {
         return false;
       }
     }
@@ -861,12 +961,15 @@ class _ReportsPageState extends State<ReportsPage> {
   }
 
   void _showAccessDenied(BuildContext context, AppLocalizations t) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(t.accessDenied)),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(t.accessDenied)));
   }
 
-  List<_ReportSection> _buildData(BuildContext context, {required AppLocalizations t}) {
+  List<_ReportSection> _buildData(
+    BuildContext context, {
+    required AppLocalizations t,
+  }) {
     final b = widget.businessId;
     final sections = <_ReportSection>[
       _ReportSection(
@@ -882,6 +985,22 @@ class _ReportsPageState extends State<ReportsPage> {
             icon: Icons.view_kanban,
             route: '/business/$b/reports/kardex',
             keywords: const ['کاردکس', 'kardex', 'ریز', 'تراکنش'],
+            permissionSection: 'reports',
+          ),
+          _ReportLink(
+            key: 'hscript_builder',
+            title: 'گزارش‌ساز اسکریپتی',
+            subtitle: 'ساخت گزارش سفارشی با HScript',
+            icon: Icons.code,
+            route: '/business/$b/hscript',
+            keywords: const [
+              'hscript',
+              'اسکریپت',
+              'گزارش سفارشی',
+              'custom report',
+              'داشبورد',
+              'نمودار',
+            ],
             permissionSection: 'reports',
           ),
         ],
@@ -919,12 +1038,58 @@ class _ReportsPageState extends State<ReportsPage> {
             permissionSection: 'people',
           ),
           _ReportLink(
+            key: 'ar_aging',
+            title: 'سن بدهی مشتریان',
+            subtitle: 'تحلیل سررسید مطالبات',
+            icon: Icons.timelapse_outlined,
+            route: '/business/$b/reports/ar-aging',
+            keywords: const ['سن بدهی', 'مطالبات', 'سررسید', 'aging', 'ar'],
+            permissionSection: 'people',
+          ),
+          _ReportLink(
+            key: 'ap_aging',
+            title: 'سن بستانکاری تامین‌کنندگان',
+            subtitle: 'تحلیل سررسید بدهی‌ها',
+            icon: Icons.history_toggle_off_outlined,
+            route: '/business/$b/reports/ap-aging',
+            keywords: const [
+              'سن بستانکاری',
+              'بدهی',
+              'تامین کننده',
+              'سررسید',
+              'aging',
+              'ap',
+            ],
+            permissionSection: 'people',
+          ),
+          _ReportLink(
+            key: 'person_balances_by_currency',
+            title: 'مانده اشخاص به تفکیک ارز',
+            subtitle: 'مانده بومی هر ارز و معادل ارز پایه',
+            icon: Icons.currency_exchange_outlined,
+            route: '/business/$b/reports/person-balances-by-currency',
+            keywords: const ['مانده اشخاص', 'ارز', 'معادل پایه', 'currency'],
+            permissionSection: 'people',
+          ),
+          _ReportLink(
             key: 'people_transactions',
             title: t.reportsPeopleTransactionsTitle,
             subtitle: t.reportsPeopleTransactionsSubtitle,
             icon: Icons.receipt_long,
             route: '/business/$b/reports/people-transactions',
-            keywords: const ['تراکنش', 'دریافت', 'پرداخت'],
+            keywords: const [
+              'تراکنش',
+              'دریافت',
+              'پرداخت',
+              'معین',
+              'معین جامع',
+              'طرف حساب',
+              'کارت حساب',
+              'ریز خرید',
+              'ریز فروش',
+              'تامین کننده',
+              'مشتری',
+            ],
             permissionSection: 'people_transactions',
           ),
         ],
@@ -1228,6 +1393,24 @@ class _ReportsPageState extends State<ReportsPage> {
             permissionSection: 'accounting_documents',
           ),
           _ReportLink(
+            key: 'balance_sheet',
+            title: t.reportsBalanceSheetTitle,
+            subtitle: t.reportsBalanceSheetSubtitle,
+            icon: Icons.account_balance,
+            route: '/business/$b/reports/balance-sheet',
+            keywords: const ['ترازنامه', 'وضعیت مالی', 'دارایی', 'بدهی'],
+            permissionSection: 'accounting_documents',
+          ),
+          _ReportLink(
+            key: 'financial_package',
+            title: t.reportsFinancialPackageTitle,
+            subtitle: t.reportsFinancialPackageSubtitle,
+            icon: Icons.folder_special_outlined,
+            route: '/business/$b/reports/financial-package',
+            keywords: const ['بسته', 'گزارش مالی', 'تراز', 'سود و زیان'],
+            permissionSection: 'accounting_documents',
+          ),
+          _ReportLink(
             key: 'general_ledger',
             title: t.reportsGeneralLedgerTitle,
             subtitle: t.reportsGeneralLedgerSubtitle,
@@ -1252,6 +1435,24 @@ class _ReportsPageState extends State<ReportsPage> {
             icon: Icons.account_tree,
             route: '/business/$b/reports/accounts-review',
             keywords: const ['مرور حساب', 'درختی'],
+          ),
+          _ReportLink(
+            key: 'cash_flow',
+            title: 'صورت جریان وجوه نقد',
+            subtitle: 'تحلیل ورود و خروج وجه نقد',
+            icon: Icons.account_balance_wallet_outlined,
+            route: '/business/$b/reports/cash-flow',
+            keywords: const ['جریان نقد', 'وجوه نقد', 'cash flow'],
+            permissionSection: 'accounting_documents',
+          ),
+          _ReportLink(
+            key: 'fx_revaluation',
+            title: 'گزارش تسعیر ارز',
+            subtitle: 'سود و زیان ناشی از تسعیر ارز',
+            icon: Icons.currency_exchange_outlined,
+            route: '/business/$b/reports/fx-revaluation',
+            keywords: const ['تسعیر', 'ارز', 'fx', 'revaluation'],
+            permissionSection: 'accounting_documents',
           ),
         ],
       ),
@@ -1298,7 +1499,8 @@ class _ReportsPageState extends State<ReportsPage> {
         ],
       ),
     ];
-    if (_marketplacePluginsResolved && _activeMarketplacePluginCodes.contains('basalam_connector')) {
+    if (_marketplacePluginsResolved &&
+        _activeMarketplacePluginCodes.contains('basalam_connector')) {
       sections.add(
         _ReportSection(
           id: 'basalam_reports',
@@ -1353,7 +1555,8 @@ class _ReportsPageState extends State<ReportsPage> {
         ),
       );
     }
-    if (_marketplacePluginsResolved && _activeMarketplacePluginCodes.contains('woocommerce_hesabix')) {
+    if (_marketplacePluginsResolved &&
+        _activeMarketplacePluginCodes.contains('woocommerce_hesabix')) {
       sections.add(
         _ReportSection(
           id: kReportsSectionWooCommerce,
@@ -1457,10 +1660,7 @@ class _ReportLink {
 }
 
 class _PinnedHeaderDelegate extends SliverPersistentHeaderDelegate {
-  _PinnedHeaderDelegate({
-    required this.height,
-    required this.child,
-  });
+  _PinnedHeaderDelegate({required this.height, required this.child});
 
   final double height;
   final Widget child;
@@ -1472,7 +1672,11 @@ class _PinnedHeaderDelegate extends SliverPersistentHeaderDelegate {
   double get maxExtent => height;
 
   @override
-  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
+  Widget build(
+    BuildContext context,
+    double shrinkOffset,
+    bool overlapsContent,
+  ) {
     final cs = Theme.of(context).colorScheme;
     return Container(
       alignment: Alignment.centerLeft,
@@ -1481,7 +1685,9 @@ class _PinnedHeaderDelegate extends SliverPersistentHeaderDelegate {
       foregroundDecoration: BoxDecoration(
         border: Border(
           bottom: BorderSide(
-            color: cs.outlineVariant.withValues(alpha: overlapsContent ? 0.7 : 0.0),
+            color: cs.outlineVariant.withValues(
+              alpha: overlapsContent ? 0.7 : 0.0,
+            ),
           ),
         ),
       ),
@@ -1495,8 +1701,4 @@ class _PinnedHeaderDelegate extends SliverPersistentHeaderDelegate {
   }
 }
 
-enum _DesktopSort {
-  recommended,
-  alphabetical,
-}
-
+enum _DesktopSort { recommended, alphabetical }

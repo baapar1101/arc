@@ -1,3 +1,5 @@
+import 'package:shamsi_date/shamsi_date.dart';
+
 /// Converts JSON value to bool safely (handles int 0/1 and string 'true'/'false' from API).
 bool _fromJsonBool(dynamic v, [bool defaultValue = false]) {
   if (v == null) return defaultValue;
@@ -5,6 +7,59 @@ bool _fromJsonBool(dynamic v, [bool defaultValue = false]) {
   if (v is int) return v != 0;
   if (v is String) return v.toLowerCase() == 'true' || v == '1';
   return defaultValue;
+}
+
+DateTime _parsePersonDateTime(dynamic value) {
+  if (value == null) return DateTime.now();
+  if (value is DateTime) return value;
+  if (value is int) {
+    return DateTime.fromMillisecondsSinceEpoch(value);
+  }
+
+  final raw = value.toString().trim();
+  if (raw.isEmpty) return DateTime.now();
+
+  // First try ISO-compatible date parsing.
+  try {
+    return DateTime.parse(raw);
+  } catch (_) {}
+
+  // Handle Jalali or Gregorian slash dates like 1405/04/18 17:08:49.
+  final parts = raw.split(' ');
+  final datePart = parts[0];
+  final timePart = parts.length > 1 ? parts[1] : '';
+  final dateSegments = datePart.split('/');
+  if (dateSegments.length == 3) {
+    final year = int.tryParse(dateSegments[0]);
+    final month = int.tryParse(dateSegments[1]);
+    final day = int.tryParse(dateSegments[2]);
+    if (year != null && month != null && day != null) {
+      int hour = 0;
+      int minute = 0;
+      int second = 0;
+      if (timePart.isNotEmpty) {
+        final timeSegments = timePart.split(':');
+        if (timeSegments.length >= 2) {
+          hour = int.tryParse(timeSegments[0]) ?? 0;
+          minute = int.tryParse(timeSegments[1]) ?? 0;
+          if (timeSegments.length >= 3) {
+            second = int.tryParse(timeSegments[2]) ?? 0;
+          }
+        }
+      }
+      try {
+        if (year >= 1200 && year <= 1600) {
+          final dt = Jalali(year, month, day).toDateTime();
+          return DateTime(dt.year, dt.month, dt.day, hour, minute, second);
+        }
+        return DateTime(year, month, day, hour, minute, second);
+      } catch (_) {
+        // fallthrough to default
+      }
+    }
+  }
+
+  return DateTime.now();
 }
 
 class PersonBankAccount {
@@ -39,8 +94,8 @@ class PersonBankAccount {
       cardNumber: json['card_number'],
       shebaNumber: json['sheba_number'],
       isActive: _fromJsonBool(json['is_active'], true),
-      createdAt: DateTime.parse(json['created_at']),
-      updatedAt: DateTime.parse(json['updated_at']),
+      createdAt: _parsePersonDateTime(json['created_at'] ?? json['created_at_raw']),
+      updatedAt: _parsePersonDateTime(json['updated_at'] ?? json['updated_at_raw']),
     );
   }
 
@@ -112,12 +167,8 @@ class PersonSocialContact {
       customLabel: json['custom_label'] as String?,
       value: (json['value'] as String?) ?? '',
       sortOrder: (json['sort_order'] as int?) ?? 0,
-      createdAt: json['created_at'] != null
-          ? DateTime.parse(json['created_at'] as String)
-          : DateTime.now(),
-      updatedAt: json['updated_at'] != null
-          ? DateTime.parse(json['updated_at'] as String)
-          : DateTime.now(),
+      createdAt: _parsePersonDateTime(json['created_at'] ?? json['created_at_raw']),
+      updatedAt: _parsePersonDateTime(json['updated_at'] ?? json['updated_at_raw']),
     );
   }
 
@@ -229,13 +280,18 @@ class Person {
   final bool commissionExcludeAdditionsDeductions;
   final bool commissionPostInInvoiceDocument;
   
-  // تراز و وضعیت مالی
+  // تراز و وضعیت مالی (مبالغ به ارز پایه؛ تراز = بستانکار − بدهکار)
   final double? balance;
   final String? status;
+  final double? totalDebit;
+  final double? totalCredit;
 
   /// گروه اشخاص (دسته‌بندی)
   final int? personGroupId;
   final String? personGroupName;
+
+  /// کد ارزهای غیرپایه با گردش (کشف‌پذیری MC)
+  final List<String> foreignCurrencyCodes;
 
   Person({
     this.id,
@@ -279,8 +335,11 @@ class Person {
     this.commissionPostInInvoiceDocument = false,
     this.balance,
     this.status,
+    this.totalDebit,
+    this.totalCredit,
     this.personGroupId,
     this.personGroupName,
+    this.foreignCurrencyCodes = const [],
   });
 
   factory Person.fromJson(Map<String, dynamic> json) {
@@ -318,8 +377,8 @@ class Person {
       email: json['email'],
       website: json['website'],
       isActive: _fromJsonBool(json['is_active'], true),
-      createdAt: DateTime.parse(json['created_at']),
-      updatedAt: DateTime.parse(json['updated_at']),
+      createdAt: _parsePersonDateTime(json['created_at'] ?? json['created_at_raw']),
+      updatedAt: _parsePersonDateTime(json['updated_at'] ?? json['updated_at_raw']),
       bankAccounts: (json['bank_accounts'] as List<dynamic>?)
           ?.map((ba) => PersonBankAccount.fromJson(ba))
           .toList() ?? [],
@@ -337,8 +396,15 @@ class Person {
       commissionPostInInvoiceDocument: _fromJsonBool(json['commission_post_in_invoice_document'], false),
       balance: (json['balance'] as num?)?.toDouble(),
       status: json['status'] as String?,
+      totalDebit: (json['total_debit'] as num?)?.toDouble(),
+      totalCredit: (json['total_credit'] as num?)?.toDouble(),
       personGroupId: json['person_group_id'] as int?,
       personGroupName: json['person_group_name'] as String?,
+      foreignCurrencyCodes: (json['foreign_currency_codes'] as List?)
+              ?.map((e) => e.toString())
+              .where((e) => e.trim().isNotEmpty)
+              .toList() ??
+          const [],
     );
   }
 
@@ -385,8 +451,11 @@ class Person {
       'commission_post_in_invoice_document': commissionPostInInvoiceDocument,
       'balance': balance,
       'status': status,
+      'total_debit': totalDebit,
+      'total_credit': totalCredit,
       'person_group_id': personGroupId,
       'person_group_name': personGroupName,
+      'foreign_currency_codes': foreignCurrencyCodes,
     };
   }
 
@@ -423,6 +492,7 @@ class Person {
     List<PersonSocialContact>? socialContacts,
     int? personGroupId,
     String? personGroupName,
+    List<String>? foreignCurrencyCodes,
   }) {
     return Person(
       id: id ?? this.id,
@@ -465,8 +535,11 @@ class Person {
       commissionPostInInvoiceDocument: commissionPostInInvoiceDocument,
       balance: balance,
       status: status,
+      totalDebit: totalDebit,
+      totalCredit: totalCredit,
       personGroupId: personGroupId ?? this.personGroupId,
       personGroupName: personGroupName ?? this.personGroupName,
+      foreignCurrencyCodes: foreignCurrencyCodes ?? this.foreignCurrencyCodes,
     );
   }
 
@@ -484,6 +557,28 @@ class Person {
   String get displayName {
     return fullName.isNotEmpty ? fullName : aliasName;
   }
+}
+
+/// مانده افتتاحیه شخص — فقط در سند تراز افتتاحیه ذخیره می‌شود.
+class PersonOpeningBalanceInput {
+  final double amount;
+  final String balanceType; // debit | credit
+  final int? fiscalYearId;
+  final bool clear;
+
+  const PersonOpeningBalanceInput({
+    this.amount = 0,
+    required this.balanceType,
+    this.fiscalYearId,
+    this.clear = false,
+  });
+
+  Map<String, dynamic> toJson() => {
+        if (clear) 'clear': true,
+        if (!clear) 'amount': amount,
+        'balance_type': balanceType,
+        if (fiscalYearId != null) 'fiscal_year_id': fiscalYearId,
+      };
 }
 
 class PersonCreateRequest {
@@ -522,6 +617,7 @@ class PersonCreateRequest {
   final bool? commissionExcludeAdditionsDeductions;
   final bool? commissionPostInInvoiceDocument;
   final int? personGroupId;
+  final PersonOpeningBalanceInput? openingBalance;
 
   PersonCreateRequest({
     required this.aliasName,
@@ -559,6 +655,7 @@ class PersonCreateRequest {
     this.commissionExcludeAdditionsDeductions,
     this.commissionPostInInvoiceDocument,
     this.personGroupId,
+    this.openingBalance,
   });
 
   Map<String, dynamic> toJson() {
@@ -622,6 +719,7 @@ class PersonCreateRequest {
       if (commissionExcludeAdditionsDeductions != null) 'commission_exclude_additions_deductions': commissionExcludeAdditionsDeductions,
       if (commissionPostInInvoiceDocument != null) 'commission_post_in_invoice_document': commissionPostInInvoiceDocument,
       if (personGroupId != null) 'person_group_id': personGroupId,
+      if (openingBalance != null) 'opening_balance': openingBalance!.toJson(),
     };
   }
 }
@@ -663,6 +761,9 @@ class PersonUpdateRequest {
   final int? personGroupId;
   /// اگر ارسال شود، لیست راه‌های ارتباطی به‌طور کامل جایگزین می‌شود.
   final List<Map<String, dynamic>>? socialContacts;
+  /// اگر ارسال شود، لیست حساب‌های بانکی شخص جایگزین کامل می‌شود.
+  final List<PersonBankAccount>? bankAccounts;
+  final PersonOpeningBalanceInput? openingBalance;
 
   PersonUpdateRequest({
     this.code,
@@ -700,6 +801,8 @@ class PersonUpdateRequest {
     this.commissionPostInInvoiceDocument,
     this.personGroupId,
     this.socialContacts,
+    this.bankAccounts,
+    this.openingBalance,
   });
 
   Map<String, dynamic> toJson() {
@@ -748,6 +851,17 @@ class PersonUpdateRequest {
         'commission_post_in_invoice_document': commissionPostInInvoiceDocument,
       'person_group_id': personGroupId,
       if (socialContacts != null) 'social_contacts': socialContacts,
+      if (bankAccounts != null)
+        'bank_accounts': bankAccounts!
+            .where((ba) => ba.bankName.trim().isNotEmpty)
+            .map((ba) => {
+                  'bank_name': ba.bankName,
+                  'account_number': ba.accountNumber,
+                  'card_number': ba.cardNumber,
+                  'sheba_number': ba.shebaNumber,
+                })
+            .toList(),
+      if (openingBalance != null) 'opening_balance': openingBalance!.toJson(),
     };
   }
 }

@@ -137,7 +137,12 @@ async def set_preferred_model(
         raise ApiError("NO_ACTIVE_SUBSCRIPTION", "اشتراک فعالی وجود ندارد", http_status=400)
 
     plan = subscription.plan
-    validate_model_selection(db, plan, model_code.strip())
+    validate_model_selection(
+        db,
+        plan,
+        model_code.strip(),
+        business_id=int(effective_business_id),
+    )
 
     subscription.preferred_model_code = model_code.strip()
     db.commit()
@@ -146,7 +151,12 @@ async def set_preferred_model(
     return success_response(
         {
             "preferred_model_code": subscription.preferred_model_code,
-            "available_models": list_models_for_user(db, plan, include_pricing=True),
+            "available_models": list_models_for_user(
+                db,
+                plan,
+                include_pricing=True,
+                business_id=int(effective_business_id),
+            ),
         },
         request,
         "مدل ترجیحی ذخیره شد",

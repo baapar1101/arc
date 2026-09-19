@@ -83,6 +83,11 @@ class QuickSalesSetting(Base):
         nullable=True,
         comment="قالب چاپ پیش‌فرض"
     )
+    print_paper_size: Mapped[str | None] = mapped_column(
+        String(16),
+        nullable=True,
+        comment="سایز کاغذ چاپ: A4/A5/A6 یا 60mm/80mm/100mm",
+    )
 
     # تنظیمات موجودی
     enable_warehouse_document: Mapped[bool] = mapped_column(

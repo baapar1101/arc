@@ -14,6 +14,7 @@ import 'package:hesabix_ui/widgets/data_table/helpers/data_table_utils.dart';
 import 'package:hesabix_ui/widgets/invoice/product_combobox_widget.dart';
 import 'package:hesabix_ui/models/warehouse_model.dart';
 import 'package:hesabix_ui/core/date_utils.dart';
+import 'package:hesabix_ui/core/hesabix_back.dart';
 
 class ProductionReportPage extends StatefulWidget {
   final int businessId;
@@ -80,13 +81,8 @@ class _ProductionReportPageState extends State<ProductionReportPage> {
       setState(() {
         _currencies = items;
         // انتخاب ارز پیش‌فرض
-        if (items.isNotEmpty) {
-          final defaultCurrency = items.firstWhere(
-            (c) => c['is_default'] == true,
-            orElse: () => items.first,
-          );
-          _selectedCurrencyId = defaultCurrency['id'] as int?;
-        }
+        // قرارداد چندارزی: null = همه ارزها → معادل پایه
+        _selectedCurrencyId = null;
       });
     } catch (_) {
       // ignore errors
@@ -235,10 +231,7 @@ class _ProductionReportPageState extends State<ProductionReportPage> {
     return Scaffold(
       backgroundColor: cs.surface,
       appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.pop(),
-        ),
+        leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
         title: Text(t.reportsProductionTitle),
         actions: [
           IconButton(
@@ -331,7 +324,7 @@ class _ProductionReportPageState extends State<ProductionReportPage> {
                       items: [
                         const DropdownMenuItem<int>(
                           value: null,
-                          child: Text('همه ارزها'),
+                          child: Text('همه ارزها (معادل پایه)'),
                         ),
                         ..._currencies.map<DropdownMenuItem<int>>((c) {
                           final id = c['id'] as int?;

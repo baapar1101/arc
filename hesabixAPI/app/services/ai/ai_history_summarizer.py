@@ -9,6 +9,10 @@ from typing import Any, Dict, List, Optional
 
 from sqlalchemy.orm import Session
 
+from app.services.ai.ai_language_prompt import (
+    build_history_summary_system_prompt,
+    detect_message_language,
+)
 from app.services.ai.prompt_service import get_prompt_by_key
 
 logger = logging.getLogger(__name__)
@@ -23,6 +27,22 @@ def _message_plain_text(msg: Dict[str, Any]) -> str:
     if msg.get("tool_calls"):
         return "[فراخوانی ابزار]"
     return ""
+
+
+def _resolve_summary_language(
+    messages: List[Dict[str, Any]],
+    *,
+    language: Optional[str] = None,
+) -> str:
+    if language in ("fa", "en"):
+        return language
+    for msg in reversed(messages):
+        if msg.get("role") != "user":
+            continue
+        detected = detect_message_language(_message_plain_text(msg))
+        if detected:
+            return detected
+    return "fa"
 
 
 def build_rule_based_history_summary(messages: List[Dict[str, Any]]) -> str:
@@ -46,27 +66,41 @@ def build_rule_based_history_summary(messages: List[Dict[str, Any]]) -> str:
     return body
 
 
-def summarize_history_with_llm(
+def summarize_history_with_llm_detailed(
     provider: Any,
     model: str,
     messages: List[Dict[str, Any]],
     *,
     db: Optional[Session] = None,
     max_output_tokens: int = 500,
-) -> Optional[str]:
-    """خلاصهٔ فشرده با یک فراخوانی LLM."""
+    language: Optional[str] = None,
+) -> tuple[Optional[str], Optional[Dict[str, Any]]]:
+    """خلاصهٔ فشرده با LLM؛ usage را هم برمی‌گرداند تا در صورتحساب لحاظ شود."""
     draft = build_rule_based_history_summary(messages)
     if not draft:
-        return None
+        return None, None
+
+    lang = _resolve_summary_language(messages, language=language)
+    system_content = build_history_summary_system_prompt(lang)
+    if db is not None:
+        try:
+            seeded = get_prompt_by_key(db, "aux.history_summary")
+            if seeded and lang == "fa":
+                system_content = seeded
+        except Exception:
+            pass
+
+    user_prefix = (
+        "Conversation text:\n\n"
+        if lang == "en"
+        else "متن مکالمه:\n\n"
+    )
 
     prompt_messages = [
-        {
-            "role": "system",
-            "content": get_prompt_by_key(db, "aux.history_summary"),
-        },
+        {"role": "system", "content": system_content},
         {
             "role": "user",
-            "content": f"متن مکالمه:\n\n{draft[:12000]}",
+            "content": f"{user_prefix}{draft[:12000]}",
         },
     ]
 
@@ -81,11 +115,33 @@ def summarize_history_with_llm(
         content = (result.get("message") or {}).get("content") or ""
         text = str(content).strip()
         if not text:
-            return None
-        return text[:MAX_SUMMARY_CHARS]
+            return None, None
+        usage = result.get("usage") if isinstance(result, dict) else None
+        return text[:MAX_SUMMARY_CHARS], usage if isinstance(usage, dict) else None
     except Exception as exc:
         logger.warning("summarize_history_with_llm failed: %s", exc)
-        return None
+        return None, None
+
+
+def summarize_history_with_llm(
+    provider: Any,
+    model: str,
+    messages: List[Dict[str, Any]],
+    *,
+    db: Optional[Session] = None,
+    max_output_tokens: int = 500,
+    language: Optional[str] = None,
+) -> Optional[str]:
+    """خلاصهٔ فشرده با یک فراخوانی LLM."""
+    text, _usage = summarize_history_with_llm_detailed(
+        provider,
+        model,
+        messages,
+        db=db,
+        max_output_tokens=max_output_tokens,
+        language=language,
+    )
+    return text
 
 
 def messages_from_db_rows(db_messages: List[Any]) -> List[Dict[str, Any]]:

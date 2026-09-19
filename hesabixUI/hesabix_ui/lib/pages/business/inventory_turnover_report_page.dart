@@ -11,6 +11,7 @@ import 'package:hesabix_ui/widgets/category/category_picker_field.dart';
 import 'package:hesabix_ui/widgets/data_table/helpers/data_table_utils.dart';
 import 'package:hesabix_ui/services/category_service.dart';
 import 'package:hesabix_ui/core/api_client.dart';
+import 'package:hesabix_ui/core/hesabix_back.dart';
 
 class InventoryTurnoverReportPage extends StatefulWidget {
   final int businessId;
@@ -176,10 +177,7 @@ class _InventoryTurnoverReportPageState extends State<InventoryTurnoverReportPag
       backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
         title: const Text('گزارش گردش موجودی'),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.pop(),
-        ),
+        leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
       ),
       body: SafeArea(
         child: Column(

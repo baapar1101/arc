@@ -202,6 +202,7 @@ class DataTableConfig<T> {
   final String? subtitle;
   // Header controls
   final bool showBackButton;
+  /// Optional. Data tables ignore this and always use [hesabixNavigateBack].
   final VoidCallback? onBack;
   final bool showTableIcon;
   final bool showSearch;
@@ -221,6 +222,10 @@ class DataTableConfig<T> {
   final bool defaultSortDesc;
   final void Function(dynamic item)? onRowTap;
   final void Function(dynamic item)? onRowDoubleTap;
+  /// Shortcut `r` — reply / open active row (when search field is not focused).
+  final void Function(dynamic item)? onRowShortcutReply;
+  /// Shortcut `a` — assign active row (when search field is not focused).
+  final void Function(dynamic item)? onRowShortcutAssign;
   final Widget? Function(dynamic item)? customRowBuilder;
   final Map<String, dynamic>? additionalParams;
   final Duration? searchDebounce;
@@ -264,6 +269,8 @@ class DataTableConfig<T> {
   final bool showExportButtons;
   final bool showExcelExport;
   final bool showPdfExport;
+  /// برای خروجی‌های سنگین (مثل کالاها): export-all از جاب پس‌زمینه استفاده می‌کند.
+  final bool preferAsyncExcelExport;
   // Report templates scope (for PDF custom templates)
   final int? businessId; // needed to fetch templates
   final String? reportModuleKey;
@@ -303,6 +310,9 @@ class DataTableConfig<T> {
   /// وقتی دادهٔ **صفحهٔ جاری** (raw) از API یا حالت local به‌روز می‌شود؛ برای نگاشت ایندکس انتخاب به id و غیره
   final void Function(List<Map<String, dynamic>> currentPageRawItems)?
   onTableDataChanged;
+
+  /// پس از دریافت موفق پاسخ API؛ برای خواندن فیلدهای جانبی مثل summary / status_counts
+  final void Function(Map<String, dynamic> responseData)? onResponseData;
 
   /// وقتی کاربر «پاک کردن فیلترها» را می‌زند (هم‌گام با نوار فیلتر سریع مثل دسته در صفحهٔ کالاها)
   final VoidCallback? onAllFiltersCleared;
@@ -360,6 +370,8 @@ class DataTableConfig<T> {
     this.defaultSortDesc = false,
     this.onRowTap,
     this.onRowDoubleTap,
+    this.onRowShortcutReply,
+    this.onRowShortcutAssign,
     this.customRowBuilder,
     this.additionalParams,
     this.searchDebounce = const Duration(milliseconds: 500),
@@ -400,6 +412,7 @@ class DataTableConfig<T> {
     this.showExportButtons = false,
     this.showExcelExport = true,
     this.showPdfExport = true,
+    this.preferAsyncExcelExport = false,
     this.businessId,
     this.reportModuleKey,
     this.reportSubtype,
@@ -418,6 +431,7 @@ class DataTableConfig<T> {
     this.dataRowHeight,
     this.onRefresh,
     this.onTableDataChanged,
+    this.onResponseData,
     this.onAllFiltersCleared,
     this.persistTableFiltersPageId,
     this.autoFitColumnsOnFirstLoad = true,

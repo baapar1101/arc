@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hesabix_ui/config/brand_config.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 
 class PluginMarketplaceHero extends StatelessWidget {
@@ -61,7 +62,7 @@ class PluginMarketplaceHero extends StatelessWidget {
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    t.pluginMarketplaceSubtitle,
+                    t.branded(t.pluginMarketplaceSubtitle),
                     style: theme.textTheme.bodyMedium?.copyWith(
                       color: cs.onPrimaryContainer.withValues(alpha: 0.9),
                       height: 1.35,

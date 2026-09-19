@@ -1,26 +1,89 @@
 #!/usr/bin/env bash
-# Hesabix CLI – update from repo / control systemd units / reload itself.
+# Hesabix CLI – update / services / domains / SSL / mirrors / reload itself.
 set -euo pipefail
 
 APP_ROOT="${APP_ROOT:-/opt/hesabix}"
 
+# Installed copy lives in /usr/local/bin; libs stay in the deployed repo.
+hesabix_resolve_script_dir() {
+  if [[ -d "${APP_ROOT}/app/scripts/lib" ]]; then
+    printf '%s' "${APP_ROOT}/app/scripts"
+    return 0
+  fi
+  local self_dir
+  self_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  if [[ -d "${self_dir}/lib" ]]; then
+    printf '%s' "${self_dir}"
+    return 0
+  fi
+  echo "Hesabix scripts not found (expected ${APP_ROOT}/app/scripts/lib)." >&2
+  return 1
+}
+
+HESABIX_SCRIPT_DIR="$(hesabix_resolve_script_dir)" || exit 1
+
 if [[ ${EUID:-$(id -u)} -ne 0 ]]; then
-  echo "Run as root (e.g. sudo hesabix -update or sudo hesabix -services start)" >&2
+  echo "Run as root (e.g. sudo hesabix -update or sudo hesabix -domains show)" >&2
   exit 1
 fi
 
 usage() {
   cat <<'USAGE'
 Usage:
-  hesabix -update [-source REPO_URL] [-branch BRANCH]
-  hesabix -services {start|stop|restart|status}
+  hesabix -update [-source REPO_URL] [-branch BRANCH] [-y]
+  hesabix -services {start|stop|restart|status|show}
+  hesabix -domains {show|set|apply} [options]
+  hesabix -ssl {status|enable|renew} [options]
+  hesabix -mirrors [show|set] [options]
+  hesabix -branding {show|set|default|apply} [options]
   hesabix -cli reload
 
   -update           Run update (pull, migrate, restart, rebuild frontend, reload nginx)
+                    First shows Python/Flutter mirrors and lets you pick (Enter keeps current)
+                    Custom UI branding from .deploy_env is applied automatically during web build.
+                    Android APK uses the same pack when built with ./build_android.sh.
+  -y, --yes         Skip the mirror prompt and use the saved selection
   -source URL       Override repo URL (default: from initial deploy)
   -branch NAME      Override branch (default: from initial deploy)
-  -services ACTION  Control Hesabix systemd units (API, RQ worker, notification worker; pgadmin4 too if installed)
-  -cli reload       Reload /usr/local/bin/hesabix from the deployed repo (APP_ROOT/app/scripts/hesabix)
+  -services ACTION  Control Hesabix systemd units:
+                      always: hesabix-api, hesabix-rq-worker, hesabix-notification-moderation
+                      if installed: hesabix-api-media (Softphone Media Edge), pgadmin4
+                      show is an alias for status
+
+  -domains show     Show configured API/UI/pgAdmin domains and URLs
+  -domains set      Change domain(s); updates .deploy_env, Nginx, and rebuilds frontend
+      --api DOMAIN       New API domain
+      --ui DOMAIN        New UI domain
+      --pgadmin DOMAIN   New pgAdmin4 domain
+      --ssl              Issue Let's Encrypt certs for changed domain(s)
+      --no-rebuild       Skip Flutter web rebuild (not recommended when API/UI domain changes)
+  -domains apply    Regenerate Nginx from current .deploy_env (no domain change)
+
+  -ssl status       Show TLS status for configured domains
+  -ssl enable       Request Let's Encrypt certificates via certbot
+      --api | --ui | --pgadmin | --all
+      --email ADDRESS    Contact email for Let's Encrypt (default: admin@<domain>)
+  -ssl renew        Run certbot renew [--dry-run]
+
+  -mirrors          Probe Python and Flutter mirrors, show the saved choice, then pick
+  -mirrors show     List mirrors with live status; mark the currently saved selection
+  -mirrors set      Save a new selection (interactive, or flags below)
+      --pip NAME|URL             Python/PyPI index (hesabix|official|tuna|aliyun|devneeds|URL)
+      --pub NAME|URL             Flutter pub host
+      --storage NAME|URL         Flutter engine/storage host
+      --flutter NAME             Set pub+storage from the same preset
+
+  -branding show    Show saved UI branding (logos/icons/app names for web and Android)
+  -branding set     Save custom branding pack path and optional names
+      --dir PATH             Branding pack directory (default: /opt/hesabix/branding)
+      --name-fa NAME         Persian app display name
+      --name-en NAME         English app display name
+      --rebuild              Rebuild and publish Flutter web after saving
+  -branding default Reset to Hesabix logos and names [--rebuild]
+  -branding apply   Rebuild Flutter web with the currently saved branding
+                    Android: ./build_android.sh (same .deploy_env; does not run from this command)
+
+  -cli reload       Reload /usr/local/bin/hesabix from the deployed repo
 USAGE
 }
 
@@ -63,7 +126,6 @@ reload_hesabix_cli() {
   return 0
 }
 
-# Ensure API service gets journalctl sudo fallback env.
 ensure_api_journalctl_env() {
   local dropin_dir="/etc/systemd/system/hesabix-api.service.d"
   local dropin_file="${dropin_dir}/10-journalctl-env.conf"
@@ -75,80 +137,153 @@ EOF
   systemctl daemon-reload
 }
 
-# Core application units (order: start forward, stop reverse). pgadmin4 is optional if installed.
-run_hesabix_services() {
-  local action="$1"
+hesabix_unit_loaded() {
+  [[ "$(systemctl show "${1}.service" -p LoadState --value 2>/dev/null)" == "loaded" ]]
+}
+
+collect_hesabix_service_units() {
+  # stdout: space-separated unit names (without .service) in start/restart order
   local -a core=( hesabix-api hesabix-rq-worker hesabix-notification-moderation )
+  local -a extra=()
   local u
 
   for u in "${core[@]}"; do
-    if [[ "$(systemctl show "${u}.service" -p LoadState --value 2>/dev/null)" != "loaded" ]]; then
+    if ! hesabix_unit_loaded "${u}"; then
       echo "Expected systemd unit is missing or not loaded: ${u}.service (re-run deploy.sh backend step)" >&2
-      exit 1
+      return 1
     fi
   done
 
-  local -a extra=()
-  if [[ "$(systemctl show pgadmin4.service -p LoadState --value 2>/dev/null)" == "loaded" ]]; then
+  # Softphone Media Edge (workers=1, in-memory media_hub) — must restart with API after update
+  if hesabix_unit_loaded hesabix-api-media; then
+    extra+=( hesabix-api-media )
+  fi
+  if hesabix_unit_loaded pgadmin4; then
     extra+=( pgadmin4 )
   fi
 
+  printf '%s' "${core[*]}"
+  if [[ ${#extra[@]} -gt 0 ]]; then
+    printf ' %s' "${extra[*]}"
+  fi
+  printf '\n'
+}
+
+run_hesabix_services() {
+  local action="$1"
+  local units_line
+  local -a units=()
+  local u
+  local i
+
+  # show = status (common alias)
+  if [[ "${action}" == "show" ]]; then
+    action="status"
+  fi
+
+  units_line="$(collect_hesabix_service_units)" || exit 1
+  # shellcheck disable=SC2206
+  units=( ${units_line} )
+
+  echo "Hesabix units: ${units[*]}"
+
   case "${action}" in
     start)
-      for u in "${core[@]}"; do
-        systemctl start "${u}.service"
-      done
-      for u in "${extra[@]}"; do
-        systemctl start "${u}.service"
-      done
-      echo "Started Hesabix services."
+      for u in "${units[@]}"; do systemctl start "${u}.service"; done
+      echo "Started: ${units[*]}"
       ;;
     stop)
-      for (( i = ${#extra[@]} - 1; i >= 0; i-- )); do
-        systemctl stop "${extra[i]}.service"
-      done
-      for (( i = ${#core[@]} - 1; i >= 0; i-- )); do
-        systemctl stop "${core[i]}.service"
-      done
-      echo "Stopped Hesabix services."
+      for (( i = ${#units[@]} - 1; i >= 0; i-- )); do systemctl stop "${units[i]}.service"; done
+      echo "Stopped: ${units[*]}"
       ;;
     restart)
       ensure_api_journalctl_env
       systemctl daemon-reload
-      for u in "${core[@]}"; do
-        systemctl restart "${u}.service"
-      done
-      for u in "${extra[@]}"; do
-        systemctl restart "${u}.service"
-      done
-      echo "Restarted Hesabix services."
+      for u in "${units[@]}"; do systemctl restart "${u}.service"; done
+      echo "Restarted: ${units[*]}"
       ;;
     status)
-      for u in "${core[@]}"; do
-        echo "======== ${u}.service ========"
-        systemctl --no-pager -l status "${u}.service" || true
-      done
-      for u in "${extra[@]}"; do
+      for u in "${units[@]}"; do
         echo "======== ${u}.service ========"
         systemctl --no-pager -l status "${u}.service" || true
       done
       ;;
     *)
-      echo "Invalid action: ${action}. Use: start|stop|restart|status" >&2
+      echo "Invalid action: ${action}. Use: start|stop|restart|status|show" >&2
       exit 1
       ;;
   esac
 }
 
+run_domains_command() {
+  local action="$1"
+  shift
+  # shellcheck source=lib/hesabix_domains.sh
+  source "${HESABIX_SCRIPT_DIR}/lib/hesabix_domains.sh"
+  case "${action}" in
+    show) hesabix_domains_show ;;
+    set) hesabix_domains_set "$@" ;;
+    apply)
+      hesabix_load_deploy_env
+      hesabix_apply_nginx_domain_configs
+      ;;
+    *)
+      echo "Invalid -domains action: ${action}. Use: show|set|apply" >&2
+      return 1
+      ;;
+  esac
+}
+
+run_ssl_command() {
+  local action="$1"
+  shift
+  # shellcheck source=lib/hesabix_ssl.sh
+  source "${HESABIX_SCRIPT_DIR}/lib/hesabix_ssl.sh"
+  case "${action}" in
+    status) hesabix_ssl_status ;;
+    enable) hesabix_ssl_enable_targets "$@" ;;
+    renew) hesabix_ssl_renew "$@" ;;
+    *)
+      echo "Invalid -ssl action: ${action}. Use: status|enable|renew" >&2
+      return 1
+      ;;
+  esac
+}
+
+run_mirrors_command() {
+  # shellcheck source=lib/hesabix_mirrors.sh
+  source "${HESABIX_SCRIPT_DIR}/lib/hesabix_mirrors.sh"
+  hesabix_mirrors_command "$@"
+}
+
+run_branding_command() {
+  # shellcheck source=lib/hesabix_branding.sh
+  source "${HESABIX_SCRIPT_DIR}/lib/hesabix_branding.sh"
+  hesabix_branding_command "$@"
+}
+
 UPDATE_MODE=""
 SERVICES_ACTION=""
 CLI_ACTION=""
+DOMAINS_ACTION=""
+SSL_ACTION=""
+MIRRORS_ACTION=""
+BRANDING_ACTION=""
 SOURCE_URL=""
 BRANCH_OVERRIDE=""
+SKIP_MIRROR_PROMPT=""
+DOMAINS_ARGS=()
+SSL_ARGS=()
+MIRRORS_ARGS=()
+BRANDING_ARGS=()
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     -update) UPDATE_MODE=1; shift ;;
+    -y|--yes|--skip-mirrors)
+      SKIP_MIRROR_PROMPT=1
+      shift
+      ;;
     -cli)
       if [[ $# -lt 2 || -z "${2:-}" ]]; then
         echo "hesabix -cli requires an action: reload" >&2
@@ -175,11 +310,52 @@ while [[ $# -gt 0 ]]; do
       ;;
     -services)
       if [[ $# -lt 2 || -z "${2:-}" ]]; then
-        echo "hesabix -services requires an action: start|stop|restart|status" >&2
+        echo "hesabix -services requires an action: start|stop|restart|status|show" >&2
         exit 1
       fi
       SERVICES_ACTION="$2"
       shift 2
+      ;;
+    -domains)
+      if [[ $# -lt 2 || -z "${2:-}" ]]; then
+        echo "hesabix -domains requires an action: show|set|apply" >&2
+        exit 1
+      fi
+      DOMAINS_ACTION="$2"
+      shift 2
+      DOMAINS_ARGS=("$@")
+      break
+      ;;
+    -ssl)
+      if [[ $# -lt 2 || -z "${2:-}" ]]; then
+        echo "hesabix -ssl requires an action: status|enable|renew" >&2
+        exit 1
+      fi
+      SSL_ACTION="$2"
+      shift 2
+      SSL_ARGS=("$@")
+      break
+      ;;
+    -mirrors)
+      MIRRORS_ACTION="set"
+      if [[ $# -ge 2 && ( "$2" == "show" || "$2" == "set" || "$2" == "status" ) ]]; then
+        MIRRORS_ACTION="$2"
+        shift 2
+      else
+        shift 1
+      fi
+      MIRRORS_ARGS=("$@")
+      break
+      ;;
+    -branding)
+      if [[ $# -lt 2 || -z "${2:-}" ]]; then
+        echo "hesabix -branding requires an action: show|set|default|apply" >&2
+        exit 1
+      fi
+      BRANDING_ACTION="$2"
+      shift 2
+      BRANDING_ARGS=("$@")
+      break
       ;;
     -h|--help)
       usage
@@ -193,14 +369,66 @@ while [[ $# -gt 0 ]]; do
 done
 
 if [[ -n "${CLI_ACTION}" ]]; then
-  if [[ -n "${UPDATE_MODE}" || -n "${SERVICES_ACTION}" ]]; then
-    echo "Use -cli alone (do not combine with -update or -services)." >&2
+  if [[ -n "${UPDATE_MODE}" || -n "${SERVICES_ACTION}" || -n "${DOMAINS_ACTION}" || -n "${SSL_ACTION}" || -n "${MIRRORS_ACTION}" || -n "${BRANDING_ACTION}" ]]; then
+    echo "Use -cli alone." >&2
     exit 1
   fi
   case "${CLI_ACTION}" in
     reload) reload_hesabix_cli ;;
     *) echo "Invalid -cli action: ${CLI_ACTION}. Use: reload" >&2; exit 1 ;;
   esac
+  exit $?
+fi
+
+if [[ -n "${DOMAINS_ACTION}" ]]; then
+  if [[ -n "${UPDATE_MODE}" || -n "${SERVICES_ACTION}" || -n "${SSL_ACTION}" || -n "${MIRRORS_ACTION}" || -n "${BRANDING_ACTION}" ]]; then
+    echo "Use -domains alone." >&2
+    exit 1
+  fi
+  if [[ "${DOMAINS_ACTION}" != "show" ]] && [[ ! -f "${APP_ROOT}/.deploy_env" ]]; then
+    echo "Hesabix not deployed yet. Run deploy.sh first." >&2
+    exit 1
+  fi
+  run_domains_command "${DOMAINS_ACTION}" "${DOMAINS_ARGS[@]}"
+  exit $?
+fi
+
+if [[ -n "${MIRRORS_ACTION}" ]]; then
+  if [[ -n "${UPDATE_MODE}" || -n "${SERVICES_ACTION}" || -n "${DOMAINS_ACTION}" || -n "${SSL_ACTION}" || -n "${BRANDING_ACTION}" ]]; then
+    echo "Use -mirrors alone." >&2
+    exit 1
+  fi
+  if [[ ! -f "${APP_ROOT}/.deploy_env" ]]; then
+    echo "Hesabix not deployed yet. Run deploy.sh first." >&2
+    exit 1
+  fi
+  run_mirrors_command "${MIRRORS_ACTION}" "${MIRRORS_ARGS[@]}"
+  exit $?
+fi
+
+if [[ -n "${BRANDING_ACTION}" ]]; then
+  if [[ -n "${UPDATE_MODE}" || -n "${SERVICES_ACTION}" || -n "${DOMAINS_ACTION}" || -n "${SSL_ACTION}" || -n "${MIRRORS_ACTION}" ]]; then
+    echo "Use -branding alone." >&2
+    exit 1
+  fi
+  if [[ ! -f "${APP_ROOT}/.deploy_env" ]]; then
+    echo "Hesabix not deployed yet. Run deploy.sh first." >&2
+    exit 1
+  fi
+  run_branding_command "${BRANDING_ACTION}" "${BRANDING_ARGS[@]}"
+  exit $?
+fi
+
+if [[ -n "${SSL_ACTION}" ]]; then
+  if [[ -n "${UPDATE_MODE}" || -n "${SERVICES_ACTION}" || -n "${MIRRORS_ACTION}" || -n "${BRANDING_ACTION}" ]]; then
+    echo "Use -ssl alone." >&2
+    exit 1
+  fi
+  if [[ "${SSL_ACTION}" != "status" ]] && [[ ! -f "${APP_ROOT}/.deploy_env" ]]; then
+    echo "Hesabix not deployed yet. Run deploy.sh first." >&2
+    exit 1
+  fi
+  run_ssl_command "${SSL_ACTION}" "${SSL_ARGS[@]}"
   exit $?
 fi
 
@@ -216,8 +444,8 @@ fi
 
 if [[ -n "${SERVICES_ACTION}" ]]; then
   case "${SERVICES_ACTION}" in
-    start|stop|restart|status) ;;
-    *) echo "Invalid -services action: ${SERVICES_ACTION}. Use: start|stop|restart|status" >&2; exit 1 ;;
+    start|stop|restart|status|show) ;;
+    *) echo "Invalid -services action: ${SERVICES_ACTION}. Use: start|stop|restart|status|show" >&2; exit 1 ;;
   esac
   run_hesabix_services "${SERVICES_ACTION}"
   exit 0
@@ -237,6 +465,9 @@ set +a
 
 [[ -n "${SOURCE_URL}" ]] && export REPO_URL="${SOURCE_URL}"
 [[ -n "${BRANCH_OVERRIDE}" ]] && export BRANCH="${BRANCH_OVERRIDE}"
+if [[ -n "${SKIP_MIRROR_PROMPT}" ]]; then
+  export HESABIX_SKIP_MIRROR_PROMPT=1
+fi
 export APP_ROOT
 
 if [[ ! -f "${APP_ROOT}/app/update.sh" ]]; then
@@ -245,4 +476,3 @@ if [[ ! -f "${APP_ROOT}/app/update.sh" ]]; then
 fi
 
 exec bash "${APP_ROOT}/app/update.sh"
-

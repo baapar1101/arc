@@ -1,0 +1,20 @@
+[Unit]
+Description=Hesabix Telephony Connector (Issabel/Asterisk ↔ Hesabix)
+Documentation=https://source.hesabix.ir/hesabix/arc/src/branch/master/extraScripts/HesabixTelephonyConnector
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/HesabixTelephonyConnector
+EnvironmentFile=/opt/HesabixTelephonyConnector/.env
+ExecStart=/usr/bin/python3 /opt/HesabixTelephonyConnector/app/main.py
+Restart=always
+RestartSec=5
+TimeoutStopSec=20
+# امنیت پایه
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

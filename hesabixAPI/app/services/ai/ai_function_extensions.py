@@ -166,6 +166,40 @@ def register_extended_business_functions(registry: "AIFunctionRegistry") -> None
         )
     )
 
+    def create_warehouse_document_handler(args: Dict[str, Any], context: Dict[str, Any]) -> Any:
+        from app.services.ai.ai_tool_payloads import build_create_warehouse_document_payload
+        from app.services.warehouse_service import (
+            create_manual_warehouse_document,
+            warehouse_document_to_dict,
+        )
+
+        db = context["db"]
+        business_id = int(args.get("business_id") or context.get("business_id"))
+        user_id = context["user_context"].get_user_id()
+        data = build_create_warehouse_document_payload(args)
+        wh = create_manual_warehouse_document(db, business_id, user_id, data)
+        return warehouse_document_to_dict(db, wh)
+
+    from app.services.ai.ai_tool_payloads import (
+        CREATE_WAREHOUSE_DOCUMENT_DESCRIPTION,
+        CREATE_WAREHOUSE_DOCUMENT_PARAMETERS_SCHEMA,
+    )
+
+    registry.register(
+        AIFunction(
+            name="create_warehouse_document",
+            description=CREATE_WAREHOUSE_DOCUMENT_DESCRIPTION,
+            parameters_schema=CREATE_WAREHOUSE_DOCUMENT_PARAMETERS_SCHEMA,
+            handler=create_handler(create_warehouse_document_handler),
+            allowed_roles={AIRole.USER, AIRole.BUSINESS_OWNER, AIRole.OPERATOR, AIRole.ADMIN},
+            required_permissions=["warehouses.write"],
+            category="warehouse",
+            requires_approval=True,
+            risk_level="high",
+            is_readonly=False,
+        )
+    )
+
     # --- چک ---
     registry.register(
         AIFunction(
@@ -189,7 +223,7 @@ def register_extended_business_functions(registry: "AIFunctionRegistry") -> None
     registry.register(
         AIFunction(
             name="get_check_details",
-            description="جزئیات یک چک.",
+            description="دریافت جزئیات یک چک شامل مبلغ، وضعیت، سررسید و طرف‌حساب.",
             parameters_schema={
                 "type": "object",
                 "properties": {"check_id": {"type": "integer", "description": "شناسه چک"}},
@@ -358,7 +392,11 @@ def register_extended_business_functions(registry: "AIFunctionRegistry") -> None
     registry.register(
         AIFunction(
             name="get_person_transactions",
-            description="گزارش گردش/تراکنش‌های یک یا چند شخص (مشتری/تامین‌کننده).",
+            description=(
+                "گزارش معین/گردش حساب یک شخص (مشتری/تامین‌کننده): "
+                "فاکتور خرید/فروش همراه دریافت و پرداخت. "
+                "با detail_level=comprehensive ریز اقلام کالا هم برمی‌گردد."
+            ),
             parameters_schema={
                 "type": "object",
                 "properties": {
@@ -366,8 +404,13 @@ def register_extended_business_functions(registry: "AIFunctionRegistry") -> None
                     "person_id": {"type": "integer", "description": "شناسه شخص (توصیه می‌شود)"},
                     "document_type": {
                         "type": "string",
-                        "enum": ["receipt", "payment"],
-                        "description": "فیلتر نوع (اختیاری)",
+                        "description": "فیلتر نوع سند (مثلاً invoice_purchase, receipt, payment)",
+                    },
+                    "detail_level": {
+                        "type": "string",
+                        "enum": ["summary", "comprehensive"],
+                        "description": "summary=مبلغ کل فاکتور؛ comprehensive=ریز اقلام خرید/فروش",
+                        "default": "comprehensive",
                     },
                 },
                 "required": [],
@@ -524,6 +567,7 @@ def _person_transactions(db, business_id, user_id, **kwargs):
     q = _clamp_pagination(kwargs)
     pid = _to_int(kwargs.get("person_id"))
     person_ids = [pid] if pid is not None else None
+    detail_level = kwargs.get("detail_level") or "comprehensive"
     return get_people_transactions_report(
         db,
         business_id,
@@ -536,6 +580,7 @@ def _person_transactions(db, business_id, user_id, **kwargs):
         search=kwargs.get("search"),
         skip=q["skip"],
         take=q["take"],
+        detail_level=detail_level,
     )
 
 

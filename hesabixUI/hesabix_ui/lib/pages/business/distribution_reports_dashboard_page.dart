@@ -1,11 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
 import 'package:hesabix_ui/core/date_utils.dart' as Hd;
 import 'package:hesabix_ui/l10n/app_localizations.dart';
+import 'package:hesabix_ui/models/business_user_model.dart';
+import 'package:hesabix_ui/services/business_user_service.dart';
 import 'package:hesabix_ui/services/distribution_service.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
 import 'package:hesabix_ui/utils/snackbar_helper.dart';
+import 'package:hesabix_ui/widgets/distribution/distribution_ui_helpers.dart';
 import 'package:hesabix_ui/widgets/jalali_date_picker.dart';
+import 'package:hesabix_ui/widgets/business_subpage_back_leading.dart';
 
 /// گزارش خلاصهٔ ویزیت و مرجوعی (مرکز گزارشات).
 class DistributionReportsDashboardPage extends StatefulWidget {
@@ -29,7 +34,7 @@ class _DistributionReportsDashboardPageState extends State<DistributionReportsDa
   DateTime _to = DateTime.now();
   Map<String, dynamic>? _data;
   bool _loading = false;
-  final TextEditingController _targetUserCtl = TextEditingController();
+  int? _targetUserId;
 
   bool get _jalali => widget.calendarController.isJalali;
 
@@ -39,12 +44,11 @@ class _DistributionReportsDashboardPageState extends State<DistributionReportsDa
   Future<void> _load() async {
     setState(() => _loading = true);
     try {
-      final tid = int.tryParse(_targetUserCtl.text.trim());
       final d = await _svc.getReportsDashboard(
         businessId: widget.businessId,
         fromDate: _iso(_from),
         toDate: _iso(_to),
-        targetUserId: tid,
+        targetUserId: _targetUserId,
       );
       if (mounted) setState(() => _data = d);
     } catch (e) {
@@ -68,12 +72,6 @@ class _DistributionReportsDashboardPageState extends State<DistributionReportsDa
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) => _load());
-  }
-
-  @override
-  void dispose() {
-    _targetUserCtl.dispose();
-    super.dispose();
   }
 
   Widget _statCard(String title, String value, IconData icon, ColorScheme cs) {
@@ -108,7 +106,10 @@ class _DistributionReportsDashboardPageState extends State<DistributionReportsDa
     final byOutcome = visits?['by_outcome'] is Map ? visits!['by_outcome'] as Map<String, dynamic> : null;
 
     return Scaffold(
-      appBar: AppBar(title: Text(t.reportsDistributionDashboardTitle)),
+      appBar: AppBar(
+        title: Text(t.reportsDistributionDashboardTitle),
+        leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
+      ),
       body: RefreshIndicator(
         onRefresh: _load,
         child: ListView(
@@ -139,13 +140,29 @@ class _DistributionReportsDashboardPageState extends State<DistributionReportsDa
               ],
             ),
             const SizedBox(height: 8),
-            TextField(
-              controller: _targetUserCtl,
-              keyboardType: TextInputType.number,
-              decoration: InputDecoration(
-                labelText: t.distributionTeamPlanUserId,
-                border: const OutlineInputBorder(),
-              ),
+            FutureBuilder<BusinessUsersResponse>(
+              future: BusinessUserService(ApiClient()).getBusinessUsers(widget.businessId),
+              builder: (context, snap) {
+                final users = snap.data?.users ?? const <BusinessUser>[];
+                return DropdownButtonFormField<int?>(
+                  value: _targetUserId,
+                  isDense: true,
+                  decoration: InputDecoration(
+                    labelText: t.distributionSelectVisitor,
+                    border: const OutlineInputBorder(),
+                  ),
+                  items: [
+                    const DropdownMenuItem<int?>(value: null, child: Text('—')),
+                    ...users.map(
+                      (u) => DropdownMenuItem<int?>(
+                        value: u.userId,
+                        child: Text(u.userName.isNotEmpty ? u.userName : '${u.userId}'),
+                      ),
+                    ),
+                  ],
+                  onChanged: (v) => setState(() => _targetUserId = v),
+                );
+              },
             ),
             const SizedBox(height: 12),
             FilledButton.icon(
@@ -194,6 +211,67 @@ class _DistributionReportsDashboardPageState extends State<DistributionReportsDa
                   ),
                 ],
               ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  _statCard(
+                    t.distributionSalesLinked,
+                    '${visits['sales_linked_count'] ?? 0}',
+                    Icons.receipt_long,
+                    cs,
+                  ),
+                  const SizedBox(width: 8),
+                  _statCard(
+                    t.distributionCoveragePercent,
+                    visits['coverage_percent'] == null
+                        ? '—'
+                        : '${visits['coverage_percent']}%',
+                    Icons.pie_chart_outline,
+                    cs,
+                  ),
+                ],
+              ),
+              if (visits['sales_linked_net_total'] != null) ...[
+                const SizedBox(height: 8),
+                ListTile(
+                  leading: const Icon(Icons.payments_outlined),
+                  title: Text(t.distributionSalesLinked),
+                  trailing: Text('${visits['sales_linked_net_total']}'),
+                ),
+              ],
+              if (visits['order_rate_percent'] != null) ...[
+                const SizedBox(height: 8),
+                ListTile(
+                  leading: const Icon(Icons.trending_up),
+                  title: Text(t.distributionOrderRate),
+                  trailing: Text('${visits['order_rate_percent']}%'),
+                ),
+              ],
+              if (_data?['settlements'] is Map) ...[
+                const SizedBox(height: 20),
+                Text(t.distributionSettlementsReport, style: Theme.of(context).textTheme.titleMedium),
+                const SizedBox(height: 8),
+                ListTile(
+                  leading: const Icon(Icons.account_balance_wallet_outlined),
+                  title: Text(t.distributionSaveDraft),
+                  trailing: Text('${(_data!['settlements'] as Map)['draft_count'] ?? 0}'),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.verified_outlined),
+                  title: Text(t.distributionSettlementConfirmed),
+                  trailing: Text('${(_data!['settlements'] as Map)['confirmed_count'] ?? 0}'),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.payments_outlined),
+                  title: Text(t.distributionCashCollected),
+                  trailing: Text('${(_data!['settlements'] as Map)['confirmed_collected_total'] ?? 0}'),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.balance),
+                  title: Text(t.distributionVarianceAbs),
+                  trailing: Text('${(_data!['settlements'] as Map)['confirmed_variance_abs_total'] ?? 0}'),
+                ),
+              ],
               if (byOutcome != null && byOutcome.isNotEmpty) ...[
                 const SizedBox(height: 20),
                 Text(t.distributionReportsOutcomeBreakdown, style: Theme.of(context).textTheme.titleMedium),
@@ -201,7 +279,7 @@ class _DistributionReportsDashboardPageState extends State<DistributionReportsDa
                 ...byOutcome.entries.map(
                   (e) => ListTile(
                     leading: const Icon(Icons.pie_chart_outline),
-                    title: Text(e.key),
+                    title: Text(distributionOutcomeLabel(t, e.key)),
                     trailing: Text('${e.value}'),
                   ),
                 ),
@@ -228,7 +306,7 @@ class _DistributionReportsDashboardPageState extends State<DistributionReportsDa
                 final m = Map<String, dynamic>.from(row as Map);
                 return ListTile(
                   leading: const CircleAvatar(child: Icon(Icons.person)),
-                  title: Text('user ${m['user_id']}'),
+                  title: Text(m['user_name']?.toString() ?? 'user ${m['user_id']}'),
                   trailing: Text('${m['visit_count']}'),
                 );
               }),

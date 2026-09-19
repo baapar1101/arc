@@ -6,6 +6,7 @@ import '../theme/theme_controller.dart';
 import 'language_switcher.dart';
 import 'calendar_switcher.dart';
 import 'theme_mode_switcher.dart';
+import 'theme_palette_switcher.dart';
 
 class AuthFooter extends StatelessWidget {
   final LocaleController localeController;
@@ -23,6 +24,8 @@ class AuthFooter extends StatelessWidget {
           CalendarSwitcher(controller: calendarController),
           const SizedBox(width: 8),
           if (themeController != null) ...[
+            ThemePaletteSwitcher(controller: themeController!),
+            const SizedBox(width: 8),
             ThemeModeSwitcher(controller: themeController!),
             const SizedBox(width: 8),
           ],

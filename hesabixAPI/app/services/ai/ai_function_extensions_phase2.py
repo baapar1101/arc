@@ -90,7 +90,7 @@ def register_phase2_business_functions(registry: "AIFunctionRegistry") -> None:
     registry.register(
         AIFunction(
             name="get_bom_details",
-            description="جزئیات یک BOM.",
+            description="دریافت جزئیات یک صورت مواد (BOM) شامل اقلام، مقدار و محصول والد.",
             parameters_schema={
                 "type": "object",
                 "properties": {"bom_id": {"type": "integer"}},

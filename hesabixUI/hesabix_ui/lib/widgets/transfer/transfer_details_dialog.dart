@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 import '../../core/date_utils.dart';
 import '../../core/calendar_controller.dart';
 import '../../core/api_client.dart';
-import 'package:hesabix_ui/utils/web/web_utils.dart' as web_utils;
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
+import 'package:hesabix_ui/services/bytes_export/bytes_export_service.dart';
 
 class TransferDetailsDialog extends StatefulWidget {
   final Map<String, dynamic> document;
@@ -57,11 +56,8 @@ class _TransferDetailsDialogState extends State<TransferDetailsDialog> {
       
       final path = '/transfers/$documentId/pdf';
       final bytes = await api.downloadPdf(path);
-      await _savePdfFile(bytes, widget.document['code'] as String? ?? 'transfer');
-
-      if (mounted) {
-        SnackBarHelper.showSuccess(context, message: 'فایل PDF با موفقیت تولید شد');
-      }
+      final result = await _savePdfFile(bytes, widget.document['code'] as String? ?? 'transfer');
+      if (mounted) BytesExportService.showFeedback(context, result);
     } catch (e) {
       if (mounted) {
         SnackBarHelper.showError(
@@ -78,16 +74,12 @@ class _TransferDetailsDialogState extends State<TransferDetailsDialog> {
     }
   }
 
-  Future<void> _savePdfFile(List<int> bytes, String filename) async {
-    if (kIsWeb) {
-      await web_utils.saveBytesAsFileWeb(
-        bytes,
-        filename.endsWith('.pdf') ? filename : '$filename.pdf',
-        mimeType: 'application/pdf',
-      );
-    } else {
-      throw UnsupportedError('دانلود فایل فقط در نسخه وب پشتیبانی می‌شود');
-    }
+  Future<BytesExportResult> _savePdfFile(List<int> bytes, String filename) async {
+    return BytesExportService.export(
+      bytes: bytes,
+      filename: filename.endsWith('.pdf') ? filename : '$filename.pdf',
+      mimeType: 'application/pdf',
+    );
   }
 
   @override

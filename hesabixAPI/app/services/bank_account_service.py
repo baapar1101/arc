@@ -215,21 +215,17 @@ def _calculate_bank_account_balance(
 	fiscal_year_id: Optional[int] = None,
 ) -> Decimal:
 	"""
-	محاسبه موجودی یک حساب بانکی
-	
-	Args:
-		db: نشست پایگاه داده
-		bank_account_id: شناسه حساب بانکی
-		business_id: شناسه کسب‌وکار
-		fiscal_year_id: شناسه سال مالی (اختیاری)
-	
-	Returns:
-		Decimal: موجودی حساب (debit - credit)
+	محاسبه موجودی یک حساب بانکی به ارز همان حساب.
+
+	اگر خط دارای extra_info.account_currency_amount باشد (انتقال/پرداخت بین‌ارزی)،
+	همان مبلغ بومی لحاظ می‌شود؛ در غیر این صورت debit/credit سند.
 	"""
-	query = db.query(
-		func.coalesce(func.sum(DocumentLine.debit), 0).label('total_debit'),
-		func.coalesce(func.sum(DocumentLine.credit), 0).label('total_credit')
-	).join(
+	from app.services.account_native_balance import line_native_signed_amount_for_account
+
+	bank = db.query(BankAccount).filter(BankAccount.id == int(bank_account_id)).first()
+	bank_currency_id = int(bank.currency_id) if bank else None
+
+	query = db.query(DocumentLine, Document).join(
 		Document, DocumentLine.document_id == Document.id
 	).filter(
 		Document.business_id == business_id,
@@ -237,17 +233,15 @@ def _calculate_bank_account_balance(
 		DocumentLine.bank_account_id == bank_account_id
 	)
 	
-	# فیلتر سال مالی
 	if fiscal_year_id:
 		query = query.filter(Document.fiscal_year_id == fiscal_year_id)
 	
-	result = query.first()
-	if result:
-		total_debit = Decimal(str(result.total_debit or 0))
-		total_credit = Decimal(str(result.total_credit or 0))
-		return total_debit - total_credit
-	
-	return Decimal(0)
+	total = Decimal(0)
+	for line, doc in query.all():
+		total += line_native_signed_amount_for_account(
+			line, doc, account_currency_id=bank_currency_id
+		)
+	return total
 
 
 def _calculate_bank_accounts_balances_bulk(
@@ -256,54 +250,36 @@ def _calculate_bank_accounts_balances_bulk(
 	business_id: int,
 	fiscal_year_id: Optional[int] = None,
 ) -> Dict[int, Decimal]:
-	"""
-	محاسبه موجودی چند حساب بانکی به صورت bulk
-	
-	Args:
-		db: نشست پایگاه داده
-		bank_account_ids: لیست شناسه‌های حساب‌های بانکی
-		business_id: شناسه کسب‌وکار
-		fiscal_year_id: شناسه سال مالی (اختیاری)
-	
-	Returns:
-		Dict[int, Decimal]: دیکشنری {bank_account_id: balance}
-	"""
+	"""محاسبه موجودی چند حساب بانکی به صورت bulk (با پشتیبانی مبلغ بومی بین‌ارزی)."""
+	from app.services.account_native_balance import line_native_signed_amount_for_account
+
 	if not bank_account_ids:
 		return {}
-	
-	query = db.query(
-		DocumentLine.bank_account_id,
-		func.coalesce(func.sum(DocumentLine.debit), 0).label('total_debit'),
-		func.coalesce(func.sum(DocumentLine.credit), 0).label('total_credit')
-	).join(
+
+	banks = {
+		int(b.id): b
+		for b in db.query(BankAccount).filter(BankAccount.id.in_(bank_account_ids)).all()
+	}
+	out: Dict[int, Decimal] = {int(i): Decimal(0) for i in bank_account_ids}
+
+	query = db.query(DocumentLine, Document).join(
 		Document, DocumentLine.document_id == Document.id
 	).filter(
 		Document.business_id == business_id,
 		Document.is_proforma == False,
 		DocumentLine.bank_account_id.in_(bank_account_ids)
-	).group_by(
-		DocumentLine.bank_account_id
 	)
-	
-	# فیلتر سال مالی
 	if fiscal_year_id:
 		query = query.filter(Document.fiscal_year_id == fiscal_year_id)
-	
-	results = query.all()
-	
-	balances = {}
-	for result in results:
-		ba_id = result.bank_account_id
-		total_debit = Decimal(str(result.total_debit or 0))
-		total_credit = Decimal(str(result.total_credit or 0))
-		balances[ba_id] = total_debit - total_credit
-	
-	# برای حساب‌هایی که تراکنشی ندارند، موجودی صفر است
-	for ba_id in bank_account_ids:
-		if ba_id not in balances:
-			balances[ba_id] = Decimal(0)
-	
-	return balances
+
+	for line, doc in query.all():
+		bid = int(line.bank_account_id)
+		bank = banks.get(bid)
+		bank_currency_id = int(bank.currency_id) if bank else None
+		out[bid] += line_native_signed_amount_for_account(
+			line, doc, account_currency_id=bank_currency_id
+		)
+	return out
 
 
 def list_bank_accounts(
@@ -518,6 +494,18 @@ def get_bank_accounts_turnover_report(
             'pagination': اطلاعات pagination
         }
     """
+    # Without a currency filter, every aggregate is expressed in the business
+    # base currency.  This prevents mixed native-currency totals.
+    amounts_in_base = currency_id is None
+    debit_amount = (
+        func.coalesce(DocumentLine.debit_base, DocumentLine.debit)
+        if amounts_in_base else DocumentLine.debit
+    )
+    credit_amount = (
+        func.coalesce(DocumentLine.credit_base, DocumentLine.credit)
+        if amounts_in_base else DocumentLine.credit
+    )
+
     # Query پایه: DocumentLine join Document و BankAccount
     query = db.query(
         DocumentLine,
@@ -594,7 +582,11 @@ def get_bank_accounts_turnover_report(
                 'total_pages': 0,
                 'has_next': False,
                 'has_prev': False,
-            }
+            },
+            'meta': {
+                'currency_id': currency_id,
+                'amounts_in_base': amounts_in_base,
+            },
         }
     
     # تابع برای تبدیل document_type به نام فارسی
@@ -643,8 +635,8 @@ def get_bank_accounts_turnover_report(
             for ba_id in unique_bank_account_ids:
                 # محاسبه مجموع واریز (debit) و برداشت (credit) تا date_before_from
                 opening_query = db.query(
-                    func.coalesce(func.sum(DocumentLine.debit), 0).label('total_deposit'),
-                    func.coalesce(func.sum(DocumentLine.credit), 0).label('total_withdrawal')
+                    func.coalesce(func.sum(debit_amount), 0).label('total_deposit'),
+                    func.coalesce(func.sum(credit_amount), 0).label('total_withdrawal')
                 ).join(
                     Document, DocumentLine.document_id == Document.id
                 ).filter(
@@ -683,8 +675,14 @@ def get_bank_accounts_turnover_report(
         if ba_id not in balance_by_account:
             balance_by_account[ba_id] = Decimal(0)
         
-        deposit = Decimal(str(line.debit or 0))
-        withdrawal = Decimal(str(line.credit or 0))
+        deposit = Decimal(str(
+            (line.debit_base if line.debit_base is not None else line.debit)
+            if amounts_in_base else line.debit
+        ) or 0)
+        withdrawal = Decimal(str(
+            (line.credit_base if line.credit_base is not None else line.credit)
+            if amounts_in_base else line.credit
+        ) or 0)
         
         # به‌روزرسانی مانده: واریز (debit) اضافه می‌کند، برداشت (credit) کم می‌کند
         balance_by_account[ba_id] += deposit - withdrawal
@@ -750,7 +748,11 @@ def get_bank_accounts_turnover_report(
             'total_pages': total_pages,
             'has_next': current_page < total_pages,
             'has_prev': current_page > 1,
-        }
+        },
+        'meta': {
+            'currency_id': currency_id,
+            'amounts_in_base': amounts_in_base,
+        },
 	}
 
 

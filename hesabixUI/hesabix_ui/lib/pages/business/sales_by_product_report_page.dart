@@ -14,11 +14,12 @@ import 'package:hesabix_ui/widgets/data_table/helpers/data_table_utils.dart';
 import 'package:hesabix_ui/widgets/invoice/product_combobox_widget.dart';
 import 'package:hesabix_ui/widgets/category/category_picker_field.dart';
 import 'package:hesabix_ui/core/date_utils.dart';
+import 'package:hesabix_ui/core/hesabix_back.dart';
 
 class SalesByProductReportPage extends StatefulWidget {
   final int businessId;
   final CalendarController calendarController;
-  
+
   const SalesByProductReportPage({
     super.key,
     required this.businessId,
@@ -26,7 +27,8 @@ class SalesByProductReportPage extends StatefulWidget {
   });
 
   @override
-  State<SalesByProductReportPage> createState() => _SalesByProductReportPageState();
+  State<SalesByProductReportPage> createState() =>
+      _SalesByProductReportPageState();
 }
 
 class _SalesByProductReportPageState extends State<SalesByProductReportPage> {
@@ -38,7 +40,7 @@ class _SalesByProductReportPageState extends State<SalesByProductReportPage> {
   int? _selectedCategoryId;
   Map<String, dynamic>? _selectedProduct;
   bool _includeZeroSales = false;
-  
+
   // Data
   List<Map<String, dynamic>> _fiscalYears = [];
   List<Map<String, dynamic>> _currencies = [];
@@ -76,18 +78,15 @@ class _SalesByProductReportPageState extends State<SalesByProductReportPage> {
   Future<void> _loadCurrencies() async {
     try {
       final svc = CurrencyService(ApiClient());
-      final items = await svc.listBusinessCurrencies(businessId: widget.businessId);
+      final items = await svc.listBusinessCurrencies(
+        businessId: widget.businessId,
+      );
       if (!mounted) return;
       setState(() {
         _currencies = items;
         // انتخاب ارز پیش‌فرض
-        if (items.isNotEmpty) {
-          final defaultCurrency = items.firstWhere(
-            (c) => c['is_default'] == true,
-            orElse: () => items.first,
-          );
-          _selectedCurrencyId = defaultCurrency['id'] as int?;
-        }
+        // قرارداد چندارزی: null = همه ارزها → معادل پایه
+        _selectedCurrencyId = null;
       });
     } catch (_) {
       // ignore errors
@@ -114,14 +113,17 @@ class _SalesByProductReportPageState extends State<SalesByProductReportPage> {
   }
 
   // تابع برای جمع‌آوری تمام ID های زیرشاخه‌های یک دسته‌بندی
-  List<int> _getAllCategoryIds(int categoryId, List<Map<String, dynamic>> categories) {
+  List<int> _getAllCategoryIds(
+    int categoryId,
+    List<Map<String, dynamic>> categories,
+  ) {
     final result = <int>[categoryId];
-    
+
     // تابع بازگشتی برای پیدا کردن زیرشاخه‌ها
     void findChildren(int parentId, List<Map<String, dynamic>> tree) {
       for (final cat in tree) {
         final id = cat['id'] as int?;
-        
+
         if (id != null) {
           // بررسی اینکه آیا این دسته‌بندی فرزند parentId است
           final parentIdFromTree = cat['parent_id'] as int?;
@@ -133,7 +135,7 @@ class _SalesByProductReportPageState extends State<SalesByProductReportPage> {
               findChildren(id, children.cast<Map<String, dynamic>>());
             }
           }
-          
+
           // بررسی زیرشاخه‌های این دسته‌بندی
           final children = cat['children'] as List<dynamic>?;
           if (children != null && children.isNotEmpty) {
@@ -142,7 +144,7 @@ class _SalesByProductReportPageState extends State<SalesByProductReportPage> {
         }
       }
     }
-    
+
     findChildren(categoryId, categories);
     return result;
   }
@@ -153,11 +155,14 @@ class _SalesByProductReportPageState extends State<SalesByProductReportPage> {
     if (_selectedCategoryId != null) {
       categoryIds = _getAllCategoryIds(_selectedCategoryId!, _categories);
     }
-    
+
     return {
-      if (_fromDate != null) 'date_from': _fromDate!.toIso8601String().split('T').first,
-      if (_toDate != null) 'date_to': _toDate!.toIso8601String().split('T').first,
-      if (_selectedFiscalYearId != null) 'fiscal_year_id': _selectedFiscalYearId,
+      if (_fromDate != null)
+        'date_from': _fromDate!.toIso8601String().split('T').first,
+      if (_toDate != null)
+        'date_to': _toDate!.toIso8601String().split('T').first,
+      if (_selectedFiscalYearId != null)
+        'fiscal_year_id': _selectedFiscalYearId,
       if (_selectedCurrencyId != null) 'currency_id': _selectedCurrencyId,
       if (categoryIds != null) 'category_ids': categoryIds,
       if (_selectedProduct != null) 'product_ids': [_selectedProduct!['id']],
@@ -167,21 +172,31 @@ class _SalesByProductReportPageState extends State<SalesByProductReportPage> {
 
   String _formatNumber(dynamic value) {
     if (value == null) return '0';
-    final n = value is num ? value.toDouble() : double.tryParse(value.toString()) ?? 0.0;
+    final n = value is num
+        ? value.toDouble()
+        : double.tryParse(value.toString()) ?? 0.0;
     return DataTableUtils.formatNumber(n);
   }
 
   String _formatDate(dynamic value) {
     if (value == null) return '';
+<<<<<<< HEAD
+    return HesabixDateUtils.formatForDisplay(
+      value is DateTime
+          ? value
+          : (value is String ? DateTime.tryParse(value) : null),
+=======
     return MarkStreetDateUtils.formatForDisplay(
       value is DateTime ? value : (value is String ? DateTime.tryParse(value) : null),
+>>>>>>> github/Huma
       widget.calendarController.isJalali,
     );
   }
 
   DataTableConfig<Map<String, dynamic>> _buildTableConfig(AppLocalizations t) {
     return DataTableConfig<Map<String, dynamic>>(
-      endpoint: '/api/v1/products/businesses/${widget.businessId}/reports/sales-by-product',
+      endpoint:
+          '/api/v1/products/businesses/${widget.businessId}/reports/sales-by-product',
       businessId: widget.businessId,
       persistTableFiltersPageId: ListFilterPageIds.salesByProductReportTable,
       reportModuleKey: 'sales_by_product',
@@ -192,37 +207,44 @@ class _SalesByProductReportPageState extends State<SalesByProductReportPage> {
         TextColumn(
           'product_code',
           'کد کالا',
-          formatter: (item) => (item as Map<String, dynamic>)['product_code']?.toString() ?? '',
+          formatter: (item) =>
+              (item as Map<String, dynamic>)['product_code']?.toString() ?? '',
         ),
         TextColumn(
           'product_name',
           'نام کالا',
-          formatter: (item) => (item as Map<String, dynamic>)['product_name']?.toString() ?? '',
+          formatter: (item) =>
+              (item as Map<String, dynamic>)['product_name']?.toString() ?? '',
         ),
         TextColumn(
           'unit',
           'واحد',
-          formatter: (item) => (item as Map<String, dynamic>)['unit']?.toString() ?? '',
+          formatter: (item) =>
+              (item as Map<String, dynamic>)['unit']?.toString() ?? '',
         ),
         TextColumn(
           'category_name',
           'دسته‌بندی',
-          formatter: (item) => (item as Map<String, dynamic>)['category_name']?.toString() ?? '',
+          formatter: (item) =>
+              (item as Map<String, dynamic>)['category_name']?.toString() ?? '',
         ),
         NumberColumn(
           'total_quantity',
           'تعداد فروش',
-          formatter: (item) => _formatNumber((item as Map<String, dynamic>)['total_quantity']),
+          formatter: (item) =>
+              _formatNumber((item as Map<String, dynamic>)['total_quantity']),
         ),
         NumberColumn(
           'total_amount',
           'مبلغ کل فروش',
-          formatter: (item) => _formatNumber((item as Map<String, dynamic>)['total_amount']),
+          formatter: (item) =>
+              _formatNumber((item as Map<String, dynamic>)['total_amount']),
         ),
         NumberColumn(
           'average_price',
           'میانگین قیمت',
-          formatter: (item) => _formatNumber((item as Map<String, dynamic>)['average_price']),
+          formatter: (item) =>
+              _formatNumber((item as Map<String, dynamic>)['average_price']),
         ),
         DateColumn(
           'last_sale_date',
@@ -238,8 +260,10 @@ class _SalesByProductReportPageState extends State<SalesByProductReportPage> {
       defaultPageSize: 20,
       additionalParams: _additionalParams(),
       showExportButtons: true,
-      excelEndpoint: '/api/v1/products/businesses/${widget.businessId}/reports/sales-by-product/export/excel',
-      pdfEndpoint: '/api/v1/products/businesses/${widget.businessId}/reports/sales-by-product/export/pdf',
+      excelEndpoint:
+          '/api/v1/products/businesses/${widget.businessId}/reports/sales-by-product/export/excel',
+      pdfEndpoint:
+          '/api/v1/products/businesses/${widget.businessId}/reports/sales-by-product/export/pdf',
       getExportParams: () => _additionalParams(),
       footerTotals: {
         'total_quantity': 'جمع تعداد فروش',
@@ -253,14 +277,11 @@ class _SalesByProductReportPageState extends State<SalesByProductReportPage> {
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
     final cs = Theme.of(context).colorScheme;
-    
+
     return Scaffold(
       backgroundColor: cs.surface,
       appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.pop(),
-        ),
+        leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
         title: Text(t.reportsSalesByProductTitle),
         actions: [
           IconButton(
@@ -289,7 +310,10 @@ class _SalesByProductReportPageState extends State<SalesByProductReportPage> {
                       decoration: InputDecoration(
                         labelText: 'سال مالی',
                         border: const OutlineInputBorder(),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 16,
+                        ),
                       ),
                       items: _fiscalYears.map((fy) {
                         return DropdownMenuItem<int>(
@@ -309,7 +333,7 @@ class _SalesByProductReportPageState extends State<SalesByProductReportPage> {
                       },
                     ),
                   ),
-                  
+
                   // Date From
                   SizedBox(
                     width: 180,
@@ -324,7 +348,7 @@ class _SalesByProductReportPageState extends State<SalesByProductReportPage> {
                       },
                     ),
                   ),
-                  
+
                   // Date To
                   SizedBox(
                     width: 180,
@@ -339,7 +363,7 @@ class _SalesByProductReportPageState extends State<SalesByProductReportPage> {
                       },
                     ),
                   ),
-                  
+
                   // Currency
                   SizedBox(
                     width: 220,
@@ -349,12 +373,15 @@ class _SalesByProductReportPageState extends State<SalesByProductReportPage> {
                         labelText: 'واحد پول',
                         border: const OutlineInputBorder(),
                         isDense: true,
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 16,
+                        ),
                       ),
                       items: [
                         const DropdownMenuItem<int>(
                           value: null,
-                          child: Text('همه ارزها'),
+                          child: Text('همه ارزها (معادل پایه)'),
                         ),
                         ..._currencies.map((curr) {
                           final code = curr['code']?.toString() ?? '';
@@ -377,7 +404,7 @@ class _SalesByProductReportPageState extends State<SalesByProductReportPage> {
                       },
                     ),
                   ),
-                  
+
                   // Category - استفاده از CategoryPickerField
                   SizedBox(
                     width: 280,
@@ -394,7 +421,7 @@ class _SalesByProductReportPageState extends State<SalesByProductReportPage> {
                       },
                     ),
                   ),
-                  
+
                   // Product
                   SizedBox(
                     width: 280,
@@ -420,7 +447,7 @@ class _SalesByProductReportPageState extends State<SalesByProductReportPage> {
                       ],
                     ),
                   ),
-                  
+
                   // Include Zero Sales
                   SizedBox(
                     width: 200,
@@ -441,7 +468,7 @@ class _SalesByProductReportPageState extends State<SalesByProductReportPage> {
               ),
             ),
           ),
-          
+
           // Data Table
           Expanded(
             child: DataTableWidget<Map<String, dynamic>>(
@@ -457,6 +484,4 @@ class _SalesByProductReportPageState extends State<SalesByProductReportPage> {
       ),
     );
   }
-
 }
-

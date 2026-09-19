@@ -13,6 +13,7 @@ WorkingDirectory=/var/www/arc/hesabixAPI
 
 # Environment
 Environment="PYTHONUNBUFFERED=1"
+Environment="TZ=UTC"
 Environment="PYTHONPATH=/var/www/arc/hesabixAPI"
 Environment="PATH=/var/www/arc/hesabixAPI/.venv/bin:/usr/local/bin:/usr/bin:/bin"
 # Python Optimization Flags برای بیشترین کارایی

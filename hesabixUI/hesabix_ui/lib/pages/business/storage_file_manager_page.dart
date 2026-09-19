@@ -1,17 +1,16 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
-import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/services/business_storage_service.dart';
-import 'package:hesabix_ui/utils/web/web_utils.dart' as web_utils;
 import 'package:file_picker/file_picker.dart';
-import 'package:file_saver/file_saver.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
 import 'package:hesabix_ui/utils/date_formatters.dart';
 import '../../utils/snackbar_helper.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
+import 'package:hesabix_ui/services/bytes_export/bytes_export_service.dart';
+import 'package:hesabix_ui/core/hesabix_back.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 /// صفحه فایل منیجر برای مدیریت فایل‌های کسب‌وکار
 class StorageFileManagerPage extends StatefulWidget {
@@ -339,7 +338,7 @@ class _StorageFileManagerPageState extends State<StorageFileManagerPage> {
     return showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('حذف فایل'),
+        title: Text('حذف فایل'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -348,11 +347,11 @@ class _StorageFileManagerPageState extends State<StorageFileManagerPage> {
               'آیا از حذف "${file['original_name'] ?? ''}" اطمینان دارید؟',
               style: theme.textTheme.bodyMedium,
             ),
-            const SizedBox(height: 16),
+            SizedBox(height: 16),
             if (usageError != null)
               Text(
                 'خطا در دریافت وابستگی‌ها: $usageError',
-                style: theme.textTheme.bodySmall?.copyWith(color: Colors.red),
+                style: theme.textTheme.bodySmall?.copyWith(color: SemanticColorResolver.negative(context)),
               )
             else if (dependencies.isEmpty)
               Text(
@@ -386,7 +385,7 @@ class _StorageFileManagerPageState extends State<StorageFileManagerPage> {
                   },
                 ),
               ),
-              const SizedBox(height: 8),
+              SizedBox(height: 8),
               Text(
                 'با حذف فایل، لینک‌های بالا به صورت خودکار پاک می‌شوند.',
                 style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
@@ -397,11 +396,11 @@ class _StorageFileManagerPageState extends State<StorageFileManagerPage> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('لغو'),
+            child: Text('لغو'),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
-            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            style: FilledButton.styleFrom(backgroundColor: SemanticColorResolver.negative(context)),
             child: const Text('حذف'),
           ),
         ],
@@ -541,6 +540,14 @@ class _StorageFileManagerPageState extends State<StorageFileManagerPage> {
         throw Exception('فایل خالی است');
       }
 
+<<<<<<< HEAD
+      final result = await BytesExportService.export(
+        bytes: bytes,
+        filename: fileName,
+        mimeType: mimeType,
+      );
+      if (mounted) BytesExportService.showFeedback(context, result);
+=======
       if (kIsWeb) {
         await web_utils.saveBytesAsFileWeb(bytes, fileName, mimeType: mimeType);
       } else {
@@ -556,6 +563,7 @@ class _StorageFileManagerPageState extends State<StorageFileManagerPage> {
           SnackBarHelper.showSuccess(context, message: 'فایل با موفقیت ذخیره شد');
         }
       }
+>>>>>>> github/Huma
     } catch (e) {
       if (mounted) {
         SnackBarHelper.showError(
@@ -709,18 +717,15 @@ class _StorageFileManagerPageState extends State<StorageFileManagerPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('فایل منیجر'),
+        title: Text('فایل منیجر'),
         backgroundColor: theme.colorScheme.primary,
         foregroundColor: theme.colorScheme.onPrimary,
         elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.go('/business/${widget.businessId}/storage-files'),
-        ),
+        leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
         actions: [
           IconButton(
             onPressed: _showBusinessSharesSheet,
-            icon: const Icon(Icons.link),
+            icon: Icon(Icons.link),
             tooltip: 'مدیریت لینک‌های اشتراک',
           ),
           IconButton(
@@ -742,7 +747,7 @@ class _StorageFileManagerPageState extends State<StorageFileManagerPage> {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.error_outline, size: 64, color: Colors.red),
+                      Icon(Icons.error_outline, size: 64, color: SemanticColorResolver.negative(context)),
                       const SizedBox(height: 16),
                       Text(_error!, textAlign: TextAlign.center),
                       const SizedBox(height: 16),
@@ -1213,8 +1218,8 @@ class _StorageFileManagerPageState extends State<StorageFileManagerPage> {
             ),
             const Divider(),
             ListTile(
-              leading: const Icon(Icons.delete, color: Colors.red),
-              title: const Text('حذف', style: TextStyle(color: Colors.red)),
+              leading: Icon(Icons.delete, color: SemanticColorResolver.negative(context)),
+              title: Text('حذف', style: TextStyle(color: SemanticColorResolver.negative(context))),
               onTap: () {
                 Navigator.pop(context);
                 _deleteFile(file);

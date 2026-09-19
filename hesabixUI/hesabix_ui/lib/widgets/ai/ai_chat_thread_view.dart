@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../models/ai_models.dart';
+import '../../models/ai_voice_models.dart';
 import '../../services/voice/voice_phase.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/models/ai_stream_event.dart';
@@ -15,6 +16,10 @@ import 'ai_error_recovery_banner.dart';
 import 'ai_write_approval_banner.dart';
 import 'ai_execution_mode.dart';
 typedef MessageActionCallback = void Function(AIChatMessage message);
+
+String aiChatSpeakKey(AIChatMessage message) {
+  return '${message.id ?? 'noid'}:${message.createdAt?.millisecondsSinceEpoch ?? 0}:${message.content.hashCode}';
+}
 
 class AIChatThreadView extends StatelessWidget {
   final List<AIChatMessage> messages;
@@ -44,6 +49,9 @@ class AIChatThreadView extends StatelessWidget {
   final String Function(DateTime?) formatTime;
   final VoidCallback onSend;
   final VoidCallback? onMic;
+  final VoidCallback? onDictate;
+  final bool dictating;
+  final bool dictateBusy;
   final VoidCallback? onStopVoice;
   final VoidCallback? onStopGenerating;
   final VoidCallback? onAttach;
@@ -69,6 +77,10 @@ class AIChatThreadView extends StatelessWidget {
   final bool streamErrorRecoverable;
   final VoidCallback? onRetryStreamError;
   final VoidCallback? onDismissStreamError;
+  final String? continueRunId;
+  final VoidCallback? onContinueRun;
+  final VoidCallback? onDismissContinueRun;
+  final String? continueRunHint;
   final bool showWriteApproval;
   final List<Map<String, dynamic>> writeApprovalOps;
   final bool writeApprovalLoading;
@@ -80,6 +92,16 @@ class AIChatThreadView extends StatelessWidget {
   final VoidCallback? onCreditUpgrade;
   final String executionMode;
   final ValueChanged<String>? onExecutionModeChanged;
+  final void Function(AISessionTodoItem item, String status)? onTodoStatus;
+  final void Function(String subagentId)? onCancelSubagent;
+  final void Function(AIChatMessage message)? onSpeakMessage;
+  final String? speakingMessageKey;
+  final List<AIVoiceModelItem> sttModels;
+  final List<AIVoiceModelItem> ttsModels;
+  final String? selectedSttCode;
+  final String? selectedTtsCode;
+  final ValueChanged<String>? onSttChanged;
+  final ValueChanged<String>? onTtsChanged;
 
   const AIChatThreadView({
     super.key,
@@ -112,6 +134,9 @@ class AIChatThreadView extends StatelessWidget {
     required this.formatTime,
     required this.onSend,
     this.onMic,
+    this.onDictate,
+    this.dictating = false,
+    this.dictateBusy = false,
     this.onStopVoice,
     this.onStopGenerating,
     this.onAttach,
@@ -135,6 +160,10 @@ class AIChatThreadView extends StatelessWidget {
     this.streamErrorRecoverable = false,
     this.onRetryStreamError,
     this.onDismissStreamError,
+    this.continueRunId,
+    this.onContinueRun,
+    this.onDismissContinueRun,
+    this.continueRunHint,
     this.showWriteApproval = false,
     this.writeApprovalOps = const [],
     this.writeApprovalLoading = false,
@@ -146,6 +175,16 @@ class AIChatThreadView extends StatelessWidget {
     this.onCreditUpgrade,
     this.executionMode = AIExecutionMode.analyzer,
     this.onExecutionModeChanged,
+    this.onTodoStatus,
+    this.onCancelSubagent,
+    this.onSpeakMessage,
+    this.speakingMessageKey,
+    this.sttModels = const [],
+    this.ttsModels = const [],
+    this.selectedSttCode,
+    this.selectedTtsCode,
+    this.onSttChanged,
+    this.onTtsChanged,
   });
 
   Widget _buildMessageList(BuildContext context) {
@@ -196,6 +235,22 @@ class AIChatThreadView extends StatelessWidget {
                           message.role == MessageRole.assistant
                       ? onRegenerateLast
                       : null,
+                  onSpeak: !voiceActive &&
+                          message.role == MessageRole.assistant &&
+                          message.content.trim().isNotEmpty &&
+                          onSpeakMessage != null
+                      ? () => onSpeakMessage!(message)
+                      : null,
+                  speaking: speakingMessageKey != null &&
+                      speakingMessageKey == aiChatSpeakKey(message),
+                  onTodoStatus: message.role == MessageRole.assistant &&
+                          message.id != null &&
+                          message.id == lastAssistantMessageId
+                      ? onTodoStatus
+                      : null,
+                  onCancelSubagent: message.role == MessageRole.assistant
+                      ? onCancelSubagent
+                      : null,
                 ),
               ),
             ),
@@ -224,6 +279,8 @@ class AIChatThreadView extends StatelessWidget {
               elapsedSeconds: streamingElapsedSeconds,
               agentBudget: streamingAgentBudget,
               formatTime: formatTime(streamingTimestamp),
+              onTodoStatus: onTodoStatus,
+              onCancelSubagent: onCancelSubagent,
             ),
           ),
         );
@@ -266,6 +323,13 @@ class AIChatThreadView extends StatelessWidget {
             onRetry: onRetryStreamError,
             onDismiss: onDismissStreamError,
           ),
+        if (continueRunId != null && onContinueRun != null)
+          AIContinueRunBanner(
+            onContinue: onContinueRun!,
+            onDismiss: onDismissContinueRun,
+            loading: sending,
+            hint: continueRunHint,
+          ),
         if (showWriteApproval &&
             onConfirmWriteApproval != null &&
             onDismissWriteApproval != null)
@@ -302,6 +366,9 @@ class AIChatThreadView extends StatelessWidget {
           voiceStatusEvent: voiceStatusEvent,
           onSend: onSend,
           onMic: onMic,
+          onDictate: onDictate,
+          dictating: dictating,
+          dictateBusy: dictateBusy,
           onStopVoice: onStopVoice,
           onStopGenerating: isGenerating ? onStopGenerating : null,
           onAttach: onAttach,
@@ -312,6 +379,12 @@ class AIChatThreadView extends StatelessWidget {
           modelPricingHint: modelPricingHint,
           executionMode: executionMode,
           onExecutionModeChanged: onExecutionModeChanged,
+          sttModels: sttModels,
+          ttsModels: ttsModels,
+          selectedSttCode: selectedSttCode,
+          selectedTtsCode: selectedTtsCode,
+          onSttChanged: onSttChanged,
+          onTtsChanged: onTtsChanged,
         ),
       ],
     );
@@ -370,6 +443,10 @@ class _MessageRow extends StatelessWidget {
   final ValueChanged<int>? onFeedback;
   final int? feedbackRating;
   final VoidCallback? onRegenerate;
+  final VoidCallback? onSpeak;
+  final bool speaking;
+  final void Function(AISessionTodoItem item, String status)? onTodoStatus;
+  final void Function(String subagentId)? onCancelSubagent;
 
   const _MessageRow({
     this.businessId,
@@ -382,6 +459,10 @@ class _MessageRow extends StatelessWidget {
     this.onFeedback,
     this.feedbackRating,
     this.onRegenerate,
+    this.onSpeak,
+    this.speaking = false,
+    this.onTodoStatus,
+    this.onCancelSubagent,
   });
 
   @override
@@ -454,6 +535,8 @@ class _MessageRow extends StatelessWidget {
                     functionCalls: message.functionCalls,
                     functionResults: message.functionResults,
                     suppressApprovalToolChips: suppressApprovalToolChips,
+                    onTodoStatus: onTodoStatus,
+                    onCancelSubagent: onCancelSubagent,
                   ),
                   Row(
                     children: [
@@ -461,6 +544,8 @@ class _MessageRow extends StatelessWidget {
                         child: AIChatMessageActions(
                           onCopy: onCopy,
                           onRegenerate: onRegenerate,
+                          onSpeak: onSpeak,
+                          speaking: speaking,
                           onFeedback: onFeedback,
                           currentRating: feedbackRating,
                         ),
@@ -502,6 +587,8 @@ class _StreamingRow extends StatelessWidget {
   final int? elapsedSeconds;
   final AIStreamAgentBudget? agentBudget;
   final String formatTime;
+  final void Function(AISessionTodoItem item, String status)? onTodoStatus;
+  final void Function(String subagentId)? onCancelSubagent;
 
   const _StreamingRow({
     this.businessId,
@@ -518,6 +605,8 @@ class _StreamingRow extends StatelessWidget {
     this.elapsedSeconds,
     this.agentBudget,
     required this.formatTime,
+    this.onTodoStatus,
+    this.onCancelSubagent,
   });
 
   @override
@@ -539,7 +628,7 @@ class _StreamingRow extends StatelessWidget {
         toolActivities.isNotEmpty ||
         agentBudget != null;
     final showStatusLine =
-        content.isEmpty && !hasReasoningPanel;
+        content.isEmpty && statusPhase != 'writing';
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 14),
@@ -566,9 +655,13 @@ class _StreamingRow extends StatelessWidget {
                     agentBudget: agentBudget,
                     todoSnapshot: todoSnapshot,
                     compact: true,
-                    initiallyExpanded: todoSnapshot?.hasActiveItem == true ||
-                        traceSteps.any((s) => s.isActive),
+                    keepExpanded: true,
+                    initiallyExpanded: true,
+                    onTodoStatus: onTodoStatus,
+                    onCancelSubagent: onCancelSubagent,
                   ),
+                if (hasReasoningPanel && showStatusLine)
+                  const SizedBox(height: 8),
                 if (content.isNotEmpty)
                   AIChatMessageBody(
                     content: content,
@@ -578,6 +671,7 @@ class _StreamingRow extends StatelessWidget {
                 else if (showStatusLine)
                   _StreamingStatusPulse(
                     label: statusLabel,
+                    elapsedSeconds: elapsedSeconds,
                     theme: theme,
                     scheme: scheme,
                   ),
@@ -614,11 +708,13 @@ class _StreamingRow extends StatelessWidget {
 
 class _StreamingStatusPulse extends StatefulWidget {
   final String label;
+  final int? elapsedSeconds;
   final ThemeData theme;
   final ColorScheme scheme;
 
   const _StreamingStatusPulse({
     required this.label,
+    this.elapsedSeconds,
     required this.theme,
     required this.scheme,
   });
@@ -648,12 +744,18 @@ class _StreamingStatusPulseState extends State<_StreamingStatusPulse>
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final elapsed = widget.elapsedSeconds;
+    final displayLabel = elapsed != null && elapsed > 0
+        ? '${widget.label} · ${l10n.aiStatusElapsed(elapsed)}'
+        : widget.label;
+
     return FadeTransition(
       opacity: Tween<double>(begin: 0.45, end: 1).animate(
         CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
       ),
       child: Text(
-        widget.label,
+        displayLabel,
         style: widget.theme.textTheme.bodyMedium?.copyWith(
           height: 1.5,
           color: widget.scheme.onSurfaceVariant,

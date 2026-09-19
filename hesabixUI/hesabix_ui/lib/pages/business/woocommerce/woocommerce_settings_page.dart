@@ -6,6 +6,7 @@ import '../../../core/business_nav.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../core/permission_guard.dart';
 import 'woocommerce_plugin_settings_body.dart';
+import 'package:hesabix_ui/core/hesabix_back.dart';
 
 /// تنظیمات افزونهٔ ووکامرس زیر مسیر `.../settings/woocommerce`.
 class WoocommerceSettingsPage extends StatelessWidget {
@@ -36,10 +37,7 @@ class WoocommerceSettingsPage extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: Text(t.woocommerceSettingsPageTitle),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.pop(),
-        ),
+        leading: hesabixBackAppBarLeading(context, businessId: businessId),
         actions: [
           IconButton(
             tooltip: t.woocommerceOpenReportsOverviewTooltip,

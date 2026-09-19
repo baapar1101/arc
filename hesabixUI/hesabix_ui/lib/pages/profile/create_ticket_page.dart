@@ -7,9 +7,12 @@ import 'package:hesabix_ui/services/support_tickets_public_config.dart';
 import 'package:hesabix_ui/models/support_models.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/responsive_helper.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 class CreateTicketPage extends StatefulWidget {
-  const CreateTicketPage({super.key});
+  final bool fullPage;
+
+  const CreateTicketPage({super.key, this.fullPage = false});
 
   @override
   State<CreateTicketPage> createState() => _CreateTicketPageState();
@@ -75,7 +78,7 @@ class _CreateTicketPageState extends State<CreateTicketPage> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Icon(
-                  backgroundColor == Colors.green ? Icons.check_circle : Icons.error,
+                  backgroundColor == SemanticColorResolver.positive(context) ? Icons.check_circle : Icons.error,
                   color: Colors.white,
                   size: 20,
                 ),
@@ -144,7 +147,7 @@ class _CreateTicketPageState extends State<CreateTicketPage> {
       final t = AppLocalizations.of(context);
       _showOverlayMessage(
         t.pleaseSelectCategoryAndPriority,
-        Colors.red,
+        SemanticColorResolver.negative(context),
         const Duration(seconds: 3),
       );
       return;
@@ -169,7 +172,7 @@ class _CreateTicketPageState extends State<CreateTicketPage> {
         final t = AppLocalizations.of(context);
         _showOverlayMessage(
           t.ticketCreatedSuccessfully,
-          Colors.green,
+          SemanticColorResolver.positive(context),
           const Duration(seconds: 2),
         );
         Navigator.pop(context, true);
@@ -183,88 +186,103 @@ class _CreateTicketPageState extends State<CreateTicketPage> {
     }
   }
 
+  Widget _buildHeader(ThemeData theme, AppLocalizations t) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            theme.colorScheme.primary.withValues(alpha: 0.1),
+            theme.colorScheme.primary.withValues(alpha: 0.05),
+          ],
+        ),
+        borderRadius: widget.fullPage
+            ? null
+            : const BorderRadius.only(
+                topLeft: Radius.circular(16),
+                topRight: Radius.circular(16),
+              ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.primary,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Icon(Icons.support_agent, color: Colors.white, size: 24),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  t.createNewTicket,
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: theme.colorScheme.primary,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  t.descriptionHint,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (!widget.fullPage)
+            IconButton(
+              onPressed: () => context.pop(),
+              icon: const Icon(Icons.close),
+              style: IconButton.styleFrom(
+                backgroundColor: theme.colorScheme.surface,
+                foregroundColor: theme.colorScheme.onSurface,
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final t = AppLocalizations.of(context);
     final isMobile = ResponsiveHelper.isMobile(context);
 
+    final content = Column(
+      children: [
+        if (!widget.fullPage) _buildHeader(theme, t),
+        Expanded(
+          child: _buildBody(theme, !isMobile, t, isMobile),
+        ),
+      ],
+    );
+
+    if (widget.fullPage) {
+      return Scaffold(
+        appBar: AppBar(
+          title: Text(t.createNewTicket),
+        ),
+        body: content,
+      );
+    }
+
     return Dialog(
       insetPadding: ResponsiveHelper.getDialogPadding(context),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Container(
         constraints: ResponsiveHelper.getDialogConstraints(context),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Header with close button
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    theme.colorScheme.primary.withValues(alpha: 0.1),
-                    theme.colorScheme.primary.withValues(alpha: 0.05),
-                  ],
-                ),
-                borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(16),
-                  topRight: Radius.circular(16),
-                ),
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: theme.colorScheme.primary,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: const Icon(
-                      Icons.support_agent,
-                      color: Colors.white,
-                      size: 24,
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          t.createNewTicket,
-                          style: theme.textTheme.titleLarge?.copyWith(
-                            fontWeight: FontWeight.bold,
-                            color: theme.colorScheme.primary,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          t.descriptionHint,
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  IconButton(
-                    onPressed: () => context.pop(),
-                    icon: const Icon(Icons.close),
-                    style: IconButton.styleFrom(
-                      backgroundColor: theme.colorScheme.surface,
-                      foregroundColor: theme.colorScheme.onSurface,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            // Form content
-            Flexible(
-              child: _buildBody(theme, !isMobile, t, isMobile),
-            ),
+            _buildHeader(theme, t),
+            Flexible(child: _buildBody(theme, !isMobile, t, isMobile)),
           ],
         ),
       ),
@@ -320,16 +338,16 @@ class _CreateTicketPageState extends State<CreateTicketPage> {
               Container(
                 padding: const EdgeInsets.all(24),
                 decoration: BoxDecoration(
-                  color: Colors.red.withValues(alpha: 0.1),
+                  color: SemanticColorResolver.negative(context).withValues(alpha: 0.1),
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
                   Icons.error_outline,
                   size: 48,
-                  color: Colors.red.withValues(alpha: 0.8),
+                  color: SemanticColorResolver.negative(context).withValues(alpha: 0.8),
                 ),
               ),
-              const SizedBox(height: 24),
+              SizedBox(height: 24),
               Text(
                 t.dataLoadingError,
                 style: theme.textTheme.titleLarge?.copyWith(
@@ -340,7 +358,7 @@ class _CreateTicketPageState extends State<CreateTicketPage> {
               Text(
                 _error!,
                 style: theme.textTheme.bodyMedium?.copyWith(
-                  color: Colors.red,
+                  color: SemanticColorResolver.negative(context),
                 ),
                 textAlign: TextAlign.center,
               ),

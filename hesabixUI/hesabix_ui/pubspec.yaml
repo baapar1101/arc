@@ -1,5 +1,5 @@
 name: hesabix_ui
-description: "A new Flutter project."
+description: "cloud and open source accounting software with love."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
@@ -16,7 +16,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 1.1.56+23
+version: 70.15.200+70015200
 
 environment:
   sdk: ^3.9.2
@@ -62,13 +62,28 @@ dependencies:
   pdf: ^3.11.3
   barcode: ^2.2.9
   flutter_sound: ^9.2.13
+<<<<<<< HEAD
+  ffi: ^2.1.4
+  permission_handler: ^11.3.1
+  geolocator: ^13.0.2
+  flutter_map: ^7.0.2
+=======
   permission_handler: ^12.0.3
   geolocator: ^14.0.3
   flutter_map: ^8.3.0
+>>>>>>> github/Huma
   latlong2: ^0.9.1
   desktop_drop: ^0.4.4
   mobile_scanner: ^7.2.0
+  local_auth: ^2.3.0
   flutter_markdown: ^0.7.7+1
+  markdown: ^7.1.1
+  package_info_plus: ^8.3.0
+  path_provider: ^2.1.5
+  flutter_local_notifications: ^22.1.0
+  flutter_foreground_task: ^10.0.0
+  connectivity_plus: ^7.3.0
+  background_downloader: ^9.5.7
 
 dev_dependencies:
   flutter_test:
@@ -108,12 +123,18 @@ flutter:
   uses-material-design: true
   generate: true
   fonts:
+    # TTF برای اندروید/iOS/دسکتاپ؛ وب هم TTF را پشتیبانی می‌کند.
+    # WOFF2 فقط در CSS لودر وب (hesabix_web_loader.css) برای preload قبل از Flutter.
     - family: Roboto
       fonts:
-        - asset: assets/fonts/roboto.woff2
+        - asset: assets/fonts/Roboto-Regular.ttf
+        - asset: assets/fonts/Roboto-Bold.ttf
+          weight: 700
     - family: NotoSansArabic
       fonts:
-        - asset: assets/fonts/nanosansarabic.woff2
+        - asset: assets/fonts/Vazirmatn-Regular.ttf
+        - asset: assets/fonts/Vazirmatn-Bold.ttf
+          weight: 700
     - family: Vazirmatn
       fonts:
         - asset: assets/fonts/Vazirmatn-Regular.ttf
@@ -134,16 +155,17 @@ flutter:
           weight: 800
         - asset: assets/fonts/YekanBakhFaNum-Black.ttf
           weight: 900
-    # پوشش ایموجی و کاراکترهایی که یکان/عربی ندارند؛ بدون آن وب موتور Noto دانلودی را امتحان می‌کند و ممکن است به هشدار console برسد.
+    # پوشش لاتین/عمومی وقتی Roboto کافی نباشد. ایموجی از shardهای محلی
+    # fonts/gstatic/s/notocoloremoji (fontFallbackBaseUrl) — نه TTF مونolith.
     - family: Noto Sans
       fonts:
-        - asset: assets/fonts/NotoSans-Regular.woff2
-    - family: Noto Color Emoji
-      fonts:
-        - asset: assets/fonts/NotoColorEmoji-Regular.ttf
+        - asset: assets/fonts/Roboto-Regular.ttf
   assets:
     - assets/images/
+    - assets/fonts/Roboto-Regular.ttf
+    - assets/fonts/Roboto-Bold.ttf
     - assets/fonts/Vazirmatn-Regular.ttf
+    - assets/fonts/Vazirmatn-Bold.ttf
     - assets/fonts/YekanBakhFaNum-Regular.ttf
     - assets/fonts/YekanBakhFaNum-Bold.ttf
 

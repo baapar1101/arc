@@ -1,7 +1,6 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:go_router/go_router.dart';
 import '../../services/warehouse_service.dart';
 import '../../core/api_client.dart';
@@ -12,10 +11,16 @@ import '../../core/calendar_controller.dart';
 import '../../l10n/app_localizations.dart';
 import '../../utils/snackbar_helper.dart';
 
+<<<<<<< HEAD
+import '../../core/date_utils.dart' show HesabixDateUtils;
+=======
 import '../../utils/web/web_utils.dart' as web_utils;
 import '../../core/date_utils.dart' show MarkStreetDateUtils;
+>>>>>>> github/Huma
 import 'warehouse_postal_label_print_dialog.dart';
 import '../../utils/error_extractor.dart';
+import 'package:hesabix_ui/services/bytes_export/bytes_export_service.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 class WarehouseDocumentDetailsDialog extends StatefulWidget {
   final int businessId;
@@ -153,9 +158,9 @@ class _WarehouseDocumentDetailsDialogState extends State<WarehouseDocumentDetail
 
   Color _getStatusColor(String? status) {
     switch (status) {
-      case 'draft': return Colors.orange;
-      case 'posted': return Colors.green;
-      case 'cancelled': return Colors.red;
+      case 'draft': return SemanticColorResolver.warning(context);
+      case 'posted': return SemanticColorResolver.positive(context);
+      case 'cancelled': return SemanticColorResolver.negative(context);
       default: return Colors.grey;
     }
   }
@@ -343,15 +348,12 @@ class _WarehouseDocumentDetailsDialogState extends State<WarehouseDocumentDetail
         '/warehouse-docs/business/${widget.businessId}/${widget.documentId}/pdf',
       );
       if (!mounted) return;
-      if (kIsWeb) {
-        await web_utils.saveBytesAsFileWeb(
-          bytes,
-          'warehouse_doc_${widget.documentId}.pdf',
-          mimeType: 'application/pdf',
-        );
-      } else {
-        SnackBarHelper.show(context, message: 'دانلود PDF در موبایل به زودی...');
-      }
+      final result = await BytesExportService.export(
+        bytes: bytes,
+        filename: 'warehouse_doc_${widget.documentId}.pdf',
+        mimeType: 'application/pdf',
+      );
+      if (mounted) BytesExportService.showFeedback(context, result);
     } catch (e) {
       if (!mounted) return;
       SnackBarHelper.show(
@@ -383,7 +385,7 @@ class _WarehouseDocumentDetailsDialogState extends State<WarehouseDocumentDetail
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              const Icon(Icons.error_outline, color: Colors.red, size: 48),
+                              Icon(Icons.error_outline, color: SemanticColorResolver.negative(context), size: 48),
                               const SizedBox(height: 12),
                               Text(_error!),
                               const SizedBox(height: 12),

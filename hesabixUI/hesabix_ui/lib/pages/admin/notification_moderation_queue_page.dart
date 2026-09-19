@@ -5,6 +5,7 @@ import 'package:hesabix_ui/core/date_utils.dart' show MarkStreetDateUtils;
 import 'package:hesabix_ui/widgets/data_table/data_table_config.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table_widget.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 /// صفحه مدیریت صف بررسی قالب‌های نوتیفیکیشن
 class NotificationModerationQueuePage extends StatefulWidget {
@@ -574,14 +575,14 @@ class _NotificationModerationQueuePageState
               runSpacing: 4,
               children: [
                 IconButton(
-                  icon: const Icon(Icons.visibility_outlined),
+                  icon: Icon(Icons.visibility_outlined),
                   onPressed: () => _showDetailsDialog(item),
                   tooltip: 'جزئیات',
                   iconSize: 20,
                 ),
                 if (canAct) ...[
                   IconButton(
-                    icon: const Icon(Icons.edit_outlined),
+                    icon: Icon(Icons.edit_outlined),
                     onPressed: _isProcessing ? null : () => _showEditDialog(item),
                     tooltip: 'ویرایش',
                     iconSize: 20,
@@ -597,7 +598,7 @@ class _NotificationModerationQueuePageState
                     icon: const Icon(Icons.check),
                     onPressed: _isProcessing ? null : () => _showApproveDialog(item),
                     tooltip: 'تایید',
-                    color: Colors.green,
+                    color: SemanticColorResolver.positive(context),
                     iconSize: 20,
                   ),
                 ],

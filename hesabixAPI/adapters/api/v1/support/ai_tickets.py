@@ -1,5 +1,6 @@
 from typing import Dict, Any, TYPE_CHECKING
-from fastapi import APIRouter, Depends, Request, Body, Path
+from fastapi import APIRouter, Depends, Request, Body, Path, Query
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from adapters.db.session import get_db
@@ -8,10 +9,20 @@ from app.core.responses import success_response, ApiError
 from app.core.permissions import require_app_permission
 from app.services.ai.ai_service import AIService
 from app.services.ai.prompt_service import get_prompt_by_key
+from app.services.ai.ai_channel_policy import (
+    CHANNEL_TICKET,
+    CHANNEL_TICKET_READ_TOOLS,
+    CHANNEL_ITERATION_CAP,
+    filter_tools_by_allowlist,
+)
+from app.services.ai.ai_untrusted import wrap_untrusted_block
+from app.services.ai.ai_channel_stream import iter_channel_assist_sse
+from app.services.ai.ai_stream_helpers import sse_response_headers
 from adapters.db.repositories.support.ticket_repository import TicketRepository
 from adapters.db.repositories.support.message_repository import MessageRepository
 from adapters.api.v1.schemas import QueryInfo
 from app.services.notification_service import NotificationService
+from app.services.support.notification_helpers import support_notification_context
 from pydantic import BaseModel
 import logging
 
@@ -33,6 +44,7 @@ async def suggest_ai_reply(
     options: AISuggestReplyRequest = Body(...),
     db: Session = Depends(get_db),
     ctx: AuthContext = Depends(get_current_user),
+    stream: bool = Query(False, description="استریم SSE به‌جای JSON"),
 ) -> Dict[str, Any]:
     """دریافت پیشنهاد پاسخ AI برای تیکت"""
     ticket_repo = TicketRepository(db)
@@ -45,15 +57,25 @@ async def suggest_ai_reply(
     # استفاده از messages از طریق relationship در ticket (که قبلاً load شده)
     ticket_messages = ticket.messages if ticket.messages else []
     
-    # ساخت context برای AI
+    # ساخت context برای AI (متن تیکت دادهٔ غیرقابل‌اعتماد است)
     context_messages = []
     if options.use_ticket_history:
         for msg in ticket_messages:
-            # تبدیل sender_type به string اگر enum باشد
-            sender_type_str = msg.sender_type.value if hasattr(msg.sender_type, 'value') else str(msg.sender_type)
+            sender_type_str = (
+                msg.sender_type.value
+                if hasattr(msg.sender_type, "value")
+                else str(msg.sender_type)
+            )
+            wrapped = wrap_untrusted_block(
+                "ticket",
+                msg.content or "",
+                title=f"ticket-{ticket_id}-{sender_type_str}",
+            )
+            if not wrapped:
+                continue
             context_messages.append({
                 "role": "user" if sender_type_str == "user" else "assistant",
-                "content": msg.content
+                "content": wrapped,
             })
     
     # دریافت اطلاعات کسب‌وکار کاربر (اگر نیاز باشد)
@@ -97,23 +119,55 @@ async def suggest_ai_reply(
         },
     )
     
-    # ارسال به AI
+    ticket_user_prompt = get_prompt_by_key(
+        db,
+        "support.ticket_suggest.user",
+        {
+            "ticket_description": wrap_untrusted_block(
+                "ticket",
+                ticket.description or "",
+                title=f"ticket-{ticket_id}-description",
+            )
+        },
+    )
     ai_messages = [
         {"role": "system", "content": system_prompt},
         *context_messages,
-        {
-            "role": "user",
-            "content": get_prompt_by_key(
-                db,
-                "support.ticket_suggest.user",
-                {"ticket_description": ticket.description},
-            ),
-        },
+        {"role": "user", "content": ticket_user_prompt},
     ]
-    
-    # بدون tools: بسیاری از gatewayهای OpenAI-compatible (مثلاً vLLM) بدون
-    # --enable-auto-tool-choice خطا می‌دهند؛ پیشنهاد پاسخ تیکت فقط متن است.
-    response = await ai_service.chat_completion(ai_messages, use_function_calling=False)
+
+    catalog = ai_service.get_available_functions(
+        session_business_id=ai_service.business_id,
+        user_query=ticket.title or ticket.description or "",
+        execution_mode="analyzer",
+        channel="ticket",
+    )
+    tools = filter_tools_by_allowlist(catalog, CHANNEL_TICKET_READ_TOOLS)
+    if stream:
+        return StreamingResponse(
+            iter_channel_assist_sse(
+                ai_service,
+                ai_messages,
+                tools=tools,
+                user_query=ticket.title or "",
+                iteration_cap=CHANNEL_ITERATION_CAP[CHANNEL_TICKET],
+                result_field="suggested_reply",
+                feature="ticket_suggest_reply",
+                extra={"ticket_id": ticket_id},
+            ),
+            media_type="text/event-stream",
+            headers=sse_response_headers(),
+        )
+    response = await ai_service.chat_completion(
+        ai_messages,
+        tools=tools,
+        use_function_calling=True,
+        execution_mode="analyzer",
+        approve_writes=False,
+        user_query=ticket.title or "",
+        session_business_id=ai_service.business_id,
+        iteration_cap=CHANNEL_ITERATION_CAP[CHANNEL_TICKET],
+    )
     
     # بررسی سهمیه و شارژ
     usage = response.get("usage", {})
@@ -136,9 +190,18 @@ async def suggest_ai_reply(
     )
     
     suggested_reply = response["message"]["content"]
-    
+    tools_used = []
+    for item in response.get("_function_calls") or []:
+        if isinstance(item, dict) and item.get("name"):
+            tools_used.append(str(item["name"]))
+    citations = response.get("citations") or []
+    if not isinstance(citations, list):
+        citations = []
+
     return success_response({
         "suggested_reply": suggested_reply,
+        "tools_used": tools_used,
+        "citations": citations,
         "usage": {
             "input_tokens": input_tokens,
             "output_tokens": output_tokens,
@@ -188,14 +251,15 @@ async def ai_auto_reply(
             operator_name = f"{ctx.user.first_name or ''} {ctx.user.last_name or ''}".strip() or "اپراتور پشتیبانی"
             message_preview = suggested_reply[:200] + ("..." if len(suggested_reply) > 200 else "")
             
-            context = {
+            context = support_notification_context({
                 "subject": f"پاسخ جدید به تیکت #{ticket_id}",
                 "message": f"اپراتور {operator_name} به تیکت شما پاسخ داد:\n\n{message_preview}",
                 "ticket_id": ticket_id,
                 "ticket_title": ticket.title if hasattr(ticket, 'title') else "تیکت",
                 "operator_name": operator_name,
-                "message_preview": message_preview
-            }
+                "message_preview": message_preview,
+                "user_id": ticket.user_id,
+            }, ticket_id)
             
             notification_service.send(
                 user_id=ticket.user_id,

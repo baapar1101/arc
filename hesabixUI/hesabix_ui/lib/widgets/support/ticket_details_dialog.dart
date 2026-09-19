@@ -1,23 +1,18 @@
-import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
-import 'package:hesabix_ui/l10n/app_localizations.dart';
-import 'package:hesabix_ui/models/support_models.dart';
-import 'package:hesabix_ui/models/response_template.dart';
-import 'package:hesabix_ui/services/support_service.dart';
-import 'package:hesabix_ui/services/response_templates_service.dart';
-import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
-import 'package:hesabix_ui/core/date_utils.dart' as date_utils;
-import 'package:hesabix_ui/widgets/support/message_bubble.dart';
-import 'package:hesabix_ui/widgets/support/ai_ticket_assistant.dart';
+import 'package:hesabix_ui/models/support_models.dart';
+import 'package:hesabix_ui/widgets/support/ticket_detail_view.dart';
 
-class TicketDetailsDialog extends StatefulWidget {
+export 'ticket_detail_view.dart' show TicketDetailView, TicketDetailDisplayMode;
+
+/// Shell wrappers for [TicketDetailView] (dialog / page / embedded).
+class TicketDetailsDialog extends StatelessWidget {
   final SupportTicket ticket;
   final bool isOperator;
   final VoidCallback? onTicketUpdated;
   final CalendarController? calendarController;
+  final TicketDetailDisplayMode displayMode;
+  final VoidCallback? onRequestCsat;
 
   const TicketDetailsDialog({
     super.key,
@@ -25,9 +20,13 @@ class TicketDetailsDialog extends StatefulWidget {
     this.isOperator = false,
     this.onTicketUpdated,
     this.calendarController,
+    this.displayMode = TicketDetailDisplayMode.dialog,
+    this.onRequestCsat,
   });
 
   @override
+<<<<<<< HEAD
+=======
   State<TicketDetailsDialog> createState() => _TicketDetailsDialogState();
 }
 
@@ -374,423 +373,27 @@ class _TicketDetailsDialogState extends State<TicketDetailsDialog> {
   }
 
   @override
+>>>>>>> github/Huma
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context);
-    final theme = Theme.of(context);
-
-    return Dialog(
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Container(
-        width: MediaQuery.of(context).size.width * 0.9,
-        height: MediaQuery.of(context).size.height * 0.9,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(20),
-          color: Colors.white,
-        ),
-        child: Column(
-          children: [
-            // Header
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: theme.primaryColor.withValues(alpha: 0.1),
-                borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(20),
-                  topRight: Radius.circular(20),
-                ),
-              ),
-              child: Row(
-                children: [
-                  Icon(
-                    Icons.support_agent,
-                    color: theme.primaryColor,
-                    size: 24,
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          l10n.ticketNumber(_ticket.id.toString()),
-                          style: theme.textTheme.titleLarge?.copyWith(
-                            fontWeight: FontWeight.bold,
-                            color: theme.primaryColor,
-                          ),
-                        ),
-                        Text(
-                          _ticket.title,
-                          style: theme.textTheme.titleMedium?.copyWith(
-                            color: Colors.grey[700],
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const SizedBox(height: 4),
-                        Row(
-                          children: [
-                            Icon(
-                              Icons.access_time,
-                              size: 14,
-                              color: Colors.grey[600],
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              _formatTicketDate(_ticket.createdAt),
-                              style: theme.textTheme.bodySmall?.copyWith(
-                                color: Colors.grey[600],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                  IconButton(
-                    onPressed: () => context.pop(),
-                    icon: const Icon(Icons.close),
-                    style: IconButton.styleFrom(
-                      backgroundColor: Colors.grey[200],
-                      foregroundColor: Colors.grey[600],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            // Messages Section (Main Focus) + AI Panel
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: LayoutBuilder(
-                builder: (context, constraints) {
-                  final showSidePanel = widget.isOperator && constraints.maxWidth > 900;
-                  final conversationColumn = Column(
-                    children: [
-                      if (!showSidePanel) _buildConversationInfo(l10n, theme),
-
-                      // Messages List
-                      Expanded(
-                        child: _isLoading
-                            ? const Center(
-                                child: CircularProgressIndicator(),
-                              )
-                            : _messages.isEmpty
-                                ? Center(
-                                    child: Column(
-                                      mainAxisAlignment: MainAxisAlignment.center,
-                                      children: [
-                                        Icon(
-                                          Icons.chat_bubble_outline,
-                                          size: 48,
-                                          color: Colors.grey[400],
-                                        ),
-                                        const SizedBox(height: 16),
-                                        Text(
-                                          l10n.noMessagesFound,
-                                          style: theme.textTheme.bodyLarge?.copyWith(
-                                            color: Colors.grey[600],
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  )
-                                : Scrollbar(
-                                    controller: _scrollController,
-                                    thumbVisibility: true,
-                                    child: ListView.builder(
-                                      controller: _scrollController,
-                                      padding: const EdgeInsets.all(16),
-                                      itemCount: _messages.length,
-                                      itemBuilder: (context, index) {
-                                        final message = _messages[index];
-                                        return Padding(
-                                          padding: const EdgeInsets.only(bottom: 12),
-                                          child: MessageBubble(
-                                            message: message,
-                                            calendarController: widget.calendarController,
-                                          ),
-                                        );
-                                      },
-                                    ),
-                                  ),
-                      ),
-
-                      if (!showSidePanel && widget.isOperator)
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                          child: AITicketAssistant(
-                            ticketId: _ticket.id,
-                            ticketContext: _ticket.description,
-                            onReplySuggested: (suggestedReply) {
-                              _messageController.text = suggestedReply;
-                            },
-                            onAutoReply: (replyText) {
-                              _loadMessages();
-                              widget.onTicketUpdated?.call();
-                            },
-                          ),
-                        ),
-
-                      // Message Input
-                      Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: Colors.grey[50],
-                          border: Border(
-                            top: BorderSide(color: Colors.grey[200]!),
-                          ),
-                        ),
-                        child: Column(
-                          children: [
-                            // Quick Reply Buttons (only for operators)
-                            if (widget.isOperator && _templates.isNotEmpty) ...[
-                              Container(
-                                padding: const EdgeInsets.symmetric(vertical: 8),
-                                child: SizedBox(
-                                  height: 36,
-                                  child: ListView(
-                                    scrollDirection: Axis.horizontal,
-                                    children: [
-                                      ..._templates.take(4).map((template) {
-                                        return Padding(
-                                          padding: const EdgeInsets.only(right: 8),
-                                          child: OutlinedButton(
-                                            onPressed: () {
-                                              final variables = {
-                                                'user_name': _ticket.user?.displayName ?? 'کاربر',
-                                                'ticket_id': _ticket.id.toString(),
-                                                'ticket_title': _ticket.title,
-                                              };
-                                              final formattedContent = template.format(variables);
-                                              _messageController.text = formattedContent;
-                                            },
-                                            style: OutlinedButton.styleFrom(
-                                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                                              minimumSize: const Size(0, 36),
-                                            ),
-                                            child: Text(
-                                              template.name,
-                                              style: const TextStyle(fontSize: 12),
-                                            ),
-                                          ),
-                                        );
-                                      }).toList(),
-                                      IconButton(
-                                        icon: const Icon(Icons.more_horiz, size: 20),
-                                        tooltip: 'مشاهده همه قالب‌ها',
-                                        onPressed: _showTemplatesDialog,
-                                        padding: EdgeInsets.zero,
-                                        constraints: const BoxConstraints(),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ],
-                            Row(
-                              children: [
-                                if (widget.isOperator && _templates.isNotEmpty) ...[
-                                  IconButton(
-                                    icon: const Icon(Icons.description),
-                                    tooltip: 'قالب‌های پاسخ',
-                                    onPressed: _showTemplatesDialog,
-                                    color: theme.primaryColor,
-                                  ),
-                                  const SizedBox(width: 4),
-                                ],
-                                Expanded(
-                              child: TextField(
-                                controller: _messageController,
-                                decoration: InputDecoration(
-                                  hintText: widget.isOperator
-                                      ? l10n.writeYourResponse
-                                      : l10n.writeYourMessage,
-                                  border: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(25),
-                                    borderSide: BorderSide(color: Colors.grey[300]!),
-                                  ),
-                                  enabledBorder: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(25),
-                                    borderSide: BorderSide(color: Colors.grey[300]!),
-                                  ),
-                                  focusedBorder: OutlineInputBorder(
-                                    borderRadius: BorderRadius.circular(25),
-                                    borderSide: BorderSide(color: theme.primaryColor),
-                                  ),
-                                  contentPadding: const EdgeInsets.symmetric(
-                                    horizontal: 16,
-                                    vertical: 12,
-                                  ),
-                                  filled: true,
-                                  fillColor: Colors.white,
-                                ),
-                                keyboardType: TextInputType.multiline,
-                                minLines: 1,
-                                maxLines: 5,
-                                textInputAction: TextInputAction.send,
-                                onSubmitted: (_) => _sendMessage(),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Container(
-                              decoration: BoxDecoration(
-                                color: theme.primaryColor,
-                                borderRadius: BorderRadius.circular(25),
-                              ),
-                              child: IconButton(
-                                onPressed: _isSending ? null : _sendMessage,
-                                icon: _isSending
-                                    ? const SizedBox(
-                                        width: 20,
-                                        height: 20,
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2,
-                                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                                        ),
-                                      )
-                                    : const Icon(
-                                        Icons.send,
-                                        color: Colors.white,
-                                      ),
-                              ),
-                            ),
-                          ],
-                        ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  );
-
-                  if (!showSidePanel) {
-                    return conversationColumn;
-                  }
-
-                  final sidePanelWidth = math.min(
-                    360.0,
-                    math.max(280.0, constraints.maxWidth * 0.28),
-                  );
-
-                  return Row(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      SizedBox(
-                        width: sidePanelWidth,
-                        child: Scrollbar(
-                          thumbVisibility: true,
-                        child: SingleChildScrollView(
-                          padding: const EdgeInsets.fromLTRB(0, 16, 0, 16),
-                          child: Column(
-                            children: [
-                              _buildConversationInfo(l10n, theme),
-                              const SizedBox(height: 12),
-                              AITicketAssistant(
-                                ticketId: _ticket.id,
-                                ticketContext: _ticket.description,
-                                onReplySuggested: (suggestedReply) {
-                                  _messageController.text = suggestedReply;
-                                },
-                                onAutoReply: (replyText) {
-                                  _loadMessages();
-                                  widget.onTicketUpdated?.call();
-                                },
-                              ),
-                            ],
-                          ),
-                        ),
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      Expanded(child: conversationColumn),
-                    ],
-                  );
-                },
-              ),
-              ),
-            ),
-          ],
-        ),
-      ),
+    final view = TicketDetailView(
+      key: key,
+      ticket: ticket,
+      isOperator: isOperator,
+      onTicketUpdated: onTicketUpdated,
+      calendarController: calendarController,
+      displayMode: displayMode,
+      onRequestCsat: onRequestCsat,
     );
-  }
-}
 
-/// Dialog for selecting response templates
-class _TemplatesDialog extends StatelessWidget {
-  final List<ResponseTemplate> templates;
-
-  const _TemplatesDialog({required this.templates});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    
-    return Dialog(
-      child: Container(
-        width: 500,
-        height: 600,
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            Row(
-              children: [
-                Text(
-                  'قالب‌های پاسخ',
-                  style: theme.textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const Spacer(),
-                IconButton(
-                  icon: const Icon(Icons.close),
-                  onPressed: () => Navigator.of(context).pop(),
-                ),
-              ],
-            ),
-            const Divider(),
-            Expanded(
-              child: templates.isEmpty
-                  ? Center(
-                      child: Text(
-                        'هیچ قالبی یافت نشد',
-                        style: theme.textTheme.bodyLarge?.copyWith(
-                          color: Colors.grey,
-                        ),
-                      ),
-                    )
-                  : ListView.builder(
-                      itemCount: templates.length,
-                      itemBuilder: (context, index) {
-                        final template = templates[index];
-                        return Card(
-                          margin: const EdgeInsets.only(bottom: 8),
-                          child: ListTile(
-                            title: Text(
-                              template.name,
-                              style: const TextStyle(fontWeight: FontWeight.bold),
-                            ),
-                            subtitle: Text(
-                              template.content.length > 100
-                                  ? '${template.content.substring(0, 100)}...'
-                                  : template.content,
-                              maxLines: 3,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            onTap: () {
-                              Navigator.of(context).pop(template);
-                            },
-                            trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-                          ),
-                        );
-                      },
-                    ),
-            ),
-          ],
-        ),
-      ),
-    );
+    switch (displayMode) {
+      case TicketDetailDisplayMode.page:
+      case TicketDetailDisplayMode.embedded:
+        return view;
+      case TicketDetailDisplayMode.dialog:
+        return Dialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          child: view,
+        );
+    }
   }
 }

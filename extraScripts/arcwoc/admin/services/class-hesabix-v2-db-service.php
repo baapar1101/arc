@@ -190,6 +190,87 @@ class Hesabix_V2_DB_Service
 	}
 
 	/**
+	 * حذف نگاشت «محصول والد بدون والد» (مثلاً محصول متغیر که اشتباهاً به‌عنوان ساده همگام شده).
+	 *
+	 * @since 4.7.2
+	 * @param int $wc_id
+	 * @return bool
+	 */
+	public function delete_parent_only_product_mapping($wc_id)
+	{
+		global $wpdb;
+
+		$wc_id = absint($wc_id);
+		if ($wc_id < 1) {
+			return false;
+		}
+
+		$sql = $wpdb->prepare(
+			"DELETE FROM {$this->table}
+			WHERE entity_type = %s AND wc_id = %d AND wc_parent_id IS NULL AND business_id = %d",
+			'product',
+			$wc_id,
+			$this->business_id
+		);
+
+		return false !== $wpdb->query($sql);
+	}
+
+	/**
+	 * حذف نگاشت‌های والد (wc_parent_id IS NULL) که به یک hesabix_id مشخص اشاره دارند.
+	 *
+	 * @since 4.7.2
+	 * @param int $hesabix_id
+	 * @return bool
+	 */
+	public function delete_parent_only_product_mapping_by_hesabix_id($hesabix_id)
+	{
+		global $wpdb;
+
+		$hesabix_id = absint($hesabix_id);
+		if ($hesabix_id < 1) {
+			return false;
+		}
+
+		$sql = $wpdb->prepare(
+			"DELETE FROM {$this->table}
+			WHERE entity_type = %s AND hesabix_id = %d AND wc_parent_id IS NULL AND business_id = %d",
+			'product',
+			$hesabix_id,
+			$this->business_id
+		);
+
+		return false !== $wpdb->query($sql);
+	}
+
+	/**
+	 * حذف همهٔ نگاشت‌های واریانت متعلق به یک محصول والد.
+	 *
+	 * @since 4.7.2
+	 * @param int $parent_wc_id
+	 * @return bool
+	 */
+	public function delete_child_product_mappings($parent_wc_id)
+	{
+		global $wpdb;
+
+		$parent_wc_id = absint($parent_wc_id);
+		if ($parent_wc_id < 1) {
+			return false;
+		}
+
+		$sql = $wpdb->prepare(
+			"DELETE FROM {$this->table}
+			WHERE entity_type = %s AND wc_parent_id = %d AND business_id = %d",
+			'product',
+			$parent_wc_id,
+			$this->business_id
+		);
+
+		return false !== $wpdb->query($sql);
+	}
+
+	/**
 	 * Update sync status
 	 *
 	 * @since    2.0.0

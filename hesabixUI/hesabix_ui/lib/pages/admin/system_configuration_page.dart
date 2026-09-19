@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
+import 'package:hesabix_ui/config/brand_config.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/utils/number_normalizer.dart';
 import '../../core/api_client.dart';
 import '../../services/admin_system_settings_service.dart';
 import '../../utils/error_extractor.dart';
+import '../../utils/snackbar_helper.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 class SystemConfigurationPage extends StatefulWidget {
   const SystemConfigurationPage({super.key});
@@ -26,12 +29,22 @@ class _SystemConfigurationPageState extends State<SystemConfigurationPage> {
   String _appVersion = '';
   String _defaultLanguage = 'fa';
   String _defaultTheme = 'system';
+  String _defaultThemeId = 'classic_blue';
   String _defaultDisplayTimezone = 'Asia/Tehran';
   bool _enableRegistration = true;
   bool _enableEmailVerification = true;
   bool _enableMaintenanceMode = false;
   bool _supportTicketsEnabled = true;
   final TextEditingController _supportTicketsDisabledMessageCtrl = TextEditingController();
+  bool _legacyApiImportEnabled = true;
+  final TextEditingController _legacyApiImportDisabledMessageCtrl = TextEditingController();
+  String _supportBillingMode = 'free';
+  int _supportFreeQuotaPerMonth = 2;
+  int _supportGracePeriodDays = 3;
+  bool _supportAllowReadWithoutSub = true;
+  bool _supportRequireSubToReply = true;
+  bool _supportPaidPriorityBoost = true;
+  final TextEditingController _supportInvoicePrefixCtrl = TextEditingController(text: 'SUP');
   int _sessionTimeout = 30;
   int _maxFileSize = 10;
   int _maxUsers = 0;
@@ -128,6 +141,8 @@ class _SystemConfigurationPageState extends State<SystemConfigurationPage> {
   @override
   void dispose() {
     _supportTicketsDisabledMessageCtrl.dispose();
+    _legacyApiImportDisabledMessageCtrl.dispose();
+    _supportInvoicePrefixCtrl.dispose();
     super.dispose();
   }
 
@@ -141,10 +156,24 @@ class _SystemConfigurationPageState extends State<SystemConfigurationPage> {
       final data = await _service.getSystemConfiguration();
       if (mounted) {
         setState(() {
+<<<<<<< HEAD
+          _appName = data['app_name']?.toString() ?? BrandConfig.materialTitle;
+=======
           _appName = data['app_name']?.toString() ?? 'MarkStreet';
+>>>>>>> github/Huma
           _appVersion = data['app_version']?.toString() ?? '1.0.23';
           _defaultLanguage = data['default_language']?.toString() ?? 'fa';
           _defaultTheme = data['default_theme']?.toString() ?? 'system';
+          final themeIdRaw = data['default_theme_id']?.toString().trim().toLowerCase();
+          _defaultThemeId = (themeIdRaw != null &&
+                  const {
+                    'classic_blue',
+                    'turquoise_sea',
+                    'emerald_forest',
+                    'warm_copper',
+                  }.contains(themeIdRaw))
+              ? themeIdRaw
+              : 'classic_blue';
           final tzRaw = data['default_timezone']?.toString().trim();
           _defaultDisplayTimezone = (tzRaw != null && tzRaw.isNotEmpty) ? tzRaw : 'Asia/Tehran';
           _enableRegistration = data['enable_registration'] as bool? ?? true;
@@ -153,6 +182,24 @@ class _SystemConfigurationPageState extends State<SystemConfigurationPage> {
           _supportTicketsEnabled = data['support_tickets_enabled'] as bool? ?? true;
           _supportTicketsDisabledMessageCtrl.text =
               data['support_tickets_disabled_message']?.toString() ?? '';
+          _legacyApiImportEnabled =
+              data['legacy_api_import_enabled'] as bool? ?? true;
+          _legacyApiImportDisabledMessageCtrl.text =
+              data['legacy_api_import_disabled_message']?.toString() ?? '';
+          final billingMode = data['support_billing_mode']?.toString() ?? 'free';
+          _supportBillingMode =
+              const ['free', 'paid', 'hybrid'].contains(billingMode) ? billingMode : 'free';
+          _supportFreeQuotaPerMonth = _asConfigInt(data['support_free_quota_per_month'], 2);
+          _supportGracePeriodDays = _asConfigInt(data['support_grace_period_days'], 3);
+          _supportAllowReadWithoutSub =
+              data['support_allow_read_without_subscription'] as bool? ?? true;
+          _supportRequireSubToReply =
+              data['support_require_subscription_to_reply'] as bool? ?? true;
+          _supportPaidPriorityBoost = data['support_paid_priority_boost'] as bool? ?? true;
+          _supportInvoicePrefixCtrl.text =
+              data['support_invoice_prefix']?.toString().trim().isNotEmpty == true
+                  ? data['support_invoice_prefix'].toString().trim()
+                  : 'SUP';
           _sessionTimeout = data['session_timeout'] as int? ?? 30;
           _maxFileSize = data['max_file_size'] as int? ?? 10;
           _maxUsers = data['max_users'] as int? ?? 0;
@@ -216,7 +263,7 @@ class _SystemConfigurationPageState extends State<SystemConfigurationPage> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('${t.errorLoadingSettings}: $err'),
-            backgroundColor: Colors.red,
+            backgroundColor: SemanticColorResolver.negative(context),
           ),
         );
       }
@@ -272,7 +319,7 @@ class _SystemConfigurationPageState extends State<SystemConfigurationPage> {
           foregroundColor: theme.colorScheme.onPrimary,
           elevation: 0,
           leading: IconButton(
-            icon: const Icon(Icons.arrow_back),
+            icon: Icon(Icons.arrow_back),
             onPressed: () => context.go('/user/profile/system-settings'),
           ),
         ),
@@ -282,7 +329,7 @@ class _SystemConfigurationPageState extends State<SystemConfigurationPage> {
             children: [
               Text(
                 _error!,
-                style: const TextStyle(color: Colors.red),
+                style: TextStyle(color: SemanticColorResolver.negative(context)),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 16),
@@ -393,6 +440,26 @@ class _SystemConfigurationPageState extends State<SystemConfigurationPage> {
                       ],
                       onChanged: (value) => setState(() => _defaultTheme = value!),
                     ),
+                    _buildDropdownField(
+                      label: t.defaultColorTheme,
+                      value: _defaultThemeId,
+                      items: [
+                        DropdownMenuItem(value: 'classic_blue', child: Text(t.themeClassicBlue)),
+                        DropdownMenuItem(value: 'turquoise_sea', child: Text(t.themeTurquoiseSea)),
+                        DropdownMenuItem(value: 'emerald_forest', child: Text(t.themeEmeraldForest)),
+                        DropdownMenuItem(value: 'warm_copper', child: Text(t.themeWarmCopper)),
+                      ],
+                      onChanged: (value) => setState(() => _defaultThemeId = value!),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 16),
+                      child: Text(
+                        t.defaultColorThemeHint,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
                     _buildTextField(
                       label: 'منطقهٔ زمانی نمایش (IANA)',
                       value: _defaultDisplayTimezone,
@@ -475,6 +542,41 @@ class _SystemConfigurationPageState extends State<SystemConfigurationPage> {
                 const SizedBox(height: 24),
                 _buildSectionCard(
                   theme,
+                  t.legacyApiImportSectionTitle,
+                  Icons.cloud_sync_outlined,
+                  [
+                    _buildSwitchField(
+                      label: t.legacyApiImportAllowUsersLabel,
+                      value: _legacyApiImportEnabled,
+                      onChanged: (value) =>
+                          setState(() => _legacyApiImportEnabled = value),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Text(
+                        t.legacyApiImportAllowUsersDescription,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                    TextFormField(
+                      controller: _legacyApiImportDisabledMessageCtrl,
+                      minLines: 2,
+                      maxLines: 6,
+                      maxLength: 8192,
+                      decoration: InputDecoration(
+                        labelText: t.legacyApiImportDisabledNoticeLabel,
+                        hintText: t.legacyApiImportDisabledNoticeHint,
+                        border: const OutlineInputBorder(),
+                        alignLabelWithHint: true,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 24),
+                _buildSectionCard(
+                  theme,
                   t.maintenanceSettings,
                   Icons.build_outlined,
                   [
@@ -532,6 +634,57 @@ class _SystemConfigurationPageState extends State<SystemConfigurationPage> {
                         border: const OutlineInputBorder(),
                         alignLabelWithHint: true,
                       ),
+                    ),
+                    const SizedBox(height: 12),
+                    DropdownButtonFormField<String>(
+                      value: _supportBillingMode,
+                      decoration: const InputDecoration(
+                        labelText: 'حالت صورتحساب پشتیبانی',
+                        border: OutlineInputBorder(),
+                      ),
+                      items: const [
+                        DropdownMenuItem(value: 'free', child: Text('رایگان برای همه')),
+                        DropdownMenuItem(value: 'paid', child: Text('پشتیبانی غیر رایگان')),
+                        DropdownMenuItem(value: 'hybrid', child: Text('ترکیبی (سهمیه + اشتراک)')),
+                      ],
+                      onChanged: (v) => setState(() => _supportBillingMode = v ?? 'free'),
+                    ),
+                    if (_supportBillingMode == 'hybrid')
+                      _buildNumberField(
+                        label: 'سهمیه رایگان ماهانه (تیکت)',
+                        value: _supportFreeQuotaPerMonth,
+                        onChanged: (value) => setState(() => _supportFreeQuotaPerMonth = value),
+                        min: 0,
+                        max: 1000,
+                      ),
+                    _buildNumberField(
+                      label: 'مهلت ارفاق بعد از انقضا (روز)',
+                      value: _supportGracePeriodDays,
+                      onChanged: (value) => setState(() => _supportGracePeriodDays = value),
+                      min: 0,
+                      max: 90,
+                    ),
+                    TextFormField(
+                      controller: _supportInvoicePrefixCtrl,
+                      decoration: const InputDecoration(
+                        labelText: 'پیشوند کد صورت‌حساب',
+                        border: OutlineInputBorder(),
+                      ),
+                    ),
+                    _buildSwitchField(
+                      label: 'مشاهده تیکت‌های قبلی بدون اشتراک',
+                      value: _supportAllowReadWithoutSub,
+                      onChanged: (value) => setState(() => _supportAllowReadWithoutSub = value),
+                    ),
+                    _buildSwitchField(
+                      label: 'برای پاسخ هم اشتراک لازم باشد',
+                      value: _supportRequireSubToReply,
+                      onChanged: (value) => setState(() => _supportRequireSubToReply = value),
+                    ),
+                    _buildSwitchField(
+                      label: 'اولویت‌دهی تیکت مشترکان در صف اپراتور',
+                      value: _supportPaidPriorityBoost,
+                      onChanged: (value) => setState(() => _supportPaidPriorityBoost = value),
                     ),
                   ],
                 ),
@@ -1057,12 +1210,23 @@ class _SystemConfigurationPageState extends State<SystemConfigurationPage> {
         'app_version': _appVersion.trim(),
         'default_language': _defaultLanguage,
         'default_theme': _defaultTheme,
+        'default_theme_id': _defaultThemeId,
         'default_timezone': _defaultDisplayTimezone.trim(),
         'enable_registration': _enableRegistration,
         'enable_email_verification': _enableEmailVerification,
         'enable_maintenance_mode': _enableMaintenanceMode,
         'support_tickets_enabled': _supportTicketsEnabled,
         'support_tickets_disabled_message': _supportTicketsDisabledMessageCtrl.text.trim(),
+        'legacy_api_import_enabled': _legacyApiImportEnabled,
+        'legacy_api_import_disabled_message':
+            _legacyApiImportDisabledMessageCtrl.text.trim(),
+        'support_billing_mode': _supportBillingMode,
+        'support_free_quota_per_month': _supportFreeQuotaPerMonth,
+        'support_grace_period_days': _supportGracePeriodDays,
+        'support_allow_read_without_subscription': _supportAllowReadWithoutSub,
+        'support_require_subscription_to_reply': _supportRequireSubToReply,
+        'support_invoice_prefix': _supportInvoicePrefixCtrl.text.trim(),
+        'support_paid_priority_boost': _supportPaidPriorityBoost,
         'session_timeout': _sessionTimeout,
         'max_file_size': _maxFileSize,
         'max_users': _maxUsers,
@@ -1099,23 +1263,13 @@ class _SystemConfigurationPageState extends State<SystemConfigurationPage> {
 
       if (mounted) {
         final t = AppLocalizations.of(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(t.settingsSavedSuccessfully),
-            backgroundColor: Colors.green,
-          ),
-        );
+        SnackBarHelper.showSuccess(context, message: t.settingsSavedSuccessfully);
       }
     } catch (e) {
       if (mounted) {
         final t = AppLocalizations.of(context);
         final err = ErrorExtractor.forContext(e, context);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('${t.errorSavingSettings}: $err'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        SnackBarHelper.showError(context, message: '${t.errorSavingSettings}: $err');
       }
     } finally {
       if (mounted) {

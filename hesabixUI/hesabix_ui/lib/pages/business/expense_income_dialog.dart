@@ -15,6 +15,7 @@ import '../../utils/snackbar_helper.dart';
 import '../../utils/error_extractor.dart';
 import '../../constants/frequent_description_scope.dart';
 import '../../widgets/inputs/frequent_description_text_field.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 class ExpenseIncomeDialog extends StatefulWidget {
   final int businessId;
@@ -235,9 +236,9 @@ class _ExpenseIncomeDialogState extends State<ExpenseIncomeDialog> {
                             spacing: 16,
                             runSpacing: 8,
                             children: [
-                              _chip('جمع اقلام', sumItems),
-                              _chip('جمع طرف‌حساب', sumTx),
-                              _chip('اختلاف', diff, isError: diff != 0),
+                              _chip(context, 'جمع اقلام', sumItems),
+                              _chip(context, 'جمع طرف‌حساب', sumTx),
+                              _chip(context, 'اختلاف', diff, isError: diff != 0),
                             ],
                           ),
                           Padding(
@@ -469,10 +470,10 @@ class _ItemLine {
       );
 }
 
-Widget _chip(String label, double value, {bool isError = false}) {
+Widget _chip(BuildContext context, String label, double value, {bool isError = false}) {
   return Chip(
     label: Text('$label: ${value.toStringAsFixed(0)}'),
-    backgroundColor: isError ? Colors.red.shade100 : Colors.grey.shade200,
+    backgroundColor: isError ? SemanticColorResolver.negative(context).withValues(alpha: 0.18) : Colors.grey.shade200,
   );
 }
 

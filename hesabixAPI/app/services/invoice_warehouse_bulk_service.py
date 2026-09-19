@@ -5,14 +5,12 @@
 from __future__ import annotations
 
 from datetime import date
-from decimal import Decimal
 from typing import Any, Dict, List, Tuple
 
 from sqlalchemy import and_
 from sqlalchemy.orm import Session
 
 from adapters.db.models.document import Document
-from adapters.db.models.invoice_item_line import InvoiceItemLine
 from adapters.db.models.warehouse_document import WarehouseDocument
 from app.core.responses import ApiError
 from app.services.invoice_service import (
@@ -31,121 +29,8 @@ from app.services.warehouse_service import (
 	delete_warehouse_document,
 	invoice_lines_have_trackable_inventory_products,
 	post_warehouse_document,
+	remaining_invoice_lines_for_warehouse,
 )
-
-
-def _load_invoice_lines(db: Session, invoice_id: int) -> List[Dict[str, Any]]:
-	rows = (
-		db.query(InvoiceItemLine)
-		.filter(InvoiceItemLine.document_id == invoice_id)
-		.order_by(InvoiceItemLine.id.asc())
-		.all()
-	)
-	lines: List[Dict[str, Any]] = []
-	for row in rows:
-		lines.append({
-			"product_id": row.product_id,
-			"quantity": float(row.quantity or 0),
-			"extra_info": row.extra_info or {},
-		})
-	return lines
-
-
-def _processed_by_movement_from_posted_invoice_warehouses(
-	db: Session,
-	business_id: int,
-	invoice_id: int,
-) -> Tuple[Dict[int, Decimal], Dict[int, Decimal]]:
-	"""مجموع مقادیر posted به تفکیک movement in / out برای هر product_id."""
-	warehouse_docs = db.query(WarehouseDocument).filter(
-		and_(
-			WarehouseDocument.business_id == business_id,
-			WarehouseDocument.source_type == "invoice",
-			WarehouseDocument.source_document_id == invoice_id,
-		)
-	).all()
-	processed_out: Dict[int, Decimal] = {}
-	processed_in: Dict[int, Decimal] = {}
-	for wh_doc in warehouse_docs:
-		if wh_doc.status != "posted":
-			continue
-		for wh_line in wh_doc.lines:
-			pid = wh_line.product_id
-			if not pid:
-				continue
-			qty = Decimal(str(wh_line.quantity or 0))
-			if wh_line.movement == "out":
-				processed_out[pid] = processed_out.get(pid, Decimal(0)) + qty
-			elif wh_line.movement == "in":
-				processed_in[pid] = processed_in.get(pid, Decimal(0)) + qty
-	return processed_out, processed_in
-
-
-def _processed_quantities_from_posted_invoice_warehouses(
-	db: Session,
-	business_id: int,
-	invoice_id: int,
-	inv: Document,
-) -> Dict[int, Decimal]:
-	"""برای انواع غیر تولید: یک عدد پردازش‌شده به‌ازای هر کالا (همان منطق endpoint line-quantities)."""
-	pout, pin = _processed_by_movement_from_posted_invoice_warehouses(db, business_id, invoice_id)
-	processed_quantities: Dict[int, Decimal] = {}
-	if inv.document_type in (
-		INVOICE_SALES,
-		INVOICE_PURCHASE_RETURN,
-		INVOICE_DIRECT_CONSUMPTION,
-		INVOICE_WASTE,
-	):
-		processed_quantities = dict(pout)
-	elif inv.document_type in (INVOICE_PURCHASE, INVOICE_SALES_RETURN):
-		processed_quantities = dict(pin)
-	elif inv.document_type == INVOICE_PRODUCTION:
-		# برای تولید از تابع جداگانه استفاده می‌شود
-		pass
-	return processed_quantities
-
-
-def _has_remaining_inventory_to_create(
-	db: Session,
-	business_id: int,
-	invoice_id: int,
-	inv: Document,
-	invoice_lines: List[Dict[str, Any]],
-) -> bool:
-	if not invoice_lines:
-		return False
-	if inv.document_type == INVOICE_PRODUCTION:
-		pout, pin = _processed_by_movement_from_posted_invoice_warehouses(db, business_id, invoice_id)
-		out_lines = [ln for ln in invoice_lines if (ln.get("extra_info") or {}).get("movement") == "out"]
-		in_lines = [ln for ln in invoice_lines if (ln.get("extra_info") or {}).get("movement") == "in"]
-		for ln in out_lines:
-			pid = ln.get("product_id")
-			if not pid:
-				continue
-			req = Decimal(str(ln.get("quantity") or 0))
-			proc = pout.get(int(pid), Decimal(0))
-			if req - proc > Decimal("0.000001"):
-				return True
-		for ln in in_lines:
-			pid = ln.get("product_id")
-			if not pid:
-				continue
-			req = Decimal(str(ln.get("quantity") or 0))
-			proc = pin.get(int(pid), Decimal(0))
-			if req - proc > Decimal("0.000001"):
-				return True
-		return False
-
-	processed = _processed_quantities_from_posted_invoice_warehouses(db, business_id, invoice_id, inv)
-	for ln in invoice_lines:
-		pid = ln.get("product_id")
-		if not pid:
-			continue
-		req = Decimal(str(ln.get("quantity") or 0))
-		proc = processed.get(int(pid), Decimal(0))
-		if req - proc > Decimal("0.000001"):
-			return True
-	return False
 
 
 def create_draft_warehouse_documents_for_invoice_bulk(
@@ -166,11 +51,8 @@ def create_draft_warehouse_documents_for_invoice_bulk(
 	if bool(getattr(inv, "is_proforma", False)):
 		return {"ok": False, "code": "PROFORMA", "message": "برای پیش‌فاکتور حواله انبار ثبت نمی‌شود"}
 
-	lines_input = _load_invoice_lines(db, invoice_id)
+	lines_input = remaining_invoice_lines_for_warehouse(db, business_id, inv)
 	if not lines_input:
-		return {"ok": False, "code": "NO_LINES", "message": "خطی برای فاکتور ثبت نشده است"}
-
-	if not _has_remaining_inventory_to_create(db, business_id, invoice_id, inv, lines_input):
 		return {"ok": False, "code": "NOTHING_TO_CREATE", "message": "موجودی قابل ثبت در حواله برای این فاکتور باقی نمانده است"}
 
 	created_ids: List[int] = []

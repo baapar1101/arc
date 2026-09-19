@@ -2,10 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 
 import '../person/file_picker_bridge.dart';
+import '../../services/bytes_export/bytes_export_service.dart';
 import '../../services/invoice_service.dart';
-import '../data_table/helpers/file_saver.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 
 class InvoiceImportDialog extends StatefulWidget {
@@ -80,10 +81,17 @@ class _InvoiceImportDialogState extends State<InvoiceImportDialog> {
         businessId: widget.businessId,
       );
       String filename = 'invoices_import_template.xlsx';
-      await FileSaver.saveBytes(bytes, filename);
+      final result = await BytesExportService.export(
+        bytes: bytes,
+        filename: filename,
+      );
       if (mounted) {
         final t = AppLocalizations.of(context);
-        SnackBarHelper.show(context, message: '${t.templateDownloaded}: $filename');
+        BytesExportService.showFeedback(
+          context,
+          result,
+          successOverride: '${t.templateDownloaded}: $filename',
+        );
       }
     } catch (e) {
       if (mounted) {
@@ -288,7 +296,7 @@ class _ResultSummary extends StatelessWidget {
                 final errorList = (e['errors'] as List?)?.cast<String>() ?? [];
                 return ListTile(
                   dense: true,
-                  leading: const Icon(Icons.error_outline, color: Colors.red),
+                  leading: Icon(Icons.error_outline, color: SemanticColorResolver.negative(context)),
                   title: Text('فاکتور: $invoiceNumber (ردیف: $row)'),
                   subtitle: Text(errorList.join(', ')),
                 );

@@ -4,6 +4,7 @@ import 'package:hesabix_ui/l10n/app_localizations.dart';
 
 import '../../core/auth_store.dart';
 import '../../core/api_client.dart';
+import '../../core/business_panel_ui_store.dart';
 import '../../core/business_nav.dart';
 import '../../core/business_named_route_locations.dart';
 import '../../services/marketplace_service.dart';
@@ -17,6 +18,7 @@ import '../../widgets/marketplace/plugin_detail_sheet.dart';
 import '../../widgets/marketplace/plugin_marketplace_empty_state.dart';
 import '../../widgets/marketplace/plugin_marketplace_hero.dart';
 import '../../widgets/marketplace/plugin_marketplace_skeleton.dart';
+import '../../widgets/business_subpage_back_leading.dart';
 import '../../widgets/marketplace/plugin_marketplace_utils.dart';
 import '../../widgets/marketplace/plugin_purchase_confirm_dialog.dart';
 import '../../widgets/marketplace/plugin_wallet_banner.dart';
@@ -181,6 +183,7 @@ class _PluginMarketplacePageState extends State<PluginMarketplacePage> with Sing
       await _marketplace.startTrial(businessId: widget.businessId, pluginId: pluginId);
       if (!mounted) return;
       SnackBarHelper.show(context, message: t.pluginMarketplaceTrialSuccess);
+      BusinessPanelUiStore.instance.requestBusinessPluginsReload();
       await _load();
       if (mounted) Navigator.of(context).maybePop();
     } catch (e) {
@@ -217,6 +220,7 @@ class _PluginMarketplacePageState extends State<PluginMarketplacePage> with Sing
       final status = (res['status'] ?? '').toString();
       if (status == 'paid') {
         await _showPurchaseSuccess(pluginId: pluginId);
+        BusinessPanelUiStore.instance.requestBusinessPluginsReload();
         await _load();
       } else if (status == 'insufficient_funds') {
         await _showInsufficientFunds(res);
@@ -382,7 +386,10 @@ class _PluginMarketplacePageState extends State<PluginMarketplacePage> with Sing
 
     if (!widget.authStore.hasBusinessPermission('marketplace', 'view')) {
       return Scaffold(
-        appBar: AppBar(title: Text(t.pluginMarketplace)),
+        appBar: AppBar(
+          title: Text(t.pluginMarketplace),
+          leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
+        ),
         body: Center(
           child: Padding(
             padding: const EdgeInsets.all(24),
@@ -395,6 +402,7 @@ class _PluginMarketplacePageState extends State<PluginMarketplacePage> with Sing
     return Scaffold(
       appBar: AppBar(
         title: Text(t.pluginMarketplace),
+        leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
         bottom: TabBar(
           controller: _tabController,
           tabs: [

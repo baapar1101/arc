@@ -19,6 +19,14 @@ logger = logging.getLogger(__name__)
 DOCUMENT_TYPES_RECEIPT_PAYMENT = frozenset({"receipt", "payment"})
 
 
+def _to_decimal(value: Any) -> Decimal:
+    if value is None:
+        return Decimal(0)
+    if isinstance(value, Decimal):
+        return value
+    return Decimal(str(value))
+
+
 def _infer_payment_method_from_line(line: DocumentLine) -> Optional[str]:
     if line.check_id:
         return "check"
@@ -62,7 +70,7 @@ def build_receipt_payment_trigger_enrichment(
 
     total_debit = Decimal(0)
     for line in lines:
-        total_debit += line.debit or Decimal(0)
+        total_debit += _to_decimal(line.debit)
         if line.person_id:
             pid = int(line.person_id)
             person_ids.add(pid)
@@ -138,7 +146,7 @@ def build_document_trigger_enrichment(
     line_account_ids: Set[int] = set()
 
     for line in lines:
-        total_debit += line.debit or Decimal(0)
+        total_debit += _to_decimal(line.debit)
         if line.person_id:
             person_ids.add(int(line.person_id))
         if line.account_id:

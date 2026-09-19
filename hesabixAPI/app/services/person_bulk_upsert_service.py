@@ -1,5 +1,7 @@
 """
-ایجاد/ویرایش گروهی اشخاص برای ادغام (مثل ووکامرس) — هر آیتم جدا خطا؛ کش در انتهای موفقیت یک‌بار invalidate.
+ایجاد/ویرایش گروهی اشخاص برای ادغام (مثل ووکامرس / مهاجرت هلو) —
+هر آیتم جدا خطا؛ کش در انتهای موفقیت یک‌بار invalidate.
+مانده افتتاحیه در صورت ارسال، از مسیر create/update_with_opening_balance اعمال می‌شود.
 """
 
 from typing import Any, Dict, List, Optional
@@ -12,7 +14,16 @@ from adapters.db.models.person import Person
 from app.core.auth_dependency import AuthContext
 from app.core.permissions import has_business_permission_for_business
 from app.core.responses import ApiError
-from app.services.person_service import create_person, update_person, invalidate_persons_cache
+from app.services.person_opening_balance_service import (
+    create_person_with_opening_balance,
+    update_person_with_opening_balance,
+)
+from app.services.person_service import (
+    create_person,
+    delete_person,
+    invalidate_persons_cache,
+    update_person,
+)
 
 MAX_BULK_PERSON_ITEMS = 1000
 
@@ -25,6 +36,11 @@ def api_error_detail(err: ApiError) -> Dict[str, str]:
         msg = payload.get("message") or str(err)
         return {"code": str(code), "message": str(msg)}
     return {"code": "API_ERROR", "message": str(err)}
+
+
+def _payload_has_opening_balance(payload: Dict[str, Any]) -> bool:
+    ob = payload.get("opening_balance")
+    return isinstance(ob, dict)
 
 
 def bulk_upsert_persons_integration(
@@ -48,6 +64,18 @@ def bulk_upsert_persons_integration(
 
     can_add = has_business_permission_for_business(auth_context, db, business_id, "people", "add")
     can_edit = has_business_permission_for_business(auth_context, db, business_id, "people", "edit")
+    can_edit_ob = has_business_permission_for_business(
+        auth_context, db, business_id, "opening_balance", "edit"
+    )
+    user_id = auth_context.get_user_id()
+
+    def _create_person_deferred(session: Session, bid: int, pdata: Any) -> Dict[str, Any]:
+        return create_person(session, bid, pdata, defer_cache_invalidation=True)
+
+    def _update_person_deferred(
+        session: Session, pid: int, bid: int, pdata: Any
+    ) -> Optional[Dict[str, Any]]:
+        return update_person(session, pid, bid, pdata, defer_cache_invalidation=True)
 
     results: List[Dict[str, Any]] = []
     any_success = False
@@ -86,6 +114,19 @@ def bulk_upsert_persons_integration(
                     "person_id": None,
                     "error_code": "INVALID_PAYLOAD",
                     "message": "فیلد payload الزامی است و باید شیٔ باشد",
+                }
+            )
+            continue
+
+        wants_ob = _payload_has_opening_balance(payload)
+        if wants_ob and not can_edit_ob:
+            results.append(
+                {
+                    **row_base,
+                    "status": "failed",
+                    "person_id": None,
+                    "error_code": "OPENING_BALANCE_PERMISSION_REQUIRED",
+                    "message": "برای ثبت مانده افتتاحیه به دسترسی ویرایش تراز افتتاحیه نیاز است",
                 }
             )
             continue
@@ -150,13 +191,23 @@ def bulk_upsert_persons_integration(
                     )
                     continue
                 try:
-                    updated = update_person(
-                        db,
-                        int(person_id),
-                        business_id,
-                        p_update,
-                        defer_cache_invalidation=True,
-                    )
+                    if wants_ob:
+                        updated = update_person_with_opening_balance(
+                            db,
+                            business_id,
+                            user_id,
+                            int(person_id),
+                            p_update,
+                            update_person_fn=_update_person_deferred,
+                        )
+                    else:
+                        updated = update_person(
+                            db,
+                            int(person_id),
+                            business_id,
+                            p_update,
+                            defer_cache_invalidation=True,
+                        )
                 except ApiError as ae:
                     de = api_error_detail(ae)
                     results.append(
@@ -237,7 +288,19 @@ def bulk_upsert_persons_integration(
                 continue
 
             try:
-                cr = create_person(db, business_id, p_create, defer_cache_invalidation=True)
+                if wants_ob:
+                    cr = create_person_with_opening_balance(
+                        db,
+                        business_id,
+                        user_id,
+                        p_create,
+                        create_person_fn=_create_person_deferred,
+                        delete_person_fn=delete_person,
+                    )
+                else:
+                    cr = create_person(
+                        db, business_id, p_create, defer_cache_invalidation=True
+                    )
                 pdata = cr.get("data") or {}
                 nid = pdata.get("id")
                 any_success = True
@@ -245,9 +308,7 @@ def bulk_upsert_persons_integration(
                     {
                         **row_base,
                         "status": "created",
-                        "person_id": int(nid)
-                        if nid is not None
-                        else None,
+                        "person_id": int(nid) if nid is not None else None,
                     }
                 )
             except ApiError as ae:

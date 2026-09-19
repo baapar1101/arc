@@ -1,3 +1,65 @@
+import 'package:shamsi_date/shamsi_date.dart';
+
+/// پارس امن تاریخ از فیلدهای API (ترجیح با *_raw، پشتیبانی از جلالی و ISO)
+DateTime _parseProjectDateTime(dynamic value) {
+  if (value == null) return DateTime.now();
+  if (value is DateTime) return value;
+  if (value is int) {
+    return DateTime.fromMillisecondsSinceEpoch(value);
+  }
+
+  final raw = value.toString().trim();
+  if (raw.isEmpty) return DateTime.now();
+
+  try {
+    return DateTime.parse(raw);
+  } catch (_) {}
+
+  // فرمت جلالی یا میلادی اسلش‌دار مثل 1403/06/22 18:30:00
+  if (raw.contains('/') && !raw.contains('-')) {
+    final parts = raw.split(' ');
+    final datePart = parts[0];
+    final timePart = parts.length > 1 ? parts[1] : '';
+    final dateSegments = datePart.split('/');
+    if (dateSegments.length == 3) {
+      final year = int.tryParse(dateSegments[0]);
+      final month = int.tryParse(dateSegments[1]);
+      final day = int.tryParse(dateSegments[2]);
+      if (year != null && month != null && day != null) {
+        int hour = 0;
+        int minute = 0;
+        int second = 0;
+        if (timePart.isNotEmpty) {
+          final timeSegments = timePart.split(':');
+          if (timeSegments.length >= 2) {
+            hour = int.tryParse(timeSegments[0]) ?? 0;
+            minute = int.tryParse(timeSegments[1]) ?? 0;
+            if (timeSegments.length >= 3) {
+              second = int.tryParse(timeSegments[2]) ?? 0;
+            }
+          }
+        }
+        try {
+          if (year >= 1200 && year <= 1600) {
+            final dt = Jalali(year, month, day).toDateTime();
+            return DateTime(dt.year, dt.month, dt.day, hour, minute, second);
+          }
+          return DateTime(year, month, day, hour, minute, second);
+        } catch (_) {}
+      }
+    }
+  }
+
+  return DateTime.now();
+}
+
+DateTime? _parseProjectDateTimeNullable(dynamic value) {
+  if (value == null) return null;
+  final raw = value.toString().trim();
+  if (raw.isEmpty) return null;
+  return _parseProjectDateTime(value);
+}
+
 /// مدل پروژه
 class ProjectModel {
   final int id;
@@ -59,12 +121,13 @@ class ProjectModel {
       description: json['description'] as String?,
       status: json['status'] as String,
       statusName: json['status_name'] as String,
-      startDate: json['start_date'] != null
-          ? DateTime.parse(json['start_date'] as String)
-          : null,
-      endDate: json['end_date'] != null
-          ? DateTime.parse(json['end_date'] as String)
-          : null,
+      // اولویت با *_raw (ISO) تا تاریخ‌های جلالی نمایشی پارس نشکنند
+      startDate: _parseProjectDateTimeNullable(
+        json['start_date_raw'] ?? json['start_date'],
+      ),
+      endDate: _parseProjectDateTimeNullable(
+        json['end_date_raw'] ?? json['end_date'],
+      ),
       budget: json['budget'] != null ? (json['budget'] as num).toDouble() : null,
       currencyId: json['currency_id'] as int?,
       currencyCode: json['currency_code'] as String?,
@@ -74,8 +137,12 @@ class ProjectModel {
       personId: json['person_id'] as int?,
       personName: json['person_name'] as String?,
       isActive: json['is_active'] as bool? ?? true,
-      createdAt: DateTime.parse(json['created_at'] as String),
-      updatedAt: DateTime.parse(json['updated_at'] as String),
+      createdAt: _parseProjectDateTime(
+        json['created_at_raw'] ?? json['created_at'],
+      ),
+      updatedAt: _parseProjectDateTime(
+        json['updated_at_raw'] ?? json['updated_at'],
+      ),
       createdById: json['created_by_id'] as int,
       createdByName: json['created_by_name'] as String?,
       extraInfo: json['extra_info'] as Map<String, dynamic>?,
@@ -154,4 +221,3 @@ class ProjectModel {
     );
   }
 }
-

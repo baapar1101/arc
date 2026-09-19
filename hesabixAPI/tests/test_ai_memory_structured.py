@@ -1,38 +1,26 @@
-"""تست حافظه ساخت‌یافته."""
+"""تست‌های باقی‌ماندهٔ ماژول structured — فقط برای سازگاری import در صورت نیاز."""
 from __future__ import annotations
 
-from app.services.ai.ai_memory_structured import (
-    extract_structured_from_text,
-    merge_structured_patch,
-    parse_structured,
-    structured_to_prompt_block,
+import pytest
+
+
+def test_structured_module_still_importable_but_unused():
+    """فیلدهای ساخت‌یافته از جریان اصلی حافظه حذف شدند."""
+    from app.services.ai import ai_memory_structured as mod
+
+    assert hasattr(mod, "parse_structured")
+    s = mod.parse_structured(None)
+    assert isinstance(s, dict)
+
+
+@pytest.mark.parametrize(
+    "text,expect_key",
+    [
+        ("هدف فروش ماهانه ۵۰۰ میلیون تومان", "sales_goal_monthly"),
+    ],
 )
+def test_legacy_extract_still_works(text, expect_key):
+    from app.services.ai.ai_memory_structured import extract_structured_from_text
 
-
-def test_parse_structured_defaults():
-    s = parse_structured(None)
-    assert s["currency_display"] == "toman"
-    assert s["report_style"] == "summary"
-
-
-def test_merge_structured_terms():
-    base = parse_structured({"internal_terms": [{"term": "کالا", "meaning": "محصول"}]})
-    merged = merge_structured_patch(
-        base,
-        {"internal_terms": [{"term": "فاکتور", "meaning": "سند فروش"}]},
-    )
-    terms = {t["term"] for t in merged["internal_terms"]}
-    assert "کالا" in terms and "فاکتور" in terms
-
-
-def test_structured_to_prompt_block():
-    block = structured_to_prompt_block(
-        {"sales_goal_monthly": 500_000_000, "currency_display": "toman"}
-    )
-    assert "هدف فروش" in block
-    assert "toman" in block
-
-
-def test_extract_structured_from_text_goal():
-    patch = extract_structured_from_text("هدف فروش ماهانه ۵۰۰ میلیون تومان")
-    assert patch.get("sales_goal_monthly") == 500_000_000
+    patch = extract_structured_from_text(text)
+    assert expect_key in patch

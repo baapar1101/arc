@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/utils/number_normalizer.dart';
 
+import 'invoice_form_layout.dart';
+
 String invoiceFxFormatRowLabel(AppLocalizations t, Map<String, dynamic> e) {
   final rawRate = e['rate'];
   final rate = rawRate == null ? '—' : formatFxRateForDisplay(rawRate);
@@ -112,7 +114,7 @@ class _InvoiceFxRateFieldState extends State<InvoiceFxRateField> {
                             ListTile(
                               title: Text(t.invoiceFxRateAuto),
                               leading: const Icon(Icons.auto_fix_high),
-                              onTap: () => Navigator.of(ctx).pop(-1), // sentin
+                              onTap: () => Navigator.of(ctx).pop(-1),
                             ),
                             const Divider(height: 1),
                             ...() {
@@ -185,56 +187,36 @@ class _InvoiceFxRateFieldState extends State<InvoiceFxRateField> {
     if (!widget.show) {
       return const SizedBox.shrink();
     }
+
     final t = AppLocalizations.of(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        if (widget.loading) const LinearProgressIndicator(),
-        SizedBox(
-          height: 56,
-          child: InputDecorator(
-            decoration: InputDecoration(
-              labelText: t.invoiceFxRateFieldLabel,
-              border: const OutlineInputBorder(),
-              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-            ),
-            child: InkWell(
-              onTap: widget.loading ? null : _openPicker,
-              child: Row(
-                children: [
-                  if (widget.loading) ...[
-                    const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    ),
-                    const SizedBox(width: 8),
-                  ],
-                  Expanded(
-                    child: Text(
-                      _summaryLabel(t),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.bodyLarge,
-                    ),
+
+    return InputDecorator(
+      decoration: InvoiceFormFieldMetrics.mergeDecoration(
+        context,
+        InputDecoration(
+          labelText: t.invoiceFxRateFieldLabel,
+          suffixIcon: widget.loading
+              ? const Padding(
+                  padding: EdgeInsets.all(10),
+                  child: SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
                   ),
-                  const Icon(Icons.arrow_drop_down),
-                ],
-              ),
-            ),
-          ),
+                )
+              : const Icon(Icons.arrow_drop_down, size: 22),
+          suffixIconConstraints: InvoiceFormFieldMetrics.compactSuffixIconConstraints,
         ),
-        if (!widget.loading)
-          Padding(
-            padding: const EdgeInsets.only(left: 12, right: 12, top: 4),
-            child: Text(
-              t.invoiceFxRateHelper,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).colorScheme.outline,
-                  ),
-            ),
-          ),
-      ],
+      ),
+      child: InkWell(
+        onTap: widget.loading ? null : _openPicker,
+        child: Text(
+          _summaryLabel(t),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: Theme.of(context).textTheme.bodyMedium,
+        ),
+      ),
     );
   }
 }

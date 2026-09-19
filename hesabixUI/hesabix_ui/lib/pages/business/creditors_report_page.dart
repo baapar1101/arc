@@ -13,6 +13,8 @@ import 'package:hesabix_ui/services/currency_service.dart';
 import 'package:hesabix_ui/utils/number_formatters.dart';
 import 'package:hesabix_ui/utils/number_normalizer.dart';
 import 'package:hesabix_ui/core/date_utils.dart';
+import 'package:hesabix_ui/core/hesabix_back.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 class CreditorsReportPage extends StatefulWidget {
   final int businessId;
@@ -83,14 +85,8 @@ class _CreditorsReportPageState extends State<CreditorsReportPage> {
       if (!mounted) return;
       setState(() {
         _currencies = items;
-        // انتخاب ارز پیش‌فرض
-        if (items.isNotEmpty) {
-          final defaultCurrency = items.firstWhere(
-            (c) => c['is_default'] == true,
-            orElse: () => items.first,
-          );
-          _selectedCurrencyId = defaultCurrency['id'] as int?;
-        }
+        // پیش‌فرض: همه ارزها → معادل پایه در بک‌اند
+        _selectedCurrencyId = null;
       });
     } catch (_) {
       // ignore errors
@@ -196,11 +192,11 @@ class _CreditorsReportPageState extends State<CreditorsReportPage> {
             
             Color? color;
             if (b > 0) {
-              color = Colors.green[700];
+              color = SemanticColorResolver.positive(context);
             } else if (b == 0) {
               color = Colors.grey;
             } else {
-              color = Colors.red[700];
+              color = SemanticColorResolver.negative(context);
             }
             
             return Text(
@@ -223,7 +219,7 @@ class _CreditorsReportPageState extends State<CreditorsReportPage> {
           final balance = m['balance'];
           final b = balance is num ? balance.toDouble() : double.tryParse(balance?.toString() ?? '0') ?? 0.0;
           if (b > 0) {
-            return Colors.green.withValues(alpha: 0.05);
+            return SemanticColorResolver.positive(context).withValues(alpha: 0.05);
           }
         } catch (_) {}
         return null;
@@ -245,10 +241,7 @@ class _CreditorsReportPageState extends State<CreditorsReportPage> {
     return Scaffold(
       backgroundColor: cs.surface,
       appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.pop(),
-        ),
+        leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
         title: Text(t.reportsCreditorsTitle),
         actions: [
           IconButton(
@@ -301,8 +294,8 @@ class _CreditorsReportPageState extends State<CreditorsReportPage> {
                     ),
                   ),
                   SizedBox(
-                    width: 220,
-                    child: DropdownButtonFormField<int>(
+                    width: 240,
+                    child: DropdownButtonFormField<int?>(
                       value: _selectedCurrencyId,
                       decoration: InputDecoration(
                         labelText: t.currency,
@@ -310,20 +303,26 @@ class _CreditorsReportPageState extends State<CreditorsReportPage> {
                         isDense: true,
                         contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
                       ),
-                      items: _currencies.map<DropdownMenuItem<int>>((c) {
-                        final id = c['id'] as int?;
-                        final code = (c['code'] ?? '').toString();
-                        final title = (c['title'] ?? code).toString();
-                        final isDefault = c['is_default'] == true;
-                        return DropdownMenuItem<int>(
-                          value: id,
-                          child: Text(
-                            isDefault ? '$title (پیش‌فرض)' : title,
-                            overflow: TextOverflow.ellipsis,
-                            maxLines: 1,
-                          ),
-                        );
-                      }).toList(),
+                      items: [
+                        const DropdownMenuItem<int?>(
+                          value: null,
+                          child: Text('همه ارزها (معادل پایه)'),
+                        ),
+                        ..._currencies.map<DropdownMenuItem<int?>>((c) {
+                          final id = c['id'] as int?;
+                          final code = (c['code'] ?? '').toString();
+                          final title = (c['title'] ?? code).toString();
+                          final isDefault = c['is_default'] == true;
+                          return DropdownMenuItem<int?>(
+                            value: id,
+                            child: Text(
+                              isDefault ? '$title (پایه)' : title,
+                              overflow: TextOverflow.ellipsis,
+                              maxLines: 1,
+                            ),
+                          );
+                        }),
+                      ],
                       menuMaxHeight: 300,
                       onChanged: (val) {
                         setState(() {

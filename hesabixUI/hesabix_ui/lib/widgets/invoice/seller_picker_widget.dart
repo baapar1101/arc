@@ -4,7 +4,7 @@ import '../../models/person_model.dart';
 import '../../services/person_service.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
-import '../person/person_financial_balance_banner.dart';
+import 'invoice_form_layout.dart';
 
 class SellerPickerWidget extends StatefulWidget {
   final Person? selectedSeller;
@@ -185,89 +185,42 @@ class _SellerPickerWidgetState extends State<SellerPickerWidget> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final inlineBalance =
-        widget.showFinancialBalance && widget.selectedSeller?.id != null;
 
-    return InkWell(
-      onTap: _showSellerPicker,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        decoration: BoxDecoration(
-          border: Border.all(
-            color: colorScheme.outline.withValues(alpha: 0.5),
-          ),
-          borderRadius: BorderRadius.circular(8),
-          color: colorScheme.surface,
+    final displayText = widget.selectedSeller != null
+        ? widget.selectedSeller!.displayName
+        : widget.hintText;
+
+    return InputDecorator(
+      decoration: InvoiceFormFieldMetrics.mergeDecoration(
+        context,
+        InputDecoration(
+          labelText: widget.label,
+          hintText: widget.hintText,
+          suffixIcon: widget.selectedSeller != null
+              ? IconButton(
+                  tooltip: 'پاک کردن',
+                  icon: Icon(Icons.clear, color: colorScheme.error, size: 18),
+                  onPressed: () => widget.onSellerChanged(null),
+                  padding: EdgeInsets.zero,
+                  constraints: InvoiceFormFieldMetrics.compactSuffixIconConstraints,
+                )
+              : const Icon(Icons.arrow_drop_down, size: 22),
+          suffixIconConstraints: InvoiceFormFieldMetrics.compactSuffixIconConstraints,
         ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.person_search,
-              color: colorScheme.primary,
-              size: 20,
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: widget.selectedSeller != null
-                  ? (inlineBalance
-                      ? Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              widget.selectedSeller!.displayName,
-                              style: theme.textTheme.bodyMedium?.copyWith(
-                                fontWeight: FontWeight.w500,
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                              maxLines: 1,
-                            ),
-                            Padding(
-                              padding: const EdgeInsets.only(top: 2),
-                              child: PersonFinancialBalanceBanner(
-                                selectedPerson: widget.selectedSeller,
-                              ),
-                            ),
-                          ],
-                        )
-                      : Text(
-                          widget.selectedSeller!.displayName,
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            fontWeight: FontWeight.w500,
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                          maxLines: 1,
-                        ))
-                  : Text(
-                      widget.hintText,
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: colorScheme.onSurface.withValues(alpha: 0.6),
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                      maxLines: 1,
-                    ),
-            ),
-            if (widget.selectedSeller != null)
-              GestureDetector(
-                onTap: () {
-                  widget.onSellerChanged(null);
-                },
-                child: Container(
-                  padding: const EdgeInsets.all(4),
-                  child: Icon(
-                    Icons.clear,
-                    color: colorScheme.error,
-                    size: 18,
-                  ),
-                ),
-              )
-            else
-              Icon(
-                Icons.arrow_drop_down,
-                color: colorScheme.onSurface.withValues(alpha: 0.6),
-              ),
-          ],
+      ),
+      child: InkWell(
+        onTap: _showSellerPicker,
+        child: Text(
+          displayText,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: widget.selectedSeller != null
+                ? colorScheme.onSurface
+                : colorScheme.onSurfaceVariant.withValues(alpha: 0.75),
+            fontWeight:
+                widget.selectedSeller != null ? FontWeight.w500 : FontWeight.normal,
+          ),
         ),
       ),
     );

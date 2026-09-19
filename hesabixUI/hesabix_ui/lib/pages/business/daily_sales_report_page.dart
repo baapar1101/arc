@@ -11,11 +11,12 @@ import 'package:hesabix_ui/services/business_dashboard_service.dart';
 import 'package:hesabix_ui/services/currency_service.dart';
 import 'package:hesabix_ui/widgets/data_table/helpers/data_table_utils.dart';
 import 'package:hesabix_ui/core/date_utils.dart';
+import 'package:hesabix_ui/core/hesabix_back.dart';
 
 class DailySalesReportPage extends StatefulWidget {
   final int businessId;
   final CalendarController calendarController;
-  
+
   const DailySalesReportPage({
     super.key,
     required this.businessId,
@@ -32,7 +33,7 @@ class _DailySalesReportPageState extends State<DailySalesReportPage> {
   DateTime? _toDate;
   int? _selectedFiscalYearId;
   int? _selectedCurrencyId;
-  
+
   // Data
   List<Map<String, dynamic>> _fiscalYears = [];
   List<Map<String, dynamic>> _currencies = [];
@@ -68,18 +69,15 @@ class _DailySalesReportPageState extends State<DailySalesReportPage> {
   Future<void> _loadCurrencies() async {
     try {
       final svc = CurrencyService(ApiClient());
-      final items = await svc.listBusinessCurrencies(businessId: widget.businessId);
+      final items = await svc.listBusinessCurrencies(
+        businessId: widget.businessId,
+      );
       if (!mounted) return;
       setState(() {
         _currencies = items;
         // انتخاب ارز پیش‌فرض
-        if (items.isNotEmpty) {
-          final defaultCurrency = items.firstWhere(
-            (c) => c['is_default'] == true,
-            orElse: () => items.first,
-          );
-          _selectedCurrencyId = defaultCurrency['id'] as int?;
-        }
+        // قرارداد چندارزی: null = همه ارزها → معادل پایه
+        _selectedCurrencyId = null;
       });
     } catch (_) {
       // ignore errors
@@ -94,16 +92,21 @@ class _DailySalesReportPageState extends State<DailySalesReportPage> {
 
   Map<String, dynamic> _additionalParams() {
     return {
-      if (_fromDate != null) 'date_from': _fromDate!.toIso8601String().split('T').first,
-      if (_toDate != null) 'date_to': _toDate!.toIso8601String().split('T').first,
-      if (_selectedFiscalYearId != null) 'fiscal_year_id': _selectedFiscalYearId,
+      if (_fromDate != null)
+        'date_from': _fromDate!.toIso8601String().split('T').first,
+      if (_toDate != null)
+        'date_to': _toDate!.toIso8601String().split('T').first,
+      if (_selectedFiscalYearId != null)
+        'fiscal_year_id': _selectedFiscalYearId,
       if (_selectedCurrencyId != null) 'currency_id': _selectedCurrencyId,
     };
   }
 
   String _formatNumber(dynamic value) {
     if (value == null) return '0';
-    final n = value is num ? value.toDouble() : double.tryParse(value.toString()) ?? 0.0;
+    final n = value is num
+        ? value.toDouble()
+        : double.tryParse(value.toString()) ?? 0.0;
     return DataTableUtils.formatNumber(n);
   }
 
@@ -112,7 +115,14 @@ class _DailySalesReportPageState extends State<DailySalesReportPage> {
     if (value is String) {
       try {
         final dt = DateTime.parse(value);
+<<<<<<< HEAD
+        return HesabixDateUtils.formatForDisplay(
+          dt,
+          widget.calendarController.isJalali,
+        );
+=======
         return MarkStreetDateUtils.formatForDisplay(dt, widget.calendarController.isJalali);
+>>>>>>> github/Huma
       } catch (_) {
         return value;
       }
@@ -137,8 +147,10 @@ class _DailySalesReportPageState extends State<DailySalesReportPage> {
       showActiveFilters: true,
       showClearFiltersButton: false,
       showExportButtons: true,
-      excelEndpoint: '/api/v1/businesses/${widget.businessId}/reports/daily-sales/export/excel',
-      pdfEndpoint: '/api/v1/businesses/${widget.businessId}/reports/daily-sales/export/pdf',
+      excelEndpoint:
+          '/api/v1/businesses/${widget.businessId}/reports/daily-sales/export/excel',
+      pdfEndpoint:
+          '/api/v1/businesses/${widget.businessId}/reports/daily-sales/export/pdf',
       additionalParams: _additionalParams(),
       columns: [
         DateColumn(
@@ -201,10 +213,7 @@ class _DailySalesReportPageState extends State<DailySalesReportPage> {
       backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
         title: Text(t.reportsDailySalesTitle),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.pop(),
-        ),
+        leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
       ),
       body: SafeArea(
         child: Column(
@@ -234,7 +243,10 @@ class _DailySalesReportPageState extends State<DailySalesReportPage> {
                       value: _selectedFiscalYearId,
                       decoration: InputDecoration(
                         labelText: 'سال مالی',
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 16,
+                        ),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
                         ),
@@ -265,7 +277,7 @@ class _DailySalesReportPageState extends State<DailySalesReportPage> {
                       },
                     ),
                   ),
-                  
+
                   // Currency
                   SizedBox(
                     width: 200,
@@ -273,7 +285,10 @@ class _DailySalesReportPageState extends State<DailySalesReportPage> {
                       value: _selectedCurrencyId,
                       decoration: InputDecoration(
                         labelText: 'واحد پول',
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 16,
+                        ),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
                         ),
@@ -281,13 +296,15 @@ class _DailySalesReportPageState extends State<DailySalesReportPage> {
                       items: [
                         const DropdownMenuItem<int>(
                           value: null,
-                          child: Text('همه ارزها'),
+                          child: Text('همه ارزها (معادل پایه)'),
                         ),
                         ..._currencies.map((curr) {
                           final id = curr['id'] as int?;
                           final code = (curr['code'] ?? '').toString();
                           final title = (curr['title'] ?? '').toString();
-                          final displayName = code.isNotEmpty ? '$code - $title' : title;
+                          final displayName = code.isNotEmpty
+                              ? '$code - $title'
+                              : title;
                           return DropdownMenuItem<int>(
                             value: id,
                             child: Text(
@@ -306,7 +323,7 @@ class _DailySalesReportPageState extends State<DailySalesReportPage> {
                       },
                     ),
                   ),
-                  
+
                   // From Date
                   SizedBox(
                     width: 200,
@@ -322,7 +339,7 @@ class _DailySalesReportPageState extends State<DailySalesReportPage> {
                       },
                     ),
                   ),
-                  
+
                   // To Date
                   SizedBox(
                     width: 200,
@@ -341,18 +358,20 @@ class _DailySalesReportPageState extends State<DailySalesReportPage> {
                 ],
               ),
             ),
-            
+
             // Data Table
             Expanded(
               child: Padding(
                 padding: const EdgeInsets.all(8.0),
                 child: DataTableWidget<Map<String, dynamic>>(
-                  key: ValueKey({
-                    _selectedFiscalYearId,
-                    _selectedCurrencyId,
-                    _fromDate?.toIso8601String(),
-                    _toDate?.toIso8601String(),
-                  }.toString()),
+                  key: ValueKey(
+                    {
+                      _selectedFiscalYearId,
+                      _selectedCurrencyId,
+                      _fromDate?.toIso8601String(),
+                      _toDate?.toIso8601String(),
+                    }.toString(),
+                  ),
                   config: _buildTableConfig(t),
                   fromJson: (json) => Map<String, dynamic>.from(json as Map),
                   calendarController: widget.calendarController,
@@ -365,4 +384,3 @@ class _DailySalesReportPageState extends State<DailySalesReportPage> {
     );
   }
 }
-

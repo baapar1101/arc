@@ -75,6 +75,18 @@ def _check_plugin_active(db: Session, business_id: int) -> None:
         )
 
 
+def _person_display_name(person: Person) -> str:
+    """نام نمایشی شخص (مدل Person فیلد name ندارد)."""
+    parts = [person.first_name, person.last_name]
+    full = " ".join(p for p in parts if p)
+    return (
+        person.alias_name
+        or full.strip()
+        or person.company_name
+        or ""
+    )
+
+
 def _get_current_fiscal_year(db: Session, business_id: int) -> FiscalYear:
     """دریافت سال مالی جاری"""
     today = date.today()
@@ -167,7 +179,7 @@ def list_technicians(
             "id": tech.id,
             "business_id": tech.business_id,
             "person_id": tech.person_id,
-            "person_name": person.name if person else "",
+            "person_name": _person_display_name(person) if person else "",
             "code": tech.code,
             "commission_type": tech.commission_type,
             "commission_value": float(tech.commission_value),
@@ -202,7 +214,7 @@ def get_technician(
         "id": tech.id,
         "business_id": tech.business_id,
         "person_id": tech.person_id,
-        "person_name": person.name if person else "",
+        "person_name": _person_display_name(person) if person else "",
         "code": tech.code,
         "commission_type": tech.commission_type,
         "commission_value": float(tech.commission_value),
@@ -449,7 +461,7 @@ def list_repair_orders(
             technician = technicians_map.get(order.assigned_technician_id)
             if technician:
                 tech_person = tech_persons_map.get(technician.person_id)
-                technician_name = tech_person.name if tech_person else ""
+                technician_name = _person_display_name(tech_person) if tech_person else ""
         
         # دریافت ارز این سفارش از cache
         currency = currencies_map.get(order.currency_id)
@@ -459,7 +471,7 @@ def list_repair_orders(
             "id": order.id,
             "code": order.code,
             "customer_person_id": order.customer_person_id,
-            "customer_name": customer.name if customer else "",
+            "customer_name": _person_display_name(customer) if customer else "",
             "customer_phone": customer.mobile if customer else None,
             "product_name": order.product_name,
             "product_serial": order.product_serial,
@@ -470,9 +482,9 @@ def list_repair_orders(
             "final_cost": float(order.final_cost),
             "currency_id": order.currency_id,
             "currency_symbol": currency_symbol,
-            "received_at": order.received_at.isoformat(),
-            "estimated_delivery_at": order.estimated_delivery_at.isoformat() if order.estimated_delivery_at else None,
-            "completed_at": order.completed_at.isoformat() if order.completed_at else None,
+            "received_at": order.received_at,
+            "estimated_delivery_at": order.estimated_delivery_at,
+            "completed_at": order.completed_at,
         })
     
     return {
@@ -508,7 +520,7 @@ def get_repair_order(
         ).first()
         if technician:
             tech_person = db.query(Person).filter(Person.id == technician.person_id).first()
-            technician_name = tech_person.name if tech_person else ""
+            technician_name = _person_display_name(tech_person) if tech_person else ""
     
     # دریافت اطلاعات ارز
     currency = db.query(Currency).filter(Currency.id == order.currency_id).first()
@@ -543,7 +555,7 @@ def get_repair_order(
             "id": status.id,
             "status": status.status,
             "notes": status.notes,
-            "created_at": status.created_at.isoformat(),
+            "created_at": status.created_at,
             "sms_sent": status.sms_sent,
             "email_sent": status.email_sent,
         })
@@ -553,7 +565,7 @@ def get_repair_order(
         "code": order.code,
         "business_id": order.business_id,
         "customer_person_id": order.customer_person_id,
-        "customer_name": customer.name if customer else "",
+        "customer_name": _person_display_name(customer) if customer else "",
         "customer_phone": customer.mobile if customer else None,
         "customer_email": customer.email if customer else None,
         "product_id": order.product_id,
@@ -574,10 +586,10 @@ def get_repair_order(
         "currency_id": order.currency_id,
         "currency_symbol": currency_symbol,
         "currency_code": currency_code,
-        "received_at": order.received_at.isoformat(),
-        "estimated_delivery_at": order.estimated_delivery_at.isoformat() if order.estimated_delivery_at else None,
-        "completed_at": order.completed_at.isoformat() if order.completed_at else None,
-        "delivered_at": order.delivered_at.isoformat() if order.delivered_at else None,
+        "received_at": order.received_at,
+        "estimated_delivery_at": order.estimated_delivery_at,
+        "completed_at": order.completed_at,
+        "delivered_at": order.delivered_at,
         "extra_info": order.extra_info or {},
         "parts": parts_list,
         "status_history": status_history,
@@ -588,7 +600,8 @@ def create_repair_order(
     db: Session,
     business_id: int,
     data: Dict[str, Any],
-    user_id: int
+    user_id: int,
+    calendar_type: str = "jalali",
 ) -> Dict[str, Any]:
     """ایجاد سفارش تعمیر جدید"""
     _check_plugin_active(db, business_id)
@@ -705,7 +718,8 @@ def create_repair_order(
                 business_id=business_id,
                 repair_order=order,
                 event_type="repair_shop.received",
-                triggered_by_user_id=user_id
+                triggered_by_user_id=user_id,
+                calendar_type=calendar_type,
             )
         except Exception as e:
             logger.error(f"خطا در ارسال نوتیفیکیشن دریافت سفارش: {e}")

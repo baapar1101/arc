@@ -1,14 +1,20 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
 import '../../services/warehouse_service.dart';
 import '../../core/api_client.dart';
 import '../../widgets/invoice/warehouse_combobox_widget.dart';
 import '../../widgets/warehouse/warehouse_location_dropdown.dart';
 import '../../widgets/document/document_details_dialog.dart';
 import '../../core/calendar_controller.dart';
+<<<<<<< HEAD
+import '../../core/date_utils.dart' show HesabixDateUtils;
+=======
 import '../../utils/web/web_utils.dart' as web_utils;
 import '../../core/date_utils.dart' show MarkStreetDateUtils;
+>>>>>>> github/Huma
 import '../../utils/error_extractor.dart';
+import '../../widgets/business_subpage_back_leading.dart';
+import 'package:hesabix_ui/services/bytes_export/bytes_export_service.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 class WarehouseDocumentDetailsPage extends StatefulWidget {
   final int businessId;
@@ -142,9 +148,9 @@ class _WarehouseDocumentDetailsPageState extends State<WarehouseDocumentDetailsP
 
   Color _getStatusColor(String? status) {
     switch (status) {
-      case 'draft': return Colors.orange;
-      case 'posted': return Colors.green;
-      case 'cancelled': return Colors.red;
+      case 'draft': return SemanticColorResolver.warning(context);
+      case 'posted': return SemanticColorResolver.positive(context);
+      case 'cancelled': return SemanticColorResolver.negative(context);
       default: return Colors.grey;
     }
   }
@@ -383,19 +389,28 @@ class _WarehouseDocumentDetailsPageState extends State<WarehouseDocumentDetailsP
   Widget build(BuildContext context) {
     if (_loading) {
       return Scaffold(
-        appBar: AppBar(title: const Text('جزئیات حواله')),
+        appBar: AppBar(
+          title: const Text('جزئیات حواله'),
+          leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
+        ),
         body: const Center(child: CircularProgressIndicator()),
       );
     }
     if (_error != null) {
       return Scaffold(
-        appBar: AppBar(title: const Text('جزئیات حواله')),
+        appBar: AppBar(
+          title: const Text('جزئیات حواله'),
+          leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
+        ),
         body: Center(child: Text('خطا: $_error')),
       );
     }
     if (_doc == null) {
       return Scaffold(
-        appBar: AppBar(title: const Text('جزئیات حواله')),
+        appBar: AppBar(
+          title: const Text('جزئیات حواله'),
+          leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
+        ),
         body: const Center(child: Text('حواله یافت نشد')),
       );
     }
@@ -410,6 +425,7 @@ class _WarehouseDocumentDetailsPageState extends State<WarehouseDocumentDetailsP
     return Scaffold(
       appBar: AppBar(
         title: const Text('جزئیات حواله'),
+        leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
         actions: [
           IconButton(
             icon: const Icon(Icons.print),
@@ -420,16 +436,13 @@ class _WarehouseDocumentDetailsPageState extends State<WarehouseDocumentDetailsP
                   '/warehouse-docs/business/${widget.businessId}/${widget.documentId}/pdf',
                 );
                 if (!mounted || !context.mounted) return;
-                if (kIsWeb) {
-                  await web_utils.saveBytesAsFileWeb(
-                    bytes,
-                    'warehouse_doc_${widget.documentId}.pdf',
-                    mimeType: 'application/pdf',
-                  );
-                } else {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('دانلود PDF در موبایل به زودی...')),
-                  );
+                final result = await BytesExportService.export(
+                  bytes: bytes,
+                  filename: 'warehouse_doc_${widget.documentId}.pdf',
+                  mimeType: 'application/pdf',
+                );
+                if (mounted && context.mounted) {
+                  BytesExportService.showFeedback(context, result);
                 }
               } catch (e) {
                 if (!mounted || !context.mounted) return;

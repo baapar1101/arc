@@ -158,8 +158,13 @@ get_title()           → name_fa
 get_price()           → sell_price
 get_sku()             → barcode
 is_virtual()          → is_service
-managing_stock()      → track_inventory
+managing_stock()      → track_inventory   (پرچم ردیابی؛ عدد موجودی نیست)
 get_category_ids()    → category_id
+
+نکته موجودی عددی:
+- همگام‌سازی محصول عدد stock_quantity را نمی‌فرستد.
+- WC→Hesabix عدد: موجودی افتتاحیه یا (با سیاست ووکامرس) حواله تعدیل.
+- Hesabix→WC عدد: کشش موجودی (Cron/دستی) یا پوش پس از قطعی حواله انبار.
 ```
 
 ### مشتری ووکامرس → مارک‌استریت

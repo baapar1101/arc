@@ -1,0 +1,240 @@
+{
+  "sizes": [
+    {
+      "size": 180,
+      "real_tools": 180,
+      "synthetic_tools": 0,
+      "keyword_linear_ms": 38.067,
+      "inverted_index_build_ms": 101.57,
+      "inverted_index_query_ms": 5.396,
+      "inverted_index_query_p50_ms": 5.358,
+      "inverted_index_query_p95_ms": 5.526,
+      "inverted_postings": 522,
+      "index_memory_bytes_est": 120048,
+      "semantic_linear_ms": 39.234,
+      "ranking_latency_ms": 38.067,
+      "semantic_search_latency_ms": 39.234,
+      "discovery_latency_ms": 77.301,
+      "schema_loading_latency_ms": 3.643,
+      "database_queries": 0,
+      "top15": [
+        "search_invoices",
+        "get_sales_report",
+        "get_invoice_details",
+        "delete_invoice",
+        "create_invoice"
+      ],
+      "inverted_top15": [
+        "search_invoices",
+        "get_sales_report",
+        "delete_invoice",
+        "create_invoice",
+        "delete_memory_entry"
+      ],
+      "production_ready": false
+    },
+    {
+      "size": 500,
+      "real_tools": 180,
+      "synthetic_tools": 320,
+      "keyword_linear_ms": 69.998,
+      "inverted_index_build_ms": 181.453,
+      "inverted_index_query_ms": 5.805,
+      "inverted_index_query_p50_ms": 5.798,
+      "inverted_index_query_p95_ms": 5.892,
+      "inverted_postings": 845,
+      "index_memory_bytes_est": 339200,
+      "semantic_linear_ms": 105.663,
+      "ranking_latency_ms": 69.998,
+      "semantic_search_latency_ms": 105.663,
+      "discovery_latency_ms": 175.661,
+      "schema_loading_latency_ms": 3.515,
+      "database_queries": 0,
+      "top15": [
+        "search_invoices",
+        "get_sales_report",
+        "get_invoice_details",
+        "delete_invoice",
+        "create_invoice"
+      ],
+      "inverted_top15": [
+        "search_invoices",
+        "get_sales_report",
+        "delete_invoice",
+        "create_invoice",
+        "delete_memory_entry"
+      ],
+      "production_ready": false
+    },
+    {
+      "size": 1200,
+      "real_tools": 180,
+      "synthetic_tools": 1020,
+      "keyword_linear_ms": 100.839,
+      "inverted_index_build_ms": 397.414,
+      "inverted_index_query_ms": 6.454,
+      "inverted_index_query_p50_ms": 6.44,
+      "inverted_index_query_p95_ms": 6.597,
+      "inverted_postings": 1545,
+      "index_memory_bytes_est": 818640,
+      "semantic_linear_ms": 246.336,
+      "ranking_latency_ms": 100.839,
+      "semantic_search_latency_ms": 246.336,
+      "discovery_latency_ms": 347.175,
+      "schema_loading_latency_ms": 3.619,
+      "database_queries": 0,
+      "top15": [
+        "search_invoices",
+        "get_sales_report",
+        "get_invoice_details",
+        "delete_invoice",
+        "create_invoice"
+      ],
+      "inverted_top15": [
+        "search_invoices",
+        "get_sales_report",
+        "delete_invoice",
+        "create_invoice",
+        "delete_memory_entry"
+      ],
+      "production_ready": false
+    },
+    {
+      "size": 5000,
+      "real_tools": 180,
+      "synthetic_tools": 4820,
+      "keyword_linear_ms": 334.283,
+      "inverted_index_build_ms": 1456.405,
+      "inverted_index_query_ms": 10.55,
+      "inverted_index_query_p50_ms": 10.626,
+      "inverted_index_query_p95_ms": 10.937,
+      "inverted_postings": 5345,
+      "index_memory_bytes_est": 3421376,
+      "semantic_linear_ms": 1053.128,
+      "ranking_latency_ms": 334.283,
+      "semantic_search_latency_ms": 1053.128,
+      "discovery_latency_ms": 1387.411,
+      "schema_loading_latency_ms": 3.603,
+      "database_queries": 0,
+      "top15": [
+        "search_invoices",
+        "get_sales_report",
+        "get_invoice_details",
+        "delete_invoice",
+        "create_invoice"
+      ],
+      "inverted_top15": [
+        "search_invoices",
+        "get_sales_report",
+        "delete_invoice",
+        "create_invoice",
+        "delete_memory_entry"
+      ],
+      "production_ready": false
+    },
+    {
+      "size": 10000,
+      "real_tools": 180,
+      "synthetic_tools": 9820,
+      "keyword_linear_ms": 635.31,
+      "inverted_index_build_ms": 3033.773,
+      "inverted_index_query_ms": 13.662,
+      "inverted_index_query_p50_ms": 13.602,
+      "inverted_index_query_p95_ms": 13.914,
+      "inverted_postings": 10345,
+      "index_memory_bytes_est": 6846112,
+      "semantic_linear_ms": 2131.595,
+      "ranking_latency_ms": 635.31,
+      "semantic_search_latency_ms": 2131.595,
+      "discovery_latency_ms": 2766.905,
+      "schema_loading_latency_ms": 5.317,
+      "database_queries": 0,
+      "top15": [
+        "search_invoices",
+        "get_sales_report",
+        "get_invoice_details",
+        "delete_invoice",
+        "create_invoice"
+      ],
+      "inverted_top15": [
+        "search_invoices",
+        "get_sales_report",
+        "delete_invoice",
+        "create_invoice",
+        "delete_memory_entry"
+      ],
+      "production_ready": false
+    }
+  ],
+  "size_100000": {
+    "size": 100000,
+    "real_tools": 180,
+    "synthetic_tools": 99820,
+    "keyword_linear_ms": null,
+    "inverted_index_build_ms": 30796.249,
+    "inverted_index_query_ms": 122.269,
+    "inverted_index_query_p50_ms": 120.801,
+    "inverted_index_query_p95_ms": 126.76,
+    "inverted_postings": 100345,
+    "index_memory_bytes_est": 68490352,
+    "semantic_linear_ms": null,
+    "ranking_latency_ms": null,
+    "semantic_search_latency_ms": null,
+    "discovery_latency_ms": 0,
+    "schema_loading_latency_ms": null,
+    "database_queries": 0,
+    "top15": [],
+    "inverted_top15": [
+      "search_invoices",
+      "get_sales_report",
+      "delete_invoice",
+      "create_invoice",
+      "delete_memory_entry"
+    ],
+    "production_ready": false
+  },
+  "stress_10k": [
+    {
+      "concurrency": 1,
+      "queries": 1,
+      "wall_ms": 18.536,
+      "p50_ms": 16.324,
+      "p95_ms": 16.324
+    },
+    {
+      "concurrency": 10,
+      "queries": 10,
+      "wall_ms": 227.407,
+      "p50_ms": 87.168,
+      "p95_ms": 138.001
+    },
+    {
+      "concurrency": 50,
+      "queries": 50,
+      "wall_ms": 1591.009,
+      "p50_ms": 1395.796,
+      "p95_ms": 1507.56
+    },
+    {
+      "concurrency": 100,
+      "queries": 100,
+      "wall_ms": 3166.629,
+      "p50_ms": 2766.092,
+      "p95_ms": 3006.562
+    }
+  ],
+  "memory_current_kb": 15373.2,
+  "memory_peak_kb": 217806.9,
+  "note": "Synthetic names never enter production registry. Inverted index is derived posting lists. Linear semantic at 10k is not a production design. 100k skips semantic scan.",
+  "index_study": {
+    "A_inverted_keyword": "In-process inverted index is the Phase 10 candidate generator.",
+    "B_postgres_gin_trigram": "Optional later for fuzzy tokens; not required at 10k.",
+    "C_pgvector_ann": "Existing pgvector is for knowledge chunks, not tools. No new vector DB.",
+    "D_hnsw": "Preferred future ANN when a versioned neural embedding exists.",
+    "E_hybrid_inverted_plus_vector": "Merge is implemented behind VECTOR_CANDIDATE_RETRIEVAL=False.",
+    "phase_10_gate": "Do not ship 10k linear semantic. Keyword inverted index is the online path.",
+    "semantic_10k_ms": 2131.595,
+    "inverted_10k_query_ms": 13.662,
+    "keyword_10k_ms": 635.31
+  }
+}

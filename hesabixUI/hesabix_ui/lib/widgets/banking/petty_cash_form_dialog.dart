@@ -260,10 +260,10 @@ class _PettyCashFormDialogState extends State<PettyCashFormDialog> {
 								validator: (value) {
 									if (!_autoGenerateCode) {
 										if (value == null || value.trim().isEmpty) {
-											return t.personCodeRequired;
+											return t.codeRequired;
 										}
 										if (value.trim().length < 3) {
-											return t.passwordMinLength; // fallback
+											return t.codeMinLength;
 										}
 										if (!RegExp(r'^\d+$').hasMatch(value.trim())) {
 											return t.codeMustBeNumeric;

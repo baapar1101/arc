@@ -397,6 +397,11 @@ class SystemConfigurationPayload(BaseModel):
 	app_version: str | None = None
 	default_language: str | None = None
 	default_theme: str | None = None
+	default_theme_id: str | None = Field(
+		default=None,
+		description="شناسه پالت رنگی پیش‌فرض: classic_blue | turquoise_sea | emerald_forest | warm_copper",
+		max_length=64,
+	)
 	default_timezone: str | None = Field(
 		default=None,
 		description="نام منطقهٔ زمانی IANA برای نمایش تاریخ/زمان در کل سیستم (مثال Asia/Tehran)",
@@ -414,6 +419,24 @@ class SystemConfigurationPayload(BaseModel):
 		description="متن دلخواه مدیر؛ در صورت خالی نمایش پیش‌فرض در خطا و عمومی برای کاربر",
 		max_length=8192,
 	)
+	legacy_api_import_enabled: bool | None = Field(
+		default=None,
+		description="اگر False باشد گزینه انتقال از حسابیکس قبلی برای کاربران عادی مخفی و API مربوطه قطع می‌شود",
+	)
+	legacy_api_import_disabled_message: str | None = Field(
+		default=None,
+		description="متن دلخواه مدیر وقتی انتقال از حسابیکس قبلی غیرفعال است",
+		max_length=8192,
+	)
+	support_billing_mode: str | None = Field(default=None, description="free | paid | hybrid")
+	support_free_quota_per_month: int | None = None
+	support_grace_period_days: int | None = None
+	support_allow_read_without_subscription: bool | None = None
+	support_require_subscription_to_reply: bool | None = None
+	support_default_gateway_id: int | None = None
+	support_invoice_prefix: str | None = None
+	support_expiry_notify_days: list[int] | None = None
+	support_paid_priority_boost: bool | None = None
 	session_timeout: int | None = None
 	max_file_size: int | None = None
 	max_users: int | None = None
@@ -486,12 +509,24 @@ def set_system_configuration_endpoint(
 		app_version=payload.app_version,
 		default_language=payload.default_language,
 		default_theme=payload.default_theme,
+		default_theme_id=payload.default_theme_id,
 		default_timezone=payload.default_timezone,
 		enable_registration=payload.enable_registration,
 		enable_email_verification=payload.enable_email_verification,
 		enable_maintenance_mode=payload.enable_maintenance_mode,
 		support_tickets_enabled=payload.support_tickets_enabled,
 		support_tickets_disabled_message=payload.support_tickets_disabled_message,
+		legacy_api_import_enabled=payload.legacy_api_import_enabled,
+		legacy_api_import_disabled_message=payload.legacy_api_import_disabled_message,
+		support_billing_mode=payload.support_billing_mode,
+		support_free_quota_per_month=payload.support_free_quota_per_month,
+		support_grace_period_days=payload.support_grace_period_days,
+		support_allow_read_without_subscription=payload.support_allow_read_without_subscription,
+		support_require_subscription_to_reply=payload.support_require_subscription_to_reply,
+		support_default_gateway_id=payload.support_default_gateway_id,
+		support_invoice_prefix=payload.support_invoice_prefix,
+		support_expiry_notify_days=payload.support_expiry_notify_days,
+		support_paid_priority_boost=payload.support_paid_priority_boost,
 		session_timeout=payload.session_timeout,
 		max_file_size=payload.max_file_size,
 		max_users=payload.max_users,

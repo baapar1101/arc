@@ -40,6 +40,11 @@ class ExpenseIncomeFormDialog extends StatefulWidget {
   final BusinessWithPermission? businessInfo;
   final ApiClient apiClient;
   final ExpenseIncomeDocument? initialDocument;
+  /// Prefill from SMS bank assistant (create mode only).
+  final double? initialAmount;
+  final String? initialBankId;
+  final String? initialBankName;
+  final String? initialDescription;
 
   const ExpenseIncomeFormDialog({
     super.key,
@@ -49,6 +54,10 @@ class ExpenseIncomeFormDialog extends StatefulWidget {
     this.businessInfo,
     required this.apiClient,
     this.initialDocument,
+    this.initialAmount,
+    this.initialBankId,
+    this.initialBankName,
+    this.initialDescription,
   });
 
   @override
@@ -127,6 +136,23 @@ class _ExpenseIncomeFormDialogState extends State<ExpenseIncomeFormDialog>
       _docDate = DateTime.now();
       _isIncome = widget.isIncome;
       _selectedCurrencyId = widget.businessInfo?.defaultCurrency?.id;
+      final seedAmount = widget.initialAmount;
+      if (seedAmount != null && seedAmount > 0) {
+        if (widget.initialDescription != null && widget.initialDescription!.trim().isNotEmpty) {
+          _descriptionController.text = widget.initialDescription!.trim();
+        }
+        _counterpartyLines.add(
+          _CounterpartyLine(
+            rowId: _nextExpenseIncomeRowId(),
+            transactionType: TransactionType.bank,
+            amount: seedAmount,
+            transactionDate: _docDate,
+            description: widget.initialDescription,
+            bankAccountId: widget.initialBankId,
+            bankAccountName: widget.initialBankName,
+          ),
+        );
+      }
     }
   }
 

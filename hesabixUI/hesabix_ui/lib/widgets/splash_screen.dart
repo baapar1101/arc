@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:hesabix_ui/config/brand_config.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
+import 'package:hesabix_ui/theme/brand_logo.dart';
 
 class SplashScreen extends StatelessWidget {
   final String? message;
@@ -20,6 +22,7 @@ class SplashScreen extends StatelessWidget {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final isDark = theme.brightness == Brightness.dark;
+    final t = AppLocalizations.of(context);
     
     final bgColor = backgroundColor ?? colorScheme.surface;
     final primary = primaryColor ?? colorScheme.primary;
@@ -64,22 +67,10 @@ class SplashScreen extends StatelessWidget {
                 ),
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(20),
-                  child: Image.asset(
-                    isDark ? 'assets/images/logo-light.png' : 'assets/images/logo-blue.png',
-                    fit: BoxFit.contain,
-                    errorBuilder: (context, error, stackTrace) {
-                      return Container(
-                        decoration: BoxDecoration(
-                          color: primary,
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Icon(
-                          Icons.account_balance,
-                          size: 60,
-                          color: colorScheme.onPrimary,
-                        ),
-                      );
-                    },
+                  child: BrandLogo(
+                    width: 120,
+                    height: 120,
+                    primaryOverride: primary,
                   ),
                 ),
               ),
@@ -88,7 +79,11 @@ class SplashScreen extends StatelessWidget {
             
             // App Name
             Text(
+<<<<<<< HEAD
+              BrandConfig.appTitle(t),
+=======
               'MarkStreet',
+>>>>>>> github/Huma
               style: theme.textTheme.headlineMedium?.copyWith(
                 fontWeight: FontWeight.bold,
                 color: colorScheme.onSurface,
@@ -99,7 +94,7 @@ class SplashScreen extends StatelessWidget {
             
             // Subtitle
             Text(
-              AppLocalizations.of(context).businessManagementPlatform,
+              t.businessManagementPlatform,
               style: theme.textTheme.bodyLarge?.copyWith(
                 color: colorScheme.onSurfaceVariant,
                 fontWeight: FontWeight.w400,
@@ -122,7 +117,7 @@ class SplashScreen extends StatelessWidget {
                 
                 // Loading Message
                 Text(
-                  message ?? AppLocalizations.of(context).loading,
+                  message ?? t.loading,
                   style: theme.textTheme.bodyMedium?.copyWith(
                     color: colorScheme.onSurfaceVariant,
                     fontWeight: FontWeight.w500,
@@ -135,7 +130,7 @@ class SplashScreen extends StatelessWidget {
             
             // Version Info (Optional)
             Text(
-              AppLocalizations.of(context).version,
+              t.version,
               style: theme.textTheme.bodySmall?.copyWith(
                 color: colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
               ),

@@ -1,5 +1,6 @@
 import 'package:intl/intl.dart';
 import 'package:data_table_2/data_table_2.dart';
+import 'package:hesabix_ui/core/date_utils.dart';
 import '../data_table_config.dart';
 
 /// Utility functions for data table
@@ -48,19 +49,22 @@ class DataTableUtils {
     String? format,
     bool isJalali = false,
     bool showTime = false,
+    dynamic rawValue,
   }) {
-    if (value == null) return '';
-    
-    DateTime? date;
-    if (value is DateTime) {
-      date = value;
-    } else if (value is String) {
-      try {
-        date = DateTime.parse(value);
-      } catch (e) {
-        return value; // Return original string if parsing fails
+    if (value == null && rawValue == null) return '';
+
+    final parsed = HesabixDateUtils.parseApiDate(value, rawValue: rawValue);
+    if (parsed != null) {
+      if (showTime) {
+        return HesabixDateUtils.formatDateTime(parsed, isJalali);
       }
-    } else if (value is Map<String, dynamic>) {
+      if (!isJalali && format != null && format.isNotEmpty) {
+        return DateFormat(format).format(parsed.toLocal());
+      }
+      return HesabixDateUtils.formatForDisplay(parsed, isJalali);
+    }
+
+    if (value is Map<String, dynamic>) {
       // Handle formatted date objects from backend
       if (value.containsKey('date_only')) {
         return value['date_only'].toString();
@@ -69,16 +73,13 @@ class DataTableUtils {
       }
       return value.toString();
     }
-    
-    if (date == null) return value.toString();
-    
-    if (isJalali) {
-      // TODO: Implement Jalali date formatting
-      return DateFormat(format ?? 'yyyy/MM/dd').format(date);
-    } else {
-      final pattern = format ?? (showTime ? 'yyyy/MM/dd HH:mm' : 'yyyy/MM/dd');
-      return DateFormat(pattern).format(date);
-    }
+
+    return HesabixDateUtils.formatApiDateForDisplay(
+      value,
+      isJalali,
+      rawValue: rawValue,
+      fallback: value?.toString() ?? '',
+    );
   }
 
   /// Get column width as double
@@ -318,9 +319,11 @@ class DataTableUtils {
   /// Format cell value based on column type
   static String formatCellValue(
     dynamic value,
-    DataTableColumn column,
-  ) {
-    if (value == null) return '';
+    DataTableColumn column, {
+    bool isJalali = false,
+    dynamic rawValue,
+  }) {
+    if (value == null && rawValue == null) return '';
     
     if (column is TextColumn) {
       if (column.formatter != null) {
@@ -345,6 +348,8 @@ class DataTableUtils {
         value,
         format: column.dateFormat,
         showTime: column.showTime,
+        isJalali: isJalali,
+        rawValue: rawValue,
       );
     }
     

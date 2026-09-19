@@ -8,7 +8,7 @@ import 'package:hesabix_ui/services/admin_system_settings_service.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
 import 'package:hesabix_ui/utils/snackbar_helper.dart';
-import 'package:hesabix_ui/utils/web/web_utils.dart' as web_utils;
+import 'package:hesabix_ui/services/bytes_export/bytes_export_service.dart';
 
 class DatabaseBackupPage extends StatefulWidget {
   const DatabaseBackupPage({super.key});
@@ -90,15 +90,16 @@ class _DatabaseBackupPageState extends State<DatabaseBackupPage> {
       final ext = _compress ? 'sql.gz' : 'sql';
       final ts = DateTime.now().toIso8601String().replaceAll(':', '-').split('.').first;
       final filename = 'hesabix_db_backup_$ts.$ext';
-      await web_utils.saveBytesAsFileWeb(
-        bytes,
-        filename,
+      final result = await BytesExportService.export(
+        bytes: bytes,
+        filename: filename,
         mimeType: 'application/octet-stream',
       );
       if (mounted) {
-        SnackBarHelper.showSuccess(
+        BytesExportService.showFeedback(
           context,
-          message: 'بکاپ با موفقیت دانلود شد',
+          result,
+          successOverride: 'بکاپ با موفقیت دانلود شد',
         );
       }
     } catch (e) {

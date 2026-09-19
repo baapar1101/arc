@@ -303,6 +303,79 @@ class _BusinessPrintSettingsPageState extends State<BusinessPrintSettingsPage> {
             });
           },
         ),
+          if (cfg.showStamp) ...[
+          const SizedBox(height: 4),
+          Padding(
+            padding: const EdgeInsetsDirectional.only(start: 16, end: 8),
+            child: Text(
+              'اندازه مهر در PDF',
+              style: Theme.of(context).textTheme.titleSmall,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Padding(
+            padding: const EdgeInsetsDirectional.only(start: 8, end: 8),
+            child: _ScalePresetRow(
+              value: cfg.stampScalePercent,
+              onChanged: (v) {
+                setState(() {
+                  final current = _currentConfig();
+                  _updateCurrentConfig(current.copyWith(stampScalePercent: v));
+                });
+              },
+            ),
+          ),
+          if (_isCustomScale(cfg.stampScalePercent))
+            Padding(
+              padding: const EdgeInsetsDirectional.only(start: 8, end: 8),
+              child: _ScaleSlider(
+                label: 'مقیاس مهر',
+                value: cfg.stampScalePercent,
+                onChanged: (v) {
+                  setState(() {
+                    final current = _currentConfig();
+                    _updateCurrentConfig(current.copyWith(stampScalePercent: v));
+                  });
+                },
+              ),
+            ),
+          const SizedBox(height: 8),
+          Padding(
+            padding: const EdgeInsetsDirectional.only(start: 16, end: 8),
+            child: Text(
+              'اندازه امضا در PDF',
+              style: Theme.of(context).textTheme.titleSmall,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Padding(
+            padding: const EdgeInsetsDirectional.only(start: 8, end: 8),
+            child: _ScalePresetRow(
+              value: cfg.signatureScalePercent,
+              onChanged: (v) {
+                setState(() {
+                  final current = _currentConfig();
+                  _updateCurrentConfig(current.copyWith(signatureScalePercent: v));
+                });
+              },
+            ),
+          ),
+          if (_isCustomScale(cfg.signatureScalePercent))
+            Padding(
+              padding: const EdgeInsetsDirectional.only(start: 8, end: 8),
+              child: _ScaleSlider(
+                label: 'مقیاس امضا',
+                value: cfg.signatureScalePercent,
+                onChanged: (v) {
+                  setState(() {
+                    final current = _currentConfig();
+                    _updateCurrentConfig(current.copyWith(signatureScalePercent: v));
+                  });
+                },
+              ),
+            ),
+          const SizedBox(height: 8),
+        ],
         SwitchListTile(
           title: const Text('نمایش بلوک امضا / مهر فروشنده'),
           subtitle: const Text('کل بخش امضای فروشنده در انتهای صفحهٔ PDF؛ می‌توانید بدون خاموش کردن بقیهٔ فاکتور مخفی کنید'),
@@ -385,6 +458,66 @@ class _BusinessPrintSettingsPageState extends State<BusinessPrintSettingsPage> {
             });
           },
         ),
+        const SizedBox(height: 16),
+        Text(
+          'نمایش مبالغ مالیات و تخفیف',
+          style: Theme.of(context).textTheme.titleMedium,
+        ),
+        const SizedBox(height: 4),
+        Text(
+          'حالت «هوشمند»: اگر مقدار مربوطه در فاکتور صفر باشد، در خروجی PDF نمایش داده نمی‌شود.',
+          style: Theme.of(context).textTheme.bodySmall,
+        ),
+        const SizedBox(height: 8),
+        _TaxDiscountDisplayModeTile(
+          title: 'ستون تخفیف (جدول اقلام)',
+          value: cfg.lineDiscountDisplay,
+          onChanged: (v) => setState(() {
+            _updateCurrentConfig(cfg.copyWith(lineDiscountDisplay: v));
+          }),
+        ),
+        _TaxDiscountDisplayModeTile(
+          title: 'ستون مالیات (جدول اقلام)',
+          value: cfg.lineTaxDisplay,
+          onChanged: (v) => setState(() {
+            _updateCurrentConfig(cfg.copyWith(lineTaxDisplay: v));
+          }),
+        ),
+        _TaxDiscountDisplayModeTile(
+          title: 'ستون جمع بدون تخفیف (جدول اقلام)',
+          value: cfg.lineAmountBeforeDiscountDisplay,
+          onChanged: (v) => setState(() {
+            _updateCurrentConfig(cfg.copyWith(lineAmountBeforeDiscountDisplay: v));
+          }),
+        ),
+        _TaxDiscountDisplayModeTile(
+          title: 'ستون جمع بدون مالیات (جدول اقلام)',
+          value: cfg.lineAmountBeforeTaxDisplay,
+          onChanged: (v) => setState(() {
+            _updateCurrentConfig(cfg.copyWith(lineAmountBeforeTaxDisplay: v));
+          }),
+        ),
+        _TaxDiscountDisplayModeTile(
+          title: 'ردیف تخفیف (خلاصه مالی)',
+          value: cfg.summaryDiscountDisplay,
+          onChanged: (v) => setState(() {
+            _updateCurrentConfig(cfg.copyWith(summaryDiscountDisplay: v));
+          }),
+        ),
+        _TaxDiscountDisplayModeTile(
+          title: 'ردیف مبلغ بدون مالیات (خلاصه مالی)',
+          value: cfg.summaryAmountWithoutTaxDisplay,
+          onChanged: (v) => setState(() {
+            _updateCurrentConfig(cfg.copyWith(summaryAmountWithoutTaxDisplay: v));
+          }),
+        ),
+        _TaxDiscountDisplayModeTile(
+          title: 'ردیف مالیات (خلاصه مالی)',
+          value: cfg.summaryTaxDisplay,
+          onChanged: (v) => setState(() {
+            _updateCurrentConfig(cfg.copyWith(summaryTaxDisplay: v));
+          }),
+        ),
         const SizedBox(height: 12),
         TextFormField(
           controller: _footerController,
@@ -401,6 +534,10 @@ class _BusinessPrintSettingsPageState extends State<BusinessPrintSettingsPage> {
 }
 
 class _PrintConfig {
+  static const String displaySmart = 'smart';
+  static const String displayAlways = 'always';
+  static const String displayNever = 'never';
+
   final bool showLogo;
   final bool showStamp;
   final bool showSellerSignatureArea;
@@ -412,6 +549,17 @@ class _PrintConfig {
   final bool showFooterPrintTime;
   final bool showFooterPreparer;
   final String? footerNote;
+  /// مقیاس مهر نسبت به اندازه پایه قالب (۵۰ تا ۲۰۰؛ ۱۰۰ = پیش‌فرض)
+  final int stampScalePercent;
+  /// مقیاس امضا نسبت به اندازه پایه قالب (۵۰ تا ۲۰۰؛ ۱۰۰ = پیش‌فرض)
+  final int signatureScalePercent;
+  final String lineDiscountDisplay;
+  final String lineTaxDisplay;
+  final String lineAmountBeforeDiscountDisplay;
+  final String lineAmountBeforeTaxDisplay;
+  final String summaryDiscountDisplay;
+  final String summaryTaxDisplay;
+  final String summaryAmountWithoutTaxDisplay;
 
   const _PrintConfig({
     required this.showLogo,
@@ -425,6 +573,15 @@ class _PrintConfig {
     required this.showFooterPrintTime,
     required this.showFooterPreparer,
     required this.footerNote,
+    required this.stampScalePercent,
+    required this.signatureScalePercent,
+    required this.lineDiscountDisplay,
+    required this.lineTaxDisplay,
+    required this.lineAmountBeforeDiscountDisplay,
+    required this.lineAmountBeforeTaxDisplay,
+    required this.summaryDiscountDisplay,
+    required this.summaryTaxDisplay,
+    required this.summaryAmountWithoutTaxDisplay,
   });
 
   factory _PrintConfig.initial() {
@@ -440,7 +597,24 @@ class _PrintConfig {
       showFooterPrintTime: true,
       showFooterPreparer: true,
       footerNote: null,
+      stampScalePercent: 100,
+      signatureScalePercent: 100,
+      lineDiscountDisplay: displaySmart,
+      lineTaxDisplay: displaySmart,
+      lineAmountBeforeDiscountDisplay: displaySmart,
+      lineAmountBeforeTaxDisplay: displaySmart,
+      summaryDiscountDisplay: displaySmart,
+      summaryTaxDisplay: displaySmart,
+      summaryAmountWithoutTaxDisplay: displaySmart,
     );
+  }
+
+  static String _displayMode(String? raw, {String fallback = displaySmart}) {
+    final mode = (raw ?? '').trim().toLowerCase();
+    if (mode == displayAlways || mode == displayNever || mode == displaySmart) {
+      return mode;
+    }
+    return fallback;
   }
 
   factory _PrintConfig.fromJson(Map<String, dynamic> json) {
@@ -470,6 +644,18 @@ class _PrintConfig {
       footerNote: (json['footer_note'] as String?)?.trim().isEmpty == true
           ? null
           : json['footer_note'] as String?,
+      stampScalePercent: _clampScale(json['stamp_scale_percent'], 100),
+      signatureScalePercent: _clampScale(json['signature_scale_percent'], 100),
+      lineDiscountDisplay: _displayMode(json['line_discount_display'] as String?),
+      lineTaxDisplay: _displayMode(json['line_tax_display'] as String?),
+      lineAmountBeforeDiscountDisplay:
+          _displayMode(json['line_amount_before_discount_display'] as String?),
+      lineAmountBeforeTaxDisplay:
+          _displayMode(json['line_amount_before_tax_display'] as String?),
+      summaryDiscountDisplay: _displayMode(json['summary_discount_display'] as String?),
+      summaryTaxDisplay: _displayMode(json['summary_tax_display'] as String?),
+      summaryAmountWithoutTaxDisplay:
+          _displayMode(json['summary_amount_without_tax_display'] as String?),
     );
   }
 
@@ -486,6 +672,15 @@ class _PrintConfig {
       'show_footer_print_time': showFooterPrintTime,
       'show_footer_preparer': showFooterPreparer,
       'footer_note': footerNote,
+      'stamp_scale_percent': stampScalePercent,
+      'signature_scale_percent': signatureScalePercent,
+      'line_discount_display': lineDiscountDisplay,
+      'line_tax_display': lineTaxDisplay,
+      'line_amount_before_discount_display': lineAmountBeforeDiscountDisplay,
+      'line_amount_before_tax_display': lineAmountBeforeTaxDisplay,
+      'summary_discount_display': summaryDiscountDisplay,
+      'summary_tax_display': summaryTaxDisplay,
+      'summary_amount_without_tax_display': summaryAmountWithoutTaxDisplay,
     };
   }
 
@@ -501,6 +696,15 @@ class _PrintConfig {
     bool? showFooterPrintTime,
     bool? showFooterPreparer,
     String? footerNote,
+    int? stampScalePercent,
+    int? signatureScalePercent,
+    String? lineDiscountDisplay,
+    String? lineTaxDisplay,
+    String? lineAmountBeforeDiscountDisplay,
+    String? lineAmountBeforeTaxDisplay,
+    String? summaryDiscountDisplay,
+    String? summaryTaxDisplay,
+    String? summaryAmountWithoutTaxDisplay,
   }) {
     return _PrintConfig(
       showLogo: showLogo ?? this.showLogo,
@@ -514,6 +718,159 @@ class _PrintConfig {
       showFooterPrintTime: showFooterPrintTime ?? this.showFooterPrintTime,
       showFooterPreparer: showFooterPreparer ?? this.showFooterPreparer,
       footerNote: footerNote ?? this.footerNote,
+      stampScalePercent: stampScalePercent ?? this.stampScalePercent,
+      signatureScalePercent: signatureScalePercent ?? this.signatureScalePercent,
+      lineDiscountDisplay: lineDiscountDisplay ?? this.lineDiscountDisplay,
+      lineTaxDisplay: lineTaxDisplay ?? this.lineTaxDisplay,
+      lineAmountBeforeDiscountDisplay:
+          lineAmountBeforeDiscountDisplay ?? this.lineAmountBeforeDiscountDisplay,
+      lineAmountBeforeTaxDisplay:
+          lineAmountBeforeTaxDisplay ?? this.lineAmountBeforeTaxDisplay,
+      summaryDiscountDisplay: summaryDiscountDisplay ?? this.summaryDiscountDisplay,
+      summaryTaxDisplay: summaryTaxDisplay ?? this.summaryTaxDisplay,
+      summaryAmountWithoutTaxDisplay:
+          summaryAmountWithoutTaxDisplay ?? this.summaryAmountWithoutTaxDisplay,
+    );
+  }
+}
+
+class _TaxDiscountDisplayModeTile extends StatelessWidget {
+  final String title;
+  final String value;
+  final ValueChanged<String> onChanged;
+
+  const _TaxDiscountDisplayModeTile({
+    required this.title,
+    required this.value,
+    required this.onChanged,
+  });
+
+  static const _labels = <String, String>{
+    _PrintConfig.displaySmart: 'هوشمند',
+    _PrintConfig.displayAlways: 'همیشه',
+    _PrintConfig.displayNever: 'هرگز',
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      contentPadding: const EdgeInsetsDirectional.only(start: 8, end: 8),
+      title: Text(title),
+      trailing: DropdownButton<String>(
+        value: _labels.containsKey(value) ? value : _PrintConfig.displaySmart,
+        underline: const SizedBox.shrink(),
+        items: _labels.entries
+            .map(
+              (e) => DropdownMenuItem<String>(
+                value: e.key,
+                child: Text(e.value),
+              ),
+            )
+            .toList(),
+        onChanged: (v) {
+          if (v != null) onChanged(v);
+        },
+      ),
+    );
+  }
+}
+
+bool _isCustomScale(int value) => value != 70 && value != 100 && value != 140;
+
+int _clampScale(dynamic raw, int fallback) {
+  int n = fallback;
+  if (raw is int) {
+    n = raw;
+  } else if (raw is num) {
+    n = raw.round();
+  } else if (raw is String) {
+    n = int.tryParse(raw.trim()) ?? fallback;
+  }
+  if (n < 50) return 50;
+  if (n > 200) return 200;
+  return n;
+}
+
+class _ScalePresetRow extends StatelessWidget {
+  final int value;
+  final ValueChanged<int> onChanged;
+
+  const _ScalePresetRow({
+    required this.value,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final selected = _isCustomScale(value)
+        ? 'custom'
+        : (value == 70
+            ? 'small'
+            : (value == 140 ? 'large' : 'medium'));
+
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: [
+        ChoiceChip(
+          label: const Text('کوچک'),
+          selected: selected == 'small',
+          onSelected: (_) => onChanged(70),
+        ),
+        ChoiceChip(
+          label: const Text('متوسط'),
+          selected: selected == 'medium',
+          onSelected: (_) => onChanged(100),
+        ),
+        ChoiceChip(
+          label: const Text('بزرگ'),
+          selected: selected == 'large',
+          onSelected: (_) => onChanged(140),
+        ),
+        ChoiceChip(
+          label: Text(_isCustomScale(value) ? 'سفارشی ($value٪)' : 'سفارشی'),
+          selected: selected == 'custom',
+          onSelected: (_) {
+            if (!_isCustomScale(value)) {
+              onChanged(120);
+            }
+          },
+        ),
+      ],
+    );
+  }
+}
+
+class _ScaleSlider extends StatelessWidget {
+  final String label;
+  final int value;
+  final ValueChanged<int> onChanged;
+
+  const _ScaleSlider({
+    required this.label,
+    required this.value,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(child: Text('$label: $value٪')),
+          ],
+        ),
+        Slider(
+          value: value.toDouble().clamp(50, 200),
+          min: 50,
+          max: 200,
+          divisions: 30,
+          label: '$value٪',
+          onChanged: (v) => onChanged(v.round()),
+        ),
+      ],
     );
   }
 }

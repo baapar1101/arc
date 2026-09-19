@@ -1,19 +1,51 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/core/api_client.dart';
+import 'package:hesabix_ui/core/auth_store.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
 import 'package:hesabix_ui/services/support_service.dart';
-import 'package:hesabix_ui/services/saved_filters_service.dart';
 import 'package:hesabix_ui/models/support_models.dart';
-import 'package:hesabix_ui/models/saved_filter.dart';
-import 'package:hesabix_ui/widgets/data_table/data_table.dart';
-import 'package:hesabix_ui/widgets/data_table/data_table_config.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
+import 'package:hesabix_ui/utils/snackbar_helper.dart';
 import 'package:hesabix_ui/widgets/support/ticket_details_dialog.dart';
+import 'package:hesabix_ui/services/support_realtime_service.dart';
+import 'package:hesabix_ui/widgets/support/operator_command_palette.dart';
+import 'package:hesabix_ui/widgets/support/operator_inbox_list.dart';
+import 'package:hesabix_ui/widgets/support/operator_inbox_splitter.dart';
+
+/// Breakpoint for split inbox + detail workspace.
+const kOperatorSplitBreakpoint = 960.0;
+
+/// Primary chips shown in the toolbar; the rest live under «بیشتر».
+const _kPrimaryInboxViews = <OperatorInboxView>[
+  OperatorInboxView.all,
+  OperatorInboxView.mine,
+  OperatorInboxView.unread,
+  OperatorInboxView.unassigned,
+];
+
+const _kSecondaryInboxViews = <OperatorInboxView>[
+  OperatorInboxView.waitingOnCustomer,
+  OperatorInboxView.overdue,
+];
 
 class OperatorTicketsPage extends StatefulWidget {
   final CalendarController? calendarController;
-  const OperatorTicketsPage({super.key, this.calendarController});
+  final int? initialTicketId;
+  final AuthStore? authStore;
+  final OperatorInboxView? initialInboxView;
+
+  const OperatorTicketsPage({
+    super.key,
+    this.calendarController,
+    this.initialTicketId,
+    this.authStore,
+    this.initialInboxView,
+  });
 
   @override
   State<OperatorTicketsPage> createState() => _OperatorTicketsPageState();
@@ -21,252 +53,157 @@ class OperatorTicketsPage extends StatefulWidget {
 
 class _OperatorTicketsPageState extends State<OperatorTicketsPage> {
   Set<int> _selectedRows = <int>{};
-  
-  // Key for accessing DataTable state
-  final GlobalKey _dataTableKey = GlobalKey();
-  
-  // Support data for filters
   final SupportService _supportService = SupportService(ApiClient());
+
   List<SupportStatus> _statuses = [];
-  List<SupportPriority> _priorities = [];
-  List<SupportCategory> _categories = [];
-  
-  // Refresh counter to force data table refresh
   int _refreshCounter = 0;
-  
-  // Check if current user is superadmin
   bool _isSuperAdmin = false;
-  
-  // Current user ID for quick actions
   int? _currentUserId;
-  
-  // Saved filters
-  List<SavedFilter> _savedFilters = [];
-  SavedFilter? _selectedFilter;
-  
-  // Additional filters
-  bool? _lastMessageFromUser; // null = همه, true = از کاربر, false = از اپراتور
+  bool _selectionMode = false;
+
+  SupportTicket? _selectedTicket;
+  bool _selectedTicketLoading = false;
+  int? _selectedTicketId;
+
+  SupportRealtimeService? _realtime;
+  Timer? _pollTimer;
+  DateTime? _lastRefreshBump;
+  Timer? _refreshThrottle;
+  bool _wsConnected = false;
+
+  OperatorInboxView _inboxView = OperatorInboxView.unread;
 
   @override
   void initState() {
     super.initState();
+    if (widget.initialInboxView != null) {
+      _inboxView = widget.initialInboxView!;
+    }
     _loadMetadata();
-    _checkUserPermissions();
-    _loadCurrentUserId();
-    _loadSavedFilters();
+    _loadSession();
+    _startPolling();
+    _connectRealtime();
+    final ticketId = widget.initialTicketId;
+    if (ticketId != null && ticketId > 0) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        final wide = MediaQuery.sizeOf(context).width >= kOperatorSplitBreakpoint;
+        if (wide) {
+          _openTicketInSplitView(ticketId);
+        } else {
+          context.push('/user/profile/operator/tickets/$ticketId');
+        }
+      });
+    }
   }
 
-  // Helper برای setState ایمن
-  void _safeSetState(VoidCallback fn) {
-    if (mounted) {
-      setState(fn);
+  @override
+  void dispose() {
+    _pollTimer?.cancel();
+    _refreshThrottle?.cancel();
+    _realtime?.disconnect();
+    super.dispose();
+  }
+
+  void _startPolling() {
+    _pollTimer?.cancel();
+    // Fallback only while WebSocket is down.
+    _pollTimer = Timer.periodic(const Duration(seconds: 60), (_) {
+      if (!mounted || _wsConnected) return;
+      _bumpRefresh(immediate: true);
+    });
+  }
+
+  void _bumpRefresh({bool immediate = false}) {
+    if (!mounted) return;
+    if (immediate) {
+      setState(() => _refreshCounter++);
+      _lastRefreshBump = DateTime.now();
+      return;
     }
+    final last = _lastRefreshBump;
+    if (last != null && DateTime.now().difference(last) < const Duration(seconds: 2)) {
+      _refreshThrottle?.cancel();
+      _refreshThrottle = Timer(const Duration(seconds: 2), () {
+        if (!mounted) return;
+        setState(() => _refreshCounter++);
+        _lastRefreshBump = DateTime.now();
+      });
+      return;
+    }
+    setState(() => _refreshCounter++);
+    _lastRefreshBump = DateTime.now();
+  }
+
+  void _connectRealtime() {
+    final apiKey = widget.authStore?.apiKey;
+    if (apiKey == null || apiKey.isEmpty) return;
+    _realtime = createSupportRealtimeService();
+    _realtime!.connect(
+      apiKey: apiKey,
+      onStatus: (connected) {
+        if (!mounted) return;
+        _wsConnected = connected;
+      },
+      onEvent: (event) {
+        if ('${event['type']}' != 'support') return;
+        if (!mounted) return;
+        _wsConnected = true;
+        _bumpRefresh();
+        final eventTicketId = event['ticket_id'];
+        if (eventTicketId is int && eventTicketId == _selectedTicketId) {
+          _reloadSelectedTicket();
+        }
+      },
+    );
+  }
+
+  void _safeSetState(VoidCallback fn) {
+    if (mounted) setState(fn);
   }
 
   Future<void> _loadMetadata() async {
     try {
       final statuses = await _supportService.getStatuses();
-      final priorities = await _supportService.getPriorities();
-      final categories = await _supportService.getCategories();
-      
-      _safeSetState(() {
-        _statuses = statuses;
-        _priorities = priorities;
-        _categories = categories;
-      });
-    } catch (e) {
-      // Handle error silently for now, filters will just be empty
-    }
+      _safeSetState(() => _statuses = statuses);
+    } catch (_) {}
   }
 
-  Future<void> _checkUserPermissions() async {
+  Future<void> _loadSession() async {
     try {
-      final apiClient = ApiClient();
-      final response = await apiClient.get<Map<String, dynamic>>('/api/v1/auth/me');
-      final permissions = response.data?['data']?['permissions'] as Map<String, dynamic>?;
-      final isSuperAdmin = permissions?['is_superadmin'] as bool? ?? false;
-      
+      final response = await ApiClient().get<Map<String, dynamic>>('/api/v1/auth/me');
+      final data = response.data?['data'] as Map<String, dynamic>?;
+      final permissions = data?['permissions'] as Map<String, dynamic>?;
       _safeSetState(() {
-        _isSuperAdmin = isSuperAdmin;
+        _isSuperAdmin = permissions?['is_superadmin'] as bool? ?? false;
+        _currentUserId = data?['id'] as int?;
       });
-    } catch (e) {
-      // Handle error silently
-    }
-  }
-
-  Future<void> _loadCurrentUserId() async {
-    try {
-      final apiClient = ApiClient();
-      final response = await apiClient.get<Map<String, dynamic>>('/api/v1/auth/me');
-      final userId = response.data?['data']?['id'] as int?;
-      
-      _safeSetState(() {
-        _currentUserId = userId;
-      });
-      
-      // Load default filters after getting user ID
-      if (userId != null) {
-        _loadSavedFilters();
-      }
-    } catch (e) {
-      // Handle error silently
-    }
-  }
-
-  Future<void> _loadSavedFilters() async {
-    try {
-      final filters = await SavedFiltersService.getSavedFilters();
-      
-      // Add default filters if no saved filters exist
-      if (filters.isEmpty && _currentUserId != null) {
-        final defaultFilters = SavedFiltersService.getDefaultFilters(_currentUserId);
-        _safeSetState(() {
-          _savedFilters = defaultFilters;
-        });
-      } else {
-        _safeSetState(() {
-          _savedFilters = filters;
-        });
-      }
-    } catch (e) {
-      // Handle error silently
-    }
-  }
-
-  Future<void> _saveCurrentFilter() async {
-    if (!mounted) return;
-    
-    final controller = TextEditingController();
-    final result = await showDialog<String>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('ذخیره فیلتر'),
-        content: TextField(
-          controller: controller,
-          decoration: const InputDecoration(
-            labelText: 'نام فیلتر',
-            hintText: 'مثلاً: تیکت‌های من',
-          ),
-          autofocus: true,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('لغو'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.of(context).pop(controller.text.trim()),
-            child: const Text('ذخیره'),
-          ),
-        ],
-      ),
-    );
-
-    if (result != null && result.isNotEmpty) {
-      try {
-        // TODO: Get current filters from DataTable
-        // For now, create a basic filter
-        final filter = SavedFilter(
-          name: result,
-          filters: _selectedFilter?.filters ?? {},
-        );
-        
-        await SavedFiltersService.saveFilter(filter);
-        await _loadSavedFilters();
-        
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('فیلتر با موفقیت ذخیره شد')),
-          );
-        }
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                'خطا در ذخیره فیلتر: ${ErrorExtractor.forContext(e, context)}',
-              ),
-            ),
-          );
-        }
-      }
-    }
-  }
-
-  Future<void> _deleteSavedFilter(String filterName) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('حذف فیلتر'),
-        content: Text('آیا مطمئن هستید که می‌خواهید فیلتر "$filterName" را حذف کنید؟'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('لغو'),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-            child: const Text('حذف'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed == true) {
-      await SavedFiltersService.deleteFilter(filterName);
-      await _loadSavedFilters();
-      
-      if (_selectedFilter?.name == filterName) {
-        _safeSetState(() {
-          _selectedFilter = null;
-        });
-      }
-      
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('فیلتر حذف شد')),
-        );
-      }
-    }
+    } catch (_) {}
   }
 
   Future<void> _assignToMe() async {
     if (_selectedRows.isEmpty || _currentUserId == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('لطفاً حداقل یک تیکت انتخاب کنید')),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('لطفاً حداقل یک تیکت انتخاب کنید')));
       return;
     }
-
     try {
-      final result = await _supportService.bulkAssignTickets(
-        _selectedRows.toList(),
-        _currentUserId!,
-      );
-      
+      final result = await _supportService.bulkAssignTickets(_selectedRows.toList(), _currentUserId!);
       _safeSetState(() {
         _selectedRows.clear();
+        _selectionMode = false;
         _refreshCounter++;
       });
-
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('${result['updated_count']} تیکت به شما تخصیص داده شد'),
-            backgroundColor: Colors.green,
-          ),
+        SnackBarHelper.showSuccess(
+          context,
+          message: '${result['updated_count']} تیکت به شما تخصیص داده شد',
         );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'خطا در تخصیص تیکت‌ها: ${ErrorExtractor.forContext(e, context)}',
-            ),
-            backgroundColor: Colors.red,
-          ),
+        SnackBarHelper.showError(
+          context,
+          message: ErrorExtractor.forContext(e, context),
         );
       }
     }
@@ -274,599 +211,433 @@ class _OperatorTicketsPageState extends State<OperatorTicketsPage> {
 
   Future<void> _markResolved() async {
     if (_selectedRows.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('لطفاً حداقل یک تیکت انتخاب کنید')),
-      );
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('لطفاً حداقل یک تیکت انتخاب کنید')));
       return;
     }
-
-    // پیدا کردن status_id برای "حل شده" (معمولاً 5)
+    if (_statuses.isEmpty) return;
     final resolvedStatus = _statuses.firstWhere(
       (s) => s.name.toLowerCase().contains('حل') || s.name.toLowerCase().contains('resolved'),
-      orElse: () => _statuses.firstWhere(
-        (s) => s.isFinal == true,
-        orElse: () => _statuses.last,
-      ),
+      orElse: () => _statuses.firstWhere((s) => s.isFinal, orElse: () => _statuses.last),
     );
-
     try {
       final result = await _supportService.bulkUpdateStatus(
         _selectedRows.toList(),
         resolvedStatus.id,
         assignedOperatorId: _currentUserId,
       );
-      
       _safeSetState(() {
         _selectedRows.clear();
+        _selectionMode = false;
         _refreshCounter++;
       });
-
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('${result['updated_count']} تیکت به عنوان حل شده علامت‌گذاری شد'),
-            backgroundColor: Colors.green,
-          ),
+        SnackBarHelper.showSuccess(
+          context,
+          message: '${result['updated_count']} تیکت حل‌شده شد',
         );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'خطا در تغییر وضعیت تیکت‌ها: ${ErrorExtractor.forContext(e, context)}',
-            ),
-            backgroundColor: Colors.red,
-          ),
+        SnackBarHelper.showError(
+          context,
+          message: ErrorExtractor.forContext(e, context),
         );
       }
     }
   }
 
+  bool get _isWide => MediaQuery.sizeOf(context).width >= kOperatorSplitBreakpoint;
 
   void _navigateToTicketDetail(Map<String, dynamic> ticketData) {
-    final ticket = SupportTicket.fromJson(ticketData);
-    showDialog(
+    final ticketId = ticketData['id'];
+    if (ticketId is! int) return;
+    if (_isWide) {
+      _openTicketInSplitView(ticketId);
+      return;
+    }
+    context.push('/user/profile/operator/tickets/$ticketId');
+  }
+
+  Future<void> _openTicketInSplitView(int ticketId) async {
+    if (_selectedTicketId == ticketId && _selectedTicket != null) return;
+    final previousId = _selectedTicketId;
+    _safeSetState(() {
+      _selectedTicketId = ticketId;
+      _selectedTicket = null;
+      _selectedTicketLoading = true;
+    });
+    if (previousId != null && previousId != ticketId) {
+      _realtime?.unsubscribeTicket(previousId);
+    }
+    _realtime?.subscribeTicket(ticketId);
+    try {
+      final ticket = await _supportService.getOperatorTicket(ticketId);
+      _safeSetState(() {
+        _selectedTicket = ticket;
+        _selectedTicketLoading = false;
+      });
+    } catch (e) {
+      _safeSetState(() => _selectedTicketLoading = false);
+      if (mounted) {
+        SnackBarHelper.showError(
+          context,
+          message: ErrorExtractor.forContext(e, context),
+        );
+      }
+    }
+  }
+
+  Future<void> _reloadSelectedTicket() async {
+    final id = _selectedTicketId;
+    if (id == null) return;
+    try {
+      final ticket = await _supportService.getOperatorTicket(id);
+      _safeSetState(() => _selectedTicket = ticket);
+    } catch (_) {}
+  }
+
+  Future<void> _deleteTicket(int ticketId) async {
+    final t = AppLocalizations.of(context);
+    final confirmed = await showDialog<bool>(
       context: context,
-      builder: (context) => TicketDetailsDialog(
-        ticket: ticket,
-        isOperator: true,
-        calendarController: widget.calendarController,
-        onTicketUpdated: () {
-          // Refresh the data table after ticket update
-          _safeSetState(() {
-            _refreshCounter++;
-          });
+      builder: (ctx) => AlertDialog(
+        title: const Text('تأیید حذف'),
+        content: const Text('آیا مطمئن هستید که می‌خواهید این تیکت را حذف کنید؟'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(t.cancel)),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: Text(t.delete)),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    try {
+      await _supportService.deleteTicket(ticketId);
+      _safeSetState(() {
+        _selectedRows.remove(ticketId);
+        if (_selectedTicketId == ticketId) {
+          _selectedTicketId = null;
+          _selectedTicket = null;
+        }
+        _refreshCounter++;
+      });
+    } catch (e) {
+      if (mounted) {
+        SnackBarHelper.showError(
+          context,
+          message: ErrorExtractor.forContext(e, context),
+        );
+      }
+    }
+  }
+
+  void _showCommandPalette() {
+    OperatorCommandPalette.show(
+      context,
+      OperatorCommandPalette(
+        onSelectView: (view) => _safeSetState(() => _inboxView = view),
+        onRefresh: () => _bumpRefresh(immediate: true),
+        onAssignToMe: () {
+          if (_selectedTicketId != null) {
+            _safeSetState(() => _selectedRows = {_selectedTicketId!});
+          }
+          _assignToMe();
+        },
+        onMarkResolved: () {
+          if (_selectedTicketId != null) {
+            _safeSetState(() => _selectedRows = {_selectedTicketId!});
+          }
+          _markResolved();
+        },
+        onOpenTicket: (id) {
+          if (_isWide) {
+            _openTicketInSplitView(id);
+          } else {
+            context.push('/user/profile/operator/tickets/$id');
+          }
         },
       ),
     );
   }
 
-  Future<void> _deleteTicket(int ticketId) async {
-    if (!mounted) return;
-    
-    final t = AppLocalizations.of(context);
-    
-    // نمایش دیالوگ تأیید
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('تأیید حذف'),
-        content: const Text('آیا مطمئن هستید که می‌خواهید این تیکت را حذف کنید؟'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: Text(t.cancel),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.of(dialogContext).pop(true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              foregroundColor: Colors.white,
-            ),
-            child: Text(t.delete),
-          ),
-        ],
-      ),
+  Widget _buildInboxList() {
+    final selectionOn = _selectionMode || _selectedRows.isNotEmpty;
+    return OperatorInboxList(
+      view: _inboxView,
+      currentUserId: _currentUserId,
+      selectedTicketId: _selectedTicketId,
+      refreshToken: _refreshCounter,
+      calendarController: widget.calendarController,
+      onTicketTap: _navigateToTicketDetail,
+      selectionEnabled: selectionOn,
+      selectedIds: _selectedRows,
+      onSelectionChanged: (ids) => _safeSetState(() {
+        _selectedRows = ids;
+        if (ids.isEmpty) _selectionMode = false;
+      }),
     );
-    
-    if (confirmed != true || !mounted) return;
-    
-    try {
-      await _supportService.deleteTicket(ticketId);
-      
-      if (!mounted) return;
-      
-      // حذف تیکت از selectedRows اگر انتخاب شده بود و refresh
-      _safeSetState(() {
-        _selectedRows.remove(ticketId);
-        _refreshCounter++;
-      });
-      
-      // نمایش پیام موفقیت بعد از setState
-      await Future.delayed(const Duration(milliseconds: 100));
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('تیکت با موفقیت حذف شد')),
-        );
-      }
-    } catch (e) {
-      if (!mounted) return;
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'خطا در حذف تیکت: ${ErrorExtractor.forContext(e, context)}',
-          ),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
   }
-
-  Future<void> _deleteSelectedTickets() async {
-    if (!mounted) return;
-    
-    final t = AppLocalizations.of(context);
-    
-    if (_selectedRows.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('هیچ تیکتی انتخاب نشده است')),
-      );
-      return;
-    }
-    
-    final ticketCount = _selectedRows.length;
-    
-    // نمایش دیالوگ تأیید
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('تأیید حذف گروهی'),
-        content: Text('آیا مطمئن هستید که می‌خواهید $ticketCount تیکت را حذف کنید؟'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: Text(t.cancel),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.of(dialogContext).pop(true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              foregroundColor: Colors.white,
-            ),
-            child: Text(t.delete),
-          ),
-        ],
-      ),
-    );
-    
-    if (confirmed != true || !mounted) return;
-    
-    // نمایش loading
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (loadingContext) => const Center(
-        child: CircularProgressIndicator(),
-      ),
-    );
-    
-    try {
-      // استخراج شناسه‌های واقعی تیکت‌ها از ردیف‌های انتخاب‌شده
-      final tableState = _dataTableKey.currentState as dynamic;
-      final selectedItems = (tableState?.getSelectedItems() as List<dynamic>?) ?? <dynamic>[];
-      
-      final ticketIds = <int>[];
-      for (final row in selectedItems) {
-        if (row is Map<String, dynamic>) {
-          final ticketId = row['id'];
-          if (ticketId is int) {
-            ticketIds.add(ticketId);
-          }
-        }
-      }
-      
-      if (ticketIds.isEmpty) {
-        if (mounted) Navigator.of(context).pop();
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('خطا: شناسه تیکت‌ها یافت نشد'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
-        return;
-      }
-      
-      final result = await _supportService.deleteTickets(ticketIds);
-      
-      // بستن loading
-      if (mounted) Navigator.of(context).pop();
-      
-      if (!mounted) return;
-      
-      final successCount = result['success'] as int;
-      final failCount = result['failed'] as int;
-      
-      // پاک کردن انتخاب‌ها و refresh
-      _safeSetState(() {
-        _selectedRows.clear();
-        _refreshCounter++;
-      });
-      
-      // نمایش پیام موفقیت بعد از setState
-      await Future.delayed(const Duration(milliseconds: 100));
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              '$successCount تیکت حذف شد${failCount > 0 ? ' و $failCount تیکت ناموفق بود' : ''}',
-            ),
-            backgroundColor: failCount > 0 ? Colors.orange : Colors.green,
-          ),
-        );
-      }
-    } catch (e) {
-      // بستن loading
-      if (mounted) Navigator.of(context).pop();
-      
-      if (!mounted) return;
-      
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'خطا در حذف تیکت‌ها: ${ErrorExtractor.forContext(e, context)}',
-          ),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
-  }
-
 
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
     final theme = Theme.of(context);
 
-    return Scaffold(
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
+    return Shortcuts(
+      shortcuts: {
+        LogicalKeySet(LogicalKeyboardKey.control, LogicalKeyboardKey.keyK): const _OpenCommandPaletteIntent(),
+        LogicalKeySet(LogicalKeyboardKey.meta, LogicalKeyboardKey.keyK): const _OpenCommandPaletteIntent(),
+      },
+      child: Actions(
+        actions: {
+          _OpenCommandPaletteIntent: CallbackAction<_OpenCommandPaletteIntent>(
+            onInvoke: (_) {
+              _showCommandPalette();
+              return null;
+            },
+          ),
+        },
+        child: Focus(
+          autofocus: true,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _buildCompactToolbar(t, theme),
+              Expanded(
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final useSplit = constraints.maxWidth >= kOperatorSplitBreakpoint;
+                    if (useSplit) {
+                      return OperatorInboxSplitter(
+                        left: _buildInboxList(),
+                        right: _buildSplitDetailPanel(),
+                      );
+                    }
+                    return _buildInboxList();
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCompactToolbar(AppLocalizations t, ThemeData theme) {
+    final secondarySelected = _kSecondaryInboxViews.contains(_inboxView);
+
+    return Material(
+      color: theme.colorScheme.surfaceContainerLow,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(10, 6, 6, 6),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            Row(
               children: [
-                Row(
-                  children: [
-                    Text(
-                      t.operatorPanel,
-                      style: theme.textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const Spacer(),
-                // Quick Actions
-                if (_selectedRows.isNotEmpty) ...[
-                  ElevatedButton.icon(
-                    onPressed: _assignToMe,
-                    icon: const Icon(Icons.person_add),
-                    label: Text('تخصیص به من (${_selectedRows.length})'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: theme.primaryColor.withValues(alpha: 0.1),
-                      foregroundColor: theme.primaryColor,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  ElevatedButton.icon(
-                    onPressed: _markResolved,
-                    icon: const Icon(Icons.check_circle),
-                    label: Text('حل شده (${_selectedRows.length})'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green.shade50,
-                      foregroundColor: Colors.green.shade700,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                ],
-                // دکمه حذف گروهی (فقط برای superadmin)
-                if (_isSuperAdmin && _selectedRows.isNotEmpty) ...[
-                  ElevatedButton.icon(
-                    onPressed: _deleteSelectedTickets,
-                    icon: const Icon(Icons.delete_outline),
-                    label: Text('حذف (${_selectedRows.length})'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.red.shade50,
-                      foregroundColor: Colors.red.shade700,
-                    ),
-                  ),
-                    const SizedBox(width: 8),
-                  ],
-                ],
+                Icon(Icons.support_agent, size: 18, color: theme.colorScheme.primary),
+                const SizedBox(width: 6),
+                Text(
+                  t.operatorPanel,
+                  style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
                 ),
-                // Quick Filters
-                const SizedBox(height: 12),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    // فیلتر آخرین پیام از کاربر
-                    FilterChip(
-                      label: const Text('آخرین پیام از کاربر'),
-                      selected: _lastMessageFromUser == true,
-                      onSelected: (selected) {
-                        _safeSetState(() {
-                          _lastMessageFromUser = selected ? true : null;
-                        });
-                        _refreshCounter++;
-                      },
-                      avatar: Icon(
-                        _lastMessageFromUser == true ? Icons.check_circle : Icons.radio_button_unchecked,
-                        size: 18,
-                      ),
-                    ),
-                    FilterChip(
-                      label: const Text('آخرین پیام از اپراتور'),
-                      selected: _lastMessageFromUser == false,
-                      onSelected: (selected) {
-                        _safeSetState(() {
-                          _lastMessageFromUser = selected ? false : null;
-                        });
-                        _refreshCounter++;
-                      },
-                      avatar: Icon(
-                        _lastMessageFromUser == false ? Icons.check_circle : Icons.radio_button_unchecked,
-                        size: 18,
-                      ),
-                    ),
-                    if (_lastMessageFromUser != null)
-                      IconButton(
-                        icon: const Icon(Icons.clear, size: 18),
-                        tooltip: 'پاک کردن فیلتر',
-                        onPressed: () {
-                          _safeSetState(() {
-                            _lastMessageFromUser = null;
-                          });
-                          _refreshCounter++;
-                        },
-                      ),
-                  ],
+                const Spacer(),
+                IconButton(
+                  tooltip: _selectionMode ? 'لغو انتخاب' : 'انتخاب چندتایی',
+                  icon: Icon(
+                    _selectionMode ? Icons.checklist_rtl : Icons.checklist,
+                    size: 20,
+                  ),
+                  visualDensity: VisualDensity.compact,
+                  onPressed: () => _safeSetState(() {
+                    _selectionMode = !_selectionMode;
+                    if (!_selectionMode) _selectedRows.clear();
+                  }),
                 ),
-                // Saved Filters
-                if (_savedFilters.isNotEmpty) ...[
-                  const SizedBox(height: 12),
-                  SizedBox(
-                    height: 40,
-                    child: ListView(
-                      scrollDirection: Axis.horizontal,
-                      children: [
-                        ..._savedFilters.map((filter) {
-                          final isSelected = _selectedFilter?.name == filter.name;
-                          return Padding(
-                            padding: const EdgeInsets.only(right: 8),
-                            child: FilterChip(
-                              label: Text(filter.name),
-                              selected: isSelected,
-                              onSelected: (selected) {
-                                if (selected) {
-                                  _safeSetState(() {
-                                    _selectedFilter = filter;
-                                  });
-                                  // TODO: Apply filter to DataTable
-                                  _refreshCounter++;
-                                } else {
-                                  _safeSetState(() {
-                                    _selectedFilter = null;
-                                  });
-                                  _refreshCounter++;
-                                }
-                              },
-                              deleteIcon: Icon(
-                                Icons.close,
-                                size: 18,
-                                color: isSelected ? Colors.white : Colors.grey,
-                              ),
-                              onDeleted: () => _deleteSavedFilter(filter.name),
-                            ),
-                          );
-                        }).toList(),
-                        IconButton(
-                          icon: const Icon(Icons.add),
-                          tooltip: 'ذخیره فیلتر فعلی',
-                          onPressed: _saveCurrentFilter,
-                        ),
-                      ],
-                    ),
-                  ),
-                ] else ...[
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      TextButton.icon(
-                        icon: const Icon(Icons.save, size: 18),
-                        label: const Text('ذخیره فیلتر فعلی'),
-                        onPressed: _saveCurrentFilter,
-                      ),
-                    ],
-                  ),
-                ],
+                IconButton(
+                  tooltip: 'دستورات سریع (Ctrl+K)',
+                  icon: const Icon(Icons.bolt_outlined, size: 20),
+                  visualDensity: VisualDensity.compact,
+                  onPressed: _showCommandPalette,
+                ),
+                IconButton(
+                  tooltip: 'بروزرسانی',
+                  icon: const Icon(Icons.refresh, size: 20),
+                  visualDensity: VisualDensity.compact,
+                  onPressed: () => _bumpRefresh(immediate: true),
+                ),
               ],
             ),
-            const SizedBox(height: 16),
-            Expanded(
-              child: DataTableWidget<Map<String, dynamic>>(
-                key: ValueKey('data_table_$_refreshCounter'),
-                config: DataTableConfig<Map<String, dynamic>>(
-                  title: 'لیست تیکت‌های پشتیبانی - پنل اپراتور',
-                  endpoint: '/api/v1/support/operator/tickets/search',
-                  columns: [
-                    TextColumn(
-                      'title',
-                      'عنوان',
-                      sortable: true,
-                      searchable: true,
-                      width: ColumnWidth.large,
-                    ),
-                    TextColumn(
-                      'user.first_name',
-                      'نام کاربر',
-                      sortable: true,
-                      searchable: true,
-                      width: ColumnWidth.medium,
-                    ),
-                    TextColumn(
-                      'user.email',
-                      'ایمیل کاربر',
-                      sortable: true,
-                      searchable: true,
-                      width: ColumnWidth.large,
-                    ),
-                    TextColumn(
-                      'category.name',
-                      'دسته‌بندی',
-                      sortable: true,
-                      searchable: true,
-                      width: ColumnWidth.medium,
-                      filterType: ColumnFilterType.multiSelect,
-                      filterOptions: _categories.map((category) => FilterOption(
-                        value: category.name,
-                        label: category.name,
-                        description: category.description,
-                      )).toList(),
-                    ),
-                    TextColumn(
-                      'priority.name',
-                      'اولویت',
-                      sortable: true,
-                      searchable: true,
-                      width: ColumnWidth.small,
-                      filterType: ColumnFilterType.multiSelect,
-                      filterOptions: _priorities.map((priority) => FilterOption(
-                        value: priority.name,
-                        label: priority.name,
-                        description: priority.description,
-                        color: priority.color != null ? Color(int.parse(priority.color!.replaceFirst('#', '0xFF'))) : null,
-                      )).toList(),
-                    ),
-                    TextColumn(
-                      'status.name',
-                      'وضعیت',
-                      sortable: true,
-                      searchable: true,
-                      width: ColumnWidth.small,
-                      filterType: ColumnFilterType.multiSelect,
-                      filterOptions: _statuses.map((status) => FilterOption(
-                        value: status.name,
-                        label: status.name,
-                        description: status.description,
-                        color: status.color != null ? Color(int.parse(status.color!.replaceFirst('#', '0xFF'))) : null,
-                      )).toList(),
-                    ),
-                    TextColumn(
-                      'assigned_operator.first_name',
-                      'اپراتور مسئول',
-                      sortable: true,
-                      searchable: true,
-                      width: ColumnWidth.medium,
-                    ),
-                    DateColumn(
-                      'created_at',
-                      'تاریخ ایجاد',
-                      sortable: true,
-                      searchable: true,
-                      width: ColumnWidth.medium,
-                      showTime: false,
-                    ),
-                    DateColumn(
-                      'updated_at',
-                      'آخرین بروزرسانی',
-                      sortable: true,
-                      searchable: true,
-                      width: ColumnWidth.medium,
-                      showTime: false,
-                    ),
-                    // ستون عملیات (فقط برای superadmin)
-                    if (_isSuperAdmin)
-                      ActionColumn('actions', 'عملیات', actions: [
-                        DataTableAction(
-                          icon: Icons.delete_outline,
-                          label: 'حذف',
-                          onTap: (row) {
-                            if (row is Map<String, dynamic>) {
-                              final ticketId = row['id'];
-                              if (ticketId is int) {
-                                _deleteTicket(ticketId);
-                              } else {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text('خطا: شناسه تیکت نامعتبر است'),
-                                    backgroundColor: Colors.red,
-                                  ),
-                                );
-                              }
-                            }
-                          },
-                          isDestructive: true,
+            const SizedBox(height: 4),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  ..._kPrimaryInboxViews.map((view) {
+                    final selected = _inboxView == view;
+                    return Padding(
+                      padding: const EdgeInsets.only(left: 4),
+                      child: ChoiceChip(
+                        avatar: Icon(view.icon, size: 14),
+                        label: Text(view.label, style: const TextStyle(fontSize: 11)),
+                        selected: selected,
+                        visualDensity: const VisualDensity(horizontal: -2, vertical: -2),
+                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        labelPadding: const EdgeInsets.only(left: 2, right: 4),
+                        onSelected: (_) => _safeSetState(() => _inboxView = view),
+                      ),
+                    );
+                  }),
+                  Padding(
+                    padding: const EdgeInsets.only(left: 4),
+                    child: PopupMenuButton<OperatorInboxView>(
+                      tooltip: 'فیلترهای بیشتر',
+                      initialValue: secondarySelected ? _inboxView : null,
+                      onSelected: (view) => _safeSetState(() => _inboxView = view),
+                      itemBuilder: (context) => _kSecondaryInboxViews
+                          .map(
+                            (v) => PopupMenuItem(
+                              value: v,
+                              child: Row(
+                                children: [
+                                  Icon(v.icon, size: 16),
+                                  const SizedBox(width: 8),
+                                  Text(v.label),
+                                ],
+                              ),
+                            ),
+                          )
+                          .toList(),
+                      child: Chip(
+                        avatar: Icon(
+                          secondarySelected ? _inboxView.icon : Icons.more_horiz,
+                          size: 14,
                         ),
-                      ]),
-                  ],
-                  searchFields: ['title', 'description', 'user.first_name', 'user.last_name', 'user.email'],
-                  filterFields: ['title', 'user.first_name', 'user.email', 'category.name', 'priority.name', 'status.name', 'assigned_operator.first_name', 'created_at', 'last_message_from_user'],
-                  dateRangeField: 'created_at',
-                  showSearch: true,
-                  showFilters: true,
-                  showColumnSearch: true,
-                  showPagination: true,
-                  showActiveFilters: true,
-                  enableSorting: true,
-                  enableGlobalSearch: true,
-                  enableDateRangeFilter: true,
-                  showRowNumbers: true,
-                  enableRowSelection: true,
-                  enableMultiRowSelection: true,
-                  selectedRows: _selectedRows,
-                  onRowSelectionChanged: (selectedRows) {
-                    _safeSetState(() {
-                      _selectedRows = selectedRows;
-                    });
-                  },
-                  getCustomFilters: () {
-                    final filters = <FilterItem>[];
-                    if (_lastMessageFromUser != null) {
-                      filters.add(FilterItem(
-                        property: 'last_message_from_user',
-                        operator: '==',
-                        value: _lastMessageFromUser == true ? 'true' : 'false',
-                      ));
-                    }
-                    return filters;
-                  },
-                  defaultPageSize: 20,
-                  pageSizeOptions: const [10, 20, 50, 100],
-                  showRefreshButton: true,
-                  showClearFiltersButton: true,
-                  emptyStateMessage: 'هیچ تیکتی یافت نشد',
-                  loadingMessage: 'در حال بارگذاری تیکت‌ها...',
-                  errorMessage: 'خطا در بارگذاری تیکت‌ها',
-                  enableHorizontalScroll: true,
-                  minTableWidth: 1000,
-                  showBorder: true,
-                  borderRadius: BorderRadius.circular(8),
-                  padding: const EdgeInsets.all(16),
-                  onRowTap: (ticketData) => _navigateToTicketDetail(ticketData),
-                  expandBodyHeightToFitRows: true,
-                ),
-                fromJson: (json) => json,
-                calendarController: widget.calendarController,
+                        label: Text(
+                          secondarySelected ? _inboxView.label : 'بیشتر',
+                          style: const TextStyle(fontSize: 11),
+                        ),
+                        visualDensity: const VisualDensity(horizontal: -2, vertical: -2),
+                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        labelPadding: const EdgeInsets.only(left: 2, right: 4),
+                        side: BorderSide(
+                          color: secondarySelected
+                              ? theme.colorScheme.primary
+                              : theme.colorScheme.outlineVariant,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ),
             ),
+            if (_selectedRows.isNotEmpty) ...[
+              const SizedBox(height: 6),
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    Text(
+                      '${_selectedRows.length} انتخاب‌شده',
+                      style: theme.textTheme.labelMedium?.copyWith(
+                        color: theme.colorScheme.primary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    FilledButton.tonalIcon(
+                      onPressed: _assignToMe,
+                      icon: const Icon(Icons.person_add_outlined, size: 16),
+                      label: const Text('تخصیص به من'),
+                      style: FilledButton.styleFrom(
+                        visualDensity: VisualDensity.compact,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    FilledButton.tonalIcon(
+                      onPressed: _markResolved,
+                      icon: const Icon(Icons.check_circle_outline, size: 16),
+                      label: const Text('حل‌شده'),
+                      style: FilledButton.styleFrom(
+                        visualDensity: VisualDensity.compact,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                    ),
+                    if (_isSuperAdmin) ...[
+                      const SizedBox(width: 6),
+                      FilledButton.tonalIcon(
+                        onPressed: () => _deleteTicket(_selectedRows.first),
+                        icon: const Icon(Icons.delete_outline, size: 16),
+                        label: const Text('حذف'),
+                        style: FilledButton.styleFrom(
+                          visualDensity: VisualDensity.compact,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                      ),
+                    ],
+                    const SizedBox(width: 6),
+                    TextButton(
+                      onPressed: () => _safeSetState(() {
+                        _selectedRows.clear();
+                        _selectionMode = false;
+                      }),
+                      child: const Text('لغو'),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ],
         ),
       ),
     );
   }
 
+  Widget _buildSplitDetailPanel() {
+    final theme = Theme.of(context);
+    if (_selectedTicketId == null) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.inbox_outlined, size: 44, color: theme.colorScheme.outlineVariant),
+            const SizedBox(height: 10),
+            Text('تیکتی انتخاب نشده', style: theme.textTheme.titleSmall),
+            const SizedBox(height: 4),
+            Text(
+              'از لیست یک تیکت را انتخاب کنید',
+              style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+            ),
+          ],
+        ),
+      );
+    }
+    if (_selectedTicketLoading || _selectedTicket == null) {
+      return const Center(
+        child: SizedBox(
+          width: 28,
+          height: 28,
+          child: CircularProgressIndicator(strokeWidth: 2.5),
+        ),
+      );
+    }
+    return TicketDetailsDialog(
+      key: ValueKey(_selectedTicket!.id),
+      ticket: _selectedTicket!,
+      isOperator: true,
+      calendarController: widget.calendarController,
+      displayMode: TicketDetailDisplayMode.embedded,
+      onTicketUpdated: () {
+        _bumpRefresh();
+        _reloadSelectedTicket();
+      },
+    );
+  }
+}
+
+class _OpenCommandPaletteIntent extends Intent {
+  const _OpenCommandPaletteIntent();
 }

@@ -1,16 +1,24 @@
 {
-	"version": "4.6.1",
+	"version": "4.9.3",
 	"download_url": "https://source.hesabix.ir/hesabix/ArcWOC/archive/master.zip",
 	"requires": "5.0",
-	"tested": "6.4",
+	"tested": "6.8",
 	"requires_php": "7.4",
 	"name": "Hesabix V2: WooCommerce",
 	"slug": "arcwoc",
 	"homepage": "https://hesabix.ir/",
+<<<<<<< HEAD
+	"author": "Hesabix Team",
+	"last_updated": "2026-08-06",
+	"sections": {
+		"description": "اتصال ووکامرس به نسخه جدید حسابیکس با API پیشرفته - نسخه دوم با پشتیبانی از API Key و امکانات جدید",
+		"changelog": "<h4>4.9.3</h4>\n<ul>\n<li>رفع لیست خالی مشتریان پل REST (جایگزینی WC_Customer_Query با WP_User_Query)</li>\n<li>هدر ضدکش LiteSpeed برای پاسخ‌های پل</li>\n<li>شمارش مشتریان گزارش خلاصه هم‌راستا با نقش‌های همگام‌سازی</li>\n</ul>\n<h4>4.9.2</h4>\n<ul>\n<li>نمایش سود فاکتور با واحد ارز حسابیکس (ریال) به‌جای برچسب تومان ووکامرس</li>\n</ul>\n<h4>4.9.1</h4>\n<ul>\n<li>رفع خواندن سود فاکتور از data.item به‌جای data (نمایش صفر اشتباه)</li>\n<li>هشدار وقتی بهای تمام‌شده صفر است و سود ظاهراً ۱۰۰٪ است</li>\n</ul>\n<h4>4.9.0</h4>\n<ul>\n<li>نمایش سود فاکتور حسابیکس در فهرست سفارش‌ها و متاباکس سفارش ووکامرس</li>\n<li>دریافت خودکار سود پس از همگام‌سازی + تازه‌سازی تکی و دسته‌ای</li>\n<li>بنر فعال‌سازی لایسنس افزونه ووکامرس بازار حسابیکس (پنهان هنگام لایسنس فعال)</li>\n<li>یادآوری فعال‌سازی پل وردپرس وقتی لایسنس هست ولی پل آماده نیست</li>\n</ul>"
+=======
 	"author": "MarkStreet Team",
 	"last_updated": "2026-05-08",
 	"sections": {
 		"description": "اتصال ووکامرس به نسخه جدید مارک‌استریت با API پیشرفته - نسخه دوم با پشتیبانی از API Key و امکانات جدید",
 		"changelog": "<h4>2.0.0</h4>\n<ul>\n<li>نسخه اولیه با پشتیبانی کامل از API V2</li>\n<li>Personal API Keys</li>\n<li>Setup Wizard</li>\n<li>Sync Queue System</li>\n<li>همگام‌سازی محصولات، مشتریان و سفارشات</li>\n</ul>"
+>>>>>>> github/Huma
 	}
 }

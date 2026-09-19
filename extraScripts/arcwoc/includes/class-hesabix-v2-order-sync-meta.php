@@ -99,6 +99,10 @@ class Hesabix_V2_Order_Sync_Meta
 			self::clear_rp_sync_fp($order);
 			self::remove_order_system_note($order);
 		}
+
+		if (class_exists('Hesabix_V2_Invoice_Profit_Service')) {
+			Hesabix_V2_Invoice_Profit_Service::clear_for_order((int) $order_id);
+		}
 	}
 
 	/**

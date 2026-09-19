@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import and_
 from jinja2.sandbox import SandboxedEnvironment
 from jinja2 import StrictUndefined, BaseLoader, TemplateSyntaxError, UndefinedError
+from jinja2.runtime import Undefined
 
 from adapters.db.models.report_template import ReportTemplate
 from adapters.db.models.report_template_status_event import ReportTemplateStatusEvent
@@ -204,12 +205,12 @@ class ReportTemplateService:
 						)
 					except TemplateSyntaxError as ex:
 						errors.append(f"Invalid totals expression in row {idx}: {ex.message}")
-		if module_key == "invoices" and (subtype or "") == "detail":
+		if module_key == "invoices" and (subtype or "") in ("detail", "receipt"):
 			found_types = {str((b.get("type") or "")).strip().lower() for b in all_blocks}
 			if "table" not in found_types:
-				warnings.append("Invoice detail template usually needs an items table block")
+				warnings.append("Invoice template usually needs an items table block")
 			if "totals" not in found_types:
-				warnings.append("Invoice detail template usually needs a totals block")
+				warnings.append("Invoice template usually needs a totals block")
 		return {"errors": errors, "warnings": warnings}
 
 	@staticmethod
@@ -558,7 +559,14 @@ class ReportTemplateService:
 			enable_async=False,
 		)
 		# فیلترهای ساده کاربردی
-		env.filters["default"] = lambda v, d="": v if v not in (None, "") else d
+		def _default_filter(v, d="", boolean=False):
+			if isinstance(v, Undefined):
+				return d
+			if boolean:
+				return v if v else d
+			return v if v not in (None, "") else d
+
+		env.filters["default"] = _default_filter
 		env.filters["upper"] = lambda v: str(v).upper()
 		env.filters["lower"] = lambda v: str(v).lower()
 		def _smart_number(v, max_decimals: int = 2):
@@ -582,6 +590,8 @@ class ReportTemplateService:
 			return f'<span style="direction:ltr; unicode-bidi:plaintext; font-variant-numeric: tabular-nums">{s}</span>'
 		env.filters["ltr"] = _ltr
 		def _money(v, decimals: int = 0, sep: str = ","):
+			if isinstance(v, Undefined) or v is None or v == "":
+				return ""
 			try:
 				n = float(v)
 			except Exception:
@@ -653,39 +663,100 @@ class ReportTemplateService:
 
 		# تزریق assets به context برای دسترسی در قالب‌ها (مثلاً assets.images['logo'])
 		try:
+			ctx = dict(context or {})
 			if hasattr(template, "assets") and getattr(template, "assets"):
-				ctx = dict(context or {})
 				ctx.setdefault("assets", getattr(template, "assets"))
-			else:
-				ctx = context
 		except Exception:
-			ctx = context
+			ctx = dict(context or {})
+		for _key in (
+			"business_logo_data_uri",
+			"business_name",
+			"invoice_footer_note",
+			"invoice_verify_qr_data_uri",
+			"invoice_date_jalali",
+			"document_date_jalali",
+			"document_date_display",
+			"document_date",
+			"code",
+			"created_by_name",
+			"issuer_name",
+			"generated_at",
+			"description",
+			"title_text",
+			"date_now",
+		):
+			ctx.setdefault(_key, "")
+		def _render_jinja_fragment(source: str, *, fragment: str) -> str:
+			src = (source or "").strip()
+			if not src:
+				return ""
+			try:
+				return env.from_string(src).render(**ctx)
+			except TemplateSyntaxError as e:
+				logger.error(
+					"Template syntax error in %s for template %s: %s",
+					fragment,
+					getattr(template, "id", "unknown"),
+					e,
+					exc_info=True,
+				)
+				raise ApiError(
+					"TEMPLATE_SYNTAX_ERROR",
+					f"خطای دستور در {fragment}: {e.message} (خط {e.lineno})",
+					http_status=400,
+				) from e
+			except UndefinedError as e:
+				logger.warning(
+					"Undefined variable in %s for template %s: %s",
+					fragment,
+					getattr(template, "id", "unknown"),
+					e,
+					exc_info=True,
+				)
+				raise ApiError(
+					"TEMPLATE_VARIABLE_ERROR",
+					f"متغیر تعریف نشده در {fragment}: {e.message}",
+					http_status=400,
+				) from e
+			except Exception as e:
+				logger.exception(
+					"Template rendering error in %s for template %s: %s",
+					fragment,
+					getattr(template, "id", "unknown"),
+					e,
+				)
+				raise ApiError(
+					"TEMPLATE_RENDER_ERROR",
+					f"خطا در رندر {fragment}: {str(e)}",
+					http_status=500,
+				) from e
+
 		try:
-			template_obj = env.from_string(template.content_html)
-			html = template_obj.render(**ctx)
-		except TemplateSyntaxError as e:
-			logger.error(f"Template syntax error in template {getattr(template, 'id', 'unknown')}: {e}", exc_info=True)
-			raise ApiError("TEMPLATE_SYNTAX_ERROR", f"خطای دستور در قالب: {e.message} (خط {e.lineno})", http_status=400)
-		except UndefinedError as e:
-			logger.warning(f"Undefined variable in template {getattr(template, 'id', 'unknown')}: {e}", exc_info=True)
-			raise ApiError("TEMPLATE_VARIABLE_ERROR", f"متغیر تعریف نشده در قالب: {e.message}", http_status=400)
-		except Exception as e:
-			logger.exception(f"Template rendering error for template {getattr(template, 'id', 'unknown')}: {e}")
-			raise ApiError("TEMPLATE_RENDER_ERROR", f"خطا در رندر قالب: {str(e)}", http_status=500)
+			html = _render_jinja_fragment(template.content_html, fragment="بدنه قالب")
+		except ApiError:
+			raise
 
 		# تنظیمات صفحه (@page) از روی ویژگی‌های قالب (با امکان override از چاپ/PDF)
 		try:
+			from app.services.pdf.page_size import (
+				build_page_size_css,
+				default_receipt_margins,
+				is_receipt_paper,
+				receipt_page_chrome_css,
+			)
+
 			page_css_parts = []
-			size_parts = []
 			ps_eff = (page_paper_size or "").strip() or (getattr(template, "paper_size", None) or "").strip()
 			ori_eff = (page_orientation or "").strip().lower() or (getattr(template, "orientation", None) or "").strip().lower()
+			if is_receipt_paper(ps_eff) and ori_eff not in ("portrait", "landscape"):
+				ori_eff = "portrait"
 			if ps_eff:
-				size_parts.append(str(ps_eff))
-			if ori_eff in ("portrait", "landscape"):
-				size_parts.append(str(ori_eff))
-			if size_parts:
-				page_css_parts.append(f"size: {' '.join(size_parts)};")
+				page_css_parts.append(f"size: {build_page_size_css(ps_eff, ori_eff or 'portrait')};")
+			elif ori_eff in ("portrait", "landscape"):
+				page_css_parts.append(f"size: A4 {ori_eff};")
 			margins = template.margins or {}
+			if is_receipt_paper(ps_eff) and not margins:
+				margins = default_receipt_margins()
 			mt = margins.get("top")
 			mr = margins.get("right")
 			mb = margins.get("bottom")
@@ -715,6 +786,9 @@ class ReportTemplateService:
 			# اگر چیزی برای @page داریم، تزریق کنیم
 			if page_css_parts:
 				page_css = "@page { " + " ".join(page_css_parts) + " }"
+				if is_receipt_paper(ps_eff):
+					cont = "ادامه فاکتور" if context.get("is_fa", True) else "Continued"
+					page_css = page_css + receipt_page_chrome_css(continuation_label=cont)
 				if "</head>" in html:
 					html = html.replace("</head>", f"<style>{page_css}</style></head>")
 				else:
@@ -733,8 +807,14 @@ class ReportTemplateService:
 				html = f"<head><style>{css}</style></head>{html}"
 		# درج Header/Footer ساده در بدنه (در صورت وجود). طراح می‌تواند با CSS آن‌ها را به fixed تبدیل کند.
 		try:
-			header_html = (template.header_html or "").strip()
-			footer_html = (template.footer_html or "").strip()
+			header_html = _render_jinja_fragment(
+				getattr(template, "header_html", None) or "",
+				fragment="سربرگ قالب",
+			)
+			footer_html = _render_jinja_fragment(
+				getattr(template, "footer_html", None) or "",
+				fragment="پاورقی قالب",
+			)
 			if header_html:
 				insertion = f'<div class="__tpl-header">{header_html}</div>'
 				if "<body" in html and "</body>" in html:
@@ -750,8 +830,8 @@ class ReportTemplateService:
 					html = html.replace("</body>", f"{insertion}</body>", 1)
 				else:
 					html = f"{html}{insertion}"
-		except Exception:
-			pass
+		except ApiError:
+			raise
 		return html
 
 	@staticmethod

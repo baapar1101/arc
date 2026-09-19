@@ -2,12 +2,19 @@ import 'package:flutter/material.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:flutter/services.dart';
 
+import '../../../controllers/product_form_controller.dart';
+import '../../../core/auth_store.dart';
 import '../../../models/product_form_data.dart';
+import '../../../services/product_service.dart';
+import '../../../utils/error_extractor.dart';
 import '../../../utils/number_normalizer.dart';
 import '../../../utils/product_form_validator.dart';
 import '../../../widgets/invoice/warehouse_combobox_widget.dart';
 import '../../../utils/snackbar_helper.dart';
 import '../../../utils/responsive_helper.dart';
+import '../../../widgets/multi_currency_gate.dart';
+import 'product_suppliers_section.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 
 class ProductPricingInventorySection extends StatefulWidget {
@@ -22,6 +29,8 @@ class ProductPricingInventorySection extends StatefulWidget {
   final void Function(Map<String, dynamic> item) onDeletePriceItem;
   final dynamic controller; // ProductFormController
   final int? productId; // برای تشخیص ویرایش
+  final AuthStore? authStore;
+  final bool isMultiCurrency;
 
   const ProductPricingInventorySection({
     super.key,
@@ -36,6 +45,8 @@ class ProductPricingInventorySection extends StatefulWidget {
     required this.onDeletePriceItem,
     this.controller,
     this.productId,
+    this.authStore,
+    this.isMultiCurrency = false,
   });
 
   @override
@@ -47,6 +58,11 @@ class _ProductPricingInventorySectionState extends State<ProductPricingInventory
   late TextEditingController _purchasePriceController;
   late TextEditingController _salesNoteController;
   late TextEditingController _purchaseNoteController;
+  late TextEditingController _openingQuantityController;
+  late TextEditingController _openingCostPriceController;
+  ProductFormController? _boundController;
+  bool _syncingFxBase = false;
+  bool _syncPriceListWithFx = true;
 
   @override
   void initState() {
@@ -59,11 +75,40 @@ class _ProductPricingInventorySectionState extends State<ProductPricingInventory
     );
     _salesNoteController = TextEditingController(text: widget.formData.baseSalesNote ?? '');
     _purchaseNoteController = TextEditingController(text: widget.formData.basePurchaseNote ?? '');
+    _openingQuantityController = TextEditingController();
+    _openingCostPriceController = TextEditingController();
+    _bindController(widget.controller);
+  }
+
+  void _bindController(dynamic controller) {
+    if (controller is! ProductFormController) return;
+    if (identical(_boundController, controller)) return;
+    _boundController?.removeListener(_syncOpeningBalanceFromController);
+    _boundController = controller;
+    controller.addListener(_syncOpeningBalanceFromController);
+    _syncOpeningBalanceFromController();
+  }
+
+  void _syncOpeningBalanceFromController() {
+    final controller = _boundController;
+    if (controller == null) return;
+    final qty = controller.openingBalanceQuantity;
+    final cost = controller.openingBalanceCostPrice;
+    if (_openingQuantityController.text != qty) {
+      _openingQuantityController.text = qty;
+    }
+    if (_openingCostPriceController.text != cost) {
+      _openingCostPriceController.text = cost;
+    }
+    if (mounted) setState(() {});
   }
 
   @override
   void didUpdateWidget(ProductPricingInventorySection oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.controller != widget.controller) {
+      _bindController(widget.controller);
+    }
     // به‌روزرسانی کنترلرها فقط وقتی مقدار واقعاً تغییر کرده (نه از طریق تایپ کاربر)
     // این برای حفظ جداکننده هزارگان بعد از تغییر تب‌ها مهم است
     if (oldWidget.formData.baseSalesPrice != widget.formData.baseSalesPrice) {
@@ -94,10 +139,13 @@ class _ProductPricingInventorySectionState extends State<ProductPricingInventory
 
   @override
   void dispose() {
+    _boundController?.removeListener(_syncOpeningBalanceFromController);
     _salesPriceController.dispose();
     _purchasePriceController.dispose();
     _salesNoteController.dispose();
     _purchaseNoteController.dispose();
+    _openingQuantityController.dispose();
+    _openingCostPriceController.dispose();
     super.dispose();
   }
 
@@ -116,6 +164,12 @@ class _ProductPricingInventorySectionState extends State<ProductPricingInventory
         _buildPricingSection(context),
         const SizedBox(height: 24),
         _buildPerPriceListPricing(context),
+        const SizedBox(height: 24),
+        ProductSuppliersSection(
+          businessId: widget.businessId,
+          formData: widget.formData,
+          onChanged: _updateFormData,
+        ),
       ],
     );
   }
@@ -169,11 +223,11 @@ class _ProductPricingInventorySectionState extends State<ProductPricingInventory
                 ),
                 // گزینه‌های ردیابی برای حالت یونیک
                 if (widget.formData.inventoryMode == 'unique') ...[
-                  const SizedBox(height: 16),
+                  SizedBox(height: 16),
                   SwitchListTile(
                     value: widget.formData.trackSerial,
                     onChanged: (value) => _updateFormData(widget.formData.copyWith(trackSerial: value)),
-                    title: const Text('ردیابی سریال نامبر'),
+                    title: Text('ردیابی سریال نامبر'),
                     subtitle: const Text('هر واحد کالا دارای شماره سریال یکتا خواهد بود'),
                   ),
                   SwitchListTile(
@@ -189,19 +243,19 @@ class _ProductPricingInventorySectionState extends State<ProductPricingInventory
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: Colors.blue.shade50,
-                      border: Border.all(color: Colors.blue.shade200),
+                      color: SemanticColorResolver.info(context).withValues(alpha: 0.12),
+                      border: Border.all(color: SemanticColorResolver.info(context).withValues(alpha: 0.35)),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Row(
                       children: [
-                        Icon(Icons.info_outline, color: Colors.blue.shade700, size: 20),
-                        const SizedBox(width: 8),
+                        Icon(Icons.info_outline, color: SemanticColorResolver.info(context), size: 20),
+                        SizedBox(width: 8),
                         Expanded(
                           child: Text(
                             t.inventoryUniqueModeRequiresTrack,
                             style: TextStyle(
-                              color: Colors.blue.shade800,
+                              color: SemanticColorResolver.info(context),
                               fontSize: 13,
                             ),
                           ),
@@ -346,8 +400,170 @@ class _ProductPricingInventorySectionState extends State<ProductPricingInventory
               );
             },
           ),
+          const SizedBox(height: 16),
+          _buildOpeningBalanceSection(context),
         ],
       ],
+    );
+  }
+
+  Widget _buildOpeningBalanceSection(BuildContext context) {
+    final controller = _boundController;
+    if (controller == null || !controller.showOpeningBalanceSection) {
+      return const SizedBox.shrink();
+    }
+
+    final eligibility = controller.obEligibility;
+    final loading = controller.obEligibilityLoading;
+    final fyTitle = eligibility?['fiscal_year_title']?.toString();
+    final statusMessage = eligibility?['message']?.toString();
+    final readonly = !loading && eligibility != null && !controller.obEditable;
+    final readonlyWarning = _openingBalanceReadonlyWarning(statusMessage);
+    final isMobile = ResponsiveHelper.isMobile(context);
+    final spacing = ResponsiveHelper.getGridSpacing(context);
+
+    return Card(
+      elevation: 1,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'تعداد اولیه (تراز افتتاحیه)',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+            ),
+            SizedBox(height: 8),
+            if (controller.obEligibilityLoading)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 8),
+                child: LinearProgressIndicator(),
+              ),
+            if (fyTitle != null && fyTitle.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Text('سال مالی: $fyTitle'),
+              ),
+            if (readonly)
+              Container(
+                width: double.infinity,
+                margin: const EdgeInsets.only(bottom: 12),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: SemanticColorResolver.warning(context).withValues(alpha: 0.12),
+                  border: Border.all(color: SemanticColorResolver.warning(context).withValues(alpha: 0.35)),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(
+                      Icons.lock_outline,
+                      size: 18,
+                      color: SemanticColorResolver.warning(context),
+                    ),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        readonlyWarning,
+                        style: TextStyle(
+                          color: SemanticColorResolver.warning(context),
+                          fontSize: 13,
+                          height: 1.35,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              )
+            else ...[
+              if (statusMessage != null && statusMessage.isNotEmpty)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Text(
+                    statusMessage,
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ),
+              Text(
+                'مقدار در سند تراز افتتاحیه سال مالی جاری ثبت می‌شود. برای ثبت ارزش حسابداری، بهای تمام‌شده را وارد کنید.',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ],
+            const SizedBox(height: 12),
+            if (isMobile) ...[
+              TextFormField(
+                controller: _openingQuantityController,
+                readOnly: readonly || loading,
+                decoration: const InputDecoration(
+                  labelText: 'تعداد اولیه',
+                  hintText: 'مثلاً ۱۰۰',
+                ),
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                inputFormatters: [
+                  const EnglishDigitsFormatter(),
+                  ThousandsSeparatorInputFormatter(),
+                ],
+                onChanged: (readonly || loading) ? null : controller.setOpeningBalanceQuantity,
+              ),
+              SizedBox(height: spacing),
+              TextFormField(
+                controller: _openingCostPriceController,
+                readOnly: readonly || loading,
+                decoration: const InputDecoration(
+                  labelText: 'بهای تمام‌شده (هر واحد)',
+                  hintText: 'برای ثبت بدهکار حساب موجودی',
+                ),
+                keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                inputFormatters: [
+                  const EnglishDigitsFormatter(),
+                  ThousandsSeparatorInputFormatter(),
+                ],
+                onChanged: (readonly || loading) ? null : controller.setOpeningBalanceCostPrice,
+              ),
+            ] else
+              Row(
+                children: [
+                  Expanded(
+                    child: TextFormField(
+                      controller: _openingQuantityController,
+                      readOnly: readonly || loading,
+                      decoration: const InputDecoration(
+                        labelText: 'تعداد اولیه',
+                        hintText: 'مثلاً ۱۰۰',
+                      ),
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      inputFormatters: [
+                        const EnglishDigitsFormatter(),
+                        ThousandsSeparatorInputFormatter(),
+                      ],
+                      onChanged: (readonly || loading) ? null : controller.setOpeningBalanceQuantity,
+                    ),
+                  ),
+                  SizedBox(width: spacing),
+                  Expanded(
+                    child: TextFormField(
+                      controller: _openingCostPriceController,
+                      readOnly: readonly || loading,
+                      decoration: const InputDecoration(
+                        labelText: 'بهای تمام‌شده (هر واحد)',
+                        hintText: 'برای ثبت بدهکار حساب موجودی',
+                      ),
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      inputFormatters: [
+                        const EnglishDigitsFormatter(),
+                        ThousandsSeparatorInputFormatter(),
+                      ],
+                      onChanged: (readonly || loading) ? null : controller.setOpeningBalanceCostPrice,
+                    ),
+                  ),
+                ],
+              ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -403,6 +619,105 @@ class _ProductPricingInventorySectionState extends State<ProductPricingInventory
             ),
           ),
         ),
+        if (widget.isMultiCurrency)
+          MultiCurrencyGate(
+            isMultiCurrency: true,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const SizedBox(height: 16),
+                Text('قیمت ارزی (چندارزی)', style: Theme.of(context).textTheme.titleSmall),
+                const SizedBox(height: 8),
+                DropdownButtonFormField<int?>(
+                  value: widget.formData.priceFxCurrencyId,
+                  decoration: const InputDecoration(
+                    labelText: 'ارز قیمت ارزی',
+                    border: OutlineInputBorder(),
+                  ),
+                  items: [
+                    const DropdownMenuItem<int?>(value: null, child: Text('—')),
+                    ...widget.currencies.map((c) {
+                      final id = (c['id'] as num?)?.toInt();
+                      final label =
+                          '${c['code'] ?? ''} ${c['title'] ?? c['symbol'] ?? ''}'.trim();
+                      return DropdownMenuItem<int?>(value: id, child: Text(label));
+                    }),
+                  ],
+                  onChanged: (v) => _updateFormData(
+                    widget.formData.copyWith(priceFxCurrencyId: v),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  initialValue: formatNumberForInput(widget.formData.salesPriceFx),
+                  decoration: const InputDecoration(labelText: 'قیمت فروش ارزی'),
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  inputFormatters: [
+                    const EnglishDigitsFormatter(),
+                    ThousandsSeparatorInputFormatter(),
+                  ],
+                  onChanged: (value) => _updateFormData(
+                    widget.formData.copyWith(
+                      salesPriceFx: num.tryParse(value.replaceAll(',', '')),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  initialValue: formatNumberForInput(widget.formData.purchasePriceFx),
+                  decoration: const InputDecoration(labelText: 'قیمت خرید ارزی'),
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  inputFormatters: [
+                    const EnglishDigitsFormatter(),
+                    ThousandsSeparatorInputFormatter(),
+                  ],
+                  onChanged: (value) => _updateFormData(
+                    widget.formData.copyWith(
+                      purchasePriceFx: num.tryParse(value.replaceAll(',', '')),
+                    ),
+                  ),
+                ),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('به‌روزرسانی خودکار قیمت پایه از نرخ'),
+                  subtitle: const Text('پس از ثبت نرخ جدید، base = قیمت ارزی × نرخ'),
+                  value: widget.formData.autoUpdateBaseFromFx,
+                  onChanged: (v) => _updateFormData(
+                    widget.formData.copyWith(autoUpdateBaseFromFx: v),
+                  ),
+                ),
+                if (widget.productId != null) ...[
+                  CheckboxListTile(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('همگام با لیست قیمت پیش‌فرض'),
+                    subtitle: const Text('پس از sync، قیمت فروش پایه در PriceList به‌روز شود'),
+                    value: _syncPriceListWithFx,
+                    onChanged: _syncingFxBase
+                        ? null
+                        : (v) => setState(() => _syncPriceListWithFx = v ?? true),
+                    controlAffinity: ListTileControlAffinity.leading,
+                  ),
+                  const SizedBox(height: 4),
+                  Align(
+                    alignment: AlignmentDirectional.centerStart,
+                    child: OutlinedButton.icon(
+                      onPressed: _syncingFxBase ? null : _syncBasePriceFromFx,
+                      icon: _syncingFxBase
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.currency_exchange, size: 18),
+                      label: Text(_syncingFxBase
+                          ? 'در حال بروزرسانی…'
+                          : 'بروزرسانی قیمت پایه از نرخ'),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
       ],
     );
   }
@@ -464,7 +779,7 @@ class _ProductPricingInventorySectionState extends State<ProductPricingInventory
                                   },
                                 ),
                                 IconButton(
-                                  icon: const Icon(Icons.delete, color: Colors.red),
+                                  icon: Icon(Icons.delete, color: SemanticColorResolver.negative(context)),
                                   onPressed: () => widget.onDeletePriceItem(it),
                                 ),
                               ],
@@ -577,7 +892,7 @@ class _ProductPricingInventorySectionState extends State<ProductPricingInventory
                           },
                         ),
                         IconButton(
-                          icon: const Icon(Icons.delete, color: Colors.red),
+                          icon: Icon(Icons.delete, color: SemanticColorResolver.negative(context)),
                           onPressed: () => widget.onDeletePriceItem(it),
                         ),
                       ],
@@ -648,8 +963,8 @@ class _ProductPricingInventorySectionState extends State<ProductPricingInventory
       builder: (ctx) => AlertDialog(
         title: Row(
           children: [
-            Icon(Icons.warning, color: Colors.orange[700]),
-            const SizedBox(width: 8),
+            Icon(Icons.warning, color: SemanticColorResolver.warning(context)),
+            SizedBox(width: 8),
             Text(t.noPriceListsTitle),
           ],
         ),
@@ -662,19 +977,19 @@ class _ProductPricingInventorySectionState extends State<ProductPricingInventory
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.blue.withValues(alpha: 0.1),
+                color: SemanticColorResolver.info(context).withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.blue.withValues(alpha: 0.3)),
+                border: Border.all(color: SemanticColorResolver.info(context).withValues(alpha: 0.3)),
               ),
               child: Row(
                 children: [
-                  Icon(Icons.info, color: Colors.blue[700], size: 20),
-                  const SizedBox(width: 8),
+                  Icon(Icons.info, color: SemanticColorResolver.info(context), size: 20),
+                  SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       t.noPriceListsHint,
                       style: TextStyle(
-                        color: Colors.blue[700],
+                        color: SemanticColorResolver.info(context),
                         fontSize: 14,
                       ),
                     ),
@@ -892,8 +1207,81 @@ class _ProductPricingInventorySectionState extends State<ProductPricingInventory
     );
   }
 
+  Future<void> _syncBasePriceFromFx() async {
+    final productId = widget.productId;
+    if (productId == null) return;
+    if (widget.formData.priceFxCurrencyId == null) {
+      SnackBarHelper.showError(context, message: 'ابتدا ارز قیمت ارزی را انتخاب کنید');
+      return;
+    }
+    setState(() => _syncingFxBase = true);
+    try {
+      final result = await ProductService().syncBasePriceFromFx(
+        businessId: widget.businessId,
+        productId: productId,
+        syncPriceList: _syncPriceListWithFx,
+      );
+      if (!mounted) return;
+      if (result['updated'] == true) {
+        final after = result['after'];
+        num? sales;
+        num? purchase;
+        if (after is Map) {
+          sales = num.tryParse('${after['base_sales_price'] ?? ''}');
+          purchase = num.tryParse('${after['base_purchase_price'] ?? ''}');
+        }
+        final updated = widget.formData.copyWith(
+          baseSalesPrice: sales ?? widget.formData.baseSalesPrice,
+          basePurchasePrice: purchase ?? widget.formData.basePurchasePrice,
+        );
+        _updateFormData(updated);
+        if (sales != null) {
+          _salesPriceController.text = formatNumberForInput(sales);
+        }
+        if (purchase != null) {
+          _purchasePriceController.text = formatNumberForInput(purchase);
+        }
+        SnackBarHelper.show(
+          context,
+          message: 'قیمت پایه از نرخ بروزرسانی شد'
+              '${result['rate'] != null ? ' (نرخ: ${result['rate']})' : ''}',
+        );
+      } else {
+        final reason = result['reason']?.toString() ?? 'بدون تغییر';
+        final messages = <String, String>{
+          'no_fx_currency': 'ارز قیمت ارزی تنظیم نشده است',
+          'no_rate': 'نرخ تسعیر برای این ارز یافت نشد',
+          'fx_currency_is_base': 'ارز قیمت ارزی با ارز پایه یکی است',
+          'auto_update_disabled': 'به‌روزرسانی خودکار غیرفعال است',
+          'no_base_currency': 'ارز پایه کسب‌وکار تنظیم نشده است',
+        };
+        SnackBarHelper.show(
+          context,
+          message: messages[reason] ?? 'قیمت پایه تغییر نکرد ($reason)',
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        SnackBarHelper.showError(
+          context,
+          message: ErrorExtractor.forContext(e, context),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _syncingFxBase = false);
+    }
+  }
+
   void _updateFormData(ProductFormData newData) {
     widget.onChanged(newData);
+  }
+
+  String _openingBalanceReadonlyWarning(String? statusMessage) {
+    if (statusMessage != null && statusMessage.trim().isNotEmpty) {
+      return statusMessage.trim();
+    }
+    return 'تعداد اولیه و بهای تمام‌شده قابل ویرایش نیستند. '
+        'برای مشاهده یا تغییر از صفحه تراز افتتاحیه استفاده کنید.';
   }
 
   Widget _buildConversionWarning() {
@@ -922,8 +1310,8 @@ class _ProductPricingInventorySectionState extends State<ProductPricingInventory
           margin: const EdgeInsets.only(top: 16),
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: Colors.orange.shade50,
-            border: Border.all(color: Colors.orange.shade200),
+            color: SemanticColorResolver.warning(context).withValues(alpha: 0.12),
+            border: Border.all(color: SemanticColorResolver.warning(context).withValues(alpha: 0.35)),
             borderRadius: BorderRadius.circular(8),
           ),
           child: Column(
@@ -931,23 +1319,23 @@ class _ProductPricingInventorySectionState extends State<ProductPricingInventory
             children: [
               Row(
                 children: [
-                  Icon(Icons.warning_amber_rounded, color: Colors.orange.shade700),
-                  const SizedBox(width: 8),
+                  Icon(Icons.warning_amber_rounded, color: SemanticColorResolver.warning(context)),
+                  SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       'تبدیل به حالت یونیک',
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.bold,
-                        color: Colors.orange.shade900,
+                        color: SemanticColorResolver.warning(context),
                       ),
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 12),
+              SizedBox(height: 12),
               Text(
                 'این کالا دارای $stock واحد موجودی است. برای تبدیل به حالت یونیک، باید برای هر واحد موجودی یک instance ایجاد شود.',
-                style: TextStyle(color: Colors.orange.shade800),
+                style: TextStyle(color: SemanticColorResolver.warning(context)),
               ),
               const SizedBox(height: 12),
               Row(
@@ -973,10 +1361,10 @@ class _ProductPricingInventorySectionState extends State<ProductPricingInventory
                         SnackBarHelper.showError(context, message: controller?.errorMessage ?? 'خطا در تبدیل کالا');
                       }
                     },
-                    icon: const Icon(Icons.transform),
-                    label: const Text('تبدیل و ایجاد Instance ها'),
+                    icon: Icon(Icons.transform),
+                    label: Text('تبدیل و ایجاد Instance ها'),
                     style: FilledButton.styleFrom(
-                      backgroundColor: Colors.orange.shade700,
+                      backgroundColor: SemanticColorResolver.warning(context),
                     ),
                   ),
                 ],

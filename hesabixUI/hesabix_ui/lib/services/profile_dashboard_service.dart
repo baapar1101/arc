@@ -219,89 +219,114 @@ class ProfileDashboardService {
     List<String> keys,
   ) {
     final out = Map<String, dynamic>.from(base);
+    // ویجت‌های خاص را خالی نگذار تا hydrate بتواند تشخیص دهد و در صورت نیاز پر کند
+    const specialKeys = {
+      'profile_recent_businesses',
+      'profile_announcements',
+      'profile_support_tickets',
+    };
     for (final k in keys) {
       if (out.containsKey(k)) continue;
-      if (k == 'profile_recent_businesses') {
-        out[k] = {
-          'items': <Map<String, dynamic>>[],
-        };
-      } else if (k == 'profile_announcements') {
-        out[k] = {
-          'items': <Map<String, dynamic>>[],
-        };
-      } else if (k == 'profile_support_tickets') {
-        out[k] = {
-          'items': <Map<String, dynamic>>[],
-        };
-      }
+      if (specialKeys.contains(k)) continue;
+      out[k] = <String, dynamic>{};
     }
     return out;
   }
 
-  // کمک‌متد برای تأمین داده واقعی برخی ویجت‌ها (مثل لیست کسب‌وکارها)
+  /// فقط وقتی batch سرور دادهٔ قابل‌استفاده ندارد، از APIهای دامنه hydrate می‌کند.
+  /// درخواست‌های لازم به‌صورت موازی اجرا می‌شوند.
   Future<Map<String, dynamic>> hydrateSpecialWidgets(
     Map<String, dynamic> currentData,
     List<String> keys, {
     bool onlyUnread = false,
   }) async {
     final out = Map<String, dynamic>.from(currentData);
-    if (keys.contains('profile_recent_businesses')) {
-      try {
-        final businesses = await _businessService.getUserBusinesses();
-        // فیلتر کردن کسب و کارهای حذف شده یا در حال حذف
-        final filteredBusinesses = businesses
-            .where((b) => !b.isDeleted && !b.isDeletionPending && b.deletedAt == null)
-            .toList();
-        out['profile_recent_businesses'] = {
-          'items': filteredBusinesses
-              .map((b) => {
-                    'id': b.id,
-                    'name': b.name,
-                    'role': b.role,
-                    'is_owner': b.isOwner,
-                  })
-              .toList(),
-        };
-      } catch (_) {
-        // در سکوت ادامه می‌دهیم؛ داده‌ی موجود کافی است
-      }
+    final needBusinesses =
+        keys.contains('profile_recent_businesses') && !_hasUsableItemsPayload(out['profile_recent_businesses']);
+    final needTickets =
+        keys.contains('profile_support_tickets') && !_hasUsableItemsPayload(out['profile_support_tickets']);
+    final needAnnouncements =
+        keys.contains('profile_announcements') && !_hasUsableItemsPayload(out['profile_announcements']);
+    if (!needBusinesses && !needTickets && !needAnnouncements) {
+      return out;
     }
-    if (keys.contains('profile_support_tickets')) {
-      try {
-        final support = SupportService(_apiClient);
-        final res = await support.searchUserTickets({
-          'page': 1,
-          'limit': 5,
-          'sort_by': 'updated_at',
-          'sort_desc': true,
-        });
-        out['profile_support_tickets'] = {
-          'items': res.items.map((t) {
-            return {
-              'id': t.id,
-              'subject': t.title,
-              'status': t.status?.name ?? '',
-              'updated_at': t.updatedAt.toIso8601String(),
-            };
-          }).toList(),
-        };
-      } catch (_) {
-        // fallback باقی می‌ماند
-      }
+
+    final futures = <Future<void>>[];
+    if (needBusinesses) {
+      futures.add(() async {
+        try {
+          final businesses = await _businessService.getUserBusinesses();
+          final filteredBusinesses = businesses
+              .where((b) => !b.isDeleted && !b.isDeletionPending && b.deletedAt == null)
+              .toList();
+          out['profile_recent_businesses'] = {
+            'items': filteredBusinesses
+                .map((b) => {
+                      'id': b.id,
+                      'name': b.name,
+                      'role': b.role,
+                      'is_owner': b.isOwner,
+                    })
+                .toList(),
+          };
+        } catch (_) {}
+      }());
     }
-    if (keys.contains('profile_announcements')) {
-      try {
-        final ann = AnnouncementsService(_apiClient);
-        final res = await ann.listAnnouncements(page: 1, limit: 5, onlyUnread: onlyUnread);
-        final items = (res['items'] as List? ?? const <dynamic>[])
-            .map<Map<String, dynamic>>((e) => Map<String, dynamic>.from(e as Map))
-            .toList();
-        out['profile_announcements'] = {'items': items};
-      } catch (_) {
-        // fallback باقی می‌ماند
-      }
+    if (needTickets) {
+      futures.add(() async {
+        try {
+          final support = SupportService(_apiClient);
+          final res = await support.searchUserTickets({
+            'page': 1,
+            'limit': 5,
+            'sort_by': 'last_message_at',
+            'sort_desc': true,
+          });
+          out['profile_support_tickets'] = {
+            'items': res.items.map((t) {
+              return {
+                'id': t.id,
+                'subject': t.title,
+                'status': t.status?.name ?? '',
+                'updated_at': t.lastActivityAt.toIso8601String(),
+                'last_message_at': t.lastMessageAt?.toIso8601String(),
+              };
+            }).toList(),
+          };
+        } catch (_) {}
+      }());
+    }
+    if (needAnnouncements) {
+      futures.add(() async {
+        try {
+          final ann = AnnouncementsService(_apiClient);
+          final res = await ann.listAnnouncements(page: 1, limit: 5, onlyUnread: onlyUnread);
+          final items = (res['items'] as List? ?? const <dynamic>[])
+              .map<Map<String, dynamic>>((e) => Map<String, dynamic>.from(e as Map))
+              .toList();
+          out['profile_announcements'] = {'items': items};
+        } catch (_) {}
+      }());
+    }
+    await Future.wait(futures);
+    // اگر hydrate هم شکست خورد، اسپینر نماند
+    if (needBusinesses && !_hasUsableItemsPayload(out['profile_recent_businesses'])) {
+      out['profile_recent_businesses'] = {'items': <Map<String, dynamic>>[]};
+    }
+    if (needTickets && !_hasUsableItemsPayload(out['profile_support_tickets'])) {
+      out['profile_support_tickets'] = {'items': <Map<String, dynamic>>[]};
+    }
+    if (needAnnouncements && !_hasUsableItemsPayload(out['profile_announcements'])) {
+      out['profile_announcements'] = {'items': <Map<String, dynamic>>[]};
     }
     return out;
+  }
+
+  bool _hasUsableItemsPayload(dynamic raw) {
+    if (raw is! Map) return false;
+    if (raw.containsKey('error')) return false;
+    final items = raw['items'];
+    return items is List;
   }
 }
 

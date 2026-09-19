@@ -19,6 +19,24 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/integrations/telegram", tags=["integrations.telegram"])
 
 
+def _to_utc_datetime(value: date | datetime) -> datetime:
+	"""تبدیل date/datetime به datetime UTC (برای پاسخ API و مقایسه انقضا)."""
+	if isinstance(value, date) and not isinstance(value, datetime):
+		return datetime.combine(value, datetime.min.time(), tzinfo=timezone.utc)
+	if value.tzinfo is None:
+		return value.replace(tzinfo=timezone.utc)
+	return value.astimezone(timezone.utc)
+
+
+def _is_link_token_expired(expires_at: date | datetime, *, now: datetime | None = None) -> bool:
+	"""بررسی انقضای توکن؛ سازگار با ستون date قدیمی و timestamp جدید."""
+	now = now or datetime.utcnow()
+	if isinstance(expires_at, date) and not isinstance(expires_at, datetime):
+		return expires_at < now.date()
+	expires_naive = expires_at.replace(tzinfo=None) if expires_at.tzinfo else expires_at
+	return expires_naive < now
+
+
 @router.post("/link", summary="ایجاد لینک اتصال تلگرام")
 def create_link(
 	request: Request,
@@ -40,16 +58,7 @@ def create_link(
 	bot_username = settings.get("telegram_bot_username") or ""
 	deep_link = f"https://t.me/{bot_username}?start={link.token}" if bot_username else None
 	deep_link_crm = f"https://t.me/{bot_username}?start=crm" if bot_username else None
-	# اطمینان از اینکه expires_at با Z (UTC) برگردانده می‌شود
-	# پشتیبانی از date و datetime (برخی دیتابیس‌ها date برمی‌گردانند)
-	exp = link.expires_at
-	if isinstance(exp, date) and not isinstance(exp, datetime):
-		expires_at_utc = datetime.combine(exp, datetime.min.time(), tzinfo=timezone.utc)
-	elif exp.tzinfo is None:
-		expires_at_utc = exp.replace(tzinfo=timezone.utc)
-	else:
-		expires_at_utc = exp.astimezone(timezone.utc)
-	expires_at_iso = expires_at_utc.isoformat()
+	expires_at_iso = _to_utc_datetime(link.expires_at).isoformat()
 	return success_response(
 		{
 			"deep_link": deep_link,
@@ -153,7 +162,7 @@ def telegram_webhook(
 			token = _start_parts[1].strip()
 			t_repo = TelegramRepository(db)
 			t_obj = t_repo.get_by_token(token)
-			if not t_obj or t_obj.used_at is not None or t_obj.expires_at < datetime.utcnow():
+			if not t_obj or t_obj.used_at is not None or _is_link_token_expired(t_obj.expires_at):
 				if chat_id:
 					provider.send_text(chat_id=int(chat_id), text="⛔️ لینک اتصال نامعتبر یا منقضی است. لطفاً از داخل برنامه، لینک جدید بسازید.")
 				return {"ok": False}

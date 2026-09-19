@@ -34,10 +34,16 @@ class LocalizationHelper {
         return t.settingsWalletSettings;
       case 'settingsCurrenciesAdmin':
         return t.settingsCurrenciesAdmin;
+      case 'settingsFxProvidersAdmin':
+        return t.settingsFxProvidersAdmin;
       case 'settingsWalletPayoutsAdmin':
         return t.settingsWalletPayoutsAdmin;
       case 'settingsSupportOperators':
         return t.settingsSupportOperators;
+      case 'settingsSupportPlans':
+        return 'پلن‌های پشتیبانی';
+      case 'settingsSupportBillingStats':
+        return 'آمار پشتیبانی غیر رایگان';
       case 'settingsPaymentGateways':
         return t.settingsPaymentGateways;
       case 'settingsBusinessesManagement':
@@ -54,6 +60,12 @@ class LocalizationHelper {
         return t.settingsNotificationSmsPricing;
       case 'settingsAISettings':
         return t.settingsAISettings;
+      case 'settingsAIModels':
+        return t.settingsAIModels;
+      case 'settingsAIVoiceModels':
+        return t.settingsAIVoiceModels;
+      case 'settingsAIProviderCredentials':
+        return t.settingsAIProviderCredentials;
       case 'settingsAIPlans':
         return t.settingsAIPlans;
       case 'settingsAIPrompts':
@@ -110,10 +122,16 @@ class LocalizationHelper {
         return t.settingsWalletSettingsDescription;
       case 'settingsCurrenciesAdminDescription':
         return t.settingsCurrenciesAdminDescription;
+      case 'settingsFxProvidersAdminDescription':
+        return t.settingsFxProvidersAdminDescription;
       case 'settingsWalletPayoutsAdminDescription':
         return t.settingsWalletPayoutsAdminDescription;
       case 'settingsSupportOperatorsDescription':
         return t.settingsSupportOperatorsDescription;
+      case 'settingsSupportPlansDescription':
+        return 'تعریف قیمت و مدت اشتراک‌های پشتیبانی کاربر';
+      case 'settingsSupportBillingStatsDescription':
+        return 'گزارش درآمد، اشتراک فعال و صورت‌حساب‌های پشتیبانی';
       case 'settingsPaymentGatewaysDescription':
         return t.settingsPaymentGatewaysDescription;
       case 'settingsBusinessesManagementDescription':
@@ -130,6 +148,12 @@ class LocalizationHelper {
         return t.settingsNotificationSmsPricingDescription;
       case 'settingsAISettingsDescription':
         return t.settingsAISettingsDescription;
+      case 'settingsAIModelsDescription':
+        return t.settingsAIModelsDescription;
+      case 'settingsAIVoiceModelsDescription':
+        return t.settingsAIVoiceModelsDescription;
+      case 'settingsAIProviderCredentialsDescription':
+        return t.settingsAIProviderCredentialsDescription;
       case 'settingsAIPlansDescription':
         return t.settingsAIPlansDescription;
       case 'settingsAIPromptsDescription':

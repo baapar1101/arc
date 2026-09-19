@@ -2,32 +2,39 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/gestures.dart';
 import 'package:go_router/go_router.dart';
 import 'package:dio/dio.dart';
-import 'package:flutter/gestures.dart';
-import 'package:url_launcher/url_launcher_string.dart';
-
-import '../core/api_client.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
+import '../core/api_client.dart';
 import '../core/calendar_controller.dart';
 import '../core/auth_store.dart';
 import '../core/locale_controller.dart';
-import '../core/mobile_launcher_prefs.dart';
 import '../core/referral_store.dart';
 import '../theme/theme_controller.dart';
-import '../theme/tokens/extensions.dart';
 import '../utils/number_normalizer.dart';
 import '../utils/password_validator.dart';
-import '../widgets/auth_footer.dart';
-import '../../utils/snackbar_helper.dart';
-import '../utils/responsive_helper.dart';
 import '../services/otp_login_service.dart';
 import '../services/password_reset_otp_service.dart';
 import '../services/errors/api_error.dart';
 import '../utils/error_extractor.dart';
 import '../widgets/auth/otp_input_dialog.dart';
+import '../../utils/snackbar_helper.dart';
+import 'auth/auth_flow.dart';
+import 'auth/widgets/auth_shell.dart';
+import 'auth/widgets/forgot_password_form.dart';
+import 'auth/widgets/otp_login_form.dart';
+import 'auth/widgets/sign_in_form.dart';
+import '../services/biometric_post_login_flow.dart';
+import 'auth/widgets/sign_up_wizard.dart';
 
-enum _LoginTabKind { login, register, forgot, otp }
+int? _parseUserId(dynamic raw) {
+  if (raw == null) return null;
+  if (raw is int) return raw;
+  if (raw is num) return raw.toInt();
+  return int.tryParse(raw.toString());
+}
+
 
 class LoginPage extends StatefulWidget {
   final LocaleController localeController;
@@ -40,7 +47,7 @@ class LoginPage extends StatefulWidget {
   State<LoginPage> createState() => _LoginPageState();
 }
 
-class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMixin {
+class _LoginPageState extends State<LoginPage> {
   // Login
   final _formKey = GlobalKey<FormState>();
   final _identifierCtrl = TextEditingController();
@@ -53,6 +60,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
 
   // Register
   final _registerKey = GlobalKey<FormState>();
+  final _signUpWizardKey = GlobalKey<SignUpWizardState>();
   final _firstNameCtrl = TextEditingController();
   final _lastNameCtrl = TextEditingController();
   final _emailCtrl = TextEditingController();
@@ -99,7 +107,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
   /// از پاسخ `/auth/captcha` — همه کپچاهای صفحه از یک تنظیم سرور تبعیت می‌کنند.
   String _captchaMode = 'numeric';
 
-  late TabController _tabController;
+  AuthFlow _flow = AuthFlow.signIn;
   bool _registrationEnabled = true;
 
   List<TextInputFormatter> get _captchaInputFormatters => _captchaMode == 'alphanumeric'
@@ -136,9 +144,12 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
     _otpLoginCaptchaFocus.dispose();
     _privacyTapRecognizer.dispose();
     _termsTapRecognizer.dispose();
-    _tabController.removeListener(_onAuthTabChanged);
-    _tabController.dispose();
     super.dispose();
+  }
+
+  void _goToFlow(AuthFlow flow) {
+    if (_flow == flow) return;
+    setState(() => _flow = flow);
   }
 
   Future<void> _refreshCaptcha(String scope, {bool clearOtpChannels = true}) async {
@@ -205,79 +216,40 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
-    _tabController.addListener(_onAuthTabChanged);
-    // پیش‌بارگذاری کپچا برای هر چهار تب
     _refreshCaptcha('login');
     _refreshCaptcha('register');
     _refreshCaptcha('forgot');
     _refreshCaptcha('otpLogin');
     unawaited(_loadOtpChannelStatus());
-    // ذخیره کد معرف از URL (اگر وجود داشت)
     unawaited(ReferralStore.captureFromCurrentUrl());
     unawaited(_loadPublicAuthSettings());
+    WidgetsBinding.instance.addPostFrameCallback((_) => _readFlowFromUrl());
   }
 
-  void _onAuthTabChanged() {
-    if (_tabController.indexIsChanging) return;
-    setState(() {});
-  }
-
-  _LoginTabKind _tabKindAt(int index) {
-    if (_registrationEnabled) {
-      switch (index) {
-        case 0:
-          return _LoginTabKind.login;
-        case 1:
-          return _LoginTabKind.register;
-        case 2:
-          return _LoginTabKind.forgot;
-        default:
-          return _LoginTabKind.otp;
+  void _readFlowFromUrl() {
+    if (!mounted) return;
+    try {
+      final view = GoRouterState.of(context).uri.queryParameters['view'];
+      switch (view) {
+        case 'signup':
+        case 'register':
+          if (_registrationEnabled) _goToFlow(AuthFlow.signUp);
+        case 'forgot':
+          _goToFlow(AuthFlow.forgotPassword);
+        case 'otp':
+          _goToFlow(AuthFlow.otpLogin);
       }
-    }
-    switch (index) {
-      case 0:
-        return _LoginTabKind.login;
-      case 1:
-        return _LoginTabKind.forgot;
-      default:
-        return _LoginTabKind.otp;
-    }
+    } catch (_) {}
   }
 
   void _applyRegistrationEnabledFromServer(bool enabled) {
     if (_registrationEnabled == enabled) return;
-    final oldLen = _tabController.length;
-    final oldIndex = _tabController.index;
-    _registrationEnabled = enabled;
-    final newLen = enabled ? 4 : 3;
-    if (oldLen == newLen) {
-      setState(() {});
-      return;
-    }
-    _tabController.removeListener(_onAuthTabChanged);
-    _tabController.dispose();
-    var newIndex = oldIndex;
-    if (oldLen == 4 && newLen == 3) {
-      if (oldIndex <= 0) {
-        newIndex = 0;
-      } else if (oldIndex == 1) {
-        newIndex = 0;
-      } else {
-        newIndex = oldIndex - 1;
+    setState(() {
+      _registrationEnabled = enabled;
+      if (!enabled && _flow == AuthFlow.signUp) {
+        _flow = AuthFlow.signIn;
       }
-    } else if (oldLen == 3 && newLen == 4) {
-      if (oldIndex <= 0) {
-        newIndex = 0;
-      } else {
-        newIndex = oldIndex + 1;
-      }
-    }
-    newIndex = newIndex.clamp(0, newLen - 1);
-    _tabController = TabController(length: newLen, vsync: this, initialIndex: newIndex);
-    _tabController.addListener(_onAuthTabChanged);
-    setState(() {});
+    });
   }
 
   Future<void> _loadPublicAuthSettings() async {
@@ -424,6 +396,79 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
     return ErrorExtractor.extractErrorMessage(e, t);
   }
 
+  int? _registerFieldToStep(String? field) {
+    switch (field) {
+      case 'email':
+      case 'mobile':
+        return 0;
+      case 'first_name':
+      case 'last_name':
+      case 'password':
+        return 1;
+      case 'captcha':
+      case 'captcha_code':
+        return 2;
+      default:
+        return null;
+    }
+  }
+
+  int? _inferRegisterErrorStep(Object e) {
+    try {
+      if (e is DioException) {
+        final data = e.response?.data;
+        if (data is Map) {
+          final err = data['error'] is Map ? data['error'] as Map : null;
+          final code = (err?['code'] ?? data['error_code'])?.toString();
+          switch (code) {
+            case 'EMAIL_IN_USE':
+            case 'MOBILE_IN_USE':
+            case 'INVALID_MOBILE':
+            case 'IDENTIFIER_REQUIRED':
+              return 0;
+            case 'INVALID_CAPTCHA':
+              return 2;
+          }
+
+          List<dynamic>? details;
+          if (err != null && err['details'] is List) {
+            details = err['details'] as List;
+          } else if (data['detail'] is List) {
+            details = data['detail'] as List;
+          }
+          if (details != null) {
+            for (final item in details) {
+              if (item is Map) {
+                final fieldRaw = (item['field'] ??
+                        (item['loc'] is List
+                            ? (item['loc'] as List).isNotEmpty
+                                ? (item['loc'] as List).last?.toString()
+                                : null
+                            : null))
+                    ?.toString();
+                final step = _registerFieldToStep(fieldRaw);
+                if (step != null) return step;
+              }
+            }
+          }
+
+          final message = (err?['message'] ?? data['message'])?.toString().toLowerCase() ?? '';
+          if (message.contains('email') ||
+              message.contains('mobile') ||
+              message.contains('ایمیل') ||
+              message.contains('موبایل') ||
+              message.contains('شماره')) {
+            return 0;
+          }
+          if (message.contains('captcha') || message.contains('کپچا') || message.contains('امنیتی')) {
+            return 2;
+          }
+        }
+      }
+    } catch (_) {}
+    return null;
+  }
+
   void _showSnack(String message) {
     if (!mounted) return;
     SnackBarHelper.show(context, message: message);
@@ -507,12 +552,14 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                 final user = verifyResult['user'] as Map<String, dynamic>?;
                 
                 if (apiKey != null && apiKey.isNotEmpty) {
+                  // Hold /login redirect until biometric opt-in finishes.
+                  widget.authStore.beginPostLoginFlow();
                   await widget.authStore.saveApiKey(apiKey);
                   
                   // ذخیره اطلاعات کاربر
                   final appPermissions = user?['app_permissions'] as Map<String, dynamic>?;
                   final isSuperAdmin = appPermissions?['superadmin'] == true;
-                  final userId = user?['id'] as int?;
+                  final userId = _parseUserId(user?['id']);
                   final referralCode = user?['referral_code']?.toString();
                   
                   String? userName;
@@ -524,25 +571,17 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                     }
                   }
                   
-                  if (appPermissions != null) {
-                    await widget.authStore.saveAppPermissions(
-                      appPermissions,
-                      isSuperAdmin,
-                      userId: userId,
-                      userName: userName,
-                    );
-                  }
+                  await widget.authStore.saveAppPermissions(
+                    appPermissions ?? <String, dynamic>{},
+                    isSuperAdmin,
+                    userId: userId,
+                    userName: userName,
+                  );
                   
                   if (referralCode != null) {
                     unawaited(ReferralStore.saveUserReferralCode(referralCode));
                   }
                   
-                  if (!mounted) return true;
-                  SnackBarHelper.show(context, message: AppLocalizations.of(context).homeWelcome);
-
-                  final home = await MobileLauncherPrefs.postAuthHomeLocation(widget.authStore.currentUserId);
-                  if (!mounted) return true;
-                  context.go(home);
                   return true;
                 }
                 return false;
@@ -616,8 +655,13 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
         );
         
         if (verified == true && mounted) {
-          // ورود موفق - صفحه بسته می‌شود
-          Navigator.of(context).pop();
+          SnackBarHelper.show(context, message: AppLocalizations.of(context).homeWelcome);
+          await BiometricPostLoginFlow.completeLoginAndNavigate(
+            context,
+            authStore: widget.authStore,
+          );
+        } else if (verified == true) {
+          widget.authStore.endPostLoginFlow();
         }
       } else {
         SnackBarHelper.showError(context, message: 'خطا در ارسال کد ورود');
@@ -689,6 +733,8 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
       }
       final apiKey = data != null ? data['api_key']?.toString() : null;
       if (apiKey != null && apiKey.isNotEmpty) {
+        // Hold /login redirect until biometric opt-in finishes.
+        widget.authStore.beginPostLoginFlow();
         await widget.authStore.saveApiKey(apiKey);
       }
       
@@ -700,7 +746,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
       // ذخیره دسترسی‌های اپلیکیشن و اطلاعات کاربر برای نمایش در منو
       final appPermissions = user?['app_permissions'] as Map<String, dynamic>?;
       final isSuperAdmin = appPermissions?['superadmin'] == true;
-      final userId = user?['id'] as int?;
+      final userId = _parseUserId(user?['id']);
       String? userName;
       String? userMobile;
       if (user != null) {
@@ -727,36 +773,42 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
           userMobile = mobile;
         }
       }
-      if (appPermissions != null) {
-        await widget.authStore.saveAppPermissions(
-          appPermissions,
-          isSuperAdmin,
-          userId: userId,
-          userName: userName,
-          userMobile: userMobile,
-        );
-      }
+      await widget.authStore.saveAppPermissions(
+        appPermissions ?? <String, dynamic>{},
+        isSuperAdmin,
+        userId: userId,
+        userName: userName,
+        userMobile: userMobile,
+      );
 
-      if (!mounted) return;
+      if (!mounted) {
+        widget.authStore.endPostLoginFlow();
+        return;
+      }
       _showSnack(t.homeWelcome);
       // بعد از login موفق، به صفحه قبلی یا dashboard برود
       try {
         final currentPath = GoRouterState.of(context).uri.path;
         if (currentPath.startsWith('/user/profile/') || currentPath.startsWith('/acc/') || currentPath.startsWith('/business/')) {
-          // اگر در صفحه محافظت شده بود، همان صفحه را refresh کند
-          context.go(currentPath);
+          await BiometricPostLoginFlow.completeLoginAndNavigate(
+            context,
+            authStore: widget.authStore,
+            preferredPath: currentPath,
+          );
         } else {
-          final home = await MobileLauncherPrefs.postAuthHomeLocation(widget.authStore.currentUserId);
-          if (!mounted) return;
-          context.go(home);
+          await BiometricPostLoginFlow.completeLoginAndNavigate(
+            context,
+            authStore: widget.authStore,
+          );
         }
       } catch (e) {
-        // اگر GoRouterState در دسترس نیست، به dashboard برود
-        final home = await MobileLauncherPrefs.postAuthHomeLocation(widget.authStore.currentUserId);
-        if (!mounted) return;
-        context.go(home);
+        await BiometricPostLoginFlow.completeLoginAndNavigate(
+          context,
+          authStore: widget.authStore,
+        );
       }
     } catch (e) {
+      widget.authStore.endPostLoginFlow();
       final msg = _extractErrorMessage(e, AppLocalizations.of(context));
       _showSnack(msg);
       setState(() {
@@ -829,6 +881,8 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
       }
       final apiKey = data != null ? data['api_key']?.toString() : null;
       if (apiKey != null && apiKey.isNotEmpty) {
+        // Hold /login redirect until biometric opt-in finishes.
+        widget.authStore.beginPostLoginFlow();
         await widget.authStore.saveApiKey(apiKey);
       }
       
@@ -840,7 +894,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
       // ذخیره دسترسی‌های اپلیکیشن و اطلاعات کاربر برای نمایش در منو
       final appPermissions = user?['app_permissions'] as Map<String, dynamic>?;
       final isSuperAdmin = appPermissions?['superadmin'] == true;
-      final userId = user?['id'] as int?;
+      final userId = _parseUserId(user?['id']);
       String? userName;
       String? userMobile;
       if (user != null) {
@@ -867,27 +921,33 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
           userMobile = mobile;
         }
       }
-      if (appPermissions != null) {
-        await widget.authStore.saveAppPermissions(
-          appPermissions,
-          isSuperAdmin,
-          userId: userId,
-          userName: userName,
-          userMobile: userMobile,
-        );
-      }
+      await widget.authStore.saveAppPermissions(
+        appPermissions ?? <String, dynamic>{},
+        isSuperAdmin,
+        userId: userId,
+        userName: userName,
+        userMobile: userMobile,
+      );
       _showSnack(t.registerSuccess);
       // پاکسازی کد معرف پس از ثبت‌نام موفق
       unawaited(ReferralStore.clearReferrer());
       if (mounted) {
-        final home = await MobileLauncherPrefs.postAuthHomeLocation(widget.authStore.currentUserId);
-        if (!mounted) return;
-        context.go(home);
+        await BiometricPostLoginFlow.completeLoginAndNavigate(
+          context,
+          authStore: widget.authStore,
+        );
+      } else {
+        widget.authStore.endPostLoginFlow();
       }
     } catch (e) {
+      widget.authStore.endPostLoginFlow();
       if (!mounted) return;
       final msg = _extractErrorMessage(e, AppLocalizations.of(context));
       _showSnack(msg.isEmpty ? t.registerFailed : msg);
+      final errorStep = _inferRegisterErrorStep(e);
+      if (errorStep != null) {
+        _signUpWizardKey.currentState?.goToStep(errorStep);
+      }
       setState(() {
         _registerCaptchaCtrl.clear();
       });
@@ -1186,7 +1246,13 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
               child: const Text('انصراف'),
             ),
             FilledButton(
-              onPressed: saving ? null : () async {
+              style: FilledButton.styleFrom(
+                backgroundColor: Theme.of(dialogContext).colorScheme.primary,
+                foregroundColor: Theme.of(dialogContext).colorScheme.onPrimary,
+                disabledBackgroundColor: Theme.of(dialogContext).colorScheme.primary,
+                disabledForegroundColor: Theme.of(dialogContext).colorScheme.onPrimary,
+              ),
+              onPressed: saving ? () {} : () async {
                 if (!formKey.currentState!.validate()) return;
                 
                 if (captchaId == null || captchaCtrl.text.trim().isEmpty) {
@@ -1237,12 +1303,18 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                 }
               },
               child: saving
-                  ? const SizedBox(
+                  ? SizedBox(
                       width: 20,
                       height: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2),
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Theme.of(dialogContext).colorScheme.onPrimary,
+                      ),
                     )
-                  : const Text('تغییر رمز عبور'),
+                  : Text(
+                      'تغییر رمز عبور',
+                      style: TextStyle(color: Theme.of(dialogContext).colorScheme.onPrimary),
+                    ),
             ),
           ],
         ),
@@ -1258,6 +1330,21 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
 
   @override
   Widget build(BuildContext context) {
+<<<<<<< HEAD
+    return AuthShell(
+      localeController: widget.localeController,
+      calendarController: widget.calendarController,
+      themeController: widget.themeController,
+      formPanel: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 280),
+        switchInCurve: Curves.easeOutCubic,
+        switchOutCurve: Curves.easeInCubic,
+        transitionBuilder: (child, animation) => FadeTransition(
+          opacity: animation,
+          child: SlideTransition(
+            position: Tween<Offset>(begin: const Offset(0, 0.03), end: Offset.zero).animate(animation),
+            child: child,
+=======
     final t = AppLocalizations.of(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final String logoAsset = isDark
@@ -1912,10 +1999,104 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                 ),
               );
             },
+>>>>>>> github/Huma
           ),
         ),
+        child: KeyedSubtree(
+          key: ValueKey(_flow),
+          child: _buildFlowContent(),
+        ),
+      ),
     );
   }
+
+  Widget _buildFlowContent() {
+    switch (_flow) {
+      case AuthFlow.signIn:
+        return SignInForm(
+          formKey: _formKey,
+          identifierController: _identifierCtrl,
+          passwordController: _passwordCtrl,
+          captchaController: _loginCaptchaCtrl,
+          captchaImage: _loginCaptchaImage,
+          captchaMode: _captchaMode,
+          captchaFormatters: _captchaInputFormatters,
+          loading: _loadingLogin,
+          registrationEnabled: _registrationEnabled,
+          onSubmit: _onSubmit,
+          onRefreshCaptcha: () => _refreshCaptcha('login'),
+          onForgotPassword: () => _goToFlow(AuthFlow.forgotPassword),
+          onOtpLogin: () => _goToFlow(AuthFlow.otpLogin),
+          onSignUp: _registrationEnabled ? () => _goToFlow(AuthFlow.signUp) : null,
+        );
+      case AuthFlow.signUp:
+        return SignUpWizard(
+          key: _signUpWizardKey,
+          formKey: _registerKey,
+          firstNameController: _firstNameCtrl,
+          lastNameController: _lastNameCtrl,
+          emailController: _emailCtrl,
+          mobileController: _mobileCtrl,
+          passwordController: _registerPasswordCtrl,
+          captchaController: _registerCaptchaCtrl,
+          captchaImage: _registerCaptchaImage,
+          captchaMode: _captchaMode,
+          captchaFormatters: _captchaInputFormatters,
+          loading: _loadingRegister,
+          acceptedTerms: _acceptedTerms,
+          onAcceptedTermsChanged: (v) => setState(() => _acceptedTerms = v),
+          privacyRecognizer: _privacyTapRecognizer,
+          termsRecognizer: _termsTapRecognizer,
+          onSubmit: _onRegister,
+          onRefreshCaptcha: () => _refreshCaptcha('register'),
+          onBackToSignIn: () => _goToFlow(AuthFlow.signIn),
+        );
+      case AuthFlow.forgotPassword:
+        return ForgotPasswordForm(
+          formKey: _forgotKey,
+          identifierController: _forgotIdentifierCtrl,
+          captchaController: _forgotCaptchaCtrl,
+          captchaImage: _forgotCaptchaImage,
+          captchaMode: _captchaMode,
+          captchaFormatters: _captchaInputFormatters,
+          loading: _loadingForgot,
+          onSubmit: _onForgot,
+          onRefreshCaptcha: () => _refreshCaptcha('forgot'),
+          onBackToSignIn: () => _goToFlow(AuthFlow.signIn),
+        );
+      case AuthFlow.otpLogin:
+        return OtpLoginForm(
+          formKey: _otpLoginKey,
+          identifierController: _otpLoginIdentifierCtrl,
+          captchaController: _otpLoginCaptchaCtrl,
+          captchaFocusNode: _otpLoginCaptchaFocus,
+          captchaImage: _otpLoginCaptchaImage,
+          captchaMode: _captchaMode,
+          captchaFormatters: _captchaInputFormatters,
+          allChannels: _otpAllChannels,
+          channelOnServer: _otpChannelOnServer,
+          selectedChannel: _selectedChannel,
+          sessionId: _otpLoginSessionId,
+          availableChannels: _availableChannels,
+          loading: _loadingOtpLogin,
+          loadingChannelStatus: _loadingOtpChannelStatus,
+          onSendOtp: _sendOtpLogin,
+          onRefreshCaptcha: () => _refreshCaptcha('otpLogin'),
+          onBackToSignIn: () => _goToFlow(AuthFlow.signIn),
+          onChannelSelected: (ch) => setState(() => _selectedChannel = ch),
+          onChangeIdentifier: () {
+            setState(() {
+              _otpLoginSessionId = null;
+              _otpLoginIdentifierCtrl.clear();
+              _availableChannels = [];
+              _ensureOtpChannelSelection();
+            });
+          },
+          onChangeChannel: (channel) async {
+            setState(() => _selectedChannel = channel);
+            await _sendOtpLogin(changeChannel: true);
+          },
+        );
+    }
+  }
 }
-
-

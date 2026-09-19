@@ -80,8 +80,22 @@ def _translate_http_exception(request: Request, exc: HTTPException) -> JSONRespo
 		code = error.get("code")
 		message = error.get("message")
 		if translator is not None and isinstance(code, str):
-			localized = translator.t(code, default=message if isinstance(message, str) else None)
-			detail["error"]["message"] = localized
+			specific = message if isinstance(message, str) else ""
+			# ترجمهٔ کلید کد فقط وقتی پیام خالی یا خودِ کد است؛ پیام اختصاصی را با ترجمهٔ عمومی عوض نکن.
+			if specific.strip() and specific != code:
+				error["message"] = translator.t(specific, default=specific)
+			else:
+				error["message"] = translator.t(code, default=specific or code)
+		if status_code in (400, 409, 422) or status_code >= 500:
+			logger = logging.getLogger(__name__)
+			logger.warning(
+				"HTTPException method=%s path=%s status=%s code=%s message=%s",
+				request.method,
+				request.url.path,
+				status_code,
+				code,
+				error.get("message") if isinstance(error, dict) else message,
+			)
 		return JSONResponse(status_code=status_code, content=detail)
 	# ساختار قدیمی: { "error": "CODE", "message": "...", ... } (مثلاً file_storage_service)
 	if isinstance(detail, dict) and isinstance(detail.get("error"), str):

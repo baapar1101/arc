@@ -52,9 +52,11 @@ class MemapsPlacesService {
     double? nearLng,
     String? type,
     int limit = 10,
+    String? apiKey,
   }) async {
     final q = query.trim();
     if (q.length < 2) return [];
+    final key = (apiKey ?? '').trim();
     final res = await _dio.get<Map<String, dynamic>>(
       MemapsConfig.searchPlacesUrl,
       queryParameters: <String, dynamic>{
@@ -63,7 +65,9 @@ class MemapsPlacesService {
         if (nearLng != null) 'lng': nearLng,
         if (type != null && type.isNotEmpty) 'type': type,
         'limit': limit,
+        if (key.isNotEmpty) 'key': key,
       },
+      options: key.isEmpty ? null : Options(headers: {'X-Memaps-Key': key}),
     );
     final data = res.data;
     if (data == null || data['success'] != true) return [];

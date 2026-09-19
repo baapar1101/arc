@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
+import '../../core/api_client.dart';
 import '../../services/business_api_service.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 class DeleteBusinessPage extends StatefulWidget {
   final int businessId;
@@ -21,6 +23,7 @@ class _DeleteBusinessPageState extends State<DeleteBusinessPage> {
   Map<String, dynamic>? _deleteInfo;
   bool _loading = true;
   bool _confirming = false;
+  bool _skipRestorePeriod = false;
   final TextEditingController _deleteConfirmController = TextEditingController();
 
   /// Accepts English `delete` (case-insensitive) or Persian `حذف`.
@@ -94,31 +97,31 @@ class _DeleteBusinessPageState extends State<DeleteBusinessPage> {
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: Colors.red.shade50,
+                      color: SemanticColorResolver.negative(context).withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Row(
                       children: [
-                        Icon(Icons.warning_amber_rounded, color: Colors.red.shade700, size: 32),
-                        const SizedBox(width: 12),
+                        Icon(Icons.warning_amber_rounded, color: SemanticColorResolver.negative(context), size: 32),
+                        SizedBox(width: 12),
                         Expanded(
                           child: Text(
                             'هشدار حذف کسب و کار',
                             style: TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.bold,
-                              color: Colors.red.shade700,
+                              color: SemanticColorResolver.negative(context),
                             ),
                           ),
                         ),
                       ],
                     ),
                   ),
-                  const SizedBox(height: 24),
+                  SizedBox(height: 24),
                   // متن هشدار
                   Text(
                     'آیا از حذف کسب و کار "$businessName" مطمئن هستید؟',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
                     ),
@@ -127,31 +130,37 @@ class _DeleteBusinessPageState extends State<DeleteBusinessPage> {
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: Colors.orange.shade50,
+                      color: SemanticColorResolver.warning(context).withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.orange.shade200),
+                      border: Border.all(color: SemanticColorResolver.warning(context).withValues(alpha: 0.35)),
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Row(
                           children: [
-                            Icon(Icons.info_outline, color: Colors.orange.shade700, size: 20),
-                            const SizedBox(width: 8),
-                            const Text(
+                            Icon(Icons.info_outline, color: SemanticColorResolver.warning(context), size: 20),
+                            SizedBox(width: 8),
+                            Text(
                               'این عمل:',
                               style: TextStyle(fontWeight: FontWeight.w600),
                             ),
                           ],
                         ),
                         const SizedBox(height: 12),
-                        _buildWarningItem(Icons.delete_forever, 'غیرقابل بازگشت است (بعد از 30 روز)'),
-                        const SizedBox(height: 8),
-                        _buildWarningItem(Icons.data_object, 'تمام داده‌های کسب و کار را حذف می‌کند'),
-                        const SizedBox(height: 8),
                         _buildWarningItem(Icons.backup, 'یک بکاپ خودکار قبل از حذف ایجاد می‌شود'),
-                        const SizedBox(height: 8),
-                        _buildWarningItem(Icons.restore, 'شما 30 روز فرصت دارید آن را بازیابی کنید'),
+                        if (_skipRestorePeriod) ...[
+                          const SizedBox(height: 8),
+                          _buildWarningItem(
+                            Icons.timer_off,
+                            'بدون مهلت بازیابی — امکان بازگردانی وجود ندارد',
+                          ),
+                        ] else ...[
+                          const SizedBox(height: 8),
+                          _buildWarningItem(Icons.delete_forever, 'غیرقابل بازگشت است (بعد از 30 روز)'),
+                          const SizedBox(height: 8),
+                          _buildWarningItem(Icons.restore, 'شما 30 روز فرصت دارید آن را بازیابی کنید'),
+                        ],
                       ],
                     ),
                   ),
@@ -171,7 +180,7 @@ class _DeleteBusinessPageState extends State<DeleteBusinessPage> {
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
-                        borderSide: BorderSide(color: Colors.red.shade300, width: 2),
+                        borderSide: BorderSide(color: SemanticColorResolver.negative(context).withValues(alpha: 0.5), width: 2),
                       ),
                     ),
                     onChanged: (_) => setDialogState(() {}),
@@ -196,10 +205,10 @@ class _DeleteBusinessPageState extends State<DeleteBusinessPage> {
                             onPressed: isMatch
                                 ? () => Navigator.of(ctx).pop(true)
                                 : null,
-                            icon: const Icon(Icons.delete_forever),
-                            label: const Text('ادامه'),
+                            icon: Icon(Icons.delete_forever),
+                            label: Text('ادامه'),
                             style: FilledButton.styleFrom(
-                              backgroundColor: Colors.red,
+                              backgroundColor: SemanticColorResolver.negative(context),
                               foregroundColor: Colors.white,
                               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                             ),
@@ -231,17 +240,17 @@ class _DeleteBusinessPageState extends State<DeleteBusinessPage> {
               Container(
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
-                  color: Colors.red.shade100,
+                  color: SemanticColorResolver.negative(context).withValues(alpha: 0.18),
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
                   Icons.warning_amber_rounded,
-                  color: Colors.red.shade700,
+                  color: SemanticColorResolver.negative(context),
                   size: 48,
                 ),
               ),
-              const SizedBox(height: 24),
-              const Text(
+              SizedBox(height: 24),
+              Text(
                 'تایید نهایی',
                 style: TextStyle(
                   fontSize: 20,
@@ -260,17 +269,17 @@ class _DeleteBusinessPageState extends State<DeleteBusinessPage> {
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 14,
-                  color: Colors.red.shade700,
+                  color: SemanticColorResolver.negative(context),
                   fontWeight: FontWeight.w600,
                 ),
               ),
-              const SizedBox(height: 24),
+              SizedBox(height: 24),
               Row(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
                   TextButton(
                     onPressed: () => Navigator.of(ctx).pop(false),
-                    child: const Text('انصراف'),
+                    child: Text('انصراف'),
                   ),
                   const SizedBox(width: 8),
                   FilledButton.icon(
@@ -278,7 +287,7 @@ class _DeleteBusinessPageState extends State<DeleteBusinessPage> {
                     icon: const Icon(Icons.delete_forever),
                     label: const Text('بله، حذف کن'),
                     style: FilledButton.styleFrom(
-                      backgroundColor: Colors.red,
+                      backgroundColor: SemanticColorResolver.negative(context),
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                     ),
@@ -296,11 +305,20 @@ class _DeleteBusinessPageState extends State<DeleteBusinessPage> {
     // انجام حذف
     setState(() => _confirming = true);
     try {
-      await BusinessApiService.deleteBusiness(businessId: widget.businessId);
+      await BusinessApiService.deleteBusiness(
+        businessId: widget.businessId,
+        skipRestorePeriod: _skipRestorePeriod,
+      );
+      final authStore = ApiClient.getAuthStore();
+      if (authStore?.currentBusiness?.id == widget.businessId) {
+        await authStore!.clearCurrentBusiness();
+      }
       if (mounted) {
         SnackBarHelper.show(
           context,
-          message: 'کسب و کار با موفقیت حذف شد. شما 30 روز فرصت دارید آن را بازیابی کنید.',
+          message: _skipRestorePeriod
+              ? 'کسب و کار با موفقیت حذف شد. مهلت بازیابی فعال نیست.'
+              : 'کسب و کار با موفقیت حذف شد. شما 30 روز فرصت دارید آن را بازیابی کنید.',
         );
         // هدایت به صفحه لیست کسب و کارها
         context.go('/user/profile/businesses');
@@ -323,7 +341,7 @@ class _DeleteBusinessPageState extends State<DeleteBusinessPage> {
   Widget _buildWarningItem(IconData icon, String text) {
     return Row(
       children: [
-        Icon(icon, size: 18, color: Colors.orange.shade700),
+        Icon(icon, size: 18, color: SemanticColorResolver.warning(context)),
         const SizedBox(width: 8),
         Expanded(
           child: Text(
@@ -369,20 +387,20 @@ class _DeleteBusinessPageState extends State<DeleteBusinessPage> {
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: Colors.red.shade50,
+                  color: SemanticColorResolver.negative(context).withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.error_outline, color: Colors.red.shade700, size: 32),
-                    const SizedBox(width: 12),
+                    Icon(Icons.error_outline, color: SemanticColorResolver.negative(context), size: 32),
+                    SizedBox(width: 12),
                     Expanded(
                       child: Text(
                         'امکان حذف وجود ندارد',
                         style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
-                          color: Colors.red.shade700,
+                          color: SemanticColorResolver.negative(context),
                         ),
                       ),
                     ),
@@ -419,7 +437,7 @@ class _DeleteBusinessPageState extends State<DeleteBusinessPage> {
       padding: const EdgeInsets.only(bottom: 12),
       child: Row(
         children: [
-          Icon(icon, color: Colors.red.shade700, size: 20),
+          Icon(icon, color: SemanticColorResolver.negative(context), size: 20),
           const SizedBox(width: 12),
           Expanded(
             child: Text(
@@ -484,7 +502,7 @@ class _DeleteBusinessPageState extends State<DeleteBusinessPage> {
       appBar: AppBar(
         title: Text(t.deleteBusiness),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
+          icon: Icon(Icons.arrow_back),
           onPressed: () => Navigator.of(context).pop(),
         ),
       ),
@@ -499,41 +517,41 @@ class _DeleteBusinessPageState extends State<DeleteBusinessPage> {
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
                 gradient: LinearGradient(
-                  colors: [Colors.red.shade50, Colors.orange.shade50],
+                  colors: [SemanticColorResolver.negative(context).withValues(alpha: 0.12), SemanticColorResolver.warning(context).withValues(alpha: 0.12)],
                   begin: Alignment.topRight,
                   end: Alignment.bottomLeft,
                 ),
                 borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: Colors.red.shade200, width: 2),
+                border: Border.all(color: SemanticColorResolver.negative(context).withValues(alpha: 0.35), width: 2),
               ),
               child: Column(
                 children: [
                   Icon(
                     Icons.warning_amber_rounded,
                     size: 56,
-                    color: Colors.red.shade700,
+                    color: SemanticColorResolver.negative(context),
                   ),
-                  const SizedBox(height: 16),
+                  SizedBox(height: 16),
                   Text(
                     'حذف دائمی کسب و کار',
                     style: TextStyle(
                       fontSize: 22,
                       fontWeight: FontWeight.bold,
-                      color: Colors.red.shade700,
+                      color: SemanticColorResolver.negative(context),
                     ),
                   ),
-                  const SizedBox(height: 8),
+                  SizedBox(height: 8),
                   Text(
                     'این عمل غیرقابل بازگشت است',
                     style: TextStyle(
                       fontSize: 14,
-                      color: Colors.red.shade600,
+                      color: SemanticColorResolver.negative(context),
                     ),
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 24),
+            SizedBox(height: 24),
             
             // اطلاعات کسب و کار
             Card(
@@ -603,19 +621,19 @@ class _DeleteBusinessPageState extends State<DeleteBusinessPage> {
                     icon: Icons.description,
                     label: 'اسناد',
                     value: '${stats['total_documents']}',
-                    color: Colors.blue,
+                    color: SemanticColorResolver.info(context),
                   ),
                 ),
-                const SizedBox(width: 12),
+                SizedBox(width: 12),
                 Expanded(
                   child: _buildStatCard(
                     icon: Icons.person,
                     label: 'اشخاص',
                     value: '${stats['total_persons']}',
-                    color: Colors.green,
+                    color: SemanticColorResolver.positive(context),
                   ),
                 ),
-                const SizedBox(width: 12),
+                SizedBox(width: 12),
                 Expanded(
                   child: _buildStatCard(
                     icon: Icons.inventory_2,
@@ -634,28 +652,28 @@ class _DeleteBusinessPageState extends State<DeleteBusinessPage> {
                 width: double.infinity,
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
-                  color: Colors.red.shade50,
+                  color: SemanticColorResolver.negative(context).withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: Colors.red.shade200),
+                  border: Border.all(color: SemanticColorResolver.negative(context).withValues(alpha: 0.35)),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
                       children: [
-                        Icon(Icons.block, color: Colors.red.shade700, size: 28),
-                        const SizedBox(width: 12),
+                        Icon(Icons.block, color: SemanticColorResolver.negative(context), size: 28),
+                        SizedBox(width: 12),
                         Text(
                           'امکان حذف وجود ندارد',
                           style: TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.bold,
-                            color: Colors.red.shade700,
+                            color: SemanticColorResolver.negative(context),
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 16),
+                    SizedBox(height: 16),
                     if (restrictions['has_finalized_invoices'] == true)
                       _buildRestrictionItem(
                         Icons.receipt_long,
@@ -705,13 +723,44 @@ class _DeleteBusinessPageState extends State<DeleteBusinessPage> {
                   const SizedBox(height: 12),
                   _buildInfoItem(Icons.backup, 'بکاپ خودکار قبل از حذف ایجاد می‌شود'),
                   const SizedBox(height: 8),
-                  _buildInfoItem(Icons.restore, '30 روز فرصت برای بازیابی دارید'),
-                  const SizedBox(height: 8),
-                  _buildInfoItem(Icons.delete_forever, 'بعد از 30 روز حذف دائمی خواهد بود'),
+                  if (_skipRestorePeriod)
+                    _buildInfoItem(
+                      Icons.timer_off,
+                      'حذف سریع: بدون مهلت ۳۰ روزه بازیابی',
+                    )
+                  else ...[
+                    _buildInfoItem(Icons.restore, '30 روز فرصت برای بازیابی دارید'),
+                    const SizedBox(height: 8),
+                    _buildInfoItem(Icons.delete_forever, 'بعد از 30 روز حذف دائمی خواهد بود'),
+                  ],
                 ],
               ),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 16),
+            Card(
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+                side: BorderSide(color: cs.outlineVariant),
+              ),
+              child: CheckboxListTile(
+                value: _skipRestorePeriod,
+                onChanged: canDelete && !_confirming
+                    ? (value) => setState(() => _skipRestorePeriod = value ?? false)
+                    : null,
+                controlAffinity: ListTileControlAffinity.leading,
+                title: Text(
+                  'حذف سریع (بدون مهلت بازیابی)',
+                  style: TextStyle(fontWeight: FontWeight.w600),
+                ),
+                subtitle: const Text(
+                  'کسب و کار بلافاصله حذف می‌شود و امکان بازیابی از داخل برنامه وجود ندارد.',
+                  style: TextStyle(fontSize: 13),
+                ),
+                secondary: Icon(Icons.flash_on, color: _skipRestorePeriod ? SemanticColorResolver.warning(context) : cs.onSurfaceVariant),
+              ),
+            ),
+            SizedBox(height: 24),
             
             // دکمه حذف
             SizedBox(
@@ -728,13 +777,13 @@ class _DeleteBusinessPageState extends State<DeleteBusinessPage> {
                           valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                         ),
                       )
-                    : const Icon(Icons.delete_forever),
+                    : Icon(Icons.delete_forever),
                 label: Text(
                   _confirming ? 'در حال حذف...' : t.deleteBusiness,
                   style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                 ),
                 style: FilledButton.styleFrom(
-                  backgroundColor: Colors.red,
+                  backgroundColor: SemanticColorResolver.negative(context),
                   foregroundColor: Colors.white,
                   disabledBackgroundColor: Colors.grey.shade300,
                   shape: RoundedRectangleBorder(
@@ -792,14 +841,14 @@ class _DeleteBusinessPageState extends State<DeleteBusinessPage> {
       padding: const EdgeInsets.only(bottom: 12),
       child: Row(
         children: [
-          Icon(icon, color: Colors.red.shade700, size: 20),
-          const SizedBox(width: 12),
+          Icon(icon, color: SemanticColorResolver.negative(context), size: 20),
+          SizedBox(width: 12),
           Expanded(
             child: Text(
               text,
               style: TextStyle(
                 fontSize: 14,
-                color: Colors.red.shade700,
+                color: SemanticColorResolver.negative(context),
               ),
             ),
           ),

@@ -1,19 +1,24 @@
 import 'package:flutter/material.dart';
 
+<<<<<<< HEAD
+/// فونت اصلی و fallback برای فارسی — بدون Noto Sans تا ارقام لاتین جایگزین نشوند.
+///
+/// ایموجی و اسکریپت‌های نادر از مسیر موتور (`fontFallbackBaseUrl` + shardهای
+/// محلی `fonts/gstatic/s/`) به‌صورت lazy لود می‌شوند؛ ثبت TTF مونolith ایموجی
+/// در FontManifest باعث دانلود ~۲۴ مگ در مسیر بحرانی می‌شد و حذف شده است.
+=======
 /// فونت اصلی و fallback — بدون Noto Sans تا ارقام لاتین جایگزین نشوند.
+>>>>>>> github/Huma
 abstract final class AppFonts {
   static const String faPrimary = 'YekanBakhFaNum';
   static const List<String> faFallback = [
-    'Noto Color Emoji',
     'Vazirmatn',
     'NotoSansArabic',
   ];
 
   static const String enPrimary = 'Roboto';
   static const List<String> enFallback = [
-    'Noto Color Emoji',
     'Noto Sans',
-    'Roboto',
   ];
 }
 

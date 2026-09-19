@@ -1,0 +1,2 @@
+# وابستگی‌های اختیاری Connector برای Softphone Media Relay
+websocket-client>=1.6.0

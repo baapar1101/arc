@@ -5,6 +5,7 @@ import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/utils/number_normalizer.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
 import 'package:hesabix_ui/utils/snackbar_helper.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 /// دیالوگ مستقل و شخصی‌سازی شده برای استعلام اطلاعات هویتی
 /// با ظاهری زیبا، چند زبانه و کاربرپسند
@@ -591,7 +592,7 @@ class _IdentityInquiryDialogState extends State<IdentityInquiryDialog> {
                   color: theme.colorScheme.onPrimaryContainer,
                 ),
               ),
-              const SizedBox(height: 20),
+              SizedBox(height: 20),
               if (firstName != null || lastName != null)
                 Text(
                   '${firstName ?? ''} ${lastName ?? ''}'.trim(),
@@ -629,13 +630,13 @@ class _IdentityInquiryDialogState extends State<IdentityInquiryDialog> {
                     padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
                     decoration: BoxDecoration(
                       color: (alive == true || isDead == false)
-                          ? Colors.green.withOpacity(0.2)
-                          : Colors.red.withOpacity(0.2),
+                          ? SemanticColorResolver.positive(context).withValues(alpha: 0.2)
+                          : SemanticColorResolver.negative(context).withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(25),
                       border: Border.all(
                         color: (alive == true || isDead == false)
-                            ? Colors.green
-                            : Colors.red,
+                            ? SemanticColorResolver.positive(context)
+                            : SemanticColorResolver.negative(context),
                         width: 2,
                       ),
                     ),
@@ -648,10 +649,10 @@ class _IdentityInquiryDialogState extends State<IdentityInquiryDialog> {
                               : Icons.cancel,
                           size: 24,
                           color: (alive == true || isDead == false)
-                              ? Colors.green
-                              : Colors.red,
+                              ? SemanticColorResolver.positive(context)
+                              : SemanticColorResolver.negative(context),
                         ),
-                        const SizedBox(width: 10),
+                        SizedBox(width: 10),
                         Text(
                           (alive == true || isDead == false) 
                               ? AppLocalizations.of(context).alive
@@ -659,8 +660,8 @@ class _IdentityInquiryDialogState extends State<IdentityInquiryDialog> {
                           style: theme.textTheme.bodyLarge?.copyWith(
                             fontWeight: FontWeight.bold,
                             color: (alive == true || isDead == false)
-                                ? Colors.green.shade700
-                                : Colors.red.shade700,
+                                ? SemanticColorResolver.positive(context)
+                                : SemanticColorResolver.negative(context),
                           ),
                         ),
                       ],

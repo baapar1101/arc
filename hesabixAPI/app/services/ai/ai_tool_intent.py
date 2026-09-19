@@ -5,10 +5,24 @@
 from __future__ import annotations
 
 import re
-from typing import AbstractSet, Iterable, List, Optional, Set
+from typing import AbstractSet, Iterable, List, Optional, Sequence, Set, Union
 
-from app.services.ai.ai_constants import MAX_TOOLS_PER_REQUEST, QUERY_COMPLEXITY_ITERATIONS
+from app.services.ai.ai_constants import (
+    MAX_TOOLS_AUTONOMOUS,
+    MAX_TOOLS_PER_REQUEST,
+    QUERY_COMPLEXITY_ITERATIONS,
+)
+from app.services.ai.ai_tool_index import get_tool_index
 
+<<<<<<< HEAD
+_TOOL_INDEX = get_tool_index()
+_CATEGORY_TOOLS = _TOOL_INDEX.category_tools
+_CORE_TOOL_NAMES = _TOOL_INDEX.core_names
+_WRITE_TOOLS = _TOOL_INDEX.intent_write_names
+_WRITE_TOOL_COMPANIONS = _TOOL_INDEX.companions
+MEMORY_TOOL_NAMES = _CATEGORY_TOOLS.get("memory", frozenset())
+
+=======
 # همیشه در دسترس (پرس‌وجو و دادهٔ پایه)
 _CORE_TOOL_NAMES: frozenset[str] = frozenset({
     "query_business_data",
@@ -196,10 +210,11 @@ _CATEGORY_TOOLS: dict[str, frozenset[str]] = {
         "list_business_plugins",
     }),
 }
+>>>>>>> github/Huma
 
 # کلیدواژهٔ فارسی/انگلیسی → دسته
 _KEYWORD_CATEGORIES: List[tuple[str, str]] = [
-    (r"فاکتور|invoice|فروش|خرید|دریافت|پرداخت|چک|انتقال|سند|حساب|بانک|صندوق|سال\s*مال|تراز|افتتاح|اقساط|اعتبار|credit|receipt|payment", "financial"),
+    (r"فاکتور|invoice|فروش|خرید|دریافت|پرداخت|چک|انتقال|سند|حساب|بانک|صندوق|سال\s*مال|تراز|افتتاح|اقساط|اعتبار|credit|receipt|payment|بدهکار|بستانکار|debtor|creditor", "financial"),
     (r"انبار|موجودی|حواله|warehouse|stock|کاردکس|bom|تولید|production", "warehouse"),
     (r"سرنخ|lead|معامله|deal|crm|قیف|pipeline|فعالیت\s*crm", "crm"),
     (r"باشگاه|امتیاز|rfm|مشتری\s*وفادار|customer\s*club", "customer_club"),
@@ -208,50 +223,33 @@ _KEYWORD_CATEGORIES: List[tuple[str, str]] = [
     (r"ووکامرس|woocommerce|باسلام|basalam|کانکتور|connector|یکپارچه", "integration"),
     (r"مرحله|گام|قدم|سناریو|چند\s*مرحله|گام\s*به\s*گام|برنامه\s*کار|checklist|todo", "agent"),
     (r"فروش\s*سریع|quick\s*sales|لیست\s*قیمت|price\s*list|لاگ|فعالیت\s*سیستم|workflow|تعمیر|گارانتی|توزیع|صندوق\s*خرد", "misc"),
-    (r"شخص|مشتری|تامین|تأمین|supplier|customer|people|گروه\s*اشخاص", "people"),
-    (r"دسته\s*بندی|category|ویژگی\s*کالا|attribute", "products_write"),
+    (r"شخص|مشتری|تامین|تأمین|supplier|customer|people|گروه\s*اشخاص|طرف[\s\-]*حساب", "people"),
+    (r"دسته\s*بندی|category|ویژگی\s*کالا|attribute|کالا|محصول|product", "products_write"),
     (r"فیلتر\s*پیشرفته|عملگر|بزرگتر\s*از|کمتر\s*از|شامل|list_queryable|query_business", "query"),
     (r"ماه\s*گذشته|هفته\s*اخیر|امروز|دیروز|فروردین|اردیبهشت|خرداد|مرداد|شهریور|آبان|اسفند|بازه\s*تاریخ|resolve_date|از\s*تاریخ|تا\s*تاریخ", "query"),
     (r"گزارش\s*یکپارچه|get_report|batch_query|list_available_reports", "reports_meta"),
     (r"خروجی|export|اکسل|excel|دانلود\s*لیست", "reports_meta"),
     (r"تراز\s*آزمایشی|دفتر\s*کل|دفتر\s*روزنامه|سود\s*و\s*زیان|مرور\s*حساب|trial\s*balance|ledger", "reports_meta"),
     (r"قالب\s*گزارش|قالب\s*فاکتور|قالب\s*چاپ|report\s*template", "report_templates"),
-    (r"بازار\s*افزونه|افزونه\s*فعال|plugin\s*marketplace|marketplace", "marketplace"),
+    (r"بازار\s*افزونه|افزونه\s*فعال|plugin\s*marketplace|marketplace|افزونه", "marketplace"),
     (r"dead\s*letter|صف\s*خطا|خلاصه\s*باسلام", "integration"),
-    (r"هزینه|درآمد|expense|income", "financial"),
+    (r"هزینه|درآمد|expense|income|مالی", "financial"),
     (r"اتوماسیون|automation|workflow|گردش\s*کار|اجرای\s*workflow|تریگر\s*workflow", "workflow"),
+    (r"کیف\s*پول|wallet|درگاه\s*پرداخت|سرفصل|حساب\s*کل", "financial"),
+    (r"hscript|اچ[\s\-]*اسکریپت|اسکریپت\s*حسابیکس", "hscript"),
+    (
+        r"حافظه\s*دستیار|دستورات\s*همیشگی|چی\s*درباره(?:‌|\s)*من|"
+        r"what do you (?:know|remember) about me|از حافظه|"
+        r"فراموش(?:ش)?\s*کن|به\s*خاطر\s*بسپار|remember (?:this|that|me)|"
+        r"forget (?:this|that|my)|read_memory|upsert_memory",
+        "memory",
+    ),
 ]
 
 _WRITE_KEYWORDS = re.compile(
     r"ثبت|ایجاد|اضافه|بساز|بزن|ویرایش|حذف|create|update|add|new\s+invoice|مشتری\s+جدید|کالای\s+جدید",
     re.IGNORECASE,
 )
-
-_WRITE_TOOLS = frozenset({
-    "create_invoice",
-    "create_person",
-    "update_person",
-    "create_receipt_payment",
-    "delete_person",
-    "create_product",
-    "update_product",
-    "create_check",
-    "create_transfer",
-    "create_expense_income",
-    "update_invoice",
-    "delete_invoice",
-    "create_lead",
-    "execute_workflow",
-    "create_workflow",
-    "update_workflow",
-    "delete_workflow",
-    "export_business_data",
-    "set_default_report_template",
-    "publish_report_template",
-    "adjust_customer_club_points",
-    "recalculate_customer_club_rfm",
-    "update_customer_club_settings",
-})
 
 _PEOPLE_KEYWORDS = re.compile(
     r"شخص|مشتری|تامین|تأمین|supplier|customer|people|person|علی|نام\s+",
@@ -267,11 +265,24 @@ _GREETING_ONLY = re.compile(
     r"^(سلام|درود|hello|hi|hey|صبح بخیر|عصر بخیر|وقت بخیر)\b",
     re.IGNORECASE,
 )
+# سلام/درود ابتدای جمله — باید قبل از تشخیص دامنه حذف شود تا «سلام یه گزارش
+# هزینه‌ها بده» به‌اشتباه به‌عنوان صرفاً خوش‌وبش تشخیص داده نشود.
+_LEADING_GREETING = re.compile(
+    r"^(سلام|درود|صبح\s*بخیر|عصر\s*بخیر|وقت\s*بخیر|hello|hi|hey)[\s,،!؛:.]*",
+    re.IGNORECASE,
+)
 _KNOWLEDGE_HINTS = re.compile(
     r"دانشنامه|قوانین|سیاست|رویه|دستورالعمل|راهنما|مقررات|فرآیند|فرایند|"
     r"documentation|policy|procedure|how\s+to",
     re.IGNORECASE,
 )
+
+
+def _strip_leading_greeting(user_query: Optional[str]) -> str:
+    """حذف سلام/درود ابتدای جمله قبل از تشخیص دامنه ابزار."""
+    text = (user_query or "").strip()
+    stripped = _LEADING_GREETING.sub("", text, count=1).strip()
+    return stripped or text
 
 
 def query_needs_knowledge(user_query: Optional[str]) -> bool:
@@ -299,14 +310,23 @@ def query_needs_knowledge(user_query: Optional[str]) -> bool:
     return len(q) >= 56
 
 
-def detect_categories(user_query: Optional[str]) -> Set[str]:
+def matched_query_categories(user_query: Optional[str]) -> Set[str]:
+    """دسته‌هایی که واقعاً در متن آمده‌اند (بدون fallback عمومی)."""
     text = _normalize_query(user_query)
     if not text:
-        return set(_CATEGORY_TOOLS.keys())
+        return set()
     found: Set[str] = set()
     for pattern, category in _KEYWORD_CATEGORIES:
         if re.search(pattern, text, re.IGNORECASE):
             found.add(category)
+    return found
+
+
+def detect_categories(user_query: Optional[str]) -> Set[str]:
+    text = _normalize_query(user_query)
+    if not text:
+        return set(_CATEGORY_TOOLS.keys()) - {"memory"}
+    found = matched_query_categories(user_query)
     if not found:
         # سوال عمومی — چند دستهٔ پرکاربرد
         return {"financial", "warehouse", "crm", "misc"}
@@ -328,6 +348,17 @@ _MEDIUM_PATTERNS = re.compile(
     r"چند|چقدر|لیست|تعداد|جمع|میانگین|how\s+many|total|list|count|average",
     re.IGNORECASE,
 )
+_REPORT_FORCE_MEDIUM = re.compile(
+    r"تراز\s*آزمایشی|ترازنامه|سود\s*و\s*زیان|بدهکار|بستانکار|گردش\s*حساب|"
+    r"دفتر\s*کل|دفتر\s*روزنامه|کاردکس|موجودی\s*انبار|سن\s*بدهی|"
+    r"trial\s*balance|balance\s*sheet|aging|گزارش",
+    re.IGNORECASE,
+)
+_REPORT_FORCE_COMPLEX = re.compile(
+    r"گزارش\s*جامع|تحلیل\s*کامل|بسته\s*مالی|financial\s*package|"
+    r"چند\s*گزارش|مقایسه.*گزارش",
+    re.IGNORECASE,
+)
 
 
 def estimate_query_complexity(
@@ -342,11 +373,19 @@ def estimate_query_complexity(
     if not q:
         return "simple"
 
+    if _REPORT_FORCE_COMPLEX.search(q):
+        return "complex"
+    if _REPORT_FORCE_MEDIUM.search(q):
+        domain_cats = matched_query_categories(q) - {"query", "reports_meta", "misc"}
+        if len(domain_cats) >= 2 or len(q) > 80:
+            return "complex"
+        return "medium"
+
     # سوال بسیار کوتاه یا خوش‌و‌بش
     if len(q) < 15 or _SIMPLE_PATTERNS.match(q):
         return "simple"
 
-    categories = detect_categories(q)
+    categories = matched_query_categories(q)
     if len(categories) >= 3:
         return "complex"
     if len(categories) >= 2 and (
@@ -381,6 +420,87 @@ def estimate_query_complexity(
     return "simple"
 
 
+# Date/filter words ("امروز") are too broad to count as an accounting domain.
+_RANKING_WEAK_DOMAINS = frozenset({"query"})
+_STRONG_DATE_INTENT = re.compile(
+    r"از\s*تاریخ|تا\s*تاریخ|ماه\s*گذشته|هفته\s*اخیر|بازه\s*تاریخ|"
+    r"فروردین|اردیبهشت|خرداد|مرداد|شهریور|آبان|اسفند|"
+    r"resolve_date|\d+\s*ماه\s*پیش|سه\s*ماه|۳\s*ماه",
+    re.IGNORECASE,
+)
+
+
+def ranking_intent_domains(
+    user_query: Optional[str],
+    history_messages: Optional[List[dict]] = None,
+) -> Set[str]:
+    """دسته‌های واقعاً تطبیق‌یافته برای امتیازدهی — بدون dump عمومی.
+
+    detect_categories برای پیچیدگی هنوز fallback دارد؛ Ranking نباید از آن
+    برای پر کردن Top-K استفاده کند.
+    """
+    found = matched_query_categories(_strip_leading_greeting(user_query))
+    q = (user_query or "").strip()
+    if history_messages and (not (found - _RANKING_WEAK_DOMAINS) or len(q) < 40):
+        for msg in reversed(history_messages[-8:]):
+            if msg.get("role") != "user":
+                continue
+            content = msg.get("content") or ""
+            if len(content) < 10:
+                continue
+            prev = matched_query_categories(content) - _RANKING_WEAK_DOMAINS
+            if prev:
+                found |= prev
+                break
+    return found - _RANKING_WEAK_DOMAINS
+
+
+def query_targets_tool_domain(user_query: Optional[str]) -> bool:
+    """آیا سوال کاربر به دامنهٔ داده/ابزار کسب‌وکار اشاره دارد (routing، نه پاسخ مدل)."""
+    text = _normalize_query(_strip_leading_greeting(user_query))
+    if not text or len(text) < 8:
+        return False
+    if _SIMPLE_PATTERNS.match(text):
+        return False
+    found = matched_query_categories(text)
+    if found - _RANKING_WEAK_DOMAINS:
+        return True
+    # «امروز» به‌تنهایی (مثلاً آب‌وهوا) دامنهٔ ابزار نیست؛ بازهٔ تاریخ هست.
+    if "query" in found and _STRONG_DATE_INTENT.search(text):
+        return True
+    return False
+
+
+def query_expects_tool_use(
+    user_query: Optional[str],
+    history_messages: Optional[List[dict]] = None,
+) -> bool:
+    """آیا سوال برای پاسخ به ابزار/data وابسته است (بدون regex روی پاسخ مدل)."""
+    effective_query = _strip_leading_greeting(user_query)
+    if estimate_query_complexity(effective_query, history_messages) in (
+        "medium",
+        "complex",
+    ):
+        return True
+    if query_targets_tool_domain(effective_query):
+        return True
+    q = effective_query.strip()
+    # پیام‌های پیگیری کوتاه («انجامش بده») هم باید به context قبلی مراجعه کنند —
+    # سقف بزرگ‌تر از تشخیص greeting/غیر-داده صرف تا follow-upهای کمی طولانی‌تر را هم بگیرد.
+    if len(q) < 40 and history_messages:
+        for msg in reversed(history_messages[-8:]):
+            if msg.get("role") != "user":
+                continue
+            prior = (msg.get("content") or "").strip()
+            if len(prior) < 8:
+                continue
+            if query_targets_tool_domain(prior):
+                return True
+            if estimate_query_complexity(prior) in ("medium", "complex"):
+                return True
+    return False
+
+
 def iterations_for_query(
     user_query: Optional[str],
     history_messages: Optional[List[dict]] = None,
@@ -396,26 +516,77 @@ def detect_categories_from_history(
 ) -> Set[str]:
     """
     تشخیص دسته‌بندی با در نظر گرفتن تاریخچه مکالمه.
-    اگر سوال فعلی مبهم باشد از پیام‌های قبلی استفاده می‌کند.
+    اگر سوال فعلی مبهم یا کوتاه (پیگیری) باشد از پیام‌های قبلی استفاده می‌کند.
     """
     cats = detect_categories(user_query)
-    if cats and "financial" not in cats | {"misc"}:
+    q = (user_query or "").strip()
+    default_generic = {"financial", "warehouse", "crm", "misc"}
+    generic = not cats or cats == default_generic
+    short_followup = len(q) < 40
+    if not history_messages or (not generic and not short_followup):
         return cats
 
-    # اگر نتیجه عمومی بود، از آخرین پیام‌های کاربر کمک بگیر
-    if history_messages:
-        for msg in reversed(history_messages[-8:]):
-            if msg.get("role") != "user":
-                continue
-            content = msg.get("content") or ""
-            if len(content) < 10:
-                continue
-            prev_cats = detect_categories(content)
-            specific = prev_cats - {"misc", "financial"}
-            if specific:
-                cats |= specific
-                break
+    for msg in reversed(history_messages[-8:]):
+        if msg.get("role") != "user":
+            continue
+        content = msg.get("content") or ""
+        if len(content) < 10:
+            continue
+        prev_cats = detect_categories(content)
+        specific = prev_cats - {"misc", "financial"}
+        if specific:
+            cats |= specific
+            break
     return cats
+
+
+def merge_tool_allowlists(
+    intent_names: Iterable[str],
+    *,
+    skill_names: Optional[AbstractSet[str]] = None,
+    forced_names: Optional[AbstractSet[str]] = None,
+) -> Set[str]:
+    """اتحاد intent + مهارت + اجباری — مهارت نباید دامنه را حذف کند."""
+    out = set(intent_names)
+    if skill_names:
+        out |= set(skill_names)
+    if forced_names:
+        out |= set(forced_names)
+    return out
+
+
+def select_catalog_tool_names(
+    all_names: Iterable[str],
+    user_query: Optional[str],
+    *,
+    max_tools: int = MAX_TOOLS_AUTONOMOUS,
+    protected_names: Optional[AbstractSet[str]] = None,
+    prefer_names: Optional[AbstractSet[str]] = None,
+    history_messages: Optional[List[dict]] = None,
+) -> Set[str]:
+    """کاتالوگ کامل مجاز با سقف ایمنی ارائه‌دهنده.
+
+    Ranking فقط روی مجموعهٔ امنیتی‌شده انجام می‌شود.
+    protected هرگز به‌خاطر سقف حذف نمی‌شود، اما نمی‌تواند Tool غیرمجاز را برگرداند.
+    """
+    from app.services.ai.ai_tool_rank import rank_and_cap_tool_names
+    from app.services.ai.ai_tool_security import filter_security_candidates
+
+    available = filter_security_candidates(
+        {n for n in all_names if n},
+        user_query,
+        history_messages=history_messages,
+        unknown_policy="allow",
+    )
+    return rank_and_cap_tool_names(
+        available,
+        user_query,
+        max_tools=max_tools,
+        core_names=_CORE_TOOL_NAMES,
+        prefer_names=prefer_names,
+        protected_names=protected_names,
+        intent_domains=ranking_intent_domains(user_query, history_messages),
+    )
 
 
 def select_tool_names(
@@ -424,55 +595,70 @@ def select_tool_names(
     *,
     max_tools: int = MAX_TOOLS_PER_REQUEST,
     history_messages: Optional[List[dict]] = None,
+    prefer_names: Optional[AbstractSet[str]] = None,
+    protected_names: Optional[AbstractSet[str]] = None,
 ) -> Set[str]:
     """
     زیرمجموعهٔ نام functionها برای ارسال به مدل.
+
+    Security filter قبل از Ranking اعمال می‌شود؛ امتیاز keyword امنیت را دور نمی‌زند.
     """
-    available = set(all_names)
-    selected: Set[str] = set(_CORE_TOOL_NAMES) & available
+    from app.services.ai.ai_tool_rank import rank_and_cap_tool_names
+    from app.services.ai.ai_tool_security import filter_security_candidates
 
-    cats = detect_categories_from_history(user_query, history_messages)
-    for cat in cats:
-        selected |= _CATEGORY_TOOLS.get(cat, frozenset()) & available
-
+    available = filter_security_candidates(
+        {n for n in all_names if n},
+        user_query,
+        history_messages=history_messages,
+        unknown_policy="allow",
+    )
+    cats = ranking_intent_domains(user_query, history_messages)
+    prefer: Set[str] = set(prefer_names or ()) & available
     if _WRITE_KEYWORDS.search(user_query or ""):
-        selected |= _WRITE_TOOLS & available
-
+        for name in _WRITE_TOOLS & available:
+            prefer |= set(_WRITE_TOOL_COMPANIONS.get(name, ()))
+        prefer &= available
     if _PEOPLE_KEYWORDS.search(user_query or ""):
-        selected |= _CATEGORY_TOOLS.get("people", frozenset()) & available
+        prefer |= _CATEGORY_TOOLS.get("people", frozenset()) & available
 
-    # اگر هنوز کم است، ابزارهای پرکاربرد اضافه
-    if len(selected) < 12:
-        for cat in ("financial", "warehouse", "crm"):
-            selected |= _CATEGORY_TOOLS.get(cat, frozenset()) & available
-
-    if len(selected) > max_tools:
-        # اولویت: core + دسته‌های تشخیص‌داده‌شده
-        ordered: List[str] = []
-        for name in sorted(selected):
-            if name in _CORE_TOOL_NAMES:
-                ordered.append(name)
-        for cat in detect_categories(user_query):
-            for name in sorted(_CATEGORY_TOOLS.get(cat, frozenset())):
-                if name in selected and name not in ordered:
-                    ordered.append(name)
-        for name in sorted(selected):
-            if name not in ordered:
-                ordered.append(name)
-        selected = set(ordered[:max_tools])
-
-    return selected
+    # Core وارد استخر می‌شود اما ظرفیت Top-K را reserve نمی‌کند.
+    return rank_and_cap_tool_names(
+        available,
+        user_query,
+        max_tools=max_tools,
+        core_names=_CORE_TOOL_NAMES,
+        prefer_names=prefer,
+        protected_names=protected_names,
+        intent_domains=cats,
+    )
 
 
 def filter_function_definitions(
     definitions: List[dict],
-    allowed_names: AbstractSet[str],
+    allowed_names: Union[AbstractSet[str], Sequence[str]],
 ) -> List[dict]:
+    """فقط تعاریف داخل allowed_names. مجموعهٔ خالی = هیچ Tool (fail-closed).
+
+    اگر allowed_names دنباله باشد، ترتیب Discovery حفظ می‌شود.
+    """
     if not allowed_names:
-        return definitions
-    out: List[dict] = []
+        return []
+    if isinstance(allowed_names, (set, frozenset)):
+        allowed = {n for n in allowed_names if n}
+        if not allowed:
+            return []
+        return [
+            d
+            for d in definitions
+            if (d.get("function") or {}).get("name") in allowed
+        ]
+    ordered = [n for n in allowed_names if n]
+    allowed = set(ordered)
+    if not allowed:
+        return []
+    by_name = {}
     for d in definitions:
         fn = (d.get("function") or {}).get("name")
-        if fn and fn in allowed_names:
-            out.append(d)
-    return out
+        if fn and fn in allowed and fn not in by_name:
+            by_name[fn] = d
+    return [by_name[n] for n in ordered if n in by_name]

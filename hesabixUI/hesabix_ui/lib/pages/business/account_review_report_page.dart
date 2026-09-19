@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 import 'package:go_router/go_router.dart';
 import 'package:dio/dio.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
@@ -13,7 +12,9 @@ import 'package:hesabix_ui/core/date_utils.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 
-import 'package:hesabix_ui/utils/web/web_utils.dart' as web_utils;
+import 'package:hesabix_ui/services/bytes_export/bytes_export_service.dart';
+import 'package:hesabix_ui/core/hesabix_back.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 class AccountReviewReportPage extends StatefulWidget {
   final int businessId;
@@ -159,13 +160,8 @@ class _AccountReviewReportPageState extends State<AccountReviewReportPage> {
       if (!mounted) return;
       setState(() {
         _currencies = items;
-        if (items.isNotEmpty) {
-          final defaultCurrency = items.firstWhere(
-            (c) => c['is_default'] == true,
-            orElse: () => items.first,
-          );
-          _selectedCurrencyId = defaultCurrency['id'] as int?;
-        }
+        // قرارداد چندارزی: null = همه ارزها → معادل پایه (هم‌تراز با تراز آزمایشی)
+        _selectedCurrencyId = null;
       });
       // Check if both filters are loaded
       if (!mounted) return;
@@ -301,17 +297,12 @@ class _AccountReviewReportPageState extends State<AccountReviewReportPage> {
         ),
       );
       final data = bytes.data ?? <int>[];
-      if (kIsWeb) {
-        await web_utils.saveBytesAsFileWeb(
-          data,
-          'accounts_review_${widget.businessId}.xlsx',
-          mimeType: 'application/octet-stream',
-        );
-      } else {
-        if (mounted) {
-          SnackBarHelper.show(context, message: 'Export only available on web');
-        }
-      }
+      final result = await BytesExportService.export(
+        bytes: data,
+        filename: 'accounts_review_${widget.businessId}.xlsx',
+        mimeType: 'application/octet-stream',
+      );
+      if (mounted) BytesExportService.showFeedback(context, result);
     } catch (e) {
       if (!mounted) return;
       SnackBarHelper.showError(
@@ -345,17 +336,12 @@ class _AccountReviewReportPageState extends State<AccountReviewReportPage> {
         ),
       );
       final data = bytes.data ?? <int>[];
-      if (kIsWeb) {
-        await web_utils.saveBytesAsFileWeb(
-          data,
-          'accounts_review_${widget.businessId}.pdf',
-          mimeType: 'application/pdf',
-        );
-      } else {
-        if (mounted) {
-          SnackBarHelper.show(context, message: 'Export only available on web');
-        }
-      }
+      final result = await BytesExportService.export(
+        bytes: data,
+        filename: 'accounts_review_${widget.businessId}.pdf',
+        mimeType: 'application/pdf',
+      );
+      if (mounted) BytesExportService.showFeedback(context, result);
     } catch (e) {
       if (!mounted) return;
       SnackBarHelper.showError(
@@ -571,10 +557,7 @@ class _AccountReviewReportPageState extends State<AccountReviewReportPage> {
     return Scaffold(
       backgroundColor: cs.surface,
       appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.pop(),
-        ),
+        leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
         title: const Text('گزارش مرور حساب‌ها'),
         actions: [
           PopupMenuButton<String>(
@@ -592,8 +575,8 @@ class _AccountReviewReportPageState extends State<AccountReviewReportPage> {
                 value: 'excel',
                 child: Row(
                   children: [
-                    Icon(Icons.table_chart, color: Colors.green[600]),
-                    const SizedBox(width: 8),
+                    Icon(Icons.table_chart, color: SemanticColorResolver.positive(context)),
+                    SizedBox(width: 8),
                     Text(t.exportToExcel),
                   ],
                 ),
@@ -602,7 +585,7 @@ class _AccountReviewReportPageState extends State<AccountReviewReportPage> {
                 value: 'pdf',
                 child: Row(
                   children: [
-                    Icon(Icons.picture_as_pdf, color: Colors.red[600]),
+                    Icon(Icons.picture_as_pdf, color: SemanticColorResolver.negative(context)),
                     const SizedBox(width: 8),
                     Text(t.exportToPdf),
                   ],
@@ -706,7 +689,7 @@ class _AccountReviewReportPageState extends State<AccountReviewReportPage> {
                             const DropdownMenuItem<int>(
                               value: null,
                               child: Text(
-                                'همه ارزها',
+                                'همه ارزها (معادل پایه)',
                                 overflow: TextOverflow.ellipsis,
                                 maxLines: 1,
                               ),
@@ -1190,9 +1173,9 @@ class _AccountReviewReportPageState extends State<AccountReviewReportPage> {
                                                       textAlign: TextAlign.center,
                                                       style: TextStyle(
                                                         color: (detail['balance_type']?.toString() == 'debit')
-                                                            ? Colors.blue
+                                                            ? SemanticColorResolver.info(context)
                                                             : (detail['balance_type']?.toString() == 'credit')
-                                                                ? Colors.orange
+                                                                ? SemanticColorResolver.warning(context)
                                                                 : null,
                                                       ),
                                                     )),

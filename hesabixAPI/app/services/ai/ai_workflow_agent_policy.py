@@ -3,7 +3,9 @@
 """
 from __future__ import annotations
 
-from typing import AbstractSet, FrozenSet
+from typing import AbstractSet, Any, FrozenSet, Iterable, List, Optional
+
+from app.services.ai.ai_write_guard import is_write_function
 
 # ابزارهایی که نود ai_agent در workflow به‌طور پیش‌فرض نباید صدا بزند
 WORKFLOW_AGENT_DEFAULT_DENYLIST: FrozenSet[str] = frozenset({
@@ -29,3 +31,26 @@ def merge_workflow_agent_denylist(
     if user_denylist:
         merged.update(user_denylist)
     return frozenset(merged)
+
+
+def filter_workflow_agent_tools(
+    tools: Optional[Iterable[Any]],
+    *,
+    denylist: AbstractSet[str],
+    allow_writes: bool = False,
+    registry=None,
+) -> List[Any]:
+    """حذف ابزارهای خطرناک و (به‌طور پیش‌فرض) نوشتنی از کاتالوگ نود."""
+    if not tools:
+        return []
+    out: List[Any] = []
+    for item in tools:
+        if not isinstance(item, dict):
+            continue
+        name = (item.get("function") or {}).get("name")
+        if not name or name in denylist:
+            continue
+        if not allow_writes and is_write_function(str(name), registry):
+            continue
+        out.append(item)
+    return out

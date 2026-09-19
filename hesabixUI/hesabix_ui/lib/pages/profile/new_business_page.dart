@@ -1,38 +1,63 @@
+import 'package:dio/dio.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
-import 'package:file_picker/file_picker.dart';
-import 'dart:typed_data';
+import 'package:shamsi_date/shamsi_date.dart';
+
+import '../../core/calendar_controller.dart';
+import '../../core/date_utils.dart';
+import '../../core/api_client.dart';
 import '../../models/business_models.dart';
 import '../../services/business_api_service.dart';
-import '../../core/calendar_controller.dart';
-import '../../widgets/date_input_field.dart';
-import '../../core/date_utils.dart';
-import '../../utils/number_normalizer.dart';
-import '../../utils/responsive_helper.dart';
-import '../../utils/error_extractor.dart';
-import '../../utils/snackbar_helper.dart';
-import 'package:dio/dio.dart';
 import '../../services/errors/api_error.dart';
 import '../../services/job_service.dart';
-import '../../widgets/profile/legacy_business_import_panel.dart';
+import '../../services/legacy_api_import_public_config.dart';
+import '../../utils/error_extractor.dart';
+import '../../utils/responsive_helper.dart';
+import '../../utils/snackbar_helper.dart';
+import '../../widgets/profile/legacy_import_wizard.dart';
+import '../../widgets/profile/new_business/new_business_financial_step.dart';
+import '../../widgets/profile/new_business/new_business_identity_step.dart';
+import '../../widgets/profile/new_business/new_business_intent_view.dart';
+import '../../widgets/profile/new_business/new_business_paths_panel.dart';
+import '../../widgets/profile/new_business/new_business_review_step.dart';
+import '../../widgets/profile/new_business/new_business_wizard_chrome.dart';
+
+enum _NewBusinessPhase { intent, wizard }
 
 class NewBusinessPage extends StatefulWidget {
   final CalendarController calendarController;
-  const NewBusinessPage({super.key, required this.calendarController});
+
+  /// Optional deep-link: `create` | `backup` | `legacy`
+  final String? initialFlow;
+
+  const NewBusinessPage({
+    super.key,
+    required this.calendarController,
+    this.initialFlow,
+  });
 
   @override
   State<NewBusinessPage> createState() => _NewBusinessPageState();
 }
 
 class _NewBusinessPageState extends State<NewBusinessPage> {
+  static const int _lastWizardStep = 2;
+
   final PageController _pageController = PageController();
-  final BusinessData _businessData = BusinessData();
+  final TextEditingController _nameController = TextEditingController();
+  final TextEditingController _fiscalTitleController = TextEditingController();
+  final FocusNode _nameFocusNode = FocusNode();
+
+  BusinessData _businessData = BusinessData();
+  _NewBusinessPhase _phase = _NewBusinessPhase.intent;
   int _currentStep = 0;
   bool _isLoading = false;
-  final int _fiscalTabIndex = 0;
-  late TextEditingController _fiscalTitleController;
+  bool _showNameError = false;
+  bool _legacyWizardOpen = false;
+  LegacyApiImportPublicConfig _legacyImportConfig =
+      const LegacyApiImportPublicConfig();
   List<Map<String, dynamic>> _currencies = [];
   String? _importJobId;
   int _importProgress = 0;
@@ -42,23 +67,115 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
   void initState() {
     super.initState();
     widget.calendarController.addListener(_onCalendarChanged);
-    _fiscalTitleController = TextEditingController();
-    // Set default selections for business type and field
     _businessData.businessType ??= BusinessType.shop;
     _businessData.businessField ??= BusinessField.commercial;
+    _ensureFiscalDefaults();
     _loadCurrencies();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _bootstrapInitialFlow();
+    });
+  }
+
+  Future<void> _bootstrapInitialFlow() async {
+    final cfg = await LegacyApiImportPublicConfig.fetch(ApiClient());
+    if (!mounted) return;
+    setState(() => _legacyImportConfig = cfg);
+    _applyInitialFlow(widget.initialFlow);
+  }
+
+  void _applyInitialFlow(String? flow) {
+    switch ((flow ?? '').trim().toLowerCase()) {
+      case 'create':
+        _startManualWizard();
+        break;
+      case 'backup':
+        _importFromBackup();
+        break;
+      case 'legacy':
+        _openLegacyImport();
+        break;
+      default:
+        break;
+    }
   }
 
   @override
   void dispose() {
     widget.calendarController.removeListener(_onCalendarChanged);
     _pageController.dispose();
+    _nameController.dispose();
     _fiscalTitleController.dispose();
+    _nameFocusNode.dispose();
     super.dispose();
   }
 
   void _onCalendarChanged() {
     if (_businessData.fiscalYears.isEmpty) return;
+<<<<<<< HEAD
+    final fiscal = _businessData.fiscalYears.first;
+    if (fiscal.endDate == null) return;
+    if (_isAutoFiscalTitle(fiscal.title)) {
+      setState(() {
+        fiscal.title = _fiscalAutoTitle(fiscal.endDate!);
+        _fiscalTitleController.text = fiscal.title;
+      });
+    }
+  }
+
+  String _fiscalAutoTitle(DateTime end) {
+    final t = AppLocalizations.of(context);
+    final endStr = HesabixDateUtils.formatForDisplay(
+      end,
+      widget.calendarController.isJalali,
+    );
+    return t.fiscalYearEndingTitle(endStr);
+  }
+
+  bool _isAutoFiscalTitle(String title) {
+    final trimmed = title.trim();
+    if (trimmed.isEmpty) return true;
+    // Localized auto titles always include a date with `/`.
+    // Also treat legacy Persian prefix as auto.
+    return trimmed.contains('/') &&
+        (trimmed.startsWith('سال مالی منتهی به') ||
+            trimmed.toLowerCase().startsWith('fiscal year ending'));
+  }
+
+  void _ensureFiscalDefaults() {
+    if (_businessData.fiscalYears.isEmpty) {
+      _businessData.fiscalYears.add(FiscalYearData(isLast: true));
+    }
+    final fiscal = _businessData.fiscalYears.first;
+    if (fiscal.startDate != null) return;
+
+    final DateTime start;
+    if (widget.calendarController.isJalali) {
+      final now = Jalali.now();
+      start = HesabixDateUtils.toDateOnlyLocal(
+        Jalali(now.year, 1, 1).toDateTime(),
+      );
+    } else {
+      final now = DateTime.now();
+      start = HesabixDateUtils.toDateOnlyLocal(DateTime(now.year, 1, 1));
+    }
+    fiscal.startDate = start;
+    fiscal.endDate = HesabixDateUtils.fiscalYearInclusiveEndFromStart(
+      start,
+      widget.calendarController.isJalali,
+    );
+  }
+
+  void _syncFiscalTitleController() {
+    if (_businessData.fiscalYears.isEmpty) return;
+    final fiscal = _businessData.fiscalYears.first;
+    if (fiscal.endDate != null &&
+        (fiscal.title.trim().isEmpty || _isAutoFiscalTitle(fiscal.title))) {
+      fiscal.title = _fiscalAutoTitle(fiscal.endDate!);
+    }
+    if (_fiscalTitleController.text != fiscal.title) {
+      _fiscalTitleController.text = fiscal.title;
+=======
     final fiscal = _businessData.fiscalYears[_fiscalTabIndex];
     if (fiscal.endDate != null) {
       const autoPrefix = 'سال مالی منتهی به';
@@ -70,132 +187,195 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
           _fiscalTitleController.text = fiscal.title;
         });
       }
+>>>>>>> github/Huma
     }
   }
 
   Future<void> _loadCurrencies() async {
     try {
       final list = await BusinessApiService.getCurrencies();
+      if (!mounted) return;
+      setState(() {
+        _currencies = list;
+        Map<String, dynamic>? irr;
+        for (final e in _currencies) {
+          if ((e['code'] as String?) == 'IRR') {
+            irr = e;
+            break;
+          }
+        }
+        if (irr != null) {
+          _businessData.defaultCurrencyId ??= irr['id'] as int?;
+          final id = _businessData.defaultCurrencyId;
+          if (id != null && !_businessData.currencyIds.contains(id)) {
+            _businessData.currencyIds.add(id);
+          }
+        } else if (_businessData.defaultCurrencyId == null &&
+            _currencies.isNotEmpty) {
+          final id = _currencies.first['id'] as int?;
+          _businessData.defaultCurrencyId = id;
+          if (id != null && !_businessData.currencyIds.contains(id)) {
+            _businessData.currencyIds.add(id);
+          }
+        }
+      });
+    } catch (e) {
+      if (!mounted) return;
+      SnackBarHelper.showError(
+        context,
+        message: ErrorExtractor.forContext(e, context),
+      );
+    }
+  }
+
+  void _startManualWizard() {
+    _ensureFiscalDefaults();
+    _syncFiscalTitleController();
+    setState(() {
+      _phase = _NewBusinessPhase.wizard;
+      _currentStep = 0;
+      _showNameError = false;
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_pageController.hasClients) {
+        _pageController.jumpToPage(0);
+      }
+      if (mounted) {
+        _nameFocusNode.requestFocus();
+      }
+    });
+  }
+
+  void _backToIntent() {
+    setState(() {
+      _phase = _NewBusinessPhase.intent;
+      _currentStep = 0;
+      _showNameError = false;
+    });
+  }
+
+  Future<void> _openLegacyImport() async {
+    if (_isLoading || _legacyWizardOpen) return;
+    if (!_legacyImportConfig.enabledForUsers) {
+      final t = AppLocalizations.of(context);
+      final msg = _legacyImportConfig.disabledMessage.trim().isNotEmpty
+          ? _legacyImportConfig.disabledMessage
+          : t.legacyApiImportUnavailableBody;
+      SnackBarHelper.showError(context, message: msg);
+      return;
+    }
+    setState(() {
+      _legacyWizardOpen = true;
+      _isLoading = true;
+    });
+    try {
+      await LegacyImportWizard.show(context);
+    } finally {
       if (mounted) {
         setState(() {
-          _currencies = list;
-          final irr = _currencies.firstWhere(
-            (e) => (e['code'] as String?) == 'IRR',
-            orElse: () => {} as Map<String, dynamic>,
-          );
-          if (irr.isNotEmpty) {
-            _businessData.defaultCurrencyId ??= irr['id'] as int?;
-            if (_businessData.defaultCurrencyId != null && !_businessData.currencyIds.contains(_businessData.defaultCurrencyId)) {
-              _businessData.currencyIds.add(_businessData.defaultCurrencyId!);
-            }
-          }
+          _legacyWizardOpen = false;
+          _isLoading = false;
         });
       }
-    } catch (_) {}
+    }
   }
 
   Future<void> _importFromBackup() async {
-    final t = Localizations.of<AppLocalizations>(context, AppLocalizations)!;
-    
+    final t = AppLocalizations.of(context);
     try {
       final result = await FilePicker.pickFiles(
         type: FileType.custom,
-        allowedExtensions: ['hbx', 'hs60'],
+        allowedExtensions: const ['hbx'],
         withData: true,
       );
-      
       if (result == null || result.files.isEmpty) return;
-      
+      if (!mounted) return;
+
       final file = result.files.first;
       if (file.bytes == null || file.bytes!.isEmpty) {
-        SnackBarHelper.showError(context, message: 'فایل انتخاب شده خالی است');
+        SnackBarHelper.showError(context, message: t.importBackupEmptyFile);
         return;
       }
-      
+
       final filename = file.name;
       final fileExt = filename.toLowerCase().split('.').last;
-      
-      // بررسی فایل .hs60
       if (fileExt == 'hs60') {
         SnackBarHelper.showError(
           context,
-          message: 'فرمت فایل .hs60 در حال حاضر پشتیبانی نمی‌شود. این قابلیت در آینده اضافه خواهد شد.',
+          message: t.importBackupHs60Unsupported,
         );
         return;
       }
-      
+
       setState(() {
         _isLoading = true;
         _importJobId = null;
         _importProgress = 0;
         _importMessage = null;
       });
-      
+
       try {
-        final result = await BusinessApiService.importBusinessFromBackup(
+        final importResult = await BusinessApiService.importBusinessFromBackup(
           filename: filename,
           fileBytes: file.bytes!,
           asyncMode: true,
         );
-        
-        final jobId = result['job_id'] as String?;
+        if (!mounted) return;
+
+        final jobId = importResult['job_id'] as String?;
         if (jobId != null) {
           setState(() {
             _importJobId = jobId;
-            _importMessage = 'در حال پردازش...';
+            _importMessage = t.importBackupProcessing;
           });
-          _pollImportJob(jobId);
+          await _pollImportJob(jobId);
         } else {
-          // اگر هم‌زمان بود
-          final businessId = result['business_id'] as int?;
+          final businessId = importResult['business_id'] as int?;
           if (businessId != null) {
-            SnackBarHelper.showSuccess(context, message: 'کسب‌وکار با موفقیت از فایل پشتیبان ایجاد شد');
-            if (mounted) {
-              context.goNamed('profile_businesses');
-            }
+            SnackBarHelper.showSuccess(context, message: t.importBackupSuccess);
+            context.goNamed('profile_businesses');
           }
         }
       } on DioException catch (e) {
-        String errorMessage = 'خطا در ایمپورت فایل پشتیبان';
+        if (!mounted) return;
+        String errorMessage = t.importBackupFailed;
         if (e.response?.data != null) {
           final errorData = e.response!.data;
           if (errorData is Map) {
             final error = errorData['error'];
             if (error is Map) {
-              errorMessage = error['message'] ?? errorMessage;
+              errorMessage = error['message']?.toString() ?? errorMessage;
             } else if (errorData['message'] != null) {
-              errorMessage = errorData['message'];
+              errorMessage = errorData['message'].toString();
             }
           }
         }
         SnackBarHelper.showError(context, message: errorMessage);
       } catch (e) {
-        SnackBarHelper.showError(
-          context,
-          message: 'خطا در ایمپورت: ${ErrorExtractor.forContext(e, context)}',
-        );
-      } finally {
-        if (mounted) {
-          setState(() {
-            _isLoading = false;
-          });
-        }
-      }
-    } catch (e) {
-      if (mounted) {
+        if (!mounted) return;
         SnackBarHelper.showError(
           context,
           message:
-              'خطا در انتخاب فایل: ${ErrorExtractor.forContext(e, context)}',
+              '${t.importBackupFailed}: ${ErrorExtractor.forContext(e, context)}',
         );
-        setState(() {
-          _isLoading = false;
-        });
+      } finally {
+        if (mounted && _importJobId == null) {
+          setState(() => _isLoading = false);
+        }
       }
+    } catch (e) {
+      if (!mounted) return;
+      SnackBarHelper.showError(
+        context,
+        message:
+            '${t.importBackupSelectFailed}: ${ErrorExtractor.forContext(e, context)}',
+      );
+      setState(() => _isLoading = false);
     }
   }
-  
+
   Future<void> _pollImportJob(String jobId) async {
+    final t = AppLocalizations.of(context);
     final jobService = JobService();
     try {
       final poll = await jobService.pollUntilComplete(
@@ -218,8 +398,8 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
         final stats = poll.result?['stats'];
         final skipped = stats is Map ? stats['documents_skipped'] : null;
         final msg = skipped != null && (skipped as num) > 0
-            ? 'ایمپورت انجام شد؛ برخی اسناد منتقل نشدند ($skipped مورد)'
-            : 'کسب‌وکار با موفقیت از فایل پشتیبان ایجاد شد';
+            ? t.importBackupPartialSuccess(skipped.toInt())
+            : t.importBackupSuccess;
         SnackBarHelper.showSuccess(context, message: msg);
         if (businessId != null) {
           context.goNamed('profile_businesses');
@@ -227,7 +407,7 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
       } else {
         SnackBarHelper.showError(
           context,
-          message: poll.errorMessage ?? 'خطا در ایمپورت',
+          message: poll.errorMessage ?? t.importBackupFailed,
         );
       }
     } catch (e) {
@@ -235,7 +415,7 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
         SnackBarHelper.showError(
           context,
           message:
-              'خطا در بررسی وضعیت: ${ErrorExtractor.forContext(e, context)}',
+              '${t.importBackupStatusFailed}: ${ErrorExtractor.forContext(e, context)}',
         );
       }
     } finally {
@@ -249,6 +429,8 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
     }
   }
 
+<<<<<<< HEAD
+=======
   Widget _buildFiscalStep() {
     if (_businessData.fiscalYears.isEmpty) {
       _businessData.fiscalYears.add(FiscalYearData(isLast: true));
@@ -416,60 +598,105 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
     );
   }
 
+>>>>>>> github/Huma
   bool _canGoToNextStep() {
     switch (_currentStep) {
       case 0:
-        return _businessData.isStep1Valid();
+        return _businessData.isStep1Valid() &&
+            _businessData.isStep2Valid() &&
+            _businessData.isStep3Valid();
       case 1:
-        return _businessData.isStep2Valid();
-      case 2:
-        return _businessData.isStep3Valid();
-      case 3:
-        return _businessData.isFiscalStepValid();
+        return _businessData.isFiscalStepValid() &&
+            _businessData.isCurrencyStepValid();
       default:
         return false;
     }
   }
 
-  bool _isMobile(BuildContext context) {
-    return ResponsiveHelper.isMobile(context);
-  }
-
-  bool _isTablet(BuildContext context) {
-    return ResponsiveHelper.isTablet(context);
-  }
-
-  bool _isDesktop(BuildContext context) {
-    return ResponsiveHelper.isDesktop(context);
-  }
-
-  String _getCurrentStepTitle(AppLocalizations t) {
-    switch (_currentStep) {
-      case 0:
-        return t.businessBasicInfo;
-      case 1:
-        return t.businessContactInfo;
-      case 2:
-        return t.businessLegalInfo;
-      case 3:
-        return 'ارز و سال مالی';
-      case 4:
-        return t.businessConfirmation;
-      default:
-        return '';
+  void _nextStep() {
+    _businessData.name = _nameController.text.trim();
+    if (!_canGoToNextStep()) {
+      if (_currentStep == 0) {
+        setState(() => _showNameError = _businessData.name.trim().isEmpty);
+      }
+      final t = AppLocalizations.of(context);
+      SnackBarHelper.showError(context, message: t.pleaseFillRequiredFields);
+      return;
     }
+    if (_currentStep >= _lastWizardStep) return;
+    if (_currentStep == 0) {
+      _ensureFiscalDefaults();
+      _syncFiscalTitleController();
+    }
+    setState(() {
+      _currentStep++;
+      _showNameError = false;
+    });
+    _pageController.nextPage(
+      duration: const Duration(milliseconds: 320),
+      curve: Curves.easeOutCubic,
+    );
+  }
+
+  void _previousStep() {
+    if (_currentStep <= 0) {
+      _backToIntent();
+      return;
+    }
+    setState(() => _currentStep--);
+    _pageController.previousPage(
+      duration: const Duration(milliseconds: 320),
+      curve: Curves.easeOutCubic,
+    );
+  }
+
+  void _goToStep(int step) {
+    if (step < 0 || step > _lastWizardStep) return;
+    if (step > _currentStep) {
+      // Only allow forward jump when all intermediate steps are valid.
+      for (var i = _currentStep; i < step; i++) {
+        final ok = switch (i) {
+          0 =>
+            _businessData.isStep1Valid() &&
+                _businessData.isStep2Valid() &&
+                _businessData.isStep3Valid(),
+          1 =>
+            _businessData.isFiscalStepValid() &&
+                _businessData.isCurrencyStepValid(),
+          _ => true,
+        };
+        if (!ok) {
+          final t = AppLocalizations.of(context);
+          SnackBarHelper.showError(
+            context,
+            message: t.pleaseFillRequiredFields,
+          );
+          if (i == 0) {
+            setState(() => _showNameError = _businessData.name.trim().isEmpty);
+          }
+          return;
+        }
+      }
+    }
+    setState(() => _currentStep = step);
+    _pageController.animateToPage(
+      step,
+      duration: const Duration(milliseconds: 320),
+      curve: Curves.easeOutCubic,
+    );
   }
 
   Future<void> _showVerificationRequiredDialog(String message) async {
+    final t = AppLocalizations.of(context);
     final result = await showDialog<bool>(
       context: context,
       barrierDismissible: false,
       builder: (ctx) => AlertDialog(
-        title: const Row(
+        title: Row(
           children: [
-            Icon(Icons.info_outline, color: Colors.orange),
-            SizedBox(width: 8),
-            Text('تایید مورد نیاز'),
+            Icon(Icons.info_outline, color: Theme.of(ctx).colorScheme.tertiary),
+            const SizedBox(width: 8),
+            Expanded(child: Text(t.verificationRequiredTitle)),
           ],
         ),
         content: Column(
@@ -478,80 +705,73 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
           children: [
             Text(message),
             const SizedBox(height: 16),
-            const Text(
-              'برای تایید ایمیل و شماره موبایل، به بخش تنظیمات حساب کاربری بروید.',
-              style: TextStyle(fontWeight: FontWeight.bold),
+            Text(
+              t.verificationRequiredBody,
+              style: const TextStyle(fontWeight: FontWeight.bold),
             ),
           ],
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('بعداً'),
+            child: Text(t.verificationLater),
           ),
           FilledButton.icon(
             onPressed: () => Navigator.of(ctx).pop(true),
             icon: const Icon(Icons.verified_user),
-            label: const Text('رفتن به تایید'),
+            label: Text(t.verificationGo),
           ),
         ],
       ),
     );
-    
+
     if (result == true && mounted) {
-      // هدایت به صفحه تایید
       context.go('/user/profile/verification');
     }
   }
 
   Future<void> _submitBusiness() async {
-    final t = Localizations.of<AppLocalizations>(context, AppLocalizations)!;
+    final t = AppLocalizations.of(context);
+    _businessData.name = _nameController.text.trim();
     if (!_businessData.isFormValid()) {
-      ScaffoldMessenger.of(Navigator.of(context, rootNavigator: true).context).showSnackBar(
-        SnackBar(
-          content: Text(t.pleaseFillRequiredFields),
-          backgroundColor: Colors.red,
-          behavior: SnackBarBehavior.floating,
-          margin: const EdgeInsets.all(16),
-          duration: const Duration(seconds: 3),
-        ),
-      );
+      SnackBarHelper.showError(context, message: t.pleaseFillRequiredFields);
+      if (!_businessData.isStep1Valid() ||
+          !_businessData.isStep2Valid() ||
+          !_businessData.isStep3Valid()) {
+        _goToStep(0);
+      } else if (!_businessData.isCurrencyStepValid() ||
+          !_businessData.isFiscalStepValid()) {
+        _goToStep(1);
+      }
       return;
     }
 
-    setState(() {
-      _isLoading = true;
-    });
-
+    setState(() => _isLoading = true);
     try {
       final created = await BusinessApiService.createBusiness(_businessData);
-
-      if (mounted) {
-        final seedFailed = _businessData.includeSampleData &&
-            created.sampleDataSeeded == false &&
-            (created.sampleDataError != null && created.sampleDataError!.isNotEmpty);
-        ScaffoldMessenger.of(Navigator.of(context, rootNavigator: true).context).showSnackBar(
-          SnackBar(
-            content: Text(
-              seedFailed
-                  ? '${t.sampleDataSeedWarning}: ${created.sampleDataError}'
-                  : t.businessCreatedSuccessfully,
-            ),
-            backgroundColor: seedFailed ? Colors.deepOrange : Colors.green,
-            behavior: SnackBarBehavior.floating,
-            margin: const EdgeInsets.all(16),
-            duration: Duration(seconds: seedFailed ? 5 : 2),
-          ),
+      if (!mounted) return;
+      final seedFailed =
+          _businessData.includeSampleData &&
+          created.sampleDataSeeded == false &&
+          (created.sampleDataError != null &&
+              created.sampleDataError!.isNotEmpty);
+      if (seedFailed) {
+        SnackBarHelper.showError(
+          context,
+          message: '${t.sampleDataSeedWarning}: ${created.sampleDataError}',
         );
-        context.goNamed('profile_businesses');
+      } else {
+        SnackBarHelper.showSuccess(
+          context,
+          message: t.businessCreatedSuccessfully,
+        );
       }
+      context.goNamed('profile_businesses');
     } on DioException catch (e) {
       if (!mounted) return;
-      
-      // بررسی خطای BUSINESS_CREATION_NOT_ALLOWED
+
       String? errorCode;
       String? errorMessage;
-      
       if (e.error is ApiErrorDetails) {
         final apiError = e.error as ApiErrorDetails;
         errorCode = apiError.code;
@@ -564,1972 +784,242 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
           errorMessage = errorObj['message']?.toString();
         }
       }
-      
+
       if (errorCode == 'BUSINESS_CREATION_NOT_ALLOWED') {
-        // نمایش Dialog راهنما
-        await _showVerificationRequiredDialog(errorMessage ?? 'شما اجازه ایجاد کسب و کار را ندارید');
+        await _showVerificationRequiredDialog(
+          errorMessage ?? t.businessCreationFailed,
+        );
         return;
       }
-      
-      // سایر خطاها
-      ScaffoldMessenger.of(Navigator.of(context, rootNavigator: true).context).showSnackBar(
-        SnackBar(
-          content: Text(
+
+      SnackBarHelper.showError(
+        context,
+        message:
             errorMessage ??
-                '${t.businessCreationFailed}: ${ErrorExtractor.forContext(e, context)}',
-          ),
-          backgroundColor: Colors.red,
-          behavior: SnackBarBehavior.floating,
-          margin: const EdgeInsets.all(16),
-          duration: const Duration(seconds: 5),
-        ),
+            '${t.businessCreationFailed}: ${ErrorExtractor.forContext(e, context)}',
       );
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(Navigator.of(context, rootNavigator: true).context).showSnackBar(
-          SnackBar(
-            content: Text(
-              '${t.businessCreationFailed}: ${ErrorExtractor.forContext(e, context)}',
-            ),
-            backgroundColor: Colors.red,
-            behavior: SnackBarBehavior.floating,
-            margin: const EdgeInsets.all(16),
-            duration: const Duration(seconds: 5),
-          ),
-        );
-      }
+      if (!mounted) return;
+      SnackBarHelper.showError(
+        context,
+        message:
+            '${t.businessCreationFailed}: ${ErrorExtractor.forContext(e, context)}',
+      );
     } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
+  List<String> _stepTitles(AppLocalizations t) => [
+    t.newBusinessIdentityStepTitle,
+    t.newBusinessFinancialStepTitle,
+    t.newBusinessReviewStepTitle,
+  ];
+
   @override
   Widget build(BuildContext context) {
-    final t = Localizations.of<AppLocalizations>(context, AppLocalizations)!;
-    final isMobile = _isMobile(context);
-    final isTablet = _isTablet(context);
-    final isDesktop = _isDesktop(context);
-    final padding = ResponsiveHelper.getPadding(context);
-    
+    final t = AppLocalizations.of(context);
+    final isMobile = ResponsiveHelper.isMobile(context);
+    final isDesktop = ResponsiveHelper.isDesktop(context);
+    final showWizard = _phase == _NewBusinessPhase.wizard;
+
     return Scaffold(
-      appBar: isMobile ? AppBar(
-        title: Text(t.newBusiness),
-        centerTitle: true,
-        elevation: 0,
-      ) : null,
-      body: Stack(
-        children: [
-          Column(
-        children: [
-          // Progress indicator
-          Container(
-            padding: EdgeInsets.all(padding),
-            child: Column(
-              children: [
-                // Progress bar
-                Row(
-                  children: List.generate(5, (index) {
-                    final isActive = index <= _currentStep;
-                    final isCurrent = index == _currentStep;
-                    
-                    final progressHeight = ResponsiveHelper.responsiveValue(
-                      context,
-                      mobile: 4.0,
-                      tablet: 5.0,
-                      desktop: 6.0,
-                    );
-                    final progressMargin = ResponsiveHelper.responsiveValue(
-                      context,
-                      mobile: 1.0,
-                      tablet: 1.5,
-                      desktop: 2.0,
-                    );
-                    final borderRadius = ResponsiveHelper.responsiveValue(
-                      context,
-                      mobile: 2.0,
-                      tablet: 2.5,
-                      desktop: 3.0,
-                    );
-                    
-                    return Expanded(
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 300),
-                        margin: EdgeInsets.symmetric(horizontal: progressMargin),
-                        height: progressHeight,
-                        decoration: BoxDecoration(
-                          color: isActive
-                              ? Theme.of(context).colorScheme.primary
-                              : Theme.of(context).brightness == Brightness.dark
-                                  ? Theme.of(context).colorScheme.surfaceContainerHighest
-                                  : Theme.of(context).colorScheme.outline.withValues(alpha: 0.4),
-                          borderRadius: BorderRadius.circular(borderRadius),
-                          boxShadow: isCurrent
-                              ? [
-                                  BoxShadow(
-                                    color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.4),
-                                    blurRadius: 4,
-                                    spreadRadius: 1,
-                                  ),
-                                ]
-                              : null,
-                        ),
-                      ),
-                    );
-                  }),
-                ),
-                SizedBox(height: ResponsiveHelper.responsiveValue(context, mobile: 8.0, tablet: 10.0, desktop: 12.0)),
-                // Progress text
-                Text(
-                  '${t.step} ${_currentStep + 1} ${t.ofText} 5',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurface,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          
-          // Step indicator - برای تبلت و دسکتاپ
-          if (!isMobile)
-            Container(
-              padding: EdgeInsets.symmetric(
-                horizontal: padding,
-                vertical: ResponsiveHelper.responsiveValue(context, mobile: 8.0, tablet: 10.0, desktop: 12.0),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  _buildStepIndicator(0, t.businessBasicInfo, isTablet),
-                  _buildStepIndicator(1, t.businessContactInfo, isTablet),
-                  _buildStepIndicator(2, t.businessLegalInfo, isTablet),
-                  _buildStepIndicator(3, 'ارز و سال مالی', isTablet),
-                  _buildStepIndicator(4, t.businessConfirmation, isTablet),
-                ],
-              ),
-            ),
-          
-          // Current step title for mobile
-          if (isMobile)
-            Container(
-              width: double.infinity,
-              padding: EdgeInsets.symmetric(horizontal: padding, vertical: 12),
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.primaryContainer,
-                border: Border(
-                  bottom: BorderSide(
-                    color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.2),
-                    width: 1,
-                  ),
-                ),
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    width: 32,
-                    height: 32,
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.primary,
-                      shape: BoxShape.circle,
-                    ),
-                    child: Center(
-                      child: Text(
-                        '${_currentStep + 1}',
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.onPrimary,
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ),
-                  SizedBox(width: ResponsiveHelper.responsiveValue(context, mobile: 12.0, tablet: 14.0, desktop: 16.0)),
-                  Expanded(
-                    child: Text(
-                      _getCurrentStepTitle(t),
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        color: Theme.of(context).colorScheme.onPrimaryContainer,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          
-          // Form content
-          Expanded(
-            child: PageView(
-              controller: _pageController,
-              physics: const NeverScrollableScrollPhysics(),
-              onPageChanged: (index) {
-                setState(() {
-                  _currentStep = index;
-                });
-              },
-              children: [
-                SingleChildScrollView(child: _buildStep1()),
-                SingleChildScrollView(child: _buildStep2()),
-                SingleChildScrollView(child: _buildStep3()),
-                SingleChildScrollView(child: _buildCurrencyAndFiscalStep()),
-                SingleChildScrollView(child: _buildStep4()),
-              ],
-            ),
-          ),
-          
-          // Navigation buttons
-          Container(
-            padding: EdgeInsets.all(padding),
-            decoration: BoxDecoration(
-              color: Theme.of(context).scaffoldBackgroundColor,
-              border: Border(
-                top: BorderSide(
-                  color: Theme.of(context).dividerColor.withValues(alpha: 0.2),
-                  width: 1,
-                ),
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: Theme.of(context).shadowColor.withValues(alpha: 0.1),
-                  blurRadius: 4,
-                  offset: const Offset(0, -2),
-                ),
-              ],
-            ),
-            child: isMobile 
-                ? Column(
-                    children: [
-                      // Next/Submit button - full width on mobile
-                      SizedBox(
-                        width: double.infinity,
-                        child: _buildNavigationButton(
-                          text: _currentStep < 4 ? t.next : t.createBusiness,
-                          icon: _currentStep < 4 ? Icons.arrow_forward_ios : Icons.check,
-                          onPressed: _currentStep < 4 
-                              ? (_canGoToNextStep() ? _nextStep : null)
-                              : (_isLoading ? null : _submitBusiness),
-                          isPrimary: true,
+      appBar: isMobile
+          ? AppBar(
+              title: Text(t.newBusiness),
+              centerTitle: true,
+              elevation: 0,
+              leading: showWizard
+                  ? IconButton(
+                      tooltip: t.newBusinessBackToOptions,
+                      onPressed: _isLoading ? null : _backToIntent,
+                      icon: const Icon(Icons.close_rounded),
+                    )
+                  : null,
+            )
+          : null,
+      body: NewBusinessAmbientBackground(
+        child: Stack(
+          children: [
+            AnimatedSwitcher(
+              duration: const Duration(milliseconds: 320),
+              switchInCurve: Curves.easeOutCubic,
+              switchOutCurve: Curves.easeInCubic,
+              child: showWizard
+                  ? KeyedSubtree(
+                      key: const ValueKey('wizard'),
+                      child: _buildWizard(context, t, isDesktop),
+                    )
+                  : KeyedSubtree(
+                      key: const ValueKey('intent'),
+                      child: SingleChildScrollView(
+                        child: NewBusinessIntentView(
                           isLoading: _isLoading,
+                          onCreateManually: _startManualWizard,
+                          onImportBackup: _importFromBackup,
+                          onImportLegacy: _openLegacyImport,
+                          showLegacyImport: _legacyImportConfig.enabledForUsers,
                         ),
                       ),
-                      // Previous button - full width on mobile
-                      if (_currentStep > 0) ...[
-                        SizedBox(height: ResponsiveHelper.responsiveValue(context, mobile: 12.0, tablet: 14.0, desktop: 16.0)),
-                        SizedBox(
-                          width: double.infinity,
-                          child: _buildNavigationButton(
-                            text: t.previous,
-                            icon: Icons.arrow_back_ios,
-                            onPressed: _previousStep,
-                            isPrimary: false,
-                          ),
-                        ),
-                      ],
-                    ],
-                  )
-                : Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      _buildNavigationButton(
-                        text: t.previous,
-                        icon: Icons.arrow_back_ios,
-                        onPressed: _currentStep > 0 ? _previousStep : null,
-                        isPrimary: false,
-                      ),
-                      Row(
-                        children: [
-                          if (_currentStep < 4) ...[
-                            _buildNavigationButton(
-                              text: t.next,
-                              icon: Icons.arrow_forward_ios,
-                              onPressed: _canGoToNextStep() ? _nextStep : null,
-                              isPrimary: true,
-                            ),
-                          ] else ...[
-                            _buildNavigationButton(
-                              text: t.createBusiness,
-                              icon: Icons.check,
-                              onPressed: _isLoading ? null : _submitBusiness,
-                              isPrimary: true,
-                              isLoading: _isLoading,
-                            ),
-                          ],
-                        ],
-                      ),
-                    ],
-                  ),
-          ),
-        ],
-      ),
-          if (_isLoading && _importJobId != null) ...[
-            ModalBarrier(
-              color: Colors.black.withValues(alpha: 0.45),
-              dismissible: false,
+                    ),
             ),
-            Center(
-              child: Card(
-                margin: const EdgeInsets.all(32),
-                child: Padding(
-                  padding: const EdgeInsets.all(24),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      SizedBox(
-                        width: 48,
-                        height: 48,
-                        child: CircularProgressIndicator(
-                          value: _importProgress > 0 ? _importProgress / 100 : null,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        _importMessage ?? 'در حال ایمپورت از فایل پشتیبان...',
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 8),
-                      Text('$_importProgress%'),
-                      const SizedBox(height: 8),
-                      Text(
-                        'لطفاً صبر کنید',
-                        style: Theme.of(context).textTheme.bodySmall,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
+            if (_isLoading && _importJobId != null) _buildImportOverlay(t),
           ],
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStepIndicator(int step, String title, bool isCompact) {
-    final isActive = step <= _currentStep;
-    final isCurrent = step == _currentStep;
-    
-    final iconSize = ResponsiveHelper.responsiveValue(
-      context,
-      mobile: 20.0,
-      tablet: 22.0,
-      desktop: 24.0,
-    );
-    final fontSize = ResponsiveHelper.responsiveValue(
-      context,
-      mobile: 11.0,
-      tablet: 11.5,
-      desktop: 12.0,
-    );
-    final horizontalPadding = ResponsiveHelper.responsiveValue(
-      context,
-      mobile: 8.0,
-      tablet: 10.0,
-      desktop: 12.0,
-    );
-    
-    final isDesktop = _isDesktop(context);
-    
-    // برای تبلت، عنوان را کوتاه‌تر یا فقط آیکون نشان می‌دهیم
-    String displayTitle = title;
-    if (isCompact && !isDesktop && title.length > 12) {
-      // برای تبلت، عنوان‌های طولانی را کوتاه می‌کنیم
-      displayTitle = title.substring(0, 12) + '...';
-    }
-    
-    return GestureDetector(
-      onTap: () => _goToStep(step),
-      child: Tooltip(
-        message: title,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 300),
-          padding: EdgeInsets.symmetric(
-            horizontal: horizontalPadding,
-            vertical: ResponsiveHelper.responsiveValue(context, mobile: 6.0, tablet: 8.0, desktop: 8.0),
-          ),
-          decoration: BoxDecoration(
-            color: isActive
-                ? Theme.of(context).colorScheme.primaryContainer
-                : Theme.of(context).colorScheme.surfaceContainerHighest,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(
-              color: isActive
-                  ? Theme.of(context).colorScheme.primary
-                  : Theme.of(context).colorScheme.outlineVariant,
-              width: 1.5,
-            ),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              AnimatedContainer(
-                duration: const Duration(milliseconds: 300),
-                width: iconSize,
-                height: iconSize,
-                decoration: BoxDecoration(
-                  color: isActive
-                      ? Theme.of(context).colorScheme.primary
-                      : Theme.of(context).colorScheme.outline,
-                  shape: BoxShape.circle,
-                  boxShadow: isCurrent
-                      ? [
-                          BoxShadow(
-                            color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.4),
-                            blurRadius: 6,
-                            spreadRadius: 2,
-                          ),
-                        ]
-                      : isActive
-                          ? [
-                              BoxShadow(
-                                color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.2),
-                                blurRadius: 3,
-                                spreadRadius: 1,
-                              ),
-                            ]
-                          : null,
-                ),
-                child: Center(
-                  child: isActive
-                      ? Icon(
-                          Icons.check,
-                          size: iconSize * 0.65,
-                          color: Colors.white,
-                        )
-                      : Text(
-                          '${step + 1}',
-                          style: TextStyle(
-                            color: isActive
-                                ? Theme.of(context).colorScheme.onPrimary
-                                : Theme.of(context).colorScheme.onSurface,
-                            fontSize: fontSize,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                ),
-              ),
-              if (!isCompact || isDesktop) ...[
-                SizedBox(width: ResponsiveHelper.responsiveValue(context, mobile: 6.0, tablet: 8.0, desktop: 8.0)),
-                Text(
-                  displayTitle,
-                  style: TextStyle(
-                    color: isActive
-                        ? Theme.of(context).colorScheme.onPrimaryContainer
-                        : Theme.of(context).colorScheme.onSurface,
-                    fontSize: fontSize,
-                    fontWeight: isActive ? FontWeight.w600 : FontWeight.w500,
-                  ),
-                ),
-              ],
-            ],
-          ),
         ),
       ),
     );
   }
 
-  Widget _buildNavigationButton({
-    required String text,
-    required IconData icon,
-    required VoidCallback? onPressed,
-    required bool isPrimary,
-    bool isLoading = false,
-  }) {
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 200),
-      height: 48,
-      constraints: const BoxConstraints(minWidth: 120),
-      child: ElevatedButton(
-        onPressed: onPressed,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: isPrimary
-              ? Theme.of(context).primaryColor
-              : Theme.of(context).colorScheme.surface,
-          foregroundColor: isPrimary
-              ? Colors.white
-              : Theme.of(context).colorScheme.onSurface,
-          elevation: isPrimary ? 2 : 0,
-          shadowColor: isPrimary
-              ? Theme.of(context).primaryColor.withValues(alpha: 0.3)
-              : null,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-            side: isPrimary
-                ? BorderSide.none
-                : BorderSide(
-                    color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.5),
-                    width: 1,
-                  ),
-          ),
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-          animationDuration: const Duration(milliseconds: 200),
-        ),
-        child: AnimatedSwitcher(
-          duration: const Duration(milliseconds: 300),
-          child: isLoading
-              ? SizedBox(
-                  key: const ValueKey('loading'),
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    valueColor: AlwaysStoppedAnimation<Color>(
-                      isPrimary ? Colors.white : Theme.of(context).primaryColor,
-                    ),
-                  ),
-                )
-              : Row(
-                  key: ValueKey('content_$text'),
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    if (isPrimary) ...[
-                      Text(
-                        text,
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Icon(
-                        icon,
-                        size: 18,
-                      ),
-                    ] else ...[
-                      Icon(
-                        icon,
-                        size: 18,
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        text,
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildStep1() {
-    final t = Localizations.of<AppLocalizations>(context, AppLocalizations)!;
-    final padding = ResponsiveHelper.getPadding(context);
-    final spacing = ResponsiveHelper.responsiveValue(
-      context,
-      mobile: 16.0,
-      tablet: 20.0,
-      desktop: 24.0,
-    );
-    
-    return Center(
-      child: ConstrainedBox(
-        constraints: BoxConstraints(
-          maxWidth: ResponsiveHelper.getCardMaxWidth(context),
-        ),
-        child: Padding(
-          padding: EdgeInsets.all(padding),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-                LegacyBusinessImportPanel(
-                  isLoading: _isLoading,
-                  onLoadingChanged: (v) {
-                    if (mounted) setState(() => _isLoading = v);
-                  },
-                ),
-                SizedBox(height: spacing),
-                // دکمه ایمپورت از فایل پشتیبان
-                Card(
-                  elevation: 2,
-                  child: InkWell(
-                    onTap: _isLoading ? null : _importFromBackup,
-                    borderRadius: BorderRadius.circular(12),
-                    child: Padding(
-                      padding: EdgeInsets.all(spacing),
-                      child: Row(
-                        children: [
-                          Icon(
-                            Icons.upload_file,
-                            color: Theme.of(context).colorScheme.primary,
-                          ),
-                          SizedBox(width: spacing * 0.5),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'ایجاد از فایل پشتیبان',
-                                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                                SizedBox(height: 4),
-                                Text(
-                                  'آپلود فایل .hbx برای ایجاد کسب‌وکار',
-                                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          if (_isLoading && _importJobId != null)
-                            SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                value: _importProgress / 100,
-                              ),
-                            )
-                          else if (_isLoading)
-                            SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          else
-                            Icon(
-                              Icons.arrow_forward_ios,
-                              size: 16,
-                              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
-                            ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-                if (_importMessage != null) ...[
-                  SizedBox(height: spacing * 0.5),
-                  Text(
-                    _importMessage!,
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Theme.of(context).colorScheme.primary,
-                    ),
-                  ),
-                ],
-                SizedBox(height: spacing),
-                Row(
-                  children: [
-                    Expanded(child: Divider()),
-                    Padding(
-                      padding: EdgeInsets.symmetric(horizontal: spacing * 0.5),
-                      child: Text(
-                        'یا',
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
-                        ),
-                      ),
-                    ),
-                    Expanded(child: Divider()),
-                  ],
-                ),
-                SizedBox(height: spacing),
-                Text(
-                  t.businessBasicInfo,
-                  style: Theme.of(context).textTheme.titleLarge,
-                ),
-                SizedBox(height: spacing),
-                
-                // نام کسب و کار
-                TextFormField(
-                  decoration: InputDecoration(
-                    labelText: '${t.businessName} *',
-                    border: OutlineInputBorder(
-                      borderSide: BorderSide(
-                        color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.5),
-                      ),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderSide: BorderSide(
-                        color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.5),
-                      ),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderSide: BorderSide(
-                        color: Theme.of(context).primaryColor,
-                        width: 2,
-                      ),
-                    ),
-                  ),
-                  onChanged: (value) {
-                    setState(() {
-                      _businessData.name = value;
-                    });
-                  },
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return '${t.businessName} ${t.required}';
-                    }
-                    return null;
-                  },
-                ),
-                SizedBox(height: spacing),
-                
-                // نوع کسب و کار
-                DropdownButtonFormField<BusinessType>(
-                  decoration: InputDecoration(
-                    labelText: '${t.businessType} *',
-                    border: OutlineInputBorder(
-                      borderSide: BorderSide(
-                        color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.5),
-                      ),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderSide: BorderSide(
-                        color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.5),
-                      ),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderSide: BorderSide(
-                        color: Theme.of(context).primaryColor,
-                        width: 2,
-                      ),
-                    ),
-                  ),
-                  initialValue: _businessData.businessType,
-                  items: BusinessType.values.map((type) {
-                    return DropdownMenuItem(
-                      value: type,
-                      child: Text(type.displayName),
-                    );
-                  }).toList(),
-                  onChanged: (value) {
-                    setState(() {
-                      _businessData.businessType = value;
-                    });
-                  },
-                  validator: (value) {
-                    if (value == null) {
-                      return '${t.businessType} ${t.required}';
-                    }
-                    return null;
-                  },
-                ),
-                SizedBox(height: spacing),
-                
-                // زمینه فعالیت
-                DropdownButtonFormField<BusinessField>(
-                  decoration: InputDecoration(
-                    labelText: '${t.businessField} *',
-                    border: OutlineInputBorder(
-                      borderSide: BorderSide(
-                        color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.5),
-                      ),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderSide: BorderSide(
-                        color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.5),
-                      ),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderSide: BorderSide(
-                        color: Theme.of(context).primaryColor,
-                        width: 2,
-                      ),
-                    ),
-                  ),
-                  initialValue: _businessData.businessField,
-                  items: BusinessField.values.map((field) {
-                    return DropdownMenuItem(
-                      value: field,
-                      child: Text(field.displayName),
-                    );
-                  }).toList(),
-                  onChanged: (value) {
-                    setState(() {
-                      _businessData.businessField = value;
-                    });
-                  },
-                  validator: (value) {
-                    if (value == null) {
-                      return '${t.businessField} ${t.required}';
-                    }
-                    return null;
-                  },
-                ),
-                SizedBox(height: spacing),
-                CheckboxListTile(
-                  value: _businessData.includeSampleData,
-                  onChanged: _isLoading
-                      ? null
-                      : (v) {
-                          setState(() {
-                            _businessData.includeSampleData = v ?? false;
-                          });
-                        },
-                  title: Text(t.includeSampleDataLabel),
-                  subtitle: Text(
-                    t.includeSampleDataSubtitle,
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.75),
-                        ),
-                  ),
-                  controlAffinity: ListTileControlAffinity.leading,
-                  contentPadding: EdgeInsets.zero,
-                ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildStep2() {
-    final t = Localizations.of<AppLocalizations>(context, AppLocalizations)!;
-    final padding = ResponsiveHelper.getPadding(context);
-    final spacing = ResponsiveHelper.responsiveValue(
-      context,
-      mobile: 16.0,
-      tablet: 20.0,
-      desktop: 24.0,
-    );
-    final isTablet = _isTablet(context);
-    
-    return Center(
-      child: ConstrainedBox(
-        constraints: BoxConstraints(
-          maxWidth: ResponsiveHelper.getCardMaxWidth(context),
-        ),
-        child: Padding(
-          padding: EdgeInsets.all(padding),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-                Text(
-                  t.businessContactInfo,
-                  style: Theme.of(context).textTheme.titleLarge,
-                ),
-                SizedBox(height: spacing),
-                
-                // آدرس - تمام عرض
-                TextFormField(
-                  decoration: InputDecoration(
-                    labelText: t.address,
-                    border: OutlineInputBorder(
-                      borderSide: BorderSide(
-                        color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.5),
-                      ),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderSide: BorderSide(
-                        color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.5),
-                      ),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderSide: BorderSide(
-                        color: Theme.of(context).primaryColor,
-                        width: 2,
-                      ),
-                    ),
-                  ),
-                  maxLines: 3,
-                  onChanged: (value) {
-                    setState(() {
-                      _businessData.address = value;
-                    });
-                  },
-                ),
-                const SizedBox(height: 16),
-                
-                // فیلدهای تماس در دو ستون
-                LayoutBuilder(
-                  builder: (context, constraints) {
-                    final fieldSpacing = ResponsiveHelper.getGridSpacing(context);
-                    if (!_isMobile(context)) {
-                      return Row(
-                        children: [
-                          Expanded(
-                            child: TextFormField(
-                              decoration: InputDecoration(
-                                labelText: t.phone,
-                                border: OutlineInputBorder(
-                                  borderSide: BorderSide(
-                                    color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.5),
-                                  ),
-                                ),
-                                enabledBorder: OutlineInputBorder(
-                                  borderSide: BorderSide(
-                                    color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.5),
-                                  ),
-                                ),
-                                focusedBorder: OutlineInputBorder(
-                                  borderSide: BorderSide(
-                                    color: Theme.of(context).primaryColor,
-                                    width: 2,
-                                  ),
-                                ),
-                                errorText: _businessData.getValidationError('phone'),
-                                helperText: '${t.example}: ${t.phoneExample}',
-                              ),
-                              keyboardType: TextInputType.phone,
-                              inputFormatters: const [EnglishDigitsFormatter()],
-                              onChanged: (value) {
-                                setState(() {
-                                  _businessData.phone = toEnglishDigits(value);
-                                });
-                              },
-                            ),
-                          ),
-                          SizedBox(width: fieldSpacing),
-                          Expanded(
-                            child: TextFormField(
-                              decoration: InputDecoration(
-                                labelText: t.mobile,
-                                border: OutlineInputBorder(
-                                  borderSide: BorderSide(
-                                    color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.5),
-                                  ),
-                                ),
-                                enabledBorder: OutlineInputBorder(
-                                  borderSide: BorderSide(
-                                    color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.5),
-                                  ),
-                                ),
-                                focusedBorder: OutlineInputBorder(
-                                  borderSide: BorderSide(
-                                    color: Theme.of(context).primaryColor,
-                                    width: 2,
-                                  ),
-                                ),
-                                errorText: _businessData.getValidationError('mobile'),
-                                helperText: '${t.example}: ${t.mobileExample}',
-                              ),
-                              keyboardType: TextInputType.phone,
-                              inputFormatters: const [EnglishDigitsFormatter()],
-                              onChanged: (value) {
-                                setState(() {
-                                  _businessData.mobile = toEnglishDigits(value);
-                                });
-                              },
-                            ),
-                          ),
-                        ],
-                      );
-                    } else {
-                      return Column(
-                        children: [
-                          TextFormField(
-                            decoration: InputDecoration(
-                              labelText: t.phone,
-                              border: OutlineInputBorder(
-                                borderSide: BorderSide(
-                                  color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.5),
-                                ),
-                              ),
-                              enabledBorder: OutlineInputBorder(
-                                borderSide: BorderSide(
-                                  color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.5),
-                                ),
-                              ),
-                              focusedBorder: OutlineInputBorder(
-                                borderSide: BorderSide(
-                                  color: Theme.of(context).primaryColor,
-                                  width: 2,
-                                ),
-                              ),
-                              errorText: _businessData.getValidationError('phone'),
-                              helperText: '${t.example}: ${t.phoneExample}',
-                            ),
-                            keyboardType: TextInputType.phone,
-                            inputFormatters: const [EnglishDigitsFormatter()],
-                            onChanged: (value) {
-                              setState(() {
-                                _businessData.phone = toEnglishDigits(value);
-                              });
-                            },
-                          ),
-                          SizedBox(height: spacing),
-                          TextFormField(
-                            decoration: InputDecoration(
-                              labelText: t.mobile,
-                              border: OutlineInputBorder(
-                                borderSide: BorderSide(
-                                  color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.5),
-                                ),
-                              ),
-                              enabledBorder: OutlineInputBorder(
-                                borderSide: BorderSide(
-                                  color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.5),
-                                ),
-                              ),
-                              focusedBorder: OutlineInputBorder(
-                                borderSide: BorderSide(
-                                  color: Theme.of(context).primaryColor,
-                                  width: 2,
-                                ),
-                              ),
-                              errorText: _businessData.getValidationError('mobile'),
-                              helperText: '${t.example}: ${t.mobileExample}',
-                            ),
-                            keyboardType: TextInputType.phone,
-                            inputFormatters: const [EnglishDigitsFormatter()],
-                            onChanged: (value) {
-                              setState(() {
-                                _businessData.mobile = toEnglishDigits(value);
-                              });
-                            },
-                          ),
-                        ],
-                      );
-                    }
-                  },
-                ),
-                SizedBox(height: spacing),
-                
-                // کد پستی
-                TextFormField(
-                  decoration: InputDecoration(
-                    labelText: t.postalCode,
-                    border: OutlineInputBorder(
-                      borderSide: BorderSide(
-                        color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.5),
-                      ),
-                    ),
-                    enabledBorder: OutlineInputBorder(
-                      borderSide: BorderSide(
-                        color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.5),
-                      ),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderSide: BorderSide(
-                        color: Theme.of(context).primaryColor,
-                        width: 2,
-                      ),
-                    ),
-                  ),
-                  keyboardType: TextInputType.number,
-                inputFormatters: [
-                  EnglishDigitsFormatter(),
-                  FilteringTextInputFormatter.digitsOnly,
-                ],
-                  onChanged: (value) {
-                    setState(() {
-                    _businessData.postalCode = toEnglishDigits(value);
-                    });
-                  },
-                ),
-                SizedBox(height: spacing * 1.5),
-                
-                // فیلدهای جغرافیایی
-                Text(
-                  t.businessGeographicInfo,
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
-                    color: Theme.of(context).colorScheme.primary,
-                  ),
-                ),
-                SizedBox(height: spacing),
-                
-                // فیلدهای جغرافیایی در دو ستون
-                LayoutBuilder(
-                  builder: (context, constraints) {
-                    final fieldSpacing = ResponsiveHelper.getGridSpacing(context);
-                    if (!_isMobile(context)) {
-                      return Column(
-                        children: [
-                          Row(
-                            children: [
-                              Expanded(
-                                child: TextFormField(
-                                  decoration: InputDecoration(
-                                    labelText: t.country,
-                                    border: OutlineInputBorder(
-                                      borderSide: BorderSide(
-                                        color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.5),
-                                      ),
-                                    ),
-                                    enabledBorder: OutlineInputBorder(
-                                      borderSide: BorderSide(
-                                        color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.5),
-                                      ),
-                                    ),
-                                    focusedBorder: OutlineInputBorder(
-                                      borderSide: BorderSide(
-                                        color: Theme.of(context).primaryColor,
-                                        width: 2,
-                                      ),
-                                    ),
-                                  ),
-                                  onChanged: (value) {
-                                    setState(() {
-                                      _businessData.country = value;
-                                    });
-                                  },
-                                ),
-                              ),
-                              SizedBox(width: fieldSpacing),
-                              Expanded(
-                                child: TextFormField(
-                                  decoration: InputDecoration(
-                                    labelText: t.province,
-                                    border: OutlineInputBorder(
-                                      borderSide: BorderSide(
-                                        color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.5),
-                                      ),
-                                    ),
-                                    enabledBorder: OutlineInputBorder(
-                                      borderSide: BorderSide(
-                                        color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.5),
-                                      ),
-                                    ),
-                                    focusedBorder: OutlineInputBorder(
-                                      borderSide: BorderSide(
-                                        color: Theme.of(context).primaryColor,
-                                        width: 2,
-                                      ),
-                                    ),
-                                  ),
-                                  onChanged: (value) {
-                                    setState(() {
-                                      _businessData.province = value;
-                                    });
-                                  },
-                                ),
-                              ),
-                            ],
-                          ),
-                          SizedBox(height: spacing),
-                          TextFormField(
-                            decoration: InputDecoration(
-                              labelText: t.city,
-                              border: OutlineInputBorder(
-                                borderSide: BorderSide(
-                                  color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.5),
-                                ),
-                              ),
-                              enabledBorder: OutlineInputBorder(
-                                borderSide: BorderSide(
-                                  color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.5),
-                                ),
-                              ),
-                              focusedBorder: OutlineInputBorder(
-                                borderSide: BorderSide(
-                                  color: Theme.of(context).primaryColor,
-                                  width: 2,
-                                ),
-                              ),
-                            ),
-                            onChanged: (value) {
-                              setState(() {
-                                _businessData.city = value;
-                              });
-                            },
-                          ),
-                        ],
-                      );
-                    } else {
-                      return Column(
-                        children: [
-                          TextFormField(
-                            decoration: InputDecoration(
-                              labelText: t.country,
-                              border: OutlineInputBorder(
-                                borderSide: BorderSide(
-                                  color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.5),
-                                ),
-                              ),
-                              enabledBorder: OutlineInputBorder(
-                                borderSide: BorderSide(
-                                  color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.5),
-                                ),
-                              ),
-                              focusedBorder: OutlineInputBorder(
-                                borderSide: BorderSide(
-                                  color: Theme.of(context).primaryColor,
-                                  width: 2,
-                                ),
-                              ),
-                            ),
-                            onChanged: (value) {
-                              setState(() {
-                                _businessData.country = value;
-                              });
-                            },
-                          ),
-                          SizedBox(height: spacing),
-                          TextFormField(
-                            decoration: InputDecoration(
-                              labelText: t.province,
-                              border: OutlineInputBorder(
-                                borderSide: BorderSide(
-                                  color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.5),
-                                ),
-                              ),
-                              enabledBorder: OutlineInputBorder(
-                                borderSide: BorderSide(
-                                  color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.5),
-                                ),
-                              ),
-                              focusedBorder: OutlineInputBorder(
-                                borderSide: BorderSide(
-                                  color: Theme.of(context).primaryColor,
-                                  width: 2,
-                                ),
-                              ),
-                            ),
-                            onChanged: (value) {
-                              setState(() {
-                                _businessData.province = value;
-                              });
-                            },
-                          ),
-                          SizedBox(height: spacing),
-                          TextFormField(
-                            decoration: InputDecoration(
-                              labelText: t.city,
-                              border: OutlineInputBorder(
-                                borderSide: BorderSide(
-                                  color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.5),
-                                ),
-                              ),
-                              enabledBorder: OutlineInputBorder(
-                                borderSide: BorderSide(
-                                  color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.5),
-                                ),
-                              ),
-                              focusedBorder: OutlineInputBorder(
-                                borderSide: BorderSide(
-                                  color: Theme.of(context).primaryColor,
-                                  width: 2,
-                                ),
-                              ),
-                            ),
-                            onChanged: (value) {
-                              setState(() {
-                                _businessData.city = value;
-                              });
-                            },
-                          ),
-                        ],
-                      );
-                    }
-                  },
-                ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildStep3() {
-    final t = Localizations.of<AppLocalizations>(context, AppLocalizations)!;
-    final padding = ResponsiveHelper.getPadding(context);
-    final spacing = ResponsiveHelper.responsiveValue(
-      context,
-      mobile: 16.0,
-      tablet: 20.0,
-      desktop: 24.0,
-    );
-    
-    return Center(
-      child: ConstrainedBox(
-        constraints: BoxConstraints(
-          maxWidth: ResponsiveHelper.getCardMaxWidth(context),
-        ),
-        child: Padding(
-          padding: EdgeInsets.all(padding),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-                Text(
-                  t.businessLegalInfo,
-                  style: Theme.of(context).textTheme.titleLarge,
-                ),
-                SizedBox(height: spacing),
-                
-                // فیلدهای قانونی در دو ستون
-                LayoutBuilder(
-                  builder: (context, constraints) {
-                    final fieldSpacing = ResponsiveHelper.getGridSpacing(context);
-                    if (!_isMobile(context)) {
-                      return Column(
-                        children: [
-                          Row(
-                            children: [
-                              Expanded(
-                                child: TextFormField(
-                                  decoration: InputDecoration(
-                                    labelText: t.nationalId,
-                                    border: OutlineInputBorder(
-                                      borderSide: BorderSide(
-                                        color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.5),
-                                      ),
-                                    ),
-                                    enabledBorder: OutlineInputBorder(
-                                      borderSide: BorderSide(
-                                        color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.5),
-                                      ),
-                                    ),
-                                    focusedBorder: OutlineInputBorder(
-                                      borderSide: BorderSide(
-                                        color: Theme.of(context).primaryColor,
-                                        width: 2,
-                                      ),
-                                    ),
-                                    errorText: _businessData.getValidationError('nationalId'),
-                                    helperText: '${t.example}: ${t.nationalIdExample}',
-                                  ),
-                                  keyboardType: TextInputType.number,
-                                  onChanged: (value) {
-                                    setState(() {
-                                      _businessData.nationalId = value;
-                                    });
-                                  },
-                                ),
-                              ),
-                              SizedBox(width: fieldSpacing),
-                              Expanded(
-                                child: TextFormField(
-                                  decoration: InputDecoration(
-                                    labelText: t.registrationNumber,
-                                    border: OutlineInputBorder(
-                                      borderSide: BorderSide(
-                                        color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.5),
-                                      ),
-                                    ),
-                                    enabledBorder: OutlineInputBorder(
-                                      borderSide: BorderSide(
-                                        color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.5),
-                                      ),
-                                    ),
-                                    focusedBorder: OutlineInputBorder(
-                                      borderSide: BorderSide(
-                                        color: Theme.of(context).primaryColor,
-                                        width: 2,
-                                      ),
-                                    ),
-                                  ),
-                                  keyboardType: TextInputType.text,
-                                  onChanged: (value) {
-                                    setState(() {
-                                      _businessData.registrationNumber = value;
-                                    });
-                                  },
-                                ),
-                              ),
-                            ],
-                          ),
-                          SizedBox(height: spacing),
-                          TextFormField(
-                            decoration: InputDecoration(
-                              labelText: t.economicId,
-                              border: OutlineInputBorder(
-                                borderSide: BorderSide(
-                                  color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.5),
-                                ),
-                              ),
-                              enabledBorder: OutlineInputBorder(
-                                borderSide: BorderSide(
-                                  color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.5),
-                                ),
-                              ),
-                              focusedBorder: OutlineInputBorder(
-                                borderSide: BorderSide(
-                                  color: Theme.of(context).primaryColor,
-                                  width: 2,
-                                ),
-                              ),
-                            ),
-                            keyboardType: TextInputType.text,
-                            onChanged: (value) {
-                              setState(() {
-                                _businessData.economicId = value;
-                              });
-                            },
-                          ),
-                        ],
-                      );
-                    } else {
-                      return Column(
-                        children: [
-                          TextFormField(
-                            decoration: InputDecoration(
-                              labelText: t.nationalId,
-                              border: OutlineInputBorder(
-                                borderSide: BorderSide(
-                                  color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.5),
-                                ),
-                              ),
-                              enabledBorder: OutlineInputBorder(
-                                borderSide: BorderSide(
-                                  color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.5),
-                                ),
-                              ),
-                              focusedBorder: OutlineInputBorder(
-                                borderSide: BorderSide(
-                                  color: Theme.of(context).primaryColor,
-                                  width: 2,
-                                ),
-                              ),
-                              errorText: _businessData.getValidationError('nationalId'),
-                              helperText: '${t.example}: ${t.nationalIdExample}',
-                            ),
-                            keyboardType: TextInputType.number,
-                            inputFormatters: [
-                              EnglishDigitsFormatter(),
-                              FilteringTextInputFormatter.digitsOnly,
-                            ],
-                            onChanged: (value) {
-                              setState(() {
-                                _businessData.nationalId = toEnglishDigits(value);
-                              });
-                            },
-                          ),
-                          SizedBox(height: spacing),
-                          TextFormField(
-                            decoration: InputDecoration(
-                              labelText: t.registrationNumber,
-                              border: OutlineInputBorder(
-                                borderSide: BorderSide(
-                                  color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.5),
-                                ),
-                              ),
-                              enabledBorder: OutlineInputBorder(
-                                borderSide: BorderSide(
-                                  color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.5),
-                                ),
-                              ),
-                              focusedBorder: OutlineInputBorder(
-                                borderSide: BorderSide(
-                                  color: Theme.of(context).primaryColor,
-                                  width: 2,
-                                ),
-                              ),
-                            ),
-                            keyboardType: TextInputType.text,
-                            onChanged: (value) {
-                              setState(() {
-                                _businessData.registrationNumber = value;
-                              });
-                            },
-                          ),
-                          SizedBox(height: spacing),
-                          TextFormField(
-                            decoration: InputDecoration(
-                              labelText: t.economicId,
-                              border: OutlineInputBorder(
-                                borderSide: BorderSide(
-                                  color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.5),
-                                ),
-                              ),
-                              enabledBorder: OutlineInputBorder(
-                                borderSide: BorderSide(
-                                  color: Theme.of(context).colorScheme.outline.withValues(alpha: 0.5),
-                                ),
-                              ),
-                              focusedBorder: OutlineInputBorder(
-                                borderSide: BorderSide(
-                                  color: Theme.of(context).primaryColor,
-                                  width: 2,
-                                ),
-                              ),
-                            ),
-                            keyboardType: TextInputType.text,
-                            onChanged: (value) {
-                              setState(() {
-                                _businessData.economicId = value;
-                              });
-                            },
-                          ),
-                        ],
-                      );
-                    }
-                  },
-                ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildCurrencyAndFiscalStep() {
-    final padding = ResponsiveHelper.getPadding(context);
-    final spacing = ResponsiveHelper.responsiveValue(
-      context,
-      mobile: 16.0,
-      tablet: 20.0,
-      desktop: 24.0,
-    );
-    
-    return Center(
-      child: ConstrainedBox(
-        constraints: BoxConstraints(
-          maxWidth: ResponsiveHelper.getCardMaxWidth(context),
-        ),
-        child: Padding(
-          padding: EdgeInsets.all(padding),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'ارز و سال مالی',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              SizedBox(height: spacing),
-              Container(
-                padding: EdgeInsets.all(padding),
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.surface,
-                  borderRadius: BorderRadius.circular(
-                    ResponsiveHelper.responsiveValue(
-                      context,
-                      mobile: 12.0,
-                      tablet: 14.0,
-                      desktop: 16.0,
-                    ),
-                  ),
-                  border: Border.all(
-                    color: Theme.of(context).dividerColor.withValues(alpha: 0.3),
-                  ),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    DropdownButtonFormField<int>(
-                      initialValue: _businessData.defaultCurrencyId,
-                      items: _currencies.map((c) {
-                        return DropdownMenuItem<int>(
-                          value: c['id'] as int,
-                          child: Text('${c['title']} (${c['code']})'),
-                        );
-                      }).toList(),
-                      decoration: const InputDecoration(
-                        labelText: 'ارز پیشفرض *',
-                        border: OutlineInputBorder(),
-                      ),
-                      onChanged: (v) {
-                        setState(() {
-                          _businessData.defaultCurrencyId = v;
-                          if (v != null && !_businessData.currencyIds.contains(v)) {
-                            _businessData.currencyIds.add(v);
-                          }
-                        });
-                      },
-                    ),
-                    SizedBox(height: spacing * 0.75),
-                    _CurrencyMultiSelect(
-                      currencies: _currencies,
-                      selectedIds: _businessData.currencyIds,
-                      defaultId: _businessData.defaultCurrencyId,
-                      onChanged: (ids) {
-                        setState(() {
-                          _businessData.currencyIds = ids;
-                          final d = _businessData.defaultCurrencyId;
-                          if (d != null && !_businessData.currencyIds.contains(d)) {
-                            _businessData.currencyIds.add(d);
-                          }
-                        });
-                      },
-                    ),
-                  ],
-                ),
-              ),
-              SizedBox(height: spacing * 1.5),
-              _buildFiscalStep(),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildStep4() {
-    final t = Localizations.of<AppLocalizations>(context, AppLocalizations)!;
-    final padding = ResponsiveHelper.getPadding(context);
-    final spacing = ResponsiveHelper.responsiveValue(
-      context,
-      mobile: 16.0,
-      tablet: 20.0,
-      desktop: 24.0,
-    );
-    final isTablet = _isTablet(context);
-    final isDesktop = _isDesktop(context);
-    
-    return Center(
-      child: ConstrainedBox(
-        constraints: BoxConstraints(
-          maxWidth: ResponsiveHelper.getCardMaxWidth(context),
-        ),
-        child: Padding(
-          padding: EdgeInsets.all(padding),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-                Text(
-                  t.confirmInfo,
-                  style: Theme.of(context).textTheme.titleLarge,
-                ),
-                SizedBox(height: spacing * 1.5),
-                
-                // نمایش خلاصه اطلاعات
-                Container(
-                  padding: EdgeInsets.all(padding),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.surface,
-                    borderRadius: BorderRadius.circular(
-                      ResponsiveHelper.responsiveValue(
-                        context,
-                        mobile: 12.0,
-                        tablet: 14.0,
-                        desktop: 16.0,
-                      ),
-                    ),
-                    border: Border.all(
-                      color: Theme.of(context).dividerColor.withValues(alpha: 0.3),
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Theme.of(context).shadowColor.withValues(alpha: 0.1),
-                        blurRadius: 8,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: LayoutBuilder(
-                    builder: (context, constraints) {
-                      // برای دسکتاپ و تبلت بزرگ، از دو ستون استفاده می‌کنیم
-                      if (isDesktop) {
-                        return Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  _buildSummaryItem(t.businessName, _businessData.name),
-                                  _buildSummaryItem(t.businessType, _businessData.businessType?.displayName ?? ''),
-                                  _buildSummaryItem(t.businessField, _businessData.businessField?.displayName ?? ''),
-                                  if (_businessData.address?.isNotEmpty == true)
-                                    _buildSummaryItem(t.address, _businessData.address!),
-                                  if (_businessData.phone?.isNotEmpty == true)
-                                    _buildSummaryItem(t.phone, _businessData.phone!),
-                                  if (_businessData.mobile?.isNotEmpty == true)
-                                    _buildSummaryItem(t.mobile, _businessData.mobile!),
-                                  if (_businessData.postalCode?.isNotEmpty == true)
-                                    _buildSummaryItem(t.postalCode, _businessData.postalCode!),
-                                ],
-                              ),
-                            ),
-                            SizedBox(width: spacing),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  if (_businessData.nationalId?.isNotEmpty == true)
-                                    _buildSummaryItem(t.nationalId, _businessData.nationalId!),
-                                  if (_businessData.registrationNumber?.isNotEmpty == true)
-                                    _buildSummaryItem(t.registrationNumber, _businessData.registrationNumber!),
-                                  if (_businessData.economicId?.isNotEmpty == true)
-                                    _buildSummaryItem(t.economicId, _businessData.economicId!),
-                                  if (_businessData.country?.isNotEmpty == true)
-                                    _buildSummaryItem(t.country, _businessData.country!),
-                                  if (_businessData.province?.isNotEmpty == true)
-                                    _buildSummaryItem(t.province, _businessData.province!),
-                                  if (_businessData.city?.isNotEmpty == true)
-                                    _buildSummaryItem(t.city, _businessData.city!),
-                                  if (_businessData.fiscalYears.isNotEmpty)
-                                    _buildSummaryItem('سال مالی', _businessData.fiscalYears.first.title),
-                                ],
-                              ),
-                            ),
-                          ],
-                        );
-                      } else {
-                        return Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _buildSummaryItem(t.businessName, _businessData.name),
-                            _buildSummaryItem(t.businessType, _businessData.businessType?.displayName ?? ''),
-                            _buildSummaryItem(t.businessField, _businessData.businessField?.displayName ?? ''),
-                            if (_businessData.address?.isNotEmpty == true)
-                              _buildSummaryItem(t.address, _businessData.address!),
-                            if (_businessData.phone?.isNotEmpty == true)
-                              _buildSummaryItem(t.phone, _businessData.phone!),
-                            if (_businessData.mobile?.isNotEmpty == true)
-                              _buildSummaryItem(t.mobile, _businessData.mobile!),
-                            if (_businessData.nationalId?.isNotEmpty == true)
-                              _buildSummaryItem(t.nationalId, _businessData.nationalId!),
-                            if (_businessData.registrationNumber?.isNotEmpty == true)
-                              _buildSummaryItem(t.registrationNumber, _businessData.registrationNumber!),
-                            if (_businessData.economicId?.isNotEmpty == true)
-                              _buildSummaryItem(t.economicId, _businessData.economicId!),
-                            if (_businessData.country?.isNotEmpty == true)
-                              _buildSummaryItem(t.country, _businessData.country!),
-                            if (_businessData.province?.isNotEmpty == true)
-                              _buildSummaryItem(t.province, _businessData.province!),
-                            if (_businessData.city?.isNotEmpty == true)
-                              _buildSummaryItem(t.city, _businessData.city!),
-                            if (_businessData.postalCode?.isNotEmpty == true)
-                              _buildSummaryItem(t.postalCode, _businessData.postalCode!),
-                            if (_businessData.fiscalYears.isNotEmpty)
-                              _buildSummaryItem('سال مالی', _businessData.fiscalYears.first.title),
-                          ],
-                        );
-                      }
-                    },
-                  ),
-                ),
-                SizedBox(height: spacing * 1.5),
-                
-                // پیام تأیید
-                Row(
-                  children: [
-                    Icon(
-                      Icons.info_outline,
-                      color: Theme.of(context).primaryColor,
-                      size: ResponsiveHelper.responsiveValue(
-                        context,
-                        mobile: 20.0,
-                        tablet: 22.0,
-                        desktop: 24.0,
-                      ),
-                    ),
-                    SizedBox(width: spacing * 0.5),
-                    Expanded(
-                      child: Text(
-                        t.confirmInfoMessage,
-                        style: TextStyle(
-                          fontSize: ResponsiveHelper.responsiveValue(
-                            context,
-                            mobile: 14.0,
-                            tablet: 15.0,
-                            desktop: 16.0,
-                          ),
-                          fontWeight: FontWeight.bold,
-                          color: Theme.of(context).colorScheme.onSurface,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSummaryItem(String label, String value) {
-    final spacing = ResponsiveHelper.responsiveValue(
-      context,
-      mobile: 8.0,
-      tablet: 10.0,
-      desktop: 12.0,
-    );
-    final labelWidth = ResponsiveHelper.responsiveValue(
-      context,
-      mobile: 100.0,
-      tablet: 120.0,
-      desktop: 140.0,
-    );
-    
-    return Padding(
-      padding: EdgeInsets.only(bottom: spacing * 0.75),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: labelWidth,
-            child: Text(
-              '$label:',
-              style: TextStyle(
-                fontWeight: FontWeight.w500,
-                fontSize: ResponsiveHelper.responsiveValue(
-                  context,
-                  mobile: 13.0,
-                  tablet: 14.0,
-                  desktop: 14.0,
-                ),
-                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.7),
-              ),
-            ),
-          ),
-          SizedBox(width: spacing * 0.5),
-          Expanded(
-            child: Text(
-              value,
-              style: TextStyle(
-                fontWeight: FontWeight.w400,
-                fontSize: ResponsiveHelper.responsiveValue(
-                  context,
-                  mobile: 13.0,
-                  tablet: 14.0,
-                  desktop: 14.0,
-                ),
-                color: Theme.of(context).colorScheme.onSurface,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _CurrencyMultiSelect extends StatefulWidget {
-  final List<Map<String, dynamic>> currencies;
-  final List<int> selectedIds;
-  final int? defaultId;
-  final ValueChanged<List<int>> onChanged;
-
-  const _CurrencyMultiSelect({
-    required this.currencies,
-    required this.selectedIds,
-    required this.defaultId,
-    required this.onChanged,
-  });
-
-  @override
-  State<_CurrencyMultiSelect> createState() => _CurrencyMultiSelectState();
-}
-
-class _CurrencyMultiSelectState extends State<_CurrencyMultiSelect> {
-  late List<int> _selected;
-  final TextEditingController _searchCtrl = TextEditingController();
-  bool _panelOpen = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _selected = List<int>.from(widget.selectedIds);
-  }
-
-  @override
-  void didUpdateWidget(covariant _CurrencyMultiSelect oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.selectedIds != widget.selectedIds) {
-      _selected = List<int>.from(widget.selectedIds);
-    }
-  }
-
-  @override
-  void dispose() {
-    _searchCtrl.dispose();
-    super.dispose();
-  }
-
-  void _toggle(int id) {
-    setState(() {
-      if (_selected.contains(id)) {
-        if (widget.defaultId != id) {
-          _selected.remove(id);
-        }
-      } else {
-        _selected.add(id);
-      }
-      widget.onChanged(List<int>.from(_selected));
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final filtered = widget.currencies.where((c) {
-      final q = _searchCtrl.text.trim();
-      if (q.isEmpty) return true;
-      final title = (c['title'] ?? '').toString();
-      final code = (c['code'] ?? '').toString();
-      return title.contains(q) || code.toLowerCase().contains(q.toLowerCase());
-    }).toList();
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+  Widget _buildWizard(
+    BuildContext context,
+    AppLocalizations t,
+    bool isDesktop,
+  ) {
+    final titles = _stepTitles(t);
+    final content = Column(
       children: [
-        Text('ارزهای جانبی', style: theme.textTheme.titleSmall),
-        const SizedBox(height: 8),
-        GestureDetector(
-          onTap: () => setState(() => _panelOpen = !_panelOpen),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            decoration: BoxDecoration(
-              border: Border.all(color: theme.colorScheme.outline.withValues(alpha: 0.4)),
-              borderRadius: BorderRadius.circular(8),
-              color: theme.colorScheme.surface,
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Wrap(
-                    spacing: 6,
-                    runSpacing: 6,
-                    children: _selected.isEmpty
-                        ? [
-                            Text(
-                              'انتخاب کنید...',
-                              style: theme.textTheme.bodyMedium?.copyWith(
-                                color: theme.hintColor,
-                              ),
-                            )
-                          ]
-                        : _selected.map((id) {
-                            final c = widget.currencies.firstWhere((e) => e['id'] == id, orElse: () => {});
-                            final isDefault = widget.defaultId == id;
-                            return Chip(
-                              label: Text('${c['title']} (${c['code']})'),
-                              avatar: isDefault ? const Icon(Icons.star, size: 16) : null,
-                              onDeleted: isDefault ? null : () => _toggle(id),
-                              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                              visualDensity: VisualDensity.compact,
-                            );
-                          }).toList(),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Icon(_panelOpen ? Icons.expand_less : Icons.expand_more),
-              ],
-            ),
+        NewBusinessWizardProgress(
+          currentStep: _currentStep,
+          totalSteps: _lastWizardStep + 1,
+          stepTitles: titles,
+          onStepTap: _isLoading ? null : _goToStep,
+        ),
+        Expanded(
+          child: isDesktop
+              ? Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    SizedBox(
+                      width: 300,
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(24, 20, 8, 20),
+                        child: Align(
+                          alignment: Alignment.topCenter,
+                          child: NewBusinessLivePreview(
+                            data: _businessData,
+                            currencies: _currencies,
+                          ),
+                        ),
+                      ),
+                    ),
+                    VerticalDivider(
+                      width: 1,
+                      color: Theme.of(
+                        context,
+                      ).colorScheme.outlineVariant.withValues(alpha: 0.5),
+                    ),
+                    Expanded(child: _buildPageView()),
+                  ],
+                )
+              : _buildPageView(),
+        ),
+        NewBusinessWizardNavBar(
+          currentStep: _currentStep,
+          lastStep: _lastWizardStep,
+          canGoNext: _canGoToNextStep(),
+          isLoading: _isLoading,
+          showBackToOptions: true,
+          onBack: _isLoading ? null : _previousStep,
+          onNext: _isLoading ? null : _nextStep,
+          onSubmit: _isLoading ? null : _submitBusiness,
+          onBackToOptions: _isLoading ? null : _backToIntent,
+        ),
+      ],
+    );
+
+    return content;
+  }
+
+  Widget _buildPageView() {
+    return PageView(
+      controller: _pageController,
+      physics: const NeverScrollableScrollPhysics(),
+      onPageChanged: (index) {
+        setState(() => _currentStep = index);
+      },
+      children: [
+        SingleChildScrollView(
+          child: NewBusinessIdentityStep(
+            data: _businessData,
+            nameController: _nameController,
+            nameFocusNode: _nameFocusNode,
+            showNameError: _showNameError,
+            onChanged: (data) {
+              setState(() {
+                _businessData = data;
+                _showNameError = false;
+              });
+            },
           ),
         ),
-        if (_panelOpen) ...[
-          const SizedBox(height: 8),
-          TextField(
-            controller: _searchCtrl,
-            decoration: const InputDecoration(
-              prefixIcon: Icon(Icons.search),
-              hintText: 'جستجو بر اساس نام یا کد...',
-              border: OutlineInputBorder(),
-              isDense: true,
-            ),
-            onChanged: (_) => setState(() {}),
+        SingleChildScrollView(
+          child: NewBusinessFinancialStep(
+            data: _businessData,
+            currencies: _currencies,
+            calendarController: widget.calendarController,
+            fiscalTitleController: _fiscalTitleController,
+            fiscalAutoTitle: _fiscalAutoTitle,
+            isAutoFiscalTitle: _isAutoFiscalTitle,
+            onChanged: (data) => setState(() => _businessData = data),
           ),
-          const SizedBox(height: 8),
-          ConstrainedBox(
-            constraints: const BoxConstraints(maxHeight: 240),
-            child: Scrollbar(
-              child: ListView.builder(
-                shrinkWrap: true,
-                itemCount: filtered.length,
-                itemBuilder: (context, index) {
-                  final c = filtered[index];
-                  final id = c['id'] as int;
-                  final selected = _selected.contains(id);
-                  final isDefault = widget.defaultId == id;
-                  return CheckboxListTile(
-                    value: selected,
-                    onChanged: (val) => _toggle(id),
-                    dense: true,
-                    title: Text('${c['title']} (${c['code']})'),
-                    secondary: isDefault ? const Icon(Icons.star, size: 18) : null,
-                    controlAffinity: ListTileControlAffinity.leading,
-                  );
-                },
+        ),
+        SingleChildScrollView(
+          child: NewBusinessReviewStep(
+            data: _businessData,
+            currencies: _currencies,
+            calendarController: widget.calendarController,
+            onEditStep: _goToStep,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildImportOverlay(AppLocalizations t) {
+    return Stack(
+      children: [
+        ModalBarrier(
+          color: Colors.black.withValues(alpha: 0.45),
+          dismissible: false,
+        ),
+        Center(
+          child: Card(
+            margin: const EdgeInsets.all(32),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(28),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SizedBox(
+                    width: 52,
+                    height: 52,
+                    child: CircularProgressIndicator(
+                      value: _importProgress > 0 ? _importProgress / 100 : null,
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  Text(
+                    _importMessage ?? t.importBackupInProgress,
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text('$_importProgress%'),
+                  const SizedBox(height: 8),
+                  Text(
+                    t.importBackupPleaseWait,
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ],
               ),
             ),
           ),
-        ],
+        ),
       ],
     );
   }

@@ -74,7 +74,7 @@ class _PersonFinancialBalanceBannerState extends State<PersonFinancialBalanceBan
   static String statusDisplayLabel(String apiStatus) {
     switch (apiStatus) {
       case 'بالانس':
-        return 'تراز';
+        return 'تسویه';
       default:
         return apiStatus;
     }
@@ -131,7 +131,7 @@ class _PersonFinancialBalanceBannerState extends State<PersonFinancialBalanceBan
 
         final statusColor = _statusColor(context, status);
         final statusLabel = statusDisplayLabel(status);
-        final amountText = formatWithThousands(balance);
+        final amountText = formatWithThousands((balance).abs());
 
         return Text.rich(
           TextSpan(

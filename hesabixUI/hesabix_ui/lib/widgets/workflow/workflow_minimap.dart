@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../models/workflow_editor_models.dart';
 import '../../models/workflow_editor_state.dart';
+import 'package:hesabix_ui/theme/tokens/semantic_colors.dart';
 
 /// Mini-map برای نمایش نمای کلی workflow
 class WorkflowMinimap extends StatelessWidget {
@@ -135,7 +136,7 @@ class MinimapPainter extends CustomPainter {
 
     // رسم connections
     final connectionPaint = Paint()
-      ..color = Colors.blue.shade300
+      ..color = (theme.extension<AppSemanticColors>()?.info ?? theme.colorScheme.primary).withValues(alpha: 0.5)
       ..strokeWidth = 1.0
       ..style = PaintingStyle.stroke;
 
@@ -198,13 +199,14 @@ class MinimapPainter extends CustomPainter {
   }
 
   Color _getNodeColor(WorkflowNodeType type) {
+    final semantics = theme.extension<AppSemanticColors>();
     switch (type) {
       case WorkflowNodeType.trigger:
-        return Colors.green;
+        return semantics?.positive ?? theme.colorScheme.tertiary;
       case WorkflowNodeType.action:
         return theme.colorScheme.primary;
       case WorkflowNodeType.condition:
-        return Colors.orange;
+        return semantics?.warning ?? theme.colorScheme.secondary;
       case WorkflowNodeType.loop:
         return Colors.purple;
     }

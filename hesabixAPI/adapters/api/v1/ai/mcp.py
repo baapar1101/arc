@@ -18,16 +18,16 @@ async def mcp_jsonrpc_endpoint(
     request: Request,
     body: Dict[str, Any] = Body(...),
     business_id: Optional[int] = Query(None, description="شناسه کسب‌وکار برای tools"),
-    approve_writes: bool = Query(
-        False,
-        description="اجازه اجرای ابزارهای تغییردهنده (create_invoice و …)",
-    ),
     db: Session = Depends(get_db),
     ctx: AuthContext = Depends(get_current_user),
 ) -> Dict[str, Any]:
     """
     Endpoint سازگار با MCP برای لیست و فراخوانی ابزارهای Hesabix.
     احراز هویت مانند سایر APIها (Bearer / Api-Key).
+
+    ابزارهای نوشتنی به‌صورت پیش‌فرض ``APPROVAL_REQUIRED`` برمی‌گردند.
+    برای اجرای write پس از تأیید، در بدنهٔ JSON-RPC مقدار
+    ``params.approve_writes: true`` بفرستید — نه در query string.
     """
     effective_business_id = business_id or ctx.business_id
     if body.get("method") == "tools/call" and not effective_business_id:
@@ -40,6 +40,5 @@ async def mcp_jsonrpc_endpoint(
         ctx,
         body,
         business_id=effective_business_id,
-        approve_writes=approve_writes,
     )
     return response

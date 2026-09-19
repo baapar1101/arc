@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import List
 from fastapi import APIRouter, Depends, Request
-from adapters.api.v1.support.dependencies import require_end_user_support_open
+from adapters.api.v1.support.dependencies import require_support_access
 from sqlalchemy.orm import Session
 
 from adapters.db.session import get_db
@@ -11,6 +11,7 @@ from adapters.api.v1.support.schemas import StatusResponse
 from adapters.api.v1.schemas import SuccessResponse
 from app.core.responses import success_response, format_datetime_fields
 from app.core.cache import CacheService
+from app.core.auth_dependency import get_current_user, AuthContext
 
 router = APIRouter()
 cache_service = CacheService()
@@ -19,7 +20,8 @@ cache_service = CacheService()
 @router.get("", response_model=SuccessResponse)
 async def get_statuses(
     request: Request,
-    _require_support: None = Depends(require_end_user_support_open),
+    _require_support: None = Depends(require_support_access),
+    current_user: AuthContext = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """دریافت لیست وضعیت‌ها - با caching"""

@@ -6,6 +6,7 @@ import '../../../core/auth_store.dart';
 import '../../../l10n/app_localizations.dart';
 import '../../../core/permission_guard.dart';
 import 'basalam_plugin_settings_body.dart';
+import 'package:hesabix_ui/core/hesabix_back.dart';
 
 /// تنظیمات افزونهٔ باسلام زیر مسیر `.../settings/basalam`.
 class BasalamSettingsPage extends StatelessWidget {
@@ -35,10 +36,7 @@ class BasalamSettingsPage extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: Text(t.basalamSettingsPageTitle),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.pop(),
-        ),
+        leading: hesabixBackAppBarLeading(context, businessId: businessId),
         actions: [
           IconButton(
             tooltip: t.basalamOpenIntegrationHub,

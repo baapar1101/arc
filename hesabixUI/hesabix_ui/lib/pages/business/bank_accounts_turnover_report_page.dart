@@ -12,6 +12,7 @@ import 'package:hesabix_ui/services/currency_service.dart';
 import 'package:hesabix_ui/services/bank_account_service.dart';
 import 'package:hesabix_ui/widgets/data_table/helpers/data_table_utils.dart';
 import 'package:hesabix_ui/core/date_utils.dart';
+import 'package:hesabix_ui/core/hesabix_back.dart';
 
 class BankAccountsTurnoverReportPage extends StatefulWidget {
   final int businessId;
@@ -76,14 +77,8 @@ class _BankAccountsTurnoverReportPageState extends State<BankAccountsTurnoverRep
       if (!mounted) return;
       setState(() {
         _currencies = items;
-        // انتخاب ارز پیش‌فرض
-        if (items.isNotEmpty) {
-          final defaultCurrency = items.firstWhere(
-            (c) => c['is_default'] == true,
-            orElse: () => items.first,
-          );
-          _selectedCurrencyId = defaultCurrency['id'] as int?;
-        }
+        // قرارداد چندارزی: null = همه ارزها → معادل پایه
+        _selectedCurrencyId = null;
       });
     } catch (_) {
       // ignore errors
@@ -218,10 +213,7 @@ class _BankAccountsTurnoverReportPageState extends State<BankAccountsTurnoverRep
     return Scaffold(
       backgroundColor: cs.surface,
       appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.pop(),
-        ),
+        leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
         title: Text(t.reportsBankAccountsTurnoverTitle),
         actions: [
           IconButton(
@@ -275,7 +267,7 @@ class _BankAccountsTurnoverReportPageState extends State<BankAccountsTurnoverRep
                   ),
                   SizedBox(
                     width: 220,
-                    child: DropdownButtonFormField<int>(
+                    child: DropdownButtonFormField<int?>(
                       value: _selectedCurrencyId,
                       decoration: InputDecoration(
                         labelText: t.currency,
@@ -283,11 +275,16 @@ class _BankAccountsTurnoverReportPageState extends State<BankAccountsTurnoverRep
                         isDense: true,
                         contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
                       ),
-                      items: _currencies.map<DropdownMenuItem<int>>((c) {
+                      items: [
+                        const DropdownMenuItem<int?>(
+                          value: null,
+                          child: Text('همه ارزها (معادل پایه)'),
+                        ),
+                        ..._currencies.map<DropdownMenuItem<int?>>((c) {
                         final id = c['id'] as int?;
                         final code = (c['code'] ?? '').toString();
                         final title = (c['title'] ?? code).toString();
-                        return DropdownMenuItem<int>(
+                        return DropdownMenuItem<int?>(
                           value: id,
                           child: Text(
                             '$code - $title',
@@ -295,7 +292,8 @@ class _BankAccountsTurnoverReportPageState extends State<BankAccountsTurnoverRep
                             maxLines: 1,
                           ),
                         );
-                      }).toList(),
+                      }),
+                      ],
                       menuMaxHeight: 300,
                       onChanged: (val) {
                         setState(() {

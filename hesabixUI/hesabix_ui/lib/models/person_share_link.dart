@@ -1,11 +1,13 @@
 class PersonShareLinkOptionsModel {
   final bool includeLedger;
   final bool includeInvoices;
+  final bool includeInvoiceLines;
   final int documentsLimit;
 
   const PersonShareLinkOptionsModel({
     required this.includeLedger,
     required this.includeInvoices,
+    this.includeInvoiceLines = true,
     required this.documentsLimit,
   });
 
@@ -14,6 +16,7 @@ class PersonShareLinkOptionsModel {
     return PersonShareLinkOptionsModel(
       includeLedger: data['include_ledger'] != false,
       includeInvoices: data['include_invoices'] != false,
+      includeInvoiceLines: data['include_invoice_lines'] != false,
       documentsLimit: (data['documents_limit'] as num?)?.toInt() ?? 50,
     );
   }
@@ -21,17 +24,20 @@ class PersonShareLinkOptionsModel {
   Map<String, dynamic> toJson() => {
         'include_ledger': includeLedger,
         'include_invoices': includeInvoices,
+        'include_invoice_lines': includeInvoiceLines,
         'documents_limit': documentsLimit,
       };
 
   PersonShareLinkOptionsModel copyWith({
     bool? includeLedger,
     bool? includeInvoices,
+    bool? includeInvoiceLines,
     int? documentsLimit,
   }) {
     return PersonShareLinkOptionsModel(
       includeLedger: includeLedger ?? this.includeLedger,
       includeInvoices: includeInvoices ?? this.includeInvoices,
+      includeInvoiceLines: includeInvoiceLines ?? this.includeInvoiceLines,
       documentsLimit: documentsLimit ?? this.documentsLimit,
     );
   }

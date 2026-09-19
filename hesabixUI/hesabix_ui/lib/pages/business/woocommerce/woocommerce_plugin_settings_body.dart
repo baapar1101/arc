@@ -11,6 +11,7 @@ import '../../../utils/error_extractor.dart';
 import '../../../utils/snackbar_helper.dart';
 import 'woocommerce_arcwoc_plugin_panel.dart';
 import 'woocommerce_l10n_format.dart';
+import 'package:hesabix_ui/config/brand_config.dart';
 
 /// فرم تنظیمات پل ووکامرس + پنل تنظیمات کلی افزونهٔ ArcWOC.
 class WoocommercePluginSettingsBody extends StatefulWidget {
@@ -41,6 +42,7 @@ class _WoocommercePluginSettingsBodyState
   bool _hasStoredBridgeToken = false;
   bool _tokenObscured = true;
   Map<String, dynamic>? _lastBridgeTest;
+  bool _pushStockOnWarehousePost = true;
 
   bool _canWooCommerceView() {
     if (widget.authStore.currentBusiness?.isOwner == true) return true;
@@ -78,6 +80,8 @@ class _WoocommercePluginSettingsBodyState
       final tok = (m['bridge_token'] ?? '').toString();
       _hasStoredBridgeToken = tok == '***' || tok.isNotEmpty;
       _tokenCtl.text = tok == '***' ? '' : tok;
+      _pushStockOnWarehousePost =
+          m['push_stock_to_wc_on_warehouse_post'] != false;
     } catch (e) {
       if (mounted) {
         SnackBarHelper.showError(
@@ -102,6 +106,7 @@ class _WoocommercePluginSettingsBodyState
           'bridge_token': _tokenCtl.text.trim().isEmpty
               ? '***'
               : _tokenCtl.text.trim(),
+          'push_stock_to_wc_on_warehouse_post': _pushStockOnWarehousePost,
         },
       );
       if (mounted) {
@@ -219,7 +224,7 @@ class _WoocommercePluginSettingsBodyState
         ),
         const SizedBox(height: 8),
         Text(
-          t.woocommerceSettingsBridgeIntroBody,
+          t.branded(t.woocommerceSettingsBridgeIntroBody),
           style: theme.textTheme.bodyMedium,
         ),
         const SizedBox(height: 12),
@@ -290,6 +295,16 @@ class _WoocommercePluginSettingsBodyState
             color: theme.colorScheme.outline,
           ),
         ),
+        const SizedBox(height: 12),
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          title: Text(t.woocommerceSettingsPushStockOnWarehousePost),
+          subtitle: Text(t.branded(t.woocommerceSettingsPushStockOnWarehousePostHelp)),
+          value: _pushStockOnWarehousePost,
+          onChanged: !canManage
+              ? null
+              : (v) => setState(() => _pushStockOnWarehousePost = v),
+        ),
         const SizedBox(height: 16),
         Wrap(
           spacing: 8,
@@ -344,7 +359,7 @@ class _WoocommercePluginSettingsBodyState
             child: ListTile(
               leading: const Icon(Icons.inventory_2_outlined),
               title: Text(t.woocommerceSettingsOpeningInventoryLinkTitle),
-              subtitle: Text(t.woocommerceSettingsOpeningInventoryLinkSubtitle),
+              subtitle: Text(t.branded(t.woocommerceSettingsOpeningInventoryLinkSubtitle)),
               trailing: const Icon(Icons.chevron_right),
               onTap: () => context.push(
                 context.businessPanelUrl(

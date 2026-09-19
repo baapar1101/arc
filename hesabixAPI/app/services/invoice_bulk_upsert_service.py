@@ -50,208 +50,222 @@ def bulk_upsert_invoices_integration(
             http_status=400,
         )
 
-    uid = auth_context.get_user_id()
+    migration_mode = bool(body.get("migration_mode"))
+    token = None
+    if migration_mode:
+        if not has_business_permission_for_business(auth_context, db, business_id, "invoices", "add"):
+            raise ApiError("FORBIDDEN", "مجوز مهاجرت فاکتور وجود ندارد", http_status=403)
+        from app.services.legacy_import.context import set_legacy_import_active
 
+        token = set_legacy_import_active(True)
+
+    uid = auth_context.get_user_id()
     results: List[Dict[str, Any]] = []
 
-    for idx, raw in enumerate(items):
-        base = {"index": idx}
-        cref = raw.get("client_ref") if isinstance(raw, dict) else None
-        if cref is not None:
-            base["client_ref"] = str(cref).strip() or None
-        else:
-            base["client_ref"] = None
+    try:
+        for idx, raw in enumerate(items):
+            base = {"index": idx}
+            cref = raw.get("client_ref") if isinstance(raw, dict) else None
+            if cref is not None:
+                base["client_ref"] = str(cref).strip() or None
+            else:
+                base["client_ref"] = None
 
-        if not isinstance(raw, dict):
-            results.append(
-                {
-                    **base,
-                    "status": "failed",
-                    "invoice_id": None,
-                    "error_code": "INVALID_ITEM",
-                    "message": "آیتم باید شیٔ JSON باشد",
-                }
-            )
-            continue
+            if not isinstance(raw, dict):
+                results.append(
+                    {
+                        **base,
+                        "status": "failed",
+                        "invoice_id": None,
+                        "error_code": "INVALID_ITEM",
+                        "message": "آیتم باید شیٔ JSON باشد",
+                    }
+                )
+                continue
 
-        payload = raw.get("payload")
-        if not isinstance(payload, dict):
-            results.append(
-                {
-                    **base,
-                    "status": "failed",
-                    "invoice_id": None,
-                    "error_code": "INVALID_PAYLOAD",
-                    "message": "payload الزامی است و باید شیٔ باشد",
-                }
-            )
-            continue
+            payload = raw.get("payload")
+            if not isinstance(payload, dict):
+                results.append(
+                    {
+                        **base,
+                        "status": "failed",
+                        "invoice_id": None,
+                        "error_code": "INVALID_PAYLOAD",
+                        "message": "payload الزامی است و باید شیٔ باشد",
+                    }
+                )
+                continue
 
-        inv_type = str(payload.get("invoice_type") or "").strip()
+            inv_type = str(payload.get("invoice_type") or "").strip()
 
-        raw_iid = raw.get("invoice_id")
-        invoice_id_val: int | None = None
-        if raw_iid not in (None, ""):
-            try:
-                invoice_id_val = int(raw_iid)
-            except (ValueError, TypeError):
+            raw_iid = raw.get("invoice_id")
+            invoice_id_val: int | None = None
+            if raw_iid not in (None, ""):
+                try:
+                    invoice_id_val = int(raw_iid)
+                except (ValueError, TypeError):
+                    invoice_id_val = None
+            if invoice_id_val is not None and invoice_id_val <= 0:
                 invoice_id_val = None
-        if invoice_id_val is not None and invoice_id_val <= 0:
-            invoice_id_val = None
 
-        # --- ایجاد ---
-        if invoice_id_val is None:
-            if not has_business_permission_for_business(auth_context, db, business_id, "invoices", "add"):
-                results.append(
-                    {
-                        **base,
-                        "status": "failed",
-                        "invoice_id": None,
-                        "error_code": "FORBIDDEN",
-                        "message": "مجوز افزودن فاکتور وجود ندارد",
-                    }
-                )
-                continue
-            if inv_type not in SUPPORTED_INVOICE_TYPES:
-                results.append(
-                    {
-                        **base,
-                        "status": "failed",
-                        "invoice_id": None,
-                        "error_code": "INVALID_INVOICE_TYPE",
-                        "message": f"نوع فاکتور نامعتبر: {inv_type!r}",
-                    }
-                )
-                continue
-            if not has_invoice_type_permission_for_business(
-                auth_context, db, business_id, inv_type, "add"
-            ):
-                results.append(
-                    {
-                        **base,
-                        "status": "failed",
-                        "invoice_id": None,
-                        "error_code": "FORBIDDEN",
-                        "message": f"مجوز ثبت برای نوع سند ({inv_type}) وجود ندارد",
-                    }
-                )
-                continue
-            try:
-                doc_dict = create_invoice(
-                    db=db,
-                    business_id=business_id,
-                    user_id=int(uid),
-                    data=payload,
-                    user_can_select_fx_rate=user_can_select_fx_rate,
-                )
-                nid = doc_dict.get("id") if isinstance(doc_dict, dict) else None
-                results.append(
-                    {
-                        **base,
-                        "status": "created",
-                        "invoice_id": int(nid) if nid is not None else None,
-                    }
-                )
-            except ApiError as ae:
-                p = _api_error_parts(ae)
-                results.append(
-                    {
-                        **base,
-                        "status": "failed",
-                        "invoice_id": None,
-                        "error_code": p["code"],
-                        "message": p["message"],
-                    }
-                )
-            except IntegrityError as e:
-                results.append(
-                    {
-                        **base,
-                        "status": "failed",
-                        "invoice_id": None,
-                        "error_code": "INTEGRITY_ERROR",
-                        "message": str(getattr(e, "orig", e) or e),
-                    }
-                )
+            # --- ایجاد ---
+            if invoice_id_val is None:
+                if not has_business_permission_for_business(auth_context, db, business_id, "invoices", "add"):
+                    results.append(
+                        {
+                            **base,
+                            "status": "failed",
+                            "invoice_id": None,
+                            "error_code": "FORBIDDEN",
+                            "message": "مجوز افزودن فاکتور وجود ندارد",
+                        }
+                    )
+                    continue
+                if inv_type not in SUPPORTED_INVOICE_TYPES:
+                    results.append(
+                        {
+                            **base,
+                            "status": "failed",
+                            "invoice_id": None,
+                            "error_code": "INVALID_INVOICE_TYPE",
+                            "message": f"نوع فاکتور نامعتبر: {inv_type!r}",
+                        }
+                    )
+                    continue
+                if not has_invoice_type_permission_for_business(
+                    auth_context, db, business_id, inv_type, "add"
+                ):
+                    results.append(
+                        {
+                            **base,
+                            "status": "failed",
+                            "invoice_id": None,
+                            "error_code": "FORBIDDEN",
+                            "message": f"مجوز ثبت برای نوع سند ({inv_type}) وجود ندارد",
+                        }
+                    )
+                    continue
+                try:
+                    doc_dict = create_invoice(
+                        db=db,
+                        business_id=business_id,
+                        user_id=int(uid),
+                        data=payload,
+                        user_can_select_fx_rate=user_can_select_fx_rate,
+                    )
+                    nid = doc_dict.get("id") if isinstance(doc_dict, dict) else None
+                    results.append(
+                        {
+                            **base,
+                            "status": "created",
+                            "invoice_id": int(nid) if nid is not None else None,
+                        }
+                    )
+                except ApiError as ae:
+                    p = _api_error_parts(ae)
+                    results.append(
+                        {
+                            **base,
+                            "status": "failed",
+                            "invoice_id": None,
+                            "error_code": p["code"],
+                            "message": p["message"],
+                        }
+                    )
+                except IntegrityError as e:
+                    results.append(
+                        {
+                            **base,
+                            "status": "failed",
+                            "invoice_id": None,
+                            "error_code": "INTEGRITY_ERROR",
+                            "message": str(getattr(e, "orig", e) or e),
+                        }
+                    )
 
-        else:
-            # --- ویرایش ---
-            if not has_business_permission_for_business(auth_context, db, business_id, "invoices", "edit"):
-                results.append(
-                    {
-                        **base,
-                        "status": "failed",
-                        "invoice_id": invoice_id_val,
-                        "error_code": "FORBIDDEN",
-                        "message": "مجوز ویرایش فاکتور وجود ندارد",
-                    }
-                )
-                continue
+            else:
+                # --- ویرایش ---
+                if not has_business_permission_for_business(auth_context, db, business_id, "invoices", "edit"):
+                    results.append(
+                        {
+                            **base,
+                            "status": "failed",
+                            "invoice_id": invoice_id_val,
+                            "error_code": "FORBIDDEN",
+                            "message": "مجوز ویرایش فاکتور وجود ندارد",
+                        }
+                    )
+                    continue
 
-            doc = db.query(Document).filter(Document.id == invoice_id_val).first()
-            if not doc or doc.business_id != business_id or doc.document_type not in SUPPORTED_INVOICE_TYPES:
-                results.append(
-                    {
-                        **base,
-                        "status": "failed",
-                        "invoice_id": invoice_id_val,
-                        "error_code": "DOCUMENT_NOT_FOUND",
-                        "message": "فاکتور یافت نشد یا نامعتبر است",
-                    }
-                )
-                continue
+                doc = db.query(Document).filter(Document.id == invoice_id_val).first()
+                if not doc or doc.business_id != business_id or doc.document_type not in SUPPORTED_INVOICE_TYPES:
+                    results.append(
+                        {
+                            **base,
+                            "status": "failed",
+                            "invoice_id": invoice_id_val,
+                            "error_code": "DOCUMENT_NOT_FOUND",
+                            "message": "فاکتور یافت نشد یا نامعتبر است",
+                        }
+                    )
+                    continue
 
-            if not has_invoice_type_permission_for_business(
-                auth_context, db, business_id, doc.document_type, "edit"
-            ):
-                results.append(
-                    {
-                        **base,
-                        "status": "failed",
-                        "invoice_id": invoice_id_val,
-                        "error_code": "FORBIDDEN",
-                        "message": f"مجوز ویرایش برای نوع سند ({doc.document_type}) وجود ندارد",
-                    }
-                )
-                continue
+                if not has_invoice_type_permission_for_business(
+                    auth_context, db, business_id, doc.document_type, "edit"
+                ):
+                    results.append(
+                        {
+                            **base,
+                            "status": "failed",
+                            "invoice_id": invoice_id_val,
+                            "error_code": "FORBIDDEN",
+                            "message": f"مجوز ویرایش برای نوع سند ({doc.document_type}) وجود ندارد",
+                        }
+                    )
+                    continue
 
-            try:
-                doc_dict = update_invoice(
-                    db=db,
-                    document_id=invoice_id_val,
-                    user_id=int(uid),
-                    data=payload,
-                    user_can_select_fx_rate=user_can_select_fx_rate,
-                )
-                nid = doc_dict.get("id") if isinstance(doc_dict, dict) else None
-                results.append(
-                    {
-                        **base,
-                        "status": "updated",
-                        "invoice_id": int(nid) if nid is not None else invoice_id_val,
-                    }
-                )
-            except ApiError as ae:
-                p = _api_error_parts(ae)
-                results.append(
-                    {
-                        **base,
-                        "status": "failed",
-                        "invoice_id": invoice_id_val,
-                        "error_code": p["code"],
-                        "message": p["message"],
-                    }
-                )
-            except IntegrityError as e:
-                results.append(
-                    {
-                        **base,
-                        "status": "failed",
-                        "invoice_id": invoice_id_val,
-                        "error_code": "INTEGRITY_ERROR",
-                        "message": str(getattr(e, "orig", e) or e),
-                    }
-                )
+                try:
+                    doc_dict = update_invoice(
+                        db=db,
+                        document_id=invoice_id_val,
+                        user_id=int(uid),
+                        data=payload,
+                        user_can_select_fx_rate=user_can_select_fx_rate,
+                    )
+                    nid = doc_dict.get("id") if isinstance(doc_dict, dict) else None
+                    results.append(
+                        {
+                            **base,
+                            "status": "updated",
+                            "invoice_id": int(nid) if nid is not None else invoice_id_val,
+                        }
+                    )
+                except ApiError as ae:
+                    p = _api_error_parts(ae)
+                    results.append(
+                        {
+                            **base,
+                            "status": "failed",
+                            "invoice_id": invoice_id_val,
+                            "error_code": p["code"],
+                            "message": p["message"],
+                        }
+                    )
+                except IntegrityError as e:
+                    results.append(
+                        {
+                            **base,
+                            "status": "failed",
+                            "invoice_id": invoice_id_val,
+                            "error_code": "INTEGRITY_ERROR",
+                            "message": str(getattr(e, "orig", e) or e),
+                        }
+                    )
+    finally:
+        if token is not None:
+            from app.services.legacy_import.context import reset_legacy_import_active
+
+            reset_legacy_import_active(token)
 
     summary = {
         "total": len(items),

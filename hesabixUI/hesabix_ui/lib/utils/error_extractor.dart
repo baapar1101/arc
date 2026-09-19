@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:dio/dio.dart' as dio;
 import 'package:flutter/widgets.dart' show BuildContext, Locale;
 
+import '../config/brand_config.dart';
 import '../core/api_client.dart';
 import '../l10n/app_localizations.dart';
 import '../services/errors/api_error.dart';
@@ -135,6 +136,51 @@ class ErrorExtractor {
       case 'TITLE_REQUIRED':
         return t.loanFacilityValidationTitleRequired;
 
+      case 'NO_ACTIVE_STORAGE_PLAN':
+        return t.apiErrorNoActiveStoragePlan;
+      case 'STORAGE_LIMIT_EXCEEDED':
+        return t.apiErrorStorageLimitExceeded;
+      case 'FILE_SIZE_EXCEEDED':
+        return t.apiErrorFileSizeExceeded;
+
+      case 'LEGACY_ACCPRO_REQUIRED':
+        return t.branded(t.apiErrorLegacyAccproRequired);
+
+      default:
+        return null;
+    }
+  }
+
+  static String? _messageForStorageError(Map error, AppLocalizations t) {
+    final code = error['code'];
+    if (code is! String) return null;
+
+    switch (code) {
+      case 'NO_ACTIVE_STORAGE_PLAN':
+        final noPlanMsg = error['message'];
+        if (noPlanMsg is String && noPlanMsg.isNotEmpty) return noPlanMsg;
+        return t.apiErrorNoActiveStoragePlan;
+      case 'FILE_SIZE_EXCEEDED':
+        final sizeMsg = error['message'];
+        if (sizeMsg is String && sizeMsg.isNotEmpty) return sizeMsg;
+        return t.apiErrorFileSizeExceeded;
+      case 'STORAGE_LIMIT_EXCEEDED':
+        final base = (error['message'] is String && (error['message'] as String).isNotEmpty)
+            ? error['message'] as String
+            : t.apiErrorStorageLimitExceeded;
+        final available = error['available_gb'];
+        final required = error['required_gb'];
+        if (available != null && required != null) {
+          try {
+            final availGb = (available is num) ? available.toDouble() : double.parse('$available');
+            final reqGb = (required is num) ? required.toDouble() : double.parse('$required');
+            return '$base (فضای آزاد: ${availGb.toStringAsFixed(2)} گیگابایت، '
+                'حجم موردنیاز: ${reqGb.toStringAsFixed(2)} گیگابایت)';
+          } catch (_) {
+            return base;
+          }
+        }
+        return base;
       default:
         return null;
     }
@@ -157,11 +203,14 @@ class ErrorExtractor {
     if (error is Map) {
       final code = error['code'];
       final codeStr = code is String ? code : null;
+      if (codeStr == 'STORAGE_LIMIT_EXCEEDED' ||
+          codeStr == 'NO_ACTIVE_STORAGE_PLAN' ||
+          codeStr == 'FILE_SIZE_EXCEEDED') {
+        final storageMsg = _messageForStorageError(error, t);
+        if (storageMsg != null) return storageMsg;
+      }
       final fromCode = _messageForKnownApiErrorCode(codeStr, t);
       if (fromCode != null) return fromCode;
-    }
-    if (error is Map && error['code'] == 'STORAGE_LIMIT_EXCEEDED') {
-      return error['message'] as String? ?? 'حجم فایل از محدودیت ذخیره‌سازی تجاوز می‌کند';
     }
     if (error is Map && error['message'] is String) {
       final message = error['message'] as String;
@@ -188,28 +237,35 @@ class ErrorExtractor {
   }
 
   /// قطع/تایم‌اوت اتصال یا خطای سطح سوکت (بفراتر از صرف [DioException.message]).
+  /// توجه: receive/send/connection timeout را اینجا «قطع اینترنت» حساب نکن —
+  /// پیام‌های اختصاصی تایم‌اوت در [_dioExceptionMessage] نمایش داده می‌شوند.
   static bool _isNetworkConnectivityFailure(dio.DioException e) {
     final type = e.type;
-    if (type == dio.DioExceptionType.connectionTimeout ||
-        type == dio.DioExceptionType.receiveTimeout ||
-        type == dio.DioExceptionType.sendTimeout ||
-        type == dio.DioExceptionType.connectionError ||
+    if (type == dio.DioExceptionType.connectionError ||
         type == dio.DioExceptionType.badCertificate) {
       return true;
     }
-    if (type == dio.DioExceptionType.badResponse || type == dio.DioExceptionType.cancel) {
+    if (type == dio.DioExceptionType.badResponse ||
+        type == dio.DioExceptionType.cancel ||
+        type == dio.DioExceptionType.connectionTimeout ||
+        type == dio.DioExceptionType.receiveTimeout ||
+        type == dio.DioExceptionType.sendTimeout ||
+        type == dio.DioExceptionType.transformTimeout) {
       return false;
     }
     if (type == dio.DioExceptionType.unknown) {
       final m = (e.message ?? '').toLowerCase();
       final errStr = (e.error?.toString() ?? '').toLowerCase();
+      // تایم‌اوت‌ها → نه «قطع اینترنت»
+      if (m.contains('receive timeout') ||
+          m.contains('send timeout') ||
+          m.contains('connection timeout') ||
+          m.contains('took longer')) {
+        return false;
+      }
       if (m.contains('dioexception') &&
-          (m.contains('connection timeout') ||
-              m.contains('connection error') ||
-              m.contains('receive timeout') ||
-              m.contains('send timeout') ||
+          (m.contains('connection error') ||
               m.contains('aborted') ||
-              m.contains('took longer') ||
               m.contains('larger than') ||
               m.contains('requestoptions'))) {
         return true;
@@ -253,6 +309,7 @@ class ErrorExtractor {
       case dio.DioExceptionType.sendTimeout:
         return t.errorSendTimeout;
       case dio.DioExceptionType.receiveTimeout:
+      case dio.DioExceptionType.transformTimeout:
         return t.errorReceiveTimeout;
       case dio.DioExceptionType.connectionError:
         return t.errorConnectionError;

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:hesabix_ui/config/brand_config.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/services/ai_service.dart';
 import 'package:hesabix_ui/models/ai_models.dart';
@@ -8,6 +9,8 @@ import 'package:hesabix_ui/widgets/data_table/data_table_config.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table_widget.dart';
 import 'package:intl/intl.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
+import 'package:hesabix_ui/core/hesabix_back.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 class AIUsagePage extends StatefulWidget {
   final int? businessId;
@@ -127,16 +130,7 @@ class _AIUsagePageState extends State<AIUsagePage> {
       return Scaffold(
         appBar: AppBar(
           title: const Text('آمار استفاده از AI'),
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back),
-            onPressed: () {
-              if (context.canPop()) {
-                context.pop();
-              } else if (widget.businessId != null) {
-                context.go('/business/${widget.businessId}/dashboard');
-              }
-            },
-          ),
+          leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
         ),
         body: const Center(child: CircularProgressIndicator()),
       );
@@ -145,16 +139,7 @@ class _AIUsagePageState extends State<AIUsagePage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('آمار استفاده از AI'),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () {
-            if (context.canPop()) {
-              context.pop();
-            } else if (widget.businessId != null) {
-              context.go('/business/${widget.businessId}/dashboard');
-            }
-          },
-        ),
+        leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
@@ -238,21 +223,21 @@ class _AIUsagePageState extends State<AIUsagePage> {
                   label: 'کل توکن',
                   value: _numberFormatter.format(totalTokens),
                   icon: Icons.token_outlined,
-                  color: Colors.blue,
+                  color: SemanticColorResolver.info(context),
                 ),
               ),
-              const SizedBox(width: 12),
+              SizedBox(width: 12),
               Expanded(
                 child: _StatCard(
                   label: 'کل هزینه',
                   value: '${_numberFormatter.format(totalCost)} تومان',
                   icon: Icons.attach_money,
-                  color: Colors.green,
+                  color: SemanticColorResolver.positive(context),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: 12),
           Row(
             children: [
               Expanded(
@@ -260,7 +245,7 @@ class _AIUsagePageState extends State<AIUsagePage> {
                   label: 'کل درخواست‌ها',
                   value: _numberFormatter.format(totalRequests),
                   icon: Icons.request_quote_outlined,
-                  color: Colors.orange,
+                  color: SemanticColorResolver.warning(context),
                 ),
               ),
               const SizedBox(width: 12),
@@ -352,7 +337,7 @@ class _AIUsagePageState extends State<AIUsagePage> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.error_outline, size: 48, color: Colors.red),
+            Icon(Icons.error_outline, size: 48, color: SemanticColorResolver.negative(context)),
             const SizedBox(height: 16),
             Text(
               'خطا در نمایش آمار: ${ErrorExtractor.forContext(e, context)}',
@@ -387,19 +372,19 @@ class _AIUsagePageState extends State<AIUsagePage> {
                 label: 'مثبت',
                 value: '${summary['positive'] ?? 0}',
                 icon: Icons.thumb_up_outlined,
-                color: Colors.green,
+                color: SemanticColorResolver.positive(context),
               ),
             ),
-            const SizedBox(width: 12),
+            SizedBox(width: 12),
             Expanded(
               child: _StatCard(
                 label: 'منفی',
                 value: '${summary['negative'] ?? 0}',
                 icon: Icons.thumb_down_outlined,
-                color: Colors.red,
+                color: SemanticColorResolver.negative(context),
               ),
             ),
-            const SizedBox(width: 12),
+            SizedBox(width: 12),
             Expanded(
               child: _StatCard(
                 label: 'رضایت',
@@ -407,7 +392,7 @@ class _AIUsagePageState extends State<AIUsagePage> {
                     ? '${summary['satisfaction_rate_percent']}%'
                     : '—',
                 icon: Icons.sentiment_satisfied_alt_outlined,
-                color: Colors.blue,
+                color: SemanticColorResolver.info(context),
               ),
             ),
           ],
@@ -499,12 +484,21 @@ class _AIUsagePageState extends State<AIUsagePage> {
           'ارائه‌دهنده',
           width: ColumnWidth.small,
           filterType: ColumnFilterType.multiSelect,
+<<<<<<< HEAD
+          filterOptions: [
+            const FilterOption(value: 'openai', label: 'OpenAI'),
+            const FilterOption(value: 'azure', label: 'Azure OpenAI'),
+            const FilterOption(value: 'anthropic', label: 'Anthropic'),
+            const FilterOption(value: 'local', label: 'Local'),
+            FilterOption(value: 'hesabix', label: BrandConfig.displayName(languageCode: 'en')),
+=======
           filterOptions: const [
             FilterOption(value: 'openai', label: 'OpenAI'),
             FilterOption(value: 'azure', label: 'Azure OpenAI'),
             FilterOption(value: 'anthropic', label: 'Anthropic'),
             FilterOption(value: 'local', label: 'Local'),
             FilterOption(value: 'hesabix', label: 'MarkStreet'),
+>>>>>>> github/Huma
           ],
           formatter: (item) => _providerLabel((item as AIUsageLog).provider),
         ),
@@ -647,7 +641,11 @@ class _AIUsagePageState extends State<AIUsagePage> {
       case 'local':
         return 'مدل محلی';
       case 'hesabix':
+<<<<<<< HEAD
+        return BrandConfig.displayName(languageCode: 'en');
+=======
         return 'MarkStreet';
+>>>>>>> github/Huma
       default:
         return provider ?? '-';
     }

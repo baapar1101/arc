@@ -133,6 +133,8 @@ class RepairShopService {
     int? assignedTechnicianId,
     int? warrantyCodeId,
     String? search,
+    String? fromDate,
+    String? toDate,
     int offset = 0,
     int limit = 50,
   }) async {
@@ -146,6 +148,8 @@ class RepairShopService {
     if (assignedTechnicianId != null) queryParams['assigned_technician_id'] = assignedTechnicianId;
     if (warrantyCodeId != null) queryParams['warranty_code_id'] = warrantyCodeId;
     if (search != null && search.isNotEmpty) queryParams['search'] = search;
+    if (fromDate != null && fromDate.isNotEmpty) queryParams['from_date'] = fromDate;
+    if (toDate != null && toDate.isNotEmpty) queryParams['to_date'] = toDate;
 
     final response = await _api.get<Map<String, dynamic>>(
       '/api/v1/repair-shop/businesses/$businessId/orders',

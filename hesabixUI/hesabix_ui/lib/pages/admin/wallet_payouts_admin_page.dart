@@ -13,6 +13,7 @@ import '../../widgets/data_table/data_table_config.dart';
 import '../../widgets/jalali_date_picker.dart';
 import '../../core/date_utils.dart' show MarkStreetDateUtils;
 import '../../core/calendar_controller.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 class WalletPayoutsAdminPage extends StatefulWidget {
   const WalletPayoutsAdminPage({super.key});
@@ -86,13 +87,13 @@ class _WalletPayoutsAdminPageState extends State<WalletPayoutsAdminPage> {
   Color _statusColor(String raw, ThemeData theme) {
     switch (raw.toLowerCase()) {
       case 'settled':
-        return Colors.green.shade600;
+        return SemanticColorResolver.positive(context);
       case 'failed':
-        return Colors.red.shade600;
+        return SemanticColorResolver.negative(context);
       case 'canceled':
-        return Colors.orange.shade700;
+        return SemanticColorResolver.warning(context);
       case 'approved':
-        return Colors.blue.shade600;
+        return SemanticColorResolver.info(context);
       case 'processing':
         return Colors.teal.shade600;
       case 'requested':
@@ -568,7 +569,7 @@ class _WalletPayoutsAdminPageState extends State<WalletPayoutsAdminPage> {
             children: [
               // Stats Dashboard
               if (_loadingStats)
-                const Padding(
+                Padding(
                   padding: EdgeInsets.all(16),
                   child: Center(child: CircularProgressIndicator()),
                 )
@@ -612,7 +613,7 @@ class _WalletPayoutsAdminPageState extends State<WalletPayoutsAdminPage> {
                                 ? (_stats!['monthly_settled'] as num).toDouble() 
                                 : double.tryParse('${_stats!['monthly_settled']}') ?? 0),
                             icon: Icons.check_circle,
-                            color: Colors.green.shade600,
+                            color: SemanticColorResolver.positive(context),
                           ),
                           _buildStatsCard(
                             title: 'کارمزد (ماه جاری)',
@@ -620,28 +621,28 @@ class _WalletPayoutsAdminPageState extends State<WalletPayoutsAdminPage> {
                                 ? (_stats!['monthly_fees'] as num).toDouble() 
                                 : double.tryParse('${_stats!['monthly_fees']}') ?? 0),
                             icon: Icons.percent,
-                            color: Colors.orange.shade700,
+                            color: SemanticColorResolver.warning(context),
                           ),
                         ],
                       ),
                       if ((_stats!['old_pending_count'] ?? 0) > 0) ...[
-                        const SizedBox(height: 12),
+                        SizedBox(height: 12),
                         Container(
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            color: Colors.orange.shade50,
+                            color: SemanticColorResolver.warning(context).withValues(alpha: 0.12),
                             borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: Colors.orange.shade200),
+                            border: Border.all(color: SemanticColorResolver.warning(context).withValues(alpha: 0.35)),
                           ),
                           child: Row(
                             children: [
-                              Icon(Icons.warning_amber_rounded, color: Colors.orange.shade700),
-                              const SizedBox(width: 8),
+                              Icon(Icons.warning_amber_rounded, color: SemanticColorResolver.warning(context)),
+                              SizedBox(width: 8),
                               Expanded(
                                 child: Text(
                                   '${_stats!['old_pending_count']} درخواست قدیمی (> 7 روز) نیاز به بررسی دارد',
                                   style: theme.textTheme.bodyMedium?.copyWith(
-                                    color: Colors.orange.shade900,
+                                    color: SemanticColorResolver.warning(context),
                                   ),
                                 ),
                               ),
@@ -814,7 +815,7 @@ class _WalletPayoutsAdminPageState extends State<WalletPayoutsAdminPage> {
                       final days = _calculatePendingDays(item['created_at']?.toString());
                       final status = item['status']?.toString() ?? '';
                       if (days > 7 && status != 'settled') {
-                        return Colors.orange.shade50;
+                        return SemanticColorResolver.warning(context).withValues(alpha: 0.12);
                       }
                       return null;
                     },
@@ -964,7 +965,7 @@ class _PayoutDetailSheet extends StatelessWidget {
                               onPressed: () async {
                                 await onSettle!();
                               },
-                              icon: const Icon(Icons.check_circle_outline),
+                              icon: Icon(Icons.check_circle_outline),
                               label: Text(t.walletPayoutsAdminSettleAction),
                             ),
                         ],
@@ -983,26 +984,26 @@ class _PayoutDetailSheet extends StatelessWidget {
                         'تاریخچه',
                         style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
                       ),
-                      const SizedBox(height: 12),
+                      SizedBox(height: 12),
                       _TimelineItem(
                         icon: Icons.add_circle_outline,
                         title: 'ایجاد درخواست',
                         date: _formatDate(payout['created_at']?.toString(), isJalali),
-                        color: Colors.blue,
+                        color: SemanticColorResolver.info(context),
                       ),
                       if (status == 'approved' || status == 'processing' || status == 'settled')
                         _TimelineItem(
                           icon: Icons.verified,
                           title: 'تایید شده',
                           date: _formatDate(payout['updated_at']?.toString(), isJalali),
-                          color: Colors.green,
+                          color: SemanticColorResolver.positive(context),
                         ),
                       if (status == 'settled' && payout['settlement_date'] != null)
                         _TimelineItem(
                           icon: Icons.check_circle,
                           title: 'تسویه شده',
                           date: _formatDate(payout['settlement_date']?.toString(), isJalali),
-                          color: Colors.green.shade700,
+                          color: SemanticColorResolver.positive(context),
                           isLast: true,
                         ),
                     ],

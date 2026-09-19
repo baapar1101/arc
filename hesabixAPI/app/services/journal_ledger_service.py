@@ -12,6 +12,7 @@ from adapters.db.models.document_line import DocumentLine
 from adapters.db.models.account import Account
 from adapters.db.models.fiscal_year import FiscalYear
 from adapters.db.models.person import Person
+from adapters.db.models.currency import Currency
 from app.services.opening_balance_service import _ensure_fiscal_year
 
 
@@ -56,106 +57,134 @@ def _get_document_type_name(doc_type: str | None) -> str:
     return mapping.get(doc_type, doc_type)
 
 
-def _find_general_account(account_id: int, accounts_map: Dict[int, Dict[str, Any]]) -> Optional[Dict[str, Any]]:
-    """
-    پیدا کردن حساب کل با پیمایش به سمت بالا تا parent_id = NULL
-    
-    Args:
-        account_id: شناسه حساب
-        accounts_map: دیکشنری کامل تمام حساب‌ها با parent_id
-    
-    Returns:
-        دیکشنری حساب کل یا None
-    """
+def _get_ancestor_chain(account_id: int, accounts_map: Dict[int, Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """زنجیرهٔ اجداد از ریشه تا حساب (شامل خود حساب)."""
     if account_id not in accounts_map:
-        return None
-    
-    current_id = account_id
-    visited = set()  # جلوگیری از حلقه بی‌نهایت
-    
+        return []
+
+    chain: List[Dict[str, Any]] = []
+    current_id: Optional[int] = account_id
+    visited: set[int] = set()
+
     while current_id and current_id in accounts_map:
         if current_id in visited:
-            break  # حلقه پیدا شد
+            break
         visited.add(current_id)
-        
-        account = accounts_map[current_id]
-        # اگر parent_id ندارد، این حساب کل است
-        if account['parent_id'] is None:
-            return account
-        
-        # به والد برو
-        current_id = account['parent_id']
-    
+        chain.append(accounts_map[current_id])
+        current_id = accounts_map[current_id]["parent_id"]
+
+    chain.reverse()
+    return chain
+
+
+def _compute_branch_max_depths(accounts_map: Dict[int, Dict[str, Any]]) -> Dict[int, int]:
+    """حداکثر عمق هر شاخه از ریشه‌های آن."""
+    children: Dict[int, List[int]] = {}
+    roots: List[int] = []
+
+    for acc_id, acc in accounts_map.items():
+        parent_id = acc["parent_id"]
+        if parent_id is None:
+            roots.append(acc_id)
+        else:
+            children.setdefault(parent_id, []).append(acc_id)
+
+    branch_max: Dict[int, int] = {}
+
+    def max_depth(node_id: int) -> int:
+        kids = children.get(node_id, [])
+        if not kids:
+            return 1
+        return 1 + max(max_depth(child_id) for child_id in kids)
+
+    for root_id in roots:
+        branch_max[root_id] = max_depth(root_id)
+
+    return branch_max
+
+
+def _get_group_offset(
+    chain: List[Dict[str, Any]],
+    branch_max_depths: Dict[int, int],
+) -> int:
+    """
+    آفست سطح گروه در نمودار حساب:
+    - نمودار ۴ سطحی (گروه/کل/معین/تفصیل): ۱
+    - نمودار ۳ سطحی (کل/معین/تفصیل): ۰
+    """
+    if not chain:
+        return 0
+    root_id = chain[0]["id"]
+    return 1 if branch_max_depths.get(root_id, len(chain)) >= 4 else 0
+
+
+def _find_general_account(
+    account_id: int,
+    accounts_map: Dict[int, Dict[str, Any]],
+    branch_max_depths: Optional[Dict[int, int]] = None,
+) -> Optional[Dict[str, Any]]:
+    """
+    پیدا کردن حساب کل بر اساس عمق درخت (سطح ۲ در نمودار ۴ سطحی، سطح ۱ در نمودار ۳ سطحی).
+    """
+    chain = _get_ancestor_chain(account_id, accounts_map)
+    if not chain:
+        return None
+
+    if branch_max_depths is None:
+        branch_max_depths = _compute_branch_max_depths(accounts_map)
+
+    general_idx = _get_group_offset(chain, branch_max_depths)
+    if len(chain) > general_idx:
+        return chain[general_idx]
     return None
 
 
 def _find_subsidiary_account(
-    account_id: int, 
-    accounts_map: Dict[int, Dict[str, Any]], 
-    general_account: Optional[Dict[str, Any]]
+    account_id: int,
+    accounts_map: Dict[int, Dict[str, Any]],
+    general_account: Optional[Dict[str, Any]] = None,
+    branch_max_depths: Optional[Dict[int, int]] = None,
 ) -> Optional[Dict[str, Any]]:
     """
-    پیدا کردن حساب معین:
-    - اگر خود حساب، مستقیماً زیر حساب کل است → خودش حساب معین است
-    - اگر حساب زیر حساب معین است → والد مستقیم حساب معین است
-    
-    Args:
-        account_id: شناسه حساب
-        accounts_map: دیکشنری کامل تمام حساب‌ها با parent_id
-        general_account: حساب کل (اگر پیدا شده باشد)
-    
-    Returns:
-        دیکشنری حساب معین یا None
+    پیدا کردن حساب معین بر اساس عمق درخت (سطح ۳ در نمودار ۴ سطحی، سطح ۲ در نمودار ۳ سطحی).
+    """
+    chain = _get_ancestor_chain(account_id, accounts_map)
+    if not chain:
+        return None
+
+    if branch_max_depths is None:
+        branch_max_depths = _compute_branch_max_depths(accounts_map)
+
+    subsidiary_idx = _get_group_offset(chain, branch_max_depths) + 1
+    if len(chain) > subsidiary_idx:
+        return chain[subsidiary_idx]
+    return None
+
+
+def _find_detail_account(
+    account_id: int,
+    accounts_map: Dict[int, Dict[str, Any]],
+    subsidiary_account: Optional[Dict[str, Any]] = None,
+    branch_max_depths: Optional[Dict[int, int]] = None,
+) -> Optional[Dict[str, Any]]:
+    """
+    پیدا کردن حساب تفصیلی:
+    - اگر حساب ثبت‌شده زیر سطح معین باشد، خود آن حساب تفصیلی است
+    - اگر حساب در سطح کل یا معین باشد، تفصیلی ندارد
     """
     if account_id not in accounts_map:
         return None
-    
-    account = accounts_map[account_id]
-    
-    # اگر خودش حساب کل است
-    if account['parent_id'] is None:
-        return None  # حساب معین ندارد
-    
-    # اگر حساب کل پیدا نشده، ابتدا آن را پیدا کن
-    if general_account is None:
-        general_account = _find_general_account(account_id, accounts_map)
-        if general_account is None:
-            return None
-    
-    # اگر والد مستقیم، حساب کل است
-    parent_id = account['parent_id']
-    if parent_id == general_account['id']:
-        # خود حساب، حساب معین است
-        return account
-    
-    # اگر والد مستقیم، خودش حساب معین است (parent_id آن = حساب کل)
-    if parent_id in accounts_map:
-        parent = accounts_map[parent_id]
-        if parent['parent_id'] == general_account['id']:
-            return parent
-    
-    # در غیر این صورت، به سمت بالا برو تا حساب معین را پیدا کنی
-    current_id = account_id
-    visited = set()
-    
-    while current_id and current_id in accounts_map:
-        if current_id in visited:
-            break
-        visited.add(current_id)
-        
-        acc = accounts_map[current_id]
-        if acc['parent_id'] is None:
-            break
-        
-        parent_id = acc['parent_id']
-        if parent_id in accounts_map:
-            parent = accounts_map[parent_id]
-            # اگر والد، مستقیماً زیر حساب کل است
-            if parent['parent_id'] == general_account['id']:
-                return parent
-        
-        current_id = parent_id
-    
+
+    chain = _get_ancestor_chain(account_id, accounts_map)
+    if not chain:
+        return None
+
+    if branch_max_depths is None:
+        branch_max_depths = _compute_branch_max_depths(accounts_map)
+
+    subsidiary_idx = _get_group_offset(chain, branch_max_depths) + 1
+    if len(chain) > subsidiary_idx + 1:
+        return accounts_map.get(account_id)
     return None
 
 
@@ -171,6 +200,7 @@ def get_journal_ledger_report(
     include_proforma: bool = False,
     skip: int = 0,
     take: int = 50,
+    disable_pagination: bool = False,
 ) -> Dict[str, Any]:
     """
     گزارش دفتر روزنامه
@@ -191,6 +221,7 @@ def get_journal_ledger_report(
         include_proforma: شامل اسناد پیش‌نویس (پیش‌فرض: False)
         skip: تعداد رکوردهای رد شده برای pagination
         take: تعداد رکوردهای برگشتی
+        disable_pagination: بازگرداندن تمام سطرها بدون صفحه‌بندی (برای export)
     
     Returns:
         dict: {
@@ -289,6 +320,7 @@ def get_journal_ledger_report(
             'name': acc.name,
             'parent_id': acc.parent_id,
         }
+    branch_max_depths = _compute_branch_max_depths(accounts_full_map)
     
     # دریافت اطلاعات حساب‌های استفاده شده (برای نمایش در خروجی)
     accounts_map = {}
@@ -312,14 +344,36 @@ def get_journal_ledger_report(
                 'name': person.alias_name or person.name or '',
             }
     
+    # نقشه کد/نماد ارز اسناد (برای نمایش مبلغ اصلی کنار معادل پایه)
+    currency_ids = {int(doc.currency_id) for _, doc in all_lines if doc.currency_id}
+    currencies_map: Dict[int, Dict[str, Any]] = {}
+    if currency_ids:
+        for cur in db.query(Currency).filter(Currency.id.in_(list(currency_ids))).all():
+            currencies_map[int(cur.id)] = {
+                'id': int(cur.id),
+                'code': cur.code or '',
+                'symbol': cur.symbol or cur.code or '',
+                'title': cur.title or cur.code or '',
+                'decimal_places': int(getattr(cur, 'decimal_places', None) or 0),
+            }
+
     # ساخت آیتم‌ها
     items = []
     total_debit = Decimal(0)
     total_credit = Decimal(0)
+    use_base_amounts = currency_id is None
     
     for line, doc in all_lines:
-        debit = Decimal(str(line.debit or 0))
-        credit = Decimal(str(line.credit or 0))
+        if use_base_amounts:
+            debit = Decimal(str(line.debit_base if line.debit_base is not None else line.debit or 0))
+            credit = Decimal(str(line.credit_base if line.credit_base is not None else line.credit or 0))
+            native_debit = Decimal(str(line.debit or 0))
+            native_credit = Decimal(str(line.credit or 0))
+        else:
+            debit = Decimal(str(line.debit or 0))
+            credit = Decimal(str(line.credit or 0))
+            native_debit = debit
+            native_credit = credit
         
         total_debit += debit
         total_credit += credit
@@ -368,12 +422,24 @@ def get_journal_ledger_report(
         
         general_account = None
         subsidiary_account = None
+        detail_account = None
         if account_id_for_general_subsidiary:
-            general_account = _find_general_account(account_id_for_general_subsidiary, accounts_full_map)
+            general_account = _find_general_account(
+                account_id_for_general_subsidiary,
+                accounts_full_map,
+                branch_max_depths,
+            )
             subsidiary_account = _find_subsidiary_account(
-                account_id_for_general_subsidiary, 
-                accounts_full_map, 
-                general_account
+                account_id_for_general_subsidiary,
+                accounts_full_map,
+                general_account,
+                branch_max_depths,
+            )
+            detail_account = _find_detail_account(
+                account_id_for_general_subsidiary,
+                accounts_full_map,
+                subsidiary_account,
+                branch_max_depths,
             )
         
         items.append({
@@ -387,6 +453,8 @@ def get_journal_ledger_report(
             'general_account_name': general_account['name'] if general_account else None,
             'subsidiary_account_code': subsidiary_account['code'] if subsidiary_account else None,
             'subsidiary_account_name': subsidiary_account['name'] if subsidiary_account else None,
+            'detail_account_code': detail_account['code'] if detail_account else None,
+            'detail_account_name': detail_account['name'] if detail_account else None,
             'debit_account_id': debit_account['id'] if debit_account else None,
             'debit_account_code': debit_account['code'] if debit_account else None,
             'debit_account_name': debit_account['name'] if debit_account else None,
@@ -395,6 +463,22 @@ def get_journal_ledger_report(
             'credit_account_code': credit_account['code'] if credit_account else None,
             'credit_account_name': credit_account['name'] if credit_account else None,
             'credit_amount': float(credit),
+            'native_debit_amount': float(native_debit),
+            'native_credit_amount': float(native_credit),
+            'document_currency_id': int(doc.currency_id) if doc.currency_id else None,
+            'document_currency_code': (
+                currencies_map.get(int(doc.currency_id), {}).get('code')
+                if doc.currency_id else None
+            ),
+            'document_currency_symbol': (
+                currencies_map.get(int(doc.currency_id), {}).get('symbol')
+                if doc.currency_id else None
+            ),
+            'document_currency_decimal_places': (
+                currencies_map.get(int(doc.currency_id), {}).get('decimal_places', 0)
+                if doc.currency_id else 0
+            ),
+            'amounts_in_base': use_base_amounts,
             'person_id': person_info['id'] if person_info else None,
             'person_name': person_info['name'] if person_info else None,
             'person_code': person_info['code'] if person_info else None,
@@ -402,9 +486,14 @@ def get_journal_ledger_report(
     
     # Pagination
     total = len(items)
-    current_page = (skip // take) + 1
-    total_pages = (total + take - 1) // take if take > 0 else 1
-    paginated_items = items[skip:skip + take]
+    if disable_pagination:
+        paginated_items = items
+        current_page = 1
+        total_pages = 1
+    else:
+        current_page = (skip // take) + 1
+        total_pages = (total + take - 1) // take if take > 0 else 1
+        paginated_items = items[skip:skip + take]
     
     # بررسی تراز (Trial Balance Check)
     balance_valid = True
@@ -422,6 +511,7 @@ def get_journal_ledger_report(
             'total_credit': float(total_credit),
             'balance_valid': balance_valid,
             'balance_diff': float(balance_diff),
+            'amounts_in_base': use_base_amounts,
         },
         'pagination': {
             'total': total,

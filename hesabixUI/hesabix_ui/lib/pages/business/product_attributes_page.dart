@@ -10,6 +10,7 @@ import '../../services/product_attribute_service.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../services/list_filter_preferences_service.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 class ProductAttributeItem {
   final int id;
@@ -191,7 +192,7 @@ class _ProductAttributesPageState extends State<ProductAttributesPage> {
         DateColumn('updated_at', t.updatedAt, formatter: (e) => _formatDateFromItem(e, context, isUpdated: true)),
         ActionColumn('actions', t.actions, actions: [
           DataTableAction(icon: Icons.edit, label: t.edit, onTap: (e) => _openForm(editing: e)),
-          DataTableAction(icon: Icons.delete, label: t.delete, color: Colors.red, onTap: (e) => _confirmDelete(e)),
+          DataTableAction(icon: Icons.delete, label: t.delete, color: SemanticColorResolver.negative(context), onTap: (e) => _confirmDelete(e)),
         ]),
       ],
       searchFields: ['title', 'description'],
@@ -336,7 +337,7 @@ class _ProductAttributesPageState extends State<ProductAttributesPage> {
                               ),
                             ),
                             IconButton(
-                              icon: const Icon(Icons.delete, color: Colors.red),
+                              icon: Icon(Icons.delete, color: SemanticColorResolver.negative(context)),
                               onPressed: optionControllers.length > 1
                                   ? () {
                                       setState(() {
@@ -510,7 +511,7 @@ class _ProductAttributesPageState extends State<ProductAttributesPage> {
                   'خطا در حذف ویژگی: ${ErrorExtractor.forContext(e, context)}',
             );
             }
-          }, style: TextButton.styleFrom(foregroundColor: Colors.red), child: Text(t.delete)),
+          }, style: TextButton.styleFrom(foregroundColor: SemanticColorResolver.negative(context)), child: Text(t.delete)),
         ],
       ),
     );

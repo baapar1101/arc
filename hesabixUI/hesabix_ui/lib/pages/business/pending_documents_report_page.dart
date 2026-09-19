@@ -7,6 +7,7 @@ import 'package:hesabix_ui/widgets/data_table/data_table_config.dart';
 import 'package:hesabix_ui/services/list_filter_preferences_service.dart';
 import 'package:hesabix_ui/widgets/invoice/warehouse_combobox_widget.dart';
 import 'package:hesabix_ui/widgets/data_table/helpers/data_table_utils.dart';
+import 'package:hesabix_ui/core/hesabix_back.dart';
 
 class PendingDocumentsReportPage extends StatefulWidget {
   final int businessId;
@@ -125,10 +126,7 @@ class _PendingDocumentsReportPageState extends State<PendingDocumentsReportPage>
       backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
         title: const Text('گزارش حواله‌های در انتظار تایید'),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.pop(),
-        ),
+        leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
       ),
       body: SafeArea(
         child: Column(

@@ -4,6 +4,8 @@ from datetime import datetime
 from decimal import Decimal
 from enum import Enum
 
+from typing import Any, Dict, List
+
 from sqlalchemy import (
     String,
     Integer,
@@ -13,6 +15,7 @@ from sqlalchemy import (
     UniqueConstraint,
     Boolean,
     Numeric,
+    JSON,
     Enum as SQLEnum,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -73,6 +76,27 @@ class Product(Base):
     base_purchase_price: Mapped[Decimal | None] = mapped_column(Numeric(18, 2), nullable=True)
     base_purchase_note: Mapped[str | None] = mapped_column(Text, nullable=True)
 
+    # قیمت ارزی (P6 — فقط کسب‌وکار چندارزی استفاده می‌کند)
+    sales_price_fx: Mapped[Decimal | None] = mapped_column(
+        Numeric(18, 6), nullable=True, comment="قیمت فروش ارزی"
+    )
+    purchase_price_fx: Mapped[Decimal | None] = mapped_column(
+        Numeric(18, 6), nullable=True, comment="قیمت خرید ارزی"
+    )
+    price_fx_currency_id: Mapped[int | None] = mapped_column(
+        Integer,
+        ForeignKey("currencies.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+        comment="ارز قیمت‌های ارزی",
+    )
+    auto_update_base_from_fx: Mapped[bool] = mapped_column(
+        Boolean,
+        default=False,
+        nullable=False,
+        comment="به‌روزرسانی خودکار قیمت پایه از نرخ × قیمت ارزی",
+    )
+
     # کنترل موجودی
     track_inventory: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     reorder_point: Mapped[int | None] = mapped_column(Integer, nullable=True)
@@ -115,6 +139,32 @@ class Product(Base):
         unique=True,
         index=True,
         comment="شناسهٔ عمومی برای لینک کاتالوگ",
+    )
+
+    # پروفایل شبکهٔ تأمین (کاتالوگ عمومی)
+    catalog_short_description: Mapped[str | None] = mapped_column(
+        Text,
+        nullable=True,
+        comment="خلاصه کوتاه برای کاتالوگ عمومی",
+    )
+    catalog_expert_review: Mapped[str | None] = mapped_column(
+        Text,
+        nullable=True,
+        comment="بررسی تخصصی برای کاتالوگ عمومی",
+    )
+    catalog_specifications: Mapped[List[Dict[str, Any]] | None] = mapped_column(
+        JSON,
+        nullable=True,
+        comment="مشخصات فنی کاتالوگ",
+    )
+    catalog_brand: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    catalog_model: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    catalog_country_of_origin: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    catalog_video_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    catalog_gallery_file_ids: Mapped[List[str] | None] = mapped_column(
+        JSON,
+        nullable=True,
+        comment="شناسه‌های فایل گالری کاتالوگ",
     )
 
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)

@@ -1,5 +1,4 @@
-import 'package:intl/intl.dart';
-
+import '../core/date_utils.dart';
 import 'person_share_link.dart';
 
 class PublicPersonSharePayload {
@@ -145,6 +144,12 @@ class PublicLedgerItem {
   final double? debit;
   final double? credit;
   final String? currencyCode;
+  final String? rowKind;
+  final String? productName;
+  final String? productCode;
+  final double? quantity;
+  final double? unitPrice;
+  final double? lineAmount;
 
   const PublicLedgerItem({
     required this.lineId,
@@ -157,6 +162,12 @@ class PublicLedgerItem {
     required this.debit,
     required this.credit,
     required this.currencyCode,
+    this.rowKind,
+    this.productName,
+    this.productCode,
+    this.quantity,
+    this.unitPrice,
+    this.lineAmount,
   });
 
   factory PublicLedgerItem.fromJson(Map<String, dynamic> json) {
@@ -166,17 +177,26 @@ class PublicLedgerItem {
       documentCode: json['document_code']?.toString(),
       documentType: json['document_type']?.toString(),
       documentTypeName: json['document_type_name']?.toString(),
-      documentDate: _parseDate(json['document_date']),
+      documentDate: HesabixDateUtils.parseApiDate(
+        json['document_date'],
+        rawValue: json['document_date_raw'],
+      ),
       description: json['description']?.toString(),
       debit: _toDouble(json['debit']),
       credit: _toDouble(json['credit']),
       currencyCode: json['currency_code']?.toString(),
+      rowKind: json['row_kind']?.toString(),
+      productName: json['product_name']?.toString(),
+      productCode: json['product_code']?.toString(),
+      quantity: _toDouble(json['quantity']),
+      unitPrice: _toDouble(json['unit_price']),
+      lineAmount: _toDouble(json['line_amount']),
     );
   }
 
-  String formattedDate() {
+  String formattedDate({bool jalali = true}) {
     if (documentDate == null) return '';
-    return DateFormat('yyyy/MM/dd').format(documentDate!);
+    return HesabixDateUtils.formatForDisplay(documentDate, jalali);
   }
 }
 
@@ -209,7 +229,10 @@ class PublicInvoiceItem {
       documentCode: json['document_code']?.toString(),
       documentType: json['document_type']?.toString(),
       documentTypeName: json['document_type_name']?.toString(),
-      documentDate: _parseDate(json['document_date']),
+      documentDate: HesabixDateUtils.parseApiDate(
+        json['document_date'],
+        rawValue: json['document_date_raw'],
+      ),
       description: json['description']?.toString(),
       amount: _toDouble(json['amount']),
       currencyCode: json['currency_code']?.toString(),
@@ -217,9 +240,9 @@ class PublicInvoiceItem {
     );
   }
 
-  String formattedDate() {
+  String formattedDate({bool jalali = true}) {
     if (documentDate == null) return '';
-    return DateFormat('yyyy/MM/dd').format(documentDate!);
+    return HesabixDateUtils.formatForDisplay(documentDate, jalali);
   }
 }
 
@@ -227,14 +250,5 @@ double? _toDouble(dynamic value) {
   if (value == null) return null;
   if (value is num) return value.toDouble();
   return double.tryParse(value.toString());
-}
-
-DateTime? _parseDate(dynamic value) {
-  if (value == null) return null;
-  try {
-    return DateTime.parse(value.toString()).toLocal();
-  } catch (_) {
-    return null;
-  }
 }
 

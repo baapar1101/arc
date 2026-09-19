@@ -207,6 +207,23 @@ def subscribe_to_plan(
             period_end = period_start + timedelta(days=30)
         else:
             period_end = period_start + timedelta(days=365)
+    elif plan.plan_type == AIPlanType.BYOK.value:
+        # ارائه‌دهنده اختصاصی: بدون سقف توکن پلتفرم؛ کارمزد اختیاری پلتفرم
+        from app.services.ai.business_ai_provider_service import get_byok_platform_fee
+
+        fee = get_byok_platform_fee(plan)
+        period_start = datetime.utcnow()
+        fee_amount = fee["monthly_price"] if period == "monthly" else fee["yearly_price"]
+        if fee_amount > 0:
+            subscription_type = SubscriptionType.SUBSCRIPTION.value
+            if period == "monthly":
+                period_end = period_start + timedelta(days=30)
+            else:
+                period_end = period_start + timedelta(days=365)
+        else:
+            subscription_type = SubscriptionType.PAY_AS_GO.value
+            period_end = None
+        tokens_limit_val = None
     else:
         raise ApiError("INVALID_PLAN_TYPE", "نوع پلن نامعتبر است", http_status=400)
 
@@ -228,14 +245,23 @@ def subscribe_to_plan(
 
     invoice = None
     payment_info: Optional[Dict[str, Any]] = None
-    if plan.plan_type in [AIPlanType.SUBSCRIPTION.value, AIPlanType.HYBRID.value]:
-        pricing_config = json.loads(plan.pricing_config or "{}")
-        subscription_config = pricing_config.get("subscription", {})
+    if plan.plan_type in [
+        AIPlanType.SUBSCRIPTION.value,
+        AIPlanType.HYBRID.value,
+        AIPlanType.BYOK.value,
+    ]:
+        if plan.plan_type == AIPlanType.BYOK.value:
+            from app.services.ai.business_ai_provider_service import get_byok_platform_fee
 
-        if period == "monthly":
-            amount = Decimal(str(subscription_config.get("monthly_price", 0)))
+            fee = get_byok_platform_fee(plan)
+            amount = Decimal(str(fee["monthly_price"] if period == "monthly" else fee["yearly_price"]))
         else:
-            amount = Decimal(str(subscription_config.get("yearly_price", 0)))
+            pricing_config = json.loads(plan.pricing_config or "{}")
+            subscription_config = pricing_config.get("subscription", {})
+            if period == "monthly":
+                amount = Decimal(str(subscription_config.get("monthly_price", 0)))
+            else:
+                amount = Decimal(str(subscription_config.get("yearly_price", 0)))
 
         if amount > 0:
             if not business_id:
@@ -286,6 +312,12 @@ def detect_billing_period(subscription: UserAISubscription) -> str:
 
 def get_renewal_amount(plan: AIPlan, period: str) -> Decimal:
     """مبلغ تمدید بر اساس پلن و دوره."""
+    if plan.plan_type == AIPlanType.BYOK.value:
+        from app.services.ai.business_ai_provider_service import get_byok_platform_fee
+
+        fee = get_byok_platform_fee(plan)
+        key = "yearly_price" if period == "yearly" else "monthly_price"
+        return Decimal(str(fee.get(key, 0) or 0))
     if plan.plan_type not in (AIPlanType.SUBSCRIPTION.value, AIPlanType.HYBRID.value):
         return Decimal("0")
     try:
@@ -335,7 +367,11 @@ def renew_ai_subscription(
         db.commit()
         return {"renewed": False, "reason": "plan_inactive"}
 
-    if plan.plan_type not in (AIPlanType.SUBSCRIPTION.value, AIPlanType.HYBRID.value):
+    if plan.plan_type not in (
+        AIPlanType.SUBSCRIPTION.value,
+        AIPlanType.HYBRID.value,
+        AIPlanType.BYOK.value,
+    ):
         return {"renewed": False, "reason": "not_billable_plan"}
 
     if not subscription.auto_renew:
@@ -344,6 +380,10 @@ def renew_ai_subscription(
     now = datetime.utcnow()
     if subscription.period_end and subscription.period_end > now:
         return {"renewed": False, "reason": "not_due"}
+
+    # BYOK بدون کارمزد دوره‌ای تمدید دوره‌ای ندارد
+    if plan.plan_type == AIPlanType.BYOK.value and not subscription.period_end:
+        return {"renewed": False, "reason": "not_billable_plan"}
 
     period = detect_billing_period(subscription)
     amount = get_renewal_amount(plan, period)

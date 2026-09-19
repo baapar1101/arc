@@ -23,7 +23,7 @@ REPORT_DEFINITIONS: Tuple[ReportDefinition, ...] = (
     ReportDefinition("debtors", "بدهکاران", "financial", ("reports.read", "persons.read")),
     ReportDefinition("creditors", "بستانکاران", "financial", ("reports.read", "persons.read")),
     ReportDefinition("cash_flow", "جریان نقدی (دریافت/پرداخت)", "financial", ("reports.read",)),
-    ReportDefinition("people_transactions", "گردش اشخاص", "financial", ("reports.read", "persons.read")),
+    ReportDefinition("people_transactions", "معین / گردش اشخاص (با ریز اقلام)", "financial", ("reports.read", "persons.read")),
     ReportDefinition("bank_accounts_turnover", "گردش حساب بانکی", "financial", ("reports.read", "bank_accounts.view")),
     ReportDefinition("cash_petty_turnover", "گردش صندوق/تنخواه", "financial", ("reports.read", "cash_registers.view")),
     # --- فروش و خرید ---
@@ -64,6 +64,7 @@ REPORT_DEFINITIONS: Tuple[ReportDefinition, ...] = (
     ReportDefinition("pnl_period", "سود و زیان دوره‌ای", "accounting", ("reports.read", "accounting_documents.view")),
     ReportDefinition("pnl_cumulative", "سود و زیان تجمعی", "accounting", ("reports.read", "accounting_documents.view")),
     ReportDefinition("accounts_review", "مرور حساب‌ها", "accounting", ("reports.read", "accounting_documents.view")),
+    ReportDefinition("balance_sheet", "ترازنامه", "accounting", ("reports.read", "accounting_documents.view")),
     # --- یکپارچه‌سازی / سایر ---
     ReportDefinition("distribution_dashboard", "داشبورد توزیع", "integration", ("reports.read", "distribution.view")),
     ReportDefinition("basalam_overview", "خلاصه باسلام", "integration", ("basalam.view",)),

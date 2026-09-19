@@ -1,5 +1,6 @@
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/services/ai_service.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
 import 'package:hesabix_ui/utils/snackbar_helper.dart' show SnackBarHelper;
@@ -57,7 +58,9 @@ class _AIChatKnowledgeSheetState extends State<_AIChatKnowledgeSheet> {
       if (mounted) {
         SnackBarHelper.show(
           context,
-          message: 'خطا: ${ErrorExtractor.forContext(e, context)}',
+          message: AppLocalizations.of(context).aiKnowledgeLoadFailed(
+            ErrorExtractor.forContext(e, context),
+          ),
           isError: true,
         );
       }
@@ -67,12 +70,13 @@ class _AIChatKnowledgeSheetState extends State<_AIChatKnowledgeSheet> {
   }
 
   Future<void> _addManual() async {
+    final l10n = AppLocalizations.of(context);
     final titleCtrl = TextEditingController();
     final bodyCtrl = TextEditingController();
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('سند جدید'),
+        title: Text(l10n.aiKnowledgeNewDocument),
         content: SizedBox(
           width: 420,
           child: Column(
@@ -80,14 +84,14 @@ class _AIChatKnowledgeSheetState extends State<_AIChatKnowledgeSheet> {
             children: [
               TextField(
                 controller: titleCtrl,
-                decoration: const InputDecoration(labelText: 'عنوان'),
+                decoration: InputDecoration(labelText: l10n.aiKnowledgeTitleLabel),
               ),
               const SizedBox(height: 12),
               TextField(
                 controller: bodyCtrl,
                 maxLines: 8,
-                decoration: const InputDecoration(
-                  labelText: 'متن',
+                decoration: InputDecoration(
+                  labelText: l10n.aiKnowledgeBodyLabel,
                   alignLabelWithHint: true,
                 ),
               ),
@@ -95,20 +99,27 @@ class _AIChatKnowledgeSheetState extends State<_AIChatKnowledgeSheet> {
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('انصراف')),
-          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('ذخیره')),
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(l10n.cancel)),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: Text(l10n.save)),
         ],
       ),
     );
     if (ok != true || !mounted) return;
     try {
       await widget.aiService.createKnowledgeDocument(
-        title: titleCtrl.text.trim().isEmpty ? 'بدون عنوان' : titleCtrl.text.trim(),
+        title: titleCtrl.text.trim().isEmpty
+            ? AppLocalizations.of(context).aiKnowledgeUntitled
+            : titleCtrl.text.trim(),
         content: bodyCtrl.text,
         businessId: widget.businessId,
       );
       await _load();
-      if (mounted) SnackBarHelper.show(context, message: 'سند اضافه شد');
+      if (mounted) {
+        SnackBarHelper.show(
+          context,
+          message: AppLocalizations.of(context).aiKnowledgeAdded,
+        );
+      }
     } catch (e) {
       if (mounted) {
         SnackBarHelper.show(
@@ -134,7 +145,12 @@ class _AIChatKnowledgeSheetState extends State<_AIChatKnowledgeSheet> {
         businessId: widget.businessId,
       );
       await _load();
-      if (mounted) SnackBarHelper.show(context, message: 'فایل آپلود شد');
+      if (mounted) {
+        SnackBarHelper.show(
+          context,
+          message: AppLocalizations.of(context).aiKnowledgeUploaded,
+        );
+      }
     } catch (e) {
       if (mounted) {
         SnackBarHelper.show(
@@ -154,7 +170,10 @@ class _AIChatKnowledgeSheetState extends State<_AIChatKnowledgeSheet> {
       if (!mounted) return;
       SnackBarHelper.show(
         context,
-        message: 'بازنمایه‌سازی: ${stats['documents']} سند، ${stats['chunks']} بخش',
+        message: AppLocalizations.of(context).aiKnowledgeReindexResult(
+          stats['documents'],
+          stats['chunks'],
+        ),
       );
     } catch (e) {
       if (mounted) {
@@ -187,8 +206,26 @@ class _AIChatKnowledgeSheetState extends State<_AIChatKnowledgeSheet> {
     }
   }
 
+  String _indexStatusLabel(AppLocalizations l10n, Map<String, dynamic> doc) {
+    final status = doc['index_status'] as String? ?? 'keyword';
+    final chunks = doc['chunk_count'] as int? ?? 0;
+    switch (status) {
+      case 'semantic':
+        return chunks > 0
+            ? l10n.aiKnowledgeSemanticChunks(chunks)
+            : l10n.aiKnowledgeSemantic;
+      case 'error':
+        return l10n.aiKnowledgeIndexFailed;
+      default:
+        return chunks > 0
+            ? l10n.aiKnowledgeKeywordChunks(chunks)
+            : l10n.aiKnowledgeKeyword;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final bottom = MediaQuery.viewInsetsOf(context).bottom;
     return Padding(
       padding: EdgeInsets.fromLTRB(16, 8, 16, 16 + bottom),
@@ -197,12 +234,12 @@ class _AIChatKnowledgeSheetState extends State<_AIChatKnowledgeSheet> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(
-            'دانشنامه کسب‌وکار',
+            l10n.aiKnowledgeTitle,
             style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
           ),
           const SizedBox(height: 4),
           Text(
-            'اسناد مرتبط هنگام پاسخ‌دهی به پرسش شما جستجو و به context اضافه می‌شوند.',
+            l10n.aiKnowledgeIntro,
             style: Theme.of(context).textTheme.bodySmall,
           ),
           const SizedBox(height: 12),
@@ -211,13 +248,13 @@ class _AIChatKnowledgeSheetState extends State<_AIChatKnowledgeSheet> {
               FilledButton.tonalIcon(
                 onPressed: _addManual,
                 icon: const Icon(Icons.note_add_outlined, size: 20),
-                label: const Text('متن'),
+                label: Text(l10n.aiKnowledgeText),
               ),
               const SizedBox(width: 8),
               OutlinedButton.icon(
                 onPressed: _uploadFile,
                 icon: const Icon(Icons.upload_file_outlined, size: 20),
-                label: const Text('فایل'),
+                label: Text(l10n.aiKnowledgeFile),
               ),
               const Spacer(),
               TextButton.icon(
@@ -229,7 +266,7 @@ class _AIChatKnowledgeSheetState extends State<_AIChatKnowledgeSheet> {
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
                     : const Icon(Icons.sync_rounded, size: 20),
-                label: const Text('بازنمایه'),
+                label: Text(l10n.aiKnowledgeReindex),
               ),
             ],
           ),
@@ -240,9 +277,9 @@ class _AIChatKnowledgeSheetState extends State<_AIChatKnowledgeSheet> {
               child: Center(child: CircularProgressIndicator()),
             )
           else if (_docs.isEmpty)
-            const Padding(
-              padding: EdgeInsets.all(16),
-              child: Text('هنوز سندی ثبت نشده است.'),
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Text(l10n.aiKnowledgeEmpty),
             )
           else
             Flexible(
@@ -257,7 +294,12 @@ class _AIChatKnowledgeSheetState extends State<_AIChatKnowledgeSheet> {
                   return ListTile(
                     contentPadding: EdgeInsets.zero,
                     title: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis),
-                    subtitle: Text('$chars کاراکتر'),
+                    subtitle: Text(
+                      l10n.aiKnowledgeDocSubtitle(
+                        chars,
+                        _indexStatusLabel(l10n, doc),
+                      ),
+                    ),
                     trailing: IconButton(
                       icon: const Icon(Icons.delete_outline),
                       onPressed: () => _deleteDoc(id),

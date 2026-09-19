@@ -25,6 +25,7 @@ import '../../widgets/invoice/account_tree_combobox_widget.dart';
 import '../../models/account_model.dart';
 import '../../services/business_dashboard_service.dart';
 import '../../services/account_service.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 /// صفحه لیست اسناد هزینه و درآمد با ویجت جدول
 class ExpenseIncomeListPage extends StatefulWidget {
@@ -1196,7 +1197,7 @@ class _ExpenseIncomeListPageState extends State<ExpenseIncomeListPage> {
   Widget _buildMobileSummaryCard(ExpenseIncomeDocument doc) {
     final theme = Theme.of(context);
     final isIncome = doc.isIncome;
-    final typeColor = isIncome ? Colors.green : Colors.orange;
+    final typeColor = isIncome ? SemanticColorResolver.positive(context) : SemanticColorResolver.warning(context);
     final amountText = '${formatWithThousands(doc.totalAmount)} ${doc.currencyCode ?? 'ریال'}';
     final dateText = MarkStreetDateUtils.formatForDisplay(doc.documentDate, widget.calendarController.isJalali);
     final counterparty = (doc.counterpartyInfo ?? '').trim();

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import '../core/auth_store.dart';
+import '../main.dart' show navigatorKey;
 
 class UrlTracker extends StatefulWidget {
   final Widget child;
@@ -28,10 +30,12 @@ class _UrlTrackerState extends State<UrlTracker> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         try {
-          final currentUrl = Uri.base.path;
-          if (currentUrl != _lastTrackedUrl && 
-              currentUrl.isNotEmpty && 
-              currentUrl != '/' && 
+          final ctx = navigatorKey.currentContext;
+          if (ctx == null) return;
+          final currentUrl = GoRouterState.of(ctx).uri.path;
+          if (currentUrl != _lastTrackedUrl &&
+              currentUrl.isNotEmpty &&
+              currentUrl != '/' &&
               currentUrl != '/login' &&
               (currentUrl.startsWith('/user/profile/') ||
                   currentUrl.startsWith('/business/') ||
@@ -41,7 +45,6 @@ class _UrlTrackerState extends State<UrlTracker> {
           }
         } catch (e) {
           // اگر GoRouterState در دسترس نیست، URL را track نکن
-          // این ممکن است در splash screen یا loading state اتفاق بیفتد
         }
       }
     });

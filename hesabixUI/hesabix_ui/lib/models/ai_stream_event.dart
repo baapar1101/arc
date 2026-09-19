@@ -1,17 +1,50 @@
+import 'package:hesabix_ui/utils/ai_content_sanitize.dart';
+
 /// کلید ذخیره trace در function_results (بک‌اند).
 const kAgentTraceStorageKey = '_agent_trace';
 const kAgentBudgetStorageKey = '_agent_budget';
 const kAgentTodosStorageKey = '_agent_todos';
+const kAgentRunStorageKey = '_agent_run';
+const kAgentCitationsStorageKey = '_citations';
+const kActivatedSkillsStorageKey = '_activated_skills';
+const kReasoningTraceStorageKey = '_reasoning_trace';
+const kAwaitingApprovalStorageKey = '_awaiting_approval';
 
 /// استخراج trace از function_results پیام ذخیره‌شده.
 List<AIAgentTraceStep> extractAgentTraceFromResults(Object? functionResults) {
   if (functionResults is! Map) return [];
   final raw = functionResults[kAgentTraceStorageKey];
   if (raw is! List) return [];
-  return raw
+  final steps = raw
       .whereType<Map>()
       .map((e) => AIAgentTraceStep.fromJson(Map<String, dynamic>.from(e)))
       .toList();
+  return finalizeAgentTraceForDisplay(steps);
+}
+
+// Phase 1 (backend answer-channel gate): فقط answer پاسخ نهایی می‌شود؛
+// explored/thought شواهد خام هستند و نباید مستقیم به کاربر نمایش داده شوند.
+const _traceContentFallbackKinds = [
+  'answer',
+];
+
+/// متن پاسخ از trace وقتی content پیام خالی است (هم‌تراز بک‌اند).
+String extractContentFromTraceSteps(List<AIAgentTraceStep> steps) {
+  for (final kind in _traceContentFallbackKinds) {
+    const minLen = 20;
+    for (final step in steps.reversed) {
+      if (step.kind != kind) continue;
+      final body = sanitizeAssistantContent(step.bodyMarkdown?.trim() ?? '');
+      if (body.length >= minLen) return body;
+    }
+  }
+  return '';
+}
+
+String extractContentFromAgentTraceResults(Object? functionResults) {
+  return extractContentFromTraceSteps(
+    extractAgentTraceFromResults(functionResults),
+  );
 }
 
 AIStreamAgentBudget? extractAgentBudgetFromResults(Object? functionResults) {
@@ -27,6 +60,38 @@ AISessionTodoSnapshot? extractAgentTodosFromResults(Object? functionResults) {
   final raw = functionResults[kAgentTodosStorageKey];
   if (raw is! Map) return null;
   return AISessionTodoSnapshot.fromJson(Map<String, dynamic>.from(raw));
+}
+
+/// checkpoint اجرای agent از function_results پیام ذخیره‌شده.
+Map<String, dynamic>? extractAgentRunFromResults(Object? functionResults) {
+  if (functionResults is! Map) return null;
+  final raw = functionResults[kAgentRunStorageKey];
+  if (raw is! Map) return null;
+  final runId = raw['run_id']?.toString();
+  if (runId == null || runId.isEmpty) return null;
+  return Map<String, dynamic>.from(raw);
+}
+
+bool agentRunCanContinue(Object? functionResults) {
+  final run = extractAgentRunFromResults(functionResults);
+  if (run == null) return false;
+  if (run['can_continue'] == true) return true;
+  final status = run['status']?.toString();
+  return status == 'interrupted' || status == 'budget_exhausted';
+}
+
+/// دلیل توقف بودجه برای بنر ادامه (اگر در checkpoint ذخیره شده باشد).
+String? extractContinueStopMessage(Object? functionResults) {
+  final budget = extractAgentBudgetFromResults(functionResults);
+  final msg = budget?.stopMessageFa?.trim();
+  if (msg != null && msg.isNotEmpty) return msg;
+  return null;
+}
+
+/// نشانگر Last-Event-ID / run_id برای reconnect و ادامه.
+class AISseCursor {
+  int? lastEventId;
+  String? runId;
 }
 
 /// رویدادهای استریم SSE چت AI
@@ -49,8 +114,16 @@ class AIStreamChunk {
   final String? error;
   final bool recoverable;
   final String? suggestedAction;
+  final String? errorCode;
   final String? requestedModel;
   final String? resolvedModel;
+  final bool? awaitingApproval;
+  final String? citationsContext;
+  final String? executionMode;
+  final String? runId;
+  final int? sseId;
+  final bool? canContinue;
+  final String? finalContent;
 
   const AIStreamChunk({
     this.contentDelta,
@@ -71,9 +144,54 @@ class AIStreamChunk {
     this.error,
     this.recoverable = false,
     this.suggestedAction,
+    this.errorCode,
     this.requestedModel,
     this.resolvedModel,
+    this.awaitingApproval,
+    this.citationsContext,
+    this.executionMode,
+    this.runId,
+    this.sseId,
+    this.canContinue,
+    this.finalContent,
   });
+
+  AIStreamChunk withStreamMeta({
+    String? runId,
+    int? sseId,
+    bool? canContinue,
+  }) {
+    return AIStreamChunk(
+      contentDelta: contentDelta,
+      toolEvent: toolEvent,
+      statusEvent: statusEvent,
+      traceStep: traceStep,
+      traceStepUpdate: traceStepUpdate,
+      contextUsage: contextUsage,
+      agentBudget: agentBudget,
+      heartbeatElapsedMs: heartbeatElapsedMs,
+      todoSnapshot: todoSnapshot,
+      done: done,
+      usage: usage,
+      messageId: messageId,
+      functionCalls: functionCalls,
+      functionResults: functionResults,
+      agentTrace: agentTrace,
+      error: error,
+      recoverable: recoverable,
+      suggestedAction: suggestedAction,
+      errorCode: errorCode,
+      requestedModel: requestedModel,
+      resolvedModel: resolvedModel,
+      awaitingApproval: awaitingApproval,
+      citationsContext: citationsContext,
+      executionMode: executionMode,
+      runId: runId ?? this.runId,
+      sseId: sseId ?? this.sseId,
+      canContinue: canContinue ?? this.canContinue,
+      finalContent: finalContent,
+    );
+  }
 }
 
 /// یک گام در زنجیرهٔ agent (نمایش تایم‌لاین).
@@ -101,6 +219,8 @@ class AIAgentTraceStep {
   final int? findingsCount;
   final String? hypothesis;
   final String? confidence;
+  final String? subagentId;
+  final String? parentStepId;
 
   const AIAgentTraceStep({
     this.traceId,
@@ -125,16 +245,28 @@ class AIAgentTraceStep {
     this.findingsCount,
     this.hypothesis,
     this.confidence,
+    this.subagentId,
+    this.parentStepId,
   });
 
   bool get isActive => state == 'active';
   bool get isError => state == 'error';
+  bool get isNestedSubagentStep =>
+      parentStepId != null && parentStepId!.trim().isNotEmpty;
   bool get isReasoningLayer =>
       layer == 'reasoning' ||
       (layer == null &&
           kind != 'answer' &&
           kind != 'system');
   bool get isAnswerLayer => layer == 'answer' || kind == 'answer';
+
+  String? get cancelableSubagentId {
+    if (kind != 'subagent') return null;
+    final explicit = subagentId?.trim();
+    if (explicit != null && explicit.isNotEmpty) return explicit;
+    final fallback = exploreTarget?.trim();
+    return (fallback == null || fallback.isEmpty) ? null : fallback;
+  }
 
   /// نمایش زمان اجرا به صورت خوانا
   String? get elapsedLabel {
@@ -179,6 +311,8 @@ class AIAgentTraceStep {
       findingsCount: json['findings_count'] as int?,
       hypothesis: json['hypothesis'] as String?,
       confidence: json['confidence'] as String?,
+      subagentId: json['subagent_id'] as String?,
+      parentStepId: json['parent_step_id'] as String?,
     );
   }
 
@@ -205,6 +339,8 @@ class AIAgentTraceStep {
         if (findingsCount != null) 'findings_count': findingsCount,
         if (hypothesis != null) 'hypothesis': hypothesis,
         if (confidence != null) 'confidence': confidence,
+        if (subagentId != null) 'subagent_id': subagentId,
+        if (parentStepId != null) 'parent_step_id': parentStepId,
       };
 
   AIAgentTraceStep copyWith({
@@ -214,9 +350,13 @@ class AIAgentTraceStep {
     int? resultCount,
   }) {
     return AIAgentTraceStep(
+      traceId: traceId,
       stepId: stepId,
       kind: kind,
       state: state ?? this.state,
+      layer: layer,
+      visibility: visibility,
+      retryAttempt: retryAttempt,
       titleKey: titleKey,
       titleParams: titleParams,
       bodyMarkdown: bodyMarkdown ?? this.bodyMarkdown,
@@ -226,6 +366,14 @@ class AIAgentTraceStep {
       elapsedMs: elapsedMs ?? this.elapsedMs,
       resultCount: resultCount ?? this.resultCount,
       citations: citations,
+      bundleId: bundleId,
+      exploreTarget: exploreTarget,
+      entityRefs: entityRefs,
+      findingsCount: findingsCount,
+      hypothesis: hypothesis,
+      confidence: confidence,
+      subagentId: subagentId,
+      parentStepId: parentStepId,
     );
   }
 }
@@ -238,6 +386,10 @@ class AIStreamContextUsage {
   final double? usagePercent;
   final bool historySummarized;
   final bool contextRetried;
+  final int? staticTokens;
+  final int? semiStaticTokens;
+  final int? insightsTokens;
+  final int? runtimeTokens;
 
   const AIStreamContextUsage({
     this.estimatedTokens,
@@ -246,6 +398,10 @@ class AIStreamContextUsage {
     this.usagePercent,
     this.historySummarized = false,
     this.contextRetried = false,
+    this.staticTokens,
+    this.semiStaticTokens,
+    this.insightsTokens,
+    this.runtimeTokens,
   });
 
   factory AIStreamContextUsage.fromJson(Map<String, dynamic> json) {
@@ -256,6 +412,10 @@ class AIStreamContextUsage {
       usagePercent: (json['usage_percent'] as num?)?.toDouble(),
       historySummarized: json['history_summarized'] as bool? ?? false,
       contextRetried: json['context_retried'] as bool? ?? false,
+      staticTokens: json['static_tokens'] as int?,
+      semiStaticTokens: json['semi_static_tokens'] as int?,
+      insightsTokens: json['insights_tokens'] as int?,
+      runtimeTokens: json['runtime_tokens'] as int?,
     );
   }
 }
@@ -273,6 +433,9 @@ class AIStreamAgentBudget {
   final String? reasoningEffort;
   final String? stopReason;
   final String? stopMessageFa;
+  final int? extensionsGranted;
+  final int? maxExtensions;
+  final int? baseMaxIterations;
 
   const AIStreamAgentBudget({
     this.iteration,
@@ -286,6 +449,9 @@ class AIStreamAgentBudget {
     this.reasoningEffort,
     this.stopReason,
     this.stopMessageFa,
+    this.extensionsGranted,
+    this.maxExtensions,
+    this.baseMaxIterations,
   });
 
   factory AIStreamAgentBudget.fromJson(Map<String, dynamic> json) {
@@ -301,6 +467,9 @@ class AIStreamAgentBudget {
       reasoningEffort: json['reasoning_effort'] as String?,
       stopReason: json['stop_reason'] as String?,
       stopMessageFa: json['stop_message_fa'] as String?,
+      extensionsGranted: json['extensions_granted'] as int?,
+      maxExtensions: json['max_extensions'] as int?,
+      baseMaxIterations: json['base_max_iterations'] as int?,
     );
   }
 
@@ -318,6 +487,9 @@ class AIStreamAgentBudget {
         if (reasoningEffort != null) 'reasoning_effort': reasoningEffort,
         if (stopReason != null) 'stop_reason': stopReason,
         if (stopMessageFa != null) 'stop_message_fa': stopMessageFa,
+        if (extensionsGranted != null) 'extensions_granted': extensionsGranted,
+        if (maxExtensions != null) 'max_extensions': maxExtensions,
+        if (baseMaxIterations != null) 'base_max_iterations': baseMaxIterations,
       };
 }
 
@@ -420,6 +592,7 @@ class AISessionTodoItem {
   bool get isSkipped => status == 'skipped';
   bool get isError => status == 'error';
   bool get isTerminal => isDone || isSkipped || isError;
+  bool get canUserDecide => isPending || isInProgress;
 
   factory AISessionTodoItem.fromJson(Map<String, dynamic> json) {
     return AISessionTodoItem(

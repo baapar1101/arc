@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:dio/dio.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
 import 'package:hesabix_ui/core/api_client.dart';
@@ -10,7 +11,12 @@ import 'package:hesabix_ui/services/business_dashboard_service.dart';
 import 'package:hesabix_ui/services/currency_service.dart';
 import 'package:hesabix_ui/widgets/data_table/helpers/data_table_utils.dart';
 import 'package:hesabix_ui/services/list_filter_preferences_service.dart';
+import 'package:hesabix_ui/services/bytes_export/bytes_export_service.dart';
 import 'package:hesabix_ui/core/date_utils.dart';
+import 'package:hesabix_ui/utils/snackbar_helper.dart';
+import 'package:hesabix_ui/utils/error_extractor.dart';
+import 'package:hesabix_ui/utils/currency_display_utils.dart';
+import 'package:hesabix_ui/core/hesabix_back.dart';
 
 class JournalLedgerReportPage extends StatefulWidget {
   final int businessId;
@@ -41,6 +47,7 @@ class _JournalLedgerReportPageState extends State<JournalLedgerReportPage> {
   
   // Summary from API response
   Map<String, dynamic>? _summary;
+  bool _isExportingElectronic = false;
 
   // Document types
   final Map<String, String> _documentTypes = {
@@ -101,13 +108,8 @@ class _JournalLedgerReportPageState extends State<JournalLedgerReportPage> {
       if (!mounted) return;
       setState(() {
         _currencies = items;
-        if (items.isNotEmpty) {
-          final defaultCurrency = items.firstWhere(
-            (c) => c['is_default'] == true,
-            orElse: () => items.first,
-          );
-          _selectedCurrencyId = defaultCurrency['id'] as int?;
-        }
+        // پیش‌فرض: همه ارزها (= مبالغ پایه در بک‌اند)
+        _selectedCurrencyId = null;
       });
     } catch (_) {
       // ignore errors
@@ -160,10 +162,110 @@ class _JournalLedgerReportPageState extends State<JournalLedgerReportPage> {
     };
   }
 
+  bool _isSelectedCurrencyRial() {
+    if (_selectedCurrencyId == null) return false;
+    for (final currency in _currencies) {
+      if (currency['id'] == _selectedCurrencyId) {
+        final code = (currency['code'] ?? currency['name'] ?? '').toString().toUpperCase();
+        return code == 'IRR' || code == 'RIAL';
+      }
+    }
+    return false;
+  }
+
+  Future<void> _exportElectronicBooks() async {
+    if (_isExportingElectronic) return;
+
+    if (!_isSelectedCurrencyRial()) {
+      SnackBarHelper.showError(
+        context,
+        message: 'برای خروجی دفتر الکترونیکی باید ارز ریال (IRR) انتخاب شود.',
+      );
+      return;
+    }
+
+    setState(() => _isExportingElectronic = true);
+    final t = AppLocalizations.of(context);
+
+    try {
+      final api = ApiClient();
+      final response = await api.post<List<int>>(
+        '/api/v1/businesses/${widget.businessId}/reports/journal-ledger/export/electronic-books',
+        data: {
+          ..._additionalParams(),
+          'format': 'auto',
+        },
+        options: Options(
+          responseType: ResponseType.bytes,
+          headers: {
+            'X-Calendar-Type': widget.calendarController.isJalali ? 'jalali' : 'gregorian',
+          },
+        ),
+      );
+
+      final data = response.data;
+      if (data == null || data.isEmpty) {
+        throw Exception('پاسخ خالی از سرور');
+      }
+
+      final exportFormat = response.headers.value('x-export-format')?.toLowerCase() ?? 'xlsx';
+      final extension = exportFormat == 'csv' ? 'csv' : 'xlsx';
+
+      final result = await BytesExportService.exportResponse(
+        response: response,
+        fallbackBaseName:
+            'electronic_journal_ledger_${DateTime.now().millisecondsSinceEpoch}',
+        fallbackExt: extension,
+      );
+
+      if (!mounted) return;
+      BytesExportService.showFeedback(context, result);
+    } catch (e) {
+      if (!mounted) return;
+      SnackBarHelper.showError(
+        context,
+        message: '${t.exportError}: ${ErrorExtractor.forContext(e, context)}',
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isExportingElectronic = false);
+      }
+    }
+  }
+
   String _formatNumber(dynamic value) {
     if (value == null) return '0';
     final n = value is num ? value.toDouble() : double.tryParse(value.toString()) ?? 0.0;
     return DataTableUtils.formatNumber(n);
+  }
+
+  String get _baseCurrencyUnit {
+    Map<String, dynamic>? def;
+    for (final c in _currencies) {
+      if (c['is_default'] == true) {
+        def = c;
+        break;
+      }
+    }
+    def ??= _currencies.isNotEmpty ? _currencies.first : null;
+    if (def == null) return 'ریال';
+    return currencyUnitLabelFromBusinessCurrencyMap(def);
+  }
+
+  String _formatLedgerAmount(Map<String, dynamic> m, String amountKey, String nativeKey) {
+    final amountsInBase = m['amounts_in_base'] == true || _selectedCurrencyId == null;
+    final unit = (m['document_currency_symbol'] ?? m['document_currency_code'] ?? '')
+        .toString();
+    final dp = (m['document_currency_decimal_places'] as num?)?.toInt() ?? 2;
+    return formatReportLedgerAmount(
+      amount: m[amountKey],
+      amountsInBase: amountsInBase,
+      nativeAmount: m[nativeKey],
+      documentCurrencyUnit: unit,
+      baseUnit: _baseCurrencyUnit,
+      baseDecimalPlaces: 0,
+      nativeDecimalPlaces: dp,
+    );
   }
 
   String _formatAccount(dynamic code, dynamic name) {
@@ -249,7 +351,11 @@ class _JournalLedgerReportPageState extends State<JournalLedgerReportPage> {
         NumberColumn(
           'debit_amount',
           'مبلغ بدهکار',
-          formatter: (item) => _formatNumber((item as Map<String, dynamic>)['debit_amount']),
+          formatter: (item) => _formatLedgerAmount(
+            item as Map<String, dynamic>,
+            'debit_amount',
+            'native_debit_amount',
+          ),
         ),
         TextColumn(
           'credit_account',
@@ -262,7 +368,11 @@ class _JournalLedgerReportPageState extends State<JournalLedgerReportPage> {
         NumberColumn(
           'credit_amount',
           'مبلغ بستانکار',
-          formatter: (item) => _formatNumber((item as Map<String, dynamic>)['credit_amount']),
+          formatter: (item) => _formatLedgerAmount(
+            item as Map<String, dynamic>,
+            'credit_amount',
+            'native_credit_amount',
+          ),
         ),
         TextColumn(
           'person_name',
@@ -274,6 +384,22 @@ class _JournalLedgerReportPageState extends State<JournalLedgerReportPage> {
       defaultPageSize: 50,
       additionalParams: _additionalParams(),
       showExportButtons: true,
+      customHeaderActions: [
+        Tooltip(
+          message: 'خروجی مطابق قالب سامانه دفاتر الکترونیکی سازمان امور مالیاتی',
+          child: FilledButton.tonalIcon(
+            onPressed: _isExportingElectronic ? null : _exportElectronicBooks,
+            icon: _isExportingElectronic
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.upload_file_outlined),
+            label: const Text('دفتر الکترونیکی'),
+          ),
+        ),
+      ],
       excelEndpoint: '/api/v1/businesses/${widget.businessId}/reports/journal-ledger/export/excel',
       pdfEndpoint: '/api/v1/businesses/${widget.businessId}/reports/journal-ledger/export/pdf',
       getExportParams: () => _additionalParams(),
@@ -295,10 +421,7 @@ class _JournalLedgerReportPageState extends State<JournalLedgerReportPage> {
     return Scaffold(
       backgroundColor: cs.surface,
       appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.pop(),
-        ),
+        leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
         title: Text(t.reportsJournalLedgerTitle),
         actions: [
           IconButton(
@@ -388,10 +511,11 @@ class _JournalLedgerReportPageState extends State<JournalLedgerReportPage> {
                                     ),
                                   ),
                                   
-                                  // Currency
+                                  // Currency — فقط چندارزی
+                                  if (_currencies.length > 1)
                                   SizedBox(
-                                    width: 200,
-                                    child: DropdownButtonFormField<int>(
+                                    width: 220,
+                                    child: DropdownButtonFormField<int?>(
                                       value: _selectedCurrencyId,
                                       decoration: InputDecoration(
                                         labelText: 'ارز',
@@ -399,16 +523,16 @@ class _JournalLedgerReportPageState extends State<JournalLedgerReportPage> {
                                         contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
                                       ),
                                       items: [
-                                        const DropdownMenuItem<int>(
+                                        const DropdownMenuItem<int?>(
                                           value: null,
-                                          child: Text('همه ارزها'),
+                                          child: Text('همه ارزها (معادل پایه)'),
                                         ),
-                                        ..._currencies.map<DropdownMenuItem<int>>((c) {
+                                        ..._currencies.map<DropdownMenuItem<int?>>((c) {
                                           final id = c['id'] as int?;
                                           final code = (c['code'] ?? '').toString();
-                                          final name = (c['name'] ?? '').toString();
+                                          final name = (c['title'] ?? c['name'] ?? '').toString();
                                           final displayName = code.isNotEmpty ? '$code - $name' : name;
-                                          return DropdownMenuItem<int>(
+                                          return DropdownMenuItem<int?>(
                                             key: ValueKey('currency_$id'),
                                             value: id,
                                             child: Text(

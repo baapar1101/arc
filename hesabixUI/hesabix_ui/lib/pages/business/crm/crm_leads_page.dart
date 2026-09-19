@@ -8,16 +8,15 @@ import 'package:hesabix_ui/services/business_user_service.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/services/crm_service.dart';
 import 'package:hesabix_ui/utils/snackbar_helper.dart';
-import 'package:hesabix_ui/utils/web/web_utils.dart' as web_utils;
-import 'package:hesabix_ui/widgets/crm/crm_ai_assistant_widget.dart';
 import 'package:hesabix_ui/widgets/crm/crm_delete_confirm_dialog.dart';
-import 'package:hesabix_ui/widgets/crm/crm_responsive_dialog.dart';
+import 'package:hesabix_ui/widgets/crm/crm_lead_form_dialog.dart';
+import 'package:hesabix_ui/widgets/crm/crm_lead_quick_create_dialog.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
-import 'package:hesabix_ui/core/date_utils.dart';
-import 'package:hesabix_ui/widgets/crm/crm_section_card.dart';
-import 'package:hesabix_ui/widgets/jalali_date_picker.dart';
 import 'package:hesabix_ui/widgets/permission/permission_widgets.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
+import 'package:hesabix_ui/services/bytes_export/bytes_export_service.dart';
+import 'package:hesabix_ui/core/hesabix_back.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 /// صفحه لیست سرنخ‌های CRM
 class CrmLeadsPage extends StatefulWidget {
@@ -57,9 +56,33 @@ class _CrmLeadsPageState extends State<CrmLeadsPage> {
   @override
   void initState() {
     super.initState();
-    final openAdd = GoRouterState.of(context).uri.queryParameters['openAdd'] == '1';
+    final qp = GoRouterState.of(context).uri.queryParameters;
+    final openAdd = qp['openAdd'] == '1';
+    final leadIdRaw = qp['leadId'] ?? qp['lead_id'];
+    final deepLeadId = leadIdRaw != null ? int.tryParse(leadIdRaw) : null;
     _loadProcessDefinitions().then((_) {
-      if (mounted && openAdd) {
+      if (!mounted) return;
+      if (deepLeadId != null) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          context.go('/business/${widget.businessId}/crm/leads/$deepLeadId');
+        });
+        return;
+      }
+      // پیش‌فرض فانل برای کانبان
+      if (_processDefs.isNotEmpty && _filterProcessDefinitionId == null) {
+        final def = _processDefs.cast<Map<String, dynamic>?>().firstWhere(
+              (p) => p?['is_default'] == true,
+              orElse: () => _processDefs.first,
+            );
+        setState(() {
+          _filterProcessDefinitionId = def?['id'] as int?;
+          _stages = (def?['stages'] is List
+                  ? (def!['stages'] as List).cast<Map<String, dynamic>>()
+                  : <Map<String, dynamic>>[]);
+        });
+      }
+      if (openAdd) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted) _onAdd();
         });
@@ -211,9 +234,17 @@ class _CrmLeadsPageState extends State<CrmLeadsPage> {
         ].join(','));
       }
       final bytes = utf8.encode(sb.toString());
-      await web_utils.saveBytesAsFileWeb(bytes, 'leads.csv', mimeType: 'text/csv; charset=utf-8');
+      final exportResult = await BytesExportService.export(
+        bytes: bytes,
+        filename: 'leads.csv',
+        mimeType: 'text/csv; charset=utf-8',
+      );
       if (!mounted) return;
-      SnackBarHelper.show(context, message: 'فایل leads.csv ذخیره شد');
+      BytesExportService.showFeedback(
+        context,
+        exportResult,
+        successOverride: 'فایل leads.csv ذخیره شد',
+      );
     } catch (e) {
       if (!mounted) return;
       SnackBarHelper.show(
@@ -233,12 +264,7 @@ class _CrmLeadsPageState extends State<CrmLeadsPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('سرنخ‌ها'),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () {
-            if (context.canPop()) context.pop();
-          },
-        ),
+        leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
         actions: [
           SegmentedButton<bool>(
             segments: const [
@@ -426,7 +452,7 @@ class _CrmLeadsPageState extends State<CrmLeadsPage> {
                                   Padding(
                                     padding: const EdgeInsets.only(top: 8),
                                     child: Text(
-                                      'ابتدا از منوی «فرایندها و زون ارجاعات» یک فرایند از نوع فانل سرنخ تعریف کنید.',
+                                      'ابتدا از منوی «فرایندها و مراحل قیف» یک فرایند از نوع فانل سرنخ تعریف کنید.',
                                       textAlign: TextAlign.center,
                                       style: Theme.of(context).textTheme.bodySmall,
                                     ),
@@ -461,43 +487,67 @@ class _CrmLeadsPageState extends State<CrmLeadsPage> {
                                 final personId = item['person_id'] as int?;
                                 final personName = item['person_name']?.toString();
                                 final isConverted = convertedAt != null || personId != null;
+                                final score = (item['score'] as num?)?.toInt();
+                                final slaDueRaw = item['sla_due_at']?.toString();
+                                final slaDue = (slaDueRaw != null && slaDueRaw.isNotEmpty) ? DateTime.tryParse(slaDueRaw) : null;
+                                final slaOverdue = slaDue != null && slaDue.isBefore(DateTime.now()) && !isConverted;
+                                final subtitleLine = [if (code.isNotEmpty) code, companyName.isNotEmpty ? companyName : null, mobile.isNotEmpty ? mobile : null, stageName].whereType<String>().join(' · ');
                                 return Card(
                                   margin: const EdgeInsets.only(bottom: 8),
                                   child: ListTile(
                                     leading: CircleAvatar(
-                                      backgroundColor: isConverted ? Colors.green.shade100 : Theme.of(context).colorScheme.primaryContainer,
+                                      backgroundColor: isConverted ? SemanticColorResolver.positive(context).withValues(alpha: 0.18) : Theme.of(context).colorScheme.primaryContainer,
                                       child: Icon(
                                         isConverted ? Icons.check_circle : Icons.contact_phone,
-                                        color: isConverted ? Colors.green : Theme.of(context).colorScheme.onPrimaryContainer,
+                                        color: isConverted ? SemanticColorResolver.positive(context) : Theme.of(context).colorScheme.onPrimaryContainer,
                                       ),
                                     ),
                                     title: Row(
                                       children: [
                                         Expanded(child: Text(name)),
+                                        if (score != null && score > 0)
+                                          Padding(
+                                            padding: const EdgeInsets.only(left: 4),
+                                            child: Chip(
+                                              avatar: Icon(Icons.local_fire_department, size: 16, color: Theme.of(context).colorScheme.primary),
+                                              label: Text('$score', style: TextStyle(fontSize: 12)),
+                                              visualDensity: VisualDensity.compact,
+                                            ),
+                                          ),
                                         if (isConverted)
                                           Chip(
-                                            label: Text(personName ?? 'تبدیل شده', style: const TextStyle(fontSize: 12)),
+                                            label: Text(personName ?? 'تبدیل شده', style: TextStyle(fontSize: 12)),
                                             visualDensity: VisualDensity.compact,
-                                            backgroundColor: Colors.green.shade50,
+                                            backgroundColor: SemanticColorResolver.positive(context).withValues(alpha: 0.12),
                                           ),
                                       ],
                                     ),
-                                    subtitle: Text([if (code.isNotEmpty) code, companyName.isNotEmpty ? companyName : null, mobile.isNotEmpty ? mobile : null, stageName].whereType<String>().join(' · ')),
+                                    subtitle: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        if (subtitleLine.isNotEmpty) Text(subtitleLine),
+                                        if (slaOverdue)
+                                          Text(
+                                            'مهلت SLA گذشته است',
+                                            style: TextStyle(color: Theme.of(context).colorScheme.error, fontSize: 12),
+                                          ),
+                                      ],
+                                    ),
                                     trailing: widget.authStore.hasBusinessPermission('crm', 'write')
                                         ? PopupMenuButton<String>(
                                             onSelected: (v) {
-                                              if (v == 'edit') _onEdit(item);
+                                              if (v == 'edit') _openRecord(item);
                                               if (v == 'convert' && id != null && !isConverted) _onConvertToCustomer(id, name);
                                               if (v == 'delete' && id != null) _onDelete(id, name);
                                             },
                                             itemBuilder: (_) => [
-                                              const PopupMenuItem(value: 'edit', child: Text('ویرایش')),
+                                              const PopupMenuItem(value: 'edit', child: Text('مشاهده / ویرایش')),
                                               if (!isConverted) const PopupMenuItem(value: 'convert', child: Text('تبدیل به مشتری')),
                                               const PopupMenuItem(value: 'delete', child: Text('حذف')),
                                             ],
                                           )
                                         : null,
-                                    onTap: () => _onEdit(item),
+                                    onTap: () => _openRecord(item),
                                   ),
                                 );
                               },
@@ -545,6 +595,7 @@ class _CrmLeadsPageState extends State<CrmLeadsPage> {
         byStage.putIfAbsent(sid, () => []).add(l);
       }
     }
+    final canWrite = widget.authStore.hasBusinessPermission('crm', 'write');
     final height = MediaQuery.of(context).size.height - 280;
     return RefreshIndicator(
       onRefresh: () => _load(resetPage: true),
@@ -566,96 +617,105 @@ class _CrmLeadsPageState extends State<CrmLeadsPage> {
             final leads = sid != null ? (byStage[sid] ?? []) : [];
             return SizedBox(
               width: 280,
-              child: Card(
-                margin: const EdgeInsets.only(right: 12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: (col ?? Theme.of(context).colorScheme.primaryContainer).withOpacity(0.3),
-                        borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
-                      ),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              stageName,
-                              style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+              child: DragTarget<Map<String, dynamic>>(
+                onWillAcceptWithDetails: (details) {
+                  final from = details.data['stage_id'] as int?;
+                  return canWrite && sid != null && from != sid && details.data['converted_at'] == null && details.data['person_id'] == null;
+                },
+                onAcceptWithDetails: (details) {
+                  if (sid != null) _moveLeadToStage(details.data, sid);
+                },
+                builder: (context, candidate, rejected) {
+                  final highlight = candidate.isNotEmpty;
+                  return Card(
+                    margin: const EdgeInsets.only(right: 12),
+                    color: highlight ? Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.35) : null,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: (col ?? Theme.of(context).colorScheme.primaryContainer).withValues(alpha: 0.3),
+                            borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
+                          ),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  stageName,
+                                  style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+                                ),
+                              ),
+                              Chip(label: Text('${leads.length}'), visualDensity: VisualDensity.compact),
+                            ],
+                          ),
+                        ),
+                        Expanded(
+                          child: SingleChildScrollView(
+                            padding: const EdgeInsets.all(8),
+                            child: Column(
+                              children: [
+                                ...leads.map<Widget>((l) {
+                                  final name = l['name']?.toString() ?? '';
+                                  final companyName = l['company_name']?.toString() ?? '';
+                                  final mobile = l['mobile']?.toString() ?? '';
+                                  final id = l['id'] as int?;
+                                  final isConverted = l['converted_at'] != null || l['person_id'] != null;
+                                  final card = Card(
+                                    margin: const EdgeInsets.only(bottom: 8),
+                                    child: ListTile(
+                                      dense: true,
+                                      leading: Icon(
+                                        isConverted ? Icons.check_circle : Icons.drag_indicator,
+                                        size: 20,
+                                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                      ),
+                                      title: Text(name, maxLines: 1, overflow: TextOverflow.ellipsis),
+                                      subtitle: Text(
+                                        [if (companyName.isNotEmpty) companyName, if (mobile.isNotEmpty) mobile].join(' · '),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                      onTap: () => _openRecord(l),
+                                    ),
+                                  );
+                                  if (!canWrite || isConverted || id == null) return card;
+                                  return LongPressDraggable<Map<String, dynamic>>(
+                                    data: l,
+                                    feedback: Material(
+                                      elevation: 6,
+                                      borderRadius: BorderRadius.circular(12),
+                                      child: SizedBox(
+                                        width: 240,
+                                        child: Card(
+                                          child: ListTile(
+                                            dense: true,
+                                            title: Text(name, maxLines: 1),
+                                            subtitle: const Text('رها کنید روی مرحله مقصد'),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                    childWhenDragging: Opacity(opacity: 0.35, child: card),
+                                    child: card,
+                                  );
+                                }),
+                                if (canWrite)
+                                  TextButton.icon(
+                                    onPressed: () => _onAdd(stageId: sid),
+                                    icon: const Icon(Icons.add, size: 18),
+                                    label: const Text('افزودن'),
+                                  ),
+                              ],
                             ),
                           ),
-                          Chip(
-                            label: Text('${leads.length}'),
-                            visualDensity: VisualDensity.compact,
-                          ),
-                        ],
-                      ),
-                    ),
-                    Expanded(
-                      child: SingleChildScrollView(
-                        padding: const EdgeInsets.all(8),
-                        child: Column(
-                          children: leads.map<Widget>((l) {
-                            final name = l['name']?.toString() ?? '';
-                            final companyName = l['company_name']?.toString() ?? '';
-                            final mobile = l['mobile']?.toString() ?? '';
-                            final id = l['id'] as int?;
-                            final isConverted = l['converted_at'] != null || l['person_id'] != null;
-                            return Card(
-                              margin: const EdgeInsets.only(bottom: 8),
-                              child: ListTile(
-                                dense: true,
-                                leading: CircleAvatar(
-                                  radius: 18,
-                                  backgroundColor: isConverted ? Colors.green.shade100 : Theme.of(context).colorScheme.primaryContainer,
-                                  child: Icon(
-                                    isConverted ? Icons.check_circle : Icons.person_outline,
-                                    size: 20,
-                                    color: isConverted ? Colors.green.shade700 : Theme.of(context).colorScheme.onPrimaryContainer,
-                                  ),
-                                ),
-                                title: Text(name, maxLines: 1, overflow: TextOverflow.ellipsis),
-                                subtitle: Text(
-                                  [if (companyName.isNotEmpty) companyName, if (mobile.isNotEmpty) mobile].join(' · '),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                                trailing: widget.authStore.hasBusinessPermission('crm', 'write') && !isConverted
-                                    ? PopupMenuButton<String>(
-                                        onSelected: (v) {
-                                          if (v == 'edit') _onEdit(l);
-                                          if (v == 'convert' && id != null) _onConvertToCustomer(id, name);
-                                          if (v == 'delete' && id != null) _onDelete(id, name);
-                                        },
-                                        itemBuilder: (_) => [
-                                          const PopupMenuItem(value: 'edit', child: Text('ویرایش')),
-                                          const PopupMenuItem(value: 'convert', child: Text('تبدیل به مشتری')),
-                                          const PopupMenuItem(value: 'delete', child: Text('حذف')),
-                                        ],
-                                      )
-                                    : widget.authStore.hasBusinessPermission('crm', 'write')
-                                        ? PopupMenuButton<String>(
-                                            onSelected: (v) {
-                                              if (v == 'edit') _onEdit(l);
-                                              if (v == 'delete' && id != null) _onDelete(id, name);
-                                            },
-                                            itemBuilder: (_) => [
-                                              const PopupMenuItem(value: 'edit', child: Text('ویرایش')),
-                                              const PopupMenuItem(value: 'delete', child: Text('حذف')),
-                                            ],
-                                          )
-                                        : null,
-                                onTap: () => _onEdit(l),
-                              ),
-                            );
-                          }).toList(),
                         ),
-                      ),
+                      ],
                     ),
-                  ],
-                ),
+                  );
+                },
               ),
             );
           }).toList(),
@@ -664,41 +724,56 @@ class _CrmLeadsPageState extends State<CrmLeadsPage> {
     );
   }
 
-  void _onAdd() {
+  Future<void> _moveLeadToStage(Map<String, dynamic> lead, int stageId) async {
+    final id = lead['id'] as int?;
+    if (id == null) return;
+    final prev = lead['stage_id'];
+    setState(() => lead['stage_id'] = stageId);
+    try {
+      await _crmService.updateLead(businessId: widget.businessId, leadId: id, stageId: stageId);
+      if (!mounted) return;
+      SnackBarHelper.show(context, message: 'مرحله سرنخ به‌روز شد');
+      await _load(resetPage: true);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => lead['stage_id'] = prev);
+      SnackBarHelper.show(context, message: 'خطا: ${ErrorExtractor.forContext(e, context)}', isError: true);
+    }
+  }
+
+  void _openRecord(Map<String, dynamic> item) {
+    final id = item['id'] as int?;
+    if (id == null) return;
+    context.go('/business/${widget.businessId}/crm/leads/$id');
+  }
+
+  void _onAdd({int? stageId}) {
     if (!widget.authStore.hasBusinessPermission('crm', 'write') || _processDefs.isEmpty) return;
-    showDialog<void>(
+    showDialog<Map<String, dynamic>?>(
       context: context,
-      builder: (ctx) => _LeadFormDialog(
+      builder: (ctx) => CrmLeadQuickCreateDialog(
         businessId: widget.businessId,
         processDefs: _processDefs,
         leadSources: _leadSources,
         crmService: _crmService,
         calendarController: widget.calendarController,
+        initialProcessDefinitionId: _filterProcessDefinitionId,
+        initialStageId: stageId ?? _filterStageId,
         onSaved: () => _load(resetPage: true),
       ),
-    );
+    ).then((created) {
+      if (!mounted) return;
+      final id = (created?['id'] as num?)?.toInt();
+      if (id != null) {
+        context.go('/business/${widget.businessId}/crm/leads/$id');
+      }
+    });
   }
-
-  void _onEdit(Map<String, dynamic> item) {
-    showDialog<void>(
-      context: context,
-      builder: (ctx) => _LeadFormDialog(
-        businessId: widget.businessId,
-        processDefs: _processDefs,
-        leadSources: _leadSources,
-        crmService: _crmService,
-        calendarController: widget.calendarController,
-        initial: item,
-        onSaved: () => _load(resetPage: true),
-      ),
-    );
-  }
-
 
   Future<void> _onConvertToCustomer(int id, String name) async {
     final result = await showDialog<Map<String, dynamic>?>(
       context: context,
-      builder: (ctx) => _ConvertLeadDialog(
+      builder: (ctx) => CrmConvertLeadDialog(
         businessId: widget.businessId,
         leadId: id,
         leadName: name,
@@ -741,6 +816,8 @@ class _CrmLeadsPageState extends State<CrmLeadsPage> {
     }
   }
 }
+<<<<<<< HEAD
+=======
 
 /// دیالوگ تبدیل سرنخ به مشتری با گزینه ایجاد همزمان فرصت فروش
 class _ConvertLeadDialog extends StatefulWidget {
@@ -1481,3 +1558,4 @@ class _LeadFormDialogState extends State<_LeadFormDialog> {
     }
   }
 }
+>>>>>>> github/Huma

@@ -1,0 +1,69 @@
+[
+  {
+    "id": "db_1309_pending_date_range",
+    "message_id": 1309,
+    "user_query": "از تاریخ امروز تا ۳ ماه پیش منظورم هست",
+    "round_text": "در حال تبدیل بازهٔ «امروز تا ۳ ماه پیش» به بازهٔ دقیق شمسی برای استخراج هزینه‌ها.",
+    "expect_continue": true,
+    "expect_goal_reached": false,
+    "note": "narrative بدون tool_call — قبلاً به‌عنوان پاسخ نهایی ذخیره می‌شد"
+  },
+  {
+    "id": "db_1320_pending_invoice_search",
+    "message_id": 1320,
+    "user_query": "فاکتورهای فروش را بررسی کن",
+    "round_text": "در حال جستجوی فاکتورهای فروش برای بازهٔ «از 1405/01/23 تا 1405/04/23».",
+    "expect_continue": true,
+    "expect_goal_reached": false,
+    "note": "narrative فارسی بدون evidence"
+  },
+  {
+    "id": "db_1328_pending_resolve_date",
+    "message_id": 1328,
+    "user_query": "بررسی مالی از ۳ ماه گذشته انجام بده",
+    "round_text": "در حال محاسبه بازهٔ تاریخ «۳ ماه گذشته» بر حسب تقویم جلالی است. برای این کار ابتدا تابع `resolve_date_range` را صدا می‌زنیم.",
+    "expect_continue": true,
+    "expect_goal_reached": false,
+    "note": "اعلام intent ابزار در متن — بدون infer"
+  },
+  {
+    "id": "db_1330_en_will_call",
+    "message_id": 1330,
+    "user_query": "انجامش بده",
+    "history_messages": [
+      {"role": "user", "content": "بررسی مالی از ۳ ماه گذشته انجام بده"}
+    ],
+    "round_text": "We will call resolve_date_range then get_financial_summary.",
+    "expect_continue": true,
+    "expect_goal_reached": false,
+    "note": "planning انگلیسی — follow-up کوتاه با context قبلی"
+  },
+  {
+    "id": "db_1350_budget_message",
+    "message_id": 1350,
+    "user_query": "بررسی کن کدام فاکتورهای فروش پولشون پرداخت شده",
+    "round_text": "چند مرحلهٔ اخیر دادهٔ تازه‌ای اضافه نکرد؛ با شواهد موجود پاسخ می‌دهم.",
+    "expect_continue": true,
+    "expect_goal_reached": false,
+    "note": "پیام budget unproductive — نباید پاسخ نهایی باشد"
+  },
+  {
+    "id": "db_1367_expense_report_status",
+    "message_id": 1367,
+    "user_query": "یه گزارش از هزینه ها بهم بگو",
+    "round_text": "در حال دریافت لیست گزارش‌های موجود برای شناسایی گزارش هزینه‌ها هستم.",
+    "expect_continue": true,
+    "expect_goal_reached": false,
+    "note": "status narrative without tools — must continue"
+  },
+  {
+    "id": "db_1348_complete_answer",
+    "message_id": 1348,
+    "user_query": "لیست بدهکاران را بهم بگو و نمودار بده",
+    "round_text": "**لیست بدهکاران (بدهکاران)**\n\n```table\n{\"title\": \"بدهکاران\"}\n```",
+    "expect_continue": false,
+    "expect_goal_reached": true,
+    "needs_tools_override": false,
+    "note": "پاسخ کامل با جدول — needs_tools=False چون از tool round آمده"
+  }
+]

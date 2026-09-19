@@ -14,13 +14,24 @@ from app.services.ai.ai_write_guard import (
     build_approval_required_result,
     is_write_function,
 )
-from app.services.ai.function_registry import registry
 
 logger = logging.getLogger(__name__)
 
 MCP_PROTOCOL_VERSION = "2024-11-05"
 SERVER_NAME = "hesabix-ai"
 SERVER_VERSION = "1.0.0"
+
+
+def prepare_mcp_tool_arguments(arguments: Dict[str, Any]) -> Dict[str, Any]:
+    """کپی آرگومان‌ها بدون در پشتی تأیید write."""
+    cleaned = dict(arguments or {})
+    cleaned.pop("_approve_writes", None)
+    return cleaned
+
+
+def mcp_explicit_write_approval(params: Dict[str, Any]) -> bool:
+    """فقط تأیید صریح در params JSON-RPC — نه query و نه آرگومان ابزار."""
+    return params.get("approve_writes") is True
 
 
 def _jsonrpc_result(req_id: Any, result: Any) -> Dict[str, Any]:
@@ -49,7 +60,6 @@ async def handle_mcp_request(
     body: Dict[str, Any],
     *,
     business_id: Optional[int] = None,
-    approve_writes: bool = False,
 ) -> Dict[str, Any]:
     req_id = body.get("id")
     method = body.get("method")
@@ -73,6 +83,12 @@ async def handle_mcp_request(
         return _jsonrpc_result(req_id, {})
 
     if method == "tools/list":
+        from app.services.ai.function_registry import registry
+
+        # Listing = permission/tenant gate only. Execution guard is in tools/call.
+        # Phase 3: MCP tools/list stays a full permissioned catalog (MCP contract).
+        # Phase 7: tools/list can later reuse load_tool_schemas(); MCP listing
+        # remains a separate contract from the agent Schema Loader path.
         context = {
             "db": db,
             "user_context": ctx,
@@ -91,11 +107,13 @@ async def handle_mcp_request(
         if not eff_business:
             return _jsonrpc_error(req_id, -32602, "business_id required for tools/call")
 
+        from app.services.ai.function_registry import registry
+
         tool_name_str = str(tool_name)
-        mcp_approve = bool(
-            approve_writes or params.get("approve_writes") or arguments.pop("_approve_writes", False)
-        )
-        if is_write_function(tool_name_str) and not mcp_approve:
+        arguments = prepare_mcp_tool_arguments(arguments)
+        mcp_approve = mcp_explicit_write_approval(params)
+        # Execution guard: listing a write tool never authorizes calling it.
+        if is_write_function(tool_name_str, registry) and not mcp_approve:
             result = build_approval_required_result(tool_name_str, arguments)
             text = json.dumps(result, ensure_ascii=False)
             return _jsonrpc_result(

@@ -1,7 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import '../../core/calendar_controller.dart';
+<<<<<<< HEAD
+import '../../core/date_utils.dart' show HesabixDateUtils;
+import '../../utils/invoice_payable_total.dart';
+=======
 import '../../core/date_utils.dart' show MarkStreetDateUtils;
+>>>>>>> github/Huma
 import '../../utils/number_formatters.dart' show formatWithThousands;
 import '../../widgets/invoice/person_combobox_widget.dart';
 import '../../widgets/invoice/invoice_transactions_widget.dart';
@@ -22,6 +27,7 @@ import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../utils/responsive_helper.dart';
 import '../../utils/currency_display_utils.dart';
+import '../../utils/invoice_payment_tx_from_receipt.dart';
 import '../../services/currency_service.dart';
 import '../../widgets/money/amount_field_words_tooltip.dart';
 import '../../constants/frequent_description_scope.dart';
@@ -1154,13 +1160,7 @@ class _PersonLineTileState extends State<_PersonLineTile> {
                 final doc = await receiptPaymentService.getById(docId);
                 if (doc == null) continue;
                 
-                // مجموع account_lines (بدون کارمزد)
-                for (final accountLine in doc.accountLines) {
-                  final isCommission = accountLine.extraInfo?['is_commission_line'] == true;
-                  if (!isCommission) {
-                    totalPaid += accountLine.amount;
-                  }
-                }
+                totalPaid += paidTowardInvoiceCurrencyFromReceiptDoc(doc);
               } catch (e) {
                 // ادامه در صورت خطا
               }
@@ -1228,13 +1228,7 @@ class _PersonLineTileState extends State<_PersonLineTile> {
             
             processedDocIds.add(docId);
             
-            // مجموع account_lines (بدون کارمزد)
-            for (final accountLine in doc.accountLines) {
-              final isCommission = accountLine.extraInfo?['is_commission_line'] == true;
-              if (!isCommission) {
-                totalPaid += accountLine.amount;
-              }
-            }
+            totalPaid += paidTowardInvoiceCurrencyFromReceiptDoc(doc);
           } catch (e) {
             // ادامه در صورت خطا
           }
@@ -1249,35 +1243,10 @@ class _PersonLineTileState extends State<_PersonLineTile> {
     }
   }
 
-  /// استخراج مبلغ کل فاکتور
+  /// استخراج مبلغ کل فاکتور (شامل اضافات/کسورات)
   double _getInvoiceTotal(Map<String, dynamic> invoice) {
     try {
-      // اول از total_amount
-      if (invoice['total_amount'] != null) {
-        final total = invoice['total_amount'];
-        if (total is num) return total.toDouble();
-        if (total is String) return double.tryParse(total) ?? 0;
-      }
-      
-      // سپس از extra_info.totals.net
-      final extraInfo = invoice['extra_info'] as Map<String, dynamic>?;
-      if (extraInfo != null) {
-        final totals = extraInfo['totals'] as Map<String, dynamic>?;
-        if (totals != null && totals['net'] != null) {
-          final net = totals['net'];
-          if (net is num) return net.toDouble();
-          if (net is String) return double.tryParse(net) ?? 0;
-        }
-      }
-      
-      // در نهایت از total
-      if (invoice['total'] != null) {
-        final total = invoice['total'];
-        if (total is num) return total.toDouble();
-        if (total is String) return double.tryParse(total) ?? 0;
-      }
-      
-      return 0;
+      return invoicePayableTotalFromInvoiceMap(invoice);
     } catch (e) {
       return 0;
     }

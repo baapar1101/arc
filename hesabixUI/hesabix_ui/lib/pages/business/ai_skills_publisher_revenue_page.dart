@@ -9,6 +9,7 @@ import 'package:hesabix_ui/utils/error_extractor.dart';
 import 'package:hesabix_ui/utils/snackbar_helper.dart';
 import 'package:hesabix_ui/widgets/ai/ai_chat_design.dart';
 import 'package:hesabix_ui/widgets/ai/ai_empty_state.dart';
+import 'package:hesabix_ui/widgets/business_subpage_back_leading.dart';
 
 /// داشبورد درآمد ناشر مهارت‌های AI
 class AISkillsPublisherRevenuePage extends StatefulWidget {
@@ -82,6 +83,7 @@ class _AISkillsPublisherRevenuePageState extends State<AISkillsPublisherRevenueP
     return Scaffold(
       appBar: AppBar(
         title: const Text('درآمد مهارت‌های AI'),
+        leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
         actions: [
           IconButton(onPressed: _loading ? null : _load, icon: const Icon(Icons.refresh)),
         ],

@@ -251,7 +251,7 @@ final class Shabake_Tamin_Admin {
 			<hr />
 			<h2><?php esc_html_e( 'شورت‌کد و بلوک', 'shabake-tamin' ); ?></h2>
 			<p><code>[shabake_tamin]</code> <?php esc_html_e( 'یا:', 'shabake-tamin' ); ?></p>
-			<pre class="code" style="direction:ltr;text-align:left;">[shabake_tamin business_id="123" category_id="5" province="تهران" city="" location_filters="1" province_suggest="1" show_details="1" columns="4" search="1" take="20" page="1"]</pre>
+			<pre class="code" style="direction:ltr;text-align:left;">[shabake_tamin business_id="123" category_id="5" province="تهران" city="" brand="" location_filters="1" brand_filters="1" province_suggest="1" show_details="1" columns="4" search="1" take="20" page="1"]</pre>
 			<p class="description"><?php esc_html_e( 'با page="1" همان چیدمان تمام‌عرض (هیرو + شمارندهٔ نتایج) داخل برگهٔ عادی هم قابل استفاده است.', 'shabake-tamin' ); ?></p>
 			<p class="description"><?php esc_html_e( 'در ظاهر → ابزارک‌ها، «کاتالوگ شبکه تأمین» را می‌توانید به سایدبار اضافه کنید. در ویرایشگر بلوک، بلوک هم‌نام را در دستهٔ ابزارک‌ها بیابید.', 'shabake-tamin' ); ?></p>
 			<p class="description">

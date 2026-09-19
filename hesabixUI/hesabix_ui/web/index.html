@@ -17,6 +17,33 @@
   <base href="$FLUTTER_BASE_HREF">
 
   <meta charset="UTF-8">
+  <script>
+    /* بلافاصله lang/dir را از تنظیمات ذخیره‌شده اعمال کن (پیش‌فرض: فارسی RTL) */
+    (function () {
+      function parseStored(raw) {
+        if (raw == null || raw === '') return null;
+        try { return JSON.parse(raw); } catch (e) { return raw; }
+      }
+      function langFromStorage() {
+        var keys = ['hesabix_locale', 'flutter.app_locale_code'];
+        for (var i = 0; i < keys.length; i++) {
+          var raw = null;
+          try { raw = localStorage.getItem(keys[i]); } catch (e) {}
+          if (!raw) continue;
+          var v = parseStored(raw);
+          var s = String(v != null ? v : raw).trim();
+          var code = s.split('-')[0].toLowerCase().replace(/^["']|["']$/g, '');
+          if (code === 'en') return 'en';
+          if (code === 'fa') return 'fa';
+        }
+        return 'fa';
+      }
+      var loc = langFromStorage();
+      var html = document.documentElement;
+      html.setAttribute('lang', loc === 'en' ? 'en' : 'fa');
+      html.setAttribute('dir', loc === 'en' ? 'ltr' : 'rtl');
+    })();
+  </script>
   <!-- Purge legacy Flutter service workers once per deploy (old SW + cache can mismatch CanvasKit). -->
   <script>
     (function () {
@@ -54,8 +81,13 @@
 
   <!-- iOS meta tags & icons -->
   <meta name="mobile-web-app-capable" content="yes">
+<<<<<<< HEAD
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Hesabix">
+=======
   <meta name="apple-mobile-web-app-status-bar-style" content="black">
   <meta name="apple-mobile-web-app-title" content="MarkStreet">
+>>>>>>> github/Huma
   <link rel="apple-touch-icon" href="icons/Icon-192.png">
 
   <!-- Favicon -->
@@ -64,16 +96,62 @@
 
   <title>MarkStreet</title>
   <link rel="manifest" href="manifest.json">
+<<<<<<< HEAD
+  <meta name="theme-color" content="#0F4C81" id="hesabix-theme-color">
+  <script>
+    /* اعمال فوری رنگ برند ذخیره‌شده (قبل از لودر) برای theme-color و CSS vars */
+    (function () {
+      function parseStored(raw) {
+        if (raw == null || raw === '') return null;
+        try { return JSON.parse(raw); } catch (e) { return raw; }
+      }
+      function readBrand() {
+        try {
+          var raw = localStorage.getItem('hesabix_theme_brand');
+          var v = parseStored(raw);
+          var s = String(v != null ? v : (raw || '')).trim();
+          if (/^#[0-9A-Fa-f]{6}$/.test(s)) return s.toUpperCase();
+        } catch (e) {}
+        return null;
+      }
+      var brand = readBrand();
+      if (!brand) return;
+      var meta = document.getElementById('hesabix-theme-color');
+      if (meta) meta.setAttribute('content', brand);
+      var root = document.documentElement;
+      root.style.setProperty('--brand', brand);
+      try {
+        var r = parseInt(brand.slice(1, 3), 16);
+        var g = parseInt(brand.slice(3, 5), 16);
+        var b = parseInt(brand.slice(5, 7), 16);
+        root.style.setProperty('--brand-soft', 'rgba(' + r + ',' + g + ',' + b + ',0.14)');
+        root.style.setProperty('--loader-fill', brand);
+      } catch (e) {}
+    })();
+  </script>
+
+  <link rel="preload" href="fonts/YekanBakhFaNum-Regular.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="fonts/YekanBakhFaNum-SemiBold.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="fonts/roboto.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="hesabix_web_loader.css" as="style">
+  <link rel="preload" href="hesabix_web_loader.js" as="script">
+  <link rel="preconnect" href="https://hsxn.hesabix.ir" crossorigin>
+  <link rel="dns-prefetch" href="https://hsxn.hesabix.ir">
+=======
   
   <!-- Preconnect and DNS prefetch for API to improve connection speed -->
   <link rel="preconnect" href="https://tamastore.ir" crossorigin>
   <link rel="dns-prefetch" href="https://tamastore.ir">
   
   <!-- Preload critical resources for faster page loads -->
+>>>>>>> github/Huma
   <link rel="preload" href="flutter_bootstrap.js" as="script">
   <link rel="preload" href="flutter_web_preload.js" as="script">
-  <link rel="preload" href="assets/images/logo-light.svg" as="image" type="image/svg+xml">
+  <link rel="preload" href="images/logo-light.png" as="image" type="image/png">
   
+<<<<<<< HEAD
+  <link rel="stylesheet" href="hesabix_web_loader.css">
+=======
   <!-- Initial Loading Screen Styles -->
     <style>
     /* هم‌راستا با دیزاین‌سیستم: زمینهٔ ink، لهجهٔ زمردی brand.
@@ -431,6 +509,7 @@
       }
     }
   </style>
+>>>>>>> github/Huma
   
   <!-- Suppress Intl.v8BreakIterator deprecation warning -->
   <script>
@@ -452,6 +531,29 @@
   </script>
 </head>
 <body>
+<<<<<<< HEAD
+  <script src="hesabix_web_loader.js"></script>
+
+  <div id="flutter-loading-screen" role="status" aria-live="polite" aria-busy="true">
+    <div class="loader-center">
+      <div class="loader-logo-wrap">
+        <img
+          class="loader-logo"
+          src="images/logo-light.png"
+          width="44"
+          height="44"
+          alt="Hesabix"
+          decoding="async"
+          fetchpriority="high" />
+      </div>
+      <h1 class="loader-title" id="loader-title">حسابیکس</h1>
+      <p class="loader-tagline" id="loader-tagline">حسابداری ابری هوشمند برای کسب‌وکار شما</p>
+
+      <div class="loader-progress-block">
+        <div class="loader-progress-meta">
+          <span class="loader-step" id="loading-step"></span>
+          <span class="loader-percent" id="loading-percent"></span>
+=======
   <!-- Initial Loading Screen - نمایش داده می‌شود تا Flutter لود شود -->
   <div id="flutter-loading-screen" role="status" aria-live="polite" aria-busy="true" aria-label="در حال بارگذاری مارک‌استریت">
     <div class="loading-screen-bg" aria-hidden="true"></div>
@@ -468,42 +570,30 @@
         <div class="loading-title-row">
           <div class="loading-title" role="heading" aria-level="1">MARKSTREET</div>
           <p class="loading-brand-fa">مارک‌استریت</p>
+>>>>>>> github/Huma
         </div>
-        <p class="loading-subtitle">سامانه جامع مدیریت کسب و کار</p>
-
-        <div class="loading-steps" aria-hidden="true">
-          <div class="loading-step is-active" data-step="0">
-            <div class="loading-step__icon"><span class="loading-step__num">۱</span></div>
-            <span class="loading-step__label">اتصال</span>
-          </div>
-          <div class="loading-step" data-step="1">
-            <div class="loading-step__icon"><span class="loading-step__num">۲</span></div>
-            <span class="loading-step__label">منابع</span>
-          </div>
-          <div class="loading-step" data-step="2">
-            <div class="loading-step__icon"><span class="loading-step__num">۳</span></div>
-            <span class="loading-step__label">آماده‌سازی</span>
-          </div>
+        <div class="loader-progress-track is-indeterminate" id="loading-progress-wrap">
+          <div class="loader-progress-bar" id="loading-progress-bar"></div>
         </div>
+      </div>
 
-        <p class="loading-quote" id="loading-quote">
-          <span class="loading-quote__mark" aria-hidden="true">«</span>
-          <span id="loading-quote-text">برای امنیت بیشتر، پس از کار حتماً از حساب خود خارج شوید.</span>
-          <span class="loading-quote__mark" aria-hidden="true">»</span>
-        </p>
+      <p class="loader-status" id="loading-status">در حال بارگذاری…</p>
 
-        <div class="loading-spinner" aria-hidden="true"></div>
+      <div class="loader-spinner" id="loader-spinner" hidden aria-hidden="true"></div>
 
-        <div class="loading-progress-wrap" id="loading-progress-wrap" aria-hidden="true">
-          <div class="loading-progress-bar" id="loading-progress-bar"></div>
-        </div>
+      <p class="loader-quote" id="loading-quote" aria-hidden="true">
+        <span id="loading-quote-text"></span>
+      </p>
 
-        <p class="loading-text" id="loading-status">در حال بارگذاری...</p>
+      <div id="loader-retry-wrap" hidden>
+        <button type="button" id="loader-retry-btn" onclick="window.location.reload()">تلاش مجدد</button>
       </div>
     </div>
   </div>
 
   <script>
+<<<<<<< HEAD
+=======
     (function () {
       var QUOTES = [
         'برای امنیت بیشتر، پس از کار حتماً از حساب خود خارج شوید.',
@@ -585,6 +675,7 @@
   </script>
   
   <script>
+>>>>>>> github/Huma
     // همگام‌سازی ارتفاع صفحه با visual viewport برای جلوگیری از فضای سفید زیرین هنگام نمایش کیبورد
     (function() {
       function updateAppHeight() {
@@ -612,44 +703,9 @@
       }
     })();
 
-    // پنهان کردن loading screen وقتی Flutter آماده شد
-    function hideLoadingScreen() {
-      const loadingScreen = document.getElementById('flutter-loading-screen');
-      if (loadingScreen) {
-        if (window.__hesabixLoaderUI && typeof window.__hesabixLoaderUI.stopQuoteRotation === 'function') {
-          window.__hesabixLoaderUI.stopQuoteRotation();
-        }
-        loadingScreen.setAttribute('aria-busy', 'false');
-        loadingScreen.classList.add('hidden');
-        setTimeout(function() {
-          loadingScreen.remove();
-          document.body.classList.add('flutter-ready');
-        }, 500);
-      }
-    }
-    
-    // گوش دادن به رویداد flutter-first-frame
-    window.addEventListener('flutter-first-frame', function() {
-      hideLoadingScreen();
-      setTimeout(function() {
-        const router = window._flutterNavigationState?.router;
-        if (router) {
-          console.log('Flutter app loaded, routes are available');
-        }
-      }, 1000);
-    }, { once: true });
-    
-    // Fallback: اگر بعد از مدت طولانی Flutter لود نشد، loading screen را پنهان کن
-    // (پیش‌بار main.dart.js + CanvasKit ممکن است بیش از ۱۰ ثانیه طول بکشد)
-    setTimeout(function() {
-      const loadingScreen = document.getElementById('flutter-loading-screen');
-      if (loadingScreen && !loadingScreen.classList.contains('hidden')) {
-        console.warn('Flutter loading timeout - hiding loading screen');
-        hideLoadingScreen();
-      }
-    }, 120000);
-    
-    // پیکربندی صحیح Flutter با روش جدید - intercept loader قبل از اجرای flutter_bootstrap
+    // Loader hide: توسط Flutter با __hesabixSignalAppReady() — نه flutter-first-frame
+
+    // پیکربندی Flutter — intercept loader قبل از اجرای flutter_bootstrap
     if (!window._flutter) {
       window._flutter = {};
     }

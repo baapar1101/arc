@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'dart:async';
 import '../main.dart' show navigatorKey;
+import '../theme/semantic_color_resolver.dart';
 
 /// Helper utility for showing SnackBar messages that appear above dialogs.
 /// 
@@ -16,9 +17,9 @@ class SnackBarHelper {
   }
   
   /// Gets the default background color for snackbars based on theme
-  static Color _getDefaultBackgroundColor(ThemeData theme, bool isError) {
+  static Color _getDefaultBackgroundColor(ThemeData theme, bool isError, BuildContext context) {
     if (isError) {
-      return Colors.red;
+      return SemanticColorResolver.negative(context);
     }
     // Use a color that works well in both light and dark themes
     final brightness = theme.brightness;
@@ -78,7 +79,7 @@ class SnackBarHelper {
     
     final theme = Theme.of(context);
     final effectiveBackgroundColor = backgroundColor ?? 
-        _getDefaultBackgroundColor(theme, isError);
+        _getDefaultBackgroundColor(theme, isError, context);
     final textColor = _getTextColorForBackground(effectiveBackgroundColor);
     
     debugPrint('[SnackBarHelper.show] Showing SnackBar with message: "$message"');
@@ -115,7 +116,7 @@ class SnackBarHelper {
 
     final theme = Theme.of(rootContext);
     final effectiveBackgroundColor = backgroundColor ?? 
-        _getDefaultBackgroundColor(theme, isError);
+        _getDefaultBackgroundColor(theme, isError, rootContext);
     final textColor = _getTextColorForBackground(effectiveBackgroundColor);
     final effectiveDuration = duration ?? const Duration(seconds: 4);
 
@@ -204,7 +205,7 @@ class SnackBarHelper {
     show(
       context,
       message: message,
-      backgroundColor: Colors.green,
+      backgroundColor: SemanticColorResolver.positive(context),
       duration: duration,
     );
   }
@@ -218,7 +219,11 @@ class SnackBarHelper {
     show(
       context,
       message: message,
+<<<<<<< HEAD
+      backgroundColor: SemanticColorResolver.info(context),
+=======
       backgroundColor: Colors.grey,
+>>>>>>> github/Huma
       duration: duration,
     );
   }
@@ -232,7 +237,7 @@ class SnackBarHelper {
     show(
       context,
       message: message,
-      backgroundColor: Colors.orange,
+      backgroundColor: SemanticColorResolver.warning(context),
       duration: duration,
     );
   }

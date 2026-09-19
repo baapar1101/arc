@@ -6,6 +6,7 @@ import 'ai_agent_todo_list.dart';
 import 'ai_chat_design.dart';
 import 'ai_chat_l10n.dart';
 import 'ai_chat_tool_activity_list.dart';
+import 'ai_subagent_trace.dart';
 
 /// پنل استدلال — traceهای لایه reasoning جدا از پاسخ نهایی.
 class AIReasoningPanel extends StatefulWidget {
@@ -15,6 +16,10 @@ class AIReasoningPanel extends StatefulWidget {
   final AISessionTodoSnapshot? todoSnapshot;
   final bool compact;
   final bool initiallyExpanded;
+  /// در حین استریم زنده پنل را باز نگه می‌دارد (بدون auto-collapse).
+  final bool keepExpanded;
+  final void Function(AISessionTodoItem item, String status)? onTodoStatus;
+  final void Function(String subagentId)? onCancelSubagent;
 
   const AIReasoningPanel({
     super.key,
@@ -24,14 +29,20 @@ class AIReasoningPanel extends StatefulWidget {
     this.todoSnapshot,
     this.compact = false,
     this.initiallyExpanded = false,
+    this.keepExpanded = false,
+    this.onTodoStatus,
+    this.onCancelSubagent,
   });
 
   static List<AIAgentTraceStep> reasoningOnly(List<AIAgentTraceStep> all) {
     return all
         .where((s) {
+          // پاسخ نهایی و گام‌های داخلی نباید در پنل تحلیل دیده شوند.
+          if (s.visibility == 'internal') return false;
           final layer = s.layer;
           if (layer == 'answer') return false;
           if (layer == null && s.kind == 'answer') return false;
+          if (s.kind == 'answer') return false;
           return true;
         })
         .toList();
@@ -51,7 +62,7 @@ class _AIReasoningPanelState extends State<AIReasoningPanel>
   @override
   void initState() {
     super.initState();
-    _expanded = widget.initiallyExpanded;
+    _expanded = widget.initiallyExpanded || widget.keepExpanded;
     _pulseCtrl = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1200),
@@ -64,12 +75,14 @@ class _AIReasoningPanelState extends State<AIReasoningPanel>
   @override
   void didUpdateWidget(covariant AIReasoningPanel oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (!_userControlledExpansion) {
+    if (!_userControlledExpansion && !widget.keepExpanded) {
       if (_hasActiveStep) {
         _expanded = true;
       } else if (!widget.initiallyExpanded) {
         _expanded = false;
       }
+    } else if (widget.keepExpanded && !_userControlledExpansion) {
+      _expanded = true;
     }
     if (_hasActiveStep && !_pulseCtrl.isAnimating) {
       _pulseCtrl.repeat(reverse: true);
@@ -94,8 +107,12 @@ class _AIReasoningPanelState extends State<AIReasoningPanel>
   @override
   Widget build(BuildContext context) {
     final reasoning = AIReasoningPanel.reasoningOnly(widget.steps);
-    final toolCount = widget.toolActivities.length;
-    final todoCount = widget.todoSnapshot?.items.length ?? 0;
+    final toolCount = widget.toolActivities
+        .where((a) => !isSubagentLifecycleTool(a.tool))
+        .length;
+    final hasOtherReasoning = reasoning.isNotEmpty ||
+        toolCount > 0 ||
+        widget.agentBudget != null;
     if (reasoning.isEmpty &&
         toolCount == 0 &&
         widget.agentBudget == null &&
@@ -108,19 +125,30 @@ class _AIReasoningPanelState extends State<AIReasoningPanel>
     final scheme = theme.colorScheme;
     final detailCount = reasoning.length +
         toolCount +
-        todoCount +
         (widget.agentBudget != null ? 1 : 0);
-    final title = _hasTodoPlan
-        ? aiSessionPlanReasoningTitle(l10n)
-        : reasoning.isNotEmpty
-            ? l10n.aiReasoningPanelTitle
-            : widget.agentBudget != null
-                ? 'بودجه تحلیل'
-                : 'ابزارهای استفاده‌شده';
+    final title = reasoning.isNotEmpty
+        ? l10n.aiReasoningPanelTitle
+        : widget.agentBudget != null
+            ? l10n.aiReasoningBudgetTitle
+            : l10n.aiReasoningToolsUsedTitle;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        if (_hasTodoPlan)
+          Padding(
+            padding: EdgeInsets.only(bottom: hasOtherReasoning ? 8 : 0),
+            child: AIAgentTodoList(
+              snapshot: widget.todoSnapshot!,
+              compact: widget.compact,
+              initiallyExpanded:
+                  widget.todoSnapshot!.hasActiveItem || widget.keepExpanded,
+              onUserStatus: widget.onTodoStatus,
+            ),
+          ),
+        if (!hasOtherReasoning)
+          const SizedBox.shrink()
+        else ...[
         Material(
           color: scheme.primaryContainer.withValues(alpha: 0.22),
           borderRadius: BorderRadius.circular(12),
@@ -218,16 +246,6 @@ class _AIReasoningPanelState extends State<AIReasoningPanel>
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      if (_hasTodoPlan)
-                        Padding(
-                          padding: const EdgeInsets.only(bottom: 8),
-                          child: AIAgentTodoList(
-                            snapshot: widget.todoSnapshot!,
-                            compact: widget.compact,
-                            initiallyExpanded:
-                                widget.todoSnapshot!.hasActiveItem,
-                          ),
-                        ),
                       if (widget.agentBudget != null)
                         Padding(
                           padding: const EdgeInsets.only(bottom: 8),
@@ -243,6 +261,7 @@ class _AIReasoningPanelState extends State<AIReasoningPanel>
                           steps: reasoning,
                           compact: widget.compact,
                           initiallyExpanded: false,
+                          onCancelSubagent: widget.onCancelSubagent,
                         ),
                       if (widget.toolActivities.isNotEmpty)
                         Padding(
@@ -259,6 +278,7 @@ class _AIReasoningPanelState extends State<AIReasoningPanel>
           ),
           secondChild: const SizedBox(width: double.infinity, height: 0),
         ),
+        ],
       ],
     );
   }

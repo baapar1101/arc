@@ -3,8 +3,11 @@ import 'package:flutter/services.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/models/ai_stream_event.dart';
+import 'package:hesabix_ui/utils/ai_markdown_normalize.dart';
 import 'ai_chat_l10n.dart';
 import 'ai_chat_design.dart';
+import 'ai_chat_subagent_card.dart';
+import 'ai_subagent_trace.dart';
 import 'ai_thinking_scroll_box.dart';
 
 /// تایم‌لاین عمودی مراحل agent — پیش‌فرض جمع‌شده.
@@ -12,12 +15,14 @@ class AIAgentTraceTimeline extends StatefulWidget {
   final List<AIAgentTraceStep> steps;
   final bool compact;
   final bool initiallyExpanded;
+  final void Function(String subagentId)? onCancelSubagent;
 
   const AIAgentTraceTimeline({
     super.key,
     required this.steps,
     this.compact = false,
     this.initiallyExpanded = false,
+    this.onCancelSubagent,
   });
 
   @override
@@ -50,14 +55,12 @@ class _AIAgentTraceTimelineState extends State<AIAgentTraceTimeline> {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final activeCount =
-        widget.steps.where((s) => s.isActive).length;
+    final roots = timelineRootSteps(widget.steps);
+    final activeCount = roots.where((s) => s.isActive).length;
 
     final visibleSteps = (_expanded || widget.compact)
-        ? widget.steps
-        : widget.steps
-            .where((s) => s.isActive || s.isError)
-            .toList();
+        ? roots
+        : roots.where((s) => s.isActive || s.isError).toList();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -80,7 +83,7 @@ class _AIAgentTraceTimelineState extends State<AIAgentTraceTimeline> {
                   const SizedBox(width: 6),
                   Expanded(
                     child: Text(
-                      l10n.aiTraceStepsHeader(widget.steps.length),
+                      l10n.aiTraceStepsHeader(roots.length),
                       style: theme.textTheme.labelMedium?.copyWith(
                         color: scheme.primary,
                         fontWeight: FontWeight.w600,
@@ -103,13 +106,22 @@ class _AIAgentTraceTimelineState extends State<AIAgentTraceTimeline> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               for (var i = 0; i < visibleSteps.length; i++)
-                _TraceStepTile(
+                visibleSteps[i].kind == 'subagent'
+                    ? AIChatSubagentCard(
+                        step: visibleSteps[i],
+                        allSteps: widget.steps,
+                        compact: widget.compact,
+                        onCancelSubagent: widget.onCancelSubagent,
+                      )
+                    : _TraceStepTile(
                   step: visibleSteps[i],
                   title: aiTraceStepTitle(l10n, visibleSteps[i]),
                   isLast: i == visibleSteps.length - 1,
                   theme: theme,
                   scheme: scheme,
                   compact: widget.compact,
+                  l10n: l10n,
+                  onCancelSubagent: widget.onCancelSubagent,
                 ),
             ],
           ),
@@ -125,6 +137,8 @@ class _TraceStepTile extends StatefulWidget {
   final ThemeData theme;
   final ColorScheme scheme;
   final bool compact;
+  final AppLocalizations l10n;
+  final void Function(String subagentId)? onCancelSubagent;
 
   const _TraceStepTile({
     required this.step,
@@ -133,6 +147,8 @@ class _TraceStepTile extends StatefulWidget {
     required this.theme,
     required this.scheme,
     required this.compact,
+    required this.l10n,
+    this.onCancelSubagent,
   });
 
   @override
@@ -157,6 +173,10 @@ class _TraceStepTileState extends State<_TraceStepTile> {
         return Icons.route_outlined;
       case 'narrative':
         return Icons.record_voice_over_outlined;
+      case 'reasoning':
+        return Icons.psychology_alt_outlined;
+      case 'subagent':
+        return Icons.account_tree_outlined;
       case 'tool':
         return Icons.build_circle_outlined;
       case 'observation':
@@ -176,15 +196,18 @@ class _TraceStepTileState extends State<_TraceStepTile> {
     final body = step.bodyMarkdown?.trim() ?? '';
     final hasBody = body.isNotEmpty &&
         (step.kind == 'narrative' ||
+            step.kind == 'reasoning' ||
             step.kind == 'plan' ||
             step.kind == 'observation' ||
             step.kind == 'explored' ||
             step.kind == 'thought' ||
             step.kind == 'explore' ||
+            step.kind == 'subagent' ||
             (step.kind != 'answer' && !step.isActive));
 
     final showBodyAlways = hasBody &&
         (step.kind == 'narrative' ||
+            step.kind == 'reasoning' ||
             step.kind == 'plan' ||
             step.kind == 'explored' ||
             step.kind == 'thought' ||
@@ -286,7 +309,7 @@ class _TraceStepTileState extends State<_TraceStepTile> {
                             (step.kind == 'thought')) ...[
                           const SizedBox(width: 4),
                           _Badge(
-                            label: _confidenceLabel(step.confidence!),
+                            label: _confidenceLabel(widget.l10n, step.confidence!),
                             icon: Icons.verified_outlined,
                             color: _confidenceColor(scheme, step.confidence!),
                             scheme: scheme,
@@ -308,6 +331,29 @@ class _TraceStepTileState extends State<_TraceStepTile> {
                             '#${step.iteration}',
                             style: theme.textTheme.labelSmall?.copyWith(
                               color: scheme.outline,
+                            ),
+                          ),
+                        ],
+                        if (step.kind == 'subagent' &&
+                            step.isActive &&
+                            step.cancelableSubagentId != null &&
+                            widget.onCancelSubagent != null) ...[
+                          const SizedBox(width: 4),
+                          Tooltip(
+                            message: widget.l10n.aiToolCancelSubagent,
+                            child: InkWell(
+                              onTap: () => widget.onCancelSubagent!(
+                                step.cancelableSubagentId!,
+                              ),
+                              borderRadius: BorderRadius.circular(12),
+                              child: Padding(
+                                padding: const EdgeInsets.all(4),
+                                child: Icon(
+                                  Icons.stop_circle_outlined,
+                                  size: 18,
+                                  color: scheme.error,
+                                ),
+                              ),
                             ),
                           ),
                         ],
@@ -376,9 +422,9 @@ class _BodyContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (kind != 'thought' && kind != 'explored' && kind != 'system') {
+    if (kind != 'thought' && kind != 'explored' && kind != 'system' && kind != 'reasoning') {
       return MarkdownBody(
-        data: body,
+        data: normalizeAssistantMarkdown(body),
         selectable: true,
         styleSheet: MarkdownStyleSheet(
           p: theme.textTheme.bodySmall?.copyWith(
@@ -391,7 +437,7 @@ class _BodyContent extends StatelessWidget {
         ),
       );
     }
-    final accent = kind == 'thought' || kind == 'system'
+    final accent = kind == 'thought' || kind == 'system' || kind == 'reasoning'
         ? scheme.primary
         : scheme.secondary;
     return AIThinkingScrollBox(
@@ -454,14 +500,14 @@ Color _confidenceColor(ColorScheme scheme, String confidence) {
   }
 }
 
-String _confidenceLabel(String confidence) {
+String _confidenceLabel(AppLocalizations l10n, String confidence) {
   switch (confidence) {
     case 'high':
-      return 'اطمینان بالا';
+      return l10n.aiConfidenceHigh;
     case 'low':
-      return 'داده ناکافی';
+      return l10n.aiConfidenceLow;
     default:
-      return 'نیازمند بررسی';
+      return l10n.aiConfidenceMedium;
   }
 }
 

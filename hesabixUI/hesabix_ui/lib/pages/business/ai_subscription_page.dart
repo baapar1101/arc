@@ -4,12 +4,14 @@ import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/core/business_route_paths.dart';
 import 'package:hesabix_ui/core/date_utils.dart';
 import 'package:hesabix_ui/services/ai_service.dart';
+import 'package:hesabix_ui/services/wallet_service.dart';
 import 'package:hesabix_ui/models/ai_models.dart';
 import 'package:hesabix_ui/core/auth_store.dart';
 import 'package:hesabix_ui/utils/number_formatters.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
 import 'package:hesabix_ui/utils/snackbar_helper.dart';
+import 'package:hesabix_ui/core/hesabix_back.dart';
 
 class AISubscriptionPage extends StatefulWidget {
   final int? businessId;
@@ -27,6 +29,7 @@ class AISubscriptionPage extends StatefulWidget {
 
 class _AISubscriptionPageState extends State<AISubscriptionPage> {
   late final AIService _aiService;
+  late final WalletService _walletService;
   bool _loading = true;
   String? _loadError;
   UserAISubscription? _currentSubscription;
@@ -35,13 +38,25 @@ class _AISubscriptionPageState extends State<AISubscriptionPage> {
   bool _isRefreshing = false;
   bool _actionInProgress = false;
   String _billingPeriod = 'monthly';
+  String _walletCurrencyLabel = '';
 
   @override
   void initState() {
     super.initState();
     final api = ApiClient();
     _aiService = AIService(api);
+    _walletService = WalletService(api);
     _load();
+  }
+
+  String _currencyLabelFromWallet(Map<String, dynamic> wallet) {
+    final title = wallet['base_currency_title']?.toString().trim();
+    final symbol = wallet['base_currency_symbol']?.toString().trim();
+    final code = wallet['base_currency_code']?.toString().trim();
+    if (title != null && title.isNotEmpty) return title;
+    if (symbol != null && symbol.isNotEmpty) return symbol;
+    if (code != null && code.isNotEmpty) return code;
+    return '';
   }
 
   Future<void> _load() async {
@@ -54,6 +69,7 @@ class _AISubscriptionPageState extends State<AISubscriptionPage> {
     UserAISubscription? subscription;
     List<AIPlan> plans = [];
     Map<String, dynamic> usageStats = {};
+    String currencyLabel = _walletCurrencyLabel;
     String? loadError;
 
     try {
@@ -82,6 +98,16 @@ class _AISubscriptionPageState extends State<AISubscriptionPage> {
       }
     }
 
+    final businessId = widget.businessId;
+    if (businessId != null) {
+      try {
+        final wallet = await _walletService.getOverview(businessId: businessId);
+        currencyLabel = _currencyLabelFromWallet(wallet);
+      } catch (_) {
+        // برچسب قبلی حفظ می‌شود؛ مبلغ همان ارز پایه کیف پول است
+      }
+    }
+
     usageStats = await _loadUsageStatsSafe(
       periodStart: subscription?.periodStart,
     );
@@ -91,6 +117,7 @@ class _AISubscriptionPageState extends State<AISubscriptionPage> {
       _currentSubscription = subscription;
       _availablePlans = plans;
       _usageStats = usageStats;
+      _walletCurrencyLabel = currencyLabel;
       _loading = false;
       _isRefreshing = false;
       _loadError = loadError;
@@ -116,7 +143,9 @@ class _AISubscriptionPageState extends State<AISubscriptionPage> {
       return false;
     }
     final pc = plan.pricingConfig;
-    final sub = pc['subscription'];
+    final sub = pc['platform_fee'] is Map
+        ? pc['platform_fee']
+        : pc['subscription'];
     if (sub is! Map) return false;
     final key = _billingPeriod == 'yearly' ? 'yearly_price' : 'monthly_price';
     final raw = sub[key];
@@ -163,6 +192,33 @@ class _AISubscriptionPageState extends State<AISubscriptionPage> {
       if (mounted) {
         SnackBarHelper.show(context, message: 'اشتراک با موفقیت فعال شد');
         _load();
+        if (plan.planType == AIPlanType.byok) {
+          final go = await showDialog<bool>(
+                context: context,
+                builder: (context) => AlertDialog(
+                  title: const Text('تنظیم ارائه‌دهنده'),
+                  content: const Text(
+                    'پلن ارائه‌دهنده اختصاصی فعال شد. برای استفاده از AI باید URL، API Key و مدل‌ها را تنظیم کنید.',
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context, false),
+                      child: const Text('بعداً'),
+                    ),
+                    FilledButton(
+                      onPressed: () => Navigator.pop(context, true),
+                      child: const Text('رفتن به تنظیمات'),
+                    ),
+                  ],
+                ),
+              ) ??
+              false;
+          if (go && mounted) {
+            context.go(
+              BusinessRoutePaths.uri(widget.businessId!, 0, 'settings/ai-provider'),
+            );
+          }
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -263,12 +319,7 @@ class _AISubscriptionPageState extends State<AISubscriptionPage> {
       return Scaffold(
         appBar: AppBar(
           title: const Text('اشتراک هوش مصنوعی'),
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back_ios_new),
-            onPressed: () {
-              if (context.canPop()) context.pop();
-            },
-          ),
+          leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
         ),
         body: Center(
           child: Padding(
@@ -307,15 +358,7 @@ class _AISubscriptionPageState extends State<AISubscriptionPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('اشتراک هوش مصنوعی'),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new),
-          onPressed: () {
-            if (!mounted) return;
-            if (context.canPop()) {
-              context.pop();
-            }
-          },
-        ),
+        leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
         actions: [
           if (widget.businessId != null)
             IconButton(
@@ -350,6 +393,7 @@ class _AISubscriptionPageState extends State<AISubscriptionPage> {
                 child: _SubscriptionHero(
                   subscription: _currentSubscription,
                   onCancel: _cancelSubscription,
+                  businessId: widget.businessId,
                   isJalali: isJalali,
                 ),
               ),
@@ -392,6 +436,7 @@ class _AISubscriptionPageState extends State<AISubscriptionPage> {
                       plans: _availablePlans,
                       currentSubscription: _currentSubscription,
                       billingPeriod: _billingPeriod,
+                      currencyLabel: _walletCurrencyLabel,
                       actionInProgress: _actionInProgress,
                       onSelect: _subscribeToPlan,
                       onUpgrade: _upgradeSubscription,
@@ -410,11 +455,13 @@ class _AISubscriptionPageState extends State<AISubscriptionPage> {
 class _SubscriptionHero extends StatelessWidget {
   final UserAISubscription? subscription;
   final VoidCallback onCancel;
+  final int? businessId;
   final bool isJalali;
 
   const _SubscriptionHero({
     required this.subscription,
     required this.onCancel,
+    this.businessId,
     required this.isJalali,
   });
 
@@ -522,6 +569,22 @@ class _SubscriptionHero extends StatelessWidget {
               color: theme.colorScheme.onPrimary.withValues(alpha: 0.8),
             ),
           ),
+          if (planType == AIPlanType.byok && businessId != null) ...[
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              style: OutlinedButton.styleFrom(
+                foregroundColor: theme.colorScheme.onPrimary,
+                side: BorderSide(color: theme.colorScheme.onPrimary.withValues(alpha: 0.6)),
+              ),
+              onPressed: () {
+                context.go(
+                  BusinessRoutePaths.uri(businessId!, 0, 'settings/ai-provider'),
+                );
+              },
+              icon: const Icon(Icons.settings_suggest_outlined, size: 18),
+              label: const Text('تنظیم ارائه‌دهنده اختصاصی'),
+            ),
+          ],
           if (subscription!.periodEnd != null) ...[
             const SizedBox(height: 12),
             Text(
@@ -546,6 +609,8 @@ class _SubscriptionHero extends StatelessWidget {
         return 'پرداخت به ازای استفاده';
       case AIPlanType.hybrid:
         return 'پلن ترکیبی';
+      case AIPlanType.byok:
+        return 'ارائه‌دهنده اختصاصی';
     }
   }
 }
@@ -716,6 +781,7 @@ class _PlanGrid extends StatelessWidget {
   final List<AIPlan> plans;
   final UserAISubscription? currentSubscription;
   final String billingPeriod;
+  final String currencyLabel;
   final bool actionInProgress;
   final void Function(AIPlan plan) onSelect;
   final void Function(AIPlan plan) onUpgrade;
@@ -724,6 +790,7 @@ class _PlanGrid extends StatelessWidget {
     required this.plans,
     required this.currentSubscription,
     required this.billingPeriod,
+    required this.currencyLabel,
     required this.actionInProgress,
     required this.onSelect,
     required this.onUpgrade,
@@ -760,6 +827,7 @@ class _PlanGrid extends StatelessWidget {
                 isCurrent: isCurrentPlan,
                 canUpgrade: canUpgrade,
                 billingPeriod: billingPeriod,
+                currencyLabel: currencyLabel,
                 actionInProgress: actionInProgress,
                 onSelect: () => onSelect(plan),
                 onUpgrade: () => onUpgrade(plan),
@@ -777,6 +845,7 @@ class _PlanCard extends StatelessWidget {
   final bool isCurrent;
   final bool canUpgrade;
   final String billingPeriod;
+  final String currencyLabel;
   final bool actionInProgress;
   final VoidCallback onSelect;
   final VoidCallback onUpgrade;
@@ -786,6 +855,7 @@ class _PlanCard extends StatelessWidget {
     required this.isCurrent,
     required this.canUpgrade,
     required this.billingPeriod,
+    required this.currencyLabel,
     required this.actionInProgress,
     required this.onSelect,
     required this.onUpgrade,
@@ -794,7 +864,7 @@ class _PlanCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final priceText = _planPriceText(plan, billingPeriod);
+    final priceText = _planPriceText(plan, billingPeriod, currencyLabel);
     return Card(
       elevation: isCurrent ? 6 : 1,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
@@ -926,32 +996,49 @@ class _PlanCard extends StatelessWidget {
     );
   }
 
-  String? _planPriceText(AIPlan plan, String billingPeriod) {
+  String? _planPriceText(AIPlan plan, String billingPeriod, String currencyLabel) {
+    final currency = currencyLabel.trim().isEmpty ? '' : ' ${currencyLabel.trim()}';
     final pc = plan.pricingConfig;
     if (pc.isEmpty) return null;
     if (plan.planType == AIPlanType.free) {
       return 'رایگان';
     }
-    if (plan.planType == AIPlanType.subscription || plan.planType == AIPlanType.hybrid) {
-      final sub = pc['subscription'];
+    if (plan.planType == AIPlanType.subscription ||
+        plan.planType == AIPlanType.hybrid ||
+        plan.planType == AIPlanType.byok) {
+      final sub = pc['platform_fee'] is Map ? pc['platform_fee'] : pc['subscription'];
       if (sub is Map) {
         final parts = <String>[];
         if (billingPeriod == 'monthly') {
           final m = sub['monthly_price'];
           final n = m is num ? m.toDouble() : double.tryParse(m?.toString() ?? '');
           if (n != null && n > 0) {
-            parts.add('${formatWithThousands(n)} تومان / ماه');
+            parts.add(
+              plan.planType == AIPlanType.byok
+                  ? '${formatWithThousands(n)}$currency کارمزد / ماه'
+                  : '${formatWithThousands(n)}$currency / ماه',
+            );
+          } else if (plan.planType == AIPlanType.byok) {
+            parts.add('بدون کارمزد پلتفرم — هزینه مدل با شما');
           }
         } else {
           final y = sub['yearly_price'];
           final n = y is num ? y.toDouble() : double.tryParse(y?.toString() ?? '');
           if (n != null && n > 0) {
-            parts.add('${formatWithThousands(n)} تومان / سال');
+            parts.add(
+              plan.planType == AIPlanType.byok
+                  ? '${formatWithThousands(n)}$currency کارمزد / سال'
+                  : '${formatWithThousands(n)}$currency / سال',
+            );
+          } else if (plan.planType == AIPlanType.byok) {
+            parts.add('بدون کارمزد پلتفرم — هزینه مدل با شما');
           }
         }
         if (parts.isNotEmpty) {
           return parts.join(' — ');
         }
+      } else if (plan.planType == AIPlanType.byok) {
+        return 'بدون کارمزد پلتفرم — هزینه مدل با شما';
       }
     }
     if (plan.planType == AIPlanType.payAsGo || plan.planType == AIPlanType.hybrid) {
@@ -970,7 +1057,7 @@ class _PlanCard extends StatelessWidget {
             chunks.add('خروجی: ${formatWithThousands(outN)}');
           }
           if (chunks.isNotEmpty) {
-            return 'هر ۱۰۰۰ توکن — ${chunks.join('، ')} تومان';
+            return 'هر ۱۰۰۰ توکن — ${chunks.join('، ')}$currency';
           }
         }
       }
@@ -988,6 +1075,8 @@ class _PlanCard extends StatelessWidget {
         return 'پرداخت به ازای استفاده';
       case AIPlanType.hybrid:
         return 'ترکیبی';
+      case AIPlanType.byok:
+        return 'ارائه‌دهنده اختصاصی';
     }
   }
 }

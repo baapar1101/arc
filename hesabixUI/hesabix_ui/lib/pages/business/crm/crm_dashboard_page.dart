@@ -8,6 +8,7 @@ import 'package:hesabix_ui/utils/error_extractor.dart';
 import 'package:hesabix_ui/widgets/ai/ai_chat_dialog.dart';
 import 'package:hesabix_ui/widgets/permission/permission_widgets.dart';
 import 'package:intl/intl.dart';
+import 'package:hesabix_ui/core/hesabix_back.dart';
 
 /// داشبورد خلاصه CRM
 class CrmDashboardPage extends StatefulWidget {
@@ -76,12 +77,7 @@ class _CrmDashboardPageState extends State<CrmDashboardPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('داشبورد CRM'),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () {
-            if (context.canPop()) context.pop();
-          },
-        ),
+        leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
         actions: [
           IconButton(
             tooltip: 'چت با دستیار هوشمند',
@@ -186,9 +182,40 @@ class _CrmDashboardPageState extends State<CrmDashboardPage> {
                           ),
                         );
 
+                        final quickLinks = rowPair(
+                          _SummaryCard(
+                            icon: Icons.task_alt,
+                            title: 'صف کار',
+                            value: 'باز کردن',
+                            subtitle: 'تسک‌ها و پیگیری‌های من',
+                            onTap: () => context.go('/business/${widget.businessId}/crm/tasks'),
+                          ),
+                          _SummaryCard(
+                            icon: Icons.person_search,
+                            title: 'نمای ۳۶۰ مشتری',
+                            value: 'باز کردن',
+                            subtitle: 'دید کامل مشتری',
+                            onTap: () => context.go('/business/${widget.businessId}/crm/customer-360'),
+                          ),
+                        );
+
                         return Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
+                            Text(
+                              'امروز من',
+                              style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'پیگیری‌ها، صف کار و میانبرهای سریع فروش',
+                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                  ),
+                            ),
+                            SizedBox(height: gap),
+                            quickLinks,
+                            SizedBox(height: gap),
                             p1,
                             SizedBox(height: gap),
                             p2,
@@ -272,7 +299,7 @@ class _FollowUpsCard extends StatelessWidget {
                   leading: const Icon(Icons.person_outline, size: 20),
                   title: Text(m['name']?.toString() ?? '-', overflow: TextOverflow.ellipsis),
                   subtitle: Text('سرنخ • $dateStr', style: Theme.of(context).textTheme.bodySmall),
-                  onTap: () => context.go('/business/$businessId/crm/leads?leadId=${m['id']}'),
+                  onTap: () => context.go('/business/$businessId/crm/leads/${m['id']}'),
                 );
               }),
               ...deals.take(5).map((e) {
@@ -286,7 +313,7 @@ class _FollowUpsCard extends StatelessWidget {
                   leading: const Icon(Icons.handshake_outlined, size: 20),
                   title: Text(m['title']?.toString() ?? '-', overflow: TextOverflow.ellipsis),
                   subtitle: Text('${m['person_name'] ?? ''} • $dateStr', style: Theme.of(context).textTheme.bodySmall, overflow: TextOverflow.ellipsis),
-                  onTap: () => context.go('/business/$businessId/crm/deals?dealId=${m['id']}'),
+                  onTap: () => context.go('/business/$businessId/crm/deals/${m['id']}'),
                 );
               }),
               if (total > 5)

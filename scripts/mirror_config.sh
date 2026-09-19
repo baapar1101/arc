@@ -3,10 +3,14 @@
 # Non-interactive: PIP_MIRROR=hesabix|official|tuna|aliyun|custom
 #                 FLUTTER_MIRROR=hesabix|pub_azs|flutter_io_cn|tuna|sjtu|official|custom
 # Direct URL override (advanced): PIP_INDEX_URL, PUB_HOSTED_URL, FLUTTER_STORAGE_BASE_URL
+# China fallback: Aliyun extra-index (sanctions-safe; reachable from Iran) unless PIP_DISABLE_CHINA_FALLBACK=1.
 
 # shellcheck disable=SC2034
 HESABIX_PIP_INDEX_URL="https://p.mirror.hesabix.ir/simple"
 HESABIX_PIP_TRUSTED_HOST="p.mirror.hesabix.ir"
+HESABIX_PIP_CHINA_INDEX_URL="https://mirrors.aliyun.com/pypi/simple"
+HESABIX_PIP_CHINA_TRUSTED_HOST="mirrors.aliyun.com"
+HESABIX_PIP_CHINA_SECONDARY_INDEX_URL="https://mirrors.cloud.tencent.com/pypi/simple"
 HESABIX_PUB_HOSTED_URL="https://f.mirror.hesabix.ir/pub"
 HESABIX_FLUTTER_STORAGE_BASE_URL="https://f.mirror.hesabix.ir/gcs"
 
@@ -54,6 +58,94 @@ hesabix_set_pip_mirror_for_url() {
   else
     unset PIP_TRUSTED_HOST
   fi
+}
+
+hesabix_pip_append_trusted_host() {
+  local host="$1"
+  [[ -n "${host}" ]] || return 0
+  case " ${PIP_TRUSTED_HOST:-} " in
+    *" ${host} "*) return 0 ;;
+  esac
+  if [[ -n "${PIP_TRUSTED_HOST:-}" ]]; then
+    export PIP_TRUSTED_HOST="${PIP_TRUSTED_HOST} ${host}"
+  else
+    export PIP_TRUSTED_HOST="${host}"
+  fi
+}
+
+# Attach a Chinese extra-index so incomplete/sanctioned primary mirrors still resolve setuptools etc.
+hesabix_apply_pip_china_fallback() {
+  if [[ "${PIP_DISABLE_CHINA_FALLBACK:-0}" == "1" ]]; then
+    return 0
+  fi
+  local china="${HESABIX_PIP_CHINA_INDEX_URL}"
+  local primary="${PIP_INDEX_URL:-}"
+  if [[ -z "${PIP_EXTRA_INDEX_URL:-}" ]]; then
+    if [[ "${primary}" == "${china}" ]]; then
+      export PIP_EXTRA_INDEX_URL="${HESABIX_PIP_CHINA_SECONDARY_INDEX_URL}"
+      hesabix_pip_append_trusted_host "mirrors.cloud.tencent.com"
+    else
+      export PIP_EXTRA_INDEX_URL="${china}"
+      hesabix_pip_append_trusted_host "${HESABIX_PIP_CHINA_TRUSTED_HOST}"
+    fi
+  else
+    local extra_host
+    extra_host="$(hesabix_pip_trusted_host_from_url "${PIP_EXTRA_INDEX_URL%% *}")"
+    [[ -n "${extra_host}" ]] && hesabix_pip_append_trusted_host "${extra_host}"
+  fi
+  hesabix_mirror_log_info "PyPI extra index (China fallback): ${PIP_EXTRA_INDEX_URL}"
+}
+
+hesabix_pip_index_fallback_urls() {
+  local -a urls=()
+  local u
+  [[ -n "${PIP_INDEX_URL:-}" ]] && urls+=("${PIP_INDEX_URL}")
+  [[ -n "${PIP_EXTRA_INDEX_URL:-}" ]] && urls+=("${PIP_EXTRA_INDEX_URL%% *}")
+  urls+=("${HESABIX_PIP_CHINA_INDEX_URL}" "${HESABIX_PIP_CHINA_SECONDARY_INDEX_URL}" "${HESABIX_PIP_INDEX_URL}")
+  local -A seen=()
+  for u in "${urls[@]}"; do
+    u="${u%/}"
+    [[ -n "$u" && -z "${seen[$u]:-}" ]] || continue
+    seen[$u]=1
+    printf '%s\n' "$u"
+  done
+}
+
+# Usage: hesabix_pip_cmd_with_fallback <pip-binary> <pip args...>
+hesabix_pip_cmd_with_fallback() {
+  local pip_bin="$1"
+  shift
+  if [[ "${PIP_DISABLE_CHINA_FALLBACK:-0}" == "1" ]]; then
+    "${pip_bin}" "$@"
+    return $?
+  fi
+  if "${pip_bin}" "$@"; then
+    return 0
+  fi
+  local url orig_index orig_extra orig_trust
+  orig_index="${PIP_INDEX_URL:-}"
+  orig_extra="${PIP_EXTRA_INDEX_URL:-}"
+  orig_trust="${PIP_TRUSTED_HOST:-}"
+  while IFS= read -r url; do
+    [[ -n "$url" ]] || continue
+    [[ "$url" == "${orig_index}" ]] && continue
+    hesabix_mirror_log_warning "pip failed on ${orig_index:-<unset>}; retrying ${url}"
+    hesabix_set_pip_mirror_for_url "$url"
+    if [[ "$url" == "${HESABIX_PIP_CHINA_INDEX_URL}" ]]; then
+      export PIP_EXTRA_INDEX_URL="${HESABIX_PIP_CHINA_SECONDARY_INDEX_URL}"
+    else
+      export PIP_EXTRA_INDEX_URL="${HESABIX_PIP_CHINA_INDEX_URL}"
+    fi
+    hesabix_pip_append_trusted_host "$(hesabix_pip_trusted_host_from_url "${PIP_EXTRA_INDEX_URL}")"
+    if "${pip_bin}" "$@"; then
+      hesabix_mirror_log_info "pip succeeded from ${url}"
+      return 0
+    fi
+  done < <(hesabix_pip_index_fallback_urls)
+  export PIP_INDEX_URL="${orig_index}"
+  export PIP_EXTRA_INDEX_URL="${orig_extra}"
+  export PIP_TRUSTED_HOST="${orig_trust}"
+  return 1
 }
 
 hesabix_resolve_pip_mirror_from_preset() {
@@ -141,19 +233,25 @@ hesabix_resolve_flutter_mirror_from_preset() {
 }
 
 # Apply pip mirror: env PIP_INDEX_URL wins; else PIP_MIRROR preset; else Hesabix.
+# Always attach a Chinese extra-index unless PIP_DISABLE_CHINA_FALLBACK=1.
 hesabix_apply_pip_mirror_env() {
   if [[ -n "${PIP_INDEX_URL:-}" ]]; then
     hesabix_mirror_log_info "Using PyPI index from environment: PIP_INDEX_URL=${PIP_INDEX_URL}"
     hesabix_set_pip_mirror_for_url "${PIP_INDEX_URL}"
+    hesabix_apply_pip_china_fallback
     return 0
   fi
   PIP_MIRROR="${PIP_MIRROR:-hesabix}"
   export PIP_MIRROR
   hesabix_resolve_pip_mirror_from_preset "${PIP_MIRROR}"
+  hesabix_apply_pip_china_fallback
   hesabix_mirror_log_info "Using PyPI mirror (${PIP_MIRROR}): ${PIP_INDEX_URL}"
 }
 
 # Apply Flutter mirror: explicit URLs win; else FLUTTER_MIRROR preset; else Hesabix.
+# Note: callers that need a reachable mirror should also run
+# hesabix_resolve_flutter_pub_hosted_url / hesabix_resolve_flutter_storage_base_url
+# (saved "official"/pub.dev often returns HTTP 403 from filtered networks).
 hesabix_apply_flutter_mirror_env() {
   if [[ -n "${PUB_HOSTED_URL:-}" && -n "${FLUTTER_STORAGE_BASE_URL:-}" ]]; then
     export PUB_HOSTED_URL FLUTTER_STORAGE_BASE_URL
@@ -196,7 +294,7 @@ hesabix_probe_flutter_storage_base() {
   [[ -n "$engine" ]] || return 1
   realm=""
   if [[ -f "${flutter_root}/bin/cache/engine.realm" ]]; then
-    realm="$(tr -d '\n\r' < "${flutter_root}/bin/cache/engine.realm")"
+    realm="$(tr -d '[:space:]' < "${flutter_root}/bin/cache/engine.realm")"
   fi
   rel_path="flutter_infra_release/flutter/${engine}/sky_engine.zip"
   while IFS= read -r base; do
@@ -207,7 +305,8 @@ hesabix_probe_flutter_storage_base() {
     else
       url="${base}/${rel_path}"
     fi
-    code="$(curl -fsSI -o /dev/null -w '%{http_code}' --connect-timeout 8 --max-time 25 "$url" 2>/dev/null || echo 000)"
+    code="$(curl -fsSI -o /dev/null -w '%{http_code}' --connect-timeout 8 --max-time 25 "$url" 2>/dev/null || true)"
+    code="${code:-000}"
     if [[ "$code" == "200" ]]; then
       printf '%s' "$base"
       return 0
@@ -235,6 +334,67 @@ hesabix_resolve_flutter_storage_base_url() {
   return 0
 }
 
+# Ordered pub hosted bases (preferred env URL first). pub.dev often returns 403 from
+# sanctioned/filtered networks; Dart reports that as "authorization failed".
+hesabix_flutter_pub_fallback_bases() {
+  local -a bases=()
+  local b
+  if [[ -n "${PUB_HOSTED_URL:-}" ]]; then
+    bases+=("${PUB_HOSTED_URL%/}")
+  fi
+  bases+=(
+    "${HESABIX_PUB_HOSTED_URL}"
+    "https://pub.flutter-io.cn"
+    "https://pub-azs.ir"
+    "https://mirrors.tuna.tsinghua.edu.cn/dart-pub"
+    "https://mirror.sjtu.edu.cn/dart-pub"
+    "https://pub.dev"
+  )
+  local -A seen=()
+  for b in "${bases[@]}"; do
+    b="${b%/}"
+    [[ -n "$b" && -z "${seen[$b]:-}" ]] || continue
+    seen[$b]=1
+    printf '%s\n' "$b"
+  done
+}
+
+# Probe a known package API; print first working PUB_HOSTED_URL base.
+hesabix_probe_flutter_pub_hosted() {
+  local base url code
+  while IFS= read -r base; do
+    [[ -n "$base" ]] || continue
+    base="${base%/}"
+    url="${base}/api/packages/intl"
+    code="$(curl -fsSI -o /dev/null -w '%{http_code}' --connect-timeout 8 --max-time 20 "$url" 2>/dev/null || true)"
+    code="${code:-000}"
+    if [[ "$code" == "200" ]]; then
+      printf '%s' "$base"
+      return 0
+    fi
+  done < <(hesabix_flutter_pub_fallback_bases)
+  return 1
+}
+
+# If the preferred pub mirror is blocked/unreachable, switch to a working fallback.
+hesabix_resolve_flutter_pub_hosted_url() {
+  local preferred resolved
+  preferred="${PUB_HOSTED_URL:-}"
+  hesabix_apply_flutter_mirror_env >/dev/null 2>&1 || true
+  preferred="${PUB_HOSTED_URL:-${preferred}}"
+  resolved="$(hesabix_probe_flutter_pub_hosted)" || {
+    hesabix_mirror_log_warning "No Flutter pub mirror can serve package metadata (intl)."
+    return 1
+  }
+  export PUB_HOSTED_URL="${resolved}"
+  if [[ -n "${preferred}" && "${resolved}" != "${preferred%/}" ]]; then
+    hesabix_mirror_log_warning "Flutter pub fallback: ${preferred} → ${resolved} (preferred blocked or unreachable)"
+  else
+    hesabix_mirror_log_info "Flutter pub: ${resolved}"
+  fi
+  return 0
+}
+
 hesabix_configure_pip_mirror() {
   if ! command -v python3 >/dev/null 2>&1; then
     return 0
@@ -242,8 +402,13 @@ hesabix_configure_pip_mirror() {
   hesabix_apply_pip_mirror_env
   python3 -m pip config --user set global.index "${PIP_INDEX_URL}" 2>/dev/null || true
   python3 -m pip config --user set global.index-url "${PIP_INDEX_URL}" 2>/dev/null || true
-  if [[ -n "${PIP_TRUSTED_HOST:-}" ]]; then
-    python3 -m pip config --user set global.trusted-host "${PIP_TRUSTED_HOST}" 2>/dev/null || true
+  local primary_host
+  primary_host="$(hesabix_pip_trusted_host_from_url "${PIP_INDEX_URL}")"
+  if [[ -n "${primary_host}" ]]; then
+    python3 -m pip config --user set global.trusted-host "${primary_host}" 2>/dev/null || true
+  fi
+  if [[ -n "${PIP_EXTRA_INDEX_URL:-}" ]]; then
+    python3 -m pip config --user set global.extra-index-url "${PIP_EXTRA_INDEX_URL%% *}" 2>/dev/null || true
   fi
   hesabix_mirror_log_info "pip user config: ${PIP_INDEX_URL}"
 }
@@ -330,6 +495,9 @@ hesabix_mirror_summary_pip() {
   else
     echo "  • PyPI (pip):     ${PIP_MIRROR:-hesabix} — ${PIP_INDEX_URL:-}"
   fi
+  if [[ -n "${PIP_EXTRA_INDEX_URL:-}" && "${PIP_DISABLE_CHINA_FALLBACK:-0}" != "1" ]]; then
+    echo "  • PyPI extra:     ${PIP_EXTRA_INDEX_URL}"
+  fi
 }
 
 hesabix_mirror_summary_flutter() {
@@ -343,6 +511,11 @@ hesabix_mirror_summary_flutter() {
   fi
 }
 
+# Write KEY=value into a sourced env file; quote so values with spaces are safe.
+hesabix_write_env_assignment() {
+  printf '%s=%q\n' "$1" "${2:-}"
+}
+
 # Write mirror vars into .deploy_env (append/update keys).
 hesabix_persist_mirror_to_deploy_env() {
   local env_file="${1:-/opt/hesabix/.deploy_env}"
@@ -351,15 +524,16 @@ hesabix_persist_mirror_to_deploy_env() {
   hesabix_apply_flutter_mirror_env
   local tmp
   tmp=$(mktemp)
-  grep -vE '^(PIP_MIRROR|FLUTTER_MIRROR|PIP_INDEX_URL|PIP_TRUSTED_HOST|PUB_HOSTED_URL|FLUTTER_STORAGE_BASE_URL)=' "${env_file}" > "${tmp}" 2>/dev/null || true
+  grep -vE '^(PIP_MIRROR|FLUTTER_MIRROR|PIP_INDEX_URL|PIP_EXTRA_INDEX_URL|PIP_TRUSTED_HOST|PUB_HOSTED_URL|FLUTTER_STORAGE_BASE_URL)=' "${env_file}" > "${tmp}" 2>/dev/null || true
   {
     cat "${tmp}"
-    echo "PIP_MIRROR=${PIP_MIRROR:-hesabix}"
-    echo "FLUTTER_MIRROR=${FLUTTER_MIRROR:-hesabix}"
-    echo "PIP_INDEX_URL=${PIP_INDEX_URL:-}"
-    echo "PIP_TRUSTED_HOST=${PIP_TRUSTED_HOST:-}"
-    echo "PUB_HOSTED_URL=${PUB_HOSTED_URL:-}"
-    echo "FLUTTER_STORAGE_BASE_URL=${FLUTTER_STORAGE_BASE_URL:-}"
+    hesabix_write_env_assignment PIP_MIRROR "${PIP_MIRROR:-hesabix}"
+    hesabix_write_env_assignment FLUTTER_MIRROR "${FLUTTER_MIRROR:-hesabix}"
+    hesabix_write_env_assignment PIP_INDEX_URL "${PIP_INDEX_URL:-}"
+    hesabix_write_env_assignment PIP_EXTRA_INDEX_URL "${PIP_EXTRA_INDEX_URL:-}"
+    hesabix_write_env_assignment PIP_TRUSTED_HOST "${PIP_TRUSTED_HOST:-}"
+    hesabix_write_env_assignment PUB_HOSTED_URL "${PUB_HOSTED_URL:-}"
+    hesabix_write_env_assignment FLUTTER_STORAGE_BASE_URL "${FLUTTER_STORAGE_BASE_URL:-}"
   } > "${env_file}.new"
   mv "${env_file}.new" "${env_file}"
   chmod 600 "${env_file}" 2>/dev/null || true

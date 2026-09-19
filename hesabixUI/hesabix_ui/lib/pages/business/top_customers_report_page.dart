@@ -11,6 +11,7 @@ import 'package:hesabix_ui/services/business_dashboard_service.dart';
 import 'package:hesabix_ui/services/currency_service.dart';
 import 'package:hesabix_ui/widgets/data_table/helpers/data_table_utils.dart';
 import 'package:hesabix_ui/core/date_utils.dart';
+import 'package:hesabix_ui/core/hesabix_back.dart';
 
 class TopCustomersReportPage extends StatefulWidget {
   final int businessId;
@@ -191,10 +192,7 @@ class _TopCustomersReportPageState extends State<TopCustomersReportPage> {
       backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
         title: Text(t.reportsTopCustomersTitle),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.pop(),
-        ),
+        leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
       ),
       body: SafeArea(
         child: Column(
@@ -271,7 +269,7 @@ class _TopCustomersReportPageState extends State<TopCustomersReportPage> {
                       items: [
                         const DropdownMenuItem<int>(
                           value: null,
-                          child: Text('همه ارزها'),
+                          child: Text('همه ارزها (معادل پایه)'),
                         ),
                         ..._currencies.map((curr) {
                           final id = curr['id'] as int?;

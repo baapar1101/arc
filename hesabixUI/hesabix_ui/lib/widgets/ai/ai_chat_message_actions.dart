@@ -7,6 +7,8 @@ import 'ai_chat_design.dart';
 class AIChatMessageActions extends StatefulWidget {
   final VoidCallback onCopy;
   final VoidCallback? onRegenerate;
+  final VoidCallback? onSpeak;
+  final bool speaking;
   final ValueChanged<int>? onFeedback;
   final int? currentRating;
 
@@ -14,6 +16,8 @@ class AIChatMessageActions extends StatefulWidget {
     super.key,
     required this.onCopy,
     this.onRegenerate,
+    this.onSpeak,
+    this.speaking = false,
     this.onFeedback,
     this.currentRating,
   });
@@ -52,6 +56,20 @@ class _AIChatMessageActionsState extends State<AIChatMessageActions> {
                   scheme: scheme,
                   selected: false,
                 ),
+                if (widget.onSpeak != null) ...[
+                  const SizedBox(width: 4),
+                  _ActionIcon(
+                    icon: widget.speaking
+                        ? Icons.stop_circle_outlined
+                        : Icons.volume_up_outlined,
+                    tooltip: widget.speaking
+                        ? l10n.aiVoiceStopReading
+                        : l10n.aiVoiceReadAloud,
+                    onPressed: widget.onSpeak,
+                    scheme: scheme,
+                    selected: widget.speaking,
+                  ),
+                ],
                 if (widget.onRegenerate != null) ...[
                   const SizedBox(width: 4),
                   _ActionIcon(

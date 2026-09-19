@@ -264,7 +264,11 @@ def upsert_opening_balance(
         if info.get("movement") != "in":
             info["movement"] = "in"
         if info.get("warehouse_id") is None:
-            raise ApiError("WAREHOUSE_REQUIRED", "warehouse_id برای خطوط موجودی الزامی است", http_status=400)
+            raise ApiError(
+                "WAREHOUSE_REQUIRED",
+                "برای خطوط موجودی تراز افتتاحیه، انتخاب انبار الزامی است",
+                http_status=400,
+            )
         cost_price = _norm_amount(info.get("cost_price"))
         if cost_price > 0:
             inventory_total_value += qty * cost_price
@@ -300,9 +304,9 @@ def upsert_opening_balance(
     if auto_balance_to_equity:
         total_debit = sum(Decimal(str(line.get("debit", 0) or 0)) for line in lines)
         total_credit = sum(Decimal(str(line.get("credit", 0) or 0)) for line in lines)
-        diff = total_debit - total_credit
-        tolerance = Decimal("0.01")
-        if abs(diff) > tolerance:
+        diff = (total_debit - total_credit).quantize(Decimal("0.01"))
+        # هر اختلاف غیرصفر (حتی دقیقاً 0.01) را ببند — قبلاً فقط > 0.01 بود و با خطای اعشار validate می‌شکست
+        if diff != 0:
             if not equity_account_id:
                 raise ApiError(
                     "EQUITY_ACCOUNT_REQUIRED",
@@ -429,7 +433,11 @@ def preview_opening_balance(
         if info.get("movement") != "in":
             info["movement"] = "in"
         if info.get("warehouse_id") is None:
-            raise ApiError("WAREHOUSE_REQUIRED", "warehouse_id برای خطوط موجودی الزامی است", http_status=400)
+            raise ApiError(
+                "WAREHOUSE_REQUIRED",
+                "برای خطوط موجودی تراز افتتاحیه، انتخاب انبار الزامی است",
+                http_status=400,
+            )
         cost_price = _norm_amount(info.get("cost_price"))
         if cost_price > 0:
             inventory_total_value += qty * cost_price
@@ -465,9 +473,9 @@ def preview_opening_balance(
     if auto_balance_to_equity:
         total_debit = sum(Decimal(str(line.get("debit", 0) or 0)) for line in lines)
         total_credit = sum(Decimal(str(line.get("credit", 0) or 0)) for line in lines)
-        diff = total_debit - total_credit
-        tolerance = Decimal("0.01")
-        if abs(diff) > tolerance:
+        diff = (total_debit - total_credit).quantize(Decimal("0.01"))
+        # هر اختلاف غیرصفر (حتی دقیقاً 0.01) را ببند — قبلاً فقط > 0.01 بود و با خطای اعشار validate می‌شکست
+        if diff != 0:
             if not equity_account_id:
                 raise ApiError(
                     "EQUITY_ACCOUNT_REQUIRED",

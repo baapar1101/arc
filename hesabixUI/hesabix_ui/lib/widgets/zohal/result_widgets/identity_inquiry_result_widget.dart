@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hesabix_ui/widgets/zohal/zohal_result_widget.dart';
 import 'package:hesabix_ui/utils/snackbar_helper.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 
 /// ویجت نمایش نتیجه برای استعلام اطلاعات هویتی
@@ -139,7 +140,7 @@ class IdentityInquiryResultWidget extends ZohalResultWidget {
               size: 64,
               color: theme.colorScheme.onPrimaryContainer,
             ),
-            const SizedBox(height: 16),
+            SizedBox(height: 16),
             if (firstName != null || lastName != null)
               Text(
                 '${firstName ?? ''} ${lastName ?? ''}'.trim(),
@@ -176,13 +177,13 @@ class IdentityInquiryResultWidget extends ZohalResultWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 decoration: BoxDecoration(
                   color: (alive == true || isDead == false)
-                      ? Colors.green.withValues(alpha: 0.2)
-                      : Colors.red.withValues(alpha: 0.2),
+                      ? SemanticColorResolver.positive(context).withValues(alpha: 0.2)
+                      : SemanticColorResolver.negative(context).withValues(alpha: 0.2),
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(
                     color: (alive == true || isDead == false)
-                        ? Colors.green
-                        : Colors.red,
+                        ? SemanticColorResolver.positive(context)
+                        : SemanticColorResolver.negative(context),
                     width: 1.5,
                   ),
                 ),
@@ -195,17 +196,17 @@ class IdentityInquiryResultWidget extends ZohalResultWidget {
                           : Icons.cancel,
                       size: 20,
                       color: (alive == true || isDead == false)
-                          ? Colors.green
-                          : Colors.red,
+                          ? SemanticColorResolver.positive(context)
+                          : SemanticColorResolver.negative(context),
                     ),
-                    const SizedBox(width: 8),
+                    SizedBox(width: 8),
                     Text(
                       (alive == true || isDead == false) ? 'زنده' : 'فوت شده',
                       style: theme.textTheme.bodyMedium?.copyWith(
                         fontWeight: FontWeight.bold,
                         color: (alive == true || isDead == false)
-                            ? Colors.green.shade700
-                            : Colors.red.shade700,
+                            ? SemanticColorResolver.positive(context)
+                            : SemanticColorResolver.negative(context),
                       ),
                     ),
                   ],

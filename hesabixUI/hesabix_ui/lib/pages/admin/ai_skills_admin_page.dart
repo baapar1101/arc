@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
 import 'package:hesabix_ui/utils/snackbar_helper.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 /// تأیید/رد مهارت‌های AI در انتظار بررسی (مدیر سیستم).
 class AISkillsAdminPage extends StatefulWidget {
@@ -167,11 +168,11 @@ class _AISkillsAdminPageState extends State<AISkillsAdminPage> {
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 IconButton(
-                                  icon: const Icon(Icons.check_circle_outline, color: Colors.green),
+                                  icon: Icon(Icons.check_circle_outline, color: SemanticColorResolver.positive(context)),
                                   onPressed: _busy ? null : () => _approve(packageId),
                                 ),
                                 IconButton(
-                                  icon: const Icon(Icons.cancel_outlined, color: Colors.red),
+                                  icon: Icon(Icons.cancel_outlined, color: SemanticColorResolver.negative(context)),
                                   onPressed: _busy ? null : () => _reject(packageId),
                                 ),
                               ],

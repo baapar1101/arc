@@ -87,106 +87,149 @@ class Hesabix_V2_Admin
 	 *
 	 * @since    2.0.0
 	 */
-	public function enqueue_styles()
+	/**
+	 * آیا دارایی‌های ادمین حسابیکس باید بارگذاری شوند؟
+	 *
+	 * @param string $hook_suffix
+	 * @return bool
+	 */
+	private function should_enqueue_admin_assets($hook_suffix = '')
 	{
-		if (isset($_GET['page']) && strpos($_GET['page'], 'hesabix-v2') !== false) {
-			$fonts_url = HESABIX_V2_PLUGIN_URL . 'assets/fonts/';
-			?>
-			<style>
-				@font-face {
-					font-family: 'IRANYekanWeb';
-					src: url('<?php echo esc_url($fonts_url); ?>eot/IRANYekanWebThin.eot');
-					src: url('<?php echo esc_url($fonts_url); ?>eot/IRANYekanWebThin.eot?#iefix') format('embedded-opentype'),
-						url('<?php echo esc_url($fonts_url); ?>woff2/IRANYekanWebThin.woff2') format('woff2'),
-						url('<?php echo esc_url($fonts_url); ?>woff/IRANYekanWebThin.woff') format('woff'),
-						url('<?php echo esc_url($fonts_url); ?>ttf/IRANYekanWebThin.ttf') format('truetype'),
-						url('<?php echo esc_url($fonts_url); ?>svg/iranyekanwebthin.svg#IRANYekanWebThin') format('svg');
-					font-weight: 100;
-					font-style: normal;
-					font-display: swap;
-				}
-				@font-face {
-					font-family: 'IRANYekanWeb';
-					src: url('<?php echo esc_url($fonts_url); ?>eot/IRANYekanWebLight.eot');
-					src: url('<?php echo esc_url($fonts_url); ?>eot/IRANYekanWebLight.eot?#iefix') format('embedded-opentype'),
-						url('<?php echo esc_url($fonts_url); ?>woff2/IRANYekanWebLight.woff2') format('woff2'),
-						url('<?php echo esc_url($fonts_url); ?>woff/IRANYekanWebLight.woff') format('woff'),
-						url('<?php echo esc_url($fonts_url); ?>ttf/IRANYekanWebLight.ttf') format('truetype'),
-						url('<?php echo esc_url($fonts_url); ?>svg/iranyekanweblight.svg#IRANYekanWebLight') format('svg');
-					font-weight: 300;
-					font-style: normal;
-					font-display: swap;
-				}
-				@font-face {
-					font-family: 'IRANYekanWeb';
-					src: url('<?php echo esc_url($fonts_url); ?>eot/IRANYekanWebRegular.eot');
-					src: url('<?php echo esc_url($fonts_url); ?>eot/IRANYekanWebRegular.eot?#iefix') format('embedded-opentype'),
-						url('<?php echo esc_url($fonts_url); ?>woff2/IRANYekanWebRegular.woff2') format('woff2'),
-						url('<?php echo esc_url($fonts_url); ?>woff/IRANYekanWebRegular.woff') format('woff'),
-						url('<?php echo esc_url($fonts_url); ?>ttf/IRANYekanWebRegular.ttf') format('truetype'),
-						url('<?php echo esc_url($fonts_url); ?>svg/IRANYekanWebRegular.svg#IRANYekanWebRegular') format('svg');
-					font-weight: 400;
-					font-style: normal;
-					font-display: swap;
-				}
-				@font-face {
-					font-family: 'IRANYekanWeb';
-					src: url('<?php echo esc_url($fonts_url); ?>eot/IRANYekanWebMedium.eot');
-					src: url('<?php echo esc_url($fonts_url); ?>eot/IRANYekanWebMedium.eot?#iefix') format('embedded-opentype'),
-						url('<?php echo esc_url($fonts_url); ?>woff2/IRANYekanWebMedium.woff2') format('woff2'),
-						url('<?php echo esc_url($fonts_url); ?>woff/IRANYekanWebMedium.woff') format('woff'),
-						url('<?php echo esc_url($fonts_url); ?>ttf/IRANYekanWebMedium.ttf') format('truetype'),
-						url('<?php echo esc_url($fonts_url); ?>svg/iranyekanwebmedium.svg#IRANYekanWebMedium') format('svg');
-					font-weight: 500;
-					font-style: normal;
-					font-display: swap;
-				}
-				@font-face {
-					font-family: 'IRANYekanWeb';
-					src: url('<?php echo esc_url($fonts_url); ?>eot/IRANYekanWebBold.eot');
-					src: url('<?php echo esc_url($fonts_url); ?>eot/IRANYekanWebBold.eot?#iefix') format('embedded-opentype'),
-						url('<?php echo esc_url($fonts_url); ?>woff2/IRANYekanWebBold.woff2') format('woff2'),
-						url('<?php echo esc_url($fonts_url); ?>woff/IRANYekanWebBold.woff') format('woff'),
-						url('<?php echo esc_url($fonts_url); ?>ttf/IRANYekanWebBold.ttf') format('truetype'),
-						url('<?php echo esc_url($fonts_url); ?>svg/iranyekanwebbold.svg#IRANYekanWebBold') format('svg');
-					font-weight: 700;
-					font-style: normal;
-					font-display: swap;
-				}
-				@font-face {
-					font-family: 'IRANYekanWeb';
-					src: url('<?php echo esc_url($fonts_url); ?>eot/IRANYekanWebExtraBold.eot');
-					src: url('<?php echo esc_url($fonts_url); ?>eot/IRANYekanWebExtraBold.eot?#iefix') format('embedded-opentype'),
-						url('<?php echo esc_url($fonts_url); ?>woff2/IRANYekanWebExtraBold.woff2') format('woff2'),
-						url('<?php echo esc_url($fonts_url); ?>woff/IRANYekanWebExtraBold.woff') format('woff'),
-						url('<?php echo esc_url($fonts_url); ?>ttf/IRANYekanWebExtraBold.ttf') format('truetype'),
-						url('<?php echo esc_url($fonts_url); ?>svg/iranyekanwebextrabold.svg#IRANYekanWebExtraBold') format('svg');
-					font-weight: 800;
-					font-style: normal;
-					font-display: swap;
-				}
-				@font-face {
-					font-family: 'IRANYekanWeb';
-					src: url('<?php echo esc_url($fonts_url); ?>eot/IRANYekanWebBlack.eot');
-					src: url('<?php echo esc_url($fonts_url); ?>eot/IRANYekanWebBlack.eot?#iefix') format('embedded-opentype'),
-						url('<?php echo esc_url($fonts_url); ?>woff2/IRANYekanWebBlack.woff2') format('woff2'),
-						url('<?php echo esc_url($fonts_url); ?>woff/IRANYekanWebBlack.woff') format('woff'),
-						url('<?php echo esc_url($fonts_url); ?>ttf/IRANYekanWebBlack.ttf') format('truetype'),
-						url('<?php echo esc_url($fonts_url); ?>svg/iranyekanwebblack.svg#IRANYekanWebBlack') format('svg');
-					font-weight: 900;
-					font-style: normal;
-					font-display: swap;
-				}
-			</style>
-			<?php
-			wp_enqueue_style(
-				$this->plugin_name,
-				HESABIX_V2_PLUGIN_URL . 'assets/css/hesabix-v2-admin.css',
-				array(),
-				$this->version,
-				'all'
-			);
+		if (isset($_GET['page']) && strpos((string) $_GET['page'], 'hesabix-v2') !== false) {
+			return true;
 		}
+
+		$hook_suffix = (string) $hook_suffix;
+		if ($hook_suffix !== '' && (
+			strpos($hook_suffix, 'shop_order') !== false
+			|| strpos($hook_suffix, 'woocommerce_page_wc-orders') !== false
+		)) {
+			return true;
+		}
+
+		// ویرایش سفارش کلاسیک / HPOS
+		$screen = function_exists('get_current_screen') ? get_current_screen() : null;
+		if ($screen) {
+			$id = isset($screen->id) ? (string) $screen->id : '';
+			if ($id === 'shop_order' || $id === 'woocommerce_page_wc-orders') {
+				return true;
+			}
+			if (function_exists('wc_get_page_screen_id') && $id === wc_get_page_screen_id('shop-order')) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	/**
+	 * Register the stylesheets for the admin area.
+	 *
+	 * @since    2.0.0
+	 * @param string $hook_suffix Current admin page hook.
+	 */
+	public function enqueue_styles($hook_suffix = '')
+	{
+		if (!$this->should_enqueue_admin_assets($hook_suffix)) {
+			return;
+		}
+
+		$fonts_url = HESABIX_V2_PLUGIN_URL . 'assets/fonts/';
+		?>
+		<style>
+			@font-face {
+				font-family: 'IRANYekanWeb';
+				src: url('<?php echo esc_url($fonts_url); ?>eot/IRANYekanWebThin.eot');
+				src: url('<?php echo esc_url($fonts_url); ?>eot/IRANYekanWebThin.eot?#iefix') format('embedded-opentype'),
+					url('<?php echo esc_url($fonts_url); ?>woff2/IRANYekanWebThin.woff2') format('woff2'),
+					url('<?php echo esc_url($fonts_url); ?>woff/IRANYekanWebThin.woff') format('woff'),
+					url('<?php echo esc_url($fonts_url); ?>ttf/IRANYekanWebThin.ttf') format('truetype'),
+					url('<?php echo esc_url($fonts_url); ?>svg/iranyekanwebthin.svg#IRANYekanWebThin') format('svg');
+				font-weight: 100;
+				font-style: normal;
+				font-display: swap;
+			}
+			@font-face {
+				font-family: 'IRANYekanWeb';
+				src: url('<?php echo esc_url($fonts_url); ?>eot/IRANYekanWebLight.eot');
+				src: url('<?php echo esc_url($fonts_url); ?>eot/IRANYekanWebLight.eot?#iefix') format('embedded-opentype'),
+					url('<?php echo esc_url($fonts_url); ?>woff2/IRANYekanWebLight.woff2') format('woff2'),
+					url('<?php echo esc_url($fonts_url); ?>woff/IRANYekanWebLight.woff') format('woff'),
+					url('<?php echo esc_url($fonts_url); ?>ttf/IRANYekanWebLight.ttf') format('truetype'),
+					url('<?php echo esc_url($fonts_url); ?>svg/iranyekanweblight.svg#IRANYekanWebLight') format('svg');
+				font-weight: 300;
+				font-style: normal;
+				font-display: swap;
+			}
+			@font-face {
+				font-family: 'IRANYekanWeb';
+				src: url('<?php echo esc_url($fonts_url); ?>eot/IRANYekanWebRegular.eot');
+				src: url('<?php echo esc_url($fonts_url); ?>eot/IRANYekanWebRegular.eot?#iefix') format('embedded-opentype'),
+					url('<?php echo esc_url($fonts_url); ?>woff2/IRANYekanWebRegular.woff2') format('woff2'),
+					url('<?php echo esc_url($fonts_url); ?>woff/IRANYekanWebRegular.woff') format('woff'),
+					url('<?php echo esc_url($fonts_url); ?>ttf/IRANYekanWebRegular.ttf') format('truetype'),
+					url('<?php echo esc_url($fonts_url); ?>svg/IRANYekanWebRegular.svg#IRANYekanWebRegular') format('svg');
+				font-weight: 400;
+				font-style: normal;
+				font-display: swap;
+			}
+			@font-face {
+				font-family: 'IRANYekanWeb';
+				src: url('<?php echo esc_url($fonts_url); ?>eot/IRANYekanWebMedium.eot');
+				src: url('<?php echo esc_url($fonts_url); ?>eot/IRANYekanWebMedium.eot?#iefix') format('embedded-opentype'),
+					url('<?php echo esc_url($fonts_url); ?>woff2/IRANYekanWebMedium.woff2') format('woff2'),
+					url('<?php echo esc_url($fonts_url); ?>woff/IRANYekanWebMedium.woff') format('woff'),
+					url('<?php echo esc_url($fonts_url); ?>ttf/IRANYekanWebMedium.ttf') format('truetype'),
+					url('<?php echo esc_url($fonts_url); ?>svg/iranyekanwebmedium.svg#IRANYekanWebMedium') format('svg');
+				font-weight: 500;
+				font-style: normal;
+				font-display: swap;
+			}
+			@font-face {
+				font-family: 'IRANYekanWeb';
+				src: url('<?php echo esc_url($fonts_url); ?>eot/IRANYekanWebBold.eot');
+				src: url('<?php echo esc_url($fonts_url); ?>eot/IRANYekanWebBold.eot?#iefix') format('embedded-opentype'),
+					url('<?php echo esc_url($fonts_url); ?>woff2/IRANYekanWebBold.woff2') format('woff2'),
+					url('<?php echo esc_url($fonts_url); ?>woff/IRANYekanWebBold.woff') format('woff'),
+					url('<?php echo esc_url($fonts_url); ?>ttf/IRANYekanWebBold.ttf') format('truetype'),
+					url('<?php echo esc_url($fonts_url); ?>svg/iranyekanwebbold.svg#IRANYekanWebBold') format('svg');
+				font-weight: 700;
+				font-style: normal;
+				font-display: swap;
+			}
+			@font-face {
+				font-family: 'IRANYekanWeb';
+				src: url('<?php echo esc_url($fonts_url); ?>eot/IRANYekanWebExtraBold.eot');
+				src: url('<?php echo esc_url($fonts_url); ?>eot/IRANYekanWebExtraBold.eot?#iefix') format('embedded-opentype'),
+					url('<?php echo esc_url($fonts_url); ?>woff2/IRANYekanWebExtraBold.woff2') format('woff2'),
+					url('<?php echo esc_url($fonts_url); ?>woff/IRANYekanWebExtraBold.woff') format('woff'),
+					url('<?php echo esc_url($fonts_url); ?>ttf/IRANYekanWebExtraBold.ttf') format('truetype'),
+					url('<?php echo esc_url($fonts_url); ?>svg/iranyekanwebextrabold.svg#IRANYekanWebExtraBold') format('svg');
+				font-weight: 800;
+				font-style: normal;
+				font-display: swap;
+			}
+			@font-face {
+				font-family: 'IRANYekanWeb';
+				src: url('<?php echo esc_url($fonts_url); ?>eot/IRANYekanWebBlack.eot');
+				src: url('<?php echo esc_url($fonts_url); ?>eot/IRANYekanWebBlack.eot?#iefix') format('embedded-opentype'),
+					url('<?php echo esc_url($fonts_url); ?>woff2/IRANYekanWebBlack.woff2') format('woff2'),
+					url('<?php echo esc_url($fonts_url); ?>woff/IRANYekanWebBlack.woff') format('woff'),
+					url('<?php echo esc_url($fonts_url); ?>ttf/IRANYekanWebBlack.ttf') format('truetype'),
+					url('<?php echo esc_url($fonts_url); ?>svg/iranyekanwebblack.svg#IRANYekanWebBlack') format('svg');
+				font-weight: 900;
+				font-style: normal;
+				font-display: swap;
+			}
+		</style>
+		<?php
+		wp_enqueue_style(
+			$this->plugin_name,
+			HESABIX_V2_PLUGIN_URL . 'assets/css/hesabix-v2-admin.css',
+			array(),
+			$this->version,
+			'all'
+		);
 	}
 
 	/**
@@ -238,7 +281,17 @@ class Hesabix_V2_Admin
 						'lbl_type' => __('نوع شخصیت', 'hesabix-v2'),
 						'lbl_fiscal_current' => __('سال مالی جاری مارک‌استریت', 'hesabix-v2'),
 						'lbl_fiscal_dates' => __('بازه', 'hesabix-v2'),
+<<<<<<< HEAD
+						'lbl_api_key_owner' => __('صاحب کلید API در حسابیکس', 'hesabix-v2'),
+						'profit_refreshing' => __('در حال دریافت سود…', 'hesabix-v2'),
+						'profit_refreshed' => __('سود به‌روز شد', 'hesabix-v2'),
+						'mp_checking' => __('در حال بررسی لایسنس…', 'hesabix-v2'),
+						'mp_active' => __('لایسنس فعال است — صفحه تازه‌سازی می‌شود.', 'hesabix-v2'),
+						'mp_inactive' => __('لایسنس هنوز فعال نیست.', 'hesabix-v2'),
+						'mp_dismissed' => __('بنر برای دو هفته پنهان شد.', 'hesabix-v2'),
+=======
 						'lbl_api_key_owner' => __('صاحب کلید API در مارک‌استریت', 'hesabix-v2'),
+>>>>>>> github/Huma
 					),
 				)
 			);
@@ -267,8 +320,15 @@ class Hesabix_V2_Admin
 							'confirmUnsync' => __('فاکتور این سفارش در مارک‌استریت حذف و پیوند افزونه پاک شود؟ این کار برگشت‌پذیر نیست.', 'hesabix-v2'),
 							'confirmBulkSync' => __('برای همهٔ سفارش‌های انتخاب‌شده ارسال یا به‌روزرسانی انجام شود؟', 'hesabix-v2'),
 							'confirmBulkUnsync' => __('برای همهٔ موارد انتخاب‌شده لغو ارسال (حذف فاکتور) انجام شود؟', 'hesabix-v2'),
+<<<<<<< HEAD
+							'confirmPause' => __('همگام‌سازی خودکار این سفارش متوقف شود؟ (فاکتورهای دستی در حسابیکس با به‌روزرسانی خودکار بازنویسی نمی‌شوند.)', 'hesabix-v2'),
+							'confirmResume' => __('همگام‌سازی خودکار دوباره فعال شود؟ در رویدادهای بعدی، محتوای ووکامرس ممکن است فاکتور حسابیکس را به‌روز کند.', 'hesabix-v2'),
+							'confirmBulkProfit' => __('سود فاکتور برای سفارش‌های انتخاب‌شده از حسابیکس دریافت شود؟', 'hesabix-v2'),
+							'profitRefreshing' => __('در حال دریافت سود…', 'hesabix-v2'),
+=======
 							'confirmPause' => __('همگام‌سازی خودکار این سفارش متوقف شود؟ (فاکتورهای دستی در مارک‌استریت با به‌روزرسانی خودکار بازنویسی نمی‌شوند.)', 'hesabix-v2'),
 							'confirmResume' => __('همگام‌سازی خودکار دوباره فعال شود؟ در رویدادهای بعدی، محتوای ووکامرس ممکن است فاکتور مارک‌استریت را به‌روز کند.', 'hesabix-v2'),
+>>>>>>> github/Huma
 						),
 					)
 				);
@@ -320,11 +380,24 @@ class Hesabix_V2_Admin
 						'ajax_url' => admin_url('admin-ajax.php'),
 						'nonce' => wp_create_nonce('hesabix_v2_nonce'),
 						'chunk_size' => max(5, min(Hesabix_V2_Sync_Service::BULK_WC_CHUNK_MAX_ITEMS, $p_chunk)),
+						'orphan_chunk_size' => 8,
 						'strings' => array(
 							'genericError' => __('عملیات ناموفق بود.', 'hesabix-v2'),
 							'requestFailed' => __('خطا در ارتباط با سرور.', 'hesabix-v2'),
+<<<<<<< HEAD
+							'confirmSync' => __('این محصول (و در صورت متغیر بودن، واریانت‌ها) با حسابیکس همگام شود؟', 'hesabix-v2'),
+							'confirmBulkSync' => __('برای تمام محصولات انتخاب‌شده همگام‌سازی با حسابیکس انجام شود؟', 'hesabix-v2'),
+							'orphanScanning' => __('در حال اسکن…', 'hesabix-v2'),
+							'orphanNoSelection' => __('حداقل یک کاندیدا را انتخاب کنید.', 'hesabix-v2'),
+							'orphanConfirmDryRun' => __('پیش‌نمایش پاک‌سازی برای موارد انتخاب‌شده انجام شود؟ (حذف واقعی انجام نمی‌شود)', 'hesabix-v2'),
+							'orphanConfirmCleanup' => __('پاک‌سازی امن انجام شود؟ کالاهای استفاده‌نشده حذف و کالاهای در استفاده غیرفعال می‌شوند. این عمل برای حذف‌ها غیرقابل بازگشت است.', 'hesabix-v2'),
+							'orphanTierHigh' => __('بالا', 'hesabix-v2'),
+							'orphanTierMedium' => __('متوسط', 'hesabix-v2'),
+							'orphanDone' => __('عملیات تمام شد.', 'hesabix-v2'),
+=======
 							'confirmSync' => __('این محصول (و در صورت متغیر بودن، واریانت‌ها) با مارک‌استریت همگام شود؟', 'hesabix-v2'),
 							'confirmBulkSync' => __('برای تمام محصولات انتخاب‌شده همگام‌سازی با مارک‌استریت انجام شود؟', 'hesabix-v2'),
+>>>>>>> github/Huma
 						),
 					)
 				);
@@ -392,6 +465,28 @@ class Hesabix_V2_Admin
 					)
 				);
 			}
+		} elseif ($this->should_enqueue_admin_assets($hook_suffix)) {
+			// صفحه ویرایش سفارش ووکامرس: فقط اسکریپت سود/متاباکس
+			wp_enqueue_script(
+				'hesabix-v2-order-panel',
+				HESABIX_V2_PLUGIN_URL . 'assets/js/hesabix-v2-order-panel.js',
+				array('jquery'),
+				$this->version,
+				true
+			);
+			wp_localize_script(
+				'hesabix-v2-order-panel',
+				'hesabix_v2_ajax',
+				array(
+					'ajax_url' => admin_url('admin-ajax.php'),
+					'nonce' => wp_create_nonce('hesabix_v2_nonce'),
+					'strings' => array(
+						'profit_refreshing' => __('در حال دریافت سود…', 'hesabix-v2'),
+						'profit_refreshed' => __('سود به‌روز شد', 'hesabix-v2'),
+						'error' => __('خطا رخ داد', 'hesabix-v2'),
+					),
+				)
+			);
 		}
 	}
 
@@ -752,6 +847,12 @@ class Hesabix_V2_Admin
 			'auto_sync_customers' => isset($_POST['auto_sync_customers']),
 			'auto_sync_orders' => isset($_POST['auto_sync_orders']),
 			'sync_on_product_update' => isset($_POST['sync_on_product_update']),
+			'product_sync_preset' => isset($_POST['product_sync_preset'])
+				? sanitize_key(wp_unslash($_POST['product_sync_preset']))
+				: Hesabix_V2_Product_Sync_Payload::PRESET_ACCOUNTING,
+			'sync_product_name' => isset($_POST['sync_product_name']),
+			'sync_product_description' => isset($_POST['sync_product_description']),
+			'sync_product_barcode' => isset($_POST['sync_product_barcode']),
 			'sync_product_categories' => isset($_POST['sync_product_categories']),
 			'sync_category_link_by_name_in_hesabix' => isset($_POST['sync_category_link_by_name_in_hesabix']),
 			'sync_product_price' => isset($_POST['sync_product_price']),
@@ -828,6 +929,10 @@ class Hesabix_V2_Admin
 
 		if (class_exists('Hesabix_V2_Gateway_Fee_Service')) {
 			$sync_settings = Hesabix_V2_Gateway_Fee_Service::normalize_sync_settings($sync_settings);
+		}
+
+		if (class_exists('Hesabix_V2_Product_Sync_Payload')) {
+			$sync_settings = Hesabix_V2_Product_Sync_Payload::normalize_sync_settings($sync_settings);
 		}
 
 		update_option('hesabix_v2_sync_settings', $sync_settings);
@@ -907,9 +1012,22 @@ class Hesabix_V2_Admin
 				'cron_minutes' => $cron_min,
 				'force_manage_stock' => isset($_POST['stock_pull_force_manage_stock']),
 				'disable_wc_stock_reduction' => isset($_POST['stock_pull_disable_wc_reduce']),
+				'skip_zero_overwrite' => isset($_POST['stock_pull_skip_zero_overwrite']),
 			)
 		);
 		Hesabix_V2_Stock_Pull_Service::reschedule_cron();
+
+		if (isset($_POST['hesabix_v2_inventory_policy_fields'])) {
+			Hesabix_V2_Inventory_Policy::sanitize_and_save(
+				array(
+					'source_of_truth' => isset($_POST['inventory_source_of_truth'])
+						? sanitize_key(wp_unslash($_POST['inventory_source_of_truth']))
+						: 'hesabix',
+					'push_wc_qty_to_hesabix' => isset($_POST['push_wc_qty_to_hesabix']),
+					'accept_remote_stock_push' => isset($_POST['accept_remote_stock_push']),
+				)
+			);
+		}
 
 		$inv_resolution = isset($_POST['invoice_wh_resolution'])
 			? sanitize_key(wp_unslash($_POST['invoice_wh_resolution']))
@@ -991,6 +1109,7 @@ class Hesabix_V2_Admin
 		
 		if (isset($sync_settings['auto_sync_products']) && $sync_settings['auto_sync_products']) {
 			$sync_service = new Hesabix_V2_Sync_Service();
+			// برای محصول متغیر، sync_product همهٔ واریانت‌ها را گسترش می‌دهد
 			$sync_service->sync_product($product_id);
 		}
 	}
@@ -1007,8 +1126,70 @@ class Hesabix_V2_Admin
 		
 		if (isset($sync_settings['sync_on_product_update']) && $sync_settings['sync_on_product_update']) {
 			$sync_service = new Hesabix_V2_Sync_Service();
+			// برای محصول متغیر، sync_product همهٔ واریانت‌ها را گسترش می‌دهد
 			$sync_service->sync_product($product_id);
 		}
+	}
+
+	/**
+	 * On product variation create
+	 *
+	 * @since 4.7.2
+	 * @param int $variation_id
+	 */
+	public function on_product_variation_create($variation_id)
+	{
+		$sync_settings = get_option('hesabix_v2_sync_settings', array());
+
+		if (empty($sync_settings['auto_sync_products'])) {
+			return;
+		}
+
+		$this->sync_variation_from_hook($variation_id);
+	}
+
+	/**
+	 * On product variation update
+	 *
+	 * @since 4.7.2
+	 * @param int $variation_id
+	 */
+	public function on_product_variation_update($variation_id)
+	{
+		$sync_settings = get_option('hesabix_v2_sync_settings', array());
+
+		if (empty($sync_settings['sync_on_product_update'])) {
+			return;
+		}
+
+		$this->sync_variation_from_hook($variation_id);
+	}
+
+	/**
+	 * همگام‌سازی یک واریانت از هوک ووکامرس.
+	 *
+	 * @since 4.7.2
+	 * @param int $variation_id
+	 */
+	private function sync_variation_from_hook($variation_id)
+	{
+		$variation_id = absint($variation_id);
+		if ($variation_id < 1) {
+			return;
+		}
+
+		$variation = wc_get_product($variation_id);
+		if (!$variation || !$variation->is_type('variation')) {
+			return;
+		}
+
+		$parent_id = absint($variation->get_parent_id());
+		if ($parent_id < 1) {
+			return;
+		}
+
+		$sync_service = new Hesabix_V2_Sync_Service();
+		$sync_service->sync_product($parent_id, $variation_id);
 	}
 
 	/**
@@ -1019,13 +1200,26 @@ class Hesabix_V2_Admin
 	 */
 	public function on_product_delete($product_id)
 	{
-		// Only if it's a product
-		if (get_post_type($product_id) !== 'product') {
+		$post_type = get_post_type($product_id);
+		if ($post_type !== 'product' && $post_type !== 'product_variation') {
 			return;
 		}
 
 		$db = new Hesabix_V2_DB_Service();
-		$db->delete_mapping('product', $product_id);
+
+		if ($post_type === 'product_variation') {
+			$parent_id = absint(wp_get_post_parent_id($product_id));
+			if ($parent_id > 0) {
+				$db->delete_mapping('product', $product_id, $parent_id);
+			} else {
+				$db->delete_mapping('product', $product_id);
+			}
+			return;
+		}
+
+		// والد ساده یا متغیر: نگاشت والد + همهٔ واریانت‌های فرزند
+		$db->delete_parent_only_product_mapping($product_id);
+		$db->delete_child_product_mappings($product_id);
 	}
 
 	/**
@@ -1262,7 +1456,16 @@ class Hesabix_V2_Admin
 			}
 		}
 
+<<<<<<< HEAD
+		echo '<p><strong>' . esc_html__('وضعیت حسابیکس:', 'hesabix-v2') . '</strong> ' . esc_html($hx_status) . '</p>';
+
+		if (class_exists('Hesabix_V2_Invoice_Profit_Service')) {
+			echo Hesabix_V2_Invoice_Profit_Service::render_meta_box_block($order); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped inside service
+		}
+
+=======
 		echo '<p><strong>' . esc_html__('وضعیت مارک‌استریت:', 'hesabix-v2') . '</strong> ' . esc_html($hx_status) . '</p>';
+>>>>>>> github/Huma
 		echo '<p class="description">' . esc_html__(
 			'اگر فاکتور را در مارک‌استریت دستی ویرایش کرده‌اید، با فعال کردن گزینهٔ زیر از بازنویسی خودکار توسط ووکامرس جلوگیری کنید.',
 			'hesabix-v2'
@@ -1509,6 +1712,74 @@ class Hesabix_V2_Admin
 	}
 
 	/**
+	 * AJAX: اسکن کالاهای یتیم والد متغیر.
+	 *
+	 * @since 4.7.2
+	 * @return void
+	 */
+	public function ajax_orphans_scan()
+	{
+		check_ajax_referer('hesabix_v2_nonce', 'nonce');
+		$this->ajax_require_manage_wc();
+
+		if (!get_option('hesabix_v2_enabled')) {
+			wp_send_json_error(array('message' => __('افزونه حسابیکس غیرفعال است.', 'hesabix-v2')));
+		}
+
+		$include_heuristic = !empty($_POST['include_name_heuristics']);
+		$svc = new Hesabix_V2_Orphan_Product_Service();
+		$result = $svc->scan_candidates(
+			array(
+				'include_name_heuristics' => $include_heuristic,
+			)
+		);
+
+		wp_send_json_success($result);
+	}
+
+	/**
+	 * AJAX: پیش‌نمایش یا پاک‌سازی دسته‌ای کالاهای یتیم.
+	 *
+	 * @since 4.7.2
+	 * @return void
+	 */
+	public function ajax_orphans_cleanup_batch()
+	{
+		check_ajax_referer('hesabix_v2_nonce', 'nonce');
+		$this->ajax_require_manage_wc();
+
+		if (!get_option('hesabix_v2_enabled')) {
+			wp_send_json_error(array('message' => __('افزونه حسابیکس غیرفعال است.', 'hesabix-v2')));
+		}
+
+		$raw = isset($_POST['hesabix_ids']) ? wp_unslash($_POST['hesabix_ids']) : array();
+		if (!is_array($raw)) {
+			$raw = array();
+		}
+
+		$ids = array_slice(array_filter(array_map('absint', $raw)), 0, 20);
+		if (empty($ids)) {
+			wp_send_json_error(array('message' => __('کالایی انتخاب نشده است.', 'hesabix-v2')));
+		}
+
+		$dry_run = !empty($_POST['dry_run']);
+		$allow_medium = !empty($_POST['allow_medium']);
+		$deactivate_if_used = !isset($_POST['deactivate_if_used']) || !empty($_POST['deactivate_if_used']);
+
+		$svc = new Hesabix_V2_Orphan_Product_Service();
+		$result = $svc->cleanup_batch(
+			$ids,
+			array(
+				'dry_run' => $dry_run,
+				'allow_medium' => $allow_medium,
+				'deactivate_if_used' => $deactivate_if_used,
+			)
+		);
+
+		wp_send_json_success($result);
+	}
+
+	/**
 	 * AJAX: لغو ارسال (حذف فاکتور) برای چند سفارش
 	 *
 	 * @return void
@@ -1565,6 +1836,119 @@ class Hesabix_V2_Admin
 
 		Hesabix_V2_Order_Sync_Meta::set_pause_auto_sync($order_id, $pause);
 		wp_send_json_success(array('pause' => $pause));
+	}
+
+	/**
+	 * AJAX: به‌روزرسانی سود یک سفارش از فاکتور حسابیکس
+	 *
+	 * @since 4.9.0
+	 * @return void
+	 */
+	public function ajax_refresh_order_profit()
+	{
+		check_ajax_referer('hesabix_v2_nonce', 'nonce');
+		$this->ajax_require_manage_wc();
+
+		if (!get_option('hesabix_v2_enabled')) {
+			wp_send_json_error(array('message' => __('افزونه حسابیکس غیرفعال است.', 'hesabix-v2')));
+		}
+
+		$order_id = isset($_POST['order_id']) ? absint($_POST['order_id']) : 0;
+		if ($order_id < 1) {
+			wp_send_json_error(array('message' => __('سفارش نامعتبر است.', 'hesabix-v2')));
+		}
+
+		$result = Hesabix_V2_Invoice_Profit_Service::refresh_for_order($order_id);
+		if (empty($result['success'])) {
+			wp_send_json_error(array(
+				'message' => isset($result['message']) ? (string) $result['message'] : __('ناموفق', 'hesabix-v2'),
+			));
+		}
+
+		$order = wc_get_order($order_id);
+		$html_list = $order ? Hesabix_V2_Invoice_Profit_Service::render_list_cell($order) : '';
+		$html_box = ($order instanceof WC_Order)
+			? Hesabix_V2_Invoice_Profit_Service::render_meta_box_block($order)
+			: '';
+
+		wp_send_json_success(array(
+			'message' => isset($result['message']) ? (string) $result['message'] : '',
+			'data' => isset($result['data']) ? $result['data'] : array(),
+			'html_list' => $html_list,
+			'html_box' => $html_box,
+		));
+	}
+
+	/**
+	 * AJAX: به‌روزرسانی دسته‌ای سود سفارش‌ها
+	 *
+	 * @since 4.9.0
+	 * @return void
+	 */
+	public function ajax_refresh_orders_profit_batch()
+	{
+		check_ajax_referer('hesabix_v2_nonce', 'nonce');
+		$this->ajax_require_manage_wc();
+
+		if (!get_option('hesabix_v2_enabled')) {
+			wp_send_json_error(array('message' => __('افزونه حسابیکس غیرفعال است.', 'hesabix-v2')));
+		}
+
+		$raw = isset($_POST['order_ids']) ? wp_unslash($_POST['order_ids']) : array();
+		if (!is_array($raw)) {
+			$raw = array();
+		}
+		$ids = array_slice(array_filter(array_map('absint', $raw)), 0, 15);
+		if (empty($ids)) {
+			wp_send_json_error(array('message' => __('سفارشی انتخاب نشده است.', 'hesabix-v2')));
+		}
+
+		$results = array();
+		foreach ($ids as $oid) {
+			$r = Hesabix_V2_Invoice_Profit_Service::refresh_for_order($oid);
+			$order = wc_get_order($oid);
+			$results[] = array(
+				'order_id' => $oid,
+				'success' => !empty($r['success']),
+				'message' => isset($r['message']) ? (string) $r['message'] : '',
+				'html_list' => $order ? Hesabix_V2_Invoice_Profit_Service::render_list_cell($order) : '',
+			);
+		}
+
+		wp_send_json_success(array('results' => $results));
+	}
+
+	/**
+	 * AJAX: بررسی مجدد لایسنس بازار افزونه
+	 *
+	 * @since 4.9.0
+	 * @return void
+	 */
+	public function ajax_marketplace_license_refresh()
+	{
+		check_ajax_referer('hesabix_v2_nonce', 'nonce');
+		$this->ajax_require_manage_wc();
+
+		$status = Hesabix_V2_Marketplace_License::refresh_status();
+		wp_send_json_success(array(
+			'status' => $status,
+			'active' => !empty($status['active']),
+			'marketplace_url' => Hesabix_V2_Marketplace_License::marketplace_url(),
+		));
+	}
+
+	/**
+	 * AJAX: پنهان‌سازی موقت بنر بازار افزونه
+	 *
+	 * @since 4.9.0
+	 * @return void
+	 */
+	public function ajax_marketplace_banner_dismiss()
+	{
+		check_ajax_referer('hesabix_v2_nonce', 'nonce');
+		$this->ajax_require_manage_wc();
+		Hesabix_V2_Marketplace_License::dismiss_banner_for_user();
+		wp_send_json_success(array('dismissed' => true));
 	}
 
 	/**
@@ -2351,6 +2735,10 @@ class Hesabix_V2_Admin
 		$api = new Hesabix_V2_Api();
 		$warehouses = array();
 		$banks = array();
+		$cash_registers = array();
+		$currencies = array();
+		$errors = array();
+		$warnings = array();
 
 		$wh_res = $api->get_warehouses();
 		if (!empty($wh_res['success']) && !empty($wh_res['data'])) {
@@ -2363,6 +2751,12 @@ class Hesabix_V2_Admin
 					$warehouses[] = array('id' => (int) $id, 'name' => $name, 'code' => $code);
 				}
 			}
+		} elseif (is_array($wh_res) && isset($wh_res['success']) && $wh_res['success'] === false) {
+			$errors[] = sprintf(
+				/* translators: %s: API error message */
+				__('انبارها: %s', 'hesabix-v2'),
+				isset($wh_res['message']) ? (string) $wh_res['message'] : __('خطای ناشناخته', 'hesabix-v2')
+			);
 		}
 
 		$bank_res = $api->get_bank_accounts();
@@ -2376,9 +2770,14 @@ class Hesabix_V2_Admin
 					$banks[] = array('id' => (string) $id, 'name' => $name, 'code' => $code);
 				}
 			}
+		} elseif (is_array($bank_res) && isset($bank_res['success']) && $bank_res['success'] === false) {
+			$errors[] = sprintf(
+				/* translators: %s: API error message */
+				__('حساب‌های بانکی: %s', 'hesabix-v2'),
+				isset($bank_res['message']) ? (string) $bank_res['message'] : __('خطای ناشناخته', 'hesabix-v2')
+			);
 		}
 
-		$cash_registers = array();
 		$cash_res = $api->get_cash_registers();
 		if (!empty($cash_res['success']) && !empty($cash_res['data'])) {
 			$items = isset($cash_res['data']['items']) ? $cash_res['data']['items'] : (is_array($cash_res['data']) ? $cash_res['data'] : array());
@@ -2390,9 +2789,14 @@ class Hesabix_V2_Admin
 					$cash_registers[] = array('id' => (string) $id, 'name' => $name, 'code' => $code);
 				}
 			}
+		} elseif (is_array($cash_res) && isset($cash_res['success']) && $cash_res['success'] === false) {
+			$errors[] = sprintf(
+				/* translators: %s: API error message */
+				__('صندوق‌ها: %s', 'hesabix-v2'),
+				isset($cash_res['message']) ? (string) $cash_res['message'] : __('خطای ناشناخته', 'hesabix-v2')
+			);
 		}
 
-		$currencies = array();
 		$cur_res = $api->get_business_currencies();
 		$cur_rows = Hesabix_V2_Currency_Service::normalize_rows_from_api_response($cur_res);
 		foreach ($cur_rows as $row) {
@@ -2404,12 +2808,64 @@ class Hesabix_V2_Admin
 			);
 		}
 
+		$bank_ids = array();
+		foreach ($banks as $b) {
+			$bank_ids[ (string) $b['id'] ] = true;
+		}
+		$cash_ids = array();
+		foreach ($cash_registers as $c) {
+			$cash_ids[ (string) $c['id'] ] = true;
+		}
+
+		$saved_bank = trim((string) get_option('hesabix_v2_default_bank_id', ''));
+		$saved_cash = trim((string) get_option('hesabix_v2_default_cash_register_id', ''));
+		$cleared_defaults = array();
+
+		if ($saved_bank !== '' && empty($errors) && !isset($bank_ids[ $saved_bank ])) {
+			delete_option('hesabix_v2_default_bank_id');
+			$cleared_defaults[] = 'bank';
+			$warnings[] = sprintf(
+				/* translators: %s: bank account id */
+				__('حساب بانکی پیش‌فرض ذخیره‌شده (#%s) در این کسب‌وکار یافت نشد و پاک شد. لطفاً حساب بانکی معتبر را دوباره انتخاب و ذخیره کنید.', 'hesabix-v2'),
+				$saved_bank
+			);
+			$saved_bank = '';
+		}
+
+		if ($saved_cash !== '' && empty($errors) && !isset($cash_ids[ $saved_cash ])) {
+			delete_option('hesabix_v2_default_cash_register_id');
+			$cleared_defaults[] = 'cash_register';
+			$warnings[] = sprintf(
+				/* translators: %s: cash register id */
+				__('صندوق پیش‌فرض ذخیره‌شده (#%s) در این کسب‌وکار یافت نشد و پاک شد. لطفاً صندوق معتبر را دوباره انتخاب و ذخیره کنید.', 'hesabix-v2'),
+				$saved_cash
+			);
+			$saved_cash = '';
+		}
+
+		if (empty($banks) && empty($cash_registers) && empty($errors)) {
+			$warnings[] = __('هیچ حساب بانکی یا صندوقی در حسابیکس برای این کسب‌وکار تعریف نشده است. برای ثبت دریافت فاکتور، ابتدا در حسابیکس بانک یا صندوق بسازید.', 'hesabix-v2');
+		}
+
+		$message = '';
+		if (!empty($errors)) {
+			$message = implode(' — ', $errors);
+		} elseif (!empty($warnings)) {
+			$message = implode(' — ', $warnings);
+		}
+
 		wp_send_json(array(
-			'success' => true,
+			'success' => empty($errors),
 			'warehouses' => $warehouses,
 			'banks' => $banks,
 			'cash_registers' => $cash_registers,
 			'currencies' => $currencies,
+			'errors' => $errors,
+			'warnings' => $warnings,
+			'cleared_defaults' => $cleared_defaults,
+			'saved_bank_id' => $saved_bank,
+			'saved_cash_register_id' => $saved_cash,
+			'message' => $message,
 		));
 	}
 
@@ -2433,6 +2889,32 @@ class Hesabix_V2_Admin
 		$result = Hesabix_V2_Stock_Pull_Service::execute_pull(array('source' => 'ajax'));
 
 		wp_send_json($result);
+	}
+
+	/**
+	 * AJAX: نمونه اختلاف موجودی WC و حسابیکس
+	 *
+	 * @since 4.8.0
+	 */
+	public function ajax_stock_conflicts()
+	{
+		check_ajax_referer('hesabix_v2_nonce', 'nonce');
+		$this->ajax_require_manage_wc();
+
+		if (!get_option('hesabix_v2_enabled')) {
+			wp_send_json(array(
+				'success' => false,
+				'message' => __('ابتدا اتصال به حسابیکس را تکمیل کنید.', 'hesabix-v2'),
+			));
+		}
+
+		$limit = 25;
+		if (class_exists('Hesabix_V2_Inventory_Policy')) {
+			$o = Hesabix_V2_Inventory_Policy::get_options();
+			$limit = isset($o['conflict_sample_limit']) ? (int) $o['conflict_sample_limit'] : 25;
+		}
+
+		wp_send_json(Hesabix_V2_Stock_Pull_Service::detect_conflicts($limit));
 	}
 
 	// ==================== Setup Wizard AJAX ====================

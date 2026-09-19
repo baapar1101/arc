@@ -40,6 +40,11 @@ if ($invoice_payment_destination !== 'cash_register') {
 }
 
 $stock_pull_opts = Hesabix_V2_Stock_Pull_Service::get_options();
+$inventory_policy = Hesabix_V2_Inventory_Policy::get_options();
+$inventory_status = Hesabix_V2_Inventory_Policy::status_summary();
+$stock_pull_last = isset($inventory_status['last_stock_pull']) && is_array($inventory_status['last_stock_pull'])
+	? $inventory_status['last_stock_pull']
+	: array();
 $inv_wh_cfg = Hesabix_V2_Invoice_Warehouse_Service::get_config();
 $inv_wh_saved_wids = array();
 for ($iwp = 0; $iwp < 12; $iwp++) {
@@ -157,6 +162,12 @@ $hsx_post = ini_get('post_max_size') ?: '';
 <div class="wrap hesabix-v2-wrap">
 	<h1><?php echo esc_html(get_admin_page_title()); ?></h1>
 
+	<?php
+	if (class_exists('Hesabix_V2_Marketplace_License')) {
+		Hesabix_V2_Marketplace_License::render_admin_notices('settings');
+	}
+	?>
+
 	<?php settings_errors('hesabix_v2_messages'); ?>
 
 	<form method="post" action="">
@@ -226,6 +237,7 @@ $hsx_post = ini_get('post_max_size') ?: '';
 			<a href="#" class="nav-tab nav-tab-active" role="tab" aria-selected="true" data-tab="connection"><?php esc_html_e('اتصال', 'hesabix-v2'); ?></a>
 			<a href="#" class="nav-tab" role="tab" aria-selected="false" data-tab="sync"><?php esc_html_e('همگام‌سازی', 'hesabix-v2'); ?></a>
 			<a href="#" class="nav-tab" role="tab" aria-selected="false" data-tab="invoice"><?php esc_html_e('فاکتور', 'hesabix-v2'); ?></a>
+			<a href="#" class="nav-tab" role="tab" aria-selected="false" data-tab="inventory"><?php esc_html_e('موجودی', 'hesabix-v2'); ?></a>
 			<a href="#" class="nav-tab" role="tab" aria-selected="false" data-tab="opening_inv"><?php esc_html_e('موجودی افتتاحیه', 'hesabix-v2'); ?></a>
 			<a href="#" class="nav-tab" role="tab" aria-selected="false" data-tab="extra"><?php esc_html_e('سایر', 'hesabix-v2'); ?></a>
 			<a href="#" class="nav-tab" role="tab" aria-selected="false" data-tab="update"><?php esc_html_e('به‌روزرسانی افزونه', 'hesabix-v2'); ?></a>
@@ -333,7 +345,11 @@ $hsx_post = ini_get('post_max_size') ?: '';
 						<input type="checkbox" name="auto_sync_products" value="1" <?php checked($sync_settings['auto_sync_products'] ?? false); ?>>
 						<?php _e('فعال', 'hesabix-v2'); ?>
 					</label>
+<<<<<<< HEAD
+					<p class="description"><?php _e('با ایجاد یا انتشار محصول جدید (وضعیت منتشرشده)، به‌طور خودکار به حسابیکس ارسال شود. پیش‌نویس و کپیِ منتشرنشده همگام نمی‌شوند.', 'hesabix-v2'); ?></p>
+=======
 					<p class="description"><?php _e('محصولات جدید به طور خودکار به مارک‌استریت ارسال شوند', 'hesabix-v2'); ?></p>
+>>>>>>> github/Huma
 				</td>
 			</tr>
 
@@ -344,11 +360,74 @@ $hsx_post = ini_get('post_max_size') ?: '';
 						<input type="checkbox" name="sync_on_product_update" value="1" <?php checked($sync_settings['sync_on_product_update'] ?? false); ?>>
 						<?php _e('فعال', 'hesabix-v2'); ?>
 					</label>
+					<p class="description"><?php _e('با فعال بودن، تغییرات محصولات منتشرشده طبق «سیاست به‌روزرسانی» زیر به حسابیکس اعمال می‌شود. ذخیرهٔ پیش‌نویس همگام نمی‌شود.', 'hesabix-v2'); ?></p>
 				</td>
 			</tr>
 
 			<tr>
+<<<<<<< HEAD
+				<th scope="row"><?php _e('سیاست به‌روزرسانی محصول از ووکامرس', 'hesabix-v2'); ?></th>
+				<td>
+					<?php
+					$product_sync_preset = isset($sync_settings['product_sync_preset'])
+						? (string) $sync_settings['product_sync_preset']
+						: Hesabix_V2_Product_Sync_Payload::PRESET_ACCOUNTING;
+					?>
+					<select name="product_sync_preset" id="hesabix_v2_product_sync_preset" class="regular-text">
+						<option value="<?php echo esc_attr(Hesabix_V2_Product_Sync_Payload::PRESET_IMPORT_ONLY); ?>" <?php selected($product_sync_preset, Hesabix_V2_Product_Sync_Payload::PRESET_IMPORT_ONLY); ?>>
+							<?php esc_html_e('فقط ایمپورت اولیه (به‌روزرسانی خودکار هیچ فیلدی)', 'hesabix-v2'); ?>
+						</option>
+						<option value="<?php echo esc_attr(Hesabix_V2_Product_Sync_Payload::PRESET_ACCOUNTING); ?>" <?php selected($product_sync_preset, Hesabix_V2_Product_Sync_Payload::PRESET_ACCOUNTING); ?>>
+							<?php esc_html_e('حسابداری‌محور (پیشنهادی — نام از فروشگاه؛ حفظ قیمت خرید و داده‌های مالی)', 'hesabix-v2'); ?>
+						</option>
+						<option value="<?php echo esc_attr(Hesabix_V2_Product_Sync_Payload::PRESET_LIVE_STORE); ?>" <?php selected($product_sync_preset, Hesabix_V2_Product_Sync_Payload::PRESET_LIVE_STORE); ?>>
+							<?php esc_html_e('فروشگاه زنده (نام، قیمت، دسته و … از ووکامرس)', 'hesabix-v2'); ?>
+						</option>
+						<option value="<?php echo esc_attr(Hesabix_V2_Product_Sync_Payload::PRESET_ADVANCED); ?>" <?php selected($product_sync_preset, Hesabix_V2_Product_Sync_Payload::PRESET_ADVANCED); ?>>
+							<?php esc_html_e('پیشرفته (انتخاب فیلد به فیلد)', 'hesabix-v2'); ?>
+						</option>
+					</select>
+					<p class="description"><?php esc_html_e('در ایجاد اولیه (معمولاً هنگام انتشار)، اطلاعات پایه از ووکامرس ساخته می‌شود. در به‌روزرسانی‌های بعدی فقط فیلدهای مجاز این سیاست ارسال می‌شوند. در حالت حسابداری‌محور نام محصول از ووکامرس همگام می‌شود؛ قیمت خرید و داده‌های حسابداری هرگز از ووکامرس بازنویسی نمی‌شوند.', 'hesabix-v2'); ?></p>
+				</td>
+			</tr>
+
+			<tbody id="hesabix-v2-product-sync-field-rows">
+			<tr class="hesabix-v2-product-sync-advanced-only">
+				<th scope="row"><?php _e('همگام‌سازی نام محصول', 'hesabix-v2'); ?></th>
+				<td>
+					<label>
+						<input type="checkbox" name="sync_product_name" value="1" <?php checked(!empty($sync_settings['sync_product_name'])); ?>>
+						<?php _e('فعال', 'hesabix-v2'); ?>
+					</label>
+				</td>
+			</tr>
+
+			<tr class="hesabix-v2-product-sync-advanced-only">
+				<th scope="row"><?php _e('همگام‌سازی توضیحات محصول', 'hesabix-v2'); ?></th>
+				<td>
+					<label>
+						<input type="checkbox" name="sync_product_description" value="1" <?php checked(!empty($sync_settings['sync_product_description'])); ?>>
+						<?php _e('فعال', 'hesabix-v2'); ?>
+					</label>
+					<p class="description"><?php esc_html_e('فقط وقتی در ووکامرس توضیح داشته باشد ارسال می‌شود.', 'hesabix-v2'); ?></p>
+				</td>
+			</tr>
+
+			<tr class="hesabix-v2-product-sync-advanced-only">
+				<th scope="row"><?php _e('همگام‌سازی بارکد/SKU', 'hesabix-v2'); ?></th>
+				<td>
+					<label>
+						<input type="checkbox" name="sync_product_barcode" value="1" <?php checked(!empty($sync_settings['sync_product_barcode'])); ?>>
+						<?php _e('فعال', 'hesabix-v2'); ?>
+					</label>
+				</td>
+			</tr>
+
+			<tr class="hesabix-v2-product-sync-field-row">
+				<th scope="row"><?php _e('همگام‌سازی دستهٔ محصول با حسابیکس', 'hesabix-v2'); ?></th>
+=======
 				<th scope="row"><?php _e('همگام‌سازی دستهٔ محصول با مارک‌استریت', 'hesabix-v2'); ?></th>
+>>>>>>> github/Huma
 				<td>
 					<label>
 						<input type="checkbox" name="sync_product_categories" value="1" <?php checked(!isset($sync_settings['sync_product_categories']) || !empty($sync_settings['sync_product_categories'])); ?>>
@@ -369,28 +448,37 @@ $hsx_post = ini_get('post_max_size') ?: '';
 				</td>
 			</tr>
 
-			<tr>
-				<th scope="row"><?php _e('همگام‌سازی قیمت محصول', 'hesabix-v2'); ?></th>
+			<tr class="hesabix-v2-product-sync-field-row">
+				<th scope="row"><?php _e('همگام‌سازی قیمت فروش محصول', 'hesabix-v2'); ?></th>
 				<td>
 					<label>
 						<input type="checkbox" name="sync_product_price" value="1" <?php checked($sync_settings['sync_product_price'] ?? false); ?>>
 						<?php _e('فعال', 'hesabix-v2'); ?>
 					</label>
+					<p class="description"><?php esc_html_e('فقط قیمت فروش از ووکامرس؛ قیمت خرید حسابیکس هرگز از ووکامرس تغییر نمی‌کند.', 'hesabix-v2'); ?></p>
 				</td>
 			</tr>
 
-			<tr>
-				<th scope="row"><?php _e('همگام‌سازی موجودی محصول', 'hesabix-v2'); ?></th>
+			<tr class="hesabix-v2-product-sync-field-row">
+				<th scope="row"><?php _e('ردیابی موجودی در حسابیکس', 'hesabix-v2'); ?></th>
 				<td>
 					<label>
 						<input type="checkbox" name="sync_product_stock" value="1" <?php checked($sync_settings['sync_product_stock'] ?? false); ?>>
-						<?php _e('فعال', 'hesabix-v2'); ?>
+						<?php _e('فعال کردن پرچم «کنترل موجودی» روی کالا در حسابیکس', 'hesabix-v2'); ?>
 					</label>
+					<p class="description">
+						<?php esc_html_e('این گزینه عدد موجودی را منتقل نمی‌کند؛ فقط مشخص می‌کند کالا در حسابیکس ردیابی شود یا نه. برای عدد موجودی به تب «موجودی» و «موجودی افتتاحیه» مراجعه کنید.', 'hesabix-v2'); ?>
+					</p>
 				</td>
 			</tr>
 
+<<<<<<< HEAD
+			<tr class="hesabix-v2-product-sync-field-row">
+				<th scope="row"><?php _e('سیاست پرچم کنترل موجودی', 'hesabix-v2'); ?></th>
+=======
 			<tr>
 				<th scope="row"><?php _e('کنترل موجودی مارک‌استریت نسبت به ووکامرس', 'hesabix-v2'); ?></th>
+>>>>>>> github/Huma
 				<td>
 					<select name="track_inventory_policy" id="hesabix_v2_track_inventory_policy" class="regular-text">
 						<option value="wc" <?php selected(($sync_settings['track_inventory_policy'] ?? 'wc'), 'wc'); ?>>
@@ -406,9 +494,14 @@ $hsx_post = ini_get('post_max_size') ?: '';
 							<?php _e('همیشه خاموش', 'hesabix-v2'); ?>
 						</option>
 					</select>
+<<<<<<< HEAD
+					<p class="description"><?php _e('فقط هنگامی که گزینهٔ بالا فعال است اعمال می‌شود؛ در صورت غیرفعال بودن آن، کنترل موجودی در حسابیکس در همگام‌سازی خاموش می‌ماند.', 'hesabix-v2'); ?></p>
+=======
 					<p class="description"><?php _e('فقط هنگامی که «همگام‌سازی موجودی محصول» فعال است اعمال می‌شود؛ در صورت غیرفعال بودن آن، کنترل موجودی در مارک‌استریت در همگام‌سازی خاموش می‌ماند.', 'hesabix-v2'); ?></p>
+>>>>>>> github/Huma
 				</td>
 			</tr>
+			</tbody>
 
 			<tr>
 				<th scope="row"><?php _e('همگام‌سازی خودکار مشتریان', 'hesabix-v2'); ?></th>
@@ -835,10 +928,31 @@ $hsx_post = ini_get('post_max_size') ?: '';
 						<input type="checkbox" name="stock_pull_disable_wc_reduce" value="1" <?php checked(!empty($stock_pull_opts['disable_wc_stock_reduction'])); ?>>
 						<?php _e('کاهش خودکار موجودی ووکامرس هنگام سفارش را غیرفعال کن تا با خروج انبار مارک‌استریت تداخل نداشته باشد؛ بعد از هر سفارش تا اجرای «کشش موجودی» ممکن است عدد ویترین عقب بمانَد.', 'hesabix-v2'); ?>
 					</label>
+					<label style="display:block;margin:10px 0;">
+						<input type="checkbox" name="stock_pull_skip_zero_overwrite" value="1" <?php checked(!empty($stock_pull_opts['skip_zero_overwrite'])); ?>>
+						<?php _e('اگر حسابیکس موجودی ۰ گزارش کند ولی فروشگاه عدد مثبت دارد، موجودی ووکامرس را صفر نکن (محافظ overwrite صفر).', 'hesabix-v2'); ?>
+					</label>
+					<p class="description" style="margin-bottom:8px;">
+						<?php esc_html_e('دکمهٔ «اجرا هم‌اکنون» حتی وقتی Cron خاموش است کار می‌کند. برای همگام‌سازی خودکار پس از فاکتور خرید، منبع حقیقت را «حسابیکس» بگذارید و «پذیرش پوش از حسابیکس» را در تب موجودی فعال کنید.', 'hesabix-v2'); ?>
+					</p>
 					<p>
 						<button type="button" class="button" id="hesabix_v2_stock_pull_now_btn"><?php _e('اجرا هم‌اکنون', 'hesabix-v2'); ?></button>
 						<span id="hesabix_v2_stock_pull_now_status" class="description" style="margin-right:12px;"></span>
 					</p>
+					<?php if (!empty($stock_pull_last['at'])) : ?>
+						<p class="description">
+							<?php
+							echo esc_html(
+								sprintf(
+									/* translators: 1: datetime, 2: message */
+									__('آخرین کشش: %1$s — %2$s', 'hesabix-v2'),
+									(string) $stock_pull_last['at'],
+									(string) ($stock_pull_last['message'] ?? '')
+								)
+							);
+							?>
+						</p>
+					<?php endif; ?>
 				</td>
 			</tr>
 			<tr>
@@ -1079,70 +1193,86 @@ $hsx_post = ini_get('post_max_size') ?: '';
 					$btn.prop('disabled', true);
 				}
 				if (!isAuto) {
-					$status.text('<?php echo esc_js(__('در حال بارگذاری...', 'hesabix-v2')); ?>');
+					$status.text('<?php echo esc_js(__('در حال بارگذاری...', 'hesabix-v2')); ?>').css('color', '');
 				}
 				$.post(hesabix_v2_ajax.ajax_url, {
 					action: 'hesabix_v2_get_warehouses_and_banks',
 					nonce: hesabix_v2_ajax.nonce
 				}).done(function(res){
-					if (res.success) {
-						var $wh = $('#hesabix_v2_default_warehouse_id');
-						$wh.find('option:not(:first)').remove();
-						(res.warehouses || []).forEach(function(w){
-							$wh.append($('<option></option>').val(String(w.id)).text((w.code ? w.code + ' - ' : '') + w.name));
-						});
-						if (savedWarehouse !== '') {
-							$wh.val(String(savedWarehouse));
-						}
-						var $spwh = $('#hesabix_v2_stock_pull_wh_select');
-						if ($spwh.length) {
-							$spwh.empty();
-							(res.warehouses || []).forEach(function(w){
-								var label = (w.code ? w.code + ' - ' : '') + w.name;
-								$spwh.append($('<option></option>').val(String(w.id)).text(label));
-							});
-							if (savedStockPullWhIds && savedStockPullWhIds.length) {
-								savedStockPullWhIds.forEach(function(id){
-									$spwh.find('option[value="' + String(id) + '"]').prop('selected', true);
-								});
-							}
-						}
-						hesabixV2FillInvoiceWarehouseRuleSelects(res.warehouses || []);
+					if (!res) {
+						$status.text('<?php echo esc_js(__('خطا در بارگذاری', 'hesabix-v2')); ?>').css('color', 'red');
+						return;
+					}
+					if (typeof res.saved_bank_id !== 'undefined') {
+						savedBank = String(res.saved_bank_id || '');
+					}
+					if (typeof res.saved_cash_register_id !== 'undefined') {
+						savedCashRegister = String(res.saved_cash_register_id || '');
+					}
 
-						var $bank = $('#hesabix_v2_default_bank_id');
-						$bank.find('option:not(:first)').remove();
-						(res.banks || []).forEach(function(b){
-							$bank.append($('<option></option>').val(String(b.id)).text((b.code ? b.code + ' - ' : '') + b.name));
+					var $wh = $('#hesabix_v2_default_warehouse_id');
+					$wh.find('option:not(:first)').remove();
+					(res.warehouses || []).forEach(function(w){
+						$wh.append($('<option></option>').val(String(w.id)).text((w.code ? w.code + ' - ' : '') + w.name));
+					});
+					if (savedWarehouse !== '') {
+						$wh.val(String(savedWarehouse));
+					}
+					var $spwh = $('#hesabix_v2_stock_pull_wh_select');
+					if ($spwh.length) {
+						$spwh.empty();
+						(res.warehouses || []).forEach(function(w){
+							var label = (w.code ? w.code + ' - ' : '') + w.name;
+							$spwh.append($('<option></option>').val(String(w.id)).text(label));
 						});
-						if (savedBank !== '') {
-							$bank.val(String(savedBank));
+						if (savedStockPullWhIds && savedStockPullWhIds.length) {
+							savedStockPullWhIds.forEach(function(id){
+								$spwh.find('option[value="' + String(id) + '"]').prop('selected', true);
+							});
 						}
-						var $cash = $('#hesabix_v2_default_cash_register_id');
-						$cash.find('option:not(:first)').remove();
-						(res.cash_registers || []).forEach(function(c){
-							$cash.append($('<option></option>').val(String(c.id)).text((c.code ? c.code + ' - ' : '') + c.name));
-						});
-						if (savedCashRegister !== '') {
-							$cash.val(String(savedCashRegister));
+					}
+					hesabixV2FillInvoiceWarehouseRuleSelects(res.warehouses || []);
+
+					var $bank = $('#hesabix_v2_default_bank_id');
+					$bank.find('option:not(:first)').remove();
+					(res.banks || []).forEach(function(b){
+						$bank.append($('<option></option>').val(String(b.id)).text((b.code ? b.code + ' - ' : '') + b.name));
+					});
+					if (savedBank !== '') {
+						$bank.val(String(savedBank));
+					}
+					var $cash = $('#hesabix_v2_default_cash_register_id');
+					$cash.find('option:not(:first)').remove();
+					(res.cash_registers || []).forEach(function(c){
+						$cash.append($('<option></option>').val(String(c.id)).text((c.code ? c.code + ' - ' : '') + c.name));
+					});
+					if (savedCashRegister !== '') {
+						$cash.val(String(savedCashRegister));
+					}
+					var $cur = $('#hesabix_v2_currency_id');
+					var $keep = $cur.find('option[value="0"]');
+					$cur.find('option').not($keep).remove();
+					(res.currencies || []).forEach(function(c){
+						var label = (c.code ? c.code + ' — ' : '') + (c.title || '');
+						if (c.is_default) {
+							label += ' <?php echo esc_js(__('(پیش‌فرض کسب‌وکار)', 'hesabix-v2')); ?>';
 						}
-						var $cur = $('#hesabix_v2_currency_id');
-						var $keep = $cur.find('option[value="0"]');
-						$cur.find('option').not($keep).remove();
-						(res.currencies || []).forEach(function(c){
-							var label = (c.code ? c.code + ' — ' : '') + (c.title || '');
-							if (c.is_default) {
-								label += ' <?php echo esc_js(__('(پیش‌فرض کسب‌وکار)', 'hesabix-v2')); ?>';
-							}
-							$cur.append($('<option></option>').val(String(c.id)).text(label));
-						});
-						if (savedCurrency !== '' && savedCurrency !== '0') {
-							$cur.val(String(savedCurrency));
-						}
-						if (!isAuto) {
-							$status.text('<?php echo esc_js(__('بارگذاری شد.', 'hesabix-v2')); ?>').css('color', 'green');
-						}
+						$cur.append($('<option></option>').val(String(c.id)).text(label));
+					});
+					if (savedCurrency !== '' && savedCurrency !== '0') {
+						$cur.val(String(savedCurrency));
+					}
+
+					var warnMsg = (res.warnings && res.warnings.length) ? res.warnings.join(' — ') : '';
+					var errMsg = (res.errors && res.errors.length) ? res.errors.join(' — ') : (res.message || '');
+					if (!res.success) {
+						$status.text(errMsg || '<?php echo esc_js(__('خطا در بارگذاری', 'hesabix-v2')); ?>').css('color', 'red');
+					} else if (warnMsg) {
+						$status.text(warnMsg).css('color', '#b32d2e');
+					} else if (!isAuto) {
+						$status.text('<?php echo esc_js(__('بارگذاری شد.', 'hesabix-v2')); ?>').css('color', 'green');
 					} else {
-						$status.text(res.message || '<?php echo esc_js(__('خطا در بارگذاری', 'hesabix-v2')); ?>').css('color', 'red');
+						$status.text('').css('color', '');
 					}
 				}).fail(function(){
 					$status.text('<?php echo esc_js(__('خطا در ارتباط با سرور', 'hesabix-v2')); ?>').css('color', 'red');
@@ -1174,6 +1304,31 @@ $hsx_post = ini_get('post_max_size') ?: '';
 				}).done(function(res){
 					if (res && res.success) {
 						$st.text(res.message || '<?php echo esc_js(__('انجام شد.', 'hesabix-v2')); ?>').css('color', 'green');
+					} else {
+						$st.text((res && res.message) ? res.message : '<?php echo esc_js(__('خطا', 'hesabix-v2')); ?>').css('color', 'red');
+					}
+				}).fail(function(){
+					$st.text('<?php echo esc_js(__('خطا در ارتباط با سرور', 'hesabix-v2')); ?>').css('color', 'red');
+				}).always(function(){
+					$btn.prop('disabled', false);
+				});
+			});
+
+			$('#hesabix_v2_stock_conflict_btn').on('click', function(){
+				var $btn = $(this);
+				var $st = $('#hesabix_v2_stock_conflict_status');
+				var $out = $('#hesabix_v2_stock_conflict_out');
+				$btn.prop('disabled', true);
+				$st.text('<?php echo esc_js(__('در حال مقایسه...', 'hesabix-v2')); ?>').css('color', '');
+				$out.hide().text('');
+				$.post(hesabix_v2_ajax.ajax_url, {
+					action: 'hesabix_v2_stock_conflicts',
+					nonce: hesabix_v2_ajax.nonce
+				}).done(function(res){
+					if (res && res.success) {
+						var n = (res.conflict_count != null) ? res.conflict_count : ((res.items && res.items.length) || 0);
+						$st.text('<?php echo esc_js(__('اختلاف‌ها:', 'hesabix-v2')); ?> ' + n).css('color', n ? '#b32d2e' : 'green');
+						$out.show().text(JSON.stringify(res.items || [], null, 2));
 					} else {
 						$st.text((res && res.message) ? res.message : '<?php echo esc_js(__('خطا', 'hesabix-v2')); ?>').css('color', 'red');
 					}
@@ -1298,6 +1453,113 @@ $hsx_post = ini_get('post_max_size') ?: '';
 			$('#hesabix_v2_load_invoice_tags').on('click', function(){ hesabixV2LoadInvoiceTags(false); });
 		})(jQuery);
 		</script>
+		</div>
+
+		<div class="hesabix-v2-tab-panel" data-tab="inventory" hidden>
+			<input type="hidden" name="hesabix_v2_inventory_policy_fields" value="1" />
+			<h2><?php esc_html_e('سیاست موجودی (منبع حقیقت)', 'hesabix-v2'); ?></h2>
+			<p class="description">
+				<?php esc_html_e('عدد موجودی در همگام‌سازی محصول منتقل نمی‌شود. ابتدا مشخص کنید کدام سیستم مرجع است تا از دوبار شمردن جلوگیری شود.', 'hesabix-v2'); ?>
+			</p>
+			<table class="form-table">
+				<tr>
+					<th scope="row"><?php esc_html_e('منبع حقیقت موجودی', 'hesabix-v2'); ?></th>
+					<td>
+						<label style="display:block;margin-bottom:8px;">
+							<input type="radio" name="inventory_source_of_truth" value="hesabix" <?php checked($inventory_policy['source_of_truth'], 'hesabix'); ?>>
+							<strong><?php esc_html_e('حسابیکس (پیشنهادی برای فروشگاه متصل به حسابداری)', 'hesabix-v2'); ?></strong>
+						</label>
+						<p class="description" style="margin:0 0 12px 1.5em;">
+							<?php esc_html_e('فاکتور خرید/حواله انبار موجودی را در حسابیکس تغییر می‌دهد؛ سپس با کشش موجودی (Cron یا پوش خودکار) به ووکامرس منتقل می‌شود. موجودی دستی در ووکامرس به حسابیکس برنمی‌گردد.', 'hesabix-v2'); ?>
+						</p>
+						<label style="display:block;margin-bottom:8px;">
+							<input type="radio" name="inventory_source_of_truth" value="woocommerce" <?php checked($inventory_policy['source_of_truth'], 'woocommerce'); ?>>
+							<strong><?php esc_html_e('ووکامرس', 'hesabix-v2'); ?></strong>
+						</label>
+						<p class="description" style="margin:0 0 12px 1.5em;">
+							<?php esc_html_e('تغییر عدد موجودی در ووکامرس یک حواله تعدیل در حسابیکس می‌سازد تا عددها هم‌تراز شوند. کشش از حسابیکس به‌صورت خودکار اعمال نمی‌شود.', 'hesabix-v2'); ?>
+						</p>
+						<label style="display:block;margin-bottom:8px;">
+							<input type="radio" name="inventory_source_of_truth" value="manual" <?php checked($inventory_policy['source_of_truth'], 'manual'); ?>>
+							<strong><?php esc_html_e('دستی / بدون همگام‌سازی عددی خودکار', 'hesabix-v2'); ?></strong>
+						</label>
+						<p class="description" style="margin:0 0 0 1.5em;">
+							<?php esc_html_e('فقط موجودی افتتاحیه و عملیات دستی. برای جلوگیری از سردرگمی تا وقتی workflow مشخص نشده.', 'hesabix-v2'); ?>
+						</p>
+					</td>
+				</tr>
+				<tr>
+					<th scope="row"><?php esc_html_e('ارسال عدد از ووکامرس به حسابیکس', 'hesabix-v2'); ?></th>
+					<td>
+						<label>
+							<input type="checkbox" name="push_wc_qty_to_hesabix" value="1" <?php checked(!empty($inventory_policy['push_wc_qty_to_hesabix'])); ?>>
+							<?php esc_html_e('با تغییر موجودی در ووکامرس، حواله تعدیل در حسابیکس ثبت شود', 'hesabix-v2'); ?>
+						</label>
+						<p class="description">
+							<?php esc_html_e('فقط وقتی منبع حقیقت «ووکامرس» است اثر دارد. نیاز به انبار پیش‌فرض و دسترسی inventory.write روی کلید API دارد. اگر قبلاً موجودی افتتاحیه زده‌اید، این گزینه را فقط با آگاهی از ریسک دوبار شمردن فعال کنید.', 'hesabix-v2'); ?>
+						</p>
+						<?php if (!empty($ob_inv_done) && !empty($inventory_policy['push_wc_qty_to_hesabix'])) : ?>
+							<div class="notice notice-warning inline"><p>
+								<?php esc_html_e('هشدار: موجودی افتتاحیه قبلاً تکمیل شده و ارسال عددی از ووکامرس نیز فعال است — مراقب دوبار شمردن باشید.', 'hesabix-v2'); ?>
+							</p></div>
+						<?php endif; ?>
+					</td>
+				</tr>
+				<tr>
+					<th scope="row"><?php esc_html_e('پذیرش پوش موجودی از حسابیکس', 'hesabix-v2'); ?></th>
+					<td>
+						<label>
+							<input type="checkbox" name="accept_remote_stock_push" value="1" <?php checked(!empty($inventory_policy['accept_remote_stock_push'])); ?>>
+							<?php esc_html_e('پس از قطعی شدن حواله انبار در حسابیکس، موجودی فروشگاه به‌صورت خودکار به‌روز شود', 'hesabix-v2'); ?>
+						</label>
+						<p class="description">
+							<?php esc_html_e('فقط وقتی منبع حقیقت «حسابیکس» است. نیاز به پیکربندی پل (Store URL + Bridge Token) در پنل حسابیکس دارد.', 'hesabix-v2'); ?>
+						</p>
+					</td>
+				</tr>
+			</table>
+
+			<h2><?php esc_html_e('وضعیت و توصیه‌ها', 'hesabix-v2'); ?></h2>
+			<?php
+			$rec = isset($inventory_status['recommended']) && is_array($inventory_status['recommended']) ? $inventory_status['recommended'] : array();
+			$warns = isset($inventory_status['warnings']) && is_array($inventory_status['warnings']) ? $inventory_status['warnings'] : array();
+			?>
+			<ul style="list-style:disc;padding-right:1.5em;">
+				<?php foreach ($rec as $rk => $rok) : ?>
+					<li>
+						<?php echo !empty($rok) ? '✅' : '⚠️'; ?>
+						<code><?php echo esc_html((string) $rk); ?></code>
+						—
+						<?php echo !empty($rok) ? esc_html__('انجام شده', 'hesabix-v2') : esc_html__('نیاز به اقدام', 'hesabix-v2'); ?>
+					</li>
+				<?php endforeach; ?>
+			</ul>
+			<?php if (!empty($warns)) : ?>
+				<div class="notice notice-warning inline"><p>
+					<?php esc_html_e('هشدارهای پیکربندی:', 'hesabix-v2'); ?>
+					<?php echo esc_html(implode(', ', $warns)); ?>
+				</p></div>
+			<?php endif; ?>
+
+			<p>
+				<button type="button" class="button" id="hesabix_v2_stock_conflict_btn"><?php esc_html_e('بررسی اختلاف موجودی (نمونه)', 'hesabix-v2'); ?></button>
+				<span id="hesabix_v2_stock_conflict_status" class="description" style="margin-right:12px;"></span>
+			</p>
+			<pre id="hesabix_v2_stock_conflict_out" style="display:none;max-height:240px;overflow:auto;background:#f6f7f7;padding:10px;direction:ltr;text-align:left;"></pre>
+
+			<h2><?php esc_html_e('سوالات متداول موجودی', 'hesabix-v2'); ?></h2>
+			<details open>
+				<summary><strong><?php esc_html_e('چرا در ووکامرس ۵ زدم ولی در حسابیکس صفر است؟', 'hesabix-v2'); ?></strong></summary>
+				<p><?php esc_html_e('چون همگام‌سازی محصول فقط پرچم ردیابی را می‌فرستد، نه عدد. برای ثبت اولیه از تب «موجودی افتتاحیه» استفاده کنید، یا فاکتور خرید/رسید انبار در حسابیکس بزنید.', 'hesabix-v2'); ?></p>
+			</details>
+			<details>
+				<summary><strong><?php esc_html_e('چرا فاکتور خرید موجودی سایت را عوض نمی‌کند؟', 'hesabix-v2'); ?></strong></summary>
+				<p><?php esc_html_e('به‌صورت پیش‌فرض فقط موجودی داخل حسابیکس عوض می‌شود. منبع حقیقت را «حسابیکس» بگذارید، پذیرش پوش را فعال کنید (یا Cron کشش موجودی در تب فاکتور)، سپس «اجرا هم‌اکنون» را بزنید.', 'hesabix-v2'); ?></p>
+			</details>
+			<details>
+				<summary><strong><?php esc_html_e('چطور از دوبار شمردن جلوگیری کنم؟', 'hesabix-v2'); ?></strong></summary>
+				<p><?php esc_html_e('یک منبع حقیقت انتخاب کنید. اگر حسابیکس مرجع است: موجودی افتتاحیه را فقط یک‌بار بزنید، بعد از آن عدد را از ووکامرس دوباره نفرستید، کاهش موجودی سفارش ووکامرس را خاموش کنید و فقط از کشش/پوش حسابیکس استفاده کنید.', 'hesabix-v2'); ?></p>
+			</details>
 		</div>
 
 		<div class="hesabix-v2-tab-panel" data-tab="opening_inv" hidden>

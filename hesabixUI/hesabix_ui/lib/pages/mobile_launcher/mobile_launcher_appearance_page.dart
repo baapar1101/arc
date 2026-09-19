@@ -6,7 +6,7 @@ import '../../core/auth_store.dart';
 import '../../core/mobile_launcher_prefs.dart';
 import '../../utils/snackbar_helper.dart';
 
-/// پیش‌تنظیم‌های رنگ پس‌زمینهٔ لانچر (بدون وابستگی به پکیج خارجی).
+/// تنظیمات ظاهر لانچر موبایل (رنگ پس‌زمینه و تراکم کاشی‌ها).
 class MobileLauncherAppearancePage extends StatefulWidget {
   const MobileLauncherAppearancePage({
     super.key,
@@ -18,12 +18,13 @@ class MobileLauncherAppearancePage extends StatefulWidget {
   final AuthStore authStore;
 
   static const List<int> presetArgb = [
+    0xFF0F4C81, // classic blue
+    0xFF00A8BD, // turquoise sea
+    0xFF0F766E, // emerald forest
+    0xFFB45309, // warm copper
     0xFF1565C0,
     0xFF283593,
-    0xFF00695C,
     0xFF2E7D32,
-    0xFF6A1B9A,
-    0xFF4527A0,
     0xFFC62828,
     0xFF37474F,
     0xFF263238,
@@ -33,50 +34,46 @@ class MobileLauncherAppearancePage extends StatefulWidget {
   ];
 
   @override
-  State<MobileLauncherAppearancePage> createState() => _MobileLauncherAppearancePageState();
+  State<MobileLauncherAppearancePage> createState() =>
+      _MobileLauncherAppearancePageState();
 }
 
-class _MobileLauncherAppearancePageState extends State<MobileLauncherAppearancePage> {
-  late Future<int> _initialArgb;
+class _MobileLauncherAppearancePageState
+    extends State<MobileLauncherAppearancePage> {
+  late Future<void> _loadFuture;
   int _selectedArgb = MobileLauncherPrefs.defaultBackgroundArgb;
   int _selectedColumns = MobileLauncherPrefs.defaultGridColumns;
-  int _selectedRows = MobileLauncherPrefs.defaultGridRows;
-  static const List<(int, int)> _quickLayouts = [
-    (2, 3),
-    (3, 4),
-    (4, 3),
-    (4, 4),
-  ];
 
   @override
   void initState() {
     super.initState();
-    _initialArgb = MobileLauncherPrefs.backgroundColorArgb(
-      widget.authStore.currentUserId,
-    );
-    _initialArgb.then((v) {
-      if (mounted) setState(() => _selectedArgb = v);
-    });
-    MobileLauncherPrefs.gridColumns(widget.authStore.currentUserId).then((v) {
-      if (mounted) setState(() => _selectedColumns = v);
-    });
-    MobileLauncherPrefs.gridRows(widget.authStore.currentUserId).then((v) {
-      if (mounted) setState(() => _selectedRows = v);
+    _loadFuture = _load();
+  }
+
+  Future<void> _load() async {
+    final uid = widget.authStore.currentUserId;
+    final bg = await MobileLauncherPrefs.backgroundColorArgb(uid);
+    final cols = await MobileLauncherPrefs.gridColumns(uid);
+    if (!mounted) return;
+    setState(() {
+      _selectedArgb = bg;
+      _selectedColumns = cols.clamp(2, 3);
     });
   }
 
   Future<void> _save() async {
-    await MobileLauncherPrefs.setBackgroundColorArgb(
-      widget.authStore.currentUserId,
-      _selectedArgb,
-    );
+    final uid = widget.authStore.currentUserId;
+    await MobileLauncherPrefs.setBackgroundColorArgb(uid, _selectedArgb);
     await MobileLauncherPrefs.setGridLayout(
-      widget.authStore.currentUserId,
+      uid,
       columns: _selectedColumns,
-      rows: _selectedRows,
+      rows: MobileLauncherPrefs.defaultGridRows,
     );
     if (!mounted) return;
-    SnackBarHelper.show(context, message: AppLocalizations.of(context).mobileLauncherColorsSaved);
+    SnackBarHelper.show(
+      context,
+      message: AppLocalizations.of(context).mobileLauncherColorsSaved,
+    );
     context.pop();
   }
 
@@ -86,23 +83,42 @@ class _MobileLauncherAppearancePageState extends State<MobileLauncherAppearanceP
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
     final cs = Theme.of(context).colorScheme;
+    final bg = Color(_selectedArgb);
+    final light = _isLight(bg);
+    final onBg = light ? Colors.black87 : Colors.white;
 
     return Scaffold(
       appBar: AppBar(
         title: Text(t.mobileLauncherAppearancePageTitle),
       ),
-      body: FutureBuilder<int>(
-        future: _initialArgb,
+      body: FutureBuilder<void>(
+        future: _loadFuture,
         builder: (context, snap) {
-          if (!snap.hasData && snap.connectionState != ConnectionState.done) {
+          if (snap.connectionState != ConnectionState.done) {
             return const Center(child: CircularProgressIndicator());
           }
           return ListView(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
             children: [
               Text(
+                t.mobileLauncherLivePreview,
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
+              ),
+              const SizedBox(height: 10),
+              _LauncherLookPreview(
+                background: bg,
+                columns: _selectedColumns,
+                onBg: onBg,
+                light: light,
+              ),
+              const SizedBox(height: 28),
+              Text(
                 t.mobileLauncherBackgroundColorSection,
-                style: Theme.of(context).textTheme.titleMedium,
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
               ),
               const SizedBox(height: 12),
               Wrap(
@@ -117,72 +133,44 @@ class _MobileLauncherAppearancePageState extends State<MobileLauncherAppearanceP
                     ),
                 ],
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 28),
               Text(
-                t.mobileLauncherGridLayoutSection,
-                style: Theme.of(context).textTheme.titleMedium,
-              ),
-              const SizedBox(height: 10),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  for (final layout in _quickLayouts)
-                    ChoiceChip(
-                      label: Text('${layout.$1}×${layout.$2}'),
-                      selected: _selectedColumns == layout.$1 && _selectedRows == layout.$2,
-                      onSelected: (_) {
-                        setState(() {
-                          _selectedColumns = layout.$1;
-                          _selectedRows = layout.$2;
-                        });
-                      },
+                t.mobileLauncherTileDensitySection,
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w700,
                     ),
-                ],
+              ),
+              const SizedBox(height: 6),
+              Text(
+                t.mobileLauncherTileDensityHint,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: cs.onSurfaceVariant,
+                    ),
               ),
               const SizedBox(height: 12),
-              _CountPicker(
-                title: t.mobileLauncherGridColumns,
-                value: _selectedColumns,
-                min: 2,
-                max: 6,
-                onChanged: (v) => setState(() => _selectedColumns = v),
+              SegmentedButton<int>(
+                segments: [
+                  ButtonSegment(
+                    value: 2,
+                    label: Text(t.mobileLauncherDensityComfortable),
+                    icon: const Icon(Icons.grid_view_rounded, size: 18),
+                  ),
+                  ButtonSegment(
+                    value: 3,
+                    label: Text(t.mobileLauncherDensityCompact),
+                    icon: const Icon(Icons.apps_rounded, size: 18),
+                  ),
+                ],
+                selected: {_selectedColumns},
+                onSelectionChanged: (s) {
+                  setState(() => _selectedColumns = s.first);
+                },
               ),
-              const SizedBox(height: 8),
-              _CountPicker(
-                title: t.mobileLauncherGridRows,
-                value: _selectedRows,
-                min: 2,
-                max: 6,
-                onChanged: (v) => setState(() => _selectedRows = v),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                '${t.mobileLauncherGridPreview}: $_selectedColumns × $_selectedRows',
-                style: Theme.of(context).textTheme.bodyMedium,
-              ),
-              const SizedBox(height: 28),
+              const SizedBox(height: 32),
               FilledButton.icon(
                 onPressed: _save,
-                icon: const Icon(Icons.save_outlined),
+                icon: const Icon(Icons.check_rounded),
                 label: Text(t.mobileLauncherSaveColors),
-              ),
-              const SizedBox(height: 8),
-              Container(
-                height: 120,
-                decoration: BoxDecoration(
-                  color: Color(_selectedArgb),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: cs.outlineVariant),
-                ),
-                alignment: Alignment.center,
-                child: Icon(
-                  Icons.touch_app_outlined,
-                  size: 48,
-                  color: _isLight(Color(_selectedArgb))
-                      ? Colors.black87
-                      : Colors.white,
-                ),
               ),
             ],
           );
@@ -192,44 +180,117 @@ class _MobileLauncherAppearancePageState extends State<MobileLauncherAppearanceP
   }
 }
 
-class _CountPicker extends StatelessWidget {
-  const _CountPicker({
-    required this.title,
-    required this.value,
-    required this.min,
-    required this.max,
-    required this.onChanged,
+class _LauncherLookPreview extends StatelessWidget {
+  const _LauncherLookPreview({
+    required this.background,
+    required this.columns,
+    required this.onBg,
+    required this.light,
   });
 
-  final String title;
-  final int value;
-  final int min;
-  final int max;
-  final ValueChanged<int> onChanged;
+  final Color background;
+  final int columns;
+  final Color onBg;
+  final bool light;
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-          child: Text(
-            title,
-            style: Theme.of(context).textTheme.bodyLarge,
+    final cs = Theme.of(context).colorScheme;
+    final accents = const [
+      Color(0xFF00897B),
+      Color(0xFF1976D2),
+      Color(0xFF5E35B1),
+      Color(0xFFEF6C00),
+      Color(0xFF43A047),
+      Color(0xFF6A1B9A),
+    ];
+    final tileCount = columns * 2;
+
+    return Container(
+      height: 168,
+      decoration: BoxDecoration(
+        color: background,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: cs.outlineVariant),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.06),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
           ),
+        ],
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 18,
+                  height: 18,
+                  decoration: BoxDecoration(
+                    color: light
+                        ? Colors.white.withValues(alpha: 0.9)
+                        : Colors.white.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(5),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Container(
+                    height: 8,
+                    decoration: BoxDecoration(
+                      color: onBg.withValues(alpha: 0.35),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Expanded(
+              child: GridView.builder(
+                physics: const NeverScrollableScrollPhysics(),
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: columns.clamp(2, 3),
+                  mainAxisSpacing: 8,
+                  crossAxisSpacing: 8,
+                  childAspectRatio: 1.05,
+                ),
+                itemCount: tileCount,
+                itemBuilder: (context, index) {
+                  final accent = accents[index % accents.length];
+                  return Container(
+                    decoration: BoxDecoration(
+                      color: light
+                          ? Colors.white.withValues(alpha: 0.92)
+                          : Colors.white.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Center(
+                      child: Container(
+                        width: 22,
+                        height: 22,
+                        decoration: BoxDecoration(
+                          color: accent.withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(7),
+                        ),
+                        child: Icon(
+                          Icons.apps_rounded,
+                          size: 14,
+                          color: accent,
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ],
         ),
-        IconButton(
-          onPressed: value > min ? () => onChanged(value - 1) : null,
-          icon: const Icon(Icons.remove_circle_outline),
-        ),
-        Text(
-          '$value',
-          style: Theme.of(context).textTheme.titleMedium,
-        ),
-        IconButton(
-          onPressed: value < max ? () => onChanged(value + 1) : null,
-          icon: const Icon(Icons.add_circle_outline),
-        ),
-      ],
+      ),
     );
   }
 }
@@ -248,6 +309,7 @@ class _ColorDot extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final outline = Theme.of(context).colorScheme.outline;
+    final isLight = Color(argb).computeLuminance() > 0.85;
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -261,10 +323,33 @@ class _ColorDot extends StatelessWidget {
             shape: BoxShape.circle,
             color: Color(argb),
             border: Border.all(
-              width: selected ? 3 : 1,
-              color: selected ? Theme.of(context).colorScheme.primary : outline,
+              width: selected ? 3 : (isLight ? 1.5 : 1),
+              color: selected
+                  ? Theme.of(context).colorScheme.primary
+                  : outline.withValues(alpha: isLight ? 0.55 : 0.35),
             ),
+            boxShadow: selected
+                ? [
+                    BoxShadow(
+                      color: Theme.of(context)
+                          .colorScheme
+                          .primary
+                          .withValues(alpha: 0.28),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ]
+                : null,
           ),
+          child: selected
+              ? Icon(
+                  Icons.check_rounded,
+                  size: 20,
+                  color: Color(argb).computeLuminance() > 0.55
+                      ? Colors.black87
+                      : Colors.white,
+                )
+              : null,
         ),
       ),
     );

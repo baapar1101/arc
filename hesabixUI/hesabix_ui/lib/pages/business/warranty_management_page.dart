@@ -17,6 +17,7 @@ import '../../models/product_model.dart';
 import '../../widgets/warranty/warranty_code_details_dialog.dart';
 import '../../widgets/warranty/generate_warranty_codes_dialog.dart';
 import '../../services/list_filter_preferences_service.dart';
+import '../../widgets/business_subpage_back_leading.dart';
 
 class WarrantyManagementPage extends StatefulWidget {
   final int businessId;
@@ -93,6 +94,7 @@ class _WarrantyManagementPageState extends State<WarrantyManagementPage> {
     return Scaffold(
       appBar: AppBar(
         title: Text(t.warrantyManagement),
+        leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
         backgroundColor: colorScheme.surface,
         foregroundColor: colorScheme.onSurface,
         actions: [

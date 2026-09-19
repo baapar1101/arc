@@ -3,6 +3,10 @@ import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import '../../core/calendar_controller.dart';
 import '../../core/auth_store.dart';
+import 'android_update_settings_page.dart';
+import 'windows_update_settings_page.dart';
+import 'biometric_lock_settings_page.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 class AccountSettingsPage extends StatelessWidget {
   final CalendarController calendarController;
@@ -65,14 +69,14 @@ class AccountSettingsPage extends StatelessWidget {
                       title: t.marketing,
                       description: t.accountSettingsMarketingDescription,
                       icon: Icons.campaign,
-                      color: Colors.orange,
+                      color: SemanticColorResolver.warning(context),
                       onTap: () => context.go('/user/profile/marketing'),
                     ),
                     _SettingsCard(
                       title: t.accountSettingsNotificationsTitle,
                       description: t.accountSettingsNotificationsDescription,
                       icon: Icons.notifications_active,
-                      color: Colors.blue,
+                      color: SemanticColorResolver.info(context),
                       onTap: () => context.go('/user/profile/notifications'),
                     ),
                     _SettingsCard(
@@ -86,7 +90,7 @@ class AccountSettingsPage extends StatelessWidget {
                       title: t.accountSettingsApiKeysTitle,
                       description: t.accountSettingsApiKeysDescription,
                       icon: Icons.key,
-                      color: Colors.green,
+                      color: SemanticColorResolver.positive(context),
                       onTap: () => context.go('/user/profile/api-keys'),
                     ),
                     _SettingsCard(
@@ -96,11 +100,35 @@ class AccountSettingsPage extends StatelessWidget {
                       color: Colors.indigo,
                       onTap: () => context.go('/user/profile/sessions'),
                     ),
+                    if (showBiometricLockSettingsEntry())
+                      _SettingsCard(
+                        title: t.accountSettingsBiometricLockTitle,
+                        description: t.accountSettingsBiometricLockDescription,
+                        icon: Icons.fingerprint,
+                        color: Colors.blueGrey,
+                        onTap: () => context.go('/user/profile/biometric-lock-settings'),
+                      ),
+                    if (showAndroidUpdateSettingsEntry())
+                      _SettingsCard(
+                        title: t.accountSettingsAndroidUpdateTitle,
+                        description: t.accountSettingsAndroidUpdateDescription,
+                        icon: Icons.system_update_alt,
+                        color: Colors.cyan,
+                        onTap: () => context.go('/user/profile/android-update-settings'),
+                      ),
+                    if (showWindowsUpdateSettingsEntry())
+                      _SettingsCard(
+                        title: t.accountSettingsWindowsUpdateTitle,
+                        description: t.accountSettingsWindowsUpdateDescription,
+                        icon: Icons.system_update_alt,
+                        color: Colors.teal,
+                        onTap: () => context.go('/user/profile/windows-update-settings'),
+                      ),
                     _SettingsCard(
                       title: t.changePassword,
                       description: t.accountSettingsChangePasswordDescription,
                       icon: Icons.password,
-                      color: Colors.red,
+                      color: SemanticColorResolver.negative(context),
                       onTap: () => context.go('/user/profile/change-password'),
                     ),
                     _SettingsCard(

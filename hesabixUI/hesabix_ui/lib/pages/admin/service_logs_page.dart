@@ -9,6 +9,7 @@ import '../../services/system_services_service.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../widgets/loading_indicator.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 enum _SeverityFilter { all, errorsOnly, warningsUp }
 
@@ -263,7 +264,7 @@ class _ServiceLogsPageState extends State<ServiceLogsPage> with WidgetsBindingOb
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Text(t.serviceLogsRestartConfirmBody(_selectedService)),
-                  const SizedBox(height: 12),
+                  SizedBox(height: 12),
                   TextField(
                     controller: _restartConfirmController,
                     decoration: InputDecoration(
@@ -281,7 +282,7 @@ class _ServiceLogsPageState extends State<ServiceLogsPage> with WidgetsBindingOb
                 ),
                 ElevatedButton(
                   onPressed: ok ? () => Navigator.of(dialogContext).pop(true) : null,
-                  style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                  style: ElevatedButton.styleFrom(backgroundColor: SemanticColorResolver.negative(context)),
                   child: Text(t.serviceLogsRestart),
                 ),
               ],
@@ -335,12 +336,12 @@ class _ServiceLogsPageState extends State<ServiceLogsPage> with WidgetsBindingOb
       case 1:
       case 2:
       case 3:
-        return Colors.red;
+        return SemanticColorResolver.negative(context);
       case 4:
-        return Colors.orange;
+        return SemanticColorResolver.warning(context);
       case 5:
       case 6:
-        return Colors.blue;
+        return SemanticColorResolver.info(context);
       case 7:
         return Colors.grey;
       default:
@@ -492,15 +493,15 @@ class _ServiceLogsPageState extends State<ServiceLogsPage> with WidgetsBindingOb
                             },
                           ),
                         ),
-                        const SizedBox(width: 8),
+                        SizedBox(width: 8),
                         if (_serviceStatus != null) ...[
                           _StatusChip(
                             label: (_serviceStatus!['is_active'] as bool? ?? false)
                                 ? t.serviceLogsActive
                                 : t.serviceLogsInactive,
-                            color: (_serviceStatus!['is_active'] as bool? ?? false) ? Colors.green : Colors.red,
+                            color: (_serviceStatus!['is_active'] as bool? ?? false) ? SemanticColorResolver.positive(context) : SemanticColorResolver.negative(context),
                           ),
-                          const SizedBox(width: 6),
+                          SizedBox(width: 6),
                           _StatusChip(
                             label: (_serviceStatus!['is_enabled'] as bool? ?? false)
                                 ? t.serviceLogsEnabled
@@ -508,7 +509,7 @@ class _ServiceLogsPageState extends State<ServiceLogsPage> with WidgetsBindingOb
                             color: (_serviceStatus!['is_enabled'] as bool? ?? false) ? Colors.teal : Colors.grey,
                           ),
                           IconButton(
-                            icon: const Icon(Icons.info_outline),
+                            icon: Icon(Icons.info_outline),
                             tooltip: t.serviceLogsStatusDetails,
                             onPressed: () => _showStatusDetails(t),
                           ),
@@ -518,7 +519,7 @@ class _ServiceLogsPageState extends State<ServiceLogsPage> with WidgetsBindingOb
                           icon: const Icon(Icons.restart_alt),
                           label: Text(t.serviceLogsRestart),
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.orange,
+                            backgroundColor: SemanticColorResolver.warning(context),
                             foregroundColor: Colors.white,
                           ),
                         ),
@@ -833,9 +834,9 @@ class _ServiceLogsPageState extends State<ServiceLogsPage> with WidgetsBindingOb
           ),
           Row(
             children: [
-              _LegendDot(color: Colors.red, label: t.serviceLogsLegendError),
-              _LegendDot(color: Colors.orange, label: t.serviceLogsLegendWarn),
-              _LegendDot(color: Colors.blue, label: t.serviceLogsLegendInfo),
+              _LegendDot(color: SemanticColorResolver.negative(context), label: t.serviceLogsLegendError),
+              _LegendDot(color: SemanticColorResolver.warning(context), label: t.serviceLogsLegendWarn),
+              _LegendDot(color: SemanticColorResolver.info(context), label: t.serviceLogsLegendInfo),
             ],
           ),
         ],

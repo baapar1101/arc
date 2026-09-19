@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:dio/dio.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
 import 'package:hesabix_ui/core/api_client.dart';
@@ -10,6 +11,7 @@ import 'package:hesabix_ui/services/business_dashboard_service.dart';
 import 'package:hesabix_ui/services/currency_service.dart';
 import 'package:hesabix_ui/widgets/data_table/helpers/data_table_utils.dart';
 import 'package:hesabix_ui/services/list_filter_preferences_service.dart';
+import 'package:hesabix_ui/services/bytes_export/bytes_export_service.dart';
 import 'package:hesabix_ui/core/date_utils.dart';
 import 'package:hesabix_ui/widgets/invoice/person_combobox_widget.dart';
 import 'package:hesabix_ui/widgets/invoice/account_tree_combobox_widget.dart';
@@ -17,15 +19,31 @@ import 'package:hesabix_ui/models/account_model.dart';
 import 'package:hesabix_ui/models/person_model.dart';
 import 'package:hesabix_ui/widgets/project/project_selector_widget.dart';
 import 'package:hesabix_ui/utils/responsive_helper.dart';
+import 'package:hesabix_ui/utils/snackbar_helper.dart';
+import 'package:hesabix_ui/utils/error_extractor.dart';
+import 'package:hesabix_ui/utils/currency_display_utils.dart';
+import 'package:hesabix_ui/core/hesabix_back.dart';
 
 class GeneralLedgerReportPage extends StatefulWidget {
   final int businessId;
   final CalendarController calendarController;
+  final Account? initialAccount;
+  final int? initialFiscalYearId;
+  final DateTime? initialDateFrom;
+  final DateTime? initialDateTo;
+  final int? initialCurrencyId;
+  final int? initialProjectId;
   
   const GeneralLedgerReportPage({
     super.key,
     required this.businessId,
     required this.calendarController,
+    this.initialAccount,
+    this.initialFiscalYearId,
+    this.initialDateFrom,
+    this.initialDateTo,
+    this.initialCurrencyId,
+    this.initialProjectId,
   });
 
   @override
@@ -50,6 +68,7 @@ class _GeneralLedgerReportPageState extends State<GeneralLedgerReportPage> {
   
   // Summary from API response
   Map<String, dynamic>? _summary;
+  bool _isExportingElectronic = false;
 
   /// فیلترها به‌صورت پیش‌فرض بسته تا فضای کمتری اشغال شود
   bool _filtersExpanded = false;
@@ -57,6 +76,24 @@ class _GeneralLedgerReportPageState extends State<GeneralLedgerReportPage> {
   @override
   void initState() {
     super.initState();
+    if (widget.initialAccount != null) {
+      _selectedAccounts = [widget.initialAccount!];
+    }
+    if (widget.initialFiscalYearId != null) {
+      _selectedFiscalYearId = widget.initialFiscalYearId;
+    }
+    if (widget.initialDateFrom != null) {
+      _fromDate = widget.initialDateFrom;
+    }
+    if (widget.initialDateTo != null) {
+      _toDate = widget.initialDateTo;
+    }
+    if (widget.initialCurrencyId != null) {
+      _selectedCurrencyId = widget.initialCurrencyId;
+    }
+    if (widget.initialProjectId != null) {
+      _selectedProjectId = widget.initialProjectId;
+    }
     _loadFiscalYears();
     _loadCurrencies();
   }
@@ -68,13 +105,15 @@ class _GeneralLedgerReportPageState extends State<GeneralLedgerReportPage> {
       if (!mounted) return;
       setState(() {
         _fiscalYears = items;
-        final current = items.firstWhere(
-          (e) => (e['is_current'] == true),
-          orElse: () => const <String, dynamic>{},
-        );
-        final id = current['id'];
-        if (id is int) {
-          _selectedFiscalYearId = id;
+        if (_selectedFiscalYearId == null) {
+          final current = items.firstWhere(
+            (e) => (e['is_current'] == true),
+            orElse: () => const <String, dynamic>{},
+          );
+          final id = current['id'];
+          if (id is int) {
+            _selectedFiscalYearId = id;
+          }
         }
       });
     } catch (_) {
@@ -89,13 +128,14 @@ class _GeneralLedgerReportPageState extends State<GeneralLedgerReportPage> {
       if (!mounted) return;
       setState(() {
         _currencies = items;
-        // انتخاب ارز پیش‌فرض
-        if (items.isNotEmpty) {
-          final defaultCurrency = items.firstWhere(
-            (c) => c['is_default'] == true,
-            orElse: () => items.first,
-          );
-          _selectedCurrencyId = defaultCurrency['id'] as int?;
+        if (items.length <= 1) {
+          // تک‌ارزی: بدون فیلتر ارز
+          _selectedCurrencyId = null;
+        } else if (_selectedCurrencyId == null && widget.initialCurrencyId == null) {
+          // چندارزی: پیش‌فرض همه (= پایه)
+          _selectedCurrencyId = null;
+        } else if (_selectedCurrencyId == null && widget.initialCurrencyId != null) {
+          _selectedCurrencyId = widget.initialCurrencyId;
         }
       });
     } catch (_) {
@@ -170,10 +210,116 @@ class _GeneralLedgerReportPageState extends State<GeneralLedgerReportPage> {
     };
   }
 
+  bool _isSelectedCurrencyRial() {
+    if (_selectedCurrencyId == null) return false;
+    for (final currency in _currencies) {
+      if (currency['id'] == _selectedCurrencyId) {
+        final code = (currency['code'] ?? currency['name'] ?? '').toString().toUpperCase();
+        return code == 'IRR' || code == 'RIAL';
+      }
+    }
+    return false;
+  }
+
+  Future<void> _exportElectronicBooks() async {
+    if (_isExportingElectronic) return;
+
+    if (!_isSelectedCurrencyRial()) {
+      SnackBarHelper.showError(
+        context,
+        message: 'برای خروجی دفتر الکترونیکی باید ارز ریال (IRR) انتخاب شود.',
+      );
+      return;
+    }
+
+    setState(() => _isExportingElectronic = true);
+    final t = AppLocalizations.of(context);
+
+    try {
+      final api = ApiClient();
+      final params = <String, dynamic>{
+        if (_fromDate != null) 'date_from': _fromDate!.toIso8601String().split('T').first,
+        if (_toDate != null) 'date_to': _toDate!.toIso8601String().split('T').first,
+        if (_selectedFiscalYearId != null) 'fiscal_year_id': _selectedFiscalYearId,
+        if (_selectedCurrencyId != null) 'currency_id': _selectedCurrencyId,
+        'include_proforma': _includeProforma,
+        'format': 'auto',
+      };
+
+      final response = await api.post<List<int>>(
+        '/api/v1/businesses/${widget.businessId}/reports/general-ledger/export/electronic-books',
+        data: params,
+        options: Options(
+          responseType: ResponseType.bytes,
+          headers: {
+            'X-Calendar-Type': widget.calendarController.isJalali ? 'jalali' : 'gregorian',
+          },
+        ),
+      );
+
+      final data = response.data;
+      if (data == null || data.isEmpty) {
+        throw Exception('پاسخ خالی از سرور');
+      }
+
+      final exportFormat = response.headers.value('x-export-format')?.toLowerCase() ?? 'xlsx';
+      final extension = exportFormat == 'csv' ? 'csv' : 'xlsx';
+
+      final result = await BytesExportService.exportResponse(
+        response: response,
+        fallbackBaseName:
+            'electronic_general_ledger_${DateTime.now().millisecondsSinceEpoch}',
+        fallbackExt: extension,
+      );
+
+      if (!mounted) return;
+      BytesExportService.showFeedback(context, result);
+    } catch (e) {
+      if (!mounted) return;
+      SnackBarHelper.showError(
+        context,
+        message: '${t.exportError}: ${ErrorExtractor.forContext(e, context)}',
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isExportingElectronic = false);
+      }
+    }
+  }
+
   String _formatNumber(dynamic value) {
     if (value == null) return '0';
     final n = value is num ? value.toDouble() : double.tryParse(value.toString()) ?? 0.0;
     return DataTableUtils.formatNumber(n);
+  }
+
+  String get _baseCurrencyUnit {
+    Map<String, dynamic>? def;
+    for (final c in _currencies) {
+      if (c['is_default'] == true) {
+        def = c;
+        break;
+      }
+    }
+    def ??= _currencies.isNotEmpty ? _currencies.first : null;
+    if (def == null) return 'ریال';
+    return currencyUnitLabelFromBusinessCurrencyMap(def);
+  }
+
+  String _formatLedgerAmount(Map<String, dynamic> m, String amountKey, String nativeKey) {
+    final amountsInBase = m['amounts_in_base'] == true || _selectedCurrencyId == null;
+    final unit = (m['document_currency_symbol'] ?? m['document_currency_code'] ?? '')
+        .toString();
+    final dp = (m['document_currency_decimal_places'] as num?)?.toInt() ?? 2;
+    return formatReportLedgerAmount(
+      amount: m[amountKey],
+      amountsInBase: amountsInBase,
+      nativeAmount: m[nativeKey],
+      documentCurrencyUnit: unit,
+      baseUnit: _baseCurrencyUnit,
+      baseDecimalPlaces: 0,
+      nativeDecimalPlaces: dp,
+    );
   }
 
   String _formatBalance(dynamic balance, dynamic balanceType) {
@@ -242,12 +388,20 @@ class _GeneralLedgerReportPageState extends State<GeneralLedgerReportPage> {
         NumberColumn(
           'debit',
           'بدهکار',
-          formatter: (item) => _formatNumber((item as Map<String, dynamic>)['debit']),
+          formatter: (item) => _formatLedgerAmount(
+            item as Map<String, dynamic>,
+            'debit',
+            'native_debit',
+          ),
         ),
         NumberColumn(
           'credit',
           'بستانکار',
-          formatter: (item) => _formatNumber((item as Map<String, dynamic>)['credit']),
+          formatter: (item) => _formatLedgerAmount(
+            item as Map<String, dynamic>,
+            'credit',
+            'native_credit',
+          ),
         ),
         TextColumn(
           'balance',
@@ -264,6 +418,22 @@ class _GeneralLedgerReportPageState extends State<GeneralLedgerReportPage> {
       defaultPageSize: 50,
       additionalParams: _additionalParams(),
       showExportButtons: true,
+      customHeaderActions: [
+        Tooltip(
+          message: 'خروجی دفتر کل الکترونیکی مطابق قالب سازمان امور مالیاتی (تمام حساب‌ها)',
+          child: FilledButton.tonalIcon(
+            onPressed: _isExportingElectronic ? null : _exportElectronicBooks,
+            icon: _isExportingElectronic
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.upload_file_outlined),
+            label: const Text('دفتر کل الکترونیکی'),
+          ),
+        ),
+      ],
       excelEndpoint: '/api/v1/businesses/${widget.businessId}/reports/general-ledger/export/excel',
       pdfEndpoint: '/api/v1/businesses/${widget.businessId}/reports/general-ledger/export/pdf',
       getExportParams: () => _additionalParams(),
@@ -350,7 +520,8 @@ class _GeneralLedgerReportPageState extends State<GeneralLedgerReportPage> {
               ),
             ),
             cell(
-              DropdownButtonFormField<int>(
+              _currencies.length > 1
+                  ? DropdownButtonFormField<int?>(
                 value: _selectedCurrencyId,
                 decoration: InputDecoration(
                   hintText: 'ارز',
@@ -361,13 +532,13 @@ class _GeneralLedgerReportPageState extends State<GeneralLedgerReportPage> {
                 ),
                 isExpanded: true,
                 items: [
-                  const DropdownMenuItem<int>(value: null, child: Text('همه ارزها')),
-                  ..._currencies.map<DropdownMenuItem<int>>((c) {
+                  const DropdownMenuItem<int?>(value: null, child: Text('همه ارزها (معادل پایه)')),
+                  ..._currencies.map<DropdownMenuItem<int?>>((c) {
                     final id = c['id'] as int?;
                     final code = (c['code'] ?? '').toString();
-                    final name = (c['name'] ?? '').toString();
+                    final name = (c['title'] ?? c['name'] ?? '').toString();
                     final displayName = code.isNotEmpty ? '$code - $name' : name;
-                    return DropdownMenuItem<int>(
+                    return DropdownMenuItem<int?>(
                       key: ValueKey('currency_$id'),
                       value: id,
                       child: Text(displayName, overflow: TextOverflow.ellipsis, maxLines: 1),
@@ -378,7 +549,8 @@ class _GeneralLedgerReportPageState extends State<GeneralLedgerReportPage> {
                   setState(() => _selectedCurrencyId = val);
                   _refreshData();
                 },
-              ),
+              )
+                  : const SizedBox.shrink(),
             ),
           ],
         ),
@@ -555,10 +727,7 @@ class _GeneralLedgerReportPageState extends State<GeneralLedgerReportPage> {
     return Scaffold(
       backgroundColor: cs.surface,
       appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.pop(),
-        ),
+        leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
         title: Text(t.reportsGeneralLedgerTitle),
         actions: [
           IconButton(

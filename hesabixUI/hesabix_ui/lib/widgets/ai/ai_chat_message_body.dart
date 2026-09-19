@@ -3,13 +3,19 @@ import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/models/ai_stream_event.dart';
+import 'package:hesabix_ui/utils/ai_content_sanitize.dart';
+import 'package:hesabix_ui/utils/ai_markdown_normalize.dart';
 import 'ai_reasoning_panel.dart';
 import 'ai_chat_chart_widget.dart';
 import 'ai_chat_l10n.dart';
 import 'ai_chat_table_widget.dart';
+import 'ai_copyable_code_block.dart';
 import 'ai_markdown_table_parser.dart';
 import 'ai_visualization_spec.dart';
 import 'ai_workflow_chat_actions.dart';
+import 'ai_tool_envelope.dart';
+import 'ai_citation_chips.dart';
+import 'ai_activated_skill_chips.dart';
 
 class AIChatMessageBody extends StatelessWidget {
   final String content;
@@ -18,6 +24,8 @@ class AIChatMessageBody extends StatelessWidget {
   final Object? functionCalls;
   final Object? functionResults;
   final bool suppressApprovalToolChips;
+  final void Function(AISessionTodoItem item, String status)? onTodoStatus;
+  final void Function(String subagentId)? onCancelSubagent;
 
   const AIChatMessageBody({
     super.key,
@@ -27,6 +35,8 @@ class AIChatMessageBody extends StatelessWidget {
     this.functionCalls,
     this.functionResults,
     this.suppressApprovalToolChips = false,
+    this.onTodoStatus,
+    this.onCancelSubagent,
   });
 
   @override
@@ -47,6 +57,15 @@ class AIChatMessageBody extends StatelessWidget {
           toolActivities.where((a) => !a.approvalRequired).toList();
     }
 
+    var displayContent = sanitizeAssistantContent(content);
+    if (!isUser && displayContent.trim().isEmpty) {
+      final fromTrace = extractContentFromAgentTraceResults(functionResults);
+      if (fromTrace.isNotEmpty) displayContent = fromTrace;
+    }
+    final extraTables = (!isUser && !markdownLooksLikeTable(displayContent))
+        ? extractToolTableSpecsFromResults(functionResults)
+        : const <AITableSpec>[];
+
     return Column(
       crossAxisAlignment:
           isUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
@@ -63,10 +82,12 @@ class AIChatMessageBody extends StatelessWidget {
             todoSnapshot: agentTodos,
             compact: true,
             initiallyExpanded: agentTodos?.hasActiveItem ?? false,
+            onTodoStatus: onTodoStatus,
+            onCancelSubagent: onCancelSubagent,
           ),
           const SizedBox(height: 8),
         ],
-        if (content.trim().isNotEmpty) ...[
+        if (displayContent.trim().isNotEmpty) ...[
           isUser
               ? SelectableText(
                   content,
@@ -76,19 +97,37 @@ class AIChatMessageBody extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     _AssistantRichContent(
-                      content: content,
+                      content: displayContent,
                       theme: theme,
                       scheme: scheme,
                       businessId: businessId,
                     ),
+                    for (final spec in extraTables)
+                      AIChatTableWidget(spec: spec),
+                    if (!isUser)
+                      AICitationChips(
+                        businessId: businessId,
+                        functionResults: functionResults,
+                        assistantContent: displayContent,
+                      ),
+                    if (!isUser)
+                      AIActivatedSkillChips(functionResults: functionResults),
                     if (!isUser)
                       AIWorkflowChatActions(
                         businessId: businessId,
                         functionResults: functionResults,
-                        assistantContent: content,
+                        assistantContent: displayContent,
                       ),
                   ],
                 ),
+        ] else if (extraTables.isNotEmpty) ...[
+          for (final spec in extraTables) AIChatTableWidget(spec: spec),
+          if (!isUser)
+            AICitationChips(
+              businessId: businessId,
+              functionResults: functionResults,
+              assistantContent: displayContent,
+            ),
         ],
       ],
     );
@@ -183,6 +222,12 @@ class _AssistantRichContent extends StatelessWidget {
               data: normalizeAssistantMarkdown(seg.text.trim()),
               selectable: true,
               styleSheet: _markdownStyle(theme, scheme),
+              builders: {
+                'pre': AICopyableCodeBlockBuilder(
+                  theme: theme,
+                  scheme: scheme,
+                ),
+              },
               onTapLink: businessId != null
                   ? (text, href, title) => _onMarkdownLink(context, businessId!, text, href)
                   : null,
@@ -251,39 +296,6 @@ class _AssistantRichContent extends StatelessWidget {
       listBullet: body,
       listIndent: 20,
     );
-  }
-
-  /// نرمال‌سازی محافظه‌کارانه‌ی markdown دریافتی از هوش مصنوعی.
-  ///
-  /// مدل‌ها اغلب تأکید را با فاصله‌ی اضافه می‌نویسند (`** متن **`) که در
-  /// CommonMark معتبر نیست و bold نمی‌شود. اینجا فقط فاصله‌ی داخل دلیمیترهای
-  /// تأکید حذف می‌شود و محتوای بلوک کد و inline code دست‌نخورده می‌ماند.
-  static String normalizeAssistantMarkdown(String input) {
-    if (input.isEmpty) return input;
-    final codeSpans = RegExp(r'```[\s\S]*?```|`[^`\n]*`');
-    final buffer = StringBuffer();
-    var last = 0;
-    for (final m in codeSpans.allMatches(input)) {
-      if (m.start > last) {
-        buffer.write(_normalizeEmphasis(input.substring(last, m.start)));
-      }
-      buffer.write(m.group(0));
-      last = m.end;
-    }
-    if (last < input.length) {
-      buffer.write(_normalizeEmphasis(input.substring(last)));
-    }
-    return buffer.toString();
-  }
-
-  static final _boldSpaced = RegExp(r'\*\*[ \t]*(\S(?:.*?\S)?)[ \t]*\*\*');
-  static final _boldUnderscoreSpaced =
-      RegExp(r'__[ \t]*(\S(?:.*?\S)?)[ \t]*__');
-
-  static String _normalizeEmphasis(String s) {
-    var out = s.replaceAllMapped(_boldSpaced, (m) => '**${m[1]}**');
-    out = out.replaceAllMapped(_boldUnderscoreSpaced, (m) => '__${m[1]}__');
-    return out;
   }
 
   /// جدا کردن بلوک‌های ```chart / ```table / ```json از متن.

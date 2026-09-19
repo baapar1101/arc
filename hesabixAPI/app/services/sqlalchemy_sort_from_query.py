@@ -4,8 +4,7 @@ from typing import Any, Dict, List, Optional, Set, Type
 
 from sqlalchemy.orm import Query
 
-from adapters.api.v1.schemas import QueryInfo
-from app.services.sort_resolution import effective_sort_specs
+from app.services.sort_resolution import effective_sort_specs, query_info_for_sort
 
 
 def apply_sqlalchemy_order_from_query_dict(
@@ -25,23 +24,7 @@ def apply_sqlalchemy_order_from_query_dict(
 	- ستون‌های ناموجود روی مدل نادیده گرفته می‌شوند.
 	- در انتها در صورت وجود، tie_breaker_column به‌صورت صعودی برای پایداری صفحه‌بندی اضافه می‌شود.
 	"""
-	raw_sort = query_dict.get("sort")
-	sort_list = raw_sort if isinstance(raw_sort, list) else None
-	try:
-		qi = QueryInfo.model_validate({
-			"take": int(query_dict.get("take", 20) or 20),
-			"skip": int(query_dict.get("skip", 0) or 0),
-			"sort_by": query_dict.get("sort_by"),
-			"sort_desc": bool(query_dict.get("sort_desc", default_sort_desc)),
-			"sort": sort_list,
-		})
-	except Exception:
-		qi = QueryInfo(
-			take=20,
-			skip=0,
-			sort_by=query_dict.get("sort_by"),
-			sort_desc=bool(query_dict.get("sort_desc", default_sort_desc)),
-		)
+	qi = query_info_for_sort(query_dict, default_sort_desc=default_sort_desc)
 
 	specs = effective_sort_specs(
 		qi,

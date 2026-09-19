@@ -198,6 +198,52 @@ class Business(Base):
         server_default="1",
         comment="انتقال بین انبار همیشه نیاز به موجودی کافی (نادیده گرفتن اجازه منفی)",
     )
+    # کالای هزینه‌شده / کالای درآمدشده
+    goods_expense_income_workflow_mode: Mapped[str] = mapped_column(
+        String(20),
+        nullable=False,
+        default="simple",
+        server_default="simple",
+        comment="simple | two_step",
+    )
+    goods_expense_income_auto_post_in_simple_mode: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=True,
+        server_default="1",
+        comment="در حالت simple، ثبت قطعی در صورت داشتن مجوز post",
+    )
+    goods_expense_income_default_expense_account_code: Mapped[str] = mapped_column(
+        String(50),
+        nullable=False,
+        default="70407",
+        server_default="70407",
+    )
+    goods_expense_income_default_income_account_code: Mapped[str] = mapped_column(
+        String(50),
+        nullable=False,
+        default="60103",
+        server_default="60103",
+    )
+    goods_expense_income_stock_count_mode: Mapped[str] = mapped_column(
+        String(32),
+        nullable=False,
+        default="goods_docs",
+        server_default="goods_docs",
+        comment="goods_docs | physical_adjustment | ask",
+    )
+    goods_expense_income_allow_manual_unit_cost: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False,
+        server_default="0",
+    )
+    goods_expense_income_require_person: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False,
+        server_default="0",
+    )
     # سیاست تسعیر ارز روی فاکتور/اسناد (کلیدها در app.services.invoice_fx_revaluation)
     fx_revaluation_policy: Mapped[dict | None] = mapped_column(JSON, nullable=True)
 
@@ -219,7 +265,12 @@ class Business(Base):
         server_default="1",
         comment="نمایش قیمت فروش پایه در API عمومی کاتالوگ",
     )
-    
+    display_timezone: Mapped[str | None] = mapped_column(
+        String(80),
+        nullable=True,
+        comment="IANA timezone for datetime display; null = use system default",
+    )
+
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
     

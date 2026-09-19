@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import '../../core/api_client.dart';
 import '../../services/announcements_service.dart';
+import '../../utils/announcement_navigation.dart';
 import '../../utils/date_formatters.dart';
 import '../../utils/error_extractor.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 class AnnouncementsPage extends StatefulWidget {
   const AnnouncementsPage({super.key});
@@ -304,8 +306,8 @@ class _AnnouncementsPageState extends State<AnnouncementsPage> {
                     final time = '${it['updated_at'] ?? it['time'] ?? ''}';
 
                     final Color lvlColor = switch (level) {
-                      'critical' => Colors.red,
-                      'warning' => Colors.orange,
+                      'critical' => SemanticColorResolver.negative(context),
+                      'warning' => SemanticColorResolver.warning(context),
                       _ => cs.primary,
                     };
 
@@ -339,8 +341,27 @@ class _AnnouncementsPageState extends State<AnnouncementsPage> {
                         color: Colors.transparent,
                         child: InkWell(
                           borderRadius: BorderRadius.circular(16),
-                          onTap: () {
-                            // می‌توان در آینده دیالوگ جزئیات اضافه کرد
+                          onTap: () async {
+                            final handled = await AnnouncementNavigation.handleTap(
+                              context,
+                              it,
+                              onMarkedRead: (id) {
+                                setState(() {
+                                  _items.removeWhere(
+                                    (e) => AnnouncementNavigation.parseAnnouncementId(e['id']) == id,
+                                  );
+                                  if (_onlyUnread && _items.isEmpty && _hasMore) {
+                                    _loadMore();
+                                  }
+                                });
+                              },
+                            );
+                            if (!handled) {
+                              if (!context.mounted) return;
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(content: Text('این اعلان مقصد مشخصی ندارد')),
+                              );
+                            }
                           },
                           child: Padding(
                             padding: const EdgeInsets.all(16),

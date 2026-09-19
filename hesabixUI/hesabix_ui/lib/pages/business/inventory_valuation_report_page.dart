@@ -11,11 +11,12 @@ import 'package:hesabix_ui/widgets/category/category_picker_field.dart';
 import 'package:hesabix_ui/widgets/data_table/helpers/data_table_utils.dart';
 import 'package:hesabix_ui/services/category_service.dart';
 import 'package:hesabix_ui/core/api_client.dart';
+import 'package:hesabix_ui/core/hesabix_back.dart';
 
 class InventoryValuationReportPage extends StatefulWidget {
   final int businessId;
   final CalendarController calendarController;
-  
+
   const InventoryValuationReportPage({
     super.key,
     required this.businessId,
@@ -23,15 +24,17 @@ class InventoryValuationReportPage extends StatefulWidget {
   });
 
   @override
-  State<InventoryValuationReportPage> createState() => _InventoryValuationReportPageState();
+  State<InventoryValuationReportPage> createState() =>
+      _InventoryValuationReportPageState();
 }
 
-class _InventoryValuationReportPageState extends State<InventoryValuationReportPage> {
+class _InventoryValuationReportPageState
+    extends State<InventoryValuationReportPage> {
   DateTime? _asOfDate;
   int? _selectedWarehouseId;
   int? _selectedCategoryId;
   List<Map<String, dynamic>> _categories = [];
-  
+
   @override
   void initState() {
     super.initState();
@@ -58,7 +61,10 @@ class _InventoryValuationReportPageState extends State<InventoryValuationReportP
     }
   }
 
-  List<int> _getAllCategoryIds(int categoryId, List<Map<String, dynamic>> categories) {
+  List<int> _getAllCategoryIds(
+    int categoryId,
+    List<Map<String, dynamic>> categories,
+  ) {
     final result = <int>[categoryId];
     void findChildren(int parentId, List<Map<String, dynamic>> tree) {
       for (final cat in tree) {
@@ -79,6 +85,7 @@ class _InventoryValuationReportPageState extends State<InventoryValuationReportP
         }
       }
     }
+
     findChildren(categoryId, categories);
     return result;
   }
@@ -89,7 +96,8 @@ class _InventoryValuationReportPageState extends State<InventoryValuationReportP
       categoryIds = _getAllCategoryIds(_selectedCategoryId!, _categories);
     }
     return {
-      if (_asOfDate != null) 'as_of_date': _asOfDate!.toIso8601String().split('T').first,
+      if (_asOfDate != null)
+        'as_of_date': _asOfDate!.toIso8601String().split('T').first,
       if (_selectedWarehouseId != null) 'warehouse_ids': [_selectedWarehouseId],
       if (categoryIds != null) 'category_ids': categoryIds,
     };
@@ -97,15 +105,19 @@ class _InventoryValuationReportPageState extends State<InventoryValuationReportP
 
   String _formatNumber(dynamic value) {
     if (value == null) return '0';
-    final n = value is num ? value.toDouble() : double.tryParse(value.toString()) ?? 0.0;
+    final n = value is num
+        ? value.toDouble()
+        : double.tryParse(value.toString()) ?? 0.0;
     return DataTableUtils.formatNumber(n);
   }
 
   DataTableConfig<Map<String, dynamic>> _buildTableConfig(AppLocalizations t) {
     return DataTableConfig<Map<String, dynamic>>(
-      endpoint: '/api/v1/warehouse-reports/businesses/${widget.businessId}/inventory-valuation',
+      endpoint:
+          '/api/v1/warehouse-reports/businesses/${widget.businessId}/inventory-valuation',
       businessId: widget.businessId,
-      persistTableFiltersPageId: ListFilterPageIds.inventoryValuationReportTable,
+      persistTableFiltersPageId:
+          ListFilterPageIds.inventoryValuationReportTable,
       reportModuleKey: 'inventory_valuation',
       reportSubtype: 'list',
       title: 'گزارش ارزش موجودی انبار',
@@ -115,47 +127,56 @@ class _InventoryValuationReportPageState extends State<InventoryValuationReportP
       showActiveFilters: true,
       showClearFiltersButton: false,
       showExportButtons: true,
-      excelEndpoint: '/api/v1/warehouse-reports/businesses/${widget.businessId}/inventory-valuation/export/excel',
+      excelEndpoint:
+          '/api/v1/warehouse-reports/businesses/${widget.businessId}/inventory-valuation/export/excel',
       additionalParams: _additionalParams(),
       columns: [
         TextColumn(
           'product_code',
           'کد محصول',
           width: ColumnWidth.small,
-          formatter: (row) => (row as Map<String, dynamic>)['product_code']?.toString() ?? '',
+          formatter: (row) =>
+              (row as Map<String, dynamic>)['product_code']?.toString() ?? '',
         ),
         TextColumn(
           'product_name',
           'نام محصول',
           width: ColumnWidth.large,
-          formatter: (row) => (row as Map<String, dynamic>)['product_name']?.toString() ?? '',
+          formatter: (row) =>
+              (row as Map<String, dynamic>)['product_name']?.toString() ?? '',
         ),
         TextColumn(
           'warehouse_name',
           'انبار',
           width: ColumnWidth.medium,
-          formatter: (row) => (row as Map<String, dynamic>)['warehouse_name']?.toString() ?? '-',
+          formatter: (row) =>
+              (row as Map<String, dynamic>)['warehouse_name']?.toString() ??
+              '-',
         ),
         NumberColumn(
           'quantity',
           'موجودی',
-          formatter: (row) => _formatNumber((row as Map<String, dynamic>)['quantity']),
+          formatter: (row) =>
+              _formatNumber((row as Map<String, dynamic>)['quantity']),
         ),
         TextColumn(
           'unit',
           'واحد',
           width: ColumnWidth.small,
-          formatter: (row) => (row as Map<String, dynamic>)['unit']?.toString() ?? '',
+          formatter: (row) =>
+              (row as Map<String, dynamic>)['unit']?.toString() ?? '',
         ),
         NumberColumn(
           'cost_price',
-          'قیمت تمام شده',
-          formatter: (row) => _formatNumber((row as Map<String, dynamic>)['cost_price']),
+          'قیمت تمام شده (پایه)',
+          formatter: (row) =>
+              _formatNumber((row as Map<String, dynamic>)['cost_price']),
         ),
         NumberColumn(
           'value',
-          'ارزش',
-          formatter: (row) => _formatNumber((row as Map<String, dynamic>)['value']),
+          'ارزش (پایه)',
+          formatter: (row) =>
+              _formatNumber((row as Map<String, dynamic>)['value']),
         ),
       ],
       defaultPageSize: 50,
@@ -174,10 +195,7 @@ class _InventoryValuationReportPageState extends State<InventoryValuationReportP
       backgroundColor: theme.colorScheme.surface,
       appBar: AppBar(
         title: const Text('گزارش ارزش موجودی انبار'),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.pop(),
-        ),
+        leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
       ),
       body: SafeArea(
         child: Column(
@@ -245,20 +263,34 @@ class _InventoryValuationReportPageState extends State<InventoryValuationReportP
                       label: 'دسته‌بندی',
                     ),
                   ),
+                  Tooltip(
+                    message:
+                        'ارزش‌گذاری موجودی همیشه به معادل ارز پایه کسب‌وکار انجام می‌شود.',
+                    child: Chip(
+                      avatar: const Icon(
+                        Icons.account_balance_wallet_outlined,
+                        size: 18,
+                      ),
+                      label: const Text('مبالغ: ارز پایه کسب‌وکار'),
+                      visualDensity: VisualDensity.compact,
+                    ),
+                  ),
                 ],
               ),
             ),
-            
+
             // Data Table
             Expanded(
               child: Padding(
                 padding: const EdgeInsets.all(8.0),
                 child: DataTableWidget<Map<String, dynamic>>(
-                  key: ValueKey({
-                    _asOfDate?.toIso8601String(),
-                    _selectedWarehouseId,
-                    _selectedCategoryId,
-                  }.toString()),
+                  key: ValueKey(
+                    {
+                      _asOfDate?.toIso8601String(),
+                      _selectedWarehouseId,
+                      _selectedCategoryId,
+                    }.toString(),
+                  ),
                   config: _buildTableConfig(t),
                   fromJson: (json) => Map<String, dynamic>.from(json as Map),
                   calendarController: widget.calendarController,
@@ -271,4 +303,3 @@ class _InventoryValuationReportPageState extends State<InventoryValuationReportP
     );
   }
 }
-

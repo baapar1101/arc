@@ -180,15 +180,21 @@ class CacheService:
 			return False
 	
 	def delete_pattern(self, pattern: str) -> int:
-		"""حذف تمام کلیدهای مطابق با pattern"""
+		"""حذف تمام کلیدهای مطابق با pattern (با SCAN — غیرمسدودکننده)"""
 		if not self.enabled:
 			return 0
 		
 		try:
-			keys = self.client.keys(pattern)
-			if keys:
-				return self.client.delete(*keys)
-			return 0
+			deleted = 0
+			batch: list = []
+			for key in self.client.scan_iter(match=pattern, count=200):
+				batch.append(key)
+				if len(batch) >= 200:
+					deleted += int(self.client.delete(*batch))
+					batch = []
+			if batch:
+				deleted += int(self.client.delete(*batch))
+			return deleted
 		except (RedisError, Exception) as e:
 			logger.warning(f"Cache delete_pattern error for pattern {pattern}: {e}")
 			return 0

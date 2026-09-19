@@ -9,6 +9,7 @@ import 'package:go_router/go_router.dart';
 import '../../core/auth_store.dart';
 import '../../core/business_named_route_locations.dart';
 import '../../core/business_nav.dart';
+import '../../core/hesabix_back.dart';
 import '../../core/calendar_controller.dart';
 import '../../core/date_utils.dart';
 import '../../l10n/app_localizations.dart';
@@ -19,6 +20,7 @@ import '../../widgets/workflow/workflow_analytics_dialog.dart';
 import '../../widgets/ai/ai_workflow_chat_actions.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../utils/workflow_log_clipboard.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 class WorkflowsPage extends StatefulWidget {
   final int businessId;
@@ -167,15 +169,7 @@ class _WorkflowsPageState extends State<WorkflowsPage> {
     return Scaffold(
       appBar: AppBar(
         title: Text(title),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new),
-          onPressed: () {
-            if (!mounted) return;
-            if (Navigator.of(context).canPop()) {
-              Navigator.of(context).pop();
-            }
-          },
-        ),
+        leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
         actions: [
           IconButton(
             tooltip: 'آمار و تحلیل',
@@ -350,59 +344,59 @@ class _WorkflowsPageState extends State<WorkflowsPage> {
                     style: Theme.of(context).textTheme.titleMedium,
                   ),
                 ),
-                const SizedBox(width: 8),
+                SizedBox(width: 8),
                 Chip(
                   backgroundColor: isActive 
-                      ? Colors.green.withOpacity(0.15) 
+                      ? SemanticColorResolver.positive(context).withValues(alpha: 0.15) 
                       : statusValue == _statusApiValues['draft']!
-                          ? Colors.orange.withOpacity(0.15)
+                          ? SemanticColorResolver.warning(context).withValues(alpha: 0.15)
                           : Theme.of(context).colorScheme.surfaceVariant,
                   label: Text(
                     statusLabel,
                     style: TextStyle(
                       color: isActive 
-                          ? Colors.green.shade700 
+                          ? SemanticColorResolver.positive(context) 
                           : statusValue == _statusApiValues['draft']!
-                              ? Colors.orange.shade700
+                              ? SemanticColorResolver.warning(context)
                               : Theme.of(context).colorScheme.onSurfaceVariant,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
                   side: BorderSide(
                     color: isActive 
-                        ? Colors.green.shade300 
+                        ? SemanticColorResolver.positive(context).withValues(alpha: 0.5) 
                         : statusValue == _statusApiValues['draft']!
-                            ? Colors.orange.shade300
+                            ? SemanticColorResolver.warning(context).withValues(alpha: 0.5)
                             : Colors.transparent,
                     width: 1,
                   ),
                 ),
-                const SizedBox(width: 4),
+                SizedBox(width: 4),
                 IconButton(
                   tooltip: t.workflowRunNow,
-                  icon: const Icon(Icons.play_arrow_rounded),
-                  color: Colors.blue.shade600,
+                  icon: Icon(Icons.play_arrow_rounded),
+                  color: SemanticColorResolver.info(context),
                   onPressed: () => _runWorkflow(workflow),
                 ),
                 IconButton(
                   tooltip: t.workflowExecutionHistory,
-                  icon: const Icon(Icons.history_rounded),
+                  icon: Icon(Icons.history_rounded),
                   onPressed: () => _showExecutions(workflow, t),
                 ),
                 IconButton(
                   tooltip: t.workflowEdit,
-                  icon: const Icon(Icons.edit_rounded),
+                  icon: Icon(Icons.edit_rounded),
                   onPressed: () => _openWorkflowEditor(t, workflow: workflow),
                 ),
                 IconButton(
                   tooltip: 'حذف ورک‌فلو',
                   icon: const Icon(Icons.delete_rounded),
-                  color: Colors.red.shade600,
+                  color: SemanticColorResolver.negative(context),
                   onPressed: () => _deleteWorkflow(workflow, t),
                 ),
               ],
             ),
-            const SizedBox(height: 8),
+            SizedBox(height: 8),
             if (description != null && description.isNotEmpty) ...[
               Text(
                 description,
@@ -418,7 +412,7 @@ class _WorkflowsPageState extends State<WorkflowsPage> {
               children: [
                 Icon(
                   isActive ? Icons.check_circle_rounded : Icons.pause_circle_rounded, 
-                  color: isActive ? Colors.green.shade600 : Colors.grey.shade400, 
+                  color: isActive ? SemanticColorResolver.positive(context) : Colors.grey.shade400, 
                   size: 18,
                 ),
                 const SizedBox(width: 8),
@@ -523,7 +517,7 @@ class _WorkflowsPageState extends State<WorkflowsPage> {
           FilledButton(
             onPressed: () => Navigator.of(context).pop(true),
             style: FilledButton.styleFrom(
-              backgroundColor: Colors.red,
+              backgroundColor: SemanticColorResolver.negative(context),
             ),
             child: Text(t.delete),
           ),
@@ -1018,13 +1012,13 @@ class _WorkflowsPageState extends State<WorkflowsPage> {
   Color _logColor(String level) {
     switch (level.toLowerCase()) {
       case 'error':
-        return Colors.red;
+        return SemanticColorResolver.negative(context);
       case 'warning':
-        return Colors.orange;
+        return SemanticColorResolver.warning(context);
       case 'debug':
         return Colors.blueGrey;
       default:
-        return Colors.blue;
+        return SemanticColorResolver.info(context);
     }
   }
 }

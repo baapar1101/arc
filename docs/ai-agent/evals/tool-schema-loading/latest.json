@@ -1,0 +1,76 @@
+{
+  "dataset_version": "2026-08-19.v1",
+  "production_k": 48,
+  "complexity_iterations": {
+    "simple": 3,
+    "medium": 6,
+    "complex": 12
+  },
+  "discovery_recall": {
+    "10": 0.9549,
+    "15": 0.9752,
+    "20": 0.9819,
+    "48": 0.9819
+  },
+  "recall_regression": {
+    "at_10_ok": true,
+    "at_15_ok": true,
+    "at_20_ok": true
+  },
+  "modes": {
+    "current_k48": {
+      "k": 48,
+      "progressive": false,
+      "queries": 443,
+      "recall": 0.9819,
+      "avg_iterations": 4.98,
+      "avg_initial_schema_tokens": 7862,
+      "avg_additional_schema_tokens": 0,
+      "avg_wire_schema_tokens_per_request": 42977,
+      "avg_construction_tools": 30.56,
+      "total_wire_schema_tokens": 19038753
+    },
+    "current_k20": {
+      "k": 20,
+      "progressive": false,
+      "queries": 443,
+      "recall": 0.9819,
+      "avg_iterations": 4.98,
+      "avg_initial_schema_tokens": 4621,
+      "avg_additional_schema_tokens": 0,
+      "avg_wire_schema_tokens_per_request": 24837,
+      "avg_construction_tools": 17.05,
+      "total_wire_schema_tokens": 11002983
+    },
+    "progressive_k15": {
+      "k": 15,
+      "progressive": true,
+      "queries": 443,
+      "recall": 0.9752,
+      "avg_iterations": 4.98,
+      "avg_initial_schema_tokens": 3706,
+      "avg_additional_schema_tokens": 6,
+      "avg_wire_schema_tokens_per_request": 19955,
+      "avg_construction_tools": 13.54,
+      "total_wire_schema_tokens": 8840196
+    },
+    "progressive_k10": {
+      "k": 10,
+      "progressive": true,
+      "queries": 443,
+      "recall": 0.9549,
+      "avg_iterations": 4.98,
+      "avg_initial_schema_tokens": 2605,
+      "avg_additional_schema_tokens": 13,
+      "avg_wire_schema_tokens_per_request": 14028,
+      "avg_construction_tools": 9.48,
+      "total_wire_schema_tokens": 6214302
+    }
+  },
+  "wire_token_reduction_progressive_k15_vs_current_k48": 0.5357,
+  "honest_split": {
+    "application_side_duplication": "solved",
+    "llm_wire_duplication": "reduced_if_smaller_k_sent_each_iteration",
+    "provider_tool_prefix_cache": "openai_prompt_cache_key / anthropic_cache_control — not used for tools in this phase"
+  }
+}

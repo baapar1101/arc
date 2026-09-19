@@ -5,6 +5,8 @@ import '../../core/auth_store.dart';
 import '../../services/wallet_service.dart';
 import '../../core/api_client.dart';
 import '../../utils/error_extractor.dart';
+import '../../widgets/business_subpage_back_leading.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 class WalletPaymentResultPage extends StatefulWidget {
   final AuthStore authStore;
@@ -108,6 +110,15 @@ class _WalletPaymentResultPageState extends State<WalletPaymentResultPage> {
     }
   }
 
+  void _goBackToWallet() {
+    final bid = widget.authStore.currentBusiness?.id;
+    if (bid != null) {
+      context.go('/business/$bid/wallet');
+    } else {
+      context.go('/user/profile/dashboard');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
@@ -118,10 +129,13 @@ class _WalletPaymentResultPageState extends State<WalletPaymentResultPage> {
 
     final isSuccess = status == 'success';
     final icon = isSuccess ? Icons.check_circle : Icons.error_outline;
-    final color = isSuccess ? Colors.green : Colors.red;
+    final color = isSuccess ? SemanticColorResolver.positive(context) : SemanticColorResolver.negative(context);
 
     return Scaffold(
-      appBar: AppBar(title: Text(t.walletPaymentResultTitle)),
+      appBar: AppBar(
+        title: Text(t.walletPaymentResultTitle),
+        leading: HesabixBackButton(onPressed: _goBackToWallet),
+      ),
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -130,7 +144,7 @@ class _WalletPaymentResultPageState extends State<WalletPaymentResultPage> {
             Row(
               children: [
                 Icon(icon, color: color, size: 32),
-                const SizedBox(width: 12),
+                SizedBox(width: 12),
                 Text(
                   isSuccess ? t.walletPaymentSuccess : t.walletPaymentFailed,
                   style: Theme.of(context).textTheme.titleLarge?.copyWith(color: color),
@@ -142,18 +156,11 @@ class _WalletPaymentResultPageState extends State<WalletPaymentResultPage> {
             if (ref != null && ref.isNotEmpty) Text('${t.paymentReference}: $ref'),
             const SizedBox(height: 12),
             if (_loading) const LinearProgressIndicator(),
-            if (_error != null) Text('${t.walletStatusCheckErrorPrefix} $_error', style: const TextStyle(color: Colors.red)),
+            if (_error != null) Text('${t.walletStatusCheckErrorPrefix} $_error', style: TextStyle(color: SemanticColorResolver.negative(context))),
             if (_tx != null) Text('${t.status}: ${_tx!['status']} - ${t.moneyAmount}: ${_tx!['amount']}'),
             const Spacer(),
             FilledButton.icon(
-              onPressed: () {
-                final bid = widget.authStore.currentBusiness?.id;
-                if (bid != null) {
-                  context.go('/business/$bid/wallet');
-                } else {
-                  context.go('/user/profile/dashboard');
-                }
-              },
+              onPressed: _goBackToWallet,
               icon: const Icon(Icons.account_balance_wallet),
               label: Text(t.walletBackToWallet),
             ),

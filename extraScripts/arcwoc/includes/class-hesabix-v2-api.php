@@ -227,6 +227,7 @@ class Hesabix_V2_Api
 		// برای پاسخ‌های خطا، یک پیام قابل‌نمایش بساز (API ممکن است message، error یا errors برگرداند)
 		if (is_array($result) && ($status_code >= 400 || (isset($result['success']) && $result['success'] === false))) {
 			$result['success'] = false;
+			$result['status_code'] = (int) $status_code;
 			if (empty($result['message'])) {
 				$result['message'] = self::extract_error_message($result, $status_code, $body);
 			}
@@ -715,6 +716,45 @@ class Hesabix_V2_Api
 	}
 
 	/**
+	 * ایجاد حواله انبار دستی (رسید / خروج / تعدیل / …).
+	 * POST /warehouse-docs/business/{business_id}/create
+	 *
+	 * @since 4.8.0
+	 * @param array $data
+	 * @param int   $timeout
+	 * @return array
+	 */
+	public function create_warehouse_document($data, $timeout = 60)
+	{
+		return $this->request(
+			'POST',
+			'/warehouse-docs/business/' . (int) $this->business_id . '/create',
+			$data,
+			(int) max(25, min(180, $timeout))
+		);
+	}
+
+	/**
+	 * قطعی‌سازی حواله انبار.
+	 * POST /warehouse-docs/business/{business_id}/{wh_id}/post
+	 *
+	 * @since 4.8.0
+	 * @param int $warehouse_document_id
+	 * @param int $timeout
+	 * @return array
+	 */
+	public function post_warehouse_document($warehouse_document_id, $timeout = 60)
+	{
+		$wid = absint($warehouse_document_id);
+		return $this->request(
+			'POST',
+			'/warehouse-docs/business/' . (int) $this->business_id . '/' . $wid . '/post',
+			array(),
+			(int) max(25, min(180, $timeout))
+		);
+	}
+
+	/**
 	 * Delete product
 	 *
 	 * @since    2.0.0
@@ -726,6 +766,46 @@ class Hesabix_V2_Api
 		return $this->request(
 			'DELETE',
 			"/products/business/{$this->business_id}/{$product_id}"
+		);
+	}
+
+	/**
+	 * بررسی استفاده کالا در اسناد (فاکتور، سند، انبار، BOM، …).
+	 *
+	 * @since 4.7.2
+	 * @param int $product_id
+	 * @return array
+	 */
+	public function check_product_usage($product_id)
+	{
+		return $this->request(
+			'GET',
+			"/products/business/{$this->business_id}/" . absint($product_id) . '/usage-check'
+		);
+	}
+
+	/**
+	 * حذف گروهی کالاها.
+	 *
+	 * @since 4.7.2
+	 * @param int[] $product_ids
+	 * @return array
+	 */
+	public function bulk_delete_products(array $product_ids)
+	{
+		$ids = array_values(array_filter(array_map('absint', $product_ids)));
+		if (empty($ids)) {
+			return array(
+				'success' => false,
+				'message' => 'empty ids',
+			);
+		}
+
+		return $this->request(
+			'POST',
+			"/products/business/{$this->business_id}/bulk-delete",
+			array('ids' => $ids),
+			90
 		);
 	}
 
@@ -1018,6 +1098,20 @@ class Hesabix_V2_Api
 	}
 
 	/**
+	 * لیست لایسنس‌های بازار افزونه برای کسب‌وکار فعلی.
+	 *
+	 * @since 4.9.0
+	 * @return array
+	 */
+	public function get_business_marketplace_plugins()
+	{
+		return $this->request(
+			'GET',
+			"/marketplace/business/{$this->business_id}/plugins"
+		);
+	}
+
+	/**
 	 * Search invoices
 	 *
 	 * @since    2.0.0
@@ -1165,10 +1259,11 @@ class Hesabix_V2_Api
 	 */
 	public function get_bank_accounts()
 	{
+		// QueryInfo.take در API حسابیکس حداکثر ۱۰۰ است (le=100)؛ مقدار بالاتر → 422 و لیست خالی در تنظیمات.
 		return $this->request(
 			'POST',
 			"/bank-accounts/businesses/{$this->business_id}/bank-accounts",
-			array('take' => 500, 'skip' => 0)
+			array('take' => 100, 'skip' => 0)
 		);
 	}
 
@@ -1181,10 +1276,11 @@ class Hesabix_V2_Api
 	 */
 	public function get_cash_registers()
 	{
+		// QueryInfo.take در API حسابیکس حداکثر ۱۰۰ است (le=100).
 		return $this->request(
 			'POST',
 			"/cash-registers/businesses/{$this->business_id}/cash-registers",
-			array('take' => 500, 'skip' => 0)
+			array('take' => 100, 'skip' => 0)
 		);
 	}
 

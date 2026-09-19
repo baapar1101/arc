@@ -696,7 +696,7 @@ async def export_product_movement_history_excel(
 
 @router.post("/businesses/{business_id}/inventory-valuation",
     summary="گزارش ارزش موجودی انبار",
-    description="ارزش ریالی موجودی انبارها",
+    description="ارزش موجودی انبارها به معادل ارز پایهٔ کسب‌وکار",
 )
 @require_business_access("business_id")
 async def inventory_valuation_endpoint(
@@ -715,6 +715,7 @@ async def inventory_valuation_endpoint(
     as_of_date = body.get("as_of_date")
     warehouse_ids = body.get("warehouse_ids")
     category_ids = body.get("category_ids")
+    currency_id = body.get("currency_id")
     
     skip = int(body.get("skip", 0))
     take = int(body.get("take", 50))
@@ -725,6 +726,7 @@ async def inventory_valuation_endpoint(
         as_of_date=as_of_date,
         warehouse_ids=warehouse_ids,
         category_ids=category_ids,
+        currency_id=currency_id,
         skip=skip,
         take=take,
     )
@@ -754,6 +756,7 @@ async def export_inventory_valuation_excel(
         as_of_date=body.get("as_of_date"),
         warehouse_ids=body.get("warehouse_ids"),
         category_ids=body.get("category_ids"),
+        currency_id=body.get("currency_id"),
         skip=0,
         take=10000,
     )

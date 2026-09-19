@@ -59,6 +59,7 @@ SYSTEM_CONFIG_APP_NAME = "system_config_app_name"
 SYSTEM_CONFIG_APP_VERSION = "system_config_app_version"
 SYSTEM_CONFIG_DEFAULT_LANGUAGE = "system_config_default_language"
 SYSTEM_CONFIG_DEFAULT_THEME = "system_config_default_theme"
+SYSTEM_CONFIG_DEFAULT_THEME_ID = "system_config_default_theme_id"
 # منطقهٔ زمانی IANA برای نمایش تاریخ/زمان در API (قرارداد: مقادیر naive در DB = UTC)
 SYSTEM_CONFIG_DEFAULT_TIMEZONE = "system_config_default_timezone"
 SYSTEM_CONFIG_ENABLE_REGISTRATION = "system_config_enable_registration"
@@ -66,6 +67,8 @@ SYSTEM_CONFIG_ENABLE_EMAIL_VERIFICATION = "system_config_enable_email_verificati
 SYSTEM_CONFIG_ENABLE_MAINTENANCE_MODE = "system_config_enable_maintenance_mode"
 SYSTEM_CONFIG_SUPPORT_TICKETS_ENABLED = "system_config_support_tickets_enabled"
 SYSTEM_CONFIG_SUPPORT_TICKETS_DISABLED_MESSAGE = "system_config_support_tickets_disabled_message"
+SYSTEM_CONFIG_LEGACY_API_IMPORT_ENABLED = "system_config_legacy_api_import_enabled"
+SYSTEM_CONFIG_LEGACY_API_IMPORT_DISABLED_MESSAGE = "system_config_legacy_api_import_disabled_message"
 SYSTEM_CONFIG_SESSION_TIMEOUT = "system_config_session_timeout"
 SYSTEM_CONFIG_MAX_FILE_SIZE = "system_config_max_file_size"
 SYSTEM_CONFIG_MAX_USERS = "system_config_max_users"
@@ -107,6 +110,8 @@ REDIS_CONFIG_PASSWORD = "redis_config_password"
 
 _SUPPORT_TICKETS_DISABLED_FALLBACK_MESSAGE_FA = "سیستم تیکت‌های پشتیبانی موقتاً غیرفعال است."
 MAX_SUPPORT_TICKETS_DISABLED_MESSAGE_LEN = 8192
+_LEGACY_API_IMPORT_DISABLED_FALLBACK_MESSAGE_FA = "انتقال از حسابیکس قبلی موقتاً غیرفعال است."
+MAX_LEGACY_API_IMPORT_DISABLED_MESSAGE_LEN = 8192
 
 
 def is_support_tickets_enabled_for_users(db: Session) -> bool:
@@ -136,9 +141,50 @@ def assert_end_user_support_tickets_allowed(db: Session) -> None:
 
 def support_tickets_public_config_dict(db: Session) -> Dict[str, Any]:
 	enabled = is_support_tickets_enabled_for_users(db)
+	from app.services.support.support_billing_settings import support_billing_settings_dict
+
+	billing = support_billing_settings_dict(db)
 	return {
 		"support_tickets_enabled": enabled,
 		"support_tickets_disabled_message": "" if enabled else get_support_tickets_disabled_user_message(db),
+		"support_billing_mode": billing.get("support_billing_mode"),
+		"support_free_quota_per_month": billing.get("support_free_quota_per_month"),
+	}
+
+
+def is_legacy_api_import_enabled(db: Session) -> bool:
+	"""انتقال از حسابیکس قبلی (API)؛ پیش‌فرض روشن تا استقرارهای موجود قطع نشوند."""
+	raw = _get_setting_bool(db, SYSTEM_CONFIG_LEGACY_API_IMPORT_ENABLED)
+	return True if raw is None else raw
+
+
+def get_legacy_api_import_disabled_user_message(db: Session) -> str:
+	obj = _get_setting(db, SYSTEM_CONFIG_LEGACY_API_IMPORT_DISABLED_MESSAGE)
+	if obj and obj.value_string and obj.value_string.strip():
+		text = obj.value_string.strip()
+		return text[:MAX_LEGACY_API_IMPORT_DISABLED_MESSAGE_LEN]
+	return _LEGACY_API_IMPORT_DISABLED_FALLBACK_MESSAGE_FA
+
+
+def assert_legacy_api_import_allowed(db: Session) -> None:
+	if is_legacy_api_import_enabled(db):
+		return
+	msg = get_legacy_api_import_disabled_user_message(db)
+	raise ApiError(
+		"LEGACY_API_IMPORT_DISABLED",
+		msg,
+		http_status=403,
+		details={"user_message": msg},
+	)
+
+
+def legacy_api_import_public_config_dict(db: Session) -> Dict[str, Any]:
+	enabled = is_legacy_api_import_enabled(db)
+	return {
+		"legacy_api_import_enabled": enabled,
+		"legacy_api_import_disabled_message": (
+			"" if enabled else get_legacy_api_import_disabled_user_message(db)
+		),
 	}
 
 
@@ -790,6 +836,27 @@ def get_default_theme(db: Session) -> str:
 	return (default_theme.value_string if default_theme and default_theme.value_string else "system")
 
 
+_ALLOWED_COLOR_THEME_IDS = frozenset({"classic_blue", "turquoise_sea", "emerald_forest", "warm_copper"})
+
+
+def get_default_theme_id(db: Session) -> str:
+	"""شناسه پالت رنگی پیش‌فرض سیستم."""
+	row = _get_setting(db, SYSTEM_CONFIG_DEFAULT_THEME_ID)
+	value = (row.value_string if row and row.value_string else "classic_blue").strip().lower()
+	if value not in _ALLOWED_COLOR_THEME_IDS:
+		return "classic_blue"
+	return value
+
+
+def theme_public_config_dict(db: Session) -> Dict[str, Any]:
+	"""تنظیمات تم قابل‌دسترسی برای همه (مهمان/کاربر) بدون دسترسی ادمین."""
+	return {
+		"default_theme": get_default_theme(db),
+		"default_theme_id": get_default_theme_id(db),
+		"available_theme_ids": sorted(_ALLOWED_COLOR_THEME_IDS),
+	}
+
+
 def validate_iana_timezone_name(name: str) -> str:
 	"""نام IANA را اعتبارسنجی می‌کند؛ در صورت نامعتبر بودن Asia/Tehran برمی‌گرداند."""
 	from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
@@ -927,12 +994,23 @@ def get_system_configuration(db: Session) -> Dict[str, Any]:
 		support_disabled_msg_storage = support_disabled_msg_setting.value_string.strip()[
 			:MAX_SUPPORT_TICKETS_DISABLED_MESSAGE_LEN
 		]
+	legacy_import_disabled_msg_setting = _get_setting(
+		db, SYSTEM_CONFIG_LEGACY_API_IMPORT_DISABLED_MESSAGE
+	)
+	legacy_import_disabled_msg_storage = ""
+	if legacy_import_disabled_msg_setting and legacy_import_disabled_msg_setting.value_string:
+		legacy_import_disabled_msg_storage = (
+			legacy_import_disabled_msg_setting.value_string.strip()[
+				:MAX_LEGACY_API_IMPORT_DISABLED_MESSAGE_LEN
+			]
+		)
 
-	return {
+	out = {
 		"app_name": (app_name.value_string if app_name and app_name.value_string else env.app_name),
 		"app_version": (app_version.value_string if app_version and app_version.value_string else env.app_version),
 		"default_language": (default_language.value_string if default_language and default_language.value_string else "fa"),
 		"default_theme": (default_theme.value_string if default_theme and default_theme.value_string else "system"),
+		"default_theme_id": get_default_theme_id(db),
 		"default_timezone": resolve_system_display_timezone_string(db),
 		"enable_registration": (enable_registration if enable_registration is not None else True),
 		"enable_email_verification": (enable_email_verification if enable_email_verification is not None else True),
@@ -971,7 +1049,13 @@ def get_system_configuration(db: Session) -> Dict[str, Any]:
 		"firewall_auto_ban_duration_sec": sec["firewall_auto_ban_duration_sec"],
 		"support_tickets_enabled": is_support_tickets_enabled_for_users(db),
 		"support_tickets_disabled_message": support_disabled_msg_storage,
+		"legacy_api_import_enabled": is_legacy_api_import_enabled(db),
+		"legacy_api_import_disabled_message": legacy_import_disabled_msg_storage,
 	}
+	from app.services.support.support_billing_settings import support_billing_settings_dict
+
+	out.update(support_billing_settings_dict(db))
+	return out
 
 
 def set_system_configuration(
@@ -981,12 +1065,24 @@ def set_system_configuration(
 	app_version: str | None = None,
 	default_language: str | None = None,
 	default_theme: str | None = None,
+	default_theme_id: str | None = None,
 	default_timezone: str | None = None,
 	enable_registration: bool | None = None,
 	enable_email_verification: bool | None = None,
 	enable_maintenance_mode: bool | None = None,
 	support_tickets_enabled: bool | None = None,
 	support_tickets_disabled_message: str | None = None,
+	legacy_api_import_enabled: bool | None = None,
+	legacy_api_import_disabled_message: str | None = None,
+	support_billing_mode: str | None = None,
+	support_free_quota_per_month: int | None = None,
+	support_grace_period_days: int | None = None,
+	support_allow_read_without_subscription: bool | None = None,
+	support_require_subscription_to_reply: bool | None = None,
+	support_default_gateway_id: int | None = None,
+	support_invoice_prefix: str | None = None,
+	support_expiry_notify_days: list | None = None,
+	support_paid_priority_boost: bool | None = None,
 	session_timeout: int | None = None,
 	max_file_size: int | None = None,
 	max_users: int | None = None,
@@ -1051,6 +1147,16 @@ def set_system_configuration(
 			raise ApiError("INVALID_THEME", "تم باید system، light یا dark باشد", http_status=400)
 		_upsert_setting_string(db, SYSTEM_CONFIG_DEFAULT_THEME, default_theme)
 
+	if default_theme_id is not None:
+		theme_id = str(default_theme_id).strip().lower()
+		if theme_id not in _ALLOWED_COLOR_THEME_IDS:
+			raise ApiError(
+				"INVALID_THEME_ID",
+				"شناسه تم رنگی معتبر نیست",
+				http_status=400,
+			)
+		_upsert_setting_string(db, SYSTEM_CONFIG_DEFAULT_THEME_ID, theme_id)
+
 	if default_timezone is not None:
 		from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -1090,6 +1196,34 @@ def set_system_configuration(
 				http_status=400,
 			)
 		_upsert_setting_string(db, SYSTEM_CONFIG_SUPPORT_TICKETS_DISABLED_MESSAGE, text)
+
+	if legacy_api_import_enabled is not None:
+		_upsert_setting_bool(db, SYSTEM_CONFIG_LEGACY_API_IMPORT_ENABLED, legacy_api_import_enabled)
+
+	if legacy_api_import_disabled_message is not None:
+		text = str(legacy_api_import_disabled_message).strip()
+		if len(text) > MAX_LEGACY_API_IMPORT_DISABLED_MESSAGE_LEN:
+			raise ApiError(
+				"LEGACY_IMPORT_MESSAGE_TOO_LONG",
+				f"پیام غیرفعال‌سازی انتقال از حسابیکس قبلی حداکثر {MAX_LEGACY_API_IMPORT_DISABLED_MESSAGE_LEN} کاراکتر است",
+				http_status=400,
+			)
+		_upsert_setting_string(db, SYSTEM_CONFIG_LEGACY_API_IMPORT_DISABLED_MESSAGE, text)
+
+	from app.services.support.support_billing_settings import apply_support_billing_settings
+
+	apply_support_billing_settings(
+		db,
+		support_billing_mode=support_billing_mode,
+		support_free_quota_per_month=support_free_quota_per_month,
+		support_grace_period_days=support_grace_period_days,
+		support_allow_read_without_subscription=support_allow_read_without_subscription,
+		support_require_subscription_to_reply=support_require_subscription_to_reply,
+		support_default_gateway_id=support_default_gateway_id,
+		support_invoice_prefix=support_invoice_prefix,
+		support_expiry_notify_days=support_expiry_notify_days,
+		support_paid_priority_boost=support_paid_priority_boost,
+	)
 	
 	if session_timeout is not None:
 		# 0 به معنی نامحدود است

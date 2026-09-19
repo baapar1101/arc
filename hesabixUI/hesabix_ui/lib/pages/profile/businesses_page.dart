@@ -1,208 +1,403 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
-import '../../services/business_dashboard_service.dart';
-import '../../services/business_user_service.dart';
-import '../../services/business_api_service.dart';
 import '../../core/api_client.dart';
-import '../../models/business_dashboard_models.dart';
-import '../../models/business_user_model.dart';
 import '../../core/auth_store.dart';
+import '../../core/business_switcher_prefs.dart';
 import '../../core/mobile_launcher_prefs.dart';
+import '../../models/business_dashboard_models.dart';
+import '../../services/business_dashboard_service.dart';
 import '../../utils/error_extractor.dart';
-import '../../utils/snackbar_helper.dart';
 import '../../utils/responsive_helper.dart';
+import '../../utils/snackbar_helper.dart';
+import '../../widgets/profile/business_switcher_widgets.dart';
+import '../../widgets/profile/businesses_empty_state.dart';
+import '../../widgets/profile/businesses_hub_utils.dart';
 
+/// صفحه انتخاب فضای کاری — سوییچر خلوت، نه هاب مدیریت.
 class BusinessesPage extends StatefulWidget {
-  const BusinessesPage({super.key});
+  final AuthStore authStore;
+
+  const BusinessesPage({super.key, required this.authStore});
 
   @override
   State<BusinessesPage> createState() => _BusinessesPageState();
 }
 
 class _BusinessesPageState extends State<BusinessesPage> {
+  static const int _pageSize = 24;
+  static const double _contentMaxWidth = 560;
+  /// جست‌وجو از دو کسب‌وکار به بالا؛ با کوئری فعال همیشه نمایش داده می‌شود.
+  static const int _searchThreshold = 2;
+
   final BusinessDashboardService _service = BusinessDashboardService(ApiClient());
+  final ScrollController _scrollController = ScrollController();
+  final TextEditingController _searchController = TextEditingController();
+  final FocusNode _searchFocusNode = FocusNode();
+
   List<BusinessWithPermission> _businesses = [];
   bool _loading = true;
+  bool _softRefreshing = false;
   bool _isLoadingMore = false;
   String? _error;
-  final AuthStore _authStore = AuthStore();
-  final ScrollController _scrollController = ScrollController();
-  
-  // Pagination state
   int _skip = 0;
-  static const int _pageSize = 10;
   bool _hasMore = true;
+  int? _totalCount;
+  String _searchQuery = '';
+  Timer? _searchDebounce;
+  int _searchRequestId = 0;
+
+  BusinessSwitcherSort _sort = BusinessSwitcherSort.recent;
+  List<int> _lastUsedIds = const [];
+
+  AuthStore get _authStore => widget.authStore;
 
   @override
   void initState() {
     super.initState();
-    _init();
     _scrollController.addListener(_onScroll);
+    _searchController.addListener(_onSearchTextChanged);
+    _authStore.addListener(_onAuthChanged);
+    _init();
+  }
+
+  void _onAuthChanged() {
+    if (mounted) setState(() {});
   }
 
   @override
   void dispose() {
+    _authStore.removeListener(_onAuthChanged);
+    _searchDebounce?.cancel();
+    _searchController.removeListener(_onSearchTextChanged);
+    _searchController.dispose();
+    _searchFocusNode.dispose();
     _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
     super.dispose();
   }
 
+  void _onSearchTextChanged() {
+    _searchDebounce?.cancel();
+    _searchDebounce = Timer(const Duration(milliseconds: 320), () {
+      if (!mounted) return;
+      final next = _searchController.text.trim();
+      if (next == _searchQuery) return;
+      setState(() => _searchQuery = next);
+      _loadBusinesses(reset: true, soft: _businesses.isNotEmpty || next.isNotEmpty);
+    });
+  }
+
+  void _clearSearch() {
+    _searchDebounce?.cancel();
+    _searchController.clear();
+    if (_searchQuery.isEmpty) return;
+    setState(() => _searchQuery = '');
+    _loadBusinesses(reset: true, soft: true);
+  }
+
   void _onScroll() {
-    // جلوگیری از فراخوانی همزمان
-    if (_isLoadingMore || !_hasMore || _loading) return;
-    
-    // بررسی اینکه آیا به انتهای لیست نزدیک شده‌ایم
-    final maxScroll = _scrollController.position.maxScrollExtent;
-    final currentScroll = _scrollController.position.pixels;
-    final threshold = maxScroll - 200; // 200 پیکسل مانده به آخر
-    
-    if (currentScroll >= threshold && maxScroll > 0) {
-      // وقتی به 200 پیکسل مانده به آخر رسید، صفحات بعدی را لود کن
+    if (_isLoadingMore || !_hasMore || _loading || _softRefreshing) return;
+    final pos = _scrollController.position;
+    if (pos.pixels >= pos.maxScrollExtent - 240 && pos.maxScrollExtent > 0) {
       _loadMore();
     }
   }
 
   Future<void> _init() async {
-    // اطمینان از bind بودن AuthStore برای ApiClient
-    ApiClient.bindAuthStore(_authStore);
-    await _authStore.load();
+    // از AuthStore مشترک اپ استفاده می‌کنیم؛ نباید store خالی جدید bind شود
+    // (باعث race روی Authorization و پاک شدن سشن می‌شود).
+    final bound = ApiClient.getAuthStore();
+    if (bound != _authStore) {
+      ApiClient.bindAuthStore(_authStore);
+    }
+    final uid = _authStore.currentUserId;
+    final sort = await BusinessSwitcherPrefs.sortMode(uid);
+    final lastUsed = await BusinessSwitcherPrefs.lastUsedIds(uid);
+    if (!mounted) return;
+    setState(() {
+      _sort = sort;
+      _lastUsedIds = lastUsed;
+    });
     await _loadBusinesses();
   }
 
-  Future<void> _loadBusinesses({bool reset = true}) async {
+  ({String sortBy, bool sortDesc}) get _apiSort {
+    switch (_sort) {
+      case BusinessSwitcherSort.name:
+        return (sortBy: 'name', sortDesc: false);
+      case BusinessSwitcherSort.created:
+        return (sortBy: 'created_at', sortDesc: true);
+      case BusinessSwitcherSort.recent:
+        return (sortBy: 'created_at', sortDesc: true);
+    }
+  }
+
+  List<BusinessWithPermission> _orderForDisplay(List<BusinessWithPermission> items) {
+    if (_sort != BusinessSwitcherSort.recent || items.length < 2) return items;
+
+    final activeId = _activeBusinessId;
+    final rank = <int, int>{};
+    for (var i = 0; i < _lastUsedIds.length; i++) {
+      rank[_lastUsedIds[i]] = i;
+    }
+
+    int score(BusinessWithPermission b) {
+      if (activeId != null && b.id == activeId) return -2;
+      final r = rank[b.id];
+      if (r != null) return r;
+      return 100000 + b.id;
+    }
+
+    final copy = List<BusinessWithPermission>.of(items);
+    copy.sort((a, b) => score(a).compareTo(score(b)));
+    return copy;
+  }
+
+  Future<void> _loadBusinesses({bool reset = true, bool soft = false}) async {
+    final requestId = ++_searchRequestId;
     try {
       setState(() {
         if (reset) {
-          _loading = true;
           _skip = 0;
           _hasMore = true;
-          _businesses = [];
+          if (soft && (_businesses.isNotEmpty || _searchQuery.isNotEmpty)) {
+            _softRefreshing = true;
+            _loading = false;
+          } else {
+            _loading = true;
+            _softRefreshing = false;
+            _businesses = [];
+          }
         }
         _error = null;
       });
 
-      // استفاده از _skip فعلی (0 در reset، یا مقدار قبلی)
       final currentSkip = reset ? 0 : _skip;
-      
+      final apiSort = _apiSort;
       final result = await _service.getUserBusinessesPaginated(
         take: _pageSize,
         skip: currentSkip,
-        sortBy: 'created_at',
-        sortDesc: true,
+        sortBy: apiSort.sortBy,
+        sortDesc: apiSort.sortDesc,
+        search: _searchQuery.isEmpty ? null : _searchQuery,
       );
 
-      if (mounted) {
-        final newBusinesses = result['items'] as List<BusinessWithPermission>;
-        final pagination = result['pagination'] as Map<String, dynamic>?;
-        
-        setState(() {
-          if (reset) {
-            _businesses = newBusinesses;
-            _skip = newBusinesses.length; // به‌روزرسانی skip به تعداد آیتم‌های دریافت شده
-          } else {
-            _businesses.addAll(newBusinesses);
-            _skip += newBusinesses.length; // اضافه کردن به skip موجود
+      if (!mounted || requestId != _searchRequestId) return;
+      final newBusinesses = (result['items'] as List<BusinessWithPermission>)
+          .where((b) => !b.isDeleted || b.isDeletionPending)
+          .toList();
+      final pagination = result['pagination'] as Map<String, dynamic>?;
+
+      setState(() {
+        if (reset) {
+          _businesses = _orderForDisplay(newBusinesses);
+          _skip = newBusinesses.length;
+        } else {
+          final merged = [..._businesses, ...newBusinesses];
+          _businesses = _orderForDisplay(merged);
+          _skip += newBusinesses.length;
+        }
+        _loading = false;
+        _softRefreshing = false;
+        if (pagination != null) {
+          _hasMore = pagination['has_next'] as bool? ?? false;
+          final total = pagination['total'];
+          if (total is int) {
+            _totalCount = total;
+          } else if (total is num) {
+            _totalCount = total.toInt();
           }
-          _loading = false;
-          
-          // بررسی اینکه آیا صفحات بیشتری وجود دارد
-          if (pagination != null) {
-            _hasMore = pagination['has_next'] as bool? ?? false;
-          } else {
-            // اگر pagination وجود نداشت، بر اساس تعداد آیتم‌ها تصمیم بگیر
-            _hasMore = newBusinesses.length >= _pageSize;
-          }
-        });
-      }
+        } else {
+          _hasMore = newBusinesses.length >= _pageSize;
+          if (reset) _totalCount = newBusinesses.length;
+        }
+      });
     } catch (e) {
-      if (mounted) {
-        final err = ErrorExtractor.forContext(e, context);
-        setState(() {
-          _loading = false;
-          _error = err;
-        });
-        SnackBarHelper.showError(
-          context,
-          message:
-              '${AppLocalizations.of(context).dataLoadingError}: $err',
-        );
-      }
+      if (!mounted || requestId != _searchRequestId) return;
+      final err = ErrorExtractor.forContext(e, context);
+      setState(() {
+        _loading = false;
+        _softRefreshing = false;
+        _error = err;
+      });
+      SnackBarHelper.showError(
+        context,
+        message: '${AppLocalizations.of(context).dataLoadingError}: $err',
+      );
     }
   }
 
   Future<void> _loadMore() async {
-    if (_isLoadingMore || !_hasMore || _loading) return;
-
-    setState(() {
-      _isLoadingMore = true;
-    });
-
+    if (_isLoadingMore || !_hasMore || _loading || _softRefreshing) return;
+    setState(() => _isLoadingMore = true);
     try {
-      // استفاده از _skip فعلی برای دریافت صفحه بعدی
+      final apiSort = _apiSort;
       final result = await _service.getUserBusinessesPaginated(
         take: _pageSize,
         skip: _skip,
-        sortBy: 'created_at',
-        sortDesc: true,
+        sortBy: apiSort.sortBy,
+        sortDesc: apiSort.sortDesc,
+        search: _searchQuery.isEmpty ? null : _searchQuery,
       );
+      if (!mounted) return;
+      final newBusinesses = (result['items'] as List<BusinessWithPermission>)
+          .where((b) => !b.isDeleted || b.isDeletionPending)
+          .toList();
+      final pagination = result['pagination'] as Map<String, dynamic>?;
 
-      if (mounted) {
-        final newBusinesses = result['items'] as List<BusinessWithPermission>;
-        final pagination = result['pagination'] as Map<String, dynamic>?;
-        
-        setState(() {
-          _businesses.addAll(newBusinesses);
-          _skip += newBusinesses.length; // به‌روزرسانی skip
-          _isLoadingMore = false;
-          
-          // بررسی اینکه آیا صفحات بیشتری وجود دارد
-          if (pagination != null) {
-            _hasMore = pagination['has_next'] as bool? ?? false;
-          } else {
-            // اگر pagination وجود نداشت، بر اساس تعداد آیتم‌ها تصمیم بگیر
-            _hasMore = newBusinesses.length >= _pageSize;
+      setState(() {
+        final merged = [..._businesses, ...newBusinesses];
+        _businesses = _orderForDisplay(merged);
+        _skip += newBusinesses.length;
+        _isLoadingMore = false;
+        if (pagination != null) {
+          _hasMore = pagination['has_next'] as bool? ?? false;
+          final total = pagination['total'];
+          if (total is int) {
+            _totalCount = total;
+          } else if (total is num) {
+            _totalCount = total.toInt();
           }
-        });
-      }
+        } else {
+          _hasMore = newBusinesses.length >= _pageSize;
+        }
+      });
     } catch (e) {
-      if (mounted) {
-        setState(() {
-          _isLoadingMore = false;
-        });
-        SnackBarHelper.showError(
-          context,
-          message:
-              'خطا در بارگذاری صفحات بعدی: ${ErrorExtractor.forContext(e, context)}',
-        );
-      }
+      if (!mounted) return;
+      setState(() => _isLoadingMore = false);
+      SnackBarHelper.showError(
+        context,
+        message: AppLocalizations.of(context).businessesHubLoadMoreFailed,
+      );
     }
   }
 
-  Future<void> _navigateToBusiness(int businessId) async {
-    // بررسی اینکه کسب و کار حذف نشده باشد
-    final business = _businesses.firstWhere(
-      (b) => b.id == businessId,
-      orElse: () => throw Exception('کسب و کار یافت نشد'),
-    );
+  Future<void> _refresh() async {
+    final lastUsed = await BusinessSwitcherPrefs.lastUsedIds(_authStore.currentUserId);
+    if (mounted) setState(() => _lastUsedIds = lastUsed);
+    await _loadBusinesses(reset: true, soft: _businesses.isNotEmpty);
+  }
 
-    if (business.isDeletionPending) {
+  Future<void> _changeSort(BusinessSwitcherSort next) async {
+    if (next == _sort) return;
+    setState(() => _sort = next);
+    await BusinessSwitcherPrefs.setSortMode(_authStore.currentUserId, next);
+    if (!mounted) return;
+    await _loadBusinesses(reset: true, soft: _businesses.isNotEmpty);
+  }
+
+  bool get _isSearching => _searchQuery.isNotEmpty;
+
+  bool get _showSearch {
+    if (_isSearching) return true;
+    if (_loading && _businesses.isEmpty) return false;
+    final count = _totalCount ?? _businesses.length;
+    return count >= _searchThreshold;
+  }
+
+  bool get _showSort {
+    if (_loading && _businesses.isEmpty) return false;
+    if (_error != null) return false;
+    final count = _totalCount ?? _businesses.length;
+    return count >= _searchThreshold || _isSearching;
+  }
+
+  int? get _activeBusinessId => _authStore.currentBusiness?.id;
+
+  Future<void> _recordAndEnter(int businessId, Future<void> Function() enter) async {
+    try {
+      await BusinessSwitcherPrefs.recordLastUsed(_authStore.currentUserId, businessId);
+      final lastUsed = await BusinessSwitcherPrefs.lastUsedIds(_authStore.currentUserId);
+      if (mounted) setState(() => _lastUsedIds = lastUsed);
+    } catch (e, st) {
+      // ثبت محلی نباید جلوی ورود به کسب‌وکار را بگیرد.
+      assert(() {
+        debugPrint('BusinessSwitcherPrefs.recordLastUsed failed: $e\n$st');
+        return true;
+      }());
+    }
+    await enter();
+  }
+
+  Future<void> _navigateToBusiness(
+    int businessId, {
+    bool forceChooseMode = false,
+  }) async {
+    final business = _businesses.cast<BusinessWithPermission?>().firstWhere(
+          (b) => b?.id == businessId,
+          orElse: () => null,
+        );
+    if (business == null) return;
+
+    if (businessBlocksAccess(business.isDeleted, business.isDeletionPending)) {
       SnackBarHelper.showError(
         context,
-        message:
-            'این کسب و کار در حال حذف است و نمی‌توان به آن دسترسی داشت. می‌توانید آن را بازیابی کنید.',
+        message: business.isDeletionPending
+            ? AppLocalizations.of(context).businessesHubDeletionPending
+            : AppLocalizations.of(context).accessDenied,
       );
       return;
     }
 
-    final t = AppLocalizations.of(context);
     if (!ResponsiveHelper.isMobile(context)) {
       await MobileLauncherPrefs.clearResumeLauncher(_authStore.currentUserId);
       if (!mounted) return;
-      context.go('/business/$businessId/dashboard');
+      await _recordAndEnter(businessId, () async {
+        if (!mounted) return;
+        context.go('/business/$businessId/dashboard');
+      });
       return;
     }
-    showModalBottomSheet<void>(
+
+    final preferred = forceChooseMode
+        ? null
+        : await MobileLauncherPrefs.preferredEntryMode(_authStore.currentUserId);
+    if (!mounted) return;
+
+    if (preferred == MobileBusinessEntryMode.standard) {
+      await _enterStandard(businessId);
+      return;
+    }
+    if (preferred == MobileBusinessEntryMode.launcher) {
+      await _enterLauncher(businessId);
+      return;
+    }
+
+    await _showEntryModeSheet(businessId);
+  }
+
+  Future<void> _enterStandard(int businessId) async {
+    await MobileLauncherPrefs.clearResumeLauncher(_authStore.currentUserId);
+    if (!mounted) return;
+    await _recordAndEnter(businessId, () async {
+      if (!mounted) return;
+      context.go('/business/$businessId/dashboard');
+    });
+  }
+
+  Future<void> _enterLauncher(int businessId) async {
+    await MobileLauncherPrefs.setResumeLauncher(
+      _authStore.currentUserId,
+      businessId,
+    );
+    if (!mounted) return;
+    await _recordAndEnter(businessId, () async {
+      if (!mounted) return;
+      // یک فریم صبر تا bottom sheet / route قبلی کاملاً بسته شود (رفع race روی اندروید).
+      await Future<void>.delayed(Duration.zero);
+      if (!mounted) return;
+      context.go(MobileLauncherPrefs.launcherHomePath(businessId));
+    });
+  }
+
+  Future<void> _showEntryModeSheet(int businessId) async {
+    final t = AppLocalizations.of(context);
+
+    final mode = await showModalBottomSheet<MobileBusinessEntryMode>(
       context: context,
       showDragHandle: true,
       builder: (sheetCtx) {
@@ -220,28 +415,28 @@ class _BusinessesPageState extends State<BusinessesPage> {
                     style: Theme.of(sheetCtx).textTheme.titleMedium,
                   ),
                 ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+                  child: Text(
+                    t.mobileLauncherChooseModeHint,
+                    style: Theme.of(sheetCtx).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(sheetCtx).colorScheme.onSurfaceVariant,
+                        ),
+                  ),
+                ),
                 ListTile(
                   leading: const Icon(Icons.dashboard_outlined),
                   title: Text(t.mobileLauncherModeStandard),
-                  onTap: () async {
-                    Navigator.of(sheetCtx).pop();
-                    await MobileLauncherPrefs.clearResumeLauncher(_authStore.currentUserId);
-                    if (!mounted) return;
-                    context.go('/business/$businessId/dashboard');
-                  },
+                  onTap: () => Navigator.of(sheetCtx).pop(
+                    MobileBusinessEntryMode.standard,
+                  ),
                 ),
                 ListTile(
                   leading: const Icon(Icons.apps_outlined),
                   title: Text(t.mobileLauncherModeLauncher),
-                  onTap: () async {
-                    Navigator.of(sheetCtx).pop();
-                    await MobileLauncherPrefs.setResumeLauncher(
-                      _authStore.currentUserId,
-                      businessId,
-                    );
-                    if (!mounted) return;
-                    context.go(MobileLauncherPrefs.launcherHomePath(businessId));
-                  },
+                  onTap: () => Navigator.of(sheetCtx).pop(
+                    MobileBusinessEntryMode.launcher,
+                  ),
                 ),
               ],
             ),
@@ -249,128 +444,314 @@ class _BusinessesPageState extends State<BusinessesPage> {
         );
       },
     );
+
+    if (!mounted || mode == null) return;
+    await MobileLauncherPrefs.setPreferredEntryMode(
+      _authStore.currentUserId,
+      mode,
+    );
+    if (!mounted) return;
+    if (mode == MobileBusinessEntryMode.standard) {
+      await _enterStandard(businessId);
+    } else {
+      await _enterLauncher(businessId);
+    }
   }
+
+  void _goNewBusiness() => context.go('/user/profile/new-business');
 
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
-    final isMobile = ResponsiveHelper.isMobile(context);
     final padding = ResponsiveHelper.getPadding(context);
-    final gridSpacing = ResponsiveHelper.getGridSpacing(context);
+    final showToolsChrome = !_loading && _error == null && (_showSearch || _showSort);
+    final showInitialSkeleton = _loading && _businesses.isEmpty;
+    final noBusinessesAtAll = !_isSearching && _businesses.isEmpty;
+    final noSearchResults = _isSearching && _businesses.isEmpty;
 
     return Scaffold(
-      body: Padding(
-        padding: EdgeInsets.all(padding),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Header - responsive
-            if (!isMobile) _buildDesktopHeader(t, context),
-            if (isMobile) _buildMobileHeader(t, context),
-            
-            SizedBox(height: padding),
-            
-            // Content
-            if (_loading)
-              Expanded(
-                child: Center(
-                  child: CircularProgressIndicator(),
+      body: CallbackShortcuts(
+        bindings: {
+          const SingleActivator(LogicalKeyboardKey.slash): () {
+            if (_showSearch && !_loading && _error == null) {
+              _searchFocusNode.requestFocus();
+            }
+          },
+        },
+        child: Focus(
+          child: RefreshIndicator(
+            onRefresh: _refresh,
+            edgeOffset: 8,
+            child: CustomScrollView(
+              controller: _scrollController,
+              physics: const AlwaysScrollableScrollPhysics(),
+              slivers: [
+                SliverToBoxAdapter(
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: _contentMaxWidth),
+                      child: Padding(
+                        padding: EdgeInsets.fromLTRB(padding, padding + 8, padding, 0),
+                        child: _buildHeader(context, t),
+                      ),
+                    ),
+                  ),
                 ),
-              )
-            else if (_error != null)
-              Expanded(
-                child: _buildErrorState(t, context, padding),
-              )
-            else if (_businesses.isEmpty)
-              Expanded(
-                child: _buildEmptyState(t, context, padding),
-              )
-            else
-              Expanded(
-                child: _buildContent(context, gridSpacing),
-              ),
-          ],
-        ),
-      ),
-      // FloatingActionButton فقط در موبایل
-      floatingActionButton: isMobile && !_loading && _error == null
-          ? FloatingActionButton.extended(
-              onPressed: () => context.go('/user/profile/new-business'),
-              icon: const Icon(Icons.add),
-              label: Text(t.newBusiness),
-            )
-          : null,
-    );
-  }
-
-  Widget _buildDesktopHeader(AppLocalizations t, BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Expanded(
-          child: Text(
-            t.businesses,
-            style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-              fontSize: ResponsiveHelper.responsiveValue(
-                context,
-                mobile: 24,
-                tablet: 26,
-                desktop: 28,
-              ),
+                if (showToolsChrome)
+                  SliverToBoxAdapter(
+                    child: Center(
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: _contentMaxWidth),
+                        child: Padding(
+                          padding: EdgeInsets.fromLTRB(padding, 12, padding, 4),
+                          child: _buildToolsRow(context, t),
+                        ),
+                      ),
+                    ),
+                  ),
+                if (showToolsChrome && _softRefreshing)
+                  const SliverToBoxAdapter(
+                    child: Padding(
+                      padding: EdgeInsets.only(top: 4),
+                      child: LinearProgressIndicator(minHeight: 2),
+                    ),
+                  ),
+                if (showInitialSkeleton)
+                  SliverToBoxAdapter(
+                    child: Center(
+                      child: ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: _contentMaxWidth),
+                        child: Padding(
+                          padding: EdgeInsets.all(padding),
+                          child: const BusinessSwitcherSkeleton(),
+                        ),
+                      ),
+                    ),
+                  )
+                else if (_error != null)
+                  SliverFillRemaining(
+                    hasScrollBody: false,
+                    child: _buildErrorState(t, padding),
+                  )
+                else if (noBusinessesAtAll)
+                  const SliverFillRemaining(
+                    hasScrollBody: true,
+                    child: BusinessesEmptyState(),
+                  )
+                else if (noSearchResults)
+                  SliverFillRemaining(
+                    hasScrollBody: false,
+                    child: BusinessesEmptyState(
+                      noSearchResults: true,
+                      searchQuery: _searchQuery,
+                      onClearSearch: _clearSearch,
+                    ),
+                  )
+                else
+                  SliverPadding(
+                    padding: EdgeInsets.fromLTRB(padding, 4, padding, padding + 24),
+                    sliver: SliverToBoxAdapter(
+                      child: Center(
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: _contentMaxWidth),
+                          child: Column(
+                            children: [
+                              for (var i = 0; i < _businesses.length; i++)
+                                BusinessSwitcherRow(
+                                  business: _businesses[i],
+                                  authStore: _authStore,
+                                  isActive: _activeBusinessId == _businesses[i].id,
+                                  showDivider: i < _businesses.length - 1,
+                                  onEnter: () => _navigateToBusiness(_businesses[i].id),
+                                  onLongPress: ResponsiveHelper.isMobile(context)
+                                      ? () => _navigateToBusiness(
+                                            _businesses[i].id,
+                                            forceChooseMode: true,
+                                          )
+                                      : null,
+                                  onRefresh: _refresh,
+                                ),
+                              if (_isLoadingMore)
+                                const Padding(
+                                  padding: EdgeInsets.all(24),
+                                  child: Center(child: CircularProgressIndicator()),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
             ),
           ),
         ),
-        FilledButton.icon(
-          onPressed: () => context.go('/user/profile/new-business'),
-          icon: const Icon(Icons.add),
-          label: Text(t.newBusiness),
-        ),
-      ],
+      ),
     );
   }
 
-  Widget _buildMobileHeader(AppLocalizations t, BuildContext context) {
-    return Column(
+  Widget _buildHeader(BuildContext context, AppLocalizations t) {
+    final theme = Theme.of(context);
+    final canAdd = !_loading && _error == null && (_businesses.isNotEmpty || _isSearching);
+    final count = _totalCount ?? _businesses.length;
+    final String? subtitle;
+    if (_loading || _error != null) {
+      subtitle = null;
+    } else if (_businesses.isNotEmpty || _isSearching) {
+      if (count > 1 || _isSearching) {
+        subtitle = t.businessesHubCount(count);
+      } else {
+        subtitle = t.businessesSwitcherSubtitle;
+      }
+    } else {
+      subtitle = null;
+    }
+
+    return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          t.businesses,
-          style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-            fontSize: 24,
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                t.businesses,
+                style: theme.textTheme.headlineMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
+                  fontSize: ResponsiveHelper.isMobile(context) ? 26 : 30,
+                  letterSpacing: -0.3,
+                ),
+              ),
+              if (subtitle != null) ...[
+                const SizedBox(height: 6),
+                Text(
+                  subtitle,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ],
           ),
         ),
-        // دکمه در موبایل در FloatingActionButton است
+        if (canAdd)
+          TextButton.icon(
+            onPressed: _goNewBusiness,
+            icon: const Icon(Icons.add_rounded, size: 18),
+            label: Text(t.newBusiness),
+            style: TextButton.styleFrom(
+              visualDensity: VisualDensity.compact,
+            ),
+          ),
       ],
     );
   }
 
-  Widget _buildErrorState(AppLocalizations t, BuildContext context, double padding) {
+  Widget _buildToolsRow(BuildContext context, AppLocalizations t) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (_showSearch)
+          Expanded(child: _buildSearchField(context, t))
+        else
+          const Spacer(),
+        if (_showSort) ...[
+          if (_showSearch) const SizedBox(width: 4),
+          _buildSortButton(context, t),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildSortButton(BuildContext context, AppLocalizations t) {
+    final cs = Theme.of(context).colorScheme;
+    return PopupMenuButton<BusinessSwitcherSort>(
+      tooltip: t.businessesHubSortTooltip,
+      initialValue: _sort,
+      onSelected: _changeSort,
+      itemBuilder: (ctx) => [
+        CheckedPopupMenuItem(
+          value: BusinessSwitcherSort.recent,
+          checked: _sort == BusinessSwitcherSort.recent,
+          child: Text(t.businessesHubSortRecent),
+        ),
+        CheckedPopupMenuItem(
+          value: BusinessSwitcherSort.name,
+          checked: _sort == BusinessSwitcherSort.name,
+          child: Text(t.businessesHubSortName),
+        ),
+        CheckedPopupMenuItem(
+          value: BusinessSwitcherSort.created,
+          checked: _sort == BusinessSwitcherSort.created,
+          child: Text(t.businessesHubSortCreated),
+        ),
+      ],
+      child: Padding(
+        padding: const EdgeInsetsDirectional.only(start: 4, top: 2),
+        child: Material(
+          color: cs.surfaceContainerHighest.withValues(alpha: 0.45),
+          borderRadius: BorderRadius.circular(12),
+          child: SizedBox(
+            width: 44,
+            height: 44,
+            child: Icon(
+              Icons.sort_rounded,
+              size: 22,
+              color: cs.onSurfaceVariant,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSearchField(BuildContext context, AppLocalizations t) {
+    final cs = Theme.of(context).colorScheme;
+    return TextField(
+      controller: _searchController,
+      focusNode: _searchFocusNode,
+      textInputAction: TextInputAction.search,
+      decoration: InputDecoration(
+        hintText: t.businessesHubSearchHint,
+        prefixIcon: const Icon(Icons.search_rounded, size: 20),
+        suffixIcon: ListenableBuilder(
+          listenable: _searchController,
+          builder: (context, _) {
+            if (_searchController.text.isEmpty) return const SizedBox.shrink();
+            return IconButton(
+              tooltip: t.businessesHubClearSearch,
+              icon: const Icon(Icons.close_rounded, size: 18),
+              onPressed: _clearSearch,
+            );
+          },
+        ),
+        filled: true,
+        fillColor: cs.surfaceContainerHighest.withValues(alpha: 0.45),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide.none,
+        ),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        isDense: true,
+        helperText: ResponsiveHelper.isDesktop(context) ? t.businessesHubSearchShortcut : null,
+      ),
+    );
+  }
+
+  Widget _buildErrorState(AppLocalizations t, double padding) {
     return Center(
       child: Padding(
         padding: EdgeInsets.all(padding * 2),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Icons.error_outline,
-              size: ResponsiveHelper.responsiveValue(
-                context,
-                mobile: 64,
-                tablet: 72,
-                desktop: 80,
-              ),
-              color: Colors.red,
-            ),
+            Icon(Icons.cloud_off_rounded, size: 56, color: Theme.of(context).colorScheme.error),
             SizedBox(height: padding),
-            Text(
-              _error!,
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodyLarge,
-            ),
+            Text(_error!, textAlign: TextAlign.center),
             SizedBox(height: padding),
             FilledButton.icon(
-              onPressed: _loadBusinesses,
-              icon: const Icon(Icons.refresh),
+              onPressed: () => _loadBusinesses(),
+              icon: const Icon(Icons.refresh_rounded),
               label: Text(t.retry),
             ),
           ],
@@ -378,873 +759,4 @@ class _BusinessesPageState extends State<BusinessesPage> {
       ),
     );
   }
-
-  Widget _buildEmptyState(AppLocalizations t, BuildContext context, double padding) {
-    return Center(
-      child: Padding(
-        padding: EdgeInsets.all(padding * 2),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.business_outlined,
-              size: ResponsiveHelper.responsiveValue(
-                context,
-                mobile: 64,
-                tablet: 72,
-                desktop: 80,
-              ),
-              color: Colors.grey,
-            ),
-            SizedBox(height: padding),
-            Text(
-              t.noBusinessesFound,
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodyLarge,
-            ),
-            SizedBox(height: padding),
-            if (!ResponsiveHelper.isMobile(context))
-              FilledButton.icon(
-                onPressed: () => context.go('/user/profile/new-business'),
-                icon: const Icon(Icons.add),
-                label: Text(t.createFirstBusiness),
-              )
-            else
-              FilledButton(
-                onPressed: () => context.go('/user/profile/new-business'),
-                child: Text(t.createFirstBusiness),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildContent(BuildContext context, double spacing) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        // استفاده از ResponsiveHelper برای تعیین تعداد ستون‌ها
-        int crossAxisCount;
-        double childAspectRatio;
-        
-        if (ResponsiveHelper.isMobile(context)) {
-          crossAxisCount = 1;
-          // نسبت کمتر برای ارتفاع بیشتر کارت روی موبایل و جلوگیری از به‌هم‌ریختگی محتوا
-          childAspectRatio = 2.4; // wide card با ارتفاع مناسب‌تر
-        } else if (ResponsiveHelper.isTablet(context)) {
-          final bp = ResponsiveHelper.breakpoint(context);
-          if (bp == 'sm') {
-            crossAxisCount = 2;
-            childAspectRatio = 1.35;
-          } else {
-            // md
-            crossAxisCount = 2;
-            childAspectRatio = 1.25;
-          }
-        } else {
-          // Desktop
-          final bp = ResponsiveHelper.breakpoint(context);
-          if (bp == 'lg') {
-            crossAxisCount = 3;
-            childAspectRatio = 1.25;
-          } else {
-            // xl
-            crossAxisCount = 4;
-            childAspectRatio = 1.2;
-          }
-        }
-        
-        return GridView.builder(
-          controller: _scrollController,
-          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: crossAxisCount,
-            childAspectRatio: childAspectRatio,
-            crossAxisSpacing: spacing,
-            mainAxisSpacing: spacing,
-          ),
-          itemCount: _businesses.length + (_isLoadingMore ? 1 : 0),
-          itemBuilder: (context, index) {
-            // نمایش loading indicator در آخر لیست
-            if (index >= _businesses.length) {
-              return Center(
-                child: Padding(
-                  padding: EdgeInsets.all(spacing),
-                  child: CircularProgressIndicator(),
-                ),
-              );
-            }
-            
-            final business = _businesses[index];
-            return _BusinessCard(
-              business: business,
-              onTap: () => _navigateToBusiness(business.id),
-              authStore: _authStore,
-              isCompact: crossAxisCount > 1,
-              isMobile: crossAxisCount == 1,
-              onLeave: () => _loadBusinesses(),
-            );
-          },
-        );
-      },
-    );
-  }
 }
-
-class _BusinessCard extends StatefulWidget {
-  final BusinessWithPermission business;
-  final VoidCallback onTap;
-  final bool isCompact;
-  final bool isMobile;
-  final AuthStore authStore;
-  final VoidCallback? onLeave;
-
-  const _BusinessCard({
-    required this.business,
-    required this.onTap,
-    required this.authStore,
-    this.isCompact = true,
-    this.isMobile = false,
-    this.onLeave,
-  });
-
-  @override
-  State<_BusinessCard> createState() => _BusinessCardState();
-}
-
-class _BusinessCardState extends State<_BusinessCard> {
-  String? _localCurrencyCode;
-  bool _isLeaving = false;
-  bool _isRestoring = false;
-  final BusinessUserService _userService = BusinessUserService(ApiClient());
-
-  @override
-  void initState() {
-    super.initState();
-    _localCurrencyCode = _resolveInitialCurrency();
-  }
-
-  String? _resolveInitialCurrency() {
-    final codes = widget.business.currencies.map((c) => c.code).toSet();
-    final authCode = widget.authStore.selectedCurrencyCode;
-    if (authCode != null && codes.contains(authCode)) return authCode;
-    return widget.business.defaultCurrency?.code ?? (widget.business.currencies.isNotEmpty ? widget.business.currencies.first.code : null);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final padding = ResponsiveHelper.getPadding(context);
-    
-    if (widget.isCompact) {
-      return _buildCompactCard(context, padding);
-    } else {
-      return _buildWideCard(context, padding);
-    }
-  }
-
-  Widget _buildCompactCard(BuildContext context, double padding) {
-    final cardPadding = ResponsiveHelper.responsiveValue(
-      context,
-      mobile: padding * 1.0,
-      tablet: padding * 0.75,
-      desktop: padding * 0.5,
-    );
-    
-    return Card(
-      elevation: 1,
-      margin: EdgeInsets.zero,
-      child: InkWell(
-        onTap: widget.onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Container(
-          padding: EdgeInsets.all(cardPadding),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              // Header with icon and role badge
-              Row(
-                children: [
-                  Container(
-                    padding: EdgeInsets.all(cardPadding),
-                    decoration: BoxDecoration(
-                      color: widget.business.isOwner 
-                          ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.1)
-                          : Theme.of(context).colorScheme.secondary.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Icon(
-                      widget.business.isOwner ? Icons.business : Icons.business_outlined,
-                      color: widget.business.isOwner 
-                          ? Theme.of(context).colorScheme.primary 
-                          : Theme.of(context).colorScheme.secondary,
-                      size: ResponsiveHelper.responsiveValue(
-                        context,
-                        mobile: 20,
-                        tablet: 22,
-                        desktop: 24,
-                      ),
-                    ),
-                  ),
-                  SizedBox(width: cardPadding),
-                  Expanded(
-                    child: Container(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: cardPadding * 0.75,
-                        vertical: cardPadding * 0.25,
-                      ),
-                      decoration: BoxDecoration(
-                        color: widget.business.isOwner 
-                            ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.1)
-                            : Theme.of(context).colorScheme.secondary.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Text(
-                        widget.business.isOwner ? AppLocalizations.of(context).owner : AppLocalizations.of(context).member,
-                        style: TextStyle(
-                          color: widget.business.isOwner 
-                              ? Theme.of(context).colorScheme.primary
-                              : Theme.of(context).colorScheme.secondary,
-                          fontSize: ResponsiveHelper.responsiveValue(
-                            context,
-                            mobile: 10,
-                            tablet: 11,
-                            desktop: 12,
-                          ),
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              
-              SizedBox(height: cardPadding * 0.75),
-              
-              // Business name with deletion status
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      widget.business.name,
-                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w600,
-                        fontSize: ResponsiveHelper.responsiveValue(
-                          context,
-                          mobile: 14,
-                          tablet: 15,
-                          desktop: 16,
-                        ),
-                        decoration: widget.business.isDeletionPending 
-                            ? TextDecoration.lineThrough 
-                            : null,
-                        color: widget.business.isDeletionPending 
-                            ? Theme.of(context).colorScheme.onSurfaceVariant 
-                            : null,
-                      ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  if (widget.business.isDeletionPending && widget.business.isOwner)
-                    Padding(
-                      padding: EdgeInsets.only(left: 4),
-                      child: Container(
-                        padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: Colors.orange.shade100,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          'در حال حذف',
-                          style: TextStyle(
-                            color: Colors.orange.shade900,
-                            fontSize: 10,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-              
-              SizedBox(height: cardPadding * 0.375),
-              
-              // Business type and field
-              Text(
-                '${_translateBusinessType(widget.business.businessType, context)} • ${_translateBusinessField(widget.business.businessField, context)}',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  fontSize: ResponsiveHelper.responsiveValue(
-                    context,
-                    mobile: 11,
-                    tablet: 12,
-                    desktop: 13,
-                  ),
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-              
-              SizedBox(height: cardPadding * 0.75),
-              
-              // Footer with restore button (for deleted businesses)
-              // یا چینش مرتب‌تر ارز و دکمه خروج در دو ردیف برای جلوگیری از شلوغی
-              if (widget.business.isDeletionPending && widget.business.isOwner)
-                _buildRestoreButton(context, cardPadding)
-              else ...[
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    Expanded(
-                      child: _buildCurrencyDropdown(context),
-                    ),
-                    SizedBox(width: cardPadding * 0.5),
-                    Icon(
-                      Icons.arrow_forward_ios,
-                      size: ResponsiveHelper.responsiveValue(
-                        context,
-                        mobile: 12,
-                        tablet: 14,
-                        desktop: 16,
-                      ),
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
-                  ],
-                ),
-                if (!widget.business.isOwner) ...[
-                  SizedBox(height: cardPadding * 0.5),
-                  Align(
-                    alignment: AlignmentDirectional.centerEnd,
-                    child: _buildLeaveButton(context, cardPadding),
-                  ),
-                ],
-              ],
-            ],
-          ),
-        ),
-      ),
-    );
-  }
- 
-  Widget _buildWideCard(BuildContext context, double padding) {
-    final isMobile = widget.isMobile;
-    final cardPadding = isMobile ? padding * 1.5 : padding * 2;
-    
-    return Card(
-      elevation: 1,
-      margin: EdgeInsets.zero,
-      child: InkWell(
-        onTap: widget.business.isDeletionPending ? null : widget.onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Container(
-          padding: EdgeInsets.all(cardPadding),
-          child: Row(
-            children: [
-              // Icon
-              Container(
-                padding: EdgeInsets.all(isMobile ? 12 : 16),
-                decoration: BoxDecoration(
-                  color: widget.business.isOwner 
-                      ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.1)
-                      : Theme.of(context).colorScheme.secondary.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(
-                  widget.business.isOwner ? Icons.business : Icons.business_outlined,
-                  color: widget.business.isOwner 
-                      ? Theme.of(context).colorScheme.primary 
-                      : Theme.of(context).colorScheme.secondary,
-                  size: isMobile ? 24 : 28,
-                ),
-              ),
-              
-              SizedBox(width: isMobile ? 12 : 16),
-              
-              // Content
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Row(
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  widget.business.name,
-                                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                    fontWeight: FontWeight.w600,
-                                    fontSize: isMobile ? 16 : 18,
-                                    decoration: widget.business.isDeletionPending 
-                                        ? TextDecoration.lineThrough 
-                                        : null,
-                                    color: widget.business.isDeletionPending 
-                                        ? Theme.of(context).colorScheme.onSurfaceVariant 
-                                        : null,
-                                  ),
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                              if (widget.business.isDeletionPending && widget.business.isOwner)
-                                Padding(
-                                  padding: EdgeInsets.only(left: 8),
-                                  child: Container(
-                                    padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                    decoration: BoxDecoration(
-                                      color: Colors.orange.shade100,
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    child: Text(
-                                      'در حال حذف',
-                                      style: TextStyle(
-                                        color: Colors.orange.shade900,
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                            ],
-                          ),
-                        ),
-                        SizedBox(width: 8),
-                        Container(
-                          padding: EdgeInsets.symmetric(
-                            horizontal: isMobile ? 8 : 10,
-                            vertical: isMobile ? 4 : 5,
-                          ),
-                          decoration: BoxDecoration(
-                            color: widget.business.isOwner 
-                                ? Theme.of(context).colorScheme.primary.withValues(alpha: 0.1)
-                                : Theme.of(context).colorScheme.secondary.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Text(
-                            widget.business.isOwner ? AppLocalizations.of(context).owner : AppLocalizations.of(context).member,
-                            style: TextStyle(
-                              color: widget.business.isOwner 
-                                  ? Theme.of(context).colorScheme.primary
-                                  : Theme.of(context).colorScheme.secondary,
-                              fontSize: isMobile ? 11 : 12,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    
-                    SizedBox(height: isMobile ? 4 : 6),
-                    
-                    Text(
-                      '${_translateBusinessType(widget.business.businessType, context)} • ${_translateBusinessField(widget.business.businessField, context)}',
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        fontSize: isMobile ? 13 : 14,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    
-                    if (!isMobile) ...[
-                      SizedBox(height: 8),
-                      Text(
-                        'تأسیس: ${_formatDate(widget.business.createdAt)}',
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
-                    
-                    SizedBox(height: isMobile ? 8 : 12),
-                    
-                    // Restore button (for deleted businesses) or currency selector and leave button
-                    if (widget.business.isDeletionPending && widget.business.isOwner)
-                      _buildRestoreButton(context, isMobile ? 12.0 : 16.0)
-                    else ...[
-                      // Currency selector - در موبایل کوچکتر
-                      _buildCurrencyDropdown(context),
-                      
-                      // Leave button for members
-                      if (!widget.business.isOwner) ...[
-                        SizedBox(height: isMobile ? 8 : 12),
-                        _buildLeaveButton(context, isMobile ? 12.0 : 16.0),
-                      ],
-                    ],
-                  ],
-                ),
-              ),
-              
-              SizedBox(width: isMobile ? 8 : 12),
-              
-              // Arrow (only if not deleted)
-              if (!widget.business.isDeletionPending)
-                Icon(
-                  Icons.arrow_forward_ios,
-                  size: isMobile ? 16 : 20,
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildCurrencyDropdown(BuildContext context) {
-    final items = widget.business.currencies;
-    final value = _localCurrencyCode ?? _resolveInitialCurrency();
-    return DropdownButtonHideUnderline(
-      child: DropdownButton<String>(
-        value: value,
-        isExpanded: true,
-        hint: const Text('انتخاب ارز'),
-        items: items
-            .map((c) => DropdownMenuItem<String>(
-                  value: c.code,
-                  child: Text('${c.title} (${c.code})'),
-                ))
-            .toList(),
-        onChanged: (val) async {
-          if (val == null) return;
-          setState(() {
-            _localCurrencyCode = val;
-          });
-          final selected = items.firstWhere((c) => c.code == val, orElse: () => items.first);
-          await widget.authStore.setSelectedCurrency(code: selected.code, id: selected.id);
-        },
-      ),
-    );
-  }
-
-  Widget _buildLeaveButton(BuildContext context, double size) {
-    final theme = Theme.of(context);
-    final isMobile = ResponsiveHelper.isMobile(context);
-    
-    // برای موبایل: دکمه کوچکتر با آیکون
-    if (isMobile) {
-      return IconButton(
-        icon: _isLeaving
-            ? SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  valueColor: AlwaysStoppedAnimation<Color>(theme.colorScheme.error),
-                ),
-              )
-            : Icon(
-                Icons.exit_to_app,
-                size: 20,
-                color: theme.colorScheme.error,
-              ),
-        tooltip: 'خروج از کسب و کار',
-        onPressed: _isLeaving ? null : () => _handleLeave(context),
-        padding: const EdgeInsets.all(8),
-        constraints: const BoxConstraints(
-          minWidth: 40,
-          minHeight: 40,
-        ),
-      );
-    }
-    
-    // برای دسکتاپ: دکمه بزرگتر با متن
-    return OutlinedButton.icon(
-      onPressed: _isLeaving ? null : () => _handleLeave(context),
-      icon: _isLeaving
-          ? SizedBox(
-              width: 16,
-              height: 16,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                valueColor: AlwaysStoppedAnimation<Color>(theme.colorScheme.error),
-              ),
-            )
-          : Icon(
-              Icons.exit_to_app,
-              size: 16,
-              color: theme.colorScheme.error,
-            ),
-      label: const Text(
-        'خروج',
-        style: TextStyle(fontSize: 12),
-      ),
-      style: OutlinedButton.styleFrom(
-        foregroundColor: theme.colorScheme.error,
-        side: BorderSide(color: theme.colorScheme.error.withValues(alpha: 0.5)),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        minimumSize: const Size(0, 32),
-        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-      ),
-    );
-  }
-
-  Widget _buildRestoreButton(BuildContext context, double size) {
-    final theme = Theme.of(context);
-    final isMobile = ResponsiveHelper.isMobile(context);
-    
-    // محاسبه مهلت باقی‌مانده
-    String? remainingDaysText;
-    if (widget.business.autoDeleteAt != null) {
-      try {
-        final autoDeleteDate = DateTime.parse(widget.business.autoDeleteAt!);
-        final now = DateTime.now();
-        final difference = autoDeleteDate.difference(now);
-        if (difference.inDays > 0) {
-          remainingDaysText = '${difference.inDays} روز باقی مانده';
-        } else if (difference.inHours > 0) {
-          remainingDaysText = '${difference.inHours} ساعت باقی مانده';
-        } else {
-          remainingDaysText = 'مهلت به پایان رسیده';
-        }
-      } catch (e) {
-        remainingDaysText = null;
-      }
-    }
-    
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        if (remainingDaysText != null) ...[
-          Container(
-            padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            decoration: BoxDecoration(
-              color: Colors.orange.shade50,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.orange.shade200),
-            ),
-            child: Row(
-              children: [
-                Icon(Icons.access_time, size: 16, color: Colors.orange.shade900),
-                SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    remainingDaysText,
-                    style: TextStyle(
-                      color: Colors.orange.shade900,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          SizedBox(height: 12),
-        ],
-        FilledButton.icon(
-          onPressed: _isRestoring ? null : () => _handleRestore(context),
-          icon: _isRestoring
-              ? SizedBox(
-                  width: 16,
-                  height: 16,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    valueColor: AlwaysStoppedAnimation<Color>(theme.colorScheme.onPrimary),
-                  ),
-                )
-              : Icon(Icons.restore, size: 16),
-          label: Text(
-            _isRestoring ? 'در حال بازیابی...' : 'بازیابی کسب و کار',
-            style: TextStyle(fontSize: isMobile ? 12 : 14),
-          ),
-          style: FilledButton.styleFrom(
-            backgroundColor: Colors.green,
-            foregroundColor: Colors.white,
-            padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Future<void> _handleRestore(BuildContext context) async {
-    final pageContext = context;
-    final t = AppLocalizations.of(pageContext);
-
-    // Show confirmation dialog
-    final confirmed = await showDialog<bool>(
-      context: pageContext,
-      builder: (context) => AlertDialog(
-        title: const Text('بازیابی کسب و کار'),
-        content: Text(
-          'آیا مطمئن هستید که می‌خواهید کسب و کار "${widget.business.name}" را بازیابی کنید؟\n\n'
-          'پس از بازیابی، دسترسی شما به این کسب و کار بازگردانده خواهد شد.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: Text(t.cancel),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            style: FilledButton.styleFrom(
-              backgroundColor: Colors.green,
-            ),
-            child: const Text('بازیابی'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed != true) return;
-
-    setState(() {
-      _isRestoring = true;
-    });
-
-    try {
-      await BusinessApiService.restoreBusiness(widget.business.id);
-
-      if (!pageContext.mounted) return;
-      SnackBarHelper.showSuccess(
-        pageContext,
-        message: 'کسب و کار با موفقیت بازیابی شد',
-      );
-
-      // Refresh businesses list
-      widget.onLeave?.call();
-    } catch (e) {
-      if (!pageContext.mounted) return;
-      SnackBarHelper.showError(
-        pageContext,
-        message:
-            'خطا در بازیابی کسب و کار: ${ErrorExtractor.forContext(e, pageContext)}',
-      );
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isRestoring = false;
-        });
-      }
-    }
-  }
-
-  Future<void> _handleLeave(BuildContext context) async {
-    final pageContext = context;
-    final t = AppLocalizations.of(pageContext);
-
-    // Show confirmation dialog
-    final confirmed = await showDialog<bool>(
-      context: pageContext,
-      builder: (context) => AlertDialog(
-        title: const Text('خروج از کسب و کار'),
-        content: Text(
-          'آیا مطمئن هستید که می‌خواهید از کسب و کار "${widget.business.name}" خارج شوید؟\n\n'
-          'پس از خروج، دسترسی شما به این کسب و کار حذف خواهد شد.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: Text(t.cancel),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            style: TextButton.styleFrom(
-              foregroundColor: Theme.of(context).colorScheme.error,
-            ),
-            child: const Text('خروج'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed != true) return;
-
-    setState(() {
-      _isLeaving = true;
-    });
-
-    try {
-      final request = LeaveBusinessRequest(businessId: widget.business.id);
-      final response = await _userService.leaveBusiness(request);
-
-      if (response.success) {
-        if (!pageContext.mounted) return;
-        SnackBarHelper.showSuccess(
-          pageContext,
-          message: response.message,
-        );
-
-        // Clear current business if it's the one we're leaving
-        if (widget.authStore.currentBusiness?.id == widget.business.id) {
-          await widget.authStore.clearCurrentBusiness();
-        }
-
-        if (!pageContext.mounted) return;
-        // Trigger refresh in parent to reload the list
-        widget.onLeave?.call();
-      } else {
-        if (!pageContext.mounted) return;
-        SnackBarHelper.showError(
-          pageContext,
-          message: response.message,
-        );
-      }
-    } catch (e) {
-      if (!pageContext.mounted) return;
-      SnackBarHelper.showError(
-        pageContext,
-        message:
-            'خطا در خروج از کسب و کار: ${ErrorExtractor.forContext(e, pageContext)}',
-      );
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isLeaving = false;
-        });
-      }
-    }
-  }
-}
-
-String _formatDate(String dateString) {
-  try {
-    final date = DateTime.parse(dateString);
-    return '${date.year}/${date.month}/${date.day}';
-  } catch (e) {
-    return dateString;
-  }
-}
-
-String _translateBusinessType(String type, BuildContext context) {
-  final l10n = AppLocalizations.of(context);
-  switch (type) {
-    case 'شرکت':
-      return l10n.company;
-    case 'مغازه':
-      return l10n.shop;
-    case 'فروشگاه':
-      return l10n.store;
-    case 'اتحادیه':
-      return l10n.union;
-    case 'باشگاه':
-      return l10n.club;
-    case 'موسسه':
-      return l10n.institute;
-    case 'شخصی':
-      return l10n.individual;
-    default:
-      return type;
-  }
-}
-
-String _translateBusinessField(String field, BuildContext context) {
-  final l10n = AppLocalizations.of(context);
-  switch (field) {
-    case 'تولیدی':
-      return l10n.manufacturing;
-    case 'بازرگانی':
-      return l10n.trading;
-    case 'خدماتی':
-      return l10n.service;
-    case 'سایر':
-      return l10n.other;
-    default:
-      return field;
-  }
-}
-
-
