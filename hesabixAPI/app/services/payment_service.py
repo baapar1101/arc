@@ -328,7 +328,7 @@ def _initiate_parsian(db: Session, gw: PaymentGateway, cfg: Dict[str, Any], busi
 
 
 def _verify_parsian(db: Session, params: Dict[str, Any]) -> Dict[str, Any]:
-	"""تأیید پرداخت پارسیان با ConfirmPaymentWithAmount (الزامی برای تسویه)."""
+	"""تأیید پرداخت پارسیان با همان ConfirmPayment نمونه رسمی درگاه."""
 	token = str(params.get("Token") or params.get("token") or "").strip()
 	cb_status = params.get("status") if params.get("status") is not None else params.get("Status")
 	try:
@@ -362,20 +362,18 @@ def _verify_parsian(db: Session, params: Dict[str, Any]) -> Dict[str, Any]:
 		gateway_id = extra.get("gateway_id") if extra else None
 		gw = db.query(PaymentGateway).filter(PaymentGateway.id == int(gateway_id)).first() if gateway_id else None
 		paid_at_bank = callback_paid(cb_status)
-		if gw and paid_at_bank and token:
+		callback_rrn = parse_amount(params.get("RRN") or params.get("rrn"))
+		if gw and paid_at_bank and callback_rrn > 0 and token:
 			if gw.is_sandbox and is_test_token(token):
 				success = True
 			else:
 				cfg = _load_config(gw)
-				order_id = parse_amount(params.get("OrderId") or extra.get("parsian_order_id") or make_order_id("wallet", tx_id))
-				cb_amount = parse_amount(params.get("Amount"))
-				amount = cb_amount if cb_amount > 0 else parse_amount(tx.amount if tx else 0)
 				confirm = confirm_payment(
 					cfg,
 					is_sandbox=bool(gw.is_sandbox),
 					token=token,
-					order_id=order_id,
-					amount=amount,
+					order_id=parse_amount(params.get("OrderId") or extra.get("parsian_order_id") or make_order_id("wallet", tx_id)),
+					amount=parse_amount(params.get("Amount")) or parse_amount(tx.amount if tx else 0),
 				)
 				success = bool(confirm.ok)
 				if confirm.rrn:

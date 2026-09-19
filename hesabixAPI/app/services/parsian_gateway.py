@@ -29,7 +29,7 @@ CONFIRM_NS = "https://pec.Shaparak.ir/NewIPGServices/Confirm/ConfirmService"
 REVERSE_NS = "https://pec.Shaparak.ir/NewIPGServices/Reversal/ReversalService"
 
 SALE_SOAP_ACTION = f"{SALE_NS}/SalePaymentRequest"
-CONFIRM_SOAP_ACTION = f"{CONFIRM_NS}/ConfirmPaymentWithAmount"
+CONFIRM_SOAP_ACTION = f"{CONFIRM_NS}/ConfirmPayment"
 REVERSE_SOAP_ACTION = f"{REVERSE_NS}/ReversalRequest"
 
 WALLET_ORDER_BASE = 1_000_000_000
@@ -182,8 +182,6 @@ def build_confirm_envelope(
 	*,
 	login_account: str,
 	token: str,
-	order_id: int,
-	amount: int,
 ) -> str:
 	return (
 		'<?xml version="1.0" encoding="utf-8"?>'
@@ -191,14 +189,12 @@ def build_confirm_envelope(
 		' xmlns:xsd="http://www.w3.org/2001/XMLSchema"'
 		' xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">'
 		"<soap:Body>"
-		f'<ConfirmPaymentWithAmount xmlns="{CONFIRM_NS}">'
+		f'<ConfirmPayment xmlns="{CONFIRM_NS}">'
 		"<requestData>"
 		f"<LoginAccount>{xml_escape(login_account)}</LoginAccount>"
 		f"<Token>{xml_escape(str(token))}</Token>"
-		f"<OrderId>{int(order_id)}</OrderId>"
-		f"<Amount>{int(amount)}</Amount>"
 		"</requestData>"
-		"</ConfirmPaymentWithAmount>"
+		"</ConfirmPayment>"
 		"</soap:Body>"
 		"</soap:Envelope>"
 	)
@@ -347,8 +343,6 @@ def confirm_payment(
 	envelope = build_confirm_envelope(
 		login_account=login,
 		token=token,
-		order_id=order_id,
-		amount=amount,
 	)
 	try:
 		raw = _soap_post(url, envelope, CONFIRM_SOAP_ACTION)

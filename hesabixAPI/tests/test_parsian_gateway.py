@@ -221,7 +221,7 @@ def test_wallet_verify_requires_confirm_soap(mock_confirm: MagicMock, mock_top_u
 	gw = MagicMock(is_sandbox=False, id=3, config_json='{"pin":"P"}')
 	db = MagicMock()
 	db.query.return_value.filter.return_value.first.side_effect = [tx, gw]
-	out = _verify_parsian(db, {"tx_id": 9, "Token": "9876543210", "status": "0", "Amount": "1,450,000", "OrderId": "1000000009"})
+	out = _verify_parsian(db, {"tx_id": 9, "Token": "9876543210", "status": "0", "Amount": "1,450,000", "OrderId": "1000000009", "RRN": "123456789012"})
 	assert out["success"] is True
 	assert out["ref_id"] == "123456789012"
 	mock_confirm.assert_called_once()
@@ -300,6 +300,8 @@ def test_confirm_payment_posts_confirm_service(mock_post: MagicMock) -> None:
 	assert result.ok is True
 	url, envelope, action = mock_post.call_args.args
 	assert url.endswith("/NewIPGServices/Confirm/ConfirmService.asmx")
-	assert "ConfirmPaymentWithAmount" in envelope
-	assert "<Amount>1450000</Amount>" in envelope
-	assert "ConfirmPaymentWithAmount" in action
+	assert "<ConfirmPayment" in envelope
+	assert "<LoginAccount>P</LoginAccount>" in envelope
+	assert "<Token>9876543210</Token>" in envelope
+	assert "<Amount>" not in envelope
+	assert action.endswith("/ConfirmPayment")

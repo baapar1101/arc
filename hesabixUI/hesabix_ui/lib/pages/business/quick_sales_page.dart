@@ -50,11 +50,7 @@ import 'package:hesabix_ui/services/bytes_export/bytes_export_service.dart';
 import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 /// کد کسب‌وکاری برای نمایش در فروش سریع: اگر [code] با [id] یکی باشد، از `product_code`، `tax_code` یا اولین بارکد عمومی استفاده می‌شود.
-String? _quickSalesDisplayProductBusinessCode(Map<String, dynamic> p) {
-  final idRaw = p['id'];
-  final idStr = idRaw == null
-      ? ''
-      : number_utils.toEnglishDigits(idRaw.toString().trim());
+          _searchByBarcode(value);
 
   bool looksLikeInternalIdOnly(String v) {
     final t = v.trim();
