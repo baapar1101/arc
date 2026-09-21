@@ -15,39 +15,71 @@ void main() {
   });
 
   group('quick sales Enter behavior', () {
-    test('keeps the field as reference for a fast barcode scan', () {
+    test('searches the field when fast barcode suggestions are not loaded', () {
       expect(
-        shouldCommitHighlightedProductSuggestion(
+        resolveQuickSalesProductSearchSubmitAction(
           input: '6260151234567',
-          loadedQuery: '6260151234567',
-          hasSuggestions: true,
+          loadedQuery: '',
+          suggestionCount: 0,
+          hasMoreSuggestions: false,
           navigatedByKeyboard: false,
         ),
-        isFalse,
+        QuickSalesProductSearchSubmitAction.searchField,
       );
     });
 
     test('commits the highlighted row after keyboard navigation', () {
       expect(
-        shouldCommitHighlightedProductSuggestion(
+        resolveQuickSalesProductSearchSubmitAction(
           input: 'شیر',
           loadedQuery: 'شیر',
-          hasSuggestions: true,
+          suggestionCount: 4,
+          hasMoreSuggestions: false,
           navigatedByKeyboard: true,
         ),
-        isTrue,
+        QuickSalesProductSearchSubmitAction.selectSuggestion,
       );
     });
 
-    test('rejects a highlighted row from stale search results', () {
+    test('commits the only current suggestion without keyboard navigation', () {
       expect(
-        shouldCommitHighlightedProductSuggestion(
+        resolveQuickSalesProductSearchSubmitAction(
+          input: 'شیر کم چرب',
+          loadedQuery: 'شیر کم چرب',
+          suggestionCount: 1,
+          hasMoreSuggestions: false,
+          navigatedByKeyboard: false,
+        ),
+        QuickSalesProductSearchSubmitAction.selectSuggestion,
+      );
+    });
+
+    test(
+      'waits for an explicit selection when several results are visible',
+      () {
+        expect(
+          resolveQuickSalesProductSearchSubmitAction(
+            input: 'شیر',
+            loadedQuery: 'شیر',
+            suggestionCount: 4,
+            hasMoreSuggestions: false,
+            navigatedByKeyboard: false,
+          ),
+          QuickSalesProductSearchSubmitAction.waitForSuggestionSelection,
+        );
+      },
+    );
+
+    test('does not select suggestions from stale search results', () {
+      expect(
+        resolveQuickSalesProductSearchSubmitAction(
           input: 'شیر کم چرب',
           loadedQuery: 'شیر',
-          hasSuggestions: true,
+          suggestionCount: 4,
+          hasMoreSuggestions: false,
           navigatedByKeyboard: true,
         ),
-        isFalse,
+        QuickSalesProductSearchSubmitAction.searchField,
       );
     });
   });
