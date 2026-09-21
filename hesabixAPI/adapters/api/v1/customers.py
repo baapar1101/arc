@@ -3,11 +3,13 @@ from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from typing import Optional, List
 
+from adapters.db.models.person import Person
 from adapters.db.session import get_db
 from app.core.responses import success_response, format_datetime_fields
 from app.core.auth_dependency import get_current_user, AuthContext
 from app.core.permissions import require_business_access_dep
 from app.services.person_service import search_persons, count_persons, get_person_by_id
+from app.services.customer_quick_entry_service import resolve_or_create_quick_customer
 
 router = APIRouter(prefix="/customers", tags=["اشخاص و مشتریان"])
 
@@ -36,6 +38,63 @@ class CustomerSearchResponse(BaseModel):
     page: int
     limit: int
     has_more: bool
+
+
+class CustomerQuickResolveRequest(BaseModel):
+    business_id: int
+    alias_name: Optional[str] = None
+    mobile: Optional[str] = None
+
+
+class CustomerQuickResolveResponse(BaseModel):
+    customers: List[CustomerResponse]
+    created: bool
+
+
+def _customer_response(person: Person) -> CustomerResponse:
+    name_parts = [
+        value
+        for value in (person.alias_name, person.first_name, person.last_name)
+        if value
+    ]
+    return CustomerResponse(
+        id=person.id,
+        name=" ".join(name_parts) if name_parts else "نامشخص",
+        code=str(person.code) if person.code else None,
+        phone=person.phone or person.mobile,
+        email=person.email,
+        address=person.address,
+        is_active=True,
+        created_at=person.created_at.isoformat() if person.created_at else None,
+    )
+
+
+@router.post(
+    "/quick-resolve",
+    summary="یافتن یا ایجاد سریع مشتری",
+    description=(
+        "مشتری موجود را با موبایل یا نام مشابه برمی‌گرداند و تنها در صورت "
+        "نبود نتیجه، مشتری جدید ایجاد می‌کند"
+    ),
+    response_model=CustomerQuickResolveResponse,
+)
+async def quick_resolve_customer(
+    request: Request,
+    payload: CustomerQuickResolveRequest,
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    _: None = Depends(require_business_access_dep),
+):
+    resolution = resolve_or_create_quick_customer(
+        db,
+        business_id=payload.business_id,
+        alias_name=payload.alias_name,
+        mobile=payload.mobile,
+    )
+    return CustomerQuickResolveResponse(
+        customers=[_customer_response(person) for person in resolution.persons],
+        created=resolution.created,
+    )
 
 
 @router.post("/search", 
@@ -98,30 +157,7 @@ async def search_customers(
         limit=search_request.limit
     )
     
-    # تبدیل به فرمت مشتری
-    customers = []
-    for person in persons:
-        # ساخت نام کامل
-        name_parts = []
-        if person.alias_name:
-            name_parts.append(person.alias_name)
-        if person.first_name:
-            name_parts.append(person.first_name)
-        if person.last_name:
-            name_parts.append(person.last_name)
-        full_name = " ".join(name_parts) if name_parts else person.alias_name or "نامشخص"
-        
-        customer = CustomerResponse(
-            id=person.id,
-            name=full_name,
-            code=str(person.code) if person.code else None,
-            phone=person.phone or person.mobile,
-            email=person.email,
-            address=person.address,
-            is_active=True,  # اشخاص همیشه فعال در نظر گرفته می‌شوند
-            created_at=person.created_at.isoformat() if person.created_at else None
-        )
-        customers.append(customer)
+    customers = [_customer_response(person) for person in persons]
     
     # محاسبه تعداد کل
     total_count = count_persons(
