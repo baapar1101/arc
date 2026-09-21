@@ -248,11 +248,11 @@ def list_kardex_lines(db: Session, business_id: int, query: Dict[str, Any]) -> D
 
     # Pagination
     try:
-        skip = int(query.get("skip", 0))
+        skip = max(int(query.get("skip", 0)), 0)
     except Exception:
         skip = 0
     try:
-        take = int(query.get("take", 20))
+        take = max(int(query.get("take", 20)), 1)
     except Exception:
         take = 20
 
@@ -290,12 +290,42 @@ def list_kardex_lines(db: Session, business_id: int, query: Dict[str, Any]) -> D
         logger.debug("KARDEX query total=%s (after filters)", total)
     except Exception:
         pass
-    rows: List[Tuple[DocumentLine, Document]] = q.offset(skip).limit(take).all()
 
-    # Running balance (optional)
+    def _line_amounts(line: DocumentLine) -> Tuple[float, float]:
+        if amounts_in_base:
+            debit = float(
+                line.debit_base if getattr(line, "debit_base", None) is not None else (line.debit or 0)
+            )
+            credit = float(
+                line.credit_base if getattr(line, "credit_base", None) is not None else (line.credit or 0)
+            )
+        else:
+            debit = float(line.debit or 0)
+            credit = float(line.credit or 0)
+        return debit, credit
+
+    # Running balance (optional) — must continue across pages in the same sort order
     include_running = bool(query.get("include_running_balance", False))
     running_amount: float = 0.0
     running_quantity: float = 0.0
+
+    if include_running and skip > 0:
+        # Load prefix + current page so مانده on page N continues from page N-1
+        window: List[Tuple[DocumentLine, Document]] = q.limit(skip + take).all()
+        for line, _doc in window[:skip]:
+            debit, credit = _line_amounts(line)
+            try:
+                running_amount += debit - credit
+            except Exception:
+                pass
+            try:
+                if line.quantity is not None:
+                    running_quantity += float(line.quantity or 0)
+            except Exception:
+                pass
+        rows = window[skip:]
+    else:
+        rows = q.offset(skip).limit(take).all()
 
     # گردآوری شناسه‌های انبار جهت نام‌گذاری
     wh_ids_in_page: set[int] = set()
@@ -381,16 +411,7 @@ def list_kardex_lines(db: Session, business_id: int, query: Dict[str, Any]) -> D
         doc_type = getattr(doc, "document_type", None)
         debit_native = float(line.debit or 0)
         credit_native = float(line.credit or 0)
-        if amounts_in_base:
-            debit = float(
-                line.debit_base if getattr(line, "debit_base", None) is not None else (line.debit or 0)
-            )
-            credit = float(
-                line.credit_base if getattr(line, "credit_base", None) is not None else (line.credit or 0)
-            )
-        else:
-            debit = debit_native
-            credit = credit_native
+        debit, credit = _line_amounts(line)
         item: Dict[str, Any] = {
             "line_id": line.id,
             "document_id": doc.id,

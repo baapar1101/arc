@@ -714,7 +714,7 @@ msgid "ROLLBACK_REASON_AI_INVOICE"
 msgstr "This document is linked to AI billing; contact support before rolling back the fiscal year."
 
 msgid "ROLLBACK_PLUGIN_PURCHASE_BLOCK"
-msgstr "A successful add-on purchase from the wallet exists in this fiscal year. Removing the current year may break reports or licenses; contact support."
+msgstr "A successful add-on purchase from the wallet was recorded after this fiscal year was opened. Removing the current year may break reports or licenses; contact support."
 
 msgid "ROLLBACK_BLOCK_DOC_LINE"
 msgstr "Document {code} (type: {doc_type}) — {reason}"

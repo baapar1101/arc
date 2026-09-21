@@ -345,9 +345,19 @@ def _collect_document_block_reasons(db: Session, document: Document, tr: Transla
 
 
 def _plugin_purchase_blocks_rollback(
-    db: Session, business_id: int, fy_start: date, fy_end: date, tr: Translator
+    db: Session,
+    business_id: int,
+    *,
+    fy_opened_at: datetime,
+    fy_end: date,
+    tr: Translator,
 ) -> Optional[str]:
-    start_dt = datetime.combine(fy_start, datetime.min.time())
+    """Block rollback only for add-on purchases made after this fiscal year was opened.
+
+    Purchases are not FK-linked to fiscal years. Using the calendar ``start_date``
+    causes false positives when the year is opened late (documents still posted to
+    the previous year until the new year row is created).
+    """
     end_dt = datetime.combine(fy_end, datetime.max.time())
     q = (
         db.query(WalletTransaction)
@@ -355,7 +365,7 @@ def _plugin_purchase_blocks_rollback(
             WalletTransaction.business_id == int(business_id),
             WalletTransaction.type == "plugin_purchase",
             WalletTransaction.status == "succeeded",
-            WalletTransaction.created_at >= start_dt,
+            WalletTransaction.created_at >= fy_opened_at,
             WalletTransaction.created_at <= end_dt,
         )
         .first()
@@ -364,7 +374,7 @@ def _plugin_purchase_blocks_rollback(
         return _tr(
             tr,
             "ROLLBACK_PLUGIN_PURCHASE_BLOCK",
-            "A successful add-on purchase from the wallet exists in this fiscal year. Removing the current year may break reports or licenses; contact support.",
+            "A successful add-on purchase from the wallet was recorded after this fiscal year was opened. Removing the current year may break reports or licenses; contact support.",
         )
     return None
 
@@ -400,7 +410,13 @@ def preview_current_fiscal_year_rollback(
             if msg not in block_reasons:
                 block_reasons.append(msg)
 
-    pp = _plugin_purchase_blocks_rollback(db, business_id, current.start_date, current.end_date, tr)
+    pp = _plugin_purchase_blocks_rollback(
+        db,
+        business_id,
+        fy_opened_at=current.created_at,
+        fy_end=current.end_date,
+        tr=tr,
+    )
     if pp:
         block_reasons.append(pp)
 
