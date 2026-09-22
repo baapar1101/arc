@@ -846,7 +846,7 @@ async def export_kardex_pdf_endpoint(
         <h3>{'گزارش کاردکس' if is_fa else 'Kardex Report'}</h3>
         {(
           "<div style='margin:6px 0 10px 0; font-size:11px; color:#555'>" +
-          "".join([f"<span style=\"display:inline-block;border:1px solid #e5e7eb;border-radius:999px;padding:3px 8px;margin:2px 4px;background:#fff\"><b>{escape(str(f.get('label')))}:</b> {escape(str(f.get('value')))}</span>" for f in (filters_summary or [])]) +
+          "".join([f'''<span style="display:inline-block;border:1px solid #e5e7eb;border-radius:999px;padding:3px 8px;margin:2px 4px;background:#fff"><b>{escape(str(f.get('label')))}:</b> {escape(str(f.get('value')))}</span>''' for f in (filters_summary or [])]) +
           "</div>"
         ) if filters_summary else ""}
         <table>

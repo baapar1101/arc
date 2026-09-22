@@ -5,6 +5,9 @@ import '../../models/customer_model.dart';
 import '../../services/customer_service.dart';
 import '../../core/auth_store.dart';
 import '../../core/api_client.dart';
+import '../../utils/customer_quick_entry.dart';
+import '../../utils/error_extractor.dart';
+import '../../utils/snackbar_helper.dart';
 import '../../widgets/person/person_form_dialog.dart';
 import '../../widgets/person/person_financial_balance_banner.dart';
 import 'invoice_form_layout.dart';
@@ -51,9 +54,11 @@ class CustomerComboboxWidget extends StatefulWidget {
   final bool isRequired;
   final String? label;
   final String? hintText;
+
   /// مانده طرف حساب زیر نام داخل همان فیلد (شناسه مشتری همان شخص است)
   final bool showFinancialBalance;
   final bool dense;
+  final bool enableQuickCreateOnSubmit;
 
   const CustomerComboboxWidget({
     super.key,
@@ -66,6 +71,7 @@ class CustomerComboboxWidget extends StatefulWidget {
     this.hintText = 'انتخاب طرف حساب',
     this.showFinancialBalance = false,
     this.dense = false,
+    this.enableQuickCreateOnSubmit = false,
   });
 
   @override
@@ -85,15 +91,16 @@ class _CustomerComboboxWidgetState extends State<CustomerComboboxWidget> {
   bool _hasMore = false;
   int _currentPage = 1;
   String _currentQuery = '';
-  final ValueNotifier<_CustomerPickerState> _pickerStateNotifier = ValueNotifier<_CustomerPickerState>(
-    _CustomerPickerState(
-      customers: [],
-      isLoading: false,
-      isLoadingMore: false,
-      hasSearched: false,
-      hasMore: false,
-    ),
-  );
+  final ValueNotifier<_CustomerPickerState> _pickerStateNotifier =
+      ValueNotifier<_CustomerPickerState>(
+        _CustomerPickerState(
+          customers: [],
+          isLoading: false,
+          isLoadingMore: false,
+          hasSearched: false,
+          hasMore: false,
+        ),
+      );
   final FocusNode _fieldFocus = FocusNode();
   final LayerLink _layerLink = LayerLink();
   final ScrollController _overlayScrollController = ScrollController();
@@ -101,11 +108,20 @@ class _CustomerComboboxWidgetState extends State<CustomerComboboxWidget> {
   int _highlightedIndex = -1;
   double _desktopFieldWidth = 0;
   bool _suppressFieldNotifications = false;
+  bool _navigatedByKeyboard = false;
+  bool _isEditingQuery = false;
+  bool _isQuickResolving = false;
+  bool _mobilePickerOpen = false;
+  int _searchGeneration = 0;
+  String _loadedQuery = '';
 
   double _desktopOverlayHeight(_CustomerPickerState state) {
     if (state.isLoading && state.customers.isEmpty) return 120;
     if (!state.isLoading && state.customers.isEmpty) return 95;
-    final extraRow = (state.isLoadingMore || (state.isLoading && state.customers.isNotEmpty)) ? 1 : 0;
+    final extraRow =
+        (state.isLoadingMore || (state.isLoading && state.customers.isNotEmpty))
+        ? 1
+        : 0;
     final rows = state.customers.length + extraRow;
     const rowHeight = 62.0;
     final raw = (rows * rowHeight) + (state.isLoading ? 4 : 0);
@@ -125,6 +141,7 @@ class _CustomerComboboxWidgetState extends State<CustomerComboboxWidget> {
   void didUpdateWidget(covariant CustomerComboboxWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.selectedCustomer?.id != widget.selectedCustomer?.id) {
+      if (_fieldFocus.hasFocus && _isEditingQuery) return;
       _setFieldQuiet(widget.selectedCustomer?.name ?? '');
     }
   }
@@ -164,6 +181,10 @@ class _CustomerComboboxWidgetState extends State<CustomerComboboxWidget> {
       Future.delayed(const Duration(milliseconds: 180), () {
         if (!mounted || _fieldFocus.hasFocus) return;
         _removeDesktopOverlay();
+        if (_isEditingQuery) {
+          _isEditingQuery = false;
+          _setFieldQuiet(widget.selectedCustomer?.name ?? '');
+        }
       });
     }
   }
@@ -185,6 +206,7 @@ class _CustomerComboboxWidgetState extends State<CustomerComboboxWidget> {
     _desktopOverlayEntry?.remove();
     _desktopOverlayEntry = null;
     _highlightedIndex = -1;
+    _navigatedByKeyboard = false;
   }
 
   void _onDesktopOverlayScroll() {
@@ -236,13 +258,22 @@ class _CustomerComboboxWidgetState extends State<CustomerComboboxWidget> {
     );
   }
 
-  Widget _buildDesktopCustomersList(BuildContext context, _CustomerPickerState state) {
+  Widget _buildDesktopCustomersList(
+    BuildContext context,
+    _CustomerPickerState state,
+  ) {
     final cs = Theme.of(context).colorScheme;
     if (state.isLoading && state.customers.isEmpty) {
-      return const SizedBox(height: 120, child: Center(child: CircularProgressIndicator(strokeWidth: 2)));
+      return const SizedBox(
+        height: 120,
+        child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+      );
     }
     if (!state.isLoading && state.customers.isEmpty) {
-      return const SizedBox(height: 90, child: Center(child: Text('طرف حسابی یافت نشد')));
+      return const SizedBox(
+        height: 90,
+        child: Center(child: Text('طرف حسابی یافت نشد')),
+      );
     }
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -251,11 +282,16 @@ class _CustomerComboboxWidgetState extends State<CustomerComboboxWidget> {
         Flexible(
           child: ListView.builder(
             controller: _overlayScrollController,
-            itemCount: state.customers.length +
-                ((state.isLoadingMore || (state.isLoading && state.customers.isNotEmpty)) ? 1 : 0),
+            itemCount:
+                state.customers.length +
+                ((state.isLoadingMore ||
+                        (state.isLoading && state.customers.isNotEmpty))
+                    ? 1
+                    : 0),
             itemBuilder: (context, index) {
               if (index == state.customers.length &&
-                  (state.isLoadingMore || (state.isLoading && state.customers.isNotEmpty))) {
+                  (state.isLoadingMore ||
+                      (state.isLoading && state.customers.isNotEmpty))) {
                 return const Padding(
                   padding: EdgeInsets.symmetric(vertical: 12),
                   child: Center(
@@ -270,13 +306,21 @@ class _CustomerComboboxWidgetState extends State<CustomerComboboxWidget> {
               final customer = state.customers[index];
               final selected = index == _highlightedIndex;
               return Material(
-                color: selected ? cs.primary.withValues(alpha: 0.10) : Colors.transparent,
+                color: selected
+                    ? cs.primary.withValues(alpha: 0.10)
+                    : Colors.transparent,
                 child: InkWell(
                   onTapDown: (_) => _selectCustomerFromOverlay(customer),
                   child: ListTile(
                     dense: true,
-                    title: Text(customer.name, maxLines: 1, overflow: TextOverflow.ellipsis),
-                    subtitle: customer.code != null ? Text('کد: ${customer.code}') : null,
+                    title: Text(
+                      customer.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    subtitle: customer.code != null
+                        ? Text('کد: ${customer.code}')
+                        : null,
                   ),
                 ),
               );
@@ -288,15 +332,23 @@ class _CustomerComboboxWidgetState extends State<CustomerComboboxWidget> {
   }
 
   void _selectCustomerFromOverlay(Customer customer) {
+    _debounceTimer?.cancel();
+    _searchGeneration++;
+    _isEditingQuery = false;
+    _navigatedByKeyboard = false;
     _setFieldQuiet(customer.name);
     widget.onCustomerChanged(customer);
     _removeDesktopOverlay();
     _fieldFocus.unfocus();
+    if (_mobilePickerOpen && mounted) {
+      Navigator.of(context).pop();
+    }
   }
 
   void _moveHighlight(int delta) {
     final items = _pickerStateNotifier.value.customers;
     if (items.isEmpty) return;
+    _navigatedByKeyboard = true;
     var idx = _highlightedIndex;
     if (idx < 0 || idx >= items.length) {
       idx = delta > 0 ? 0 : items.length - 1;
@@ -311,7 +363,9 @@ class _CustomerComboboxWidgetState extends State<CustomerComboboxWidget> {
   void _selectHighlighted() {
     final items = _pickerStateNotifier.value.customers;
     if (items.isEmpty) return;
-    final idx = (_highlightedIndex >= 0 && _highlightedIndex < items.length) ? _highlightedIndex : 0;
+    final idx = (_highlightedIndex >= 0 && _highlightedIndex < items.length)
+        ? _highlightedIndex
+        : 0;
     _selectCustomerFromOverlay(items[idx]);
   }
 
@@ -326,10 +380,6 @@ class _CustomerComboboxWidgetState extends State<CustomerComboboxWidget> {
       _moveHighlight(-1);
       return KeyEventResult.handled;
     }
-    if (event.logicalKey == LogicalKeyboardKey.enter || event.logicalKey == LogicalKeyboardKey.numpadEnter) {
-      _selectHighlighted();
-      return KeyEventResult.handled;
-    }
     if (event.logicalKey == LogicalKeyboardKey.escape) {
       _removeDesktopOverlay();
       return KeyEventResult.handled;
@@ -339,6 +389,8 @@ class _CustomerComboboxWidgetState extends State<CustomerComboboxWidget> {
 
   Future<void> _loadRecentCustomers() async {
     if (_hasLoadedRecent && !_isSearchMode) return;
+
+    final requestGeneration = ++_searchGeneration;
 
     setState(() {
       _isLoading = true;
@@ -350,6 +402,8 @@ class _CustomerComboboxWidgetState extends State<CustomerComboboxWidget> {
         limit: 5,
       );
 
+      if (!mounted || requestGeneration != _searchGeneration) return;
+
       setState(() {
         _customers = result['customers'] as List<Customer>;
         _isLoading = false;
@@ -360,6 +414,7 @@ class _CustomerComboboxWidgetState extends State<CustomerComboboxWidget> {
         _hasMore = false; // در حالت "اخیرها" صفحه‌بندی نداریم
         _currentPage = 1;
         _currentQuery = '';
+        _loadedQuery = '';
       });
       // به‌روزرسانی ValueNotifier
       _pickerStateNotifier.value = _CustomerPickerState(
@@ -369,9 +424,11 @@ class _CustomerComboboxWidgetState extends State<CustomerComboboxWidget> {
         hasSearched: _hasSearched,
         hasMore: _hasMore,
       );
-      _highlightedIndex = _customers.isEmpty ? -1 : 0;
+      _highlightedIndex = -1;
+      _navigatedByKeyboard = false;
       _desktopOverlayEntry?.markNeedsBuild();
     } catch (e) {
+      if (!mounted || requestGeneration != _searchGeneration) return;
       setState(() {
         _isLoading = false;
         _hasLoadedRecent = true;
@@ -385,20 +442,24 @@ class _CustomerComboboxWidgetState extends State<CustomerComboboxWidget> {
   }
 
   void _onSearchChanged(String query) {
-    print('[CustomerCombobox] _onSearchChanged called with query: "$query"');
     _debounceTimer?.cancel();
+    _isEditingQuery = true;
+    _navigatedByKeyboard = false;
+    _highlightedIndex = -1;
+    // پاسخ جست‌وجوی قبلی نباید متن یا پیشنهادهای ورودی جدید را بازنویسی کند.
+    _searchGeneration++;
     _debounceTimer = Timer(const Duration(milliseconds: 500), () {
-      print('[CustomerCombobox] Debounce timer fired, calling _searchCustomers with: "${query.trim()}"');
-      _searchCustomers(query.trim());
+      unawaited(_searchCustomers(query.trim()));
     });
   }
 
-  Future<void> _searchCustomers(String query) async {
-    print('[CustomerCombobox] _searchCustomers called with query: "$query"');
+  Future<bool> _searchCustomers(String query) async {
     if (query.isEmpty) {
       await _loadRecentCustomers();
-      return;
+      return true;
     }
+
+    final requestGeneration = ++_searchGeneration;
 
     setState(() {
       _isLoading = true;
@@ -418,7 +479,6 @@ class _CustomerComboboxWidgetState extends State<CustomerComboboxWidget> {
     );
 
     try {
-      print('[CustomerCombobox] Calling _customerService.searchCustomers...');
       final result = await _customerService.searchCustomers(
         businessId: widget.businessId,
         searchQuery: query,
@@ -427,7 +487,7 @@ class _CustomerComboboxWidgetState extends State<CustomerComboboxWidget> {
       );
 
       final customers = result['customers'] as List<Customer>;
-      print('[CustomerCombobox] Search completed - received ${customers.length} customers');
+      if (!mounted || requestGeneration != _searchGeneration) return false;
 
       setState(() {
         _customers = customers;
@@ -435,6 +495,7 @@ class _CustomerComboboxWidgetState extends State<CustomerComboboxWidget> {
         _hasMore = (result['hasMore'] as bool?) ?? false;
         _currentPage = 1;
         _isLoadingMore = false;
+        _loadedQuery = query;
       });
       // به‌روزرسانی ValueNotifier
       _pickerStateNotifier.value = _CustomerPickerState(
@@ -444,17 +505,19 @@ class _CustomerComboboxWidgetState extends State<CustomerComboboxWidget> {
         hasSearched: _hasSearched,
         hasMore: _hasMore,
       );
-      _highlightedIndex = _customers.isEmpty ? -1 : 0;
+      _highlightedIndex = -1;
+      _navigatedByKeyboard = false;
       _desktopOverlayEntry?.markNeedsBuild();
-      print('[CustomerCombobox] ValueNotifier updated - customers count: ${_pickerStateNotifier.value.customers.length}');
+      return true;
     } catch (e) {
-      print('[CustomerCombobox] ERROR in _searchCustomers: $e');
+      if (!mounted || requestGeneration != _searchGeneration) return false;
       setState(() {
         _customers.clear();
         _isLoading = false;
         _isLoadingMore = false;
         _hasMore = false;
         _currentPage = 1;
+        _loadedQuery = '';
       });
       // به‌روزرسانی ValueNotifier
       _pickerStateNotifier.value = _CustomerPickerState(
@@ -465,7 +528,9 @@ class _CustomerComboboxWidgetState extends State<CustomerComboboxWidget> {
         hasMore: _hasMore,
       );
       _highlightedIndex = -1;
+      _navigatedByKeyboard = false;
       _desktopOverlayEntry?.markNeedsBuild();
+      return false;
     }
   }
 
@@ -478,6 +543,8 @@ class _CustomerComboboxWidgetState extends State<CustomerComboboxWidget> {
     if (_currentQuery.trim().isEmpty) return;
 
     final nextPage = _currentPage + 1;
+    final requestGeneration = _searchGeneration;
+    final requestQuery = _currentQuery;
     setState(() {
       _isLoadingMore = true;
     });
@@ -488,14 +555,22 @@ class _CustomerComboboxWidgetState extends State<CustomerComboboxWidget> {
     try {
       final result = await _customerService.searchCustomers(
         businessId: widget.businessId,
-        searchQuery: _currentQuery,
+        searchQuery: requestQuery,
         page: nextPage,
         limit: 20,
       );
 
+      if (!mounted ||
+          requestGeneration != _searchGeneration ||
+          requestQuery != _currentQuery) {
+        return;
+      }
+
       final newCustomers = result['customers'] as List<Customer>;
       final existingIds = _customers.map((c) => c.id).toSet();
-      final uniqueNewCustomers = newCustomers.where((c) => !existingIds.contains(c.id)).toList();
+      final uniqueNewCustomers = newCustomers
+          .where((c) => !existingIds.contains(c.id))
+          .toList();
 
       setState(() {
         _customers = [..._customers, ...uniqueNewCustomers];
@@ -513,6 +588,11 @@ class _CustomerComboboxWidgetState extends State<CustomerComboboxWidget> {
       );
       _desktopOverlayEntry?.markNeedsBuild();
     } catch (e) {
+      if (!mounted ||
+          requestGeneration != _searchGeneration ||
+          requestQuery != _currentQuery) {
+        return;
+      }
       setState(() {
         _isLoadingMore = false;
       });
@@ -522,7 +602,136 @@ class _CustomerComboboxWidgetState extends State<CustomerComboboxWidget> {
     }
   }
 
+  Future<void> _submitField() async {
+    if (_isQuickResolving) return;
+    _debounceTimer?.cancel();
+    final query = _searchController.text.trim();
+    var action = resolveCustomerSearchSubmitAction(
+      input: query,
+      loadedQuery: _loadedQuery,
+      suggestionCount: _customers.length,
+      hasMoreSuggestions: _hasMore,
+      navigatedByKeyboard: _navigatedByKeyboard,
+      isLoading: _isLoading,
+      quickCreateEnabled: widget.enableQuickCreateOnSubmit,
+    );
 
+    if (action == CustomerSearchSubmitAction.search) {
+      final searched = await _searchCustomers(query);
+      if (!searched || !mounted || _searchController.text.trim() != query) {
+        if (mounted && !searched) {
+          SnackBarHelper.showError(
+            context,
+            message: 'جست‌وجوی مشتری انجام نشد؛ دوباره تلاش کنید.',
+          );
+        }
+        return;
+      }
+      action = resolveCustomerSearchSubmitAction(
+        input: query,
+        loadedQuery: _loadedQuery,
+        suggestionCount: _customers.length,
+        hasMoreSuggestions: _hasMore,
+        navigatedByKeyboard: _navigatedByKeyboard,
+        isLoading: _isLoading,
+        quickCreateEnabled: widget.enableQuickCreateOnSubmit,
+      );
+    }
+
+    switch (action) {
+      case CustomerSearchSubmitAction.selectSuggestion:
+        _selectHighlighted();
+        break;
+      case CustomerSearchSubmitAction.quickCreate:
+        await _quickResolveCustomer(query);
+        break;
+      case CustomerSearchSubmitAction.search:
+      case CustomerSearchSubmitAction.waitForSelection:
+        break;
+    }
+  }
+
+  Future<void> _quickResolveCustomer(String query) async {
+    final entry = parseCustomerQuickEntry(query);
+    if (entry == null) {
+      SnackBarHelper.showError(
+        context,
+        message: 'ورودی مشتری مبهم است؛ یک نام یا یک شماره موبایل وارد کنید.',
+      );
+      return;
+    }
+
+    setState(() => _isQuickResolving = true);
+    _desktopOverlayEntry?.markNeedsBuild();
+    try {
+      final result = await _customerService.quickResolveCustomer(
+        businessId: widget.businessId,
+        aliasName: entry.aliasName,
+        mobile: entry.mobile,
+      );
+      if (!mounted || _searchController.text.trim() != query) return;
+
+      final customers = result['customers'] as List<Customer>;
+      final created = result['created'] == true;
+      if (customers.length == 1) {
+        final customer = customers.single;
+        _selectCustomerFromOverlay(customer);
+        if (created) {
+          SnackBarHelper.show(
+            context,
+            message: '${customer.name} ثبت و انتخاب شد',
+          );
+        }
+        return;
+      }
+
+      if (customers.isNotEmpty) {
+        setState(() {
+          _customers = customers;
+          _isLoading = false;
+          _isSearchMode = true;
+          _hasSearched = true;
+          _isLoadingMore = false;
+          _hasMore = false;
+          _loadedQuery = query;
+          _currentQuery = query;
+          _highlightedIndex = -1;
+          _navigatedByKeyboard = false;
+        });
+        _pickerStateNotifier.value = _CustomerPickerState(
+          customers: customers,
+          isLoading: false,
+          isLoadingMore: false,
+          hasSearched: true,
+          hasMore: false,
+        );
+        _showDesktopOverlay();
+        _desktopOverlayEntry?.markNeedsBuild();
+        SnackBarHelper.show(
+          context,
+          message: 'چند مشتری مشابه پیدا شد؛ مشتری موردنظر را انتخاب کنید.',
+        );
+        return;
+      }
+
+      SnackBarHelper.showError(
+        context,
+        message: 'مشتری ثبت نشد؛ دوباره تلاش کنید.',
+      );
+    } catch (e) {
+      if (mounted) {
+        SnackBarHelper.showError(
+          context,
+          message: ErrorExtractor.forContext(e, context),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isQuickResolving = false);
+        _desktopOverlayEntry?.markNeedsBuild();
+      }
+    }
+  }
 
   Future<void> _applyNewCustomerDialogResult(Person? result) async {
     if (result == null || !mounted) return;
@@ -599,7 +808,6 @@ class _CustomerComboboxWidgetState extends State<CustomerComboboxWidget> {
   }
 
   void _showCustomerPicker() {
-    print('[CustomerCombobox] _showCustomerPicker called - _customers count: ${_customers.length}');
     // مقداردهی اولیه ValueNotifier
     _pickerStateNotifier.value = _CustomerPickerState(
       customers: _customers,
@@ -608,29 +816,32 @@ class _CustomerComboboxWidgetState extends State<CustomerComboboxWidget> {
       hasSearched: _hasSearched,
       hasMore: _hasMore,
     );
+    _mobilePickerOpen = true;
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       builder: (bottomSheetContext) {
-        print('[CustomerCombobox] BottomSheet builder called - _customers count: ${_customers.length}, _isLoading: $_isLoading');
         return _CustomerPickerBottomSheet(
           pickerStateNotifier: _pickerStateNotifier,
           selectedCustomer: widget.selectedCustomer,
           onCustomerSelected: (customer) {
+            _isEditingQuery = false;
+            _navigatedByKeyboard = false;
+            _searchGeneration++;
             _setFieldQuiet(customer.name);
             widget.onCustomerChanged(customer);
             Navigator.pop(bottomSheetContext);
           },
           searchController: _searchController,
           onSearchChanged: (query) {
-            print('[CustomerCombobox] onSearchChanged callback called with: "$query"');
             _onSearchChanged(query);
           },
+          onSubmitted: () => unawaited(_submitField()),
           onLoadMore: _loadMoreCustomers,
           onAddNew: () => _addNewPerson(bottomSheetContext),
         );
       },
-    );
+    ).whenComplete(() => _mobilePickerOpen = false);
   }
 
   @override
@@ -661,7 +872,9 @@ class _CustomerComboboxWidgetState extends State<CustomerComboboxWidget> {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           decoration: BoxDecoration(
-            border: Border.all(color: colorScheme.outline.withValues(alpha: 0.5)),
+            border: Border.all(
+              color: colorScheme.outline.withValues(alpha: 0.5),
+            ),
             borderRadius: BorderRadius.circular(8),
             color: colorScheme.surface,
           ),
@@ -673,31 +886,39 @@ class _CustomerComboboxWidgetState extends State<CustomerComboboxWidget> {
               Expanded(
                 child: widget.selectedCustomer != null
                     ? (inlineBalance
-                        ? Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                widget.selectedCustomer!.name,
-                                style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
-                                overflow: TextOverflow.ellipsis,
-                                maxLines: 1,
+                          ? Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  widget.selectedCustomer!.name,
+                                  style: theme.textTheme.bodyMedium?.copyWith(
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                  maxLines: 1,
+                                ),
+                                Padding(
+                                  padding: const EdgeInsets.only(top: 2),
+                                  child: PersonFinancialBalanceBanner(
+                                    selectedPerson: balancePerson,
+                                  ),
+                                ),
+                              ],
+                            )
+                          : Text(
+                              widget.selectedCustomer!.name,
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                fontWeight: FontWeight.w500,
                               ),
-                              Padding(
-                                padding: const EdgeInsets.only(top: 2),
-                                child: PersonFinancialBalanceBanner(selectedPerson: balancePerson),
-                              ),
-                            ],
-                          )
-                        : Text(
-                            widget.selectedCustomer!.name,
-                            style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
-                            overflow: TextOverflow.ellipsis,
-                            maxLines: 1,
-                          ))
+                              overflow: TextOverflow.ellipsis,
+                              maxLines: 1,
+                            ))
                     : Text(
                         widget.hintText!,
-                        style: theme.textTheme.bodyMedium?.copyWith(color: colorScheme.onSurface.withValues(alpha: 0.6)),
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: colorScheme.onSurface.withValues(alpha: 0.6),
+                        ),
                         overflow: TextOverflow.ellipsis,
                         maxLines: 1,
                       ),
@@ -709,10 +930,16 @@ class _CustomerComboboxWidgetState extends State<CustomerComboboxWidget> {
                   icon: Icon(Icons.add, color: colorScheme.primary, size: 22),
                   onPressed: _addNewCustomerFromField,
                   padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                  constraints: const BoxConstraints(
+                    minWidth: 36,
+                    minHeight: 36,
+                  ),
                 ),
               ),
-              Icon(Icons.arrow_drop_down, color: colorScheme.onSurface.withValues(alpha: 0.6)),
+              Icon(
+                Icons.arrow_drop_down,
+                color: colorScheme.onSurface.withValues(alpha: 0.6),
+              ),
             ],
           ),
         ),
@@ -755,21 +982,42 @@ class _CustomerComboboxWidgetState extends State<CustomerComboboxWidget> {
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
+                              if (_isQuickResolving)
+                                const Padding(
+                                  padding: EdgeInsets.symmetric(horizontal: 6),
+                                  child: SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  ),
+                                ),
                               IconButton(
                                 tooltip: 'افزودن طرف حساب جدید',
-                                icon: Icon(Icons.add, color: colorScheme.primary, size: 20),
+                                icon: Icon(
+                                  Icons.add,
+                                  color: colorScheme.primary,
+                                  size: 20,
+                                ),
                                 onPressed: _addNewCustomerFromField,
                                 visualDensity: VisualDensity.compact,
                                 padding: EdgeInsets.zero,
-                                constraints: InvoiceFormFieldMetrics.compactSuffixIconConstraints,
+                                constraints: InvoiceFormFieldMetrics
+                                    .compactSuffixIconConstraints,
                               ),
                               IconButton(
                                 tooltip: 'انتخاب پیشرفته',
-                                icon: Icon(Icons.manage_search_rounded, color: colorScheme.primary, size: 20),
+                                icon: Icon(
+                                  Icons.manage_search_rounded,
+                                  color: colorScheme.primary,
+                                  size: 20,
+                                ),
                                 onPressed: _showCustomerPicker,
                                 visualDensity: VisualDensity.compact,
                                 padding: EdgeInsets.zero,
-                                constraints: InvoiceFormFieldMetrics.compactSuffixIconConstraints,
+                                constraints: InvoiceFormFieldMetrics
+                                    .compactSuffixIconConstraints,
                               ),
                             ],
                           ),
@@ -792,21 +1040,41 @@ class _CustomerComboboxWidgetState extends State<CustomerComboboxWidget> {
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
+                            if (_isQuickResolving)
+                              const Padding(
+                                padding: EdgeInsets.symmetric(horizontal: 6),
+                                child: SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                ),
+                              ),
                             IconButton(
                               tooltip: 'افزودن طرف حساب جدید',
                               icon: Icon(Icons.add, color: colorScheme.primary),
                               onPressed: _addNewCustomerFromField,
                               visualDensity: VisualDensity.compact,
                               padding: EdgeInsets.zero,
-                              constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+                              constraints: const BoxConstraints(
+                                minWidth: 40,
+                                minHeight: 40,
+                              ),
                             ),
                             IconButton(
                               tooltip: 'انتخاب پیشرفته',
-                              icon: Icon(Icons.manage_search_rounded, color: colorScheme.primary),
+                              icon: Icon(
+                                Icons.manage_search_rounded,
+                                color: colorScheme.primary,
+                              ),
                               onPressed: _showCustomerPicker,
                               visualDensity: VisualDensity.compact,
                               padding: EdgeInsets.zero,
-                              constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+                              constraints: const BoxConstraints(
+                                minWidth: 40,
+                                minHeight: 40,
+                              ),
                             ),
                           ],
                         ),
@@ -830,14 +1098,13 @@ class _CustomerComboboxWidgetState extends State<CustomerComboboxWidget> {
                 _onSearchChanged(query);
                 _showDesktopOverlay();
               },
-              onSubmitted: (_) => _selectHighlighted(),
+              onSubmitted: (_) => unawaited(_submitField()),
             ),
           );
         },
       ),
     );
   }
-
 }
 
 class _CustomerPickerBottomSheet extends StatefulWidget {
@@ -846,6 +1113,7 @@ class _CustomerPickerBottomSheet extends StatefulWidget {
   final Function(Customer) onCustomerSelected;
   final TextEditingController searchController;
   final Function(String) onSearchChanged;
+  final VoidCallback onSubmitted;
   final VoidCallback onLoadMore;
   final VoidCallback? onAddNew;
 
@@ -855,15 +1123,18 @@ class _CustomerPickerBottomSheet extends StatefulWidget {
     required this.onCustomerSelected,
     required this.searchController,
     required this.onSearchChanged,
+    required this.onSubmitted,
     required this.onLoadMore,
     this.onAddNew,
   });
 
   @override
-  State<_CustomerPickerBottomSheet> createState() => _CustomerPickerBottomSheetState();
+  State<_CustomerPickerBottomSheet> createState() =>
+      _CustomerPickerBottomSheetState();
 }
 
-class _CustomerPickerBottomSheetState extends State<_CustomerPickerBottomSheet> {
+class _CustomerPickerBottomSheetState
+    extends State<_CustomerPickerBottomSheet> {
   late final ScrollController _scrollController;
   final FocusNode _searchFocus = FocusNode();
 
@@ -892,7 +1163,6 @@ class _CustomerPickerBottomSheetState extends State<_CustomerPickerBottomSheet> 
 
   @override
   Widget build(BuildContext context) {
-    print('[CustomerPickerBottomSheet] build called');
     final theme = Theme.of(context);
 
     return Container(
@@ -938,6 +1208,7 @@ class _CustomerPickerBottomSheetState extends State<_CustomerPickerBottomSheet> 
                     ),
                   ),
                   onChanged: widget.onSearchChanged,
+                  onSubmitted: (_) => widget.onSubmitted(),
                 ),
               ),
               SizedBox(
@@ -967,9 +1238,6 @@ class _CustomerPickerBottomSheetState extends State<_CustomerPickerBottomSheet> 
             child: ValueListenableBuilder<_CustomerPickerState>(
               valueListenable: widget.pickerStateNotifier,
               builder: (context, pickerState, _) {
-                print(
-                  '[CustomerPickerBottomSheet] list rebuild count=${pickerState.customers.length} loading=${pickerState.isLoading}',
-                );
                 return _buildCustomersList(context, pickerState);
               },
             ),
@@ -979,19 +1247,19 @@ class _CustomerPickerBottomSheetState extends State<_CustomerPickerBottomSheet> 
     );
   }
 
-  Widget _buildCustomersList(BuildContext context, _CustomerPickerState pickerState) {
-    print('[CustomerPickerBottomSheet] _buildCustomersList called - customers count: ${pickerState.customers.length}, isLoading: ${pickerState.isLoading}');
+  Widget _buildCustomersList(
+    BuildContext context,
+    _CustomerPickerState pickerState,
+  ) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
     // لودینگ اولیه (وقتی هنوز دیتایی نداریم)
     if (pickerState.isLoading && pickerState.customers.isEmpty) {
-      print('[CustomerPickerBottomSheet] Showing loading indicator');
       return const Center(child: CircularProgressIndicator());
     }
 
     if (pickerState.customers.isEmpty) {
-      print('[CustomerPickerBottomSheet] Showing empty state');
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -1003,7 +1271,9 @@ class _CustomerPickerBottomSheetState extends State<_CustomerPickerBottomSheet> 
             ),
             const SizedBox(height: 16),
             Text(
-              pickerState.hasSearched ? 'طرف حسابی یافت نشد' : 'هیچ طرف حسابی ثبت نشده است',
+              pickerState.hasSearched
+                  ? 'طرف حسابی یافت نشد'
+                  : 'هیچ طرف حسابی ثبت نشده است',
               style: theme.textTheme.bodyLarge?.copyWith(
                 color: colorScheme.onSurface.withValues(alpha: 0.7),
               ),
@@ -1013,7 +1283,6 @@ class _CustomerPickerBottomSheetState extends State<_CustomerPickerBottomSheet> 
       );
     }
 
-    print('[CustomerPickerBottomSheet] Building ListView with ${pickerState.customers.length} items');
     return Column(
       children: [
         // وقتی کاربر عبارت جست‌وجو را عوض می‌کند، یک لودینگ سبک نشان بده بدون اینکه لیست محو شود
@@ -1021,11 +1290,18 @@ class _CustomerPickerBottomSheetState extends State<_CustomerPickerBottomSheet> 
         Expanded(
           child: ListView.builder(
             controller: _scrollController,
-            itemCount: pickerState.customers.length +
-                ((pickerState.isLoadingMore || (pickerState.isLoading && pickerState.customers.isNotEmpty)) ? 1 : 0),
+            itemCount:
+                pickerState.customers.length +
+                ((pickerState.isLoadingMore ||
+                        (pickerState.isLoading &&
+                            pickerState.customers.isNotEmpty))
+                    ? 1
+                    : 0),
             itemBuilder: (context, index) {
               // فوتر برای بارگذاری صفحه بعد
-              if ((pickerState.isLoadingMore || (pickerState.isLoading && pickerState.customers.isNotEmpty)) &&
+              if ((pickerState.isLoadingMore ||
+                      (pickerState.isLoading &&
+                          pickerState.customers.isNotEmpty)) &&
                   index == pickerState.customers.length) {
                 return const Padding(
                   padding: EdgeInsets.symmetric(vertical: 16),
@@ -1059,10 +1335,7 @@ class _CustomerPickerBottomSheetState extends State<_CustomerPickerBottomSheet> 
                   ],
                 ),
                 trailing: isSelected
-                    ? Icon(
-                        Icons.check_circle,
-                        color: colorScheme.primary,
-                      )
+                    ? Icon(Icons.check_circle, color: colorScheme.primary)
                     : null,
                 onTap: () => widget.onCustomerSelected(customer),
               );
