@@ -21,6 +21,7 @@ import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../utils/number_normalizer.dart' as number_utils;
 import '../../utils/number_formatters.dart';
+import '../../utils/product_search_overlay_policy.dart';
 import '../../utils/invoice_global_discount_calculator.dart';
 import '../../l10n/app_localizations.dart';
 import '../../services/business_api_service.dart';
@@ -207,6 +208,8 @@ class _QuickSalesPageState extends State<QuickSalesPage>
   int _barcodeSuggestionsSkip = 0;
   String _barcodeSuggestionsQuery = '';
   int _barcodeHighlightedIndex = -1;
+  bool _barcodeSuggestionNavigatedByKeyboard = false;
+  int _barcodeSuggestionRequestGeneration = 0;
 
   /// جلوگیری از دوبار اجرا شدن انتخاب با دابل‌کلیک روی همان ردیف اورلی پیشنهادها.
   DateTime? _lastOverlaySuggestionTapAt;
@@ -1398,7 +1401,10 @@ class _QuickSalesPageState extends State<QuickSalesPage>
     await _searchByBarcode(trimmed);
   }
 
-  Future<void> _searchByBarcode(String code) async {
+  Future<void> _searchByBarcode(
+    String code, {
+    bool showMultipleResultsDialog = true,
+  }) async {
     if (code.trim().isEmpty || _barcodeSearching) return;
 
     setState(() => _barcodeSearching = true);
@@ -1415,6 +1421,7 @@ class _QuickSalesPageState extends State<QuickSalesPage>
         final items = instanceData['items'] as List?;
 
         if (multipleResults && items != null && items.isNotEmpty) {
+          if (!showMultipleResultsDialog) return;
           // اگر چند نتیجه پیدا شد، دیالوگ انتخاب نمایش بده
           if (!mounted) return;
           final selected = await showDialog<Map<String, dynamic>>(
@@ -1447,7 +1454,6 @@ class _QuickSalesPageState extends State<QuickSalesPage>
               );
               await _saveRecentProduct(product);
               _barcodeController.clear();
-              _barcodeFocus.requestFocus();
               // پاک کردن جستجوی ناموفق قبلی
               if (mounted) {
                 setState(() {
@@ -1497,7 +1503,6 @@ class _QuickSalesPageState extends State<QuickSalesPage>
           );
           await _saveRecentProduct(product);
           _barcodeController.clear();
-          _barcodeFocus.requestFocus();
           // پاک کردن جستجوی ناموفق قبلی
           if (mounted) {
             setState(() {
@@ -1544,6 +1549,7 @@ class _QuickSalesPageState extends State<QuickSalesPage>
 
       // اگر چند نتیجه پیدا شد، دیالوگ انتخاب نمایش بده
       if (products.length > 1) {
+        if (!showMultipleResultsDialog) return;
         if (!mounted) return;
         final selected = await showDialog<Map<String, dynamic>>(
           context: context,
@@ -1557,7 +1563,6 @@ class _QuickSalesPageState extends State<QuickSalesPage>
           await _addToCart(selected, skipHydrate: true);
           await _saveRecentProduct(selected);
           _barcodeController.clear();
-          _barcodeFocus.requestFocus();
           // پاک کردن جستجوی ناموفق قبلی
           if (mounted) {
             setState(() {
@@ -1587,7 +1592,6 @@ class _QuickSalesPageState extends State<QuickSalesPage>
       await _addToCart(product, skipHydrate: true);
       await _saveRecentProduct(product);
       _barcodeController.clear();
-      _barcodeFocus.requestFocus();
       // پاک کردن جستجوی ناموفق قبلی
       if (mounted) {
         setState(() {
@@ -1610,7 +1614,12 @@ class _QuickSalesPageState extends State<QuickSalesPage>
         );
       }
     } finally {
-      if (mounted) setState(() => _barcodeSearching = false);
+      if (mounted) {
+        setState(() => _barcodeSearching = false);
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _barcodeFocus.requestFocus();
+        });
+      }
     }
   }
 
@@ -2662,8 +2671,11 @@ class _QuickSalesPageState extends State<QuickSalesPage>
   void _onBarcodeFocusChanged() {
     if (!mounted || !_isDesktopLike) return;
     if (_barcodeFocus.hasFocus) {
-      _showBarcodeOverlay();
-      _scheduleBarcodeSuggestionSearch(_barcodeController.text);
+      final query = _barcodeController.text;
+      if (shouldShowProductSearchSuggestions(query)) {
+        _showBarcodeOverlay();
+        _scheduleBarcodeSuggestionSearch(query);
+      }
     } else {
       Future.delayed(const Duration(milliseconds: 160), () {
         if (!mounted || _barcodeFocus.hasFocus) return;
@@ -2689,6 +2701,25 @@ class _QuickSalesPageState extends State<QuickSalesPage>
     _barcodeOverlayEntry?.remove();
     _barcodeOverlayEntry = null;
     _barcodeHighlightedIndex = -1;
+    _barcodeSuggestionNavigatedByKeyboard = false;
+  }
+
+  void _clearBarcodeSuggestions({bool removeOverlay = true}) {
+    _searchDebounce?.cancel();
+    _barcodeSuggestionRequestGeneration++;
+    if (mounted) {
+      setState(() {
+        _barcodeSuggestions = const <Map<String, dynamic>>[];
+        _barcodeSuggestionsLoading = false;
+        _barcodeSuggestionsLoadingMore = false;
+        _barcodeSuggestionsHasMore = false;
+        _barcodeSuggestionsSkip = 0;
+        _barcodeSuggestionsQuery = '';
+        _barcodeHighlightedIndex = -1;
+        _barcodeSuggestionNavigatedByKeyboard = false;
+      });
+    }
+    if (removeOverlay) _removeBarcodeOverlay();
   }
 
   double _barcodeOverlayHeight() {
@@ -2828,82 +2859,41 @@ class _QuickSalesPageState extends State<QuickSalesPage>
   void _scheduleBarcodeSuggestionSearch(String rawQuery) {
     if (!_isDesktopLike) return;
     _searchDebounce?.cancel();
+    final query = rawQuery.trim();
+    _barcodeSuggestionNavigatedByKeyboard = false;
+    if (!shouldShowProductSearchSuggestions(query)) {
+      _clearBarcodeSuggestions();
+      return;
+    }
+    _barcodeSuggestionRequestGeneration++;
+    if (mounted) {
+      setState(() {
+        _barcodeSuggestions = const <Map<String, dynamic>>[];
+        _barcodeSuggestionsLoading = true;
+        _barcodeSuggestionsLoadingMore = false;
+        _barcodeSuggestionsHasMore = false;
+        _barcodeSuggestionsSkip = 0;
+        _barcodeSuggestionsQuery = '';
+        _barcodeHighlightedIndex = -1;
+      });
+      _barcodeOverlayEntry?.markNeedsBuild();
+    }
     _searchDebounce = Timer(const Duration(milliseconds: 220), () {
-      _loadBarcodeSuggestions(rawQuery.trim());
+      _loadBarcodeSuggestions(query);
     });
   }
 
   Future<void> _loadBarcodeSuggestions(String query) async {
     if (!mounted || !_isDesktopLike) return;
     if (query.isEmpty) {
-      setState(() {
-        _barcodeSuggestionsLoading = true;
-        _barcodeSuggestionsLoadingMore = false;
-        _barcodeSuggestionsHasMore = false;
-        _barcodeSuggestionsSkip = 0;
-        _barcodeSuggestionsQuery = '';
-      });
-      _barcodeOverlayEntry?.markNeedsBuild();
-      try {
-        final categoryIds = _getCategoryIdsForFilter(_selectedCategoryId);
-        var items = await _productService.fetchRecentFromSalesInvoices(
-          businessId: widget.businessId,
-          take: 10,
-          categoryIds: categoryIds.isNotEmpty ? categoryIds : null,
-        );
-        if (items.length < 5) {
-          final more = await _productService.searchProducts(
-            businessId: widget.businessId,
-            searchQuery: null,
-            limit: 15,
-            skip: 0,
-            searchFields: const ['code', 'name', 'barcode'],
-            categoryIds: categoryIds.isNotEmpty ? categoryIds : null,
-          );
-          final merged = List<Map<String, dynamic>>.from(items);
-          final seen = <int>{};
-          for (final m in merged) {
-            final id = (m['id'] as num?)?.toInt();
-            if (id != null) seen.add(id);
-          }
-          for (final m in more) {
-            final id = (m['id'] as num?)?.toInt();
-            if (id == null || seen.contains(id)) continue;
-            seen.add(id);
-            merged.add(m);
-            if (merged.length >= 10) break;
-          }
-          items = merged;
-        }
-        await _hydrateProductMapsBatched(items);
-        if (!mounted) return;
-        setState(() {
-          _barcodeSuggestions = items;
-          _barcodeSuggestionsLoadingMore = false;
-          _barcodeSuggestionsHasMore = false;
-          _barcodeSuggestionsSkip = items.length;
-          _barcodeSuggestionsQuery = '';
-          _barcodeHighlightedIndex = items.isEmpty ? -1 : 0;
-        });
-        _ensureHighlightedSuggestionVisible();
-      } catch (_) {
-        if (!mounted) return;
-        setState(() {
-          _barcodeSuggestions = const <Map<String, dynamic>>[];
-          _barcodeSuggestionsLoadingMore = false;
-          _barcodeSuggestionsHasMore = false;
-          _barcodeSuggestionsSkip = 0;
-          _barcodeHighlightedIndex = -1;
-        });
-      } finally {
-        if (mounted) {
-          setState(() => _barcodeSuggestionsLoading = false);
-          _barcodeOverlayEntry?.markNeedsBuild();
-        }
-      }
+      _clearBarcodeSuggestions();
       return;
     }
-    setState(() => _barcodeSuggestionsLoading = true);
+    final requestGeneration = ++_barcodeSuggestionRequestGeneration;
+    setState(() {
+      _barcodeSuggestionsLoading = true;
+      _barcodeSuggestionNavigatedByKeyboard = false;
+    });
     _barcodeOverlayEntry?.markNeedsBuild();
     try {
       final categoryIds = _getCategoryIdsForFilter(_selectedCategoryId);
@@ -2916,18 +2906,26 @@ class _QuickSalesPageState extends State<QuickSalesPage>
         categoryIds: categoryIds.isNotEmpty ? categoryIds : null,
       );
       await _hydrateProductMapsBatched(products);
-      if (!mounted) return;
+      if (!mounted ||
+          requestGeneration != _barcodeSuggestionRequestGeneration ||
+          _barcodeController.text.trim() != query) {
+        return;
+      }
       setState(() {
         _barcodeSuggestions = products;
         _barcodeSuggestionsLoadingMore = false;
         _barcodeSuggestionsHasMore = products.length >= 20;
         _barcodeSuggestionsSkip = products.length;
         _barcodeSuggestionsQuery = query;
-        _barcodeHighlightedIndex = products.isEmpty ? -1 : 0;
+        _barcodeHighlightedIndex = -1;
+        _barcodeSuggestionNavigatedByKeyboard = false;
       });
       _ensureHighlightedSuggestionVisible();
     } catch (_) {
-      if (!mounted) return;
+      if (!mounted ||
+          requestGeneration != _barcodeSuggestionRequestGeneration) {
+        return;
+      }
       setState(() {
         _barcodeSuggestions = const <Map<String, dynamic>>[];
         _barcodeSuggestionsLoadingMore = false;
@@ -2936,7 +2934,7 @@ class _QuickSalesPageState extends State<QuickSalesPage>
         _barcodeHighlightedIndex = -1;
       });
     } finally {
-      if (mounted) {
+      if (mounted && requestGeneration == _barcodeSuggestionRequestGeneration) {
         setState(() => _barcodeSuggestionsLoading = false);
         _barcodeOverlayEntry?.markNeedsBuild();
       }
@@ -2950,20 +2948,26 @@ class _QuickSalesPageState extends State<QuickSalesPage>
         _barcodeSuggestionsQuery.isEmpty) {
       return;
     }
+    final requestGeneration = _barcodeSuggestionRequestGeneration;
+    final query = _barcodeSuggestionsQuery;
     setState(() => _barcodeSuggestionsLoadingMore = true);
     _barcodeOverlayEntry?.markNeedsBuild();
     try {
       final categoryIds = _getCategoryIdsForFilter(_selectedCategoryId);
       final products = await _productService.searchProducts(
         businessId: widget.businessId,
-        searchQuery: _barcodeSuggestionsQuery,
+        searchQuery: query,
         limit: 20,
         skip: _barcodeSuggestionsSkip,
         searchFields: const ['code', 'barcode', 'name', 'general_barcodes'],
         categoryIds: categoryIds.isNotEmpty ? categoryIds : null,
       );
       await _hydrateProductMapsBatched(products);
-      if (!mounted) return;
+      if (!mounted ||
+          requestGeneration != _barcodeSuggestionRequestGeneration ||
+          _barcodeController.text.trim() != query) {
+        return;
+      }
       setState(() {
         _barcodeSuggestions = [..._barcodeSuggestions, ...products];
         _barcodeSuggestionsHasMore = products.length >= 20;
@@ -2971,15 +2975,21 @@ class _QuickSalesPageState extends State<QuickSalesPage>
         _barcodeSuggestionsLoadingMore = false;
       });
     } catch (_) {
-      if (!mounted) return;
+      if (!mounted ||
+          requestGeneration != _barcodeSuggestionRequestGeneration) {
+        return;
+      }
       setState(() => _barcodeSuggestionsLoadingMore = false);
     } finally {
-      _barcodeOverlayEntry?.markNeedsBuild();
+      if (requestGeneration == _barcodeSuggestionRequestGeneration) {
+        _barcodeOverlayEntry?.markNeedsBuild();
+      }
     }
   }
 
   void _moveSuggestionHighlight(int delta) {
     if (_barcodeSuggestions.isEmpty) return;
+    _barcodeSuggestionNavigatedByKeyboard = true;
     var idx = _barcodeHighlightedIndex;
     if (idx < 0 || idx >= _barcodeSuggestions.length) {
       idx = delta > 0 ? 0 : _barcodeSuggestions.length - 1;
@@ -3045,10 +3055,8 @@ class _QuickSalesPageState extends State<QuickSalesPage>
     await _saveRecentProduct(product);
     if (!mounted) return;
     _barcodeController.clear();
-    _barcodeSuggestions = const <Map<String, dynamic>>[];
-    _barcodeHighlightedIndex = -1;
+    _clearBarcodeSuggestions();
     _barcodeFocus.requestFocus();
-    _barcodeOverlayEntry?.markNeedsBuild();
     setState(() {
       _lastFailedSearchQuery = null;
     });
@@ -4568,7 +4576,10 @@ class _QuickSalesPageState extends State<QuickSalesPage>
                   _lastFailedSearchQuery != null &&
                   _lastFailedSearchQuery!.isNotEmpty)
                 IconButton(
-                  icon: Icon(Icons.add_circle, color: SemanticColorResolver.positive(context)),
+                  icon: Icon(
+                    Icons.add_circle,
+                    color: SemanticColorResolver.positive(context),
+                  ),
                   tooltip: 'افزودن کالای جدید: $_lastFailedSearchQuery',
                   onPressed: () =>
                       _openAddProductDialog(presetName: _lastFailedSearchQuery),
@@ -4587,7 +4598,27 @@ class _QuickSalesPageState extends State<QuickSalesPage>
             ],
           ),
         ),
-        onSubmitted: (value) => _searchByBarcode(value),
+        onSubmitted: (value) {
+          final action = resolveQuickSalesProductSearchSubmitAction(
+            input: value,
+            loadedQuery: _barcodeSuggestionsQuery,
+            suggestionCount: _barcodeSuggestions.length,
+            hasMoreSuggestions: _barcodeSuggestionsHasMore,
+            navigatedByKeyboard: _barcodeSuggestionNavigatedByKeyboard,
+          );
+          switch (action) {
+            case QuickSalesProductSearchSubmitAction.selectSuggestion:
+              unawaited(_selectHighlightedBarcodeSuggestion());
+              break;
+            case QuickSalesProductSearchSubmitAction.searchField:
+              unawaited(
+                _searchByBarcode(value, showMultipleResultsDialog: false),
+              );
+              break;
+            case QuickSalesProductSearchSubmitAction.waitForSuggestionSelection:
+              break;
+          }
+        },
         onChanged: (value) {
           if (_lastFailedSearchQuery != null &&
               value != _lastFailedSearchQuery) {
@@ -4596,10 +4627,14 @@ class _QuickSalesPageState extends State<QuickSalesPage>
             });
           }
           if (_isDesktopLike) {
-            if (_barcodeOverlayEntry == null && _barcodeFocus.hasFocus) {
-              _showBarcodeOverlay();
+            if (!shouldShowProductSearchSuggestions(value)) {
+              _clearBarcodeSuggestions();
+            } else {
+              if (_barcodeOverlayEntry == null && _barcodeFocus.hasFocus) {
+                _showBarcodeOverlay();
+              }
+              _scheduleBarcodeSuggestionSearch(value);
             }
-            _scheduleBarcodeSuggestionSearch(value);
           }
         },
         textInputAction: TextInputAction.search,
