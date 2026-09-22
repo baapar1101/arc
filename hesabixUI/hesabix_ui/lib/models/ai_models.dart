@@ -1,5 +1,27 @@
 import 'package:flutter/foundation.dart';
 
+DateTime _safeParse(dynamic value) {
+  if (value == null) return DateTime.now();
+  try {
+    final text = value.toString().trim();
+    // Try ISO first
+    if (RegExp(r'^\d{4}-\d{2}-\d{2}').hasMatch(text)) {
+      return DateTime.parse(text);
+    }
+    // Try Persian/Gregorian slash pattern: YYYY/MM/DD
+    final match = RegExp(r'^(\d{4})/(\d{1,2})/(\d{1,2})').firstMatch(text);
+    if (match != null) {
+      final year = int.parse(match.group(1)!);
+      final month = int.parse(match.group(2)!);
+      final day = int.parse(match.group(3)!);
+      if (year >= 1700 && year <= 2200 && month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+        return DateTime(year, month, day);
+      }
+    }
+  } catch (_) {}
+  return DateTime.now();
+}
+
 /// مدل‌های مربوط به سیستم AI
 
 class AIConfig {
@@ -39,10 +61,10 @@ class AIConfig {
       maxTokens: json['max_tokens'] as int? ?? 2000,
       temperature: (json['temperature'] as num?)?.toDouble() ?? 0.7,
       createdAt: json['created_at'] != null
-          ? DateTime.parse(json['created_at'] as String)
+          ? _safeParse(json['created_at'] as String)
           : null,
       updatedAt: json['updated_at'] != null
-          ? DateTime.parse(json['updated_at'] as String)
+          ? _safeParse(json['updated_at'] as String)
           : null,
     );
   }
@@ -140,10 +162,10 @@ class AIPlan {
       isActive: json['is_active'] as bool? ?? true,
       autoRenew: json['auto_renew'] as bool? ?? false,
       createdAt: json['created_at'] != null
-          ? DateTime.parse(json['created_at'] as String)
+          ? _safeParse(json['created_at'] as String)
           : null,
       updatedAt: json['updated_at'] != null
-          ? DateTime.parse(json['updated_at'] as String)
+          ? _safeParse(json['updated_at'] as String)
           : null,
     );
   }
@@ -213,22 +235,22 @@ class UserAISubscription {
       tokensLimit: json['tokens_limit'] as int?,
       isActive: json['is_active'] as bool? ?? true,
       periodStart: json['period_start'] != null
-          ? DateTime.parse(json['period_start'] as String)
+          ? _safeParse(json['period_start'] as String)
           : null,
       periodEnd: json['period_end'] != null
-          ? DateTime.parse(json['period_end'] as String)
+          ? _safeParse(json['period_end'] as String)
           : null,
       expiresAt: json['expires_at'] != null
-          ? DateTime.parse(json['expires_at'] as String)
+          ? _safeParse(json['expires_at'] as String)
           : null,
       lastResetAt: json['last_reset_at'] != null
-          ? DateTime.parse(json['last_reset_at'] as String)
+          ? _safeParse(json['last_reset_at'] as String)
           : null,
       createdAt: json['created_at'] != null
-          ? DateTime.parse(json['created_at'] as String)
+          ? _safeParse(json['created_at'] as String)
           : null,
       updatedAt: json['updated_at'] != null
-          ? DateTime.parse(json['updated_at'] as String)
+          ? _safeParse(json['updated_at'] as String)
           : null,
     );
   }
@@ -270,10 +292,10 @@ class AIChatSession {
       title: json['title'] as String,
       executionMode: (json['execution_mode'] as String?) ?? 'analyzer',
       createdAt: json['created_at'] != null
-          ? DateTime.parse(json['created_at'] as String)
+          ? _safeParse(json['created_at'] as String)
           : null,
       updatedAt: json['updated_at'] != null
-          ? DateTime.parse(json['updated_at'] as String)
+          ? _safeParse(json['updated_at'] as String)
           : null,
     );
   }
@@ -370,7 +392,7 @@ class AIChatMessage {
       functionResults: json['function_results'],
       tokensUsed: json['tokens_used'] as int? ?? 0,
       createdAt: json['created_at'] != null
-          ? DateTime.parse(json['created_at'] as String)
+          ? _safeParse(json['created_at'] as String)
           : null,
     );
   }
@@ -524,7 +546,7 @@ class AIUsageLog {
       cost: (json['cost'] as num).toDouble(),
       paymentMethod: json['payment_method'] as String,
       createdAt: json['created_at'] != null
-          ? DateTime.parse(json['created_at'] as String)
+          ? _safeParse(json['created_at'] as String)
           : null,
     );
   }
@@ -658,10 +680,10 @@ class AIPrompt {
       isDefault: json['is_default'] as bool? ?? false,
       source: json['source'] as String?,
       createdAt: json['created_at'] != null
-          ? DateTime.parse(json['created_at'] as String)
+          ? _safeParse(json['created_at'] as String)
           : null,
       updatedAt: json['updated_at'] != null
-          ? DateTime.parse(json['updated_at'] as String)
+          ? _safeParse(json['updated_at'] as String)
           : null,
     );
   }

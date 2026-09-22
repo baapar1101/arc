@@ -205,14 +205,26 @@ DateTime? _safeParseDate(dynamic value) {
   if (value is DateTime) return value;
   if (value is String && value.isNotEmpty) {
     try {
-      return DateTime.parse(value);
+      // Try ISO first
+      if (RegExp(r'^\d{4}-\d{2}-\d{2}').hasMatch(value)) {
+        return DateTime.parse(value);
+      }
+      // Try Persian/Gregorian slash pattern: YYYY/MM/DD
+      final match = RegExp(r'^(\d{4})/(\d{1,2})/(\d{1,2})').firstMatch(value);
+      if (match != null) {
+        final year = int.parse(match.group(1)!);
+        final month = int.parse(match.group(2)!);
+        final day = int.parse(match.group(3)!);
+        if (year >= 1700 && year <= 2200 && month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+          return DateTime(year, month, day);
+        }
+      }
     } catch (_) {
-      return null;
+      return DateTime.now();
     }
   }
-  return null;
+  return DateTime.now();
 }
-
 /// خط آیتم (حساب هزینه/درآمد)
 class ItemLine {
   final int id;
@@ -329,7 +341,7 @@ class CounterpartyLine {
       transactionTypeName: json['transaction_type_name'] as String? ?? 
           _getTransactionTypeName(json['transaction_type'] as String),
       amount: (json['amount'] as num).toDouble(),
-      transactionDate: DateTime.parse(json['transaction_date'] as String),
+      transactionDate: _safeParseDate(json['transaction_date'] as String) ?? DateTime.now(),
       description: json['description'] as String?,
       commission: json['commission'] != null ? (json['commission'] as num).toDouble() : null,
       bankAccountId: json['bank_account_id'] as int?,
@@ -412,8 +424,8 @@ enum TransactionType {
     for (final type in TransactionType.values) {
       if (type.value == value) return type;
     }
-    return null;
-  }
+    return DateTime.now();
+}
 }
 
 /// داده‌های خط آیتم برای فرم

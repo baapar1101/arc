@@ -1,5 +1,27 @@
 import 'package:shamsi_date/shamsi_date.dart';
 
+DateTime _safeParse(dynamic value) {
+  if (value == null) return DateTime.now();
+  try {
+    final text = value.toString().trim();
+    // Try ISO first
+    if (RegExp(r'^\d{4}-\d{2}-\d{2}').hasMatch(text)) {
+      return DateTime.parse(text);
+    }
+    // Try Persian/Gregorian slash pattern: YYYY/MM/DD
+    final match = RegExp(r'^(\d{4})/(\d{1,2})/(\d{1,2})').firstMatch(text);
+    if (match != null) {
+      final year = int.parse(match.group(1)!);
+      final month = int.parse(match.group(2)!);
+      final day = int.parse(match.group(3)!);
+      if (year >= 1700 && year <= 2200 && month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+        return DateTime(year, month, day);
+      }
+    }
+  } catch (_) {}
+  return DateTime.now();
+}
+
 class WarrantySetting {
   final int? id;
   final int businessId;
@@ -113,7 +135,7 @@ class WarrantySetting {
       }
       // ISO or other parseable formats
       try {
-        return DateTime.parse(value);
+        return _safeParse(value);
       } catch (_) {
         return DateTime.now();
       }
@@ -297,7 +319,7 @@ class WarrantyCode {
         }
       }
       try {
-        return DateTime.parse(value);
+        return _safeParse(value);
       } catch (_) {
         return DateTime.now();
       }
@@ -420,7 +442,7 @@ class WarrantyActivation {
         }
       }
       try {
-        return DateTime.parse(value);
+        return _safeParse(value);
       } catch (_) {
         return DateTime.now();
       }
@@ -566,7 +588,7 @@ class WarrantyTracking {
         }
       }
       try {
-        return DateTime.parse(value);
+        return _safeParse(value);
       } catch (_) {
         return DateTime.now();
       }
@@ -671,7 +693,7 @@ class WarrantyTrackingLink {
         }
       }
       try {
-        return DateTime.parse(value);
+        return _safeParse(value);
       } catch (_) {
         return DateTime.now();
       }
@@ -788,7 +810,7 @@ class WarrantyTrackingInfo {
         }
       }
       try {
-        return DateTime.parse(value);
+        return _safeParse(value);
       } catch (_) {
         return DateTime.now();
       }

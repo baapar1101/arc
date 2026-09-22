@@ -1,5 +1,27 @@
 import 'package:intl/intl.dart' as intl;
 
+DateTime _safeParse(dynamic value) {
+  if (value == null) return DateTime.now();
+  try {
+    final text = value.toString().trim();
+    // Try ISO first
+    if (RegExp(r'^\d{4}-\d{2}-\d{2}').hasMatch(text)) {
+      return DateTime.parse(text);
+    }
+    // Try Persian/Gregorian slash pattern: YYYY/MM/DD
+    final match = RegExp(r'^(\d{4})/(\d{1,2})/(\d{1,2})').firstMatch(text);
+    if (match != null) {
+      final year = int.parse(match.group(1)!);
+      final month = int.parse(match.group(2)!);
+      final day = int.parse(match.group(3)!);
+      if (year >= 1700 && year <= 2200 && month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+        return DateTime(year, month, day);
+      }
+    }
+  } catch (_) {}
+  return DateTime.now();
+}
+
 /// مدل سفارش تعمیر
 class RepairOrder {
   final int id;
@@ -97,15 +119,15 @@ class RepairOrder {
       currencyId: json['currency_id'] as int,
       currencySymbol: json['currency_symbol'] as String? ?? 'تومان',
       currencyCode: json['currency_code'] as String?,
-      receivedAt: DateTime.parse(json['received_at'] as String),
+      receivedAt: _safeParse(json['received_at'] as String),
       estimatedDeliveryAt: json['estimated_delivery_at'] != null
-          ? DateTime.parse(json['estimated_delivery_at'] as String)
+          ? _safeParse(json['estimated_delivery_at'] as String)
           : null,
       completedAt: json['completed_at'] != null
-          ? DateTime.parse(json['completed_at'] as String)
+          ? _safeParse(json['completed_at'] as String)
           : null,
       deliveredAt: json['delivered_at'] != null
-          ? DateTime.parse(json['delivered_at'] as String)
+          ? _safeParse(json['delivered_at'] as String)
           : null,
       extraInfo: (json['extra_info'] as Map<String, dynamic>?) ?? {},
       parts: (json['parts'] as List<dynamic>?)
@@ -302,12 +324,12 @@ class RepairOrderListItem {
       finalCost: (json['final_cost'] as num).toDouble(),
       currencyId: json['currency_id'] as int,
       currencySymbol: json['currency_symbol'] as String? ?? 'تومان',
-      receivedAt: DateTime.parse(json['received_at'] as String),
+      receivedAt: _safeParse(json['received_at'] as String),
       estimatedDeliveryAt: json['estimated_delivery_at'] != null
-          ? DateTime.parse(json['estimated_delivery_at'] as String)
+          ? _safeParse(json['estimated_delivery_at'] as String)
           : null,
       completedAt: json['completed_at'] != null
-          ? DateTime.parse(json['completed_at'] as String)
+          ? _safeParse(json['completed_at'] as String)
           : null,
     );
   }
@@ -413,7 +435,7 @@ class RepairOrderStatusItem {
       id: json['id'] as int,
       status: json['status'] as String,
       notes: json['notes'] as String?,
-      createdAt: DateTime.parse(json['created_at'] as String),
+      createdAt: _safeParse(json['created_at'] as String),
       smsSent: json['sms_sent'] as bool,
       emailSent: json['email_sent'] as bool,
     );

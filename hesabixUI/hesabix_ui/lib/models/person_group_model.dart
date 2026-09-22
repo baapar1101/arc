@@ -1,3 +1,26 @@
+
+DateTime _safeParse(dynamic value) {
+  if (value == null) return DateTime.now();
+  try {
+    final text = value.toString().trim();
+    // Try ISO first
+    if (RegExp(r'^\d{4}-\d{2}-\d{2}').hasMatch(text)) {
+      return DateTime.parse(text);
+    }
+    // Try Persian/Gregorian slash pattern: YYYY/MM/DD
+    final match = RegExp(r'^(\d{4})/(\d{1,2})/(\d{1,2})').firstMatch(text);
+    if (match != null) {
+      final year = int.parse(match.group(1)!);
+      final month = int.parse(match.group(2)!);
+      final day = int.parse(match.group(3)!);
+      if (year >= 1700 && year <= 2200 && month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+        return DateTime(year, month, day);
+      }
+    }
+  } catch (_) {}
+  return DateTime.now();
+}
+
 /// گروه اشخاص (قالب پیش‌فرض + دسته‌بندی)
 class PersonGroup {
   final int id;
@@ -40,8 +63,8 @@ class PersonGroup {
           : (pd is Map ? Map<String, dynamic>.from(pd.map((k, v) => MapEntry(k.toString(), v))) : <String, dynamic>{}),
       sortOrder: (json['sort_order'] as num?)?.toInt() ?? 0,
       isActive: json['is_active'] == true || json['is_active'] == 1,
-      createdAt: DateTime.parse(json['created_at'] as String),
-      updatedAt: DateTime.parse(json['updated_at'] as String),
+      createdAt: _safeParse(json['created_at'] as String),
+      updatedAt: _safeParse(json['updated_at'] as String),
     );
   }
 }

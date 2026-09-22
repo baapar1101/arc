@@ -1,3 +1,26 @@
+
+DateTime _safeParse(dynamic value) {
+  if (value == null) return DateTime.now();
+  try {
+    final text = value.toString().trim();
+    // Try ISO first
+    if (RegExp(r'^\d{4}-\d{2}-\d{2}').hasMatch(text)) {
+      return DateTime.parse(text);
+    }
+    // Try Persian/Gregorian slash pattern: YYYY/MM/DD
+    final match = RegExp(r'^(\d{4})/(\d{1,2})/(\d{1,2})').firstMatch(text);
+    if (match != null) {
+      final year = int.parse(match.group(1)!);
+      final month = int.parse(match.group(2)!);
+      final day = int.parse(match.group(3)!);
+      if (year >= 1700 && year <= 2200 && month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+        return DateTime(year, month, day);
+      }
+    }
+  } catch (_) {}
+  return DateTime.now();
+}
+
 class PingPongScore {
   final int? id;
   final int userId;
@@ -28,10 +51,10 @@ class PingPongScore {
       heroModeUses: json['hero_mode_uses'] as int? ?? 0,
       difficultyLevel: (json['difficulty_level'] as num?)?.toDouble() ?? 1.0,
       playedAt: json['played_at'] != null
-          ? DateTime.parse(json['played_at'] as String)
+          ? _safeParse(json['played_at'] as String)
           : null,
       createdAt: json['created_at'] != null
-          ? DateTime.parse(json['created_at'] as String)
+          ? _safeParse(json['created_at'] as String)
           : null,
     );
   }
@@ -103,7 +126,7 @@ class LeaderboardEntry {
       userName: json['user_name'] as String? ?? 'کاربر ناشناس',
       score: json['score'] as int,
       survivalTime: json['survival_time'] as int,
-      playedAt: DateTime.parse(json['played_at'] as String),
+      playedAt: _safeParse(json['played_at'] as String),
       rank: json['rank'] as int,
     );
   }

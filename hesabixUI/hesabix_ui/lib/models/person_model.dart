@@ -1,3 +1,27 @@
+import 'package:shamsi_date/shamsi_date.dart';
+
+DateTime _safeParse(dynamic value) {
+  if (value == null) return DateTime.now();
+  try {
+    final text = value.toString().trim();
+    // Try ISO first
+    if (RegExp(r'^\d{4}-\d{2}-\d{2}').hasMatch(text)) {
+      return DateTime.parse(text);
+    }
+    // Try Persian/Gregorian slash pattern: YYYY/MM/DD
+    final match = RegExp(r'^(\d{4})/(\d{1,2})/(\d{1,2})').firstMatch(text);
+    if (match != null) {
+      final year = int.parse(match.group(1)!);
+      final month = int.parse(match.group(2)!);
+      final day = int.parse(match.group(3)!);
+      if (year >= 1700 && year <= 2200 && month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+        return DateTime(year, month, day);
+      }
+    }
+  } catch (_) {}
+  return DateTime.now();
+}
+
 /// Converts JSON value to bool safely (handles int 0/1 and string 'true'/'false' from API).
 bool _fromJsonBool(dynamic v, [bool defaultValue = false]) {
   if (v == null) return defaultValue;
@@ -6,6 +30,49 @@ bool _fromJsonBool(dynamic v, [bool defaultValue = false]) {
   if (v is String) return v.toLowerCase() == 'true' || v == '1';
   return defaultValue;
 }
+
+/// Safely parse date/time from API supporting multiple formats:
+/// - ISO strings (e.g., "2025-09-22T15:19:38.001008Z")
+/// - Persian slash strings (e.g., "1405/06/31 18:49:38")
+/// - raw field fallback when *_raw is present (e.g., "1405/06/31 10:43:52.100393Z")
+DateTime _parseApiDateTime(dynamic value, {dynamic rawValue}) {
+  if (value == null && rawValue != null) value = rawValue;
+  if (value == null) return DateTime.now();
+
+  if (value is String) {
+    // Try ISO first
+    try {
+      return DateTime.parse(value);
+    } catch (_) {}
+
+    // Try Persian/Gregorian slash pattern: YYYY/MM/DD [HH:mm:ss]
+    final match = RegExp(r'^(\d{4})/(\d{1,2})/(\d{1,2})(?:\s+(\d{1,2}):(\d{2}):(\d{2}))?').firstMatch(value);
+    if (match != null) {
+      final year = int.parse(match.group(1)!);
+      final month = int.parse(match.group(2)!);
+      final day = int.parse(match.group(3)!);
+
+      // Handle Gregorian dates (1700-2100)
+      if (year >= 1700 && year <= 2100 && month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+        try {
+          return DateTime(year, month, day);
+        } catch (_) {}
+      }
+
+      // Handle Persian dates (1200-1600 range)
+      if (year >= 1200 && year <= 1600 && month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+        try {
+          // Convert Persian (Jalali) to Gregorian
+          final jalali = Jalali(year, month, day);
+          return jalali.toDateTime();
+        } catch (_) {}
+      }
+    }
+  }
+
+  return DateTime.now();
+}
+
 
 class PersonBankAccount {
   final int? id;
@@ -39,8 +106,8 @@ class PersonBankAccount {
       cardNumber: json['card_number'],
       shebaNumber: json['sheba_number'],
       isActive: _fromJsonBool(json['is_active'], true),
-      createdAt: DateTime.parse(json['created_at']),
-      updatedAt: DateTime.parse(json['updated_at']),
+      createdAt: _parseApiDateTime(json['created_at'], rawValue: json['created_at_raw']),
+      updatedAt: _parseApiDateTime(json['updated_at'], rawValue: json['updated_at_raw']),
     );
   }
 
@@ -112,12 +179,8 @@ class PersonSocialContact {
       customLabel: json['custom_label'] as String?,
       value: (json['value'] as String?) ?? '',
       sortOrder: (json['sort_order'] as int?) ?? 0,
-      createdAt: json['created_at'] != null
-          ? DateTime.parse(json['created_at'] as String)
-          : DateTime.now(),
-      updatedAt: json['updated_at'] != null
-          ? DateTime.parse(json['updated_at'] as String)
-          : DateTime.now(),
+      createdAt: _parseApiDateTime(json['created_at'], rawValue: json['created_at_raw']),
+      updatedAt: _parseApiDateTime(json['updated_at'], rawValue: json['updated_at_raw']),
     );
   }
 
@@ -318,8 +381,8 @@ class Person {
       email: json['email'],
       website: json['website'],
       isActive: _fromJsonBool(json['is_active'], true),
-      createdAt: DateTime.parse(json['created_at']),
-      updatedAt: DateTime.parse(json['updated_at']),
+      createdAt: _parseApiDateTime(json['created_at'], rawValue: json['created_at_raw']),
+      updatedAt: _parseApiDateTime(json['updated_at'], rawValue: json['updated_at_raw']),
       bankAccounts: (json['bank_accounts'] as List<dynamic>?)
           ?.map((ba) => PersonBankAccount.fromJson(ba))
           .toList() ?? [],

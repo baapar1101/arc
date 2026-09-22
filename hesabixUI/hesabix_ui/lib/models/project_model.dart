@@ -1,3 +1,26 @@
+
+DateTime _safeParse(dynamic value) {
+  if (value == null) return DateTime.now();
+  try {
+    final text = value.toString().trim();
+    // Try ISO first
+    if (RegExp(r'^\d{4}-\d{2}-\d{2}').hasMatch(text)) {
+      return DateTime.parse(text);
+    }
+    // Try Persian/Gregorian slash pattern: YYYY/MM/DD
+    final match = RegExp(r'^(\d{4})/(\d{1,2})/(\d{1,2})').firstMatch(text);
+    if (match != null) {
+      final year = int.parse(match.group(1)!);
+      final month = int.parse(match.group(2)!);
+      final day = int.parse(match.group(3)!);
+      if (year >= 1700 && year <= 2200 && month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+        return DateTime(year, month, day);
+      }
+    }
+  } catch (_) {}
+  return DateTime.now();
+}
+
 /// مدل پروژه
 class ProjectModel {
   final int id;
@@ -60,10 +83,10 @@ class ProjectModel {
       status: json['status'] as String,
       statusName: json['status_name'] as String,
       startDate: json['start_date'] != null
-          ? DateTime.parse(json['start_date'] as String)
+          ? _safeParse(json['start_date'] as String)
           : null,
       endDate: json['end_date'] != null
-          ? DateTime.parse(json['end_date'] as String)
+          ? _safeParse(json['end_date'] as String)
           : null,
       budget: json['budget'] != null ? (json['budget'] as num).toDouble() : null,
       currencyId: json['currency_id'] as int?,
@@ -74,8 +97,8 @@ class ProjectModel {
       personId: json['person_id'] as int?,
       personName: json['person_name'] as String?,
       isActive: json['is_active'] as bool? ?? true,
-      createdAt: DateTime.parse(json['created_at'] as String),
-      updatedAt: DateTime.parse(json['updated_at'] as String),
+      createdAt: _safeParse(json['created_at'] as String),
+      updatedAt: _safeParse(json['updated_at'] as String),
       createdById: json['created_by_id'] as int,
       createdByName: json['created_by_name'] as String?,
       extraInfo: json['extra_info'] as Map<String, dynamic>?,
