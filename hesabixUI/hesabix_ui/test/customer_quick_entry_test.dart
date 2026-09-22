@@ -63,7 +63,7 @@ void main() {
       );
     });
 
-    test('waits when several results exist without navigation', () {
+    test('resolves several results on the server before selection', () {
       expect(
         resolveCustomerSearchSubmitAction(
           input: 'علی',
@@ -73,6 +73,21 @@ void main() {
           navigatedByKeyboard: false,
           isLoading: false,
           quickCreateEnabled: true,
+        ),
+        CustomerSearchSubmitAction.quickCreate,
+      );
+    });
+
+    test('waits on shared fields where quick entry is disabled', () {
+      expect(
+        resolveCustomerSearchSubmitAction(
+          input: 'علی',
+          loadedQuery: 'علی',
+          suggestionCount: 3,
+          hasMoreSuggestions: false,
+          navigatedByKeyboard: false,
+          isLoading: false,
+          quickCreateEnabled: false,
         ),
         CustomerSearchSubmitAction.waitForSelection,
       );

@@ -74,3 +74,43 @@ def test_finds_name_split_between_person_fields():
         mobile=None,
     )
     assert [person.id for person in matches] == [1]
+
+
+def test_mobile_match_takes_priority_over_similar_names():
+    persons = [
+        _person(1, "علی رضایی", mobile="09121234567"),
+        _person(2, "علی رضایی فروشگاه"),
+    ]
+    matches = find_quick_customer_matches(
+        persons,
+        alias_name="علی رضایی",
+        mobile="+989121234567",
+    )
+    assert [person.id for person in matches] == [1]
+
+
+def test_exact_name_takes_priority_over_partial_names():
+    persons = [
+        _person(1, "علی رضایی فروشگاه"),
+        _person(2, "علی رضایی"),
+    ]
+    matches = find_quick_customer_matches(
+        persons,
+        alias_name="علی رضایی",
+        mobile=None,
+    )
+    assert [person.id for person in matches] == [2]
+
+
+def test_returns_all_similar_names_when_there_is_no_exact_match():
+    persons = [
+        _person(1, "علی رضایی"),
+        _person(2, "علی احمدی"),
+        _person(3, "زهرا موسوی"),
+    ]
+    matches = find_quick_customer_matches(
+        persons,
+        alias_name="علی",
+        mobile=None,
+    )
+    assert [person.id for person in matches] == [1, 2]

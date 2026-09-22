@@ -95,6 +95,16 @@ def person_matches_quick_customer_entry(
     return False
 
 
+def _person_matches_mobile(person: Person, mobile: str) -> bool:
+    stored_numbers = (
+        person.mobile,
+        person.mobile_2,
+        person.mobile_3,
+        person.phone,
+    )
+    return any(numbers_match(mobile, stored, min_len=10) for stored in stored_numbers)
+
+
 def find_quick_customer_matches(
     persons: Iterable[Person],
     *,
@@ -102,17 +112,36 @@ def find_quick_customer_matches(
     mobile: str | None,
     limit: int = 20,
 ) -> list[Person]:
-    matches: list[Person] = []
-    for person in persons:
-        if person_matches_quick_customer_entry(
-            person,
-            alias_name=alias_name,
-            mobile=mobile,
+    candidates = list(persons)
+
+    # موبایل شناسه قوی‌تری از نام است. اگر پیدا شود، شباهت نام نباید اشخاص
+    # دیگری را وارد نتیجه کند و جلوی انتخاب خودکار مشتری موجود را بگیرد.
+    if mobile:
+        mobile_matches = [
+            person for person in candidates if _person_matches_mobile(person, mobile)
+        ]
+        if mobile_matches:
+            return mobile_matches[:limit]
+
+    normalized_alias = normalize_customer_alias(alias_name)
+    if not normalized_alias:
+        return []
+
+    exact_matches: list[Person] = []
+    similar_matches: list[Person] = []
+    for person in candidates:
+        aliases = _person_alias_candidates(person)
+        if normalized_alias in aliases:
+            exact_matches.append(person)
+        elif any(
+            normalized_alias in candidate or candidate in normalized_alias
+            for candidate in aliases
         ):
-            matches.append(person)
-            if len(matches) >= limit:
-                break
-    return matches
+            similar_matches.append(person)
+
+    # نام دقیق نیز قبل از نتایج جزئی انتخاب می‌شود. چند رکورد دقیق همچنان برای
+    # انتخاب صریح کاربر برگردانده می‌شوند و رکورد تازه ساخته نمی‌شود.
+    return (exact_matches or similar_matches)[:limit]
 
 
 def resolve_or_create_quick_customer(

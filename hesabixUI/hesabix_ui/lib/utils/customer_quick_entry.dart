@@ -92,7 +92,11 @@ CustomerSearchSubmitAction resolveCustomerSearchSubmitAction({
     return CustomerSearchSubmitAction.selectSuggestion;
   }
   if (suggestionCount > 0) {
-    return CustomerSearchSubmitAction.waitForSelection;
+    // در فروش سریع، API باید تشخیص دهد نتیجه دقیق است یا چند مشتری مشابه
+    // باید برای انتخاب صریح کاربر نمایش داده شوند.
+    return quickCreateEnabled
+        ? CustomerSearchSubmitAction.quickCreate
+        : CustomerSearchSubmitAction.waitForSelection;
   }
   return quickCreateEnabled
       ? CustomerSearchSubmitAction.quickCreate
