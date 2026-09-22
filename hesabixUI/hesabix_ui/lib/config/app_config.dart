@@ -15,14 +15,36 @@ class AppConfig {
   ///   روی reverse proxy مسیرهای `/api/*` و `/ws/*` به بک‌اند پاس داده شوند).
   /// - در غیر وب، پیش‌فرض `http://localhost:8000` است.
   static String get apiBaseUrl {
-    final v = _envApiBaseUrl.trim();
-    if (v.isNotEmpty) return v;
+    return resolveApiBaseUrl(
+      configuredValue: _envApiBaseUrl,
+      isWebBuild: kIsWeb,
+      currentUri: Uri.base,
+    );
+  }
 
-    if (kIsWeb) {
-      final u = Uri.base;
+  static String resolveApiBaseUrl({
+    required String configuredValue,
+    required bool isWebBuild,
+    required Uri currentUri,
+  }) {
+    final value = configuredValue.trim();
+    if (value.isNotEmpty) return value;
+
+    if (isWebBuild) {
+      final host = currentUri.host.toLowerCase();
+      if (host == 'localhost' || host == '127.0.0.1') {
+        // Flutter web-server روی 8080 فقط فایل استاتیک سرو می‌کند. فرستادن
+        // POSTهای API به همان origin پاسخ 405 می‌دهد، پس اجرای محلی بدون
+        // dart-define نیز باید مستقیماً API توسعه را روی 8000 هدف بگیرد.
+        return Uri(
+          scheme: currentUri.scheme,
+          host: currentUri.host,
+          port: 8000,
+        ).origin;
+      }
       // مثال: http://localhost:8080 یا https://arc.hesabix.ir
       // در این حالت انتظار داریم reverse proxy مسیرهای api/ws را route کند.
-      return u.origin;
+      return currentUri.origin;
     }
 
     return 'http://localhost:8000';
@@ -53,5 +75,3 @@ class AppConfig {
     return '$b/login?reset_token=${Uri.encodeComponent(token)}';
   }
 }
-
-
