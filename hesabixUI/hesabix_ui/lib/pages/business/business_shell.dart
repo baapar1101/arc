@@ -40,6 +40,7 @@ import '../../services/warehouse_service.dart';
 import '../../utils/warehouse_invoice_lines.dart';
 import '../../services/business_menu_preferences_service.dart';
 import '../../widgets/ai/ai_chat_dialog.dart';
+import '../../widgets/ai/ai_quick_start.dart';
 import '../../widgets/calculator/calculator_dialog.dart';
 import '../../widgets/business/business_shell_glyphs.dart';
 import '../../widgets/telephony/telephony_phone_bar.dart';
@@ -1332,6 +1333,10 @@ class _BusinessShellState extends State<BusinessShell> {
     );
   }
 
+  Future<void> _openAiQuickStart(BuildContext context) async {
+    await AiQuickStart.open(context);
+  }
+
   void _openCalculator(BuildContext context) {
     CalculatorDialog.show(context);
   }
@@ -1345,12 +1350,14 @@ class _BusinessShellState extends State<BusinessShell> {
     required String tooltip,
     required Widget icon,
     required VoidCallback onPressed,
+    VoidCallback? onLongPress,
   }) {
     return IconButton(
       tooltip: tooltip,
       visualDensity: VisualDensity.compact,
       style: _bizToolbarIconStyle,
       onPressed: onPressed,
+      onLongPress: onLongPress,
       icon: icon,
     );
   }
@@ -2568,6 +2575,7 @@ class _BusinessShellState extends State<BusinessShell> {
             tooltip: t.businessShellAiChatTooltip,
             icon: Icon(Icons.smart_toy_outlined, color: appBarFg, size: 21),
             onPressed: () => _openQuickAiChat(context),
+            onLongPress: () => _openAiQuickStart(context),
           ),
           _bizToolbarIconButton(
             tooltip: t.businessShellCalculatorTooltip,
@@ -2594,6 +2602,8 @@ class _BusinessShellState extends State<BusinessShell> {
               switch (value) {
                 case 'ai':
                   _openQuickAiChat(context);
+                case 'ai_quick':
+                  _openAiQuickStart(context);
                 case 'calculator':
                   _openCalculator(context);
               }
@@ -2606,6 +2616,16 @@ class _BusinessShellState extends State<BusinessShell> {
                     const Icon(Icons.smart_toy_outlined, size: 20),
                     const SizedBox(width: 12),
                     Text(t.businessShellAiChatTooltip),
+                  ],
+                ),
+              ),
+              PopupMenuItem(
+                value: 'ai_quick',
+                child: Row(
+                  children: [
+                    const Icon(Icons.auto_awesome_rounded, size: 20),
+                    const SizedBox(width: 12),
+                    Text(t.aiQuickLauncherTitle),
                   ],
                 ),
               ),

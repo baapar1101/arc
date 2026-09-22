@@ -18228,7 +18228,32 @@ class AppLocalizationsFa extends AppLocalizations {
   String get businessShellMoreToolsTooltip => 'ابزارهای بیشتر';
 
   @override
-  String get businessShellAiChatTooltip => 'چت سریع با AI';
+  String get businessShellAiChatTooltip =>
+      'چت سریع با AI (نگه‌داشتن: لانچر · Hold Q سپس AI)';
+
+  @override
+  String get aiQuickLauncherTitle => 'دستیار هوشمند';
+
+  @override
+  String get aiQuickLauncherSubtitle => 'در چه موردی کمک می‌خواهید؟';
+
+  @override
+  String get aiQuickLauncherHint => 'موضوع را بنویسید و Enter بزنید…';
+
+  @override
+  String get aiQuickLauncherKeyboardHint =>
+      'Enter برای ارسال · Esc برای بستن · Hold Q سپس AI';
+
+  @override
+  String get aiQuickLauncherArmedHint => 'AI را تایپ کنید…';
+
+  @override
+  String get aiQuickLauncherNeedBusiness =>
+      'برای استفاده از دستیار هوشمند ابتدا یک کسب‌وکار را باز کنید.';
+
+  @override
+  String get aiQuickLauncherNeedLogin =>
+      'برای استفاده از دستیار هوشمند وارد حساب شوید.';
 
   @override
   String get businessShellCalculatorTooltip => 'ماشین حساب';

@@ -33576,6 +33576,48 @@ abstract class AppLocalizations {
   /// **'Quick AI chat'**
   String get businessShellAiChatTooltip;
 
+  /// No description provided for @aiQuickLauncherTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'AI assistant'**
+  String get aiQuickLauncherTitle;
+
+  /// No description provided for @aiQuickLauncherSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'What do you need help with?'**
+  String get aiQuickLauncherSubtitle;
+
+  /// No description provided for @aiQuickLauncherHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Type your topic and press Enter…'**
+  String get aiQuickLauncherHint;
+
+  /// No description provided for @aiQuickLauncherKeyboardHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter to send · Esc to close · Hold Q then type AI'**
+  String get aiQuickLauncherKeyboardHint;
+
+  /// No description provided for @aiQuickLauncherArmedHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Type AI…'**
+  String get aiQuickLauncherArmedHint;
+
+  /// No description provided for @aiQuickLauncherNeedBusiness.
+  ///
+  /// In en, this message translates to:
+  /// **'Open a business first to use the AI assistant.'**
+  String get aiQuickLauncherNeedBusiness;
+
+  /// No description provided for @aiQuickLauncherNeedLogin.
+  ///
+  /// In en, this message translates to:
+  /// **'Sign in to use the AI assistant.'**
+  String get aiQuickLauncherNeedLogin;
+
   /// No description provided for @businessShellCalculatorTooltip.
   ///
   /// In en, this message translates to:

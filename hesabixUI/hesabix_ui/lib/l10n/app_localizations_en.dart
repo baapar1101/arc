@@ -18322,7 +18322,31 @@ class AppLocalizationsEn extends AppLocalizations {
   String get businessShellMoreToolsTooltip => 'More tools';
 
   @override
-  String get businessShellAiChatTooltip => 'Quick AI chat';
+  String get businessShellAiChatTooltip =>
+      'Quick AI chat (long-press: launcher · Hold Q then AI)';
+
+  @override
+  String get aiQuickLauncherTitle => 'AI assistant';
+
+  @override
+  String get aiQuickLauncherSubtitle => 'What do you need help with?';
+
+  @override
+  String get aiQuickLauncherHint => 'Type your topic and press Enter…';
+
+  @override
+  String get aiQuickLauncherKeyboardHint =>
+      'Enter to send · Esc to close · Hold Q then type AI';
+
+  @override
+  String get aiQuickLauncherArmedHint => 'Type AI…';
+
+  @override
+  String get aiQuickLauncherNeedBusiness =>
+      'Open a business first to use the AI assistant.';
+
+  @override
+  String get aiQuickLauncherNeedLogin => 'Sign in to use the AI assistant.';
 
   @override
   String get businessShellCalculatorTooltip => 'Calculator';
