@@ -33573,7 +33573,7 @@ abstract class AppLocalizations {
   /// No description provided for @businessShellAiChatTooltip.
   ///
   /// In en, this message translates to:
-  /// **'Quick AI chat'**
+  /// **'Quick AI chat (long-press: launcher · Hold Q then AI)'**
   String get businessShellAiChatTooltip;
 
   /// No description provided for @aiQuickLauncherTitle.

@@ -538,6 +538,7 @@ app/services/currency_admin_service.py
 app/services/currency_quant.py
 app/services/customer_club_analytics_service.py
 app/services/customer_club_service.py
+app/services/customer_quick_entry_service.py
 app/services/dashboard_widgets_service.py
 app/services/data_table_user_settings_service.py
 app/services/database_backup_service.py
@@ -1340,6 +1341,7 @@ tests/test_business_get_access.py
 tests/test_business_print_settings_resolver.py
 tests/test_chat_message_builder.py
 tests/test_cross_currency_and_person_fx.py
+tests/test_customer_quick_entry_service.py
 tests/test_datetime_timezone.py
 tests/test_distribution_service.py
 tests/test_document_code_reservation_service.py
