@@ -31,6 +31,14 @@ void main() {
         ),
         'http://127.0.0.1:8000',
       );
+      expect(
+        AppConfig.resolveApiBaseUrl(
+          configuredValue: '',
+          isWebBuild: true,
+          currentUri: Uri.parse('http://192.168.50.101:8080/business/4952'),
+        ),
+        'http://192.168.50.101:8000',
+      );
     });
 
     test('keeps the current origin behind a production reverse proxy', () {

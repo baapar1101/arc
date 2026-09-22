@@ -32,10 +32,12 @@ class AppConfig {
 
     if (isWebBuild) {
       final host = currentUri.host.toLowerCase();
-      if (host == 'localhost' || host == '127.0.0.1') {
+      final isLocalPreview =
+          host == 'localhost' || host == '127.0.0.1' || currentUri.port == 8080;
+      if (isLocalPreview) {
         // Flutter web-server روی 8080 فقط فایل استاتیک سرو می‌کند. فرستادن
-        // POSTهای API به همان origin پاسخ 405 می‌دهد، پس اجرای محلی بدون
-        // dart-define نیز باید مستقیماً API توسعه را روی 8000 هدف بگیرد.
+        // درخواست‌های API به همان origin خطا می‌دهد. این تشخیص شامل IP شبکه
+        // نیز هست تا پیش‌نمایش روی دستگاه دیگری API همان میزبان را ببیند.
         return Uri(
           scheme: currentUri.scheme,
           host: currentUri.host,
