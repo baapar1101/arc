@@ -14,6 +14,7 @@ $sync_settings = Hesabix_V2_Invoice_Helper::normalize_sync_settings(get_option('
 $wc_status_choices = Hesabix_V2_Invoice_Helper::get_wc_order_status_choices();
 $debug_mode = get_option('hesabix_v2_debug_mode', false);
 $add_checkout_fields = get_option('hesabix_v2_add_checkout_fields', false);
+$delete_data_on_uninstall = (bool) get_option('hesabix_v2_delete_data_on_uninstall', false);
 $api_key = get_option('hesabix_v2_api_key');
 $api_base_url = get_option('hesabix_v2_api_base_url', HESABIX_V2_API_BASE_URL);
 $ob_inv_done = (bool) get_option('hesabix_v2_opening_inventory_completed');
@@ -250,14 +251,18 @@ $hsx_post = ini_get('post_max_size') ?: '';
 			<div class="notice notice-warning hesabix-v2-connection-notes" role="region" aria-labelledby="hesabix-v2-connection-notes-title">
 				<p id="hesabix-v2-connection-notes-title"><strong><?php esc_html_e('نکات مهم', 'hesabix-v2'); ?></strong></p>
 				<ul class="hesabix-v2-connection-notes-list">
-					<li><?php esc_html_e('برای اتصال به API حسابیکس و فعال‌سازی این افزونه، باید کلید API و توکن ورود خود را در اینجا وارد کنید.', 'hesabix-v2'); ?></li>
-					<li><?php esc_html_e('برای یافتن توکن ورود و کلید API، در حسابیکس به مسیر تنظیمات حساب ← کلیدهای API مراجعه کنید.', 'hesabix-v2'); ?></li>
-					<li><?php esc_html_e('اگر می‌خواهید کسب‌وکار دیگری را به افزونه متصل کنید، ابتدا افزونه را حذف و مجدد نصب کنید تا ارتباطات کسب‌وکار قبلی پاک شود.', 'hesabix-v2'); ?></li>
+					<li><?php esc_html_e('برای اتصال به API حسابیکس و فعال‌سازی این افزونه، باید کلید API خود را در ویزارد راه‌اندازی وارد کنید.', 'hesabix-v2'); ?></li>
+					<li><?php esc_html_e('برای یافتن کلید API، در حسابیکس به مسیر تنظیمات حساب ← کلیدهای API مراجعه کنید.', 'hesabix-v2'); ?></li>
+					<li><?php esc_html_e('برای تعویض کسب‌وکار از دکمه «تغییر کسب‌وکار» استفاده کنید؛ افزونه ابتدا اتصال قبلی را قطع و نگاشت‌ها را پاک می‌کند، سپس ویزارد را باز می‌کند. حذف و نصب مجدد لازم نیست.', 'hesabix-v2'); ?></li>
 				</ul>
 				<p class="hesabix-v2-connection-notes-ark">
 					<?php esc_html_e('این نسخه برای اتصال به حسابیکس (صرفاً نسخهٔ آرک) طراحی شده است و به نسخه‌های دیگر از جمله نسخهٔ شادمان متصل نخواهد شد.', 'hesabix-v2'); ?>
 				</p>
 			</div>
+
+		<?php if (!empty($_GET['hesabix_disconnected'])) : ?>
+			<div class="notice notice-success is-dismissible"><p><?php esc_html_e('اتصال از حسابیکس قطع شد و داده‌های لینک کسب‌وکار قبلی پاک شدند.', 'hesabix-v2'); ?></p></div>
+		<?php endif; ?>
 
 		<table class="form-table">
 			<tr>
@@ -279,7 +284,7 @@ $hsx_post = ini_get('post_max_size') ?: '';
 						>
 							<p class="hesabix-v2-muted"><?php esc_html_e('در حال دریافت جزئیات کسب‌وکار…', 'hesabix-v2'); ?></p>
 						</div>
-						<p class="description" style="margin-top:10px;">
+						<p class="description hesabix-v2-connection-actions" style="margin-top:10px;">
 							<button
 								type="button"
 								class="button hesabix-v2-test-connection"
@@ -289,6 +294,9 @@ $hsx_post = ini_get('post_max_size') ?: '';
 							<a href="<?php echo esc_url(admin_url('admin.php?page=hesabix-v2-setup')); ?>" class="button hesabix-v2-change-connection-trigger">
 								<?php _e('تغییر کسب‌وکار', 'hesabix-v2'); ?>
 							</a>
+							<button type="button" class="button button-link-delete hesabix-v2-disconnect-trigger">
+								<?php esc_html_e('قطع اتصال', 'hesabix-v2'); ?>
+							</button>
 						</p>
 						<div id="hesabix-v2-settings-connection-test-result" class="hesabix-v2-settings-test-result"></div>
 					<?php else: ?>
@@ -1734,6 +1742,17 @@ $hsx_post = ini_get('post_max_size') ?: '';
 						<?php _e('فعال', 'hesabix-v2'); ?>
 					</label>
 					<p class="description"><?php _e('ثبت جزئیات کامل API requests برای عیب‌یابی', 'hesabix-v2'); ?></p>
+				</td>
+			</tr>
+
+			<tr>
+				<th scope="row"><?php esc_html_e('حذف داده‌ها هنگام Uninstall', 'hesabix-v2'); ?></th>
+				<td>
+					<label>
+						<input type="checkbox" name="hesabix_v2_delete_data_on_uninstall" value="1" <?php checked($delete_data_on_uninstall); ?>>
+						<?php esc_html_e('با حذف افزونه، جداول نگاشت، صف، لاگ و تمام گزینه‌های hesabix_v2 پاک شوند', 'hesabix-v2'); ?>
+					</label>
+					<p class="description"><?php esc_html_e('به‌صورت پیش‌فرض خاموش است تا با حذف تصادفی افزونه داده‌ها از بین نروند. برای تعویض کسب‌وکار از «قطع اتصال» یا «تغییر کسب‌وکار» استفاده کنید؛ نیازی به حذف افزونه نیست.', 'hesabix-v2'); ?></p>
 				</td>
 			</tr>
 		</table>

@@ -83,7 +83,12 @@ class Hesabix_V2_Api
 		}
 
 		// Add business and fiscal year headers for business endpoints
-		if (strpos($endpoint, '/business/') !== false || strpos($endpoint, '/businesses/') !== false || strpos($endpoint, '/accounts/') !== false) {
+		if (
+			strpos($endpoint, '/business/') !== false
+			|| strpos($endpoint, '/businesses/') !== false
+			|| strpos($endpoint, '/accounts/') !== false
+			|| strpos($endpoint, '/woocommerce/') !== false
+		) {
 			if ($this->business_id) {
 				$headers['X-Business-ID'] = $this->business_id;
 			}
@@ -1404,6 +1409,33 @@ class Hesabix_V2_Api
 			'/accounts/business/' . $bid,
 			null,
 			60
+		);
+	}
+
+	/**
+	 * پاک کردن URL فروشگاه و توکن پل ووکامرس در تنظیمات کسب‌وکار حسابیکس.
+	 *
+	 * @param int|null $business_id پیش‌فرض: کسب‌وکار ذخیره‌شده
+	 * @return array
+	 */
+	public function clear_woocommerce_bridge_settings($business_id = null)
+	{
+		$bid = $business_id !== null ? (int) $business_id : (int) $this->business_id;
+		if ($bid < 1) {
+			return array(
+				'success' => false,
+				'message' => __('شناسه کسب‌وکار تنظیم نشده است.', 'hesabix-v2'),
+			);
+		}
+
+		return $this->request(
+			'PUT',
+			'/woocommerce/business/' . $bid . '/settings',
+			array(
+				'store_base_url' => '',
+				'bridge_token'   => '',
+			),
+			30
 		);
 	}
 }

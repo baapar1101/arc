@@ -5,6 +5,7 @@ import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/widgets/invoice/person_combobox_widget.dart';
 import 'package:hesabix_ui/models/person_model.dart';
 import 'package:hesabix_ui/core/api_client.dart';
+import 'package:hesabix_ui/core/fiscal_year_controller.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
 import 'package:hesabix_ui/core/date_utils.dart' show HesabixDateUtils;
 import 'package:hesabix_ui/widgets/date_input_field.dart';
@@ -1113,16 +1114,11 @@ class _InstallmentsReportPageState extends State<InstallmentsReportPage> {
       final items =
           (data['items'] as List?)?.cast<Map<String, dynamic>>() ??
           const <Map<String, dynamic>>[];
+      final defaultFyId = await FiscalYearController.resolveDefaultId(widget.businessId, items);
+      if (!mounted) return;
       setState(() {
         _fiscalYears = items;
-        _selectedFiscalYearId =
-            items.firstWhere(
-                  (e) => (e['is_current'] == true),
-                  orElse: () => (items.isNotEmpty
-                      ? items.first
-                      : const <String, dynamic>{}),
-                )['id']
-                as int?;
+        _selectedFiscalYearId = defaultFyId;
       });
       if (mounted) {
         await _fetch(resetPage: true);

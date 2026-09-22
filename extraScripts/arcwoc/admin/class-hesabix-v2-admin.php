@@ -264,14 +264,23 @@ class Hesabix_V2_Admin
 						'testing_connection' => __('در حال بررسی اتصال...', 'hesabix-v2'),
 						'loading_connection_detail' => __('در حال دریافت جزئیات کسب‌وکار...', 'hesabix-v2'),
 						'connection_detail_failed' => __('جزئیات کسب‌وکار دریافت نشد.', 'hesabix-v2'),
-						'warn_change_business_title' => __('هشدار', 'hesabix-v2'),
+						'warn_change_business_title' => __('قطع اتصال و تغییر کسب‌وکار', 'hesabix-v2'),
 						/* translators: line breaks optional; modal body */
 						'warn_change_business_body' => __(
-							'برای اتصال کسب‌وکار دیگری به افزونه، ابتدا افزونه را حذف و مجدد نصب کنید تا ارتباطات کسب‌وکار قبلی پاک شود.',
+							'با ادامه، اتصال فعلی قطع می‌شود: نگاشت‌ها، صف همگام‌سازی، شناسه‌های کالا/انبار/بانک وابسته به کسب‌وکار قبلی و توکن پل پاک می‌شوند. سپس می‌توانید کلید API و کسب‌وکار جدید را تنظیم کنید. داده‌های حسابیکس کسب‌وکار قبلی در سرور حسابیکس باقی می‌مانند.',
 							'hesabix-v2'
 						),
-						'warn_change_business_ok' => __('متوجه شدم؛ ادامه', 'hesabix-v2'),
+						'warn_change_business_ok' => __('قطع اتصال و ادامه', 'hesabix-v2'),
 						'warn_change_business_cancel' => __('انصراف', 'hesabix-v2'),
+						'warn_disconnect_title' => __('قطع اتصال از حسابیکس', 'hesabix-v2'),
+						'warn_disconnect_body' => __(
+							'اتصال قطع می‌شود و لینک‌های بین ووکامرس و کسب‌وکار فعلی (نگاشت‌ها، صف، شناسه‌های وابسته و توکن پل) پاک می‌گردند. فیلدهای کد ملی/اقتصادی مشتریان و تنظیمات ظاهری افزونه حفظ می‌شوند. این عمل برگشت‌پذیر نیست.',
+							'hesabix-v2'
+						),
+						'warn_disconnect_ok' => __('قطع اتصال', 'hesabix-v2'),
+						'warn_disconnect_cancel' => __('انصراف', 'hesabix-v2'),
+						'disconnecting' => __('در حال قطع اتصال…', 'hesabix-v2'),
+						'disconnect_failed' => __('قطع اتصال ناموفق بود.', 'hesabix-v2'),
 						'lbl_linked_business' => __('کسب‌وکار متصل', 'hesabix-v2'),
 						'lbl_business_id' => __('شناسه کسب‌وکار', 'hesabix-v2'),
 						'lbl_owner' => __('مالک در حسابیکس', 'hesabix-v2'),
@@ -1072,6 +1081,8 @@ class Hesabix_V2_Admin
 		}
 
 		update_option(Hesabix_V2_Bridge_Rest::OPT_ENABLED, isset($_POST['hesabix_v2_bridge_enabled']));
+
+		update_option('hesabix_v2_delete_data_on_uninstall', isset($_POST['hesabix_v2_delete_data_on_uninstall']));
 
 		add_settings_error(
 			'hesabix_v2_messages',
@@ -3006,6 +3017,11 @@ class Hesabix_V2_Admin
 			wp_send_json(array('success' => false, 'message' => __('کسب‌وکار را انتخاب کنید.', 'hesabix-v2')));
 		}
 
+		// اگر قبلاً متصل بود یا نگاشت قدیمی مانده، قبل از اتصال جدید پاکسازی امن انجام شود.
+		if (class_exists('Hesabix_V2_Connection_Service', false)) {
+			Hesabix_V2_Connection_Service::disconnect_before_new_connection($business_id);
+		}
+
 		update_option('hesabix_v2_api_key', $api_key);
 		update_option('hesabix_v2_business_id', $business_id);
 		$api = new Hesabix_V2_Api();
@@ -3019,6 +3035,48 @@ class Hesabix_V2_Admin
 		Hesabix_V2_Currency_Service::invalidate_list_cache();
 
 		wp_send_json(array('success' => true, 'message' => __('راه‌اندازی با موفقیت انجام شد.', 'hesabix-v2')));
+	}
+
+	/**
+	 * AJAX: قطع اتصال امن از حسابیکس و پاکسازی لینک‌های محلی.
+	 *
+	 * @return void
+	 */
+	public function ajax_disconnect()
+	{
+		check_ajax_referer('hesabix_v2_nonce', 'nonce');
+		$this->ajax_require_manage_wc();
+
+		if (!class_exists('Hesabix_V2_Connection_Service', false)) {
+			wp_send_json(array(
+				'success' => false,
+				'message' => __('سرویس قطع اتصال در دسترس نیست.', 'hesabix-v2'),
+			));
+		}
+
+		$redirect_setup = !empty($_POST['redirect_to_setup']);
+		$result = Hesabix_V2_Connection_Service::disconnect(
+			array(
+				'clear_remote_bridge' => true,
+				'show_setup_wizard'   => $redirect_setup,
+				'truncate_logs'       => true,
+				'clear_order_meta'    => true,
+			)
+		);
+
+		$payload = array(
+			'success' => !empty($result['success']),
+			'message' => isset($result['message']) ? $result['message'] : '',
+			'details' => isset($result['details']) ? $result['details'] : array(),
+		);
+
+		if ($redirect_setup) {
+			$payload['redirect'] = admin_url('admin.php?page=hesabix-v2-setup');
+		} else {
+			$payload['redirect'] = admin_url('admin.php?page=hesabix-v2-settings&hesabix_disconnected=1');
+		}
+
+		wp_send_json($payload);
 	}
 
 	/**

@@ -404,8 +404,16 @@ progress::-moz-progress-bar {
 	background: #f6f7f7;
 }
 
-.hesabix-v2-setup-reconnect-note {
-	margin-top: 12px !important;
+.hesabix-v2-connection-actions {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 8px;
+}
+
+.hesabix-v2-warn-status {
+	margin-top: 10px !important;
+	color: #b32d2e;
 }
 
 /* تنظیمات — نکات اتصال (هشدار) */

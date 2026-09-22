@@ -6,6 +6,7 @@ import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
 import 'package:hesabix_ui/core/auth_store.dart';
 import 'package:hesabix_ui/core/api_client.dart';
+import 'package:hesabix_ui/core/fiscal_year_controller.dart';
 import 'package:hesabix_ui/core/business_named_route_locations.dart';
 import 'package:hesabix_ui/models/invoice_list_item.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table_widget.dart';
@@ -310,15 +311,12 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
 
     try {
       final items = await _dashboardService.listFiscalYears(widget.businessId);
+      final defaultFyId = await FiscalYearController.resolveDefaultId(widget.businessId, items);
       if (!mounted) return;
       setState(() {
         _fiscalYears = items;
-        if (_selectedFiscalYearId == null && _fiscalYears.isNotEmpty) {
-          final current = _fiscalYears.firstWhere(
-            (fy) => fy['is_current'] == true,
-            orElse: () => _fiscalYears.first,
-          );
-          _selectedFiscalYearId = current['id'] as int?;
+        if (_selectedFiscalYearId == null) {
+          _selectedFiscalYearId = defaultFyId;
         }
         if (savedFilters != null && savedFilters.isNotEmpty) {
           _applyInvoiceSavedFiltersMap(savedFilters);
