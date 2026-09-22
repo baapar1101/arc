@@ -41,7 +41,7 @@ enum TransactionType {
         return type;
       }
     }
-    return DateTime.now();
+    return null;
 }
   static List<TransactionType> get allTypes => TransactionType.values;
 }

@@ -597,7 +597,7 @@ class UpdateManualDocumentRequest {
       }
     }
 
-    return DateTime.now();
+    return null;
 }
 }
 

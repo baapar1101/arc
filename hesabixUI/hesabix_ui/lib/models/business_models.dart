@@ -321,7 +321,7 @@ class BusinessData {
         }
         break;
     }
-    return DateTime.now();
+    return null;
 }
   String _stripPhoneFormatting(String value) {
     final normalized = toEnglishDigits(value);

@@ -424,8 +424,8 @@ enum TransactionType {
     for (final type in TransactionType.values) {
       if (type.value == value) return type;
     }
-    return DateTime.now();
-}
+    return null;
+  }
 }
 
 /// داده‌های خط آیتم برای فرم
