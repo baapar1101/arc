@@ -56,6 +56,16 @@ class Hesabix_V2_Bridge_Rest
 	}
 
 	/**
+	 * حذف هش توکن پل محلی (پس از قطع اتصال یا چرخش اجباری).
+	 *
+	 * @return void
+	 */
+	public static function clear_token()
+	{
+		delete_option(self::OPT_TOKEN_HASH);
+	}
+
+	/**
 	 * @param string $plain
 	 * @return bool
 	 */

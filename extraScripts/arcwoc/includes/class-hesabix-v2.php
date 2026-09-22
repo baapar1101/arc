@@ -133,6 +133,7 @@ class Hesabix_V2
 		require_once HESABIX_V2_PLUGIN_DIR . 'admin/services/class-hesabix-v2-orphan-product-service.php';
 		require_once HESABIX_V2_PLUGIN_DIR . 'admin/services/class-hesabix-v2-opening-inventory-service.php';
 		require_once HESABIX_V2_PLUGIN_DIR . 'admin/services/class-hesabix-v2-queue-service.php';
+		require_once HESABIX_V2_PLUGIN_DIR . 'admin/services/class-hesabix-v2-connection-service.php';
 		require_once HESABIX_V2_PLUGIN_DIR . 'includes/class-hesabix-v2-inventory-policy.php';
 		require_once HESABIX_V2_PLUGIN_DIR . 'admin/services/class-hesabix-v2-stock-push-service.php';
 		require_once HESABIX_V2_PLUGIN_DIR . 'admin/services/class-hesabix-v2-stock-pull-service.php';
@@ -233,6 +234,7 @@ class Hesabix_V2
 		$this->loader->add_action('wp_ajax_hesabix_v2_setup_verify_api_key', $plugin_admin, 'ajax_setup_verify_api_key');
 		$this->loader->add_action('wp_ajax_hesabix_v2_setup_businesses', $plugin_admin, 'ajax_setup_businesses');
 		$this->loader->add_action('wp_ajax_hesabix_v2_setup_complete', $plugin_admin, 'ajax_setup_complete');
+		$this->loader->add_action('wp_ajax_hesabix_v2_disconnect', $plugin_admin, 'ajax_disconnect');
 
 		$this->loader->add_action('wp_ajax_hesabix_v2_bridge_generate_token', $plugin_admin, 'ajax_bridge_generate_token');
 

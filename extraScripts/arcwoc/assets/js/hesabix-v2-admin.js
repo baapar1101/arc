@@ -21,6 +21,7 @@
 		init: function() {
 			this.bindEvents();
 			this.bindChangeBusinessWarning();
+			this.bindDisconnect();
 			this.initTooltips();
 			this.bootstrapConnectionPanels();
 		},
@@ -270,36 +271,95 @@
 					return;
 				}
 				e.preventDefault();
-				HesabixV2Admin.openChangeBusinessDialog(dest);
+				HesabixV2Admin.openConnectionActionDialog({
+					mode: 'change',
+					destUrl: dest
+				});
 			});
 		},
 
-		openChangeBusinessDialog: function(destUrl) {
+		bindDisconnect: function() {
+			$(document).on('click', '.hesabix-v2-disconnect-trigger', function(e) {
+				e.preventDefault();
+				HesabixV2Admin.openConnectionActionDialog({
+					mode: 'disconnect'
+				});
+			});
+		},
+
+		/**
+		 * @param {{mode:string, destUrl?:string}} opts
+		 */
+		openConnectionActionDialog: function(opts) {
 			var st = (hesabix_v2_ajax && hesabix_v2_ajax.strings) ? hesabix_v2_ajax.strings : {};
+			var mode = opts && opts.mode === 'change' ? 'change' : 'disconnect';
+			var title = mode === 'change' ? (st.warn_change_business_title || '') : (st.warn_disconnect_title || '');
+			var body = mode === 'change' ? (st.warn_change_business_body || '') : (st.warn_disconnect_body || '');
+			var okLabel = mode === 'change' ? (st.warn_change_business_ok || '') : (st.warn_disconnect_ok || '');
+			var cancelLabel = mode === 'change' ? (st.warn_change_business_cancel || '') : (st.warn_disconnect_cancel || '');
+
 			var html = ''
 				+ '<div class="hesabix-v2-warn-overlay" role="presentation">'
 				+ '<div class="hesabix-v2-warn-dialog" role="dialog" aria-labelledby="hesabix-v2-warn-title">'
 				+ '<div class="hesabix-v2-warn-dialog__header"><h3 id="hesabix-v2-warn-title">'
-				+ this.escapeHtml(st.warn_change_business_title)
+				+ this.escapeHtml(title)
 				+ '</h3></div>'
 				+ '<div class="hesabix-v2-warn-dialog__body"><p>'
-				+ this.escapeHtml(st.warn_change_business_body)
-				+ '</p></div>'
+				+ this.escapeHtml(body)
+				+ '</p>'
+				+ '<p class="hesabix-v2-warn-status hesabix-v2-muted" hidden></p>'
+				+ '</div>'
 				+ '<div class="hesabix-v2-warn-dialog__footer">'
-				+ '<button type="button" class="button button-primary hesabix-v2-warn-ok">' + this.escapeHtml(st.warn_change_business_ok) + '</button> '
-				+ '<button type="button" class="button hesabix-v2-warn-cancel">' + this.escapeHtml(st.warn_change_business_cancel) + '</button>'
+				+ '<button type="button" class="button button-primary hesabix-v2-warn-ok">' + this.escapeHtml(okLabel) + '</button> '
+				+ '<button type="button" class="button hesabix-v2-warn-cancel">' + this.escapeHtml(cancelLabel) + '</button>'
 				+ '</div></div></div>';
 
 			var $ovl = $(html);
 			$('body').append($ovl);
+			var busy = false;
 
 			function teardown() {
+				if (busy) {
+					return;
+				}
 				$ovl.remove();
 				$(document).off('keydown.hesabixv2warn');
 			}
 
-			function go() {
-				window.location.href = destUrl;
+			function setBusy(on) {
+				busy = !!on;
+				$ovl.find('.hesabix-v2-warn-ok, .hesabix-v2-warn-cancel').prop('disabled', busy);
+				var $status = $ovl.find('.hesabix-v2-warn-status');
+				if (busy) {
+					$status.text(st.disconnecting || '…').prop('hidden', false);
+				} else {
+					$status.prop('hidden', true).text('');
+				}
+			}
+
+			function runDisconnect() {
+				if (typeof hesabix_v2_ajax === 'undefined') {
+					return;
+				}
+				setBusy(true);
+				$.post(hesabix_v2_ajax.ajax_url, {
+					action: 'hesabix_v2_disconnect',
+					nonce: hesabix_v2_ajax.nonce,
+					redirect_to_setup: mode === 'change' ? 1 : 0
+				})
+					.done(function(resp) {
+						if (resp && resp.success && resp.redirect) {
+							window.location.href = resp.redirect;
+							return;
+						}
+						setBusy(false);
+						var msg = (resp && resp.message) ? resp.message : (st.disconnect_failed || '');
+						$ovl.find('.hesabix-v2-warn-status').text(msg).prop('hidden', false);
+					})
+					.fail(function() {
+						setBusy(false);
+						$ovl.find('.hesabix-v2-warn-status').text(st.disconnect_failed || '').prop('hidden', false);
+					});
 			}
 
 			$ovl.on('click', function(ev) {
@@ -313,8 +373,7 @@
 			});
 
 			$ovl.find('.hesabix-v2-warn-ok').on('click', function() {
-				teardown();
-				go();
+				runDisconnect();
 			});
 
 			$(document).on('keydown.hesabixv2warn', function(ev) {
@@ -327,6 +386,13 @@
 			setTimeout(function() {
 				$ovl.find('.hesabix-v2-warn-cancel').trigger('focus');
 			}, 30);
+		},
+
+		openChangeBusinessDialog: function(destUrl) {
+			this.openConnectionActionDialog({
+				mode: 'change',
+				destUrl: destUrl
+			});
 		},
 
 		bridgeGenerateToken: function(e) {

@@ -109,6 +109,7 @@ class Hesabix_V2_Activator
 
 		add_option('hesabix_v2_opening_inventory_completed', false);
 		add_option('hesabix_v2_opening_inventory_prefs', array());
+		add_option('hesabix_v2_delete_data_on_uninstall', false);
 
 		add_option(
 			'hesabix_v2_stock_pull',
