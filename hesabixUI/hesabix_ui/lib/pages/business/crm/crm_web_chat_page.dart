@@ -1124,7 +1124,7 @@ class _CrmWebChatPageState extends State<CrmWebChatPage> {
       await FileSaver.instance.saveFile(
         name: name,
         bytes: Uint8List.fromList(bytes),
-        ext: ext,
+        fileExtension: ext,
       );
       if (mounted) {
         final t = AppLocalizations.of(context);
@@ -1335,7 +1335,7 @@ class _CrmWebChatPageState extends State<CrmWebChatPage> {
       return;
     }
     try {
-      final pick = await FilePicker.platform.pickFiles(withData: true, type: FileType.any, allowMultiple: false);
+      final pick = await FilePicker.pickFiles(withData: true, type: FileType.any, allowMultiple: false);
       if (pick == null || pick.files.isEmpty) return;
       final f = pick.files.first;
       final bytes = f.bytes;

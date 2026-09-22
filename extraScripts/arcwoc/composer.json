@@ -1,12 +1,12 @@
 {
   "name": "hesabix/woocommerce-v2",
-  "description": "اتصال ووکامرس به نسخه جدید حسابیکس با API پیشرفته",
+  "description": "اتصال ووکامرس به نسخه جدید مارک‌استریت با API پیشرفته",
   "type": "wordpress-plugin",
   "license": "GPL-3.0-or-later",
   "authors": [
     {
-      "name": "Hesabix Team",
-      "email": "support@hesabix.ir",
+      "name": "MarkStreet Team",
+      "email": "support@markstreet.co",
       "homepage": "https://hesabix.ir"
     }
   ],
@@ -21,7 +21,7 @@
   ],
   "homepage": "https://hesabix.ir",
   "support": {
-    "email": "support@hesabix.ir",
+    "email": "support@markstreet.co",
     "issues": "https://hesabix.ir/support"
   },
   "require": {

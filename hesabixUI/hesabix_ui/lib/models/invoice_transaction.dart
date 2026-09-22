@@ -1,3 +1,26 @@
+
+DateTime _safeParse(dynamic value) {
+  if (value == null) return DateTime.now();
+  try {
+    final text = value.toString().trim();
+    // Try ISO first
+    if (RegExp(r'^\d{4}-\d{2}-\d{2}').hasMatch(text)) {
+      return DateTime.parse(text);
+    }
+    // Try Persian/Gregorian slash pattern: YYYY/MM/DD
+    final match = RegExp(r'^(\d{4})/(\d{1,2})/(\d{1,2})').firstMatch(text);
+    if (match != null) {
+      final year = int.parse(match.group(1)!);
+      final month = int.parse(match.group(2)!);
+      final day = int.parse(match.group(3)!);
+      if (year >= 1700 && year <= 2200 && month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+        return DateTime(year, month, day);
+      }
+    }
+  } catch (_) {}
+  return DateTime.now();
+}
+
 enum TransactionType {
   bank('bank', 'بانک'),
   cashRegister('cash_register', 'صندوق'),
@@ -19,8 +42,7 @@ enum TransactionType {
       }
     }
     return null;
-  }
-
+}
   static List<TransactionType> get allTypes => TransactionType.values;
 }
 
@@ -146,7 +168,7 @@ class InvoiceTransaction {
       personName: json['person_name'] as String?,
       accountId: json['account_id'] as String?,
       accountName: json['account_name'] as String?,
-      transactionDate: DateTime.parse(json['transaction_date'] as String),
+      transactionDate: _safeParse(json['transaction_date'] as String),
       amount: json['amount'] as num,
       commission: json['commission'] as num?,
       description: json['description'] as String?,

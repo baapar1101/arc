@@ -171,6 +171,7 @@ import 'core/calendar_controller.dart';
 import 'core/api_client.dart';
 import 'theme/theme_controller.dart';
 import 'theme/app_theme.dart';
+import 'theme/tokens/color_schemes.dart';
 import 'core/auth_store.dart';
 import 'core/mobile_launcher_prefs.dart';
 import 'core/permission_guard.dart';
@@ -803,10 +804,26 @@ class _MyAppState extends State<MyApp> {
         ],
       );
 
+      // بدون تم صریح، صفحهٔ بارگذاری با تم پیش‌فرض خاکستری فلاتر رندر می‌شد
+      // و تا آمادن شدن کنترلرها با بقیهٔ رابط هم‌خوان نبود.
+      final loadingLocale = _controller?.locale ?? const Locale('fa');
+      final loadingSeed = _themeController?.seedColor ?? AppColorTokens.defaultSeed;
+
       return MaterialApp.router(
         title: 'MarkStreet',
         routerConfig: loadingRouter,
-        locale: _controller?.locale ?? const Locale('fa'),
+        locale: loadingLocale,
+        theme: AppTheme.build(
+          isDark: false,
+          locale: loadingLocale,
+          seed: loadingSeed,
+        ),
+        darkTheme: AppTheme.build(
+          isDark: true,
+          locale: loadingLocale,
+          seed: loadingSeed,
+        ),
+        themeMode: _themeController?.mode ?? ThemeMode.system,
         supportedLocales: const [Locale('en'), Locale('fa')],
         localizationsDelegates: const [
           AppLocalizations.delegate,

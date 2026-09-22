@@ -288,7 +288,7 @@ async def create_product_endpoint(
     "/business/{business_id}/bulk-upsert",
     summary="ایجاد/ویرایش گروهی کالا (یکپارچه‌سازی)",
     description=(
-        "بدنه: `{\"items\":[{\"client_ref?\":\"...\",\"product_id?\":null|int شناسه کالا در حسابیکس,"
+        "بدنه: `{\"items\":[{\"client_ref?\":\"...\",\"product_id?\":null|int شناسه کالا در مارک‌استریت,"
         '"payload\":{ ... فیلدهای ایجاد/ویرایش مانند endpoint تکی }}],'
         '\"create_if_update_missing\":true}`. حداکثر ۱۰۰۰ آیتم. خروجی: results با status در created|updated|failed.'
     ),

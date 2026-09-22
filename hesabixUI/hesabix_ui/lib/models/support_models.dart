@@ -1,5 +1,27 @@
 import 'package:shamsi_date/shamsi_date.dart';
 
+DateTime _safeParse(dynamic value) {
+  if (value == null) return DateTime.now();
+  try {
+    final text = value.toString().trim();
+    // Try ISO first
+    if (RegExp(r'^\d{4}-\d{2}-\d{2}').hasMatch(text)) {
+      return DateTime.parse(text);
+    }
+    // Try Persian/Gregorian slash pattern: YYYY/MM/DD
+    final match = RegExp(r'^(\d{4})/(\d{1,2})/(\d{1,2})').firstMatch(text);
+    if (match != null) {
+      final year = int.parse(match.group(1)!);
+      final month = int.parse(match.group(2)!);
+      final day = int.parse(match.group(3)!);
+      if (year >= 1700 && year <= 2200 && month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+        return DateTime(year, month, day);
+      }
+    }
+  } catch (_) {}
+  return DateTime.now();
+}
+
 class SupportCategory {
   final int id;
   final String name;
@@ -32,7 +54,7 @@ class SupportCategory {
     if (dateTime is String) {
       try {
         // Parse ISO string and convert UTC to local time
-        final parsed = DateTime.parse(dateTime);
+        final parsed = _safeParse(dateTime);
         return parsed.isUtc ? parsed.toLocal() : parsed;
       } catch (e) {
         // If parsing fails, return current time
@@ -53,7 +75,7 @@ class SupportCategory {
       
       if (raw != null) {
         try {
-          final parsed = DateTime.parse(raw);
+          final parsed = _safeParse(raw);
           return parsed.isUtc ? parsed.toLocal() : parsed;
         } catch (e) {
           // Fall through to try other methods
@@ -73,7 +95,7 @@ class SupportCategory {
       
       if (formatted != null) {
         try {
-          final parsed = DateTime.parse(formatted);
+          final parsed = _safeParse(formatted);
           return parsed.isUtc ? parsed.toLocal() : parsed;
         } catch (e) {
           // Fall through to try other methods

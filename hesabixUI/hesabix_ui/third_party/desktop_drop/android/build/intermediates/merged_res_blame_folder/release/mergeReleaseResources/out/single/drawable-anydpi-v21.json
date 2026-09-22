@@ -1,26 +1,26 @@
 [
     {
         "merged": "one.mixin.desktop.drop.desktop_drop-release-24:/drawable-anydpi-v21/ic_call_answer_video_low.xml",
-        "source": "one.mixin.desktop.drop.desktop_drop-core-1.13.1-15:/drawable-anydpi-v21/ic_call_answer_video_low.xml"
+        "source": "one.mixin.desktop.drop.desktop_drop-core-1.13.1-19:/drawable-anydpi-v21/ic_call_answer_video_low.xml"
     },
     {
         "merged": "one.mixin.desktop.drop.desktop_drop-release-24:/drawable-anydpi-v21/ic_call_answer.xml",
-        "source": "one.mixin.desktop.drop.desktop_drop-core-1.13.1-15:/drawable-anydpi-v21/ic_call_answer.xml"
+        "source": "one.mixin.desktop.drop.desktop_drop-core-1.13.1-19:/drawable-anydpi-v21/ic_call_answer.xml"
     },
     {
         "merged": "one.mixin.desktop.drop.desktop_drop-release-24:/drawable-anydpi-v21/ic_call_answer_low.xml",
-        "source": "one.mixin.desktop.drop.desktop_drop-core-1.13.1-15:/drawable-anydpi-v21/ic_call_answer_low.xml"
+        "source": "one.mixin.desktop.drop.desktop_drop-core-1.13.1-19:/drawable-anydpi-v21/ic_call_answer_low.xml"
     },
     {
         "merged": "one.mixin.desktop.drop.desktop_drop-release-24:/drawable-anydpi-v21/ic_call_decline.xml",
-        "source": "one.mixin.desktop.drop.desktop_drop-core-1.13.1-15:/drawable-anydpi-v21/ic_call_decline.xml"
+        "source": "one.mixin.desktop.drop.desktop_drop-core-1.13.1-19:/drawable-anydpi-v21/ic_call_decline.xml"
     },
     {
         "merged": "one.mixin.desktop.drop.desktop_drop-release-24:/drawable-anydpi-v21/ic_call_answer_video.xml",
-        "source": "one.mixin.desktop.drop.desktop_drop-core-1.13.1-15:/drawable-anydpi-v21/ic_call_answer_video.xml"
+        "source": "one.mixin.desktop.drop.desktop_drop-core-1.13.1-19:/drawable-anydpi-v21/ic_call_answer_video.xml"
     },
     {
         "merged": "one.mixin.desktop.drop.desktop_drop-release-24:/drawable-anydpi-v21/ic_call_decline_low.xml",
-        "source": "one.mixin.desktop.drop.desktop_drop-core-1.13.1-15:/drawable-anydpi-v21/ic_call_decline_low.xml"
+        "source": "one.mixin.desktop.drop.desktop_drop-core-1.13.1-19:/drawable-anydpi-v21/ic_call_decline_low.xml"
     }
 ]

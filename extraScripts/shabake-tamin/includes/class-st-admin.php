@@ -175,7 +175,7 @@ final class Shabake_Tamin_Admin {
 				<table class="form-table" role="presentation">
 					<tr>
 						<th scope="row">
-							<label for="st_api_base_url"><?php esc_html_e( 'آدرس پایهٔ API حسابیکس', 'shabake-tamin' ); ?></label>
+							<label for="st_api_base_url"><?php esc_html_e( 'آدرس پایهٔ API مارک‌استریت', 'shabake-tamin' ); ?></label>
 						</th>
 						<td>
 							<input name="st_api_base_url" id="st_api_base_url" type="url" class="regular-text code"

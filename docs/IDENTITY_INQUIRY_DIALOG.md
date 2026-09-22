@@ -3,7 +3,7 @@
 
 ## 📋 توضیحات / Description
 
-یک دیالوگ مستقل، زیبا و چند زبانه برای استعلام اطلاعات هویتی (کد ملی و تاریخ تولد) در سیستم حسابیکس.
+یک دیالوگ مستقل، زیبا و چند زبانه برای استعلام اطلاعات هویتی (کد ملی و تاریخ تولد) در سیستم مارک‌استریت.
 
 A standalone, beautiful, and multilingual dialog for identity inquiry (national ID and birth date) in Hesabix system.
 

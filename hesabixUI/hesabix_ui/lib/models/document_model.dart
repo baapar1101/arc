@@ -1,3 +1,26 @@
+
+DateTime _safeParse(dynamic value) {
+  if (value == null) return DateTime.now();
+  try {
+    final text = value.toString().trim();
+    // Try ISO first
+    if (RegExp(r'^\d{4}-\d{2}-\d{2}').hasMatch(text)) {
+      return DateTime.parse(text);
+    }
+    // Try Persian/Gregorian slash pattern: YYYY/MM/DD
+    final match = RegExp(r'^(\d{4})/(\d{1,2})/(\d{1,2})').firstMatch(text);
+    if (match != null) {
+      final year = int.parse(match.group(1)!);
+      final month = int.parse(match.group(2)!);
+      final day = int.parse(match.group(3)!);
+      if (year >= 1700 && year <= 2200 && month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+        return DateTime(year, month, day);
+      }
+    }
+  } catch (_) {}
+  return DateTime.now();
+}
+
 /// مدل سند حسابداری (Document)
 class DocumentModel {
   final int id;
@@ -98,7 +121,7 @@ class DocumentModel {
       // document_date در بسیاری از پاسخ‌ها (به‌خصوص جلالی) رشته‌ی غیر-ISO است و قابل parse نیست.
       // برای داشتن DateTime معتبر، از document_date_raw (ISO/Gregorian) استفاده می‌کنیم.
       documentDate: documentDateRawIso != null
-          ? DateTime.parse(documentDateRawIso)
+          ? _safeParse(documentDateRawIso)
           : _parseDateTime(json['document_date']),
       documentType: json['document_type'] as String,
       isProforma: json['is_proforma'] as bool? ?? false,
@@ -229,7 +252,7 @@ class DocumentModel {
     
     // Try ISO format first
     try {
-      return DateTime.parse(dateStr);
+      return _safeParse(dateStr);
     } catch (e) {
       // If ISO parse fails, try other formats
       // Format: "1404/07/23 14:02:20" or "1404/07/23"
@@ -575,6 +598,6 @@ class UpdateManualDocumentRequest {
     }
 
     return null;
-  }
+}
 }
 

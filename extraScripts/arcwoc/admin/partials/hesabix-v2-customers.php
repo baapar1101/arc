@@ -1,6 +1,6 @@
 <?php
 /**
- * مشتریان ووکامرس و وضعیت همگام‌سازی حسابیکس
+ * مشتریان ووکامرس و وضعیت همگام‌سازی مارک‌استریت
  *
  * @package    Hesabix_V2
  */
@@ -14,22 +14,22 @@ if (!defined('WPINC')) {
 	<h1><?php echo esc_html(get_admin_page_title()); ?></h1>
 
 	<?php if (!get_option('hesabix_v2_enabled')) : ?>
-		<div class="notice notice-warning"><p><?php esc_html_e('افزونه حسابیکس غیرفعال است. آن را از تنظیمات فعال کنید.', 'hesabix-v2'); ?></p></div>
+		<div class="notice notice-warning"><p><?php esc_html_e('افزونه مارک‌استریت غیرفعال است. آن را از تنظیمات فعال کنید.', 'hesabix-v2'); ?></p></div>
 	<?php endif; ?>
 
 	<div class="hesabix-v2-card hesabix-v2-customers-help">
 		<p>
-			<?php esc_html_e('لیست کاربران با نقش مشتری/مشترک فروشگاه را می‌بینید. از اینجا می‌توانید هر مشتری را به شخص در حسابیکس بفرستید یا به‌روز کنید؛ اگر نگاشت از قبل موجود باشد، به‌روزرسانی می‌شود وگرنه شخص جدید ساخته می‌شود.', 'hesabix-v2'); ?>
+			<?php esc_html_e('لیست کاربران با نقش مشتری/مشترک فروشگاه را می‌بینید. از اینجا می‌توانید هر مشتری را به شخص در مارک‌استریت بفرستید یا به‌روز کنید؛ اگر نگاشت از قبل موجود باشد، به‌روزرسانی می‌شود وگرنه شخص جدید ساخته می‌شود.', 'hesabix-v2'); ?>
 		</p>
 		<ul class="hesabix-v2-connection-notes-list" style="margin-top:8px;">
 			<li><?php esc_html_e('خریدهای مهمان در این لیست نیستند؛ همگام‌سازی مهمان‌ها از مسیر سفارش انجام می‌شود.', 'hesabix-v2'); ?></li>
-			<li><?php esc_html_e('در صورت ناهم‌خوانی واحد پول فروشگاه با تنظیمات ارز حسابیکس، همگام‌سازی ممکن است متوقف شود؛ پیغام خطا نشان داده می‌شود.', 'hesabix-v2'); ?></li>
+			<li><?php esc_html_e('در صورت ناهم‌خوانی واحد پول فروشگاه با تنظیمات ارز مارک‌استریت، همگام‌سازی ممکن است متوقف شود؛ پیغام خطا نشان داده می‌شود.', 'hesabix-v2'); ?></li>
 		</ul>
 	</div>
 
 	<div class="hesabix-v2-customers-toolbar hesabix-v2-card" style="margin:12px 0;display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
 		<button type="button" class="button button-primary" id="hesabix-v2-customers-bulk-sync" <?php disabled(!get_option('hesabix_v2_enabled')); ?>>
-			<?php esc_html_e('همگام‌سازی انتخاب‌شده‌ها با حسابیکس', 'hesabix-v2'); ?>
+			<?php esc_html_e('همگام‌سازی انتخاب‌شده‌ها با مارک‌استریت', 'hesabix-v2'); ?>
 		</button>
 		<span class="description" id="hesabix-v2-customers-selection-hint"><?php esc_html_e('ابتدا مشتریان را با چک‌باکس انتخاب کنید.', 'hesabix-v2'); ?></span>
 	</div>

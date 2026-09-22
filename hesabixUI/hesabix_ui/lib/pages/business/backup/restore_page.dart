@@ -565,7 +565,7 @@ class _BusinessRestorePageState extends State<BusinessRestorePage> {
                   ? null
                   : () async {
                       try {
-                        final res = await FilePicker.platform.pickFiles(
+                        final res = await FilePicker.pickFiles(
                           type: FileType.custom,
                           allowedExtensions: const ['hbx', 'zip'],
                           withData: true,

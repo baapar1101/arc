@@ -1,6 +1,6 @@
 <?php
 /**
- * فهرست محصولات ووکامرس و همگام‌سازی با حسابیکس
+ * فهرست محصولات ووکامرس و همگام‌سازی با مارک‌استریت
  *
  * @package    Hesabix_V2
  */
@@ -14,23 +14,23 @@ if (!defined('WPINC')) {
 	<h1><?php echo esc_html(get_admin_page_title()); ?></h1>
 
 	<?php if (!get_option('hesabix_v2_enabled')) : ?>
-		<div class="notice notice-warning"><p><?php esc_html_e('افزونه حسابیکس غیرفعال است. آن را از تنظیمات فعال کنید.', 'hesabix-v2'); ?></p></div>
+		<div class="notice notice-warning"><p><?php esc_html_e('افزونه مارک‌استریت غیرفعال است. آن را از تنظیمات فعال کنید.', 'hesabix-v2'); ?></p></div>
 	<?php endif; ?>
 
 	<div class="hesabix-v2-card hesabix-v2-products-help">
 		<p>
-			<?php esc_html_e('محصولات منتشرشدهٔ والد (شامل ساده و متغیر) را می‌بینید. برای هر کالا می‌توانید همگام‌سازی با حسابیکس را دستی اجرا کنید؛ برای محصول متغیر، همهٔ واریانت‌ها در یک عملیات bulk ارسال می‌شوند.', 'hesabix-v2'); ?>
+			<?php esc_html_e('محصولات منتشرشدهٔ والد (شامل ساده و متغیر) را می‌بینید. برای هر کالا می‌توانید همگام‌سازی با مارک‌استریت را دستی اجرا کنید؛ برای محصول متغیر، همهٔ واریانت‌ها در یک عملیات bulk ارسال می‌شوند.', 'hesabix-v2'); ?>
 		</p>
 		<ul class="hesabix-v2-connection-notes-list" style="margin-top:8px;">
 			<li><?php esc_html_e('فیلتر «دارای همگام‌سازی موفق» هر محصولی را نشان می‌دهد که حداقل یک ردیف نگاشت با وضعیت «همگام شده» دارد.', 'hesabix-v2'); ?></li>
 			<li><?php esc_html_e('فیلتر «بدون ردیف نگاشت» محصولاتی است که هنوز هیچ ردیفی در جدول نگاشت افزونه برای آن‌ها ثبت نشده است.', 'hesabix-v2'); ?></li>
-			<li><?php esc_html_e('در صورت ناهم‌خوانی واحد پول فروشگاه با ارز فاکتور حسابیکس، همگام‌سازی متوقف می‌شود؛ پیام خطا در خروجی عملیات نمایش داده می‌شود.', 'hesabix-v2'); ?></li>
+			<li><?php esc_html_e('در صورت ناهم‌خوانی واحد پول فروشگاه با ارز فاکتور مارک‌استریت، همگام‌سازی متوقف می‌شود؛ پیام خطا در خروجی عملیات نمایش داده می‌شود.', 'hesabix-v2'); ?></li>
 		</ul>
 	</div>
 
 	<div class="hesabix-v2-products-toolbar hesabix-v2-card" style="margin:12px 0;display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
 		<button type="button" class="button button-primary" id="hesabix-v2-products-bulk-sync" <?php disabled(!get_option('hesabix_v2_enabled')); ?>>
-			<?php esc_html_e('همگام‌سازی انتخاب‌شده‌ها با حسابیکس', 'hesabix-v2'); ?>
+			<?php esc_html_e('همگام‌سازی انتخاب‌شده‌ها با مارک‌استریت', 'hesabix-v2'); ?>
 		</button>
 		<span class="description" id="hesabix-v2-products-selection-hint"><?php esc_html_e('ابتدا محصولات را با چک‌باکس انتخاب کنید.', 'hesabix-v2'); ?></span>
 	</div>

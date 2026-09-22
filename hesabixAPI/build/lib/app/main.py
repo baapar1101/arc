@@ -217,13 +217,13 @@ def create_app() -> FastAPI:
         4. **مدیریت کاربران**: `GET /api/v1/users` (نیاز به مجوز usermanager)
 
         ## 📞 پشتیبانی:
-        - **ایمیل**: support@hesabix.ir
+        - **ایمیل**: support@markstreet.co
         - **مستندات**: `/docs` (Swagger UI)
         - **ReDoc**: `/redoc`
         """,
         contact={
-            "name": "Hesabix Team",
-            "email": "support@hesabix.ir",
+            "name": "MarkStreet Team",
+            "email": "support@markstreet.co",
             "url": "https://hesabix.ir",
         },
         license_info={

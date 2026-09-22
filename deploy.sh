@@ -13,7 +13,7 @@ IFS=$'\n\t'
 # Full license text:
 # http://www.gnu.org/licenses/gpl-3.0.txt
 #
-# Developers: Hesabix Team
+# Developers: MarkStreet Team
 # Website: https://hesabix.ir
 # Repository: https://source.hesabix.ir/hesabix/arc.git
 # Support: https://hesabix.ir/support
@@ -1097,7 +1097,7 @@ show_license_info() {
    • Open source and free
 
 👨‍💻 Developers:
-   Hesabix Team
+   MarkStreet Team
    Website: https://hesabix.ir
    Support: https://hesabix.ir/support
 
@@ -1124,7 +1124,7 @@ show_license_info() {
 ║                     GNU GENERAL PUBLIC LICENSE                        ║
 ║                           Version 3, 29 June 2007                     ║
 ║                                                                       ║
-║  Copyright (C) 2024 Hesabix Team <https://hesabix.ir>                ║
+║  Copyright (C) 2024 MarkStreet Team <https://hesabix.ir>                ║
 ║                                                                       ║
 ║  This program is free software: you can redistribute it and/or       ║
 ║  modify it under the terms of the GNU General Public License as      ║

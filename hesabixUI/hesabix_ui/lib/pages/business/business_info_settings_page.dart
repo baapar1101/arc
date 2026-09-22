@@ -473,7 +473,7 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
       _uploadingLogo = true;
     });
     try {
-      final res = await FilePicker.platform.pickFiles(type: FileType.image, withData: true);
+      final res = await FilePicker.pickFiles(type: FileType.image, withData: true);
       final f = res?.files.isNotEmpty == true ? res!.files.first : null;
       if (f == null || f.bytes == null) return;
       final bytes = f.bytes!;
@@ -509,7 +509,7 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
       _uploadingStamp = true;
     });
     try {
-      final res = await FilePicker.platform.pickFiles(type: FileType.image, withData: true);
+      final res = await FilePicker.pickFiles(type: FileType.image, withData: true);
       final f = res?.files.isNotEmpty == true ? res!.files.first : null;
       if (f == null || f.bytes == null) return;
       final bytes = f.bytes!;

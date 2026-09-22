@@ -249,7 +249,7 @@ class _StorageFileManagerPageState extends State<StorageFileManagerPage> {
 
   Future<void> _uploadFile() async {
     try {
-      final result = await FilePicker.platform.pickFiles(
+      final result = await FilePicker.pickFiles(
         type: FileType.any,
         withData: true,
       );
@@ -550,7 +550,7 @@ class _StorageFileManagerPageState extends State<StorageFileManagerPage> {
         await FileSaver.instance.saveFile(
           name: fileName,
           bytes: uint8Bytes,
-          ext: safeExt,
+          fileExtension: safeExt,
         );
         if (mounted) {
           SnackBarHelper.showSuccess(context, message: 'فایل با موفقیت ذخیره شد');

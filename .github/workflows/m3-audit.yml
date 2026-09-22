@@ -1,0 +1,40 @@
+name: M3 Audit
+
+on:
+  pull_request:
+    paths:
+      - 'hesabixUI/hesabix_ui/lib/**'
+      - 'hesabixUI/hesabix_ui/tool/**'
+  push:
+    branches: [master]
+
+defaults:
+  run:
+    working-directory: hesabixUI/hesabix_ui
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - run: flutter pub get
+
+      # هیچ تخلف جدیدی نسبت به baseline اضافه نشده باشد.
+      - name: بررسی رگرسیون M3
+        run: dart run tool/m3_audit.dart --check
+
+      # گزارش خوانا در خلاصهٔ اجرای PR.
+      - name: گزارش
+        if: always()
+        run: |
+          echo '## وضعیت انطباق Material 3' >> "$GITHUB_STEP_SUMMARY"
+          dart run tool/m3_audit.dart --md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: تحلیل ایستا
+        run: flutter analyze --no-fatal-infos

@@ -41,7 +41,7 @@ function hesabix_v2_logs_render_json_cell($json_str)
 	<div class="notice notice-info hesabix-v2-log-policy" style="margin:12px 0;max-width:60rem;">
 		<p style="margin:.4em 0;">
 			<?php if ($debug_on): ?>
-				<?php esc_html_e('حالت دیباگ فعال است: درخواست‌ها و پاسخ‌های API بین ووکامرس و حسابیکس، همراه با رخدادهای info و warning در جدول زیر ثبت می‌شوند. هدر Authorization در لاگ سانسور می‌شود.', 'hesabix-v2'); ?>
+				<?php esc_html_e('حالت دیباگ فعال است: درخواست‌ها و پاسخ‌های API بین ووکامرس و مارک‌استریت، همراه با رخدادهای info و warning در جدول زیر ثبت می‌شوند. هدر Authorization در لاگ سانسور می‌شود.', 'hesabix-v2'); ?>
 			<?php else: ?>
 				<?php esc_html_e('حالت دیباگ غیرفعال است: فقط رخدادهای سطح خطا (error) در این جدول نگه داشته می‌شوند؛ جزئیات بدنهٔ درخواست و پاسخ هرجا در دسترس باشد در ستون‌های زیر ذخیره می‌شود.', 'hesabix-v2'); ?>
 			<?php endif; ?>

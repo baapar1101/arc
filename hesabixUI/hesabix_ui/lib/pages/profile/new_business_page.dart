@@ -98,7 +98,7 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
     final t = Localizations.of<AppLocalizations>(context, AppLocalizations)!;
     
     try {
-      final result = await FilePicker.platform.pickFiles(
+      final result = await FilePicker.pickFiles(
         type: FileType.custom,
         allowedExtensions: ['hbx', 'hs60'],
         withData: true,

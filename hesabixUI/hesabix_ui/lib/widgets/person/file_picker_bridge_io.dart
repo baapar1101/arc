@@ -18,7 +18,7 @@ class FilePickerBridge {
   }
 
   static Future<PickedFileData?> _pickFile({required List<String> extensions}) async {
-    final res = await FilePicker.platform.pickFiles(
+    final res = await FilePicker.pickFiles(
       type: FileType.custom,
       allowedExtensions: extensions,
       withData: false,

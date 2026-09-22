@@ -1,0 +1,14 @@
+name: m3_lint
+description: قوانین تحلیل اختصاصی برای نگه‌داشتن کد در چارچوب Material Design 3.
+version: 0.1.0
+publish_to: none
+
+environment:
+  sdk: ^3.9.2
+
+dependencies:
+  analyzer: ">=7.0.0 <9.0.0"
+  custom_lint_builder: ^0.7.0
+
+dev_dependencies:
+  lints: ^5.0.0

@@ -1,6 +1,6 @@
 # مارکت‌پلیس مهارت‌های AI — فازهای اجرایی و سناریوی مو‌به‌مو
 
-این سند نقشهٔ اجرای کامل قابلیت Skills (سازگار با [agentskills.io](https://agentskills.io/specification) و Anthropic) در حسابیکس است.
+این سند نقشهٔ اجرای کامل قابلیت Skills (سازگار با [agentskills.io](https://agentskills.io/specification) و Anthropic) در مارک‌استریت است.
 
 ---
 
@@ -261,7 +261,7 @@ seed: `fiscal-year-close`, `sales-return`, `inventory-reorder`
 | source_type | varchar(32) | portable, anthropic_prebuilt, hesabix_native |
 | anthropic_skill_id | varchar(64) nullable | pdf, xlsx, ... |
 | bundle_files | json nullable | {path: content_base64 or text} |
-| allowed_tool_names | json nullable | لیست ابزار حسابیکس |
+| allowed_tool_names | json nullable | لیست ابزار مارک‌استریت |
 | compatibility_report | json nullable | |
 | has_scripts | bool | |
 | publisher_user_id | int nullable | |
@@ -322,7 +322,7 @@ seed: `fiscal-year-close`, `sales-return`, `inventory-reorder`
 - [x] حداقل ۵ مهارت رسمی ERP seed شده
 - [x] monetization (قیمت‌گذاری + خرید از کیف پول)
 - [x] Flutter admin page برای moderation
-- [x] تب «حسابیکس» در مارکت‌پلیس + نمایش قیمت
+- [x] تب «مارک‌استریت» در مارکت‌پلیس + نمایش قیمت
 - [x] Import از GitHub در sheet مهارت‌ها
 
 ### فاز ۵ — ناشر و درآمد

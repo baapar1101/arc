@@ -1,18 +1,18 @@
 [
     {
         "merged": "one.mixin.desktop.drop.desktop_drop-release-24:/layout-v21/notification_template_icon_group.xml",
-        "source": "one.mixin.desktop.drop.desktop_drop-core-1.13.1-15:/layout-v21/notification_template_icon_group.xml"
+        "source": "one.mixin.desktop.drop.desktop_drop-core-1.13.1-19:/layout-v21/notification_template_icon_group.xml"
     },
     {
         "merged": "one.mixin.desktop.drop.desktop_drop-release-24:/layout-v21/notification_action.xml",
-        "source": "one.mixin.desktop.drop.desktop_drop-core-1.13.1-15:/layout-v21/notification_action.xml"
+        "source": "one.mixin.desktop.drop.desktop_drop-core-1.13.1-19:/layout-v21/notification_action.xml"
     },
     {
         "merged": "one.mixin.desktop.drop.desktop_drop-release-24:/layout-v21/notification_template_custom_big.xml",
-        "source": "one.mixin.desktop.drop.desktop_drop-core-1.13.1-15:/layout-v21/notification_template_custom_big.xml"
+        "source": "one.mixin.desktop.drop.desktop_drop-core-1.13.1-19:/layout-v21/notification_template_custom_big.xml"
     },
     {
         "merged": "one.mixin.desktop.drop.desktop_drop-release-24:/layout-v21/notification_action_tombstone.xml",
-        "source": "one.mixin.desktop.drop.desktop_drop-core-1.13.1-15:/layout-v21/notification_action_tombstone.xml"
+        "source": "one.mixin.desktop.drop.desktop_drop-core-1.13.1-19:/layout-v21/notification_action_tombstone.xml"
     }
 ]

@@ -761,7 +761,7 @@ class _AIChatDialogState extends State<AIChatDialog> {
 
   Future<void> _pickAndUploadAttachment() async {
     if (!await _ensureSession()) return;
-    final result = await FilePicker.platform.pickFiles(
+    final result = await FilePicker.pickFiles(
       type: FileType.custom,
       allowedExtensions: [
         'txt',

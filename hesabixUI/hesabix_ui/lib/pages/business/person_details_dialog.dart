@@ -2139,7 +2139,7 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
     final personId = widget.person.id;
     if (personId == null) return;
     try {
-      final result = await FilePicker.platform.pickFiles(
+      final result = await FilePicker.pickFiles(
         type: FileType.any,
         withData: true,
       );

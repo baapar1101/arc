@@ -4,7 +4,7 @@
             "outputFile": "one.mixin.desktop.drop.desktop_drop-mergeReleaseResources-22:/values-fa/values-fa.xml",
             "map": [
                 {
-                    "source": "C:\\Users\\Albert\\.gradle\\caches\\8.14.5\\transforms\\b65a1cf93b3a1582db179429064d7f8b\\transformed\\core-1.13.1\\res\\values-fa\\values-fa.xml",
+                    "source": "C:\\Users\\Albert\\.gradle\\caches\\8.14.5\\transforms\\d87a6cbd69e3d4bb957cd3980d63aab7\\transformed\\core-1.13.1\\res\\values-fa\\values-fa.xml",
                     "from": {
                         "startLines": "2,3,4,5,6,7,8,9",
                         "startColumns": "4,4,4,4,4,4,4,4",
@@ -19,7 +19,7 @@
             "outputFile": "one.mixin.desktop.drop.desktop_drop-release-24:/values-fa/values-fa.xml",
             "map": [
                 {
-                    "source": "C:\\Users\\Albert\\.gradle\\caches\\8.14.5\\transforms\\b65a1cf93b3a1582db179429064d7f8b\\transformed\\core-1.13.1\\res\\values-fa\\values-fa.xml",
+                    "source": "C:\\Users\\Albert\\.gradle\\caches\\8.14.5\\transforms\\d87a6cbd69e3d4bb957cd3980d63aab7\\transformed\\core-1.13.1\\res\\values-fa\\values-fa.xml",
                     "from": {
                         "startLines": "2,3,4,5,6,7,8,9",
                         "startColumns": "4,4,4,4,4,4,4,4",

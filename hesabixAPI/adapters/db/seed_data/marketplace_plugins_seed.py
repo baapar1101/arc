@@ -101,10 +101,10 @@ _DEFAULT_PLUGINS: Tuple[_PluginSeed, ...] = (
 	),
 	_PluginSeed(
 		code="woocommerce_hesabix",
-		name="نمایش ووکامرس در حسابیکس",
+		name="نمایش ووکامرس در مارک‌استریت",
 		description=(
 			"اتصال به افزونهٔ Hesabix V2 روی وردپرس: مشاهدهٔ سفارشات، محصولات و مشتریان فروشگاه "
-			"از داخل حسابیکس از طریق پل REST امن (ArcWOC)."
+			"از داخل مارک‌استریت از طریق پل REST امن (ArcWOC)."
 		),
 		category="integration",
 		icon_url=None,

@@ -635,14 +635,14 @@ def create_app() -> FastAPI:
 
         ## راهنما و تماس
 
-        - **ایمیل:** support@hesabix.ir
+        - **ایمیل:** support@markstreet.co
         - **Swagger UI:** همین صفحه (`/docs`)
         - **ReDoc:** `/redoc`
         - **اسکیمای باز:** `/openapi.json`
         """,
         contact={
-            "name": "Hesabix Team",
-            "email": "support@hesabix.ir",
+            "name": "MarkStreet Team",
+            "email": "support@markstreet.co",
             "url": "https://hesabix.ir",
         },
         license_info={
@@ -692,7 +692,7 @@ def create_app() -> FastAPI:
     # اضافه کردن CSS های سفارشی به صورت دستی
     @application.get("/docs-custom", include_in_schema=False, response_class=HTMLResponse)
     async def swagger_ui_custom():
-        """صفحه Swagger UI با استایل‌های سفارشی حسابیکس"""
+        """صفحه Swagger UI با استایل‌های سفارشی مارک‌استریت"""
         return f"""
         <!DOCTYPE html>
         <html lang="fa" dir="rtl">

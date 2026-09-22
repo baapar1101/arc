@@ -1,6 +1,6 @@
 <?php
 /**
- * فهرست سفارش‌ها برای پنل حسابیکس.
+ * فهرست سفارش‌ها برای پنل مارک‌استریت.
  *
  * @package    Hesabix_V2
  * @subpackage Hesabix_V2/admin
@@ -61,7 +61,7 @@ class Hesabix_V2_Orders_List_Table extends WP_List_Table
 			'status' => __('وضعیت', 'hesabix-v2'),
 			'customer' => __('خریدار', 'hesabix-v2'),
 			'total' => __('مبلغ', 'hesabix-v2'),
-			'hesabix' => __('حسابیکس', 'hesabix-v2'),
+			'hesabix' => __('مارک‌استریت', 'hesabix-v2'),
 			'pause' => __('همگام خودکار', 'hesabix-v2'),
 			'actions' => __('عملیات', 'hesabix-v2'),
 		);
@@ -233,13 +233,13 @@ class Hesabix_V2_Orders_List_Table extends WP_List_Table
 		$current = isset($_GET['hesabix_filter']) ? sanitize_key(wp_unslash((string) $_GET['hesabix_filter'])) : 'all';
 		$opts = array(
 			'all' => __('همهٔ سفارش‌ها', 'hesabix-v2'),
-			'synced' => __('ارسال‌شده به حسابیکس', 'hesabix-v2'),
+			'synced' => __('ارسال‌شده به مارک‌استریت', 'hesabix-v2'),
 			'not_synced' => __('ارسال‌نشده', 'hesabix-v2'),
 			'error' => __('خطای همگام‌سازی', 'hesabix-v2'),
 			'pending' => __('در انتظار (نگاشت)', 'hesabix-v2'),
 		);
 		echo '<div class="alignleft actions hesabix-v2-order-filters">';
-		echo '<label for="hesabix_filter" class="screen-reader-text">' . esc_html__('فیلتر حسابیکس', 'hesabix-v2') . '</label>';
+		echo '<label for="hesabix_filter" class="screen-reader-text">' . esc_html__('فیلتر مارک‌استریت', 'hesabix-v2') . '</label>';
 		echo '<select name="hesabix_filter" id="hesabix_filter">';
 		foreach ($opts as $val => $lab) {
 			printf(
