@@ -50,6 +50,14 @@ void main() {
         ),
         'https://arc.example.com',
       );
+      expect(
+        AppConfig.resolveApiBaseUrl(
+          configuredValue: '',
+          isWebBuild: true,
+          currentUri: Uri.parse('https://arc.example.com:8080/sales'),
+        ),
+        'https://arc.example.com:8080',
+      );
     });
 
     test('uses the local API default outside web builds', () {

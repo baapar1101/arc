@@ -1,8 +1,15 @@
 from types import SimpleNamespace
+from unittest.mock import Mock
 
+import pytest
+
+from app.core.auth_dependency import AuthContext
+from app.core.responses import ApiError
 from app.services.customer_quick_entry_service import (
+    alias_search_variants,
     clean_customer_alias,
     find_quick_customer_matches,
+    mobile_search_needles,
     normalize_customer_alias,
     normalize_customer_mobile,
 )
@@ -22,6 +29,10 @@ def _person(
         first_name=first_name,
         last_name=last_name,
         company_name=None,
+        code=None,
+        email=None,
+        address=None,
+        created_at=None,
         mobile=mobile,
         mobile_2=None,
         mobile_3=None,
@@ -34,6 +45,15 @@ def test_normalizes_customer_alias_and_mobile_variants():
     assert normalize_customer_alias("علي‌ رضايي") == "علی رضایی"
     assert normalize_customer_mobile("+98 912 123 4567") == "09121234567"
     assert normalize_customer_mobile("۰۹۱۲۱۲۳۴۵۶۷") == "09121234567"
+
+
+def test_alias_and_mobile_search_helpers_cover_common_variants():
+    assert "علی" in alias_search_variants("علي")
+    assert "علي" in alias_search_variants("علی")
+    needles = mobile_search_needles("09121234567")
+    assert "09121234567" in needles
+    assert "9121234567" in needles
+    assert "989121234567" in needles
 
 
 def test_finds_existing_person_by_mobile_before_creation():
@@ -114,3 +134,71 @@ def test_returns_all_similar_names_when_there_is_no_exact_match():
         mobile=None,
     )
     assert [person.id for person in matches] == [1, 2]
+
+
+@pytest.mark.asyncio
+async def test_quick_resolve_requires_business_access(monkeypatch):
+    from adapters.api.v1.customers import (
+        CustomerQuickResolveRequest,
+        quick_resolve_customer,
+    )
+
+    user = Mock()
+    user.id = 999
+    ctx = AuthContext(user=user, api_key_id=1, db=Mock())
+    ctx.can_access_business = Mock(return_value=False)
+
+    with pytest.raises(ApiError) as exc:
+        await quick_resolve_customer(
+            request=Mock(),
+            payload=CustomerQuickResolveRequest(
+                business_id=15,
+                alias_name="علی",
+            ),
+            ctx=ctx,
+            db=Mock(),
+        )
+
+    assert exc.value.status_code == 403
+    assert exc.value.code == "FORBIDDEN"
+
+
+@pytest.mark.asyncio
+async def test_quick_resolve_allows_business_member(monkeypatch):
+    from adapters.api.v1 import customers as customers_api
+    from adapters.api.v1.customers import (
+        CustomerQuickResolveRequest,
+        quick_resolve_customer,
+    )
+    from app.services.customer_quick_entry_service import QuickCustomerResolution
+
+    user = Mock()
+    user.id = 1
+    ctx = AuthContext(user=user, api_key_id=1, db=Mock())
+    ctx.can_access_business = Mock(return_value=True)
+
+    person = _person(7, "علی رضایی", mobile="09121234567")
+    monkeypatch.setattr(
+        customers_api,
+        "resolve_or_create_quick_customer",
+        lambda *args, **kwargs: QuickCustomerResolution(
+            persons=[person],
+            created=False,
+        ),
+    )
+
+    response = await quick_resolve_customer(
+        request=Mock(),
+        payload=CustomerQuickResolveRequest(
+            business_id=15,
+            alias_name="علی رضایی",
+            mobile="09121234567",
+        ),
+        ctx=ctx,
+        db=Mock(),
+    )
+
+    assert response.created is False
+    assert len(response.customers) == 1
+    assert response.customers[0].id == 7
+    ctx.can_access_business.assert_called_once_with(15)

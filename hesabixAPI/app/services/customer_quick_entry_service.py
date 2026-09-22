@@ -5,7 +5,7 @@ from dataclasses import dataclass
 import re
 from typing import Iterable
 
-from sqlalchemy import text
+from sqlalchemy import and_, func, literal, or_, text
 from sqlalchemy.orm import Session
 
 from adapters.api.v1.schema_models.person import (
@@ -19,6 +19,7 @@ from app.services.telephony.phone_normalizer import normalize_iran_phone, number
 
 
 _NAME_TRANSLATION = str.maketrans({"ي": "ی", "ى": "ی", "ك": "ک", "ۀ": "ه"})
+_CANDIDATE_FETCH_LIMIT = 500
 
 
 @dataclass(frozen=True)
@@ -46,6 +47,34 @@ def normalize_customer_mobile(value: str | None) -> str | None:
     if canonical and re.fullmatch(r"09\d{9}", canonical):
         return canonical
     return None
+
+
+def alias_search_variants(alias: str) -> set[str]:
+    """Variants covering Arabic/Persian yeh/kaf so SQL prefilter does not miss rows."""
+    cleaned = clean_customer_alias(alias) or alias
+    return {
+        cleaned,
+        cleaned.replace("ی", "ي").replace("ک", "ك"),
+        cleaned.replace("ي", "ی").replace("ك", "ک"),
+    }
+
+
+def mobile_search_needles(mobile: str) -> set[str]:
+    """Digit fragments useful for SQL prefiltering of stored phone fields."""
+    digits = re.sub(r"\D", "", mobile)
+    needles = {digits}
+    if digits.startswith("0") and len(digits) >= 11:
+        without_zero = digits[1:]
+        needles.add(without_zero)
+        needles.add(f"98{without_zero}")
+    elif digits.startswith("98") and len(digits) >= 12:
+        local = digits[2:]
+        needles.add(local)
+        needles.add(f"0{local}")
+    elif len(digits) == 10 and digits.startswith("9"):
+        needles.add(f"0{digits}")
+        needles.add(f"98{digits}")
+    return {needle for needle in needles if len(needle) >= 10}
 
 
 def _person_alias_candidates(person: Person) -> set[str]:
@@ -144,6 +173,79 @@ def find_quick_customer_matches(
     return (exact_matches or similar_matches)[:limit]
 
 
+def _name_column_filters(column, variants: set[str]):
+    filters = []
+    for variant in variants:
+        like = f"%{variant}%"
+        filters.append(column.ilike(like))
+        # نام کوتاه ذخیره‌شده داخل ورودی بلندتر (مثل alias=علی و ورودی=علی رضایی)
+        filters.append(
+            and_(
+                column.isnot(None),
+                column != "",
+                literal(variant).ilike(func.concat("%", column, "%")),
+            )
+        )
+    return filters
+
+
+def load_quick_customer_candidates(
+    db: Session,
+    *,
+    business_id: int,
+    alias_name: str | None,
+    mobile: str | None,
+    limit: int = _CANDIDATE_FETCH_LIMIT,
+) -> list[Person]:
+    """Load a bounded candidate set instead of every person in the business."""
+    filters = []
+    if mobile:
+        phone_columns = (Person.mobile, Person.mobile_2, Person.mobile_3, Person.phone)
+        for needle in mobile_search_needles(mobile):
+            like = f"%{needle}%"
+            for column in phone_columns:
+                filters.append(and_(column.isnot(None), column.ilike(like)))
+
+    if alias_name:
+        variants = alias_search_variants(alias_name)
+        name_columns = (
+            Person.alias_name,
+            Person.first_name,
+            Person.last_name,
+            Person.company_name,
+        )
+        for column in name_columns:
+            filters.extend(_name_column_filters(column, variants))
+
+        # ترکیب نام+نام‌خانوادگی برای حالتی که فقط جداگانه ذخیره شده‌اند
+        full_name = func.concat(
+            func.coalesce(Person.first_name, ""),
+            " ",
+            func.coalesce(Person.last_name, ""),
+        )
+        for variant in variants:
+            like = f"%{variant}%"
+            filters.append(full_name.ilike(like))
+            filters.append(
+                and_(
+                    or_(Person.first_name.isnot(None), Person.last_name.isnot(None)),
+                    literal(variant).ilike(func.concat("%", full_name, "%")),
+                )
+            )
+
+    query = (
+        db.query(Person)
+        .filter(Person.business_id == int(business_id))
+        .order_by(Person.alias_name, Person.id)
+    )
+    if filters:
+        query = query.filter(or_(*filters))
+    else:
+        return []
+
+    return query.limit(int(limit)).all()
+
+
 def resolve_or_create_quick_customer(
     db: Session,
     *,
@@ -169,11 +271,11 @@ def resolve_or_create_quick_customer(
             {"namespace": 1129665364, "business_id": int(business_id)},
         )
 
-    persons = (
-        db.query(Person)
-        .filter(Person.business_id == int(business_id))
-        .order_by(Person.alias_name, Person.id)
-        .all()
+    persons = load_quick_customer_candidates(
+        db,
+        business_id=int(business_id),
+        alias_name=cleaned_alias,
+        mobile=normalized_mobile,
     )
     matches = find_quick_customer_matches(
         persons,

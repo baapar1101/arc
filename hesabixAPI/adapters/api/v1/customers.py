@@ -5,13 +5,22 @@ from typing import Optional, List
 
 from adapters.db.models.person import Person
 from adapters.db.session import get_db
-from app.core.responses import success_response, format_datetime_fields
+from app.core.responses import ApiError
 from app.core.auth_dependency import get_current_user, AuthContext
-from app.core.permissions import require_business_access_dep
 from app.services.person_service import search_persons, count_persons, get_person_by_id
 from app.services.customer_quick_entry_service import resolve_or_create_quick_customer
 
 router = APIRouter(prefix="/customers", tags=["اشخاص و مشتریان"])
+
+
+def _require_business_access(ctx: AuthContext, business_id: int) -> None:
+    """business_id در body/query است؛ dependency مبتنی بر path اینجا کافی نیست."""
+    if not ctx.can_access_business(int(business_id)):
+        raise ApiError(
+            "FORBIDDEN",
+            f"No access to business {business_id}",
+            http_status=403,
+        )
 
 
 class CustomerSearchRequest(BaseModel):
@@ -83,8 +92,8 @@ async def quick_resolve_customer(
     payload: CustomerQuickResolveRequest,
     ctx: AuthContext = Depends(get_current_user),
     db: Session = Depends(get_db),
-    _: None = Depends(require_business_access_dep),
 ):
+    _require_business_access(ctx, payload.business_id)
     resolution = resolve_or_create_quick_customer(
         db,
         business_id=payload.business_id,
@@ -140,14 +149,10 @@ async def search_customers(
     search_request: CustomerSearchRequest,
     ctx: AuthContext = Depends(get_current_user),
     db: Session = Depends(get_db),
-    _: None = Depends(require_business_access_dep)
 ):
     """جست‌وجو در لیست مشتری‌ها"""
-    
-    # بررسی دسترسی به بخش اشخاص (یا join permission)
-    # در اینجا می‌توانید منطق بررسی دسترسی join را پیاده‌سازی کنید
-    # برای مثال: اگر کاربر دسترسی مستقیم به اشخاص ندارد، اما دسترسی join دارد
-    
+    _require_business_access(ctx, search_request.business_id)
+
     # جست‌وجو در اشخاص
     persons = search_persons(
         db=db,
@@ -202,10 +207,10 @@ async def get_customer(
     request: Request,
     ctx: AuthContext = Depends(get_current_user),
     db: Session = Depends(get_db),
-    _: None = Depends(require_business_access_dep)
 ):
     """دریافت اطلاعات یک مشتری"""
-    
+    _require_business_access(ctx, business_id)
+
     # دریافت اطلاعات شخص
     person_data = get_person_by_id(db, customer_id, business_id)
     
@@ -254,11 +259,7 @@ async def get_customer(
 async def check_customer_access(
     business_id: int,
     ctx: AuthContext = Depends(get_current_user),
-    _: None = Depends(require_business_access_dep)
 ):
     """بررسی دسترسی به بخش مشتری‌ها"""
-    
-    # در اینجا می‌توانید منطق بررسی دسترسی join را پیاده‌سازی کنید
-    # برای مثال: بررسی اینکه آیا کاربر دسترسی به اشخاص یا join permission دارد
-    
+    _require_business_access(ctx, business_id)
     return {"access": True, "message": "دسترسی مجاز است"}

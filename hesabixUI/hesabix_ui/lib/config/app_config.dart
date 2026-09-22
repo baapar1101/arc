@@ -22,6 +22,30 @@ class AppConfig {
     );
   }
 
+  static bool isLocalWebPreviewHost(String host) {
+    final normalized = host.toLowerCase();
+    if (normalized == 'localhost' ||
+        normalized == '127.0.0.1' ||
+        normalized == '::1') {
+      return true;
+    }
+    // RFC1918 — پیش‌نمایش روی LAN (مثلاً 192.168.x.x:8080)
+    if (RegExp(r'^10\.\d{1,3}\.\d{1,3}\.\d{1,3}$').hasMatch(normalized)) {
+      return true;
+    }
+    if (RegExp(r'^192\.168\.\d{1,3}\.\d{1,3}$').hasMatch(normalized)) {
+      return true;
+    }
+    final match = RegExp(r'^172\.(\d{1,3})\.\d{1,3}\.\d{1,3}$').firstMatch(
+      normalized,
+    );
+    if (match != null) {
+      final second = int.tryParse(match.group(1)!);
+      if (second != null && second >= 16 && second <= 31) return true;
+    }
+    return false;
+  }
+
   static String resolveApiBaseUrl({
     required String configuredValue,
     required bool isWebBuild,
@@ -32,8 +56,13 @@ class AppConfig {
 
     if (isWebBuild) {
       final host = currentUri.host.toLowerCase();
+      final isLoopback =
+          host == 'localhost' || host == '127.0.0.1' || host == '::1';
+      // فقط پیش‌نمایش Flutter روی LAN/لوپ‌بک؛ hostname عمومی روی 8080 را
+      // به‌اشتباه به پورت API نفرست.
       final isLocalPreview =
-          host == 'localhost' || host == '127.0.0.1' || currentUri.port == 8080;
+          isLoopback ||
+          (currentUri.port == 8080 && isLocalWebPreviewHost(host));
       if (isLocalPreview) {
         // Flutter web-server روی 8080 فقط فایل استاتیک سرو می‌کند. فرستادن
         // درخواست‌های API به همان origin خطا می‌دهد. این تشخیص شامل IP شبکه
