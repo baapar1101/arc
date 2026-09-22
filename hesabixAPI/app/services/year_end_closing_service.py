@@ -273,6 +273,38 @@ def _is_permanent_account(code: str) -> bool:
     return code_clean.startswith('1') or code_clean.startswith('2') or code_clean.startswith('3')
 
 
+def _treasury_gl_code_for_cash_bank_line(
+    *,
+    bank_account_id: Optional[int],
+    cash_register_id: Optional[int],
+    petty_cash_id: Optional[int],
+    account_code: Optional[str],
+) -> Optional[str]:
+    """
+    فقط سطرهایی که روی حساب خزانهٔ متناظر (۱۰۲۰۳ بانک / ۱۰۲۰۲ صندوق / ۱۰۲۰۱ تنخواه)
+    ثبت شده‌اند برای انتقال ماندهٔ بانک/صندوق/تنخواه به تراز افتتاحیه لحاظ می‌شوند.
+
+    سطرهای موقت مثل کارمزد (۷۰۹۰۲) ممکن است bank_account_id داشته باشند ولی ماندهٔ بانک نیستند
+    و نباید سطر جداگانهٔ افتتاحیه با همان bank_account_id بسازند.
+    """
+    code = (account_code or "").strip()
+    if not code:
+        return None
+    if bank_account_id is not None:
+        if code == "10203" or code.startswith("10203"):
+            return "10203"
+        return None
+    if cash_register_id is not None:
+        if code == "10202" or code.startswith("10202"):
+            return "10202"
+        return None
+    if petty_cash_id is not None:
+        if code == "10201" or code.startswith("10201"):
+            return "10201"
+        return None
+    return None
+
+
 def _calculate_account_balance(
     db: Session,
     business_id: int,
@@ -1094,29 +1126,8 @@ async def close_fiscal_year(
     if person_balance_document:
         result['person_balance_document'] = doc_repo.get_document_details(person_balance_document.id) or {}
     
-    # ایجاد تراز افتتاحیه سال جدید (در صورت نیاز)
-    if auto_create_opening_balance:
-        try:
-            opening_balance_doc = _create_opening_balance_for_new_fiscal_year(
-                db=db,
-                business_id=business_id,
-                old_fiscal_year_id=fiscal_year_id,
-                new_fiscal_year_id=new_fiscal_year.id,
-                user_id=user_id,
-                currency_id=currency_id,
-            )
-            result['opening_balance_created'] = True
-            result['opening_balance_document'] = doc_repo.get_document_details(opening_balance_doc.id) or {}
-            result['opening_balance_note'] = f'تراز افتتاحیه سال جدید با کد {opening_balance_doc.code} ایجاد شد'
-        except ApiError:
-            raise
-        except Exception as e:
-            raise ApiError(
-                "OPENING_BALANCE_CREATION_FAILED",
-                f"ایجاد تراز افتتاحیه سال جدید ناموفق بود: {str(e)}",
-                http_status=500,
-            ) from e
-
+    # انتقال اسناد بعد از پایان دوره باید قبل از افتتاحیه انجام شود تا اگر افتتاحیه خطا داد،
+    # سال جدید بدون اسناد پس از cutoff نماند. افتتاحیه فقط تا date_to سال قبل را می‌خواند.
     moved_documents = 0
     moved_warehouse_documents = 0
     if move_post_cutoff_documents_to_new_fiscal_year:
@@ -1169,6 +1180,29 @@ async def close_fiscal_year(
         "basis": _normalize_relocation_basis(document_relocation_basis),
         "performed": bool(move_post_cutoff_documents_to_new_fiscal_year),
     }
+
+    # ایجاد تراز افتتاحیه سال جدید (در صورت نیاز)
+    if auto_create_opening_balance:
+        try:
+            opening_balance_doc = _create_opening_balance_for_new_fiscal_year(
+                db=db,
+                business_id=business_id,
+                old_fiscal_year_id=fiscal_year_id,
+                new_fiscal_year_id=new_fiscal_year.id,
+                user_id=user_id,
+                currency_id=currency_id,
+            )
+            result['opening_balance_created'] = True
+            result['opening_balance_document'] = doc_repo.get_document_details(opening_balance_doc.id) or {}
+            result['opening_balance_note'] = f'تراز افتتاحیه سال جدید با کد {opening_balance_doc.code} ایجاد شد'
+        except ApiError:
+            raise
+        except Exception as e:
+            raise ApiError(
+                "OPENING_BALANCE_CREATION_FAILED",
+                f"ایجاد تراز افتتاحیه سال جدید ناموفق بود: {str(e)}",
+                http_status=500,
+            ) from e
 
     return result
 
@@ -1481,26 +1515,43 @@ def _create_opening_balance_for_new_fiscal_year(
     ar_account = _get_fixed_account_by_code(db, "13101")
     ap_account = _get_fixed_account_by_code(db, "21101")
     inventory_account_fixed = _get_fixed_account_by_code(db, "12101")
+    bank_gl_account = _get_fixed_account_by_code(db, "10203")
+    cash_gl_account = _get_fixed_account_by_code(db, "10202")
+    petty_gl_account = _get_fixed_account_by_code(db, "10201")
 
-    # حساب‌های کلّی که حداقل یک سطر آن‌ها دارای بانک / صندوق / تنخواه است (تا مانده تجمیعی تکرار نشود)
-    gl_ids_with_cash_bank_subledger_rows = db.query(DocumentLine.account_id).join(
-        Document, DocumentLine.document_id == Document.id
-    ).filter(
-        and_(
-            Document.business_id == business_id,
-            Document.fiscal_year_id == old_fiscal_year_id,
-            Document.document_date <= date_to,
-            Document.is_proforma == False,
-            or_(
-                DocumentLine.bank_account_id.isnot(None),
-                DocumentLine.cash_register_id.isnot(None),
-                DocumentLine.petty_cash_id.isnot(None),
-            ),
+    # فقط حساب‌های خزانهٔ بانک/صندوق/تنخواه که واقعاً با همان شناسهٔ فرعی منتقل می‌شوند
+    # از ماندهٔ تجمیعی حلقهٔ دائمی کنار گذاشته می‌شوند (نه حساب‌های موقت مثل ۷۰۹۰۲).
+    treasury_subledger_rows = (
+        db.query(DocumentLine.account_id, DocumentLine.bank_account_id, DocumentLine.cash_register_id, DocumentLine.petty_cash_id, Account.code)
+        .join(Document, DocumentLine.document_id == Document.id)
+        .join(Account, Account.id == DocumentLine.account_id)
+        .filter(
+            and_(
+                Document.business_id == business_id,
+                Document.fiscal_year_id == old_fiscal_year_id,
+                Document.document_date <= date_to,
+                Document.is_proforma == False,
+                or_(
+                    DocumentLine.bank_account_id.isnot(None),
+                    DocumentLine.cash_register_id.isnot(None),
+                    DocumentLine.petty_cash_id.isnot(None),
+                ),
+            )
         )
-    ).distinct().all()
-    bank_cash_gl_account_ids = {
-        int(row[0]) for row in gl_ids_with_cash_bank_subledger_rows if row[0] is not None
-    }
+        .distinct()
+        .all()
+    )
+    bank_cash_gl_account_ids: set[int] = set()
+    for account_id, bank_id, cash_id, petty_id, acc_code in treasury_subledger_rows:
+        if account_id is None:
+            continue
+        if _treasury_gl_code_for_cash_bank_line(
+            bank_account_id=bank_id,
+            cash_register_id=cash_id,
+            petty_cash_id=petty_id,
+            account_code=acc_code,
+        ):
+            bank_cash_gl_account_ids.add(int(account_id))
     
     # دریافت تمام حساب‌های دائمی (گروه 1، 2، 3)
     permanent_accounts = db.query(Account).filter(
@@ -1707,31 +1758,44 @@ def _create_opening_balance_for_new_fiscal_year(
             })
     
     # محاسبه مانده حساب‌های بانکی و صندوق به ارز پایه
-    bank_cash_rows = db.query(DocumentLine, Document).join(
-        Document, DocumentLine.document_id == Document.id
-    ).filter(
-        and_(
-            Document.business_id == business_id,
-            Document.fiscal_year_id == old_fiscal_year_id,
-            Document.document_date <= date_to,
-            Document.is_proforma == False,
-            or_(
-                DocumentLine.bank_account_id.isnot(None),
-                DocumentLine.cash_register_id.isnot(None),
-                DocumentLine.petty_cash_id.isnot(None),
-            ),
+    # فقط سطرهای حساب خزانه (۱۰۲۰۱/۱۰۲۰۲/۱۰۲۰۳ و زیرمجموعه‌ها)؛ نه کارمزد و سایر حساب‌های موقت.
+    bank_cash_rows = (
+        db.query(DocumentLine, Document, Account)
+        .join(Document, DocumentLine.document_id == Document.id)
+        .join(Account, Account.id == DocumentLine.account_id)
+        .filter(
+            and_(
+                Document.business_id == business_id,
+                Document.fiscal_year_id == old_fiscal_year_id,
+                Document.document_date <= date_to,
+                Document.is_proforma == False,
+                or_(
+                    DocumentLine.bank_account_id.isnot(None),
+                    DocumentLine.cash_register_id.isnot(None),
+                    DocumentLine.petty_cash_id.isnot(None),
+                ),
+            )
         )
-    ).all()
+        .all()
+    )
 
-    bank_cash_totals: Dict[Tuple[Optional[int], Optional[int], Optional[int], Optional[int]], Dict[str, Decimal]] = defaultdict(
+    # یک سطر افتتاحیه به ازای هر بانک/صندوق/تنخواه (نه به ازای هر account_id)
+    bank_cash_totals: Dict[Tuple[Optional[int], Optional[int], Optional[int]], Dict[str, Decimal]] = defaultdict(
         lambda: {"debit": Decimal(0), "credit": Decimal(0)}
     )
-    for line, doc in bank_cash_rows:
+    for line, doc, account in bank_cash_rows:
+        treasury_code = _treasury_gl_code_for_cash_bank_line(
+            bank_account_id=line.bank_account_id,
+            cash_register_id=line.cash_register_id,
+            petty_cash_id=line.petty_cash_id,
+            account_code=account.code,
+        )
+        if not treasury_code:
+            continue
         key = (
             line.bank_account_id,
             line.cash_register_id,
             line.petty_cash_id,
-            line.account_id,
         )
         bank_cash_totals[key]["debit"] += amount_in_document_currency_to_base(
             db,
@@ -1752,7 +1816,7 @@ def _create_opening_balance_for_new_fiscal_year(
             side="credit",
         )
 
-    for (bank_account_id, cash_register_id, petty_cash_id, account_id), totals in bank_cash_totals.items():
+    for (bank_account_id, cash_register_id, petty_cash_id), totals in bank_cash_totals.items():
         total_debit = totals["debit"]
         total_credit = totals["credit"]
         balance = total_debit - total_credit
@@ -1761,22 +1825,31 @@ def _create_opening_balance_for_new_fiscal_year(
         if balance == 0:
             continue
         
+        if bank_account_id:
+            gl_account_id = bank_gl_account.id
+            description = 'مانده ابتدای دوره - حساب بانکی'
+        elif cash_register_id:
+            gl_account_id = cash_gl_account.id
+            description = 'مانده ابتدای دوره - صندوق'
+        elif petty_cash_id:
+            gl_account_id = petty_gl_account.id
+            description = 'مانده ابتدای دوره - تنخواه'
+        else:
+            continue
+
         line_data = {
-            'account_id': account_id,
+            'account_id': gl_account_id,
             'debit': float(balance) if balance > 0 else 0.0,
             'credit': float(-balance) if balance < 0 else 0.0,
-            'description': 'مانده ابتدای دوره',
+            'description': description,
         }
         
         if bank_account_id:
             line_data['bank_account_id'] = bank_account_id
-            line_data['description'] = f'مانده ابتدای دوره - حساب بانکی'
         elif cash_register_id:
             line_data['cash_register_id'] = cash_register_id
-            line_data['description'] = f'مانده ابتدای دوره - صندوق'
         elif petty_cash_id:
             line_data['petty_cash_id'] = petty_cash_id
-            line_data['description'] = f'مانده ابتدای دوره - تنخواه'
         
         account_lines.append(line_data)
     
