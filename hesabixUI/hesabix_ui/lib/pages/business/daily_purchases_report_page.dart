@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
 import 'package:hesabix_ui/core/api_client.dart';
+import 'package:hesabix_ui/core/fiscal_year_controller.dart';
 import 'package:hesabix_ui/widgets/date_input_field.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table_widget.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table_config.dart';
@@ -50,17 +51,11 @@ class _DailyPurchasesReportPageState extends State<DailyPurchasesReportPage> {
     try {
       final svc = BusinessDashboardService(ApiClient());
       final items = await svc.listFiscalYears(widget.businessId);
+      final defaultFyId = await FiscalYearController.resolveDefaultId(widget.businessId, items);
       if (!mounted) return;
       setState(() {
         _fiscalYears = items;
-        final current = items.firstWhere(
-          (e) => (e['is_current'] == true),
-          orElse: () => const <String, dynamic>{},
-        );
-        final id = current['id'];
-        if (id is int) {
-          _selectedFiscalYearId = id;
-        }
+        _selectedFiscalYearId = defaultFyId;
       });
     } catch (_) {
       // ignore errors

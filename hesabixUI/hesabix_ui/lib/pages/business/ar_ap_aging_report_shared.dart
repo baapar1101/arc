@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/core/api_client.dart';
+import 'package:hesabix_ui/core/fiscal_year_controller.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
 import 'package:hesabix_ui/core/date_utils.dart';
 import 'package:hesabix_ui/services/business_dashboard_service.dart';
@@ -70,14 +71,12 @@ class _ArApAgingReportPageState extends State<ArApAgingReportPage> {
       ]);
       if (!mounted) return;
       final years = results[0] as List<Map<String, dynamic>>;
+      final defaultFyId = await FiscalYearController.resolveDefaultId(widget.businessId, years);
+      if (!mounted) return;
       setState(() {
         _fiscalYears = years;
         _currencies = results[1] as List<Map<String, dynamic>>;
-        final current = years.firstWhere(
-          (item) => item['is_current'] == true,
-          orElse: () => const <String, dynamic>{},
-        );
-        _fiscalYearId = current['id'] as int?;
+        _fiscalYearId = defaultFyId;
       });
     } catch (_) {}
   }

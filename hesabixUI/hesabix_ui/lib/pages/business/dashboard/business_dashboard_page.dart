@@ -94,6 +94,9 @@ class _BusinessDashboardPageState extends State<BusinessDashboardPage> {
   @override
   void dispose() {
     widget.calendarController?.removeListener(_onCalendarTypeChanged);
+    try {
+      _fiscalController.removeListener(_reloadDataOnly);
+    } catch (_) {}
     _saveDebounce?.cancel();
     super.dispose();
   }
@@ -111,11 +114,8 @@ class _BusinessDashboardPageState extends State<BusinessDashboardPage> {
     await _fiscalController.reconcileWithList(fiscalYears);
     _definitions = defs;
     _service = BusinessDashboardService(ApiClient(), fiscalYearController: _fiscalController);
-    ApiClient.bindFiscalYear(ValueNotifier<int?>(_fiscalController.fiscalYearId));
-    _fiscalController.addListener(() {
-      ApiClient.bindFiscalYear(ValueNotifier<int?>(_fiscalController.fiscalYearId));
-      _reloadDataOnly();
-    });
+    // هدر از FiscalYearController.apiBoundId هم‌زمان می‌شود
+    _fiscalController.addListener(_reloadDataOnly);
     await _loadAll();
   }
 

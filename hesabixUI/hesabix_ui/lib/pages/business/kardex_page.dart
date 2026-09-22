@@ -17,6 +17,7 @@ import 'package:hesabix_ui/widgets/invoice/petty_cash_combobox_widget.dart';
 import 'package:hesabix_ui/widgets/invoice/account_tree_combobox_widget.dart';
 import 'package:hesabix_ui/widgets/invoice/check_combobox_widget.dart';
 import 'package:hesabix_ui/core/api_client.dart';
+import 'package:hesabix_ui/core/fiscal_year_controller.dart';
 import 'package:hesabix_ui/services/business_dashboard_service.dart';
 import 'package:hesabix_ui/services/currency_service.dart';
 import 'package:hesabix_ui/services/person_service.dart';
@@ -966,17 +967,11 @@ class _KardexPageState extends State<KardexPage> {
     try {
       final svc = BusinessDashboardService(ApiClient());
       final items = await svc.listFiscalYears(widget.businessId);
+      final defaultFyId = await FiscalYearController.resolveDefaultId(widget.businessId, items);
       if (!mounted) return;
       setState(() {
         _fiscalYears = items;
-        final current = items.firstWhere(
-          (e) => (e['is_current'] == true),
-          orElse: () => const <String, dynamic>{},
-        );
-        final id = current['id'];
-        if (id is int) {
-          _selectedFiscalYearId = id;
-        }
+        _selectedFiscalYearId = defaultFyId;
       });
     } catch (_) {
       // ignore errors; dropdown remains empty

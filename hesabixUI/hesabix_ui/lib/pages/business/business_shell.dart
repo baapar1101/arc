@@ -22,6 +22,7 @@ import '../../widgets/category/category_tree_dialog.dart';
 import '../../services/business_dashboard_service.dart';
 import '../../services/marketplace_service.dart';
 import '../../core/api_client.dart';
+import '../../core/fiscal_year_controller.dart';
 import 'package:hesabix_ui/config/brand_config.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import '../../theme/brand_logo.dart';
@@ -811,6 +812,8 @@ class _BusinessShellState extends State<BusinessShell> {
     try {
       ApiClient.bindAuthStore(widget.authStore);
     } catch (_) {}
+    // سال مالی انتخاب‌شده در داشبورد را برای گزارش‌ها/هدر از همان ابتدا bind کن
+    unawaited(FiscalYearController.load(widget.businessId));
     // اضافه کردن listener برای AuthStore
     widget.authStore.addListener(() {
       if (mounted) {
@@ -841,6 +844,7 @@ class _BusinessShellState extends State<BusinessShell> {
     if (oldWidget.businessId != widget.businessId) {
       _pluginsLoaded = false;
       _pluginsLoadedForBusinessId = null;
+      unawaited(FiscalYearController.load(widget.businessId));
       _loadBusinessPlugins(force: true);
       _loadMenuPreferences();
     }

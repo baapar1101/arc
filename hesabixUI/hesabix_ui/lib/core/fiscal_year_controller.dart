@@ -1,12 +1,17 @@
 import 'package:flutter/widgets.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'api_client.dart';
+
 /// انتخاب سال مالی برای داشبورد و هدر [X-Fiscal-Year-ID].
 ///
 /// - ذخیرهٔ محلی به‌ازای هر [businessId] است (نه یک کلید سراسری).
 /// - اگر کاربر سال را دستی عوض نکرده باشد، با سال جاری سرور هم‌تراز می‌شود.
 class FiscalYearController extends ChangeNotifier {
   static final Map<int, FiscalYearController> _instances = {};
+
+  /// یک notifier مشترک برای هدر API تا گزارش‌ها و شِل همان انتخاب داشبورد را ببینند.
+  static final ValueNotifier<int?> apiBoundId = ValueNotifier<int?>(null);
 
   static String _idKey(int businessId) => 'selected_fiscal_year_id_$businessId';
 
@@ -25,10 +30,18 @@ class FiscalYearController extends ChangeNotifier {
 
   FiscalYearController._(this.businessId, this._fiscalYearId, this._manualSelection);
 
+  void _syncApiBinding() {
+    apiBoundId.value = _fiscalYearId;
+    ApiClient.bindFiscalYear(apiBoundId);
+  }
+
   /// یک نمونهٔ به‌ازای هر کسب‌وکار؛ بعد از بستن سال یا هم‌ترازی به‌روز می‌ماند.
   static Future<FiscalYearController> load(int businessId) async {
     final existing = _instances[businessId];
-    if (existing != null) return existing;
+    if (existing != null) {
+      existing._syncApiBinding();
+      return existing;
+    }
 
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_legacyGlobalPrefsKey);
@@ -38,7 +51,36 @@ class FiscalYearController extends ChangeNotifier {
 
     final c = FiscalYearController._(businessId, id, manual);
     _instances[businessId] = c;
+    c._syncApiBinding();
     return c;
+  }
+
+  /// پیش‌فرض فیلتر سال مالی برای گزارش‌ها و لیست‌ها:
+  /// انتخاب داشبورد (ذخیره‌شده)، سپس هدر، سپس سال جاری سرور.
+  static Future<int?> resolveDefaultId(
+    int businessId,
+    List<Map<String, dynamic>> fiscalYears,
+  ) async {
+    if (fiscalYears.isEmpty) return null;
+
+    bool contains(int? id) =>
+        id != null && fiscalYears.any((e) => e['id'] == id);
+
+    final c = await load(businessId);
+    await c.reconcileWithList(fiscalYears);
+    if (contains(c.fiscalYearId)) return c.fiscalYearId;
+
+    final bound = ApiClient.boundFiscalYearId;
+    if (contains(bound)) return bound;
+
+    for (final e in fiscalYears) {
+      if (e['is_current'] == true) {
+        final id = e['id'];
+        if (id is int) return id;
+      }
+    }
+    final first = fiscalYears.first['id'];
+    return first is int ? first : null;
   }
 
   /// بعد از بارگذاری لیست سال‌های مالی از API: انتخاب خودکار را با سال جاری هماهنگ کن.
@@ -59,8 +101,11 @@ class FiscalYearController extends ChangeNotifier {
       if (_fiscalYearId != currentId) {
         _fiscalYearId = currentId;
         notifyListeners();
+        _syncApiBinding();
         final prefs = await SharedPreferences.getInstance();
         await prefs.setInt(_idKey(businessId), currentId);
+      } else {
+        _syncApiBinding();
       }
       return;
     }
@@ -71,9 +116,12 @@ class FiscalYearController extends ChangeNotifier {
         _manualSelection = false;
         _fiscalYearId = currentId;
         notifyListeners();
+        _syncApiBinding();
         final prefs = await SharedPreferences.getInstance();
         await prefs.setBool(_manualKey(businessId), false);
         await prefs.setInt(_idKey(businessId), currentId);
+      } else {
+        _syncApiBinding();
       }
     }
   }
@@ -83,6 +131,7 @@ class FiscalYearController extends ChangeNotifier {
     _manualSelection = false;
     _fiscalYearId = newFiscalYearId;
     notifyListeners();
+    _syncApiBinding();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_manualKey(businessId), false);
     await prefs.setInt(_idKey(businessId), newFiscalYearId);
@@ -94,9 +143,13 @@ class FiscalYearController extends ChangeNotifier {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool(_manualKey(businessId), true);
     }
-    if (_fiscalYearId == id) return;
+    if (_fiscalYearId == id) {
+      _syncApiBinding();
+      return;
+    }
     _fiscalYearId = id;
     notifyListeners();
+    _syncApiBinding();
     final prefs = await SharedPreferences.getInstance();
     if (id == null) {
       await prefs.remove(_idKey(businessId));

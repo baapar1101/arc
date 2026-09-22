@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/core/api_client.dart';
+import 'package:hesabix_ui/core/fiscal_year_controller.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
 import 'package:hesabix_ui/services/business_dashboard_service.dart';
 import 'package:hesabix_ui/utils/number_formatters.dart';
@@ -42,14 +43,11 @@ class _PersonBalancesByCurrencyReportPageState
       final years = await BusinessDashboardService(
         ApiClient(),
       ).listFiscalYears(widget.businessId);
+      final defaultFyId = await FiscalYearController.resolveDefaultId(widget.businessId, years);
       if (!mounted) return;
       setState(() {
         _fiscalYears = years;
-        final current = years.firstWhere(
-          (item) => item['is_current'] == true,
-          orElse: () => const <String, dynamic>{},
-        );
-        _fiscalYearId = current['id'] as int?;
+        _fiscalYearId = defaultFyId;
       });
     } catch (_) {}
   }

@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:hesabix_ui/core/auth_store.dart';
 import 'package:hesabix_ui/core/api_client.dart';
+import 'package:hesabix_ui/core/fiscal_year_controller.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
 import 'package:hesabix_ui/core/date_utils.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
@@ -115,15 +116,12 @@ class _DocumentsMobileViewState extends State<DocumentsMobileView> {
   Future<void> _loadFiscalYears() async {
     try {
       final items = await _dashboardService.listFiscalYears(widget.businessId);
+      final defaultFyId = await FiscalYearController.resolveDefaultId(widget.businessId, items);
       if (!mounted) return;
       setState(() {
         _fiscalYears = items;
-        if (_fiscalYearId == null && _fiscalYears.isNotEmpty) {
-          final current = _fiscalYears.firstWhere(
-            (fy) => fy['is_current'] == true,
-            orElse: () => _fiscalYears.first,
-          );
-          _fiscalYearId = current['id'] as int?;
+        if (_fiscalYearId == null) {
+          _fiscalYearId = defaultFyId;
         }
       });
     } catch (_) {}

@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/core/api_client.dart';
+import 'package:hesabix_ui/core/fiscal_year_controller.dart';
 import 'package:hesabix_ui/core/auth_store.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
@@ -159,27 +160,18 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
     try {
       final service = BusinessDashboardService(ApiClient());
       final items = await service.listFiscalYears(widget.businessId);
+      final defaultFyId = await FiscalYearController.resolveDefaultId(widget.businessId, items);
       Map<String, dynamic>? current;
-      final boundId = ApiClient.boundFiscalYearId;
-      if (boundId != null && items.isNotEmpty) {
+      if (defaultFyId != null && items.isNotEmpty) {
         try {
-          current = items.firstWhere((fy) => (fy['id'] as num?)?.toInt() == boundId);
+          current = items.firstWhere((fy) => (fy['id'] as num?)?.toInt() == defaultFyId);
         } catch (_) {
-          current = null;
-        }
-      }
-      if (current == null && items.isNotEmpty) {
-        try {
-          current = items.firstWhere(
-            (fy) => fy['is_last'] == true || fy['isLast'] == true || fy['is_current'] == true,
-          );
-        } catch (_) {
-          current = items.first;
+          current = items.isNotEmpty ? items.first : null;
         }
       }
       if (!mounted) return;
       setState(() {
-        _currentFiscalYearId = (current?['id'] as num?)?.toInt() ?? boundId;
+        _currentFiscalYearId = (current?['id'] as num?)?.toInt() ?? defaultFyId;
         _currentFiscalYearName = current?['title']?.toString() ?? current?['name']?.toString();
       });
       _refreshKardexTable();

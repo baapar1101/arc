@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/core/api_client.dart';
+import 'package:hesabix_ui/core/fiscal_year_controller.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
 import 'package:hesabix_ui/services/business_dashboard_service.dart';
 import 'package:hesabix_ui/services/currency_service.dart';
@@ -55,15 +56,12 @@ class _CashFlowReportPageState extends State<CashFlowReportPage> {
       ]);
       if (!mounted) return;
       final years = values[0] as List<Map<String, dynamic>>;
+      final defaultFyId = await FiscalYearController.resolveDefaultId(widget.businessId, years);
+      if (!mounted) return;
       setState(() {
         _fiscalYears = years;
         _currencies = values[1] as List<Map<String, dynamic>>;
-        _fiscalYearId =
-            years.firstWhere(
-                  (item) => item['is_current'] == true,
-                  orElse: () => const <String, dynamic>{},
-                )['id']
-                as int?;
+        _fiscalYearId = defaultFyId;
       });
       _fetch();
     } catch (_) {}
