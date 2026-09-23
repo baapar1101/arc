@@ -192,7 +192,10 @@ class _CustomerComboboxWidgetState extends State<CustomerComboboxWidget> {
       Future.delayed(const Duration(milliseconds: 180), () {
         if (!mounted || _fieldFocus.hasFocus) return;
         _removeDesktopOverlay();
-        if (_isEditingQuery) {
+        // Enter may unfocus the field while quick-resolve is still awaiting the
+        // API. Restoring the previous customer here would make the successful
+        // response look stale even though the new person was already created.
+        if (_isEditingQuery && !_isQuickResolving) {
           _isEditingQuery = false;
           _setFieldQuiet(widget.selectedCustomer?.name ?? '');
         }
@@ -677,6 +680,9 @@ class _CustomerComboboxWidgetState extends State<CustomerComboboxWidget> {
       return;
     }
 
+    // Typing or selecting another value increments this generation and safely
+    // invalidates the response. Focus loss and display restoration do not.
+    final requestGeneration = ++_searchGeneration;
     setState(() => _isQuickResolving = true);
     _desktopOverlayEntry?.markNeedsBuild();
     try {
@@ -685,7 +691,7 @@ class _CustomerComboboxWidgetState extends State<CustomerComboboxWidget> {
         aliasName: entry.aliasName,
         mobile: entry.mobile,
       );
-      if (!mounted || _searchController.text.trim() != query) return;
+      if (!mounted || requestGeneration != _searchGeneration) return;
 
       final customers = result['customers'] as List<Customer>;
       final created = result['created'] == true;
@@ -1118,6 +1124,9 @@ class _CustomerComboboxWidgetState extends State<CustomerComboboxWidget> {
                 _onSearchChanged(query);
                 _showDesktopOverlay();
               },
+              // Keep focus while the asynchronous quick-resolve request is in
+              // flight. Selection itself decides when the field should unfocus.
+              onEditingComplete: () {},
               onSubmitted: (_) => unawaited(_submitField()),
             ),
           );
