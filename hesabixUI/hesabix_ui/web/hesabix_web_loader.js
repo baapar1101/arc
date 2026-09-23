@@ -47,7 +47,6 @@
       statusUi: 'آماده‌سازی رابط کاربری…',
       statusEngine: 'تقریباً آماده است…',
       statusDone: 'ورود به برنامه…',
-      statusTimeout: 'راه‌اندازی برنامه طولانی شده است؛ لطفاً تلاش مجدد را بزنید.',
       loadingLanguageSettings: 'در حال بارگذاری تنظیمات زبان…',
       loadingCalendarSettings: 'در حال بارگذاری تنظیمات تقویم…',
       loadingThemeSettings: 'در حال بارگذاری تنظیمات تم…',
@@ -71,7 +70,6 @@
       statusUi: 'Preparing interface…',
       statusEngine: 'Almost ready…',
       statusDone: 'Starting app…',
-      statusTimeout: 'The app is taking longer than expected to start. Please try again.',
       loadingLanguageSettings: 'Loading language settings…',
       loadingCalendarSettings: 'Loading calendar settings…',
       loadingThemeSettings: 'Loading theme settings…',
@@ -402,9 +400,7 @@
     var screen = document.getElementById('flutter-loading-screen');
     if (screen && !screen.classList.contains('hidden') && !appReadySignaled) {
       console.warn('[Hesabix] Loader fallback timeout');
-      setStatusKey('statusTimeout');
-      markSlowLoad();
-      showRetry();
+      hideLoadingScreen();
     }
   }, 120000);
 })();
