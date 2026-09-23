@@ -359,7 +359,7 @@ class TelegramProvider:
 		assert token
 		telegram_url = f"https://api.telegram.org/bot{token}/setWebhook"
 		
-		logger.info("telegram_set_webhook_direct", telegram_url=telegram_url)
+		logger.info("telegram_set_webhook_direct", has_token=True, method="setWebhook")
 		
 		data = json.dumps(payload, ensure_ascii=False).encode("utf-8")
 		req = request.Request(telegram_url, data=data, method="POST")
@@ -401,7 +401,6 @@ class TelegramProvider:
 		except Exception as exc:
 			logger.error("telegram_set_webhook_exception", 
 				webhook_url=url,
-				telegram_url=telegram_url,
 				exception_type=type(exc).__name__,
 				exception_message=str(exc)
 			)

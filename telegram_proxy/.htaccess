@@ -3,6 +3,11 @@
 
 RewriteEngine On
 
+# مسدود کردن صفحات تست/دیباگ عمومی (حتی اگر فایل روی دیسک مانده باشد)
+RewriteRule ^(test_webhook|set_webhook_test|test_connection)\.php$ - [F,L,NC]
+RewriteRule ^CONFIG_FIXED_EXAMPLE\.php$ - [F,L,NC]
+RewriteRule ^config\.example\.php$ - [F,L,NC]
+
 # هدایت مسیر /telegram/webhook به index.php
 RewriteCond %{REQUEST_URI} ^/telegram/webhook$ [NC]
 RewriteCond %{REQUEST_METHOD} POST [NC]
