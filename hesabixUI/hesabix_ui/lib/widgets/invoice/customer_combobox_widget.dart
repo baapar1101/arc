@@ -173,6 +173,17 @@ class _CustomerComboboxWidgetState extends State<CustomerComboboxWidget> {
   void _onDesktopFocusChanged() {
     if (!mounted || _isMobile) return;
     if (_fieldFocus.hasFocus) {
+      // TextField's web tap handling can collapse the selection after focus.
+      // Apply the selection at the end of the frame so the first keystroke
+      // reliably replaces the current customer name.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || !_fieldFocus.hasFocus) return;
+        final textLength = _searchController.text.length;
+        _searchController.selection = TextSelection(
+          baseOffset: 0,
+          extentOffset: textLength,
+        );
+      });
       _showDesktopOverlay();
       if (_searchController.text.trim().isEmpty) {
         _loadRecentCustomers();
@@ -606,6 +617,9 @@ class _CustomerComboboxWidgetState extends State<CustomerComboboxWidget> {
     if (_isQuickResolving) return;
     _debounceTimer?.cancel();
     final query = _searchController.text.trim();
+    final quickEntry = widget.enableQuickCreateOnSubmit
+        ? parseCustomerQuickEntry(query)
+        : null;
     var action = resolveCustomerSearchSubmitAction(
       input: query,
       loadedQuery: _loadedQuery,
@@ -614,6 +628,7 @@ class _CustomerComboboxWidgetState extends State<CustomerComboboxWidget> {
       navigatedByKeyboard: _navigatedByKeyboard,
       isLoading: _isLoading,
       quickCreateEnabled: widget.enableQuickCreateOnSubmit,
+      inputHasMobile: quickEntry?.mobile != null,
     );
 
     if (action == CustomerSearchSubmitAction.search) {
@@ -635,6 +650,7 @@ class _CustomerComboboxWidgetState extends State<CustomerComboboxWidget> {
         navigatedByKeyboard: _navigatedByKeyboard,
         isLoading: _isLoading,
         quickCreateEnabled: widget.enableQuickCreateOnSubmit,
+        inputHasMobile: quickEntry?.mobile != null,
       );
     }
 

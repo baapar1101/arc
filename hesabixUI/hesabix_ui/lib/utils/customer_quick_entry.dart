@@ -82,9 +82,16 @@ CustomerSearchSubmitAction resolveCustomerSearchSubmitAction({
   required bool navigatedByKeyboard,
   required bool isLoading,
   required bool quickCreateEnabled,
+  bool inputHasMobile = false,
 }) {
   final query = input.trim();
   if (query.isEmpty) return CustomerSearchSubmitAction.waitForSelection;
+  // A mobile is the authoritative identity for quick entry. Resolve it on the
+  // server even if the generic text search is stale, empty, or has one result.
+  // Explicit keyboard navigation still wins so Enter selects that row.
+  if (quickCreateEnabled && inputHasMobile && !navigatedByKeyboard) {
+    return CustomerSearchSubmitAction.quickCreate;
+  }
   if (isLoading || loadedQuery.trim() != query) {
     return CustomerSearchSubmitAction.search;
   }
