@@ -8,6 +8,8 @@ Wants=network-online.target
 Type=simple
 WorkingDirectory=/opt/HesabixTelephonyConnector
 EnvironmentFile=/opt/HesabixTelephonyConnector/.env
+# مفسر توسط hesabix-pbx install/update به پایتون ≥3.8 بازنویسی می‌شود
+# (روی Issabel/Rocky8 مسیر /usr/bin/python3 معمولاً 3.6 است و کار نمی‌کند)
 ExecStart=/usr/bin/python3 /opt/HesabixTelephonyConnector/app/main.py
 Restart=always
 RestartSec=5

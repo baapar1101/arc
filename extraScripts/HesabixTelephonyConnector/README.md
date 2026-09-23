@@ -55,8 +55,27 @@ hesabix-pbx help
 - دسترسی root روی سرور تلفن (با یا بدون `sudo`)
 - خروجی HTTPS از سرور تلفن به API حسابیکس (پورت ورودی لازم نیست)
 - کاربر AMI روی Asterisk (اسکریپت در صورت تمایل می‌سازد)
+- **Python ≥ 3.8** برای اجرای Connector (کد از `from __future__ import annotations` و typing مدرن استفاده می‌کند)
 
-پیش‌نیازهای نرم‌افزاری (`python3` و …) در صورت نبود، هنگام `install`/`update` خودکار نصب می‌شوند.
+پیش‌نیازهای نرم‌افزاری در صورت نبود، هنگام `install`/`update` خودکار نصب می‌شوند.
+
+### پایتون روی Issabel / Rocky / CentOS 8
+
+روی این توزیع‌ها `python3` سیستم اغلب **3.6** است و سرویس با SyntaxError کرش می‌کند.
+از نسخهٔ `1.3.1` اسکریپت `hesabix-pbx` خودش:
+
+1. مفسر ≥3.8 را پیدا می‌کند (`python3.9` / `python3.8` / …)
+2. در صورت نبود، بستهٔ `python39` (یا معادل) را با `dnf`/`yum`/`apt` نصب می‌کند
+3. یونیت systemd را به همان مفسر اشاره می‌دهد (نه `/usr/bin/python3` سیستم)
+4. مسیر را در `/opt/HesabixTelephonyConnector/.python-bin` ذخیره می‌کند
+
+دستی (اگر لازم شد):
+
+```bash
+dnf install -y python39 python39-pip   # Rocky/Issabel 8
+hesabix-pbx update
+hesabix-pbx softphone-setup
+```
 
 ### توزیع‌های پشتیبانی‌شده
 

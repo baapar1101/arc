@@ -3,12 +3,17 @@
 # استفاده: hesabix-pbx <command>
 set -euo pipefail
 
-VERSION="1.3.0"
+VERSION="1.3.1"
 INSTALL_DIR="${HESABIX_PBX_DIR:-/opt/HesabixTelephonyConnector}"
 ENV_FILE="${INSTALL_DIR}/.env"
 SERVICE_NAME="hesabix-telephony-connector"
 SERVICE_FILE="/etc/systemd/system/${SERVICE_NAME}.service"
 BIN_LINK="/usr/local/bin/hesabix-pbx"
+# مفسر پایتون کانکتور (باید ≥3.8 باشد؛ روی Issabel/Rocky8 پیش‌فرض سیستم 3.6 است)
+PYTHON_BIN="${HESABIX_PYTHON:-}"
+PYTHON_BIN_FILE="${INSTALL_DIR}/.python-bin"
+MIN_PYTHON_MAJOR=3
+MIN_PYTHON_MINOR=8
 
 REPO_URL="${HESABIX_PBX_REPO:-https://source.hesabix.ir/hesabix/arc.git}"
 REPO_BRANCH="${HESABIX_PBX_BRANCH:-master}"
@@ -66,6 +71,170 @@ need_root() {
 }
 
 have() { command -v "$1" >/dev/null 2>&1; }
+
+# ─── Python runtime (≥3.8) ───────────────────────────────────────────────────
+# Issabel / Rocky / CentOS 8 معمولاً فقط python3.6 دارند؛ کد کانکتور به ≥3.8 نیاز دارد.
+
+py_meets_min() {
+  local bin="$1"
+  [[ -n "$bin" && -x "$bin" ]] || return 1
+  "$bin" -c "import sys; raise SystemExit(0 if sys.version_info >= (${MIN_PYTHON_MAJOR}, ${MIN_PYTHON_MINOR}) else 1)" 2>/dev/null
+}
+
+py_version_str() {
+  local bin="${1:-}"
+  [[ -n "$bin" ]] || return 1
+  "$bin" -c 'import sys; print("%d.%d.%d" % sys.version_info[:3])' 2>/dev/null
+}
+
+# پیدا کردن اولین مفسر مناسب در PATH / مسیرهای رایج
+find_suitable_python() {
+  local c p
+  for c in \
+    "${HESABIX_PYTHON:-}" \
+    python3.12 python3.11 python3.10 python3.9 python3.8 \
+    /usr/bin/python3.12 /usr/bin/python3.11 /usr/bin/python3.10 \
+    /usr/bin/python3.9 /usr/bin/python3.8 \
+    /usr/local/bin/python3.12 /usr/local/bin/python3.11 \
+    /usr/local/bin/python3.10 /usr/local/bin/python3.9 /usr/local/bin/python3.8 \
+    python3 /usr/bin/python3
+  do
+    [[ -n "$c" ]] || continue
+    if [[ "$c" == /* ]]; then
+      p="$c"
+    else
+      p="$(command -v "$c" 2>/dev/null || true)"
+    fi
+    if py_meets_min "$p"; then
+      printf '%s\n' "$p"
+      return 0
+    fi
+  done
+  return 1
+}
+
+persist_python_bin() {
+  [[ -n "${PYTHON_BIN:-}" ]] || return 1
+  mkdir -p "$INSTALL_DIR"
+  printf '%s\n' "$PYTHON_BIN" > "$PYTHON_BIN_FILE"
+  chmod 644 "$PYTHON_BIN_FILE" 2>/dev/null || true
+}
+
+# بارگذاری مفسر ذخیره‌شده یا پیدا کردن روی سیستم (بدون نصب)
+load_python_bin() {
+  if [[ -n "${PYTHON_BIN:-}" ]] && py_meets_min "$PYTHON_BIN"; then
+    return 0
+  fi
+  if [[ -f "$PYTHON_BIN_FILE" ]]; then
+    local saved
+    saved="$(tr -d '[:space:]' < "$PYTHON_BIN_FILE" 2>/dev/null || true)"
+    if py_meets_min "$saved"; then
+      PYTHON_BIN="$saved"
+      return 0
+    fi
+  fi
+  local found
+  if found="$(find_suitable_python)"; then
+    PYTHON_BIN="$found"
+    persist_python_bin
+    return 0
+  fi
+  return 1
+}
+
+# نصب بستهٔ پایتون جدید روی RHEL/Issabel وقتی فقط 3.6 موجود است
+_install_modern_python_rhel() {
+  local pkg
+  # ترتیب: 3.9 (AppStream متداول Rocky/Alma/Issabel 8) سپس 3.8
+  for pkg in python39 python3.9 python38 python3.8; do
+    log "تلاش برای نصب ${pkg} …"
+    if pkg_install "$pkg" 2>/dev/null; then
+      # pip متناظر
+      case "$pkg" in
+        python39|python3.9) pkg_install python39-pip 2>/dev/null || true ;;
+        python38|python3.8) pkg_install python38-pip 2>/dev/null || true ;;
+      esac
+      if find_suitable_python >/dev/null; then
+        return 0
+      fi
+    fi
+  done
+  # ماژول dnf (Rocky/RHEL 8+)
+  if have dnf; then
+    for stream in python39:3.9 python38:3.8; do
+      log "تلاش dnf module enable ${stream} …"
+      dnf -y module enable "$stream" 2>/dev/null || true
+      dnf -y module install "$stream" 2>/dev/null || true
+      if find_suitable_python >/dev/null; then
+        return 0
+      fi
+    done
+  fi
+  return 1
+}
+
+_install_modern_python_debian() {
+  # روی Debian/Ubuntu معمولاً python3 ≥3.8 است؛ در صورت قدیمی بودن، نسخه‌دار نصب کن
+  pkg_install python3 python3-pip 2>/dev/null || true
+  if find_suitable_python >/dev/null; then
+    return 0
+  fi
+  local pkg
+  for pkg in python3.12 python3.11 python3.10 python3.9 python3.8; do
+    log "تلاش برای نصب ${pkg} …"
+    if pkg_install "$pkg" 2>/dev/null; then
+      pkg_install "${pkg}-venv" 2>/dev/null || true
+      if find_suitable_python >/dev/null; then
+        return 0
+      fi
+    fi
+  done
+  return 1
+}
+
+# تضمین مفسر ≥3.8 — در install/update/softphone اجباری است
+ensure_python_runtime() {
+  detect_os
+  if load_python_bin; then
+    ok "پایتون مناسب: $PYTHON_BIN ($(py_version_str "$PYTHON_BIN"))"
+    return 0
+  fi
+
+  warn "پایتون ≥${MIN_PYTHON_MAJOR}.${MIN_PYTHON_MINOR} پیدا نشد (روی Issabel/Rocky8 اغلب فقط 3.6 است)."
+  if [[ -z "$PKG_MGR" ]] || ! have "$PKG_MGR"; then
+    die "نمی‌توان پایتون جدید نصب کرد — مدیر بسته نیست.
+دستی نصب کنید، سپس دوباره: hesabix-pbx update
+  RHEL/Rocky/Issabel:  dnf install -y python39 python39-pip
+  Debian/Ubuntu:       apt-get install -y python3.9"
+  fi
+
+  log "نصب پایتون ≥${MIN_PYTHON_MAJOR}.${MIN_PYTHON_MINOR} …"
+  case "$OS_FAMILY" in
+    rhel)
+      _install_modern_python_rhel || true
+      ;;
+    debian)
+      _install_modern_python_debian || true
+      ;;
+    *)
+      _install_modern_python_rhel || _install_modern_python_debian || true
+      ;;
+  esac
+
+  local found
+  if found="$(find_suitable_python)"; then
+    PYTHON_BIN="$found"
+    persist_python_bin
+    ok "پایتون مناسب نصب/انتخاب شد: $PYTHON_BIN ($(py_version_str "$PYTHON_BIN"))"
+    return 0
+  fi
+
+  die "پس از نصب، هنوز پایتون ≥${MIN_PYTHON_MAJOR}.${MIN_PYTHON_MINOR} در سیستم نیست.
+روی Issabel/Rocky 8:
+  dnf install -y python39 python39-pip
+  hesabix-pbx update
+سپس سرویس با همین مفسر اجرا می‌شود (نه python3.6 سیستم)."
+}
 
 # تشخیص سیستم‌عامل و مدیر بسته (Debian/Ubuntu vs RHEL/CentOS/Issabel)
 # توجه: /etc/os-release را در ساب‌شل می‌خوانیم تا VERSION اسکریپت بازنویسی نشود.
@@ -160,34 +329,33 @@ ensure_prerequisites() {
   log "سیستم‌عامل: ${label:-نامشخص} | خانواده: ${OS_FAMILY} | مدیر بسته: ${PKG_MGR:-نامشخص}"
 
   local missing=()
-  have python3 || missing+=(python3)
   have rsync || missing+=(rsync)
   if ! have curl && ! have wget; then
     missing+=(curl)
   fi
   have git || missing+=(git)
 
-  if ((${#missing[@]} == 0)); then
-    ok "پیش‌نیازها از قبل نصب‌اند."
-    return 0
-  fi
-
-  if [[ -z "$PKG_MGR" ]] || ! have "$PKG_MGR"; then
-    die "پیش‌نیازهای زیر نصب نیستند و مدیر بسته در دسترس نیست: ${missing[*]}
+  if ((${#missing[@]} > 0)); then
+    if [[ -z "$PKG_MGR" ]] || ! have "$PKG_MGR"; then
+      die "پیش‌نیازهای زیر نصب نیستند و مدیر بسته در دسترس نیست: ${missing[*]}
 روی Debian/Ubuntu: apt-get install -y ${missing[*]}
 روی Issabel/CentOS/RHEL: yum install -y ${missing[*]}   یا   dnf install -y ${missing[*]}"
+    fi
+    log "نصب پیش‌نیازها (${PKG_MGR}): ${missing[*]}"
+    if ! pkg_install "${missing[@]}"; then
+      die "نصب پیش‌نیازها ناموفق بود: ${missing[*]}"
+    fi
+  else
+    ok "ابزارهای پایه (rsync/curl/git) آماده‌اند."
   fi
 
-  log "نصب پیش‌نیازها (${PKG_MGR}): ${missing[*]}"
-  if ! pkg_install "${missing[@]}"; then
-    die "نصب پیش‌نیازها ناموفق بود: ${missing[*]}"
-  fi
-
-  have python3 || die "python3 پس از نصب در PATH نیست."
   if ! have curl && ! have wget; then
     die "curl یا wget پس از نصب در PATH نیست."
   fi
-  ok "پیش‌نیازها نصب شدند."
+
+  # پایتون ≥3.8 — حیاتی برای اجرای کانکتور روی Issabel/Rocky8
+  ensure_python_runtime
+  ok "پیش‌نیازها آماده است."
 }
 
 # ورودی تعاملی: وقتی اسکریپت با curl|bash اجرا شود stdin لوله است؛ از /dev/tty بخوان.
@@ -371,71 +539,84 @@ install_systemd() {
   local unit_src="$INSTALL_DIR/systemd/hesabix-telephony-connector.service"
   [[ -f "$unit_src" ]] || die "فایل systemd پیدا نشد."
 
-  # بازنویسی مسیرها مطابق INSTALL_DIR
+  load_python_bin || ensure_python_runtime
+  [[ -n "${PYTHON_BIN:-}" ]] || die "مفسر پایتون برای سرویس مشخص نشد."
+
+  # بازنویسی مسیرها مطابق INSTALL_DIR و مفسر ≥3.8
   sed -e "s|/opt/HesabixTelephonyConnector|${INSTALL_DIR}|g" \
       -e "s|WorkingDirectory=.*|WorkingDirectory=${INSTALL_DIR}|g" \
       -e "s|EnvironmentFile=.*|EnvironmentFile=${ENV_FILE}|g" \
-      -e "s|ExecStart=.*|ExecStart=/usr/bin/python3 ${INSTALL_DIR}/app/main.py|g" \
+      -e "s|^ExecStart=.*|ExecStart=${PYTHON_BIN} ${INSTALL_DIR}/app/main.py|g" \
       "$unit_src" > "$SERVICE_FILE"
 
-  # اگر python3 جای دیگری است
-  local py
-  py="$(command -v python3 || true)"
-  if [[ -n "$py" && "$py" != "/usr/bin/python3" ]]; then
-    sed -i "s|^ExecStart=.*|ExecStart=${py} ${INSTALL_DIR}/app/main.py|" "$SERVICE_FILE"
-  fi
+  # اطمینان نهایی از مسیر مفسر
+  sed -i "s|^ExecStart=.*|ExecStart=${PYTHON_BIN} ${INSTALL_DIR}/app/main.py|" "$SERVICE_FILE"
 
+  persist_python_bin
   systemctl daemon-reload
   systemctl enable "$SERVICE_NAME" >/dev/null 2>&1 || true
-  ok "سرویس systemd ثبت شد: $SERVICE_NAME"
+  ok "سرویس systemd ثبت شد: $SERVICE_NAME (Python: $PYTHON_BIN)"
 }
 
 # ─── Softphone Media Relay helpers ───────────────────────────────────────────
 
 ensure_python_pip() {
-  have python3 || die "python3 نصب نیست."
-  if python3 -m pip --version >/dev/null 2>&1; then
+  load_python_bin || ensure_python_runtime
+  [[ -n "${PYTHON_BIN:-}" ]] || die "مفسر پایتون مشخص نیست."
+  if "$PYTHON_BIN" -m pip --version >/dev/null 2>&1; then
     return 0
   fi
-  log "pip برای python3 پیدا نشد — تلاش برای نصب…"
+  log "pip برای $PYTHON_BIN پیدا نشد — تلاش برای نصب…"
   detect_os
+  local ver_minor
+  ver_minor="$("$PYTHON_BIN" -c 'import sys; print(sys.version_info[1])' 2>/dev/null || echo "")"
   case "$PKG_MGR" in
     apt-get)
       pkg_install python3-pip || true
+      if [[ -n "$ver_minor" ]]; then
+        pkg_install "python3.${ver_minor}-distutils" 2>/dev/null || true
+      fi
       ;;
     dnf|yum)
-      pkg_install python3-pip || pkg_install python-pip || true
+      # روی RHEL بسته‌های pip نسخه‌دار: python39-pip / python38-pip
+      if [[ -n "$ver_minor" ]]; then
+        pkg_install "python3${ver_minor}-pip" 2>/dev/null \
+          || pkg_install "python3.${ver_minor}-pip" 2>/dev/null \
+          || true
+      fi
+      pkg_install python3-pip 2>/dev/null || pkg_install python-pip 2>/dev/null || true
       ;;
   esac
-  if ! python3 -m pip --version >/dev/null 2>&1; then
-    # آخرین تلاش: ensurepip
-    python3 -m ensurepip --upgrade >/dev/null 2>&1 || true
+  if ! "$PYTHON_BIN" -m pip --version >/dev/null 2>&1; then
+    "$PYTHON_BIN" -m ensurepip --upgrade >/dev/null 2>&1 || true
   fi
-  python3 -m pip --version >/dev/null 2>&1 || die "pip نصب نشد. دستی: yum/apt install python3-pip"
+  "$PYTHON_BIN" -m pip --version >/dev/null 2>&1 \
+    || die "pip برای $PYTHON_BIN نصب نشد. دستی: dnf install -y python39-pip   یا   apt install python3-pip"
 }
 
 ensure_softphone_python_deps() {
   ensure_python_pip
   local req="$INSTALL_DIR/requirements-softphone.txt"
-  log "نصب وابستگی Softphone (websocket-client)…"
+  log "نصب وابستگی Softphone (websocket-client) با $PYTHON_BIN …"
   if [[ -f "$req" ]]; then
-    python3 -m pip install -r "$req" \
-      || python3 -m pip install --break-system-packages -r "$req" \
+    "$PYTHON_BIN" -m pip install -r "$req" \
+      || "$PYTHON_BIN" -m pip install --break-system-packages -r "$req" \
       || return 1
   else
-    python3 -m pip install "websocket-client>=1.6.0" \
-      || python3 -m pip install --break-system-packages "websocket-client>=1.6.0" \
+    "$PYTHON_BIN" -m pip install "websocket-client>=1.6.0" \
+      || "$PYTHON_BIN" -m pip install --break-system-packages "websocket-client>=1.6.0" \
       || return 1
   fi
-  python3 -c "import websocket; print(websocket.__version__)" >/dev/null 2>&1 \
+  "$PYTHON_BIN" -c "import websocket; print(websocket.__version__)" >/dev/null 2>&1 \
     || return 1
   return 0
 }
 
 ensure_softphone_env_keys() {
   [[ -f "$ENV_FILE" ]] || die "فایل .env نیست. اول: hesabix-pbx configure"
+  load_python_bin || ensure_python_runtime
   log "همگام‌سازی کلیدهای Softphone در .env …"
-  python3 - "$ENV_FILE" <<'PY'
+  "$PYTHON_BIN" - "$ENV_FILE" <<'PY'
 import sys
 from pathlib import Path
 
@@ -476,9 +657,10 @@ PY
 
 verify_softphone_ready() {
   log "بررسی آمادگی Softphone…"
-  if python3 -c "import websocket" >/dev/null 2>&1; then
+  load_python_bin || ensure_python_runtime
+  if "$PYTHON_BIN" -c "import websocket" >/dev/null 2>&1; then
     local ver
-    ver="$(python3 -c "import websocket; print(getattr(websocket, '__version__', 'ok'))" 2>/dev/null || echo ok)"
+    ver="$("$PYTHON_BIN" -c "import websocket; print(getattr(websocket, '__version__', 'ok'))" 2>/dev/null || echo ok)"
     ok "websocket-client نصب است (نسخه: $ver)"
   else
     err "websocket-client هنوز import نمی‌شود."
@@ -547,8 +729,9 @@ api_request_json() {
   # خروجی: بدنه JSON؛ کد HTTP در متغیر سراسری API_HTTP_CODE
   local method="$1" url="$2" api_key="$3" body="${4:-}"
   API_HTTP_CODE="0"
+  load_python_bin || ensure_python_runtime
   HESABIX_API_KEY="$api_key" HESABIX_HTTP_METHOD="$method" HESABIX_HTTP_URL="$url" HESABIX_HTTP_BODY="$body" \
-  python3 - <<'PY'
+  "$PYTHON_BIN" - <<'PY'
 import json, os, sys, urllib.error, urllib.request
 method = os.environ["HESABIX_HTTP_METHOD"].upper()
 url = os.environ["HESABIX_HTTP_URL"]
@@ -563,7 +746,7 @@ req = urllib.request.Request(
         "Authorization": f"ApiKey {key}",
         "Accept": "application/json",
         "Content-Type": "application/json",
-        "User-Agent": "hesabix-pbx/1.2",
+        "User-Agent": "hesabix-pbx/1.3",
     },
 )
 try:
@@ -586,7 +769,8 @@ PY
 api_extract() {
   # api_extract JSON PYTHON_EXPR → چاپ نتیجه
   local json="$1" expr="$2"
-  HESABIX_JSON="$json" HESABIX_EXPR="$expr" python3 - <<'PY'
+  load_python_bin || ensure_python_runtime
+  HESABIX_JSON="$json" HESABIX_EXPR="$expr" "$PYTHON_BIN" - <<'PY'
 import json, os, sys
 data = json.loads(os.environ["HESABIX_JSON"] or "{}")
 expr = os.environ["HESABIX_EXPR"]
@@ -609,6 +793,7 @@ PY
 cmd_configure() {
   need_root configure
   mkdir -p "$INSTALL_DIR"
+  load_python_bin || ensure_python_runtime
 
   echo
   echo -e "${c_bold}پیکربندی اتصال حسابیکس ↔ Issabel/Asterisk${c_reset}"
@@ -659,7 +844,7 @@ cmd_configure() {
 
   local biz_json
   # normalize items
-  biz_json="$(HESABIX_JSON="$biz_raw" python3 - <<'PY'
+  biz_json="$(HESABIX_JSON="$biz_raw" "$PYTHON_BIN" - <<'PY'
 import json, os
 root = json.loads(os.environ["HESABIX_JSON"])
 payload = root.get("data", root)
@@ -671,7 +856,7 @@ PY
 )"
 
   local biz_count
-  biz_count="$(HESABIX_JSON="$biz_json" python3 -c 'import json,os; print(len(json.loads(os.environ["HESABIX_JSON"])))')"
+  biz_count="$(HESABIX_JSON="$biz_json" "$PYTHON_BIN" -c 'import json,os; print(len(json.loads(os.environ["HESABIX_JSON"])))')"
   if [[ "$biz_count" -eq 0 ]]; then
     die "هیچ کسب‌وکاری برای این کاربر پیدا نشد."
   fi
@@ -679,7 +864,7 @@ PY
   local -a biz_labels=()
   local i label
   for ((i = 0; i < biz_count; i++)); do
-    label="$(HESABIX_JSON="$biz_json" HESABIX_I="$i" python3 - <<'PY'
+    label="$(HESABIX_JSON="$biz_json" HESABIX_I="$i" "$PYTHON_BIN" - <<'PY'
 import json, os
 items = json.loads(os.environ["HESABIX_JSON"])
 b = items[int(os.environ["HESABIX_I"])]
@@ -693,7 +878,7 @@ PY
   # پیش‌فرض روی کسب‌وکار قبلی اگر در لیست باشد
   local default_biz="1"
   if [[ -n "$cur_bid" ]]; then
-    default_biz="$(HESABIX_JSON="$biz_json" HESABIX_BID="$cur_bid" python3 - <<'PY'
+    default_biz="$(HESABIX_JSON="$biz_json" HESABIX_BID="$cur_bid" "$PYTHON_BIN" - <<'PY'
 import json, os
 items = json.loads(os.environ["HESABIX_JSON"])
 want = str(os.environ.get("HESABIX_BID") or "")
@@ -714,8 +899,8 @@ PY
   biz_choice="$(prompt "شماره کسب‌وکار" "$default_biz")"
   [[ "$biz_choice" =~ ^[0-9]+$ ]] && (( biz_choice >= 1 && biz_choice <= biz_count )) \
     || die "انتخاب کسب‌وکار نامعتبر است."
-  biz_id="$(HESABIX_JSON="$biz_json" HESABIX_I="$((biz_choice - 1))" python3 -c 'import json,os; print(json.loads(os.environ["HESABIX_JSON"])[int(os.environ["HESABIX_I"])]["id"])')"
-  biz_name="$(HESABIX_JSON="$biz_json" HESABIX_I="$((biz_choice - 1))" python3 -c 'import json,os; print(json.loads(os.environ["HESABIX_JSON"])[int(os.environ["HESABIX_I"])].get("name") or "")')"
+  biz_id="$(HESABIX_JSON="$biz_json" HESABIX_I="$((biz_choice - 1))" "$PYTHON_BIN" -c 'import json,os; print(json.loads(os.environ["HESABIX_JSON"])[int(os.environ["HESABIX_I"])]["id"])')"
+  biz_name="$(HESABIX_JSON="$biz_json" HESABIX_I="$((biz_choice - 1))" "$PYTHON_BIN" -c 'import json,os; print(json.loads(os.environ["HESABIX_JSON"])[int(os.environ["HESABIX_I"])].get("name") or "")')"
   ok "کسب‌وکار انتخاب شد: $biz_name (#$biz_id)"
 
   log "دریافت مراکز تلفن…"
@@ -738,7 +923,7 @@ PY
     exit 1
   fi
 
-  pbx_json="$(HESABIX_JSON="$pbx_raw" python3 - <<'PY'
+  pbx_json="$(HESABIX_JSON="$pbx_raw" "$PYTHON_BIN" - <<'PY'
 import json, os
 root = json.loads(os.environ["HESABIX_JSON"])
 payload = root.get("data", root)
@@ -746,7 +931,7 @@ items = payload.get("items") if isinstance(payload, dict) else []
 print(json.dumps(items if isinstance(items, list) else [], ensure_ascii=False))
 PY
 )"
-  pbx_count="$(HESABIX_JSON="$pbx_json" python3 -c 'import json,os; print(len(json.loads(os.environ["HESABIX_JSON"])))')"
+  pbx_count="$(HESABIX_JSON="$pbx_json" "$PYTHON_BIN" -c 'import json,os; print(len(json.loads(os.environ["HESABIX_JSON"])))')"
 
   local pbx_id="" token="" pbx_name=""
   local create_new="N"
@@ -757,7 +942,7 @@ PY
   else
     local -a pbx_labels=()
     for ((i = 0; i < pbx_count; i++)); do
-      label="$(HESABIX_JSON="$pbx_json" HESABIX_I="$i" python3 - <<'PY'
+      label="$(HESABIX_JSON="$pbx_json" HESABIX_I="$i" "$PYTHON_BIN" - <<'PY'
 import json, os
 p = json.loads(os.environ["HESABIX_JSON"])[int(os.environ["HESABIX_I"])]
 print(f"{p.get('name') or 'PBX'}  (ID: {p.get('id')}) · وضعیت: {p.get('status') or '—'} · توکن: {p.get('connector_token_prefix') or ''}…")
@@ -773,7 +958,7 @@ PY
     done
     local pbx_choice default_pbx="1"
     if [[ -n "$cur_pid" ]]; then
-      default_pbx="$(HESABIX_JSON="$pbx_json" HESABIX_PID="$cur_pid" python3 - <<'PY'
+      default_pbx="$(HESABIX_JSON="$pbx_json" HESABIX_PID="$cur_pid" "$PYTHON_BIN" - <<'PY'
 import json, os
 items = json.loads(os.environ["HESABIX_JSON"])
 want = str(os.environ.get("HESABIX_PID") or "")
@@ -791,8 +976,8 @@ PY
     if (( pbx_choice == pbx_count + 1 )); then
       create_new="Y"
     elif (( pbx_choice >= 1 && pbx_choice <= pbx_count )); then
-      pbx_id="$(HESABIX_JSON="$pbx_json" HESABIX_I="$((pbx_choice - 1))" python3 -c 'import json,os; print(json.loads(os.environ["HESABIX_JSON"])[int(os.environ["HESABIX_I"])]["id"])')"
-      pbx_name="$(HESABIX_JSON="$pbx_json" HESABIX_I="$((pbx_choice - 1))" python3 -c 'import json,os; print(json.loads(os.environ["HESABIX_JSON"])[int(os.environ["HESABIX_I"])].get("name") or "")')"
+      pbx_id="$(HESABIX_JSON="$pbx_json" HESABIX_I="$((pbx_choice - 1))" "$PYTHON_BIN" -c 'import json,os; print(json.loads(os.environ["HESABIX_JSON"])[int(os.environ["HESABIX_I"])]["id"])')"
+      pbx_name="$(HESABIX_JSON="$pbx_json" HESABIX_I="$((pbx_choice - 1))" "$PYTHON_BIN" -c 'import json,os; print(json.loads(os.environ["HESABIX_JSON"])[int(os.environ["HESABIX_I"])].get("name") or "")')"
       ok "مرکز تلفن: $pbx_name (#$pbx_id)"
     else
       die "انتخاب مرکز تلفن نامعتبر است."
@@ -805,15 +990,15 @@ PY
     log "ایجاد مرکز تلفن…"
     tmp_http="$(mktemp)"; tmp_body="$(mktemp)"
     api_request_json POST "${api}/api/v1/telephony/business/${biz_id}/pbx" "$user_key" \
-      "$(HESABIX_N="$new_name" python3 -c 'import json,os; print(json.dumps({"name":os.environ["HESABIX_N"],"pbx_type":"issabel"},ensure_ascii=False))')" \
+      "$(HESABIX_N="$new_name" "$PYTHON_BIN" -c 'import json,os; print(json.dumps({"name":os.environ["HESABIX_N"],"pbx_type":"issabel"},ensure_ascii=False))')" \
       >"$tmp_body" 2>"$tmp_http" || true
     local create_code create_raw
     create_code="$(tr -d '[:space:]' < "$tmp_http")"
     create_raw="$(cat "$tmp_body")"
     rm -f "$tmp_http" "$tmp_body"
     [[ "$create_code" == "200" ]] || die "ایجاد PBX ناموفق (HTTP ${create_code}). $(api_extract "$create_raw" "data.get('error',{}).get('message') or ''")"
-    pbx_id="$(HESABIX_JSON="$create_raw" python3 -c 'import json,os; d=json.loads(os.environ["HESABIX_JSON"]).get("data",{}); print(d.get("id") or "")')"
-    token="$(HESABIX_JSON="$create_raw" python3 -c 'import json,os; d=json.loads(os.environ["HESABIX_JSON"]).get("data",{}); print(d.get("connector_token") or "")')"
+    pbx_id="$(HESABIX_JSON="$create_raw" "$PYTHON_BIN" -c 'import json,os; d=json.loads(os.environ["HESABIX_JSON"]).get("data",{}); print(d.get("id") or "")')"
+    token="$(HESABIX_JSON="$create_raw" "$PYTHON_BIN" -c 'import json,os; d=json.loads(os.environ["HESABIX_JSON"]).get("data",{}); print(d.get("connector_token") or "")')"
     pbx_name="$new_name"
     [[ -n "$pbx_id" && -n "$token" ]] || die "پاسخ ایجاد PBX ناقص بود."
     ok "مرکز تلفن ساخته شد (#$pbx_id) و توکن Connector دریافت شد."
@@ -837,7 +1022,7 @@ PY
       rot_raw="$(cat "$tmp_body")"
       rm -f "$tmp_http" "$tmp_body"
       [[ "$rot_code" == "200" ]] || die "صدور توکن ناموفق (HTTP ${rot_code}). مجوز telephony.manage لازم است."
-      token="$(HESABIX_JSON="$rot_raw" python3 -c 'import json,os; d=json.loads(os.environ["HESABIX_JSON"]).get("data",{}); print(d.get("connector_token") or "")')"
+      token="$(HESABIX_JSON="$rot_raw" "$PYTHON_BIN" -c 'import json,os; d=json.loads(os.environ["HESABIX_JSON"]).get("data",{}); print(d.get("connector_token") or "")')"
       [[ -n "$token" ]] || die "توکن در پاسخ نبود."
       ok "توکن Connector جدید دریافت شد."
     fi
@@ -856,7 +1041,7 @@ PY
 
   umask 077
   # مقادیر را برای EnvironmentFile systemd با کوتیشن امن می‌نویسیم
-  qenv() { python3 -c 'import json,sys; print(json.dumps(sys.argv[1]))' "$1"; }
+  qenv() { "$PYTHON_BIN" -c 'import json,sys; print(json.dumps(sys.argv[1]))' "$1"; }
   cat > "$ENV_FILE" <<EOF
 # generated by hesabix-pbx $(date -u +%Y-%m-%dT%H:%M:%SZ)
 # business_id=${biz_id} pbx_id=${pbx_id}
@@ -891,10 +1076,11 @@ enable_ami_general() {
   local port="${2:-5038}"
   local bind="${3:-127.0.0.1}"
   [[ -f "$conf" ]] || { warn "فایل $conf نیست."; return 1; }
+  load_python_bin || ensure_python_runtime
 
   cp -a "$conf" "${conf}.bak.hesabix-enable-$(date +%Y%m%d%H%M%S)" 2>/dev/null || true
 
-  python3 - "$conf" "$port" "$bind" <<'PY'
+  "$PYTHON_BIN" - "$conf" "$port" "$bind" <<'PY'
 import re, sys
 path, port, bind = sys.argv[1], sys.argv[2], sys.argv[3]
 text = open(path, "r", encoding="utf-8", errors="replace").read()
@@ -929,6 +1115,7 @@ setup_ami_user() {
   if [[ "$bind" != "127.0.0.1" && "$bind" != "localhost" ]]; then
     listen_bind="0.0.0.0"
   fi
+  load_python_bin || ensure_python_runtime
 
   local main_conf="/etc/asterisk/manager.conf"
   if [[ ! -f "$main_conf" ]]; then
@@ -956,7 +1143,7 @@ setup_ami_user() {
       target="$main_conf"
     fi
     cp -a "$target" "${target}.bak.hesabix-user-$(date +%Y%m%d%H%M%S)" 2>/dev/null || true
-    python3 - "$target" "$user" "$secret" <<'PY'
+    "$PYTHON_BIN" - "$target" "$user" "$secret" <<'PY'
 import re, sys
 path, user, secret = sys.argv[1], sys.argv[2], sys.argv[3]
 text = open(path, "r", encoding="utf-8", errors="replace").read()
@@ -1077,6 +1264,11 @@ cmd_status() {
     os_line+=")"
     echo "سیستم:   $os_line"
   fi
+  if load_python_bin 2>/dev/null; then
+    echo "Python:   $PYTHON_BIN ($(py_version_str "$PYTHON_BIN"))"
+  else
+    warn "Python ≥${MIN_PYTHON_MAJOR}.${MIN_PYTHON_MINOR} پیدا نشد — hesabix-pbx update"
+  fi
   if [[ -f "$ENV_FILE" ]]; then
     # shellcheck disable=SC1090
     source "$ENV_FILE" || true
@@ -1112,13 +1304,14 @@ cmd_follow() {
 
 cmd_test() {
   [[ -f "$ENV_FILE" ]] || die "ابتدا: hesabix-pbx configure"
+  load_python_bin || ensure_python_runtime
   set -a
   # shellcheck disable=SC1090
   source "$ENV_FILE"
   set +a
 
   echo -e "${c_bold}۱) تست AMI${c_reset}"
-  python3 - <<'PY' || die "تست AMI ناموفق"
+  "$PYTHON_BIN" - <<'PY' || die "تست AMI ناموفق"
 import os, socket, sys
 host = os.environ.get("AMI_HOST", "127.0.0.1")
 port = int(os.environ.get("AMI_PORT", "5038"))
@@ -1154,7 +1347,7 @@ PY
 
   echo
   echo -e "${c_bold}۲) تست Heartbeat حسابیکس${c_reset}"
-  python3 - <<'PY' || die "تست API ناموفق"
+  "$PYTHON_BIN" - <<'PY' || die "تست API ناموفق"
 import json, os, sys, urllib.request, urllib.error
 base = (os.environ.get("HESABIX_API_URL") or "").rstrip("/")
 token = os.environ.get("HESABIX_CONNECTOR_TOKEN") or ""
@@ -1229,7 +1422,7 @@ cmd_add_extension() {
   local tmp_http tmp_body code raw
   tmp_http="$(mktemp)"; tmp_body="$(mktemp)"
   api_request_json POST "${api}/api/v1/telephony/business/${bid}/extensions" "$user_key" \
-    "$(EXT="$ext" PID="$pid" DN="$display" python3 -c 'import json,os; print(json.dumps({"pbx_id":int(os.environ["PID"]),"extension":os.environ["EXT"],"display_name":os.environ["DN"]},ensure_ascii=False))')" \
+    "$(EXT="$ext" PID="$pid" DN="$display" "$PYTHON_BIN" -c 'import json,os; print(json.dumps({"pbx_id":int(os.environ["PID"]),"extension":os.environ["EXT"],"display_name":os.environ["DN"]},ensure_ascii=False))')" \
     >"$tmp_body" 2>"$tmp_http" || true
   code="$(tr -d '[:space:]' < "$tmp_http")"
   raw="$(cat "$tmp_body")"
@@ -1361,6 +1554,7 @@ ${c_bold}متغیرهای اختیاری:${c_reset}
 ${c_bold}توزیع‌های پشتیبانی‌شده:${c_reset}
   Debian / Ubuntu (apt-get) — بدون نیاز به sudo اگر با root اجرا شود
   CentOS / RHEL / Rocky / Alma / Issabel (yum یا dnf)
+  نیازمندی: Python ≥3.8 (روی Issabel/Rocky8 در صورت نبود، python39 خودکار نصب می‌شود)
 
 مخزن:
   https://source.hesabix.ir/hesabix/arc/src/branch/master/extraScripts/HesabixTelephonyConnector

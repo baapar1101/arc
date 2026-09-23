@@ -21,6 +21,7 @@ if [[ "${EUID:-$(id -u)}" -ne 0 ]]; then
 fi
 
 echo "==> نصب Hesabix PBX Connector"
+echo "    نیازمندی: Python ≥3.8 (روی Issabel/Rocky8 در صورت نیاز python39 خودکار نصب می‌شود)"
 mkdir -p "$INSTALL_DIR/bin" "$INSTALL_DIR/app" "$INSTALL_DIR/systemd"
 
 download() {
