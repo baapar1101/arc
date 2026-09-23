@@ -15,29 +15,15 @@ from app.core.payment_response import (
 	detect_source,
 	render_payment_failed,
 	render_payment_success,
+	resolve_frontend_base_url,
+	resolve_payment_display_name,
 	should_return_json,
+	support_return_urls,
 )
 from app.core.responses import success_response
-from app.core.settings import get_settings
 from app.services.support.support_payment_gateway import verify_support_gateway_payment
-from app.services.system_settings_service import resolve_public_app_base_url_for_public_links
 
 router = APIRouter(prefix="/support/payments/callback", tags=["support-payment-callbacks"])
-
-
-def _resolve_frontend_base_url(db: Session) -> str:
-	"""
-	دامنهٔ اپ برای برگشت از درگاه: همان مقدار «تنظیمات لینک‌های اشتراک»
-	(با fallback به env / app_public_url).
-	"""
-	base = (resolve_public_app_base_url_for_public_links(db) or "").strip().rstrip("/")
-	if base:
-		return base
-	settings = get_settings()
-	fallback = (settings.app_public_url or settings.share_link_public_app_url or "").strip().rstrip("/")
-	if fallback.lower().endswith("/public"):
-		fallback = fallback[: -len("/public")].rstrip("/")
-	return fallback
 
 
 def _handle_callback(
@@ -60,7 +46,7 @@ def _handle_callback(
 			if path.startswith("http"):
 				target = path
 			else:
-				front = _resolve_frontend_base_url(db)
+				front = resolve_frontend_base_url(db)
 				if not front:
 					raise ValueError("frontend base url is not configured")
 				target = f"{front}{path if path.startswith('/') else '/' + path}"
@@ -88,14 +74,30 @@ def _handle_callback(
 			message="SUPPORT_PAYMENT_OK" if data.get("success") else "SUPPORT_PAYMENT_FAILED",
 		)
 
+	app_name = resolve_payment_display_name(db)
+	urls = support_return_urls(db)
+	amount = 0.0
+	try:
+		amount = float(data.get("amount") or 0)
+	except (TypeError, ValueError):
+		amount = 0.0
+	if amount <= 0 and session_id > 0:
+		session = db.query(SupportPaymentSession).filter(SupportPaymentSession.id == int(session_id)).first()
+		if session is not None:
+			try:
+				amount = float(session.amount or 0)
+			except (TypeError, ValueError):
+				amount = 0.0
+
 	if data.get("success"):
 		return render_payment_success(
 			request,
 			transaction_id=int(session_id),
-			amount=0,
+			amount=amount,
 			external_ref=str(data.get("external_ref") or ""),
 			source=detected,
-			dashboard_url="/user/profile/support/billing",
+			dashboard_url=urls["dashboard_url"],
+			app_name=app_name,
 		)
 	return render_payment_failed(
 		request,
@@ -103,9 +105,10 @@ def _handle_callback(
 		external_ref=str(data.get("external_ref") or "") or None,
 		error_message="پرداخت اشتراک پشتیبانی ناموفق بود",
 		source=detected,
-		retry_url="/user/profile/support/billing",
-		dashboard_url="/user/profile/support/billing",
-		support_url="/user/profile/support",
+		retry_url=urls["retry_url"],
+		dashboard_url=urls["dashboard_url"],
+		support_url=urls["support_url"],
+		app_name=app_name,
 	)
 
 

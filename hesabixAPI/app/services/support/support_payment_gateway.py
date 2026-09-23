@@ -236,6 +236,7 @@ def verify_support_gateway_payment(
 			"external_ref": session.external_ref,
 			"already_paid": True,
 			"ref_id": None,
+			"amount": float(session.amount or 0),
 		}
 
 	gateway = _get_gateway(db, session.gateway_id)
@@ -270,6 +271,7 @@ def verify_support_gateway_payment(
 		"external_ref": external_ref,
 		"already_paid": False,
 		"ref_id": ref_id,
+		"amount": float(session.amount or 0),
 	}
 
 

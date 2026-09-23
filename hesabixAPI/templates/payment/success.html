@@ -33,7 +33,7 @@
 </div>
 
 {% if source == 'app' %}
-    <a href="hesabix://payment/callback?tx_id={{ transaction_id }}&status=success&amount={{ amount }}&ref={{ external_ref }}" class="btn btn-primary" style="font-size: 18px; padding: 18px 40px;">
+    <a href="{{ deep_link_scheme | default('hesabix') }}://payment/callback?tx_id={{ transaction_id }}&status=success&amount={{ amount }}&ref={{ external_ref }}" class="btn btn-primary" style="font-size: 18px; padding: 18px 40px;">
         🎉 بازگشت به اپلیکیشن
     </a>
     <div style="margin-top: 16px;">
@@ -42,7 +42,7 @@
 {% else %}
     <a href="{{ dashboard_url }}" class="btn btn-primary">بازگشت به داشبورد</a>
     {% if source == 'mobile_web' %}
-    <a href="hesabix://payment/callback?tx_id={{ transaction_id }}&status=success&amount={{ amount }}&ref={{ external_ref }}" class="btn btn-secondary">باز کردن در اپ</a>
+    <a href="{{ deep_link_scheme | default('hesabix') }}://payment/callback?tx_id={{ transaction_id }}&status=success&amount={{ amount }}&ref={{ external_ref }}" class="btn btn-secondary">باز کردن در اپ</a>
     {% endif %}
 {% endif %}
 {% endblock %}

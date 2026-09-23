@@ -217,17 +217,19 @@ def _verify_zarinpal(db: Session, params: Dict[str, Any]) -> Dict[str, Any]:
 	fee_amount = None
 	ref_id = None
 	success = False
-	if tx_id > 0 and is_ok:
-		# Load tx and gateway to verify via v4 endpoint
+	tx = None
+	if tx_id > 0:
 		tx = db.query(WalletTransaction).filter(WalletTransaction.id == int(tx_id)).first()
+	if tx_id > 0 and is_ok and tx:
+		# Load gateway to verify via v4 endpoint
 		gateway_id = None
 		try:
-			extra = json.loads(tx.extra_info or "{}") if tx and tx.extra_info else {}
+			extra = json.loads(tx.extra_info or "{}") if tx.extra_info else {}
 			gateway_id = extra.get("gateway_id")
 		except Exception:
 			gateway_id = None
 		gw = db.query(PaymentGateway).filter(PaymentGateway.id == int(gateway_id)).first() if gateway_id else None
-		if tx and gw:
+		if gw:
 			cfg = _load_config(gw)
 			merchant_id = str(cfg.get("merchant_id") or "").strip()
 			if merchant_id:
@@ -265,7 +267,15 @@ def _verify_zarinpal(db: Session, params: Dict[str, Any]) -> Dict[str, Any]:
 			tx.fee_amount = Decimal(str(fee_amount))
 			db.flush()
 		confirm_top_up(db, tx_id, success=(success or is_ok), external_ref=authority or None, user_id=user_id)
-	return {"transaction_id": tx_id, "success": (success or is_ok), "external_ref": authority, "fee_amount": fee_amount, "ref_id": ref_id}
+	amount_out = float(tx.amount or 0) if tx else 0.0
+	return {
+		"transaction_id": tx_id,
+		"success": (success or is_ok),
+		"external_ref": authority,
+		"fee_amount": fee_amount,
+		"ref_id": ref_id,
+		"amount": amount_out,
+	}
 
 
 # --------------------------
@@ -390,6 +400,12 @@ def _verify_parsian(db: Session, params: Dict[str, Any]) -> Dict[str, Any]:
 		elif paid_at_bank and gw is None and is_test_token(token):
 			success = True
 		confirm_top_up(db, tx_id, success=success, external_ref=(str(ref_id) if ref_id else token) or None, user_id=user_id)
+	amount_out = 0.0
+	if tx is not None:
+		amount_out = float(tx.amount or 0)
+	cb_amount = parse_amount(params.get("Amount"))
+	if cb_amount > 0:
+		amount_out = float(cb_amount)
 	return {
 		"transaction_id": tx_id,
 		"success": success,
@@ -397,6 +413,7 @@ def _verify_parsian(db: Session, params: Dict[str, Any]) -> Dict[str, Any]:
 		"fee_amount": fee_amount,
 		"ref_id": ref_id,
 		"card_num": card_num,
+		"amount": amount_out,
 	}
 
 
@@ -663,12 +680,17 @@ def _verify_bitpay(db: Session, params: Dict[str, Any]) -> Dict[str, Any]:
 			pass
 		# به‌روزرسانی fee_amount در صورت وجود (BitPay معمولاً fee را برنمی‌گرداند)
 		confirm_top_up(db, tx_id, success=success, external_ref=id_get, user_id=user_id)
+	if amount is None and tx is not None:
+		try:
+			amount = float(tx.amount or 0)
+		except (TypeError, ValueError):
+			amount = 0.0
 	return {
 		"transaction_id": tx_id,
 		"success": success,
 		"external_ref": id_get,
 		"fee_amount": fee_amount,
-		"amount": amount,
+		"amount": amount if amount is not None else 0.0,
 		"card_num": card_num,
 		"factor_id": factor_id,
 	}

@@ -2,13 +2,16 @@
 ماژول برای مدیریت پاسخ‌های صفحات پرداخت
 شامل تشخیص هوشمند منبع (اپ/موبایل/دسکتاپ) و render کردن template های HTML
 """
-from typing import Dict, Any, Optional
+from __future__ import annotations
+
+from typing import Any, Dict, Optional
 from fastapi import Request
 from fastapi.responses import HTMLResponse
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 import os
 from datetime import datetime
-import re
+
+from sqlalchemy.orm import Session
 
 
 # تنظیم Jinja2 environment
@@ -77,6 +80,95 @@ def detect_is_mobile(user_agent: str) -> bool:
     return any(keyword in user_agent.lower() for keyword in mobile_keywords)
 
 
+def resolve_frontend_base_url(db: Session) -> str:
+    """
+    دامنهٔ اپ وب برای لینک‌های بازگشت از درگاه.
+    اولویت: تنظیمات لینک‌های اشتراک (DB) → share_link_public_app_url → app_public_url
+    """
+    from app.core.settings import get_settings
+    from app.services.system_settings_service import resolve_public_app_base_url_for_public_links
+
+    base = (resolve_public_app_base_url_for_public_links(db) or "").strip().rstrip("/")
+    if base:
+        return base
+    settings = get_settings()
+    for candidate in (settings.app_public_url, settings.share_link_public_app_url):
+        fallback = (candidate or "").strip().rstrip("/")
+        if fallback.lower().endswith("/public"):
+            fallback = fallback[: -len("/public")].rstrip("/")
+        if fallback:
+            return fallback
+    return ""
+
+
+def join_frontend_url(base: str, path: str) -> str:
+    """اتصال امن base + path (path همیشه با / شروع می‌شود)."""
+    base = (base or "").strip().rstrip("/")
+    path = path if (path or "").startswith("/") else f"/{path or ''}"
+    if not base:
+        return path
+    return f"{base}{path}"
+
+
+def resolve_payment_display_name(db: Session) -> str:
+    """نام نمایشی برند برای صفحات HTML پرداخت (از تنظیمات سیستم)."""
+    from app.services.system_settings_service import get_app_name
+
+    name = (get_app_name(db) or "").strip()
+    if name.lower().endswith(" api"):
+        name = name[:-4].strip()
+    if not name or name.lower() == "hesabix":
+        return "حسابیکس"
+    return name
+
+
+def wallet_return_urls(db: Session, business_id: Optional[int] = None) -> Dict[str, str]:
+    """URLهای وب برای دکمه‌های صفحه نتیجه شارژ کیف پول."""
+    base = resolve_frontend_base_url(db)
+    if business_id:
+        wallet_path = f"/business/{int(business_id)}/wallet"
+        dashboard = join_frontend_url(base, wallet_path)
+        retry = dashboard
+    else:
+        dashboard = join_frontend_url(base, "/user/profile/dashboard")
+        retry = join_frontend_url(base, "/user/profile/dashboard")
+    support = join_frontend_url(base, "/user/profile/support")
+    return {
+        "dashboard_url": dashboard,
+        "retry_url": retry,
+        "support_url": support,
+    }
+
+
+def support_return_urls(db: Session) -> Dict[str, str]:
+    """URLهای وب برای دکمه‌های صفحه نتیجه پرداخت پشتیبانی."""
+    base = resolve_frontend_base_url(db)
+    billing = join_frontend_url(base, "/user/profile/support/billing")
+    support = join_frontend_url(base, "/user/profile/support")
+    return {
+        "dashboard_url": billing,
+        "retry_url": billing,
+        "support_url": support,
+    }
+
+
+def _payment_template_context(
+    *,
+    source: str,
+    app_name: Optional[str],
+    deep_link_scheme: str,
+    extra: Dict[str, Any],
+) -> Dict[str, Any]:
+    ctx = {
+        "timestamp": datetime.now().strftime("%Y/%m/%d - %H:%M"),
+        "source": source,
+        "app_name": app_name or "حسابیکس",
+        "deep_link_scheme": deep_link_scheme or "hesabix",
+    }
+    ctx.update(extra)
+    return ctx
+
+
 def render_payment_success(
     request: Request,
     transaction_id: int,
@@ -85,6 +177,8 @@ def render_payment_success(
     card_num: Optional[str] = None,
     source: Optional[str] = None,
     dashboard_url: str = "/",
+    app_name: Optional[str] = None,
+    deep_link_scheme: str = "hesabix",
 ) -> HTMLResponse:
     """
     رندر صفحه موفقیت پرداخت
@@ -97,6 +191,8 @@ def render_payment_success(
         card_num: شماره کارت (اختیاری)
         source: منبع درخواست (app/mobile_web/desktop)
         dashboard_url: URL داشبورد
+        app_name: نام برند برای نمایش در صفحه
+        deep_link_scheme: اسکیمای deep link اپ (پیش‌فرض hesabix)
     """
     if source is None:
         source = detect_source(request)
@@ -105,17 +201,21 @@ def render_payment_success(
     
     # تنظیم URL داشبورد بر اساس منبع
     if source == 'app':
-        dashboard_url = f"hesabix://dashboard"
+        scheme = deep_link_scheme or "hesabix"
+        dashboard_url = f"{scheme}://dashboard"
     
-    context = {
-        'transaction_id': transaction_id,
-        'amount': amount,
-        'external_ref': external_ref,
-        'card_num': card_num,
-        'timestamp': datetime.now().strftime('%Y/%m/%d - %H:%M'),
-        'source': source,
-        'dashboard_url': dashboard_url,
-    }
+    context = _payment_template_context(
+        source=source,
+        app_name=app_name,
+        deep_link_scheme=deep_link_scheme,
+        extra={
+            'transaction_id': transaction_id,
+            'amount': amount,
+            'external_ref': external_ref,
+            'card_num': card_num,
+            'dashboard_url': dashboard_url,
+        },
+    )
     
     html_content = template.render(**context)
     return HTMLResponse(content=html_content, status_code=200)
@@ -131,6 +231,8 @@ def render_payment_failed(
     retry_url: str = "/",
     dashboard_url: str = "/",
     support_url: str = "/support",
+    app_name: Optional[str] = None,
+    deep_link_scheme: str = "hesabix",
 ) -> HTMLResponse:
     """
     رندر صفحه شکست پرداخت
@@ -145,6 +247,8 @@ def render_payment_failed(
         retry_url: URL برای تلاش مجدد
         dashboard_url: URL داشبورد
         support_url: URL پشتیبانی
+        app_name: نام برند برای نمایش در صفحه
+        deep_link_scheme: اسکیمای deep link اپ
     """
     if source is None:
         source = detect_source(request)
@@ -153,21 +257,25 @@ def render_payment_failed(
     
     # تنظیم URL‌ها بر اساس منبع
     if source == 'app':
-        dashboard_url = f"hesabix://dashboard"
-        retry_url = f"hesabix://wallet/topup"
-        support_url = f"hesabix://support"
+        scheme = deep_link_scheme or "hesabix"
+        dashboard_url = f"{scheme}://dashboard"
+        retry_url = f"{scheme}://wallet/topup"
+        support_url = f"{scheme}://support"
     
-    context = {
-        'transaction_id': transaction_id,
-        'external_ref': external_ref,
-        'error_message': error_message or 'خطایی در پردازش تراکنش رخ داده است.',
-        'error_code': error_code,
-        'timestamp': datetime.now().strftime('%Y/%m/%d - %H:%M'),
-        'source': source,
-        'retry_url': retry_url,
-        'dashboard_url': dashboard_url,
-        'support_url': support_url,
-    }
+    context = _payment_template_context(
+        source=source,
+        app_name=app_name,
+        deep_link_scheme=deep_link_scheme,
+        extra={
+            'transaction_id': transaction_id,
+            'external_ref': external_ref,
+            'error_message': error_message or 'خطایی در پردازش تراکنش رخ داده است.',
+            'error_code': error_code,
+            'retry_url': retry_url,
+            'dashboard_url': dashboard_url,
+            'support_url': support_url,
+        },
+    )
     
     html_content = template.render(**context)
     return HTMLResponse(content=html_content, status_code=200)
@@ -195,5 +303,3 @@ def should_return_json(request: Request) -> bool:
     
     # پیش‌فرض: HTML برای تجربه بهتر کاربری
     return False
-
-
