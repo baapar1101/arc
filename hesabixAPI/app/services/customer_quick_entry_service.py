@@ -112,8 +112,12 @@ def person_matches_quick_customer_entry(
             person.mobile_3,
             person.phone,
         )
-        if any(numbers_match(mobile, stored, min_len=10) for stored in stored_numbers):
-            return True
+        # When a mobile is supplied it is the customer identity. A matching
+        # name with another mobile must remain eligible for a new record.
+        return any(
+            numbers_match(mobile, stored, min_len=10)
+            for stored in stored_numbers
+        )
 
     normalized_alias = normalize_customer_alias(alias_name)
     if normalized_alias:
@@ -143,14 +147,12 @@ def find_quick_customer_matches(
 ) -> list[Person]:
     candidates = list(persons)
 
-    # موبایل شناسه قوی‌تری از نام است. اگر پیدا شود، شباهت نام نباید اشخاص
-    # دیگری را وارد نتیجه کند و جلوی انتخاب خودکار مشتری موجود را بگیرد.
+    # با وجود موبایل، نام هیچ‌وقت معیار تطبیق نیست. این کار اجازه می‌دهد
+    # دو مشتری هم‌نام با موبایل‌های متفاوت بدون هشدار ثبت شوند.
     if mobile:
-        mobile_matches = [
+        return [
             person for person in candidates if _person_matches_mobile(person, mobile)
-        ]
-        if mobile_matches:
-            return mobile_matches[:limit]
+        ][:limit]
 
     normalized_alias = normalize_customer_alias(alias_name)
     if not normalized_alias:
@@ -206,7 +208,9 @@ def load_quick_customer_candidates(
             for column in phone_columns:
                 filters.append(and_(column.isnot(None), column.ilike(like)))
 
-    if alias_name:
+    # If a mobile is present, only load phone candidates. Mixing common-name
+    # candidates into this bounded query could hide the actual mobile match.
+    if alias_name and not mobile:
         variants = alias_search_variants(alias_name)
         name_columns = (
             Person.alias_name,

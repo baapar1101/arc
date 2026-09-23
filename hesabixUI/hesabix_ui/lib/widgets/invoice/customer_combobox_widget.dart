@@ -965,6 +965,7 @@ class _CustomerComboboxWidgetState extends State<CustomerComboboxWidget> {
             child: TextField(
               controller: _searchController,
               focusNode: _fieldFocus,
+              selectAllOnFocus: true,
               decoration: widget.dense
                   ? InvoiceFormFieldMetrics.mergeDecoration(
                       context,
@@ -1088,12 +1089,15 @@ class _CustomerComboboxWidgetState extends State<CustomerComboboxWidget> {
               },
               onChanged: (query) {
                 if (_suppressFieldNotifications) return;
-                final trimmed = query.trim();
-                if (trimmed.isEmpty && widget.selectedCustomer != null) {
-                  widget.onCustomerChanged(null);
-                } else if (widget.selectedCustomer != null &&
-                    trimmed != (widget.selectedCustomer?.name ?? '').trim()) {
-                  widget.onCustomerChanged(null);
+                // In quick entry, text is a local draft and the invoice customer
+                // changes only after an explicit selection or successful create.
+                // Other uses keep their existing clear-on-edit behavior.
+                if (!widget.enableQuickCreateOnSubmit) {
+                  final trimmed = query.trim();
+                  if (widget.selectedCustomer != null &&
+                      trimmed != (widget.selectedCustomer?.name ?? '').trim()) {
+                    widget.onCustomerChanged(null);
+                  }
                 }
                 _onSearchChanged(query);
                 _showDesktopOverlay();
@@ -1200,6 +1204,7 @@ class _CustomerPickerBottomSheetState
                 child: TextField(
                   controller: widget.searchController,
                   focusNode: _searchFocus,
+                  selectAllOnFocus: true,
                   decoration: InputDecoration(
                     hintText: 'جست‌وجو در طرف حساب‌ها...',
                     prefixIcon: const Icon(Icons.search),
