@@ -109,6 +109,33 @@ def test_mobile_match_takes_priority_over_similar_names():
     assert [person.id for person in matches] == [1]
 
 
+def test_different_mobile_does_not_match_an_identical_name():
+    persons = [
+        _person(1, "موسوی", mobile="09207201219"),
+        _person(2, "موسوی فروشگاه", mobile="09351234567"),
+    ]
+    matches = find_quick_customer_matches(
+        persons,
+        alias_name="موسوی",
+        mobile="09171006219",
+    )
+    assert matches == []
+
+
+def test_same_mobile_returns_all_duplicates_regardless_of_name():
+    persons = [
+        _person(1, "موسوی", mobile="09171006219"),
+        _person(2, "مشتری دیگر", mobile="+989171006219"),
+        _person(3, "موسوی", mobile="09207201219"),
+    ]
+    matches = find_quick_customer_matches(
+        persons,
+        alias_name="موسوی",
+        mobile="09171006219",
+    )
+    assert [person.id for person in matches] == [1, 2]
+
+
 def test_exact_name_takes_priority_over_partial_names():
     persons = [
         _person(1, "علی رضایی فروشگاه"),

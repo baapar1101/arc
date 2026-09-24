@@ -173,6 +173,17 @@ class _CustomerComboboxWidgetState extends State<CustomerComboboxWidget> {
   void _onDesktopFocusChanged() {
     if (!mounted || _isMobile) return;
     if (_fieldFocus.hasFocus) {
+      // TextField's web tap handling can collapse the selection after focus.
+      // Apply the selection at the end of the frame so the first keystroke
+      // reliably replaces the current customer name.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || !_fieldFocus.hasFocus) return;
+        final textLength = _searchController.text.length;
+        _searchController.selection = TextSelection(
+          baseOffset: 0,
+          extentOffset: textLength,
+        );
+      });
       _showDesktopOverlay();
       if (_searchController.text.trim().isEmpty) {
         _loadRecentCustomers();
@@ -181,7 +192,10 @@ class _CustomerComboboxWidgetState extends State<CustomerComboboxWidget> {
       Future.delayed(const Duration(milliseconds: 180), () {
         if (!mounted || _fieldFocus.hasFocus) return;
         _removeDesktopOverlay();
-        if (_isEditingQuery) {
+        // Enter may unfocus the field while quick-resolve is still awaiting the
+        // API. Restoring the previous customer here would make the successful
+        // response look stale even though the new person was already created.
+        if (_isEditingQuery && !_isQuickResolving) {
           _isEditingQuery = false;
           _setFieldQuiet(widget.selectedCustomer?.name ?? '');
         }
@@ -606,6 +620,9 @@ class _CustomerComboboxWidgetState extends State<CustomerComboboxWidget> {
     if (_isQuickResolving) return;
     _debounceTimer?.cancel();
     final query = _searchController.text.trim();
+    final quickEntry = widget.enableQuickCreateOnSubmit
+        ? parseCustomerQuickEntry(query)
+        : null;
     var action = resolveCustomerSearchSubmitAction(
       input: query,
       loadedQuery: _loadedQuery,
@@ -614,6 +631,7 @@ class _CustomerComboboxWidgetState extends State<CustomerComboboxWidget> {
       navigatedByKeyboard: _navigatedByKeyboard,
       isLoading: _isLoading,
       quickCreateEnabled: widget.enableQuickCreateOnSubmit,
+      inputHasMobile: quickEntry?.mobile != null,
     );
 
     if (action == CustomerSearchSubmitAction.search) {
@@ -635,6 +653,7 @@ class _CustomerComboboxWidgetState extends State<CustomerComboboxWidget> {
         navigatedByKeyboard: _navigatedByKeyboard,
         isLoading: _isLoading,
         quickCreateEnabled: widget.enableQuickCreateOnSubmit,
+        inputHasMobile: quickEntry?.mobile != null,
       );
     }
 
@@ -661,6 +680,9 @@ class _CustomerComboboxWidgetState extends State<CustomerComboboxWidget> {
       return;
     }
 
+    // Typing or selecting another value increments this generation and safely
+    // invalidates the response. Focus loss and display restoration do not.
+    final requestGeneration = ++_searchGeneration;
     setState(() => _isQuickResolving = true);
     _desktopOverlayEntry?.markNeedsBuild();
     try {
@@ -669,7 +691,7 @@ class _CustomerComboboxWidgetState extends State<CustomerComboboxWidget> {
         aliasName: entry.aliasName,
         mobile: entry.mobile,
       );
-      if (!mounted || _searchController.text.trim() != query) return;
+      if (!mounted || requestGeneration != _searchGeneration) return;
 
       final customers = result['customers'] as List<Customer>;
       final created = result['created'] == true;
@@ -965,6 +987,7 @@ class _CustomerComboboxWidgetState extends State<CustomerComboboxWidget> {
             child: TextField(
               controller: _searchController,
               focusNode: _fieldFocus,
+              selectAllOnFocus: true,
               decoration: widget.dense
                   ? InvoiceFormFieldMetrics.mergeDecoration(
                       context,
@@ -1088,16 +1111,22 @@ class _CustomerComboboxWidgetState extends State<CustomerComboboxWidget> {
               },
               onChanged: (query) {
                 if (_suppressFieldNotifications) return;
-                final trimmed = query.trim();
-                if (trimmed.isEmpty && widget.selectedCustomer != null) {
-                  widget.onCustomerChanged(null);
-                } else if (widget.selectedCustomer != null &&
-                    trimmed != (widget.selectedCustomer?.name ?? '').trim()) {
-                  widget.onCustomerChanged(null);
+                // In quick entry, text is a local draft and the invoice customer
+                // changes only after an explicit selection or successful create.
+                // Other uses keep their existing clear-on-edit behavior.
+                if (!widget.enableQuickCreateOnSubmit) {
+                  final trimmed = query.trim();
+                  if (widget.selectedCustomer != null &&
+                      trimmed != (widget.selectedCustomer?.name ?? '').trim()) {
+                    widget.onCustomerChanged(null);
+                  }
                 }
                 _onSearchChanged(query);
                 _showDesktopOverlay();
               },
+              // Keep focus while the asynchronous quick-resolve request is in
+              // flight. Selection itself decides when the field should unfocus.
+              onEditingComplete: () {},
               onSubmitted: (_) => unawaited(_submitField()),
             ),
           );
@@ -1200,6 +1229,7 @@ class _CustomerPickerBottomSheetState
                 child: TextField(
                   controller: widget.searchController,
                   focusNode: _searchFocus,
+                  selectAllOnFocus: true,
                   decoration: InputDecoration(
                     hintText: 'جست‌وجو در طرف حساب‌ها...',
                     prefixIcon: const Icon(Icons.search),

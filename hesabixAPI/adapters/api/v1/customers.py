@@ -82,8 +82,8 @@ def _customer_response(person: Person) -> CustomerResponse:
     "/quick-resolve",
     summary="یافتن یا ایجاد سریع مشتری",
     description=(
-        "مشتری موجود را با موبایل یا نام مشابه برمی‌گرداند و تنها در صورت "
-        "نبود نتیجه، مشتری جدید ایجاد می‌کند"
+        "مشتری موجود را با موبایل یا نام برمی‌گرداند و تنها در صورت "
+        "نبود نتیجه، مشتری جدید ایجاد می‌کند. هنگام ارسال موبایل، فقط موبایل معیار تطبیق است"
     ),
     response_model=CustomerQuickResolveResponse,
 )

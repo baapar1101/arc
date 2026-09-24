@@ -122,5 +122,37 @@ void main() {
         CustomerSearchSubmitAction.search,
       );
     });
+
+    test('resolves a mobile directly even while generic search is stale', () {
+      expect(
+        resolveCustomerSearchSubmitAction(
+          input: '09171006219 موسوی',
+          loadedQuery: 'موسوی',
+          suggestionCount: 1,
+          hasMoreSuggestions: false,
+          navigatedByKeyboard: false,
+          isLoading: true,
+          quickCreateEnabled: true,
+          inputHasMobile: true,
+        ),
+        CustomerSearchSubmitAction.quickCreate,
+      );
+    });
+
+    test('keeps explicit keyboard selection for a mobile entry', () {
+      expect(
+        resolveCustomerSearchSubmitAction(
+          input: '09171006219',
+          loadedQuery: '09171006219',
+          suggestionCount: 2,
+          hasMoreSuggestions: false,
+          navigatedByKeyboard: true,
+          isLoading: false,
+          quickCreateEnabled: true,
+          inputHasMobile: true,
+        ),
+        CustomerSearchSubmitAction.selectSuggestion,
+      );
+    });
   });
 }
