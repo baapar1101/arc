@@ -37,7 +37,7 @@ Friend NotInheritable Class MigrationModuleInfo
             New ModuleOption(MigrationModule.ReceiptsPayments, "دریافت/پرداخت مستقل", "SANAD Type≈20", True, 130),
             New ModuleOption(MigrationModule.Checks, "چک‌ها", "Check", True, 140),
             New ModuleOption(MigrationModule.ExpenseIncome, "هزینه و درآمد", "SANAD هزینه/درآمد", True, 150),
-            New ModuleOption(MigrationModule.ManualJournals, "اسناد دستی/عمومی", "SANAD Type 13/14/…", True, 160)
+            New ModuleOption(MigrationModule.ManualJournals, "اسناد دستی/عمومی", "SANAD بدون فاکتور/چک/هزینه", True, 160)
         }
     End Function
 
@@ -133,6 +133,8 @@ Friend Class PreflightReport
     Public Property CurrencyMode As CurrencyModeInfo
     Public Property FiscalYears As New List(Of DetectedFiscalYear)
     Public Property FullHistorySelected As Boolean
+    Public Property SarfaslAuditRows As New List(Of SarfaslAuditService.SarfaslDecisionRow)
+    Public Property RequiresSarfaslLock As Boolean
 End Class
 
 Friend Class TransferProgressEventArgs

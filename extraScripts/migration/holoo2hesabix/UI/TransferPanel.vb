@@ -179,6 +179,16 @@ Friend Class TransferPanel
 
         Dim hasDocs = modules.Any(Function(m) MigrationModuleInfo.IsDocumentModule(m))
         Dim skipOb = hasDocs
+        If hasDocs AndAlso Not _session.SarfaslProfileLocked Then
+            MessageBox.Show(Me, "برای انتقال اسناد باید در مرحله بازبینی، پروفایل نگاشت سرفصل را قفل کنید.", "شروع ممکن نیست",
+                            MessageBoxButtons.OK, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button1, AppTheme.MsgRtl)
+            Return
+        End If
+        If hasDocs AndAlso _session.SarfaslProfile IsNot Nothing AndAlso _session.SarfaslProfile.CriticalUnmappedCount > 0 Then
+            MessageBox.Show(Me, "سرفصل بحرانی بدون نگاشت باقی است؛ انتقال اسناد متوقف است.", "شروع ممکن نیست",
+                            MessageBoxButtons.OK, MessageBoxIcon.Warning, MessageBoxDefaultButton.Button1, AppTheme.MsgRtl)
+            Return
+        End If
 
         _running = True
         _btnStart.Enabled = False

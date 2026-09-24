@@ -91,6 +91,11 @@
     <Compile Include="Services\HolooDiscoveryService.vb" />
     <Compile Include="Services\HolooDocumentReader.vb" />
     <Compile Include="Services\HolooSarfaslMapper.vb" />
+    <Compile Include="Services\SarfaslCatalog.vb" />
+    <Compile Include="Services\SarfaslAuditService.vb" />
+    <Compile Include="Services\SarfaslProfile.vb" />
+    <Compile Include="Services\BalanceProofService.vb" />
+    <Compile Include="Services\E2eOpeningRunner.vb" />
     <Compile Include="Services\HolooSqlService.vb" />
     <Compile Include="Services\MigrationSession.vb" />
     <Compile Include="Services\PreflightService.vb" />

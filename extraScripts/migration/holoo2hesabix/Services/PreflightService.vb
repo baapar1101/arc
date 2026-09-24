@@ -140,7 +140,75 @@ Friend Class PreflightService
                     .Detail = "برای انتقال اسناد باید حداقل یک سال مالی از تاریخ‌ها استخراج شود."
                 })
             End If
+
+            Dim overlapManualInvoice As Long = Await Task.Run(Function() _reader.CountSql(session.SqlSettings,
+                "SELECT COUNT(*) FROM SANAD s WHERE ISNULL(s.[Delete],0)=0 AND ISNULL(s.SaveFromFacture,0)=0 " &
+                "AND ISNULL(s.Sanad_Type,0) NOT IN (5,20) " &
+                "AND EXISTS (SELECT 1 FROM FACTURE f WHERE f.Sanad_Code=s.Sanad_Code AND ISNULL(f.[Delete],0)=0) " &
+                "AND NOT EXISTS (SELECT 1 FROM SND_LIST x WHERE x.Sanad_Code=s.Sanad_Code AND x.Col_Code IN ('601','702'));"), ct).ConfigureAwait(True)
+            Dim manualCount As Long = Await Task.Run(Function() _reader.CountModule(session.SqlSettings, MigrationModule.ManualJournals), ct).ConfigureAwait(True)
+            report.ModuleCounts(MigrationModule.ManualJournals.ToString()) = manualCount
+            report.Issues.Add(New PreflightIssue With {
+                .Severity = "info",
+                .Title = "اسناد دستی (پس از پارتیشن)",
+                .Detail = "کاندید دستی بدون فاکتور/چک/هزینه: " & manualCount.ToString("N0") &
+                          " — اسناد متصل به فاکتور که از دستی حذف شدند: " & overlapManualInvoice.ToString("N0") &
+                          " (GL آن‌ها فقط از ماژول فاکتور ساخته می‌شود)."
+            })
+
+            Dim auditRows = Await Task.Run(Function() New SarfaslAuditService().Audit(session.SqlSettings), ct).ConfigureAwait(True)
+            report.SarfaslAuditRows = auditRows
+            report.RequiresSarfaslLock = True
+            Dim unmapped = auditRows.Where(Function(x) x.Decision = "Unmapped").ToList()
+            Dim bizAcc = auditRows.Where(Function(x) x.Decision = "BusinessExpense" OrElse x.Decision = "BusinessLoan" OrElse x.Decision = "BusinessIncome").ToList()
+            report.Issues.Add(New PreflightIssue With {
+                .Severity = If(unmapped.Count = 0, "info", "warning"),
+                .Title = "پوشش نگاشت جدول حساب‌ها",
+                .Detail = SarfaslAuditService.FormatReport(auditRows)
+            })
+
+            Dim store As New SarfaslProfileStore(session.SelectedBusiness.Id, session.SelectedDatabase)
+            Dim previous = store.Load()
+            Dim profile = SarfaslProfileStore.FromAudit(session.SelectedBusiness.Id, session.SelectedDatabase, auditRows, previous)
+            ' قفل قبلی فقط اگر همان مجموعه سرفصل بدون Unmapped بحرانی باشد حفظ می‌شود
+            If previous IsNot Nothing AndAlso previous.Locked AndAlso profile.CriticalUnmappedCount = 0 Then
+                profile.Locked = True
+                profile.LockedAt = previous.LockedAt
+            End If
+            session.SarfaslProfile = profile
+            session.SarfaslProfileLocked = profile.Locked
+            store.Save(profile)
+
+            If profile.CriticalUnmappedCount > 0 Then
+                report.CanProceed = False
+                report.Issues.Add(New PreflightIssue With {
+                    .Severity = "error",
+                    .Title = "سرفصل بحرانی بدون نگاشت",
+                    .Detail = profile.CriticalUnmappedCount.ToString() & " ترکیب در Colهای ترازنامه‌ای/هزینه بدون مقصد — انتقال تا رفع نگاشت متوقف است."
+                })
+            ElseIf unmapped.Count > 0 Then
+                report.Issues.Add(New PreflightIssue With {
+                    .Severity = "warning",
+                    .Title = "سرفصل بدون نگاشت",
+                    .Detail = unmapped.Count.ToString() & " ترکیب Col/Moien بدون مقصد — خطوط مربوط Fail می‌شوند."
+                })
+            End If
+            If bizAcc.Count > 0 Then
+                report.Issues.Add(New PreflightIssue With {
+                    .Severity = "info",
+                    .Title = "حساب اختصاصی کسب‌وکار",
+                    .Detail = bizAcc.Count.ToString() & " سرفصل (هزینه بدون معادل / وام زیر ۴۰۱) هنگام انتقال به‌صورت حساب اختصاصی زیر گروه استاندارد ساخته می‌شوند."
+                })
+            End If
+            If Not profile.Locked Then
+                report.Issues.Add(New PreflightIssue With {
+                    .Severity = "warning",
+                    .Title = "قفل پروفایل نگاشت",
+                    .Detail = "برای شروع انتقال اسناد، جدول نگاشت را بازبینی و گزینه «قفل پروفایل نگاشت» را تأیید کنید. مسیر: " & store.FilePath
+                })
+            End If
         Else
+            report.RequiresSarfaslLock = False
             report.Issues.Add(New PreflightIssue With {
                 .Severity = "info",
                 .Title = "محدوده انتخاب‌شده",

@@ -492,7 +492,7 @@ Friend Class HesabixApiClient
     Public Async Function CreateCheckAsync(businessId As Integer, payload As JObject, Optional ct As CancellationToken = Nothing) As Task(Of Integer)
         Dim root = Await SendJsonAsync(
             HttpMethod.Post,
-            "api/v1/businesses/" & businessId.ToString() & "/checks/create",
+            "api/v1/checks/businesses/" & businessId.ToString() & "/checks/create",
             payload,
             includeAuth:=True,
             ct:=ct
@@ -516,7 +516,19 @@ Friend Class HesabixApiClient
         If documentDate.HasValue Then body("document_date") = ApiDateFormat.ToIsoDate(documentDate.Value)
         Await SendJsonAsync(
             HttpMethod.Post,
-            "api/v1/checks/" & checkId.ToString() & "/actions/clear",
+            "api/v1/checks/checks/" & checkId.ToString() & "/actions/clear",
+            body,
+            includeAuth:=True,
+            ct:=ct
+        ).ConfigureAwait(False)
+    End Function
+
+    Public Async Function DepositCheckAsync(checkId As Integer, bankAccountId As Integer, Optional documentDate As Date? = Nothing, Optional ct As CancellationToken = Nothing) As Task
+        Dim body As New JObject From {{"bank_account_id", bankAccountId}}
+        If documentDate.HasValue Then body("document_date") = ApiDateFormat.ToIsoDate(documentDate.Value)
+        Await SendJsonAsync(
+            HttpMethod.Post,
+            "api/v1/checks/checks/" & checkId.ToString() & "/actions/deposit",
             body,
             includeAuth:=True,
             ct:=ct
@@ -533,7 +545,7 @@ Friend Class HesabixApiClient
         If documentDate.HasValue Then body("document_date") = ApiDateFormat.ToIsoDate(documentDate.Value)
         Await SendJsonAsync(
             HttpMethod.Post,
-            "api/v1/checks/" & checkId.ToString() & "/actions/return",
+            "api/v1/checks/checks/" & checkId.ToString() & "/actions/return",
             body,
             includeAuth:=True,
             ct:=ct
@@ -553,6 +565,18 @@ Friend Class HesabixApiClient
             End If
         Next
         Return map
+    End Function
+
+    ''' <summary>ایجاد حساب اختصاصی کسب‌وکار. parent_id باید والد غیربرگ باشد.</summary>
+    Public Async Function CreateBusinessAccountAsync(businessId As Integer, payload As JObject, Optional ct As CancellationToken = Nothing) As Task(Of Integer)
+        Dim root = Await SendJsonAsync(
+            HttpMethod.Post,
+            "api/v1/accounts/business/" & businessId.ToString() & "/create",
+            payload,
+            includeAuth:=True,
+            ct:=ct
+        ).ConfigureAwait(False)
+        Return GetInt(GetDataToken(root), "id")
     End Function
 
     Public Async Function UpsertOpeningBalanceAsync(businessId As Integer, payload As JObject, Optional ct As CancellationToken = Nothing) As Task(Of JObject)

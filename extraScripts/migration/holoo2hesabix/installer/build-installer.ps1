@@ -83,7 +83,7 @@ if (-not $SkipProjectCreate -or -not (Test-Path $AipPath)) {
     Write-Host "Configuring product..."
     Invoke-AiEdit /SetProperty, "ProductName=Holoo2Hesabix"
     Invoke-AiEdit /SetProperty, "Manufacturer=Hesabix"
-    Invoke-AiEdit /SetVersion, "1.0.0"
+    Invoke-AiEdit /SetVersion, "1.1.0"
     Invoke-AiEdit /SetIcon, "-icon", $IconPath
     Invoke-AiEdit /SetAppdir, "-buildname", "DefaultBuild", "-path", "[ProgramFilesFolder][Manufacturer]\[ProductName]"
     Invoke-AiEdit /SetShortcutdir, "-buildname", "DefaultBuild", "-path", "[ProgramMenuFolder][ProductName]"
@@ -107,6 +107,7 @@ if (-not $SkipProjectCreate -or -not (Test-Path $AipPath)) {
 }
 else {
     Write-Host "Refreshing file sources from Release build..."
+    Invoke-AiEdit /SetVersion, "1.1.0"
     Invoke-AiEdit /UpdateFile, "APPDIR\Holoo2Hesabix.exe", (Join-Path $ReleaseDir "Holoo2Hesabix.exe")
     Invoke-AiEdit /UpdateFile, "APPDIR\Holoo2Hesabix.exe.config", (Join-Path $ReleaseDir "Holoo2Hesabix.exe.config")
     Invoke-AiEdit /UpdateFile, "APPDIR\Newtonsoft.Json.dll", (Join-Path $ReleaseDir "Newtonsoft.Json.dll")

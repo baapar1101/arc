@@ -167,6 +167,8 @@ Friend Class HolooManualJournal
     Public Property SanadType As Integer
     Public Property Comment As String
     Public Property Lines As New List(Of HolooManualJournalLine)
+    ''' <summary>اگر پر باشد، سند در مبدأ قابل انتقال نیست و باید Failed شود (نه silent skip).</summary>
+    Public Property SkipReason As String
 
     Public ReadOnly Property Key As String
         Get
@@ -517,6 +519,8 @@ Friend Class HolooDocumentReader
                 "WHERE ISNULL(s.[Delete],0)=0 AND ISNULL(s.SaveFromFacture,0)=0 " &
                 "AND s.Sanad_Date>=@s AND s.Sanad_Date<@e " &
                 "AND EXISTS (SELECT 1 FROM SND_LIST x WHERE x.Sanad_Code=s.Sanad_Code AND x.Col_Code=@col) " &
+                "AND NOT EXISTS (SELECT 1 FROM FACTURE f WHERE f.Sanad_Code=s.Sanad_Code AND ISNULL(f.[Delete],0)=0) " &
+                "AND NOT EXISTS (SELECT 1 FROM [Check] c WHERE c.Sanad_Code=s.Sanad_Code OR c.Sanad_Code2=s.Sanad_Code) " &
                 "ORDER BY s.Sanad_Date, s.Sanad_Code;"
             Dim headers As New List(Of Tuple(Of Integer, Date, String))
             Using cmd As New SqlCommand(sql, conn)
@@ -577,7 +581,7 @@ Friend Class HolooDocumentReader
                 If doc.ItemLines.Count = 0 OrElse doc.CounterpartyLines.Count = 0 Then Continue For
                 Dim itemSum = doc.ItemLines.Sum(Function(x) x.Amount)
                 Dim cpSum = doc.CounterpartyLines.Sum(Function(x) x.Amount)
-                If Math.Abs(itemSum - cpSum) > 1.0 Then Continue For ' نامتوازن — رد اصولی
+                If Math.Abs(itemSum - cpSum) > 1.0 Then Continue For ' نامتوازن برای API هزینه — به fallback دستی می‌رود
                 list.Add(doc)
             Next
         End Using
@@ -585,8 +589,101 @@ Friend Class HolooDocumentReader
     End Function
 
     ''' <summary>
-    ''' اسناد دستی/عمومی باقی‌مانده (غیر فاکتور، غیر Type5/20، غیر لینک چک).
-    ''' Type0 در Holoo1 همگی به چک وصل‌اند و اینجا حذف می‌شوند تا GL دوبل نشود.
+    ''' اسناد دارای 601/702 که ساختار ساده هزینه/درآمد متوازن ندارند (مثلاً ترکیبی Type20)
+    ''' ولی خود سند تراز است — به‌صورت MANUAL با برچسب EXPENSE_INCOME_FALLBACK تا از پارتیشن خارج نشوند.
+    ''' رسید Type20 خالص (بدون 601/702) اینجا نیست؛ هزینه متوازن هم نیست.
+    ''' </summary>
+    Public Function ReadExpenseLikeFallbackManualsInRange(
+        settings As SqlConnectionSettings,
+        startDate As Date,
+        endDateInclusive As Date
+    ) As List(Of HolooManualJournal)
+        Dim list As New List(Of HolooManualJournal)
+        Dim openingCode = FindOpeningSanadCode(settings)
+        Dim structuredKeys As New HashSet(Of Integer)()
+        For Each d In ReadExpenseIncomeSanadsInRange(settings, startDate, endDateInclusive, False)
+            structuredKeys.Add(d.SanadCode)
+        Next
+        For Each d In ReadExpenseIncomeSanadsInRange(settings, startDate, endDateInclusive, True)
+            structuredKeys.Add(d.SanadCode)
+        Next
+
+        Using conn = Open(settings)
+            Dim sql =
+                "SELECT s.Sanad_Code, s.Sanad_Date, ISNULL(s.Sanad_Type,0), ISNULL(s.Comment,'') " &
+                "FROM SANAD s WHERE ISNULL(s.[Delete],0)=0 AND ISNULL(s.SaveFromFacture,0)=0 " &
+                "AND s.Sanad_Code<>@open AND s.Sanad_Date>=@s AND s.Sanad_Date<@e " &
+                "AND ISNULL(s.Sanad_Type,0)<>5 " &
+                "AND EXISTS (SELECT 1 FROM SND_LIST x WHERE x.Sanad_Code=s.Sanad_Code AND x.Col_Code IN ('601','702')) " &
+                "AND NOT EXISTS (SELECT 1 FROM FACTURE f WHERE f.Sanad_Code=s.Sanad_Code AND ISNULL(f.[Delete],0)=0) " &
+                "AND NOT EXISTS (SELECT 1 FROM [Check] c WHERE c.Sanad_Code=s.Sanad_Code OR c.Sanad_Code2=s.Sanad_Code) " &
+                "ORDER BY s.Sanad_Date, s.Sanad_Code;"
+            Dim headers As New List(Of Tuple(Of Integer, Date, Integer, String))
+            Using cmd As New SqlCommand(sql, conn)
+                cmd.CommandTimeout = 180
+                cmd.Parameters.AddWithValue("@open", openingCode)
+                cmd.Parameters.AddWithValue("@s", startDate)
+                cmd.Parameters.AddWithValue("@e", endDateInclusive.AddDays(1))
+                Using r = cmd.ExecuteReader()
+                    While r.Read()
+                        headers.Add(Tuple.Create(SafeInt(r, 0), Convert.ToDateTime(r.GetValue(1)).Date, SafeInt(r, 2), SafeStr(r, 3)))
+                    End While
+                End Using
+            End Using
+
+            For Each h In headers
+                If structuredKeys.Contains(h.Item1) Then Continue For
+                Dim doc As New HolooManualJournal With {
+                    .SanadCode = h.Item1,
+                    .SanadDate = h.Item2,
+                    .SanadType = h.Item3,
+                    .Comment = If(String.IsNullOrWhiteSpace(h.Item4), "", h.Item4) & " [EI-FALLBACK]"
+                }
+                Dim bedSum As Double = 0
+                Dim besSum As Double = 0
+                Using cmd As New SqlCommand(
+                    "SELECT l.Col_Code, ISNULL(l.Moien_Code,''), ISNULL(l.Tafzili_Code,''), ISNULL(s.Sarfasl_Name,''), ISNULL(l.Bed,0), ISNULL(l.Bes,0) " &
+                    "FROM SND_LIST l LEFT JOIN SARFASL s ON s.Col_Code=l.Col_Code AND ISNULL(s.Moien_Code,'')=ISNULL(l.Moien_Code,'') " &
+                    " AND ISNULL(s.Tafzili_Code,'')=ISNULL(l.Tafzili_Code,'') WHERE l.Sanad_Code=@c ORDER BY l.[Index];", conn)
+                    cmd.Parameters.AddWithValue("@c", h.Item1)
+                    Using r = cmd.ExecuteReader()
+                        While r.Read()
+                            Dim d = SafeDbl(r, 4)
+                            Dim c = SafeDbl(r, 5)
+                            If d <= 0 AndAlso c <= 0 Then Continue While
+                            bedSum += d
+                            besSum += c
+                            doc.Lines.Add(New HolooManualJournalLine With {
+                                .ColCode = SafeStr(r, 0),
+                                .MoienCode = SafeStr(r, 1),
+                                .TafziliCode = SafeStr(r, 2),
+                                .SarfaslName = SafeStr(r, 3),
+                                .Debit = d,
+                                .Credit = c
+                            })
+                        End While
+                    End Using
+                End Using
+                If doc.Lines.Count < 2 Then
+                    doc.SkipReason = "کمتر از دو خط مؤثر در مبدأ (EI-fallback)"
+                    list.Add(doc)
+                    Continue For
+                End If
+                If Math.Abs(bedSum - besSum) > 1.0 Then
+                    doc.SkipReason = "نامتوازن در مبدأ (EI-fallback)"
+                    list.Add(doc)
+                    Continue For
+                End If
+                list.Add(doc)
+            Next
+        End Using
+        Return list
+    End Function
+
+    ''' <summary>
+    ''' اسناد دستی/عمومی باقی‌مانده (غیر فاکتور، غیر Type5/20، غیر لینک چک، غیر هزینه/درآمد).
+    ''' هر سندی که ردیف FACTURE فعال دارد از این ماژول خارج است تا GL فاکتور دوبل نشود
+    ''' (حتی اگر SaveFromFacture=0 باشد؛ نمونه Holoo1: صدها Type13/14 متصل به F/K).
     ''' </summary>
     Public Function ReadManualJournalsInRange(
         settings As SqlConnectionSettings,
@@ -601,6 +698,7 @@ Friend Class HolooDocumentReader
                 "FROM SANAD s WHERE ISNULL(s.[Delete],0)=0 AND ISNULL(s.SaveFromFacture,0)=0 " &
                 "AND s.Sanad_Code<>@open AND s.Sanad_Date>=@s AND s.Sanad_Date<@e " &
                 "AND ISNULL(s.Sanad_Type,0) NOT IN (5,20) " &
+                "AND NOT EXISTS (SELECT 1 FROM FACTURE f WHERE f.Sanad_Code=s.Sanad_Code AND ISNULL(f.[Delete],0)=0) " &
                 "AND NOT EXISTS (SELECT 1 FROM [Check] c WHERE c.Sanad_Code=s.Sanad_Code OR c.Sanad_Code2=s.Sanad_Code) " &
                 "AND NOT EXISTS (SELECT 1 FROM SND_LIST x WHERE x.Sanad_Code=s.Sanad_Code AND x.Col_Code IN ('601','702')) " &
                 "ORDER BY s.Sanad_Date, s.Sanad_Code;"
@@ -649,11 +747,25 @@ Friend Class HolooDocumentReader
                         End While
                     End Using
                 End Using
-                If doc.Lines.Count < 2 Then Continue For
-                If Math.Abs(bedSum - besSum) > 1.0 Then Continue For
+                If doc.Lines.Count < 2 Then
+                    doc.SkipReason = "کمتر از دو خط مؤثر در مبدأ"
+                    list.Add(doc)
+                    Continue For
+                End If
+                If Math.Abs(bedSum - besSum) > 1.0 Then
+                    doc.SkipReason = "نامتوازن در مبدأ (|Bed-Bes|>1)"
+                    list.Add(doc)
+                    Continue For
+                End If
                 list.Add(doc)
             Next
         End Using
+
+        ' پارتیشن: Type20 ترکیبی 601/702 که API هزینه نمی‌پذیرد → دستی (بدون دوبل با EI متوازن)
+        For Each fb In ReadExpenseLikeFallbackManualsInRange(settings, startDate, endDateInclusive)
+            If list.Any(Function(x) x.SanadCode = fb.SanadCode) Then Continue For
+            list.Add(fb)
+        Next
         Return list
     End Function
 

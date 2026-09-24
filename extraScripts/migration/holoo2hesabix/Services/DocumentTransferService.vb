@@ -9,14 +9,26 @@ Imports Newtonsoft.Json.Linq
 ''' </summary>
 Friend Class DocumentTransferService
     Private ReadOnly _docs As New HolooDocumentReader()
-    ' هر درخواست = ۱ فاکتور؛ سرعت از موازی‌سازی می‌آید (bulk روی سرور هم سریال است)
+    ' تک‌فاکتور با موازی‌سازی ملایم — بیش از ۳ کارگر روی این API باعث timeout دسته‌جمعی می‌شود
     Private Const InvoiceChunk As Integer = 1
-    Private Const InvoiceParallelism As Integer = 8
+    Private Const InvoiceParallelism As Integer = 3
+    Private Const InvoiceRequestTimeoutSeconds As Integer = 90
     Private Const WarehouseChunk As Integer = 100
     Private Const ReceiptChunk As Integer = 50
     Private Const ExpenseChunk As Integer = 40
 
+    ''' <summary>اگر >0 باشد، از هر ماژول اسناد فقط همین تعداد نمونه منتقل می‌شود (تست سریع).</summary>
+    Public Property SampleLimit As Integer = 0
+
     Public Event ProgressChanged As EventHandler(Of TransferProgressEventArgs)
+
+    Private Function ApplySample(Of T)(rows As List(Of T), moduleTitle As String) As List(Of T)
+        If rows Is Nothing Then Return New List(Of T)()
+        If SampleLimit <= 0 OrElse rows.Count <= SampleLimit Then Return rows
+        RaiseProgress(moduleTitle, 0, rows.Count,
+                      "حالت نمونه: " & SampleLimit.ToString() & " از " & rows.Count.ToString() & " سند")
+        Return rows.Take(SampleLimit).ToList()
+    End Function
 
     Public Async Function RunAsync(
         session As MigrationSession,
@@ -60,19 +72,31 @@ Friend Class DocumentTransferService
         Dim warehouseMap = cp.EnsureModule(MigrationModule.Warehouses.ToString())
         Dim invoiceMap = cp.EnsureModule(MigrationModule.Invoices.ToString())
 
-        Dim defaultCashId = cashMap.Done.Values.FirstOrDefault()
-        Dim defaultBankId = bankMap.Done.Values.FirstOrDefault()
-        Dim defaultPettyId = pettyMap.Done.Values.FirstOrDefault()
-
         RaiseProgress("نگاشت سرفصل", 0, 0, "ساخت نگاشت بانک/صندوق/هزینه از SARFASL...")
         Dim mapper As New HolooSarfaslMapper()
         Await Task.Run(Sub() mapper.Build(session.SqlSettings, bankMap, cashMap, pettyMap, personMap), ct).ConfigureAwait(False)
 
+        Dim defaultCashId = If(cashMap.Done.Count = 1, cashMap.Done.Values.First(), 0)
+        Dim defaultBankId = If(bankMap.Done.Count = 1, bankMap.Done.Values.First(), 0)
+        Dim defaultPettyId = If(pettyMap.Done.Count = 1, pettyMap.Done.Values.First(), 0)
+        ' فقط وقتی دقیقاً یک برگ منتقل شده؛ DefaultLeaf* به‌عنوان dump ممنوع است
+
+        Try
+            Dim proof = Await Task.Run(Function() New BalanceProofService().BuildHolooProof(session.SqlSettings, businessId), ct).ConfigureAwait(False)
+            Dim proofPath = New BalanceProofService().SaveReport(proof, businessId, session.SelectedDatabase)
+            RaiseProgress("اثبات تراز", 0, 0, "گزارش پارتیشن هلو ذخیره شد: " & proofPath)
+        Catch ex As Exception
+            RaiseProgress("اثبات تراز", 0, 0, "هشدار گزارش اثبات: " & ex.Message, True)
+        End Try
+
         Dim accountCodeMap As Dictionary(Of String, Integer) = Nothing
+        Dim catalog As SarfaslCatalog = Nothing
+        Dim profile = session.SarfaslProfile
         If mods.Contains(MigrationModule.ExpenseIncome) OrElse
            mods.Contains(MigrationModule.FiscalYearsAndOpening) OrElse
            mods.Contains(MigrationModule.ManualJournals) Then
             accountCodeMap = Await api.ListAccountCodeMapAsync(businessId, ct).ConfigureAwait(False)
+            catalog = New SarfaslCatalog(api, businessId, accountCodeMap)
         End If
 
         Dim moneyToCurrency As Dictionary(Of Integer, Integer) = Nothing
@@ -97,7 +121,7 @@ Friend Class DocumentTransferService
                 Await TransferOpeningBalance(
                     session, api, businessId, currencyId, fy,
                     personMap, bankMap, cashMap, pettyMap, warehouseMap, productMap,
-                    mapper, accountCodeMap,
+                    mapper, accountCodeMap, catalog, profile,
                     cp, store, ct).ConfigureAwait(False)
             End If
 
@@ -125,7 +149,7 @@ Friend Class DocumentTransferService
                         ToList()
                 End If
                 If whIds.Count > 0 Then
-                    Await PostWarehouseForInvoices(api, businessId, whIds, ct).ConfigureAwait(False)
+                    Await PostWarehouseForInvoices(api, businessId, whIds, cp, store, ct).ConfigureAwait(False)
                 End If
             End If
 
@@ -147,7 +171,7 @@ Friend Class DocumentTransferService
             If mods.Contains(MigrationModule.ExpenseIncome) Then
                 Await TransferExpenseIncomeForYear(
                     session, api, businessId, currencyId, fy,
-                    personMap, mapper, accountCodeMap,
+                    personMap, mapper, accountCodeMap, catalog, profile,
                     defaultCashId, defaultBankId, defaultPettyId,
                     cp, store, ct).ConfigureAwait(False)
             End If
@@ -155,7 +179,7 @@ Friend Class DocumentTransferService
             If mods.Contains(MigrationModule.ManualJournals) Then
                 Await TransferManualJournalsForYear(
                     session, api, businessId, currencyId, fy,
-                    personMap, mapper, accountCodeMap,
+                    personMap, mapper, accountCodeMap, catalog, profile,
                     defaultCashId, defaultBankId, defaultPettyId,
                     cp, store, ct).ConfigureAwait(False)
             End If
@@ -164,7 +188,7 @@ Friend Class DocumentTransferService
             RaiseProgress(fy.Title, 1, 1, "پایان پردازش سال")
         Next
 
-        If mods.Contains(MigrationModule.Invoices) AndAlso invoiceMap.Failed.Count = 0 Then
+        If mods.Contains(MigrationModule.Invoices) AndAlso SampleLimit <= 0 AndAlso invoiceMap.Failed.Count = 0 Then
             invoiceMap.Completed = True
             store.Save(cp)
         End If
@@ -318,6 +342,8 @@ Friend Class DocumentTransferService
         productMap As ModuleCheckpoint,
         mapper As HolooSarfaslMapper,
         accountCodeMap As Dictionary(Of String, Integer),
+        catalog As SarfaslCatalog,
+        profile As SarfaslProfile,
         cp As TransferCheckpoint,
         store As CheckpointStore,
         ct As CancellationToken
@@ -349,17 +375,36 @@ Friend Class DocumentTransferService
 
         Dim merged As New Dictionary(Of String, ObMergeBucket)(StringComparer.Ordinal)
         Dim skipped = 0
+        Dim blockReasons As New List(Of String)
 
         For Each ln In lines
             If ln.Debit <= 0 AndAlso ln.Credit <= 0 Then Continue For
             Dim col = If(ln.ColCode, "").Trim()
             If col = "005" OrElse col = "006" Then Continue For
 
-            If col = "103" OrElse col = "401" Then
+            If col = "401" AndAlso mapper.IsLoan401(ln.MoienCode) Then
+                Dim loanAcctId As Integer = 0
+                If catalog IsNot Nothing Then
+                    loanAcctId = Await catalog.EnsureLoanBusinessAccountAsync(ln.MoienCode, ln.SarfaslName, ct).ConfigureAwait(False)
+                End If
+                If loanAcctId <= 0 Then
+                    skipped += 1
+                    blockReasons.Add("وام بدون حساب: " & ln.SarfaslName)
+                    Continue For
+                End If
+                Dim bLoan = GetOrAddBucket(merged, "A:LOAN:" & ln.MoienCode)
+                bLoan.AccountId = loanAcctId
+                bLoan.AccountCode = HolooSarfaslMapper.SuggestBusinessLoanCode(ln.MoienCode)
+                bLoan.Debit += ln.Debit
+                bLoan.Credit += ln.Credit
+                bLoan.Description = If(String.IsNullOrWhiteSpace(bLoan.Description), If(ln.SarfaslName, ln.Comment), bLoan.Description)
+
+            ElseIf col = "103" OrElse col = "401" Then
                 Dim personId = mapper.ResolvePersonOnCol(col, ln.MoienCode)
                 If personId <= 0 Then personId = ResolvePersonByMoien(personMap, ln.MoienCode)
                 If personId <= 0 Then
                     skipped += 1
+                    blockReasons.Add("شخص یافت نشد: " & col & "|" & ln.MoienCode & " " & ln.SarfaslName)
                     Continue For
                 End If
                 Dim b = GetOrAddBucket(merged, "P:" & personId.ToString())
@@ -371,9 +416,9 @@ Friend Class DocumentTransferService
 
             ElseIf col = "102" Then
                 Dim bankId = mapper.ResolveBank(col, ln.MoienCode, ln.TafziliCode, Nothing, ln.SarfaslName)
-                If bankId <= 0 Then bankId = bankMap.Done.Values.FirstOrDefault()
                 If bankAccId <= 0 OrElse bankId <= 0 Then
                     skipped += 1
+                    blockReasons.Add("بانک نگاشت نشد: " & ln.SarfaslName)
                     Continue For
                 End If
                 Dim b = GetOrAddBucket(merged, "B:" & bankId.ToString())
@@ -386,13 +431,10 @@ Friend Class DocumentTransferService
             ElseIf col = "101" Then
                 Dim isPetty As Boolean
                 Dim cashOrPettyId = mapper.ResolveCashOrPetty(col, ln.MoienCode, ln.TafziliCode, isPetty)
-                If cashOrPettyId <= 0 Then
-                    isPetty = (If(ln.MoienCode, "").Trim() = "0002") OrElse (If(ln.SarfaslName, "").Contains("تنخواه"))
-                    cashOrPettyId = If(isPetty, pettyMap.Done.Values.FirstOrDefault(), cashMap.Done.Values.FirstOrDefault())
-                End If
                 Dim acct = If(isPetty, pettyAccId, cashAccId)
                 If acct <= 0 OrElse cashOrPettyId <= 0 Then
                     skipped += 1
+                    blockReasons.Add("صندوق/تنخواه نگاشت نشد: " & ln.SarfaslName)
                     Continue For
                 End If
                 Dim b = GetOrAddBucket(merged, If(isPetty, "T:", "C:") & cashOrPettyId.ToString())
@@ -403,9 +445,9 @@ Friend Class DocumentTransferService
                 b.Description = If(String.IsNullOrWhiteSpace(b.Description), If(ln.SarfaslName, ln.Comment), b.Description)
 
             ElseIf col = "402" Then
-                ' اسناد پرداختنی — بدون check_id در افتتاحیه؛ یک سطر تجمیعی
                 If notesPayId <= 0 Then
                     skipped += 1
+                    blockReasons.Add("اسناد پرداختنی (402) — حساب 20202 یافت نشد")
                     Continue For
                 End If
                 Dim b = GetOrAddBucket(merged, "A:20202")
@@ -416,9 +458,10 @@ Friend Class DocumentTransferService
                 b.Description = If(String.IsNullOrWhiteSpace(b.Description), If(ln.SarfaslName, "اسناد پرداختنی"), b.Description)
 
             Else
-                Dim code = HolooSarfaslMapper.MapColToFixedCode(col, ln.MoienCode, ln.SarfaslName)
+                Dim code = ResolveMappedAccountCode(profile, col, ln.MoienCode, ln.SarfaslName)
                 If String.IsNullOrWhiteSpace(code) Then
                     skipped += 1
+                    blockReasons.Add("سرفصل بدون نگاشت: " & col & "|" & ln.MoienCode & " " & ln.SarfaslName)
                     Continue For
                 End If
                 Dim acctId As Integer = 0
@@ -427,14 +470,8 @@ Friend Class DocumentTransferService
                 End If
                 If acctId <= 0 Then
                     skipped += 1
+                    blockReasons.Add("کد حسابیکس یافت نشد: " & code)
                     Continue For
-                End If
-                ' Col104 ضمانت بانکی: تلاش برای تفصیل بانک
-                If col = "104" Then
-                    Dim bankId = mapper.ResolveBank("102", "", "", Nothing, ln.SarfaslName)
-                    If bankId > 0 AndAlso code = "10302" Then
-                        ' سپرده/ضمانت بدون تفصیل بانک در مدل افتتاحیه — فقط حساب
-                    End If
                 End If
                 Dim b = GetOrAddBucket(merged, "A:" & code)
                 b.AccountId = acctId
@@ -444,6 +481,15 @@ Friend Class DocumentTransferService
                 b.Description = If(String.IsNullOrWhiteSpace(b.Description), If(ln.SarfaslName, ln.Comment), b.Description)
             End If
         Next
+
+        If blockReasons.Count > 0 Then
+            RaiseProgress("افتتاحیه", 0, 0,
+                          "نگاشت ناقص — افتتاحیه ثبت نمی‌شود (" & blockReasons.Count.ToString() & "): " &
+                          String.Join("؛ ", blockReasons.Take(8)), True)
+            modCp.Failed(obKey) = "خطوط نگاشت‌نشده: " & blockReasons.Count.ToString()
+            store.Save(cp)
+            Return
+        End If
 
         Dim accountLines As New JArray()
         For Each kv In merged
@@ -502,14 +548,16 @@ Friend Class DocumentTransferService
 
         ' مقدار کالا برای کاردکس؛ cost_price=0 تا GL موجودی از Col106 دوبل نشود
         Dim inventoryLines As New JArray()
-        Dim defaultWhId = warehouseMap.Done.Values.FirstOrDefault()
+        Dim defaultWhId = If(warehouseMap.Done.Count = 1, warehouseMap.Done.Values.First(), 0)
         Dim qtyRows = Await Task.Run(Function() _docs.ReadProductOpeningQuantities(session.SqlSettings), ct).ConfigureAwait(False)
         For Each q In qtyRows
             Dim productId As Integer = 0
             If Not productMap.Done.TryGetValue(q.Item1, productId) OrElse productId <= 0 Then Continue For
-            Dim whId = defaultWhId
+            Dim whId As Integer = 0
             If q.Item4.HasValue AndAlso warehouseMap.Done.ContainsKey(q.Item4.Value.ToString()) Then
                 whId = warehouseMap.Done(q.Item4.Value.ToString())
+            ElseIf defaultWhId > 0 Then
+                whId = defaultWhId
             End If
             If whId <= 0 Then Continue For
             inventoryLines.Add(New JObject From {
@@ -647,7 +695,20 @@ Friend Class DocumentTransferService
         Dim settleMap = Await Task.Run(
             Function() _docs.ReadSettlementHintsForSanads(session.SqlSettings, rows.Select(Function(r) r.SanadCode)),
             ct).ConfigureAwait(False)
-        Dim pending = rows.Where(Function(r) Not invoiceMap.Done.ContainsKey(r.Key)).ToList()
+        Dim pendingRaw = rows.Where(Function(r) Not invoiceMap.Done.ContainsKey(r.Key)).ToList()
+        Dim pending As List(Of HolooInvoiceHeader)
+        If SampleLimit > 0 AndAlso pendingRaw.Count > SampleLimit Then
+            ' از هر Fac_Type تا SampleLimit نمونه (مثلاً ۲ فروش + ۲ خرید)
+            pending = pendingRaw.
+                GroupBy(Function(r) If(r.FacType, "").Trim().ToUpperInvariant()).
+                SelectMany(Function(g) g.OrderBy(Function(x) x.FacDate).Take(SampleLimit)).
+                OrderBy(Function(x) x.FacDate).ThenBy(Function(x) x.FacCode).
+                ToList()
+            RaiseProgress("فاکتور " & fy.Title, 0, pendingRaw.Count,
+                          "حالت نمونه: " & pending.Count.ToString() & " فاکتور متنوع از " & pendingRaw.Count.ToString())
+        Else
+            pending = pendingRaw
+        End If
         RaiseProgress("فاکتور " & fy.Title, invoiceMap.Done.Count, rows.Count,
                       "آماده‌سازی " & pending.Count.ToString() & " فاکتور (از " & rows.Count.ToString() & ")...")
 
@@ -657,14 +718,15 @@ Friend Class DocumentTransferService
             ct.ThrowIfCancellationRequested()
             Dim hint As HolooInvoiceSettlementHint = Nothing
             If inv.SanadCode > 0 Then settleMap.TryGetValue(inv.SanadCode, hint)
+            Dim failReason As String = Nothing
             Dim payload = BuildInvoicePayload(
                 inv, currencyId, personMap, productMap, mapper, hint,
                 defaultCashId, defaultBankId, defaultPettyId,
-                moneyToCurrency, isMultiCurrency)
+                moneyToCurrency, isMultiCurrency, failReason)
             If payload Is Nothing Then
-                invoiceMap.Failed(inv.Key) = "نگاشت شخص/کالا ناقص یا نوع نامعتبر"
+                invoiceMap.Failed(inv.Key) = If(failReason, "نگاشت شخص/کالا/تسویه ناقص یا نوع نامعتبر")
                 processed += 1
-                RaiseProgress("فاکتور " & fy.Title, processed, rows.Count, "رد: " & inv.Key, True)
+                RaiseProgress("فاکتور " & fy.Title, processed, rows.Count, "رد: " & inv.Key & " — " & invoiceMap.Failed(inv.Key), True)
                 Continue For
             End If
             queue.Enqueue(New PreparedInvoiceItem With {
@@ -726,35 +788,38 @@ Friend Class DocumentTransferService
         state As InvoiceParallelState,
         ct As CancellationToken
     ) As Task
-        Dim item As PreparedInvoiceItem = Nothing
-        While queue.TryDequeue(item)
+        While True
             ct.ThrowIfCancellationRequested()
-            Dim items As New JArray From {
-                New JObject From {
-                    {"client_ref", item.Key},
-                    {"payload", item.Payload}
-                }
-            }
-            Dim keys As New List(Of String) From {item.Key}
+            Dim batch As New List(Of PreparedInvoiceItem)()
+            Dim one As PreparedInvoiceItem = Nothing
+            While batch.Count < InvoiceChunk AndAlso queue.TryDequeue(one)
+                batch.Add(one)
+            End While
+            If batch.Count = 0 Then Exit While
+
+            Dim items As New JArray()
+            Dim keys As New List(Of String)()
+            For Each it In batch
+                items.Add(New JObject From {
+                    {"client_ref", it.Key},
+                    {"payload", it.Payload}
+                })
+                keys.Add(it.Key)
+            Next
+
             Dim localProcessed As New IntHolder With {.Value = 0}
             Dim localCreated As New List(Of Integer)()
             Dim localMap As New ModuleCheckpoint()
 
+            ' heartbeat: suppressProgress hides per-batch noise, but long API waits must still surface
+            SyncLock state.Gate
+                RaiseProgress(state.ModuleTitle, state.Processed, state.TotalRows,
+                              "ارسال دسته " & batch.Count.ToString() & " فاکتور (صف ~" & queue.Count.ToString() & ")...")
+            End SyncLock
+
             Await SendInvoiceChunkWithRetry(
                 api, businessId, fy, items, keys, localMap, localCreated, localProcessed, state.TotalRows, store, cp, ct,
                 skipCheckpointSave:=True, suppressProgress:=True).ConfigureAwait(False)
-
-            Dim doneId As Integer = 0
-            Dim failMsg As String = Nothing
-            If localMap.Done.TryGetValue(item.Key, doneId) AndAlso doneId > 0 Then
-                ' ok
-            ElseIf localMap.Failed.TryGetValue(item.Key, failMsg) Then
-                ' keep failMsg
-            ElseIf localCreated.Count > 0 Then
-                doneId = localCreated(0)
-            Else
-                failMsg = "نتیجه نامشخص"
-            End If
 
             Dim showProgress As Boolean = False
             Dim progressCurrent As Integer = 0
@@ -762,28 +827,36 @@ Friend Class DocumentTransferService
             Dim progressIsError As Boolean = False
 
             SyncLock state.Gate
-                state.Processed += 1
-                progressCurrent = state.Processed
-                If doneId > 0 Then
-                    invoiceMap.Done(item.Key) = doneId
-                    invoiceMap.Failed.Remove(item.Key)
-                    state.CreatedIds.Add(doneId)
-                    state.SuccessSinceSave += 1
-                    If state.SuccessSinceSave >= 20 OrElse (state.Processed Mod 25 = 0) Then
-                        store.Save(cp)
+                For Each k In keys
+                    state.Processed += 1
+                    Dim doneId As Integer = 0
+                    Dim failMsg As String = Nothing
+                    If localMap.Done.TryGetValue(k, doneId) AndAlso doneId > 0 Then
+                        invoiceMap.Done(k) = doneId
+                        invoiceMap.Failed.Remove(k)
+                        state.CreatedIds.Add(doneId)
+                        state.SuccessSinceSave += 1
+                    ElseIf localMap.Failed.TryGetValue(k, failMsg) Then
+                        invoiceMap.Failed(k) = If(failMsg, "خطا")
+                        progressIsError = True
+                        progressMsg = "خطا: " & k & " — " & invoiceMap.Failed(k)
+                        state.SuccessSinceSave = 0
+                    Else
+                        ' timeout رها‌شده: Failed نکن تا resume بعدی دوباره صف کند
+                        state.Processed -= 1
                         state.SuccessSinceSave = 0
                     End If
-                    If state.Processed Mod 10 = 0 OrElse state.Processed >= state.TotalRows Then
-                        showProgress = True
+                Next
+                progressCurrent = state.Processed
+                If state.SuccessSinceSave >= 5 OrElse (state.Processed Mod 10 = 0) OrElse progressIsError Then
+                    store.Save(cp)
+                    If Not progressIsError Then state.SuccessSinceSave = 0
+                End If
+                If progressIsError OrElse state.Processed Mod 5 = 0 OrElse state.Processed >= state.TotalRows Then
+                    showProgress = True
+                    If Not progressIsError Then
                         progressMsg = "موازی: " & invoiceMap.Done.Count.ToString() & " موفق / صف ~" & queue.Count.ToString()
                     End If
-                Else
-                    invoiceMap.Failed(item.Key) = If(failMsg, "خطا")
-                    showProgress = True
-                    progressIsError = True
-                    progressMsg = "خطا: " & item.Key & " — " & invoiceMap.Failed(item.Key)
-                    store.Save(cp)
-                    state.SuccessSinceSave = 0
                 End If
             End SyncLock
 
@@ -795,24 +868,39 @@ Friend Class DocumentTransferService
 
     Private Shared Function IsTransientTimeout(ex As Exception) As Boolean
         If ex Is Nothing Then Return False
+        If TypeOf ex Is OperationCanceledException Then
+            ' CancelAfter per-request — transient. Parent cancel is checked by caller via ct.
+            Return True
+        End If
         If TypeOf ex Is TaskCanceledException Then Return True
         If TypeOf ex.InnerException Is TaskCanceledException Then Return True
+        If TypeOf ex.InnerException Is OperationCanceledException Then Return True
         If TypeOf ex Is TimeoutException Then Return True
         Dim apiEx = TryCast(ex, HesabixApiException)
         If apiEx IsNot Nothing Then
-            ' 504/502/503 معمولاً timeout گیت‌وی (nginx) است؛ سرور ممکن است هنوز در حال کار باشد
             If apiEx.StatusCode = 408 OrElse apiEx.StatusCode = 429 OrElse
+               apiEx.StatusCode = 500 OrElse
                apiEx.StatusCode = 502 OrElse apiEx.StatusCode = 503 OrElse apiEx.StatusCode = 504 Then
                 Return True
             End If
         End If
-        Dim msg = If(ex.Message, "")
+        Return IsTransientFailureMessage(If(ex.Message, ""))
+    End Function
+
+    Private Shared Function IsTransientFailureMessage(msg As String) As Boolean
+        If String.IsNullOrWhiteSpace(msg) Then Return False
         Return msg.IndexOf("canceled", StringComparison.OrdinalIgnoreCase) >= 0 OrElse
                msg.IndexOf("timeout", StringComparison.OrdinalIgnoreCase) >= 0 OrElse
                msg.IndexOf("زمان", StringComparison.OrdinalIgnoreCase) >= 0 OrElse
                msg.IndexOf("504", StringComparison.OrdinalIgnoreCase) >= 0 OrElse
                msg.IndexOf("502", StringComparison.OrdinalIgnoreCase) >= 0 OrElse
-               msg.IndexOf("503", StringComparison.OrdinalIgnoreCase) >= 0
+               msg.IndexOf("503", StringComparison.OrdinalIgnoreCase) >= 0 OrElse
+               msg.IndexOf("500", StringComparison.OrdinalIgnoreCase) >= 0 OrElse
+               msg.IndexOf("internal", StringComparison.OrdinalIgnoreCase) >= 0 OrElse
+               msg.IndexOf("خطای داخلی", StringComparison.OrdinalIgnoreCase) >= 0 OrElse
+               msg.IndexOf("خطا داخلي", StringComparison.OrdinalIgnoreCase) >= 0 OrElse
+               msg.IndexOf("temporarily", StringComparison.OrdinalIgnoreCase) >= 0 OrElse
+               msg.IndexOf("Unavailable", StringComparison.OrdinalIgnoreCase) >= 0
     End Function
 
     Private Async Function SendInvoiceChunkWithRetry(
@@ -833,35 +921,56 @@ Friend Class DocumentTransferService
     ) As Task
         If items Is Nothing OrElse items.Count = 0 Then Return
 
-        Dim attempt = 0
-        While attempt < 3
+            Dim attempt = 0
+            Const maxAttempts As Integer = 5
+            While attempt < maxAttempts
             attempt += 1
+            If ct.IsCancellationRequested Then Throw New OperationCanceledException(ct)
             Dim bulk As BulkUpsertResult = Nothing
             Dim sendErr As Exception = Nothing
             Try
-                bulk = Await api.BulkUpsertInvoicesAsync(businessId, items, ct).ConfigureAwait(False)
+                Using invCts = CancellationTokenSource.CreateLinkedTokenSource(ct)
+                    invCts.CancelAfter(TimeSpan.FromSeconds(InvoiceRequestTimeoutSeconds))
+                    bulk = Await api.BulkUpsertInvoicesAsync(businessId, items, invCts.Token).ConfigureAwait(False)
+                End Using
             Catch ex As Exception
+                If ct.IsCancellationRequested Then Throw
                 sendErr = ex
             End Try
 
             If sendErr Is Nothing AndAlso bulk IsNot Nothing Then
                 Dim byClientRef = IndexByClientRef(bulk)
+                Dim retryItems As New JArray()
+                Dim retryKeys As New List(Of String)()
                 For i = 0 To chunkKeys.Count - 1
                     Dim k = chunkKeys(i)
-                    processedHolder.Value += 1
                     Dim r = ResolveItem(byClientRef, bulk, i, k)
                     If r IsNot Nothing AndAlso r.IsSuccess AndAlso r.EntityId > 0 Then
+                        processedHolder.Value += 1
                         invoiceMap.Done(k) = r.EntityId
                         invoiceMap.Failed.Remove(k)
                         createdIds.Add(r.EntityId)
                     Else
                         Dim msg = If(r Is Nothing, "نتیجه برنگشت", If(r.Message, r.ErrorCode))
-                        invoiceMap.Failed(k) = If(msg, "خطا")
-                        If Not suppressProgress Then
+                        If IsTransientFailureMessage(If(msg, "")) AndAlso attempt < maxAttempts Then
+                            retryItems.Add(items(i))
+                            retryKeys.Add(k)
+                        Else
+                            processedHolder.Value += 1
+                            invoiceMap.Failed(k) = If(msg, "خطا")
                             RaiseProgress("فاکتور " & fy.Title, processedHolder.Value, totalRows, "خطا: " & k & " — " & invoiceMap.Failed(k), True)
                         End If
                     End If
                 Next
+                If retryItems.Count > 0 AndAlso attempt < maxAttempts Then
+                    Dim delayMs = 2000 * attempt
+                    RaiseProgress("فاکتور " & fy.Title, processedHolder.Value, totalRows,
+                                  "خطای موقت روی " & retryItems.Count.ToString() & " فاکتور — صبر " & (delayMs \ 1000).ToString() & "ث...", True)
+                    Await Task.Delay(delayMs, ct).ConfigureAwait(False)
+                    items = retryItems
+                    chunkKeys = retryKeys
+                    Continue While
+                End If
                 If Not suppressProgress Then
                     RaiseProgress("فاکتور " & fy.Title, processedHolder.Value, totalRows,
                                   "دسته: ایجاد " & bulk.Created.ToString() & " / شکست " & bulk.Failed.ToString())
@@ -872,10 +981,8 @@ Friend Class DocumentTransferService
 
             If IsTransientTimeout(sendErr) AndAlso items.Count > 1 Then
                 Dim half = Math.Max(1, items.Count \ 2)
-                If Not suppressProgress Then
-                    RaiseProgress("فاکتور " & fy.Title, processedHolder.Value, totalRows,
-                                  "timeout — شکستن دسته به " & half.ToString() & " + " & (items.Count - half).ToString() & "...", True)
-                End If
+                RaiseProgress("فاکتور " & fy.Title, processedHolder.Value, totalRows,
+                              "timeout — شکستن دسته به " & half.ToString() & " + " & (items.Count - half).ToString() & "...", True)
                 Dim a As New JArray()
                 Dim b As New JArray()
                 Dim ak As New List(Of String)
@@ -892,23 +999,26 @@ Friend Class DocumentTransferService
                 Return
             End If
 
-            If IsTransientTimeout(sendErr) AndAlso attempt < 3 Then
+            If IsTransientTimeout(sendErr) AndAlso attempt < maxAttempts Then
                 Dim delayMs = 3000 * attempt
-                If Not suppressProgress Then
-                    RaiseProgress("فاکتور " & fy.Title, processedHolder.Value, totalRows,
-                                  "timeout/504 — صبر " & (delayMs \ 1000).ToString() & "ث و تلاش " & (attempt + 1).ToString() & "...", True)
-                End If
+                RaiseProgress("فاکتور " & fy.Title, processedHolder.Value, totalRows,
+                              "timeout/504 — صبر " & (delayMs \ 1000).ToString() & "ث و تلاش " & (attempt + 1).ToString() & "...", True)
                 Await Task.Delay(delayMs, ct).ConfigureAwait(False)
                 Continue While
+            End If
+
+            ' timeout مکرر: Failed نکن تا resume بعدی دوباره صف کند
+            If IsTransientTimeout(sendErr) Then
+                RaiseProgress("فاکتور " & fy.Title, processedHolder.Value, totalRows,
+                              "timeout پایدار روی " & chunkKeys.Count.ToString() & " فاکتور — برای resume بعدی رها شد", True)
+                Return
             End If
 
             Dim errMsg = If(sendErr Is Nothing, "خطای ناشناخته", sendErr.Message)
             For Each k In chunkKeys
                 invoiceMap.Failed(k) = errMsg
                 processedHolder.Value += 1
-                If Not suppressProgress Then
-                    RaiseProgress("فاکتور " & fy.Title, processedHolder.Value, totalRows, "خطای bulk: " & k & " — " & errMsg, True)
-                End If
+                RaiseProgress("فاکتور " & fy.Title, processedHolder.Value, totalRows, "خطای bulk: " & k & " — " & errMsg, True)
             Next
             If Not skipCheckpointSave Then store.Save(cp)
             Return
@@ -930,15 +1040,21 @@ Friend Class DocumentTransferService
         defaultBankId As Integer,
         defaultPettyId As Integer,
         moneyToCurrency As Dictionary(Of Integer, Integer),
-        isMultiCurrency As Boolean
+        isMultiCurrency As Boolean,
+        ByRef failReason As String
     ) As JObject
+        failReason = Nothing
         Dim invType = HolooDocumentReader.MapFacTypeToInvoiceType(inv.FacType)
-        If String.IsNullOrWhiteSpace(invType) Then Return Nothing
+        If String.IsNullOrWhiteSpace(invType) Then
+            failReason = "نوع فاکتور نامعتبر: " & inv.FacType.ToString()
+            Return Nothing
+        End If
 
         Dim needsPerson = HolooDocumentReader.InvoiceRequiresPerson(inv.FacType)
         Dim personId As Integer = 0
         If needsPerson Then
             If Not personMap.Done.TryGetValue(inv.CustomerCode, personId) OrElse personId <= 0 Then
+                failReason = "شخص نگاشت نشد: " & inv.CustomerCode
                 Return Nothing
             End If
         End If
@@ -956,10 +1072,12 @@ Friend Class DocumentTransferService
         End If
 
         Dim lines As New JArray()
+        Dim missingProducts As New List(Of String)()
         For Each ln In inv.Lines
             If String.IsNullOrWhiteSpace(ln.ArticleCode) OrElse ln.Quantity = 0 Then Continue For
             Dim productId As Integer = 0
             If Not productMap.Done.TryGetValue(ln.ArticleCode, productId) OrElse productId <= 0 Then
+                missingProducts.Add(ln.ArticleCode)
                 Continue For
             End If
             Dim unitPrice = ln.UnitPrice
@@ -981,28 +1099,30 @@ Friend Class DocumentTransferService
                 {"extra_info", lineExtra}
             })
         Next
-        If lines.Count = 0 Then Return Nothing
+        If missingProducts.Count > 0 Then
+            failReason = "کالای نگاشت‌نشده: " & String.Join(",", missingProducts.Distinct().Take(5))
+            Return Nothing
+        End If
+        If lines.Count = 0 Then
+            failReason = "هیچ خط کالای معتبری ندارد"
+            Return Nothing
+        End If
 
-        Dim cashId = defaultCashId
-        Dim bankId = defaultBankId
+        Dim cashId = 0
+        Dim bankId = 0
+        Dim extraUnsettleNote As String = Nothing
         If settleHint IsNot Nothing Then
             If Not String.IsNullOrWhiteSpace(settleHint.CashMoien) Then
                 Dim isPetty As Boolean
                 Dim resolved = mapper.ResolveCashOrPetty("101", settleHint.CashMoien, settleHint.CashTafzili, isPetty)
-                If resolved > 0 Then
-                    If isPetty Then
-                        ' تسویه نقدی از تنخواه نادر است؛ اگر تنخواه بود از petty استفاده می‌کنیم
-                        cashId = resolved
-                    Else
-                        cashId = resolved
-                    End If
-                End If
+                If resolved > 0 Then cashId = resolved
             End If
             If Not String.IsNullOrWhiteSpace(settleHint.BankMoien) OrElse Not String.IsNullOrWhiteSpace(settleHint.BankName) Then
                 Dim resolvedBank = mapper.ResolveBank("102", settleHint.BankMoien, settleHint.BankTafzili, Nothing, settleHint.BankName)
                 If resolvedBank > 0 Then bankId = resolvedBank
             End If
         End If
+        ' بدون dump به sole-default: فقط resolve قطعی از hint/سرفصل
 
         Dim payments As New JArray()
         If inv.FNaghd > 0 AndAlso cashId > 0 Then
@@ -1014,7 +1134,7 @@ Friend Class DocumentTransferService
                 payments.Add(New JObject From {
                     {"amount", Math.Round(inv.FNaghd, 2)},
                     {"transaction_type", "petty_cash"},
-                    {"petty_cash_id", If(cashId > 0, cashId, defaultPettyId)},
+                    {"petty_cash_id", cashId},
                     {"transaction_date", ApiDateFormat.ToIsoDate(inv.FacDate)}
                 })
             Else
@@ -1025,6 +1145,9 @@ Friend Class DocumentTransferService
                     {"transaction_date", ApiDateFormat.ToIsoDate(inv.FacDate)}
                 })
             End If
+        ElseIf inv.FNaghd > 0 AndAlso cashId <= 0 Then
+            ' تسویه نقد نمی‌نشیند؛ مانده نسیه می‌ماند (کل فاکتور Fail نمی‌شود)
+            extraUnsettleNote = "نقد بدون نگاشت صندوق"
         End If
         Dim cardOrHaval = inv.Card + inv.FHaval
         If cardOrHaval > 0 AndAlso bankId > 0 Then
@@ -1034,6 +1157,12 @@ Friend Class DocumentTransferService
                 {"bank_id", bankId},
                 {"transaction_date", ApiDateFormat.ToIsoDate(inv.FacDate)}
             })
+        ElseIf cardOrHaval > 0 AndAlso bankId <= 0 Then
+            If String.IsNullOrWhiteSpace(extraUnsettleNote) Then
+                extraUnsettleNote = "کارت/حواله بدون نگاشت بانک"
+            Else
+                extraUnsettleNote &= "; کارت/حواله بدون نگاشت بانک"
+            End If
         End If
         ' FCheck: مانده به‌صورت نسیه (AR/AP) می‌ماند؛ ماژول چک با ایجاد چک، AR→اسناد دریافتنی را می‌بندد
 
@@ -1057,6 +1186,9 @@ Friend Class DocumentTransferService
             extra("holoo_fcheck") = Math.Round(inv.FCheck, 2)
             extra("holoo_check_settlement") = "via_checks_module"
         End If
+        If Not String.IsNullOrWhiteSpace(extraUnsettleNote) Then
+            extra("holoo_unsettle_note") = extraUnsettleNote
+        End If
 
         Dim payload As New JObject From {
             {"invoice_type", invType},
@@ -1074,20 +1206,55 @@ Friend Class DocumentTransferService
         api As HesabixApiClient,
         businessId As Integer,
         invoiceIds As List(Of Integer),
+        cp As TransferCheckpoint,
+        store As CheckpointStore,
         ct As CancellationToken
     ) As Task
+        Dim modCp = cp.EnsureModule(MigrationModule.WarehouseDocs.ToString())
         Dim offset = 0
         While offset < invoiceIds.Count
             ct.ThrowIfCancellationRequested()
             Dim take = Math.Min(WarehouseChunk, invoiceIds.Count - offset)
             Dim chunk = invoiceIds.GetRange(offset, take)
-            Try
-                Await api.BulkWarehouseOperationsAsync(businessId, chunk, "create_draft", ct).ConfigureAwait(False)
-                Await api.BulkWarehouseOperationsAsync(businessId, chunk, "post_drafts", ct).ConfigureAwait(False)
+            Dim chunkKey = "WH:" & String.Join(",", chunk)
+            If modCp.Done.ContainsKey(chunkKey) Then
+                offset += take
+                Continue While
+            End If
+            Dim attempt = 0
+            Dim ok As Boolean = False
+            Dim lastErr As String = Nothing
+            While attempt < 3 AndAlso Not ok
+                attempt += 1
+                Dim retryDelayMs As Integer = 0
+                Try
+                    Await api.BulkWarehouseOperationsAsync(businessId, chunk, "create_draft", ct).ConfigureAwait(False)
+                    Await api.BulkWarehouseOperationsAsync(businessId, chunk, "post_drafts", ct).ConfigureAwait(False)
+                    ok = True
+                Catch ex As Exception
+                    lastErr = If(ex.Message, "خطا")
+                    If (IsTransientTimeout(ex) OrElse IsTransientFailureMessage(lastErr)) AndAlso attempt < 3 Then
+                        retryDelayMs = 2000 * attempt
+                    End If
+                End Try
+                If Not ok AndAlso retryDelayMs > 0 Then
+                    Await Task.Delay(retryDelayMs, ct).ConfigureAwait(False)
+                ElseIf Not ok Then
+                    Exit While
+                End If
+            End While
+            If ok Then
+                modCp.Done(chunkKey) = chunk.Count
+                modCp.Failed.Remove(chunkKey)
+                For Each id In chunk
+                    modCp.Done("INVWH:" & id.ToString()) = id
+                Next
                 RaiseProgress("انبار", offset + take, invoiceIds.Count, "حواله draft/post برای " & take.ToString() & " فاکتور")
-            Catch ex As Exception
-                RaiseProgress("انبار", offset + take, invoiceIds.Count, "خطای انبار: " & ex.Message, True)
-            End Try
+            Else
+                modCp.Failed(chunkKey) = If(lastErr, "خطای انبار")
+                RaiseProgress("انبار", offset + take, invoiceIds.Count, "خطای انبار: " & If(lastErr, "?"), True)
+            End If
+            store.Save(cp)
             offset += take
         End While
     End Function
@@ -1109,7 +1276,7 @@ Friend Class DocumentTransferService
     ) As Task
         Dim modCp = cp.EnsureModule(MigrationModule.ReceiptsPayments.ToString())
         Dim rows = Await Task.Run(Function() _docs.ReadReceiptLikeSanadsInRange(session.SqlSettings, fy.StartDate, fy.EndDate), ct).ConfigureAwait(False)
-        Dim pending = rows.Where(Function(r) Not modCp.Done.ContainsKey(r.Key)).ToList()
+        Dim pending = ApplySample(rows.Where(Function(r) Not modCp.Done.ContainsKey(r.Key)).ToList(), "دریافت/پرداخت " & fy.Title)
         RaiseProgress("دریافت/پرداخت " & fy.Title, modCp.Done.Count, rows.Count, "ارسال " & pending.Count.ToString() & " سند...")
 
         Dim offset = 0
@@ -1145,35 +1312,70 @@ Friend Class DocumentTransferService
                 Continue While
             End If
 
-            Try
-                Dim bulk = Await api.BulkUpsertReceiptsPaymentsAsync(businessId, items, True, ct).ConfigureAwait(False)
-                Dim byClientRef = IndexByClientRef(bulk)
-                For i = 0 To keys.Count - 1
-                    Dim k = keys(i)
-                    processed += 1
-                    Dim r = ResolveItem(byClientRef, bulk, i, k)
-                    If r IsNot Nothing AndAlso r.IsSuccess AndAlso r.EntityId > 0 Then
-                        modCp.Done(k) = r.EntityId
-                        modCp.Failed.Remove(k)
+            Dim attempt = 0
+            Dim sent As Boolean = False
+            While attempt < 3 AndAlso Not sent
+                attempt += 1
+                Dim retryDelayMs As Integer = 0
+                Dim catchFail As Boolean = False
+                Dim catchMsg As String = Nothing
+                Try
+                    Dim bulk = Await api.BulkUpsertReceiptsPaymentsAsync(businessId, items, True, ct).ConfigureAwait(False)
+                    Dim byClientRef = IndexByClientRef(bulk)
+                    Dim retryItems As New JArray()
+                    Dim retryKeys As New List(Of String)()
+                    For i = 0 To keys.Count - 1
+                        Dim k = keys(i)
+                        Dim r = ResolveItem(byClientRef, bulk, i, k)
+                        If r IsNot Nothing AndAlso r.IsSuccess AndAlso r.EntityId > 0 Then
+                            processed += 1
+                            modCp.Done(k) = r.EntityId
+                            modCp.Failed.Remove(k)
+                        Else
+                            Dim msg = If(r Is Nothing, "نتیجه برنگشت", If(r.Message, r.ErrorCode))
+                            If IsTransientFailureMessage(If(msg, "")) AndAlso attempt < 3 Then
+                                retryItems.Add(items(i))
+                                retryKeys.Add(k)
+                            Else
+                                processed += 1
+                                modCp.Failed(k) = If(msg, "خطا")
+                                RaiseProgress("دریافت/پرداخت", processed, rows.Count, "خطا: " & k, True)
+                            End If
+                        End If
+                    Next
+                    If retryItems.Count > 0 AndAlso attempt < 3 Then
+                        items = retryItems
+                        keys = retryKeys
+                        retryDelayMs = 2000 * attempt
                     Else
-                        modCp.Failed(k) = If(r Is Nothing, "نتیجه برنگشت", If(r.Message, r.ErrorCode))
-                        RaiseProgress("دریافت/پرداخت", processed, rows.Count, "خطا: " & k, True)
+                        RaiseProgress("دریافت/پرداخت " & fy.Title, processed, rows.Count,
+                                      "دسته ایجاد " & bulk.Created.ToString() & " / شکست " & bulk.Failed.ToString())
+                        sent = True
                     End If
-                Next
-                RaiseProgress("دریافت/پرداخت " & fy.Title, processed, rows.Count,
-                              "دسته ایجاد " & bulk.Created.ToString() & " / شکست " & bulk.Failed.ToString())
-            Catch ex As Exception
-                For Each k In keys
-                    modCp.Failed(k) = ex.Message
-                    processed += 1
-                Next
-                RaiseProgress("دریافت/پرداخت", processed, rows.Count, "خطای bulk: " & ex.Message, True)
-            End Try
+                Catch ex As Exception
+                    If IsTransientTimeout(ex) AndAlso attempt < 3 Then
+                        retryDelayMs = 3000 * attempt
+                    Else
+                        catchFail = True
+                        catchMsg = ex.Message
+                        sent = True
+                    End If
+                End Try
+                If catchFail Then
+                    For Each k In keys
+                        modCp.Failed(k) = catchMsg
+                        processed += 1
+                    Next
+                    RaiseProgress("دریافت/پرداخت", processed, rows.Count, "خطای bulk: " & catchMsg, True)
+                ElseIf retryDelayMs > 0 AndAlso Not sent Then
+                    Await Task.Delay(retryDelayMs, ct).ConfigureAwait(False)
+                End If
+            End While
             store.Save(cp)
             offset += take
         End While
 
-        If modCp.Failed.Count = 0 Then modCp.Completed = True
+        If SampleLimit <= 0 AndAlso modCp.Failed.Count = 0 Then modCp.Completed = True
         store.Save(cp)
     End Function
 
@@ -1193,7 +1395,7 @@ Friend Class DocumentTransferService
         If row.CounterCol = "101" Then
             Dim isPetty As Boolean
             Dim cashId = mapper.ResolveCashOrPetty(row.CounterCol, row.CounterMoien, row.CounterTafzili, isPetty)
-            If cashId <= 0 Then cashId = If(isPetty, defaultPettyId, defaultCashId)
+            ' ممنوع: dump به صندوق/تنخواه پیش‌فرض — بدون resolve قطعی Fail
             If cashId <= 0 Then Return Nothing
             If isPetty Then
                 accountLine = New JObject From {
@@ -1211,8 +1413,7 @@ Friend Class DocumentTransferService
                 }
             End If
         Else
-            Dim bankId = mapper.ResolveBank(row.CounterCol, row.CounterMoien, row.CounterTafzili)
-            If bankId <= 0 Then bankId = defaultBankId
+            Dim bankId = mapper.ResolveBank(row.CounterCol, row.CounterMoien, row.CounterTafzili, Nothing, row.CounterName)
             If bankId <= 0 Then Return Nothing
             accountLine = New JObject From {
                 {"amount", amount},
@@ -1255,10 +1456,10 @@ Friend Class DocumentTransferService
         Dim rows = Await Task.Run(Function() _docs.ReadChecksInRange(session.SqlSettings, fy.StartDate, fy.EndDate), ct).ConfigureAwait(False)
 
         ' ایجاد در سال صدور؛ چک‌های قبل از اولین سال کشف‌شده در سال اول ثبت می‌شوند
-        Dim toCreate = rows.Where(Function(r) Not r.IsVoid AndAlso Not modCp.Done.ContainsKey(r.Key) AndAlso (
+        Dim toCreate = ApplySample(rows.Where(Function(r) Not r.IsVoid AndAlso Not modCp.Done.ContainsKey(r.Key) AndAlso (
             (r.IssueDate >= fy.StartDate AndAlso r.IssueDate <= fy.EndDate) OrElse
             (isFirstYear AndAlso r.IssueDate < earliestStart)
-        )).ToList()
+        )).ToList(), "چک " & fy.Title)
 
         RaiseProgress("چک " & fy.Title, modCp.Done.Count, rows.Count, "ایجاد " & toCreate.Count.ToString() & " چک...")
 
@@ -1304,11 +1505,29 @@ Friend Class DocumentTransferService
 
             Dim createdId As Integer = 0
             Dim createError As String = Nothing
-            Try
-                createdId = Await api.CreateCheckAsync(businessId, payload, ct).ConfigureAwait(False)
-            Catch ex As Exception
-                createError = If(ex.Message, "خطا")
-            End Try
+            Dim attempt = 0
+            While attempt < 3 AndAlso createdId <= 0
+                attempt += 1
+                createError = Nothing
+                Dim retryDelayMs As Integer = 0
+                Try
+                    createdId = Await api.CreateCheckAsync(businessId, payload, ct).ConfigureAwait(False)
+                Catch ex As Exception
+                    createError = If(ex.Message, "خطا")
+                    If (IsTransientTimeout(ex) OrElse IsTransientFailureMessage(createError)) AndAlso attempt < 3 Then
+                        retryDelayMs = 2000 * attempt
+                    End If
+                End Try
+                If createdId > 0 Then Exit While
+                If retryDelayMs > 0 Then
+                    Await Task.Delay(retryDelayMs, ct).ConfigureAwait(False)
+                    Continue While
+                End If
+                If createError IsNot Nothing Then Exit While
+                If attempt < 3 Then
+                    Await Task.Delay(1500 * attempt, ct).ConfigureAwait(False)
+                End If
+            End While
 
             If createdId <= 0 AndAlso createError IsNot Nothing AndAlso
                createError.IndexOf("DUPLICATE", StringComparison.OrdinalIgnoreCase) >= 0 Then
@@ -1350,7 +1569,10 @@ Friend Class DocumentTransferService
             Dim retKey = "RET:" & row.CheckCode.ToString()
             If returnCp.Done.ContainsKey(retKey) Then Continue For
             Dim checkId As Integer = 0
-            If Not modCp.Done.TryGetValue(row.Key, checkId) OrElse checkId <= 0 Then Continue For
+            If Not modCp.Done.TryGetValue(row.Key, checkId) OrElse checkId <= 0 Then
+                returnCp.Failed(retKey) = "چک هنوز ایجاد نشده"
+                Continue For
+            End If
             Try
                 Await api.ReturnCheckAsync(checkId, "to_drawer", row.DueDate, ct).ConfigureAwait(False)
                 returnCp.Done(retKey) = checkId
@@ -1358,6 +1580,34 @@ Friend Class DocumentTransferService
             Catch ex As Exception
                 returnCp.Failed(retKey) = ex.Message
                 RaiseProgress("عودت چک", 0, returnCandidates.Count, "خطا: " & row.Key & " — " & ex.Message, True)
+            End Try
+            store.Save(cp)
+        Next
+
+        ' سپرده به جریان وصول (10404) برای چک‌های DarJaryan که هنوز پاس نشده‌اند
+        Dim depositCandidates = rows.Where(Function(r) Not r.IsVoid AndAlso Not r.IsReturned AndAlso r.IsInProcess AndAlso Not r.IsCleared AndAlso
+            r.ClearDate >= fy.StartDate AndAlso r.ClearDate <= fy.EndDate).ToList()
+        For Each row In depositCandidates
+            ct.ThrowIfCancellationRequested()
+            Dim depKey = "DEP:" & row.CheckCode.ToString()
+            If clearCp.Done.ContainsKey(depKey) Then Continue For
+            Dim checkId As Integer = 0
+            If Not modCp.Done.TryGetValue(row.Key, checkId) OrElse checkId <= 0 Then
+                clearCp.Failed(depKey) = "چک هنوز ایجاد نشده"
+                Continue For
+            End If
+            Dim bankId = mapper.ResolveBank("102", "", "", row.AccountNumber, row.BankName)
+            If bankId <= 0 Then
+                clearCp.Failed(depKey) = "بانک سپرده یافت نشد: " & row.AccountNumber
+                Continue For
+            End If
+            Try
+                Await api.DepositCheckAsync(checkId, bankId, row.ClearDate, ct).ConfigureAwait(False)
+                clearCp.Done(depKey) = checkId
+                clearCp.Failed.Remove(depKey)
+            Catch ex As Exception
+                clearCp.Failed(depKey) = ex.Message
+                RaiseProgress("سپرده چک", 0, depositCandidates.Count, "خطا DEP " & row.CheckCode.ToString() & ": " & ex.Message, True)
             End Try
             store.Save(cp)
         Next
@@ -1377,14 +1627,25 @@ Friend Class DocumentTransferService
                 Continue For
             End If
 
-            Dim bankId = mapper.ResolveBank("102", "", "", row.AccountNumber)
-            If bankId <= 0 Then bankId = defaultBankId
+            Dim bankId = mapper.ResolveBank("102", "", "", row.AccountNumber, row.BankName)
             If bankId <= 0 Then
                 clearCp.Failed(clearKey) = "بانک وصول یافت نشد: " & row.AccountNumber
                 Continue For
             End If
 
             Try
+                ' اگر قبلاً در جریان وصول بوده و deposit نشده، اول deposit
+                If row.IsInProcess Then
+                    Dim depKey = "DEP:" & row.CheckCode.ToString()
+                    If Not clearCp.Done.ContainsKey(depKey) Then
+                        Try
+                            Await api.DepositCheckAsync(checkId, bankId, row.ClearDate, ct).ConfigureAwait(False)
+                            clearCp.Done(depKey) = checkId
+                        Catch
+                            ' ممکن است از قبل deposited باشد — clear را ادامه بده
+                        End Try
+                    End If
+                End If
                 Await api.ClearCheckAsync(checkId, bankId, row.ClearDate, ct).ConfigureAwait(False)
                 clearCp.Done(clearKey) = checkId
                 clearCp.Failed.Remove(clearKey)
@@ -1397,7 +1658,7 @@ Friend Class DocumentTransferService
         Next
         RaiseProgress("وصول چک " & fy.Title, cleared, clearCandidates.Count, "وصول " & cleared.ToString() & " از " & clearCandidates.Count.ToString())
 
-        If modCp.Failed.Count = 0 Then modCp.Completed = True
+        If SampleLimit <= 0 AndAlso modCp.Failed.Count = 0 Then modCp.Completed = True
         store.Save(cp)
     End Function
 
@@ -1410,6 +1671,8 @@ Friend Class DocumentTransferService
         personMap As ModuleCheckpoint,
         mapper As HolooSarfaslMapper,
         accountCodeMap As Dictionary(Of String, Integer),
+        catalog As SarfaslCatalog,
+        profile As SarfaslProfile,
         defaultCashId As Integer,
         defaultBankId As Integer,
         defaultPettyId As Integer,
@@ -1421,11 +1684,12 @@ Friend Class DocumentTransferService
         If accountCodeMap Is Nothing Then
             accountCodeMap = Await api.ListAccountCodeMapAsync(businessId, ct).ConfigureAwait(False)
         End If
+        If catalog Is Nothing Then catalog = New SarfaslCatalog(api, businessId, accountCodeMap)
 
         Dim expenses = Await Task.Run(Function() _docs.ReadExpenseIncomeSanadsInRange(session.SqlSettings, fy.StartDate, fy.EndDate, False), ct).ConfigureAwait(False)
         Dim incomes = Await Task.Run(Function() _docs.ReadExpenseIncomeSanadsInRange(session.SqlSettings, fy.StartDate, fy.EndDate, True), ct).ConfigureAwait(False)
         Dim rows = expenses.Concat(incomes).OrderBy(Function(r) r.SanadDate).ThenBy(Function(r) r.SanadCode).ToList()
-        Dim pending = rows.Where(Function(r) Not modCp.Done.ContainsKey(r.Key)).ToList()
+        Dim pending = ApplySample(rows.Where(Function(r) Not modCp.Done.ContainsKey(r.Key)).ToList(), "هزینه/درآمد " & fy.Title)
         RaiseProgress("هزینه/درآمد " & fy.Title, modCp.Done.Count, rows.Count, "ارسال " & pending.Count.ToString() & " سند متوازن...")
 
         Dim offset = 0
@@ -1438,9 +1702,9 @@ Friend Class DocumentTransferService
             Dim keys As New List(Of String)
 
             For Each row In chunk
-                Dim payload = BuildExpenseIncomePayload(
-                    row, currencyId, personMap, mapper, accountCodeMap,
-                    defaultCashId, defaultBankId, defaultPettyId)
+                Dim payload = Await BuildExpenseIncomePayloadAsync(
+                    row, currencyId, personMap, mapper, accountCodeMap, catalog, profile,
+                    defaultCashId, defaultBankId, defaultPettyId, ct).ConfigureAwait(False)
                 If payload Is Nothing Then
                     modCp.Failed(row.Key) = "نگاشت حساب/طرف‌حساب ناقص"
                     processed += 1
@@ -1456,48 +1720,86 @@ Friend Class DocumentTransferService
                 Continue While
             End If
 
-            Try
-                Dim bulk = Await api.BulkUpsertExpenseIncomeAsync(businessId, items, True, ct).ConfigureAwait(False)
-                Dim byClientRef = IndexByClientRef(bulk)
-                For i = 0 To keys.Count - 1
-                    Dim k = keys(i)
-                    processed += 1
-                    Dim r = ResolveItem(byClientRef, bulk, i, k)
-                    If r IsNot Nothing AndAlso r.IsSuccess AndAlso r.EntityId > 0 Then
-                        modCp.Done(k) = r.EntityId
-                        modCp.Failed.Remove(k)
+            Dim attempt = 0
+            Dim sent As Boolean = False
+            While attempt < 3 AndAlso Not sent
+                attempt += 1
+                Dim retryDelayMs As Integer = 0
+                Dim catchFail As Boolean = False
+                Dim catchMsg As String = Nothing
+                Try
+                    Dim bulk = Await api.BulkUpsertExpenseIncomeAsync(businessId, items, True, ct).ConfigureAwait(False)
+                    Dim byClientRef = IndexByClientRef(bulk)
+                    Dim retryItems As New JArray()
+                    Dim retryKeys As New List(Of String)()
+                    For i = 0 To keys.Count - 1
+                        Dim k = keys(i)
+                        Dim r = ResolveItem(byClientRef, bulk, i, k)
+                        If r IsNot Nothing AndAlso r.IsSuccess AndAlso r.EntityId > 0 Then
+                            processed += 1
+                            modCp.Done(k) = r.EntityId
+                            modCp.Failed.Remove(k)
+                        Else
+                            Dim msg = If(r Is Nothing, "نتیجه برنگشت", If(r.Message, r.ErrorCode))
+                            If IsTransientFailureMessage(If(msg, "")) AndAlso attempt < 3 Then
+                                retryItems.Add(items(i))
+                                retryKeys.Add(k)
+                            Else
+                                processed += 1
+                                modCp.Failed(k) = If(msg, "خطا")
+                                RaiseProgress("هزینه/درآمد", processed, rows.Count, "خطا: " & k, True)
+                            End If
+                        End If
+                    Next
+                    If retryItems.Count > 0 AndAlso attempt < 3 Then
+                        items = retryItems
+                        keys = retryKeys
+                        retryDelayMs = 2000 * attempt
                     Else
-                        modCp.Failed(k) = If(r Is Nothing, "نتیجه برنگشت", If(r.Message, r.ErrorCode))
-                        RaiseProgress("هزینه/درآمد", processed, rows.Count, "خطا: " & k, True)
+                        RaiseProgress("هزینه/درآمد " & fy.Title, processed, rows.Count,
+                                      "دسته ایجاد " & bulk.Created.ToString() & " / شکست " & bulk.Failed.ToString())
+                        sent = True
                     End If
-                Next
-                RaiseProgress("هزینه/درآمد " & fy.Title, processed, rows.Count,
-                              "دسته ایجاد " & bulk.Created.ToString() & " / شکست " & bulk.Failed.ToString())
-            Catch ex As Exception
-                For Each k In keys
-                    modCp.Failed(k) = ex.Message
-                    processed += 1
-                Next
-                RaiseProgress("هزینه/درآمد", processed, rows.Count, "خطای bulk: " & ex.Message, True)
-            End Try
+                Catch ex As Exception
+                    If IsTransientTimeout(ex) AndAlso attempt < 3 Then
+                        retryDelayMs = 3000 * attempt
+                    Else
+                        catchFail = True
+                        catchMsg = ex.Message
+                        sent = True
+                    End If
+                End Try
+                If catchFail Then
+                    For Each k In keys
+                        modCp.Failed(k) = catchMsg
+                        processed += 1
+                    Next
+                    RaiseProgress("هزینه/درآمد", processed, rows.Count, "خطای bulk: " & catchMsg, True)
+                ElseIf retryDelayMs > 0 AndAlso Not sent Then
+                    Await Task.Delay(retryDelayMs, ct).ConfigureAwait(False)
+                End If
+            End While
             store.Save(cp)
             offset += take
         End While
 
-        If modCp.Failed.Count = 0 Then modCp.Completed = True
+        If SampleLimit <= 0 AndAlso modCp.Failed.Count = 0 Then modCp.Completed = True
         store.Save(cp)
     End Function
 
-    Private Shared Function BuildExpenseIncomePayload(
+    Private Shared Async Function BuildExpenseIncomePayloadAsync(
         row As HolooExpenseIncomeSanad,
         currencyId As Integer,
         personMap As ModuleCheckpoint,
         mapper As HolooSarfaslMapper,
         accountCodeMap As Dictionary(Of String, Integer),
+        catalog As SarfaslCatalog,
+        profile As SarfaslProfile,
         defaultCashId As Integer,
         defaultBankId As Integer,
-        defaultPettyId As Integer
-    ) As JObject
+        defaultPettyId As Integer,
+        ct As CancellationToken
+    ) As Task(Of JObject)
         Dim itemLines As New JArray()
         Dim itemTotal As Double = 0
         For Each it In row.ItemLines
@@ -1505,9 +1807,33 @@ Friend Class DocumentTransferService
             Dim name = If(String.IsNullOrWhiteSpace(it.Name),
                           If(row.IsIncome, mapper.IncomeName(it.MoienCode), mapper.ExpenseName(it.MoienCode)),
                           it.Name)
-            Dim code = If(row.IsIncome, HolooSarfaslMapper.MapIncomeToFixedCode(name), HolooSarfaslMapper.MapExpenseToFixedCode(name))
+            Dim code As String = Nothing
+            If profile IsNot Nothing Then
+                Dim pe = profile.Find(If(row.IsIncome, "702", "601"), it.MoienCode)
+                If pe IsNot Nothing AndAlso pe.Exempt Then Return Nothing
+                If pe IsNot Nothing AndAlso Not String.IsNullOrWhiteSpace(pe.OverrideCode) Then code = pe.OverrideCode.Trim()
+            End If
+            If String.IsNullOrWhiteSpace(code) Then
+                code = If(row.IsIncome,
+                          HolooSarfaslMapper.MapIncomeToFixedCode(name, it.MoienCode),
+                          HolooSarfaslMapper.MapExpenseToFixedCode(name, it.MoienCode))
+            End If
             Dim acctId As Integer = 0
-            If accountCodeMap Is Nothing OrElse Not accountCodeMap.TryGetValue(code, acctId) OrElse acctId <= 0 Then
+            If Not String.IsNullOrWhiteSpace(code) Then
+                If accountCodeMap Is Nothing OrElse Not accountCodeMap.TryGetValue(code, acctId) OrElse acctId <= 0 Then
+                    If catalog IsNot Nothing Then
+                        acctId = Await catalog.ResolveOrCreateAsync(code, Nothing, Nothing, ct).ConfigureAwait(False)
+                    End If
+                    If acctId <= 0 Then Return Nothing
+                End If
+            ElseIf Not row.IsIncome AndAlso catalog IsNot Nothing AndAlso
+                   (mapper.NeedsBusinessExpenseAccount(it.MoienCode) OrElse String.IsNullOrWhiteSpace(code)) Then
+                acctId = Await catalog.EnsureExpenseBusinessAccountAsync(it.MoienCode, name, ct).ConfigureAwait(False)
+                If acctId <= 0 Then Return Nothing
+            ElseIf row.IsIncome AndAlso catalog IsNot Nothing AndAlso String.IsNullOrWhiteSpace(code) Then
+                acctId = Await catalog.EnsureIncomeBusinessAccountAsync(it.MoienCode, name, ct).ConfigureAwait(False)
+                If acctId <= 0 Then Return Nothing
+            Else
                 Return Nothing
             End If
             Dim amt = Math.Round(it.Amount, 2)
@@ -1527,13 +1853,38 @@ Friend Class DocumentTransferService
             Dim col = If(cpLine.ColCode, "").Trim()
             Dim amt = Math.Round(cpLine.Amount, 2)
             Dim jo As JObject = Nothing
-            If col = "103" OrElse col = "401" Then
+            If col = "103" OrElse (col = "401" AndAlso Not mapper.IsLoan401(cpLine.MoienCode)) Then
                 Dim personId = mapper.ResolvePersonOnCol(col, cpLine.MoienCode)
                 If personId <= 0 Then personId = ResolvePersonByMoien(personMap, cpLine.MoienCode)
                 If personId <= 0 Then Return Nothing
+                ' درآمد+شخص: API قدیمی 1211 می‌خواست؛ از 10401 (کنترل دریافتنی فاکتور) استفاده می‌کنیم
+                Dim arId As Integer = 0
+                If row.IsIncome AndAlso accountCodeMap IsNot Nothing Then
+                    accountCodeMap.TryGetValue("10401", arId)
+                End If
+                If row.IsIncome AndAlso arId > 0 Then
+                    jo = New JObject From {
+                        {"account_id", arId},
+                        {"person_id", personId},
+                        {"amount", amt},
+                        {"transaction_date", ApiDateFormat.ToIsoDate(row.SanadDate)},
+                        {"description", cpLine.Name}
+                    }
+                Else
+                    jo = New JObject From {
+                        {"transaction_type", "person"},
+                        {"person_id", personId},
+                        {"amount", amt},
+                        {"transaction_date", ApiDateFormat.ToIsoDate(row.SanadDate)},
+                        {"description", cpLine.Name}
+                    }
+                End If
+            ElseIf col = "401" AndAlso mapper.IsLoan401(cpLine.MoienCode) Then
+                Dim loanId = Await catalog.EnsureLoanBusinessAccountAsync(cpLine.MoienCode, cpLine.Name, ct).ConfigureAwait(False)
+                If loanId <= 0 Then Return Nothing
                 jo = New JObject From {
-                    {"transaction_type", "person"},
-                    {"person_id", personId},
+                    {"transaction_type", "account"},
+                    {"account_id", loanId},
                     {"amount", amt},
                     {"transaction_date", ApiDateFormat.ToIsoDate(row.SanadDate)},
                     {"description", cpLine.Name}
@@ -1541,7 +1892,6 @@ Friend Class DocumentTransferService
             ElseIf col = "101" Then
                 Dim isPetty As Boolean
                 Dim cashId = mapper.ResolveCashOrPetty(col, cpLine.MoienCode, cpLine.TafziliCode, isPetty)
-                If cashId <= 0 Then cashId = If(isPetty, defaultPettyId, defaultCashId)
                 If cashId <= 0 Then Return Nothing
                 If isPetty Then
                     jo = New JObject From {
@@ -1561,8 +1911,7 @@ Friend Class DocumentTransferService
                     }
                 End If
             ElseIf col = "102" Then
-                Dim bankId = mapper.ResolveBank(col, cpLine.MoienCode, cpLine.TafziliCode)
-                If bankId <= 0 Then bankId = defaultBankId
+                Dim bankId = mapper.ResolveBank(col, cpLine.MoienCode, cpLine.TafziliCode, Nothing, cpLine.Name)
                 If bankId <= 0 Then Return Nothing
                 jo = New JObject From {
                     {"transaction_type", "bank"},
@@ -1588,7 +1937,7 @@ Friend Class DocumentTransferService
             {"description", If(String.IsNullOrWhiteSpace(row.Comment), "Holoo " & row.Key, row.Comment)},
             {"item_lines", itemLines},
             {"counterparty_lines", counterLines},
-            {"extra_info", New JObject From {{"source", "holoo"}, {"holoo_sanad_code", row.SanadCode}}}
+            {"extra_info", New JObject From {{"source", "holoo"}, {"holoo_sanad_code", row.SanadCode}, {"holoo_bucket", "EXPENSE_INCOME"}}}
         }
     End Function
 
@@ -1601,6 +1950,8 @@ Friend Class DocumentTransferService
         personMap As ModuleCheckpoint,
         mapper As HolooSarfaslMapper,
         accountCodeMap As Dictionary(Of String, Integer),
+        catalog As SarfaslCatalog,
+        profile As SarfaslProfile,
         defaultCashId As Integer,
         defaultBankId As Integer,
         defaultPettyId As Integer,
@@ -1612,17 +1963,24 @@ Friend Class DocumentTransferService
         If accountCodeMap Is Nothing Then
             accountCodeMap = Await api.ListAccountCodeMapAsync(businessId, ct).ConfigureAwait(False)
         End If
+        If catalog Is Nothing Then catalog = New SarfaslCatalog(api, businessId, accountCodeMap)
         Dim rows = Await Task.Run(Function() _docs.ReadManualJournalsInRange(session.SqlSettings, fy.StartDate, fy.EndDate), ct).ConfigureAwait(False)
-        Dim pending = rows.Where(Function(r) Not modCp.Done.ContainsKey(r.Key)).ToList()
+        Dim pending = ApplySample(rows.Where(Function(r) Not modCp.Done.ContainsKey(r.Key)).ToList(), "اسناد دستی " & fy.Title)
         RaiseProgress("اسناد دستی " & fy.Title, modCp.Done.Count, rows.Count, "ارسال " & pending.Count.ToString() & " سند متوازن...")
 
         Dim i = 0
         For Each row In pending
             ct.ThrowIfCancellationRequested()
             i += 1
-            Dim payload = BuildManualJournalPayload(
-                row, currencyId, personMap, mapper, accountCodeMap,
-                defaultCashId, defaultBankId, defaultPettyId)
+            If Not String.IsNullOrWhiteSpace(row.SkipReason) Then
+                modCp.Failed(row.Key) = row.SkipReason
+                RaiseProgress("اسناد دستی", i, pending.Count, "رد مبدأ: " & row.Key & " — " & row.SkipReason, True)
+                store.Save(cp)
+                Continue For
+            End If
+            Dim payload = Await BuildManualJournalPayloadAsync(
+                row, currencyId, personMap, mapper, accountCodeMap, catalog, profile,
+                defaultCashId, defaultBankId, defaultPettyId, ct).ConfigureAwait(False)
             If payload Is Nothing Then
                 modCp.Failed(row.Key) = "نگاشت خطوط ناقص یا نامتوازن"
                 RaiseProgress("اسناد دستی", i, pending.Count, "رد: " & row.Key, True)
@@ -1646,22 +2004,25 @@ Friend Class DocumentTransferService
                 store.Save(cp)
             End If
         Next
-        If modCp.Failed.Count = 0 Then modCp.Completed = True
+        If SampleLimit <= 0 AndAlso modCp.Failed.Count = 0 Then modCp.Completed = True
         store.Save(cp)
         RaiseProgress("اسناد دستی " & fy.Title, pending.Count, pending.Count,
                       "تمام — موفق " & modCp.Done.Count.ToString() & " / شکست " & modCp.Failed.Count.ToString())
     End Function
 
-    Private Shared Function BuildManualJournalPayload(
+    Private Shared Async Function BuildManualJournalPayloadAsync(
         row As HolooManualJournal,
         currencyId As Integer,
         personMap As ModuleCheckpoint,
         mapper As HolooSarfaslMapper,
         accountCodeMap As Dictionary(Of String, Integer),
+        catalog As SarfaslCatalog,
+        profile As SarfaslProfile,
         defaultCashId As Integer,
         defaultBankId As Integer,
-        defaultPettyId As Integer
-    ) As JObject
+        defaultPettyId As Integer,
+        ct As CancellationToken
+    ) As Task(Of JObject)
         Dim lines As New JArray()
         Dim bed As Double = 0
         Dim bes As Double = 0
@@ -1673,7 +2034,16 @@ Friend Class DocumentTransferService
             If debit <= 0 AndAlso credit <= 0 Then Continue For
 
             Dim jo As JObject = Nothing
-            If col = "103" OrElse col = "401" Then
+            If col = "401" AndAlso mapper.IsLoan401(ln.MoienCode) Then
+                Dim loanId = Await catalog.EnsureLoanBusinessAccountAsync(ln.MoienCode, ln.SarfaslName, ct).ConfigureAwait(False)
+                If loanId <= 0 Then Return Nothing
+                jo = New JObject From {
+                    {"account_id", loanId},
+                    {"debit", debit},
+                    {"credit", credit},
+                    {"description", ln.SarfaslName}
+                }
+            ElseIf col = "103" OrElse col = "401" Then
                 Dim personId = mapper.ResolvePersonOnCol(col, ln.MoienCode)
                 If personId <= 0 Then personId = ResolvePersonByMoien(personMap, ln.MoienCode)
                 If personId <= 0 Then Return Nothing
@@ -1690,7 +2060,6 @@ Friend Class DocumentTransferService
                 }
             ElseIf col = "102" Then
                 Dim bankId = mapper.ResolveBank(col, ln.MoienCode, ln.TafziliCode, Nothing, ln.SarfaslName)
-                If bankId <= 0 Then bankId = defaultBankId
                 Dim acctId As Integer = 0
                 If Not accountCodeMap.TryGetValue("10203", acctId) OrElse acctId <= 0 OrElse bankId <= 0 Then Return Nothing
                 jo = New JObject From {
@@ -1703,7 +2072,6 @@ Friend Class DocumentTransferService
             ElseIf col = "101" Then
                 Dim isPetty As Boolean
                 Dim cashId = mapper.ResolveCashOrPetty(col, ln.MoienCode, ln.TafziliCode, isPetty)
-                If cashId <= 0 Then cashId = If(isPetty, defaultPettyId, defaultCashId)
                 Dim code = If(isPetty, "10201", "10202")
                 Dim acctId As Integer = 0
                 If Not accountCodeMap.TryGetValue(code, acctId) OrElse acctId <= 0 OrElse cashId <= 0 Then Return Nothing
@@ -1714,13 +2082,58 @@ Friend Class DocumentTransferService
                     {"description", ln.SarfaslName}
                 }
                 If isPetty Then jo("petty_cash_id") = cashId Else jo("cash_register_id") = cashId
+            ElseIf col = "601" Then
+                Dim code As String = Nothing
+                If profile IsNot Nothing Then
+                    Dim pe = profile.Find("601", ln.MoienCode)
+                    If pe IsNot Nothing AndAlso pe.Exempt Then Return Nothing
+                    If pe IsNot Nothing AndAlso Not String.IsNullOrWhiteSpace(pe.OverrideCode) Then code = pe.OverrideCode.Trim()
+                End If
+                If String.IsNullOrWhiteSpace(code) Then code = HolooSarfaslMapper.MapExpenseToFixedCode(ln.SarfaslName, ln.MoienCode)
+                Dim acctId As Integer = 0
+                If Not String.IsNullOrWhiteSpace(code) AndAlso accountCodeMap.TryGetValue(code, acctId) AndAlso acctId > 0 Then
+                    ' ok
+                Else
+                    acctId = Await catalog.EnsureExpenseBusinessAccountAsync(ln.MoienCode, ln.SarfaslName, ct).ConfigureAwait(False)
+                    If acctId <= 0 Then Return Nothing
+                End If
+                jo = New JObject From {
+                    {"account_id", acctId},
+                    {"debit", debit},
+                    {"credit", credit},
+                    {"description", ln.SarfaslName}
+                }
+            ElseIf col = "702" Then
+                Dim code As String = Nothing
+                If profile IsNot Nothing Then
+                    Dim pe = profile.Find("702", ln.MoienCode)
+                    If pe IsNot Nothing AndAlso pe.Exempt Then Return Nothing
+                    If pe IsNot Nothing AndAlso Not String.IsNullOrWhiteSpace(pe.OverrideCode) Then code = pe.OverrideCode.Trim()
+                End If
+                If String.IsNullOrWhiteSpace(code) Then code = HolooSarfaslMapper.MapIncomeToFixedCode(ln.SarfaslName, ln.MoienCode)
+                Dim acctId As Integer = 0
+                If Not String.IsNullOrWhiteSpace(code) AndAlso accountCodeMap.TryGetValue(code, acctId) AndAlso acctId > 0 Then
+                    ' ok
+                Else
+                    acctId = Await catalog.EnsureIncomeBusinessAccountAsync(ln.MoienCode, ln.SarfaslName, ct).ConfigureAwait(False)
+                    If acctId <= 0 Then Return Nothing
+                End If
+                jo = New JObject From {
+                    {"account_id", acctId},
+                    {"debit", debit},
+                    {"credit", credit},
+                    {"description", ln.SarfaslName}
+                }
             Else
-                Dim code = HolooSarfaslMapper.MapColToFixedCode(col, ln.MoienCode, ln.SarfaslName)
-                If col = "601" Then code = HolooSarfaslMapper.MapExpenseToFixedCode(ln.SarfaslName)
-                If col = "702" Then code = HolooSarfaslMapper.MapIncomeToFixedCode(ln.SarfaslName)
+                Dim code = ResolveMappedAccountCode(profile, col, ln.MoienCode, ln.SarfaslName)
                 If String.IsNullOrWhiteSpace(code) Then Return Nothing
                 Dim acctId As Integer = 0
-                If Not accountCodeMap.TryGetValue(code, acctId) OrElse acctId <= 0 Then Return Nothing
+                If Not accountCodeMap.TryGetValue(code, acctId) OrElse acctId <= 0 Then
+                    If catalog IsNot Nothing Then
+                        acctId = Await catalog.ResolveOrCreateAsync(code, Nothing, Nothing, ct).ConfigureAwait(False)
+                    End If
+                    If acctId <= 0 Then Return Nothing
+                End If
                 jo = New JObject From {
                     {"account_id", acctId},
                     {"debit", debit},
@@ -1735,6 +2148,8 @@ Friend Class DocumentTransferService
         If lines.Count < 2 Then Return Nothing
         If Math.Abs(bed - bes) > 0.02 Then Return Nothing
 
+        Dim bucket = If(If(row.Comment, "").IndexOf("[EI-FALLBACK]", StringComparison.OrdinalIgnoreCase) >= 0,
+                        "EXPENSE_INCOME_FALLBACK", "MANUAL")
         Return New JObject From {
             {"document_date", ApiDateFormat.ToIsoDate(row.SanadDate)},
             {"currency_id", currencyId},
@@ -1743,9 +2158,26 @@ Friend Class DocumentTransferService
             {"extra_info", New JObject From {
                 {"source", "holoo"},
                 {"holoo_sanad_code", row.SanadCode},
-                {"holoo_sanad_type", row.SanadType}
+                {"holoo_sanad_type", row.SanadType},
+                {"holoo_bucket", bucket}
             }}
         }
+    End Function
+
+    Private Shared Function ResolveMappedAccountCode(
+        profile As SarfaslProfile,
+        col As String,
+        moien As String,
+        sarfaslName As String
+    ) As String
+        If profile IsNot Nothing Then
+            Dim pe = profile.Find(col, moien)
+            If pe IsNot Nothing Then
+                If pe.Exempt Then Return Nothing
+                If Not String.IsNullOrWhiteSpace(pe.OverrideCode) Then Return pe.OverrideCode.Trim()
+            End If
+        End If
+        Return HolooSarfaslMapper.MapColToFixedCode(col, moien, sarfaslName)
     End Function
 
     Private Shared Function ResolvePersonByMoien(personMap As ModuleCheckpoint, moien As String) As Integer

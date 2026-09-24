@@ -368,8 +368,10 @@ Friend Class HolooBaseDataReader
                 Return "SELECT COUNT(*) FROM SANAD s WHERE ISNULL(s.[Delete],0)=0 AND ISNULL(s.SaveFromFacture,0)=0 " &
                        "AND EXISTS (SELECT 1 FROM SND_LIST x WHERE x.Sanad_Code=s.Sanad_Code AND x.Col_Code IN ('601','702'));"
             Case MigrationModule.ManualJournals
+                ' هم‌تراز با ReadManualJournalsInRange: بدون فاکتور متصل، بدون چک، بدون 601/702
                 Return "SELECT COUNT(*) FROM SANAD s WHERE ISNULL(s.[Delete],0)=0 AND ISNULL(s.SaveFromFacture,0)=0 " &
                        "AND ISNULL(s.Sanad_Type,0) NOT IN (5,20) " &
+                       "AND NOT EXISTS (SELECT 1 FROM FACTURE f WHERE f.Sanad_Code=s.Sanad_Code AND ISNULL(f.[Delete],0)=0) " &
                        "AND NOT EXISTS (SELECT 1 FROM [Check] c WHERE c.Sanad_Code=s.Sanad_Code OR c.Sanad_Code2=s.Sanad_Code) " &
                        "AND NOT EXISTS (SELECT 1 FROM SND_LIST x WHERE x.Sanad_Code=s.Sanad_Code AND x.Col_Code IN ('601','702'));"
             Case MigrationModule.FiscalYearsAndOpening

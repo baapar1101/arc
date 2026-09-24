@@ -23,6 +23,13 @@ Friend Module Program
         Thread.CurrentThread.CurrentCulture = faGregorian
         Thread.CurrentThread.CurrentUICulture = fa
 
+        Dim args = Environment.GetCommandLineArgs().Skip(1).ToArray()
+        If args.Any(Function(a) String.Equals(a, "--e2e-opening", StringComparison.OrdinalIgnoreCase)) Then
+            Dim code = E2eOpeningRunner.Run(args)
+            Environment.Exit(code)
+            Return
+        End If
+
         Application.EnableVisualStyles()
         Application.SetCompatibleTextRenderingDefault(False)
         Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException)

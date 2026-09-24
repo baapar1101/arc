@@ -16,6 +16,8 @@ Friend Class MigrationSession
     Public Property SelectedModules As List(Of ModuleOption)
     Public Property Preflight As PreflightReport
     Public Property AllowCurrencyMismatch As Boolean
+    Public Property SarfaslProfile As SarfaslProfile
+    Public Property SarfaslProfileLocked As Boolean
 
     Public ReadOnly Property IsHesabixConnected As Boolean
         Get

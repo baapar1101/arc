@@ -375,9 +375,9 @@ def create_expense_income(
                 try:
                     account = _get_person_account(db, business_id, int(person_id_val), is_income)
                 except Exception:
-                    account = _get_fixed_account_by_code(db, "20201" if not is_income else "1211")
+                    account = _get_fixed_account_by_code(db, "20201" if not is_income else "10401")
             else:
-                account = _get_fixed_account_by_code(db, "20201" if not is_income else "1211")
+                account = _get_fixed_account_by_code(db, "20201" if not is_income else "10401")
         elif line.get("account_id"):
             account = db.query(Account).filter(
                 and_(
@@ -1031,9 +1031,9 @@ def update_expense_income(
                 try:
                     account = _get_person_account(db, document.business_id, int(person_id_val), is_income)
                 except Exception:
-                    account = _get_fixed_account_by_code(db, "20201" if not is_income else "1211")
+                    account = _get_fixed_account_by_code(db, "20201" if not is_income else "10401")
             else:
-                account = _get_fixed_account_by_code(db, "20201" if not is_income else "1211")
+                account = _get_fixed_account_by_code(db, "20201" if not is_income else "10401")
         elif line.get("account_id"):
             account = db.query(Account).filter(
                 and_(
@@ -1539,7 +1539,7 @@ def _get_person_account(
     
     # تعیین کد حساب بر اساس نوع
     if is_receivable:
-        account_code = "1211"  # دریافتنی‌ها
+        account_code = "10401"  # دریافتنی‌ها (هم‌تراز فاکتور فروش)
     else:
         account_code = "20201"  # پرداختنی‌ها
     

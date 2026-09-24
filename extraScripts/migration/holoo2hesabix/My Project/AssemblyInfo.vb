@@ -9,5 +9,5 @@ Imports System.Runtime.InteropServices
 <Assembly: AssemblyCopyright("Copyright © Hesabix")>
 <Assembly: ComVisible(False)>
 <Assembly: Guid("8f47a946-0f23-4301-8202-6654cc1986aa")>
-<Assembly: AssemblyVersion("1.0.0.0")>
-<Assembly: AssemblyFileVersion("1.0.0.0")>
+<Assembly: AssemblyVersion("1.1.0.0")>
+<Assembly: AssemblyFileVersion("1.1.0.0")>
