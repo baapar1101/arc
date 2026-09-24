@@ -1,0 +1,43 @@
+name: Sync Hesabix upstream
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 */6 * * *"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sync-hesabix-upstream
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Fetch Hesabix upstream
+        run: |
+          git remote remove upstream 2>/dev/null || true
+          git remote add upstream https://source.hesabix.ir/hesabix/arc.git
+          git fetch upstream master --tags --prune
+
+      - name: Merge upstream master
+        run: |
+          git checkout master
+          git merge --no-edit upstream/master
+
+      - name: Push synchronized changes
+        run: |
+          git push origin master
+          git push origin --tags
