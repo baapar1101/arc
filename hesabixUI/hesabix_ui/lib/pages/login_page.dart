@@ -1386,22 +1386,17 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
       child: Scaffold(
         resizeToAvoidBottomInset: true,
         body: SafeArea(
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              final bottomInset = MediaQuery.of(context).viewInsets.bottom;
-              final availableHeight = constraints.maxHeight > bottomInset + 20
-                  ? constraints.maxHeight - bottomInset - 20
-                  : 0.0;
-              return SingleChildScrollView(
-                padding: EdgeInsets.fromLTRB(8, 10, 8, bottomInset + 10),
-                child: ConstrainedBox(
-                  constraints: BoxConstraints(minHeight: availableHeight),
+          child: CustomScrollView(
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+            slivers: [
+              SliverPadding(
+                padding: const EdgeInsets.all(10),
+                sliver: SliverFillRemaining(
+                  hasScrollBody: false,
                   child: Center(
                     child: ConstrainedBox(
-                      constraints: const BoxConstraints(
-                        maxWidth: 390,
-                      ),
-                    child: GlassSurface(
+                      constraints: const BoxConstraints(maxWidth: 390),
+                      child: GlassSurface(
                       borderRadius: BorderRadius.circular(22),
                       blur: 26,
                       opacity: isDark ? 0.12 : 0.52,
@@ -2181,8 +2176,8 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                     ),
                   ),
                 ),
-              );
-            },
+              ),
+            ],
           ),
         ),
       ),
