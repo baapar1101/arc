@@ -1,5 +1,6 @@
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 
@@ -120,7 +121,7 @@ Future<void> showDistributionVisitCompleteSheet({
                       onPressed: () async {
                         Map<String, dynamic>? product;
                         final qtyCtl = TextEditingController(text: '1');
-                        await showDialog<void>(
+                        await showGlassDialog<void>(
                           context: context,
                           builder: (dctx) => AlertDialog(
                             title: Text(t.distributionVanSaleLines),

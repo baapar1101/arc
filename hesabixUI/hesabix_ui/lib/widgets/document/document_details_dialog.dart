@@ -2,6 +2,7 @@ import 'dart:math' show min;
 import 'dart:ui' as ui;
 import 'dart:ui' show FontFeature;
 import 'package:flutter/material.dart';
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:hesabix_ui/models/document_model.dart';
 import 'package:hesabix_ui/services/document_service.dart';
 import 'package:hesabix_ui/core/api_client.dart';
@@ -276,7 +277,7 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
     
     final theme = Theme.of(context);
     
-    await showDialog(
+    await showGlassDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: Row(
@@ -1714,7 +1715,7 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
   }
 
   void _openRelatedWarehouseDocument(BuildContext context, DocumentModel document, int docId) {
-    showDialog<void>(
+    showGlassDialog<void>(
       context: context,
       builder: (_) => WarehouseDocumentDetailsDialog(
         businessId: document.businessId,
@@ -4411,7 +4412,7 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
       return;
     }
 
-    await showDialog<Map<String, dynamic>>(
+    await showGlassDialog<Map<String, dynamic>>(
       context: context,
       builder: (context) => _ReceiptPaymentTransactionDialog(
         document: _document!,
@@ -4458,7 +4459,7 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
     final code = _document!.code;
     final desc = 'قسط $seq فاکتور $code';
 
-    await showDialog<Map<String, dynamic>>(
+    await showGlassDialog<Map<String, dynamic>>(
       context: context,
       builder: (context) => _ReceiptPaymentTransactionDialog(
         document: _document!,
@@ -4496,7 +4497,7 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
     final personName = doc.personLines.isNotEmpty ? doc.personLines.first.personName : null;
     
     // باز کردن دیالوگ ویرایش تراکنش
-    final result = await showDialog<Map<String, dynamic>>(
+    final result = await showGlassDialog<Map<String, dynamic>>(
       context: context,
       builder: (context) => _ReceiptPaymentTransactionDialog(
         document: _document!,
@@ -4547,7 +4548,7 @@ class _DocumentDetailsDialogState extends State<DocumentDetailsDialog> with Sing
   /// حذف تراکنش
   Future<void> _deleteTransaction(ReceiptPaymentDocument doc) async {
     // تایید حذف
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showGlassDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('حذف تراکنش'),
