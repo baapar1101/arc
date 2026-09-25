@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/services.dart';
 
 import '../../core/api_client.dart';
@@ -209,7 +210,7 @@ class _WalletPayoutsAdminPageState extends State<WalletPayoutsAdminPage> {
         : double.tryParse('${payout['gross_amount']}') ?? 0.0;
 
     try {
-      final confirmed = await showDialog<bool>(
+      final confirmed = await showGlassDialog<bool>(
         context: context,
         builder: (ctx) {
           return StatefulBuilder(

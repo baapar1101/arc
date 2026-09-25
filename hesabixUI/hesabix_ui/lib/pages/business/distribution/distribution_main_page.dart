@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hesabix_ui/theme/glass.dart';
 
 import '../../../core/auth_store.dart';
 import '../../../core/calendar_controller.dart';
@@ -376,7 +377,7 @@ class _DistributionMainPageState extends State<DistributionMainPage> with Single
     } catch (e) {
       final err = ErrorExtractor.forContext(e, context);
       if (err.contains('GEOFENCE') || err.contains('فاصله')) {
-        final ok = await showDialog<bool>(
+        final ok = await showGlassDialog<bool>(
           context: context,
           builder: (dctx) => AlertDialog(
             title: Text(t.distributionGeofenceOverride),
@@ -409,7 +410,7 @@ class _DistributionMainPageState extends State<DistributionMainPage> with Single
     final v = _activeVisit;
     if (v == null || !_canOperate) return;
     final t = AppLocalizations.of(context);
-    final ok = await showDialog<bool>(
+    final ok = await showGlassDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(t.distributionCancelVisit),
@@ -1045,7 +1046,7 @@ class _DistributionMainPageState extends State<DistributionMainPage> with Single
   }
 
   Future<void> _confirmDeleteRoute(AppLocalizations t, int routeId) async {
-    final ok = await showDialog<bool>(
+    final ok = await showGlassDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(t.distributionDeleteRoute),
@@ -1068,7 +1069,7 @@ class _DistributionMainPageState extends State<DistributionMainPage> with Single
   Future<void> _showCreateTerritoryDialog(AppLocalizations t) async {
     final codeCtl = TextEditingController();
     final nameCtl = TextEditingController();
-    await showDialog<void>(
+    await showGlassDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(t.distributionTerritoryCreate),
@@ -1111,7 +1112,7 @@ class _DistributionMainPageState extends State<DistributionMainPage> with Single
     final codeCtl = TextEditingController();
     final nameCtl = TextEditingController();
     int? territoryId;
-    await showDialog<void>(
+    await showGlassDialog<void>(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (context, setD) => AlertDialog(
@@ -1174,7 +1175,7 @@ class _DistributionMainPageState extends State<DistributionMainPage> with Single
     Person? person;
     final sortCtl = TextEditingController(text: '0');
     int? weekday;
-    await showDialog<void>(
+    await showGlassDialog<void>(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (context, setD) => AlertDialog(
@@ -1240,7 +1241,7 @@ class _DistributionMainPageState extends State<DistributionMainPage> with Single
     final userCtl = TextEditingController();
     DateTime from = DateTime.now();
     DateTime? to;
-    await showDialog<void>(
+    await showGlassDialog<void>(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (context, setD) => AlertDialog(

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/services/ai_service.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
@@ -71,7 +72,7 @@ class _AIProviderCredentialsAdminPageState
     bool isActive = existing?['is_active'] as bool? ?? true;
     bool fce = existing?['function_calling_enabled'] as bool? ?? true;
 
-    await showDialog<void>(
+    await showGlassDialog<void>(
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(

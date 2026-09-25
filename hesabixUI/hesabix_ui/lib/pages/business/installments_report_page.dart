@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/foundation.dart';
 import 'package:dio/dio.dart';
 import 'package:intl/intl.dart';
@@ -778,7 +779,7 @@ class _InstallmentsReportPageState extends State<InstallmentsReportPage> {
     if (invoiceId <= 0) return;
     final t = AppLocalizations.of(context);
     final theme = Theme.of(context);
-    await showDialog<void>(
+    await showGlassDialog<void>(
       context: context,
       builder: (ctx) {
         final dialogW = MediaQuery.sizeOf(ctx).width - 48;
@@ -1372,7 +1373,7 @@ class _InstallmentsReportPageState extends State<InstallmentsReportPage> {
     final TextEditingController q = TextEditingController();
     List<Map<String, dynamic>> results = <Map<String, dynamic>>[];
     bool loading = false;
-    await showDialog(
+    await showGlassDialog(
       context: context,
       builder: (ctx) {
         return StatefulBuilder(

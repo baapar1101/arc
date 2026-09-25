@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/api_client.dart';
@@ -123,7 +124,7 @@ class _DocumentMonetizationBusinessPageState extends State<DocumentMonetizationB
       }
       
       if (isInsufficientFunds) {
-        final shouldCharge = await showDialog<bool>(
+        final shouldCharge = await showGlassDialog<bool>(
           context: context,
           builder: (context) => AlertDialog(
             title: const Text('موجودی کافی نیست'),
@@ -540,7 +541,7 @@ class _DocumentMonetizationBusinessPageState extends State<DocumentMonetizationB
   Future<void> _confirmAndActivatePlan(Map<String, dynamic> plan) async {
     final t = AppLocalizations.of(context);
     bool dialogAutoRenew = false;
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showGlassDialog<bool>(
       context: context,
       builder: (dialogContext) {
         return StatefulBuilder(

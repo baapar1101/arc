@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:intl/intl.dart';
 
 import '../../config/app_config.dart';
@@ -527,7 +528,7 @@ class _PublicPersonShareLinkPageState extends State<PublicPersonShareLinkPage> {
 
   Future<void> _showInvoiceDetails(BuildContext context, ThemeData theme, int documentId) async {
     try {
-      showDialog(
+      showGlassDialog(
         context: context,
         barrierDismissible: false,
         builder: (context) => const Center(child: CircularProgressIndicator()),
@@ -538,7 +539,7 @@ class _PublicPersonShareLinkPageState extends State<PublicPersonShareLinkPage> {
 
       Navigator.of(context).pop(); // بستن loading dialog
 
-      showDialog(
+      showGlassDialog(
         context: context,
         builder: (context) => _InvoiceDetailsDialog(
           theme: theme,

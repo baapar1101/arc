@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/services/currency_service.dart';
 import 'package:hesabix_ui/core/api_client.dart';
@@ -119,7 +120,7 @@ class _BusinessCurrenciesSettingsPageState extends State<BusinessCurrenciesSetti
       if (usage['is_used'] == true) {
         final count = usage['document_count'] as int;
         if (mounted) {
-          await showDialog(
+          await showGlassDialog(
             context: context,
             builder: (context) => AlertDialog(
               title: const Text('امکان حذف وجود ندارد'),
@@ -139,7 +140,7 @@ class _BusinessCurrenciesSettingsPageState extends State<BusinessCurrenciesSetti
       }
       
       // نمایش Dialog تأیید
-      final confirmed = await showDialog<bool>(
+      final confirmed = await showGlassDialog<bool>(
         context: context,
         builder: (context) => AlertDialog(
           title: const Text('تأیید حذف ارز'),
@@ -199,7 +200,7 @@ class _BusinessCurrenciesSettingsPageState extends State<BusinessCurrenciesSetti
       return;
     }
     
-    final selected = await showDialog<Map<String, dynamic>>(
+    final selected = await showGlassDialog<Map<String, dynamic>>(
       context: context,
       builder: (context) => _AddCurrencyDialog(
         availableCurrencies: availableCurrencies,
@@ -334,7 +335,7 @@ class _BusinessCurrenciesSettingsPageState extends State<BusinessCurrenciesSetti
                         icon: const Icon(Icons.info_outline),
                         tooltip: 'این ارز در زمان ایجاد کسب‌وکار انتخاب شده و قابل تغییر نیست',
                         onPressed: () {
-                          showDialog(
+                          showGlassDialog(
                             context: context,
                             builder: (context) => AlertDialog(
                               title: const Text('ارز پیش‌فرض'),

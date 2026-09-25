@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 
@@ -162,7 +163,7 @@ class _BusinessCrmSettingsPageState extends State<BusinessCrmSettingsPage> {
     }
     final nameCtrl = TextEditingController();
     final originsCtrl = TextEditingController();
-    final res = await showDialog<Map<String, dynamic>>(
+    final res = await showGlassDialog<Map<String, dynamic>>(
       context: context,
       barrierDismissible: false,
       builder: (ctx) => CrmWebChatWidgetFormDialog(
@@ -239,7 +240,7 @@ class _BusinessCrmSettingsPageState extends State<BusinessCrmSettingsPage> {
     final originsCtrl = TextEditingController(
       text: (w['allowed_origins'] is List) ? (w['allowed_origins'] as List).map((e) => e.toString()).join('، ') : '',
     );
-    final res = await showDialog<Map<String, dynamic>>(
+    final res = await showGlassDialog<Map<String, dynamic>>(
       context: context,
       barrierDismissible: false,
       builder: (ctx) => CrmWebChatWidgetFormDialog(
