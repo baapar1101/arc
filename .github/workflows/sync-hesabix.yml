@@ -31,13 +31,64 @@ jobs:
           git remote remove upstream 2>/dev/null || true
           git remote add upstream https://source.hesabix.ir/hesabix/arc.git
           git fetch upstream master --tags --prune
+          git fetch origin upstream-snapshot:refs/remotes/origin/upstream-snapshot 2>/dev/null || true
 
-      - name: Merge upstream master
+      - name: Apply upstream changes selectively
+        shell: bash
         run: |
+          set -euo pipefail
           git checkout master
-          git merge --no-edit upstream/master
 
-      - name: Push synchronized changes
+          NEW_UPSTREAM="$(git rev-parse upstream/master)"
+          if git show-ref --verify --quiet refs/remotes/origin/upstream-snapshot; then
+            OLD_UPSTREAM="$(git rev-parse refs/remotes/origin/upstream-snapshot)"
+          else
+            echo "No upstream baseline exists yet."
+            echo "Initializing upstream-snapshot at ${NEW_UPSTREAM}."
+            git branch -f upstream-snapshot "${NEW_UPSTREAM}"
+            git push --force origin upstream-snapshot
+            exit 0
+          fi
+
+          if [[ "${OLD_UPSTREAM}" == "${NEW_UPSTREAM}" ]]; then
+            echo "No new upstream commits."
+            exit 0
+          fi
+
+          echo "Applying upstream delta ${OLD_UPSTREAM}..${NEW_UPSTREAM}"
+
+          # Keep the custom visual layer owned by this fork. Everything else
+          # is updated from the upstream delta. git apply --3way preserves
+          # local edits where possible and fails rather than silently
+          # overwriting a conflicting customization.
+          git diff --binary "${OLD_UPSTREAM}" "${NEW_UPSTREAM}" -- . \
+            ':(exclude).github/**' \
+            ':(exclude)hesabixUI/hesabix_ui/lib/theme/**' \
+            ':(exclude)hesabixUI/hesabix_ui/lib/pages/login_page.dart' \
+            ':(exclude)hesabixUI/hesabix_ui/lib/main.dart' \
+            ':(exclude)hesabixUI/hesabix_ui/web/index.html' \
+            ':(exclude)hesabixUI/hesabix_ui/lib/widgets/auth_footer.dart' \
+            > /tmp/hesabix-upstream.patch
+
+          if [[ -s /tmp/hesabix-upstream.patch ]]; then
+            if ! git apply --3way --index /tmp/hesabix-upstream.patch; then
+              echo "::error::Upstream changes conflict with local code. No partial sync will be pushed."
+              git status --short
+              exit 1
+            fi
+
+            if ! git diff --cached --quiet; then
+              git commit -m "Sync Hesabix upstream ${OLD_UPSTREAM:0:12}..${NEW_UPSTREAM:0:12}"
+              git push origin master
+            fi
+          else
+            echo "Upstream changed only protected visual/deployment files."
+          fi
+
+          git branch -f upstream-snapshot "${NEW_UPSTREAM}"
+          git push --force origin upstream-snapshot
+
+      - name: Push upstream tags
+        if: success()
         run: |
-          git push origin master
           git push origin --tags
