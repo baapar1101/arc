@@ -50,7 +50,6 @@ jobs:
 
           LOCAL_HEAD="$(git rev-parse HEAD)"
           UPSTREAM_HEAD="$(git rev-parse upstream/master)"
-          CUSTOM_BASE="dfa3c1ad6bcf378e2c986987db4d4fbd792a2b0d"
 
           echo "Merging upstream ${UPSTREAM_HEAD} into ${LOCAL_HEAD}"
           set +e
@@ -62,35 +61,53 @@ jobs:
           echo "Conflict count: ${#CONFLICTS[@]}"
 
           for file in "${CONFLICTS[@]}"; do
-            keep_local="false"
-
             case "$file" in
+              hesabixUI/hesabix_ui/lib/main.dart)
+                echo "::error::main.dart has an upstream conflict and needs explicit integration."
+                exit 1
+                ;;
               .github/*|\
               hesabixUI/hesabix_ui/lib/theme/*|\
               hesabixUI/hesabix_ui/lib/pages/login_page.dart|\
-              hesabixUI/hesabix_ui/lib/main.dart|\
               hesabixUI/hesabix_ui/web/index.html|\
-              hesabixUI/hesabix_ui/lib/widgets/auth_footer.dart)
-                keep_local="true"
+              hesabixUI/hesabix_ui/lib/widgets/auth_footer.dart|\
+              hesabixUI/hesabix_ui/pubspec.yaml|\
+              hesabixUI/hesabix_ui/lib/utils/error_extractor.dart|\
+              hesabixUI/hesabix_ui/assets/images/*|\
+              build_web.sh)
+                echo "KEEP PRESENTATION: $file"
+                git checkout --ours -- "$file"
+                ;;
+              *)
+                echo "TAKE UPSTREAM FUNCTIONAL SOURCE: $file"
+                git checkout --theirs -- "$file"
                 ;;
             esac
-
-            # Any file changed by the recent custom UI/glass work is treated
-            # as part of the local visual overlay when it conflicts.
-            if git cat-file -e "${CUSTOM_BASE}^{commit}" 2>/dev/null && \
-               ! git diff --quiet "${CUSTOM_BASE}" "${LOCAL_HEAD}" -- "$file"; then
-              keep_local="true"
-            fi
-
-            if [[ "$keep_local" == "true" ]]; then
-              echo "KEEP LOCAL: $file"
-              git checkout --ours -- "$file"
-            else
-              echo "TAKE UPSTREAM: $file"
-              git checkout --theirs -- "$file"
-            fi
             git add -- "$file"
           done
+
+          # Even when Git merged these cleanly, the fork owns these presentation
+          # files. Restore them exactly from the pre-merge local head.
+          git checkout "$LOCAL_HEAD" -- \
+            .github \
+            hesabixUI/hesabix_ui/lib/theme \
+            hesabixUI/hesabix_ui/lib/pages/login_page.dart \
+            hesabixUI/hesabix_ui/web/index.html \
+            hesabixUI/hesabix_ui/lib/widgets/auth_footer.dart \
+            hesabixUI/hesabix_ui/pubspec.yaml \
+            hesabixUI/hesabix_ui/lib/utils/error_extractor.dart \
+            hesabixUI/hesabix_ui/assets/images \
+            build_web.sh
+          git add \
+            .github \
+            hesabixUI/hesabix_ui/lib/theme \
+            hesabixUI/hesabix_ui/lib/pages/login_page.dart \
+            hesabixUI/hesabix_ui/web/index.html \
+            hesabixUI/hesabix_ui/lib/widgets/auth_footer.dart \
+            hesabixUI/hesabix_ui/pubspec.yaml \
+            hesabixUI/hesabix_ui/lib/utils/error_extractor.dart \
+            hesabixUI/hesabix_ui/assets/images \
+            build_web.sh
 
           if git diff --name-only --diff-filter=U | grep -q .; then
             echo "::error::Unresolved merge conflicts remain."
