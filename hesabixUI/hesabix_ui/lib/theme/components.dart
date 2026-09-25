@@ -215,7 +215,7 @@ DividerThemeData appDividerTheme(ColorScheme scheme) => DividerThemeData(
 
 IconButtonThemeData appIconButtonTheme(ColorScheme scheme) => IconButtonThemeData(
       style: ButtonStyle(
-        visualDensity: const WidgetStatePropertyAll(VisualDensity.compact),
+        visualDensity: VisualDensity.compact,
         minimumSize: const WidgetStatePropertyAll(Size(36, 36)),
         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
         iconSize: const WidgetStatePropertyAll(20),
