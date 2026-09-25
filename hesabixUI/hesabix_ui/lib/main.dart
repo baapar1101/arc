@@ -171,6 +171,7 @@ import 'core/calendar_controller.dart';
 import 'core/api_client.dart';
 import 'theme/theme_controller.dart';
 import 'theme/app_theme.dart';
+import 'theme/smokey_background.dart';
 import 'core/auth_store.dart';
 import 'core/mobile_launcher_prefs.dart';
 import 'core/permission_guard.dart';
@@ -3836,10 +3837,13 @@ class _MyAppState extends State<MyApp> {
             builder: (context, child) {
               final theme = Theme.of(context);
               final baseStyle = theme.textTheme.bodyMedium ?? const TextStyle();
-              return DefaultTextStyle(
-                style: baseStyle,
-                child: KeyboardShortcutListener(
-                  child: child ?? const SizedBox(),
+              return SmokeyBackground(
+                dark: theme.brightness == Brightness.dark,
+                child: DefaultTextStyle(
+                  style: baseStyle,
+                  child: KeyboardShortcutListener(
+                    child: child ?? const SizedBox(),
+                  ),
                 ),
               );
             },
