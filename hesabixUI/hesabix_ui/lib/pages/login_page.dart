@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:dio/dio.dart';
@@ -490,7 +491,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
         SnackBarHelper.show(context, message: t.otpCodeSentMessage(channelName));
         
         // نمایش Dialog برای وارد کردن OTP
-        final verified = await showDialog<bool>(
+        final verified = await showGlassDialog<bool>(
           context: context,
           builder: (ctx) => OtpInputDialog(
             title: AppLocalizations.of(context).otpLoginTitle,
@@ -956,7 +957,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
         if (!mounted) return;
         
         // نمایش Dialog برای وارد کردن OTP
-        final verified = await showDialog<bool>(
+        final verified = await showGlassDialog<bool>(
           context: context,
           builder: (ctx) => OtpInputDialog(
             title: 'بازیابی رمز عبور',
@@ -1081,7 +1082,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
     // بارگذاری اولیه کپچا
     await loadCaptcha();
 
-    final result = await showDialog<bool>(
+    final result = await showGlassDialog<bool>(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (dialogContext, setDialogState) => AlertDialog(

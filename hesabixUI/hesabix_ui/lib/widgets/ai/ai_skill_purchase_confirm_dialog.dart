@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hesabix_ui/theme/glass.dart';
 
 /// تأیید خرید مهارت پولی از کیف پول
 class AISkillPurchaseConfirmDialog extends StatelessWidget {
@@ -22,7 +23,7 @@ class AISkillPurchaseConfirmDialog extends StatelessWidget {
     required String currencySymbol,
     required double walletBalance,
   }) {
-    return showDialog<bool>(
+    return showGlassDialog<bool>(
       context: context,
       builder: (ctx) => AISkillPurchaseConfirmDialog(
         skillTitle: skillTitle,

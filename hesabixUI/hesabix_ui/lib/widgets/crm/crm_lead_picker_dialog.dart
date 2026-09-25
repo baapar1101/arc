@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/services/crm_service.dart';
@@ -10,7 +11,7 @@ Future<Map<String, dynamic>?> showCrmLeadPickerDialog(
   BuildContext context, {
   required int businessId,
 }) {
-  return showDialog<Map<String, dynamic>>(
+  return showGlassDialog<Map<String, dynamic>>(
     context: context,
     barrierDismissible: false,
     builder: (ctx) => _CrmLeadPickerDialog(businessId: businessId),
