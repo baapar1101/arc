@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'package:intl/intl.dart';
 import '../../l10n/app_localizations.dart';
@@ -177,7 +176,7 @@ class _WorkflowExecutionHistoryPanelState extends State<WorkflowExecutionHistory
                 IconButton(
                   icon: const Icon(Icons.analytics_outlined),
                   onPressed: () {
-                    showGlassDialog(
+                    showDialog(
                       context: context,
                       builder: (context) => WorkflowAnalyticsDialog(
                         businessId: widget.businessId,
@@ -378,7 +377,7 @@ class _WorkflowExecutionHistoryPanelState extends State<WorkflowExecutionHistory
                 onPressed: () {
                   final executionId = _selectedExecution!['id'] as int?;
                   if (executionId != null) {
-                    showGlassDialog(
+                    showDialog(
                       context: context,
                       builder: (context) => WorkflowTimelineDialog(
                         businessId: widget.businessId,

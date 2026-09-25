@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:hesabix_ui/theme/glass.dart';
 import '../../core/api_client.dart';
 import '../../services/announcements_service.dart';
 import '../../utils/date_formatters.dart';
@@ -90,7 +89,7 @@ class _AnnouncementsAdminPageState extends State<AnnouncementsAdminPage> {
       }
     }
 
-    final confirmed = await showGlassDialog<bool>(
+    final confirmed = await showDialog<bool>(
       context: context,
       barrierDismissible: false,
       builder: (ctx) {
@@ -307,7 +306,7 @@ class _AnnouncementsAdminPageState extends State<AnnouncementsAdminPage> {
                               onPressed: () async {
                                 final annId = (id is int) ? id : int.tryParse('$id');
                                 if (annId == null) return;
-                                final ok = await showGlassDialog<bool>(
+                                final ok = await showDialog<bool>(
                                   context: context,
                                   builder: (ctx) => AlertDialog(
                                     title: const Text('حذف اعلان'),

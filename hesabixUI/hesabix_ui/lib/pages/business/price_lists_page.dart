@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:hesabix_ui/theme/glass.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import '../../services/price_list_service.dart';
 import '../../core/api_client.dart';
@@ -260,7 +259,7 @@ class _PriceListsPageState extends State<PriceListsPage> {
     final formKey = GlobalKey<FormState>();
     String name = '';
 
-    return showGlassDialog<bool>(
+    return showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('ایجاد لیست قیمت'),
@@ -321,7 +320,7 @@ class _PriceListsPageState extends State<PriceListsPage> {
     bool isActive = priceList['is_active'] == true;
     final priceListId = priceList['id'] as int;
 
-    final result = await showGlassDialog<bool>(
+    final result = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('ویرایش لیست قیمت'),
@@ -397,7 +396,7 @@ class _PriceListsPageState extends State<PriceListsPage> {
     final priceListName = priceList['name']?.toString() ?? 'بدون نام';
     final priceListId = priceList['id'] as int;
 
-    final confirmed = await showGlassDialog<bool>(
+    final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text('حذف لیست قیمت'),

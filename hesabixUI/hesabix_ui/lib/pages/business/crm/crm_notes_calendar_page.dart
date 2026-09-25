@@ -99,7 +99,7 @@ class _CrmNotesCalendarPageState extends State<CrmNotesCalendarPage> {
     final sel = _selectedDay ?? DateTime.now();
     final start = _saturdayWeekStart(sel);
     final end = start.add(const Duration(days: 6));
-    return '${MarkStreetDateUtils.formatForDisplay(start, isJ)} — ${MarkStreetDateUtils.formatForDisplay(end, isJ)}';
+    return '${HesabixDateUtils.formatForDisplay(start, isJ)} — ${HesabixDateUtils.formatForDisplay(end, isJ)}';
   }
 
   @override
@@ -180,8 +180,8 @@ class _CrmNotesCalendarPageState extends State<CrmNotesCalendarPage> {
     });
     try {
       final range = _monthGregorianRange();
-      final fromS = MarkStreetDateUtils.formatForApiDate(range.$1);
-      final toS = MarkStreetDateUtils.formatForApiDate(range.$2);
+      final fromS = HesabixDateUtils.formatForApiDate(range.$1);
+      final toS = HesabixDateUtils.formatForApiDate(range.$2);
       final list = await _crm.listCrmNotes(
         businessId: widget.businessId,
         fromDate: fromS,
@@ -236,12 +236,12 @@ class _CrmNotesCalendarPageState extends State<CrmNotesCalendarPage> {
   String _monthTitle() {
     if (widget.calendarController.isJalali) {
       final j = Jalali.fromDateTime(_monthStartLocal);
-      return MarkStreetDateUtils.formatForDisplayWithMonthName(
+      return HesabixDateUtils.formatForDisplayWithMonthName(
         Jalali(j.year, j.month, 15).toDateTime(),
         true,
       );
     }
-    return MarkStreetDateUtils.formatForDisplayWithMonthName(_monthStartLocal, false);
+    return HesabixDateUtils.formatForDisplayWithMonthName(_monthStartLocal, false);
   }
 
   List<String> _weekdayHeaders(String lang) {
@@ -279,7 +279,7 @@ class _CrmNotesCalendarPageState extends State<CrmNotesCalendarPage> {
   }
 
   String _dayKey(DateTime dt) {
-    return MarkStreetDateUtils.formatForApiDate(DateTime(dt.year, dt.month, dt.day));
+    return HesabixDateUtils.formatForApiDate(DateTime(dt.year, dt.month, dt.day));
   }
 
   Iterable<Map<String, dynamic>> _notesForDay(DateTime day) sync* {
@@ -330,7 +330,7 @@ class _CrmNotesCalendarPageState extends State<CrmNotesCalendarPage> {
       final raw = (m['starts_at_raw'] ?? m['starts_at'] ?? '').toString();
       final dt = DateTime.tryParse(raw);
       if (dt != null) {
-        timeLine = MarkStreetDateUtils.formatDateTime(dt, widget.calendarController.isJalali);
+        timeLine = HesabixDateUtils.formatDateTime(dt, widget.calendarController.isJalali);
       }
     }
     final headline = title.isNotEmpty ? title : typeTitle;
@@ -659,7 +659,7 @@ class _CrmNotesCalendarPageState extends State<CrmNotesCalendarPage> {
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 2),
                   child: Tooltip(
-                    message: MarkStreetDateUtils.formatForDisplay(cell, widget.calendarController.isJalali),
+                    message: HesabixDateUtils.formatForDisplay(cell, widget.calendarController.isJalali),
                     child: Material(
                       color: bg,
                       borderRadius: BorderRadius.circular(8),
@@ -738,7 +738,7 @@ class _CrmNotesCalendarPageState extends State<CrmNotesCalendarPage> {
                       style: theme.textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant),
                     ),
                     Text(
-                      MarkStreetDateUtils.formatForDisplay(d, widget.calendarController.isJalali),
+                      HesabixDateUtils.formatForDisplay(d, widget.calendarController.isJalali),
                       style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
                     ),
                   ],

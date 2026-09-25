@@ -1,10 +1,11 @@
+import 'package:hesabix_ui/core/hesabix_back.dart';
 import 'package:flutter/material.dart';
-import 'package:hesabix_ui/theme/glass.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table_widget.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table_config.dart';
 import 'package:hesabix_ui/services/list_filter_preferences_service.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
+import 'package:hesabix_ui/core/date_utils.dart';
 import 'package:hesabix_ui/widgets/date_input_field.dart';
 import 'package:hesabix_ui/models/person_model.dart';
 import 'package:hesabix_ui/models/account_model.dart';
@@ -16,7 +17,9 @@ import 'package:hesabix_ui/widgets/invoice/petty_cash_combobox_widget.dart';
 import 'package:hesabix_ui/widgets/invoice/account_tree_combobox_widget.dart';
 import 'package:hesabix_ui/widgets/invoice/check_combobox_widget.dart';
 import 'package:hesabix_ui/core/api_client.dart';
+import 'package:hesabix_ui/core/fiscal_year_controller.dart';
 import 'package:hesabix_ui/services/business_dashboard_service.dart';
+import 'package:hesabix_ui/services/currency_service.dart';
 import 'package:hesabix_ui/services/person_service.dart';
 import 'package:hesabix_ui/services/product_service.dart';
 import 'package:hesabix_ui/services/bank_account_service.dart';
@@ -32,12 +35,18 @@ import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 class KardexPage extends StatefulWidget {
   final int businessId;
   final CalendarController calendarController;
   final List<int>? initialPersonIds;
-  const KardexPage({super.key, required this.businessId, required this.calendarController, this.initialPersonIds});
+  const KardexPage({
+    super.key,
+    required this.businessId,
+    required this.calendarController,
+    this.initialPersonIds,
+  });
 
   @override
   State<KardexPage> createState() => _KardexPageState();
@@ -68,6 +77,8 @@ class _KardexPageState extends State<KardexPage> {
   bool _includeRunningBalance = false;
   int? _selectedFiscalYearId;
   List<Map<String, dynamic>> _fiscalYears = const [];
+  int? _selectedCurrencyId;
+  List<Map<String, dynamic>> _currencies = const [];
 
   // Multi-select state
   final List<Person> _selectedPersons = [];
@@ -112,7 +123,10 @@ class _KardexPageState extends State<KardexPage> {
   }
 
   void _refreshData() {
-    _log('Manual refresh triggered. additionalParams=' + _additionalParams().toString());
+    _log(
+      'Manual refresh triggered. additionalParams=' +
+          _additionalParams().toString(),
+    );
     final state = _tableKey.currentState;
     if (state != null) {
       try {
@@ -137,10 +151,11 @@ class _KardexPageState extends State<KardexPage> {
     try {
       final qp = <String, String>{};
       Map<String, dynamic> params = _additionalParams();
-      List<int> idsOf(String key) => (params[key] as List<dynamic>? ?? const <dynamic>[]) 
-          .map((e) => int.tryParse('$e'))
-          .whereType<int>()
-          .toList();
+      List<int> idsOf(String key) =>
+          (params[key] as List<dynamic>? ?? const <dynamic>[])
+              .map((e) => int.tryParse('$e'))
+              .whereType<int>()
+              .toList();
 
       void addCsv(String key, List<int> ids) {
         if (ids.isEmpty) return;
@@ -155,11 +170,17 @@ class _KardexPageState extends State<KardexPage> {
       addCsv('account_ids', idsOf('account_ids'));
       addCsv('check_ids', idsOf('check_ids'));
       addCsv('warehouse_ids', idsOf('warehouse_ids'));
-      if (params['from_date'] != null) qp['dateFrom'] = '${params['from_date']}';
+      if (params['from_date'] != null)
+        qp['dateFrom'] = '${params['from_date']}';
       if (params['to_date'] != null) qp['dateTo'] = '${params['to_date']}';
-      if (params['fiscal_year_id'] != null) qp['fiscal_year_id'] = '${params['fiscal_year_id']}';
-      if ((params['match_mode'] ?? '').toString().isNotEmpty) qp['match_mode'] = '${params['match_mode']}';
-      if ((params['result_scope'] ?? '').toString().isNotEmpty) qp['result_scope'] = '${params['result_scope']}';
+      if (params['fiscal_year_id'] != null)
+        qp['fiscal_year_id'] = '${params['fiscal_year_id']}';
+      if (params['currency_id'] != null)
+        qp['currency_id'] = '${params['currency_id']}';
+      if ((params['match_mode'] ?? '').toString().isNotEmpty)
+        qp['match_mode'] = '${params['match_mode']}';
+      if ((params['result_scope'] ?? '').toString().isNotEmpty)
+        qp['result_scope'] = '${params['result_scope']}';
 
       final path = '/business/${widget.businessId}/reports/kardex';
       final uri = Uri(path: path, queryParameters: qp.isEmpty ? null : qp);
@@ -172,7 +193,9 @@ class _KardexPageState extends State<KardexPage> {
     setState(() {
       _fromDate = null;
       _toDate = null;
-      _selectedFiscalYearId = _selectedFiscalYearId; // نگه‌داشتن سال مالی انتخاب‌شده
+      _selectedFiscalYearId =
+          _selectedFiscalYearId; // نگه‌داشتن سال مالی انتخاب‌شده
+      _selectedCurrencyId = null;
       _matchMode = 'any';
       _resultScope = 'lines_matching';
       _includeRunningBalance = false;
@@ -258,7 +281,9 @@ class _KardexPageState extends State<KardexPage> {
       setState(() {
         _presets = updated;
         if (_selectedPresetName == name) {
-          _selectedPresetName = _presets.isNotEmpty ? _presets.keys.first : null;
+          _selectedPresetName = _presets.isNotEmpty
+              ? _presets.keys.first
+              : null;
         }
       });
     } catch (e) {
@@ -273,17 +298,24 @@ class _KardexPageState extends State<KardexPage> {
 
   Future<void> _applyPreset(Map<String, dynamic> p) async {
     try {
-      DateTime? parseDate(String? s) => (s == null || s.isEmpty) ? null : DateTime.tryParse(s);
+      DateTime? parseDate(String? s) =>
+          (s == null || s.isEmpty) ? null : DateTime.tryParse(s);
       final from = parseDate(p['from_date']?.toString());
       final to = parseDate(p['to_date']?.toString());
       List<int> ids(String key) {
         final raw = (p[key] as List<dynamic>? ?? const <dynamic>[]);
         return raw.map((e) => int.tryParse('$e')).whereType<int>().toList();
       }
+
       setState(() {
         _fromDate = from;
         _toDate = to;
-        _selectedFiscalYearId = (p['fiscal_year_id'] is int) ? p['fiscal_year_id'] as int : int.tryParse('${p['fiscal_year_id'] ?? ''}');
+        _selectedFiscalYearId = (p['fiscal_year_id'] is int)
+            ? p['fiscal_year_id'] as int
+            : int.tryParse('${p['fiscal_year_id'] ?? ''}');
+        _selectedCurrencyId = (p['currency_id'] is int)
+            ? p['currency_id'] as int
+            : int.tryParse('${p['currency_id'] ?? ''}');
         _matchMode = (p['match_mode'] ?? 'any').toString();
         _resultScope = (p['result_scope'] ?? 'lines_matching').toString();
         _includeRunningBalance = (p['include_running_balance'] == true);
@@ -306,14 +338,22 @@ class _KardexPageState extends State<KardexPage> {
         _initialWarehouseIds = ids('warehouse_ids');
       });
 
-      if (_initialPersonIds.isNotEmpty) await _hydrateInitialPersons(_initialPersonIds);
-      if (_initialProductIds.isNotEmpty) await _hydrateInitialProducts(_initialProductIds);
-      if (_initialBankAccountIds.isNotEmpty) await _hydrateInitialBankAccounts(_initialBankAccountIds);
-      if (_initialCashRegisterIds.isNotEmpty) await _hydrateInitialCashRegisters(_initialCashRegisterIds);
-      if (_initialPettyCashIds.isNotEmpty) await _hydrateInitialPettyCash(_initialPettyCashIds);
-      if (_initialAccountIds.isNotEmpty) await _hydrateInitialAccounts(_initialAccountIds);
-      if (_initialCheckIds.isNotEmpty) await _hydrateInitialChecks(_initialCheckIds);
-      if (_initialWarehouseIds.isNotEmpty) await _hydrateInitialWarehouses(_initialWarehouseIds);
+      if (_initialPersonIds.isNotEmpty)
+        await _hydrateInitialPersons(_initialPersonIds);
+      if (_initialProductIds.isNotEmpty)
+        await _hydrateInitialProducts(_initialProductIds);
+      if (_initialBankAccountIds.isNotEmpty)
+        await _hydrateInitialBankAccounts(_initialBankAccountIds);
+      if (_initialCashRegisterIds.isNotEmpty)
+        await _hydrateInitialCashRegisters(_initialCashRegisterIds);
+      if (_initialPettyCashIds.isNotEmpty)
+        await _hydrateInitialPettyCash(_initialPettyCashIds);
+      if (_initialAccountIds.isNotEmpty)
+        await _hydrateInitialAccounts(_initialAccountIds);
+      if (_initialCheckIds.isNotEmpty)
+        await _hydrateInitialChecks(_initialCheckIds);
+      if (_initialWarehouseIds.isNotEmpty)
+        await _hydrateInitialWarehouses(_initialWarehouseIds);
 
       _updateRouteQuery();
     } catch (e) {
@@ -328,36 +368,59 @@ class _KardexPageState extends State<KardexPage> {
   }
 
   Map<String, dynamic> _additionalParams() {
-    String? fmt(DateTime? d) => d == null ? null : d.toIso8601String().substring(0, 10);
+    String? fmt(DateTime? d) =>
+        d == null ? null : HesabixDateUtils.formatForApiDate(d);
     var personIds = _selectedPersons.map((p) => p.id).whereType<int>().toList();
     if (personIds.isEmpty && _initialPersonIds.isNotEmpty) {
       personIds = List<int>.from(_initialPersonIds);
     }
-    var productIds = _selectedProducts.map((m) => m['id']).map((e) => int.tryParse('$e')).whereType<int>().toList();
+    var productIds = _selectedProducts
+        .map((m) => m['id'])
+        .map((e) => int.tryParse('$e'))
+        .whereType<int>()
+        .toList();
     if (productIds.isEmpty && _initialProductIds.isNotEmpty) {
       productIds = List<int>.from(_initialProductIds);
     }
-    var bankIds = _selectedBankAccounts.map((b) => int.tryParse(b.id)).whereType<int>().toList();
+    var bankIds = _selectedBankAccounts
+        .map((b) => int.tryParse(b.id))
+        .whereType<int>()
+        .toList();
     if (bankIds.isEmpty && _initialBankAccountIds.isNotEmpty) {
       bankIds = List<int>.from(_initialBankAccountIds);
     }
-    var cashIds = _selectedCashRegisters.map((c) => int.tryParse(c.id)).whereType<int>().toList();
+    var cashIds = _selectedCashRegisters
+        .map((c) => int.tryParse(c.id))
+        .whereType<int>()
+        .toList();
     if (cashIds.isEmpty && _initialCashRegisterIds.isNotEmpty) {
       cashIds = List<int>.from(_initialCashRegisterIds);
     }
-    var pettyIds = _selectedPettyCash.map((p) => int.tryParse(p.id)).whereType<int>().toList();
+    var pettyIds = _selectedPettyCash
+        .map((p) => int.tryParse(p.id))
+        .whereType<int>()
+        .toList();
     if (pettyIds.isEmpty && _initialPettyCashIds.isNotEmpty) {
       pettyIds = List<int>.from(_initialPettyCashIds);
     }
-    var accountIds = _selectedAccounts.map((a) => a.id).whereType<int>().toList();
+    var accountIds = _selectedAccounts
+        .map((a) => a.id)
+        .whereType<int>()
+        .toList();
     if (accountIds.isEmpty && _initialAccountIds.isNotEmpty) {
       accountIds = List<int>.from(_initialAccountIds);
     }
-    var checkIds = _selectedChecks.map((c) => int.tryParse(c.id)).whereType<int>().toList();
+    var checkIds = _selectedChecks
+        .map((c) => int.tryParse(c.id))
+        .whereType<int>()
+        .toList();
     if (checkIds.isEmpty && _initialCheckIds.isNotEmpty) {
       checkIds = List<int>.from(_initialCheckIds);
     }
-    var warehouseIds = _selectedWarehouses.map((w) => int.tryParse('${w['id']}')).whereType<int>().toList();
+    var warehouseIds = _selectedWarehouses
+        .map((w) => int.tryParse('${w['id']}'))
+        .whereType<int>()
+        .toList();
     if (warehouseIds.isEmpty && _initialWarehouseIds.isNotEmpty) {
       warehouseIds = List<int>.from(_initialWarehouseIds);
     }
@@ -376,7 +439,10 @@ class _KardexPageState extends State<KardexPage> {
       'match_mode': _matchMode,
       'result_scope': _resultScope,
       'include_running_balance': _includeRunningBalance,
-      if (_selectedFiscalYearId != null) 'fiscal_year_id': _selectedFiscalYearId,
+      if (_selectedFiscalYearId != null)
+        'fiscal_year_id': _selectedFiscalYearId,
+      'currency_id': _selectedCurrencyId,
+      'amounts_in_base': _selectedCurrencyId == null,
     };
     _log('Built additionalParams=' + params.toString());
     return params;
@@ -385,8 +451,10 @@ class _KardexPageState extends State<KardexPage> {
   DataTableConfig<Map<String, dynamic>> _buildTableConfig(AppLocalizations t) {
     return DataTableConfig<Map<String, dynamic>>(
       endpoint: '/api/v1/kardex/businesses/${widget.businessId}/lines',
-      excelEndpoint: '/api/v1/kardex/businesses/${widget.businessId}/lines/export/excel',
-      pdfEndpoint: '/api/v1/kardex/businesses/${widget.businessId}/lines/export/pdf',
+      excelEndpoint:
+          '/api/v1/kardex/businesses/${widget.businessId}/lines/export/excel',
+      pdfEndpoint:
+          '/api/v1/kardex/businesses/${widget.businessId}/lines/export/pdf',
       businessId: widget.businessId,
       persistTableFiltersPageId: ListFilterPageIds.kardexLinesTable,
       reportModuleKey: 'kardex',
@@ -398,13 +466,22 @@ class _KardexPageState extends State<KardexPage> {
         DateColumn(
           'document_date',
           t.documentDate,
-          formatter: (item) => (item as Map<String, dynamic>)['document_date']?.toString(),
+          formatter: (item) {
+            final m = item as Map<String, dynamic>;
+            return HesabixDateUtils.formatApiDateForDisplay(
+              m['document_date'] ?? m['document_date_formatted'],
+              widget.calendarController.isJalali,
+              rawValue: m['document_date_raw'],
+              fallback: '',
+            );
+          },
           filterType: ColumnFilterType.dateRange,
         ),
         TextColumn(
           'document_code',
           t.documentCode,
-          formatter: (item) => (item as Map<String, dynamic>)['document_code']?.toString(),
+          formatter: (item) =>
+              (item as Map<String, dynamic>)['document_code']?.toString(),
         ),
         TextColumn(
           'document_type',
@@ -413,7 +490,9 @@ class _KardexPageState extends State<KardexPage> {
             final map = item as Map<String, dynamic>;
             // اول document_type_name را بررسی کن
             final typeName = map['document_type_name']?.toString();
-            if (typeName != null && typeName.isNotEmpty && typeName != map['document_type']?.toString()) {
+            if (typeName != null &&
+                typeName.isNotEmpty &&
+                typeName != map['document_type']?.toString()) {
               return typeName;
             }
             // در غیر این صورت از document_type استفاده کن
@@ -422,10 +501,22 @@ class _KardexPageState extends State<KardexPage> {
           filterType: ColumnFilterType.multiSelect,
           filterOptions: [
             FilterOption(value: 'invoice_sales', label: t.invoiceTypeSales),
-            FilterOption(value: 'invoice_purchase', label: t.invoiceTypePurchase),
-            FilterOption(value: 'invoice_sales_return', label: t.invoiceTypeSalesReturn),
-            FilterOption(value: 'invoice_purchase_return', label: t.invoiceTypePurchaseReturn),
-            FilterOption(value: 'invoice_direct_consumption', label: t.invoiceTypeDirectConsumption),
+            FilterOption(
+              value: 'invoice_purchase',
+              label: t.invoiceTypePurchase,
+            ),
+            FilterOption(
+              value: 'invoice_sales_return',
+              label: t.invoiceTypeSalesReturn,
+            ),
+            FilterOption(
+              value: 'invoice_purchase_return',
+              label: t.invoiceTypePurchaseReturn,
+            ),
+            FilterOption(
+              value: 'invoice_direct_consumption',
+              label: t.invoiceTypeDirectConsumption,
+            ),
             FilterOption(value: 'invoice_waste', label: t.invoiceTypeWaste),
             FilterOption(value: 'production', label: t.invoiceTypeProduction),
             FilterOption(value: 'opening_balance', label: t.openingBalance),
@@ -442,7 +533,8 @@ class _KardexPageState extends State<KardexPage> {
         TextColumn(
           'movement',
           t.movementDirection,
-          formatter: (item) => (item as Map<String, dynamic>)['movement']?.toString(),
+          formatter: (item) =>
+              (item as Map<String, dynamic>)['movement']?.toString(),
           filterType: ColumnFilterType.multiSelect,
           filterOptions: [
             FilterOption(value: 'in', label: t.movementIn),
@@ -452,22 +544,26 @@ class _KardexPageState extends State<KardexPage> {
         TextColumn(
           'description',
           t.description,
-          formatter: (item) => (item as Map<String, dynamic>)['description']?.toString(),
+          formatter: (item) =>
+              (item as Map<String, dynamic>)['description']?.toString(),
         ),
         NumberColumn(
           'debit',
           t.debit,
-          formatter: (item) => ((item as Map<String, dynamic>)['debit'])?.toString(),
+          formatter: (item) =>
+              ((item as Map<String, dynamic>)['debit'])?.toString(),
         ),
         NumberColumn(
           'credit',
           t.credit,
-          formatter: (item) => ((item as Map<String, dynamic>)['credit'])?.toString(),
+          formatter: (item) =>
+              ((item as Map<String, dynamic>)['credit'])?.toString(),
         ),
         NumberColumn(
           'quantity',
           t.quantity,
-          formatter: (item) => ((item as Map<String, dynamic>)['quantity'])?.toString(),
+          formatter: (item) =>
+              ((item as Map<String, dynamic>)['quantity'])?.toString(),
         ),
         // Custom colored running amount
         CustomColumn(
@@ -476,10 +572,16 @@ class _KardexPageState extends State<KardexPage> {
           builder: (item, _) {
             final m = (item as Map<String, dynamic>);
             final v = (m['running_amount']);
-            final d = (v is num) ? v.toDouble() : double.tryParse('${v ?? ''}') ?? 0.0;
-            final color = d > 0 ? Colors.green[700] : (d < 0 ? Colors.red[700] : null);
+            final d = (v is num)
+                ? v.toDouble()
+                : double.tryParse('${v ?? ''}') ?? 0.0;
+            final color = d > 0
+                ? SemanticColorResolver.positive(context)
+                : (d < 0 ? SemanticColorResolver.negative(context) : null);
             return Text(
-              d == d.roundToDouble() ? d.toStringAsFixed(0) : d.toStringAsFixed(2),
+              d == d.roundToDouble()
+                  ? d.toStringAsFixed(0)
+                  : d.toStringAsFixed(2),
               textDirection: TextDirection.ltr,
               style: TextStyle(
                 color: color,
@@ -494,10 +596,16 @@ class _KardexPageState extends State<KardexPage> {
           builder: (item, _) {
             final m = (item as Map<String, dynamic>);
             final v = (m['running_quantity']);
-            final d = (v is num) ? v.toDouble() : double.tryParse('${v ?? ''}') ?? 0.0;
-            final color = d > 0 ? Colors.green[700] : (d < 0 ? Colors.red[700] : null);
+            final d = (v is num)
+                ? v.toDouble()
+                : double.tryParse('${v ?? ''}') ?? 0.0;
+            final color = d > 0
+                ? SemanticColorResolver.positive(context)
+                : (d < 0 ? SemanticColorResolver.negative(context) : null);
             return Text(
-              d == d.roundToDouble() ? d.toStringAsFixed(0) : d.toStringAsFixed(2),
+              d == d.roundToDouble()
+                  ? d.toStringAsFixed(0)
+                  : d.toStringAsFixed(2),
               textDirection: TextDirection.ltr,
               style: TextStyle(
                 color: color,
@@ -518,7 +626,7 @@ class _KardexPageState extends State<KardexPage> {
                 final m = item as Map<String, dynamic>;
                 final docId = (m['document_id'] as num?)?.toInt();
                 if (docId == null) return;
-                showGlassDialog(
+                showDialog(
                   context: context,
                   builder: (_) => DocumentDetailsDialog(
                     documentId: docId,
@@ -530,7 +638,12 @@ class _KardexPageState extends State<KardexPage> {
           ],
         ),
       ],
-      searchFields: const ['document_code', 'document_type', 'warehouse_name', 'description'],
+      searchFields: const [
+        'document_code',
+        'document_type',
+        'warehouse_name',
+        'description',
+      ],
       defaultPageSize: 20,
       additionalParams: _additionalParams(),
       showExportButtons: true,
@@ -541,10 +654,10 @@ class _KardexPageState extends State<KardexPage> {
           final m = item as Map<String, dynamic>;
           final mv = (m['movement'] ?? '').toString().toLowerCase();
           if (mv == 'in') {
-            return Colors.green.withValues(alpha: 0.06);
+            return SemanticColorResolver.positive(context).withValues(alpha: 0.06);
           }
           if (mv == 'out') {
-            return Colors.red.withValues(alpha: 0.06);
+            return SemanticColorResolver.negative(context).withValues(alpha: 0.06);
           }
         } catch (_) {}
         return null;
@@ -564,9 +677,11 @@ class _KardexPageState extends State<KardexPage> {
   void initState() {
     super.initState();
     _loadFiscalYears();
+    _loadCurrencies();
     _parseInitialQueryParams();
     _loadPresets();
-    if (widget.initialPersonIds != null && widget.initialPersonIds!.isNotEmpty) {
+    if (widget.initialPersonIds != null &&
+        widget.initialPersonIds!.isNotEmpty) {
       _initialPersonIds = List<int>.from(widget.initialPersonIds!);
     }
     _log('initState: initialPersonIds=' + _initialPersonIds.toString());
@@ -595,7 +710,10 @@ class _KardexPageState extends State<KardexPage> {
 
   Future<void> _hydrateInitialPersons(List<int> ids) async {
     try {
-      final added = <int>{ for (final p in _selectedPersons) if (p.id != null) p.id! };
+      final added = <int>{
+        for (final p in _selectedPersons)
+          if (p.id != null) p.id!,
+      };
       for (final id in ids) {
         if (added.contains(id)) continue;
         final person = await _personService.getPerson(id);
@@ -614,11 +732,16 @@ class _KardexPageState extends State<KardexPage> {
 
   Future<void> _hydrateInitialProducts(List<int> ids) async {
     try {
-      final added = <int>{ for (final m in _selectedProducts) int.tryParse('${m['id']}') ?? -1 };
+      final added = <int>{
+        for (final m in _selectedProducts) int.tryParse('${m['id']}') ?? -1,
+      };
       for (final id in ids) {
         if (added.contains(id)) continue;
         try {
-          final m = await _productService.getProduct(businessId: widget.businessId, productId: id);
+          final m = await _productService.getProduct(
+            businessId: widget.businessId,
+            productId: id,
+          );
           if (!mounted) return;
           setState(() {
             _selectedProducts.add(<String, dynamic>{
@@ -635,14 +758,22 @@ class _KardexPageState extends State<KardexPage> {
 
   Future<void> _hydrateInitialBankAccounts(List<int> ids) async {
     try {
-      final added = <int>{ for (final it in _selectedBankAccounts) int.tryParse(it.id) ?? -1 };
+      final added = <int>{
+        for (final it in _selectedBankAccounts) int.tryParse(it.id) ?? -1,
+      };
       for (final id in ids) {
         if (added.contains(id)) continue;
         try {
           final acc = await _bankAccountService.getById(id);
           if (!mounted) return;
           setState(() {
-            _selectedBankAccounts.add(BankAccountOption('${acc.id}', acc.name, currencyId: acc.currencyId));
+            _selectedBankAccounts.add(
+              BankAccountOption(
+                '${acc.id}',
+                acc.name,
+                currencyId: acc.currencyId,
+              ),
+            );
           });
         } catch (_) {}
       }
@@ -652,14 +783,22 @@ class _KardexPageState extends State<KardexPage> {
 
   Future<void> _hydrateInitialCashRegisters(List<int> ids) async {
     try {
-      final added = <int>{ for (final it in _selectedCashRegisters) int.tryParse(it.id) ?? -1 };
+      final added = <int>{
+        for (final it in _selectedCashRegisters) int.tryParse(it.id) ?? -1,
+      };
       for (final id in ids) {
         if (added.contains(id)) continue;
         try {
           final cr = await _cashRegisterService.getById(id);
           if (!mounted) return;
           setState(() {
-            _selectedCashRegisters.add(CashRegisterOption('${cr.id}', cr.name, currencyId: cr.currencyId));
+            _selectedCashRegisters.add(
+              CashRegisterOption(
+                '${cr.id}',
+                cr.name,
+                currencyId: cr.currencyId,
+              ),
+            );
           });
         } catch (_) {}
       }
@@ -669,14 +808,18 @@ class _KardexPageState extends State<KardexPage> {
 
   Future<void> _hydrateInitialPettyCash(List<int> ids) async {
     try {
-      final added = <int>{ for (final it in _selectedPettyCash) int.tryParse(it.id) ?? -1 };
+      final added = <int>{
+        for (final it in _selectedPettyCash) int.tryParse(it.id) ?? -1,
+      };
       for (final id in ids) {
         if (added.contains(id)) continue;
         try {
           final pc = await _pettyCashService.getById(id);
           if (!mounted) return;
           setState(() {
-            _selectedPettyCash.add(PettyCashOption('${pc.id}', pc.name, currencyId: pc.currencyId));
+            _selectedPettyCash.add(
+              PettyCashOption('${pc.id}', pc.name, currencyId: pc.currencyId),
+            );
           });
         } catch (_) {}
       }
@@ -686,11 +829,14 @@ class _KardexPageState extends State<KardexPage> {
 
   Future<void> _hydrateInitialAccounts(List<int> ids) async {
     try {
-      final added = <int>{ for (final it in _selectedAccounts) it.id ?? -1 };
+      final added = <int>{for (final it in _selectedAccounts) it.id ?? -1};
       for (final id in ids) {
         if (added.contains(id)) continue;
         try {
-          final m = await _accountService.getAccount(businessId: widget.businessId, accountId: id);
+          final m = await _accountService.getAccount(
+            businessId: widget.businessId,
+            accountId: id,
+          );
           if (!mounted) return;
           setState(() {
             _selectedAccounts.add(Account.fromJson(m));
@@ -703,7 +849,9 @@ class _KardexPageState extends State<KardexPage> {
 
   Future<void> _hydrateInitialChecks(List<int> ids) async {
     try {
-      final added = <int>{ for (final it in _selectedChecks) int.tryParse(it.id) ?? -1 };
+      final added = <int>{
+        for (final it in _selectedChecks) int.tryParse(it.id) ?? -1,
+      };
       for (final id in ids) {
         if (added.contains(id)) continue;
         try {
@@ -714,13 +862,15 @@ class _KardexPageState extends State<KardexPage> {
           final bankName = (m['bank_name'] ?? '').toString();
           final sayad = (m['sayad_code'] ?? '').toString();
           setState(() {
-            _selectedChecks.add(CheckOption(
-              id: '$id',
-              number: checkNumber,
-              personName: personName,
-              bankName: bankName,
-              sayadCode: sayad,
-            ));
+            _selectedChecks.add(
+              CheckOption(
+                id: '$id',
+                number: checkNumber,
+                personName: personName,
+                bankName: bankName,
+                sayadCode: sayad,
+              ),
+            );
           });
         } catch (_) {}
       }
@@ -730,11 +880,16 @@ class _KardexPageState extends State<KardexPage> {
 
   Future<void> _hydrateInitialWarehouses(List<int> ids) async {
     try {
-      final added = <int>{ for (final it in _selectedWarehouses) int.tryParse('${it['id']}') ?? -1 };
+      final added = <int>{
+        for (final it in _selectedWarehouses) int.tryParse('${it['id']}') ?? -1,
+      };
       for (final id in ids) {
         if (added.contains(id)) continue;
         try {
-          final w = await _warehouseService.getWarehouse(businessId: widget.businessId, warehouseId: id);
+          final w = await _warehouseService.getWarehouse(
+            businessId: widget.businessId,
+            warehouseId: id,
+          );
           if (!mounted) return;
           setState(() {
             _selectedWarehouses.add(<String, dynamic>{
@@ -748,6 +903,7 @@ class _KardexPageState extends State<KardexPage> {
       _refreshData();
     } catch (_) {}
   }
+
   void _parseInitialQueryParams() {
     try {
       final routeState = GoRouterState.of(context);
@@ -755,7 +911,8 @@ class _KardexPageState extends State<KardexPage> {
       _log('Parsing query params: ' + uri.toString());
       List<int> _parseIds(String singularKey, String pluralKey) {
         final out = <int>{};
-        final repeated = uri.queryParametersAll[singularKey] ?? const <String>[];
+        final repeated =
+            uri.queryParametersAll[singularKey] ?? const <String>[];
         for (final v in repeated) {
           final p = int.tryParse(v);
           if (p != null) out.add(p);
@@ -773,13 +930,36 @@ class _KardexPageState extends State<KardexPage> {
       _initialPersonIds = _parseIds('person_id', 'person_ids');
       _initialProductIds = _parseIds('product_id', 'product_ids');
       _initialBankAccountIds = _parseIds('bank_account_id', 'bank_account_ids');
-      _initialCashRegisterIds = _parseIds('cash_register_id', 'cash_register_ids');
+      _initialCashRegisterIds = _parseIds(
+        'cash_register_id',
+        'cash_register_ids',
+      );
       _initialPettyCashIds = _parseIds('petty_cash_id', 'petty_cash_ids');
       _initialAccountIds = _parseIds('account_id', 'account_ids');
       _initialCheckIds = _parseIds('check_id', 'check_ids');
       _initialWarehouseIds = _parseIds('warehouse_id', 'warehouse_ids');
+      _selectedCurrencyId = int.tryParse(
+        uri.queryParameters['currency_id'] ?? '',
+      );
 
-      _log('Parsed initial ids | person=' + _initialPersonIds.toString() + ' product=' + _initialProductIds.toString() + ' bank=' + _initialBankAccountIds.toString() + ' cash=' + _initialCashRegisterIds.toString() + ' petty=' + _initialPettyCashIds.toString() + ' account=' + _initialAccountIds.toString() + ' check=' + _initialCheckIds.toString() + ' warehouse=' + _initialWarehouseIds.toString());
+      _log(
+        'Parsed initial ids | person=' +
+            _initialPersonIds.toString() +
+            ' product=' +
+            _initialProductIds.toString() +
+            ' bank=' +
+            _initialBankAccountIds.toString() +
+            ' cash=' +
+            _initialCashRegisterIds.toString() +
+            ' petty=' +
+            _initialPettyCashIds.toString() +
+            ' account=' +
+            _initialAccountIds.toString() +
+            ' check=' +
+            _initialCheckIds.toString() +
+            ' warehouse=' +
+            _initialWarehouseIds.toString(),
+      );
     } catch (_) {}
   }
 
@@ -787,21 +967,25 @@ class _KardexPageState extends State<KardexPage> {
     try {
       final svc = BusinessDashboardService(ApiClient());
       final items = await svc.listFiscalYears(widget.businessId);
+      final defaultFyId = await FiscalYearController.resolveDefaultId(widget.businessId, items);
       if (!mounted) return;
       setState(() {
         _fiscalYears = items;
-        final current = items.firstWhere(
-          (e) => (e['is_current'] == true),
-          orElse: () => const <String, dynamic>{},
-        );
-        final id = current['id'];
-        if (id is int) {
-          _selectedFiscalYearId = id;
-        }
+        _selectedFiscalYearId = defaultFyId;
       });
     } catch (_) {
       // ignore errors; dropdown remains empty
     }
+  }
+
+  Future<void> _loadCurrencies() async {
+    try {
+      final items = await CurrencyService(
+        ApiClient(),
+      ).listBusinessCurrencies(businessId: widget.businessId);
+      if (!mounted) return;
+      setState(() => _currencies = items);
+    } catch (_) {}
   }
 
   @override
@@ -832,464 +1016,630 @@ class _KardexPageState extends State<KardexPage> {
       child: Padding(
         padding: const EdgeInsets.all(8.0),
         child: Wrap(
-        spacing: 8,
-        runSpacing: 8,
-        crossAxisAlignment: WrapCrossAlignment.center,
-        children: [
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.filter_alt_outlined, size: 20),
-              const SizedBox(width: 6),
-              Text(t.filters, style: Theme.of(context).textTheme.titleSmall),
-            ],
-          ),
-          // Add filter button
-          ElevatedButton.icon(
-            key: _addFilterBtnKey,
-            onPressed: () async {
-              RelativeRect position = const RelativeRect.fromLTRB(100, 100, 0, 0);
-              try {
-                final RenderBox button = _addFilterBtnKey.currentContext!.findRenderObject() as RenderBox;
-                final RenderBox overlay = Overlay.of(context).context.findRenderObject() as RenderBox;
-                position = RelativeRect.fromRect(
-                  Rect.fromPoints(
-                    button.localToGlobal(Offset.zero, ancestor: overlay),
-                    button.localToGlobal(button.size.bottomRight(Offset.zero), ancestor: overlay),
-                  ),
-                  Offset.zero & overlay.size,
+          spacing: 8,
+          runSpacing: 8,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            if (shouldShowHesabixBackButton())
+              HesabixBackButton(businessId: widget.businessId),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.filter_alt_outlined, size: 20),
+                const SizedBox(width: 6),
+                Text(t.filters, style: Theme.of(context).textTheme.titleSmall),
+              ],
+            ),
+            // Add filter button
+            ElevatedButton.icon(
+              key: _addFilterBtnKey,
+              onPressed: () async {
+                RelativeRect position = const RelativeRect.fromLTRB(
+                  100,
+                  100,
+                  0,
+                  0,
                 );
-              } catch (_) {}
-              final picked = await showMenu<FilterType>(
-                context: context,
-                position: position,
-                items: [
-                  PopupMenuItem(value: FilterType.person, child: Text(t.addFilterPersons)),
-                  PopupMenuItem(value: FilterType.product, child: Text(t.addFilterProduct)),
-                  PopupMenuItem(value: FilterType.bank, child: Text(t.addFilterBank)),
-                  PopupMenuItem(value: FilterType.cash, child: Text(t.addFilterCash)),
-                  PopupMenuItem(value: FilterType.petty, child: Text(t.addFilterPetty)),
-                  PopupMenuItem(value: FilterType.account, child: Text(t.addFilterAccount)),
-                  PopupMenuItem(value: FilterType.check, child: Text(t.addFilterCheck)),
-                ],
-              );
-              if (picked != null && mounted) setState(() => _activePicker = picked);
-            },
-            icon: const Icon(Icons.add),
-            label: Text(t.addFilter),
-          ),
-          TextButton.icon(
-            onPressed: _clearAllFilters,
-            icon: const Icon(Icons.refresh),
-            label: Text(t.reset),
-          ),
+                try {
+                  final RenderBox button =
+                      _addFilterBtnKey.currentContext!.findRenderObject()
+                          as RenderBox;
+                  final RenderBox overlay =
+                      Overlay.of(context).context.findRenderObject()
+                          as RenderBox;
+                  position = RelativeRect.fromRect(
+                    Rect.fromPoints(
+                      button.localToGlobal(Offset.zero, ancestor: overlay),
+                      button.localToGlobal(
+                        button.size.bottomRight(Offset.zero),
+                        ancestor: overlay,
+                      ),
+                    ),
+                    Offset.zero & overlay.size,
+                  );
+                } catch (_) {}
+                final picked = await showMenu<FilterType>(
+                  context: context,
+                  position: position,
+                  items: [
+                    PopupMenuItem(
+                      value: FilterType.person,
+                      child: Text(t.addFilterPersons),
+                    ),
+                    PopupMenuItem(
+                      value: FilterType.product,
+                      child: Text(t.addFilterProduct),
+                    ),
+                    PopupMenuItem(
+                      value: FilterType.bank,
+                      child: Text(t.addFilterBank),
+                    ),
+                    PopupMenuItem(
+                      value: FilterType.cash,
+                      child: Text(t.addFilterCash),
+                    ),
+                    PopupMenuItem(
+                      value: FilterType.petty,
+                      child: Text(t.addFilterPetty),
+                    ),
+                    PopupMenuItem(
+                      value: FilterType.account,
+                      child: Text(t.addFilterAccount),
+                    ),
+                    PopupMenuItem(
+                      value: FilterType.check,
+                      child: Text(t.addFilterCheck),
+                    ),
+                  ],
+                );
+                if (picked != null && mounted)
+                  setState(() => _activePicker = picked);
+              },
+              icon: const Icon(Icons.add),
+              label: Text(t.addFilter),
+            ),
+            TextButton.icon(
+              onPressed: _clearAllFilters,
+              icon: const Icon(Icons.refresh),
+              label: Text(t.reset),
+            ),
 
-          // Presets controls
-          if (_presets.isNotEmpty)
+            // Presets controls
+            if (_presets.isNotEmpty)
+              SizedBox(
+                width: 220,
+                child: DropdownButtonFormField<String>(
+                  value: _selectedPresetName,
+                  items: _presets.keys
+                      .map(
+                        (name) => DropdownMenuItem<String>(
+                          value: name,
+                          child: Text(name),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: (v) => setState(() => _selectedPresetName = v),
+                  decoration: InputDecoration(
+                    labelText: t.presetsTitle,
+                    border: const OutlineInputBorder(),
+                    isDense: true,
+                  ),
+                ),
+              ),
+            if (_presets.isNotEmpty)
+              ElevatedButton.icon(
+                onPressed: (_selectedPresetName != null)
+                    ? () => _applyPreset(
+                        _presets[_selectedPresetName] ??
+                            const <String, dynamic>{},
+                      )
+                    : null,
+                icon: const Icon(Icons.playlist_add_check),
+                label: Text(t.applyPreset),
+              ),
+            if (_presets.isNotEmpty)
+              IconButton(
+                onPressed: (_selectedPresetName != null)
+                    ? () => _deletePreset(_selectedPresetName!)
+                    : null,
+                tooltip: t.deleteSelectedPreset,
+                icon: const Icon(Icons.delete_outline),
+              ),
+            TextButton.icon(
+              onPressed: () async {
+                final controller = TextEditingController();
+                final name = await showDialog<String>(
+                  context: context,
+                  builder: (ctx) => AlertDialog(
+                    title: Text(t.savePresetTitle),
+                    content: TextField(
+                      controller: controller,
+                      decoration: InputDecoration(hintText: t.presetNameHint),
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(ctx),
+                        child: Text(t.cancel),
+                      ),
+                      ElevatedButton(
+                        onPressed: () =>
+                            Navigator.pop(ctx, controller.text.trim()),
+                        child: Text(t.save),
+                      ),
+                    ],
+                  ),
+                );
+                if (name != null && name.isNotEmpty) {
+                  await _savePreset(name);
+                }
+              },
+              icon: const Icon(Icons.save_alt),
+              label: Text(t.savePreset),
+            ),
+
+            SizedBox(
+              width: 200,
+              child: DateInputField(
+                labelText: t.dateFrom,
+                value: _fromDate,
+                onChanged: (d) {
+                  setState(() => _fromDate = d);
+                  _scheduleApply();
+                },
+                calendarController: widget.calendarController,
+              ),
+            ),
+            SizedBox(
+              width: 200,
+              child: DateInputField(
+                labelText: t.dateTo,
+                value: _toDate,
+                onChanged: (d) {
+                  setState(() => _toDate = d);
+                  _scheduleApply();
+                },
+                calendarController: widget.calendarController,
+              ),
+            ),
             SizedBox(
               width: 220,
-              child: DropdownButtonFormField<String>(
-                value: _selectedPresetName,
-                items: _presets.keys
-                    .map((name) => DropdownMenuItem<String>(value: name, child: Text(name)))
-                    .toList(),
-                onChanged: (v) => setState(() => _selectedPresetName = v),
+              child: DropdownButtonFormField<int>(
+                isExpanded: true,
+                value: _selectedFiscalYearId,
                 decoration: InputDecoration(
-                  labelText: t.presetsTitle,
+                  labelText: t.fiscalYear,
                   border: const OutlineInputBorder(),
                   isDense: true,
                 ),
-              ),
-            ),
-          if (_presets.isNotEmpty)
-            ElevatedButton.icon(
-              onPressed: (_selectedPresetName != null)
-                  ? () => _applyPreset(_presets[_selectedPresetName] ?? const <String, dynamic>{})
-                  : null,
-              icon: const Icon(Icons.playlist_add_check),
-              label: Text(t.applyPreset),
-            ),
-          if (_presets.isNotEmpty)
-            IconButton(
-              onPressed: (_selectedPresetName != null)
-                  ? () => _deletePreset(_selectedPresetName!)
-                  : null,
-              tooltip: t.deleteSelectedPreset,
-              icon: const Icon(Icons.delete_outline),
-            ),
-          TextButton.icon(
-            onPressed: () async {
-              final controller = TextEditingController();
-              final name = await showGlassDialog<String>(
-                context: context,
-                builder: (ctx) => AlertDialog(
-                  title: Text(t.savePresetTitle),
-                  content: TextField(
-                    controller: controller,
-                    decoration: InputDecoration(hintText: t.presetNameHint),
-                  ),
-                  actions: [
-                    TextButton(onPressed: () => Navigator.pop(ctx), child: Text(t.cancel)),
-                    ElevatedButton(onPressed: () => Navigator.pop(ctx, controller.text.trim()), child: Text(t.save)),
-                  ],
-                ),
-              );
-              if (name != null && name.isNotEmpty) {
-                await _savePreset(name);
-              }
-            },
-            icon: const Icon(Icons.save_alt),
-            label: Text(t.savePreset),
-          ),
-
-          SizedBox(
-            width: 200,
-            child: DateInputField(
-              labelText: t.dateFrom,
-              value: _fromDate,
-              onChanged: (d) {
-                setState(() => _fromDate = d);
-                _scheduleApply();
-              },
-              calendarController: widget.calendarController,
-            ),
-          ),
-          SizedBox(
-            width: 200,
-            child: DateInputField(
-              labelText: t.dateTo,
-              value: _toDate,
-              onChanged: (d) {
-                setState(() => _toDate = d);
-                _scheduleApply();
-              },
-              calendarController: widget.calendarController,
-            ),
-          ),
-          SizedBox(
-            width: 220,
-            child: DropdownButtonFormField<int>(
-              isExpanded: true,
-              value: _selectedFiscalYearId,
-              decoration: InputDecoration(
-                labelText: t.fiscalYear,
-                border: const OutlineInputBorder(),
-                isDense: true,
-              ),
-              selectedItemBuilder: (ctx) {
-                return _fiscalYears.map<Widget>((fy) {
+                selectedItemBuilder: (ctx) {
+                  return _fiscalYears.map<Widget>((fy) {
+                    final id = fy['id'] as int?;
+                    final title = (fy['title'] ?? '').toString();
+                    final label = title.isNotEmpty ? title : 'FY ${id ?? ''}';
+                    return Align(
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        label,
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
+                        softWrap: false,
+                      ),
+                    );
+                  }).toList();
+                },
+                items: _fiscalYears.map<DropdownMenuItem<int>>((fy) {
                   final id = fy['id'] as int?;
                   final title = (fy['title'] ?? '').toString();
-                  final label = title.isNotEmpty ? title : 'FY ${id ?? ''}';
-                  return Align(
-                    alignment: Alignment.centerLeft,
+                  return DropdownMenuItem<int>(
+                    value: id,
                     child: Text(
-                      label,
+                      title.isNotEmpty ? title : 'FY ${id ?? ''}',
                       overflow: TextOverflow.ellipsis,
                       maxLines: 1,
                       softWrap: false,
                     ),
                   );
-                }).toList();
-              },
-              items: _fiscalYears.map<DropdownMenuItem<int>>((fy) {
-                final id = fy['id'] as int?;
-                final title = (fy['title'] ?? '').toString();
-                return DropdownMenuItem<int>(
-                  value: id,
-                  child: Text(
-                    title.isNotEmpty ? title : 'FY ${id ?? ''}',
-                    overflow: TextOverflow.ellipsis,
-                    maxLines: 1,
-                    softWrap: false,
-                  ),
-                );
-              }).toList(),
-              onChanged: (val) {
-                setState(() => _selectedFiscalYearId = val);
-                _scheduleApply();
-              },
+                }).toList(),
+                onChanged: (val) {
+                  setState(() => _selectedFiscalYearId = val);
+                  _scheduleApply();
+                },
+              ),
             ),
-          ),
-          // Unified filter chips bar
-          ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 1200),
-            child: Wrap(
-              spacing: 6,
-              runSpacing: 6,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              children: [
-                // Persons
-                ..._selectedPersons.map((p) => InputChip(
+            SizedBox(
+              width: 240,
+              child: DropdownButtonFormField<int?>(
+                value: _selectedCurrencyId,
+                isExpanded: true,
+                decoration: const InputDecoration(
+                  labelText: 'ارز',
+                  border: OutlineInputBorder(),
+                  isDense: true,
+                ),
+                items: [
+                  const DropdownMenuItem<int?>(
+                    value: null,
+                    child: Text('همه ارزها (معادل پایه)'),
+                  ),
+                  ..._currencies.map(
+                    (currency) => DropdownMenuItem<int?>(
+                      value: currency['id'] as int?,
+                      child: Text(
+                        '${currency['title'] ?? currency['code'] ?? ''}',
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ),
+                ],
+                onChanged: (value) {
+                  setState(() => _selectedCurrencyId = value);
+                  _scheduleApply();
+                },
+              ),
+            ),
+            // Unified filter chips bar
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 1200),
+              child: Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  // Persons
+                  ..._selectedPersons.map(
+                    (p) => InputChip(
                       label: Text('${t.accountTypePerson}: ${p.displayName}'),
                       onDeleted: () {
-                        setState(() => _selectedPersons.removeWhere((it) => it.id == p.id));
+                        setState(
+                          () => _selectedPersons.removeWhere(
+                            (it) => it.id == p.id,
+                          ),
+                        );
                         _scheduleApply();
                       },
-                      onPressed: () => setState(() => _activePicker = FilterType.person),
-                    )),
-                // Products
-                ..._selectedProducts.map((m) {
-                  final id = int.tryParse('${m['id']}') ?? 0;
-                  final code = (m['code'] ?? '').toString();
-                  final name = (m['name'] ?? '').toString();
-                  final label = code.isNotEmpty ? '$code - $name' : name;
-                  return InputChip(
-                    label: Text('${t.accountTypeProduct}: $label'),
-                    onDeleted: () {
-                      setState(() => _selectedProducts.removeWhere((x) => int.tryParse('${x['id']}') == id));
-                      _scheduleApply();
-                    },
-                    onPressed: () => setState(() => _activePicker = FilterType.product),
-                  );
-                }),
-                // Bank accounts
-                ..._selectedBankAccounts.map((b) => InputChip(
+                      onPressed: () =>
+                          setState(() => _activePicker = FilterType.person),
+                    ),
+                  ),
+                  // Products
+                  ..._selectedProducts.map((m) {
+                    final id = int.tryParse('${m['id']}') ?? 0;
+                    final code = (m['code'] ?? '').toString();
+                    final name = (m['name'] ?? '').toString();
+                    final label = code.isNotEmpty ? '$code - $name' : name;
+                    return InputChip(
+                      label: Text('${t.accountTypeProduct}: $label'),
+                      onDeleted: () {
+                        setState(
+                          () => _selectedProducts.removeWhere(
+                            (x) => int.tryParse('${x['id']}') == id,
+                          ),
+                        );
+                        _scheduleApply();
+                      },
+                      onPressed: () =>
+                          setState(() => _activePicker = FilterType.product),
+                    );
+                  }),
+                  // Bank accounts
+                  ..._selectedBankAccounts.map(
+                    (b) => InputChip(
                       label: Text('${t.accountTypeBank}: ${b.name}'),
                       onDeleted: () {
-                        setState(() => _selectedBankAccounts.removeWhere((x) => x.id == b.id));
+                        setState(
+                          () => _selectedBankAccounts.removeWhere(
+                            (x) => x.id == b.id,
+                          ),
+                        );
                         _scheduleApply();
                       },
-                      onPressed: () => setState(() => _activePicker = FilterType.bank),
-                    )),
-                // Cash registers
-                ..._selectedCashRegisters.map((c) => InputChip(
+                      onPressed: () =>
+                          setState(() => _activePicker = FilterType.bank),
+                    ),
+                  ),
+                  // Cash registers
+                  ..._selectedCashRegisters.map(
+                    (c) => InputChip(
                       label: Text('${t.accountTypeCashRegister}: ${c.name}'),
                       onDeleted: () {
-                        setState(() => _selectedCashRegisters.removeWhere((x) => x.id == c.id));
+                        setState(
+                          () => _selectedCashRegisters.removeWhere(
+                            (x) => x.id == c.id,
+                          ),
+                        );
                         _scheduleApply();
                       },
-                      onPressed: () => setState(() => _activePicker = FilterType.cash),
-                    )),
-                // Petty cash
-                ..._selectedPettyCash.map((p) => InputChip(
+                      onPressed: () =>
+                          setState(() => _activePicker = FilterType.cash),
+                    ),
+                  ),
+                  // Petty cash
+                  ..._selectedPettyCash.map(
+                    (p) => InputChip(
                       label: Text('${t.accountTypePettyCash}: ${p.name}'),
                       onDeleted: () {
-                        setState(() => _selectedPettyCash.removeWhere((x) => x.id == p.id));
+                        setState(
+                          () => _selectedPettyCash.removeWhere(
+                            (x) => x.id == p.id,
+                          ),
+                        );
                         _scheduleApply();
                       },
-                      onPressed: () => setState(() => _activePicker = FilterType.petty),
-                    )),
-                // Accounts
-                ..._selectedAccounts.map((a) => InputChip(
+                      onPressed: () =>
+                          setState(() => _activePicker = FilterType.petty),
+                    ),
+                  ),
+                  // Accounts
+                  ..._selectedAccounts.map(
+                    (a) => InputChip(
                       label: Text('${t.ledgerAccount}: ${a.code} - ${a.name}'),
                       onDeleted: () {
-                        setState(() => _selectedAccounts.removeWhere((x) => x.id == a.id));
+                        setState(
+                          () => _selectedAccounts.removeWhere(
+                            (x) => x.id == a.id,
+                          ),
+                        );
                         _scheduleApply();
                       },
-                      onPressed: () => setState(() => _activePicker = FilterType.account),
-                    )),
-                // Checks
-                ..._selectedChecks.map((c) => InputChip(
-                      label: Text('${t.accountTypeCheck}: ${c.number.isNotEmpty ? c.number : '#${c.id}'}'),
+                      onPressed: () =>
+                          setState(() => _activePicker = FilterType.account),
+                    ),
+                  ),
+                  // Checks
+                  ..._selectedChecks.map(
+                    (c) => InputChip(
+                      label: Text(
+                        '${t.accountTypeCheck}: ${c.number.isNotEmpty ? c.number : '#${c.id}'}',
+                      ),
                       onDeleted: () {
-                        setState(() => _selectedChecks.removeWhere((x) => x.id == c.id));
+                        setState(
+                          () =>
+                              _selectedChecks.removeWhere((x) => x.id == c.id),
+                        );
                         _scheduleApply();
                       },
-                      onPressed: () => setState(() => _activePicker = FilterType.check),
-                    )),
-                // Warehouses (no picker yet)
-                ..._selectedWarehouses.map((w) {
-                  final id = int.tryParse('${w['id']}') ?? 0;
-                  final code = (w['code'] ?? '').toString();
-                  final name = (w['name'] ?? '').toString();
-                  final label = code.isNotEmpty ? '$code - $name' : name;
-                  return InputChip(
-                    label: Text('${t.warehouse}: $label'),
-                    onDeleted: () {
-                      setState(() => _selectedWarehouses.removeWhere((x) => int.tryParse('${x['id']}') == id));
-                      _scheduleApply();
-                    },
-                  );
-                }),
-                // Active picker inline
-                if (_activePicker == FilterType.person)
-                  SizedBox(
-                    width: 260,
-                    child: PersonComboboxWidget(
-                      businessId: widget.businessId,
-                      selectedPerson: _personToAdd,
-                      onChanged: (person) {
-                        if (person == null) return;
-                        final exists = _selectedPersons.any((p) => p.id == person.id);
-                        setState(() {
-                          if (!exists) _selectedPersons.add(person);
-                          _personToAdd = null;
-                          _activePicker = null;
-                        });
-                        _scheduleApply();
-                      },
-                      hintText: t.addPerson,
+                      onPressed: () =>
+                          setState(() => _activePicker = FilterType.check),
                     ),
                   ),
-                if (_activePicker == FilterType.product)
-                  SizedBox(
-                    width: 260,
-                    child: ProductComboboxWidget(
-                      businessId: widget.businessId,
-                      selectedProduct: _productToAdd,
-                      onChanged: (prod) {
-                        if (prod == null) return;
-                        final pid = int.tryParse('${prod['id']}');
-                        final exists = _selectedProducts.any((m) => int.tryParse('${m['id']}') == pid);
-                        setState(() {
-                          if (!exists) _selectedProducts.add(prod);
-                          _productToAdd = null;
-                          _activePicker = null;
-                        });
+                  // Warehouses (no picker yet)
+                  ..._selectedWarehouses.map((w) {
+                    final id = int.tryParse('${w['id']}') ?? 0;
+                    final code = (w['code'] ?? '').toString();
+                    final name = (w['name'] ?? '').toString();
+                    final label = code.isNotEmpty ? '$code - $name' : name;
+                    return InputChip(
+                      label: Text('${t.warehouse}: $label'),
+                      onDeleted: () {
+                        setState(
+                          () => _selectedWarehouses.removeWhere(
+                            (x) => int.tryParse('${x['id']}') == id,
+                          ),
+                        );
                         _scheduleApply();
                       },
+                    );
+                  }),
+                  // Active picker inline
+                  if (_activePicker == FilterType.person)
+                    SizedBox(
+                      width: 260,
+                      child: PersonComboboxWidget(
+                        businessId: widget.businessId,
+                        selectedPerson: _personToAdd,
+                        onChanged: (person) {
+                          if (person == null) return;
+                          final exists = _selectedPersons.any(
+                            (p) => p.id == person.id,
+                          );
+                          setState(() {
+                            if (!exists) _selectedPersons.add(person);
+                            _personToAdd = null;
+                            _activePicker = null;
+                          });
+                          _scheduleApply();
+                        },
+                        hintText: t.addPerson,
+                      ),
                     ),
-                  ),
-                if (_activePicker == FilterType.bank)
-                  SizedBox(
-                    width: 260,
-                    child: BankAccountComboboxWidget(
-                      businessId: widget.businessId,
-                      selectedAccountId: _bankToAdd?.id,
-                      onChanged: (opt) {
-                        if (opt == null) return;
-                        final exists = _selectedBankAccounts.any((b) => b.id == opt.id);
-                        setState(() {
-                          if (!exists) _selectedBankAccounts.add(opt);
-                          _bankToAdd = null;
-                          _activePicker = null;
-                        });
-                        _scheduleApply();
-                      },
-                      hintText: t.addBankAccount,
+                  if (_activePicker == FilterType.product)
+                    SizedBox(
+                      width: 260,
+                      child: ProductComboboxWidget(
+                        businessId: widget.businessId,
+                        selectedProduct: _productToAdd,
+                        onChanged: (prod) {
+                          if (prod == null) return;
+                          final pid = int.tryParse('${prod['id']}');
+                          final exists = _selectedProducts.any(
+                            (m) => int.tryParse('${m['id']}') == pid,
+                          );
+                          setState(() {
+                            if (!exists) _selectedProducts.add(prod);
+                            _productToAdd = null;
+                            _activePicker = null;
+                          });
+                          _scheduleApply();
+                        },
+                      ),
                     ),
-                  ),
-                if (_activePicker == FilterType.cash)
-                  SizedBox(
-                    width: 260,
-                    child: CashRegisterComboboxWidget(
-                      businessId: widget.businessId,
-                      selectedRegisterId: _cashToAdd?.id,
-                      onChanged: (opt) {
-                        if (opt == null) return;
-                        final exists = _selectedCashRegisters.any((c) => c.id == opt.id);
-                        setState(() {
-                          if (!exists) _selectedCashRegisters.add(opt);
-                          _cashToAdd = null;
-                          _activePicker = null;
-                        });
-                        _scheduleApply();
-                      },
-                      hintText: t.addCash,
+                  if (_activePicker == FilterType.bank)
+                    SizedBox(
+                      width: 260,
+                      child: BankAccountComboboxWidget(
+                        businessId: widget.businessId,
+                        selectedAccountId: _bankToAdd?.id,
+                        onChanged: (opt) {
+                          if (opt == null) return;
+                          final exists = _selectedBankAccounts.any(
+                            (b) => b.id == opt.id,
+                          );
+                          setState(() {
+                            if (!exists) _selectedBankAccounts.add(opt);
+                            _bankToAdd = null;
+                            _activePicker = null;
+                          });
+                          _scheduleApply();
+                        },
+                        hintText: t.addBankAccount,
+                      ),
                     ),
-                  ),
-                if (_activePicker == FilterType.petty)
-                  SizedBox(
-                    width: 260,
-                    child: PettyCashComboboxWidget(
-                      businessId: widget.businessId,
-                      selectedPettyCashId: _pettyToAdd?.id,
-                      onChanged: (opt) {
-                        if (opt == null) return;
-                        final exists = _selectedPettyCash.any((p) => p.id == opt.id);
-                        setState(() {
-                          if (!exists) _selectedPettyCash.add(opt);
-                          _pettyToAdd = null;
-                          _activePicker = null;
-                        });
-                        _scheduleApply();
-                      },
-                      hintText: t.addPettyCash,
+                  if (_activePicker == FilterType.cash)
+                    SizedBox(
+                      width: 260,
+                      child: CashRegisterComboboxWidget(
+                        businessId: widget.businessId,
+                        selectedRegisterId: _cashToAdd?.id,
+                        onChanged: (opt) {
+                          if (opt == null) return;
+                          final exists = _selectedCashRegisters.any(
+                            (c) => c.id == opt.id,
+                          );
+                          setState(() {
+                            if (!exists) _selectedCashRegisters.add(opt);
+                            _cashToAdd = null;
+                            _activePicker = null;
+                          });
+                          _scheduleApply();
+                        },
+                        hintText: t.addCash,
+                      ),
                     ),
-                  ),
-                if (_activePicker == FilterType.account)
-                  SizedBox(
-                    width: 260,
-                    child: AccountTreeComboboxWidget(
-                      businessId: widget.businessId,
-                      selectedAccount: _accountToAdd,
-                      onChanged: (acc) {
-                        if (acc == null) return;
-                        final exists = _selectedAccounts.any((a) => a.id == acc.id);
-                        setState(() {
-                          if (!exists) _selectedAccounts.add(acc);
-                          _accountToAdd = null;
-                          _activePicker = null;
-                        });
-                        _scheduleApply();
-                      },
-                      hintText: t.addAccount,
+                  if (_activePicker == FilterType.petty)
+                    SizedBox(
+                      width: 260,
+                      child: PettyCashComboboxWidget(
+                        businessId: widget.businessId,
+                        selectedPettyCashId: _pettyToAdd?.id,
+                        onChanged: (opt) {
+                          if (opt == null) return;
+                          final exists = _selectedPettyCash.any(
+                            (p) => p.id == opt.id,
+                          );
+                          setState(() {
+                            if (!exists) _selectedPettyCash.add(opt);
+                            _pettyToAdd = null;
+                            _activePicker = null;
+                          });
+                          _scheduleApply();
+                        },
+                        hintText: t.addPettyCash,
+                      ),
                     ),
-                  ),
-                if (_activePicker == FilterType.check)
-                  SizedBox(
-                    width: 260,
-                    child: CheckComboboxWidget(
-                      businessId: widget.businessId,
-                      selectedCheckId: _checkToAdd?.id,
-                      onChanged: (opt) {
-                        if (opt == null) return;
-                        final exists = _selectedChecks.any((c) => c.id == opt.id);
-                        setState(() {
-                          if (!exists) _selectedChecks.add(opt);
-                          _checkToAdd = null;
-                          _activePicker = null;
-                        });
-                        _scheduleApply();
-                      },
+                  if (_activePicker == FilterType.account)
+                    SizedBox(
+                      width: 260,
+                      child: AccountTreeComboboxWidget(
+                        businessId: widget.businessId,
+                        selectedAccount: _accountToAdd,
+                        onChanged: (acc) {
+                          if (acc == null) return;
+                          final exists = _selectedAccounts.any(
+                            (a) => a.id == acc.id,
+                          );
+                          setState(() {
+                            if (!exists) _selectedAccounts.add(acc);
+                            _accountToAdd = null;
+                            _activePicker = null;
+                          });
+                          _scheduleApply();
+                        },
+                        hintText: t.addAccount,
+                      ),
                     ),
-                  ),
+                  if (_activePicker == FilterType.check)
+                    SizedBox(
+                      width: 260,
+                      child: CheckComboboxWidget(
+                        businessId: widget.businessId,
+                        selectedCheckId: _checkToAdd?.id,
+                        onChanged: (opt) {
+                          if (opt == null) return;
+                          final exists = _selectedChecks.any(
+                            (c) => c.id == opt.id,
+                          );
+                          setState(() {
+                            if (!exists) _selectedChecks.add(opt);
+                            _checkToAdd = null;
+                            _activePicker = null;
+                          });
+                          _scheduleApply();
+                        },
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            DropdownButton<String>(
+              value: _matchMode,
+              onChanged: (v) {
+                setState(() => _matchMode = v ?? 'any');
+                _scheduleApply();
+              },
+              items: [
+                DropdownMenuItem(value: 'any', child: Text(t.matchModeAny)),
+                DropdownMenuItem(
+                  value: 'same_line',
+                  child: Text(t.matchModeSameLine),
+                ),
+                DropdownMenuItem(
+                  value: 'document_and',
+                  child: Text(t.matchModeDocumentAnd),
+                ),
               ],
             ),
-          ),
-          DropdownButton<String>(
-            value: _matchMode,
-            onChanged: (v) {
-              setState(() => _matchMode = v ?? 'any');
-              _scheduleApply();
-            },
-            items: [
-              DropdownMenuItem(value: 'any', child: Text(t.matchModeAny)),
-              DropdownMenuItem(value: 'same_line', child: Text(t.matchModeSameLine)),
-              DropdownMenuItem(value: 'document_and', child: Text(t.matchModeDocumentAnd)),
-            ],
-          ),
-          DropdownButton<String>(
-            value: _resultScope,
-            onChanged: (v) {
-              setState(() => _resultScope = v ?? 'lines_matching');
-              _scheduleApply();
-            },
-            items: [
-              DropdownMenuItem(value: 'lines_matching', child: Text(t.resultScopeLinesMatching)),
-              DropdownMenuItem(value: 'lines_of_document', child: Text(t.resultScopeLinesOfDocument)),
-            ],
-          ),
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Switch(value: _includeRunningBalance, onChanged: (v) {
-                setState(() => _includeRunningBalance = v);
+            DropdownButton<String>(
+              value: _resultScope,
+              onChanged: (v) {
+                setState(() => _resultScope = v ?? 'lines_matching');
                 _scheduleApply();
-              }),
-              const SizedBox(width: 6),
-              Text(t.includeRunningBalance),
-            ],
-          ),
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Switch(value: _manualApply, onChanged: (v) => setState(() => _manualApply = v)),
-              const SizedBox(width: 6),
-              Text(t.applyManually),
-            ],
-          ),
-          ElevatedButton.icon(
-            onPressed: () {
-              _refreshData();
-              _updateRouteQuery();
-            },
-            icon: const Icon(Icons.search),
-            label: Text(t.applyFilter),
-          ),
-        ],
-      ),
+              },
+              items: [
+                DropdownMenuItem(
+                  value: 'lines_matching',
+                  child: Text(t.resultScopeLinesMatching),
+                ),
+                DropdownMenuItem(
+                  value: 'lines_of_document',
+                  child: Text(t.resultScopeLinesOfDocument),
+                ),
+              ],
+            ),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Switch(
+                  value: _includeRunningBalance,
+                  onChanged: (v) {
+                    setState(() => _includeRunningBalance = v);
+                    _scheduleApply();
+                  },
+                ),
+                const SizedBox(width: 6),
+                Text(t.includeRunningBalance),
+              ],
+            ),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Switch(
+                  value: _manualApply,
+                  onChanged: (v) => setState(() => _manualApply = v),
+                ),
+                const SizedBox(width: 6),
+                Text(t.applyManually),
+              ],
+            ),
+            ElevatedButton.icon(
+              onPressed: () {
+                _refreshData();
+                _updateRouteQuery();
+              },
+              icon: const Icon(Icons.search),
+              label: Text(t.applyFilter),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -1305,5 +1655,4 @@ class _KardexPageState extends State<KardexPage> {
       ),
     );
   }
-
 }

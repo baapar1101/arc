@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:hesabix_ui/theme/glass.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table.dart';
@@ -219,7 +218,7 @@ class _NotificationHistoryPageState extends State<NotificationHistoryPage> {
                 final date = DateTime.tryParse(createdAt);
                 if (date == null) return createdAt;
                 // استفاده از formatDateTime برای نمایش تاریخ و زمان
-                return MarkStreetDateUtils.formatDateTime(date, widget.calendarController.isJalali);
+                return HesabixDateUtils.formatDateTime(date, widget.calendarController.isJalali);
               },
             ),
             CustomColumn(
@@ -290,7 +289,7 @@ class _NotificationHistoryPageState extends State<NotificationHistoryPage> {
   }
 
   void _showNotificationDetails(BuildContext context, Map<String, dynamic> notification) {
-    showGlassDialog(
+    showDialog(
       context: context,
       builder: (context) => _NotificationDetailsDialog(
         notification: notification,
@@ -359,7 +358,7 @@ class _NotificationDetailsDialog extends StatelessWidget {
                     if (createdAt != null)
                       _buildDetailRow(
                         'تاریخ و زمان',
-                        MarkStreetDateUtils.formatDateTime(
+                        HesabixDateUtils.formatDateTime(
                           DateTime.tryParse(createdAt),
                           calendarController.isJalali,
                         ),

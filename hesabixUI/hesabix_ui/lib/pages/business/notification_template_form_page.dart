@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/api_client.dart';
@@ -939,7 +938,7 @@ class _NotificationTemplateFormPageState extends State<NotificationTemplateFormP
 
     final variables = et['available_variables'] as List? ?? [];
 
-    showGlassDialog(
+    showDialog(
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('متغیرها و فیلترها'),

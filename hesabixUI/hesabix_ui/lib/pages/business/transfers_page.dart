@@ -1,6 +1,5 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:hesabix_ui/theme/glass.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import '../../core/auth_store.dart';
 import '../../core/calendar_controller.dart';
@@ -9,7 +8,7 @@ import '../../models/transfer_document.dart';
 import '../../services/transfer_service.dart';
 import '../../widgets/data_table/data_table_widget.dart';
 import '../../widgets/data_table/data_table_config.dart';
-import '../../core/date_utils.dart' show MarkStreetDateUtils;
+import '../../core/date_utils.dart' show HesabixDateUtils;
 import '../../utils/number_formatters.dart' show formatWithThousands;
 import '../../widgets/date_input_field.dart';
 import '../../widgets/transfer/transfer_form_dialog.dart';
@@ -435,11 +434,11 @@ class _TransfersPageState extends State<TransfersPage> {
 
     if (_fromDate != null || _toDate != null) {
       final from = _fromDate != null
-          ? MarkStreetDateUtils.formatForDisplay(
+          ? HesabixDateUtils.formatForDisplay(
               _fromDate!, widget.calendarController.isJalali)
           : '—';
       final to = _toDate != null
-          ? MarkStreetDateUtils.formatForDisplay(
+          ? HesabixDateUtils.formatForDisplay(
               _toDate!, widget.calendarController.isJalali)
           : '—';
       chips.add(Chip(
@@ -772,8 +771,8 @@ class _TransfersPageState extends State<TransfersPage> {
 
   Map<String, dynamic> _transferTableExtraParams() {
     final m = <String, dynamic>{
-      if (_fromDate != null) 'from_date': MarkStreetDateUtils.formatForApiDate(_fromDate!),
-      if (_toDate != null) 'to_date': MarkStreetDateUtils.formatForApiDate(_toDate!),
+      if (_fromDate != null) 'from_date': HesabixDateUtils.formatForApiDate(_fromDate!),
+      if (_toDate != null) 'to_date': HesabixDateUtils.formatForApiDate(_toDate!),
       if (_selectedFiscalYearId != null) 'fiscal_year_id': _selectedFiscalYearId,
       if (_selectedProjectId != null) 'project_id': _selectedProjectId,
     };
@@ -826,7 +825,7 @@ class _TransfersPageState extends State<TransfersPage> {
           'document_date',
           'تاریخ سند',
           width: ColumnWidth.medium,
-          formatter: (it) => MarkStreetDateUtils.formatForDisplay(it.documentDate, widget.calendarController.isJalali),
+          formatter: (it) => HesabixDateUtils.formatForDisplay(it.documentDate, widget.calendarController.isJalali),
         ),
         TextColumn(
           'total_amount',
@@ -844,7 +843,7 @@ class _TransfersPageState extends State<TransfersPage> {
           'registered_at',
           'تاریخ ثبت',
           width: ColumnWidth.medium,
-          formatter: (it) => MarkStreetDateUtils.formatForDisplay(it.registeredAt, widget.calendarController.isJalali),
+          formatter: (it) => HesabixDateUtils.formatForDisplay(it.registeredAt, widget.calendarController.isJalali),
         ),
         TextColumn(
           'project_name',
@@ -921,7 +920,7 @@ class _TransfersPageState extends State<TransfersPage> {
   }
 
   void _onAddNew() async {
-    final result = await showGlassDialog<bool>(
+    final result = await showDialog<bool>(
       context: context,
       builder: (context) => TransferFormDialog(
         businessId: widget.businessId,
@@ -938,7 +937,7 @@ class _TransfersPageState extends State<TransfersPage> {
     final svc = TransferService(widget.apiClient);
     final full = await svc.getById(item.id);
     if (!mounted) return;
-    showGlassDialog(
+    showDialog(
       context: context,
       builder: (_) => TransferDetailsDialog(
         document: full,
@@ -951,7 +950,7 @@ class _TransfersPageState extends State<TransfersPage> {
     final svc = TransferService(widget.apiClient);
     final full = await svc.getById(item.id);
     if (!mounted) return;
-    final result = await showGlassDialog<bool>(
+    final result = await showDialog<bool>(
       context: context,
       builder: (_) => TransferFormDialog(
         businessId: widget.businessId,
@@ -966,7 +965,7 @@ class _TransfersPageState extends State<TransfersPage> {
   }
 
   void _onDelete(TransferDocument item) async {
-    final confirm = await showGlassDialog<bool>(
+    final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('حذف انتقال'),

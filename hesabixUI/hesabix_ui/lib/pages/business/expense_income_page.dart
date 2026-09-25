@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/services.dart';
 import 'package:uuid/uuid.dart';
 import '../../core/auth_store.dart';
@@ -368,7 +367,7 @@ class _ExpenseIncomePageState extends State<ExpenseIncomePage> {
   }
 
   Future<void> _save() async {
-    showGlassDialog(context: context, barrierDismissible: false, builder: (_) => const Center(child: CircularProgressIndicator()));
+    showDialog(context: context, barrierDismissible: false, builder: (_) => const Center(child: CircularProgressIndicator()));
     try {
       final service = ExpenseIncomeService(widget.apiClient);
       final itemLinesData = _itemLines

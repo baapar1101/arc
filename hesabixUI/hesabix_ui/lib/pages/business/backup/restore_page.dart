@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
-import 'package:hesabix_ui/theme/glass.dart';
 import 'package:go_router/go_router.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:dio/dio.dart';
@@ -151,7 +150,7 @@ class _BusinessRestorePageState extends State<BusinessRestorePage> {
       icon = Icons.info_outline;
     }
     
-    return showGlassDialog<bool>(
+    return showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         icon: Icon(icon, color: iconColor, size: 48),

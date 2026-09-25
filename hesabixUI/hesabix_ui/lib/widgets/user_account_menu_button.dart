@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:hesabix_ui/theme/glass.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import '../core/auth_store.dart';import '../utils/snackbar_helper.dart';
@@ -17,7 +16,7 @@ class UserAccountMenuButton extends StatelessWidget {
     final t = AppLocalizations.of(context);
     final cs = Theme.of(context).colorScheme;
 
-    showGlassDialog(
+    showDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: Text(t.profile),
@@ -59,7 +58,7 @@ class UserAccountMenuButton extends StatelessWidget {
   void _confirmLogout(BuildContext context) {
     final t = AppLocalizations.of(context);
     
-    showGlassDialog(
+    showDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: Text(t.logoutConfirmTitle),

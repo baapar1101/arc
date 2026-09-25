@@ -4,7 +4,6 @@ import 'dart:math' as math;
 import 'dart:ui' show FontFeature;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:data_table_2/data_table_2.dart';
@@ -1171,7 +1170,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
     // Initialize search type if not exists
     _columnSearchTypes[columnName] ??= '*';
 
-    showGlassDialog(
+    showDialog(
       context: context,
       builder: (context) => DataTableSearchDialog(
         columnName: columnName,
@@ -1399,7 +1398,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
   Future<void> _openColumnSettingsDialog() async {
     if (!widget.config.enableColumnSettings || _columnSettings == null) return;
 
-    final result = await showGlassDialog<ColumnSettings>(
+    final result = await showDialog<ColumnSettings>(
       context: context,
       builder: (context) => ColumnSettingsDialog(
         columns: widget.config.columns,
@@ -2480,7 +2479,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
   }
 
   void _showDataTableUserGuideDialog(AppLocalizations t, ThemeData theme) {
-    showGlassDialog<void>(
+    showDialog<void>(
       context: context,
       builder: (dialogContext) {
         final screenH = MediaQuery.sizeOf(dialogContext).height;

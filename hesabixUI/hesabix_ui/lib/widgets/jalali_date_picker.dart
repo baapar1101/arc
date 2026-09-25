@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:hesabix_ui/theme/glass.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shamsi_date/shamsi_date.dart';
 
@@ -148,7 +147,7 @@ Future<DateTime?> showJalaliDatePicker({
   required DateTime lastDate,
   String? helpText,
 }) {
-  return showGlassDialog<DateTime>(
+  return showDialog<DateTime>(
     context: context,
     builder: (context) => JalaliDatePicker(
       initialDate: initialDate,

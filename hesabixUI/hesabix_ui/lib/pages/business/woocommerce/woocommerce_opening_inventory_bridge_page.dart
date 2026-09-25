@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:hesabix_ui/theme/glass.dart';
 
 import '../../../core/auth_store.dart';
 import '../../../l10n/app_localizations.dart';
@@ -340,7 +339,7 @@ class _WoocommerceOpeningInventoryBridgePageState
     final phrase = _postConfirmPhrase ?? '';
     final ctl = TextEditingController();
     try {
-      final ok = await showGlassDialog<bool>(
+      final ok = await showDialog<bool>(
         context: context,
         builder: (ctx) => AlertDialog(
           title: Text(t.woocommerceOpeningInvPhrasePromptTitle),

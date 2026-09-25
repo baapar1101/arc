@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:hesabix_ui/theme/glass.dart';
 import '../../services/petty_cash_service.dart';
 import '../../core/api_client.dart';
 import '../../services/currency_service.dart';
@@ -233,7 +232,7 @@ class _PettyCashComboboxWidgetState extends State<PettyCashComboboxWidget> {
   }
 
   Future<void> _addNewPettyCash() async {
-    final result = await showGlassDialog<bool>(
+    final result = await showDialog<bool>(
       context: context,
       builder: (context) => PettyCashFormDialog(
         businessId: widget.businessId,

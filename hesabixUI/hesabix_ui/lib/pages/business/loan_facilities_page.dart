@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/services.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import '../../core/api_client.dart';
@@ -64,7 +63,7 @@ class LoanFacilitiesPage extends StatefulWidget {
     } else {
       if (!authStore.hasBusinessPermission('loan_facilities', 'edit')) return;
     }
-    await showGlassDialog<bool>(
+    await showDialog<bool>(
       context: context,
       barrierDismissible: false,
       builder: (ctx) => LoanFacilityUpsertDialog(
@@ -419,7 +418,7 @@ String _formatLoanFacilityDateLabel(CalendarController calendar, dynamic apiValu
   if (apiValue == null) return '—';
   final raw = apiValue.toString().trim();
   if (raw.isEmpty) return '—';
-  return MarkStreetDateUtils.formatApiDateForDisplay(apiValue, calendar.isJalali, fallback: '—');
+  return HesabixDateUtils.formatApiDateForDisplay(apiValue, calendar.isJalali, fallback: '—');
 }
 
 double _roundMoney(double value, int moneyDecimalPlaces) {
@@ -976,7 +975,7 @@ class _FacilityDetailSheetState extends State<_FacilityDetailSheet> {
 
   Future<void> _deleteFacility() async {
     final t = AppLocalizations.of(context);
-    final ok = await showGlassDialog<bool>(
+    final ok = await showDialog<bool>(
       context: context,
       builder: (dCtx) {
         final dt = AppLocalizations.of(dCtx);
@@ -1014,7 +1013,7 @@ class _FacilityDetailSheetState extends State<_FacilityDetailSheet> {
     final d = _detail;
     if (d == null) return;
     final t = AppLocalizations.of(context);
-    final ok = await showGlassDialog<bool>(
+    final ok = await showDialog<bool>(
       context: context,
       builder: (dlgCtx) => _RegenerateScheduleDialog(
         businessId: widget.businessId,
@@ -1035,7 +1034,7 @@ class _FacilityDetailSheetState extends State<_FacilityDetailSheet> {
   }
 
   void _showDocument(BuildContext ctx, int documentId) {
-    showGlassDialog<void>(
+    showDialog<void>(
       context: ctx,
       builder: (_) => DocumentDetailsDialog(
         documentId: documentId,
@@ -1051,7 +1050,7 @@ class _FacilityDetailSheetState extends State<_FacilityDetailSheet> {
   }) async {
     final pid = _asInt(pay['id']);
     if (pid == null) return;
-    final ok = await showGlassDialog<bool>(
+    final ok = await showDialog<bool>(
       context: ctx,
       builder: (dCtx) {
         final dt = AppLocalizations.of(dCtx);
@@ -1106,7 +1105,7 @@ class _FacilityDetailSheetState extends State<_FacilityDetailSheet> {
     String? bankIdStr;
     final allowPayDec = moneyDp > 0;
 
-    final submitted = await showGlassDialog<bool>(
+    final submitted = await showDialog<bool>(
       context: sheetCtx,
       builder: (dlgCtx) {
         final dt = AppLocalizations.of(dlgCtx);

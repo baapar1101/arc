@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/services.dart';
 import '../../core/api_client.dart';
 import '../../core/calendar_controller.dart';
@@ -60,7 +59,7 @@ class _ApiKeysPageState extends State<ApiKeysPage> {
   }
 
   Future<void> _createApiKey() async {
-    final result = await showGlassDialog<Map<String, dynamic>>(
+    final result = await showDialog<Map<String, dynamic>>(
       context: context,
       builder: (context) => _CreateApiKeyDialog(calendarController: widget.calendarController),
     );
@@ -97,7 +96,7 @@ class _ApiKeysPageState extends State<ApiKeysPage> {
 
   Future<void> _showApiKeyDialog(String apiKey) async {
     final t = AppLocalizations.of(context);
-    return showGlassDialog(
+    return showDialog(
       context: context,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -173,7 +172,7 @@ class _ApiKeysPageState extends State<ApiKeysPage> {
   }
 
   Future<void> _editApiKey(Map<String, dynamic> apiKey) async {
-    final result = await showGlassDialog<Map<String, dynamic>>(
+    final result = await showDialog<Map<String, dynamic>>(
       context: context,
       builder: (context) => _EditApiKeyDialog(
         apiKey: apiKey,
@@ -212,7 +211,7 @@ class _ApiKeysPageState extends State<ApiKeysPage> {
   Future<void> _deleteApiKey(Map<String, dynamic> apiKey) async {
     final t = AppLocalizations.of(context);
     final keyName = apiKey['name'] ?? t.apiKeyWithoutName;
-    final confirmed = await showGlassDialog<bool>(
+    final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -469,7 +468,7 @@ class _ApiKeyCard extends StatelessWidget {
                 context,
                 icon: Icons.calendar_today_outlined,
                 label: t.apiKeyCreatedAt,
-                value: MarkStreetDateUtils.formatDateTime(created, isJalali),
+                value: HesabixDateUtils.formatDateTime(created, isJalali),
               ),
             ],
             if (lastUsed != null) ...[
@@ -478,7 +477,7 @@ class _ApiKeyCard extends StatelessWidget {
                 context,
                 icon: Icons.access_time_outlined,
                 label: t.apiKeyLastUsed,
-                value: MarkStreetDateUtils.formatDateTime(lastUsed, isJalali),
+                value: HesabixDateUtils.formatDateTime(lastUsed, isJalali),
               ),
             ],
             if (expiresAt != null) ...[
@@ -487,7 +486,7 @@ class _ApiKeyCard extends StatelessWidget {
                 context,
                 icon: Icons.event_outlined,
                 label: t.apiKeyExpiresAt,
-                value: MarkStreetDateUtils.formatDateTime(expiresAt, isJalali),
+                value: HesabixDateUtils.formatDateTime(expiresAt, isJalali),
                 valueColor: expiresAt.isBefore(DateTime.now()) ? theme.colorScheme.error : null,
               ),
             ],
@@ -497,7 +496,7 @@ class _ApiKeyCard extends StatelessWidget {
                 context,
                 icon: Icons.block_outlined,
                 label: t.apiKeyRevokedAt,
-                value: MarkStreetDateUtils.formatDateTime(revokedAt, isJalali),
+                value: HesabixDateUtils.formatDateTime(revokedAt, isJalali),
                 valueColor: theme.colorScheme.error,
               ),
             ],
@@ -1061,7 +1060,7 @@ class _DateTimeInputFieldState extends State<_DateTimeInputField> {
     final theme = Theme.of(context);
     final isJalali = widget.calendarController.isJalali;
     final dateDisplay = _selectedDate != null
-        ? MarkStreetDateUtils.formatForDisplay(_selectedDate, isJalali)
+        ? HesabixDateUtils.formatForDisplay(_selectedDate, isJalali)
         : '';
     final timeDisplay = _selectedTime != null
         ? '${_selectedTime!.hour.toString().padLeft(2, '0')}:${_selectedTime!.minute.toString().padLeft(2, '0')}'
@@ -1136,7 +1135,7 @@ class _DateTimeInputFieldState extends State<_DateTimeInputField> {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    MarkStreetDateUtils.formatDateTime(
+                    HesabixDateUtils.formatDateTime(
                       DateTime(
                         _selectedDate!.year,
                         _selectedDate!.month,

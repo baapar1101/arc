@@ -110,12 +110,12 @@ class _TopSuppliersReportPageState extends State<TopSuppliersReportPage> {
     if (value is String) {
       try {
         final dt = DateTime.parse(value);
-        return MarkStreetDateUtils.formatForDisplay(dt, widget.calendarController.isJalali);
+        return HesabixDateUtils.formatForDisplay(dt, widget.calendarController.isJalali);
       } catch (_) {
         return value;
       }
     }
-    return MarkStreetDateUtils.formatForDisplay(
+    return HesabixDateUtils.formatForDisplay(
       value is DateTime ? value : null,
       widget.calendarController.isJalali,
     );

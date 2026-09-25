@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:hesabix_ui/theme/glass.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'calendar_switcher.dart';
 import 'language_switcher.dart';
@@ -24,7 +23,7 @@ class SettingsMenuButton extends StatelessWidget {
   void _showSettingsDialog(BuildContext context) {
     final t = AppLocalizations.of(context);
 
-    showGlassDialog(
+    showDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: Text(t.settings),

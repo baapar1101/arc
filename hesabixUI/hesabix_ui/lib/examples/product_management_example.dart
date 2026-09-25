@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:hesabix_ui/theme/glass.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import '../../core/auth_store.dart';
 import '../widgets/product/product_form_dialog.dart';
@@ -109,7 +108,7 @@ class ProductManagementExample extends StatelessWidget {
   }
 
   void _showAddProductDialog(BuildContext context) {
-    showGlassDialog(
+    showDialog(
       context: context,
       barrierDismissible: false,
       builder: (context) => ProductFormDialog(
@@ -141,7 +140,7 @@ class ProductManagementExample extends StatelessWidget {
       'is_purchase_taxable': false,
     };
 
-    showGlassDialog(
+    showDialog(
       context: context,
       barrierDismissible: false,
       builder: (context) => ProductFormDialog(
@@ -161,7 +160,7 @@ class ProductManagementExample extends StatelessWidget {
   }
 
   void _showDeleteConfirmation(BuildContext context, int productId, String productName) {
-    showGlassDialog(
+    showDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('تأیید حذف'),

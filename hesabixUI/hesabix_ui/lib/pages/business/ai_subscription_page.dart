@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:hesabix_ui/theme/glass.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/core/business_route_paths.dart';
@@ -158,7 +157,7 @@ class _AISubscriptionPageState extends State<AISubscriptionPage> {
     if (!_planRequiresPayment(plan)) return true;
     final periodLabel = _billingPeriod == 'yearly' ? 'سالانه' : 'ماهانه';
     final action = isUpgrade ? 'ارتقا به' : 'فعال‌سازی';
-    return await showGlassDialog<bool>(
+    return await showDialog<bool>(
           context: context,
           builder: (context) => AlertDialog(
             title: Text('$action ${plan.name}'),
@@ -262,7 +261,7 @@ class _AISubscriptionPageState extends State<AISubscriptionPage> {
   }
 
   Future<void> _cancelSubscription() async {
-    if (await showGlassDialog<bool>(
+    if (await showDialog<bool>(
           context: context,
           builder: (context) => AlertDialog(
             title: const Text('لغو اشتراک'),
@@ -589,7 +588,7 @@ class _SubscriptionHero extends StatelessWidget {
           if (subscription!.periodEnd != null) ...[
             const SizedBox(height: 12),
             Text(
-              'تاریخ انقضا: ${MarkStreetDateUtils.formatForDisplay(subscription!.periodEnd!.toLocal(), isJalali)}',
+              'تاریخ انقضا: ${HesabixDateUtils.formatForDisplay(subscription!.periodEnd!.toLocal(), isJalali)}',
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: theme.colorScheme.onPrimary.withValues(alpha: 0.9),
               ),
@@ -667,7 +666,7 @@ class _UsageSummary extends StatelessWidget {
                     avatar: Icon(Icons.hourglass_bottom,
                         size: 16, color: theme.colorScheme.primary),
                     label: Text(
-                      'تا ${MarkStreetDateUtils.formatForDisplay(
+                      'تا ${HesabixDateUtils.formatForDisplay(
                         subscription!.periodEnd!.toLocal(),
                         isJalali,
                       )}',

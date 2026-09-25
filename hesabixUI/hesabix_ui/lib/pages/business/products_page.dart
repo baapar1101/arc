@@ -4,7 +4,6 @@ import 'package:file_picker/file_picker.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:hesabix_ui/theme/glass.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import '../../widgets/data_table/data_table_widget.dart';
@@ -202,7 +201,7 @@ class _ProductsPageState extends State<ProductsPage> {
   }
 
   Future<void> _showProductPriceReportExportDialog() async {
-    await showGlassDialog<void>(
+    await showDialog<void>(
       context: context,
       builder: (ctx) => _ProductPriceReportExportDialog(
         businessId: widget.businessId,
@@ -1046,7 +1045,7 @@ class _ProductsPageState extends State<ProductsPage> {
     final overUsage = (error['over_usage_gb'] as num?)?.toDouble() ?? 0.0;
     final required = (error['required_gb'] as num?)?.toDouble() ?? 0.0;
     
-    await showGlassDialog(
+    await showDialog(
       context: context,
       builder: (ctx) {
         final theme = Theme.of(ctx);
@@ -1172,7 +1171,7 @@ class _ProductsPageState extends State<ProductsPage> {
     final attachmentsKey = AttachedFilesWidgetKey();
     bool uploadingFile = false;
     
-    await showGlassDialog<void>(
+    await showDialog<void>(
       context: context,
       builder: (dialogContext) {
         return StatefulBuilder(
@@ -1382,7 +1381,7 @@ class _ProductsPageState extends State<ProductsPage> {
   /// نمایش دیالوگ تصویر
   void _showImageDialog(BuildContext context, String imageUrl) {
     final isMobile = ResponsiveHelper.isMobile(context);
-    showGlassDialog(
+    showDialog(
       context: context,
       builder: (dialogContext) => Dialog(
         backgroundColor: Colors.transparent,
@@ -1862,7 +1861,7 @@ class _ProductsPageState extends State<ProductsPage> {
                 icon: Icons.edit,
                 label: t.edit,
                 onTap: (row) async {
-                  await showGlassDialog<Object?>(
+                  await showDialog<Object?>(
                     context: context,
                     builder: (ctx) => ProductFormDialog(
                       businessId: widget.businessId,
@@ -1894,7 +1893,7 @@ class _ProductsPageState extends State<ProductsPage> {
                       );
                       return;
                     }
-                    await showGlassDialog<Object?>(
+                    await showDialog<Object?>(
                       context: context,
                       builder: (ctx) => ProductFormDialog(
                         businessId: widget.businessId,
@@ -1915,7 +1914,7 @@ class _ProductsPageState extends State<ProductsPage> {
                 isDestructive: true,
                 onTap: (row) async {
                   final t = AppLocalizations.of(context);
-                  final confirm = await showGlassDialog<bool>(
+                  final confirm = await showDialog<bool>(
                     context: context,
                     builder: (ctx) => AlertDialog(
                       title: Text(t.deleteProducts),
@@ -1985,7 +1984,7 @@ class _ProductsPageState extends State<ProductsPage> {
                         }
                       }
                       if (ids.isEmpty) return;
-                      final confirm = await showGlassDialog<bool>(
+                      final confirm = await showDialog<bool>(
                         context: context,
                         builder: (ctx) => AlertDialog(
                           title: Text(t.deleteProducts),
@@ -2107,7 +2106,7 @@ class _ProductsPageState extends State<ProductsPage> {
                       }
                       if (ids.isEmpty) return;
 
-                      await showGlassDialog<bool>(
+                      await showDialog<bool>(
                         context: context,
                         builder: (ctx) => BulkDefaultWarehouseDialog(
                           businessId: widget.businessId,
@@ -2134,7 +2133,7 @@ class _ProductsPageState extends State<ProductsPage> {
               message: t.importFromExcel,
               child: IconButton(
                 onPressed: () async {
-                  final ok = await showGlassDialog<bool>(
+                  final ok = await showDialog<bool>(
                     context: context,
                     builder: (ctx) => ProductImportDialog(
                       businessId: widget.businessId,
@@ -2153,7 +2152,7 @@ class _ProductsPageState extends State<ProductsPage> {
               message: t.bulkPriceUpdateTitle,
               child: IconButton(
                 onPressed: () async {
-                  await showGlassDialog<bool>(
+                  await showDialog<bool>(
                     context: context,
                     builder: (ctx) => BulkPriceUpdateDialog(
                       businessId: widget.businessId,
@@ -2190,7 +2189,7 @@ class _ProductsPageState extends State<ProductsPage> {
               message: t.addProduct,
               child: IconButton(
                 onPressed: () async {
-                  await showGlassDialog<Object?>(
+                  await showDialog<Object?>(
                     context: context,
                     builder: (ctx) => ProductFormDialog(
                       businessId: widget.businessId,
@@ -2210,7 +2209,7 @@ class _ProductsPageState extends State<ProductsPage> {
               message: t.managePriceLists,
               child: IconButton(
                 onPressed: () async {
-                  await showGlassDialog<void>(
+                  await showDialog<void>(
                     context: context,
                     builder: (ctx) => AlertDialog(
                       title: Text(t.managePriceLists),
@@ -2837,7 +2836,7 @@ class _ProductStockTabWidgetState extends State<_ProductStockTabWidget> {
                           readOnly: true,
                           controller: TextEditingController(
                             text: _stockAsOfDate != null
-                                ? MarkStreetDateUtils.formatForDisplay(
+                                ? HesabixDateUtils.formatForDisplay(
                                     _stockAsOfDate,
                                     ApiClient.getCalendarController()?.isJalali ?? true,
                                   )

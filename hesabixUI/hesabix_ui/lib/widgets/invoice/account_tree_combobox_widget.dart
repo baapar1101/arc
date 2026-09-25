@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:hesabix_ui/theme/glass.dart';
 import '../../models/account_model.dart';
 import '../../models/account_tree_node.dart';
 import '../../services/account_service.dart';
@@ -137,7 +136,7 @@ class _AccountTreeComboboxWidgetState extends State<AccountTreeComboboxWidget> {
   }
 
   void _showAccountTreeDialog() {
-    showGlassDialog(
+    showDialog(
       context: context,
       builder: (context) => _AccountTreeDialog(
         accountTree: _accountTree,

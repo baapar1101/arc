@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:hesabix_ui/theme/glass.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/core/api_client.dart';
@@ -194,7 +193,7 @@ class _BusinessBackupPageState extends State<BusinessBackupPage> {
 
   Future<void> _delete(String id) async {
     final t = AppLocalizations.of(context);
-    final confirm = await showGlassDialog<bool>(
+    final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(t.delete),
@@ -568,7 +567,7 @@ class _BusinessBackupPageState extends State<BusinessBackupPage> {
     final isNoPlan = errorCode == 'NO_ACTIVE_STORAGE_PLAN';
     
     if (!mounted) return;
-    await showGlassDialog(
+    await showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         title: Row(

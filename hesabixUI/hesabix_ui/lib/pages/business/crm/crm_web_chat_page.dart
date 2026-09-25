@@ -5,7 +5,6 @@ import 'package:desktop_drop/desktop_drop.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
-import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -242,7 +241,7 @@ class _CrmWebChatPageState extends State<CrmWebChatPage> {
     final body = _statusFilter == null
         ? t.crmWebChatBulkDeleteConfirmAll
         : t.crmWebChatBulkDeleteConfirmStatus(_statusLabelForBulk(t, _statusFilter!));
-    final ok = await showGlassDialog<bool>(
+    final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(t.crmWebChatBulkDeleteTitle),
@@ -849,7 +848,7 @@ class _CrmWebChatPageState extends State<CrmWebChatPage> {
     final mid = (msg['id'] as num?)?.toInt();
     if (cid == null || mid == null) return;
     final controller = TextEditingController(text: msg['body']?.toString() ?? '');
-    final ok = await showGlassDialog<bool>(
+    final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) {
         final loc = AppLocalizations.of(ctx);
@@ -1897,7 +1896,7 @@ class _CrmWebChatPageState extends State<CrmWebChatPage> {
                                           padding: EdgeInsets.zero,
                                           onSelected: (v) async {
                                             if (v != 'delete') return;
-                                            final ok = await showGlassDialog<bool>(
+                                            final ok = await showDialog<bool>(
                                               context: context,
                                               builder: (ctx) => AlertDialog(
                                                 title: Text(t.crmWebChatDeleteConversation),
@@ -2188,7 +2187,7 @@ class _CrmWebChatPageState extends State<CrmWebChatPage> {
                               onPressed: () async {
                                 final id = (m['id'] as num?)?.toInt();
                                 if (id == null) return;
-                                final ok = await showGlassDialog<bool>(
+                                final ok = await showDialog<bool>(
                                   context: context,
                                   builder: (ctx) => AlertDialog(
                                     title: Text(t.crmWebChatDeleteMessage),

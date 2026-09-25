@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:hesabix_ui/theme/glass.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/core/api_client.dart';
@@ -326,7 +325,7 @@ class _BankAccountsPageState extends State<BankAccountsPage> {
                   }
                   if (ids.isEmpty) return;
 
-                  final confirm = await showGlassDialog<bool>(
+                  final confirm = await showDialog<bool>(
                     context: context,
                     builder: (ctx) => AlertDialog(
                       title: Text(t.deleteBankAccounts),
@@ -368,7 +367,7 @@ class _BankAccountsPageState extends State<BankAccountsPage> {
   }
 
   void _addBankAccount() {
-    showGlassDialog(
+    showDialog(
       context: context,
       builder: (context) => BankAccountFormDialog(
         businessId: widget.businessId,
@@ -385,7 +384,7 @@ class _BankAccountsPageState extends State<BankAccountsPage> {
   }
 
   void _editBankAccount(BankAccount account) {
-    showGlassDialog(
+    showDialog(
       context: context,
       builder: (context) => BankAccountFormDialog(
         businessId: widget.businessId,
@@ -404,7 +403,7 @@ class _BankAccountsPageState extends State<BankAccountsPage> {
   void _deleteBankAccount(BankAccount account) {
     final t = AppLocalizations.of(context);
     
-    showGlassDialog(
+    showDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: Text(t.deleteBankAccount),

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:hesabix_ui/theme/glass.dart';
 import 'storage_config_list_widget.dart';
 import 'storage_config_form_dialog.dart';
 import '../../../utils/snackbar_helper.dart';
@@ -58,7 +57,7 @@ class _StorageManagementPageState extends State<StorageManagementPage> {
   }
 
   void _showCreateDialog(BuildContext context) {
-    showGlassDialog(
+    showDialog(
       context: context,
       builder: (context) => StorageConfigFormDialog(
         onSaved: () {

@@ -1,20 +1,24 @@
 import 'package:dio/dio.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
-import 'package:printing/printing.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'package:hesabix_ui/config/app_config.dart';
+import 'package:hesabix_ui/config/brand_config.dart';
 import 'package:hesabix_ui/core/date_utils.dart';
 import 'package:hesabix_ui/models/invoice_type_model.dart';
 import 'package:hesabix_ui/services/public_invoice_share_service.dart';
+import 'package:hesabix_ui/utils/api_datetime_display.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
+import 'package:hesabix_ui/utils/number_normalizer.dart'
+    show EnglishDigitsFormatter, ThousandsSeparatorInputFormatter, formatNumberForInput, parseFormattedDouble;
+import 'package:hesabix_ui/utils/invoice_payable_total.dart';
 import 'package:hesabix_ui/utils/snackbar_helper.dart';
-import 'package:hesabix_ui/utils/web/web_utils.dart' as web_utils;
+import 'package:hesabix_ui/widgets/invoice/invoice_fx_dual_totals_banner.dart';
+import 'package:hesabix_ui/services/bytes_export/bytes_export_service.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 class PublicInvoiceShareLinkPage extends StatefulWidget {
   final String code;
@@ -124,16 +128,24 @@ class _PublicInvoiceShareLinkPageState extends State<PublicInvoiceShareLinkPage>
     if (s.isEmpty) return '—';
     final dt = DateTime.tryParse(s);
     if (dt == null) return s;
-    return MarkStreetDateUtils.formatForDisplay(dt.toLocal(), _useJalaliCalendar);
+    return HesabixDateUtils.formatForDisplay(dt.toLocal(), _useJalaliCalendar);
   }
 
-  String _formatDateTimeField(dynamic raw) {
+  String _formatDateTimeField(dynamic raw, {Map<String, dynamic>? map, String key = 'registered_at'}) {
+    if (map != null) {
+      final display = resolveApiDateTimeDisplay(map, key);
+      if (display.isNotEmpty) return display;
+    }
     if (raw == null) return '—';
     final s = raw.toString();
     if (s.isEmpty) return '—';
-    final dt = DateTime.tryParse(s);
-    if (dt == null) return s;
-    return MarkStreetDateUtils.formatDateTime(dt.toLocal(), _useJalaliCalendar);
+    if (RegExp(r'^\d{4}/').hasMatch(s.trim())) return s;
+    try {
+      final dt = s.endsWith('Z') ? DateTime.parse(s).toLocal() : DateTime.parse(s);
+      return HesabixDateUtils.formatDateTime(dt, _useJalaliCalendar);
+    } catch (_) {
+      return s;
+    }
   }
 
   String _documentTypeLabel(String? type) {
@@ -175,21 +187,17 @@ class _PublicInvoiceShareLinkPageState extends State<PublicInvoiceShareLinkPage>
       );
       if (bytes.isEmpty) return;
       final name = 'invoice_${widget.code}.pdf';
-      if (kIsWeb) {
-        await web_utils.saveBytesAsFileWeb(
-          bytes,
-          name,
-          mimeType: 'application/pdf',
-        );
-      } else {
-        await Printing.sharePdf(
-          bytes: Uint8List.fromList(bytes),
-          filename: name,
-        );
-      }
+      final result = await BytesExportService.export(
+        bytes: bytes,
+        filename: name,
+        mimeType: 'application/pdf',
+        mode: BytesExportMode.share,
+      );
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('فایل PDF آماده شد')),
+      BytesExportService.showFeedback(
+        context,
+        result,
+        successOverride: 'فایل PDF آماده شد',
       );
     } on DioException catch (e) {
       if (!mounted) return;
@@ -319,6 +327,10 @@ class _PublicInvoiceShareLinkPageState extends State<PublicInvoiceShareLinkPage>
               ],
               const SizedBox(height: 16),
               _buildTotalsCard(theme, totals, curSuffix, adjustments: adjustments),
+              if (_fxDualBanner(business, invoice) != null) ...[
+                const SizedBox(height: 8),
+                _fxDualBanner(business, invoice)!,
+              ],
               if (_showOnlinePayment(data)) ...[
                 const SizedBox(height: 16),
                 _buildOnlinePaymentCard(theme, data, curSuffix),
@@ -404,7 +416,10 @@ class _PublicInvoiceShareLinkPageState extends State<PublicInvoiceShareLinkPage>
             const SizedBox(width: 12),
             Expanded(
               child: Text(
-                auth['message_fa']?.toString() ?? 'این فاکتور در سامانه مارک‌استریت (MarkStreet) ثبت شده است.',
+                BrandConfig.rebrand(
+                  auth['message_fa']?.toString() ??
+                      'این فاکتور در سامانه حسابیکس (Hesabix) ثبت شده است.',
+                ),
                 style: theme.textTheme.bodyLarge?.copyWith(
                   fontWeight: FontWeight.w600,
                 ),
@@ -429,7 +444,7 @@ class _PublicInvoiceShareLinkPageState extends State<PublicInvoiceShareLinkPage>
     if (expires != null && expires.isNotEmpty) {
       final dt = DateTime.tryParse(expires);
       if (dt != null) {
-        final label = MarkStreetDateUtils.formatDateTime(dt.toLocal(), _useJalaliCalendar);
+        final label = HesabixDateUtils.formatDateTime(dt.toLocal(), _useJalaliCalendar);
         if (remaining is num) {
           final h = _formatInt(remaining.round());
           expLine = 'انقضای لینک: $label (حدود $h ساعت باقی‌مانده)';
@@ -656,7 +671,7 @@ class _PublicInvoiceShareLinkPageState extends State<PublicInvoiceShareLinkPage>
   ) {
     final rows = <_MetaPair>[
       _MetaPair('تاریخ سند', _formatDateField(inv['document_date'])),
-      _MetaPair('زمان ثبت', _formatDateTimeField(inv['registered_at'])),
+      _MetaPair('زمان ثبت', _formatDateTimeField(inv['registered_at'], map: inv, key: 'registered_at')),
     ];
 
     final due = extra['due_date'];
@@ -843,10 +858,10 @@ class _PublicInvoiceShareLinkPageState extends State<PublicInvoiceShareLinkPage>
     ThemeData theme,
     List<Map<String, dynamic>> rows,
   ) {
-    final addBg = Colors.green.shade50;
-    final dedBg = Colors.red.shade50;
-    final addAccent = Colors.green.shade700;
-    final dedAccent = Colors.red.shade700;
+    final addBg = SemanticColorResolver.positive(context).withValues(alpha: 0.12);
+    final dedBg = SemanticColorResolver.negative(context).withValues(alpha: 0.12);
+    final addAccent = SemanticColorResolver.positive(context);
+    final dedAccent = SemanticColorResolver.negative(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -1001,6 +1016,30 @@ class _PublicInvoiceShareLinkPageState extends State<PublicInvoiceShareLinkPage>
 
   String _suffix(String? c) => c != null && c.isNotEmpty ? ' ($c)' : '';
 
+  Widget? _fxDualBanner(
+    Map<String, dynamic>? business,
+    Map<String, dynamic> invoice,
+  ) {
+    final isMc = business?['is_multi_currency'] == true;
+    final fxTotals = invoice['fx_totals'] is Map
+        ? Map<String, dynamic>.from(invoice['fx_totals'] as Map)
+        : null;
+    final baseCurrency = invoice['base_currency'] is Map
+        ? Map<String, dynamic>.from(invoice['base_currency'] as Map)
+        : null;
+    final foreignLabel = invoice['currency_code']?.toString() ??
+        invoice['currency_symbol']?.toString() ??
+        '';
+    final foreignDp = (invoice['currency_decimal_places'] as num?)?.toInt() ?? 0;
+    return InvoiceFxDualTotalsBanner.fromInvoicePayload(
+      isMultiCurrency: isMc || (fxTotals?['show_dual'] == true),
+      fxTotals: fxTotals,
+      baseCurrency: baseCurrency,
+      foreignCurrencyLabel: foreignLabel,
+      foreignDecimalPlaces: foreignDp,
+    );
+  }
+
   Widget _buildTotalsCard(
     ThemeData theme,
     Map<String, dynamic> totals,
@@ -1043,7 +1082,7 @@ class _PublicInvoiceShareLinkPageState extends State<PublicInvoiceShareLinkPage>
           children: [
             Text('خلاصه مبالغ', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
             if (curSuffix != null) ...[
-              const SizedBox(height: 4),
+              SizedBox(height: 4),
               Text('واحد پول: $curSuffix', style: theme.textTheme.bodySmall),
             ],
             const SizedBox(height: 8),
@@ -1062,7 +1101,7 @@ class _PublicInvoiceShareLinkPageState extends State<PublicInvoiceShareLinkPage>
                   'اضافات (با مالیات)${s != '' ? s : ''}',
                   additionsTotal,
                   theme,
-                  color: Colors.green.shade700,
+                  color: SemanticColorResolver.positive(context),
                   prefix: '+',
                 ),
               if (deductionsTotal > 0)
@@ -1070,7 +1109,7 @@ class _PublicInvoiceShareLinkPageState extends State<PublicInvoiceShareLinkPage>
                   'کسورات (با مالیات)${s != '' ? s : ''}',
                   deductionsTotal,
                   theme,
-                  color: Colors.red.shade700,
+                  color: SemanticColorResolver.negative(context),
                   prefix: '−',
                 ),
               Divider(
@@ -1087,7 +1126,12 @@ class _PublicInvoiceShareLinkPageState extends State<PublicInvoiceShareLinkPage>
                 strong: true,
               )
             else if (totals['net'] != null)
-              _totRow('مبلغ قابل پرداخت${s != '' ? s : ''}', totals['net'], theme, strong: true),
+              _totRow(
+                'مبلغ قابل پرداخت${s != '' ? s : ''}',
+                invoicePayableTotalFromTotals(Map<String, dynamic>.from(totals)) ?? totals['net'],
+                theme,
+                strong: true,
+              ),
             if (totals.isEmpty && !hasAdjustments)
               const Text('جمعی ثبت نشده است.'),
           ],
@@ -1194,7 +1238,7 @@ class _PublicInvoiceShareLinkPageState extends State<PublicInvoiceShareLinkPage>
               ),
             const SizedBox(height: 12),
             FilledButton.icon(
-              onPressed: _payBusy ? null : () => _onOnlinePay(rem),
+              onPressed: _payBusy ? null : () => _onOnlinePay(rem, curSuffix),
               icon: _payBusy
                   ? const SizedBox(
                       width: 18,
@@ -1210,27 +1254,49 @@ class _PublicInvoiceShareLinkPageState extends State<PublicInvoiceShareLinkPage>
     );
   }
 
-  Future<void> _onOnlinePay(double maxRemaining) async {
+  Future<void> _onOnlinePay(double maxRemaining, String? currencyCode) async {
     if (maxRemaining <= 0 || !mounted) return;
-    final ctrl = TextEditingController(text: maxRemaining.toStringAsFixed(0));
+    final currency = currencyCode?.trim();
+    final currencyLabel = currency != null && currency.isNotEmpty ? ' ($currency)' : '';
+    final maxFormatted = _formatInt(maxRemaining);
+    final maxHint = currency != null && currency.isNotEmpty ? '$maxFormatted $currency' : maxFormatted;
+    final ctrl = TextEditingController(text: formatNumberForInput(maxRemaining.round()));
     double? amount;
     try {
-      amount = await showGlassDialog<double>(
+      amount = await showDialog<double>(
         context: context,
         builder: (ctx) => AlertDialog(
-          title: const Text('مبلغ پرداخت (ریال)'),
-          content: TextField(
-            controller: ctrl,
-            keyboardType: const TextInputType.numberWithOptions(decimal: false),
-            decoration: InputDecoration(
-              hintText: 'حداکثر ${_formatInt(maxRemaining)}',
-            ),
+          title: Text('مبلغ پرداخت$currencyLabel'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                'مانده قابل پرداخت: $maxHint',
+                style: Theme.of(ctx).textTheme.bodyMedium,
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: ctrl,
+                autofocus: true,
+                keyboardType: const TextInputType.numberWithOptions(decimal: false),
+                inputFormatters: const [
+                  EnglishDigitsFormatter(),
+                  ThousandsSeparatorInputFormatter(allowDecimal: false),
+                ],
+                decoration: InputDecoration(
+                  labelText: 'مبلغ',
+                  hintText: 'حداکثر $maxHint',
+                  suffixText: currency,
+                ),
+              ),
+            ],
           ),
           actions: [
             TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('انصراف')),
             FilledButton(
               onPressed: () {
-                final v = double.tryParse(ctrl.text.replaceAll(',', ''));
+                final v = parseFormattedDouble(ctrl.text);
                 if (v == null || v <= 0) {
                   ScaffoldMessenger.of(ctx).showSnackBar(
                     const SnackBar(content: Text('مبلغ معتبر وارد کنید')),
@@ -1239,7 +1305,7 @@ class _PublicInvoiceShareLinkPageState extends State<PublicInvoiceShareLinkPage>
                 }
                 if (v - maxRemaining > 0.01) {
                   ScaffoldMessenger.of(ctx).showSnackBar(
-                    SnackBar(content: Text('مبلغ نمی‌تواند از مانده (${_formatInt(maxRemaining)}) بیشتر باشد')),
+                    SnackBar(content: Text('مبلغ نمی‌تواند از مانده ($maxHint) بیشتر باشد')),
                   );
                   return;
                 }

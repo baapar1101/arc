@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:hesabix_ui/theme/glass.dart';
 import '../../core/api_client.dart';
 import '../../models/invoice_tag_ref.dart';
 import '../../utils/error_extractor.dart';
 
-/// انتخاب چند برچسب برای فاکتور + ایجاد برچسب سفارشی
+/// انتخاب چند برچسب برای فاکتور + ایجاد/ویرایش/حذف برچسب سفارشی
 class InvoiceTagsField extends StatefulWidget {
   final int businessId;
   final ApiClient apiClient;
@@ -12,6 +11,8 @@ class InvoiceTagsField extends StatefulWidget {
   final ValueChanged<List<int>> onChanged;
   final String label;
   final bool allowCreate;
+  /// نمایش داخل بخش فرم فاکتور بدون عنوان جداگانه.
+  final bool embedded;
 
   const InvoiceTagsField({
     super.key,
@@ -21,6 +22,7 @@ class InvoiceTagsField extends StatefulWidget {
     required this.onChanged,
     this.label = 'برچسب‌ها',
     this.allowCreate = true,
+    this.embedded = false,
   });
 
   @override
@@ -67,12 +69,15 @@ class _InvoiceTagsFieldState extends State<InvoiceTagsField> {
     }
   }
 
-  Future<void> _createTag() async {
-    final ctrl = TextEditingController();
-    final name = await showGlassDialog<String>(
+  Future<String?> _promptTagName({
+    required String title,
+    String? initial,
+  }) async {
+    final ctrl = TextEditingController(text: initial ?? '');
+    final name = await showDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('برچسب جدید'),
+        title: Text(title),
         content: TextField(
           controller: ctrl,
           decoration: const InputDecoration(
@@ -91,6 +96,19 @@ class _InvoiceTagsFieldState extends State<InvoiceTagsField> {
         ],
       ),
     );
+    ctrl.dispose();
+    return name;
+  }
+
+  Future<void> _patchTag(int tagId, Map<String, dynamic> data) async {
+    await widget.apiClient.patch<Map<String, dynamic>>(
+      '/api/v1/invoices/business/${widget.businessId}/tags/$tagId',
+      data: data,
+    );
+  }
+
+  Future<void> _createTag() async {
+    final name = await _promptTagName(title: 'برچسب جدید');
     if (name == null || name.isEmpty) return;
     try {
       final res = await widget.apiClient.post<Map<String, dynamic>>(
@@ -116,6 +134,93 @@ class _InvoiceTagsFieldState extends State<InvoiceTagsField> {
     }
   }
 
+  Future<void> _editTag(InvoiceTagRef tag) async {
+    if (tag.isSystem) return;
+    final name = await _promptTagName(title: 'ویرایش برچسب', initial: tag.name);
+    if (name == null || name.isEmpty || name == tag.name) return;
+    try {
+      await _patchTag(tag.id, {'name': name});
+      await _load();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(ErrorExtractor.forContext(e, context))),
+      );
+    }
+  }
+
+  Future<void> _deleteTag(InvoiceTagRef tag) async {
+    if (tag.isSystem) return;
+    final theme = Theme.of(context);
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('حذف برچسب'),
+        content: Text('برچسب «${tag.name}» حذف شود؟'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('انصراف')),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: FilledButton.styleFrom(backgroundColor: theme.colorScheme.error),
+            child: const Text('حذف'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    try {
+      await _patchTag(tag.id, {'is_active': false});
+      await _load();
+      if (!mounted) return;
+      if (widget.selectedTagIds.contains(tag.id)) {
+        widget.onChanged(
+          widget.selectedTagIds.where((id) => id != tag.id).toList(),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(ErrorExtractor.forContext(e, context))),
+      );
+    }
+  }
+
+  void _showTagMenu(InvoiceTagRef tag) {
+    if (tag.isSystem) return;
+    final theme = Theme.of(context);
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              dense: true,
+              visualDensity: VisualDensity.compact,
+              leading: const Icon(Icons.edit_outlined, size: 20),
+              title: const Text('ویرایش نام'),
+              onTap: () {
+                Navigator.pop(ctx);
+                _editTag(tag);
+              },
+            ),
+            ListTile(
+              dense: true,
+              visualDensity: VisualDensity.compact,
+              leading: Icon(Icons.delete_outline, size: 20, color: theme.colorScheme.error),
+              title: Text('حذف', style: TextStyle(color: theme.colorScheme.error)),
+              onTap: () {
+                Navigator.pop(ctx);
+                _deleteTag(tag);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   void _toggle(int id) {
     final set = widget.selectedTagIds.toSet();
     if (set.contains(id)) {
@@ -126,14 +231,33 @@ class _InvoiceTagsFieldState extends State<InvoiceTagsField> {
     widget.onChanged(set.toList()..sort());
   }
 
+  Widget _buildTagChip(InvoiceTagRef t) {
+    final chip = FilterChip(
+      label: Text(t.name, maxLines: 1, overflow: TextOverflow.ellipsis),
+      selected: widget.selectedTagIds.contains(t.id),
+      onSelected: (_) => _toggle(t.id),
+      visualDensity: VisualDensity.compact,
+      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+    );
+    if (t.isSystem) return chip;
+    return Tooltip(
+      message: 'نگه دارید برای ویرایش یا حذف',
+      child: GestureDetector(
+        onLongPress: () => _showTagMenu(t),
+        child: chip,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     if (_loading) {
       return Row(
         children: [
-          Text(widget.label, style: theme.textTheme.titleSmall),
-          const SizedBox(width: 8),
+          if (!widget.embedded)
+            Text(widget.label, style: theme.textTheme.titleSmall),
+          if (!widget.embedded) const SizedBox(width: 8),
           const SizedBox(
             width: 20,
             height: 20,
@@ -153,33 +277,61 @@ class _InvoiceTagsFieldState extends State<InvoiceTagsField> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            Text(widget.label, style: theme.textTheme.titleSmall),
-            if (widget.allowCreate) ...[
-              const Spacer(),
-              TextButton.icon(
-                onPressed: _createTag,
-                icon: const Icon(Icons.add, size: 18),
-                label: const Text('برچسب جدید'),
-              ),
+        if (!widget.embedded)
+          Row(
+            children: [
+              Text(widget.label, style: theme.textTheme.titleSmall),
+              if (widget.allowCreate) ...[
+                const Spacer(),
+                TextButton.icon(
+                  onPressed: _createTag,
+                  icon: const Icon(Icons.add, size: 18),
+                  label: const Text('برچسب جدید'),
+                ),
+              ],
             ],
-          ],
-        ),
-        const SizedBox(height: 4),
-        Wrap(
-          spacing: 6,
-          runSpacing: 6,
-          children: [
-            for (final t in _all)
-              FilterChip(
-                label: Text(t.name, maxLines: 1, overflow: TextOverflow.ellipsis),
-                selected: widget.selectedTagIds.contains(t.id),
-                onSelected: (_) => _toggle(t.id),
-                visualDensity: VisualDensity.compact,
-                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          )
+        else
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  widget.label,
+                  style: theme.textTheme.labelLarge?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
               ),
-          ],
+              if (widget.allowCreate)
+                TextButton.icon(
+                  onPressed: _createTag,
+                  icon: const Icon(Icons.add, size: 18),
+                  label: const Text('برچسب جدید'),
+                ),
+            ],
+          ),
+        SizedBox(height: widget.embedded ? 6 : 4),
+        Container(
+          width: double.infinity,
+          padding: widget.embedded
+              ? const EdgeInsets.symmetric(horizontal: 8, vertical: 6)
+              : EdgeInsets.zero,
+          decoration: widget.embedded
+              ? BoxDecoration(
+                  color: theme.colorScheme.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: theme.colorScheme.outlineVariant.withValues(alpha: 0.8),
+                  ),
+                )
+              : null,
+          child: Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: [
+              for (final t in _all) _buildTagChip(t),
+            ],
+          ),
         ),
       ],
     );

@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:hesabix_ui/theme/glass.dart';
 import '../../services/bank_account_service.dart';
 import '../../core/api_client.dart';
 import '../../services/currency_service.dart';
@@ -249,7 +248,7 @@ class _BankAccountComboboxWidgetState extends State<BankAccountComboboxWidget> {
   }
 
   Future<void> _addNewBankAccount() async {
-    final result = await showGlassDialog<bool>(
+    final result = await showDialog<bool>(
       context: context,
       builder: (context) => BankAccountFormDialog(
         businessId: widget.businessId,

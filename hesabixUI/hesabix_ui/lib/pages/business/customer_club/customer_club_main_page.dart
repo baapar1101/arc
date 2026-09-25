@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:hesabix_ui/theme/glass.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 
 import '../../../core/api_client.dart';
@@ -101,7 +100,7 @@ class _CustomerClubMainPageState extends State<CustomerClubMainPage> with Single
     if (s.isEmpty) return '';
     final parsed = DateTime.tryParse(s);
     if (parsed == null) return s;
-    return MarkStreetDateUtils.formatDateTime(parsed.toLocal(), _isJalaliCalendar);
+    return HesabixDateUtils.formatDateTime(parsed.toLocal(), _isJalaliCalendar);
   }
 
   String _transactionTypeLabel(AppLocalizations t, String? raw) {
@@ -196,7 +195,7 @@ class _CustomerClubMainPageState extends State<CustomerClubMainPage> with Single
 
   Future<bool> _confirmLargeAdjustment(AppLocalizations t, double delta) async {
     if (delta.abs() < _largeDeltaThreshold) return true;
-    final ok = await showGlassDialog<bool>(
+    final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(t.customerClubAdjustmentLargeDeltaTitle),

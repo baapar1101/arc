@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/services.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:dio/dio.dart';
@@ -172,7 +171,7 @@ class _BulkPriceUpdateDialogState extends State<BulkPriceUpdateDialog> {
   Future<void> _applyChanges() async {
     if (_previewResponse == null) return;
 
-    final confirmed = await showGlassDialog<bool>(
+    final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(AppLocalizations.of(ctx).confirmChangesTitle),

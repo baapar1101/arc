@@ -78,7 +78,7 @@ class AppConfig {
       return currentUri.origin;
     }
 
-    return 'https://tamastore.ir';
+    return 'http://localhost:8000';
   }
 
   static const String _envAppPublicUrl = String.fromEnvironment(

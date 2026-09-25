@@ -1,6 +1,5 @@
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
-import 'package:hesabix_ui/theme/glass.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/core/business_nav.dart';
 import 'package:hesabix_ui/services/ai_service.dart';
@@ -145,7 +144,7 @@ class _AIChatSkillsSheetState extends State<_AIChatSkillsSheet> {
 
   Future<void> _importGit() async {
     final ctrl = TextEditingController();
-    final ok = await showGlassDialog<bool>(
+    final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('وارد کردن از گیت‌هاب'),

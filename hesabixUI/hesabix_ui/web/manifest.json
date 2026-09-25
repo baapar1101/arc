@@ -1,11 +1,11 @@
 {
-    "name": "MarkStreet",
-    "short_name": "MarkStreet",
+    "name": "Hesabix",
+    "short_name": "Hesabix",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0F4C81",
     "theme_color": "#0F4C81",
-    "description": "MarkStreet - سیستم مدیریت مالی",
+    "description": "Hesabix - سیستم مدیریت مالی",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

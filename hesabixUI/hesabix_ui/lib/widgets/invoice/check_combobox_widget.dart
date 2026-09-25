@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:hesabix_ui/theme/glass.dart';
 import '../../services/check_service.dart';
 import '../../core/auth_store.dart';
 import '../../core/calendar_controller.dart';
@@ -313,7 +312,7 @@ class _CheckComboboxWidgetState extends State<CheckComboboxWidget> {
       return;
     }
 
-    final result = await showGlassDialog<bool>(
+    final result = await showDialog<bool>(
       context: context,
       builder: (context) => CheckFormDialog(
         businessId: widget.businessId,

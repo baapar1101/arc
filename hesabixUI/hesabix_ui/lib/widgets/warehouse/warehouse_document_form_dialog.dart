@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/foundation.dart' show debugPrint;
 import '../../services/warehouse_service.dart';
 import '../../services/product_service.dart';
@@ -1679,7 +1678,7 @@ class _WarehouseDocumentFormDialogState
         [];
 
     // نمایش دیالوگ مدیریت instance ها
-    final result = await showGlassDialog<List<Map<String, dynamic>>>(
+    final result = await showDialog<List<Map<String, dynamic>>>(
       context: context,
       builder: (context) => _ProductInstancesManagerDialog(
         businessId: widget.businessId,
@@ -1738,7 +1737,7 @@ class _WarehouseDocumentFormDialogState
         : (_warehouseIdFrom ?? line['warehouse_id'] as int?);
 
     // نمایش دیالوگ انتخاب
-    final selectedIds = await showGlassDialog<List<int>>(
+    final selectedIds = await showDialog<List<int>>(
       context: context,
       builder: (context) => UniqueProductSelectorDialog(
         businessId: widget.businessId,
@@ -1940,7 +1939,7 @@ class _WarehouseDocumentFormDialogState
           widget.calendarController ??
           ApiClient.getCalendarController();
       final isJalali = cc?.isJalali ?? true;
-      final errorMessage = MarkStreetDateUtils.formatIsoDatesInPlainText(
+      final errorMessage = HesabixDateUtils.formatIsoDatesInPlainText(
         extracted,
         isJalali,
       );
@@ -3216,7 +3215,7 @@ class _ProductInstancesManagerDialogState
   }
 
   Future<void> _addInstance() async {
-    final result = await showGlassDialog<Map<String, dynamic>>(
+    final result = await showDialog<Map<String, dynamic>>(
       context: context,
       builder: (context) => ProductInstanceFormDialog(
         businessId: widget.businessId,
@@ -3238,7 +3237,7 @@ class _ProductInstancesManagerDialogState
 
   Future<void> _editInstance(int index) async {
     final existing = _instances[index];
-    final result = await showGlassDialog<Map<String, dynamic>>(
+    final result = await showDialog<Map<String, dynamic>>(
       context: context,
       builder: (context) => ProductInstanceFormDialog(
         businessId: widget.businessId,

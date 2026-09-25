@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:hesabix_ui/theme/glass.dart';
 import 'package:hesabix_ui/models/document_numbering_models.dart';
 import 'package:hesabix_ui/services/document_numbering_api_service.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
@@ -197,7 +196,7 @@ class _DocumentNumberingSettingsPageState
     DocumentNumberingSetting setting,
   ) async {
     final pageContext = context;
-    final result = await showGlassDialog<bool>(
+    final result = await showDialog<bool>(
       context: pageContext,
       builder: (dialogContext) => _EditDocumentNumberingDialog(
         documentType: documentType,
@@ -382,7 +381,7 @@ class _EditDocumentNumberingDialogState
   }
 
   Future<void> _handleDelete() async {
-    final confirm = await showGlassDialog<bool>(
+    final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('حذف تنظیمات'),

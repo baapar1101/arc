@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/services.dart';
 import '../../models/warehouse_model.dart';
 import '../../services/warehouse_service.dart';
@@ -61,7 +60,7 @@ class WarehouseFormDialog extends StatefulWidget {
       );
     }
 
-    return showGlassDialog<bool>(
+    return showDialog<bool>(
       context: context,
       builder: (_) => WarehouseFormDialog(
         businessId: businessId,

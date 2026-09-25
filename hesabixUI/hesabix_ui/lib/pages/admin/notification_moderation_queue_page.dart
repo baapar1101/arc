@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:hesabix_ui/theme/glass.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
-import 'package:hesabix_ui/core/date_utils.dart' show MarkStreetDateUtils;
+import 'package:hesabix_ui/core/date_utils.dart' show HesabixDateUtils;
 import 'package:hesabix_ui/widgets/data_table/data_table_config.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table_widget.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
@@ -125,7 +124,7 @@ class _NotificationModerationQueuePageState
     final dt = DateTime.tryParse(raw);
     if (dt == null) return raw.length >= 19 ? raw.substring(0, 19).replaceAll('T', ' ') : raw;
     final isJalali = _calendarController?.isJalali ?? true;
-    return MarkStreetDateUtils.formatDateTime(dt, isJalali);
+    return HesabixDateUtils.formatDateTime(dt, isJalali);
   }
 
   String _statusLabel(String? status) {
@@ -251,7 +250,7 @@ class _NotificationModerationQueuePageState
     final queueId = _getQueueId(item);
     final aiReview = item['ai_review'] as Map<String, dynamic>?;
     final notesController = TextEditingController();
-    showGlassDialog(
+    showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('تایید قالب'),
@@ -309,7 +308,7 @@ class _NotificationModerationQueuePageState
     final aiReview = item['ai_review'] as Map<String, dynamic>?;
     final reasonController = TextEditingController();
     final notesController = TextEditingController();
-    showGlassDialog(
+    showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('رد قالب'),
@@ -401,7 +400,7 @@ class _NotificationModerationQueuePageState
     final template = item['template'] as Map<String, dynamic>? ?? {};
     final subjectController = TextEditingController(text: template['subject'] as String? ?? '');
     final bodyController = TextEditingController(text: template['full_body'] as String? ?? template['body'] as String? ?? '');
-    showGlassDialog(
+    showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('ویرایش قالب توسط مدیر'),
@@ -451,7 +450,7 @@ class _NotificationModerationQueuePageState
         : '';
     final status = item['status'] as String?;
     final aiReview = item['ai_review'] as Map<String, dynamic>?;
-    showGlassDialog(
+    showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('جزئیات قالب'),

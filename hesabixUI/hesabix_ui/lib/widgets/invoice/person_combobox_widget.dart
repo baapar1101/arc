@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/services.dart';
 import '../../services/person_service.dart';
 import '../../models/person_model.dart';
@@ -574,7 +573,7 @@ class _PersonComboboxWidgetState extends State<PersonComboboxWidget> {
     final searchQuery = _searchController.text.trim();
     Navigator.pop(bottomSheetContext);
 
-    final result = await showGlassDialog<Person?>(
+    final result = await showDialog<Person?>(
       context: context,
       builder: (context) => PersonFormDialog(
         businessId: widget.businessId,
@@ -593,7 +592,7 @@ class _PersonComboboxWidgetState extends State<PersonComboboxWidget> {
     FocusManager.instance.primaryFocus?.unfocus();
     final searchQuery = _searchController.text.trim();
 
-    final result = await showGlassDialog<Person?>(
+    final result = await showDialog<Person?>(
       context: context,
       builder: (context) => PersonFormDialog(
         businessId: widget.businessId,

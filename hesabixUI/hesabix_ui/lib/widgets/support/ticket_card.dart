@@ -300,6 +300,6 @@ class TicketCard extends StatelessWidget {
 
     // For older tickets, show full date
     final isJalali = calendarController?.isJalali ?? true;
-    return date_utils.MarkStreetDateUtils.formatForDisplay(localDateTime, isJalali);
+    return date_utils.HesabixDateUtils.formatForDisplay(localDateTime, isJalali);
   }
 }

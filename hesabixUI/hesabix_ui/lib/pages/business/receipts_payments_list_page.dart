@@ -1,12 +1,11 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:hesabix_ui/theme/glass.dart';
-import 'package:flutter/foundation.dart';
 import 'package:dio/dio.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
 import 'package:hesabix_ui/core/auth_store.dart';
 import 'package:hesabix_ui/core/api_client.dart';
+import 'package:hesabix_ui/core/fiscal_year_controller.dart';
 import 'package:hesabix_ui/models/receipt_payment_document.dart';
 import 'package:hesabix_ui/services/receipt_payment_list_service.dart';
 import 'package:hesabix_ui/services/invoice_service.dart';
@@ -23,8 +22,9 @@ import 'package:hesabix_ui/widgets/invoice/invoice_transactions_widget.dart';
 import 'package:hesabix_ui/widgets/invoice/check_combobox_widget.dart';
 import 'package:hesabix_ui/widgets/banking/currency_picker_widget.dart';
 import 'package:hesabix_ui/widgets/project/project_selector_widget.dart';
+import 'package:hesabix_ui/utils/invoice_payable_total.dart';
 import 'package:hesabix_ui/utils/number_formatters.dart' show formatWithThousands;
-import 'package:hesabix_ui/core/date_utils.dart' show MarkStreetDateUtils;
+import 'package:hesabix_ui/core/date_utils.dart' show HesabixDateUtils;
 import 'package:hesabix_ui/models/invoice_transaction.dart';
 import 'package:hesabix_ui/models/invoice_type_model.dart';
 import 'package:hesabix_ui/utils/number_normalizer.dart';
@@ -39,7 +39,10 @@ import 'package:hesabix_ui/widgets/inputs/frequent_description_text_field.dart';
 import 'package:hesabix_ui/widgets/money/amount_field_words_tooltip.dart';
 import 'package:hesabix_ui/services/currency_service.dart';
 import 'package:hesabix_ui/utils/currency_display_utils.dart';
+import 'package:hesabix_ui/utils/invoice_payment_tx_from_receipt.dart';
 import '../../services/business_dashboard_service.dart';
+import 'package:hesabix_ui/services/bytes_export/bytes_export_service.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 /// صفحه لیست اسناد دریافت و پرداخت با ویجت جدول
 class ReceiptsPaymentsListPage extends StatefulWidget {
@@ -209,16 +212,13 @@ class _ReceiptsPaymentsListPageState extends State<ReceiptsPaymentsListPage> {
 
     try {
       final items = await _dashboardService.listFiscalYears(widget.businessId);
+      final defaultFyId = await FiscalYearController.resolveDefaultId(widget.businessId, items);
       if (!mounted) return;
       int? personIdToHydrate;
       setState(() {
         _fiscalYears = items;
-        if (_selectedFiscalYearId == null && _fiscalYears.isNotEmpty) {
-          final current = _fiscalYears.firstWhere(
-            (fy) => fy['is_current'] == true,
-            orElse: () => _fiscalYears.first,
-          );
-          _selectedFiscalYearId = current['id'] as int?;
+        if (_selectedFiscalYearId == null) {
+          _selectedFiscalYearId = defaultFyId;
         }
         if (savedFilters != null && savedFilters.isNotEmpty) {
           personIdToHydrate = _applyReceiptsSavedFiltersMap(savedFilters);
@@ -594,11 +594,11 @@ class _ReceiptsPaymentsListPageState extends State<ReceiptsPaymentsListPage> {
 
     if (_fromDate != null || _toDate != null) {
       final from = _fromDate != null
-          ? MarkStreetDateUtils.formatForDisplay(
+          ? HesabixDateUtils.formatForDisplay(
               _fromDate!, widget.calendarController.isJalali)
           : '—';
       final to = _toDate != null
-          ? MarkStreetDateUtils.formatForDisplay(
+          ? HesabixDateUtils.formatForDisplay(
               _toDate!, widget.calendarController.isJalali)
           : '—';
       chips.add(Chip(
@@ -925,6 +925,7 @@ class _ReceiptsPaymentsListPageState extends State<ReceiptsPaymentsListPage> {
       persistTableFiltersPageId: ListFilterPageIds.receiptsPaymentsTable,
       reportModuleKey: 'receipts_payments',
       reportSubtype: 'list',
+      showBackButton: true,
       // دکمه حذف گروهی در هدر جدول
       customHeaderActions: [
         Tooltip(
@@ -943,8 +944,8 @@ class _ReceiptsPaymentsListPageState extends State<ReceiptsPaymentsListPage> {
       getExportParams: () => {
         'business_id': widget.businessId,
         'document_type': _selectedDocumentType,
-        if (_fromDate != null) 'from_date': MarkStreetDateUtils.formatForApiDate(_fromDate!),
-        if (_toDate != null) 'to_date': MarkStreetDateUtils.formatForApiDate(_toDate!),
+        if (_fromDate != null) 'from_date': HesabixDateUtils.formatForApiDate(_fromDate!),
+        if (_toDate != null) 'to_date': HesabixDateUtils.formatForApiDate(_toDate!),
         if (_selectedFiscalYearId != null) 'fiscal_year_id': _selectedFiscalYearId,
         if (_selectedProjectId != null) 'project_id': _selectedProjectId,
         if (_filterPerson?.id != null) 'person_id': _filterPerson!.id,
@@ -971,7 +972,7 @@ class _ReceiptsPaymentsListPageState extends State<ReceiptsPaymentsListPage> {
           'document_date',
           'تاریخ سند',
           width: ColumnWidth.medium,
-          formatter: (item) => MarkStreetDateUtils.formatForDisplay(item.documentDate, widget.calendarController.isJalali),
+          formatter: (item) => HesabixDateUtils.formatForDisplay(item.documentDate, widget.calendarController.isJalali),
         ),
         
         // مبلغ کل
@@ -1019,7 +1020,7 @@ class _ReceiptsPaymentsListPageState extends State<ReceiptsPaymentsListPage> {
           'registered_at',
           'تاریخ ثبت',
           width: ColumnWidth.medium,
-          formatter: (item) => MarkStreetDateUtils.formatForDisplay(item.registeredAt, widget.calendarController.isJalali),
+          formatter: (item) => HesabixDateUtils.formatForDisplay(item.registeredAt, widget.calendarController.isJalali),
         ),
         
         // پروژه
@@ -1081,8 +1082,8 @@ class _ReceiptsPaymentsListPageState extends State<ReceiptsPaymentsListPage> {
       },
       additionalParams: {
         'document_type': _selectedDocumentType,
-        if (_fromDate != null) 'from_date': MarkStreetDateUtils.formatForApiDate(_fromDate!),
-        if (_toDate != null) 'to_date': MarkStreetDateUtils.formatForApiDate(_toDate!),
+        if (_fromDate != null) 'from_date': HesabixDateUtils.formatForApiDate(_fromDate!),
+        if (_toDate != null) 'to_date': HesabixDateUtils.formatForApiDate(_toDate!),
         if (_selectedFiscalYearId != null) 'fiscal_year_id': _selectedFiscalYearId,
         if (_selectedProjectId != null) 'project_id': _selectedProjectId,
         if (_filterPerson?.id != null) 'person_id': _filterPerson!.id,
@@ -1099,7 +1100,7 @@ class _ReceiptsPaymentsListPageState extends State<ReceiptsPaymentsListPage> {
 
   /// افزودن سند جدید
   void _onAddNew() async {
-    final result = await showGlassDialog<bool>(
+    final result = await showDialog<bool>(
       context: context,
       builder: (_) => BulkSettlementDialog(
         businessId: widget.businessId,
@@ -1131,7 +1132,7 @@ class _ReceiptsPaymentsListPageState extends State<ReceiptsPaymentsListPage> {
       // نمایش دیالوگ مشاهده جزئیات
       if (!context.mounted) return;
       final ctx = context;
-      await showGlassDialog(
+      await showDialog(
         context: ctx,
         builder: (_) => ReceiptPaymentViewDialog(
           document: fullDoc,
@@ -1162,7 +1163,7 @@ class _ReceiptsPaymentsListPageState extends State<ReceiptsPaymentsListPage> {
 
       if (!context.mounted) return;
       final ctx = context;
-      final result = await showGlassDialog<bool>(
+      final result = await showDialog<bool>(
         context: ctx,
         builder: (_) => BulkSettlementDialog(
           businessId: widget.businessId,
@@ -1192,7 +1193,7 @@ class _ReceiptsPaymentsListPageState extends State<ReceiptsPaymentsListPage> {
   /// تأیید را با [Navigator.pop(ctx, bool)] تمام می‌کنیم و بعد از بسته‌شدن کامل دیالوگ، حذف را اجرا می‌کنیم؛
   /// باز کردن بلافاصلهٔ دیالوگ لودینگ داخل `onPressed` همزمان با بسته‌شدن دیالوگ تأیید باعث ناسازگاری پشتهٔ [Navigator] و صفحهٔ سفید می‌شود.
   Future<void> _onDelete(ReceiptPaymentDocument document) async {
-    final confirmed = await showGlassDialog<bool>(
+    final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('تأیید حذف'),
@@ -1218,7 +1219,7 @@ class _ReceiptsPaymentsListPageState extends State<ReceiptsPaymentsListPage> {
     if (!mounted) return;
 
     // لودینگ روی root navigator همان‌جایی که showDialog پیش‌فرض قرار می‌گیرد؛ بستن با context صفحه گاهی نزدیک‌ترین Navigator را می‌پَکد و به‌اشتباه مسیر GoRouter را برمی‌دارد (صفحهٔ سفید).
-    showGlassDialog<void>(
+    showDialog<void>(
       context: context,
       barrierDismissible: false,
       useRootNavigator: true,
@@ -1321,7 +1322,7 @@ class _ReceiptsPaymentsListPageState extends State<ReceiptsPaymentsListPage> {
     final codes = docs.map((d) => d.code).toList();
 
     // تایید کاربر
-    final confirmed = await showGlassDialog<bool>(
+    final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) {
         return AlertDialog(
@@ -1350,7 +1351,7 @@ class _ReceiptsPaymentsListPageState extends State<ReceiptsPaymentsListPage> {
     if (confirmed != true) return;
     if (!mounted) return;
 
-    showGlassDialog<void>(
+    showDialog<void>(
       context: context,
       barrierDismissible: false,
       useRootNavigator: true,
@@ -1399,6 +1400,12 @@ class BulkSettlementDialog extends StatefulWidget {
   final ApiClient apiClient;
   final ReceiptPaymentDocument? initialDocument;
   final AuthStore? authStore;
+  /// Prefill from SMS bank assistant (create mode only).
+  final double? initialAmount;
+  final String? initialBankId;
+  final String? initialBankName;
+  final String? initialDescription;
+
   const BulkSettlementDialog({
     super.key,
     required this.businessId,
@@ -1408,6 +1415,10 @@ class BulkSettlementDialog extends StatefulWidget {
     required this.apiClient,
     this.initialDocument,
     this.authStore,
+    this.initialAmount,
+    this.initialBankId,
+    this.initialBankName,
+    this.initialDescription,
   });
 
   @override
@@ -1518,40 +1529,31 @@ class _BulkSettlementDialogState extends State<BulkSettlementDialog>
           }
         }
       }
-      // تبدیل خطوط حساب‌ها (حذف خطوط کارمزد)
+      // تبدیل خطوط حساب‌ها با حفظ اطلاعات تسویه بین‌ارزی
       _centerTransactions.clear();
-      for (final al in initial.accountLines) {
-        final isCommission = (al.extraInfo != null && (al.extraInfo!['is_commission_line'] == true));
-        if (isCommission) continue;
-        final t = TransactionType.fromValue(al.transactionType ?? '') ?? TransactionType.person;
-        _centerTransactions.add(
-          InvoiceTransaction(
-            id: al.id.toString(),
-            type: t,
-            bankId: al.extraInfo?['bank_id']?.toString(),
-            bankName: al.extraInfo?['bank_name']?.toString(),
-            cashRegisterId: al.extraInfo?['cash_register_id']?.toString(),
-            cashRegisterName: al.extraInfo?['cash_register_name']?.toString(),
-            pettyCashId: al.extraInfo?['petty_cash_id']?.toString(),
-            pettyCashName: al.extraInfo?['petty_cash_name']?.toString(),
-            checkId: al.extraInfo?['check_id']?.toString(),
-            checkNumber: al.extraInfo?['check_number']?.toString(),
-            personId: al.extraInfo?['person_id']?.toString(),
-            personName: al.extraInfo?['person_name']?.toString(),
-            accountId: al.accountId.toString(),
-            accountName: al.accountName,
-            transactionDate: al.transactionDate ?? _docDate,
-            amount: al.amount,
-            commission: al.commission,
-            description: al.description,
-          ),
-        );
-      }
+      _centerTransactions.addAll(invoiceTransactionsFromReceiptPaymentDoc(initial));
     } else {
       // حالت ایجاد
       _docDate = DateTime.now();
       _isReceipt = widget.isReceipt;
       _selectedCurrencyId = widget.businessInfo?.defaultCurrency?.id;
+      final seedAmount = widget.initialAmount;
+      if (seedAmount != null && seedAmount > 0) {
+        if (widget.initialDescription != null && widget.initialDescription!.trim().isNotEmpty) {
+          _descriptionController.text = widget.initialDescription!.trim();
+        }
+        _centerTransactions.add(
+          InvoiceTransaction(
+            id: 'sms_seed_${DateTime.now().millisecondsSinceEpoch}',
+            type: TransactionType.bank,
+            bankId: widget.initialBankId,
+            bankName: widget.initialBankName,
+            transactionDate: _docDate,
+            amount: seedAmount,
+            description: widget.initialDescription,
+          ),
+        );
+      }
     }
     WidgetsBinding.instance.addPostFrameCallback((_) => _loadBusinessCurrenciesForBulkDialog());
   }
@@ -1601,9 +1603,10 @@ class _BulkSettlementDialogState extends State<BulkSettlementDialog>
   double _sumPersons() =>
       _personLines.fold<double>(0, (p, e) => p + e.amount);
 
+  /// مجموع به ارز سند/تسویه (بین‌ارزی: settlesAmount؛ وگرنه amount).
   double _sumCenters() => _centerTransactions.fold<double>(
         0,
-        (p, e) => p + e.amount.toDouble(),
+        (p, e) => p + e.settlesAgainstInvoice.toDouble(),
       );
 
   /// اختلافی که باید صفر شود (همان [diff] در فوتر).
@@ -1652,7 +1655,24 @@ class _BulkSettlementDialogState extends State<BulkSettlementDialog>
     final addToLastCenter = sumP - sumC;
     if (addToLastCenter.abs() < _balanceEpsilon) return;
     final last = _centerTransactions.length - 1;
-    final newAmt = _centerTransactions[last].amount.toDouble() + addToLastCenter;
+    final tx = _centerTransactions[last];
+    // بین‌ارزی: مبلغ تسویه به ارز سند تعدیل می‌شود؛ مبلغ پرداخت دست‌نخورده می‌ماند
+    if (tx.settlesAmount != null) {
+      final newSettle = tx.settlesAmount!.toDouble() + addToLastCenter;
+      if (newSettle < -_balanceEpsilon) {
+        SnackBarHelper.showError(
+          context,
+          message:
+              'مبلغ تسویه ردیف آخر پس از تعدیل منفی می‌شود. اختلاف را در چند ردیف تقسیم کنید.',
+        );
+        return;
+      }
+      setState(() {
+        _centerTransactions[last] = tx.copyWith(settlesAmount: newSettle);
+      });
+      return;
+    }
+    final newAmt = tx.amount.toDouble() + addToLastCenter;
     if (newAmt < -_balanceEpsilon) {
       SnackBarHelper.showError(
         context,
@@ -1661,8 +1681,7 @@ class _BulkSettlementDialogState extends State<BulkSettlementDialog>
       return;
     }
     setState(() {
-      _centerTransactions[last] =
-          _centerTransactions[last].copyWith(amount: newAmt);
+      _centerTransactions[last] = tx.copyWith(amount: newAmt);
     });
   }
 
@@ -1704,9 +1723,8 @@ class _BulkSettlementDialogState extends State<BulkSettlementDialog>
     final sumC = _sumCenters();
     final addToLastCenter = sumP - sumC;
     final last = _centerTransactions.length - 1;
-    final canMatchPeople = _centerTransactions[last].amount.toDouble() +
-            addToLastCenter >=
-        -_balanceEpsilon;
+    final lastSettle = _centerTransactions[last].settlesAgainstInvoice.toDouble();
+    final canMatchPeople = lastSettle + addToLastCenter >= -_balanceEpsilon;
     final addToPerson = sumC - sumP;
     final canMatchAccounts = addToPerson.abs() >= _balanceEpsilon &&
         _personLineIndexForBalanceDelta(addToPerson) != null;
@@ -1742,9 +1760,9 @@ class _BulkSettlementDialogState extends State<BulkSettlementDialog>
 
   Widget _buildMobileLayout() {
     final t = AppLocalizations.of(context);
-    final sumPersons = _personLines.fold<double>(0, (p, e) => p + e.amount);
-    final sumCenters = _centerTransactions.fold<double>(0, (p, e) => p + (e.amount.toDouble()));
-    final diff = (_isReceipt ? sumCenters - sumPersons : sumPersons - sumCenters).toDouble();
+    final sumPersons = _sumPersons();
+    final sumCenters = _sumCenters();
+    final diff = _diffAmount();
     final padding = ResponsiveHelper.getPadding(context);
 
     return Dialog(
@@ -1968,9 +1986,9 @@ class _BulkSettlementDialogState extends State<BulkSettlementDialog>
 
   Widget _buildDesktopLayout() {
     final t = AppLocalizations.of(context);
-    final sumPersons = _personLines.fold<double>(0, (p, e) => p + e.amount);
-    final sumCenters = _centerTransactions.fold<double>(0, (p, e) => p + (e.amount.toDouble()));
-    final diff = (_isReceipt ? sumCenters - sumPersons : sumPersons - sumCenters).toDouble();
+    final sumPersons = _sumPersons();
+    final sumCenters = _sumCenters();
+    final diff = _diffAmount();
     final padding = ResponsiveHelper.getPadding(context);
 
     return Dialog(
@@ -2213,7 +2231,7 @@ class _BulkSettlementDialogState extends State<BulkSettlementDialog>
     }
     
     // نمایش loading
-    showGlassDialog(
+    showDialog(
       context: context,
       barrierDismissible: false,
       builder: (ctx) => const Center(child: CircularProgressIndicator()),
@@ -2245,36 +2263,44 @@ class _BulkSettlementDialogState extends State<BulkSettlementDialog>
       }).toList();
       
       // تبدیل centerTransactions به فرمت مورد نیاز API
-      final accountLinesData = _centerTransactions.map((tx) => {
-        'account_id': tx.accountId,
-        'amount': tx.amount.toDouble(),
-        'transaction_type': tx.type.value,
-        'transaction_date': tx.transactionDate.toIso8601String(),
-        if (tx.commission != null && tx.commission! > 0)
-          'commission': tx.commission!.toDouble(),
-        if (tx.description != null && tx.description!.isNotEmpty)
-          'description': tx.description,
-        // اطلاعات اضافی بر اساس نوع تراکنش
-        if (tx.type == TransactionType.bank) ...{
-          'bank_id': tx.bankId,
-          'bank_name': tx.bankName,
-        },
-        if (tx.type == TransactionType.cashRegister) ...{
-          'cash_register_id': tx.cashRegisterId,
-          'cash_register_name': tx.cashRegisterName,
-        },
-        if (tx.type == TransactionType.pettyCash) ...{
-          'petty_cash_id': tx.pettyCashId,
-          'petty_cash_name': tx.pettyCashName,
-        },
-        if (tx.type == TransactionType.check) ...{
-          'check_id': tx.checkId,
-          'check_number': tx.checkNumber,
-        },
-        if (tx.type == TransactionType.person) ...{
-          'person_id': tx.personId,
-          'person_name': tx.personName,
-        },
+      final accountLinesData = _centerTransactions.map((tx) {
+        final map = <String, dynamic>{
+          'account_id': tx.accountId,
+          'amount': tx.amount.toDouble(),
+          'transaction_type': tx.type.value,
+          'transaction_date': tx.transactionDate.toIso8601String(),
+          if (tx.commission != null && tx.commission! > 0)
+            'commission': tx.commission!.toDouble(),
+          if (tx.description != null && tx.description!.isNotEmpty)
+            'description': tx.description,
+          if (tx.type == TransactionType.bank) ...{
+            'bank_id': tx.bankId,
+            'bank_name': tx.bankName,
+          },
+          if (tx.type == TransactionType.cashRegister) ...{
+            'cash_register_id': tx.cashRegisterId,
+            'cash_register_name': tx.cashRegisterName,
+          },
+          if (tx.type == TransactionType.pettyCash) ...{
+            'petty_cash_id': tx.pettyCashId,
+            'petty_cash_name': tx.pettyCashName,
+          },
+          if (tx.type == TransactionType.check) ...{
+            'check_id': tx.checkId,
+            'check_number': tx.checkNumber,
+          },
+          if (tx.type == TransactionType.person) ...{
+            'person_id': tx.personId,
+            'person_name': tx.personName,
+          },
+          // V2-P4 بین‌ارزی
+          if (tx.settlesAmount != null) 'settles_amount': tx.settlesAmount,
+          if (tx.fxRate != null) 'fx_rate': tx.fxRate,
+          if (tx.paymentCurrencyId != null)
+            'payment_currency_id': tx.paymentCurrencyId,
+          if (tx.allowLargeFxDiff) 'allow_large_fx_diff': true,
+        };
+        return map;
       }).toList();
       
       // ساخت extra_info (تخصیص اقساط بر اساس ردیف‌های شخص)
@@ -2505,7 +2531,7 @@ class _BulkSettlementDialogState extends State<BulkSettlementDialog>
   }
 
   Future<void> _pickInvoiceForLine(_PersonLine line) async {
-    final picked = await showGlassDialog<Map<String, dynamic>>(
+    final picked = await showDialog<Map<String, dynamic>>(
       context: context,
       builder: (ctx) => _InstallmentInvoicePickerDialog(
         businessId: widget.businessId,
@@ -2655,10 +2681,10 @@ class _InstallmentInvoicePickerDialogState extends State<_InstallmentInvoicePick
 
   Color _statusColor(String? status) {
     switch (status) {
-      case 'paid': return Colors.green;
-      case 'partial': return Colors.orange;
-      case 'pending': return Colors.blue;
-      case 'overdue': return Colors.red;
+      case 'paid': return SemanticColorResolver.positive(context);
+      case 'partial': return SemanticColorResolver.warning(context);
+      case 'pending': return SemanticColorResolver.info(context);
+      case 'overdue': return SemanticColorResolver.negative(context);
       default: return Colors.grey;
     }
   }
@@ -2669,7 +2695,7 @@ class _InstallmentInvoicePickerDialogState extends State<_InstallmentInvoicePick
     return AlertDialog(
       title: Row(
         children: [
-          const Icon(Icons.receipt_long, color: Colors.green),
+          Icon(Icons.receipt_long, color: SemanticColorResolver.positive(context)),
           const SizedBox(width: 8),
           Expanded(child: Text(t.installmentsInvoicePickerTitle)),
         ],
@@ -2752,7 +2778,7 @@ class _InstallmentInvoicePickerDialogState extends State<_InstallmentInvoicePick
                     final it = _results[i];
                     final code = (it['code']?.toString() ?? '-');
                     final desc = (it['description']?.toString() ?? '').trim();
-                    final docDate = MarkStreetDateUtils.formatApiDateForDisplay(
+                    final docDate = HesabixDateUtils.formatApiDateForDisplay(
                       it['document_date'],
                       widget.calendarController.isJalali,
                       rawValue: it['document_date_raw'],
@@ -2765,7 +2791,7 @@ class _InstallmentInvoicePickerDialogState extends State<_InstallmentInvoicePick
                     return Card(
                       margin: const EdgeInsets.symmetric(vertical: 4),
                       child: ListTile(
-                        leading: const Icon(Icons.receipt_long, color: Colors.green),
+                        leading: Icon(Icons.receipt_long, color: SemanticColorResolver.positive(context)),
                         title: Row(
                           children: [
                             Text(code, style: const TextStyle(fontWeight: FontWeight.w600)),
@@ -3140,13 +3166,7 @@ class _PersonLineTileState extends State<_PersonLineTile> {
                 final doc = await receiptPaymentService.getById(docId);
                 if (doc == null) continue;
                 
-                // مجموع account_lines (بدون کارمزد)
-                for (final accountLine in doc.accountLines) {
-                  final isCommission = accountLine.extraInfo?['is_commission_line'] == true;
-                  if (!isCommission) {
-                    totalPaid += accountLine.amount;
-                  }
-                }
+                totalPaid += paidTowardInvoiceCurrencyFromReceiptDoc(doc);
               } catch (e) {
                 // ادامه در صورت خطا
               }
@@ -3225,13 +3245,7 @@ class _PersonLineTileState extends State<_PersonLineTile> {
             
             processedDocIds.add(docId);
             
-            // مجموع account_lines (بدون کارمزد)
-            for (final accountLine in doc.accountLines) {
-              final isCommission = accountLine.extraInfo?['is_commission_line'] == true;
-              if (!isCommission) {
-                totalPaid += accountLine.amount;
-              }
-            }
+            totalPaid += paidTowardInvoiceCurrencyFromReceiptDoc(doc);
           } catch (e) {
             // ادامه در صورت خطا
           }
@@ -3256,35 +3270,10 @@ class _PersonLineTileState extends State<_PersonLineTile> {
     }
   }
 
-  /// استخراج مبلغ کل فاکتور
+  /// استخراج مبلغ کل فاکتور (شامل اضافات/کسورات)
   double _getInvoiceTotal(Map<String, dynamic> invoice) {
     try {
-      // اول از total_amount
-      if (invoice['total_amount'] != null) {
-        final total = invoice['total_amount'];
-        if (total is num) return total.toDouble();
-        if (total is String) return double.tryParse(total) ?? 0;
-      }
-      
-      // سپس از extra_info.totals.net
-      final extraInfo = invoice['extra_info'] as Map<String, dynamic>?;
-      if (extraInfo != null) {
-        final totals = extraInfo['totals'] as Map<String, dynamic>?;
-        if (totals != null && totals['net'] != null) {
-          final net = totals['net'];
-          if (net is num) return net.toDouble();
-          if (net is String) return double.tryParse(net) ?? 0;
-        }
-      }
-      
-      // در نهایت از total
-      if (invoice['total'] != null) {
-        final total = invoice['total'];
-        if (total is num) return total.toDouble();
-        if (total is String) return double.tryParse(total) ?? 0;
-      }
-      
-      return 0;
+      return invoicePayableTotalFromInvoiceMap(invoice);
     } catch (e) {
       return 0;
     }
@@ -3459,8 +3448,17 @@ class _PersonLineTileState extends State<_PersonLineTile> {
               continue;
             }
             
-            final remaining = remainingMap[invoiceId] ?? 0.0;
+            final remaining = remainingMap[invoiceId];
             debugPrint('🔍 [LoadInvoices] فاکتور ID: $invoiceId, remaining: $remaining, remainingMap.containsKey: ${remainingMap.containsKey(invoiceId)}');
+            
+            // اگر مانده محاسبه نشده، فاکتور را حذف نکن (فرض تسویه‌نشده)
+            if (remaining == null) {
+              validInvoices.add({
+                ...invoice,
+              });
+              debugPrint('⚠️ [LoadInvoices] فاکتور ID: $invoiceId بدون مانده محاسبه‌شده اضافه شد');
+              continue;
+            }
             
             // فقط فاکتورهایی که مانده > 0 دارند (تسویه نشده‌اند)
             if (remaining > 0.01) { // tolerance برای خطای ممیز شناور
@@ -3680,7 +3678,7 @@ class _PersonLineTileState extends State<_PersonLineTile> {
                         final code = invoice['code']?.toString() ?? '';
                         final total = _getInvoiceTotal(invoice);
                         final remaining = (invoice['_remaining'] as num?)?.toDouble() ?? (total - 0);
-                        final dateDisplay = MarkStreetDateUtils.formatApiDateForDisplay(
+                        final dateDisplay = HesabixDateUtils.formatApiDateForDisplay(
                           invoice['document_date'],
                           widget.calendarController.isJalali,
                           rawValue: invoice['document_date_raw'],
@@ -3872,7 +3870,7 @@ class _PersonLineTileState extends State<_PersonLineTile> {
                         if (ancestor == null) return;
                         final current = ancestor._defaultInstallmentSelectionStrategy;
                         String temp = current;
-                        await showGlassDialog(
+                        await showDialog(
                           context: context,
                           builder: (ctx) {
                             return AlertDialog(
@@ -4038,7 +4036,7 @@ class _PersonLineTileState extends State<_PersonLineTile> {
                   if (dueStr != null && dueStr.isNotEmpty && dueStr != '-') {
                     try {
                       dueDate = DateTime.parse(dueStr);
-                      dueDisplay = MarkStreetDateUtils.formatForDisplay(dueDate, widget.calendarController.isJalali);
+                      dueDisplay = HesabixDateUtils.formatForDisplay(dueDate, widget.calendarController.isJalali);
                     } catch (_) {
                       dueDisplay = dueStr;
                     }
@@ -4327,8 +4325,8 @@ class _ReceiptPaymentViewDialogState extends State<ReceiptPaymentViewDialog> {
             ),
             const SizedBox(height: 12),
             _buildInfoRow('نوع سند', doc.documentTypeName),
-            _buildInfoRow('تاریخ سند', MarkStreetDateUtils.formatForDisplay(doc.documentDate, widget.calendarController.isJalali)),
-            _buildInfoRow('تاریخ ثبت', MarkStreetDateUtils.formatForDisplay(doc.registeredAt, widget.calendarController.isJalali)),
+            _buildInfoRow('تاریخ سند', HesabixDateUtils.formatForDisplay(doc.documentDate, widget.calendarController.isJalali)),
+            _buildInfoRow('تاریخ ثبت', HesabixDateUtils.formatForDisplay(doc.registeredAt, widget.calendarController.isJalali)),
             _buildInfoRow('ارز', doc.currencyCode ?? 'نامشخص'),
             _buildInfoRow('ایجادکننده', doc.createdByName ?? 'نامشخص'),
             _buildInfoRow('مبلغ کل', formatWithThousands(doc.totalAmount) + ' ${doc.currencyCode ?? 'ریال'}'),
@@ -4450,7 +4448,7 @@ class _ReceiptPaymentViewDialogState extends State<ReceiptPaymentViewDialog> {
   }
 
   Widget _buildAccountLineItem(AccountLine line, ReceiptPaymentDocument doc) {
-    final isCommission = line.extraInfo?['is_commission_line'] == true;
+    final isCommission = line.isCommissionLine;
     
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
@@ -4586,12 +4584,8 @@ class _ReceiptPaymentViewDialogState extends State<ReceiptPaymentViewDialog> {
       );
 
       // ذخیره فایل
-      await _savePdfFile(pdfBytes, widget.document.code);
-
-      if (mounted) {
-        final t = AppLocalizations.of(context);
-        SnackBarHelper.showSuccess(context, message: t.exportSuccess);
-      }
+      final result = await _savePdfFile(pdfBytes, widget.document.code);
+      if (mounted) BytesExportService.showFeedback(context, result);
     } catch (e) {
       if (mounted) {
         final t = AppLocalizations.of(context);
@@ -4609,16 +4603,12 @@ class _ReceiptPaymentViewDialogState extends State<ReceiptPaymentViewDialog> {
     }
   }
 
-  Future<void> _savePdfFile(List<int> bytes, String filename) async {
-    if (kIsWeb) {
-      await web_utils.saveBytesAsFileWeb(
-        bytes,
-        filename.endsWith('.pdf') ? filename : '$filename.pdf',
-        mimeType: 'application/pdf',
-      );
-    } else {
-      throw UnsupportedError('PDF download is only supported on web.');
-    }
+  Future<BytesExportResult> _savePdfFile(List<int> bytes, String filename) async {
+    return BytesExportService.export(
+      bytes: bytes,
+      filename: filename.endsWith('.pdf') ? filename : '$filename.pdf',
+      mimeType: 'application/pdf',
+    );
   }
 }
 

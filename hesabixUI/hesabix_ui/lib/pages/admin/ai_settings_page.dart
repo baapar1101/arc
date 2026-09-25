@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:hesabix_ui/theme/glass.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/services/ai_service.dart';
 import 'package:hesabix_ui/models/ai_models.dart';
@@ -103,7 +102,7 @@ class _AISettingsPageState extends State<AISettingsPage> {
     try {
       final result = await _aiService.testAIConnection();
       if (mounted) {
-        showGlassDialog(
+        showDialog(
           context: context,
           builder: (context) => AlertDialog(
             title: const Text('تست اتصال'),

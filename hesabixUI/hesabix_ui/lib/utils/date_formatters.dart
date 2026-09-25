@@ -45,7 +45,7 @@ class DateFormatters {
         }
         
         if (parsedDate != null) {
-          return MarkStreetDateUtils.formatForDisplay(parsedDate, isJalali);
+          return HesabixDateUtils.formatForDisplay(parsedDate, isJalali);
         }
       } catch (e) {
         // If parsing fails, return the original string
@@ -106,7 +106,7 @@ class DateFormatters {
         }
 
         if (parsedDate != null) {
-          return MarkStreetDateUtils.formatDateTime(parsedDate, isJalali);
+          return HesabixDateUtils.formatDateTime(parsedDate, isJalali);
         }
       } catch (e) {
         return trimmed;
@@ -162,7 +162,7 @@ class DateFormatters {
     }
 
     final isJalali = ApiClient.getCalendarController()?.isJalali ?? true;
-    return MarkStreetDateUtils.formatDateTime(date, isJalali);
+    return HesabixDateUtils.formatDateTime(date, isJalali);
   }
 
   /// Format date only (without time) from server response
@@ -206,7 +206,7 @@ class DateFormatters {
         }
         
         if (parsedDate != null) {
-          return MarkStreetDateUtils.formatForDisplay(parsedDate, isJalali);
+          return HesabixDateUtils.formatForDisplay(parsedDate, isJalali);
         }
       } catch (e) {
         // If parsing fails, return the original string

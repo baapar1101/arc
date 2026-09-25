@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:hesabix_ui/theme/glass.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
 import 'package:hesabix_ui/core/auth_store.dart';
@@ -425,11 +424,11 @@ class _DocumentsPageState extends State<DocumentsPage> {
 
     if (_fromDate != null || _toDate != null) {
       final from = _fromDate != null
-          ? MarkStreetDateUtils.formatForDisplay(
+          ? HesabixDateUtils.formatForDisplay(
               _fromDate!, widget.calendarController.isJalali)
           : '—';
       final to = _toDate != null
-          ? MarkStreetDateUtils.formatForDisplay(
+          ? HesabixDateUtils.formatForDisplay(
               _toDate!, widget.calendarController.isJalali)
           : '—';
       chips.add(Chip(
@@ -614,7 +613,7 @@ class _DocumentsPageState extends State<DocumentsPage> {
 
   /// ایجاد سند جدید
   Future<void> _createNewDocument() async {
-    final result = await showGlassDialog<bool>(
+    final result = await showDialog<bool>(
       context: context,
       barrierDismissible: false,
       builder: (context) => DocumentFormDialog(
@@ -659,8 +658,8 @@ class _DocumentsPageState extends State<DocumentsPage> {
         'business_id': widget.businessId,
         if (_selectedDocumentType != null)
           'document_type': _selectedDocumentType,
-        if (_fromDate != null) 'from_date': MarkStreetDateUtils.formatForApiDate(_fromDate!),
-        if (_toDate != null) 'to_date': MarkStreetDateUtils.formatForApiDate(_toDate!),
+        if (_fromDate != null) 'from_date': HesabixDateUtils.formatForApiDate(_fromDate!),
+        if (_toDate != null) 'to_date': HesabixDateUtils.formatForApiDate(_toDate!),
         if (_selectedFiscalYearId != null) 'fiscal_year_id': _selectedFiscalYearId,
         if (_selectedProjectId != null) 'project_id': _selectedProjectId,
         if (_filterPerson?.id != null) 'person_id': _filterPerson!.id,
@@ -670,9 +669,9 @@ class _DocumentsPageState extends State<DocumentsPage> {
         if (_selectedDocumentType != null)
           'document_type': _selectedDocumentType!,
         if (_fromDate != null)
-          'from_date': MarkStreetDateUtils.formatForApiDate(_fromDate!),
+          'from_date': HesabixDateUtils.formatForApiDate(_fromDate!),
         if (_toDate != null)
-          'to_date': MarkStreetDateUtils.formatForApiDate(_toDate!),
+          'to_date': HesabixDateUtils.formatForApiDate(_toDate!),
         if (_selectedFiscalYearId != null) 'fiscal_year_id': _selectedFiscalYearId,
         if (_selectedProjectId != null) 'project_id': _selectedProjectId,
         if (_filterPerson?.id != null) 'person_id': _filterPerson!.id,
@@ -723,7 +722,7 @@ class _DocumentsPageState extends State<DocumentsPage> {
           width: ColumnWidth.medium,
           // نمایش تاریخ بر اساس تقویم انتخاب‌شده‌ی کاربر در UI (نه متن برگشتی سرور).
           formatter: (item) =>
-              MarkStreetDateUtils.formatForDisplay(item.documentDate, widget.calendarController.isJalali),
+              HesabixDateUtils.formatForDisplay(item.documentDate, widget.calendarController.isJalali),
         ),
 
         // سال مالی
@@ -888,7 +887,7 @@ class _DocumentsPageState extends State<DocumentsPage> {
 
   /// نمایش جزئیات سند
   Future<void> _showDocumentDetails(DocumentModel doc) async {
-    await showGlassDialog(
+    await showDialog(
       context: context,
       builder: (context) => DocumentDetailsDialog(
         documentId: doc.id,
@@ -910,7 +909,7 @@ class _DocumentsPageState extends State<DocumentsPage> {
       
       if (!mounted) return;
       
-      final result = await showGlassDialog<bool>(
+      final result = await showDialog<bool>(
         context: context,
         barrierDismissible: false,
         builder: (context) => DocumentFormDialog(
@@ -944,7 +943,7 @@ class _DocumentsPageState extends State<DocumentsPage> {
       return;
     }
 
-    final confirmed = await showGlassDialog<bool>(
+    final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: Text('تأیید حذف'),
@@ -986,7 +985,7 @@ class _DocumentsPageState extends State<DocumentsPage> {
 
   /// حذف گروهی اسناد
   Future<void> _handleBulkDelete() async {
-    final confirmed = await showGlassDialog<bool>(
+    final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: Text('تأیید حذف گروهی'),

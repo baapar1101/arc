@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
-import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/services.dart';
 
 import '../main.dart' show navigatorKey;
@@ -427,7 +426,7 @@ class _KeyboardShortcutListenerState extends State<KeyboardShortcutListener> {
 
   void _openMemorialDialog() {
     _openShortcutDialog(
-      dialog: const MarkStreetDevelopersMemorialDialog(),
+      dialog: const HesabixDevelopersMemorialDialog(),
       barrierDismissible: true,
     );
   }
@@ -507,7 +506,7 @@ class _KeyboardShortcutListenerState extends State<KeyboardShortcutListener> {
         }
       }
 
-      showGlassDialog<void>(
+      showDialog<void>(
         context: dialogContext,
         barrierDismissible: barrierDismissible,
         useRootNavigator: true,

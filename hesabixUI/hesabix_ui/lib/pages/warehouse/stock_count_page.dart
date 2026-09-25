@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
-import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -183,7 +182,7 @@ class _StockCountPageState extends State<StockCountPage> {
           ? 'می‌توانید همان شمارش را ادامه دهید یا از نو شروع کنید.'
           : 'آخرین ذخیرهٔ خودکار: $savedAt\nمی‌توانید همان شمارش را ادامه دهید یا از نو شروع کنید.';
 
-      final choice = await showGlassDialog<String>(
+      final choice = await showDialog<String>(
         context: context,
         barrierDismissible: false,
         builder: (ctx) => AlertDialog(
@@ -471,7 +470,7 @@ class _StockCountPageState extends State<StockCountPage> {
       return;
     }
 
-    final confirmed = await showGlassDialog<bool>(
+    final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('تایید ثبت اختلاف انبارگردانی'),
@@ -874,7 +873,7 @@ class _StockCountPageState extends State<StockCountPage> {
             readOnly: true,
             controller: TextEditingController(
               text: _asOfDate != null
-                  ? MarkStreetDateUtils.formatForDisplay(
+                  ? HesabixDateUtils.formatForDisplay(
                       _asOfDate,
                       widget.calendarController?.isJalali ??
                           ApiClient.getCalendarController()?.isJalali ??

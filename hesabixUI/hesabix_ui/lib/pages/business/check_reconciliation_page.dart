@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:hesabix_ui/theme/glass.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import '../../core/auth_store.dart';
@@ -53,7 +52,7 @@ class _CheckReconciliationPageState extends State<CheckReconciliationPage> with 
   }
 
   String _formatDate(dynamic value, {dynamic rawValue}) {
-    return MarkStreetDateUtils.formatApiDateForDisplay(value, widget.calendarController.isJalali, rawValue: rawValue);
+    return HesabixDateUtils.formatApiDateForDisplay(value, widget.calendarController.isJalali, rawValue: rawValue);
   }
 
   @override
@@ -333,7 +332,7 @@ class _CheckReconciliationPageState extends State<CheckReconciliationPage> with 
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
-    await showGlassDialog(
+    await showDialog(
       context: context,
       barrierDismissible: true,
       builder: (context) => Dialog(
@@ -717,7 +716,7 @@ class _CheckReconciliationPageState extends State<CheckReconciliationPage> with 
     try {
       final result = await _checkService.calculateReconciliation(
         businessId: widget.businessId,
-        body: {'check_ids': _selectedCheckIds.toList(), 'base_date': MarkStreetDateUtils.formatForApiDate(_baseDate!)},
+        body: {'check_ids': _selectedCheckIds.toList(), 'base_date': HesabixDateUtils.formatForApiDate(_baseDate!)},
       );
       setState(() {
         _calculationResult = result;
@@ -740,7 +739,7 @@ class _CheckReconciliationPageState extends State<CheckReconciliationPage> with 
     final nameController = TextEditingController();
     final descriptionController = TextEditingController();
 
-    final saved = await showGlassDialog<bool>(
+    final saved = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('ذخیره جلسه راس‌گیری'),
@@ -786,7 +785,7 @@ class _CheckReconciliationPageState extends State<CheckReconciliationPage> with 
         body: {
           'name': nameController.text.trim(),
           'check_ids': _selectedCheckIds.toList(),
-          'base_date': MarkStreetDateUtils.formatForApiDate(_baseDate!),
+          'base_date': HesabixDateUtils.formatForApiDate(_baseDate!),
           'description': descriptionController.text.trim().isEmpty ? null : descriptionController.text.trim(),
         },
       );
@@ -898,7 +897,7 @@ class _CheckReconciliationPageState extends State<CheckReconciliationPage> with 
     final id = row['id'] as int?;
     if (id == null) return;
 
-    showGlassDialog(
+    showDialog(
       context: context,
       builder: (ctx) => FutureBuilder<Map<String, dynamic>>(
         future: _checkService.getReconciliationById(id),
@@ -988,7 +987,7 @@ class _CheckReconciliationPageState extends State<CheckReconciliationPage> with 
     final name = row['name']?.toString() ?? 'نامشخص';
     if (id == null) return;
 
-    final ok = await showGlassDialog<bool>(
+    final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text('حذف جلسه راس‌گیری'),

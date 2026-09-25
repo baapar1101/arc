@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/services.dart';
 import 'package:dio/dio.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
@@ -137,7 +136,7 @@ class _PriceListItemsPageState extends State<PriceListItemsPage> {
     num price = (item?['price'] as num?) ?? 0;
     int? currencyId = item?['currency_id'] as int? ?? (_fallbackCurrencies.first['id'] as int);
 
-    await showGlassDialog<bool>(
+    await showDialog<bool>(
       context: context,
       builder: (ctx) {
         final t = AppLocalizations.of(ctx);

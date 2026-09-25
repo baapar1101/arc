@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 
-/// دیالوگ گرامیداشت توسعه‌دهندگان فقید پروژهٔ مارک‌استریت (میانبر مخفی Q+J+A+M).
-class MarkStreetDevelopersMemorialDialog extends StatelessWidget {
-  const MarkStreetDevelopersMemorialDialog({super.key});
+/// دیالوگ گرامیداشت توسعه‌دهندگان فقید پروژهٔ حسابیکس (میانبر مخفی Q+J+A+M).
+class HesabixDevelopersMemorialDialog extends StatelessWidget {
+  const HesabixDevelopersMemorialDialog({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -33,7 +33,7 @@ class MarkStreetDevelopersMemorialDialog extends StatelessWidget {
               ),
               const SizedBox(height: 12),
               Text(
-                'به یاد توسعه‌دهندگان پروژهٔ مارک‌استریت',
+                'به یاد توسعه‌دهندگان پروژهٔ حسابیکس',
                 textAlign: TextAlign.center,
                 style: textTheme.titleSmall?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
@@ -42,7 +42,7 @@ class MarkStreetDevelopersMemorialDialog extends StatelessWidget {
               const SizedBox(height: 20),
               Text(
                 'بزرگداشت یاد و خاطرهٔ محمد رضایی جم و مصطفی شادمان، '
-                'از توسعه‌دهندگان پروژهٔ مارک‌استریت، '
+                'از توسعه‌دهندگان پروژهٔ حسابیکس، '
                 'که تلاش‌ها و دستاوردهایشان همواره در این مسیر ماندگار است.',
                 textAlign: TextAlign.center,
                 style: textTheme.bodyMedium?.copyWith(height: 1.55),

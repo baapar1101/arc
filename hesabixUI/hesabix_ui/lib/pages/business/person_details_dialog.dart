@@ -3,7 +3,6 @@ import 'dart:ui';
 import 'package:dio/dio.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
-import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/core/api_client.dart';
@@ -151,7 +150,7 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
 
   String _activityDateDisplayLabel(DateTime date) {
     final isJalali = _calendarController?.isJalali ?? true;
-    return MarkStreetDateUtils.formatForDisplay(date.toLocal(), isJalali);
+    return HesabixDateUtils.formatForDisplay(date.toLocal(), isJalali);
   }
 
   Future<void> _loadFiscalYearInfo() async {
@@ -883,7 +882,7 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
         if (!mounted || _calendarController == null) return;
       }
       if (!mounted) return;
-      showGlassDialog(
+      showDialog(
         context: context,
         builder: (_) => DocumentDetailsDialog(
           documentId: docId,
@@ -1134,7 +1133,7 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
             Text('سریال: ${warranty.warrantySerial}'),
             Text('وضعیت: ${_getStatusLabel(warranty.status, t)}'),
             if (warranty.activatedAt != null)
-              Text('فعال شده: ${MarkStreetDateUtils.formatDateTime(warranty.activatedAt!, _calendarController?.isJalali ?? true)}'),
+              Text('فعال شده: ${HesabixDateUtils.formatDateTime(warranty.activatedAt!, _calendarController?.isJalali ?? true)}'),
           ],
         ),
         trailing: IconButton(
@@ -1144,7 +1143,7 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
             if (calendarController == null) {
               CalendarController.load().then((c) {
                 if (mounted) {
-                  showGlassDialog(
+                  showDialog(
                     context: context,
                     builder: (context) => WarrantyCodeDetailsDialog(
                       warrantyCode: warranty,
@@ -1154,7 +1153,7 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
                 }
               });
             } else {
-              showGlassDialog(
+              showDialog(
                 context: context,
                 builder: (context) => WarrantyCodeDetailsDialog(
                   warrantyCode: warranty,
@@ -1480,7 +1479,7 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
       if (firstCode != null && firstCode.isNotEmpty) selectedType = firstCode;
     }
     var selectedDate = DateTime.now();
-    final ok = await showGlassDialog<bool>(
+    final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (context, setState) => AlertDialog(
@@ -1562,7 +1561,7 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
     final descController = TextEditingController(text: a['description']?.toString() ?? '');
     var selectedType = a['activity_type']?.toString() ?? 'call';
     var selectedDate = a['activity_date'] != null ? DateTime.tryParse(a['activity_date'].toString()) ?? DateTime.now() : DateTime.now();
-    final ok = await showGlassDialog<bool>(
+    final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (context, setState) => AlertDialog(
@@ -1632,7 +1631,7 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
   }
 
   Future<void> _deleteActivity(CrmService crmService, int activityId, VoidCallback onSaved) async {
-    final ok = await showGlassDialog<bool>(
+    final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('حذف فعالیت'),
@@ -1698,8 +1697,8 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
   Widget _buildActiveShareLinkCard(AppLocalizations t, ThemeData theme, PersonShareLink link, bool canEditPeople) {
     final formatter = NumberFormat('#,##0');
     final isJalali = _calendarController?.isJalali ?? true;
-    final expiryText = link.expiresAt != null ? MarkStreetDateUtils.formatDateTime(link.expiresAt, isJalali) : t.personShareNoExpiry;
-    final lastViewText = link.lastViewAt != null ? MarkStreetDateUtils.formatDateTime(link.lastViewAt, isJalali) : t.personShareNotSet;
+    final expiryText = link.expiresAt != null ? HesabixDateUtils.formatDateTime(link.expiresAt, isJalali) : t.personShareNoExpiry;
+    final lastViewText = link.lastViewAt != null ? HesabixDateUtils.formatDateTime(link.lastViewAt, isJalali) : t.personShareNotSet;
     final viewCount = formatter.format(link.viewCount);
 
     Color statusColor;
@@ -2309,7 +2308,7 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
     final overUsage = (error['over_usage_gb'] as num?)?.toDouble() ?? 0;
 
     if (!mounted) return;
-    await showGlassDialog(
+    await showDialog(
       context: context,
       builder: (ctx) {
         final theme = Theme.of(ctx);

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:hesabix_ui/theme/glass.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/api_client.dart';
@@ -125,7 +124,7 @@ class _DocumentMonetizationBusinessPageState extends State<DocumentMonetizationB
       }
       
       if (isInsufficientFunds) {
-        final shouldCharge = await showGlassDialog<bool>(
+        final shouldCharge = await showDialog<bool>(
           context: context,
           builder: (context) => AlertDialog(
             title: const Text('موجودی کافی نیست'),
@@ -468,7 +467,7 @@ class _DocumentMonetizationBusinessPageState extends State<DocumentMonetizationB
             ),
           if (endsAt != null) ...[
             Text(
-              '${t.expiryDate}: ${MarkStreetDateUtils.formatForDisplay(endsAt, isJalali)}',
+              '${t.expiryDate}: ${HesabixDateUtils.formatForDisplay(endsAt, isJalali)}',
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: isExpired 
                     ? theme.colorScheme.onErrorContainer
@@ -542,7 +541,7 @@ class _DocumentMonetizationBusinessPageState extends State<DocumentMonetizationB
   Future<void> _confirmAndActivatePlan(Map<String, dynamic> plan) async {
     final t = AppLocalizations.of(context);
     bool dialogAutoRenew = false;
-    final confirmed = await showGlassDialog<bool>(
+    final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) {
         return StatefulBuilder(
@@ -859,7 +858,7 @@ class _DocumentMonetizationBusinessPageState extends State<DocumentMonetizationB
                           paidAt = paidAtRaw;
                         }
                         if (paidAt == null) return '';
-                        return MarkStreetDateUtils.formatForDisplay(paidAt, isJalali);
+                        return HesabixDateUtils.formatForDisplay(paidAt, isJalali);
                       },
                     ),
                     TextColumn('document_id', 'سند حسابداری',
@@ -904,7 +903,7 @@ class _DocumentMonetizationBusinessPageState extends State<DocumentMonetizationB
                           createdAt = createdAtRaw;
                         }
                         if (createdAt == null) return '';
-                        return MarkStreetDateUtils.formatForDisplay(createdAt, isJalali);
+                        return HesabixDateUtils.formatForDisplay(createdAt, isJalali);
                       },
                     ),
                     ActionColumn('actions', t.actions, actions: [

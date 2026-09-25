@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:hesabix_ui/theme/glass.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/models/person_model.dart';
 import 'package:hesabix_ui/widgets/invoice/person_combobox_widget.dart';
@@ -76,7 +75,7 @@ Future<void> showDistributionReturnDialog({
     }
   }
 
-  await showGlassDialog<void>(
+  await showDialog<void>(
     context: context,
     builder: (ctx) => StatefulBuilder(
       builder: (context, setD) {

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/services.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 
@@ -155,7 +154,7 @@ class _CustomerClubAnalyticsTabState extends State<CustomerClubAnalyticsTab> {
       final total = int.tryParse('${data['total'] ?? 0}') ?? 0;
       final csv = ids.join(',');
       if (!mounted) return;
-      await showGlassDialog<void>(
+      await showDialog<void>(
         context: context,
         builder: (ctx) => AlertDialog(
           title: Text(t.customerClubAnalyticsCampaignTitle),

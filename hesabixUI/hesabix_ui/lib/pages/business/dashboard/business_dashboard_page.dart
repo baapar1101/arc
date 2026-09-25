@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:hesabix_ui/theme/glass.dart';
 import 'package:reorderables/reorderables.dart';
 import 'dart:async';
 import 'dart:convert';
@@ -1185,7 +1184,7 @@ class _BusinessDashboardPageState extends State<BusinessDashboardPage> {
             final dateStr = it['document_date']?.toString();
             if (dateStr != null && dateStr.isNotEmpty) dateTime = DateTime.parse(dateStr.split('T')[0]);
           } catch (_) {}
-          final date = dateTime != null ? MarkStreetDateUtils.formatForDisplay(dateTime, isJalali) : DateFormatters.formatServerDateOnly(it['document_date']);
+          final date = dateTime != null ? HesabixDateUtils.formatForDisplay(dateTime, isJalali) : DateFormatters.formatServerDateOnly(it['document_date']);
           final totalAmount = (it['total_amount'] as num?) ?? 0;
           final currencyCode = (it['currency_code'] ?? '').toString();
           final personNames = it['person_names_str'] ?? it['person_names'] ?? '';
@@ -1204,7 +1203,7 @@ class _BusinessDashboardPageState extends State<BusinessDashboardPage> {
             onTap: () {
               final docId = it['id'] as int?;
               if (docId != null && calendarController != null) {
-                showGlassDialog(
+                showDialog(
                   context: context,
                   builder: (_) => DocumentDetailsDialog(
                     documentId: docId,
@@ -1380,7 +1379,7 @@ class _BusinessDashboardPageState extends State<BusinessDashboardPage> {
             final dateStr = it['document_date']?.toString();
             if (dateStr != null && dateStr.isNotEmpty) dateTime = DateTime.parse(dateStr);
           } catch (_) {}
-          final date = dateTime != null ? MarkStreetDateUtils.formatForDisplay(dateTime, isJalali) : DateFormatters.formatServerDateOnly(it['document_date']);
+          final date = dateTime != null ? HesabixDateUtils.formatForDisplay(dateTime, isJalali) : DateFormatters.formatServerDateOnly(it['document_date']);
           final net = formatWithThousands(it['net_amount']);
           final currency = (it['currency_code'] ?? '').toString();
           final itemsCount = (it['items_count'] ?? 0) as int;
@@ -1397,7 +1396,7 @@ class _BusinessDashboardPageState extends State<BusinessDashboardPage> {
             onTap: () {
               final invoiceId = it['id'] as int?;
               if (invoiceId != null && calendarController != null) {
-                showGlassDialog(
+                showDialog(
                   context: context,
                   builder: (_) => DocumentDetailsDialog(
                     documentId: invoiceId,
@@ -1550,7 +1549,7 @@ class _BusinessDashboardPageState extends State<BusinessDashboardPage> {
                     // در صورت خطا، از فرمت قبلی استفاده می‌کنیم
                   }
                   final date = dateTime != null 
-                      ? MarkStreetDateUtils.formatForDisplay(dateTime, isJalali)
+                      ? HesabixDateUtils.formatForDisplay(dateTime, isJalali)
                       : DateFormatters.formatServerDateOnly(it['document_date']);
                   final net = formatWithThousands(it['net_amount']);
                   final currency = (it['currency_code'] ?? '').toString();
@@ -1573,7 +1572,7 @@ class _BusinessDashboardPageState extends State<BusinessDashboardPage> {
                     onTap: () {
                       final invoiceId = it['id'] as int?;
                       if (invoiceId != null && calendarController != null) {
-                        showGlassDialog(
+                        showDialog(
                           context: context,
                           builder: (_) => DocumentDetailsDialog(
                             documentId: invoiceId,
@@ -2130,7 +2129,7 @@ class _BusinessDashboardPageState extends State<BusinessDashboardPage> {
     final profile = _layout!;
     final rows = List<DashboardWidgetDefinition>.from(defs.items);
     String query = '';
-    await showGlassDialog<void>(
+    await showDialog<void>(
       context: context,
       builder: (context) {
         return AlertDialog(

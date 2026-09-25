@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:hesabix_ui/theme/glass.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
@@ -669,7 +668,7 @@ class _PersonsPageState extends State<PersonsPage> {
             message: t.personGroupsManage,
             child: IconButton(
               onPressed: () {
-                showGlassDialog<void>(
+                showDialog<void>(
                   context: context,
                   builder: (ctx) => PersonGroupsManageDialog(businessId: widget.businessId),
                 ).then((_) {
@@ -704,7 +703,7 @@ class _PersonsPageState extends State<PersonsPage> {
                   }
                   if (ids.isEmpty) return;
 
-                  final confirm = await showGlassDialog<bool>(
+                  final confirm = await showDialog<bool>(
                     context: context,
                     builder: (ctx) => AlertDialog(
                       title: Text(t.deletePerson),
@@ -751,7 +750,7 @@ class _PersonsPageState extends State<PersonsPage> {
             message: t.importFromExcel,
             child: GestureDetector(
               onTap: () async {
-                final ok = await showGlassDialog<bool>(
+                final ok = await showDialog<bool>(
                   context: context,
                   builder: (context) => PersonImportDialog(businessId: widget.businessId),
                 );
@@ -793,7 +792,7 @@ class _PersonsPageState extends State<PersonsPage> {
 
 
   void _addPerson() {
-    showGlassDialog(
+    showDialog(
       context: context,
       builder: (context) => PersonFormDialog(
         businessId: widget.businessId,
@@ -810,7 +809,7 @@ class _PersonsPageState extends State<PersonsPage> {
   }
 
   void _editPerson(Person person) {
-    showGlassDialog(
+    showDialog(
       context: context,
       builder: (context) => PersonFormDialog(
         businessId: widget.businessId,
@@ -829,7 +828,7 @@ class _PersonsPageState extends State<PersonsPage> {
   void _deletePerson(Person person) {
     final t = AppLocalizations.of(context);
     
-    showGlassDialog(
+    showDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: Text(t.deletePerson),
@@ -879,7 +878,7 @@ class _PersonsPageState extends State<PersonsPage> {
         await _loadBusinessPlugins();
       }
       if (!mounted) return;
-      showGlassDialog(
+      showDialog(
         context: context,
         builder: (context) => PersonDetailsDialog(
           businessId: widget.businessId,

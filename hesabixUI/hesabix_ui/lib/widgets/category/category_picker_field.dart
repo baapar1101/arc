@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:hesabix_ui/theme/glass.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import '../../services/category_service.dart';
 import '../../core/api_client.dart';
@@ -30,7 +29,7 @@ class CategoryPickerField extends FormField<int?> {
             );
             return InkWell(
               onTap: () async {
-                final picked = await showGlassDialog<int?>(
+                final picked = await showDialog<int?>(
                   context: context,
                   builder: (ctx) => _CategoryPickerDialog(
                     businessId: businessId,
@@ -337,7 +336,7 @@ class _CategoryPickerDialogState extends State<_CategoryPickerDialog> {
     final labelCtrl = TextEditingController();
     final descriptionCtrl = TextEditingController();
     
-    final result = await showGlassDialog<Map<String, dynamic>?>(
+    final result = await showDialog<Map<String, dynamic>?>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(t.addCategory),
@@ -430,7 +429,7 @@ class _CategoryPickerDialogState extends State<_CategoryPickerDialog> {
     final labelCtrl = TextEditingController(text: (category['label'] ?? category['title'] ?? '').toString());
     final descriptionCtrl = TextEditingController(text: (category['description'] as String?) ?? '');
     
-    final result = await showGlassDialog<Map<String, dynamic>?>(
+    final result = await showDialog<Map<String, dynamic>?>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(t.updateCategory),
@@ -516,7 +515,7 @@ class _CategoryPickerDialogState extends State<_CategoryPickerDialog> {
 
   Future<void> _showDeleteCategoryDialog(BuildContext context, int categoryId) async {
     final t = AppLocalizations.of(context);
-    final ok = await showGlassDialog<bool>(
+    final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(t.deleteCategory),

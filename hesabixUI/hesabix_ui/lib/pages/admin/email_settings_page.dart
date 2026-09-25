@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/services.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/models/email_models.dart';
@@ -199,7 +198,7 @@ class _EmailSettingsPageState extends State<EmailSettingsPage> {
       }
     }
     
-    await showGlassDialog(
+    await showDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: Row(
@@ -401,7 +400,7 @@ class _EmailSettingsPageState extends State<EmailSettingsPage> {
 
   Future<void> _setAsDefault(EmailConfig config) async {
     final t = AppLocalizations.of(context);
-    final confirmed = await showGlassDialog<bool>(
+    final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: Text(t.setDefaultConfirm),
@@ -869,7 +868,7 @@ class _EmailSettingsPageState extends State<EmailSettingsPage> {
 
   Future<void> _deleteConfig(int configId) async {
     final t = AppLocalizations.of(context);
-    final confirmed = await showGlassDialog<bool>(
+    final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: Text(t.deleteConfiguration),

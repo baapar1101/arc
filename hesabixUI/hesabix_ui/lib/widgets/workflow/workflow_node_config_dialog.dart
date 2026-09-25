@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:hesabix_ui/theme/glass.dart';
 import '../../models/workflow_editor_models.dart';
 import '../../models/workflow_editor_state.dart';
 import '../../l10n/app_localizations.dart';
@@ -1618,7 +1617,7 @@ class _WorkflowNodeConfigDialogState extends State<WorkflowNodeConfigDialog> {
     final insertReference = _fieldKeyPrefersInsertReference(fieldKey, fieldSchema);
     _ensureWorkflowTextController(fieldKey);
 
-    showGlassDialog(
+    showDialog(
       context: context,
       builder: (dialogContext) => _ReferenceSelectorDialog(
         allNodes: widget.allNodes!,
@@ -1973,7 +1972,7 @@ class _WorkflowNodeConfigDialogState extends State<WorkflowNodeConfigDialog> {
 
     if (picked != null && mounted) {
       setState(() {
-        _config[key] = date_utils.MarkStreetDateUtils.formatForApiDate(picked);
+        _config[key] = date_utils.HesabixDateUtils.formatForApiDate(picked);
         _disposeWorkflowTextController(key);
       });
     }
@@ -2000,7 +1999,7 @@ class _WorkflowNodeConfigDialogState extends State<WorkflowNodeConfigDialog> {
     DateTime? parsedDate;
     final strVal = currentValue?.toString();
     if (strVal != null && strVal.isNotEmpty && strVal != 'today') {
-      parsedDate = date_utils.MarkStreetDateUtils.parseFromAPI(strVal);
+      parsedDate = date_utils.HesabixDateUtils.parseFromAPI(strVal);
     } else if (strVal != 'today') {
       parsedDate = null;
     } else {
@@ -2008,7 +2007,7 @@ class _WorkflowNodeConfigDialogState extends State<WorkflowNodeConfigDialog> {
     }
 
     final displayText = parsedDate != null
-        ? date_utils.MarkStreetDateUtils.formatForDisplay(
+        ? date_utils.HesabixDateUtils.formatForDisplay(
             parsedDate,
             ApiClient.getCalendarController()?.isJalali ?? true,
           )

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:hesabix_ui/theme/glass.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/api_client.dart';
@@ -15,6 +14,7 @@ import '../../../widgets/jalali_date_picker.dart';
 import '../../../pages/business/woocommerce/woocommerce_l10n_format.dart';
 import '../../../widgets/data_table/data_table_config.dart';
 import '../../../widgets/data_table/data_table_widget.dart';
+import 'package:hesabix_ui/config/brand_config.dart';
 
 class WoocommerceIntegrationPage extends StatefulWidget {
   final int businessId;
@@ -131,7 +131,7 @@ class _WoocommerceIntegrationPageState extends State<WoocommerceIntegrationPage>
     required String title,
     required String body,
   }) async {
-    final r = await showGlassDialog<bool>(
+    final r = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(title),
@@ -167,7 +167,7 @@ class _WoocommerceIntegrationPageState extends State<WoocommerceIntegrationPage>
       context,
       t,
       title: t.woocommerceHubSyncOrderConfirmTitle,
-      body: t.woocommerceHubSyncOrderConfirmBody,
+      body: t.branded(t.woocommerceHubSyncOrderConfirmBody),
     );
     if (!ok || !context.mounted) return;
     try {
@@ -227,7 +227,7 @@ class _WoocommerceIntegrationPageState extends State<WoocommerceIntegrationPage>
       context,
       t,
       title: t.woocommerceHubSyncProductConfirmTitle,
-      body: t.woocommerceHubSyncProductConfirmBody,
+      body: t.branded(t.woocommerceHubSyncProductConfirmBody),
     );
     if (!ok || !context.mounted) return;
     try {
@@ -275,7 +275,7 @@ class _WoocommerceIntegrationPageState extends State<WoocommerceIntegrationPage>
       context,
       t,
       title: t.woocommerceHubSyncCustomerConfirmTitle,
-      body: t.woocommerceHubSyncCustomerConfirmBody,
+      body: t.branded(t.woocommerceHubSyncCustomerConfirmBody),
     );
     if (!ok || !context.mounted) return;
     try {
@@ -916,7 +916,7 @@ class _WoocommerceIntegrationPageState extends State<WoocommerceIntegrationPage>
                           child: Text(
                             _orderFilterDateAfter == null
                                 ? t.woocommerceOrderDatePickFrom
-                                : MarkStreetDateUtils.formatForDisplay(
+                                : HesabixDateUtils.formatForDisplay(
                                     _orderFilterDateAfter,
                                     isJalali,
                                   ),
@@ -932,7 +932,7 @@ class _WoocommerceIntegrationPageState extends State<WoocommerceIntegrationPage>
                           child: Text(
                             _orderFilterDateBefore == null
                                 ? t.woocommerceOrderDatePickTo
-                                : MarkStreetDateUtils.formatForDisplay(
+                                : HesabixDateUtils.formatForDisplay(
                                     _orderFilterDateBefore,
                                     isJalali,
                                   ),
@@ -1267,7 +1267,7 @@ class _WoocommerceIntegrationPageState extends State<WoocommerceIntegrationPage>
       TextColumn('billing_email', t.woocommerceColumnBillingEmail),
       TextColumn(
         'hesabix_id',
-        t.woocommerceColumnMarkStreetId,
+        t.branded(t.woocommerceColumnHesabixId),
         sortable: false,
         formatter: (item) {
           if (item is! Map<String, dynamic>) return null;
@@ -1296,7 +1296,7 @@ class _WoocommerceIntegrationPageState extends State<WoocommerceIntegrationPage>
             final m = item is Map<String, dynamic> ? item : null;
             final id = int.tryParse('${m?['id'] ?? ''}') ?? 0;
             return IconButton(
-              tooltip: t.woocommerceHubSyncRowTooltip,
+              tooltip: t.branded(t.woocommerceHubSyncRowTooltip),
               icon: const Icon(Icons.cloud_upload_outlined, size: 20),
               onPressed: id < 1
                   ? null
@@ -1389,7 +1389,7 @@ class _WoocommerceIntegrationPageState extends State<WoocommerceIntegrationPage>
       ),
       TextColumn(
         'hesabix_id',
-        t.woocommerceColumnMarkStreetId,
+        t.branded(t.woocommerceColumnHesabixId),
         sortable: false,
         formatter: (item) {
           if (item is! Map<String, dynamic>) return null;
@@ -1418,7 +1418,7 @@ class _WoocommerceIntegrationPageState extends State<WoocommerceIntegrationPage>
             final m = item is Map<String, dynamic> ? item : null;
             final id = int.tryParse('${m?['id'] ?? ''}') ?? 0;
             return IconButton(
-              tooltip: t.woocommerceHubSyncRowTooltip,
+              tooltip: t.branded(t.woocommerceHubSyncRowTooltip),
               icon: const Icon(Icons.cloud_upload_outlined, size: 20),
               onPressed: id < 1
                   ? null
@@ -1505,7 +1505,7 @@ class _WoocommerceIntegrationPageState extends State<WoocommerceIntegrationPage>
       TextColumn('username', t.woocommerceColumnUsername),
       TextColumn(
         'hesabix_id',
-        t.woocommerceColumnMarkStreetId,
+        t.branded(t.woocommerceColumnHesabixId),
         sortable: false,
         formatter: (item) {
           if (item is! Map<String, dynamic>) return null;
@@ -1534,7 +1534,7 @@ class _WoocommerceIntegrationPageState extends State<WoocommerceIntegrationPage>
             final m = item is Map<String, dynamic> ? item : null;
             final id = int.tryParse('${m?['id'] ?? ''}') ?? 0;
             return IconButton(
-              tooltip: t.woocommerceHubSyncRowTooltip,
+              tooltip: t.branded(t.woocommerceHubSyncRowTooltip),
               icon: const Icon(Icons.cloud_upload_outlined, size: 20),
               onPressed: id < 1
                   ? null

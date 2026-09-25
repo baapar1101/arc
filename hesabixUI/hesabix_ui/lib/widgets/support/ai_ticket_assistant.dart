@@ -1,6 +1,5 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
-import 'package:hesabix_ui/theme/glass.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/services/ai_service.dart';
@@ -104,7 +103,7 @@ class _AITicketAssistantState extends State<AITicketAssistant>
   }
 
   Future<void> _autoReply() async {
-    if (await showGlassDialog<bool>(
+    if (await showDialog<bool>(
           context: context,
           builder: (context) => AlertDialog(
             title: Text(AppLocalizations.of(context).aiTicketAutoReplyConfirmTitle),

@@ -92,7 +92,7 @@ class _ActivityLogsPageState extends State<ActivityLogsPage> {
     if (value == null) return '';
     
     // استفاده از helper موجود
-    return MarkStreetDateUtils.formatForDisplay(
+    return HesabixDateUtils.formatForDisplay(
       value is DateTime ? value : (value is String ? DateTime.tryParse(value) : null),
       widget.calendarController.isJalali,
     );

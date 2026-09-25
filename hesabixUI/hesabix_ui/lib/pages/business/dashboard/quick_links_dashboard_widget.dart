@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:uuid/uuid.dart';
@@ -100,7 +99,7 @@ Future<void> showQuickLinksEditorDialog({
       },
     );
   } else {
-    await showGlassDialog<void>(
+    await showDialog<void>(
       context: context,
       barrierDismissible: true,
       builder: (ctx) {
@@ -258,7 +257,7 @@ class _QuickLinksEditorViewState extends State<_QuickLinksEditorView> {
     HapticFeedback.selectionClick();
     final cTitle = TextEditingController();
     final cUrl = TextEditingController();
-    showGlassDialog<void>(
+    showDialog<void>(
       context: context,
       barrierDismissible: true,
       builder: (ctx) => LayoutBuilder(

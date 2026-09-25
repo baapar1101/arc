@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
@@ -36,7 +35,7 @@ class WalletTopUpDialog extends StatefulWidget {
     VoidCallback? onSuccess,
     void Function(String error)? onError,
   }) async {
-    await showGlassDialog<void>(
+    await showDialog<void>(
       context: context,
       barrierDismissible: true,
       builder: (ctx) => WalletTopUpDialog(
@@ -162,7 +161,7 @@ class _WalletTopUpDialogState extends State<WalletTopUpDialog> {
         
         if (!urlLaunched && mounted) {
           // نمایش دیالوگ با لینک قابل کپی
-          showGlassDialog(
+          showDialog(
             context: context,
             builder: (ctx) => AlertDialog(
               title: const Text('لینک پرداخت'),

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/services.dart';
 
 import '../../core/api_client.dart';
@@ -12,7 +11,7 @@ import '../../utils/snackbar_helper.dart';
 import '../../widgets/data_table/data_table_widget.dart';
 import '../../widgets/data_table/data_table_config.dart';
 import '../../widgets/jalali_date_picker.dart';
-import '../../core/date_utils.dart' show MarkStreetDateUtils;
+import '../../core/date_utils.dart' show HesabixDateUtils;
 import '../../core/calendar_controller.dart';
 import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
@@ -211,7 +210,7 @@ class _WalletPayoutsAdminPageState extends State<WalletPayoutsAdminPage> {
         : double.tryParse('${payout['gross_amount']}') ?? 0.0;
 
     try {
-      final confirmed = await showGlassDialog<bool>(
+      final confirmed = await showDialog<bool>(
         context: context,
         builder: (ctx) {
           return StatefulBuilder(
@@ -320,7 +319,7 @@ class _WalletPayoutsAdminPageState extends State<WalletPayoutsAdminPage> {
                                     filled: true,
                                   ),
                                   controller: TextEditingController(
-                                    text: MarkStreetDateUtils.formatForDisplay(
+                                    text: HesabixDateUtils.formatForDisplay(
                                       selectedDate,
                                       _calendarCtrl?.isJalali ?? true,
                                     ),
@@ -776,7 +775,7 @@ class _WalletPayoutsAdminPageState extends State<WalletPayoutsAdminPage> {
                           } else {
                             return v.toString();
                           }
-                          return MarkStreetDateUtils.formatForDisplay(date, isJalali);
+                          return HesabixDateUtils.formatForDisplay(date, isJalali);
                         },
                       ),
                       DateColumn('settlement_date', t.walletPayoutsAdminSettlementDate, 
@@ -795,7 +794,7 @@ class _WalletPayoutsAdminPageState extends State<WalletPayoutsAdminPage> {
                           } else {
                             return v.toString();
                           }
-                          return MarkStreetDateUtils.formatForDisplay(date, isJalali);
+                          return HesabixDateUtils.formatForDisplay(date, isJalali);
                         },
                       ),
                       TextColumn('bank_tracking_code', t.bankTrackingCode, 
@@ -858,7 +857,7 @@ class _PayoutDetailSheet extends StatelessWidget {
     if (dateStr == null || dateStr.isEmpty) return '-';
     try {
       final date = DateTime.parse(dateStr);
-      return MarkStreetDateUtils.formatForDisplay(date, isJalali);
+      return HesabixDateUtils.formatForDisplay(date, isJalali);
     } catch (_) {
       return dateStr;
     }

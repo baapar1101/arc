@@ -862,7 +862,7 @@ class _UserNotificationsPageState extends State<UserNotificationsPage> {
                       Expanded(
                         child: Text(
                           t.notificationsTelegramConnectedSince(
-                            MarkStreetDateUtils.formatForDisplay(
+                            HesabixDateUtils.formatForDisplay(
                               DateTime.tryParse(_telegramConnectedAt!),
                               widget.calendarController.isJalali,
                             ),
@@ -1116,7 +1116,7 @@ class _UserNotificationsPageState extends State<UserNotificationsPage> {
                     Expanded(
                       child: Text(
                         t.notificationsBaleConnectedSince(
-                          MarkStreetDateUtils.formatForDisplay(
+                          HesabixDateUtils.formatForDisplay(
                             DateTime.tryParse(_baleConnectedAt!),
                             widget.calendarController.isJalali,
                           ),

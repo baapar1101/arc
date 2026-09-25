@@ -1,8 +1,6 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:hesabix_ui/theme/glass.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:go_router/go_router.dart';
 import '../../services/warehouse_service.dart';
 import '../../core/api_client.dart';
@@ -13,10 +11,11 @@ import '../../core/calendar_controller.dart';
 import '../../l10n/app_localizations.dart';
 import '../../utils/snackbar_helper.dart';
 
-import '../../utils/web/web_utils.dart' as web_utils;
-import '../../core/date_utils.dart' show MarkStreetDateUtils;
+import '../../core/date_utils.dart' show HesabixDateUtils;
 import 'warehouse_postal_label_print_dialog.dart';
 import '../../utils/error_extractor.dart';
+import 'package:hesabix_ui/services/bytes_export/bytes_export_service.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 class WarehouseDocumentDetailsDialog extends StatefulWidget {
   final int businessId;
@@ -154,9 +153,9 @@ class _WarehouseDocumentDetailsDialogState extends State<WarehouseDocumentDetail
 
   Color _getStatusColor(String? status) {
     switch (status) {
-      case 'draft': return Colors.orange;
-      case 'posted': return Colors.green;
-      case 'cancelled': return Colors.red;
+      case 'draft': return SemanticColorResolver.warning(context);
+      case 'posted': return SemanticColorResolver.positive(context);
+      case 'cancelled': return SemanticColorResolver.negative(context);
       default: return Colors.grey;
     }
   }
@@ -251,7 +250,7 @@ class _WarehouseDocumentDetailsDialogState extends State<WarehouseDocumentDetail
   }
 
   Future<void> _deleteDoc() async {
-    final ok = await showGlassDialog<bool>(
+    final ok = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
         title: const Text('حذف حواله'),
@@ -283,7 +282,7 @@ class _WarehouseDocumentDetailsDialogState extends State<WarehouseDocumentDetail
   }
 
   Future<void> _cancelDoc() async {
-    final ok = await showGlassDialog<bool>(
+    final ok = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
         title: const Text('لغو حواله'),
@@ -321,7 +320,7 @@ class _WarehouseDocumentDetailsDialogState extends State<WarehouseDocumentDetail
     
     Navigator.of(context).pop(); // بستن دیالوگ جزئیات
     
-    final result = await showGlassDialog<bool>(
+    final result = await showDialog<bool>(
       context: context,
       barrierDismissible: false,
       builder: (context) => WarehouseDocumentFormDialog(
@@ -344,15 +343,12 @@ class _WarehouseDocumentDetailsDialogState extends State<WarehouseDocumentDetail
         '/warehouse-docs/business/${widget.businessId}/${widget.documentId}/pdf',
       );
       if (!mounted) return;
-      if (kIsWeb) {
-        await web_utils.saveBytesAsFileWeb(
-          bytes,
-          'warehouse_doc_${widget.documentId}.pdf',
-          mimeType: 'application/pdf',
-        );
-      } else {
-        SnackBarHelper.show(context, message: 'دانلود PDF در موبایل به زودی...');
-      }
+      final result = await BytesExportService.export(
+        bytes: bytes,
+        filename: 'warehouse_doc_${widget.documentId}.pdf',
+        mimeType: 'application/pdf',
+      );
+      if (mounted) BytesExportService.showFeedback(context, result);
     } catch (e) {
       if (!mounted) return;
       SnackBarHelper.show(
@@ -384,7 +380,7 @@ class _WarehouseDocumentDetailsDialogState extends State<WarehouseDocumentDetail
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              const Icon(Icons.error_outline, color: Colors.red, size: 48),
+                              Icon(Icons.error_outline, color: SemanticColorResolver.negative(context), size: 48),
                               const SizedBox(height: 12),
                               Text(_error!),
                               const SizedBox(height: 12),
@@ -457,7 +453,7 @@ class _WarehouseDocumentDetailsDialogState extends State<WarehouseDocumentDetail
                       ),
                       if (doc['document_date'] != null && _calendarController != null)
                         _buildHeaderChip(
-                          '${t.warehouseDocumentDate}: ${MarkStreetDateUtils.formatForDisplay(DateTime.tryParse(doc['document_date']), _calendarController!.isJalali)}',
+                          '${t.warehouseDocumentDate}: ${HesabixDateUtils.formatForDisplay(DateTime.tryParse(doc['document_date']), _calendarController!.isJalali)}',
                           theme,
                           icon: Icons.calendar_today,
                         ),
@@ -582,7 +578,7 @@ class _WarehouseDocumentDetailsDialogState extends State<WarehouseDocumentDetail
                     _buildInfoRow(
                       theme,
                       t.warehouseDocumentDate,
-                      MarkStreetDateUtils.formatForDisplay(DateTime.tryParse(doc['document_date'] as String), _calendarController!.isJalali),
+                      HesabixDateUtils.formatForDisplay(DateTime.tryParse(doc['document_date'] as String), _calendarController!.isJalali),
                     ),
                   if (doc['fiscal_year_title'] != null)
                     _buildInfoRow(theme, 'سال مالی', doc['fiscal_year_title'].toString()),
@@ -650,7 +646,7 @@ class _WarehouseDocumentDetailsDialogState extends State<WarehouseDocumentDetail
                               ? doc['accounting_document_id'] as int
                               : int.tryParse('${doc['accounting_document_id']}');
                           if (aid == null) return;
-                          showGlassDialog(
+                          showDialog(
                             context: context,
                             builder: (_) => DocumentDetailsDialog(
                               documentId: aid,
@@ -674,7 +670,7 @@ class _WarehouseDocumentDetailsDialogState extends State<WarehouseDocumentDetail
                       child: InkWell(
                         onTap: () {
                           Navigator.of(context).pop(); // بستن دیالوگ فعلی
-                          showGlassDialog(
+                          showDialog(
                             context: context,
                             builder: (_) => WarehouseDocumentDetailsDialog(
                               businessId: widget.businessId,
@@ -1012,7 +1008,7 @@ class _WarehouseDocumentDetailsDialogState extends State<WarehouseDocumentDetail
     if (dt == null) return iso;
     final cal = _calendarController;
     if (cal != null) {
-      return MarkStreetDateUtils.formatForDisplay(dt, cal.isJalali);
+      return HesabixDateUtils.formatForDisplay(dt, cal.isJalali);
     }
     final mm = dt.minute.toString().padLeft(2, '0');
     final hh = dt.hour.toString().padLeft(2, '0');

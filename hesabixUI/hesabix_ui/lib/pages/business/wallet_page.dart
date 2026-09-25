@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:hesabix_ui/theme/glass.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import '../../core/auth_store.dart';
 import '../../widgets/permission/access_denied_page.dart';
@@ -14,7 +13,7 @@ import 'package:hesabix_ui/widgets/data_table/data_table_config.dart';
 import 'package:hesabix_ui/services/list_filter_preferences_service.dart';
 import '../../core/calendar_controller.dart';
 import 'package:hesabix_ui/utils/number_normalizer.dart';
-import '../../core/date_utils.dart' show MarkStreetDateUtils;
+import '../../core/date_utils.dart' show HesabixDateUtils;
 import '../../widgets/wallet/wallet_top_up_dialog.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
@@ -184,7 +183,7 @@ class _WalletPageState extends State<WalletPage> {
     int? bankId;
     final amountCtrl = TextEditingController();
     final descCtrl = TextEditingController();
-    final result = await showGlassDialog<bool>(
+    final result = await showDialog<bool>(
       context: context,
       builder: (ctx) {
         return AlertDialog(
@@ -288,7 +287,7 @@ class _WalletPageState extends State<WalletPage> {
 
   Future<void> _cancelBusinessPayout(int payoutId) async {
     final t = AppLocalizations.of(context);
-    final confirmed = await showGlassDialog<bool>(
+    final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(t.walletPayoutCancelRequest),
@@ -558,7 +557,7 @@ class _WalletPageState extends State<WalletPage> {
                                     
                                     // استفاده از تقویم کاربر برای فرمت کردن
                                     final isJalali = _calendarCtrl?.isJalali ?? false;
-                                    return MarkStreetDateUtils.formatForDisplay(date, isJalali);
+                                    return HesabixDateUtils.formatForDisplay(date, isJalali);
                                   }),
                                   TextColumn('type', t.type, formatter: (it) => _typeLabel((it['type'] ?? '').toString())),
                                   TextColumn('status', t.status, formatter: (it) => _statusLabel((it['status'] ?? '').toString())),

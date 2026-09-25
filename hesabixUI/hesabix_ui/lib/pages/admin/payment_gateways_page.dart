@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:hesabix_ui/theme/glass.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import '../../core/api_client.dart';
 import '../../config/app_config.dart';
@@ -221,7 +220,7 @@ class _PaymentGatewaysPageState extends State<PaymentGatewaysPage> {
     _failureRedirectCtrl.clear();
     _useSuggestedCallback = true;
     _applySuggestedCallback();
-    showGlassDialog(
+    showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         title: Row(
@@ -667,7 +666,7 @@ class _PaymentGatewaysPageState extends State<PaymentGatewaysPage> {
     });
     print('🔧 [EDIT DIALOG] State after prefill - isActive: $_isActive, isSandbox: $_isSandbox');
     
-    showGlassDialog(
+    showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         title: Row(

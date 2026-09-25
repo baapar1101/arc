@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:hesabix_ui/theme/glass.dart';
 import 'package:hesabix_ui/core/auth_store.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
 import 'package:hesabix_ui/core/date_utils.dart';
@@ -195,7 +194,7 @@ class _CheckDetailsDialogState extends State<CheckDetailsDialog> with SingleTick
 
     final theme = Theme.of(context);
 
-    await showGlassDialog(
+    await showDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: Row(
@@ -727,7 +726,7 @@ class _CheckDetailsDialogState extends State<CheckDetailsDialog> with SingleTick
                 onPressed: () {
                   final docId = item['document_id'] as int?;
                   if (docId != null) {
-                    showGlassDialog(
+                    showDialog(
                       context: context,
                       builder: (ctx) =>
                           DocumentDetailsDialog(documentId: docId, calendarController: widget.calendarController),
@@ -767,7 +766,7 @@ class _CheckDetailsDialogState extends State<CheckDetailsDialog> with SingleTick
           onPressed: () {
             final docId = doc['id'] as int?;
             if (docId != null) {
-              showGlassDialog(
+              showDialog(
                 context: context,
                 builder: (ctx) =>
                     DocumentDetailsDialog(documentId: docId, calendarController: widget.calendarController),
@@ -821,7 +820,7 @@ class _CheckDetailsDialogState extends State<CheckDetailsDialog> with SingleTick
   }
 
   String _formatDate(dynamic value, {dynamic rawValue}) {
-    return MarkStreetDateUtils.formatApiDateForDisplay(value, widget.calendarController.isJalali, rawValue: rawValue);
+    return HesabixDateUtils.formatApiDateForDisplay(value, widget.calendarController.isJalali, rawValue: rawValue);
   }
 
   String _formatStatus(String status) {

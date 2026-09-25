@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:hesabix_ui/theme/glass.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
@@ -104,7 +103,7 @@ class _FirewallRulesTabState extends State<_FirewallRulesTab> {
     final methodsCtrl = TextEditingController(text: existing?['http_methods']?.toString() ?? '');
     final priCtrl = TextEditingController(text: existing?['priority']?.toString() ?? '100');
     final noteCtrl = TextEditingController(text: existing?['note']?.toString() ?? '');
-    final ok = await showGlassDialog<bool>(
+    final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setSt) => AlertDialog(
@@ -175,7 +174,7 @@ class _FirewallRulesTabState extends State<_FirewallRulesTab> {
     final ipCtrl = TextEditingController();
     final minCtrl = TextEditingController();
     final noteCtrl = TextEditingController();
-    final ok = await showGlassDialog<bool>(
+    final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(t.firewallBanIp),
@@ -277,7 +276,7 @@ class _FirewallRulesTabState extends State<_FirewallRulesTab> {
                               icon: const Icon(Icons.delete_outline),
                               onPressed: () async {
                                 final messenger = ScaffoldMessenger.of(context);
-                                final del = await showGlassDialog<bool>(
+                                final del = await showDialog<bool>(
                                   context: context,
                                   builder: (c) => AlertDialog(
                                     title: Text(t.firewallDeleteConfirmTitle),
@@ -362,7 +361,7 @@ class _FirewallRatePoliciesTabState extends State<_FirewallRatePoliciesTab> {
     final winCtrl = TextEditingController(text: existing?['window_seconds']?.toString() ?? '60');
     final priCtrl = TextEditingController(text: existing?['priority']?.toString() ?? '100');
     final noteCtrl = TextEditingController(text: existing?['note']?.toString() ?? '');
-    final ok = await showGlassDialog<bool>(
+    final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setSt) => AlertDialog(
@@ -504,7 +503,7 @@ class _FirewallRatePoliciesTabState extends State<_FirewallRatePoliciesTab> {
                               icon: const Icon(Icons.delete_outline),
                               onPressed: () async {
                                 final messenger = ScaffoldMessenger.of(context);
-                                final del = await showGlassDialog<bool>(
+                                final del = await showDialog<bool>(
                                   context: context,
                                   builder: (c) => AlertDialog(
                                     title: Text(t.firewallDeleteRatePolicyTitle),

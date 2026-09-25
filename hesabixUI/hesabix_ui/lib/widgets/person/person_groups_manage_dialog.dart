@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:hesabix_ui/theme/glass.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 
 import '../../models/person_group_model.dart';
@@ -55,7 +54,7 @@ class _PersonGroupsManageDialogState extends State<PersonGroupsManageDialog> {
   }
 
   Future<void> _openForm({PersonGroup? group}) async {
-    final ok = await showGlassDialog<bool>(
+    final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => PersonGroupFormDialog(
         businessId: widget.businessId,
@@ -67,7 +66,7 @@ class _PersonGroupsManageDialogState extends State<PersonGroupsManageDialog> {
 
   Future<void> _confirmDelete(PersonGroup g) async {
     final t = AppLocalizations.of(context);
-    final ok = await showGlassDialog<bool>(
+    final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(t.delete),

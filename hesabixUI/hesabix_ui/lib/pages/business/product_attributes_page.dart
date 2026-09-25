@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:hesabix_ui/theme/glass.dart';
 import 'package:go_router/go_router.dart';
 import 'package:dio/dio.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
@@ -278,7 +277,7 @@ class _ProductAttributesPageState extends State<ProductAttributesPage> {
       optionControllers.add(TextEditingController());
     }
 
-    final result = await showGlassDialog<bool>(
+    final result = await showDialog<bool>(
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setState) => AlertDialog(
@@ -470,7 +469,7 @@ class _ProductAttributesPageState extends State<ProductAttributesPage> {
 
   void _confirmDelete(ProductAttributeItem item) {
     final t = AppLocalizations.of(context);
-    showGlassDialog(
+    showDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: Text(t.delete),

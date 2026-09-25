@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:hesabix_ui/theme/glass.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/auth_store.dart';
@@ -97,7 +96,7 @@ class _ChecksPageState extends State<ChecksPage> {
 
   DataTableConfig<Map<String, dynamic>> _buildConfig(AppLocalizations t, BuildContext context) {
     String formatCheckDate(Map<String, dynamic> row, String key) {
-      return MarkStreetDateUtils.formatApiDateForDisplay(
+      return HesabixDateUtils.formatApiDateForDisplay(
         row[key],
         widget.calendarController.isJalali,
         rawValue: row['${key}_raw'],
@@ -390,7 +389,7 @@ class _ChecksPageState extends State<ChecksPage> {
 
   Future<void> _openEndorseDialog(BuildContext context, Map<String, dynamic> row) async {
     Person? selectedPerson;
-    await showGlassDialog(
+    await showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (dialogContext, setDialogState) {
@@ -444,7 +443,7 @@ class _ChecksPageState extends State<ChecksPage> {
   Future<void> _openClearDialog(BuildContext context, Map<String, dynamic> row) async {
     BankAccountOption? selected;
     final currencyId = row['currency_id'] as int?;
-    await showGlassDialog(
+    await showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('وصول چک به بانک'),
@@ -490,7 +489,7 @@ class _ChecksPageState extends State<ChecksPage> {
   Future<void> _openPayDialog(BuildContext context, Map<String, dynamic> row) async {
     BankAccountOption? selected;
     final currencyId = row['currency_id'] as int?;
-    await showGlassDialog(
+    await showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('پرداخت چک پرداختنی'),
@@ -562,7 +561,7 @@ class _ChecksPageState extends State<ChecksPage> {
         return;
       }
       if (status == 'ENDORSED') {
-        final choice = await showGlassDialog<String>(
+        final choice = await showDialog<String>(
           context: context,
           builder: (ctx) {
             var selected = 'from_endorsee';
@@ -626,7 +625,7 @@ class _ChecksPageState extends State<ChecksPage> {
       return;
     }
 
-    final ok = await showGlassDialog<bool>(
+    final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('تأیید عودت'),
@@ -662,7 +661,7 @@ class _ChecksPageState extends State<ChecksPage> {
   }
 
   Future<void> _confirmBounce(BuildContext context, Map<String, dynamic> row) async {
-    final ok = await showGlassDialog<bool>(
+    final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('برگشت چک'),
@@ -685,7 +684,7 @@ class _ChecksPageState extends State<ChecksPage> {
   }
 
   Future<void> _confirmDeposit(BuildContext context, Map<String, dynamic> row) async {
-    final ok = await showGlassDialog<bool>(
+    final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('سپرده چک به بانک'),
@@ -722,7 +721,7 @@ class _ChecksPageState extends State<ChecksPage> {
       return;
     }
 
-    final ok = await showGlassDialog<bool>(
+    final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text('حذف چک'),
@@ -758,7 +757,7 @@ class _ChecksPageState extends State<ChecksPage> {
     final checkId = row['id'] as int?;
     if (checkId == null) return;
 
-    showGlassDialog(
+    showDialog(
       context: context,
       builder: (ctx) => CheckDetailsDialog(
         checkId: checkId,
@@ -775,7 +774,7 @@ class _ChecksPageState extends State<ChecksPage> {
   }
 
   Future<void> _showCheckFormDialog(BuildContext context, {int? checkId}) async {
-    final result = await showGlassDialog<bool>(
+    final result = await showDialog<bool>(
       context: context,
       builder: (ctx) => CheckFormDialog(
         businessId: widget.businessId,

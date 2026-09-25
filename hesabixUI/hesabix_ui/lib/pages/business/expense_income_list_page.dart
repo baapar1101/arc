@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/foundation.dart';
 import 'package:dio/dio.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
@@ -15,7 +14,7 @@ import 'package:hesabix_ui/widgets/data_table/data_table_widget.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table_config.dart';
 import 'package:hesabix_ui/widgets/date_input_field.dart';
 import 'package:hesabix_ui/utils/number_formatters.dart' show formatWithThousands;
-import 'package:hesabix_ui/core/date_utils.dart' show MarkStreetDateUtils;
+import 'package:hesabix_ui/core/date_utils.dart' show HesabixDateUtils;
 import 'package:hesabix_ui/widgets/expense_income/expense_income_form_dialog.dart';
 import 'package:hesabix_ui/widgets/expense_income/expense_income_details_dialog.dart';
 import '../../utils/error_extractor.dart';
@@ -567,11 +566,11 @@ class _ExpenseIncomeListPageState extends State<ExpenseIncomeListPage> {
 
     if (_fromDate != null || _toDate != null) {
       final from = _fromDate != null
-          ? MarkStreetDateUtils.formatForDisplay(
+          ? HesabixDateUtils.formatForDisplay(
               _fromDate!, widget.calendarController.isJalali)
           : '—';
       final to = _toDate != null
-          ? MarkStreetDateUtils.formatForDisplay(
+          ? HesabixDateUtils.formatForDisplay(
               _toDate!, widget.calendarController.isJalali)
           : '—';
       chips.add(Chip(
@@ -941,8 +940,8 @@ class _ExpenseIncomeListPageState extends State<ExpenseIncomeListPage> {
   Map<String, dynamic> _expenseIncomeFilterParams({required bool includeBusinessId}) {
     final m = <String, dynamic>{
       'document_type': _selectedDocumentType,
-      if (_fromDate != null) 'from_date': MarkStreetDateUtils.formatForApiDate(_fromDate!),
-      if (_toDate != null) 'to_date': MarkStreetDateUtils.formatForApiDate(_toDate!),
+      if (_fromDate != null) 'from_date': HesabixDateUtils.formatForApiDate(_fromDate!),
+      if (_toDate != null) 'to_date': HesabixDateUtils.formatForApiDate(_toDate!),
       if (_selectedFiscalYearId != null) 'fiscal_year_id': _selectedFiscalYearId,
       if (_selectedProjectId != null) 'project_id': _selectedProjectId,
       if (_filterAccount?.id != null) 'account_id': _filterAccount!.id,
@@ -1062,7 +1061,7 @@ class _ExpenseIncomeListPageState extends State<ExpenseIncomeListPage> {
           'document_date',
           'تاریخ سند',
           width: ColumnWidth.medium,
-          formatter: (item) => MarkStreetDateUtils.formatForDisplay(item.documentDate, widget.calendarController.isJalali),
+          formatter: (item) => HesabixDateUtils.formatForDisplay(item.documentDate, widget.calendarController.isJalali),
         ),
         
         // مبلغ کل
@@ -1118,7 +1117,7 @@ class _ExpenseIncomeListPageState extends State<ExpenseIncomeListPage> {
           'registered_at',
           'تاریخ ثبت',
           width: ColumnWidth.medium,
-          formatter: (item) => MarkStreetDateUtils.formatForDisplay(item.registeredAt, widget.calendarController.isJalali),
+          formatter: (item) => HesabixDateUtils.formatForDisplay(item.registeredAt, widget.calendarController.isJalali),
         ),
         
         // پروژه
@@ -1198,7 +1197,7 @@ class _ExpenseIncomeListPageState extends State<ExpenseIncomeListPage> {
     final isIncome = doc.isIncome;
     final typeColor = isIncome ? SemanticColorResolver.positive(context) : SemanticColorResolver.warning(context);
     final amountText = '${formatWithThousands(doc.totalAmount)} ${doc.currencyCode ?? 'ریال'}';
-    final dateText = MarkStreetDateUtils.formatForDisplay(doc.documentDate, widget.calendarController.isJalali);
+    final dateText = HesabixDateUtils.formatForDisplay(doc.documentDate, widget.calendarController.isJalali);
     final counterparty = (doc.counterpartyInfo ?? '').trim();
     final accounts = (doc.itemAccountNames ?? '').trim();
     final description = (doc.description ?? '').trim();
@@ -1407,7 +1406,7 @@ class _ExpenseIncomeListPageState extends State<ExpenseIncomeListPage> {
       if (isIncome == null) return; // cancelled
     }
 
-    final result = await showGlassDialog<bool>(
+    final result = await showDialog<bool>(
       context: context,
       builder: (_) => ExpenseIncomeFormDialog(
         businessId: widget.businessId,
@@ -1490,7 +1489,7 @@ class _ExpenseIncomeListPageState extends State<ExpenseIncomeListPage> {
       );
     }
 
-    return showGlassDialog<bool>(
+    return showDialog<bool>(
       context: context,
       builder: (ctx) {
         return AlertDialog(
@@ -1532,7 +1531,7 @@ class _ExpenseIncomeListPageState extends State<ExpenseIncomeListPage> {
 
       // نمایش دیالوگ مشاهده جزئیات
       if (!ctx.mounted) return;
-      await showGlassDialog(
+      await showDialog(
         context: ctx,
         builder: (_) => ExpenseIncomeDetailsDialog(
           document: fullDoc,
@@ -1568,7 +1567,7 @@ class _ExpenseIncomeListPageState extends State<ExpenseIncomeListPage> {
         return;
       }
       if (!ctx.mounted) return;
-      final result = await showGlassDialog<bool>(
+      final result = await showDialog<bool>(
         context: ctx,
         builder: (_) => ExpenseIncomeFormDialog(
           businessId: widget.businessId,
@@ -1599,7 +1598,7 @@ class _ExpenseIncomeListPageState extends State<ExpenseIncomeListPage> {
       SnackBarHelper.showError(context, message: 'دسترسی لازم برای حذف را ندارید');
       return;
     }
-    showGlassDialog<void>(
+    showDialog<void>(
       context: context,
       useRootNavigator: true,
       builder: (dialogContext) => AlertDialog(
@@ -1626,7 +1625,7 @@ class _ExpenseIncomeListPageState extends State<ExpenseIncomeListPage> {
   Future<void> _performDelete(ExpenseIncomeDocument document) async {
     final navigator = Navigator.of(context, rootNavigator: true);
     try {
-      showGlassDialog<void>(
+      showDialog<void>(
         context: context,
         useRootNavigator: true,
         barrierDismissible: false,
@@ -1722,7 +1721,7 @@ class _ExpenseIncomeListPageState extends State<ExpenseIncomeListPage> {
     final codes = docs.map((d) => d.code).toList();
 
     // تایید کاربر
-    final confirmed = await showGlassDialog<bool>(
+    final confirmed = await showDialog<bool>(
       context: context,
       useRootNavigator: true,
       builder: (ctx) {
@@ -1754,7 +1753,7 @@ class _ExpenseIncomeListPageState extends State<ExpenseIncomeListPage> {
     // نمایش لودینگ (همان navigator ریشه که دیالوگ روی آن باز می‌شود — هماهنگ با invoices_list_page)
     if (!context.mounted) return;
     final rootNavigator = Navigator.of(context, rootNavigator: true);
-    showGlassDialog<void>(
+    showDialog<void>(
       context: context,
       useRootNavigator: true,
       barrierDismissible: false,

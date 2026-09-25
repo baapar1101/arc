@@ -1,7 +1,7 @@
 import '../core/api_client.dart';
 import '../models/receipt_payment_document.dart';
 import 'document_policy_guard.dart';
-import '../core/date_utils.dart' show MarkStreetDateUtils;
+import '../core/date_utils.dart' show HesabixDateUtils;
 
 /// سرویس دریافت و پرداخت
 class ReceiptPaymentService {
@@ -86,8 +86,8 @@ class ReceiptPaymentService {
       if (search != null && search.isNotEmpty) 'search': search,
       if (documentType != null) 'document_type': documentType,
       // ارسال تاریخ به صورت YYYY-MM-DD (بدون زمان) برای جلوگیری از جابجایی روز به‌خاطر UTC
-      if (fromDate != null) 'from_date': MarkStreetDateUtils.formatForApiDate(fromDate),
-      if (toDate != null) 'to_date': MarkStreetDateUtils.formatForApiDate(toDate),
+      if (fromDate != null) 'from_date': HesabixDateUtils.formatForApiDate(fromDate),
+      if (toDate != null) 'to_date': HesabixDateUtils.formatForApiDate(toDate),
     };
 
     print('🚨🚨🚨 [ReceiptPaymentService] ارسال درخواست POST به /businesses/$businessId/receipts-payments');

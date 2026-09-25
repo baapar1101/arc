@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
@@ -94,7 +93,7 @@ class _ZohalServicesAdminPageState extends State<ZohalServicesAdminPage> {
     );
     int? selectedCurrencyId = service['currency_id'] as int?;
 
-    await showGlassDialog(
+    await showDialog(
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) {

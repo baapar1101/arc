@@ -1,6 +1,5 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/services.dart';
 import '../../utils/number_normalizer.dart' show parseFormattedNumber;
 import '../date_input_field.dart';
@@ -297,7 +296,7 @@ Future<Map<String, dynamic>?> showInvoiceLineAttributesEditor({
   }
 
   _invoiceLineAttrsDialogLog('opening AlertDialog');
-  return showGlassDialog<Map<String, dynamic>>(
+  return showDialog<Map<String, dynamic>>(
     context: context,
     builder: (ctx) => InvoiceLineAttributesDialog(
       productName: productName,

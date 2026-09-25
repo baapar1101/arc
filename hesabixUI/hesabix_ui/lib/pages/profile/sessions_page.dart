@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:hesabix_ui/theme/glass.dart';
 import '../../core/api_client.dart';
 import '../../l10n/app_localizations.dart';
 import '../../services/session_service.dart';
@@ -57,7 +56,7 @@ class _SessionsPageState extends State<SessionsPage> {
       return;
     }
 
-    final confirmed = await showGlassDialog<bool>(
+    final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -114,7 +113,7 @@ class _SessionsPageState extends State<SessionsPage> {
       return;
     }
 
-    final confirmed = await showGlassDialog<bool>(
+    final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),

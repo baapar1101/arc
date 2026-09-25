@@ -143,8 +143,8 @@ class _CheckFormDialogState extends State<CheckFormDialog> {
         final amount = data['amount'];
         _amountCtrl.text = amount == null ? '' : amount.toString();
         _formatAmountControllerValue();
-        _issueDate = MarkStreetDateUtils.parseApiDate(data['issue_date'], rawValue: data['issue_date_raw']) ?? _issueDate;
-        _dueDate = MarkStreetDateUtils.parseApiDate(data['due_date'], rawValue: data['due_date_raw']) ?? _dueDate;
+        _issueDate = HesabixDateUtils.parseApiDate(data['issue_date'], rawValue: data['issue_date_raw']) ?? _issueDate;
+        _dueDate = HesabixDateUtils.parseApiDate(data['due_date'], rawValue: data['due_date_raw']) ?? _dueDate;
         _currencyId = (data['currency_id'] is int) ? data['currency_id'] as int : _currencyId;
         _selectedPerson = loadedPerson;
       });
@@ -217,8 +217,8 @@ class _CheckFormDialogState extends State<CheckFormDialog> {
       final payload = <String, dynamic>{
         'type': _type,
         'person_id': _selectedPerson!.id, // همیشه باید مقدار داشته باشد (توسط اعتبارسنجی بررسی شده)
-        'issue_date': MarkStreetDateUtils.formatForApiDate(_issueDate!),
-        'due_date': MarkStreetDateUtils.formatForApiDate(_dueDate!),
+        'issue_date': HesabixDateUtils.formatForApiDate(_issueDate!),
+        'due_date': HesabixDateUtils.formatForApiDate(_dueDate!),
         'check_number': _checkNumberCtrl.text.trim(),
         if (_sayadCtrl.text.trim().isNotEmpty) 'sayad_code': _sayadCtrl.text.trim(),
         if (_bankCtrl.text.trim().isNotEmpty) 'bank_name': _bankCtrl.text.trim(),
@@ -226,7 +226,7 @@ class _CheckFormDialogState extends State<CheckFormDialog> {
         'amount': num.tryParse(_amountCtrl.text.replaceAll(',', '').trim()),
         'currency_id': _currencyId,
         // ثبت سند همیشه انجام می‌شود
-        'document_date': MarkStreetDateUtils.formatForApiDate((_documentDate ?? _issueDate)!),
+        'document_date': HesabixDateUtils.formatForApiDate((_documentDate ?? _issueDate)!),
         if (_docDescCtrl.text.trim().isNotEmpty) 'document_description': _docDescCtrl.text.trim(),
       };
 

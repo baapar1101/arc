@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:hesabix_ui/theme/glass.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:hesabix_ui/core/api_client.dart';
@@ -283,7 +282,7 @@ class _CurrencyRevaluationPageState extends State<CurrencyRevaluationPage> {
     if (!context.mounted) return;
     final t = AppLocalizations.of(context);
     final cal = widget.calendarController;
-    final result = await showGlassDialog<bool>(
+    final result = await showDialog<bool>(
       context: context,
       builder: (ctx) {
         return StatefulBuilder(
@@ -458,7 +457,7 @@ class _CurrencyRevaluationPageState extends State<CurrencyRevaluationPage> {
     final id = _toInt(row['id']);
     if (id == null) return;
     final t = AppLocalizations.of(context);
-    final ok = await showGlassDialog<bool>(
+    final ok = await showDialog<bool>(
       context: context,
       builder: (c) => AlertDialog(
         title: Text(t.delete),

@@ -22,7 +22,7 @@ class BusinessApiService {
     }
   }
 
-  /// پیش‌نمایش انتقال از نسخه قدیم مارک‌استریت (API)
+  /// پیش‌نمایش انتقال از نسخه قدیم حسابیکس (API)
   static Future<Map<String, dynamic>> previewLegacyImport({
     required String serverUrl,
     required String apiKey,

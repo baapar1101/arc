@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:hesabix_ui/theme/glass.dart';
 import '../../../services/bom_service.dart';
 import '../../../models/bom_models.dart';
 import '../../product/bom_editor_dialog.dart';
@@ -79,7 +78,7 @@ class _ProductBomSectionState extends State<ProductBomSection> {
               message: 'تنظیمات تولید',
               child: IconButton(
                 onPressed: () async {
-                  await showGlassDialog<bool>(
+                  await showDialog<bool>(
                     context: context,
                     builder: (_) => ProductionSettingsDialog(businessId: widget.businessId),
                   );
@@ -369,7 +368,7 @@ class _ProductBomSectionState extends State<ProductBomSection> {
 
 
   Future<void> _showCreateDialog() async {
-    final result = await showGlassDialog<ProductBOM>(
+    final result = await showDialog<ProductBOM>(
       context: context,
       builder: (_) => _CreateBomDialog(
         businessId: widget.businessId,
@@ -385,7 +384,7 @@ class _ProductBomSectionState extends State<ProductBomSection> {
   }
 
   Future<void> _showEditDialog(ProductBOM bom) async {
-    final result = await showGlassDialog<ProductBOM>(
+    final result = await showDialog<ProductBOM>(
       context: context,
       builder: (_) => _EditBomDialog(
         businessId: widget.businessId,
@@ -401,7 +400,7 @@ class _ProductBomSectionState extends State<ProductBomSection> {
   }
 
   Future<void> _openEditor(ProductBOM bom) async {
-    final updated = await showGlassDialog<ProductBOM>(
+    final updated = await showDialog<ProductBOM>(
       context: context,
       builder: (_) => BomEditorDialog(businessId: widget.businessId, bom: bom),
     );
@@ -417,7 +416,7 @@ class _ProductBomSectionState extends State<ProductBomSection> {
     final outputsCount = bom.outputs.length;
     final operationsCount = bom.operations.length;
     
-    final ok = await showGlassDialog<bool>(
+    final ok = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -622,7 +621,7 @@ class _CreateBomDialogState extends State<_CreateBomDialog> {
     if (!_hasChanges || _isLoading) {
       return true;
     }
-    final shouldClose = await showGlassDialog<bool>(
+    final shouldClose = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
         title: const Text('تغییرات ذخیره نشده'),
@@ -986,7 +985,7 @@ class _EditBomDialogState extends State<_EditBomDialog> {
     if (!_hasChanges || _isLoading) {
       return true;
     }
-    final shouldClose = await showGlassDialog<bool>(
+    final shouldClose = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
         title: const Text('تغییرات ذخیره نشده'),

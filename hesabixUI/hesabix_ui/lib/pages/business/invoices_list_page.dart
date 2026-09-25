@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:hesabix_ui/theme/glass.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
@@ -13,7 +12,7 @@ import 'package:hesabix_ui/models/invoice_list_item.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table_widget.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table_config.dart';
 import 'package:hesabix_ui/widgets/date_input_field.dart';
-import 'package:hesabix_ui/core/date_utils.dart' show MarkStreetDateUtils;
+import 'package:hesabix_ui/core/date_utils.dart' show HesabixDateUtils;
 import 'package:hesabix_ui/utils/number_formatters.dart' show formatWithThousands;
 import 'package:hesabix_ui/widgets/document/document_details_dialog.dart';
 import 'package:hesabix_ui/widgets/invoice/invoice_pdf_print_flow.dart';
@@ -604,10 +603,10 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
 
     if (_fromDate != null || _toDate != null) {
       final from = _fromDate != null
-          ? MarkStreetDateUtils.formatForDisplay(_fromDate!, widget.calendarController.isJalali)
+          ? HesabixDateUtils.formatForDisplay(_fromDate!, widget.calendarController.isJalali)
           : '—';
       final to = _toDate != null
-          ? MarkStreetDateUtils.formatForDisplay(_toDate!, widget.calendarController.isJalali)
+          ? HesabixDateUtils.formatForDisplay(_toDate!, widget.calendarController.isJalali)
           : '—';
       chips.add(Chip(
         label: Text('${t.documentDate}: $from → $to'),
@@ -1043,8 +1042,8 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
         pageSizeOptions: const [10, 20, 50, 100],
         additionalParams: {
           'document_type': _selectedInvoiceType,
-          if (_fromDate != null) 'from_date': MarkStreetDateUtils.formatForApiDate(_fromDate!),
-          if (_toDate != null) 'to_date': MarkStreetDateUtils.formatForApiDate(_toDate!),
+          if (_fromDate != null) 'from_date': HesabixDateUtils.formatForApiDate(_fromDate!),
+          if (_toDate != null) 'to_date': HesabixDateUtils.formatForApiDate(_toDate!),
           if (_isProforma != null) 'is_proforma': _isProforma,
           if (_selectedFiscalYearId != null) 'fiscal_year_id': _selectedFiscalYearId,
           if (_selectedProjectId != null) 'project_id': _selectedProjectId,
@@ -1097,7 +1096,7 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
               label: t.view,
               onTap: (item) async {
                 final invoice = item as InvoiceListItem;
-                await showGlassDialog(
+                await showDialog(
                   context: context,
                   builder: (_) => DocumentDetailsDialog(
                     documentId: invoice.id,
@@ -1249,7 +1248,7 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
           'document_date',
           t.documentDate,
           width: ColumnWidth.medium,
-          formatter: (item) => MarkStreetDateUtils.formatForDisplay(item.documentDate, widget.calendarController.isJalali),
+          formatter: (item) => HesabixDateUtils.formatForDisplay(item.documentDate, widget.calendarController.isJalali),
         ),
         // مبلغ کل
         TextColumn(
@@ -1420,8 +1419,8 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
       },
       additionalParams: {
         'document_type': _selectedInvoiceType,
-        if (_fromDate != null) 'from_date': MarkStreetDateUtils.formatForApiDate(_fromDate!),
-        if (_toDate != null) 'to_date': MarkStreetDateUtils.formatForApiDate(_toDate!),
+        if (_fromDate != null) 'from_date': HesabixDateUtils.formatForApiDate(_fromDate!),
+        if (_toDate != null) 'to_date': HesabixDateUtils.formatForApiDate(_toDate!),
         if (_isProforma != null) 'is_proforma': _isProforma,
         if (_selectedFiscalYearId != null) 'fiscal_year_id': _selectedFiscalYearId,
         if (_selectedProjectId != null) 'project_id': _selectedProjectId,
@@ -1504,7 +1503,7 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
     final remainingStr = invoice.remainingAmount != null
         ? '${formatWithThousands(invoice.remainingAmount!, decimalPlaces: 2)} ${invoice.currencyCode ?? 'ریال'}'
         : null;
-    final dateText = MarkStreetDateUtils.formatForDisplay(invoice.documentDate, widget.calendarController.isJalali);
+    final dateText = HesabixDateUtils.formatForDisplay(invoice.documentDate, widget.calendarController.isJalali);
     final typeText = (invoice.documentTypeName).trim().isNotEmpty ? invoice.documentTypeName : _invoiceTypeLabel(t, invoice.documentType);
     final counterparty = (invoice.counterparty == null || invoice.counterparty!.trim().isEmpty) ? t.unknown : invoice.counterparty!;
     final project = invoice.projectName ?? '-';
@@ -1728,7 +1727,7 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
 
   Future<void> _onImport() async {
     if (!mounted) return;
-    final result = await showGlassDialog<bool>(
+    final result = await showDialog<bool>(
       context: context,
       builder: (_) => InvoiceImportDialog(
         businessId: widget.businessId,
@@ -1754,7 +1753,7 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
   }
 
   Future<void> _onView(InvoiceListItem item) async {
-    await showGlassDialog(
+    await showDialog(
       context: context,
       builder: (_) => DocumentDetailsDialog(
         documentId: item.id,
@@ -1806,7 +1805,7 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
     final ids = items.map((e) => e.id).toList();
     final codes = items.map((e) => e.code).toList();
 
-    final confirmed = await showGlassDialog<bool>(
+    final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) {
         return AlertDialog(
@@ -1843,7 +1842,7 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
     if (confirmed != true || !mounted) return;
 
     final rootNavigator = Navigator.of(context, rootNavigator: true);
-    showGlassDialog<void>(
+    showDialog<void>(
       context: context,
       barrierDismissible: false,
       useRootNavigator: true,
@@ -1921,7 +1920,7 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
     if (items == null || items.isEmpty) return;
 
     String policy = 'post_drafts_only';
-    final chosen = await showGlassDialog<String>(
+    final chosen = await showDialog<String>(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (context, setLocal) {
@@ -2003,7 +2002,7 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
     if (items == null || items.isEmpty) return;
 
     if (!skipConfirmDialog) {
-      final confirmed = await showGlassDialog<bool>(
+      final confirmed = await showDialog<bool>(
         context: context,
         builder: (ctx) => AlertDialog(
           title: Text(title),
@@ -2026,7 +2025,7 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
     }
 
     final rootNav = Navigator.of(context, rootNavigator: true);
-    showGlassDialog<void>(
+    showDialog<void>(
       context: context,
       barrierDismissible: false,
       useRootNavigator: true,
@@ -2063,7 +2062,7 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
 
       if (!mounted) return;
 
-      await showGlassDialog<void>(
+      await showDialog<void>(
         context: context,
         useRootNavigator: true,
         builder: (ctx) => AlertDialog(
@@ -2319,7 +2318,7 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
     }
     
     // نمایش dialog تأیید
-    final confirmed = await showGlassDialog<bool>(
+    final confirmed = await showDialog<bool>(
       context: context,
       useRootNavigator: true,
       builder: (context) => AlertDialog(
@@ -2352,7 +2351,7 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
 
     // نمایش لودینگ
     final navigator = Navigator.of(context, rootNavigator: true);
-    showGlassDialog<void>(
+    showDialog<void>(
       context: context,
       useRootNavigator: true,
       barrierDismissible: false,
@@ -2404,7 +2403,7 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
       return;
     }
 
-    final confirmed = await showGlassDialog<bool>(
+    final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: Text(t.taxAddToWorkspaceDialogTitle),
@@ -2426,7 +2425,7 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
     if (confirmed != true || !mounted) return;
 
     final navigator = Navigator.of(context, rootNavigator: true);
-    showGlassDialog<void>(
+    showDialog<void>(
       context: context,
       useRootNavigator: true,
       barrierDismissible: false,
@@ -2468,7 +2467,7 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
   Future<void> _onRemoveFromTaxWorkspace(InvoiceListItem item) async {
     final t = AppLocalizations.of(context);
 
-    final confirmed = await showGlassDialog<bool>(
+    final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: Text(t.taxRemoveFromWorkspaceDialogTitle),
@@ -2490,7 +2489,7 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
     if (confirmed != true || !mounted) return;
 
     final navigator = Navigator.of(context, rootNavigator: true);
-    showGlassDialog<void>(
+    showDialog<void>(
       context: context,
       useRootNavigator: true,
       barrierDismissible: false,

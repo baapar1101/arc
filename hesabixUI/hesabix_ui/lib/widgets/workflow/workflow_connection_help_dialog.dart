@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:hesabix_ui/theme/glass.dart';
 import '../../l10n/app_localizations.dart';
 import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
@@ -8,7 +7,7 @@ class WorkflowConnectionHelpDialog extends StatelessWidget {
   const WorkflowConnectionHelpDialog({super.key});
 
   static void show(BuildContext context) {
-    showGlassDialog(
+    showDialog(
       context: context,
       builder: (context) => const WorkflowConnectionHelpDialog(),
     );

@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:hesabix_ui/theme/glass.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:hesabix_ui/core/api_client.dart';
@@ -144,7 +143,7 @@ class _BusinessActivityLogsAdminPageState
   // ---------------- Pickers ----------------
 
   Future<void> _pickBusiness() async {
-    final selected = await showGlassDialog<Map<String, dynamic>?>(
+    final selected = await showDialog<Map<String, dynamic>?>(
       context: context,
       builder: (ctx) => _SearchPickerDialog(
         title: 'انتخاب کسب‌وکار',
@@ -170,7 +169,7 @@ class _BusinessActivityLogsAdminPageState
 
   Future<void> _pickUser() async {
     final businessId = _selectedBusiness?['id'] as int?;
-    final selected = await showGlassDialog<Map<String, dynamic>?>(
+    final selected = await showDialog<Map<String, dynamic>?>(
       context: context,
       builder: (ctx) => _SearchPickerDialog(
         title: businessId == null
@@ -201,7 +200,7 @@ class _BusinessActivityLogsAdminPageState
     try {
       final detail = await _service.getLogDetail(logId);
       if (!mounted) return;
-      await showGlassDialog<void>(
+      await showDialog<void>(
         context: context,
         builder: (_) => _LogDetailDialog(log: detail),
       );
@@ -294,7 +293,7 @@ class _BusinessActivityLogsAdminPageState
     final dt = value is DateTime ? value : DateTime.tryParse(value.toString());
     if (dt == null) return value.toString();
     final isJalali = _calendarController?.isJalali ?? false;
-    return MarkStreetDateUtils.formatForDisplay(dt, isJalali);
+    return HesabixDateUtils.formatForDisplay(dt, isJalali);
   }
 
   // ---------------- DataTable config ----------------

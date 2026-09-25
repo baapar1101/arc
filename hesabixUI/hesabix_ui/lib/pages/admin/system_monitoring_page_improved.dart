@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:hesabix_ui/theme/glass.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import '../../core/api_client.dart';
@@ -778,7 +777,7 @@ class _SystemMonitoringPageState extends State<SystemMonitoringPage> with Single
 
   Future<void> _restartNotificationModerationWorker() async {
     try {
-      final confirmed = await showGlassDialog<bool>(
+      final confirmed = await showDialog<bool>(
         context: context,
         builder: (context) => AlertDialog(
           title: const Text('Restart Worker'),

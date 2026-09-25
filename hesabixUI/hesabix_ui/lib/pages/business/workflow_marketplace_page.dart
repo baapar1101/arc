@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:hesabix_ui/theme/glass.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/auth_store.dart';
@@ -252,7 +251,7 @@ class _WorkflowMarketplacePageState extends State<WorkflowMarketplacePage> with 
                             if (isPublished) ...[
                               OutlinedButton.icon(
                                 onPressed: () async {
-                                  final ok = await showGlassDialog<bool>(
+                                  final ok = await showDialog<bool>(
                                     context: ctx,
                                     builder: (dCtx) {
                                       return AlertDialog(
@@ -663,7 +662,7 @@ class _WorkflowMarketCard extends StatelessWidget {
     final parsed = pub == null ? null : DateTime.tryParse(pub)?.toLocal();
     final dateStr = parsed == null
         ? '-'
-        : MarkStreetDateUtils.formatDateTime(parsed, calendarController.isJalali);
+        : HesabixDateUtils.formatDateTime(parsed, calendarController.isJalali);
     final tags = (item['tags'] as List?)?.map((e) => e.toString()).toList() ?? const <String>[];
     final statusStr = (item['status'] ?? 'published').toString().toLowerCase();
     final isHidden = statusStr == 'hidden';

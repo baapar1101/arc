@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:hesabix_ui/theme/glass.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import '../../services/category_service.dart';
 import '../../services/product_service.dart';
@@ -980,7 +979,7 @@ class _CategoryTreeDialogState extends State<CategoryTreeDialog> {
   Future<void> _confirmDelete(int? id) async {
     if (id == null) return;
     final t = AppLocalizations.of(context);
-    final ok = await showGlassDialog<bool>(
+    final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(t.deleteCategory),
@@ -1185,7 +1184,7 @@ class _CategoryTreeDialogState extends State<CategoryTreeDialog> {
         },
       );
       } else {
-        result = await showGlassDialog<Map<String, dynamic>?>(
+        result = await showDialog<Map<String, dynamic>?>(
         context: context,
         builder: (ctx) => Dialog(
           child: ConstrainedBox(

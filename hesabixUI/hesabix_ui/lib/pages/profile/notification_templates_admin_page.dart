@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:hesabix_ui/theme/glass.dart';
 import '../../core/api_client.dart';
 import '../../services/admin_notification_templates_service.dart';
 import '../../utils/snackbar_helper.dart';
@@ -271,7 +270,7 @@ class _NotificationTemplatesAdminPageState extends State<NotificationTemplatesAd
       }
     }
 
-    await showGlassDialog<bool>(
+    await showDialog<bool>(
       context: context,
       builder: (context) {
         return StatefulBuilder(
@@ -847,7 +846,7 @@ class _NotificationTemplatesAdminPageState extends State<NotificationTemplatesAd
   }
 
   Future<void> _deleteTemplate(NotificationTemplate item) async {
-    final confirmed = await showGlassDialog<bool>(
+    final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         icon: Icon(Icons.warning_amber_rounded, color: SemanticColorResolver.warning(context), size: 48),
@@ -887,7 +886,7 @@ class _NotificationTemplatesAdminPageState extends State<NotificationTemplatesAd
   }
 
   Future<void> _showBodyDialog(NotificationTemplate item) async {
-    await showGlassDialog(
+    await showDialog(
       context: context,
       builder: (context) => Dialog(
         child: Container(
@@ -974,7 +973,7 @@ class _NotificationTemplatesAdminPageState extends State<NotificationTemplatesAd
   }
 
   Future<void> _showPreviewDialog(Map<String, dynamic> preview) async {
-    await showGlassDialog(
+    await showDialog(
       context: context,
       builder: (context) => Dialog(
         child: Container(

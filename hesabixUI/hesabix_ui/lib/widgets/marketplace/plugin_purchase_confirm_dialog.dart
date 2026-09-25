@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:hesabix_ui/theme/glass.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 
 import 'plugin_marketplace_utils.dart';
@@ -31,7 +30,7 @@ class PluginPurchaseConfirmDialog extends StatelessWidget {
     required double walletBalance,
     required String walletCurrency,
   }) {
-    return showGlassDialog<bool>(
+    return showDialog<bool>(
       context: context,
       builder: (ctx) => PluginPurchaseConfirmDialog(
         pluginName: pluginName,

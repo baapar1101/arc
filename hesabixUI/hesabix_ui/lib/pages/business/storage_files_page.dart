@@ -1,8 +1,6 @@
 import 'dart:async';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
-import 'package:hesabix_ui/theme/glass.dart';
-import 'package:flutter/foundation.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/services/business_storage_service.dart';
@@ -11,9 +9,11 @@ import 'package:hesabix_ui/utils/date_formatters.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:dio/dio.dart';
-import 'package:hesabix_ui/utils/web/web_utils.dart' as web_utils;
 import '../../utils/snackbar_helper.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
+import 'package:hesabix_ui/services/bytes_export/bytes_export_service.dart';
+import 'package:hesabix_ui/core/hesabix_back.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 /// صفحه مدیریت فایل‌های کسب‌وکار
 class StorageFilesPage extends StatefulWidget {
@@ -475,7 +475,7 @@ class _StorageFilesPageState extends State<StorageFilesPage> with SingleTickerPr
     
     final theme = Theme.of(context);
     
-    await showGlassDialog(
+    await showDialog(
       context: context,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
@@ -675,35 +675,30 @@ class _StorageFilesPageState extends State<StorageFilesPage> with SingleTickerPr
       final queryParams = _selectedModuleContext != null 
           ? {'module_context': _selectedModuleContext}
           : null;
-      
-      if (kIsWeb) {
-        // دانلود فایل از طریق API با authentication header
-        final response = await _apiClient.get<List<int>>(
-          baseUrl,
-          query: queryParams,
-          responseType: ResponseType.bytes,
-          options: Options(
-            headers: {
-              'Accept': 'application/zip',
-            },
-          ),
-        );
 
-        if (response.statusCode == 200 && response.data != null) {
-          // ذخیره فایل در مرورگر
-          await web_utils.saveBytesAsFileWeb(
-            response.data!,
-            'hesabix_files_${widget.businessId}.zip',
-            mimeType: 'application/zip',
-          );
-          
-          if (mounted) {
-            SnackBarHelper.showSuccess(context, message: 'فایل ZIP با موفقیت دانلود شد');
-          }
-        }
-      } else {
+      final response = await _apiClient.get<List<int>>(
+        baseUrl,
+        query: queryParams,
+        responseType: ResponseType.bytes,
+        options: Options(
+          headers: {
+            'Accept': 'application/zip',
+          },
+        ),
+      );
+
+      if (response.statusCode == 200 && response.data != null) {
+        final result = await BytesExportService.export(
+          bytes: response.data!,
+          filename: 'hesabix_files_${widget.businessId}.zip',
+          mimeType: 'application/zip',
+        );
         if (mounted) {
-          SnackBarHelper.show(context, message: 'دانلود فایل فقط در نسخه وب پشتیبانی می‌شود');
+          BytesExportService.showFeedback(
+            context,
+            result,
+            successOverride: 'فایل ZIP با موفقیت دانلود شد',
+          );
         }
       }
     } catch (e) {
@@ -723,20 +718,17 @@ class _StorageFilesPageState extends State<StorageFilesPage> with SingleTickerPr
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('فضای ذخیره‌سازی'),
+        title: Text('فضای ذخیره‌سازی'),
         backgroundColor: theme.colorScheme.primary,
         foregroundColor: theme.colorScheme.onPrimary,
         elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.go('/business/${widget.businessId}/dashboard'),
-        ),
+        leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
         actions: [
           if (isMobile && _tabController.index == 0)
             IconButton(
               onPressed: _uploading ? null : _uploadFile,
               icon: _uploading
-                  ? const SizedBox(
+                  ? SizedBox(
                       width: 20,
                       height: 20,
                       child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
@@ -758,7 +750,7 @@ class _StorageFilesPageState extends State<StorageFilesPage> with SingleTickerPr
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.error_outline, size: 64, color: Colors.red),
+                      Icon(Icons.error_outline, size: 64, color: SemanticColorResolver.negative(context)),
                       const SizedBox(height: 16),
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 32),
@@ -1025,11 +1017,11 @@ class _StorageFilesPageState extends State<StorageFilesPage> with SingleTickerPr
               isScrollable: isMobile,
               tabs: [
                 Tab(
-                  icon: const Icon(Icons.folder),
+                  icon: Icon(Icons.folder),
                   text: isMobile ? null : 'فایل‌ها',
                 ),
                 Tab(
-                  icon: const Icon(Icons.storage),
+                  icon: Icon(Icons.storage),
                   text: isMobile ? null : 'پلن‌ها',
                 ),
                 Tab(
@@ -1099,7 +1091,7 @@ class _StorageFilesPageState extends State<StorageFilesPage> with SingleTickerPr
                         icon: const Icon(Icons.delete_rounded, size: 18),
                         label: const Text('حذف'),
                         style: TextButton.styleFrom(
-                          foregroundColor: Colors.red,
+                          foregroundColor: SemanticColorResolver.negative(context),
                         ),
                       ),
                       const SizedBox(width: 8),
@@ -2169,13 +2161,13 @@ class _StorageFilesPageState extends State<StorageFilesPage> with SingleTickerPr
                 typeIcon = Icons.refresh;
               }
               
-              Color statusColor = Colors.orange;
+              Color statusColor = SemanticColorResolver.warning(context);
               String statusText = 'در انتظار پرداخت';
               if (status == 'paid') {
-                statusColor = Colors.green;
+                statusColor = SemanticColorResolver.positive(context);
                 statusText = 'پرداخت شده';
               } else if (status == 'cancelled') {
-                statusColor = Colors.red;
+                statusColor = SemanticColorResolver.negative(context);
                 statusText = 'لغو شده';
               }
               
@@ -2487,10 +2479,10 @@ class _StorageFilesPageState extends State<StorageFilesPage> with SingleTickerPr
 
     final theme = Theme.of(context);
 
-    return showGlassDialog<bool>(
+    return showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('حذف فایل'),
+        title: Text('حذف فایل'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -2499,11 +2491,11 @@ class _StorageFilesPageState extends State<StorageFilesPage> with SingleTickerPr
               'آیا از حذف "${file['original_name'] ?? ''}" اطمینان دارید؟',
               style: theme.textTheme.bodyMedium,
             ),
-            const SizedBox(height: 16),
+            SizedBox(height: 16),
             if (usageError != null)
               Text(
                 'خطا در دریافت وابستگی‌ها: $usageError',
-                style: theme.textTheme.bodySmall?.copyWith(color: Colors.red),
+                style: theme.textTheme.bodySmall?.copyWith(color: SemanticColorResolver.negative(context)),
               )
             else if (dependencies.isEmpty)
               Text(
@@ -2537,7 +2529,7 @@ class _StorageFilesPageState extends State<StorageFilesPage> with SingleTickerPr
                   },
                 ),
               ),
-              const SizedBox(height: 8),
+              SizedBox(height: 8),
               Text(
                 'با حذف فایل، لینک‌های بالا به صورت خودکار پاک می‌شوند.',
                 style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
@@ -2548,11 +2540,11 @@ class _StorageFilesPageState extends State<StorageFilesPage> with SingleTickerPr
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('لغو'),
+            child: Text('لغو'),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
-            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            style: FilledButton.styleFrom(backgroundColor: SemanticColorResolver.negative(context)),
             child: const Text('حذف'),
           ),
         ],
@@ -2571,22 +2563,18 @@ class _StorageFilesPageState extends State<StorageFilesPage> with SingleTickerPr
         fileId: file['id'] as String,
       );
 
-      if (kIsWeb) {
-        final fileName = file['original_name'] ?? 'file';
-        await web_utils.saveBytesAsFileWeb(
-          fileBytes,
-          fileName,
-          mimeType: file['mime_type'] ?? 'application/octet-stream',
-        );
-      } else {
-        // برای موبایل باید از path_provider استفاده شود
-        if (mounted) {
-          SnackBarHelper.showError(context, message: 'دانلود در موبایل در حال توسعه است');
-        }
-      }
-
+      final fileName = file['original_name'] ?? 'file';
+      final result = await BytesExportService.export(
+        bytes: fileBytes,
+        filename: fileName.toString(),
+        mimeType: (file['mime_type'] ?? 'application/octet-stream').toString(),
+      );
       if (mounted) {
-        SnackBarHelper.showSuccess(context, message: 'فایل با موفقیت دانلود شد');
+        BytesExportService.showFeedback(
+          context,
+          result,
+          successOverride: 'فایل با موفقیت دانلود شد',
+        );
       }
     } catch (e) {
       if (mounted) {
@@ -2613,7 +2601,7 @@ class _StorageFilesPageState extends State<StorageFilesPage> with SingleTickerPr
 
     if (!mounted) return;
 
-    showGlassDialog(
+    showDialog(
       context: context,
       builder: (context) => Dialog(
         backgroundColor: Colors.transparent,
@@ -2709,21 +2697,21 @@ class _StorageFilesPageState extends State<StorageFilesPage> with SingleTickerPr
   Future<void> _deleteSelectedFiles() async {
     if (_selectedFileIds.isEmpty) return;
 
-    final confirmed = await showGlassDialog<bool>(
+    final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('حذف فایل‌های انتخاب شده'),
+        title: Text('حذف فایل‌های انتخاب شده'),
         content: Text(
           'آیا از حذف ${_selectedFileIds.length} فایل اطمینان دارید؟',
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('لغو'),
+            child: Text('لغو'),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
-            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            style: FilledButton.styleFrom(backgroundColor: SemanticColorResolver.negative(context)),
             child: const Text('حذف'),
           ),
         ],
@@ -2782,15 +2770,17 @@ class _StorageFilesPageState extends State<StorageFilesPage> with SingleTickerPr
           fileId: fileId,
         );
 
-        if (kIsWeb) {
-          final fileName = file['original_name'] ?? 'file';
-          await web_utils.saveBytesAsFileWeb(
-            fileBytes,
-            fileName,
-            mimeType: file['mime_type'] ?? 'application/octet-stream',
-          );
+        final fileName = file['original_name'] ?? 'file';
+        final result = await BytesExportService.export(
+          bytes: fileBytes,
+          filename: fileName.toString(),
+          mimeType: (file['mime_type'] ?? 'application/octet-stream').toString(),
+        );
+        if (result.isSuccess) {
+          successCount++;
+        } else if (!result.isCancelled) {
+          failCount++;
         }
-        successCount++;
       } catch (e) {
         failCount++;
       }

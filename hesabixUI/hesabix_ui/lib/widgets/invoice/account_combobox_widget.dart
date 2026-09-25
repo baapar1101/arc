@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:hesabix_ui/theme/glass.dart';
 import '../../models/account_model.dart';
 import '../../services/account_service.dart';
 
@@ -119,7 +118,7 @@ class _AccountComboboxWidgetState extends State<AccountComboboxWidget> {
   }
 
   void _showAccountSelectionDialog() {
-    showGlassDialog(
+    showDialog(
       context: context,
       builder: (context) => _AccountSelectionDialog(
         accounts: _accounts,

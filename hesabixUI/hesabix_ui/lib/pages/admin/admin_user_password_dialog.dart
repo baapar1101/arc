@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/services.dart';
 import 'package:hesabix_ui/config/app_config.dart';
 import 'package:hesabix_ui/core/api_client.dart';
@@ -11,7 +10,7 @@ Future<void> showAdminUserPasswordDialog(
   required Map<String, dynamic> user,
   VoidCallback? onSuccess,
 }) async {
-  await showGlassDialog<void>(
+  await showDialog<void>(
     context: context,
     builder: (ctx) => _AdminUserPasswordDialog(user: user, onSuccess: onSuccess),
   );
@@ -166,7 +165,7 @@ class _AdminUserPasswordDialogState extends State<_AdminUserPasswordDialog>
   Future<void> _setRandom() async {
     final id = _parseUserId(widget.user);
     if (id == null) return;
-    final ok = await showGlassDialog<bool>(
+    final ok = await showDialog<bool>(
       context: context,
       builder: (c) => AlertDialog(
         title: const Text('تولید رمز تصادفی'),
@@ -412,7 +411,7 @@ Future<void> _showResultDialog(
   required String body,
   String? hint,
 }) async {
-  await showGlassDialog<void>(
+  await showDialog<void>(
     context: context,
     builder: (c) => AlertDialog(
       title: Text(title),

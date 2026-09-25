@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:hesabix_ui/theme/glass.dart';
 import 'package:hesabix_ui/models/account_model.dart';
 import 'package:hesabix_ui/models/person_model.dart';
 import 'package:hesabix_ui/models/product_model.dart';
@@ -231,7 +230,7 @@ class _DetailSelectorWidgetState extends State<DetailSelectorWidget> {
           .map((json) => Person.fromJson(json as Map<String, dynamic>))
           .toList();
       
-      final selected = await showGlassDialog<Person>(
+      final selected = await showDialog<Person>(
         context: context,
         builder: (context) => _PersonSelectionDialog(persons: persons),
       );
@@ -278,7 +277,7 @@ class _DetailSelectorWidgetState extends State<DetailSelectorWidget> {
           .map((json) => Product.fromJson(json))
           .toList();
       
-      final selected = await showGlassDialog<Product>(
+      final selected = await showDialog<Product>(
         context: context,
         builder: (context) => _ProductSelectionDialog(products: products),
       );
@@ -328,7 +327,7 @@ class _DetailSelectorWidgetState extends State<DetailSelectorWidget> {
           .map((json) => BankAccount.fromJson(json as Map<String, dynamic>))
           .toList();
       
-      final selected = await showGlassDialog<BankAccount>(
+      final selected = await showDialog<BankAccount>(
         context: context,
         builder: (context) => _BankAccountSelectionDialog(accounts: accounts),
       );
@@ -378,7 +377,7 @@ class _DetailSelectorWidgetState extends State<DetailSelectorWidget> {
           .map((json) => CashRegister.fromJson(json as Map<String, dynamic>))
           .toList();
       
-      final selected = await showGlassDialog<CashRegister>(
+      final selected = await showDialog<CashRegister>(
         context: context,
         builder: (context) => _CashRegisterSelectionDialog(registers: registers),
       );
@@ -428,7 +427,7 @@ class _DetailSelectorWidgetState extends State<DetailSelectorWidget> {
           .map((json) => PettyCash.fromJson(json as Map<String, dynamic>))
           .toList();
       
-      final selected = await showGlassDialog<PettyCash>(
+      final selected = await showDialog<PettyCash>(
         context: context,
         builder: (context) => _PettyCashSelectionDialog(cashes: cashes),
       );
@@ -478,7 +477,7 @@ class _DetailSelectorWidgetState extends State<DetailSelectorWidget> {
           .map((json) => Map<String, dynamic>.from(json as Map))
           .toList();
       
-      final selected = await showGlassDialog<Map<String, dynamic>>(
+      final selected = await showDialog<Map<String, dynamic>>(
         context: context,
         builder: (context) => _CheckSelectionDialog(checks: checks),
       );

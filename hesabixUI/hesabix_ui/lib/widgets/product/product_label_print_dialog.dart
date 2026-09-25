@@ -3,7 +3,6 @@ import 'dart:math' as math;
 import 'package:barcode/barcode.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/services.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
@@ -90,7 +89,7 @@ class ProductLabelPrintDialog extends StatefulWidget {
     String? dialogSubtitle,
   }) {
     if (items.isEmpty) return Future.value();
-    return showGlassDialog<void>(
+    return showDialog<void>(
       context: context,
       barrierDismissible: false,
       builder: (ctx) => ProductLabelPrintDialog(
@@ -167,7 +166,7 @@ class _ProductLabelPrintDialogState extends State<ProductLabelPrintDialog> {
   }
 
   Future<Uint8List> _buildPdfUnsafe(PdfPageFormat format) async {
-    // همان خانوادهٔ فونت خروجی PDF فاکتور (قالب‌های HTML / MarkStreet API)
+    // همان خانوادهٔ فونت خروجی PDF فاکتور (قالب‌های HTML / Hesabix API)
     pw.Font? fontRegular;
     pw.Font? fontBold;
     try {

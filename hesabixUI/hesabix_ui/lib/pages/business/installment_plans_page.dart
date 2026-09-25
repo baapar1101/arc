@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:hesabix_ui/theme/glass.dart';
 import 'package:hesabix_ui/models/credit_models.dart';
 import 'package:hesabix_ui/services/credit_api_service.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/core/api_client.dart';
-import 'package:hesabix_ui/core/date_utils.dart' show MarkStreetDateUtils;
+import 'package:hesabix_ui/core/date_utils.dart' show HesabixDateUtils;
 import '../../utils/snackbar_helper.dart';
 import '../../widgets/business_subpage_back_leading.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
@@ -52,7 +51,7 @@ class _InstallmentPlansPageState extends State<InstallmentPlansPage> {
   }
 
   Future<void> _openCreateDialog() async {
-    final created = await showGlassDialog<bool>(
+    final created = await showDialog<bool>(
       context: context,
       builder: (context) => InstallmentPlanDialog(businessId: widget.businessId),
     );
@@ -62,7 +61,7 @@ class _InstallmentPlansPageState extends State<InstallmentPlansPage> {
   }
 
   Future<void> _openEditDialog(InstallmentPlan plan) async {
-    final updated = await showGlassDialog<bool>(
+    final updated = await showDialog<bool>(
       context: context,
       builder: (context) => InstallmentPlanDialog(businessId: widget.businessId, plan: plan),
     );
@@ -72,7 +71,7 @@ class _InstallmentPlansPageState extends State<InstallmentPlansPage> {
   }
 
   Future<void> _deletePlan(InstallmentPlan plan) async {
-    final ok = await showGlassDialog<bool>(
+    final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(AppLocalizations.of(context).deletePlan),
@@ -642,7 +641,7 @@ class _InstallmentPlanDialogState extends State<InstallmentPlanDialog> {
     for (int i = 0; i < showCount; i++) {
       final due = DateTime.now().add(Duration(days: periodDays * i));
       final total = perPrincipal + perInterest;
-      final dueDisplay = MarkStreetDateUtils.formatForDisplay(due.toLocal(), isJalali);
+      final dueDisplay = HesabixDateUtils.formatForDisplay(due.toLocal(), isJalali);
       previewRows.add(
         Row(
           children: [

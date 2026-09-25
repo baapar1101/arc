@@ -160,7 +160,7 @@ class _TopCustomersReportPageState extends State<TopCustomersReportPage> {
             try {
               final dt = dateValue is DateTime ? dateValue : (dateValue is String ? DateTime.tryParse(dateValue) : null);
               if (dt != null) {
-                return MarkStreetDateUtils.formatForDisplay(dt, widget.calendarController.isJalali);
+                return HesabixDateUtils.formatForDisplay(dt, widget.calendarController.isJalali);
               }
             } catch (_) {}
             return dateValue.toString();

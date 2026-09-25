@@ -28,10 +28,10 @@ class AttributeFormatter {
           final date = DateTime.tryParse(value);
           if (date != null) {
             // Format based on calendar type
-            return MarkStreetDateUtils.formatForDisplay(date, isJalali);
+            return HesabixDateUtils.formatForDisplay(date, isJalali);
           }
         } else if (value is DateTime) {
-          return MarkStreetDateUtils.formatForDisplay(value, isJalali);
+          return HesabixDateUtils.formatForDisplay(value, isJalali);
         }
         return value.toString();
 

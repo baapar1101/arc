@@ -2,7 +2,6 @@ import 'dart:math' as math;
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
-import 'package:hesabix_ui/theme/glass.dart';
 import 'package:intl/intl.dart';
 
 import '../../config/app_config.dart';
@@ -32,7 +31,7 @@ class _PublicPersonShareLinkPageState extends State<PublicPersonShareLinkPage> {
   bool _useJalaliCalendar = true;
 
   String _formatDate(DateTime? date) =>
-      MarkStreetDateUtils.formatForDisplay(date, _useJalaliCalendar);
+      HesabixDateUtils.formatForDisplay(date, _useJalaliCalendar);
 
   NumberFormat _numberFormat() => NumberFormat('#,##0', 'fa_IR');
 
@@ -567,7 +566,7 @@ class _PublicPersonShareLinkPageState extends State<PublicPersonShareLinkPage> {
 
   Future<void> _showInvoiceDetails(BuildContext context, ThemeData theme, int documentId) async {
     try {
-      showGlassDialog(
+      showDialog(
         context: context,
         barrierDismissible: false,
         builder: (context) => const Center(child: CircularProgressIndicator()),
@@ -578,7 +577,7 @@ class _PublicPersonShareLinkPageState extends State<PublicPersonShareLinkPage> {
 
       Navigator.of(context).pop(); // بستن loading dialog
 
-      showGlassDialog(
+      showDialog(
         context: context,
         builder: (context) => _InvoiceDetailsDialog(
           theme: theme,

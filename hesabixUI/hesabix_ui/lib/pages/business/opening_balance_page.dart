@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
-import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/services.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/core/auth_store.dart';
@@ -1911,7 +1910,7 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
   Future<void> _confirmUnpost() async {
     if (_submitting != null) return;
 
-    final ok = await showGlassDialog<bool>(
+    final ok = await showDialog<bool>(
           context: context,
           builder: (ctx) => AlertDialog(
             title: const Text('لغو نهایی‌سازی تراز افتتاحیه'),

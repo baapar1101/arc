@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:hesabix_ui/theme/glass.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/core/auth_store.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
@@ -284,7 +283,7 @@ class _DocumentFormDialogState extends State<DocumentFormDialog> {
 
   Future<bool> _confirmDiscardChanges() async {
     if (!_dirty || _isSaving) return true;
-    final res = await showGlassDialog<bool>(
+    final res = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('خروج بدون ذخیره؟'),

@@ -1,6 +1,5 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
-import 'package:hesabix_ui/theme/glass.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/widgets/business_subpage_back_leading.dart';
 import 'package:hesabix_ui/core/api_client.dart';
@@ -117,7 +116,7 @@ class _FiscalYearRollbackPageState extends State<FiscalYearRollbackPage> {
       return;
     }
 
-    final ok = await showGlassDialog<bool>(
+    final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) {
         final d = AppLocalizations.of(ctx);

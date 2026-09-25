@@ -189,7 +189,7 @@ String formatPluginEndsAt(dynamic endsAt, {bool isJalali = true}) {
     dt = DateTime.tryParse(endsAt.toString());
   }
   if (dt == null) return endsAt.toString();
-  return MarkStreetDateUtils.formatDateTime(dt.toLocal(), isJalali);
+  return HesabixDateUtils.formatDateTime(dt.toLocal(), isJalali);
 }
 
 List<String> pluginDescriptionHighlights(String description, {int maxLines = 3}) {

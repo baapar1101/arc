@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:hesabix_ui/theme/glass.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import '../../core/api_client.dart';
@@ -82,7 +81,7 @@ class _DeleteBusinessPageState extends State<DeleteBusinessPage> {
     _deleteConfirmController.clear();
 
     // تایید اول: نمایش دیالوگ هشدار
-    final confirm1 = await showGlassDialog<bool>(
+    final confirm1 = await showDialog<bool>(
       context: context,
       builder: (ctx) => Dialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -229,7 +228,7 @@ class _DeleteBusinessPageState extends State<DeleteBusinessPage> {
     if (confirm1 != true) return;
     
     // تایید دوم: نمایش دیالوگ نهایی
-    final confirm2 = await showGlassDialog<bool>(
+    final confirm2 = await showDialog<bool>(
       context: context,
       builder: (ctx) => Dialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -375,7 +374,7 @@ class _DeleteBusinessPageState extends State<DeleteBusinessPage> {
       ));
     }
     
-    showGlassDialog(
+    showDialog(
       context: context,
       builder: (ctx) => Dialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),

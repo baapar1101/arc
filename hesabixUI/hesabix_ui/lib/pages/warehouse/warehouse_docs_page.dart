@@ -1,6 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:hesabix_ui/theme/glass.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:go_router/go_router.dart';
 import '../../services/warehouse_service.dart';
 import '../../services/invoice_service.dart';
@@ -8,17 +6,18 @@ import '../../core/api_client.dart';
 import '../../widgets/warehouse/warehouse_document_form_dialog.dart';
 import '../../widgets/warehouse/warehouse_document_details_dialog.dart';
 import '../../widgets/warehouse/warehouse_doc_wizard_dialog.dart';
-import '../../utils/web/web_utils.dart' as web_utils;
 import '../../widgets/data_table/data_table_widget.dart';
 import '../../widgets/data_table/data_table_config.dart';
 import '../../models/warehouse_document_model.dart';
 import '../../core/calendar_controller.dart';
-import '../../core/date_utils.dart' show MarkStreetDateUtils;
+import '../../core/date_utils.dart' show HesabixDateUtils;
 import '../../utils/error_extractor.dart';
 import '../../l10n/app_localizations.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../utils/warehouse_invoice_lines.dart';
 import '../../services/list_filter_preferences_service.dart';
+import 'package:hesabix_ui/services/bytes_export/bytes_export_service.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 class WarehouseDocsPage extends StatefulWidget {
   final int businessId;
@@ -64,7 +63,7 @@ class _WarehouseDocsPageState extends State<WarehouseDocsPage> {
   }
 
   Future<void> _onAddNew() async {
-    final wizardResult = await showGlassDialog<WarehouseDocWizardResult>(
+    final wizardResult = await showDialog<WarehouseDocWizardResult>(
       context: context,
       builder: (_) => WarehouseDocWizardDialog(
         businessId: widget.businessId,
@@ -74,7 +73,7 @@ class _WarehouseDocsPageState extends State<WarehouseDocsPage> {
     );
     if (wizardResult == null) return;
     if (wizardResult.isManual) {
-      await showGlassDialog(
+      await showDialog(
         context: context,
         builder: (_) => WarehouseDocumentFormDialog(
           businessId: widget.businessId,
@@ -93,16 +92,16 @@ class _WarehouseDocsPageState extends State<WarehouseDocsPage> {
     if (doc.status != 'draft' && doc.status != 'posted') {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
+        SnackBar(
           content: Text('فقط حواله‌های پیش‌نویس و قطعی شده قابل ویرایش هستند'),
-          backgroundColor: Colors.orange,
+          backgroundColor: SemanticColorResolver.warning(context),
         ),
       );
       return;
     }
 
     try {
-      final result = await showGlassDialog<bool>(
+      final result = await showDialog<bool>(
         context: context,
         barrierDismissible: false,
         builder: (context) => WarehouseDocumentFormDialog(
@@ -123,7 +122,7 @@ class _WarehouseDocsPageState extends State<WarehouseDocsPage> {
             content: Text(
               'خطا در بارگذاری حواله: ${ErrorExtractor.forContext(e, context)}',
             ),
-            backgroundColor: Colors.red,
+            backgroundColor: SemanticColorResolver.negative(context),
           ),
         );
       }
@@ -140,7 +139,7 @@ class _WarehouseDocsPageState extends State<WarehouseDocsPage> {
       }
     }
 
-    showGlassDialog(
+    showDialog(
       context: context,
       barrierDismissible: false,
       builder: (_) => const Center(child: CircularProgressIndicator()),
@@ -176,7 +175,7 @@ class _WarehouseDocsPageState extends State<WarehouseDocsPage> {
         );
         return;
       }
-      await showGlassDialog(
+      await showDialog(
         context: context,
         builder: (_) => WarehouseDocumentFormDialog(
           businessId: widget.businessId,
@@ -290,17 +289,12 @@ class _WarehouseDocsPageState extends State<WarehouseDocsPage> {
         '/warehouse-docs/business/${widget.businessId}/$docId/pdf',
       );
       if (!mounted) return;
-      if (kIsWeb) {
-        await web_utils.saveBytesAsFileWeb(
-          bytes,
-          'warehouse_doc_$docId.pdf',
-          mimeType: 'application/pdf',
-        );
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('دانلود PDF در موبایل به زودی...')),
-        );
-      }
+      final result = await BytesExportService.export(
+        bytes: bytes,
+        filename: 'warehouse_doc_$docId.pdf',
+        mimeType: 'application/pdf',
+      );
+      if (mounted) BytesExportService.showFeedback(context, result);
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
@@ -318,7 +312,7 @@ class _WarehouseDocsPageState extends State<WarehouseDocsPage> {
     AppLocalizations t,
   ) async {
     if (doc.id == null) return;
-    final confirm = await showGlassDialog<bool>(
+    final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(t.deleteWarehouseDocument),
@@ -374,7 +368,7 @@ class _WarehouseDocsPageState extends State<WarehouseDocsPage> {
       return;
     }
 
-    final confirm = await showGlassDialog<bool>(
+    final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(t.deleteWarehouseDocument),
@@ -446,7 +440,7 @@ class _WarehouseDocsPageState extends State<WarehouseDocsPage> {
           enableSorting: true,
           defaultSortBy: 'document_date',
           defaultSortDesc: true,
-          searchFields: const ['code'],
+          searchFields: const ['code', 'counterparty'],
           filterFields: const ['doc_type', 'status', 'document_date', 'source_type'],
           dateRangeField: 'document_date',
           enableDateRangeFilter: true,
@@ -476,7 +470,7 @@ class _WarehouseDocsPageState extends State<WarehouseDocsPage> {
                 label: t.viewWarehouseDocument,
                 onTap: (item) {
                   if (item is WarehouseDocument && item.id != null) {
-                    showGlassDialog(
+                    showDialog(
                       context: context,
                       builder: (_) => WarehouseDocumentDetailsDialog(
                         businessId: widget.businessId,
@@ -626,7 +620,7 @@ class _WarehouseDocsPageState extends State<WarehouseDocsPage> {
               formatter: (item) {
                 final doc = item as WarehouseDocument;
                 if (doc.documentDate == null) return '';
-                return MarkStreetDateUtils.formatForDisplay(
+                return HesabixDateUtils.formatForDisplay(
                   doc.documentDate,
                   _calendarController?.isJalali ?? false,
                 );
@@ -656,7 +650,7 @@ class _WarehouseDocsPageState extends State<WarehouseDocsPage> {
           ],
           onRowTap: (item) {
             if (item is WarehouseDocument && item.id != null) {
-              showGlassDialog(
+              showDialog(
                 context: context,
                 builder: (_) => WarehouseDocumentDetailsDialog(
                   businessId: widget.businessId,

@@ -190,7 +190,7 @@ class _DataTableSearchDialogState extends State<DataTableSearchDialog> {
         leading: const Icon(Icons.calendar_today),
         title: Text(t.dateFrom),
         subtitle: Text(_fromDate != null 
-            ? MarkStreetDateUtils.formatForDisplay(_fromDate!, isJalali)
+            ? HesabixDateUtils.formatForDisplay(_fromDate!, isJalali)
             : t.selectDate),
         onTap: () => _selectFromDate(t),
       ),
@@ -199,7 +199,7 @@ class _DataTableSearchDialogState extends State<DataTableSearchDialog> {
         leading: const Icon(Icons.calendar_today),
         title: Text(t.dateTo),
         subtitle: Text(_toDate != null 
-            ? MarkStreetDateUtils.formatForDisplay(_toDate!, isJalali)
+            ? HesabixDateUtils.formatForDisplay(_toDate!, isJalali)
             : t.selectDate),
         onTap: () => _selectToDate(t),
       ),
@@ -467,7 +467,7 @@ class _DataTableDateRangeDialogState extends State<DataTableDateRangeDialog> {
             leading: const Icon(Icons.calendar_today),
             title: Text(t.dateFrom),
             subtitle: Text(_fromDate != null 
-                ? MarkStreetDateUtils.formatForDisplay(
+                ? HesabixDateUtils.formatForDisplay(
                     _fromDate!,
                     ApiClient.getCalendarController()?.isJalali ?? true,
                   )
@@ -491,7 +491,7 @@ class _DataTableDateRangeDialogState extends State<DataTableDateRangeDialog> {
             leading: const Icon(Icons.calendar_today),
             title: Text(t.dateTo),
             subtitle: Text(_toDate != null 
-                ? MarkStreetDateUtils.formatForDisplay(
+                ? HesabixDateUtils.formatForDisplay(
                     _toDate!,
                     ApiClient.getCalendarController()?.isJalali ?? true,
                   )
@@ -702,7 +702,7 @@ class ActiveFiltersWidget extends StatelessWidget {
                   return Padding(
                     padding: const EdgeInsetsDirectional.only(end: 6),
                     child: Chip(
-                    label: Text('$columnLabel: ${MarkStreetDateUtils.formatForDisplay(fromDate, calendarController?.isJalali ?? false)} - ${MarkStreetDateUtils.formatForDisplay(toDate, calendarController?.isJalali ?? false)}'),
+                    label: Text('$columnLabel: ${HesabixDateUtils.formatForDisplay(fromDate, calendarController?.isJalali ?? false)} - ${HesabixDateUtils.formatForDisplay(toDate, calendarController?.isJalali ?? false)}'),
                     deleteIcon: const Icon(Icons.close, size: 16),
                     onDeleted: () => onRemoveColumnFilter(columnName),
                     backgroundColor: theme.primaryColor.withValues(alpha: 0.1),
@@ -722,7 +722,7 @@ class ActiveFiltersWidget extends StatelessWidget {
                 Padding(
                   padding: const EdgeInsetsDirectional.only(end: 6),
                   child: Chip(
-                    label: Text('${t.dateFrom}: ${MarkStreetDateUtils.formatForDisplay(fromDate!, calendarController?.isJalali ?? false)} - ${t.dateTo}: ${MarkStreetDateUtils.formatForDisplay(toDate!, calendarController?.isJalali ?? false)}'),
+                    label: Text('${t.dateFrom}: ${HesabixDateUtils.formatForDisplay(fromDate!, calendarController?.isJalali ?? false)} - ${t.dateTo}: ${HesabixDateUtils.formatForDisplay(toDate!, calendarController?.isJalali ?? false)}'),
                     deleteIcon: const Icon(Icons.close, size: 16),
                     onDeleted: () => onClearAll(),
                     backgroundColor: theme.primaryColor.withValues(alpha: 0.1),

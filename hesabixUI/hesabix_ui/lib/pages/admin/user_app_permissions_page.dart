@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:hesabix_ui/theme/glass.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/services/admin_users_service.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
@@ -117,7 +116,7 @@ class _UserAppPermissionsPageState extends State<UserAppPermissionsPage> {
   Future<void> _confirmAndSetAllAppPermissions(bool enable) async {
     final t = AppLocalizations.of(context);
     if (!enable) {
-      final ok = await showGlassDialog<bool>(
+      final ok = await showDialog<bool>(
         context: context,
         builder: (ctx) => AlertDialog(
           title: Text(t.permissionsConfirmDisableAllTitle),

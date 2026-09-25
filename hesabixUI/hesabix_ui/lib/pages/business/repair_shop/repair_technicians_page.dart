@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:hesabix_ui/theme/glass.dart';
 import '../../../services/repair_shop_service.dart';
 import '../../../services/person_service.dart';
 import '../../../models/repair_technician_model.dart';
@@ -99,7 +98,7 @@ class _RepairTechniciansPageState extends State<RepairTechniciansPage> {
   }
 
   Future<void> _deleteTechnician(RepairTechnician technician) async {
-    final confirm = await showGlassDialog<bool>(
+    final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: Text('غیرفعال کردن تعمیرکار'),
@@ -372,7 +371,7 @@ class _TechnicianFormDialogState extends State<_TechnicianFormDialog> {
 
     if (!mounted) return;
 
-    final selected = await showGlassDialog<Person>(
+    final selected = await showDialog<Person>(
       context: context,
       builder: (context) => SimpleDialog(
         title: const Text('انتخاب فرد'),

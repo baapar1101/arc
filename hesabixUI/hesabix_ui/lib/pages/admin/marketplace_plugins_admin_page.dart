@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/services.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/services/marketplace_service.dart';
@@ -126,7 +125,7 @@ class _MarketplacePluginsAdminPageState extends State<MarketplacePluginsAdminPag
     bool isActive = initialData?['is_active'] ?? true;
     bool trialAllowed = initialData?['trial_allowed'] ?? false;
 
-    await showGlassDialog(
+    await showDialog(
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) {
@@ -363,7 +362,7 @@ class _MarketplacePluginsAdminPageState extends State<MarketplacePluginsAdminPag
     int? selectedCurrencyId = initialData?['currency_id'];
     bool isActive = initialData?['is_active'] ?? true;
 
-    await showGlassDialog(
+    await showDialog(
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) {
@@ -545,7 +544,7 @@ class _MarketplacePluginsAdminPageState extends State<MarketplacePluginsAdminPag
   }
 
   Future<void> _deletePlugin(int pluginId) async {
-    final confirmed = await showGlassDialog<bool>(
+    final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('تایید حذف'),
@@ -575,7 +574,7 @@ class _MarketplacePluginsAdminPageState extends State<MarketplacePluginsAdminPag
   }
 
   Future<void> _deletePlan(int planId) async {
-    final confirmed = await showGlassDialog<bool>(
+    final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('تایید حذف'),

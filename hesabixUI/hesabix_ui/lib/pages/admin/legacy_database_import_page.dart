@@ -291,7 +291,7 @@ class _LegacyDatabaseImportPageState extends State<LegacyDatabaseImportPage> {
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Text(
-          'دامپ MySQL نسخه قدیمی MarkStreet (phpMyAdmin) یا فایل .hs60 / .zip حاوی SQL را آپلود کنید. '
+          'دامپ MySQL نسخه قدیمی Hesabix (phpMyAdmin) یا فایل .hs60 / .zip حاوی SQL را آپلود کنید. '
           'داده‌ها از مسیر سرویس‌های استاندارد (فاکتور، دریافت/پرداخت، هزینه/درآمد، حواله انبار، انتقال، تراز افتتاحیه، چک) ثبت می‌شوند.',
           style: theme.textTheme.bodyMedium,
         ),

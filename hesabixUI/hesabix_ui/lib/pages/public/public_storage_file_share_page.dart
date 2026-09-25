@@ -6,7 +6,7 @@ import '../../services/public_storage_file_share_service.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 
-/// نمایش عمومی فایل از طریق لینک اشتراک (بدون ورود به MarkStreet).
+/// نمایش عمومی فایل از طریق لینک اشتراک (بدون ورود به Hesabix).
 class PublicStorageFileSharePage extends StatefulWidget {
   final String token;
 

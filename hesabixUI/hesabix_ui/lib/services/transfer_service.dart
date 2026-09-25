@@ -1,6 +1,6 @@
 import '../core/api_client.dart';
 import 'package:dio/dio.dart';
-import '../core/date_utils.dart' show MarkStreetDateUtils;
+import '../core/date_utils.dart' show HesabixDateUtils;
 
 import 'document_policy_guard.dart';
 
@@ -77,8 +77,8 @@ class TransferService {
       'sort_desc': sortDesc,
       if (sortBy != null) 'sort_by': sortBy,
       if (search != null && search.isNotEmpty) 'search': search,
-      if (fromDate != null) 'from_date': MarkStreetDateUtils.formatForApiDate(fromDate),
-      if (toDate != null) 'to_date': MarkStreetDateUtils.formatForApiDate(toDate),
+      if (fromDate != null) 'from_date': HesabixDateUtils.formatForApiDate(fromDate),
+      if (toDate != null) 'to_date': HesabixDateUtils.formatForApiDate(toDate),
     };
     final res = await _apiClient.post('/businesses/$businessId/transfers', data: body);
     return (res.data as Map<String, dynamic>)['data'] as Map<String, dynamic>;
@@ -100,8 +100,8 @@ class TransferService {
       'sort_desc': sortDesc,
       if (sortBy != null) 'sort_by': sortBy,
       if (search != null && search.isNotEmpty) 'search': search,
-      if (fromDate != null) 'from_date': MarkStreetDateUtils.formatForApiDate(fromDate),
-      if (toDate != null) 'to_date': MarkStreetDateUtils.formatForApiDate(toDate),
+      if (fromDate != null) 'from_date': HesabixDateUtils.formatForApiDate(fromDate),
+      if (toDate != null) 'to_date': HesabixDateUtils.formatForApiDate(toDate),
     };
     final res = await _apiClient.post<List<int>>(
       '/businesses/$businessId/transfers/export/excel',
@@ -127,8 +127,8 @@ class TransferService {
       'sort_desc': sortDesc,
       if (sortBy != null) 'sort_by': sortBy,
       if (search != null && search.isNotEmpty) 'search': search,
-      if (fromDate != null) 'from_date': MarkStreetDateUtils.formatForApiDate(fromDate),
-      if (toDate != null) 'to_date': MarkStreetDateUtils.formatForApiDate(toDate),
+      if (fromDate != null) 'from_date': HesabixDateUtils.formatForApiDate(fromDate),
+      if (toDate != null) 'to_date': HesabixDateUtils.formatForApiDate(toDate),
     };
     final res = await _apiClient.post<List<int>>(
       '/businesses/$businessId/transfers/export/pdf',

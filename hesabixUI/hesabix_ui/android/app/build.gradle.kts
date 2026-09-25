@@ -4,6 +4,7 @@ import org.gradle.api.GradleException
 
 plugins {
     id("com.android.application")
+    id("org.jetbrains.kotlin.android")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
 }
@@ -63,7 +64,7 @@ val resolvedNdkVersion: String = run {
         val best = pickNewestNdk(complete)
         if (best != null) {
             logger.lifecycle(
-                "MarkStreet: preferred NDK '$preferredNdk' not under Sdk/ndk (or incomplete); " +
+                "Hesabix: preferred NDK '$preferredNdk' not under Sdk/ndk (or incomplete); " +
                     "using newest local kit with source.properties: $best",
             )
             return@run best
