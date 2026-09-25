@@ -76,21 +76,21 @@
   
   <!-- Initial Loading Screen Styles -->
     <style>
-    /* Grayscale palette coordinated with Neutral/Metallic accents */
+    /* Smoky glass splash shown before Flutter/CanvasKit is ready. */
     #flutter-loading-screen {
-      --loader-fg: rgba(255, 255, 255, 0.96);
-      --loader-fg-muted: rgba(240, 240, 240, 0.88);
-      --loader-fg-subtle: rgba(225, 225, 225, 0.72);
-      --loader-ring: rgba(255, 255, 255, 0.22);
-      --loader-ring-accent: #f0f0f0;
-      --loader-glow: rgba(40, 40, 40, 0.35);
+      --loader-fg: rgba(255, 255, 255, 0.98);
+      --loader-fg-muted: rgba(226, 232, 240, 0.92);
+      --loader-fg-subtle: rgba(203, 213, 225, 0.78);
+      --loader-ring: rgba(147, 197, 253, 0.22);
+      --loader-ring-accent: #60a5fa;
+      --loader-glow: rgba(37, 99, 235, 0.42);
 
       position: fixed;
       top: 0;
       left: 0;
       width: 100%;
       height: 100%;
-      background: #111111; /* Changed from deep blue-black to neutral dark gray */
+      background: #050a14;
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -105,25 +105,73 @@
 
     .loading-screen-bg {
       position: absolute;
-      inset: 0;
+      inset: -12%;
       z-index: 0;
-      background: linear-gradient(
-        125deg,
-        #222222 0%,
-        #444444 35%,
-        #888888 55%,
-        #333333 85%,
-        #1a1a1a 100%
-      );
-
-      background-size: 220% 220%;
-      animation: loaderGradientShift 18s ease-in-out infinite;
+      overflow: hidden;
+      background:
+        radial-gradient(circle at 18% 22%, rgba(37, 99, 235, 0.68) 0%, rgba(37, 99, 235, 0.28) 22%, transparent 48%),
+        radial-gradient(circle at 82% 68%, rgba(59, 130, 246, 0.46) 0%, rgba(59, 130, 246, 0.16) 25%, transparent 50%),
+        radial-gradient(circle at 48% 50%, rgba(15, 23, 42, 0.78) 0%, rgba(15, 23, 42, 0.40) 34%, transparent 62%),
+        linear-gradient(135deg, #040814 0%, #081225 45%, #050a16 100%);
+      background-size: 145% 145%, 150% 150%, 135% 135%, 100% 100%;
+      animation: loaderSmokeDrift 18s ease-in-out infinite alternate;
+      transform: scale(1.08);
+      filter: saturate(1.12) contrast(1.04);
       pointer-events: none;
     }
 
-    @keyframes loaderGradientShift {
-      0%, 100% { background-position: 0% 40%; }
-      50% { background-position: 100% 60%; }
+    .loading-screen-bg::before,
+    .loading-screen-bg::after {
+      content: '';
+      position: absolute;
+      width: 72vmax;
+      height: 72vmax;
+      border-radius: 50%;
+      opacity: 0.72;
+      filter: blur(72px);
+      will-change: transform;
+      pointer-events: none;
+    }
+
+    .loading-screen-bg::before {
+      left: -22vmax;
+      top: -20vmax;
+      background:
+        radial-gradient(circle at 42% 48%, rgba(96, 165, 250, 0.56), rgba(37, 99, 235, 0.24) 38%, transparent 68%);
+      animation: loaderSmokeBlobA 16s ease-in-out infinite alternate;
+    }
+
+    .loading-screen-bg::after {
+      right: -24vmax;
+      bottom: -24vmax;
+      background:
+        radial-gradient(circle at 54% 46%, rgba(30, 64, 175, 0.60), rgba(59, 130, 246, 0.20) 42%, transparent 70%);
+      animation: loaderSmokeBlobB 20s ease-in-out infinite alternate;
+    }
+
+    @keyframes loaderSmokeDrift {
+      0% {
+        background-position: 0% 10%, 100% 90%, 45% 50%, center;
+        transform: scale(1.08) rotate(0deg);
+      }
+      50% {
+        background-position: 18% 30%, 82% 64%, 52% 45%, center;
+        transform: scale(1.13) rotate(1.5deg);
+      }
+      100% {
+        background-position: 32% 18%, 68% 82%, 44% 56%, center;
+        transform: scale(1.10) rotate(-1deg);
+      }
+    }
+
+    @keyframes loaderSmokeBlobA {
+      0% { transform: translate3d(0, 0, 0) scale(1); }
+      100% { transform: translate3d(22vw, 13vh, 0) scale(1.18); }
+    }
+
+    @keyframes loaderSmokeBlobB {
+      0% { transform: translate3d(0, 0, 0) scale(1.10); }
+      100% { transform: translate3d(-18vw, -16vh, 0) scale(0.94); }
     }
 
     .loading-card {
@@ -133,17 +181,18 @@
       max-width: 26rem;
       padding: 1.75rem 1.35rem 1.5rem;
       border-radius: 20px;
-      background: linear-gradient(165deg, rgba(255, 255, 255, 0.14) 0%, rgba(255, 255, 255, 0.05) 100%);
-      border: 1px solid rgba(255, 255, 255, 0.2);
+      background: linear-gradient(155deg, rgba(15, 23, 42, 0.48) 0%, rgba(15, 23, 42, 0.20) 100%);
+      border: 1px solid rgba(147, 197, 253, 0.20);
       box-shadow:
-        0 4px 24px rgba(0, 0, 0, 0.35), /* Replaced blue-tinted shadow with neutral black */
-        inset 0 1px 0 rgba(255, 255, 255, 0.22);
+        0 24px 70px rgba(2, 6, 23, 0.54),
+        0 0 46px rgba(37, 99, 235, 0.16),
+        inset 0 1px 0 rgba(255, 255, 255, 0.18);
     }
 
     @supports (backdrop-filter: blur(12px)) {
       .loading-card {
-        backdrop-filter: blur(14px);
-        -webkit-backdrop-filter: blur(14px);
+        backdrop-filter: blur(24px) saturate(1.18);
+        -webkit-backdrop-filter: blur(24px) saturate(1.18);
       }
     }
     
@@ -236,7 +285,7 @@
       margin: 0 auto 0.35rem;
       border-radius: 50%;
       border: 2px solid rgba(255, 255, 255, 0.28);
-      background: rgba(255, 255, 255, 0.05); /* Removed navy tint */
+      background: rgba(59, 130, 246, 0.08);
       display: flex;
       align-items: center;
       justify-content: center;
@@ -249,14 +298,14 @@
 
     .loading-step.is-active .loading-step__icon {
       border-color: var(--loader-ring-accent);
-      background: rgba(255, 255, 255, 0.18);
+      background: rgba(37, 99, 235, 0.30);
       color: var(--loader-fg);
-      box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.1);
+      box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.12), 0 0 18px rgba(37, 99, 235, 0.26);
     }
 
     .loading-step.is-done .loading-step__icon {
-      border-color: rgba(255, 255, 255, 0.6); /* High contrast gray/white */
-      background: rgba(100, 100, 100, 0.35); /* Neutral gray fill */
+      border-color: rgba(147, 197, 253, 0.72);
+      background: rgba(37, 99, 235, 0.38);
       color: #ffffff;
     }
 
@@ -305,7 +354,7 @@
     }
 
     .loading-quote__mark {
-      color: rgba(255, 255, 255, 0.55); /* White/Silver color */
+      color: rgba(147, 197, 253, 0.82);
       font-style: normal;
       font-size: 1.05em;
     }
@@ -327,7 +376,7 @@
       height: 6px;
       margin: 0 auto 12px;
       border-radius: 999px;
-      background: rgba(255, 255, 255, 0.1); /* Neutral background */
+      background: rgba(148, 163, 184, 0.14);
       overflow: hidden;
       box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.2);
     }
@@ -336,8 +385,8 @@
       height: 100%;
       width: 0%;
       border-radius: inherit;
-      background: linear-gradient(90deg, #bbbbbb, #eeeeee, #ffffff); /* Metallic gradient */
-      box-shadow: 0 0 12px rgba(255, 255, 255, 0.3);
+      background: linear-gradient(90deg, #2563eb, #60a5fa, #bfdbfe);
+      box-shadow: 0 0 16px rgba(59, 130, 246, 0.42);
       transition: width 0.18s ease-out;
     }
 
@@ -374,10 +423,14 @@
       #flutter-loading-screen {
         transition: none;
       }
-      .loading-screen-bg {
+      .loading-screen-bg,
+      .loading-screen-bg::before,
+      .loading-screen-bg::after {
         animation: none;
-        background-size: 100% 100%;
+      }
+      .loading-screen-bg {
         background-position: center;
+        transform: scale(1.08);
       }
       .loading-logo,
       .loading-spinner {
@@ -403,7 +456,7 @@
 
     body {
       overflow: hidden;
-      background-color: #111111; /* Neutral background color */
+      background-color: #050a14;
       min-height: var(--app-height, 100vh);
     }
     
