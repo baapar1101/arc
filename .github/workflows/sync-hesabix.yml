@@ -43,8 +43,58 @@ jobs:
           set -euo pipefail
           git checkout master
 
+          apply_glass_modals() {
+            python3 - <<'PY'
+from pathlib import Path
+import re
+
+root = Path("hesabixUI/hesabix_ui/lib")
+glass_file = root / "theme" / "glass.dart"
+dialog_re = re.compile(r"\bshowDialog(?=\s*(?:<|\())")
+sheet_re = re.compile(r"\bshowModalBottomSheet(?=\s*(?:<|\())")
+glass_import_re = re.compile(
+    r"^import\s+['\"][^'\"]*theme/glass\.dart['\"];\s*$",
+    re.MULTILINE,
+)
+first_import_re = re.compile(r"^import\s+['\"][^'\"]+['\"];\s*$", re.MULTILINE)
+package_import = "import 'package:hesabix_ui/theme/glass.dart';\n"
+
+changed = []
+for path in root.rglob("*.dart"):
+    if path == glass_file or path.name.endswith(".dart.backup"):
+        continue
+
+    original = path.read_text(encoding="utf-8")
+    updated = dialog_re.sub("showGlassDialog", original)
+    updated = sheet_re.sub("showGlassModalBottomSheet", updated)
+
+    if updated == original:
+        continue
+
+    if not glass_import_re.search(updated):
+        match = first_import_re.search(updated)
+        if match:
+            updated = updated[:match.start()] + package_import + updated[match.start():]
+        else:
+            updated = package_import + updated
+
+    path.write_text(updated, encoding="utf-8")
+    changed.append(str(path))
+
+print(f"Glass-normalized {len(changed)} Dart files")
+for item in changed:
+    print(item)
+PY
+          }
+
           if git merge-base --is-ancestor upstream/master HEAD; then
             echo "Already contains current upstream master."
+            apply_glass_modals
+            if ! git diff --quiet; then
+              git add hesabixUI/hesabix_ui/lib
+              git commit -m "Reapply glass modals across updated UI"
+              git push origin master
+            fi
             exit 0
           fi
 
@@ -114,6 +164,9 @@ jobs:
             git diff --name-only --diff-filter=U
             exit 1
           fi
+
+          apply_glass_modals
+          git add hesabixUI/hesabix_ui/lib
 
           if git diff --cached --quiet; then
             echo "Merge produced no tree changes."
