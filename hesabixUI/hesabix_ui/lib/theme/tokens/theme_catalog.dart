@@ -41,7 +41,7 @@ const List<AppThemeDefinition> kAppThemeCatalog = [
     id: kDefaultThemeId,
     labelFa: 'آبی کلاسیک',
     labelEn: 'Classic Blue',
-    primary: Color(0xFF0F4C81),
+    primary: Color(0xFF2563EB),
     secondary: Color(0xFF5A6A7A),
     positive: Color(0xFF2E7D32),
     negative: Color(0xFFB3261E),
