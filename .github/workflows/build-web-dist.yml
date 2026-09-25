@@ -1,0 +1,87 @@
+name: Build Web Distribution
+
+on:
+  push:
+    branches:
+      - master
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: web-dist
+  cancel-in-progress: true
+
+jobs:
+  build-web:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Enable Flutter Web
+        run: flutter config --enable-web
+
+      - name: Build production frontend
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          chmod +x build_web.sh
+
+          ./build_web.sh \
+            --project hesabixUI/hesabix_ui \
+            --mode release \
+            --clean \
+            --install-deps \
+            --api-base-url https://tamastore.ir
+
+      - name: Publish build/web to web-dist
+        shell: bash
+        env:
+          DIST_DIR: hesabixUI/hesabix_ui/build/web
+        run: |
+          set -euo pipefail
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git fetch origin web-dist || true
+          rm -rf /tmp/web-dist
+
+          if git show-ref --verify --quiet refs/remotes/origin/web-dist; then
+            git worktree add -B web-dist /tmp/web-dist origin/web-dist
+          else
+            git worktree add --detach /tmp/web-dist
+            cd /tmp/web-dist
+            git switch --orphan web-dist
+            git rm -rf . || true
+          fi
+
+          cd /tmp/web-dist
+
+          rsync -a --delete \
+            --exclude='.git' \
+            "$GITHUB_WORKSPACE/$DIST_DIR/" ./
+
+          touch .nojekyll
+
+          git add -A
+
+          if git diff --cached --quiet; then
+            echo "No distribution changes."
+            exit 0
+          fi
+
+          git commit -m "Web build ${GITHUB_SHA::7}"
+          git push origin web-dist
