@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table.dart';
@@ -288,7 +289,7 @@ class _BusinessesListPageState extends State<BusinessesListPage> {
   }
 
   void _showBusinessDetailsDialog(BuildContext context, Map<String, dynamic> business) {
-    showDialog(
+    showGlassDialog(
       context: context,
       builder: (context) => _BusinessDetailsDialog(business: business),
     );
@@ -440,7 +441,7 @@ class _BusinessDetailsDialogState extends State<_BusinessDetailsDialog> {
     if (widget.business['id'] == null) return;
     final pageContext = context;
 
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showGlassDialog<bool>(
       context: pageContext,
       builder: (context) => AlertDialog(
         title: const Text('بازیابی کسب و کار'),
@@ -1132,7 +1133,7 @@ class _BusinessPoliciesTabState extends State<_BusinessPoliciesTab> {
     bool isActive = initial?['is_active'] ?? true;
     String policyType = (initial?['policy_type'] ?? 'per_document') as String;
 
-    await showDialog(
+    await showGlassDialog(
       context: context,
       builder: (context) {
         return StatefulBuilder(

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/foundation.dart';
 import 'package:dio/dio.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
@@ -1407,7 +1408,7 @@ class _ExpenseIncomeListPageState extends State<ExpenseIncomeListPage> {
       if (isIncome == null) return; // cancelled
     }
 
-    final result = await showDialog<bool>(
+    final result = await showGlassDialog<bool>(
       context: context,
       builder: (_) => ExpenseIncomeFormDialog(
         businessId: widget.businessId,
@@ -1490,7 +1491,7 @@ class _ExpenseIncomeListPageState extends State<ExpenseIncomeListPage> {
       );
     }
 
-    return showDialog<bool>(
+    return showGlassDialog<bool>(
       context: context,
       builder: (ctx) {
         return AlertDialog(
@@ -1532,7 +1533,7 @@ class _ExpenseIncomeListPageState extends State<ExpenseIncomeListPage> {
 
       // نمایش دیالوگ مشاهده جزئیات
       if (!ctx.mounted) return;
-      await showDialog(
+      await showGlassDialog(
         context: ctx,
         builder: (_) => ExpenseIncomeDetailsDialog(
           document: fullDoc,
@@ -1568,7 +1569,7 @@ class _ExpenseIncomeListPageState extends State<ExpenseIncomeListPage> {
         return;
       }
       if (!ctx.mounted) return;
-      final result = await showDialog<bool>(
+      final result = await showGlassDialog<bool>(
         context: ctx,
         builder: (_) => ExpenseIncomeFormDialog(
           businessId: widget.businessId,
@@ -1599,7 +1600,7 @@ class _ExpenseIncomeListPageState extends State<ExpenseIncomeListPage> {
       SnackBarHelper.showError(context, message: 'دسترسی لازم برای حذف را ندارید');
       return;
     }
-    showDialog<void>(
+    showGlassDialog<void>(
       context: context,
       useRootNavigator: true,
       builder: (dialogContext) => AlertDialog(
@@ -1626,7 +1627,7 @@ class _ExpenseIncomeListPageState extends State<ExpenseIncomeListPage> {
   Future<void> _performDelete(ExpenseIncomeDocument document) async {
     final navigator = Navigator.of(context, rootNavigator: true);
     try {
-      showDialog<void>(
+      showGlassDialog<void>(
         context: context,
         useRootNavigator: true,
         barrierDismissible: false,
@@ -1722,7 +1723,7 @@ class _ExpenseIncomeListPageState extends State<ExpenseIncomeListPage> {
     final codes = docs.map((d) => d.code).toList();
 
     // تایید کاربر
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showGlassDialog<bool>(
       context: context,
       useRootNavigator: true,
       builder: (ctx) {
@@ -1754,7 +1755,7 @@ class _ExpenseIncomeListPageState extends State<ExpenseIncomeListPage> {
     // نمایش لودینگ (همان navigator ریشه که دیالوگ روی آن باز می‌شود — هماهنگ با invoices_list_page)
     if (!context.mounted) return;
     final rootNavigator = Navigator.of(context, rootNavigator: true);
-    showDialog<void>(
+    showGlassDialog<void>(
       context: context,
       useRootNavigator: true,
       barrierDismissible: false,

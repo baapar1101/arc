@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/services/ai_service.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
@@ -79,7 +80,7 @@ class _AITicketAssistantState extends State<AITicketAssistant>
   }
 
   Future<void> _autoReply() async {
-    if (await showDialog<bool>(
+    if (await showGlassDialog<bool>(
           context: context,
           builder: (context) => AlertDialog(
             title: const Text('پاسخ خودکار'),

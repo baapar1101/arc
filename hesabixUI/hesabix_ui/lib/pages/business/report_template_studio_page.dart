@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../constants/report_template_constants.dart';
@@ -203,7 +204,7 @@ class _ReportTemplateStudioPageState extends State<ReportTemplateStudioPage> {
     } else if (engine == 'builder') {
       final builderDesign = (assets['builder_design'] as Map?)?.cast<String, dynamic>() ?? const {};
       if (mounted && builderDesign.isNotEmpty) {
-        final migrate = await showDialog<bool>(
+        final migrate = await showGlassDialog<bool>(
           context: context,
           builder: (ctx) => AlertDialog(
             title: const Text('ارتقا به استودیو قالب'),
@@ -431,7 +432,7 @@ class _ReportTemplateStudioPageState extends State<ReportTemplateStudioPage> {
 
   Future<bool> _confirmDiscard() async {
     if (!_hasUnsavedChanges) return true;
-    final ok = await showDialog<bool>(
+    final ok = await showGlassDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('خروج بدون ذخیره؟'),
@@ -447,7 +448,7 @@ class _ReportTemplateStudioPageState extends State<ReportTemplateStudioPage> {
 
   Future<void> _openAdvancedHtml() async {
     if (_design == null) return;
-    final ok = await showDialog<bool>(
+    final ok = await showGlassDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('حالت پیشرفته — HTML'),
@@ -524,7 +525,7 @@ class _ReportTemplateStudioPageState extends State<ReportTemplateStudioPage> {
   }
 
   Future<void> _showPageSettings() async {
-    await showDialog<void>(
+    await showGlassDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('تنظیمات صفحه'),

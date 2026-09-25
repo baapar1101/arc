@@ -3,6 +3,7 @@ import 'dart:math' as math;
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/core/auth_store.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
@@ -28,7 +29,7 @@ Future<void> showCrmNoteEditorDialog(
   required DateTime? presetDay,
   required VoidCallback onSaved,
 }) {
-  return showDialog<void>(
+  return showGlassDialog<void>(
     context: context,
     barrierDismissible: false,
     builder: (ctx) => CrmNoteEditorDialog(
@@ -218,7 +219,7 @@ class _CrmNoteEditorDialogState extends State<CrmNoteEditorDialog> with SingleTi
 
   Future<void> _openCreateNoteType() async {
     if (!widget.authStore.canWriteSection('crm')) return;
-    final payload = await showDialog<Map<String, dynamic>>(
+    final payload = await showGlassDialog<Map<String, dynamic>>(
       context: context,
       barrierDismissible: false,
       builder: (ctx) => _CrmNoteTypeCreateDialog(t: AppLocalizations.of(context)),
@@ -343,7 +344,7 @@ class _CrmNoteEditorDialogState extends State<CrmNoteEditorDialog> with SingleTi
     final id = (widget.existing?['id'] as num?)?.toInt();
     if (id == null) return;
     final hasComments = _comments.isNotEmpty;
-    final ok = await showDialog<bool>(
+    final ok = await showGlassDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(t.crmNotesDeleteConfirmTitle),

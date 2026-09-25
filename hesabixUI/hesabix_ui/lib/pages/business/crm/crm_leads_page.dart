@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/core/auth_store.dart';
@@ -666,7 +667,7 @@ class _CrmLeadsPageState extends State<CrmLeadsPage> {
 
   void _onAdd() {
     if (!widget.authStore.hasBusinessPermission('crm', 'write') || _processDefs.isEmpty) return;
-    showDialog<void>(
+    showGlassDialog<void>(
       context: context,
       builder: (ctx) => _LeadFormDialog(
         businessId: widget.businessId,
@@ -680,7 +681,7 @@ class _CrmLeadsPageState extends State<CrmLeadsPage> {
   }
 
   void _onEdit(Map<String, dynamic> item) {
-    showDialog<void>(
+    showGlassDialog<void>(
       context: context,
       builder: (ctx) => _LeadFormDialog(
         businessId: widget.businessId,
@@ -696,7 +697,7 @@ class _CrmLeadsPageState extends State<CrmLeadsPage> {
 
 
   Future<void> _onConvertToCustomer(int id, String name) async {
-    final result = await showDialog<Map<String, dynamic>?>(
+    final result = await showGlassDialog<Map<String, dynamic>?>(
       context: context,
       builder: (ctx) => _ConvertLeadDialog(
         businessId: widget.businessId,
@@ -1451,7 +1452,7 @@ class _LeadFormDialogState extends State<_LeadFormDialog> {
     final id = widget.initial?['id'] as int?;
     final name = widget.initial?['name']?.toString() ?? '';
     if (id == null) return;
-    final result = await showDialog<Map<String, dynamic>?>(
+    final result = await showGlassDialog<Map<String, dynamic>?>(
       context: context,
       builder: (ctx) => _ConvertLeadDialog(
         businessId: widget.businessId,
