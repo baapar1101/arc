@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
@@ -1214,7 +1215,7 @@ class _PublicInvoiceShareLinkPageState extends State<PublicInvoiceShareLinkPage>
     final ctrl = TextEditingController(text: maxRemaining.toStringAsFixed(0));
     double? amount;
     try {
-      amount = await showDialog<double>(
+      amount = await showGlassDialog<double>(
         context: context,
         builder: (ctx) => AlertDialog(
           title: const Text('مبلغ پرداخت (ریال)'),

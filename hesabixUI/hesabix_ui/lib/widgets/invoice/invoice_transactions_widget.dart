@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/services.dart';
 import 'package:uuid/uuid.dart';
 import '../../models/invoice_transaction.dart';
@@ -662,7 +663,7 @@ class _InvoiceTransactionsWidgetState extends State<InvoiceTransactionsWidget> {
   }
 
   void _removeTransaction(int index) {
-    showDialog(
+    showGlassDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('حذف تراکنش'),
@@ -695,7 +696,7 @@ class _InvoiceTransactionsWidgetState extends State<InvoiceTransactionsWidget> {
     int? index,
     num? initialAmount,
   }) {
-    showDialog(
+    showGlassDialog(
       context: context,
       builder: (context) => TransactionDialog(
         transaction: transaction,

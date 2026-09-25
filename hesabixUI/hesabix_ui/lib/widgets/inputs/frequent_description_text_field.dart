@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hesabix_ui/theme/glass.dart';
 
 import '../../l10n/app_localizations.dart';
 import '../../models/frequent_description_item.dart';
@@ -382,7 +383,7 @@ class _ManageFrequentDescriptionsSheetState extends State<_ManageFrequentDescrip
 
   Future<void> _delete(FrequentDescriptionItem it) async {
     final t = AppLocalizations.of(context);
-    final ok = await showDialog<bool>(
+    final ok = await showGlassDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(t.frequentDescriptionsDeleteTitle),

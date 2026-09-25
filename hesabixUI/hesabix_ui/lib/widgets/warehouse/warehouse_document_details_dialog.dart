@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:go_router/go_router.dart';
 import '../../services/warehouse_service.dart';
@@ -250,7 +251,7 @@ class _WarehouseDocumentDetailsDialogState extends State<WarehouseDocumentDetail
   }
 
   Future<void> _deleteDoc() async {
-    final ok = await showDialog<bool>(
+    final ok = await showGlassDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
         title: const Text('حذف حواله'),
@@ -282,7 +283,7 @@ class _WarehouseDocumentDetailsDialogState extends State<WarehouseDocumentDetail
   }
 
   Future<void> _cancelDoc() async {
-    final ok = await showDialog<bool>(
+    final ok = await showGlassDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
         title: const Text('لغو حواله'),
@@ -320,7 +321,7 @@ class _WarehouseDocumentDetailsDialogState extends State<WarehouseDocumentDetail
     
     Navigator.of(context).pop(); // بستن دیالوگ جزئیات
     
-    final result = await showDialog<bool>(
+    final result = await showGlassDialog<bool>(
       context: context,
       barrierDismissible: false,
       builder: (context) => WarehouseDocumentFormDialog(
@@ -649,7 +650,7 @@ class _WarehouseDocumentDetailsDialogState extends State<WarehouseDocumentDetail
                               ? doc['accounting_document_id'] as int
                               : int.tryParse('${doc['accounting_document_id']}');
                           if (aid == null) return;
-                          showDialog(
+                          showGlassDialog(
                             context: context,
                             builder: (_) => DocumentDetailsDialog(
                               documentId: aid,
@@ -673,7 +674,7 @@ class _WarehouseDocumentDetailsDialogState extends State<WarehouseDocumentDetail
                       child: InkWell(
                         onTap: () {
                           Navigator.of(context).pop(); // بستن دیالوگ فعلی
-                          showDialog(
+                          showGlassDialog(
                             context: context,
                             builder: (_) => WarehouseDocumentDetailsDialog(
                               businessId: widget.businessId,

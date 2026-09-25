@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
+import 'package:hesabix_ui/theme/glass.dart';
 
 import '../../constants/report_template_constants.dart';
 import '../../core/api_client.dart';
@@ -16,7 +17,7 @@ Future<void> showWarehousePostalLabelPrintDialog({
   required int businessId,
   required int documentId,
 }) async {
-  await showDialog<void>(
+  await showGlassDialog<void>(
     context: context,
     builder: (ctx) => _WarehousePostalLabelPrintDialog(
       businessId: businessId,

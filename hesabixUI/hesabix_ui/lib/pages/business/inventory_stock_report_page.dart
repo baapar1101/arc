@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
@@ -561,7 +562,7 @@ class _InventoryStockReportPageState extends State<InventoryStockReportPage> {
   }
 
   Future<Map<String, dynamic>?> _showProductPickerDialog() async {
-    return showDialog<Map<String, dynamic>?>(
+    return showGlassDialog<Map<String, dynamic>?>(
       context: context,
       builder: (ctx) {
         final searchController = TextEditingController();

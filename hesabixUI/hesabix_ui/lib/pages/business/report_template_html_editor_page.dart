@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 
@@ -239,7 +240,7 @@ class _ReportTemplateHtmlEditorPageState extends State<ReportTemplateHtmlEditorP
 
   Future<bool> _confirmDiscard() async {
     if (!_hasUnsavedChanges) return true;
-    final ok = await showDialog<bool>(
+    final ok = await showGlassDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('خروج بدون ذخیره؟'),
@@ -351,7 +352,7 @@ class _ReportTemplateHtmlEditorPageState extends State<ReportTemplateHtmlEditorP
       );
 
       if (!mounted) return;
-      await showDialog<void>(
+      await showGlassDialog<void>(
         context: context,
         builder: (ctx) => AlertDialog(
           title: Text(t.reportTemplatePreview),
