@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 
@@ -61,6 +62,26 @@ class _SmokeyBackgroundState extends State<SmokeyBackground>
       fit: StackFit.expand,
       children: [
         IgnorePointer(child: background),
+
+        // Real optical blur. All transparent Material surfaces above this layer
+        // reveal a softened version of the animated smoke instead of a flat
+        // translucent color, which makes the whole application read as glass.
+        Positioned.fill(
+          child: IgnorePointer(
+            child: BackdropFilter(
+              filter: ui.ImageFilter.blur(
+                sigmaX: widget.dark ? 18 : 14,
+                sigmaY: widget.dark ? 18 : 14,
+              ),
+              child: ColoredBox(
+                color: widget.dark
+                    ? const Color(0x12000000)
+                    : const Color(0x18FFFFFF),
+              ),
+            ),
+          ),
+        ),
+
         if (widget.child != null) widget.child!,
       ],
     );
