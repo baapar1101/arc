@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
 import 'package:hesabix_ui/core/date_utils.dart' show MarkStreetDateUtils;
@@ -249,7 +250,7 @@ class _NotificationModerationQueuePageState
     final queueId = _getQueueId(item);
     final aiReview = item['ai_review'] as Map<String, dynamic>?;
     final notesController = TextEditingController();
-    showDialog(
+    showGlassDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('تایید قالب'),
@@ -307,7 +308,7 @@ class _NotificationModerationQueuePageState
     final aiReview = item['ai_review'] as Map<String, dynamic>?;
     final reasonController = TextEditingController();
     final notesController = TextEditingController();
-    showDialog(
+    showGlassDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('رد قالب'),
@@ -399,7 +400,7 @@ class _NotificationModerationQueuePageState
     final template = item['template'] as Map<String, dynamic>? ?? {};
     final subjectController = TextEditingController(text: template['subject'] as String? ?? '');
     final bodyController = TextEditingController(text: template['full_body'] as String? ?? template['body'] as String? ?? '');
-    showDialog(
+    showGlassDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('ویرایش قالب توسط مدیر'),
@@ -449,7 +450,7 @@ class _NotificationModerationQueuePageState
         : '';
     final status = item['status'] as String?;
     final aiReview = item['ai_review'] as Map<String, dynamic>?;
-    showDialog(
+    showGlassDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('جزئیات قالب'),

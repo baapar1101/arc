@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
@@ -461,7 +462,7 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
   }
 
   Future<void> _showVerificationRequiredDialog(String message) async {
-    final result = await showDialog<bool>(
+    final result = await showGlassDialog<bool>(
       context: context,
       barrierDismissible: false,
       builder: (ctx) => AlertDialog(

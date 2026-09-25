@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/core/api_client.dart';
@@ -78,7 +79,7 @@ class _StoragePlansAdminPageState extends State<StoragePlansAdminPage> {
     bool isFree = initialData?['is_free'] ?? false;
     bool isActive = initialData?['is_active'] ?? true;
 
-    await showDialog(
+    await showGlassDialog(
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) {
@@ -523,7 +524,7 @@ class _StoragePlansAdminPageState extends State<StoragePlansAdminPage> {
   }
 
   Future<void> _deletePlan(int planId) async {
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showGlassDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('حذف پلن'),

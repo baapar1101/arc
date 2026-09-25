@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/services.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/core/api_client.dart';
@@ -21,7 +22,7 @@ class IdentityInquiryDialog extends StatefulWidget {
     BuildContext context, {
     int? businessId,
   }) {
-    return showDialog<Map<String, dynamic>>(
+    return showGlassDialog<Map<String, dynamic>>(
       context: context,
       barrierDismissible: false,
       builder: (context) => IdentityInquiryDialog(
@@ -164,7 +165,7 @@ class _IdentityInquiryDialogState extends State<IdentityInquiryDialog> {
   /// انتخاب تاریخ تولد
   Future<void> _selectBirthDate() async {
     final textController = TextEditingController(text: _birthDateController.text);
-    await showDialog<String>(
+    await showGlassDialog<String>(
       context: context,
       builder: (context) {
         final t = AppLocalizations.of(context);
