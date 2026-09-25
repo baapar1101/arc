@@ -29,12 +29,12 @@ class AppColorTokens {
         onSecondary: const Color(0xFF08111F),
         secondaryContainer: const Color(0xFF172554),
         onSecondaryContainer: const Color(0xFFDBEAFE),
-        surface: const Color(0xCC0F172A),
+        surface: const Color(0x8A0F172A),
         surfaceContainerLowest: const Color(0x000A0F1D),
-        surfaceContainerLow: const Color(0x99111827),
-        surfaceContainer: const Color(0xB3111827),
-        surfaceContainerHigh: const Color(0xCC172033),
-        surfaceContainerHighest: const Color(0xD91E293B),
+        surfaceContainerLow: const Color(0x4D111827),
+        surfaceContainer: const Color(0x66111827),
+        surfaceContainerHigh: const Color(0x80172033),
+        surfaceContainerHighest: const Color(0x991E293B),
         onSurface: const Color(0xFFF8FAFC),
         onSurfaceVariant: const Color(0xFFCBD5E1),
         outline: const Color(0xFF64748B),
@@ -58,12 +58,12 @@ class AppColorTokens {
       onSecondary: Colors.white,
       secondaryContainer: const Color(0xFFE0ECFF),
       onSecondaryContainer: const Color(0xFF172554),
-      surface: const Color(0xDDF8FAFF),
+      surface: const Color(0x99F8FAFF),
       surfaceContainerLowest: const Color(0x00FFFFFF),
-      surfaceContainerLow: const Color(0xCCFFFFFF),
-      surfaceContainer: const Color(0xDDFFFFFF),
-      surfaceContainerHigh: const Color(0xE6F8FAFF),
-      surfaceContainerHighest: const Color(0xFFF0F5FF),
+      surfaceContainerLow: const Color(0x59FFFFFF),
+      surfaceContainer: const Color(0x70FFFFFF),
+      surfaceContainerHigh: const Color(0x8AFFFFFF),
+      surfaceContainerHighest: const Color(0xA6FFFFFF),
       onSurface: const Color(0xFF0F172A),
       onSurfaceVariant: const Color(0xFF475569),
       outline: const Color(0xFF94A3B8),
@@ -91,6 +91,22 @@ class AppColorTokens {
     final secondary = _adaptForDark(def.secondary, dark: dark, amount: 0.22);
     final error = _adaptForDark(def.negative, dark: dark, amount: 0.08);
 
+    final glassSurface = dark
+        ? const Color(0x8A0F172A)
+        : const Color(0x99F8FAFF);
+    final glassLow = dark
+        ? const Color(0x4D111827)
+        : const Color(0x59FFFFFF);
+    final glassContainer = dark
+        ? const Color(0x66111827)
+        : const Color(0x70FFFFFF);
+    final glassHigh = dark
+        ? const Color(0x80172033)
+        : const Color(0x8AFFFFFF);
+    final glassHighest = dark
+        ? const Color(0x991E293B)
+        : const Color(0xA6FFFFFF);
+
     return base.copyWith(
       primary: primary,
       onPrimary: _onFor(primary),
@@ -105,6 +121,12 @@ class AppColorTokens {
       onError: _onFor(error),
       errorContainer: Color.lerp(error, base.errorContainer, 0.55) ?? base.errorContainer,
       onErrorContainer: base.onErrorContainer,
+      surface: glassSurface,
+      surfaceContainerLowest: Colors.transparent,
+      surfaceContainerLow: glassLow,
+      surfaceContainer: glassContainer,
+      surfaceContainerHigh: glassHigh,
+      surfaceContainerHighest: glassHighest,
     );
   }
 }
