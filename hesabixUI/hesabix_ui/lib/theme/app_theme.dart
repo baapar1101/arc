@@ -63,7 +63,7 @@ class AppTheme {
         textStyle: textTheme.bodySmall?.copyWith(color: scheme.onInverseSurface),
       ),
       popupMenuTheme: PopupMenuThemeData(
-        color: isDark ? const Color(0xF2111827) : const Color(0xF7FFFFFF),
+        color: isDark ? const Color(0xB8111827) : const Color(0xC9FFFFFF),
         surfaceTintColor: Colors.transparent,
         elevation: 12,
         shape: RoundedRectangleBorder(
@@ -71,16 +71,25 @@ class AppTheme {
           side: BorderSide(color: scheme.onSurface.withValues(alpha: 0.10)),
         ),
       ),
-      bottomSheetTheme: const BottomSheetThemeData(
-        backgroundColor: Colors.transparent,
+      bottomSheetTheme: BottomSheetThemeData(
+        backgroundColor: isDark
+            ? const Color(0xA6111827)
+            : const Color(0xB8FFFFFF),
         surfaceTintColor: Colors.transparent,
-        modalBackgroundColor: Colors.transparent,
+        modalBackgroundColor: isDark
+            ? const Color(0xA6111827)
+            : const Color(0xB8FFFFFF),
+        modalBarrierColor: isDark
+            ? const Color(0x99000000)
+            : const Color(0x520F172A),
+        elevation: 12,
+        shadowColor: Colors.black.withValues(alpha: 0.35),
         shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
         ),
       ),
       navigationBarTheme: NavigationBarThemeData(
-        backgroundColor: isDark ? const Color(0xE6111827) : const Color(0xE6FFFFFF),
+        backgroundColor: isDark ? const Color(0x8F111827) : const Color(0x99FFFFFF),
         indicatorColor: scheme.primary.withValues(alpha: 0.18),
         surfaceTintColor: Colors.transparent,
       ),
