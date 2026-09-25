@@ -1389,13 +1389,18 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
           child: LayoutBuilder(
             builder: (context, constraints) {
               final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+              final availableHeight = constraints.maxHeight > bottomInset + 20
+                  ? constraints.maxHeight - bottomInset - 20
+                  : 0.0;
               return SingleChildScrollView(
                 padding: EdgeInsets.fromLTRB(8, 10, 8, bottomInset + 10),
-                child: Center(
-                  child: ConstrainedBox(
-                    constraints: BoxConstraints(
-                      maxWidth: 390,
-                    ),
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(minHeight: availableHeight),
+                  child: Center(
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(
+                        maxWidth: 390,
+                      ),
                     child: GlassSurface(
                       borderRadius: BorderRadius.circular(22),
                       blur: 26,
@@ -2173,6 +2178,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                           ],
                         ),
                       ),
+                    ),
                   ),
                 ),
               );
