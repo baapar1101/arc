@@ -234,8 +234,8 @@ IconButtonThemeData appIconButtonTheme(ColorScheme scheme) => IconButtonThemeDat
 DialogThemeData appDialogTheme(ColorScheme scheme, AppRadii radii, TextTheme textTheme) =>
     DialogThemeData(
       backgroundColor: _isDark(scheme)
-          ? const Color(0xF2111827)
-          : const Color(0xF7FFFFFF),
+          ? const Color(0x8A111827)
+          : const Color(0xB8FFFFFF),
       surfaceTintColor: Colors.transparent,
       elevation: 12,
       shadowColor: Colors.black.withValues(alpha: 0.35),
