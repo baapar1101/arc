@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/services.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 
@@ -1248,7 +1249,7 @@ class _PersonFormDialogState extends State<PersonFormDialog> {
           onPressed: _loadingPersonGroups
               ? null
               : () async {
-                  await showDialog<void>(
+                  await showGlassDialog<void>(
                     context: context,
                     builder: (ctx) => PersonGroupsManageDialog(businessId: widget.businessId),
                   );

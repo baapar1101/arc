@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/services.dart';
 
 import '../../core/api_client.dart';
@@ -147,7 +148,7 @@ class _DocumentMonetizationAdminPageState extends State<DocumentMonetizationAdmi
     final priceCtrl = TextEditingController(text: initial?['price']?.toString() ?? '0');
     bool isActive = initial?['is_active'] ?? true;
 
-    await showDialog(
+    await showGlassDialog(
       context: context,
       builder: (context) {
         return StatefulBuilder(
@@ -263,7 +264,7 @@ class _DocumentMonetizationAdminPageState extends State<DocumentMonetizationAdmi
     bool isActive = initial?['is_active'] ?? true;
     String policyType = (initial?['policy_type'] ?? 'per_document') as String;
 
-    await showDialog(
+    await showGlassDialog(
       context: context,
       builder: (context) {
         return StatefulBuilder(
@@ -641,7 +642,7 @@ class _DocumentMonetizationAdminPageState extends State<DocumentMonetizationAdmi
     final config = Map<String, dynamic>.from(policy['config'] as Map? ?? {});
     
     // برای انواع مختلف سیاست، فرم‌های مختلف نمایش می‌دهیم
-    await showDialog(
+    await showGlassDialog(
       context: context,
       builder: (context) {
         return AlertDialog(
@@ -1585,7 +1586,7 @@ class _DocumentMonetizationAdminPageState extends State<DocumentMonetizationAdmi
                             IconButton(
                               icon: const Icon(Icons.delete_forever),
                               onPressed: () async {
-                                final confirmed = await showDialog<bool>(
+                                final confirmed = await showGlassDialog<bool>(
                                   context: context,
                                   builder: (context) => AlertDialog(
                                     title: const Text('حذف پلن'),
@@ -1704,7 +1705,7 @@ class _DocumentMonetizationAdminPageState extends State<DocumentMonetizationAdmi
                               IconButton(
                                 icon: const Icon(Icons.delete_forever),
                                 onPressed: () async {
-                                  final confirmed = await showDialog<bool>(
+                                  final confirmed = await showGlassDialog<bool>(
                                     context: context,
                                     builder: (context) => AlertDialog(
                                       title: const Text('حذف سیاست'),

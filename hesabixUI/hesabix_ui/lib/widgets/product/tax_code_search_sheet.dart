@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -65,7 +66,7 @@ class _TaxCodeSearchSheetState extends State<TaxCodeSearchSheet> {
     final controller = TextEditingController();
     String? errorText;
 
-    final result = await showDialog<String>(
+    final result = await showGlassDialog<String>(
       context: context,
       barrierDismissible: true,
       builder: (ctx) {
