@@ -1473,7 +1473,10 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                                               children: [
                                                 TextFormField(
                                                   controller: _identifierCtrl,
-                                                  decoration: InputDecoration(labelText: t.identifier),
+                                                  decoration: InputDecoration(
+                                                    labelText: t.identifier,
+                                                    prefixIcon: const Icon(Icons.person_outline_rounded, size: 18),
+                                                  ),
                                                   validator: (v) => (v == null || v.trim().isEmpty) ? '${t.identifier} ${t.requiredField}' : null,
                                                   textInputAction: TextInputAction.next,
                                                   onFieldSubmitted: (_) =>
@@ -1482,7 +1485,10 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                                                 const SizedBox(height: 6),
                                                 TextFormField(
                                                   controller: _passwordCtrl,
-                                                  decoration: InputDecoration(labelText: t.password),
+                                                  decoration: InputDecoration(
+                                                    labelText: t.password,
+                                                    prefixIcon: const Icon(Icons.lock_outline_rounded, size: 18),
+                                                  ),
                                                   obscureText: true,
                                                   validator: (v) {
                                                     if (v == null || v.isEmpty) return '${t.password} ${t.requiredField}';
@@ -1493,13 +1499,28 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                                                   onFieldSubmitted: (_) =>
                                                       FocusScope.of(context).nextFocus(),
                                                 ),
-                                                const SizedBox(height: 6),
+                                                Align(
+                                                  alignment: AlignmentDirectional.centerEnd,
+                                                  child: TextButton(
+                                                    onPressed: _loadingLogin
+                                                        ? null
+                                                        : () => _switchAuthMode(_LoginTabKind.forgot),
+                                                    child: Text(
+                                                      t.forgotPassword,
+                                                      style: const TextStyle(fontSize: 11.5),
+                                                    ),
+                                                  ),
+                                                ),
+                                                const SizedBox(height: 2),
                                                 Row(
                                                   children: [
                                                     Expanded(
                                                       child: TextFormField(
                                                         controller: _loginCaptchaCtrl,
-                                                        decoration: InputDecoration(labelText: t.captcha),
+                                                        decoration: InputDecoration(
+                                                          labelText: t.captcha,
+                                                          prefixIcon: const Icon(Icons.security_outlined, size: 18),
+                                                        ),
                                                         validator: (v) => (v == null || v.trim().isEmpty) ? '${t.captcha} ${t.requiredField}' : null,
                                                         keyboardType: _captchaMode == 'alphanumeric' ? TextInputType.text : TextInputType.number,
                                                         inputFormatters: _captchaInputFormatters,
@@ -1537,8 +1558,25 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                                                 FilledButton(
                                                   onPressed: _loadingLogin ? null : _onSubmit,
                                                   child: _loadingLogin
-                                                      ? const SizedBox(height: 16, width: 16, child: CircularProgressIndicator(strokeWidth: 2))
-                                                      : Text(t.login),
+                                                      ? const SizedBox(
+                                                          height: 16,
+                                                          width: 16,
+                                                          child: CircularProgressIndicator(strokeWidth: 2),
+                                                        )
+                                                      : Row(
+                                                          mainAxisAlignment: MainAxisAlignment.center,
+                                                          mainAxisSize: MainAxisSize.min,
+                                                          children: [
+                                                            Text(t.login),
+                                                            const SizedBox(width: 7),
+                                                            Icon(
+                                                              Directionality.of(context) == TextDirection.rtl
+                                                                  ? Icons.arrow_back_rounded
+                                                                  : Icons.arrow_forward_rounded,
+                                                              size: 18,
+                                                            ),
+                                                          ],
+                                                        ),
                                                 ),
                                               ],
                                             ),
@@ -1570,7 +1608,10 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                                               children: [
                                                 TextFormField(
                                                   controller: _firstNameCtrl,
-                                                  decoration: InputDecoration(labelText: t.firstName),
+                                                  decoration: InputDecoration(
+                                                    labelText: t.firstName,
+                                                    prefixIcon: const Icon(Icons.badge_outlined, size: 18),
+                                                  ),
                                                   validator: (v) => (v == null || v.trim().isEmpty) ? '${t.firstName} ${t.requiredField}' : null,
                                                   textInputAction: TextInputAction.next,
                                                   onFieldSubmitted: (_) =>
@@ -1579,7 +1620,10 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                                                 const SizedBox(height: 6),
                                                 TextFormField(
                                                   controller: _lastNameCtrl,
-                                                  decoration: InputDecoration(labelText: t.lastName),
+                                                  decoration: InputDecoration(
+                                                    labelText: t.lastName,
+                                                    prefixIcon: const Icon(Icons.badge_outlined, size: 18),
+                                                  ),
                                                   validator: (v) => (v == null || v.trim().isEmpty) ? '${t.lastName} ${t.requiredField}' : null,
                                                   textInputAction: TextInputAction.next,
                                                   onFieldSubmitted: (_) =>
@@ -1588,7 +1632,10 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                                                 const SizedBox(height: 6),
                                                 TextFormField(
                                                   controller: _emailCtrl,
-                                                  decoration: InputDecoration(labelText: t.email),
+                                                  decoration: InputDecoration(
+                                                    labelText: t.email,
+                                                    prefixIcon: const Icon(Icons.alternate_email_rounded, size: 18),
+                                                  ),
                                                   keyboardType: TextInputType.emailAddress,
                                                   validator: (v) => (v == null || v.trim().isEmpty) ? '${t.email} ${t.requiredField}' : null,
                                                   textInputAction: TextInputAction.next,
@@ -1598,7 +1645,10 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                                                 const SizedBox(height: 6),
                                                 TextFormField(
                                                   controller: _mobileCtrl,
-                                                  decoration: InputDecoration(labelText: t.mobile),
+                                                  decoration: InputDecoration(
+                                                    labelText: t.mobile,
+                                                    prefixIcon: const Icon(Icons.phone_outlined, size: 18),
+                                                  ),
                                                   keyboardType: TextInputType.phone,
                                                   validator: (v) => (v == null || v.trim().isEmpty) ? '${t.mobile} ${t.requiredField}' : null,
                                                   textInputAction: TextInputAction.next,
@@ -1608,7 +1658,10 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                                                 const SizedBox(height: 6),
                                                 TextFormField(
                                                   controller: _registerPasswordCtrl,
-                                                  decoration: InputDecoration(labelText: t.password),
+                                                  decoration: InputDecoration(
+                                                    labelText: t.password,
+                                                    prefixIcon: const Icon(Icons.lock_outline_rounded, size: 18),
+                                                  ),
                                                   obscureText: true,
                                                   validator: (v) => validatePassword(
                                                     value: v,
@@ -1627,7 +1680,10 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                                                     Expanded(
                                                       child: TextFormField(
                                                         controller: _registerCaptchaCtrl,
-                                                        decoration: InputDecoration(labelText: t.captcha),
+                                                        decoration: InputDecoration(
+                                                          labelText: t.captcha,
+                                                          prefixIcon: const Icon(Icons.security_outlined, size: 18),
+                                                        ),
                                                         validator: (v) => (v == null || v.trim().isEmpty) ? '${t.captcha} ${t.requiredField}' : null,
                                                         keyboardType: _captchaMode == 'alphanumeric' ? TextInputType.text : TextInputType.number,
                                                         inputFormatters: _captchaInputFormatters,
@@ -1728,7 +1784,10 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                                               children: [
                                                 TextFormField(
                                                   controller: _forgotIdentifierCtrl,
-                                                  decoration: InputDecoration(labelText: t.identifier),
+                                                  decoration: InputDecoration(
+                                                    labelText: t.identifier,
+                                                    prefixIcon: const Icon(Icons.person_outline_rounded, size: 18),
+                                                  ),
                                                   validator: (v) => (v == null || v.trim().isEmpty) ? '${t.identifier} ${t.requiredField}' : null,
                                                   textInputAction: TextInputAction.next,
                                                   onFieldSubmitted: (_) =>
@@ -1740,7 +1799,10 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                                                     Expanded(
                                                       child: TextFormField(
                                                         controller: _forgotCaptchaCtrl,
-                                                        decoration: InputDecoration(labelText: t.captcha),
+                                                        decoration: InputDecoration(
+                                                          labelText: t.captcha,
+                                                          prefixIcon: const Icon(Icons.security_outlined, size: 18),
+                                                        ),
                                                         validator: (v) => (v == null || v.trim().isEmpty) ? '${t.captcha} ${t.requiredField}' : null,
                                                         keyboardType: _captchaMode == 'alphanumeric' ? TextInputType.text : TextInputType.number,
                                                         inputFormatters: _captchaInputFormatters,
@@ -1808,19 +1870,6 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                                             child: Column(
                                               crossAxisAlignment: CrossAxisAlignment.stretch,
                                               children: [
-                                                Text(
-                                                  AppLocalizations.of(context).otpLoginTitle,
-                                                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                                                    fontWeight: FontWeight.w700,
-                                                  ),
-                                                ),
-                                                const SizedBox(height: 6),
-                                                Text(
-                                                  AppLocalizations.of(context).otpLoginSubtitle,
-                                                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                                                  ),
-                                                ),
                                                 if (_loadingOtpChannelStatus) ...[
                                                   const SizedBox(height: 6),
                                                   const LinearProgressIndicator(),
@@ -1831,7 +1880,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                                                   enabled: _otpLoginSessionId == null,
                                                   decoration: InputDecoration(
                                                     labelText: AppLocalizations.of(context).identifier,
-                                                    prefixIcon: const Icon(Icons.person),
+                                                    prefixIcon: const Icon(Icons.person_outline_rounded, size: 18),
                                                     helperText: _otpLoginSessionId != null
                                                         ? AppLocalizations.of(context).otpCodeSent
                                                         : AppLocalizations.of(context).otpLoginIdentifierHint,
@@ -1915,7 +1964,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                                                           enabled: !_loadingOtpLogin,
                                                           decoration: InputDecoration(
                                                             labelText: AppLocalizations.of(context).captcha,
-                                                            prefixIcon: const Icon(Icons.security),
+                                                            prefixIcon: const Icon(Icons.security_outlined, size: 18),
                                                           ),
                                                           keyboardType: _captchaMode == 'alphanumeric' ? TextInputType.text : TextInputType.number,
                                                           textInputAction: TextInputAction.done,
@@ -2045,9 +2094,77 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                                 );
                               },
                             ),
-                            const SizedBox(height: 6),
-                            Text(t.brandTagline, textAlign: TextAlign.center, style: Theme.of(context).textTheme.bodySmall?.copyWith(fontSize: 10.5)),
-                            const SizedBox(height: 6),
+                            if (currentKind == _LoginTabKind.login) ...[
+                              const SizedBox(height: 10),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: Divider(
+                                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.14),
+                                    ),
+                                  ),
+                                  Padding(
+                                    padding: const EdgeInsets.symmetric(horizontal: 10),
+                                    child: Text(
+                                      isFa ? 'یا ادامه با' : 'OR CONTINUE WITH',
+                                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                        fontSize: 9.5,
+                                        letterSpacing: isFa ? 0 : 0.6,
+                                      ),
+                                    ),
+                                  ),
+                                  Expanded(
+                                    child: Divider(
+                                      color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.14),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              OutlinedButton.icon(
+                                onPressed: () => _switchAuthMode(_LoginTabKind.otp),
+                                icon: const Icon(Icons.password_rounded, size: 18),
+                                label: Text(t.otpLogin),
+                              ),
+                              if (_registrationEnabled) ...[
+                                const SizedBox(height: 8),
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Text(
+                                      isFa ? 'حساب ندارید؟' : "Don't have an account?",
+                                      style: Theme.of(context).textTheme.bodySmall,
+                                    ),
+                                    TextButton(
+                                      onPressed: () => _switchAuthMode(_LoginTabKind.register),
+                                      child: Text(t.register),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ] else ...[
+                              const SizedBox(height: 8),
+                              TextButton.icon(
+                                onPressed: () => _switchAuthMode(_LoginTabKind.login),
+                                icon: Icon(
+                                  Directionality.of(context) == TextDirection.rtl
+                                      ? Icons.arrow_forward_rounded
+                                      : Icons.arrow_back_rounded,
+                                  size: 16,
+                                ),
+                                label: Text(t.login),
+                              ),
+                            ],
+                            const SizedBox(height: 4),
+                            Text(
+                              t.brandTagline,
+                              textAlign: TextAlign.center,
+                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                fontSize: 9.5,
+                                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                              ),
+                            ),
                             AuthFooter(
                               localeController: widget.localeController,
                               calendarController: widget.calendarController,
