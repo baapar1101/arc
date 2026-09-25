@@ -1,13 +1,13 @@
+import 'package:data_table_2/data_table_2.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 
 import '../../core/auth_store.dart';
 import '../../services/product_service.dart';
 import '../../services/price_list_service.dart';
 import '../../utils/responsive_helper.dart';
-import '../../widgets/data_table/helpers/file_saver.dart';
 import '../../widgets/person/file_picker_bridge.dart';
 import '../../utils/number_formatters.dart' show formatWithThousands;
 import '../../utils/number_normalizer.dart'
@@ -15,6 +15,8 @@ import '../../utils/number_normalizer.dart'
 import '../../utils/snackbar_helper.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/api_datetime_display.dart';
+import '../../widgets/business_subpage_back_leading.dart';
+import 'package:hesabix_ui/services/bytes_export/bytes_export_service.dart';
 
 /// ویرایش گسترده قیمت پایه و (اختیاری) قیمت‌های لیست قیمت، با صفحه‌بندی.
 class ProductBulkPricesSheetPage extends StatefulWidget {
@@ -33,13 +35,17 @@ class ProductBulkPricesSheetPage extends StatefulWidget {
 
 class _ProductBulkPricesSheetPageState extends State<ProductBulkPricesSheetPage> {
   static const _pageSize = 40;
-  static const _cardLayoutBreakpoint = 820.0;
+  static const _priceColWidth = 152.0;
+  static const _codeColWidth = 100.0;
+  static const _nameColMinWidth = 176.0;
+  static const _headingRowHeight = 52.0;
+  static const _dataRowHeight = 52.0;
+  static const _tableHMargin = 10.0;
 
   final _searchController = TextEditingController();
   final _productService = ProductService();
   final _priceListService = PriceListService();
-  final _tableVScroll = ScrollController();
-  final _tableHScroll = ScrollController();
+  final _priceListChipsScroll = ScrollController();
 
   int _skip = 0;
   int? _totalCount;
@@ -65,8 +71,7 @@ class _ProductBulkPricesSheetPageState extends State<ProductBulkPricesSheetPage>
   @override
   void dispose() {
     _searchController.dispose();
-    _tableVScroll.dispose();
-    _tableHScroll.dispose();
+    _priceListChipsScroll.dispose();
     _disposeRowControllers();
     _disposePriceItemControllers();
     super.dispose();
@@ -77,10 +82,6 @@ class _ProductBulkPricesSheetPageState extends State<ProductBulkPricesSheetPage>
     super.initState();
     _loadPriceLists();
     _loadPage();
-  }
-
-  bool _useCardLayout(BuildContext context) {
-    return MediaQuery.sizeOf(context).width < _cardLayoutBreakpoint;
   }
 
   Future<void> _loadPriceLists() async {
@@ -260,6 +261,26 @@ class _ProductBulkPricesSheetPageState extends State<ProductBulkPricesSheetPage>
     return double.tryParse(t);
   }
 
+  bool _isDirtyText(String current, String initial) => current.trim() != initial.trim();
+
+  int _dirtyCellCount() {
+    var n = 0;
+    for (final row in _rows) {
+      final id = _parseId(row['id']);
+      if (id == null) continue;
+      final sc = _salesControllers[id];
+      final pc = _purchaseControllers[id];
+      if (sc != null && _isDirtyText(sc.text, _initialSales[id] ?? '')) n++;
+      if (pc != null && _isDirtyText(pc.text, _initialPurchase[id] ?? '')) n++;
+      for (final piid in _columnOrder) {
+        final key = _piKey(id, piid);
+        final c = _priceItemControllers[key];
+        if (c != null && _isDirtyText(c.text, _priceItemInitial[key] ?? '')) n++;
+      }
+    }
+    return n;
+  }
+
   List<Map<String, dynamic>> _collectDirtyItems() {
     final out = <Map<String, dynamic>>[];
     for (final row in _rows) {
@@ -323,6 +344,35 @@ class _ProductBulkPricesSheetPageState extends State<ProductBulkPricesSheetPage>
     return out;
   }
 
+  Future<bool> _confirmDiscardIfDirty() async {
+    if (_collectDirtyItems().isEmpty) return true;
+    final t = AppLocalizations.of(context);
+    final go = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(t.bulkProductPricesSheetUnsavedTitle),
+        content: Text(t.bulkProductPricesSheetUnsavedMessage),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(t.cancel),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(t.bulkProductPricesSheetDiscardChanges),
+          ),
+        ],
+      ),
+    );
+    return go == true;
+  }
+
+  Future<void> _runAfterDirtyCheck(VoidCallback action) async {
+    if (!await _confirmDiscardIfDirty()) return;
+    if (!mounted) return;
+    action();
+  }
+
   Future<void> _savePage() async {
     final t = AppLocalizations.of(context);
     final items = _collectDirtyItems();
@@ -366,9 +416,17 @@ class _ProductBulkPricesSheetPageState extends State<ProductBulkPricesSheetPage>
       }
       final ts = DateTime.now().toIso8601String().replaceAll(RegExp(r'[:.]'), '-');
       final fname = 'bulk_prices_sheet_${widget.businessId}_$ts.xlsx';
-      await FileSaver.saveBytes(bytes, fname);
+      final result = await BytesExportService.export(
+        bytes: bytes,
+        filename: fname,
+        mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      );
       if (!mounted) return;
-      SnackBarHelper.showSuccess(context, message: t.operationSuccessful);
+      BytesExportService.showFeedback(
+        context,
+        result,
+        successOverride: t.operationSuccessful,
+      );
     } catch (e) {
       if (!mounted) return;
       SnackBarHelper.showError(context, message: ErrorExtractor.extractErrorMessage(e, t));
@@ -404,43 +462,19 @@ class _ProductBulkPricesSheetPageState extends State<ProductBulkPricesSheetPage>
   }
 
   void _togglePriceList(int listId, bool selected) {
-    setState(() {
-      if (selected) {
-        if (!_selectedPriceListIds.contains(listId)) {
-          _selectedPriceListIds = [..._selectedPriceListIds, listId];
+    _runAfterDirtyCheck(() {
+      setState(() {
+        if (selected) {
+          if (!_selectedPriceListIds.contains(listId)) {
+            _selectedPriceListIds = [..._selectedPriceListIds, listId];
+          }
+        } else {
+          _selectedPriceListIds = [..._selectedPriceListIds]..remove(listId);
         }
-      } else {
-        _selectedPriceListIds = [..._selectedPriceListIds]..remove(listId);
-      }
-      _skip = 0;
+        _skip = 0;
+      });
+      _loadPage();
     });
-    _loadPage();
-  }
-
-  InputDecoration _priceDecoration(BuildContext context, {String? label, String? hint}) {
-    final cs = Theme.of(context).colorScheme;
-    final r = BorderRadius.circular(10);
-    return InputDecoration(
-      isDense: true,
-      filled: true,
-      fillColor: cs.surfaceContainerHighest.withValues(alpha: 0.38),
-      labelText: label,
-      hintText: hint,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      border: OutlineInputBorder(borderRadius: r),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: r,
-        borderSide: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.65)),
-      ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: r,
-        borderSide: BorderSide(color: cs.primary, width: 1.6),
-      ),
-      disabledBorder: OutlineInputBorder(
-        borderRadius: r,
-        borderSide: BorderSide(color: cs.outline.withValues(alpha: 0.35)),
-      ),
-    );
   }
 
   List<TextInputFormatter> get _priceInputFormatters => [
@@ -449,67 +483,78 @@ class _ProductBulkPricesSheetPageState extends State<ProductBulkPricesSheetPage>
         const ThousandsSeparatorInputFormatter(),
       ];
 
-  Widget _buildPriceField({
+  (String title, String subtitle) _splitColumnLabel(String label) {
+    final parts = label.split(' · ').where((p) => p.trim().isNotEmpty).toList();
+    if (parts.length < 2) return (label, '');
+    return (parts.first, parts.sublist(1).join(' · '));
+  }
+
+  double _tableMinWidth() {
+    final priceCols = 2 + _columnOrder.length;
+    return _codeColWidth +
+        _nameColMinWidth +
+        _priceColWidth * priceCols +
+        _tableHMargin * 2 +
+        8;
+  }
+
+  Widget _buildSheetPriceField({
     required BuildContext context,
     required TextEditingController controller,
+    required String initial,
     required bool enabled,
-    String? label,
+    String? tooltip,
   }) {
-    return TextField(
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final dirty = _isDirtyText(controller.text, initial);
+    final field = TextField(
       controller: controller,
       enabled: enabled,
       keyboardType: TextInputType.number,
       inputFormatters: _priceInputFormatters,
-      decoration: _priceDecoration(context, label: label),
-    );
-  }
-
-  Widget _buildPriceListCell(
-    BuildContext context, {
-    required TextEditingController controller,
-    required bool enabled,
-    String? updatedAtDisplay,
-  }) {
-    final theme = Theme.of(context);
-    final d = updatedAtDisplay?.trim();
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: SizedBox(
-        width: 136,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: controller,
-              enabled: enabled,
-              keyboardType: TextInputType.number,
-              inputFormatters: _priceInputFormatters,
-              decoration: _priceDecoration(context),
-            ),
-            if (d != null && d.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.only(top: 4),
-                child: Text(
-                  d,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.labelSmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                    fontSize: 10,
-                  ),
-                ),
-              ),
-          ],
+      textAlign: TextAlign.end,
+      style: theme.textTheme.bodyMedium?.copyWith(
+        fontFeatures: const [FontFeature.tabularFigures()],
+        fontWeight: dirty ? FontWeight.w700 : FontWeight.w500,
+        color: dirty ? cs.tertiary : null,
+      ),
+      onChanged: (_) {
+        if (mounted) setState(() {});
+      },
+      decoration: InputDecoration(
+        isDense: true,
+        filled: true,
+        fillColor: dirty ? cs.tertiaryContainer.withValues(alpha: 0.55) : cs.surface,
+        hintText: '—',
+        hintStyle: theme.textTheme.bodyMedium?.copyWith(color: cs.outline),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide(
+            color: dirty ? cs.tertiary.withValues(alpha: 0.7) : cs.outlineVariant.withValues(alpha: 0.55),
+          ),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide(color: cs.primary, width: 1.6),
+        ),
+        disabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide(color: cs.outline.withValues(alpha: 0.28)),
         ),
       ),
     );
+    final d = tooltip?.trim();
+    if (d == null || d.isEmpty) return field;
+    return Tooltip(message: d, waitDuration: const Duration(milliseconds: 400), child: field);
   }
 
   Widget _buildErrorBanner(BuildContext context, AppLocalizations t) {
     final cs = Theme.of(context).colorScheme;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+      padding: const EdgeInsets.fromLTRB(0, 0, 0, 8),
       child: Material(
         color: cs.errorContainer.withValues(alpha: 0.65),
         borderRadius: BorderRadius.circular(12),
@@ -548,7 +593,7 @@ class _ProductBulkPricesSheetPageState extends State<ProductBulkPricesSheetPage>
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.inventory_2_outlined, size: 56, color: cs.outline),
+              Icon(Icons.grid_on_outlined, size: 56, color: cs.outline),
               const SizedBox(height: 16),
               Text(
                 t.bulkProductPricesSheetNoRows,
@@ -579,105 +624,96 @@ class _ProductBulkPricesSheetPageState extends State<ProductBulkPricesSheetPage>
     return '${t.bulkProductPricesSheetPageLabel} $pageNo · $from–$to';
   }
 
-  Widget _buildPaginationFooter(BuildContext context, AppLocalizations t, bool hasMore, bool hasPrev) {
-    final cs = Theme.of(context).colorScheme;
-    final style = Theme.of(context).textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant);
-
-    return Padding(
-      padding: const EdgeInsets.only(top: 8),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              _paginationSummary(t),
-              style: style,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-          const SizedBox(width: 8),
-          IconButton.filledTonal(
-            tooltip: t.bulkProductPricesSheetPrev,
-            onPressed: !hasPrev || _loading
-                ? null
-                : () {
-                    _skip = (_skip - _pageSize).clamp(0, 1 << 30);
-                    _loadPage();
-                  },
-            icon: const Icon(Icons.chevron_right_rounded),
-          ),
-          const SizedBox(width: 4),
-          IconButton.filledTonal(
-            tooltip: t.bulkProductPricesSheetNext,
-            onPressed: !hasMore || _loading
-                ? null
-                : () {
-                    _skip += _pageSize;
-                    _loadPage();
-                  },
-            icon: const Icon(Icons.chevron_left_rounded),
+  void _showExcelHelp(AppLocalizations t) {
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(t.bulkProductPricesSheetGuideTitle),
+        content: SingleChildScrollView(
+          child: Text(t.bulkProductPricesSheetExcelHint, style: Theme.of(ctx).textTheme.bodyMedium),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(t.close),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildFilterCard(BuildContext context, AppLocalizations t) {
+  Widget _headerLabel(BuildContext context, String title, {String? subtitle, bool numeric = false}) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
-    final pad = ResponsiveHelper.getPadding(context);
-    final narrow = _useCardLayout(context);
+    return Align(
+      alignment: numeric ? AlignmentDirectional.centerEnd : AlignmentDirectional.centerStart,
+      child: Column(
+        crossAxisAlignment: numeric ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(
+            title,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w700),
+          ),
+          if (subtitle != null && subtitle.isNotEmpty)
+            Text(
+              subtitle,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.labelSmall?.copyWith(color: cs.onSurfaceVariant),
+            ),
+        ],
+      ),
+    );
+  }
 
-    return Card(
-      margin: EdgeInsets.zero,
+  Widget _buildToolbar(BuildContext context, AppLocalizations t) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final compact = ResponsiveHelper.isMobile(context);
+
+    return Material(
+      color: cs.surface,
       elevation: 0,
-      color: cs.surfaceContainerLow,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
-        side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.45)),
+        side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.5)),
       ),
       child: Padding(
-        padding: EdgeInsets.all(pad),
+        padding: EdgeInsets.fromLTRB(compact ? 10 : 14, 10, compact ? 10 : 14, 10),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Row(
-              children: [
-                Icon(Icons.tune_rounded, color: cs.primary, size: 22),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    t.bulkProductPricesSheetSearchSection,
-                    style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 6),
-            Text(
-              t.bulkProductPricesSheetSubtitle,
-              style: theme.textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-            ),
-            const SizedBox(height: 14),
-            if (narrow)
+            if (compact)
               Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   TextField(
                     controller: _searchController,
+                    textInputAction: TextInputAction.search,
                     decoration: InputDecoration(
+                      isDense: true,
                       filled: true,
-                      fillColor: cs.surface.withValues(alpha: 0.72),
+                      fillColor: cs.surfaceContainerLowest,
                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                       hintText: t.bulkProductPricesSheetSearch,
                       prefixIcon: const Icon(Icons.search_rounded, size: 22),
+                      suffixIcon: IconButton(
+                        tooltip: t.bulkProductPricesSheetHelpTooltip,
+                        onPressed: () => _showExcelHelp(t),
+                        icon: const Icon(Icons.help_outline_rounded),
+                      ),
                     ),
                     onSubmitted: (_) {
-                      _skip = 0;
-                      _loadPage();
+                      _runAfterDirtyCheck(() {
+                        _skip = 0;
+                        _loadPage();
+                      });
                     },
                   ),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 8),
                   Row(
                     children: [
                       Expanded(
@@ -685,8 +721,10 @@ class _ProductBulkPricesSheetPageState extends State<ProductBulkPricesSheetPage>
                           onPressed: _loading
                               ? null
                               : () {
-                                  _skip = 0;
-                                  _loadPage();
+                                  _runAfterDirtyCheck(() {
+                                    _skip = 0;
+                                    _loadPage();
+                                  });
                                 },
                           icon: const Icon(Icons.search_rounded, size: 20),
                           label: Text(t.bulkProductPricesSheetSearch),
@@ -698,9 +736,11 @@ class _ProductBulkPricesSheetPageState extends State<ProductBulkPricesSheetPage>
                           onPressed: _loading
                               ? null
                               : () {
-                                  _searchController.clear();
-                                  _skip = 0;
-                                  _loadPage();
+                                  _runAfterDirtyCheck(() {
+                                    _searchController.clear();
+                                    _skip = 0;
+                                    _loadPage();
+                                  });
                                 },
                           icon: const Icon(Icons.clear_rounded, size: 20),
                           label: Text(t.bulkProductPricesSheetClearSearch),
@@ -712,32 +752,36 @@ class _ProductBulkPricesSheetPageState extends State<ProductBulkPricesSheetPage>
               )
             else
               Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Expanded(
-                    flex: 3,
                     child: TextField(
                       controller: _searchController,
+                      textInputAction: TextInputAction.search,
                       decoration: InputDecoration(
+                        isDense: true,
                         filled: true,
-                        fillColor: cs.surface.withValues(alpha: 0.72),
+                        fillColor: cs.surfaceContainerLowest,
                         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                         hintText: t.bulkProductPricesSheetSearch,
                         prefixIcon: const Icon(Icons.search_rounded, size: 22),
                       ),
                       onSubmitted: (_) {
-                        _skip = 0;
-                        _loadPage();
+                        _runAfterDirtyCheck(() {
+                          _skip = 0;
+                          _loadPage();
+                        });
                       },
                     ),
                   ),
-                  const SizedBox(width: 10),
+                  const SizedBox(width: 8),
                   FilledButton.tonalIcon(
                     onPressed: _loading
                         ? null
                         : () {
-                            _skip = 0;
-                            _loadPage();
+                            _runAfterDirtyCheck(() {
+                              _skip = 0;
+                              _loadPage();
+                            });
                           },
                     icon: const Icon(Icons.search_rounded, size: 20),
                     label: Text(t.bulkProductPricesSheetSearch),
@@ -747,229 +791,103 @@ class _ProductBulkPricesSheetPageState extends State<ProductBulkPricesSheetPage>
                     onPressed: _loading
                         ? null
                         : () {
-                            _searchController.clear();
-                            _skip = 0;
-                            _loadPage();
+                            _runAfterDirtyCheck(() {
+                              _searchController.clear();
+                              _skip = 0;
+                              _loadPage();
+                            });
                           },
                     icon: const Icon(Icons.clear_rounded, size: 20),
                     label: Text(t.bulkProductPricesSheetClearSearch),
                   ),
+                  IconButton(
+                    tooltip: t.bulkProductPricesSheetHelpTooltip,
+                    onPressed: () => _showExcelHelp(t),
+                    icon: const Icon(Icons.help_outline_rounded),
+                  ),
                 ],
               ),
-            const SizedBox(height: 18),
-            Text(
-              t.bulkProductPricesSheetPriceListsForColumns,
-              style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              t.bulkProductPricesSheetSelectListsHint,
-              style: theme.textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-            ),
             const SizedBox(height: 10),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: _priceLists.map((pl) {
-                final id = _parseId(pl['id']);
-                if (id == null) return const SizedBox.shrink();
-                final name = pl['name']?.toString() ?? '—';
-                final sel = _selectedPriceListIds.contains(id);
-                return FilterChip(
-                  avatar: Icon(
-                    sel ? Icons.check_circle_rounded : Icons.list_alt_rounded,
-                    size: 18,
-                    color: sel ? cs.onSecondaryContainer : cs.onSurfaceVariant,
-                  ),
-                  label: Text(name, overflow: TextOverflow.ellipsis),
-                  selected: sel,
-                  showCheckmark: false,
-                  onSelected: _loading ? null : (v) => _togglePriceList(id, v),
-                );
-              }).toList(),
-            ),
-            if (_priceListsLoadError != null) ...[
-              const SizedBox(height: 12),
-              Text(
-                _priceListsLoadError!,
-                style: theme.textTheme.bodySmall?.copyWith(color: cs.error),
-              ),
-              Align(
-                alignment: AlignmentDirectional.centerStart,
-                child: TextButton.icon(
-                  onPressed: _loadPriceLists,
-                  icon: const Icon(Icons.refresh_rounded, size: 20),
-                  label: Text(t.retry),
-                ),
-              ),
-            ],
-            Theme(
-              data: theme.copyWith(dividerColor: Colors.transparent),
-              child: ExpansionTile(
-                tilePadding: EdgeInsets.zero,
-                childrenPadding: const EdgeInsets.only(bottom: 4),
-                title: Text(
-                  t.bulkProductPricesSheetGuideTitle,
-                  style: theme.textTheme.labelLarge?.copyWith(
-                    color: cs.primary,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                leading: Icon(Icons.help_outline_rounded, color: cs.primary, size: 22),
-                children: [
-                  Text(
-                    t.bulkProductPricesSheetExcelHint,
-                    style: theme.textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant, height: 1.45),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildMobileProductCard(
-    BuildContext context,
-    AppLocalizations t,
-    Map<String, dynamic> row,
-    bool canEdit,
-  ) {
-    final theme = Theme.of(context);
-    final cs = theme.colorScheme;
-    final spacing = ResponsiveHelper.getGridSpacing(context);
-    final id = _parseId(row['id']);
-    if (id == null) return const SizedBox.shrink();
-    final sc = _salesControllers[id];
-    final pc = _purchaseControllers[id];
-    final code = row['code']?.toString() ?? '';
-    final name = row['name']?.toString() ?? '';
-
-    return Card(
-      margin: EdgeInsets.only(bottom: spacing),
-      elevation: 0,
-      color: cs.surface,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(14),
-        side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.45)),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
             Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                  decoration: BoxDecoration(
-                    color: cs.primaryContainer.withValues(alpha: 0.55),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    code.isEmpty ? '—' : code,
-                    style: theme.textTheme.labelLarge?.copyWith(
-                      fontWeight: FontWeight.w700,
-                      color: cs.onPrimaryContainer,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 10),
+                Icon(Icons.view_column_outlined, size: 18, color: cs.primary),
+                const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    name.isEmpty ? '—' : name,
-                    style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600, height: 1.25),
+                    t.bulkProductPricesSheetPriceListsForColumns,
+                    style: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w700),
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 14),
-            if (sc != null && pc != null)
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          t.salesPrice,
-                          style: theme.textTheme.labelMedium?.copyWith(color: cs.onSurfaceVariant),
-                        ),
-                        const SizedBox(height: 6),
-                        _buildPriceField(context: context, controller: sc, enabled: canEdit),
-                      ],
+            const SizedBox(height: 8),
+            if (_priceLists.isEmpty && _priceListsLoadError == null)
+              Text(
+                t.bulkProductPricesSheetNoPriceLists,
+                style: theme.textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+              )
+            else
+              SizedBox(
+                height: 40,
+                child: ScrollConfiguration(
+                  behavior: ScrollConfiguration.of(context).copyWith(
+                    dragDevices: {
+                      PointerDeviceKind.touch,
+                      PointerDeviceKind.mouse,
+                      PointerDeviceKind.trackpad,
+                      PointerDeviceKind.stylus,
+                    },
+                  ),
+                  child: Scrollbar(
+                    controller: _priceListChipsScroll,
+                    thumbVisibility: _priceLists.length > 4,
+                    child: ListView.separated(
+                      controller: _priceListChipsScroll,
+                      scrollDirection: Axis.horizontal,
+                      itemCount: _priceLists.length,
+                      separatorBuilder: (_, _) => const SizedBox(width: 8),
+                      itemBuilder: (context, i) {
+                        final pl = _priceLists[i];
+                        final id = _parseId(pl['id']);
+                        if (id == null) return const SizedBox.shrink();
+                        final name = pl['name']?.toString() ?? '—';
+                        final sel = _selectedPriceListIds.contains(id);
+                        return FilterChip(
+                          avatar: Icon(
+                            sel ? Icons.check_circle_rounded : Icons.list_alt_rounded,
+                            size: 18,
+                            color: sel ? cs.onSecondaryContainer : cs.onSurfaceVariant,
+                          ),
+                          label: ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 200),
+                            child: Text(name, overflow: TextOverflow.ellipsis),
+                          ),
+                          selected: sel,
+                          showCheckmark: false,
+                          onSelected: _loading ? null : (v) => _togglePriceList(id, v),
+                        );
+                      },
                     ),
                   ),
-                  const SizedBox(width: 12),
+                ),
+              ),
+            if (_priceListsLoadError != null) ...[
+              const SizedBox(height: 8),
+              Row(
+                children: [
                   Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          t.purchasePrice,
-                          style: theme.textTheme.labelMedium?.copyWith(color: cs.onSurfaceVariant),
-                        ),
-                        const SizedBox(height: 6),
-                        _buildPriceField(context: context, controller: pc, enabled: canEdit),
-                      ],
+                    child: Text(
+                      _priceListsLoadError!,
+                      style: theme.textTheme.bodySmall?.copyWith(color: cs.error),
                     ),
+                  ),
+                  TextButton.icon(
+                    onPressed: _loadPriceLists,
+                    icon: const Icon(Icons.refresh_rounded, size: 18),
+                    label: Text(t.retry),
                   ),
                 ],
               ),
-            if (_columnOrder.isNotEmpty) ...[
-              const SizedBox(height: 14),
-              Divider(height: 1, color: cs.outlineVariant.withValues(alpha: 0.4)),
-              const SizedBox(height: 12),
-              Text(
-                t.bulkProductPricesSheetPriceListPrices,
-                style: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w700),
-              ),
-              const SizedBox(height: 10),
-              ..._columnOrder.map((piid) {
-                final key = _piKey(id, piid);
-                final c = _priceItemControllers[key];
-                final lbl = _columnLabels[piid] ?? '$piid';
-                final updated = _priceItemUpdatedAt[key];
-                if (c == null) {
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 10),
-                    child: Row(
-                      children: [
-                        Expanded(child: Text(lbl, style: theme.textTheme.bodySmall)),
-                        Text('—', style: theme.textTheme.bodyMedium?.copyWith(color: cs.outline)),
-                      ],
-                    ),
-                  );
-                }
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Text(
-                        lbl,
-                        style: theme.textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant, height: 1.3),
-                      ),
-                      const SizedBox(height: 6),
-                      _buildPriceField(context: context, controller: c, enabled: canEdit),
-                      if (updated != null && updated.trim().isNotEmpty)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 4),
-                          child: Text(
-                            updated.trim(),
-                            style: theme.textTheme.labelSmall?.copyWith(
-                              color: cs.onSurfaceVariant,
-                              fontSize: 10,
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                );
-              }),
             ],
           ],
         ),
@@ -977,134 +895,271 @@ class _ProductBulkPricesSheetPageState extends State<ProductBulkPricesSheetPage>
     );
   }
 
-  Widget _buildDesktopTable(BuildContext context, AppLocalizations t, bool canEdit) {
+  Widget _buildSpreadsheet(BuildContext context, AppLocalizations t, bool canEdit) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
+    final headingStyle = theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w700);
 
-    return Scrollbar(
-      controller: _tableVScroll,
-      thumbVisibility: ResponsiveHelper.isDesktop(context),
-      child: SingleChildScrollView(
-        controller: _tableVScroll,
-        child: Scrollbar(
-          controller: _tableHScroll,
-          thumbVisibility: ResponsiveHelper.isDesktop(context),
-          notificationPredicate: (n) => n.depth == 1,
-          child: SingleChildScrollView(
-            controller: _tableHScroll,
-            scrollDirection: Axis.horizontal,
-            child: ConstrainedBox(
-              constraints: BoxConstraints(
-                minWidth: MediaQuery.sizeOf(context).width - ResponsiveHelper.getPadding(context) * 2,
+    if (_rows.isEmpty) {
+      if (_loading) {
+        return const Center(child: CircularProgressIndicator());
+      }
+      return _buildEmptyState(context, t);
+    }
+
+    final columns = <DataColumn2>[
+      DataColumn2(
+        label: _headerLabel(context, t.bulkProductPricesSheetCode),
+        fixedWidth: _codeColWidth,
+      ),
+      DataColumn2(
+        label: _headerLabel(context, t.bulkProductPricesSheetName),
+        size: ColumnSize.L,
+        minWidth: _nameColMinWidth,
+      ),
+      DataColumn2(
+        label: _headerLabel(context, t.salesPrice, numeric: true),
+        numeric: true,
+        fixedWidth: _priceColWidth,
+      ),
+      DataColumn2(
+        label: _headerLabel(context, t.purchasePrice, numeric: true),
+        numeric: true,
+        fixedWidth: _priceColWidth,
+      ),
+      ..._columnOrder.map((piid) {
+        final raw = _columnLabels[piid] ?? '$piid';
+        final split = _splitColumnLabel(raw);
+        return DataColumn2(
+          label: Tooltip(
+            message: raw,
+            child: _headerLabel(context, split.$1, subtitle: split.$2, numeric: true),
+          ),
+          numeric: true,
+          fixedWidth: _priceColWidth,
+        );
+      }),
+    ];
+
+    final rows = _rows.where((r) => _parseId(r['id']) != null).toList();
+
+    return ScrollConfiguration(
+      behavior: ScrollConfiguration.of(context).copyWith(
+        dragDevices: {
+          PointerDeviceKind.touch,
+          PointerDeviceKind.mouse,
+          PointerDeviceKind.trackpad,
+          PointerDeviceKind.stylus,
+        },
+      ),
+      child: DataTable2(
+        key: ValueKey('bulk-price-grid-$_skip-${_columnOrder.length}-${rows.length}'),
+        columns: columns,
+        rows: [
+          for (var i = 0; i < rows.length; i++)
+            _buildDataRow(context, canEdit, rows[i], i),
+        ],
+        minWidth: _tableMinWidth(),
+        isHorizontalScrollBarVisible: true,
+        isVerticalScrollBarVisible: true,
+        showCheckboxColumn: false,
+        headingRowHeight: _headingRowHeight,
+        dataRowHeight: _dataRowHeight,
+        bottomMargin: 16,
+        horizontalMargin: _tableHMargin,
+        columnSpacing: 8,
+        dividerThickness: 0.6,
+        headingRowColor: WidgetStateProperty.all(cs.surfaceContainerHigh),
+        fixedColumnsColor: cs.surface,
+        fixedCornerColor: cs.surfaceContainerHigh,
+        fixedLeftColumns: 2,
+        headingTextStyle: headingStyle,
+        border: TableBorder(
+          horizontalInside: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.45)),
+          verticalInside: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.35)),
+        ),
+      ),
+    );
+  }
+
+  DataRow2 _buildDataRow(
+    BuildContext context,
+    bool canEdit,
+    Map<String, dynamic> row,
+    int index,
+  ) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final id = _parseId(row['id'])!;
+    final sc = _salesControllers[id];
+    final pc = _purchaseControllers[id];
+    final zebra = index.isOdd ? cs.surfaceContainerLowest.withValues(alpha: 0.7) : null;
+
+    if (sc == null || pc == null) {
+      return DataRow2(
+        color: WidgetStateProperty.all(zebra),
+        cells: [
+          DataCell(Text(row['code']?.toString() ?? '')),
+          DataCell(Text(row['name']?.toString() ?? '')),
+          const DataCell(Text('')),
+          const DataCell(Text('')),
+          ..._columnOrder.map((_) => const DataCell(Text(''))),
+        ],
+      );
+    }
+
+    return DataRow2(
+      color: WidgetStateProperty.all(zebra),
+      cells: [
+        DataCell(
+          Text(
+            row['code']?.toString() ?? '',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w700),
+          ),
+        ),
+        DataCell(
+          Text(
+            row['name']?.toString() ?? '',
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: theme.textTheme.bodyMedium?.copyWith(height: 1.25),
+          ),
+        ),
+        DataCell(
+          _buildSheetPriceField(
+            context: context,
+            controller: sc,
+            initial: _initialSales[id] ?? '',
+            enabled: canEdit,
+          ),
+        ),
+        DataCell(
+          _buildSheetPriceField(
+            context: context,
+            controller: pc,
+            initial: _initialPurchase[id] ?? '',
+            enabled: canEdit,
+          ),
+        ),
+        ..._columnOrder.map((piid) {
+          final key = _piKey(id, piid);
+          final c = _priceItemControllers[key];
+          if (c == null) {
+            return DataCell(
+              Align(
+                alignment: AlignmentDirectional.centerEnd,
+                child: Text('—', style: theme.textTheme.bodyMedium?.copyWith(color: cs.outline)),
               ),
-              child: DataTableTheme(
-                data: DataTableThemeData(
-                  headingRowHeight: 46,
-                  dataRowMinHeight: 72,
-                  horizontalMargin: 18,
-                  columnSpacing: 20,
-                  dividerThickness: 0.6,
-                  headingRowColor: WidgetStateProperty.all(cs.surfaceContainerHigh.withValues(alpha: 0.85)),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.45)),
-                  ),
-                ),
-                child: DataTable(
-                  clipBehavior: Clip.antiAlias,
-                  columns: [
-                    DataColumn(
-                      label: Text(
-                        t.bulkProductPricesSheetCode,
-                        style: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w700),
-                      ),
-                    ),
-                    DataColumn(
-                      label: SizedBox(
-                        width: 200,
-                        child: Text(
-                          t.bulkProductPricesSheetName,
-                          style: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w700),
-                        ),
-                      ),
-                    ),
-                    DataColumn(
-                      label: Text(t.salesPrice, style: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w700)),
-                    ),
-                    DataColumn(
-                      label: Text(t.purchasePrice, style: theme.textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w700)),
-                    ),
-                    ..._columnOrder.map(
-                      (piid) => DataColumn(
-                        label: SizedBox(
-                          width: 132,
-                          child: Text(
-                            _columnLabels[piid] ?? '$piid',
-                            maxLines: 3,
-                            overflow: TextOverflow.ellipsis,
-                            style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w600),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                  rows: _rows.where((r) => _parseId(r['id']) != null).map((row) {
-                    final id = _parseId(row['id'])!;
-                    final sc = _salesControllers[id];
-                    final pc = _purchaseControllers[id];
-                    if (sc == null || pc == null) {
-                      return DataRow(
-                        cells: [
-                          DataCell(Text(row['code']?.toString() ?? '')),
-                          DataCell(Text(row['name']?.toString() ?? '')),
-                          const DataCell(Text('')),
-                          const DataCell(Text('')),
-                          ..._columnOrder.map((_) => const DataCell(Text(''))),
-                        ],
-                      );
-                    }
-                    return DataRow(
-                      cells: [
-                        DataCell(Text(row['code']?.toString() ?? '', style: theme.textTheme.bodyMedium)),
-                        DataCell(
-                          SizedBox(
-                            width: 208,
-                            child: Text(
-                              row['name']?.toString() ?? '',
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: theme.textTheme.bodyMedium,
-                            ),
-                          ),
-                        ),
-                        DataCell(
-                          SizedBox(width: 148, child: _buildPriceField(context: context, controller: sc, enabled: canEdit)),
-                        ),
-                        DataCell(
-                          SizedBox(width: 148, child: _buildPriceField(context: context, controller: pc, enabled: canEdit)),
-                        ),
-                        ..._columnOrder.map((piid) {
-                          final key = _piKey(id, piid);
-                          final c = _priceItemControllers[key];
-                          if (c == null) {
-                            return const DataCell(Text('—'));
-                          }
-                          final updated = _priceItemUpdatedAt[key];
-                          return DataCell(
-                            _buildPriceListCell(
-                              context,
-                              controller: c,
-                              enabled: canEdit,
-                              updatedAtDisplay: updated,
-                            ),
-                          );
-                        }),
-                      ],
-                    );
-                  }).toList(),
-                ),
-              ),
+            );
+          }
+          return DataCell(
+            _buildSheetPriceField(
+              context: context,
+              controller: c,
+              initial: _priceItemInitial[key] ?? '',
+              enabled: canEdit,
+              tooltip: _priceItemUpdatedAt[key],
             ),
+          );
+        }),
+      ],
+    );
+  }
+
+  Widget _buildFooterBar(
+    BuildContext context,
+    AppLocalizations t,
+    bool canEdit,
+    bool hasMore,
+    bool hasPrev,
+    int dirtyCount,
+  ) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final compact = ResponsiveHelper.isMobile(context);
+
+    return Material(
+      color: cs.surface,
+      elevation: 2,
+      shadowColor: cs.shadow.withValues(alpha: 0.12),
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  _paginationSummary(t),
+                  style: theme.textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+              if (dirtyCount > 0 && !compact) ...[
+                const SizedBox(width: 8),
+                Chip(
+                  visualDensity: VisualDensity.compact,
+                  avatar: Icon(Icons.edit_outlined, size: 16, color: cs.onTertiaryContainer),
+                  label: Text(t.bulkProductPricesSheetDirtyCount(dirtyCount)),
+                  backgroundColor: cs.tertiaryContainer,
+                  labelStyle: theme.textTheme.labelMedium?.copyWith(
+                    color: cs.onTertiaryContainer,
+                    fontWeight: FontWeight.w700,
+                  ),
+                  side: BorderSide.none,
+                ),
+              ],
+              if (canEdit) ...[
+                const SizedBox(width: 8),
+                if (compact)
+                  IconButton.filled(
+                    tooltip: dirtyCount > 0
+                        ? t.bulkProductPricesSheetDirtyCount(dirtyCount)
+                        : t.bulkProductPricesSheetSave,
+                    onPressed: _loading ? null : _savePage,
+                    icon: Badge(
+                      isLabelVisible: dirtyCount > 0,
+                      label: Text('$dirtyCount'),
+                      child: const Icon(Icons.save_outlined, size: 20),
+                    ),
+                  )
+                else
+                  FilledButton.icon(
+                    onPressed: _loading ? null : _savePage,
+                    icon: const Icon(Icons.save_outlined, size: 18),
+                    label: Text(t.bulkProductPricesSheetSave),
+                  ),
+              ],
+              const SizedBox(width: 8),
+              IconButton.filledTonal(
+                tooltip: t.bulkProductPricesSheetPrev,
+                onPressed: !hasPrev || _loading
+                    ? null
+                    : () {
+                        _runAfterDirtyCheck(() {
+                          _skip = (_skip - _pageSize).clamp(0, 1 << 30);
+                          _loadPage();
+                        });
+                      },
+                icon: const Icon(Icons.chevron_right_rounded),
+              ),
+              const SizedBox(width: 4),
+              IconButton.filledTonal(
+                tooltip: t.bulkProductPricesSheetNext,
+                onPressed: !hasMore || _loading
+                    ? null
+                    : () {
+                        _runAfterDirtyCheck(() {
+                          _skip += _pageSize;
+                          _loadPage();
+                        });
+                      },
+                icon: const Icon(Icons.chevron_left_rounded),
+              ),
+            ],
           ),
         ),
       ),
@@ -1125,15 +1180,6 @@ class _ProductBulkPricesSheetPageState extends State<ProductBulkPricesSheetPage>
             onPressed: _loading ? null : _importExcel,
             icon: const Icon(Icons.upload_outlined),
           ),
-        if (canEdit)
-          Padding(
-            padding: const EdgeInsetsDirectional.only(start: 4, end: 10),
-            child: FilledButton.icon(
-              onPressed: _loading ? null : _savePage,
-              icon: const Icon(Icons.save_outlined, size: 20),
-              label: Text(t.bulkProductPricesSheetSave),
-            ),
-          ),
       ];
     }
 
@@ -1150,9 +1196,7 @@ class _ProductBulkPricesSheetPageState extends State<ProductBulkPricesSheetPage>
           tooltip: t.bulkProductPricesSheetMoreActions,
           icon: const Icon(Icons.more_vert_rounded),
           onSelected: (v) {
-            if (v == 'save') {
-              _savePage();
-            } else if (v == 'import') {
+            if (v == 'import') {
               _importExcel();
             }
           },
@@ -1163,14 +1207,6 @@ class _ProductBulkPricesSheetPageState extends State<ProductBulkPricesSheetPage>
                 contentPadding: EdgeInsets.zero,
                 leading: const Icon(Icons.upload_file_outlined),
                 title: Text(t.bulkProductPricesSheetImportExcel),
-              ),
-            ),
-            PopupMenuItem(
-              value: 'save',
-              child: ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: const Icon(Icons.save_outlined),
-                title: Text(t.bulkProductPricesSheetSave),
               ),
             ),
           ],
@@ -1188,7 +1224,10 @@ class _ProductBulkPricesSheetPageState extends State<ProductBulkPricesSheetPage>
 
     if (!widget.authStore.hasBusinessPermission('products', 'view')) {
       return Scaffold(
-        appBar: AppBar(title: Text(t.bulkProductPricesSheetTitle)),
+        appBar: AppBar(
+          title: Text(t.bulkProductPricesSheetTitle),
+          leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
+        ),
         body: Center(
           child: Padding(
             padding: const EdgeInsets.all(24),
@@ -1211,128 +1250,83 @@ class _ProductBulkPricesSheetPageState extends State<ProductBulkPricesSheetPage>
     final hasPrev = _skip > 0;
     final outerPad = ResponsiveHelper.getPadding(context);
     final compactToolbar = ResponsiveHelper.isMobile(context);
-    final cardLayout = _useCardLayout(context);
+    final dirtyCount = _dirtyCellCount();
 
     return Scaffold(
       backgroundColor: cs.surfaceContainerLowest,
       appBar: AppBar(
         elevation: 0,
-        scrolledUnderElevation: 1,
+        scrolledUnderElevation: 0,
         title: Text(t.bulkProductPricesSheetTitle),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_rounded),
-          onPressed: () => context.pop(),
-        ),
+        leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
         actions: _buildAppBarActions(t, canEdit, compactToolbar),
       ),
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          Padding(
+            padding: EdgeInsets.fromLTRB(outerPad, 8, outerPad, 8),
+            child: _buildToolbar(context, t),
+          ),
+          if (_loadError != null)
+            Padding(
+              padding: EdgeInsets.symmetric(horizontal: outerPad),
+              child: _buildErrorBanner(context, t),
+            ),
           Expanded(
-            child: Stack(
-              children: [
-                AbsorbPointer(
-                  absorbing: _loading,
-                  child: CustomScrollView(
-                    slivers: [
-                      SliverPadding(
-                        padding: EdgeInsets.fromLTRB(outerPad, outerPad, outerPad, 8),
-                        sliver: SliverToBoxAdapter(
-                          child: _buildFilterCard(context, t),
-                        ),
-                      ),
-                      if (_loadError != null)
-                        SliverToBoxAdapter(child: _buildErrorBanner(context, t)),
-                      if (cardLayout && !_loading)
-                        SliverPadding(
-                          padding: EdgeInsets.fromLTRB(outerPad, 0, outerPad, outerPad),
-                          sliver: SliverToBoxAdapter(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                Row(
-                                  children: [
-                                    Icon(Icons.grid_view_rounded, size: 20, color: cs.primary),
-                                    const SizedBox(width: 8),
-                                    Text(
-                                      t.bulkProductPricesSheetTableSection,
-                                      style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 10),
-                                ..._rows.map((row) => _buildMobileProductCard(context, t, row, canEdit)),
-                                if (_rows.isEmpty) SizedBox(height: MediaQuery.sizeOf(context).height * 0.15, child: _buildEmptyState(context, t)),
-                                _buildPaginationFooter(context, t, hasMore, hasPrev),
-                              ],
-                            ),
-                          ),
-                        ),
-                      if (!cardLayout && !_loading)
-                        SliverPadding(
-                          padding: EdgeInsets.fromLTRB(outerPad, 0, outerPad, outerPad),
-                          sliver: SliverToBoxAdapter(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.stretch,
-                              children: [
-                                Row(
-                                  children: [
-                                    Icon(Icons.table_rows_rounded, size: 20, color: cs.primary),
-                                    const SizedBox(width: 8),
-                                    Text(
-                                      t.bulkProductPricesSheetTableSection,
-                                      style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 10),
-                                Center(
-                                  child: ConstrainedBox(
-                                    constraints: const BoxConstraints(maxWidth: 1680),
-                                    child: _rows.isEmpty ? _buildEmptyState(context, t) : _buildDesktopTable(context, t, canEdit),
-                                  ),
-                                ),
-                                _buildPaginationFooter(context, t, hasMore, hasPrev),
-                              ],
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(outerPad, 0, outerPad, 0),
+              child: Card(
+                margin: EdgeInsets.zero,
+                elevation: 0,
+                clipBehavior: Clip.antiAlias,
+                color: cs.surface,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  side: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.5)),
                 ),
-                if (_loading)
-                  Positioned.fill(
-                    child: Material(
-                      color: cs.scrim.withValues(alpha: 0.18),
-                      child: Center(
-                        child: Card(
-                          elevation: 4,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 22),
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const SizedBox(
-                                  width: 36,
-                                  height: 36,
-                                  child: CircularProgressIndicator(strokeWidth: 3),
-                                ),
-                                const SizedBox(height: 14),
-                                Text(
-                                  t.loading,
-                                  style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
-                                ),
-                              ],
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    if (_loading)
+                      const LinearProgressIndicator(minHeight: 2),
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(14, 10, 14, 6),
+                      child: Row(
+                        children: [
+                          Icon(Icons.table_rows_rounded, size: 18, color: cs.primary),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              t.bulkProductPricesSheetTableSection,
+                              style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
                             ),
                           ),
-                        ),
+                          if (!compactToolbar)
+                            Flexible(
+                              child: Text(
+                                t.bulkProductPricesSheetSubtitle,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                textAlign: TextAlign.end,
+                                style: theme.textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                              ),
+                            ),
+                        ],
                       ),
                     ),
-                  ),
-              ],
+                    Expanded(
+                      child: IgnorePointer(
+                        ignoring: _loading,
+                        child: _buildSpreadsheet(context, t, canEdit),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
           ),
+          _buildFooterBar(context, t, canEdit, hasMore, hasPrev, dirtyCount),
         ],
       ),
     );

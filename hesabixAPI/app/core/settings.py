@@ -20,13 +20,13 @@ class Settings(BaseSettings):
 	db_port: int = 5432
 	db_name: str = "hesabix"
 	sqlalchemy_echo: bool = False
-	# DB Pooling - بهینه‌سازی برای مقیاس‌پذیری بالا
-	# بهینه‌سازی برای 24 worker و PostgreSQL با max_connections=300
-	# محاسبه: (تعداد Worker ها * اتصالات مورد نیاز per Worker)
-	# 24 workers * 12 connections = 288 + buffer = 300 (مطابق با max_connections PostgreSQL)
-	# برای استفاده حداکثری از منابع و کمترین زمان پاسخگویی
-	db_pool_size: int = 150  # اتصالات پایه در Pool (50% از max_connections)
-	db_max_overflow: int = 150  # اتصالات اضافی در صورت نیاز (50% از max_connections)
+	# DB Pooling — هر worker Uvicorn pool مستقل دارد.
+	# فرمول: (postgres_max_connections - overhead) / uvicorn_workers ≈ اتصال per worker
+	# با max_connections=300 و 24 worker → ~12 اتصال per worker (8+4)
+	# برای بار بالاتر از PgBouncer (transaction pooling) استفاده شود.
+	uvicorn_workers: int = 24
+	db_pool_size: int = 8
+	db_max_overflow: int = 4
 	db_pool_timeout: int = 30  # Timeout برای Pool (30 ثانیه)
 	db_pool_recycle: int = 1800  # Recycle اتصالات هر 30 دقیقه - بهینه برای جلوگیری از connection leak و بهبود performance
 
@@ -110,6 +110,14 @@ class Settings(BaseSettings):
 	redis_db: int = 0
 	redis_password: str | None = None
 
+	# Softphone Media Edge
+	# api = workerهای عمومی (بدون media_hub زنده)
+	# media_edge = نود واحد Softphone (uvicorn --workers 1)
+	# auto = dev/تست تک‌process (اجازه عملیات media)
+	hesabix_process_role: str = "auto"
+	hesabix_media_edge_url: str = "http://127.0.0.1:8001"
+	hesabix_media_edge_token: str | None = None
+
 	# مانیتورینگ صف اعلان / پیامک (آستانه هشدار در پنل)
 	monitoring_outbox_due_retry_warn: int = 500
 	monitoring_outbox_sms_pending_warn: int = 50
@@ -156,6 +164,8 @@ class Settings(BaseSettings):
 	# Data collection (اختیاری، برای بهبود کیفیت در آینده)
 	voice_data_collection_enabled: bool = False
 	voice_data_collection_dir: str = "/var/lib/hesabix/voice-data"
+	voice_max_concurrent_sessions_per_user: int = 2
+	voice_stt_max_seconds: int = 30
 
 	@property
 	def postgresql_dsn(self) -> str:

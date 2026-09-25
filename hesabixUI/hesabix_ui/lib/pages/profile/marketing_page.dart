@@ -5,6 +5,7 @@ import '../../core/referral_store.dart';
 import '../../core/api_client.dart';
 import '../../core/calendar_controller.dart';
 import '../../widgets/data_table/data_table.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 class MarketingPage extends StatefulWidget {
   final CalendarController calendarController;
@@ -201,7 +202,7 @@ class _MarketingPageState extends State<MarketingPage> {
                                     ),
                                   );
                               },
-                              icon: const Icon(Icons.copy, size: 18),
+                              icon: Icon(Icons.copy, size: 18),
                               label: Text(t.copyLink),
                             ),
                           ],
@@ -211,7 +212,7 @@ class _MarketingPageState extends State<MarketingPage> {
                   ),
                 ),
               ),
-              const SizedBox(height: 24),
+              SizedBox(height: 24),
             ],
             
             // Stats Cards
@@ -224,21 +225,21 @@ class _MarketingPageState extends State<MarketingPage> {
                   value: _todayCount,
                   loading: _loading,
                   icon: Icons.today,
-                  color: Colors.blue,
+                  color: SemanticColorResolver.info(context),
                 ),
                 _StatCard(
                   title: t.thisMonth,
                   value: _monthCount,
                   loading: _loading,
                   icon: Icons.calendar_month,
-                  color: Colors.green,
+                  color: SemanticColorResolver.positive(context),
                 ),
                 _StatCard(
                   title: t.total,
                   value: _totalCount,
                   loading: _loading,
                   icon: Icons.people,
-                  color: Colors.orange,
+                  color: SemanticColorResolver.warning(context),
                 ),
                 _StatCard(
                   title: '${t.dateFrom}-${t.dateTo}',

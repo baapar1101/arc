@@ -13,6 +13,8 @@ import '../../widgets/date_input_field.dart';
 import '../../services/check_service.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
+import '../../core/hesabix_back.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 class CheckReconciliationPage extends StatefulWidget {
   final int businessId;
@@ -75,16 +77,7 @@ class _CheckReconciliationPageState extends State<CheckReconciliationPage> with 
       return Scaffold(
         appBar: AppBar(
           title: const Text('راس‌گیری چک‌ها'),
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back),
-            onPressed: () {
-              if (context.canPop()) {
-                context.pop();
-              } else {
-                context.go('/business/${widget.businessId}/dashboard');
-              }
-            },
-          ),
+          leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
         ),
         body: const Center(child: Text('دسترسی ندارید')),
       );
@@ -93,16 +86,7 @@ class _CheckReconciliationPageState extends State<CheckReconciliationPage> with 
     return Scaffold(
       appBar: AppBar(
         title: const Text('راس‌گیری چک‌ها'),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () {
-            if (context.canPop()) {
-              context.pop();
-            } else {
-              context.go('/business/${widget.businessId}/dashboard');
-            }
-          },
-        ),
+        leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
         bottom: TabBar(
           controller: _tabController,
           tabs: const [
@@ -134,7 +118,7 @@ class _CheckReconciliationPageState extends State<CheckReconciliationPage> with 
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          const Text('انتخاب چک‌ها', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                          Text('انتخاب چک‌ها', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
                           if (_selectedCheckIds.isNotEmpty)
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -152,7 +136,7 @@ class _CheckReconciliationPageState extends State<CheckReconciliationPage> with 
                             ),
                         ],
                       ),
-                      const SizedBox(height: 16),
+                      SizedBox(height: 16),
                       _buildCheckSelectionWidget(),
                     ],
                   ),
@@ -198,15 +182,15 @@ class _CheckReconciliationPageState extends State<CheckReconciliationPage> with 
               // نمایش خطا
               if (_calculationError != null)
                 Card(
-                  color: Colors.red.shade50,
+                  color: SemanticColorResolver.negative(context).withValues(alpha: 0.12),
                   child: Padding(
                     padding: const EdgeInsets.all(16),
                     child: Row(
                       children: [
-                        Icon(Icons.error_outline, color: Colors.red.shade700),
-                        const SizedBox(width: 8),
+                        Icon(Icons.error_outline, color: SemanticColorResolver.negative(context)),
+                        SizedBox(width: 8),
                         Expanded(
-                          child: Text(_calculationError!, style: TextStyle(color: Colors.red.shade700)),
+                          child: Text(_calculationError!, style: TextStyle(color: SemanticColorResolver.negative(context))),
                         ),
                       ],
                     ),
@@ -594,11 +578,11 @@ class _CheckReconciliationPageState extends State<CheckReconciliationPage> with 
         final days = (item['days_to_maturity'] as num?)?.toInt() ?? 0;
 
         final colors = [
-          Colors.blue,
-          Colors.green,
-          Colors.orange,
+          SemanticColorResolver.info(context),
+          SemanticColorResolver.positive(context),
+          SemanticColorResolver.warning(context),
           Colors.purple,
-          Colors.red,
+          SemanticColorResolver.negative(context),
           Colors.teal,
           Colors.pink,
           Colors.indigo,
@@ -1007,13 +991,13 @@ class _CheckReconciliationPageState extends State<CheckReconciliationPage> with 
     final ok = await showGlassDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('حذف جلسه راس‌گیری'),
+        title: Text('حذف جلسه راس‌گیری'),
         content: Text('آیا از حذف جلسه "$name" مطمئن هستید؟'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('خیر')),
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text('خیر')),
           FilledButton(
             onPressed: () => Navigator.pop(ctx, true),
-            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            style: FilledButton.styleFrom(backgroundColor: SemanticColorResolver.negative(context)),
             child: const Text('بله، حذف کن'),
           ),
         ],

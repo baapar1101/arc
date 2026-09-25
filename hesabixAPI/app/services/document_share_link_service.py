@@ -385,6 +385,15 @@ def build_public_payload(
     _enrich_public_invoice_adjustments(db, public_invoice)
     installments = _build_public_installments(public_invoice.get("extra_info") or {})
 
+    is_mc = False
+    try:
+        from app.services.fx_rate_provider_service import business_is_multi_currency
+
+        is_mc = bool(business_is_multi_currency(db, int(link.business_id)))
+    except Exception:
+        fx_t = public_invoice.get("fx_totals") if isinstance(public_invoice.get("fx_totals"), dict) else {}
+        is_mc = bool(fx_t.get("show_dual"))
+
     opts = _link_options(link)
     online_payment: Dict[str, Any] = {
         "enabled": bool(opts.get("online_payment_enabled")),
@@ -409,6 +418,7 @@ def build_public_payload(
             "mobile": getattr(business, "mobile", None),
             "address": getattr(business, "address", None),
             "has_logo": bool(getattr(business, "logo_file_id", None)),
+            "is_multi_currency": is_mc,
         },
         "invoice": public_invoice,
         "installments": installments,

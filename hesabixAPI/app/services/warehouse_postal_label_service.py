@@ -37,14 +37,9 @@ def postal_label_direction(doc_type: Optional[str]) -> str:
 
 
 def _page_size_css(paper_size: str, orientation: str) -> str:
-	ps = (paper_size or "A6").strip() or "A6"
-	ori = (orientation or "portrait").strip().lower()
-	if ori not in ("portrait", "landscape"):
-		ori = "portrait"
-	# ابعاد کاملاً سفارشی (دو مقدار mm) — جهت را جدا نمی‌چسبانیم
-	if "mm" in ps and ps.count("mm") >= 2:
-		return ps
-	return f"{ps} {ori}"
+	from app.services.pdf.page_size import build_page_size_css
+
+	return build_page_size_css(paper_size or "A6", orientation or "portrait")
 
 
 def parse_label_field_flags(query_params: Any) -> Dict[str, bool]:

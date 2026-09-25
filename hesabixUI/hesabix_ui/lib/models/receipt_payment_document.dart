@@ -1,3 +1,5 @@
+import '../core/date_utils.dart';
+
 double _jsonAmountToDouble(dynamic v, [double fallback = 0.0]) {
   if (v == null) return fallback;
   if (v is bool) return fallback;
@@ -95,6 +97,9 @@ class AccountLine {
     this.commission,
     this.extraInfo,
   });
+
+  /// خط کارمزد داخلی سند (کسر از بانک/صندوق و هزینه ۷۰۹۰۲) — جزء پرداخت مشتری نیست.
+  bool get isCommissionLine => extraInfo?['is_commission_line'] == true;
 
   factory AccountLine.fromJson(dynamic json) {
     final m = json is Map ? Map<String, dynamic>.from(json) : <String, dynamic>{};
@@ -220,8 +225,16 @@ class ReceiptPaymentDocument {
       code: json['code'] ?? '',
       businessId: json['business_id'] ?? 0,
       documentType: json['document_type'] ?? '',
-      documentDate: DateTime.tryParse(json['document_date'] ?? '') ?? DateTime.now(),
-      registeredAt: DateTime.tryParse(json['registered_at'] ?? '') ?? DateTime.now(),
+      documentDate: HesabixDateUtils.parseApiDate(
+            json['document_date'],
+            rawValue: json['document_date_raw'],
+          ) ??
+          DateTime.now(),
+      registeredAt: HesabixDateUtils.parseApiDate(
+            json['registered_at'],
+            rawValue: json['registered_at_raw'],
+          ) ??
+          DateTime.now(),
       currencyId: json['currency_id'] ?? 0,
       currencyCode: json['currency_code'],
       createdByUserId: json['created_by_user_id'] ?? 0,
@@ -240,8 +253,16 @@ class ReceiptPaymentDocument {
               .toList() ??
           [],
       personNames: json['person_names'],
-      createdAt: DateTime.tryParse(json['created_at'] ?? '') ?? DateTime.now(),
-      updatedAt: DateTime.tryParse(json['updated_at'] ?? '') ?? DateTime.now(),
+      createdAt: HesabixDateUtils.parseApiDate(
+            json['created_at'],
+            rawValue: json['created_at_raw'],
+          ) ??
+          DateTime.now(),
+      updatedAt: HesabixDateUtils.parseApiDate(
+            json['updated_at'],
+            rawValue: json['updated_at_raw'],
+          ) ??
+          DateTime.now(),
     );
   }
 

@@ -12,6 +12,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart' show debugPrint, kDebugMode;
 import '../../../utils/job_status_utils.dart';
 import '../../../utils/snackbar_helper.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 
 class BusinessBackupPage extends StatefulWidget {
@@ -574,7 +575,7 @@ class _BusinessBackupPageState extends State<BusinessBackupPage> {
           children: [
             Icon(
               isNoPlan ? Icons.info_outline : Icons.warning_amber_rounded,
-              color: isNoPlan ? Colors.blue : Colors.orange,
+              color: isNoPlan ? SemanticColorResolver.info(context) : SemanticColorResolver.warning(context),
               size: 28,
             ),
             const SizedBox(width: 12),
@@ -665,7 +666,7 @@ class _BusinessBackupPageState extends State<BusinessBackupPage> {
             style: theme.textTheme.bodyMedium?.copyWith(
               fontWeight: isHighlight ? FontWeight.bold : FontWeight.normal,
               color: isError 
-                  ? Colors.red 
+                  ? SemanticColorResolver.negative(context) 
                   : isHighlight 
                       ? theme.colorScheme.primary 
                       : theme.colorScheme.onSurface,

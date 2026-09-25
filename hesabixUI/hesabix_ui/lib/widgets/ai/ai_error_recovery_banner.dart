@@ -183,3 +183,73 @@ class AIChatCreditHint extends StatelessWidget {
     );
   }
 }
+
+/// بنر ادامهٔ همان run پس از قطع یا سقف بودجه.
+class AIContinueRunBanner extends StatelessWidget {
+  final VoidCallback onContinue;
+  final VoidCallback? onDismiss;
+  final bool loading;
+  final String? hint;
+
+  const AIContinueRunBanner({
+    super.key,
+    required this.onContinue,
+    this.onDismiss,
+    this.loading = false,
+    this.hint,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: AIChatDesign.contentMaxWidth),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
+              color: scheme.primaryContainer.withValues(alpha: 0.45),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: scheme.primary.withValues(alpha: 0.2)),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.play_circle_outline_rounded, color: scheme.primary, size: 18),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    hint ?? l10n.aiContinueAnalysisHint,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: scheme.onPrimaryContainer,
+                    ),
+                  ),
+                ),
+                TextButton(
+                  onPressed: loading ? null : onContinue,
+                  style: TextButton.styleFrom(
+                    visualDensity: VisualDensity.compact,
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                  ),
+                  child: Text(l10n.aiContinueAnalysis),
+                ),
+                if (onDismiss != null)
+                  IconButton(
+                    tooltip: l10n.aiContinueAnalysisDismiss,
+                    visualDensity: VisualDensity.compact,
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                    onPressed: onDismiss,
+                    icon: Icon(Icons.close_rounded, size: 16, color: scheme.outline),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}

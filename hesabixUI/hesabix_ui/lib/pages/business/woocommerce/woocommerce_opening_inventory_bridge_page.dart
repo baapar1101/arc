@@ -7,6 +7,7 @@ import '../../../services/woocommerce_integration_service.dart';
 import '../../../utils/error_extractor.dart';
 import '../../../utils/snackbar_helper.dart';
 import '../../../widgets/business_subpage_back_leading.dart';
+import 'package:hesabix_ui/config/brand_config.dart';
 
 /// اجرای موجودی اولیه / تراز افتتاحیه روی فروشگاه از طریق API پل (بدون wp-admin).
 class WoocommerceOpeningInventoryBridgePage extends StatefulWidget {
@@ -472,7 +473,7 @@ class _WoocommerceOpeningInventoryBridgePageState
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          Text(t.woocommerceOpeningInvBridgeSubtitle, style: Theme.of(context).textTheme.bodyMedium),
+          Text(t.branded(t.woocommerceOpeningInvBridgeSubtitle), style: Theme.of(context).textTheme.bodyMedium),
           const SizedBox(height: 12),
           if (_invCompleted)
             Card(
@@ -632,7 +633,7 @@ class _WoocommerceOpeningInventoryBridgePageState
             onChanged: _uiLocked ? null : (v) => setState(() => _autoBalance = v),
           ),
           SwitchListTile(
-            title: Text(t.woocommerceOpeningInvDoPostLabel),
+            title: Text(t.branded(t.woocommerceOpeningInvDoPostLabel)),
             value: _doPost,
             onChanged: _uiLocked ? null : (v) => setState(() => _doPost = v),
           ),

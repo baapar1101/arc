@@ -3,12 +3,14 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/core/business_nav.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
+import 'package:hesabix_ui/config/brand_config.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/pages/business/woocommerce/woocommerce_l10n_format.dart';
 import 'package:hesabix_ui/services/woocommerce_integration_service.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table_config.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table_widget.dart';
+import 'package:hesabix_ui/core/hesabix_back.dart';
 
 Widget _reportsWooSettingsPromoCard(BuildContext context, int businessId) {
   final t = AppLocalizations.of(context);
@@ -113,7 +115,7 @@ class _WooCommerceReportsOverviewPageState extends State<WooCommerceReportsOverv
     return Scaffold(
       appBar: AppBar(
         title: Text(t.reportsWooOverviewTitle),
-        leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop()),
+        leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
         actions: _reportsWooAppBarActions(context, t, widget.businessId, _load),
       ),
       body: SafeArea(
@@ -345,7 +347,7 @@ class _WooCommerceRecentOrdersReportPageState extends State<WooCommerceRecentOrd
         TextColumn('billing_email', t.woocommerceColumnBillingEmail),
         TextColumn(
           'hesabix_id',
-          t.woocommerceColumnMarkStreetId,
+          t.branded(t.woocommerceColumnHesabixId),
           sortable: false,
           formatter: (item) {
             if (item is! Map<String, dynamic>) return null;
@@ -383,7 +385,7 @@ class _WooCommerceRecentOrdersReportPageState extends State<WooCommerceRecentOrd
     return Scaffold(
       appBar: AppBar(
         title: Text(t.reportsWooRecentOrdersTitle),
-        leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop()),
+        leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
         actions: _reportsWooAppBarActions(context, t, widget.businessId, _load),
       ),
       body: SafeArea(
@@ -501,7 +503,7 @@ class _WooCommerceCatalogReportPageState extends State<WooCommerceCatalogReportP
         ),
         TextColumn(
           'hesabix_id',
-          t.woocommerceColumnMarkStreetId,
+          t.branded(t.woocommerceColumnHesabixId),
           sortable: false,
           formatter: (item) {
             if (item is! Map<String, dynamic>) return null;
@@ -539,7 +541,7 @@ class _WooCommerceCatalogReportPageState extends State<WooCommerceCatalogReportP
     return Scaffold(
       appBar: AppBar(
         title: Text(t.reportsWooCatalogTitle),
-        leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop()),
+        leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
         actions: _reportsWooAppBarActions(context, t, widget.businessId, _load),
       ),
       body: SafeArea(
@@ -636,7 +638,7 @@ class _WooCommerceBridgeHealthReportPageState extends State<WooCommerceBridgeHea
     return Scaffold(
       appBar: AppBar(
         title: Text(t.reportsWooBridgeTitle),
-        leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.pop()),
+        leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
         actions: _reportsWooAppBarActions(context, t, widget.businessId, _load),
       ),
       body: SafeArea(

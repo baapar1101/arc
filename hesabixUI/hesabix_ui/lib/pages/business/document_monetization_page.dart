@@ -16,6 +16,7 @@ import '../../services/list_filter_preferences_service.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../widgets/business_subpage_back_leading.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 class DocumentMonetizationBusinessPage extends StatefulWidget {
   final int businessId;
@@ -826,17 +827,17 @@ class _DocumentMonetizationBusinessPageState extends State<DocumentMonetizationB
                         FilterOption(
                           value: 'awaiting_payment',
                           label: t.statusAwaitingPayment,
-                          color: Colors.orange,
+                          color: SemanticColorResolver.warning(context),
                         ),
                         FilterOption(
                           value: 'paid',
                           label: t.statusPaid,
-                          color: Colors.green,
+                          color: SemanticColorResolver.positive(context),
                         ),
                         FilterOption(
                           value: 'invoiced',
                           label: t.statusInvoiced,
-                          color: Colors.blue,
+                          color: SemanticColorResolver.info(context),
                         ),
                       ],
                     ),

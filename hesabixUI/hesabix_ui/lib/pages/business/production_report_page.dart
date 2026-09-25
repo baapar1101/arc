@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
 import 'package:hesabix_ui/core/api_client.dart';
+import 'package:hesabix_ui/core/fiscal_year_controller.dart';
 import 'package:hesabix_ui/widgets/date_input_field.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table_widget.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table_config.dart';
@@ -14,6 +15,7 @@ import 'package:hesabix_ui/widgets/data_table/helpers/data_table_utils.dart';
 import 'package:hesabix_ui/widgets/invoice/product_combobox_widget.dart';
 import 'package:hesabix_ui/models/warehouse_model.dart';
 import 'package:hesabix_ui/core/date_utils.dart';
+import 'package:hesabix_ui/core/hesabix_back.dart';
 
 class ProductionReportPage extends StatefulWidget {
   final int businessId;
@@ -55,17 +57,11 @@ class _ProductionReportPageState extends State<ProductionReportPage> {
     try {
       final svc = BusinessDashboardService(ApiClient());
       final items = await svc.listFiscalYears(widget.businessId);
+      final defaultFyId = await FiscalYearController.resolveDefaultId(widget.businessId, items);
       if (!mounted) return;
       setState(() {
         _fiscalYears = items;
-        final current = items.firstWhere(
-          (e) => (e['is_current'] == true),
-          orElse: () => const <String, dynamic>{},
-        );
-        final id = current['id'];
-        if (id is int) {
-          _selectedFiscalYearId = id;
-        }
+        _selectedFiscalYearId = defaultFyId;
       });
     } catch (_) {
       // ignore errors
@@ -80,13 +76,8 @@ class _ProductionReportPageState extends State<ProductionReportPage> {
       setState(() {
         _currencies = items;
         // انتخاب ارز پیش‌فرض
-        if (items.isNotEmpty) {
-          final defaultCurrency = items.firstWhere(
-            (c) => c['is_default'] == true,
-            orElse: () => items.first,
-          );
-          _selectedCurrencyId = defaultCurrency['id'] as int?;
-        }
+        // قرارداد چندارزی: null = همه ارزها → معادل پایه
+        _selectedCurrencyId = null;
       });
     } catch (_) {
       // ignore errors
@@ -235,10 +226,7 @@ class _ProductionReportPageState extends State<ProductionReportPage> {
     return Scaffold(
       backgroundColor: cs.surface,
       appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.pop(),
-        ),
+        leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
         title: Text(t.reportsProductionTitle),
         actions: [
           IconButton(
@@ -331,7 +319,7 @@ class _ProductionReportPageState extends State<ProductionReportPage> {
                       items: [
                         const DropdownMenuItem<int>(
                           value: null,
-                          child: Text('همه ارزها'),
+                          child: Text('همه ارزها (معادل پایه)'),
                         ),
                         ..._currencies.map<DropdownMenuItem<int>>((c) {
                           final id = c['id'] as int?;

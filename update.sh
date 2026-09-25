@@ -6,6 +6,7 @@
 # AI voice (local STT/TTS): scripts/ensure_voice_chat.sh — prompts if deps missing (INSTALL_VOICE in .deploy_env).
 # Requires: API_DOMAIN, UI_DOMAIN, BRANCH, REPO_URL in env or in ${APP_ROOT}/.deploy_env
 # Web build API URL: https if /etc/letsencrypt/live/<API_DOMAIN> exists; else http unless API_PUBLIC_SCHEME is set in env (custom TLS).
+# Telemetry: after success, optional POST to hesabix.ir (HESABIX_TELEMETRY=0 to disable); see scripts/hesabix_telemetry.sh.
 set -euo pipefail
 
 APP_ROOT="${APP_ROOT:-/opt/hesabix}"
@@ -22,6 +23,11 @@ UPDATE_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 if [[ -r "${UPDATE_SCRIPT_DIR}/scripts/mirror_config.sh" ]]; then
   # shellcheck disable=SC1091
   source "${UPDATE_SCRIPT_DIR}/scripts/mirror_config.sh"
+fi
+# shellcheck source=scripts/hesabix_python.sh
+if [[ -r "${UPDATE_SCRIPT_DIR}/scripts/hesabix_python.sh" ]]; then
+  # shellcheck disable=SC1091
+  source "${UPDATE_SCRIPT_DIR}/scripts/hesabix_python.sh"
 fi
 
 # If normal checkout/pull fails (local generated file, merge, diverged branch), realign the clone with remote.
@@ -51,7 +57,7 @@ persist_flutter_path_in_profile_d() {
     return 0
   fi
   cat > "${f}" <<'PROFILE'
-# Hesabix: Flutter در PATH برای شِل‌های login (deploy.sh / update.sh) — ترجیحاً دستی ویرایش نشود.
+# Hesabix: Flutter on PATH for login shells (deploy.sh / update.sh) — prefer not to edit by hand.
 if [ -x /opt/flutter/bin/flutter ]; then
   case ":${PATH}:" in
     *:/opt/flutter/bin:*) ;;
@@ -66,12 +72,12 @@ if [ -x /snap/bin/flutter ]; then
 fi
 PROFILE
   chmod 644 "${f}" 2>/dev/null || true
-  log_ok "Flutter برای شِل‌های login در PATH: ${f}"
+  log_ok "Flutter on PATH for login shells: ${f}"
 
   local marker="# hesabix-flutter-PATH (deploy.sh)"
   if [[ -f /etc/bash.bashrc ]] && ! grep -qF "${marker}" /etc/bash.bashrc 2>/dev/null; then
     printf '\n%s\n[ -r /etc/profile.d/hesabix-flutter.sh ] && . /etc/profile.d/hesabix-flutter.sh\n' "${marker}" >> /etc/bash.bashrc
-    log_ok "شِل تعاملی bash: منبع ${f} به /etc/bash.bashrc اضافه شد."
+    log_ok "Interactive bash sources ${f} via /etc/bash.bashrc."
   fi
 }
 
@@ -85,8 +91,9 @@ configure_pip_hesabix_mirror() {
   fi
   python3 -m pip config --user set global.index "https://p.mirror.hesabix.ir/simple" 2>/dev/null || true
   python3 -m pip config --user set global.index-url "https://p.mirror.hesabix.ir/simple" 2>/dev/null || true
+  python3 -m pip config --user set global.extra-index-url "https://mirrors.aliyun.com/pypi/simple" 2>/dev/null || true
   python3 -m pip config --user set global.trusted-host "p.mirror.hesabix.ir" 2>/dev/null || true
-  log_info "pip user config: Hesabix PyPI (p.mirror.hesabix.ir/simple)"
+  log_info "pip user config: Hesabix PyPI (p.mirror.hesabix.ir/simple) + Aliyun extra-index"
 }
 
 ensure_api_journalctl_env() {
@@ -133,8 +140,23 @@ fi
 DB_PASSWORD=$(cat "${APP_ROOT}/.db_password")
 export DB_PASSWORD
 
+# --- 0. Python / Flutter mirrors (show status + let the operator pick) ---
+if [[ -r "${UPDATE_SCRIPT_DIR}/scripts/lib/hesabix_mirrors.sh" ]]; then
+  # shellcheck source=scripts/lib/hesabix_mirrors.sh
+  source "${UPDATE_SCRIPT_DIR}/scripts/lib/hesabix_mirrors.sh"
+  hesabix_mirrors_prompt_before_update
+  if [[ -f "${APP_ROOT}/.deploy_env" ]]; then
+    set -a
+    # shellcheck source=/dev/null
+    source "${APP_ROOT}/.deploy_env"
+    set +a
+  fi
+  export DB_PASSWORD
+fi
+
 echo "==========================================" | tee -a "${LOG_FILE}"
 log_info "Hesabix update started (repo=${REPO_URL}, branch=${BRANCH})"
+log_info "Mirrors: pip=${PIP_INDEX_URL:-} pub=${PUB_HOSTED_URL:-} storage=${FLUTTER_STORAGE_BASE_URL:-}"
 echo "==========================================" | tee -a "${LOG_FILE}"
 
 # --- 1. Update from repo ---
@@ -146,13 +168,13 @@ if [[ "${current_remote}" != "${REPO_URL}" ]]; then
 fi
 git fetch origin --prune
 if ! git show-ref -q "origin/${BRANCH}"; then
-  log_err "شاخه origin/${BRANCH} روی remote نیست. BRANCH و REPO_URL را در ${APP_ROOT}/.deploy_env بررسی کنید."
+  log_err "origin/${BRANCH} is not on the remote. Check BRANCH and REPO_URL in ${APP_ROOT}/.deploy_env"
   exit 1
 fi
 if git checkout -B "${BRANCH}" "origin/${BRANCH}" && git pull origin "${BRANCH}" --ff-only; then
   :
 else
-  log_info "به‌روزرسانی معمولی Git ناموفق (مثلاً تغییرات محلی یا هم‌نشانی نشدن شاخه). در حال بازیابی با reset --hard..."
+  log_info "Normal git update failed (local changes or diverged branch). Recovering with reset --hard..."
   if ! hesabix_force_sync_origin; then
     exit 1
   fi
@@ -169,6 +191,23 @@ if [[ ! -d "${api_dir}/.venv" ]]; then
   exit 1
 fi
 cd "${api_dir}"
+if declare -F hesabix_resolve_backend_python >/dev/null 2>&1; then
+  backend_python=""
+  if ! backend_python=$(hesabix_resolve_backend_python); then
+    log_info "Python >= 3.11 not found; installing packages..."
+    if ! hesabix_install_backend_python_packages || ! backend_python=$(hesabix_resolve_backend_python); then
+      log_err "hesabix-api requires Python >= 3.11."
+      exit 1
+    fi
+  fi
+  if ! hesabix_ensure_backend_venv "${api_dir}" "${backend_python}"; then
+    log_err "Failed to ensure backend virtualenv with ${backend_python}"
+    exit 1
+  fi
+  if [[ "${HESABIX_VENV_RECREATED:-0}" == "1" ]]; then
+    log_info "Backend virtualenv rebuilt with Python >= 3.11."
+  fi
+fi
 # shellcheck disable=SC1091
 source .venv/bin/activate
 if declare -F hesabix_apply_pip_mirror_env >/dev/null 2>&1; then
@@ -176,10 +215,16 @@ if declare -F hesabix_apply_pip_mirror_env >/dev/null 2>&1; then
 else
   export PIP_INDEX_URL="${PIP_INDEX_URL:-https://p.mirror.hesabix.ir/simple}"
   export PIP_TRUSTED_HOST="${PIP_TRUSTED_HOST:-p.mirror.hesabix.ir}"
+  export PIP_EXTRA_INDEX_URL="${PIP_EXTRA_INDEX_URL:-https://mirrors.aliyun.com/pypi/simple}"
 fi
 log_info "Installing backend deps from PyPI: ${PIP_INDEX_URL}"
-pip install --upgrade pip setuptools wheel -q
-pip install -e . -q
+if declare -F hesabix_pip_cmd_with_fallback >/dev/null 2>&1; then
+  hesabix_pip_cmd_with_fallback pip install --upgrade pip setuptools wheel -q
+  hesabix_pip_cmd_with_fallback pip install -e . -q
+else
+  pip install --upgrade pip setuptools wheel -q
+  pip install -e . -q
+fi
 ensure_voice="${APP_ROOT}/app/scripts/ensure_voice_chat.sh"
 if [[ -f "${ensure_voice}" ]]; then
   chmod +x "${ensure_voice}" 2>/dev/null || true
@@ -199,6 +244,12 @@ if [[ -f "${ensure_pgvector}" ]]; then
   else
     log_info "pgvector package not installed (non-fatal)."
   fi
+fi
+fixup_db="${APP_ROOT}/app/scripts/hesabix_fixup_db_privileges.sh"
+if [[ -f "${fixup_db}" ]]; then
+  chmod +x "${fixup_db}" 2>/dev/null || true
+  log_info "Ensuring hesabix owns public schema objects (Alembic/API access)..."
+  bash "${fixup_db}"
 fi
 # Ensure alembic_version.version_num is VARCHAR(255) for long revision IDs (fixes StringDataRightTruncation)
 log_info "Ensuring alembic_version schema compatibility..."
@@ -232,7 +283,12 @@ if [[ -f "${ensure_secrets}" ]]; then
 fi
 chown -R www-data:www-data "${api_dir}"
 systemctl daemon-reload
-systemctl restart hesabix-api hesabix-rq-worker hesabix-notification-moderation
+# Softphone Media Edge holds media_hub in-memory (workers=1); restart with API when installed.
+_hesabix_restart_units=(hesabix-api hesabix-rq-worker hesabix-notification-moderation)
+if [[ "$(systemctl show hesabix-api-media.service -p LoadState --value 2>/dev/null)" == "loaded" ]]; then
+  _hesabix_restart_units+=(hesabix-api-media)
+fi
+systemctl restart "${_hesabix_restart_units[@]}"
 sleep 3
 for svc in hesabix-api; do
   if ! systemctl is-active --quiet "$svc"; then
@@ -240,6 +296,14 @@ for svc in hesabix-api; do
     exit 1
   fi
 done
+if [[ " ${_hesabix_restart_units[*]} " == *" hesabix-api-media "* ]]; then
+  if ! systemctl is-active --quiet hesabix-api-media; then
+    log_err "Service hesabix-api-media failed to start. Check: journalctl -u hesabix-api-media"
+    exit 1
+  fi
+  log_ok "hesabix-api-media (Softphone Media Edge) restarted."
+fi
+unset _hesabix_restart_units
 log_ok "Backend services restarted."
 
 # --- 3. Flutter: update SDK, build web, deploy (PATH دائمی: /etc/profile.d/hesabix-flutter.sh) ---
@@ -269,6 +333,9 @@ if ! command -v flutter >/dev/null 2>&1; then
   exit 1
 fi
 persist_flutter_path_in_profile_d
+if declare -F hesabix_resolve_flutter_pub_hosted_url >/dev/null 2>&1; then
+  hesabix_resolve_flutter_pub_hosted_url || true
+fi
 if declare -F hesabix_resolve_flutter_storage_base_url >/dev/null 2>&1; then
   hesabix_resolve_flutter_storage_base_url || true
 elif declare -F hesabix_apply_flutter_mirror_env >/dev/null 2>&1; then
@@ -303,9 +370,14 @@ fi
 api_scheme="$(hesabix_resolve_api_public_scheme)"
 api_url="${api_scheme}://${API_DOMAIN}"
 cd "${app_dir}"
+log_info "UI branding: mode=${BRANDING_MODE:-default} dir=${BRANDING_DIR:-/opt/hesabix/branding}"
 if ! env PATH="/opt/flutter/bin:/snap/bin:$PATH" \
     PUB_HOSTED_URL="${PUB_HOSTED_URL:-}" FLUTTER_STORAGE_BASE_URL="${FLUTTER_STORAGE_BASE_URL:-}" \
     SKIP_NGINX_ENSURE=1 \
+    BRANDING_MODE="${BRANDING_MODE:-}" \
+    BRANDING_DIR="${BRANDING_DIR:-}" \
+    APP_NAME_FA="${APP_NAME_FA:-}" \
+    APP_NAME_EN="${APP_NAME_EN:-}" \
     bash build_web.sh --mode release --api-base-url "${api_url}" --clean --install-deps; then
   log_err "Frontend build failed."
   exit 1
@@ -317,6 +389,14 @@ if [[ ! -f "${build_output}/index.html" ]]; then
   exit 1
 fi
 mkdir -p "/var/www/${UI_DOMAIN}"
+if ! command -v rsync >/dev/null 2>&1; then
+  log_info "Installing rsync (required to publish Flutter web build)..."
+  apt-get install -y -qq rsync >/dev/null 2>&1 || true
+fi
+if ! command -v rsync >/dev/null 2>&1; then
+  log_err "rsync is required but not installed. Run: apt-get install -y rsync"
+  exit 1
+fi
 rsync -a --delete "${build_output}/" "/var/www/${UI_DOMAIN}/"
 chown -R www-data:www-data "/var/www/${UI_DOMAIN}"
 log_ok "Frontend built and deployed to /var/www/${UI_DOMAIN}."
@@ -469,3 +549,15 @@ fi
 echo "==========================================" | tee -a "${LOG_FILE}"
 log_ok "Hesabix update completed."
 echo "==========================================" | tee -a "${LOG_FILE}"
+
+# Anonymous update telemetry (non-blocking). Opt out: HESABIX_TELEMETRY=0
+telem_script="${app_dir}/scripts/hesabix_telemetry.sh"
+if [[ -r "${telem_script}" ]]; then
+  # shellcheck source=scripts/hesabix_telemetry.sh
+  # shellcheck disable=SC1090
+  source "${telem_script}"
+  if hesabix_telemetry_enabled; then
+    log_info "Sending anonymous update stats to hesabix.ir (set HESABIX_TELEMETRY=0 to disable)..."
+    hesabix_telemetry_send "update" "update" || true
+  fi
+fi

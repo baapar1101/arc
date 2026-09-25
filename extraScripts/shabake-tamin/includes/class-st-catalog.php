@@ -60,6 +60,12 @@ final class Shabake_Tamin_Catalog {
 			$config['provinceSuggestions'] = false;
 		}
 
+		if ( ! array_key_exists( 'brandFilters', $config ) ) {
+			$config['brandFilters'] = false;
+		} else {
+			$config['brandFilters'] = filter_var( $config['brandFilters'], FILTER_VALIDATE_BOOLEAN );
+		}
+
 		if ( ! array_key_exists( 'showProductDetails', $config ) ) {
 			$config['showProductDetails'] = true;
 		} else {
@@ -100,6 +106,15 @@ final class Shabake_Tamin_Catalog {
 			$city = mb_substr( sanitize_text_field( trim( $city ) ), 0, 100 );
 			if ( '' !== $city ) {
 				$config['city'] = $city;
+			}
+		}
+
+		$brand = $config['brand'] ?? null;
+		$config['brand'] = null;
+		if ( is_string( $brand ) ) {
+			$brand = mb_substr( sanitize_text_field( trim( $brand ) ), 0, 255 );
+			if ( '' !== $brand ) {
+				$config['brand'] = $brand;
 			}
 		}
 

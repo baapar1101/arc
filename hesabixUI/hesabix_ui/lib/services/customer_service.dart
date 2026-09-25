@@ -32,7 +32,7 @@ class CustomerService {
 
       if (response.statusCode == 200) {
         final data = response.data as Map<String, dynamic>;
-        
+
         // تبدیل لیست مشتری‌ها
         final customersJson = data['customers'] as List<dynamic>;
         final customers = customersJson
@@ -52,6 +52,30 @@ class CustomerService {
     } catch (e) {
       throw Exception('خطا در جست‌وجوی مشتری‌ها: $e');
     }
+  }
+
+  /// مشتری موجود را برمی‌گرداند یا پس از بررسی تکراری، مشتری جدید می‌سازد.
+  Future<Map<String, dynamic>> quickResolveCustomer({
+    required int businessId,
+    String? aliasName,
+    String? mobile,
+  }) async {
+    final response = await _apiClient.post(
+      '/api/v1/customers/quick-resolve',
+      data: {
+        'business_id': businessId,
+        if (aliasName != null && aliasName.trim().isNotEmpty)
+          'alias_name': aliasName.trim(),
+        if (mobile != null && mobile.trim().isNotEmpty) 'mobile': mobile.trim(),
+      },
+    );
+    final data = Map<String, dynamic>.from(response.data as Map);
+    final customers = (data['customers'] as List<dynamic>? ?? const [])
+        .map(
+          (json) => Customer.fromJson(Map<String, dynamic>.from(json as Map)),
+        )
+        .toList();
+    return {'customers': customers, 'created': data['created'] == true};
   }
 
   /// دریافت اطلاعات یک مشتری خاص
@@ -87,9 +111,7 @@ class CustomerService {
       final response = await _apiClient.get(
         '/api/v1/customers/access-check',
         query: {'business_id': businessId},
-        options: Options(
-          headers: {'Authorization': 'Bearer $authToken'},
-        ),
+        options: Options(headers: {'Authorization': 'Bearer $authToken'}),
       );
 
       return response.statusCode == 200;

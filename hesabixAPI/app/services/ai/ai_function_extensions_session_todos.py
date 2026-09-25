@@ -95,7 +95,7 @@ def register_session_todo_functions(registry: "AIFunctionRegistry") -> None:
             name="create_session_plan",
             description=(
                 "ساخت برنامهٔ کاری چندمرحله‌ای برای سناریوی پیچیده در همین گفت‌وگو. "
-                "فقط وقتی کار بیش از یک مرغلهٔ مجزا دارد استفاده کن. "
+                "فقط وقتی کار بیش از یک مرحلهٔ مجزا دارد استفاده کن. "
                 "هر آیتم باید title داشته باشد؛ description و linked_tool اختیاری‌اند."
             ),
             parameters_schema={

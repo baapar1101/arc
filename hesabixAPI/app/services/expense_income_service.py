@@ -375,9 +375,9 @@ def create_expense_income(
                 try:
                     account = _get_person_account(db, business_id, int(person_id_val), is_income)
                 except Exception:
-                    account = _get_fixed_account_by_code(db, "20201" if not is_income else "1211")
+                    account = _get_fixed_account_by_code(db, "20201" if not is_income else "10401")
             else:
-                account = _get_fixed_account_by_code(db, "20201" if not is_income else "1211")
+                account = _get_fixed_account_by_code(db, "20201" if not is_income else "10401")
         elif line.get("account_id"):
             account = db.query(Account).filter(
                 and_(
@@ -892,7 +892,24 @@ def update_expense_income(
     document.currency_id = int(currency_id)
     document.fiscal_year_id = fiscal_year.id
     document.description = (data.get("description") or "").strip() or None
-    document.extra_info = data.get("extra_info") if isinstance(data.get("extra_info"), dict) else None
+    if "extra_info" in data:
+        document.extra_info = data.get("extra_info") if isinstance(data.get("extra_info"), dict) else None
+    if "project_id" in data:
+        project_id = data.get("project_id")
+        if project_id:
+            from adapters.db.models.project import Project
+            project = db.query(Project).filter(
+                and_(
+                    Project.id == int(project_id),
+                    Project.business_id == document.business_id,
+                    Project.is_active == True,
+                )
+            ).first()
+            if not project:
+                raise ApiError("PROJECT_NOT_FOUND", "پروژه یافت نشد یا غیرفعال است", http_status=404)
+            document.project_id = int(project_id)
+        else:
+            document.project_id = None
     
     # سطرهای حساب‌های هزینه/درآمد
     for line in item_lines:
@@ -1014,9 +1031,9 @@ def update_expense_income(
                 try:
                     account = _get_person_account(db, document.business_id, int(person_id_val), is_income)
                 except Exception:
-                    account = _get_fixed_account_by_code(db, "20201" if not is_income else "1211")
+                    account = _get_fixed_account_by_code(db, "20201" if not is_income else "10401")
             else:
-                account = _get_fixed_account_by_code(db, "20201" if not is_income else "1211")
+                account = _get_fixed_account_by_code(db, "20201" if not is_income else "10401")
         elif line.get("account_id"):
             account = db.query(Account).filter(
                 and_(
@@ -1522,7 +1539,7 @@ def _get_person_account(
     
     # تعیین کد حساب بر اساس نوع
     if is_receivable:
-        account_code = "1211"  # دریافتنی‌ها
+        account_code = "10401"  # دریافتنی‌ها (هم‌تراز فاکتور فروش)
     else:
         account_code = "20201"  # پرداختنی‌ها
     

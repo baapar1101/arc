@@ -4,6 +4,7 @@ import '../../l10n/app_localizations.dart';
 import '../../services/workflow_service.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 
 /// دیالوگ نمایش Timeline اجرای workflow
@@ -199,7 +200,7 @@ class _WorkflowTimelineDialogState extends State<WorkflowTimelineDialog> {
             Row(
               children: [
                 Icon(_getStatusIcon(status), color: _getStatusColor(status)),
-                const SizedBox(width: 8),
+                SizedBox(width: 8),
                 Text(
                   'وضعیت: $status',
                   style: theme.textTheme.titleMedium?.copyWith(
@@ -247,19 +248,19 @@ class _WorkflowTimelineDialogState extends State<WorkflowTimelineDialog> {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.red[50],
+                  color: SemanticColorResolver.negative(context).withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.red[200]!),
+                  border: Border.all(color: SemanticColorResolver.negative(context).withValues(alpha: 0.35)!),
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.error_outline, color: Colors.red[900], size: 20),
-                    const SizedBox(width: 8),
+                    Icon(Icons.error_outline, color: SemanticColorResolver.negative(context), size: 20),
+                    SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         errorMessage,
                         style: TextStyle(
-                          color: Colors.red[900],
+                          color: SemanticColorResolver.negative(context),
                           fontSize: 13,
                         ),
                       ),
@@ -283,25 +284,25 @@ class _WorkflowTimelineDialogState extends State<WorkflowTimelineDialog> {
             icon: Icons.list,
             label: t.workflowAllLogs,
             value: (summary['total_logs'] as int? ?? 0).toString(),
-            color: Colors.blue,
+            color: SemanticColorResolver.info(context),
           ),
         ),
-        const SizedBox(width: 12),
+        SizedBox(width: 12),
         Expanded(
           child: _buildSummaryCard(
             icon: Icons.account_tree,
             label: t.workflowAllNodes,
             value: (summary['total_nodes'] as int? ?? 0).toString(),
-            color: Colors.green,
+            color: SemanticColorResolver.positive(context),
           ),
         ),
-        const SizedBox(width: 12),
+        SizedBox(width: 12),
         Expanded(
           child: _buildSummaryCard(
             icon: Icons.error,
             label: t.workflowErrors,
             value: (summary['error_count'] as int? ?? 0).toString(),
-            color: Colors.red,
+            color: SemanticColorResolver.negative(context),
           ),
         ),
       ],
@@ -375,7 +376,7 @@ class _WorkflowTimelineDialogState extends State<WorkflowTimelineDialog> {
                     Text(
                       errors.toString(),
                       style: TextStyle(
-                        color: errors > 0 ? Colors.red : null,
+                        color: errors > 0 ? SemanticColorResolver.negative(context) : null,
                         fontWeight: errors > 0 ? FontWeight.bold : null,
                       ),
                     ),
@@ -478,7 +479,7 @@ class _WorkflowTimelineDialogState extends State<WorkflowTimelineDialog> {
                 ),
             ],
           ),
-          const SizedBox(width: 16),
+          SizedBox(width: 16),
           
           // Content
           Expanded(
@@ -507,14 +508,14 @@ class _WorkflowTimelineDialogState extends State<WorkflowTimelineDialog> {
                             vertical: 2,
                           ),
                           decoration: BoxDecoration(
-                            color: Colors.blue[50],
+                            color: SemanticColorResolver.info(context).withValues(alpha: 0.12),
                             borderRadius: BorderRadius.circular(4),
                           ),
                           child: Text(
                             nodeId,
                             style: TextStyle(
                               fontSize: 11,
-                              color: Colors.blue[900],
+                              color: SemanticColorResolver.info(context),
                             ),
                           ),
                         ),
@@ -603,15 +604,15 @@ class _WorkflowTimelineDialogState extends State<WorkflowTimelineDialog> {
     
     switch (nodeType) {
       case 'trigger':
-        color = Colors.blue;
+        color = SemanticColorResolver.info(context);
         icon = Icons.play_circle;
         break;
       case 'action':
-        color = Colors.green;
+        color = SemanticColorResolver.positive(context);
         icon = Icons.play_arrow;
         break;
       case 'condition':
-        color = Colors.orange;
+        color = SemanticColorResolver.warning(context);
         icon = Icons.help_outline;
         break;
       case 'loop':
@@ -650,13 +651,13 @@ class _WorkflowTimelineDialogState extends State<WorkflowTimelineDialog> {
   Color _getLevelColor(String level) {
     switch (level.toLowerCase()) {
       case 'error':
-        return Colors.red;
+        return SemanticColorResolver.negative(context);
       case 'warning':
-        return Colors.orange;
+        return SemanticColorResolver.warning(context);
       case 'debug':
         return Colors.purple;
       default:
-        return Colors.blue;
+        return SemanticColorResolver.info(context);
     }
   }
 
@@ -676,15 +677,15 @@ class _WorkflowTimelineDialogState extends State<WorkflowTimelineDialog> {
   Color _getStatusColor(String? status) {
     switch (status) {
       case 'تکمیل شده':
-        return Colors.green;
+        return SemanticColorResolver.positive(context);
       case 'ناموفق':
-        return Colors.red;
+        return SemanticColorResolver.negative(context);
       case 'در حال اجرا':
-        return Colors.blue;
+        return SemanticColorResolver.info(context);
       case 'لغو شده':
         return Colors.grey;
       default:
-        return Colors.orange;
+        return SemanticColorResolver.warning(context);
     }
   }
 

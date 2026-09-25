@@ -14,8 +14,11 @@ from adapters.db.models.tax_setting import TaxSetting
 from app.core.responses import ApiError
 from app.core.settings import get_settings
 from app.integrations.moadian.client import MoadianClient
-from app.integrations.moadian.invoice_builder import build_invoice_for_moadian
-from app.services.invoice_service import invoice_document_to_dict
+from app.integrations.moadian.invoice_builder import (
+    build_invoice_for_moadian,
+    ensure_person_snapshot_on_document_dict,
+)
+from app.services.invoice_service import invoice_document_to_dict, refresh_invoice_line_tax_snapshots
 from app.services.tax_validation_service import validate_document_for_tax, validate_tax_submission_scenario
 from app.integrations.moadian.utils import extract_moadian_error_message
 from app.services.tax_reference_service import (
@@ -74,21 +77,66 @@ def _extract_inquiry_error_message(item: Dict[str, Any]) -> str | None:
 
 def _apply_inquiry_result_to_document(doc: Document, item: Dict[str, Any], *, now: str) -> None:
     extra = dict(doc.extra_info or {})
+    current_status = str(extra.get("tax_status") or "").strip().lower()
     mapped_status = _map_inquiry_status(item.get("status"))
+    # NOT_FOUND / وضعیت‌های ناشناخته نباید ارسال موفق را به «ارسال نشده» برگردانند.
+    # استعلام فوری بعد از send اغلب NOT_FOUND است چون هنوز در صف پردازش مودیان است.
     if mapped_status:
-        extra["tax_status"] = mapped_status
+        if mapped_status == "failed" or current_status not in _NON_REGRESSIBLE_TAX_STATUSES:
+            extra["tax_status"] = mapped_status
+        elif mapped_status in _NON_REGRESSIBLE_TAX_STATUSES and _tax_status_rank(
+            mapped_status
+        ) >= _tax_status_rank(current_status):
+            extra["tax_status"] = mapped_status
+    elif current_status in ("not_found", "unknown", "") and extra.get("tax_tracking_code"):
+        # پاسخ استعلام بی‌اثر بود ولی کد رهگیری داریم → حداقل «ارسال شده»
+        extra["tax_status"] = "sent"
     error_message = _extract_inquiry_error_message(item)
     status_norm = str(item.get("status") or "").lower()
     if error_message:
         extra["tax_error_message"] = error_message
     elif status_norm in ("failed", "error"):
         extra["tax_error_message"] = extra.get("tax_error_message") or "رد شده توسط سامانه مودیان"
-    elif mapped_status not in ("failed",):
+    elif mapped_status not in ("failed",) and status_norm not in ("not_found", "unknown"):
         extra.pop("tax_error_message", None)
     extra["tax_last_inquiry_at"] = now
     if item.get("raw_data"):
         extra["tax_last_inquiry_response"] = item.get("raw_data")
     doc.extra_info = extra
+
+
+_NON_REGRESSIBLE_TAX_STATUSES = frozenset({"sent", "pending", "finalized", "accepted", "success"})
+
+
+def _tax_status_rank(status: str | None) -> int:
+    """رتبه پیشرفت وضعیت برای جلوگیری از پسرفت هنگام استعلام."""
+    s = str(status or "").strip().lower()
+    return {
+        "not_sent": 0,
+        "not_found": 0,
+        "unknown": 0,
+        "pending": 1,
+        "sent": 2,
+        "finalized": 3,
+        "accepted": 3,
+        "success": 3,
+        "failed": 4,
+    }.get(s, 0)
+
+
+def normalize_stored_tax_status(extra: dict | None) -> str:
+    """
+    وضعیت قابل نمایش/فیلتر در کارپوشه.
+    not_found بعد از دریافت کد رهگیری را به sent نگاشت می‌کند.
+    """
+    extra = extra or {}
+    status = str(extra.get("tax_status") or "").strip().lower()
+    tracking = str(extra.get("tax_tracking_code") or "").strip()
+    if status in ("not_found", "unknown") and tracking:
+        return "sent"
+    if not status:
+        return "sent" if tracking else "not_sent"
+    return status
 
 
 def _resolve_submission_mode(document: Document, submission_mode: str | None) -> str:
@@ -113,6 +161,9 @@ def send_document_to_tax_system(
     ensure_moadian_plugin_active(db, int(document.business_id))
     mode = _resolve_submission_mode(document, submission_mode)
 
+    # snapshot مالیاتی خطوط ممکن است قدیمی باشد (فاکتور قبل از تکمیل کد مالیاتی کالا)
+    refresh_invoice_line_tax_snapshots(db, document)
+
     validation = validate_document_for_tax(db, document)
     if not validation["valid"]:
         raise ApiError(
@@ -134,7 +185,11 @@ def send_document_to_tax_system(
             http_status=400,
         )
 
-    if not (tax_setting.tax_memory_id and tax_setting.private_key and tax_setting.economic_code):
+    if not (
+        tax_setting.tax_memory_id
+        and tax_setting.private_key
+        and tax_setting.economic_code
+    ):
         raise ApiError(
             "TAX_SETTINGS_INCOMPLETE",
             "تنظیمات سامانه مودیان ناقص است. شناسه حافظه، کد اقتصادی و کلید خصوصی الزامی است.",
@@ -159,6 +214,7 @@ def send_document_to_tax_system(
         irtaxid = compute_taxid_for_document(document, tax_setting)
 
     raw_document = invoice_document_to_dict(db, document)
+    raw_document = ensure_person_snapshot_on_document_dict(db, raw_document)
     if mode in ("cancel", "corrective"):
         # صورتحساب ابطال/اصلاح باید taxid جدید داشته باشد؛ مرجع در irtaxid است.
         raw_document["_tax_internal_id_override"] = int(
@@ -571,13 +627,16 @@ def extract_moadian_errors_from_extra(extra: dict | None) -> List[Dict[str, Any]
         if str(top_status or "").upper() == "FAILED" and not errors:
             _add(raw.get("errorCode"), raw.get("errorDetail"))
 
-    return errors
+    from app.integrations.moadian.error_playbook import enrich_moadian_errors
+
+    return enrich_moadian_errors(errors)
 
 
 def build_tax_status_fields_for_api(extra: dict | None) -> Dict[str, Any]:
     """فیلدهای مالیاتی قابل نمایش در لیست/جزئیات."""
     extra = extra or {}
     fields: Dict[str, Any] = {
+        "tax_status": normalize_stored_tax_status(extra),
         "tax_error_message": extra.get("tax_error_message"),
         "tax_last_inquiry_at": extra.get("tax_last_inquiry_at"),
         "tax_moadian_taxid": extra.get("tax_moadian_taxid"),
@@ -613,7 +672,9 @@ def build_tax_failure_details(
         if not details["moadian_errors"]:
             err = _extract_inquiry_error_message(inquiry)
             if err:
-                details["moadian_errors"] = [{"code": None, "message": err}]
+                from app.integrations.moadian.error_playbook import enrich_moadian_errors
+
+                details["moadian_errors"] = enrich_moadian_errors([{"code": None, "message": err}])
     raw_inquiry = extra.get("tax_last_inquiry_response")
     if isinstance(raw_inquiry, dict):
         details["inquiry_response"] = raw_inquiry
@@ -641,15 +702,22 @@ def _enrich_inquiry_result_item(item: Dict[str, Any]) -> Dict[str, Any]:
 def _map_inquiry_status(status: Any) -> str | None:
     if not status:
         return None
-    normalized = str(status).lower()
+    normalized = str(status).strip().lower().replace("-", "_")
     mapping = {
         "sent": "sent",
         "pending": "pending",
+        "inprogress": "pending",
+        "in_progress": "pending",
+        "processing": "pending",
         "finalized": "finalized",
         "accepted": "finalized",
         "success": "finalized",
         "failed": "failed",
         "error": "failed",
+        "rejected": "failed",
+        # هنوز در سامانه قابل استعلام نیست — وضعیت قبلی (معمولاً sent) حفظ شود
+        "not_found": None,
+        "unknown": None,
     }
-    return mapping.get(normalized, normalized or None)
+    return mapping.get(normalized)
 

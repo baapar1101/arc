@@ -4,6 +4,7 @@ import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
 import 'package:hesabix_ui/core/auth_store.dart';
 import 'package:hesabix_ui/core/api_client.dart';
+import 'package:hesabix_ui/core/fiscal_year_controller.dart';
 import 'package:hesabix_ui/core/date_utils.dart';
 import 'package:hesabix_ui/models/document_model.dart';
 import 'package:hesabix_ui/services/document_service.dart';
@@ -21,7 +22,9 @@ import '../../services/business_dashboard_service.dart';
 import '../../models/person_model.dart';
 import '../../widgets/project/project_selector_widget.dart';
 import '../../widgets/invoice/person_combobox_widget.dart';
+import '../../widgets/fx/report_currency_filter_dropdown.dart';
 import '../../services/list_filter_preferences_service.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 /// صفحه لیست اسناد حسابداری (عمومی و اتوماتیک)
 class DocumentsPage extends StatefulWidget {
@@ -70,6 +73,9 @@ class _DocumentsPageState extends State<DocumentsPage> {
 
   int? _selectedProjectId;
   Person? _filterPerson;
+  /// null = همه ارزها (فقط وقتی چندارزی فعال است معنا دارد)
+  int? _filterCurrencyId;
+  bool _currencyFilterTouched = false;
 
   bool _showDesktopFilters = false;
 
@@ -110,15 +116,12 @@ class _DocumentsPageState extends State<DocumentsPage> {
   Future<void> _loadFiscalYears() async {
     try {
       final items = await _dashboardService.listFiscalYears(widget.businessId);
+      final defaultFyId = await FiscalYearController.resolveDefaultId(widget.businessId, items);
       if (!mounted) return;
       setState(() {
         _fiscalYears = items;
-        if (_selectedFiscalYearId == null && _fiscalYears.isNotEmpty) {
-          final current = _fiscalYears.firstWhere(
-            (fy) => fy['is_current'] == true,
-            orElse: () => _fiscalYears.first,
-          );
-          _selectedFiscalYearId = current['id'] as int?;
+        if (_selectedFiscalYearId == null) {
+          _selectedFiscalYearId = defaultFyId;
         }
         _fiscalYearsResolved = true;
       });
@@ -347,7 +350,8 @@ class _DocumentsPageState extends State<DocumentsPage> {
         _toDate != null ||
         _selectedFiscalYearId != null ||
         _selectedProjectId != null ||
-        _filterPerson != null;
+        _filterPerson != null ||
+        (_currencyFilterTouched && widget.authStore.isMultiCurrency);
   }
 
   void _clearExternalFilters() {
@@ -357,6 +361,8 @@ class _DocumentsPageState extends State<DocumentsPage> {
       _toDate = null;
       _selectedProjectId = null;
       _filterPerson = null;
+      _filterCurrencyId = null;
+      _currencyFilterTouched = false;
     });
   }
 
@@ -405,6 +411,15 @@ class _DocumentsPageState extends State<DocumentsPage> {
       chips.add(Chip(
         label: Text(_filterPerson!.displayName),
         avatar: const Icon(Icons.person_outline, size: 16),
+      ));
+    }
+
+    if (widget.authStore.isMultiCurrency && _currencyFilterTouched) {
+      chips.add(Chip(
+        label: Text(
+          _filterCurrencyId == null ? 'همه ارزها' : 'ارز انتخاب‌شده',
+        ),
+        avatar: const Icon(Icons.currency_exchange, size: 16),
       ));
     }
 
@@ -517,6 +532,21 @@ class _DocumentsPageState extends State<DocumentsPage> {
                 searchHint: 'جست‌وجو در اشخاص...',
               ),
             ),
+            if (widget.authStore.isMultiCurrency)
+              ReportCurrencyFilterDropdown(
+                businessId: widget.businessId,
+                isMultiCurrency: true,
+                selectedCurrencyId: _filterCurrencyId,
+                width: 280,
+                dense: true,
+                onChanged: (id) {
+                  setState(() {
+                    _filterCurrencyId = id;
+                    _currencyFilterTouched = true;
+                  });
+                  _refreshData();
+                },
+              ),
           ],
         ),
         const SizedBox(height: 8),
@@ -634,6 +664,7 @@ class _DocumentsPageState extends State<DocumentsPage> {
         if (_selectedFiscalYearId != null) 'fiscal_year_id': _selectedFiscalYearId,
         if (_selectedProjectId != null) 'project_id': _selectedProjectId,
         if (_filterPerson?.id != null) 'person_id': _filterPerson!.id,
+        if (_filterCurrencyId != null) 'currency_id': _filterCurrencyId,
       },
       additionalParams: {
         if (_selectedDocumentType != null)
@@ -645,6 +676,7 @@ class _DocumentsPageState extends State<DocumentsPage> {
         if (_selectedFiscalYearId != null) 'fiscal_year_id': _selectedFiscalYearId,
         if (_selectedProjectId != null) 'project_id': _selectedProjectId,
         if (_filterPerson?.id != null) 'person_id': _filterPerson!.id,
+        if (_filterCurrencyId != null) 'currency_id': _filterCurrencyId!,
       },
       columns: [
         // شماره سند
@@ -729,14 +761,14 @@ class _DocumentsPageState extends State<DocumentsPage> {
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
               decoration: BoxDecoration(
                 color: doc.isProforma
-                    ? Colors.orange.withValues(alpha: 0.1)
-                    : Colors.green.withValues(alpha: 0.1),
+                    ? SemanticColorResolver.warning(context).withValues(alpha: 0.1)
+                    : SemanticColorResolver.positive(context).withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Text(
                 doc.statusText,
                 style: TextStyle(
-                  color: doc.isProforma ? Colors.orange : Colors.green,
+                  color: doc.isProforma ? SemanticColorResolver.warning(context) : SemanticColorResolver.positive(context),
                   fontSize: 11,
                 ),
               ),
@@ -836,15 +868,15 @@ class _DocumentsPageState extends State<DocumentsPage> {
   Color _getDocumentTypeColor(String type) {
     switch (type) {
       case 'manual':
-        return Colors.blue;
+        return SemanticColorResolver.info(context);
       case 'expense':
-        return Colors.red;
+        return SemanticColorResolver.negative(context);
       case 'income':
-        return Colors.green;
+        return SemanticColorResolver.positive(context);
       case 'receipt':
         return Colors.teal;
       case 'payment':
-        return Colors.orange;
+        return SemanticColorResolver.warning(context);
       case 'transfer':
         return Colors.purple;
       case 'invoice':
@@ -915,17 +947,17 @@ class _DocumentsPageState extends State<DocumentsPage> {
     final confirmed = await showGlassDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('تأیید حذف'),
+        title: Text('تأیید حذف'),
         content: Text('آیا از حذف سند ${doc.code} اطمینان دارید؟'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('انصراف'),
+            child: Text('انصراف'),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
+              backgroundColor: SemanticColorResolver.negative(context),
               foregroundColor: Colors.white,
             ),
             child: const Text('حذف'),
@@ -957,18 +989,18 @@ class _DocumentsPageState extends State<DocumentsPage> {
     final confirmed = await showGlassDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('تأیید حذف گروهی'),
+        title: Text('تأیید حذف گروهی'),
         content: Text(
             'آیا از حذف $_selectedCount سند انتخاب شده اطمینان دارید؟\n\nتوجه: فقط اسناد دستی حذف خواهند شد.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('انصراف'),
+            child: Text('انصراف'),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
+              backgroundColor: SemanticColorResolver.negative(context),
               foregroundColor: Colors.white,
             ),
             child: const Text('حذف'),

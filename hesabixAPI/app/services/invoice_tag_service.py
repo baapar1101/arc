@@ -109,6 +109,14 @@ def create_invoice_tag(
 	return _tag_to_dict(t)
 
 
+def _raise_system_tag_protected(action: str) -> None:
+	raise ApiError(
+		"SYSTEM_TAG_PROTECTED",
+		f"برچسب پیش‌فرض قابل {action} نیست",
+		http_status=400,
+	)
+
+
 def update_invoice_tag(
 	db: Session, business_id: int, tag_id: int, data: Dict[str, Any]
 ) -> Dict[str, Any]:
@@ -119,6 +127,21 @@ def update_invoice_tag(
 	)
 	if t is None:
 		raise ApiError("TAG_NOT_FOUND", "برچسب یافت نشد", http_status=404)
+	if t.is_system:
+		if "name" in data and data["name"] is not None:
+			new_name = str(data["name"]).strip()
+			if new_name != t.name:
+				_raise_system_tag_protected("ویرایش")
+		if "is_active" in data and data["is_active"] is not None and not bool(data["is_active"]):
+			_raise_system_tag_protected("حذف")
+		if "color" in data:
+			new_color = (str(data["color"])[:32] if data["color"] is not None else None) or None
+			current_color = (str(t.color)[:32] if t.color is not None else None) or None
+			if new_color != current_color:
+				_raise_system_tag_protected("ویرایش")
+		if "sort_order" in data and data["sort_order"] is not None:
+			if int(data["sort_order"]) != int(t.sort_order or 0):
+				_raise_system_tag_protected("ویرایش")
 	if "name" in data and data["name"] is not None:
 		new_name = str(data["name"]).strip()
 		if not new_name:

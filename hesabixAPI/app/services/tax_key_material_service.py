@@ -237,10 +237,10 @@ def key_material_warnings(
     if pk and not cert:
         warnings.append({
             "code": "CERTIFICATE_MISSING",
-            "level": "warning",
+            "level": "info",
             "message": (
-                "گواهی دیجیتال صادرشده از کارپوشه مودیان در تنظیمات ذخیره نشده است. "
-                "پس از تأیید CSR، فایل گواهی (.crt) را در همین صفحه بارگذاری کنید."
+                "گواهی PEM ذخیره نشده؛ اتصال با API v1 (فقط کلید خصوصی) انجام می‌شود. "
+                "اگر گواهی از مرکز صدور دارید، برای API v2 در فیلد گواهی قرار دهید."
             ),
         })
 

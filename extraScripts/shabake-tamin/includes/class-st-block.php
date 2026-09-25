@@ -83,6 +83,10 @@ final class Shabake_Tamin_Block {
 						'type'    => 'string',
 						'default' => '',
 					),
+					'brand'      => array(
+						'type'    => 'string',
+						'default' => '',
+					),
 					'columns'    => array(
 						'type'    => 'integer',
 						'default' => 4,
@@ -96,6 +100,10 @@ final class Shabake_Tamin_Block {
 						'default' => 20,
 					),
 					'locationFilters' => array(
+						'type'    => 'boolean',
+						'default' => false,
+					),
+					'brandFilters' => array(
 						'type'    => 'boolean',
 						'default' => false,
 					),
@@ -138,10 +146,12 @@ final class Shabake_Tamin_Block {
 			'categoryId'            => isset( $atts['categoryId'] ) ? (int) $atts['categoryId'] : 0,
 			'province'              => isset( $atts['province'] ) ? (string) $atts['province'] : '',
 			'city'                  => isset( $atts['city'] ) ? (string) $atts['city'] : '',
+			'brand'                 => isset( $atts['brand'] ) ? (string) $atts['brand'] : '',
 			'columns'               => isset( $atts['columns'] ) ? (int) $atts['columns'] : 4,
 			'search'                => array_key_exists( 'search', $atts ) ? (bool) $atts['search'] : true,
 			'take'                  => isset( $atts['take'] ) ? (int) $atts['take'] : 20,
 			'locationFilters'       => array_key_exists( 'locationFilters', $atts ) ? (bool) $atts['locationFilters'] : false,
+			'brandFilters'          => array_key_exists( 'brandFilters', $atts ) ? (bool) $atts['brandFilters'] : false,
 			'provinceSuggestions'   => array_key_exists( 'provinceSuggestions', $atts ) ? (bool) $atts['provinceSuggestions'] : true,
 			'showProductDetails'    => array_key_exists( 'showProductDetails', $atts ) ? (bool) $atts['showProductDetails'] : true,
 			'pageLayout'            => array_key_exists( 'pageLayout', $atts ) ? (bool) $atts['pageLayout'] : false,

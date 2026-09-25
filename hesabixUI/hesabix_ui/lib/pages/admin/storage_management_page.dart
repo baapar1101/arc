@@ -5,6 +5,7 @@ import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/widgets/admin/file_storage/storage_config_list_widget.dart';
 import 'package:hesabix_ui/widgets/admin/file_storage/storage_config_form_dialog.dart';
 import 'package:hesabix_ui/widgets/admin/file_storage/storage_share_link_settings_card.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 class AdminStorageManagementPage extends StatefulWidget {
   const AdminStorageManagementPage({super.key});
@@ -86,7 +87,7 @@ class _AdminStorageManagementPageState extends State<AdminStorageManagementPage>
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text('${AppLocalizations.of(context).addStorageConfig} ${AppLocalizations.of(context).save}'),
-              backgroundColor: Colors.green,
+              backgroundColor: SemanticColorResolver.positive(context),
             ),
           );
         },

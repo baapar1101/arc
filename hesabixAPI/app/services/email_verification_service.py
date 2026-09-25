@@ -103,6 +103,14 @@ def send_verification_email(db: Session, user_id: int, email: str, token: str, b
 تیم حسابیکس
 """
 	
+	# رنگ برند از تم پیش‌فرض سیستم
+	try:
+		from app.services.system_settings_service import get_default_theme_id
+		from app.services.theme_brand_colors import primary_hex_for_theme_id
+		brand_hex = primary_hex_for_theme_id(get_default_theme_id(db))
+	except Exception:
+		brand_hex = "#0F4C81"
+
 	html_body = f"""
 <!DOCTYPE html>
 <html dir="rtl" lang="fa">
@@ -113,14 +121,14 @@ def send_verification_email(db: Session, user_id: int, email: str, token: str, b
 </head>
 <body style="font-family: Tahoma, Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
 	<div style="background-color: #f8f9fa; padding: 30px; border-radius: 10px; border: 1px solid #dee2e6;">
-		<h2 style="color: #0F4C81; margin-top: 0;">تایید ایمیل حساب کاربری</h2>
+		<h2 style="color: {brand_hex}; margin-top: 0;">تایید ایمیل حساب کاربری</h2>
 		<p>سلام {user_name}،</p>
 		<p>برای فعال‌سازی حساب کاربری خود در حسابیکس، لطفاً روی دکمه زیر کلیک کنید:</p>
 		<div style="text-align: center; margin: 30px 0;">
-			<a href="{verify_url}" style="background-color: #0F4C81; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block; font-weight: bold;">تایید ایمیل</a>
+			<a href="{verify_url}" style="background-color: {brand_hex}; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block; font-weight: bold;">تایید ایمیل</a>
 		</div>
 		<p style="color: #666; font-size: 14px;">یا می‌توانید لینک زیر را در مرورگر خود کپی کنید:</p>
-		<p style="word-break: break-all; color: #0F4C81; font-size: 12px;">{verify_url}</p>
+		<p style="word-break: break-all; color: {brand_hex}; font-size: 12px;">{verify_url}</p>
 		<p style="color: #666; font-size: 14px; margin-top: 30px;">این لینک تا 24 ساعت معتبر است.</p>
 		<p style="color: #666; font-size: 14px;">اگر شما این درخواست را انجام نداده‌اید، لطفاً این ایمیل را نادیده بگیرید.</p>
 		<hr style="border: none; border-top: 1px solid #dee2e6; margin: 30px 0;">

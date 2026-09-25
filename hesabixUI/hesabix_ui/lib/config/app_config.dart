@@ -15,14 +15,67 @@ class AppConfig {
   ///   روی reverse proxy مسیرهای `/api/*` و `/ws/*` به بک‌اند پاس داده شوند).
   /// - در غیر وب، پیش‌فرض `http://localhost:8000` است.
   static String get apiBaseUrl {
-    final v = _envApiBaseUrl.trim();
-    if (v.isNotEmpty) return v;
+    return resolveApiBaseUrl(
+      configuredValue: _envApiBaseUrl,
+      isWebBuild: kIsWeb,
+      currentUri: Uri.base,
+    );
+  }
 
-    if (kIsWeb) {
-      final u = Uri.base;
+  static bool isLocalWebPreviewHost(String host) {
+    final normalized = host.toLowerCase();
+    if (normalized == 'localhost' ||
+        normalized == '127.0.0.1' ||
+        normalized == '::1') {
+      return true;
+    }
+    // RFC1918 — پیش‌نمایش روی LAN (مثلاً 192.168.x.x:8080)
+    if (RegExp(r'^10\.\d{1,3}\.\d{1,3}\.\d{1,3}$').hasMatch(normalized)) {
+      return true;
+    }
+    if (RegExp(r'^192\.168\.\d{1,3}\.\d{1,3}$').hasMatch(normalized)) {
+      return true;
+    }
+    final match = RegExp(r'^172\.(\d{1,3})\.\d{1,3}\.\d{1,3}$').firstMatch(
+      normalized,
+    );
+    if (match != null) {
+      final second = int.tryParse(match.group(1)!);
+      if (second != null && second >= 16 && second <= 31) return true;
+    }
+    return false;
+  }
+
+  static String resolveApiBaseUrl({
+    required String configuredValue,
+    required bool isWebBuild,
+    required Uri currentUri,
+  }) {
+    final value = configuredValue.trim();
+    if (value.isNotEmpty) return value;
+
+    if (isWebBuild) {
+      final host = currentUri.host.toLowerCase();
+      final isLoopback =
+          host == 'localhost' || host == '127.0.0.1' || host == '::1';
+      // فقط پیش‌نمایش Flutter روی LAN/لوپ‌بک؛ hostname عمومی روی 8080 را
+      // به‌اشتباه به پورت API نفرست.
+      final isLocalPreview =
+          isLoopback ||
+          (currentUri.port == 8080 && isLocalWebPreviewHost(host));
+      if (isLocalPreview) {
+        // Flutter web-server روی 8080 فقط فایل استاتیک سرو می‌کند. فرستادن
+        // درخواست‌های API به همان origin خطا می‌دهد. این تشخیص شامل IP شبکه
+        // نیز هست تا پیش‌نمایش روی دستگاه دیگری API همان میزبان را ببیند.
+        return Uri(
+          scheme: currentUri.scheme,
+          host: currentUri.host,
+          port: 8000,
+        ).origin;
+      }
       // مثال: http://localhost:8080 یا https://arc.hesabix.ir
       // در این حالت انتظار داریم reverse proxy مسیرهای api/ws را route کند.
-      return u.origin;
+      return currentUri.origin;
     }
 
     return 'https://tamastore.ir';
@@ -53,5 +106,3 @@ class AppConfig {
     return '$b/login?reset_token=${Uri.encodeComponent(token)}';
   }
 }
-
-

@@ -191,8 +191,8 @@ class QueryInfo(BaseModel):
 	take: int = Field(
 		default=10, 
 		ge=1, 
-		le=1000, 
-		description="تعداد رکورد در هر صفحه (حداقل 1، حداکثر 1000)",
+		le=100, 
+		description="تعداد رکورد در هر صفحه (حداقل 1، حداکثر 100)",
 		example=20
 	)
 	skip: int = Field(
@@ -241,8 +241,8 @@ class QueryInfo(BaseModel):
 	def validate_take(cls, v):
 		if v < 1:
 			raise ValueError('take باید حداقل 1 باشد')
-		if v > 1000:
-			raise ValueError('take نمی‌تواند بیشتر از 1000 باشد')
+		if v > 100:
+			raise ValueError('take نمی‌تواند بیشتر از 100 باشد')
 		return v
 
 
@@ -342,6 +342,14 @@ class KardexListQuery(QueryInfo):
 	match_mode: Optional[str] = Field(default="any", description="any | all")
 	result_scope: Optional[str] = Field(default="lines_matching", description="دامنه نتیجه کاردکس")
 	include_running_balance: Optional[bool] = False
+	currency_id: Optional[int] = Field(
+		default=None,
+		description="فیلتر ارز سند؛ خالی = همه ارزها (مبالغ می‌توانند معادل پایه باشند)",
+	)
+	amounts_in_base: Optional[bool] = Field(
+		default=None,
+		description="اگر true (یا ارز خالی) مبالغ از debit_base/credit_base نمایش داده شوند",
+	)
 
 
 class WarehouseDocListQuery(QueryInfo):
@@ -863,6 +871,36 @@ class BusinessUpdateRequest(BaseModel):
 		default=None,
 		description="اگر true باشد، حواله انتقال همیشه کنترل کسری کامل دارد",
 	)
+	goods_expense_income_workflow_mode: Optional[str] = Field(
+		default=None,
+		description="simple | two_step — گردش‌کار کالای هزینه/درآمد",
+	)
+	goods_expense_income_auto_post_in_simple_mode: Optional[bool] = Field(
+		default=None,
+		description="در حالت simple، قطعی خودکار در صورت داشتن مجوز post",
+	)
+	goods_expense_income_default_expense_account_code: Optional[str] = Field(
+		default=None,
+		max_length=50,
+		description="کد حساب پیش‌فرض کالای هزینه‌شده (مثلاً 70407)",
+	)
+	goods_expense_income_default_income_account_code: Optional[str] = Field(
+		default=None,
+		max_length=50,
+		description="کد حساب پیش‌فرض کالای درآمدشده (مثلاً 60103)",
+	)
+	goods_expense_income_stock_count_mode: Optional[str] = Field(
+		default=None,
+		description="goods_docs | physical_adjustment | ask",
+	)
+	goods_expense_income_allow_manual_unit_cost: Optional[bool] = Field(
+		default=None,
+		description="اجازه تغییر دستی بهای واحد",
+	)
+	goods_expense_income_require_person: Optional[bool] = Field(
+		default=None,
+		description="الزام انتخاب شخص روی سند",
+	)
 	invoice_global_discount_percent_basis: Optional[str] = Field(
 		default=None,
 		description=(
@@ -885,11 +923,24 @@ class BusinessUpdateRequest(BaseModel):
 		ge=0,
 		description="سقف مبلغ تخفیف کلی (اختیاری)",
 	)
+	display_timezone: Optional[str] = Field(
+		default=None,
+		max_length=80,
+		description="منطقهٔ زمانی نمایش (IANA مثل Asia/Tehran)؛ خالی = پیش‌فرض سیستم",
+	)
 	# تسعیر ارز فاکتور: as_of_source، document_date_effective، when_no_rate
 	fx_revaluation_policy: Optional[Dict[str, Any]] = Field(
 		default=None,
 		description="سیاست تسعیر ارز (JSON): document_date/registered_at، start/end of day، block یا allow_without_fx",
 	)
+
+	@validator("display_timezone", pre=True)
+	def _validate_display_timezone(cls, v):  # noqa: N805
+		if v is None:
+			return None
+		from app.services.business_timezone_service import normalize_business_display_timezone
+
+		return normalize_business_display_timezone(v)
 
 	@validator("fx_revaluation_policy", pre=True)
 	def _validate_fx_revaluation_policy_field(cls, v):  # noqa: N805
@@ -935,6 +986,38 @@ class BusinessUpdateRequest(BaseModel):
 		if s in ("draft",):
 			return "draft"
 		raise ValueError("invoice_warehouse_release_mode نامعتبر است (none، draft یا posted)")
+
+	@validator("goods_expense_income_workflow_mode")
+	def _validate_gei_workflow_mode(cls, v):  # noqa: N805
+		if v is None or v == "":
+			return None
+		s = str(v).strip().lower()
+		if s not in ("simple", "two_step"):
+			raise ValueError("goods_expense_income_workflow_mode باید simple یا two_step باشد")
+		return s
+
+	@validator("goods_expense_income_stock_count_mode")
+	def _validate_gei_stock_count_mode(cls, v):  # noqa: N805
+		if v is None or v == "":
+			return None
+		s = str(v).strip().lower()
+		if s not in ("goods_docs", "physical_adjustment", "ask"):
+			raise ValueError(
+				"goods_expense_income_stock_count_mode باید goods_docs، physical_adjustment یا ask باشد"
+			)
+		return s
+
+	@validator(
+		"goods_expense_income_default_expense_account_code",
+		"goods_expense_income_default_income_account_code",
+	)
+	def _validate_gei_account_code(cls, v):  # noqa: N805
+		if v is None or v == "":
+			return None
+		s = str(v).strip()
+		if not s:
+			raise ValueError("کد حساب نمی‌تواند خالی باشد")
+		return s
 
 	@validator("invoice_purchase_accounting_mode")
 	def _validate_invoice_purchase_accounting_mode(cls, v):  # noqa: N805
@@ -1363,4 +1446,20 @@ class DocumentNumberingSettingResponse(BaseModel):
     class Config:
         from_attributes = True
 
+
+class DocumentCodeReservationRequest(BaseModel):
+    document_type: str = Field(..., description="نوع سند فاکتور (invoice_sales, ...)")
+    document_date: str = Field(..., description="تاریخ سند به فرمت YYYY-MM-DD")
+
+
+class DocumentCodeReservationResponse(BaseModel):
+    reservation_id: str
+    code: str
+    document_type: str
+    document_date: str
+    expires_at: Optional[str] = None
+    status: str
+
+    class Config:
+        from_attributes = True
 

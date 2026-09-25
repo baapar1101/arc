@@ -4,6 +4,9 @@ class ProductAttributeService {
   final ApiClient _apiClient;
   ProductAttributeService({ApiClient? apiClient}) : _apiClient = apiClient ?? ApiClient();
 
+  /// API [QueryInfo.take] max is 100.
+  static const int maxTake = 100;
+
   Future<Map<String, dynamic>> search({
     required int businessId,
     int page = 1,
@@ -12,9 +15,10 @@ class ProductAttributeService {
     String? sortBy,
     bool sortDesc = true,
   }) async {
+    final take = limit.clamp(1, maxTake);
     final body = <String, dynamic>{
-      'take': limit,
-      'skip': (page - 1) * limit,
+      'take': take,
+      'skip': (page - 1) * take,
       'sort_desc': sortDesc,
     };
     if (search != null && search.isNotEmpty) body['search'] = search;
@@ -25,6 +29,39 @@ class ProductAttributeService {
       data: body,
     );
     return Map<String, dynamic>.from(res.data?['data'] ?? const {});
+  }
+
+  /// Fetch attribute definitions by id (avoids search take>100 validation errors).
+  Future<List<Map<String, dynamic>>> getByIds({
+    required int businessId,
+    required Iterable<dynamic> ids,
+  }) async {
+    final uniqueIds = <int>{};
+    for (final raw in ids) {
+      final id = raw is int
+          ? raw
+          : raw is num
+              ? raw.toInt()
+              : int.tryParse(raw.toString());
+      if (id != null && id > 0) uniqueIds.add(id);
+    }
+    if (uniqueIds.isEmpty) return [];
+
+    final results = await Future.wait(
+      uniqueIds.map((id) async {
+        try {
+          return await getOne(businessId: businessId, id: id);
+        } catch (_) {
+          return <String, dynamic>{};
+        }
+      }),
+    );
+
+    final items = results.where((m) => m.isNotEmpty).toList();
+    items.sort(
+      (a, b) => ((a['id'] as num?)?.toInt() ?? 0).compareTo((b['id'] as num?)?.toInt() ?? 0),
+    );
+    return items;
   }
 
   Future<Map<String, dynamic>> create({

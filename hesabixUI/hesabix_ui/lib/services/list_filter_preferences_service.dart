@@ -31,6 +31,7 @@ abstract class ListFilterPageIds {
   static const String expenseIncomeTable = 'expense_income_table';
   static const String warrantyCodesTable = 'warranty_codes_table';
   static const String productAttributesTable = 'product_attributes_table';
+  static const String catalogSpecFieldsTable = 'catalog_spec_fields_table';
   static const String taxWorkspaceTable = 'tax_workspace_table';
   static const String currencyRevaluationRatesTable = 'currency_revaluation_rates_table';
   static const String interWarehouseTransfersReportTable =

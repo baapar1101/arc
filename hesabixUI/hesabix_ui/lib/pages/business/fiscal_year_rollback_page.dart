@@ -10,6 +10,7 @@ import 'package:hesabix_ui/services/backup_service.dart';
 import 'package:hesabix_ui/services/business_ftp_backup_service.dart';
 import 'package:hesabix_ui/services/fiscal_year_rollback_service.dart';
 import 'package:hesabix_ui/utils/snackbar_helper.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 /// حذف سال مالی جاری و بازگشت به سال قبل (عملیات خطرناک).
 class FiscalYearRollbackPage extends StatefulWidget {
@@ -134,7 +135,7 @@ class _FiscalYearRollbackPageState extends State<FiscalYearRollbackPage> {
             ),
             FilledButton(
               onPressed: () => Navigator.pop(ctx, true),
-              style: FilledButton.styleFrom(backgroundColor: Colors.red),
+              style: FilledButton.styleFrom(backgroundColor: SemanticColorResolver.negative(context)),
               child: Text(d.fiscalYearRollbackConfirmDelete),
             ),
           ],
@@ -259,7 +260,7 @@ class _FiscalYearRollbackPageState extends State<FiscalYearRollbackPage> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(_error!, textAlign: TextAlign.center),
-                        const SizedBox(height: 16),
+                        SizedBox(height: 16),
                         FilledButton(onPressed: _load, child: Text(t.fiscalYearRollbackRetry)),
                       ],
                     ),
@@ -271,12 +272,12 @@ class _FiscalYearRollbackPageState extends State<FiscalYearRollbackPage> {
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
                       Card(
-                        color: Colors.orange.shade50,
+                        color: SemanticColorResolver.warning(context).withValues(alpha: 0.12),
                         child: Padding(
                           padding: const EdgeInsets.all(16),
                           child: Row(
                             children: [
-                              Icon(Icons.warning_amber_rounded, color: Colors.orange.shade800),
+                              Icon(Icons.warning_amber_rounded, color: SemanticColorResolver.warning(context)),
                               const SizedBox(width: 12),
                               Expanded(
                                 child: Text(t.fiscalYearRollbackWarningCard),
@@ -343,7 +344,7 @@ class _FiscalYearRollbackPageState extends State<FiscalYearRollbackPage> {
                                       onPressed: _executing
                                           ? null
                                           : () => context.go('/business/${widget.businessId}/settings/backup'),
-                                      icon: const Icon(Icons.open_in_new, size: 18),
+                                      icon: Icon(Icons.open_in_new, size: 18),
                                       label: Text(t.fiscalYearRollbackOpenBackupPage),
                                     ),
                                   ),
@@ -379,7 +380,7 @@ class _FiscalYearRollbackPageState extends State<FiscalYearRollbackPage> {
                           ),
                         ),
                         if (_executing && _phaseMessage != null) ...[
-                          const SizedBox(height: 12),
+                          SizedBox(height: 12),
                           LinearProgressIndicator(
                             value: _backupProgress > 0 ? _backupProgress / 100.0 : null,
                           ),
@@ -389,9 +390,9 @@ class _FiscalYearRollbackPageState extends State<FiscalYearRollbackPage> {
                         const SizedBox(height: 16),
                         FilledButton(
                           onPressed: _executing ? null : _execute,
-                          style: FilledButton.styleFrom(backgroundColor: Colors.red),
+                          style: FilledButton.styleFrom(backgroundColor: SemanticColorResolver.negative(context)),
                           child: _executing
-                              ? const SizedBox(
+                              ? SizedBox(
                                   width: 22,
                                   height: 22,
                                   child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
@@ -402,7 +403,7 @@ class _FiscalYearRollbackPageState extends State<FiscalYearRollbackPage> {
                         const SizedBox(height: 24),
                         Text(
                           t.fiscalYearRollbackBlockedTitle,
-                          style: theme.textTheme.titleSmall?.copyWith(color: Colors.red.shade900),
+                          style: theme.textTheme.titleSmall?.copyWith(color: SemanticColorResolver.negative(context)),
                         ),
                         const SizedBox(height: 4),
                         Text(

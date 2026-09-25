@@ -77,6 +77,8 @@ async def notifications_ws(websocket: WebSocket):
 
 
 from adapters.api.v1.crm_chat_ws import router as _crm_chat_ws_router  # noqa: E402
+from adapters.api.v1.support.support_ws import router as _support_ws_router  # noqa: E402
 
 router.include_router(_crm_chat_ws_router)
+router.include_router(_support_ws_router)
 

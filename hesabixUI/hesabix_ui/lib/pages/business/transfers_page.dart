@@ -23,6 +23,7 @@ import '../../widgets/invoice/cash_register_combobox_widget.dart';
 import '../../widgets/invoice/petty_cash_combobox_widget.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
 import 'package:hesabix_ui/services/list_filter_preferences_service.dart';
+import 'package:hesabix_ui/core/fiscal_year_controller.dart';
 
 class TransfersPage extends StatefulWidget {
   final int businessId;
@@ -88,15 +89,12 @@ class _TransfersPageState extends State<TransfersPage> {
   Future<void> _loadFiscalYears() async {
     try {
       final items = await _dashboardService.listFiscalYears(widget.businessId);
+      final defaultFyId = await FiscalYearController.resolveDefaultId(widget.businessId, items);
       if (!mounted) return;
       setState(() {
         _fiscalYears = items;
-        if (_selectedFiscalYearId == null && _fiscalYears.isNotEmpty) {
-          final current = _fiscalYears.firstWhere(
-            (fy) => fy['is_current'] == true,
-            orElse: () => _fiscalYears.first,
-          );
-          _selectedFiscalYearId = current['id'] as int?;
+        if (_selectedFiscalYearId == null) {
+          _selectedFiscalYearId = defaultFyId;
         }
         _fiscalYearsResolved = true;
       });

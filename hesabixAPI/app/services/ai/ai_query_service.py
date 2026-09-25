@@ -9,6 +9,7 @@ from typing import Any, Dict, List, Optional
 from sqlalchemy.orm import Session
 
 from app.core.auth_dependency import AuthContext
+from app.services.ai.ai_constants import AI_LIST_TAKE_DEFAULT, AI_LIST_TAKE_MAX
 
 logger = logging.getLogger(__name__)
 
@@ -25,6 +26,8 @@ _SUPPORTED_ENTITIES_PHASE1 = frozenset({
     "cash_register",
     "fiscal_year",
     "person_transaction",
+    "person",
+    "product",
 })
 SUPPORTED_ENTITIES = _SUPPORTED_ENTITIES_PHASE1
 
@@ -42,6 +45,8 @@ ENTITY_READ_PERMISSIONS: Dict[str, List[str]] = {
     "cash_register": ["cash_registers.view"],
     "fiscal_year": ["fiscal_years.view"],
     "person_transaction": ["persons.read", "reports.read"],
+    "person": ["persons.read"],
+    "product": ["inventory.read"],
 }
 
 
@@ -54,7 +59,12 @@ def _to_int(v: Any, default: Optional[int] = None) -> Optional[int]:
         return default
 
 
-def _clamp_pagination(filters: Dict[str, Any], *, default_take: int = 50, max_take: int = 200) -> Dict[str, Any]:
+def _clamp_pagination(
+    filters: Dict[str, Any],
+    *,
+    default_take: int = AI_LIST_TAKE_DEFAULT,
+    max_take: int = AI_LIST_TAKE_MAX,
+) -> Dict[str, Any]:
     take = max(1, min(_to_int(filters.get("take"), default_take) or default_take, max_take))
     skip = max(0, _to_int(filters.get("skip"), 0) or 0)
     out = dict(filters)
@@ -115,8 +125,18 @@ def query_business_data(
     entity_key = (entity or "").strip().lower()
     action_key = (action or "search").strip().lower()
     if entity_key not in SUPPORTED_ENTITIES:
+        dedicated = {
+            "person": "search_persons",
+            "people": "search_persons",
+            "customer": "search_persons",
+            "product": "search_products",
+            "item": "search_products",
+        }
+        hint = ""
+        if entity_key in dedicated:
+            hint = f" به‌جای این entity از ابزار {dedicated[entity_key]} استفاده کن."
         raise ValueError(
-            f"entity نامعتبر: {entity_key}. مقادیر مجاز: {', '.join(sorted(SUPPORTED_ENTITIES))}"
+            f"entity نامعتبر: {entity_key}. مقادیر مجاز: {', '.join(sorted(SUPPORTED_ENTITIES))}.{hint}"
         )
     if action_key not in SUPPORTED_ACTIONS:
         raise ValueError(
@@ -266,9 +286,32 @@ def _entity_search(
             search=filters.get("search"),
             skip=q["skip"],
             take=q["take"],
+            detail_level=filters.get("detail_level") or "comprehensive",
         )
 
-    raise ValueError(f"entity پیاده‌سازی نشده: {entity}")
+    if entity == "person":
+        from app.services.person_service import get_persons_by_business
+
+        q = _build_list_query(filters, entity=entity)
+        return get_persons_by_business(
+            db,
+            business_id,
+            q,
+            fiscal_year_id=_to_int(filters.get("fiscal_year_id")),
+        )
+
+    if entity == "product":
+        from app.services.product_service import list_products
+
+        q = _build_list_query(filters, entity=entity)
+        if q.get("search") and not q.get("search_fields"):
+            q["search_fields"] = ["code", "name", "barcode"]
+        return list_products(db, business_id, q)
+
+    raise ValueError(
+        f"entity پیاده‌سازی نشده: {entity}. "
+        "برای اشخاص search_persons و برای کالا search_products را صدا بزن."
+    )
 
 
 def _entity_get(
@@ -386,6 +429,28 @@ def _entity_get(
         if not document or document.document_type not in SUPPORTED_INVOICE_TYPES:
             raise ValueError(f"فاکتور {iid} یافت نشد")
         return invoice_document_to_dict(db, document)
+
+    if entity == "person":
+        from app.services.person_service import get_person_by_id
+
+        pid = rid or _to_int(filters.get("person_id") or filters.get("id"))
+        if pid is None:
+            raise ValueError("person_id الزامی است")
+        data = get_person_by_id(db, pid, business_id)
+        if not data:
+            raise ValueError(f"شخص {pid} یافت نشد")
+        return data
+
+    if entity == "product":
+        from app.services.product_service import get_product
+
+        pid = rid or _to_int(filters.get("product_id") or filters.get("id"))
+        if pid is None:
+            raise ValueError("product_id الزامی است")
+        data = get_product(db, pid, business_id)
+        if not data:
+            raise ValueError(f"کالا/خدمت {pid} یافت نشد")
+        return data
 
     if entity == "fiscal_year":
         return get_current_fiscal_year_data(db, business_id)

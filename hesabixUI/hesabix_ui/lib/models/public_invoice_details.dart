@@ -53,8 +53,14 @@ class PublicInvoiceDetails {
       code: json['code']?.toString(),
       businessId: (json['business_id'] as num).toInt(),
       documentType: json['document_type']?.toString(),
-      documentDate: _parseDate(json['document_date']),
-      registeredAt: _parseDate(json['registered_at']),
+      documentDate: HesabixDateUtils.parseApiDate(
+        json['document_date'],
+        rawValue: json['document_date_raw'],
+      ),
+      registeredAt: HesabixDateUtils.parseApiDate(
+        json['registered_at'],
+        rawValue: json['registered_at_raw'],
+      ),
       currencyId: json['currency_id'] as int?,
       currencyCode: json['currency_code']?.toString(),
       createdByUserId: json['created_by_user_id'] as int?,
@@ -72,8 +78,14 @@ class PublicInvoiceDetails {
       discountAmount: _toDouble(json['discount_amount']) ?? 0.0,
       taxAmount: _toDouble(json['tax_amount']) ?? 0.0,
       total: _toDouble(json['total']) ?? 0.0,
-      createdAt: _parseDate(json['created_at']),
-      updatedAt: _parseDate(json['updated_at']),
+      createdAt: HesabixDateUtils.parseApiDate(
+        json['created_at'],
+        rawValue: json['created_at_raw'],
+      ),
+      updatedAt: HesabixDateUtils.parseApiDate(
+        json['updated_at'],
+        rawValue: json['updated_at_raw'],
+      ),
     );
   }
 
@@ -172,14 +184,5 @@ double? _toDouble(dynamic value) {
   if (value == null) return null;
   if (value is num) return value.toDouble();
   return double.tryParse(value.toString());
-}
-
-DateTime? _parseDate(dynamic value) {
-  if (value == null) return null;
-  try {
-    return DateTime.parse(value.toString()).toLocal();
-  } catch (_) {
-    return null;
-  }
 }
 

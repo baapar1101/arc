@@ -14,6 +14,7 @@ import 'package:dio/dio.dart';
 import 'package:go_router/go_router.dart';
 import '../../utils/snackbar_helper.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 class CheckDetailsDialog extends StatefulWidget {
   final int checkId;
@@ -199,7 +200,7 @@ class _CheckDetailsDialogState extends State<CheckDetailsDialog> with SingleTick
       builder: (context) => AlertDialog(
         title: Row(
           children: [
-            Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 28),
+            Icon(Icons.warning_amber_rounded, color: SemanticColorResolver.warning(context), size: 28),
             const SizedBox(width: 12),
             const Expanded(
               child: Text('محدودیت ذخیره‌سازی', style: TextStyle(fontWeight: FontWeight.bold)),
@@ -289,7 +290,7 @@ class _CheckDetailsDialogState extends State<CheckDetailsDialog> with SingleTick
             style: theme.textTheme.bodyMedium?.copyWith(
               fontWeight: isHighlight ? FontWeight.bold : FontWeight.normal,
               color: isError
-                  ? Colors.red
+                  ? SemanticColorResolver.negative(context)
                   : isHighlight
                   ? theme.colorScheme.primary
                   : theme.colorScheme.onSurface,
@@ -333,7 +334,7 @@ class _CheckDetailsDialogState extends State<CheckDetailsDialog> with SingleTick
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(Icons.error_outline, size: 64, color: Colors.red),
+                          Icon(Icons.error_outline, size: 64, color: SemanticColorResolver.negative(context)),
                           const SizedBox(height: 16),
                           Text(_error!),
                           const SizedBox(height: 16),

@@ -24,6 +24,9 @@ get_header();
 			<p class="st-public-hero__tagline">
 				<?php esc_html_e( 'جستجو در کالاهای عمومی، مقایسهٔ قیمت و اطلاعات تأمین‌کنندگان؛ داده از Hesabix.', 'shabake-tamin' ); ?>
 			</p>
+			<p class="st-public-hero__contact-hint">
+				<?php esc_html_e( 'برای تماس مستقیم با تأمین‌کننده، اطلاعات تماس هر کالا را در کارت محصول یا بخش جزئیات ببینید.', 'shabake-tamin' ); ?>
+			</p>
 		</div>
 	</header>
 	<div class="st-public-page__body">

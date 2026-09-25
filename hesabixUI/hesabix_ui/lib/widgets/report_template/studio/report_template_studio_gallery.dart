@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 class ReportTemplateStudioGallery extends StatelessWidget {
   final List<Map<String, dynamic>> items;
@@ -90,10 +91,10 @@ class ReportTemplateStudioGallery extends StatelessWidget {
                           ),
                         ),
                         if (selected)
-                          const Positioned(
+                          Positioned(
                             top: 8,
                             left: 8,
-                            child: Icon(Icons.check_circle, color: Colors.green, size: 22),
+                            child: Icon(Icons.check_circle, color: SemanticColorResolver.positive(context), size: 22),
                           ),
                       ],
                     ),

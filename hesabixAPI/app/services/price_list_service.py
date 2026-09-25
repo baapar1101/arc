@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Dict, Any, Optional
 from sqlalchemy.orm import Session
-from sqlalchemy import and_
+from sqlalchemy import and_, or_
 
 from app.core.responses import ApiError
 from adapters.db.repositories.price_list_repository import PriceListRepository, PriceItemRepository
@@ -118,6 +118,130 @@ def delete_price_item(db: Session, business_id: int, id: int) -> bool:
     if not pl or pl.business_id != business_id:
         return False
     return repo.delete(id)
+
+
+def _resolve_price_list_id(db: Session, business_id: int, item: Dict[str, Any]) -> int:
+    if item.get("price_list_id") is not None and item.get("price_list_id") != "":
+        pl_id = int(item["price_list_id"])
+        pl = db.get(PriceList, pl_id)
+        if not pl or pl.business_id != business_id:
+            raise ApiError("NOT_FOUND", "لیست قیمت یافت نشد", http_status=404)
+        return pl_id
+    name = str(item.get("price_list_name") or "").strip()
+    if not name:
+        raise ApiError(
+            "PRICE_LIST_REQUIRED",
+            "برای ردیف لیست قیمت باید price_list_id یا price_list_name بفرستی",
+            http_status=400,
+        )
+    exact = (
+        db.query(PriceList)
+        .filter(and_(PriceList.business_id == business_id, PriceList.name == name))
+        .all()
+    )
+    if len(exact) == 1:
+        return int(exact[0].id)
+    fuzzy = (
+        db.query(PriceList)
+        .filter(and_(PriceList.business_id == business_id, PriceList.name.ilike(f"%{name}%")))
+        .all()
+    )
+    if len(fuzzy) == 1:
+        return int(fuzzy[0].id)
+    if not fuzzy:
+        raise ApiError(
+            "NOT_FOUND",
+            f"لیست قیمت «{name}» یافت نشد. ابتدا list_price_lists را صدا بزن.",
+            http_status=404,
+        )
+    raise ApiError(
+        "AMBIGUOUS_PRICE_LIST",
+        f"چند لیست قیمت با نام شبیه «{name}» پیدا شد؛ price_list_id بفرست.",
+        http_status=400,
+    )
+
+
+def _resolve_currency_id(db: Session, business_id: int, item: Dict[str, Any]) -> int:
+    from adapters.db.models.business import Business
+    from adapters.db.models.currency import BusinessCurrency, Currency
+
+    if item.get("currency_id") is not None and item.get("currency_id") != "":
+        return int(item["currency_id"])
+    code = str(item.get("currency_code") or "").strip()
+    if code:
+        linked = (
+            db.query(Currency)
+            .join(BusinessCurrency, BusinessCurrency.currency_id == Currency.id)
+            .filter(BusinessCurrency.business_id == business_id)
+            .filter(
+                or_(
+                    Currency.code.ilike(code),
+                    Currency.name.ilike(code),
+                    Currency.title.ilike(code),
+                )
+            )
+            .all()
+        )
+        if len(linked) == 1:
+            return int(linked[0].id)
+        global_rows = (
+            db.query(Currency)
+            .filter(
+                or_(
+                    Currency.code.ilike(code),
+                    Currency.name.ilike(code),
+                    Currency.title.ilike(code),
+                )
+            )
+            .all()
+        )
+        if len(global_rows) == 1:
+            return int(global_rows[0].id)
+        if not linked and not global_rows:
+            raise ApiError(
+                "NOT_FOUND",
+                f"ارز «{code}» یافت نشد. ابتدا list_currencies را صدا بزن.",
+                http_status=404,
+            )
+        raise ApiError(
+            "AMBIGUOUS_CURRENCY",
+            f"چند ارز با کد/نام «{code}» پیدا شد؛ currency_id بفرست.",
+            http_status=400,
+        )
+    biz = db.get(Business, business_id)
+    if biz and biz.default_currency_id:
+        return int(biz.default_currency_id)
+    raise ApiError(
+        "CURRENCY_REQUIRED",
+        "currency_id یا currency_code الزامی است مگر ارز پیش‌فرض کسب‌وکار تنظیم باشد",
+        http_status=400,
+    )
+
+
+def upsert_price_items_for_product(
+    db: Session,
+    business_id: int,
+    product_id: int,
+    items: list[Dict[str, Any]],
+) -> list[Dict[str, Any]]:
+    """همان ذخیرهٔ ردیف‌های لیست قیمت در فرم کالا (upsert به‌ازای هر ردیف)."""
+    applied: list[Dict[str, Any]] = []
+    for item in items:
+        pl_id = _resolve_price_list_id(db, business_id, item)
+        currency_id = _resolve_currency_id(db, business_id, item)
+        payload = PriceItemUpsertRequest(
+            product_id=product_id,
+            currency_id=currency_id,
+            price=item["price"],
+            tier_name=item.get("tier_name"),
+            min_qty=item.get("min_qty") or 0,
+        )
+        result = upsert_price_item(db, business_id, pl_id, payload)
+        row = dict(result.get("data") or {})
+        if item.get("price_list_name"):
+            row["price_list_name"] = item["price_list_name"]
+        applied.append(row)
+    return applied
 
 
 def _pl_to_dict(obj: PriceList) -> Dict[str, Any]:

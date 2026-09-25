@@ -76,6 +76,12 @@ final class Shabake_Tamin_REST {
 							return mb_substr( sanitize_text_field( (string) $v ), 0, 500 );
 						},
 					),
+					'brand'       => array(
+						'type'              => 'string',
+						'sanitize_callback' => function ( $v ) {
+							return mb_substr( sanitize_text_field( (string) $v ), 0, 255 );
+						},
+					),
 					'business_id' => array( 'type' => 'integer' ),
 					'category_id' => array( 'type' => 'integer' ),
 					'province'    => array(
@@ -156,6 +162,10 @@ final class Shabake_Tamin_REST {
 		$search = $req->get_param( 'search' );
 		if ( is_string( $search ) && '' !== trim( $search ) ) {
 			$query['search'] = trim( $search );
+		}
+		$brand = $req->get_param( 'brand' );
+		if ( is_string( $brand ) && '' !== trim( $brand ) ) {
+			$query['brand'] = trim( $brand );
 		}
 		$bid = $req->get_param( 'business_id' );
 		if ( null !== $bid && '' !== $bid ) {

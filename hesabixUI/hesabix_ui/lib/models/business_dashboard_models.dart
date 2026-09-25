@@ -54,20 +54,35 @@ class BusinessStatistics {
   final double totalPurchases;
   final int activeMembers;
   final int recentTransactions;
+  final CurrencyLite? currency;
+  final int? fiscalYearId;
 
   BusinessStatistics({
     required this.totalSales,
     required this.totalPurchases,
     required this.activeMembers,
     required this.recentTransactions,
+    this.currency,
+    this.fiscalYearId,
   });
 
   factory BusinessStatistics.fromJson(Map<String, dynamic> json) {
+    CurrencyLite? currency;
+    final rawCurrency = json['currency'];
+    if (rawCurrency is Map) {
+      try {
+        currency = CurrencyLite.fromJson(Map<String, dynamic>.from(rawCurrency));
+      } catch (_) {
+        currency = null;
+      }
+    }
     return BusinessStatistics(
       totalSales: (json['total_sales'] ?? 0).toDouble(),
       totalPurchases: (json['total_purchases'] ?? 0).toDouble(),
       activeMembers: json['active_members'] ?? 0,
       recentTransactions: json['recent_transactions'] ?? 0,
+      currency: currency,
+      fiscalYearId: (json['fiscal_year_id'] as num?)?.toInt(),
     );
   }
 }
@@ -192,12 +207,14 @@ class CurrencyLite {
   final String code;
   final String title;
   final String symbol;
+  final int decimalPlaces;
 
   CurrencyLite({
     required this.id,
     required this.code,
     required this.title,
     required this.symbol,
+    this.decimalPlaces = 0,
   });
 
   factory CurrencyLite.fromJson(Map<String, dynamic> json) {
@@ -211,8 +228,15 @@ class CurrencyLite {
       code: json['code'] as String? ?? '',
       title: json['title'] as String? ?? '',
       symbol: json['symbol'] as String? ?? '',
+      decimalPlaces: (json['decimal_places'] as num?)?.toInt() ?? 0,
     );
   }
+
+  Map<String, dynamic> toUnitMap() => {
+        'symbol': symbol,
+        'code': code,
+        'title': title,
+      };
 }
 
 class BusinessWithPermission {
@@ -230,6 +254,10 @@ class BusinessWithPermission {
   final Map<String, dynamic> permissions;
   final CurrencyLite? defaultCurrency;
   final List<CurrencyLite> currencies;
+  /// از API: حداقل یک ارز فرعی غیر از ارز اصلی.
+  final bool isMultiCurrency;
+  /// سیاست تسعیر (شامل rate_display_unit برای D2).
+  final Map<String, dynamic>? fxRevaluationPolicy;
   // Soft Delete fields
   final String? deletedAt;
   final String? autoDeleteAt;
@@ -251,6 +279,8 @@ class BusinessWithPermission {
     required this.permissions,
     this.defaultCurrency,
     this.currencies = const <CurrencyLite>[],
+    this.isMultiCurrency = false,
+    this.fxRevaluationPolicy,
     this.deletedAt,
     this.autoDeleteAt,
     this.isDeleted = false,
@@ -268,6 +298,21 @@ class BusinessWithPermission {
       createdAt = '';
     }
 
+    final currencies = (json['currencies'] as List<dynamic>? ?? const [])
+        .map((c) => CurrencyLite.fromJson(Map<String, dynamic>.from(c)))
+        .toList();
+    final defaultCurrency = _parseDefaultCurrency(json['default_currency']);
+    final flagged = json['is_multi_currency'];
+    final bool isMc;
+    if (flagged is bool) {
+      isMc = flagged;
+    } else {
+      // fallback کلاینت: بیش از یک ارز یا ارز غیر از پیش‌فرض
+      isMc = currencies.length > 1 ||
+          (defaultCurrency != null &&
+              currencies.any((c) => c.id != defaultCurrency.id));
+    }
+
     return BusinessWithPermission(
       id: json['id'],
       name: json['name'],
@@ -281,10 +326,12 @@ class BusinessWithPermission {
       isOwner: json['is_owner'] ?? false,
       role: json['role'] ?? 'عضو',
       permissions: Map<String, dynamic>.from(json['permissions'] ?? {}),
-      defaultCurrency: _parseDefaultCurrency(json['default_currency']),
-      currencies: (json['currencies'] as List<dynamic>? ?? const [])
-          .map((c) => CurrencyLite.fromJson(Map<String, dynamic>.from(c)))
-          .toList(),
+      defaultCurrency: defaultCurrency,
+      currencies: currencies,
+      isMultiCurrency: isMc,
+      fxRevaluationPolicy: json['fx_revaluation_policy'] != null
+          ? Map<String, dynamic>.from(json['fx_revaluation_policy'] as Map)
+          : null,
       deletedAt: json['deleted_at'] as String?,
       autoDeleteAt: json['auto_delete_at'] as String?,
       isDeleted: (json['is_deleted'] as bool?) ?? false,

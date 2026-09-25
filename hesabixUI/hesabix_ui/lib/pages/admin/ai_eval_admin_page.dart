@@ -3,6 +3,7 @@ import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/services/ai_service.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
 import 'package:hesabix_ui/utils/snackbar_helper.dart' show SnackBarHelper;
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 /// ارزیابی کیفیت پاسخ AI (regression سناریوها).
 class AIEvalAdminPage extends StatefulWidget {
@@ -240,7 +241,7 @@ class _AIEvalAdminPageState extends State<AIEvalAdminPage> {
                     return ListTile(
                       leading: Icon(
                         passed ? Icons.check_circle : Icons.cancel,
-                        color: passed ? Colors.green : Colors.red,
+                        color: passed ? SemanticColorResolver.positive(context) : SemanticColorResolver.negative(context),
                       ),
                       title: Text(m['case_name'] as String? ?? ''),
                       subtitle: Text('${m['latency_ms']} ms'),

@@ -40,19 +40,18 @@ $telegramBase = rtrim($config['telegram_api_base'] ?? 'https://api.telegram.org'
 $internalWebhook = $config['internal_webhook_url'] ?? null;
 $proxyKey = $config['proxy_api_key'] ?? null;
 
-// لاگ تنظیمات (بدون نمایش کامل مقادیر حساس)
+// لاگ تنظیمات (بدون نمایش مقادیر حساس)
 TelegramProxyLogger::info("Proxy configuration loaded", [
 	'has_bot_token' => !empty($botToken),
-	'bot_token_preview' => $botToken ? substr($botToken, 0, 15) . '...' : null,
+	'bot_id_preview' => ($botToken && strpos($botToken, ':') !== false) ? (explode(':', $botToken, 2)[0] . ':***') : null,
 	'telegram_api_base' => $telegramBase,
 	'has_internal_webhook' => !empty($internalWebhook),
-	'internal_webhook_url' => $internalWebhook, // نمایش کامل URL برای بررسی صحت
+	'internal_webhook_host' => $internalWebhook ? (parse_url($internalWebhook, PHP_URL_HOST) ?: null) : null,
 	'has_proxy_key' => !empty($proxyKey),
-	'proxy_key_preview' => $proxyKey ? substr($proxyKey, 0, 10) . '...' : null,
 ]);
 
 // بررسی تنظیمات ضروری
-if (!$botToken) {
+if (!$botToken || $botToken === 'REPLACE_WITH_BOT_TOKEN') {
 	TelegramProxyLogger::error("Bot token not configured", [
 		'config_keys' => array_keys($config),
 		'bot_token_exists' => isset($config['telegram_bot_token']),
@@ -61,6 +60,27 @@ if (!$botToken) {
 	echo json_encode(['ok' => false, 'error' => 'BOT_TOKEN_NOT_SET']);
 	return;
 }
+
+if (!$proxyKey || $proxyKey === 'REPLACE_WITH_INDEPENDENT_PROXY_API_KEY' || $proxyKey === 'change-me') {
+	TelegramProxyLogger::error("Proxy API key not configured securely");
+	http_response_code(500);
+	echo json_encode(['ok' => false, 'error' => 'PROXY_KEY_NOT_SET']);
+	return;
+}
+
+/** متدهای مجاز Bot API که اپلیکیشن واقعاً استفاده می‌کند */
+$TG_PROXY_ALLOWED_METHODS = [
+	'sendMessage',
+	'sendChatAction',
+	'editMessageText',
+	'editMessageReplyMarkup',
+	'answerCallbackQuery',
+	'setWebhook',
+	'deleteWebhook',
+	'setMyCommands',
+	'getWebhookInfo',
+	'getMe',
+];
 
 // بررسی internal_webhook_url
 if (!$internalWebhook) {
@@ -96,16 +116,24 @@ if (!$internalWebhook) {
 }
 
 function requireAuth(?string $expectedKey): bool {
+	// بدون کلید پیکربندی‌شده، دسترسی مجاز نیست (قبلاً به‌اشتباه true برمی‌گشت)
 	if (!$expectedKey) {
-		return true;
+		http_response_code(500);
+		echo json_encode(['ok' => false, 'error' => 'PROXY_KEY_NOT_SET']);
+		return false;
 	}
 	$headerKey = $_SERVER['HTTP_X_PROXY_KEY'] ?? null;
-	if ($headerKey !== $expectedKey) {
+	if (!is_string($headerKey) || !hash_equals($expectedKey, $headerKey)) {
 		http_response_code(401);
 		echo json_encode(['ok' => false, 'error' => 'INVALID_PROXY_KEY']);
 		return false;
 	}
 	return true;
+}
+
+function isAllowedTelegramMethod(string $method): bool {
+	global $TG_PROXY_ALLOWED_METHODS;
+	return in_array($method, $TG_PROXY_ALLOWED_METHODS ?? [], true);
 }
 
 function readJsonBody(): array {
@@ -399,6 +427,15 @@ if ($path === '/telegram/send' && $_SERVER['REQUEST_METHOD'] === 'POST') {
 	$body = readJsonBody();
 	$method = $body['method'] ?? 'sendMessage';
 	$payload = $body['payload'] ?? [];
+
+	if (!is_string($method) || !isAllowedTelegramMethod($method)) {
+		TelegramProxyLogger::warning("Rejected disallowed Telegram method", [
+			'method' => is_string($method) ? $method : gettype($method),
+		]);
+		http_response_code(403);
+		echo json_encode(['ok' => false, 'error' => 'METHOD_NOT_ALLOWED']);
+		return;
+	}
 	
 	TelegramProxyLogger::info("Proxy request received", [
 		'method' => $method,
@@ -527,7 +564,7 @@ if ($path === '/telegram/send' && $_SERVER['REQUEST_METHOD'] === 'POST') {
 	
 	TelegramProxyLogger::info("Calling Telegram API", [
 		'method' => $method,
-		'telegram_url' => $url,
+		'telegram_host' => $telegramBase,
 		'payload_size' => strlen(json_encode($payload))
 	]);
 	

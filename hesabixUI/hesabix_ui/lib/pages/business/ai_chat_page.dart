@@ -8,12 +8,14 @@ class AIChatPage extends StatelessWidget {
   final int businessId;
   final AuthStore authStore;
   final CalendarController? calendarController;
+  final int? initialSessionId;
 
   const AIChatPage({
     super.key,
     required this.businessId,
     required this.authStore,
     this.calendarController,
+    this.initialSessionId,
   });
 
   @override
@@ -23,6 +25,7 @@ class AIChatPage extends StatelessWidget {
       authStore: authStore,
       calendarController: calendarController,
       embeddedInShell: true,
+      initialSessionId: initialSessionId,
     );
   }
 }

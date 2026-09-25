@@ -165,6 +165,12 @@ String aiToolLabel(AppLocalizations l10n, String toolName, {String? toolKey}) {
       return l10n.aiToolListBasalamSyncedInvoices;
     case 'aiToolListBasalamProductConflicts':
       return l10n.aiToolListBasalamProductConflicts;
+    case 'aiToolSpawnSubagent':
+      return l10n.aiToolSpawnSubagent;
+    case 'aiToolAwaitSubagent':
+      return l10n.aiToolAwaitSubagent;
+    case 'aiToolCancelSubagent':
+      return l10n.aiToolCancelSubagent;
     default:
       return _toolLabelFallbackFa[toolName] ?? l10n.aiToolGeneric;
   }
@@ -295,8 +301,17 @@ String _toolNameToKey(String name) {
     'adjust_customer_club_points': 'aiToolAdjustCustomerClubPoints',
     'recalculate_customer_club_rfm': 'aiToolRecalculateCustomerClubRfm',
     'update_customer_club_settings': 'aiToolUpdateCustomerClubSettings',
+    'spawn_subagent': 'aiToolSpawnSubagent',
+    'await_subagent': 'aiToolAwaitSubagent',
+    'cancel_subagent': 'aiToolCancelSubagent',
     'get_user_memory': 'aiToolGeneric',
     'update_user_memory': 'aiToolGeneric',
+    'list_memory_items': 'aiToolGeneric',
+    'upsert_memory_item': 'aiToolGeneric',
+    'delete_memory_item': 'aiToolGeneric',
+    'read_memory': 'aiToolGeneric',
+    'upsert_memory_entry': 'aiToolGeneric',
+    'delete_memory_entry': 'aiToolGeneric',
   };
   return map[name] ?? 'aiToolGeneric';
 }
@@ -346,7 +361,13 @@ const _toolLabelFallbackFa = <String, String>{
   'recalculate_customer_club_rfm': 'محاسبه مجدد RFM',
   'update_customer_club_settings': 'تنظیمات باشگاه مشتری',
   'get_user_memory': 'خواندن حافظه دستیار',
-  'update_user_memory': 'به‌روزرسانی حافظه دستیار',
+  'update_user_memory': 'به‌روزرسانی دستورات همیشگی',
+  'list_memory_items': 'فهرست حافظه یادگرفته‌شده',
+  'upsert_memory_item': 'ذخیره حقیقت در حافظه',
+  'delete_memory_item': 'حذف حقیقت از حافظه',
+  'read_memory': 'خواندن حافظه دستیار',
+  'upsert_memory_entry': 'ذخیره در حافظه',
+  'delete_memory_entry': 'حذف از حافظه',
 };
 
 /// خلاصهٔ بودجه agent برای نمایش در استریم.
@@ -426,7 +447,7 @@ String aiStreamStatusLabel(
       );
       return l10n.aiStatusRunningTool(label);
     case 'awaiting_approval':
-      return 'منتظر تأیید شما برای اجرای عملیات';
+      return l10n.aiStatusAwaitingApproval;
     case 'preparing_context':
       switch (step) {
         case 'loading_prompt':
@@ -497,6 +518,13 @@ String aiTraceStepTitle(AppLocalizations l10n, AIAgentTraceStep step) {
       );
     case 'aiStatusThinking':
       return l10n.aiStatusThinking;
+    case 'aiTraceReasoning':
+      return l10n.aiTraceReasoning;
+    case 'aiTraceSubagent':
+      final goal = (params['goal'] as String?)?.trim() ?? '';
+      return goal.isEmpty
+          ? l10n.aiSubagentLabel
+          : '${l10n.aiSubagentLabel}: $goal';
     case 'aiStatusLoadingPrompt':
       return l10n.aiStatusLoadingPrompt;
     case 'aiStatusLoadingInsights':
@@ -530,7 +558,16 @@ String aiTraceStepTitle(AppLocalizations l10n, AIAgentTraceStep step) {
         return l10n.aiTraceThought('${step.findingsCount ?? 0}');
       }
       if (step.kind == 'approval') {
-        return 'منتظر تأیید شما';
+        return l10n.aiStatusAwaitingApproval;
+      }
+      if (step.kind == 'subagent') {
+        final goal = params['goal'] as String? ??
+            step.bodyMarkdown ??
+            '';
+        final trimmed = goal.trim();
+        return trimmed.isEmpty
+            ? l10n.aiSubagentLabel
+            : '${l10n.aiSubagentLabel}: $trimmed';
       }
       if (step.tool != null) {
         return aiToolLabel(l10n, step.tool!, toolKey: step.toolKey);
@@ -557,8 +594,25 @@ String aiSessionPlanProgressLabel(
         ? '$completed از $total مرحله انجام شد'
         : '$completed of $total steps done';
 
+String aiSessionPlanSkipLabel(AppLocalizations l10n) =>
+    _isFaLocale(l10n) ? 'رد کردن' : 'Skip';
+
+String aiSessionPlanConfirmLabel(AppLocalizations l10n) =>
+    _isFaLocale(l10n) ? 'انجام شد' : 'Done';
+
 String aiSessionPlanLinkedToolLabel(AppLocalizations l10n, String tool) =>
     _isFaLocale(l10n) ? 'ابزار: $tool' : 'Tool: $tool';
 
 String aiStatusLoadingSessionPlan(AppLocalizations l10n) =>
     _isFaLocale(l10n) ? 'بارگذاری برنامهٔ کاری…' : 'Loading work plan…';
+
+String aiCitationSourcesLabel(AppLocalizations l10n) =>
+    _isFaLocale(l10n) ? 'منابع' : 'Sources';
+
+String aiCitationUngroundedWarning(AppLocalizations l10n) =>
+    _isFaLocale(l10n)
+        ? 'اعداد این پاسخ به رکورد منبع در نتایج ابزار وصل نشد.'
+        : 'Numbers in this answer are not linked to a source record.';
+
+String aiActivatedSkillsLabel(AppLocalizations l10n) =>
+    _isFaLocale(l10n) ? 'مهارت فعال' : 'Active skill';

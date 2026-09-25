@@ -3,14 +3,12 @@
 """
 from __future__ import annotations
 
-import json
 from typing import Any, Dict, List, Optional
 
 from app.services.ai.ai_constants import (
     MAX_HISTORY_MESSAGES,
     MAX_SINGLE_MESSAGE_CHARS,
     MAX_SYSTEM_PROMPT_CHARS,
-    MAX_TOOL_RESULT_JSON_CHARS,
 )
 
 _TRUNC_SUFFIX = "\n\n… [متن کوتاه شد]"
@@ -76,7 +74,11 @@ def trim_messages_for_llm(messages: List[Dict[str, Any]]) -> List[Dict[str, Any]
     rest = [m for m in messages if m.get("role") != "system"]
 
     if len(rest) > MAX_HISTORY_MESSAGES:
-        rest = rest[-MAX_HISTORY_MESSAGES:]
+        drop = len(rest) - MAX_HISTORY_MESSAGES
+        start = drop
+        while start < len(rest) and rest[start].get("role") == "tool":
+            start += 1
+        rest = rest[start:]
 
     trimmed: List[Dict[str, Any]] = []
     for msg in system_msgs + rest:
@@ -88,12 +90,8 @@ def trim_messages_for_llm(messages: List[Dict[str, Any]]) -> List[Dict[str, Any]
     return trimmed
 
 
-def serialize_tool_result_for_llm(result: Any) -> str:
-    """JSON فشرده برای role=tool با سقف طول."""
-    if isinstance(result, (dict, list)):
-        text = json.dumps(result, ensure_ascii=False)
-    else:
-        text = str(result)
-    if len(text) <= MAX_TOOL_RESULT_JSON_CHARS:
-        return text
-    return text[: MAX_TOOL_RESULT_JSON_CHARS - 24] + "\n… [نتیجه کوتاه شد]"
+def serialize_tool_result_for_llm(result: Any, *, tool_name: str = "") -> str:
+    """JSON فشرده برای role=tool با سقف طول و envelope در صورت برش."""
+    from app.services.ai.ai_tool_result import compact_tool_result_for_llm
+
+    return compact_tool_result_for_llm(tool_name or "tool", result)

@@ -1,0 +1,12 @@
+# Generated / local Advanced Installer outputs
+dist/
+*.msi
+*.exe
+hesabix.aip.bak
+
+# Local code-signing material (never commit)
+codesign.pfx
+codesign.pvk
+codesign.spc
+*.pfx
+*.pvk

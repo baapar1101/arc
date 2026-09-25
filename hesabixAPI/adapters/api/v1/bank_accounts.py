@@ -1046,3 +1046,40 @@ async def export_bank_accounts_turnover_excel(
     )
 
 
+@router.post(
+    "/businesses/{business_id}/reports/bank-accounts-turnover/export/pdf",
+    summary="خروجی PDF گزارش گردش حساب‌های بانکی",
+)
+@require_business_access("business_id")
+async def export_bank_accounts_turnover_pdf(
+    request: Request,
+    business_id: int,
+    body: Dict[str, Any] = Body(default={}),
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_dep("reports", "export")),
+):
+    from app.services.turnover_report_export_service import (
+        BANK_TURNOVER_COLUMNS,
+        turnover_pdf_response,
+    )
+
+    bank_account_ids = body.get("bank_account_ids")
+    if bank_account_ids is not None and not isinstance(bank_account_ids, list):
+        bank_account_ids = None
+
+    return turnover_pdf_response(
+        request,
+        business_id,
+        body,
+        ctx,
+        db,
+        fetch_fn=get_bank_accounts_turnover_report,
+        columns=BANK_TURNOVER_COLUMNS,
+        filename_prefix="bank_accounts_turnover",
+        title_fa="گزارش گردش حساب‌های بانکی",
+        title_en="Bank Accounts Turnover Report",
+        fetch_kwargs={"bank_account_ids": bank_account_ids},
+    )
+
+

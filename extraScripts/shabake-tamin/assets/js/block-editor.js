@@ -61,6 +61,13 @@
 								set( { city: v == null ? '' : String( v ) } );
 							},
 						} ),
+						el( TextControl, {
+							label: __( 'برند / مدل (فیلتر متن)', 'shabake-tamin' ),
+							value: a.brand,
+							onChange: function ( v ) {
+								set( { brand: v == null ? '' : String( v ) } );
+							},
+						} ),
 						el( ToggleControl, {
 							label: __( 'فیلدهای استان/شهر برای بازدیدکننده', 'shabake-tamin' ),
 							checked: !! a.locationFilters,
@@ -82,6 +89,17 @@
 							help: ! a.locationFilters
 								? __( 'ابتدا «فیلدهای استان/شهر» را روشن کنید.', 'shabake-tamin' )
 								: __( 'لیست ثابت ۳۱ استان ایران در فیلد استان.', 'shabake-tamin' ),
+						} ),
+						el( ToggleControl, {
+							label: __( 'فیلد برند/مدل برای بازدیدکننده', 'shabake-tamin' ),
+							checked: !! a.brandFilters,
+							onChange: function ( v ) {
+								set( { brandFilters: !! v } );
+							},
+							help: __(
+								'اگر روشن باشد، بازدیدکننده می‌تواند برند یا مدل را وارد کند و با «اعمال فیلتر» لیست را به‌روز کند.',
+								'shabake-tamin'
+							),
 						} )
 					),
 					el(

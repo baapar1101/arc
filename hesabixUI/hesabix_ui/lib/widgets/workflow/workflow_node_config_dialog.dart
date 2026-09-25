@@ -22,6 +22,7 @@ import '../../models/warehouse_model.dart';
 import '../invoice/person_combobox_widget.dart';
 import '../invoice/product_combobox_widget.dart';
 import '../jalali_date_picker.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 /// عملگرهای شرط ساده (هم‌خوان با workflow_engine)
 const _kWorkflowConditionOperators = <String>[
@@ -1128,7 +1129,7 @@ class _WorkflowNodeConfigDialogState extends State<WorkflowNodeConfigDialog> {
                               onPressed: () => _showReferenceSelector(key, fieldSchema: schema),
                             ),
                           if (required)
-                            Icon(Icons.star, size: 12, color: Colors.red),
+                            Icon(Icons.star, size: 12, color: SemanticColorResolver.negative(context)),
                         ],
                       ),
                     ),
@@ -1200,7 +1201,7 @@ class _WorkflowNodeConfigDialogState extends State<WorkflowNodeConfigDialog> {
               labelText: _formatKey(key),
               border: OutlineInputBorder(),
               helperText: description,
-              suffixIcon: required ? const Icon(Icons.star, size: 12, color: Colors.red) : null,
+              suffixIcon: required ? Icon(Icons.star, size: 12, color: SemanticColorResolver.negative(context)) : null,
             ),
             keyboardType: TextInputType.number,
             validator: required
@@ -1568,11 +1569,11 @@ class _WorkflowNodeConfigDialogState extends State<WorkflowNodeConfigDialog> {
     }
     switch (type) {
       case WorkflowNodeType.trigger:
-        return Colors.green;
+        return SemanticColorResolver.positive(context);
       case WorkflowNodeType.action:
         return theme.colorScheme.primary;
       case WorkflowNodeType.condition:
-        return Colors.orange;
+        return SemanticColorResolver.warning(context);
       case WorkflowNodeType.loop:
         return Colors.purple;
     }
@@ -1690,19 +1691,19 @@ class _WorkflowNodeConfigDialogState extends State<WorkflowNodeConfigDialog> {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.orange.withOpacity(0.1),
+                color: SemanticColorResolver.warning(context).withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.orange),
+                border: Border.all(color: SemanticColorResolver.warning(context)),
               ),
               child: Row(
                 children: [
-                  Icon(Icons.warning, color: Colors.orange, size: 20),
-                  const SizedBox(width: 8),
+                  Icon(Icons.warning, color: SemanticColorResolver.warning(context), size: 20),
+                  SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       AppLocalizations.of(context).workflowConfigNoTelegramUsers,
                       style: theme.textTheme.bodySmall?.copyWith(
-                        color: Colors.orange.shade700,
+                        color: SemanticColorResolver.warning(context),
                       ),
                     ),
                   ),
@@ -1724,7 +1725,7 @@ class _WorkflowNodeConfigDialogState extends State<WorkflowNodeConfigDialog> {
                       children: [
                         Icon(Icons.telegram, size: 18, color: theme.colorScheme.primary),
                         if (required)
-                          Icon(Icons.star, size: 12, color: Colors.red),
+                          Icon(Icons.star, size: 12, color: SemanticColorResolver.negative(context)),
                       ],
                     ),
                     prefixIcon: selectedUserId != null
@@ -1834,19 +1835,19 @@ class _WorkflowNodeConfigDialogState extends State<WorkflowNodeConfigDialog> {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.orange.withOpacity(0.1),
+                color: SemanticColorResolver.warning(context).withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.orange),
+                border: Border.all(color: SemanticColorResolver.warning(context)),
               ),
               child: Row(
                 children: [
-                  Icon(Icons.warning, color: Colors.orange, size: 20),
-                  const SizedBox(width: 8),
+                  Icon(Icons.warning, color: SemanticColorResolver.warning(context), size: 20),
+                  SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       AppLocalizations.of(context).workflowConfigNoBaleUsers,
                       style: theme.textTheme.bodySmall?.copyWith(
-                        color: Colors.orange.shade700,
+                        color: SemanticColorResolver.warning(context),
                       ),
                     ),
                   ),
@@ -1868,7 +1869,7 @@ class _WorkflowNodeConfigDialogState extends State<WorkflowNodeConfigDialog> {
                       children: [
                         Icon(Icons.chat_bubble, size: 18, color: theme.colorScheme.primary),
                         if (required)
-                          Icon(Icons.star, size: 12, color: Colors.red),
+                          Icon(Icons.star, size: 12, color: SemanticColorResolver.negative(context)),
                       ],
                     ),
                     prefixIcon: selectedUserId != null
@@ -2030,12 +2031,12 @@ class _WorkflowNodeConfigDialogState extends State<WorkflowNodeConfigDialog> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   IconButton(
-                    icon: const Icon(Icons.calendar_today),
+                    icon: Icon(Icons.calendar_today),
                     tooltip: AppLocalizations.of(context).workflowConfigSelectDate,
                     onPressed: () => _openDatePickerForKey(key, parsedDate),
                   ),
                   if (required)
-                    const Icon(Icons.star, size: 12, color: Colors.red),
+                    Icon(Icons.star, size: 12, color: SemanticColorResolver.negative(context)),
                 ],
               ),
             ),
@@ -2096,12 +2097,12 @@ class _WorkflowNodeConfigDialogState extends State<WorkflowNodeConfigDialog> {
                 children: [
                   if (widget.allNodes != null && widget.allNodes!.isNotEmpty)
                     IconButton(
-                      icon: const Icon(Icons.select_all, size: 18),
+                      icon: Icon(Icons.select_all, size: 18),
                       tooltip: AppLocalizations.of(context).workflowConfigSelectFromNodes,
                       onPressed: () => _showReferenceSelector(key, fieldSchema: schema),
                     ),
                   if (required)
-                    const Icon(Icons.star, size: 12, color: Colors.red),
+                    Icon(Icons.star, size: 12, color: SemanticColorResolver.negative(context)),
                 ],
               ),
             ),
@@ -2237,7 +2238,7 @@ class _WorkflowNodeConfigDialogState extends State<WorkflowNodeConfigDialog> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (_loadingSmsTemplates)
-            const Padding(
+            Padding(
               padding: EdgeInsets.only(bottom: 8),
               child: LinearProgressIndicator(),
             ),
@@ -2257,7 +2258,7 @@ class _WorkflowNodeConfigDialogState extends State<WorkflowNodeConfigDialog> {
               labelText: _formatKey(key),
               border: const OutlineInputBorder(),
               helperText: description,
-              suffixIcon: required ? const Icon(Icons.star, size: 12, color: Colors.red) : null,
+              suffixIcon: required ? Icon(Icons.star, size: 12, color: SemanticColorResolver.negative(context)) : null,
             ),
             hint: Text(isFa ? 'انتخاب قالب پیامک' : 'Select SMS template'),
             items: [
@@ -2494,7 +2495,7 @@ class _WorkflowNodeConfigDialogState extends State<WorkflowNodeConfigDialog> {
               labelText: _formatKey(key),
               border: const OutlineInputBorder(),
               helperText: description,
-              suffixIcon: required ? const Icon(Icons.star, size: 12, color: Colors.red) : null,
+              suffixIcon: required ? Icon(Icons.star, size: 12, color: SemanticColorResolver.negative(context)) : null,
             ),
             hint: Text(isFa ? 'انتخاب رویداد' : 'Select event'),
             isExpanded: true,
@@ -2570,11 +2571,11 @@ class _WorkflowNodeConfigDialogState extends State<WorkflowNodeConfigDialog> {
                           children: [
                             if (widget.allNodes != null && widget.allNodes!.isNotEmpty)
                               IconButton(
-                                icon: const Icon(Icons.select_all, size: 18),
+                                icon: Icon(Icons.select_all, size: 18),
                                 tooltip: t.workflowConfigSelectFromNodes,
                                 onPressed: () => _showReferenceSelector(key, fieldSchema: schema),
                               ),
-                            if (required) const Icon(Icons.star, size: 12, color: Colors.red),
+                            if (required) Icon(Icons.star, size: 12, color: SemanticColorResolver.negative(context)),
                           ],
                         ),
                       ),
@@ -2728,7 +2729,7 @@ class _WorkflowNodeConfigDialogState extends State<WorkflowNodeConfigDialog> {
                 ),
               ),
             ),
-          const SizedBox(height: 8),
+          SizedBox(height: 8),
           TextFormField(
             controller: c,
             decoration: InputDecoration(
@@ -2745,7 +2746,7 @@ class _WorkflowNodeConfigDialogState extends State<WorkflowNodeConfigDialog> {
                       onPressed: () => _showReferenceSelector(key, fieldSchema: schema),
                     ),
                   if (required)
-                    Icon(Icons.star, size: 12, color: Colors.red),
+                    Icon(Icons.star, size: 12, color: SemanticColorResolver.negative(context)),
                 ],
               ),
             ),
@@ -3021,7 +3022,7 @@ class _WorkflowNodeConfigDialogState extends State<WorkflowNodeConfigDialog> {
                 ),
               ),
               if (required)
-                Icon(Icons.star, size: 14, color: Colors.red),
+                Icon(Icons.star, size: 14, color: SemanticColorResolver.negative(context)),
             ],
           ),
           if (description != null)
@@ -3591,7 +3592,7 @@ class _WorkflowNodeConfigDialogState extends State<WorkflowNodeConfigDialog> {
                   labelText: _formatKey(key),
                   border: const OutlineInputBorder(),
                   helperText: description ?? AppLocalizations.of(context).workflowConfigSelectWarehouse,
-                  suffixIcon: required ? const Icon(Icons.star, size: 12, color: Colors.red) : null,
+                  suffixIcon: required ? Icon(Icons.star, size: 12, color: SemanticColorResolver.negative(context)) : null,
                 ),
                 items: [
                   DropdownMenuItem<int?>(value: null, child: Text(AppLocalizations.of(context).workflowConfigNotSelected)),
@@ -3665,7 +3666,7 @@ class _WorkflowNodeConfigDialogState extends State<WorkflowNodeConfigDialog> {
                   labelText: _formatKey(key),
                   border: const OutlineInputBorder(),
                   helperText: description ?? AppLocalizations.of(context).workflowConfigSelectAccount,
-                  suffixIcon: required ? const Icon(Icons.star, size: 12, color: Colors.red) : null,
+                  suffixIcon: required ? Icon(Icons.star, size: 12, color: SemanticColorResolver.negative(context)) : null,
                 ),
                 items: [
                   DropdownMenuItem<int?>(value: null, child: Text(AppLocalizations.of(context).workflowConfigNotSelected)),
@@ -3740,7 +3741,7 @@ class _WorkflowNodeConfigDialogState extends State<WorkflowNodeConfigDialog> {
                   labelText: _formatKey(key),
                   border: const OutlineInputBorder(),
                   helperText: description ?? AppLocalizations.of(context).workflowConfigSelectFiscalYear,
-                  suffixIcon: required ? const Icon(Icons.star, size: 12, color: Colors.red) : null,
+                  suffixIcon: required ? Icon(Icons.star, size: 12, color: SemanticColorResolver.negative(context)) : null,
                 ),
                 items: [
                   DropdownMenuItem<int?>(value: null, child: Text(AppLocalizations.of(context).workflowConfigNotSelected)),
@@ -3814,7 +3815,7 @@ class _WorkflowNodeConfigDialogState extends State<WorkflowNodeConfigDialog> {
                   labelText: _formatKey(key),
                   border: const OutlineInputBorder(),
                   helperText: description,
-                  suffixIcon: required ? const Icon(Icons.star, size: 12, color: Colors.red) : null,
+                  suffixIcon: required ? Icon(Icons.star, size: 12, color: SemanticColorResolver.negative(context)) : null,
                 ),
                 items: [
                   DropdownMenuItem<int?>(value: null, child: Text(AppLocalizations.of(context).workflowConfigNotSelected)),
@@ -3887,7 +3888,7 @@ class _WorkflowNodeConfigDialogState extends State<WorkflowNodeConfigDialog> {
                       onPressed: () => _showReferenceSelector(key, fieldSchema: schema),
                     ),
                   if (required)
-                    Icon(Icons.star, size: 12, color: Colors.red),
+                    Icon(Icons.star, size: 12, color: SemanticColorResolver.negative(context)),
                 ],
               ),
             ),
@@ -3974,7 +3975,7 @@ class _WorkflowNodeConfigDialogState extends State<WorkflowNodeConfigDialog> {
                     height: 20,
                     child: CircularProgressIndicator(strokeWidth: 2),
                   ),
-                  const SizedBox(width: 12),
+                  SizedBox(width: 12),
                   Text('در حال بارگذاری ارزها...'),
                 ],
               ),
@@ -3983,19 +3984,19 @@ class _WorkflowNodeConfigDialogState extends State<WorkflowNodeConfigDialog> {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.orange.withOpacity(0.1),
+                color: SemanticColorResolver.warning(context).withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.orange),
+                border: Border.all(color: SemanticColorResolver.warning(context)),
               ),
               child: Row(
                 children: [
-                  Icon(Icons.warning, color: Colors.orange, size: 20),
-                  const SizedBox(width: 8),
+                  Icon(Icons.warning, color: SemanticColorResolver.warning(context), size: 20),
+                  SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       'ارزی یافت نشد. لطفاً شناسه ارز را وارد کنید.',
                       style: theme.textTheme.bodySmall?.copyWith(
-                        color: Colors.orange.shade700,
+                        color: SemanticColorResolver.warning(context),
                       ),
                     ),
                   ),
@@ -4010,7 +4011,7 @@ class _WorkflowNodeConfigDialogState extends State<WorkflowNodeConfigDialog> {
                 border: OutlineInputBorder(),
                 helperText: description,
                 prefixIcon: Icon(Icons.monetization_on, size: 20),
-                suffixIcon: required ? Icon(Icons.star, size: 12, color: Colors.red) : null,
+                suffixIcon: required ? Icon(Icons.star, size: 12, color: SemanticColorResolver.negative(context)) : null,
               ),
               items: _currencies.map((currency) {
                 final id = currency['id'] as int;
@@ -4097,7 +4098,7 @@ class _WorkflowNodeConfigDialogState extends State<WorkflowNodeConfigDialog> {
         padding: const EdgeInsets.only(bottom: 16),
         child: Text(
           AppLocalizations.of(context).workflowConfigEnumRequiredForMultiSelect,
-          style: TextStyle(color: Colors.red),
+          style: TextStyle(color: SemanticColorResolver.negative(context)),
         ),
       );
     }
@@ -4161,7 +4162,7 @@ class _WorkflowNodeConfigDialogState extends State<WorkflowNodeConfigDialog> {
               child: Text(
                 AppLocalizations.of(context).workflowConfigSelectAtLeastOne,
                 style: theme.textTheme.bodySmall?.copyWith(
-                  color: Colors.red,
+                  color: SemanticColorResolver.negative(context),
                 ),
               ),
             ),
@@ -4203,7 +4204,7 @@ class _WorkflowNodeConfigDialogState extends State<WorkflowNodeConfigDialog> {
                       onPressed: () => _showReferenceSelector(key, fieldSchema: schema),
                     ),
                   if (required)
-                    Icon(Icons.star, size: 12, color: Colors.red),
+                    Icon(Icons.star, size: 12, color: SemanticColorResolver.negative(context)),
                 ],
               ),
             ),
@@ -5345,11 +5346,11 @@ class _ReferenceSelectorDialogState extends State<_ReferenceSelectorDialog> {
     }
     switch (type) {
       case WorkflowNodeType.trigger:
-        return Colors.green;
+        return SemanticColorResolver.positive(context);
       case WorkflowNodeType.action:
         return theme.colorScheme.primary;
       case WorkflowNodeType.condition:
-        return Colors.orange;
+        return SemanticColorResolver.warning(context);
       case WorkflowNodeType.loop:
         return Colors.purple;
     }

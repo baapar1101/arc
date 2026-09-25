@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/widgets/ai/ai_chat_design.dart';
 
 /// بنر تأیید عملیات نوشتنی پیشنهادی توسط دستیار AI.
@@ -105,7 +106,12 @@ class AIWriteApprovalBanner extends StatelessWidget {
     required Color accent,
     required bool compact,
   }) {
-    return Column(
+    final l10n = AppLocalizations.of(context);
+    return Semantics(
+      container: true,
+      liveRegion: true,
+      label: l10n.aiChatApprovalBannerLabel,
+      child: Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Padding(
@@ -147,7 +153,7 @@ class AIWriteApprovalBanner extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'تأیید عملیات',
+                      l10n.aiChatApprovalTitle,
                       style: theme.textTheme.titleSmall?.copyWith(
                         fontWeight: FontWeight.w700,
                         color: scheme.onSurface,
@@ -156,8 +162,8 @@ class AIWriteApprovalBanner extends StatelessWidget {
                     const SizedBox(height: 2),
                     Text(
                       pendingOps.length <= 1
-                          ? 'دستیار می‌خواهد تغییری در داده‌های کسب‌وکار ثبت کند.'
-                          : '${pendingOps.length} عملیات منتظر تأیید شماست.',
+                          ? l10n.aiChatApprovalBodySingle
+                          : l10n.aiChatApprovalBodyMultiple(pendingOps.length),
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: scheme.onSurfaceVariant,
                         height: 1.4,
@@ -227,7 +233,7 @@ class AIWriteApprovalBanner extends StatelessWidget {
                         ),
                       ),
                       child: Text(
-                        'رد کردن',
+                        l10n.aiChatApprovalDismiss,
                         style: TextStyle(
                           color: scheme.onSurfaceVariant,
                           fontWeight: FontWeight.w600,
@@ -251,7 +257,9 @@ class AIWriteApprovalBanner extends StatelessWidget {
                             )
                           : const Icon(Icons.check_circle_outline_rounded, size: 20),
                       label: Text(
-                        loading ? 'در حال ارسال…' : 'تأیید و اجرا',
+                        loading
+                            ? l10n.aiChatApprovalSending
+                            : l10n.aiChatApprovalConfirm,
                         style: const TextStyle(fontWeight: FontWeight.w700),
                       ),
                       style: FilledButton.styleFrom(
@@ -279,6 +287,7 @@ class AIWriteApprovalBanner extends StatelessWidget {
                 child: _SecurityNote(scheme: scheme, theme: theme),
               ),
       ],
+    ),
     );
   }
 }
@@ -302,7 +311,7 @@ class _SecurityNote extends StatelessWidget {
         const SizedBox(width: 6),
         Expanded(
           child: Text(
-            'فقط همان عملیاتی اجرا می‌شود که در این پیشنهاد آمده؛ تغییر پارامترها بدون تأیید مجدد ممکن نیست.',
+            AppLocalizations.of(context).aiChatApprovalSecurityNote,
             style: theme.textTheme.labelSmall?.copyWith(
               color: scheme.onSurfaceVariant.withValues(alpha: 0.85),
               height: 1.4,

@@ -404,8 +404,16 @@ progress::-moz-progress-bar {
 	background: #f6f7f7;
 }
 
-.hesabix-v2-setup-reconnect-note {
-	margin-top: 12px !important;
+.hesabix-v2-connection-actions {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 8px;
+}
+
+.hesabix-v2-warn-status {
+	margin-top: 10px !important;
+	color: #b32d2e;
 }
 
 /* تنظیمات — نکات اتصال (هشدار) */
@@ -487,4 +495,280 @@ progress::-moz-progress-bar {
 
 .hesabix-v2-orders-help ul {
 	max-width: 900px;
+}
+
+/* —— Profit column / order panel —— */
+.hesabix-v2-profit-amount {
+	font-weight: 700;
+	font-variant-numeric: tabular-nums;
+	letter-spacing: -0.01em;
+}
+
+.hesabix-v2-profit-positive {
+	color: #0f6b3c;
+}
+
+.hesabix-v2-profit-negative {
+	color: #b42318;
+}
+
+.hesabix-v2-profit-pct,
+.hesabix-v2-profit-empty {
+	font-size: 12px;
+	color: #646970;
+}
+
+.hesabix-v2-profit-curr-hint {
+	font-size: 11px;
+	color: #646970;
+}
+
+.hesabix-v2-profit-details__warn {
+	color: #8a6116;
+	font-size: 11px;
+	line-height: 1.5;
+}
+
+.hesabix-v2-refresh-profit.button-link {
+	font-size: 11px;
+	padding: 0;
+	height: auto;
+	line-height: 1.4;
+	text-decoration: none;
+	color: #2271b1;
+}
+
+.hesabix-v2-refresh-profit.button-link:hover {
+	color: #135e96;
+}
+
+.hesabix-v2-profit-panel {
+	margin: 12px 0 16px;
+	padding: 12px;
+	border-radius: 8px;
+	background: linear-gradient(160deg, #f7faf8 0%, #eef4f8 100%);
+	border: 1px solid #d8e2ea;
+}
+
+.hesabix-v2-profit-panel__head {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+	margin-bottom: 8px;
+}
+
+.hesabix-v2-profit-hero {
+	margin: 0 0 8px;
+	display: flex;
+	flex-wrap: wrap;
+	align-items: baseline;
+	gap: 6px 10px;
+}
+
+.hesabix-v2-profit-hero__label {
+	display: block;
+	width: 100%;
+	font-size: 11px;
+	color: #50575e;
+	font-weight: 500;
+}
+
+.hesabix-v2-profit-hero__value {
+	font-size: 18px;
+	font-weight: 800;
+	line-height: 1.2;
+}
+
+.hesabix-v2-profit-hero__pct {
+	font-size: 12px;
+	font-weight: 600;
+	opacity: 0.85;
+}
+
+.hesabix-v2-profit-details {
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.hesabix-v2-profit-details li {
+	display: flex;
+	justify-content: space-between;
+	gap: 8px;
+	padding: 4px 0;
+	border-top: 1px solid rgba(0, 0, 0, 0.06);
+	font-size: 12px;
+}
+
+.hesabix-v2-profit-details__meta {
+	color: #646970;
+	font-weight: 400;
+}
+
+/* —— Marketplace upsell banner —— */
+.hesabix-v2-mp-banner {
+	position: relative;
+	overflow: hidden;
+	margin: 16px 0 20px;
+	border-radius: 14px;
+	border: 1px solid #c9d8e8;
+	background: linear-gradient(135deg, #0b3d5c 0%, #1a5f7a 42%, #0e4d6b 100%);
+	color: #f4f8fb;
+	box-shadow: 0 10px 28px rgba(11, 61, 92, 0.18);
+}
+
+.hesabix-v2-mp-banner__glow {
+	position: absolute;
+	inset: -40% auto auto -10%;
+	width: 55%;
+	height: 140%;
+	background: radial-gradient(circle at center, rgba(120, 200, 220, 0.28), transparent 68%);
+	pointer-events: none;
+}
+
+.hesabix-v2-mp-banner__content {
+	position: relative;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 20px 28px;
+	align-items: stretch;
+	justify-content: space-between;
+	padding: 22px 24px;
+}
+
+.hesabix-v2-mp-banner__copy {
+	flex: 1 1 320px;
+	max-width: 640px;
+}
+
+.hesabix-v2-mp-banner__eyebrow {
+	margin: 0 0 6px;
+	font-size: 11px;
+	font-weight: 700;
+	letter-spacing: 0.06em;
+	text-transform: uppercase;
+	color: #9ed4e8;
+}
+
+.hesabix-v2-mp-banner__title {
+	margin: 0 0 8px;
+	font-size: 20px;
+	line-height: 1.35;
+	font-weight: 800;
+	color: #fff;
+}
+
+.hesabix-v2-mp-banner__text {
+	margin: 0 0 12px;
+	font-size: 13px;
+	line-height: 1.7;
+	color: rgba(244, 248, 251, 0.88);
+}
+
+.hesabix-v2-mp-banner__alert {
+	margin: 0 0 12px;
+	padding: 8px 10px;
+	border-radius: 6px;
+	background: rgba(255, 196, 120, 0.16);
+	border: 1px solid rgba(255, 196, 120, 0.35);
+	color: #ffe7c2;
+	font-size: 12px;
+}
+
+.hesabix-v2-mp-banner__alert--soft {
+	background: rgba(255, 255, 255, 0.08);
+	border-color: rgba(255, 255, 255, 0.18);
+	color: rgba(244, 248, 251, 0.9);
+}
+
+.hesabix-v2-mp-banner__actions {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	align-items: center;
+}
+
+.hesabix-v2-mp-banner__cta {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	padding: 8px 16px;
+	border-radius: 8px;
+	background: #f0b429;
+	color: #1a2a33 !important;
+	font-weight: 700;
+	font-size: 13px;
+	text-decoration: none !important;
+	border: none;
+	box-shadow: 0 2px 0 rgba(0, 0, 0, 0.12);
+	transition: transform 0.15s ease, background 0.15s ease;
+}
+
+.hesabix-v2-mp-banner__cta:hover {
+	background: #ffc94a;
+	transform: translateY(-1px);
+	color: #122028 !important;
+}
+
+.hesabix-v2-mp-banner__refresh,
+.hesabix-v2-mp-banner__dismiss {
+	background: transparent;
+	border: 1px solid rgba(255, 255, 255, 0.28);
+	color: #e8f3f8;
+	border-radius: 8px;
+	padding: 7px 12px;
+	font-size: 12px;
+	cursor: pointer;
+	font-family: inherit;
+}
+
+.hesabix-v2-mp-banner__refresh:hover,
+.hesabix-v2-mp-banner__dismiss:hover {
+	background: rgba(255, 255, 255, 0.08);
+}
+
+.hesabix-v2-mp-banner__aside {
+	flex: 0 1 200px;
+	display: flex;
+	flex-direction: column;
+	justify-content: center;
+	gap: 14px;
+	min-width: 160px;
+}
+
+.hesabix-v2-mp-banner__mark {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 8px;
+	padding: 14px 12px;
+	border-radius: 12px;
+	background: rgba(255, 255, 255, 0.08);
+	border: 1px solid rgba(255, 255, 255, 0.14);
+	font-weight: 800;
+	font-size: 15px;
+	letter-spacing: 0.02em;
+}
+
+.hesabix-v2-mp-banner__perks {
+	margin: 0;
+	padding: 0 0 0 16px;
+	font-size: 12px;
+	line-height: 1.7;
+	color: rgba(244, 248, 251, 0.85);
+}
+
+.hesabix-v2-bridge-hint {
+	border-right: 4px solid #2271b1;
+}
+
+@media (max-width: 782px) {
+	.hesabix-v2-mp-banner__title {
+		font-size: 17px;
+	}
+
+	.hesabix-v2-mp-banner__aside {
+		width: 100%;
+	}
 }

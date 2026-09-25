@@ -179,6 +179,7 @@ def extract_archive_counts(data_files: Dict[str, list]) -> Dict[str, int]:
         "documents": len(data_files.get("hesabdari_docs.json") or []),
         "document_rows": len(data_files.get("hesabdari_rows.json") or []),
         "storerooms": len(data_files.get("storerooms.json") or []),
+        "storeroom_tickets": len(data_files.get("storeroom_tickets.json") or []),
         "bank_accounts": len(data_files.get("bank_accounts.json") or []),
         "fiscal_years": len(data_files.get("years.json") or []),
     }

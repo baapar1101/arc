@@ -168,19 +168,32 @@ def register_workflow_ai_functions(registry: "AIFunctionRegistry") -> None:
     registry.register(
         AIFunction(
             name="create_workflow",
-            description="ایجاد اتوماسیون جدید. پیش‌فرض وضعیت پیش‌نویس.",
+            description=(
+                "ایجاد اتوماسیون جدید. اول get_workflow_design_rules و "
+                "list_workflow_trigger_catalog / list_workflow_action_catalog، "
+                "سپس validate_workflow_draft، بعد create با status=پیش‌نویس. "
+                "workflow_data = {nodes, connections}. نیاز به تأیید."
+            ),
             parameters_schema={
                 "type": "object",
                 "properties": {
-                    "name": {"type": "string"},
-                    "description": {"type": "string"},
-                    "workflow_data": {"type": "object"},
+                    "name": {"type": "string", "description": "نام اتوماسیون"},
+                    "description": {"type": "string", "description": "شرح (اختیاری)"},
+                    "workflow_data": {
+                        "type": "object",
+                        "description": (
+                            "گراف: {nodes: [...], connections: [{source, target, branch?}]}. "
+                            "هر نود id و type=trigger|action|condition|loop. "
+                            "قبل از ذخیره validate_workflow_draft."
+                        ),
+                    },
                     "status": {
                         "type": "string",
                         "enum": ["پیش‌نویس", "فعال", "غیرفعال"],
                         "default": "پیش‌نویس",
+                        "description": "پیش‌فرض پیش‌نویس؛ فعال فقط با تأیید کاربر",
                     },
-                    "settings": {"type": "object"},
+                    "settings": {"type": "object", "description": "تنظیمات اختیاری"},
                 },
                 "required": ["name", "workflow_data"],
             },
@@ -197,16 +210,26 @@ def register_workflow_ai_functions(registry: "AIFunctionRegistry") -> None:
     registry.register(
         AIFunction(
             name="update_workflow",
-            description="به‌روزرسانی اتوماسیون (نام، گراف، وضعیت).",
+            description=(
+                "به‌روزرسانی اتوماسیون. اول get_workflow. "
+                "اگر گراف عوض می‌شود validate_workflow_draft. نیاز به تأیید."
+            ),
             parameters_schema={
                 "type": "object",
                 "properties": {
-                    "workflow_id": {"type": "integer"},
-                    "name": {"type": "string"},
-                    "description": {"type": "string"},
-                    "workflow_data": {"type": "object"},
-                    "status": {"type": "string", "enum": ["پیش‌نویس", "فعال", "غیرفعال"]},
-                    "settings": {"type": "object"},
+                    "workflow_id": {"type": "integer", "description": "شناسه اتوماسیون از list_workflows"},
+                    "name": {"type": "string", "description": "نام جدید (اختیاری)"},
+                    "description": {"type": "string", "description": "شرح (اختیاری)"},
+                    "workflow_data": {
+                        "type": "object",
+                        "description": "گراف کامل {nodes, connections} اگر می‌خواهی جایگزین شود",
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": ["پیش‌نویس", "فعال", "غیرفعال"],
+                        "description": "وضعیت (اختیاری)",
+                    },
+                    "settings": {"type": "object", "description": "تنظیمات (اختیاری)"},
                 },
                 "required": ["workflow_id"],
             },
@@ -223,7 +246,7 @@ def register_workflow_ai_functions(registry: "AIFunctionRegistry") -> None:
     registry.register(
         AIFunction(
             name="delete_workflow",
-            description="حذف اتوماسیون.",
+            description="حذف یک اتوماسیون/گردش‌کار ذخیره‌شده با شناسه. عملیات مخرب است.",
             parameters_schema={
                 "type": "object",
                 "properties": {"workflow_id": {"type": "integer"}},
@@ -352,7 +375,9 @@ def _design_rules(db, business_id, user_id, **kwargs):
 
 
 def _validate(db, business_id, user_id, workflow_data, **kwargs):
-    return validate_workflow_draft(workflow_data)
+    from app.services.ai.ai_tool_payloads import normalize_workflow_graph
+
+    return validate_workflow_draft(normalize_workflow_graph(workflow_data))
 
 
 def _get_workflow(db, business_id, user_id, workflow_id, include_graph=True, **kwargs):
@@ -362,29 +387,52 @@ def _get_workflow(db, business_id, user_id, workflow_id, include_graph=True, **k
 
 
 def _create_workflow(
-    db, business_id, user_id, name, workflow_data, description=None, status="پیش‌نویس", settings=None, **kwargs
+    db, business_id, user_id, name=None, workflow_data=None, description=None, status="پیش‌نویس", settings=None, **kwargs
 ):
+    from app.services.ai.ai_tool_payloads import build_create_workflow_payload
+
+    payload = build_create_workflow_payload(
+        {
+            "name": name,
+            "workflow_data": workflow_data,
+            "description": description,
+            "status": status,
+            "settings": settings,
+            **kwargs,
+        }
+    )
     return create_workflow_for_ai(
         db,
         business_id,
         user_id,
-        name=name,
-        workflow_data=workflow_data,
-        description=description,
-        status=status,
-        settings=settings,
+        name=payload["name"],
+        workflow_data=payload["workflow_data"],
+        description=payload.get("description"),
+        status=payload.get("status"),
+        settings=payload.get("settings"),
     )
 
 
 def _update_workflow(db, business_id, user_id, workflow_id, **kwargs):
+    from app.services.ai.ai_tool_payloads import (
+        _WORKFLOW_STATUS_ALIASES,
+        normalize_workflow_graph,
+    )
+
+    workflow_data = kwargs.get("workflow_data")
+    if workflow_data is not None:
+        workflow_data = normalize_workflow_graph(workflow_data)
+    status = kwargs.get("status")
+    if status:
+        status = _WORKFLOW_STATUS_ALIASES.get(str(status).strip(), status)
     return update_workflow_for_ai(
         db,
         business_id,
         int(workflow_id),
         name=kwargs.get("name"),
         description=kwargs.get("description"),
-        status=kwargs.get("status"),
-        workflow_data=kwargs.get("workflow_data"),
+        status=status,
+        workflow_data=workflow_data,
         settings=kwargs.get("settings"),
     )
 

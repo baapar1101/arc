@@ -4,7 +4,9 @@ import 'package:flutter/foundation.dart';
 import '../core/api_client.dart';
 import '../utils/error_extractor.dart';
 import '../models/ai_models.dart';
+import '../models/ai_voice_models.dart';
 import '../models/ai_stream_event.dart';
+import '../widgets/ai/ai_subagent_restore.dart';
 import 'ai_sse_client.dart';
 
 // Enable debug prints
@@ -143,6 +145,86 @@ class AIService {
     return Map<String, dynamic>.from(body['data'] as Map);
   }
 
+  Future<List<AIVoiceModelItem>> listAdminVoiceModels({String? kind}) async {
+    final query = <String, dynamic>{};
+    if (kind != null) query['kind'] = kind;
+    final res = await _api.get<Map<String, dynamic>>(
+      '/api/v1/admin/ai/voice-models',
+      query: query,
+    );
+    final body = res.data as Map<String, dynamic>;
+    final data = body['data'] as List? ?? const [];
+    return data
+        .whereType<Map>()
+        .map((e) => AIVoiceModelItem.fromJson(Map<String, dynamic>.from(e)))
+        .toList();
+  }
+
+  Future<AIVoiceModelItem> createAdminVoiceModel(Map<String, dynamic> data) async {
+    final res = await _api.post<Map<String, dynamic>>(
+      '/api/v1/admin/ai/voice-models',
+      data: data,
+    );
+    final body = res.data as Map<String, dynamic>;
+    return AIVoiceModelItem.fromJson(body['data'] as Map<String, dynamic>);
+  }
+
+  Future<AIVoiceModelItem> updateAdminVoiceModel(
+    int modelId,
+    Map<String, dynamic> data,
+  ) async {
+    final res = await _api.put<Map<String, dynamic>>(
+      '/api/v1/admin/ai/voice-models/$modelId',
+      data: data,
+    );
+    final body = res.data as Map<String, dynamic>;
+    return AIVoiceModelItem.fromJson(body['data'] as Map<String, dynamic>);
+  }
+
+  Future<void> deleteAdminVoiceModel(int modelId) async {
+    await _api.delete('/api/v1/admin/ai/voice-models/$modelId');
+  }
+
+  Future<Map<String, dynamic>> seedAdminVoiceModels({bool force = false}) async {
+    final res = await _api.post<Map<String, dynamic>>(
+      '/api/v1/admin/ai/voice-models/seed-from-env',
+      data: {'force': force},
+    );
+    final body = res.data as Map<String, dynamic>;
+    return Map<String, dynamic>.from(body['data'] as Map);
+  }
+
+  Future<Map<String, dynamic>> getAdminVoicePolicy() async {
+    final res = await _api.get<Map<String, dynamic>>(
+      '/api/v1/admin/ai/voice-models/policy',
+    );
+    final body = res.data as Map<String, dynamic>;
+    return Map<String, dynamic>.from(body['data'] as Map);
+  }
+
+  Future<Map<String, dynamic>> updateAdminVoicePolicy(
+    Map<String, dynamic> data,
+  ) async {
+    final res = await _api.put<Map<String, dynamic>>(
+      '/api/v1/admin/ai/voice-models/policy',
+      data: data,
+    );
+    final body = res.data as Map<String, dynamic>;
+    return Map<String, dynamic>.from(body['data'] as Map);
+  }
+
+  Future<Map<String, dynamic>> testAdminVoiceModel(
+    int modelId, {
+    String? text,
+  }) async {
+    final res = await _api.post<Map<String, dynamic>>(
+      '/api/v1/admin/ai/voice-models/$modelId/test',
+      data: {if (text != null) 'text': text},
+    );
+    final body = res.data as Map<String, dynamic>;
+    return Map<String, dynamic>.from(body['data'] as Map);
+  }
+
   Future<List<Map<String, dynamic>>> listAIProviderCredentials() async {
     final res = await _api.get<Map<String, dynamic>>(
       '/api/v1/admin/ai/provider-credentials',
@@ -184,8 +266,54 @@ class AIService {
     return Map<String, dynamic>.from(body['data'] as Map);
   }
 
+  // ========== Business: BYOK provider ==========
+  Future<Map<String, dynamic>> getBusinessAIProvider(int businessId) async {
+    final res = await _api.get<Map<String, dynamic>>(
+      '/api/v1/businesses/$businessId/ai-provider',
+    );
+    final body = res.data as Map<String, dynamic>;
+    return Map<String, dynamic>.from(body['data'] as Map);
+  }
+
+  Future<Map<String, dynamic>> saveBusinessAIProvider(
+    int businessId,
+    Map<String, dynamic> data,
+  ) async {
+    final res = await _api.put<Map<String, dynamic>>(
+      '/api/v1/businesses/$businessId/ai-provider',
+      data: data,
+    );
+    final body = res.data as Map<String, dynamic>;
+    return Map<String, dynamic>.from(body['data'] as Map);
+  }
+
+  Future<Map<String, dynamic>> testBusinessAIProvider(
+    int businessId, {
+    String? model,
+  }) async {
+    final res = await _api.post<Map<String, dynamic>>(
+      '/api/v1/businesses/$businessId/ai-provider/test',
+      data: {if (model != null) 'model': model},
+    );
+    final body = res.data as Map<String, dynamic>;
+    return Map<String, dynamic>.from(body['data'] as Map);
+  }
+
+  Future<void> deleteBusinessAIProvider(int businessId) async {
+    await _api.delete<Map<String, dynamic>>(
+      '/api/v1/businesses/$businessId/ai-provider',
+    );
+  }
+
   // ========== User: AI Models ==========
   Future<List<AIModelCatalogItem>> listAvailableAIModels({int? businessId}) async {
+    final result = await listAvailableAIModelsResult(businessId: businessId);
+    return result.models;
+  }
+
+  /// کاتالوگ مدل‌ها به‌همراه preferred/plan default (یک درخواست).
+  Future<({List<AIModelCatalogItem> models, String? preferredModelCode})>
+      listAvailableAIModelsResult({int? businessId}) async {
     final query = <String, dynamic>{};
     if (businessId != null) query['business_id'] = businessId;
     final res = await _api.get<Map<String, dynamic>>(
@@ -194,23 +322,17 @@ class AIService {
     );
     final body = res.data as Map<String, dynamic>;
     final data = body['data'] as Map<String, dynamic>;
-    final models = data['models'] as List? ?? [];
-    return models
+    final models = (data['models'] as List? ?? [])
         .map((e) => AIModelCatalogItem.fromJson(e as Map<String, dynamic>))
         .toList();
+    final preferred = data['preferred_model_code'] as String? ??
+        data['plan_default_model'] as String?;
+    return (models: models, preferredModelCode: preferred);
   }
 
   Future<String?> getPreferredModelCode({int? businessId}) async {
-    final query = <String, dynamic>{};
-    if (businessId != null) query['business_id'] = businessId;
-    final res = await _api.get<Map<String, dynamic>>(
-      '/api/v1/ai/models',
-      query: query,
-    );
-    final body = res.data as Map<String, dynamic>;
-    final data = body['data'] as Map<String, dynamic>;
-    return data['preferred_model_code'] as String? ??
-        data['plan_default_model'] as String?;
+    final result = await listAvailableAIModelsResult(businessId: businessId);
+    return result.preferredModelCode;
   }
 
   Future<void> setPreferredModel({
@@ -224,6 +346,89 @@ class AIService {
         if (businessId != null) 'business_id': businessId,
       },
     );
+  }
+
+  Future<AIVoiceCatalog> getVoiceCatalog({int? businessId}) async {
+    final query = <String, dynamic>{};
+    if (businessId != null) query['business_id'] = businessId;
+    final res = await _api.get<Map<String, dynamic>>(
+      '/api/v1/ai/voice/catalog',
+      query: query,
+    );
+    final body = res.data as Map<String, dynamic>;
+    return AIVoiceCatalog.fromJson(body['data'] as Map<String, dynamic>);
+  }
+
+  Future<Map<String, dynamic>> getBusinessVoiceSettings(int businessId) async {
+    final res = await _api.get<Map<String, dynamic>>(
+      '/api/v1/ai/voice/settings',
+      query: {'business_id': businessId},
+    );
+    final body = res.data as Map<String, dynamic>;
+    return Map<String, dynamic>.from(body['data'] as Map);
+  }
+
+  Future<Map<String, dynamic>> saveBusinessVoiceSettings(
+    int businessId,
+    Map<String, dynamic> data,
+  ) async {
+    final res = await _api.put<Map<String, dynamic>>(
+      '/api/v1/ai/voice/settings',
+      query: {'business_id': businessId},
+      data: data,
+    );
+    final body = res.data as Map<String, dynamic>;
+    return Map<String, dynamic>.from(body['data'] as Map);
+  }
+
+  Future<String> transcribeVoice({
+    required List<int> wavBytes,
+    int? businessId,
+    String? sttCode,
+  }) async {
+    final form = FormData.fromMap({
+      'file': MultipartFile.fromBytes(
+        wavBytes,
+        filename: 'dictate.wav',
+        contentType: DioMediaType('audio', 'wav'),
+      ),
+      if (sttCode != null && sttCode.isNotEmpty) 'stt_code': sttCode,
+    });
+    final res = await _api.post<Map<String, dynamic>>(
+      '/api/v1/ai/voice/stt',
+      data: form,
+      query: {if (businessId != null) 'business_id': businessId},
+      options: Options(
+        sendTimeout: _kLongAiHttpTimeout,
+        receiveTimeout: _kLongAiHttpTimeout,
+      ),
+    );
+    final body = res.data as Map<String, dynamic>;
+    final data = body['data'] as Map<String, dynamic>;
+    return (data['text'] as String? ?? '').trim();
+  }
+
+  Future<List<int>> synthesizeVoice({
+    required String text,
+    int? businessId,
+    String? ttsCode,
+  }) async {
+    final res = await _api.post<List<int>>(
+      '/api/v1/ai/voice/tts',
+      data: {
+        'text': text,
+        if (ttsCode != null && ttsCode.isNotEmpty) 'tts_code': ttsCode,
+      },
+      query: {if (businessId != null) 'business_id': businessId},
+      options: Options(
+        responseType: ResponseType.bytes,
+        sendTimeout: _kLongAiHttpTimeout,
+        receiveTimeout: _kLongAiHttpTimeout,
+      ),
+    );
+    final data = res.data;
+    if (data == null) return const [];
+    return data;
   }
 
   Future<List<AIPlan>> listPublicAIPlans({int? businessId}) async {
@@ -337,31 +542,60 @@ class AIService {
   Future<Map<String, dynamic>> updateAIMemory({
     required String content,
     int? businessId,
-    Map<String, dynamic>? structured,
   }) async {
     final res = await _api.put<Map<String, dynamic>>(
       '/api/v1/ai/chat/memory',
       data: {
         'content': content,
+        'instructions': content,
         if (businessId != null) 'business_id': businessId,
-        if (structured != null && structured.isNotEmpty)
-          'structured': structured,
       },
     );
     final body = res.data as Map<String, dynamic>;
     return body['data'] as Map<String, dynamic>;
   }
 
-  Future<Map<String, dynamic>> getAIMemoryDigest({int? businessId}) async {
-    final query = <String, dynamic>{
-      if (businessId != null) 'business_id': businessId.toString(),
-    };
-    final res = await _api.get<Map<String, dynamic>>(
-      '/api/v1/ai/chat/memory/digest',
-      query: query,
+  Future<Map<String, dynamic>> updateAIMemoryItem({
+    required int itemId,
+    required String content,
+    int? businessId,
+  }) async {
+    final res = await _api.put<Map<String, dynamic>>(
+      '/api/v1/ai/chat/memory/items/$itemId',
+      data: {
+        'content': content,
+        if (businessId != null) 'business_id': businessId,
+      },
     );
     final body = res.data as Map<String, dynamic>;
     return body['data'] as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> pinAIMemoryEntry({
+    required String content,
+    String kind = 'context',
+    int? businessId,
+  }) async {
+    final res = await _api.post<Map<String, dynamic>>(
+      '/api/v1/ai/chat/memory/entries',
+      data: {
+        'content': content,
+        'kind': kind,
+        if (businessId != null) 'business_id': businessId,
+      },
+    );
+    final body = res.data as Map<String, dynamic>;
+    return body['data'] as Map<String, dynamic>;
+  }
+
+  Future<void> deleteAIMemoryItem({
+    required int itemId,
+    int? businessId,
+  }) async {
+    await _api.delete<Map<String, dynamic>>(
+      '/api/v1/ai/chat/memory/items/$itemId',
+      query: {if (businessId != null) 'business_id': businessId.toString()},
+    );
   }
 
   Future<void> deleteAIMemory({int? businessId}) async {
@@ -460,6 +694,50 @@ class AIService {
         .toList();
   }
 
+  Future<AIChatSession?> getChatSession({required int sessionId}) async {
+    try {
+      final res = await _api.get<Map<String, dynamic>>(
+        '/api/v1/ai/chat/sessions/$sessionId',
+      );
+      final data = res.data?['data'];
+      if (data is Map<String, dynamic>) {
+        return AIChatSession.fromJson(data);
+      }
+    } catch (e) {
+      debugPrint('[AIService] getChatSession failed: $e');
+    }
+    return null;
+  }
+
+  Future<AIChatActiveRun?> getActiveAgentRun({required int sessionId}) async {
+    try {
+      final res = await _api.get<Map<String, dynamic>>(
+        '/api/v1/ai/chat/sessions/$sessionId/active-run',
+      );
+      final data = res.data?['data'];
+      if (data is Map<String, dynamic>) {
+        return AIChatActiveRun.fromJson(data);
+      }
+    } catch (e) {
+      debugPrint('[AIService] getActiveAgentRun failed: $e');
+    }
+    return null;
+  }
+
+  Future<void> cancelAgentRun({
+    required int sessionId,
+    required String runId,
+  }) async {
+    try {
+      await _api.post(
+        '/api/v1/ai/chat/sessions/$sessionId/runs/$runId/cancel',
+        data: const <String, dynamic>{},
+      );
+    } catch (e) {
+      debugPrint('[AIService] cancelAgentRun failed: $e');
+    }
+  }
+
   Future<AIChatSession> createChatSession({
     int? businessId,
     String? executionMode,
@@ -511,6 +789,21 @@ class AIService {
         .toList();
   }
 
+  Future<List<AIChatSubagentSummary>> listSessionSubagents(int sessionId) async {
+    final res = await _api.get<Map<String, dynamic>>(
+      '/api/v1/ai/chat/sessions/$sessionId/subagents',
+    );
+    final body = res.data as Map<String, dynamic>;
+    final data = body['data'];
+    final rawItems = data is Map ? data['items'] : null;
+    if (rawItems is! List) return const [];
+    return rawItems
+        .whereType<Map>()
+        .map((e) => AIChatSubagentSummary.fromJson(Map<String, dynamic>.from(e)))
+        .where((e) => e.subagentId.isNotEmpty)
+        .toList();
+  }
+
   Future<Map<String, dynamic>> sendMessage({
     required int sessionId,
     required String content,
@@ -532,12 +825,14 @@ class AIService {
     required int sessionId,
     required String content,
     bool approveWrites = false,
+    bool silent = false,
     String? explorationMode,
     String? executionMode,
     String? model,
     void Function(Map<String, dynamic>? usage, int? messageId)? onComplete,
     void Function(String error)? onError,
     CancelToken? cancelToken,
+    AISseCursor? sseCursor,
   }) async* {
     try {
       final query = <String, dynamic>{'stream': true};
@@ -547,6 +842,7 @@ class AIService {
       final payload = <String, dynamic>{
         'content': content,
         'approve_writes': approveWrites,
+        if (silent) 'silent': true,
         if (explorationMode != null && explorationMode.isNotEmpty)
           'mode': explorationMode,
         if (executionMode != null && executionMode.isNotEmpty)
@@ -562,8 +858,14 @@ class AIService {
           headers: headers,
           body: jsonEncode(payload),
           cancelToken: cancelToken,
+          onEventId: (id) => sseCursor?.lastEventId = id,
         )) {
-          final chunk = _parseSsePayload(eventPayload, onError, onComplete);
+          final chunk = _parseSsePayload(
+            eventPayload,
+            onError,
+            onComplete,
+            cursor: sseCursor,
+          );
           if (chunk != null) yield chunk;
         }
         return;
@@ -602,9 +904,15 @@ class AIService {
             eventBuffer.join('\n'),
             onError,
             onComplete,
+            cursor: sseCursor,
           );
           eventBuffer.clear();
           if (chunk != null) yield chunk;
+          continue;
+        }
+        if (line.startsWith('id:')) {
+          final id = int.tryParse(line.substring(3).trim());
+          if (id != null) sseCursor?.lastEventId = id;
           continue;
         }
         if (line.startsWith('data:')) {
@@ -620,6 +928,7 @@ class AIService {
           eventBuffer.join('\n'),
           onError,
           onComplete,
+          cursor: sseCursor,
         );
         if (chunk != null) yield chunk;
       }
@@ -634,8 +943,9 @@ class AIService {
   AIStreamChunk? _parseSsePayload(
     String payload,
     void Function(String error)? onError,
-    void Function(Map<String, dynamic>? usage, int? messageId)? onComplete,
-  ) {
+    void Function(Map<String, dynamic>? usage, int? messageId)? onComplete, {
+    AISseCursor? cursor,
+  }) {
     Map<String, dynamic> data;
     try {
       data = jsonDecode(payload) as Map<String, dynamic>;
@@ -644,16 +954,35 @@ class AIService {
     }
 
     final eventType = data['type'] as String?;
+    final runId = data['run_id'] as String?;
+    final sseId = (data['sse_id'] as num?)?.toInt();
+    final canContinue = data['can_continue'] as bool?;
+    if (cursor != null) {
+      if (sseId != null) cursor.lastEventId = sseId;
+      if (runId != null && runId.isNotEmpty) cursor.runId = runId;
+    }
 
     if (data.containsKey('error') &&
         ((data['done'] as bool? ?? false) || eventType == 'error')) {
       final errorMessage = data['error'] as String? ?? 'خطای نامشخص';
-      onError?.call(errorMessage);
+      // خطا به‌صورت chunk به UI می‌رسد تا یک مسیر بازیابی واحد باشد؛
+      // onError فقط برای شکست شبکه/پارس در لایهٔ استریم است.
       return AIStreamChunk(
         error: errorMessage,
         done: data['done'] as bool? ?? true,
         recoverable: data['recoverable'] as bool? ?? false,
         suggestedAction: data['suggested_action'] as String?,
+        errorCode: data['error_code'] as String?,
+        runId: runId,
+        sseId: sseId,
+        canContinue: canContinue,
+      );
+    }
+    if (eventType == 'agent_run' || eventType == 'run_resumed') {
+      return AIStreamChunk(
+        runId: runId,
+        sseId: sseId,
+        canContinue: canContinue,
       );
     }
     if (eventType == 'status') {
@@ -745,11 +1074,36 @@ class AIService {
         done: true,
         messageId: data['message_id'] as int?,
         functionCalls: data['function_calls'],
-        functionResults: data['function_results'],
+        functionResults: () {
+          final fr = data['function_results'];
+          final cites = data['citations'];
+          final skills = data['activated_skills'];
+          if ((cites is List && cites.isNotEmpty) ||
+              (skills is List && skills.isNotEmpty)) {
+            final map = fr is Map
+                ? Map<String, dynamic>.from(fr)
+                : <String, dynamic>{};
+            if (cites is List && cites.isNotEmpty) {
+              map.putIfAbsent(kAgentCitationsStorageKey, () => cites);
+            }
+            if (skills is List && skills.isNotEmpty) {
+              map.putIfAbsent(kActivatedSkillsStorageKey, () => skills);
+            }
+            return map;
+          }
+          return fr;
+        }(),
         agentTrace: agentTrace,
         agentBudget: agentBudget,
         requestedModel: data['requested_model'] as String?,
         resolvedModel: data['resolved_model'] as String?,
+        awaitingApproval: data['awaiting_approval'] as bool?,
+        citationsContext: data['citations_context'] as String?,
+        executionMode: data['execution_mode'] as String?,
+        runId: runId,
+        sseId: sseId,
+        canContinue: canContinue,
+        finalContent: _assistFinalText(data),
       );
     }
 
@@ -757,6 +1111,74 @@ class AIService {
       return AIStreamChunk(contentDelta: content);
     }
     return null;
+  }
+
+  static String? _assistFinalText(Map<String, dynamic> data) {
+    for (final key in [
+      'final_content',
+      'summary',
+      'suggested_reply',
+      'suggested_text',
+    ]) {
+      final value = data[key];
+      if (value is String && value.trim().isNotEmpty) return value;
+    }
+    return null;
+  }
+
+  /// ادامهٔ همان run پس از قطع استریم یا سقف بودجه
+  Stream<AIStreamChunk> continueAgentRunStream({
+    required int sessionId,
+    required String runId,
+    bool approveWrites = false,
+    String? executionMode,
+    String? model,
+    AISseCursor? sseCursor,
+    void Function(Map<String, dynamic>? usage, int? messageId)? onComplete,
+    void Function(String error)? onError,
+    CancelToken? cancelToken,
+  }) {
+    final headers = <String, dynamic>{};
+    if (sseCursor?.lastEventId != null) {
+      headers['Last-Event-ID'] = '${sseCursor!.lastEventId}';
+    }
+    return _postSseStream(
+      '/api/v1/ai/chat/sessions/$sessionId/runs/$runId/continue?stream=true',
+      data: {
+        'approve_writes': approveWrites,
+        if (executionMode != null && executionMode.isNotEmpty)
+          'execution_mode': executionMode,
+        if (model != null && model.isNotEmpty) 'model': model,
+        if (sseCursor?.lastEventId != null) 'last_event_id': sseCursor!.lastEventId,
+      },
+      onComplete: onComplete,
+      onError: onError,
+      cancelToken: cancelToken,
+      logLabel: 'ContinueRun',
+      sseCursor: sseCursor,
+    );
+  }
+
+  /// اشتراک مجدد به run زنده بدون اجرای دوبارهٔ ایجنت.
+  Stream<AIStreamChunk> subscribeAgentRunStream({
+    required int sessionId,
+    required String runId,
+    AISseCursor? sseCursor,
+    void Function(Map<String, dynamic>? usage, int? messageId)? onComplete,
+    void Function(String error)? onError,
+    CancelToken? cancelToken,
+  }) {
+    return _postSseStream(
+      '/api/v1/ai/chat/sessions/$sessionId/runs/$runId/events',
+      data: {
+        if (sseCursor?.lastEventId != null) 'last_event_id': sseCursor!.lastEventId,
+      },
+      onComplete: onComplete,
+      onError: onError,
+      cancelToken: cancelToken,
+      logLabel: 'SubscribeRun',
+      sseCursor: sseCursor,
+    );
   }
 
   /// تولید مجدد آخرین پاسخ (همان قرارداد استریم sendMessageStream)
@@ -1011,6 +1433,17 @@ class AIService {
     final res = await _api.post<Map<String, dynamic>>(
       '/api/v1/ai/chat/sessions/$sessionId/fork',
       query: query,
+    );
+    final body = res.data as Map<String, dynamic>;
+    return body['data'] as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> cancelSubagent({
+    required int sessionId,
+    required String subagentId,
+  }) async {
+    final res = await _api.post<Map<String, dynamic>>(
+      '/api/v1/ai/chat/sessions/$sessionId/subagents/$subagentId/cancel',
     );
     final body = res.data as Map<String, dynamic>;
     return body['data'] as Map<String, dynamic>;
@@ -1313,18 +1746,28 @@ class AIService {
     void Function(String error)? onError,
     CancelToken? cancelToken,
     String logLabel = 'SSE',
+    AISseCursor? sseCursor,
   }) async* {
     try {
       if (kIsWeb) {
         final uri = _api.resolveUri(path, query: query);
         final headers = _api.streamingHeadersFor(uri);
+        if (sseCursor?.lastEventId != null) {
+          headers['Last-Event-ID'] = '${sseCursor!.lastEventId}';
+        }
         await for (final eventPayload in postSsePayloads(
           uri: uri,
           headers: headers,
           body: jsonEncode(data ?? const <String, dynamic>{}),
           cancelToken: cancelToken,
+          onEventId: (id) => sseCursor?.lastEventId = id,
         )) {
-          final chunk = _parseSsePayload(eventPayload, onError, onComplete);
+          final chunk = _parseSsePayload(
+            eventPayload,
+            onError,
+            onComplete,
+            cursor: sseCursor,
+          );
           if (chunk != null) yield chunk;
         }
         return;
@@ -1337,7 +1780,12 @@ class AIService {
         options: Options(
           receiveTimeout: const Duration(minutes: 10),
           sendTimeout: const Duration(seconds: 60),
-          headers: {'Accept': 'text/event-stream', 'Cache-Control': 'no-cache'},
+          headers: {
+            'Accept': 'text/event-stream',
+            'Cache-Control': 'no-cache',
+            if (sseCursor?.lastEventId != null)
+              'Last-Event-ID': '${sseCursor!.lastEventId}',
+          },
         ),
         cancelToken: cancelToken,
       );
@@ -1362,9 +1810,15 @@ class AIService {
             eventBuffer.join('\n'),
             onError,
             onComplete,
+            cursor: sseCursor,
           );
           eventBuffer.clear();
           if (chunk != null) yield chunk;
+          continue;
+        }
+        if (line.startsWith('id:')) {
+          final id = int.tryParse(line.substring(3).trim());
+          if (id != null) sseCursor?.lastEventId = id;
           continue;
         }
         if (line.startsWith('data:')) {
@@ -1379,6 +1833,7 @@ class AIService {
           eventBuffer.join('\n'),
           onError,
           onComplete,
+          cursor: sseCursor,
         );
         if (chunk != null) yield chunk;
       }
@@ -1392,6 +1847,26 @@ class AIService {
 
   Future<void> deleteChatSession(int sessionId) async {
     await _api.delete('/api/v1/ai/chat/sessions/$sessionId');
+  }
+
+  Future<AISessionTodoSnapshot> updateSessionTodo({
+    required int sessionId,
+    required String todoId,
+    required String status,
+  }) async {
+    final res = await _api.patch<Map<String, dynamic>>(
+      '/api/v1/ai/chat/sessions/$sessionId/todos/$todoId',
+      data: {'status': status},
+    );
+    final body = res.data as Map<String, dynamic>;
+    final data = body['data'];
+    if (data is! Map) {
+      return const AISessionTodoSnapshot(
+        items: [],
+        summary: AISessionTodoSummary(total: 0, completed: 0),
+      );
+    }
+    return AISessionTodoSnapshot.fromJson(Map<String, dynamic>.from(data));
   }
 
   // ========== Voice: Feedback ==========
@@ -1652,6 +2127,48 @@ class AIService {
   }
 
   // ========== Support: AI Ticket Suggestions ==========
+  Stream<AIStreamChunk> streamCrmSummarizeLead({
+    required int businessId,
+    required int leadId,
+    CancelToken? cancelToken,
+  }) {
+    return _postSseStream(
+      '/api/v1/ai/crm/businesses/$businessId/summarize-lead',
+      query: {'stream': 'true'},
+      data: {'lead_id': leadId},
+      cancelToken: cancelToken,
+      logLabel: 'CRM-lead',
+    );
+  }
+
+  Stream<AIStreamChunk> streamCrmSummarizeDeal({
+    required int businessId,
+    required int dealId,
+    CancelToken? cancelToken,
+  }) {
+    return _postSseStream(
+      '/api/v1/ai/crm/businesses/$businessId/summarize-deal',
+      query: {'stream': 'true'},
+      data: {'deal_id': dealId},
+      cancelToken: cancelToken,
+      logLabel: 'CRM-deal',
+    );
+  }
+
+  Stream<AIStreamChunk> streamTicketSuggestReply({
+    required int ticketId,
+    String? context,
+    CancelToken? cancelToken,
+  }) {
+    return _postSseStream(
+      '/api/v1/support/tickets/$ticketId/ai-suggest-reply',
+      query: {'stream': 'true'},
+      data: {if (context != null) 'context': context},
+      cancelToken: cancelToken,
+      logLabel: 'ticket-suggest',
+    );
+  }
+
   Future<Map<String, dynamic>> suggestTicketReply({
     required int ticketId,
     String? context,

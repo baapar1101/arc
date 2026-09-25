@@ -45,6 +45,8 @@ async def list_kardex_lines_endpoint(
         key_payload = {
             "business_id": business_id,
             "query": query_dict,
+            # نتیجه شامل تاریخ‌های فرمت‌شده است؛ تقویم درخواست باید در کلید کش باشد
+            "calendar_type": getattr(getattr(request, "state", None), "calendar_type", None),
         }
         key_str = json.dumps(key_payload, sort_keys=True, ensure_ascii=False)
         key_hash = hashlib.sha256(key_str.encode("utf-8")).hexdigest()[:16]
@@ -844,7 +846,7 @@ async def export_kardex_pdf_endpoint(
         <h3>{'گزارش کاردکس' if is_fa else 'Kardex Report'}</h3>
         {(
           "<div style='margin:6px 0 10px 0; font-size:11px; color:#555'>" +
-          "".join([f"<span style=\"display:inline-block;border:1px solid #e5e7eb;border-radius:999px;padding:3px 8px;margin:2px 4px;background:#fff\"><b>{escape(str(f.get('label')))}:</b> {escape(str(f.get('value')))}</span>" for f in (filters_summary or [])]) +
+          "".join([f'''<span style="display:inline-block;border:1px solid #e5e7eb;border-radius:999px;padding:3px 8px;margin:2px 4px;background:#fff"><b>{escape(str(f.get('label')))}:</b> {escape(str(f.get('value')))}</span>''' for f in (filters_summary or [])]) +
           "</div>"
         ) if filters_summary else ""}
         <table>

@@ -2,7 +2,11 @@
 from app.services.ai.ai_tool_intent import (
     detect_categories,
     estimate_query_complexity,
+    merge_tool_allowlists,
+    query_expects_tool_use,
     query_needs_knowledge,
+    query_targets_tool_domain,
+    select_catalog_tool_names,
     select_tool_names,
 )
 
@@ -20,8 +24,9 @@ def test_select_tools_includes_core():
         "get_customer_club_settings",
     }
     selected = select_tool_names(all_names, "فاکتور فروش")
-    assert "query_business_data" in selected
     assert "search_invoices" in selected
+    # Core بدون relevance نباید جای ابزار مرتبط را بگیرد
+    assert "get_customer_club_settings" not in selected or "search_invoices" in selected
 
 
 def test_query_needs_knowledge_skips_greeting():
@@ -66,3 +71,87 @@ def test_estimate_query_complexity_write_operation():
 
 def test_estimate_query_complexity_greeting():
     assert estimate_query_complexity("سلام") == "simple"
+
+
+# ---- Phase 0: routing باید حتی سوال‌های «ساده» اما داده‌محور را tools بدهد ----
+
+def test_query_expects_tool_use_simple_complexity_but_data_domain():
+    query = "موجودی کالای الف چقدر است؟"
+    # سوال داده‌محور کوتاه بدون کلیدواژهٔ گزارش هنوز می‌تواند simple باشد
+    # اما باید tools بگیرد.
+    assert query_expects_tool_use(query) is True
+
+
+def test_estimate_query_complexity_short_report_is_not_simple():
+    assert estimate_query_complexity("تراز آزمایشی فروردین") == "medium"
+    assert estimate_query_complexity("یه گزارش از هزینه ها بهم بگو") == "medium"
+    assert estimate_query_complexity("سلام") == "simple"
+
+
+def test_query_targets_tool_domain_strips_leading_greeting():
+    assert query_targets_tool_domain("سلام یه گزارش از هزینه ها بهم بگو") is True
+
+
+def test_query_expects_tool_use_greeting_prefixed_data_query():
+    assert query_expects_tool_use("سلام یه گزارش از هزینه ها بهم بگو") is True
+
+
+def test_query_expects_tool_use_pure_greeting_stays_false():
+    assert query_expects_tool_use("سلام") is False
+
+
+def test_query_expects_tool_use_short_followup_with_history():
+    history = [
+        {"role": "user", "content": "بررسی مالی از ۳ ماه گذشته انجام بده"},
+    ]
+    assert query_expects_tool_use("انجامش بده", history) is True
+
+
+def test_plan_tools_union_survives_intent_without_plan_keywords():
+    from app.services.ai.ai_session_todo_service import SESSION_TODO_TOOL_NAMES
+
+    all_names = {
+        "query_business_data",
+        "search_invoices",
+        "get_sales_report",
+        "create_session_plan",
+        "list_session_todos",
+        "update_session_todo",
+    }
+    selected = select_tool_names(all_names, "فروش این ماه چقدر بوده؟", max_tools=3)
+    assert "create_session_plan" not in selected
+    assert "search_invoices" in selected or "get_sales_report" in selected
+    allowed = merge_tool_allowlists(
+        selected,
+        forced_names=SESSION_TODO_TOOL_NAMES & all_names,
+    )
+    assert "create_session_plan" in allowed
+    assert "update_session_todo" in allowed
+
+
+def test_select_catalog_keeps_write_tools_on_multi_step_query():
+    all_names = {
+        "query_business_data",
+        "create_person",
+        "create_invoice",
+        "create_receipt_payment",
+        "search_persons",
+        "search_products",
+        "list_bank_accounts",
+        "create_session_plan",
+        "spawn_subagent",
+    }
+    all_names |= {f"zzz_filler_{i:03d}" for i in range(140)}
+    selected = select_catalog_tool_names(
+        all_names,
+        "یک شخص به نام علی بساز سپس فاکتور فروش خدمات پشتیبانی سازمانی بزن و با بانک ملت تسویه کن",
+        protected_names={
+            "create_person",
+            "create_invoice",
+            "create_receipt_payment",
+        },
+        prefer_names={"create_session_plan", "spawn_subagent"},
+    )
+    assert "create_person" in selected
+    assert "create_invoice" in selected
+    assert "create_receipt_payment" in selected

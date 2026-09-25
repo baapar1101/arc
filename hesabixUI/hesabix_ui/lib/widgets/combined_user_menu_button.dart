@@ -9,6 +9,7 @@ import '../theme/theme_controller.dart';
 import 'calendar_switcher.dart';
 import 'language_switcher.dart';
 import 'theme_mode_switcher.dart';
+import 'theme_palette_switcher.dart';
 import '../utils/snackbar_helper.dart';
 
 
@@ -249,6 +250,13 @@ class CombinedUserMenuButton extends StatelessWidget {
                           
                           // تنظیمات تم
                           if (themeController != null) ...[
+                            _buildSettingRow(
+                              context,
+                              icon: Icons.color_lens_outlined,
+                              title: t.colorTheme,
+                              child: ThemePaletteSwitcher(controller: themeController!),
+                            ),
+                            const SizedBox(height: 8),
                             _buildSettingRow(
                               context,
                               icon: Icons.palette,

@@ -10,6 +10,7 @@ from adapters.api.v1.schemas import QueryInfo, PaginatedResponse, SuccessRespons
 from adapters.api.v1.support.schemas import (
     CreateMessageRequest,
     UpdateStatusRequest,
+    UpdatePriorityRequest,
     AssignTicketRequest,
     BulkAssignRequest,
     BulkUpdateStatusRequest,
@@ -20,6 +21,19 @@ from app.core.auth_dependency import get_current_user, AuthContext
 from app.core.permissions import require_app_permission
 from app.core.responses import success_response, format_datetime_fields, ApiError
 from app.services.notification_service import NotificationService
+from app.services.support.ticket_access_service import TicketAccessService
+from app.services.support.ticket_lifecycle_service import TicketLifecycleService
+from app.services.support.ticket_event_service import TicketEventService
+from app.services.support.support_attachment_service import SupportAttachmentService
+from adapters.api.v1.support.message_helpers import serialize_message, serialize_messages
+from adapters.api.v1.support.ticket_serialize import ticket_to_dict, ticket_response_dict
+from app.services.support.ticket_engagement_service import mark_operator_read
+from adapters.db.repositories.support.attachment_repository import AttachmentRepository
+from app.services.support.notification_helpers import (
+    support_notification_context,
+    support_operator_notification_context,
+    resolve_announcement_navigation,
+)
 import logging
 
 router = APIRouter()
@@ -42,62 +56,7 @@ async def search_operator_tickets(
     
     tickets, total = ticket_repo.get_operator_tickets(query_info)
     
-    # تبدیل به dict
-    ticket_dicts = []
-    for ticket in tickets:
-        ticket_dict = {
-            "id": ticket.id,
-            "title": ticket.title,
-            "description": ticket.description,
-            "user_id": ticket.user_id,
-            "category_id": ticket.category_id,
-            "priority_id": ticket.priority_id,
-            "status_id": ticket.status_id,
-            "assigned_operator_id": ticket.assigned_operator_id,
-            "is_internal": ticket.is_internal,
-            "closed_at": ticket.closed_at,
-            "created_at": ticket.created_at,
-            "updated_at": ticket.updated_at,
-            "user": {
-                "id": ticket.user.id,
-                "first_name": ticket.user.first_name,
-                "last_name": ticket.user.last_name,
-                "email": ticket.user.email
-            } if ticket.user else None,
-            "assigned_operator": {
-                "id": ticket.assigned_operator.id,
-                "first_name": ticket.assigned_operator.first_name,
-                "last_name": ticket.assigned_operator.last_name,
-                "email": ticket.assigned_operator.email
-            } if ticket.assigned_operator else None,
-            "category": {
-                "id": ticket.category.id,
-                "name": ticket.category.name,
-                "description": ticket.category.description,
-                "is_active": ticket.category.is_active,
-                "created_at": ticket.category.created_at,
-                "updated_at": ticket.category.updated_at
-            } if ticket.category else None,
-            "priority": {
-                "id": ticket.priority.id,
-                "name": ticket.priority.name,
-                "description": ticket.priority.description,
-                "color": ticket.priority.color,
-                "order": ticket.priority.order,
-                "created_at": ticket.priority.created_at,
-                "updated_at": ticket.priority.updated_at
-            } if ticket.priority else None,
-            "status": {
-                "id": ticket.status.id,
-                "name": ticket.status.name,
-                "description": ticket.status.description,
-                "color": ticket.status.color,
-                "is_final": ticket.status.is_final,
-                "created_at": ticket.status.created_at,
-                "updated_at": ticket.status.updated_at
-            } if ticket.status else None
-        }
-        ticket_dicts.append(ticket_dict)
+    ticket_dicts = [ticket_to_dict(ticket, db) for ticket in tickets]
     
     paginated_data = PaginatedResponse.create(
         items=ticket_dicts,
@@ -109,6 +68,58 @@ async def search_operator_tickets(
     # Format datetime fields based on calendar type
     formatted_data = format_datetime_fields(paginated_data.dict(), request)
     
+    return success_response(formatted_data, request)
+
+
+@router.get("/operators", response_model=SuccessResponse)
+@require_app_permission("support_operator")
+async def list_support_operators(
+    request: Request,
+    current_user: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """لیست اپراتورهای پشتیبانی برای تخصیص"""
+    from adapters.db.repositories.user_repo import UserRepository
+
+    user_repo = UserRepository(db)
+    operators = user_repo.get_support_operators()
+    items = [
+        {
+            "id": op.id,
+            "first_name": op.first_name,
+            "last_name": op.last_name,
+            "email": op.email,
+        }
+        for op in operators
+    ]
+    return success_response(items, request)
+
+
+@router.get("/tickets/{ticket_id}/events", response_model=SuccessResponse)
+@require_app_permission("support_operator")
+async def get_operator_ticket_events(
+    request: Request,
+    ticket_id: int,
+    current_user: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """دریافت تاریخچه رویدادهای تیکت برای اپراتور"""
+    access = TicketAccessService(db)
+    access.get_operator_ticket(ticket_id)
+    events = TicketEventService(db).list_for_ticket(ticket_id)
+    items = [
+        {
+            "id": e.id,
+            "ticket_id": e.ticket_id,
+            "actor_id": e.actor_id,
+            "event_type": e.event_type,
+            "old_value": e.old_value,
+            "new_value": e.new_value,
+            "created_at": e.created_at,
+        }
+        for e in events
+    ]
+    formatted_data = format_datetime_fields(items, request)
     return success_response(formatted_data, request)
 
 
@@ -131,10 +142,26 @@ async def get_operator_ticket(
         )
     
     # Format datetime fields based on calendar type
-    ticket_data = TicketResponse.from_orm(ticket).dict()
+    ticket_data = ticket_response_dict(ticket, db)
     formatted_data = format_datetime_fields(ticket_data, request)
     
     return success_response(formatted_data, request)
+
+
+@router.post("/tickets/{ticket_id}/read", response_model=SuccessResponse)
+@require_app_permission("support_operator")
+async def mark_ticket_read_operator(
+    request: Request,
+    ticket_id: int,
+    current_user: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """علامت‌گذاری تیکت به‌عنوان خوانده‌شده توسط اپراتور"""
+    access = TicketAccessService(db)
+    ticket = access.get_operator_ticket(ticket_id)
+    mark_operator_read(db, ticket)
+    data = ticket_to_dict(ticket, db)
+    return success_response(format_datetime_fields(data, request), request)
 
 
 @router.put("/tickets/{ticket_id}/status", response_model=SuccessResponse)
@@ -148,8 +175,8 @@ async def update_ticket_status(
 ):
     """تغییر وضعیت تیکت"""
     ticket_repo = TicketRepository(db)
+    lifecycle = TicketLifecycleService(db)
     
-    # دریافت وضعیت قبلی تیکت
     old_ticket = ticket_repo.get_operator_ticket_with_details(ticket_id)
     if not old_ticket:
         raise HTTPException(
@@ -160,40 +187,29 @@ async def update_ticket_status(
     old_status_id = old_ticket.status_id
     old_status_name = old_ticket.status.name if old_ticket.status else "نامشخص"
     
-    ticket = ticket_repo.update_ticket_status(
+    ticket_with_details = lifecycle.update_status(
         ticket_id=ticket_id,
         status_id=status_request.status_id,
-        operator_id=status_request.assigned_operator_id or current_user.get_user_id()
+        actor_id=current_user.get_user_id(),
+        assigned_operator_id=status_request.assigned_operator_id or current_user.get_user_id(),
     )
-    
-    if not ticket:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="تیکت یافت نشد"
-        )
-    
-    db.commit()
-    
-    # دریافت تیکت با جزئیات جدید
-    ticket_with_details = ticket_repo.get_operator_ticket_with_details(ticket_id)
     new_status_name = ticket_with_details.status.name if ticket_with_details.status else "نامشخص"
     
-    # ارسال ناتیفیکیشن به کاربر صاحب تیکت (اگر وضعیت تغییر کرده باشد)
     if old_status_id != status_request.status_id and ticket_with_details.user_id:
         try:
             notification_service = NotificationService(db)
             operator_name = f"{current_user.user.first_name or ''} {current_user.user.last_name or ''}".strip() or "اپراتور پشتیبانی"
             
-            context = {
+            context = support_notification_context({
                 "subject": f"وضعیت تیکت #{ticket_id} تغییر کرد",
-                "message": f"وضعیت تیکت شما (#{ticket_id}: {ticket.title}) از '{old_status_name}' به '{new_status_name}' تغییر کرد.",
+                "message": f"وضعیت تیکت شما (#{ticket_id}: {ticket_with_details.title}) از '{old_status_name}' به '{new_status_name}' تغییر کرد.",
                 "ticket_id": ticket_id,
-                "ticket_title": ticket.title,
+                "ticket_title": ticket_with_details.title,
                 "operator_name": operator_name,
                 "old_status": old_status_name,
                 "new_status": new_status_name,
-                "user_id": ticket_with_details.user_id  # برای audience_filters
-            }
+                "user_id": ticket_with_details.user_id
+            }, ticket_id)
             
             notification_service.send(
                 user_id=ticket_with_details.user_id,
@@ -207,9 +223,28 @@ async def update_ticket_status(
             logger.error(f"خطا در ارسال ناتیفیکیشن برای تغییر وضعیت تیکت {ticket_id}: {e}")
     
     # Format datetime fields based on calendar type
-    ticket_data = TicketResponse.from_orm(ticket_with_details).dict()
+    ticket_data = ticket_response_dict(ticket_with_details, db)
     formatted_data = format_datetime_fields(ticket_data, request)
     
+    return success_response(formatted_data, request)
+
+
+@router.put("/tickets/{ticket_id}/priority", response_model=SuccessResponse)
+@require_app_permission("support_operator")
+async def update_ticket_priority(
+    request: Request,
+    ticket_id: int,
+    priority_request: UpdatePriorityRequest,
+    current_user: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """تغییر اولویت تیکت"""
+    lifecycle = TicketLifecycleService(db)
+    ticket_with_details = lifecycle.update_priority(
+        ticket_id, priority_request.priority_id, current_user.get_user_id()
+    )
+    ticket_data = ticket_response_dict(ticket_with_details, db)
+    formatted_data = format_datetime_fields(ticket_data, request)
     return success_response(formatted_data, request)
 
 
@@ -227,8 +262,8 @@ async def assign_ticket(
     
     ticket_repo = TicketRepository(db)
     user_repo = UserRepository(db)
+    lifecycle = TicketLifecycleService(db)
     
-    # بررسی اینکه operator_id واقعاً یک اپراتور است
     if assign_request.operator_id:
         if not user_repo.is_support_operator(assign_request.operator_id):
             raise HTTPException(
@@ -236,7 +271,6 @@ async def assign_ticket(
                 detail="کاربر مشخص شده یک اپراتور پشتیبانی نیست"
             )
     
-    # بررسی وجود تیکت
     ticket = ticket_repo.get_operator_ticket_with_details(ticket_id)
     if not ticket:
         raise HTTPException(
@@ -247,34 +281,34 @@ async def assign_ticket(
     old_operator_id = ticket.assigned_operator_id
     new_operator_id = assign_request.operator_id
     
-    # تخصیص تیکت
-    ticket = ticket_repo.assign_ticket(ticket_id, assign_request.operator_id)
-    if not ticket:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="تیکت یافت نشد"
+    ticket_with_details = lifecycle.assign(
+        ticket_id, assign_request.operator_id, current_user.get_user_id()
+    )
+
+    try:
+        from app.services.support.support_broadcast import broadcast_ticket_updated
+
+        broadcast_ticket_updated(
+            db,
+            ticket_with_details,
+            changes={"assigned_operator_id": assign_request.operator_id},
         )
+    except Exception:
+        pass
     
-    db.commit()
-    
-    # دریافت تیکت با جزئیات
-    ticket_with_details = ticket_repo.get_operator_ticket_with_details(ticket_id)
-    
-    # ارسال ناتیفیکیشن به اپراتور جدید (اگر تغییر کرده باشد)
     if new_operator_id and new_operator_id != old_operator_id:
         try:
             notification_service = NotificationService(db)
             operator = user_repo.get_by_id(new_operator_id)
             operator_name = f"{operator.first_name or ''} {operator.last_name or ''}".strip() if operator else "اپراتور پشتیبانی"
             
-            context = {
+            context = support_operator_notification_context({
                 "subject": f"تیکت جدید به شما تخصیص داده شد: #{ticket_id}",
-                "message": f"تیکت #{ticket_id}: {ticket.title} به شما تخصیص داده شد.",
-                "ticket_id": ticket_id,
-                "ticket_title": ticket.title,
+                "message": f"تیکت #{ticket_id}: {ticket_with_details.title} به شما تخصیص داده شد.",
+                "ticket_title": ticket_with_details.title,
                 "operator_name": operator_name,
-                "user_id": ticket_with_details.user_id  # برای audience_filters (اگر نیاز باشد)
-            }
+                "user_id": ticket_with_details.user_id,
+            }, ticket_id)
             
             notification_service.send(
                 user_id=new_operator_id,
@@ -288,7 +322,7 @@ async def assign_ticket(
             logger.error(f"خطا در ارسال ناتیفیکیشن برای تخصیص تیکت {ticket_id}: {e}")
     
     # Format datetime fields based on calendar type
-    ticket_data = TicketResponse.from_orm(ticket_with_details).dict()
+    ticket_data = ticket_response_dict(ticket_with_details, db)
     formatted_data = format_datetime_fields(ticket_data, request)
     
     return success_response(formatted_data, request)
@@ -304,33 +338,34 @@ async def send_operator_message(
     db: Session = Depends(get_db)
 ):
     """ارسال پیام اپراتور به تیکت"""
-    ticket_repo = TicketRepository(db)
+    access = TicketAccessService(db)
     message_repo = MessageRepository(db)
+    ticket_repo = TicketRepository(db)
     
-    # بررسی وجود تیکت
-    ticket = ticket_repo.get_operator_ticket_with_details(ticket_id)
-    if not ticket:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="تیکت یافت نشد"
-        )
+    ticket = access.get_operator_ticket(ticket_id)
     
-    # بررسی تخصیص: اگر تیکت به اپراتور دیگری تخصیص شده، فقط هشدار می‌دهیم اما اجازه پاسخ می‌دهیم
-    # (ممکن است اپراتورها بخواهند به تیکت‌های یکدیگر کمک کنند)
     if ticket.assigned_operator_id and ticket.assigned_operator_id != current_user.get_user_id():
         logger = logging.getLogger(__name__)
         logger.info(f"اپراتور {current_user.get_user_id()} به تیکت {ticket_id} که به اپراتور {ticket.assigned_operator_id} تخصیص شده پاسخ می‌دهد")
+
+    content = (message_request.content or "").strip()
+    if not content and not message_request.attachment_ids:
+        raise ApiError("EMPTY_MESSAGE", "متن پیام یا پیوست الزامی است", http_status=400)
+    if not content:
+        content = "📎 پیوست فایل"
     
-    # ایجاد پیام
     message = message_repo.create_message(
         ticket_id=ticket_id,
         sender_id=current_user.get_user_id(),
         sender_type="operator",
-        content=message_request.content,
+        content=content,
         is_internal=message_request.is_internal
     )
+
+    attachment_service = SupportAttachmentService(db)
+    if message_request.attachment_ids:
+        attachment_service.attach_to_message(ticket_id, message.id, message_request.attachment_ids)
     
-    # اگر تیکت هنوز به اپراتور تخصیص نشده، آن را تخصیص ده
     if not ticket.assigned_operator_id:
         ticket_repo.assign_ticket(ticket_id, current_user.get_user_id())
         db.commit()
@@ -338,18 +373,21 @@ async def send_operator_message(
     # ارسال ناتیفیکیشن به کاربر (فقط برای پیام‌های غیرداخلی)
     if not message_request.is_internal and ticket.user_id:
         try:
+            from app.services.support.support_sla_service import SupportSlaService
+
+            SupportSlaService(db).mark_first_response(ticket)
             notification_service = NotificationService(db)
             operator_name = f"{current_user.user.first_name or ''} {current_user.user.last_name or ''}".strip() or "اپراتور پشتیبانی"
-            message_preview = message_request.content[:200] + ("..." if len(message_request.content) > 200 else "")
+            message_preview = content[:200] + ("..." if len(content) > 200 else "")
             
-            context = {
+            context = support_notification_context({
                 "subject": f"پاسخ جدید به تیکت #{ticket_id}",
                 "message": f"اپراتور {operator_name} به تیکت شما پاسخ داد:\n\n{message_preview}",
                 "ticket_id": ticket_id,
                 "ticket_title": ticket.title,
                 "operator_name": operator_name,
                 "message_preview": message_preview
-            }
+            }, ticket_id)
             
             notification_service.send(
                 user_id=ticket.user_id,
@@ -362,9 +400,23 @@ async def send_operator_message(
             # در صورت خطا، لاگ می‌کنیم اما فرآیند اصلی ادامه می‌یابد
             logger = logging.getLogger(__name__)
             logger.error(f"خطا در ارسال ناتیفیکیشن برای پاسخ اپراتور به تیکت {ticket_id}: {e}")
+
+    if not message_request.is_internal:
+        try:
+            from app.services.support.support_broadcast import broadcast_message_created
+
+            broadcast_message_created(
+                db,
+                ticket,
+                sender_type="operator",
+                message_id=message.id,
+                preview=content,
+            )
+        except Exception:
+            pass
     
-    # Format datetime fields based on calendar type
-    message_data = MessageResponse.from_orm(message).dict()
+    attachment_repo = AttachmentRepository(db)
+    message_data = serialize_message(message, attachment_repo)
     formatted_data = format_datetime_fields(message_data, request)
     
     return success_response(formatted_data, request)
@@ -380,42 +432,18 @@ async def search_operator_ticket_messages(
     db: Session = Depends(get_db)
 ):
     """جستجو در پیام‌های تیکت برای اپراتور"""
-    ticket_repo = TicketRepository(db)
+    access = TicketAccessService(db)
     message_repo = MessageRepository(db)
     
-    # بررسی وجود تیکت
-    ticket = ticket_repo.get_operator_ticket_with_details(ticket_id)
-    if not ticket:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="تیکت یافت نشد"
-        )
+    access.get_operator_ticket(ticket_id)
     
-    # تنظیم فیلدهای قابل جستجو
     if not query_info.search_fields:
         query_info.search_fields = ["content"]
     
     messages, total = message_repo.get_ticket_messages(ticket_id, query_info)
     
-    # تبدیل به dict
-    message_dicts = []
-    for message in messages:
-        message_dict = {
-            "id": message.id,
-            "ticket_id": message.ticket_id,
-            "sender_id": message.sender_id,
-            "sender_type": message.sender_type,
-            "content": message.content,
-            "is_internal": message.is_internal,
-            "created_at": message.created_at,
-            "sender": {
-                "id": message.sender.id,
-                "first_name": message.sender.first_name,
-                "last_name": message.sender.last_name,
-                "email": message.sender.email
-            } if message.sender else None
-        }
-        message_dicts.append(message_dict)
+    attachment_repo = AttachmentRepository(db)
+    message_dicts = serialize_messages(messages, attachment_repo)
     
     paginated_data = PaginatedResponse.create(
         items=message_dicts,
@@ -473,8 +501,9 @@ async def bulk_assign_tickets(
                 "subject": f"{updated_count} تیکت به شما تخصیص داده شد",
                 "message": f"{updated_count} تیکت به شما تخصیص داده شد.",
                 "operator_name": operator_name,
-                "ticket_count": updated_count
+                "ticket_count": updated_count,
             }
+            context.update(resolve_announcement_navigation("support.tickets_bulk_assigned", context))
             
             notification_service.send(
                 user_id=bulk_request.operator_id,
@@ -545,8 +574,12 @@ async def bulk_update_ticket_status(
                     "message": f"وضعیت {len(user_tickets)} تیکت شما به '{new_status_name}' تغییر کرد.",
                     "operator_name": operator_name,
                     "new_status": new_status_name,
-                    "ticket_count": len(user_tickets)
+                    "ticket_count": len(user_tickets),
                 }
+                if len(user_tickets) == 1:
+                    context = support_notification_context(context, user_tickets[0].id)
+                else:
+                    context.update(resolve_announcement_navigation("support.tickets_bulk_status_changed", context))
                 
                 notification_service.send(
                     user_id=user_id,
@@ -596,3 +629,61 @@ async def delete_ticket(
         {"message": "تیکت با موفقیت حذف شد", "ticket_id": ticket_id},
         request
     )
+
+
+@router.get("/dashboard/stats", response_model=SuccessResponse)
+@require_app_permission("support_operator")
+async def operator_dashboard_stats(
+    request: Request,
+    current_user: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    from app.services.support.support_dashboard_service import SupportDashboardService
+
+    stats = SupportDashboardService(db).get_stats(current_user.get_user_id())
+    return success_response(stats, request)
+
+
+@router.get("/dashboard/overdue", response_model=SuccessResponse)
+@require_app_permission("support_operator")
+async def operator_dashboard_overdue(
+    request: Request,
+    limit: int = 20,
+    current_user: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    from app.services.support.support_dashboard_service import SupportDashboardService
+
+    items = SupportDashboardService(db).get_overdue_tickets(limit=limit)
+    formatted = format_datetime_fields(items, request)
+    return success_response(formatted, request)
+
+
+@router.get("/dashboard/activity", response_model=SuccessResponse)
+@require_app_permission("support_operator")
+async def operator_dashboard_activity(
+    request: Request,
+    days: int = 7,
+    current_user: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    from app.services.support.support_dashboard_service import SupportDashboardService
+
+    items = SupportDashboardService(db).get_activity(days=days)
+    return success_response(items, request)
+
+
+@router.get("/users/{user_id}/tickets", response_model=SuccessResponse)
+@require_app_permission("support_operator")
+async def operator_user_ticket_history(
+    request: Request,
+    user_id: int,
+    take: int = 5,
+    current_user: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    from app.services.support.support_dashboard_service import SupportDashboardService
+
+    items = SupportDashboardService(db).get_user_ticket_history(user_id, take=take)
+    formatted = format_datetime_fields(items, request)
+    return success_response(formatted, request)

@@ -14,12 +14,20 @@ class VoiceChatController {
     required this.collectDataOptIn,
     required this.onEvent,
     required this.onError,
+    this.modelCode,
+    this.executionMode,
+    this.sttCode,
+    this.ttsCode,
   });
 
   final int sessionId;
   final bool collectDataOptIn;
   final void Function(Map<String, dynamic> event) onEvent;
   final void Function(String message) onError;
+  final String? modelCode;
+  final String? executionMode;
+  final String? sttCode;
+  final String? ttsCode;
 
   final VoiceWsClient _ws = createVoiceWsClient();
 
@@ -55,13 +63,17 @@ class VoiceChatController {
     } catch (_) {}
     _playHeadTime = _ctx!.currentTime;
 
-    final preferWebm = VoiceWebCapture.supportsWebmOpus;
     final startPayload = <String, dynamic>{
       'type': 'start',
       'session_id': sessionId,
       'collect_data': collectDataOptIn,
-      'audio_transport': preferWebm ? 'base64' : 'binary',
-      'input_codec': preferWebm ? 'webm_opus' : 'pcm',
+      'audio_transport': 'binary',
+      'input_codec': 'pcm',
+      if (modelCode != null && modelCode!.isNotEmpty) 'model_code': modelCode,
+      if (executionMode != null && executionMode!.isNotEmpty)
+        'execution_mode': executionMode,
+      if (sttCode != null && sttCode!.isNotEmpty) 'stt_code': sttCode,
+      if (ttsCode != null && ttsCode!.isNotEmpty) 'tts_code': ttsCode,
     };
     _ws.setSessionStartPayload(startPayload);
 
@@ -72,7 +84,7 @@ class VoiceChatController {
       onError: (e) => onError(e.toString()),
       onDone: () => onError('اتصال صوت قطع شد.'),
       onReconnected: () => onEvent({'type': 'reconnected'}),
-      preferBinaryDownlink: !preferWebm,
+      preferBinaryDownlink: true,
     );
 
     _ws.enableReconnect();
@@ -97,11 +109,6 @@ class VoiceChatController {
             _ws.sendBytes(pcm);
           }
         },
-        onWebmChunk: (webm) {
-          if (webm.isNotEmpty) {
-            _ws.sendWebmChunk(webm);
-          }
-        },
       );
       final mode = await _capture!.start(_ctx!, _targetSampleRate);
       if (mode == VoiceWebCaptureMode.webmOpus) {
@@ -113,6 +120,11 @@ class VoiceChatController {
     } catch (e) {
       onError('خطا در دسترسی به میکروفون: $e');
     }
+  }
+
+  void bargeIn() {
+    if (!_started) return;
+    _ws.sendJson({'type': 'barge_in'});
   }
 
   Future<void> stopRecording() async {

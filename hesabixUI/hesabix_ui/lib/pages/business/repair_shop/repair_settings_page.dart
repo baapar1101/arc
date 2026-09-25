@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../services/repair_shop_service.dart';
 import '../../../models/repair_settings_model.dart';
 import '../../../core/api_client.dart';
+import '../../../core/calendar_controller.dart';
 import '../../../utils/error_extractor.dart';
 import '../../../utils/snackbar_helper.dart';
 import '../../../widgets/business_subpage_back_leading.dart';
@@ -10,10 +11,12 @@ import '../../../widgets/business_subpage_back_leading.dart';
 /// صفحه تنظیمات تعمیرگاه
 class RepairSettingsPage extends StatefulWidget {
   final int businessId;
+  final CalendarController calendarController;
 
   const RepairSettingsPage({
     super.key,
     required this.businessId,
+    required this.calendarController,
   });
 
   @override

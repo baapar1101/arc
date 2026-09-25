@@ -1,0 +1,12 @@
+{
+  "k": 20,
+  "progressive": false,
+  "queries": 443,
+  "recall": 0.9819,
+  "avg_iterations": 4.98,
+  "avg_initial_schema_tokens": 4621,
+  "avg_additional_schema_tokens": 0,
+  "avg_wire_schema_tokens_per_request": 24837,
+  "avg_construction_tools": 17.05,
+  "total_wire_schema_tokens": 11002983
+}

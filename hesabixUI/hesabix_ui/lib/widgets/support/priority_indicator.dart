@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:hesabix_ui/models/support_models.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 class PriorityIndicator extends StatelessWidget {
   final SupportPriority priority;
@@ -16,7 +17,7 @@ class PriorityIndicator extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final color = _getPriorityColor(theme);
+    final color = _getPriorityColor(context, theme);
     
     if (!showText) {
       return Container(
@@ -67,7 +68,7 @@ class PriorityIndicator extends StatelessWidget {
     );
   }
 
-  Color _getPriorityColor(ThemeData theme) {
+  Color _getPriorityColor(BuildContext context, ThemeData theme) {
     if (priority.color != null) {
       try {
         return Color(int.parse(priority.color!.replaceFirst('#', '0xFF')));
@@ -76,16 +77,17 @@ class PriorityIndicator extends StatelessWidget {
       }
     }
 
+    final semantics = SemanticColorResolver.of(context);
     // Default colors based on priority name
     switch (priority.name.toLowerCase()) {
       case 'کم':
-        return Colors.green;
+        return semantics.positive;
       case 'متوسط':
-        return Colors.orange;
+        return semantics.warning;
       case 'بالا':
-        return Colors.red;
+        return semantics.negative;
       case 'فوری':
-        return Colors.red.shade800;
+        return theme.colorScheme.error;
       default:
         return theme.colorScheme.primary;
     }

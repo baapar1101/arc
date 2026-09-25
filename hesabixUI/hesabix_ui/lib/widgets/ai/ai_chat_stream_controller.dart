@@ -1,5 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:hesabix_ui/models/ai_stream_event.dart';
+import 'package:hesabix_ui/utils/ai_content_sanitize.dart';
+import 'package:hesabix_ui/widgets/ai/ai_chat_stream_turn.dart';
 
 /// برچسب ابزار برای رویدادهای استریم (معمولاً از l10n).
 typedef AIChatToolLabelResolver =
@@ -20,6 +24,7 @@ class AIChatStreamController extends ChangeNotifier {
   double? contextUsagePercent;
   bool contextHistorySummarized = false;
   AIStreamAgentBudget? agentBudget;
+  String? runId;
   DateTime? startedAt;
   DateTime? timestamp;
   bool pendingWriteApproval = false;
@@ -49,16 +54,19 @@ class AIChatStreamController extends ChangeNotifier {
     pendingWriteApproval = false;
     pendingApprovalOps = [];
     agentBudget = null;
+    runId = null;
     _lastUiUpdate = null;
     notifyListeners();
   }
 
-  void clear() {
+  void clear({bool keepWriteApproval = false}) {
+    final savedPending = pendingWriteApproval;
+    final savedOps = List<Map<String, dynamic>>.from(pendingApprovalOps);
     content = null;
     toolActivities = [];
     traceSteps = [];
     todoSnapshot = null;
-    statusPhase = null;
+    statusPhase = keepWriteApproval ? 'awaiting_approval' : null;
     statusStep = null;
     iteration = null;
     maxIterations = null;
@@ -66,8 +74,8 @@ class AIChatStreamController extends ChangeNotifier {
     startedAt = null;
     // contextUsage* بین پیام‌ها حفظ می‌شود
     timestamp = null;
-    pendingWriteApproval = false;
-    pendingApprovalOps = [];
+    pendingWriteApproval = keepWriteApproval && savedPending;
+    pendingApprovalOps = keepWriteApproval ? savedOps : [];
     agentBudget = null;
     _lastUiUpdate = null;
     notifyListeners();
@@ -103,13 +111,22 @@ class AIChatStreamController extends ChangeNotifier {
         ? Map<String, dynamic>.from(functionResults)
         : <String, dynamic>{};
     if (traceSteps.isNotEmpty) {
-      map[kAgentTraceStorageKey] = traceSteps.map((e) => e.toJson()).toList();
+      map[kAgentTraceStorageKey] = finalizeAgentTraceForDisplay(traceSteps)
+          .map((e) => e.toJson())
+          .toList();
     }
     if (agentBudget != null) {
       map[kAgentBudgetStorageKey] = agentBudget!.toJson();
     }
     if (todoSnapshot != null && !todoSnapshot!.isEmpty) {
       map[kAgentTodosStorageKey] = todoSnapshot!.toJson();
+    }
+    if (runId != null && runId!.isNotEmpty) {
+      map[kAgentRunStorageKey] = {
+        'run_id': runId,
+        if (agentBudget?.stopReason != null) 'stop_reason': agentBudget!.stopReason,
+        'can_continue': true,
+      };
     }
     if (map.isEmpty) return functionResults;
     return map;
@@ -119,6 +136,9 @@ class AIChatStreamController extends ChangeNotifier {
     AIStreamChunk chunk, {
     required AIChatToolLabelResolver resolveToolLabel,
   }) {
+    if (chunk.runId != null && chunk.runId!.isNotEmpty) {
+      runId = chunk.runId;
+    }
     if (chunk.contextUsage != null) {
       contextUsageRatio = chunk.contextUsage!.usageRatio;
       contextUsagePercent = chunk.contextUsage!.usagePercent;
@@ -203,7 +223,7 @@ class AIChatStreamController extends ChangeNotifier {
         chunk.agentBudget != null;
 
     if (immediate) {
-      content = accumulated;
+      content = sanitizeAssistantContent(accumulated);
       notifyListeners();
       return true;
     }
@@ -220,9 +240,27 @@ class AIChatStreamController extends ChangeNotifier {
     if (!shouldUpdate) return false;
 
     _lastUiUpdate = now;
-    content = accumulated;
+    content = sanitizeAssistantContent(accumulated);
     notifyListeners();
     return true;
+  }
+
+  void applyDoneMetadata(AIStreamChunk chunk) {
+    var changed = false;
+    if (chunk.agentBudget != null) {
+      agentBudget = chunk.agentBudget;
+      changed = true;
+    }
+    if (chunk.runId != null && chunk.runId!.isNotEmpty) {
+      runId = chunk.runId;
+      changed = true;
+    }
+    if (chunk.awaitingApproval == true) {
+      pendingWriteApproval = true;
+      statusPhase = 'awaiting_approval';
+      changed = true;
+    }
+    if (changed) notifyListeners();
   }
 
   void mergeAgentTraceFromDone(List<AIAgentTraceStep>? agentTrace) {
@@ -257,26 +295,76 @@ class AIChatStreamController extends ChangeNotifier {
     notifyListeners();
   }
 
+  void markSubagentCancelled(String subagentId) {
+    final id = subagentId.trim();
+    if (id.isEmpty) return;
+    var changed = false;
+    for (var i = 0; i < traceSteps.length; i++) {
+      final step = traceSteps[i];
+      final matchesParent = step.kind == 'subagent' &&
+          (step.cancelableSubagentId == id || step.subagentId == id);
+      final matchesChild =
+          step.kind != 'subagent' && step.subagentId == id;
+      if (!matchesParent && !matchesChild) continue;
+      if (step.kind == 'subagent') {
+        traceSteps[i] = step.copyWith(state: 'error');
+        changed = true;
+      } else if (step.isActive) {
+        traceSteps[i] = step.copyWith(state: 'done');
+        changed = true;
+      }
+    }
+    if (changed) notifyListeners();
+  }
+
+  void ingestVoiceApproval(Map<String, dynamic> detail) {
+    pendingWriteApproval = true;
+    statusPhase = 'awaiting_approval';
+    final fn = detail['function'] as String?;
+    final exists = pendingApprovalOps.any(
+      (o) =>
+          o['function'] == fn &&
+          o['arguments'].toString() == detail['arguments'].toString(),
+    );
+    if (!exists) {
+      pendingApprovalOps = [...pendingApprovalOps, detail];
+    }
+    notifyListeners();
+  }
+
+  void ingestVoiceTraceStep(Map<String, dynamic> raw) {
+    _applyTraceStep(AIAgentTraceStep.fromJson(raw));
+    notifyListeners();
+  }
+
   void _applyTraceStep(AIAgentTraceStep step) {
-    if (step.kind == 'observation' && step.tool != null) {
+    var next = step;
+    final body = next.bodyMarkdown;
+    if (body != null && body.isNotEmpty) {
+      final clean = sanitizeAssistantContent(body);
+      if (clean != body) {
+        next = next.copyWith(bodyMarkdown: clean);
+      }
+    }
+    if (next.kind == 'observation' && next.tool != null) {
       for (var i = 0; i < traceSteps.length; i++) {
         final existing = traceSteps[i];
         if (existing.kind == 'tool' &&
-            existing.tool == step.tool &&
+            existing.tool == next.tool &&
             existing.isActive) {
           traceSteps[i] = existing.copyWith(state: 'done');
         }
       }
     }
-    if (step.stepId.isEmpty) {
-      traceSteps.add(step);
+    if (next.stepId.isEmpty) {
+      traceSteps.add(next);
       return;
     }
-    final idx = traceSteps.indexWhere((s) => s.stepId == step.stepId);
+    final idx = traceSteps.indexWhere((s) => s.stepId == next.stepId);
     if (idx >= 0) {
-      traceSteps[idx] = step;
+      traceSteps[idx] = next;
     } else {
-      traceSteps.add(step);
+      traceSteps.add(next);
     }
   }
 
@@ -334,5 +422,138 @@ class AIChatStreamController extends ChangeNotifier {
         }
       }
     }
+  }
+
+  AIChatLiveChunkAction ingestLiveChunk(
+    AIStreamChunk chunk,
+    AIChatStreamTurn turn, {
+    required AIChatToolLabelResolver resolveToolLabel,
+    String? sseCursorRunId,
+    void Function()? onContentTick,
+  }) {
+    applyChunk(chunk, resolveToolLabel: resolveToolLabel);
+    turn.addDelta(chunk.contentDelta);
+    if (chunk.done) {
+      turn.applyDone(
+        chunk,
+        streamRunId: runId,
+        sseCursorRunId: sseCursorRunId,
+      );
+      applyDoneMetadata(chunk);
+      mergeAgentTraceFromDone(chunk.agentTrace);
+      return AIChatLiveChunkAction.completed;
+    }
+    if (updateAccumulatedContent(turn.accumulated, chunk)) {
+      onContentTick?.call();
+    }
+    return AIChatLiveChunkAction.keepListening;
+  }
+
+  AIChatStreamTurnOutcome completeSuccessTurn(AIChatStreamTurn turn) {
+    var resolved = sanitizeAssistantContent(turn.accumulated);
+    if (resolved.trim().isEmpty && traceSteps.isNotEmpty) {
+      resolved = extractContentFromTraceSteps(traceSteps);
+    }
+    final visible = resolved.isNotEmpty ||
+        toolActivities.isNotEmpty ||
+        traceSteps.isNotEmpty;
+    return AIChatStreamTurnOutcome(
+      status: visible
+          ? AIChatStreamTurnStatus.success
+          : AIChatStreamTurnStatus.empty,
+      resolvedContent: resolved,
+      hasVisibleOutput: visible,
+      assistantMessageId: turn.assistantMessageId,
+      functionCalls: turn.functionCalls,
+      functionResults: functionResultsWithTrace(turn.functionResults),
+      createdAt: timestamp,
+      continueRunId: turn.canContinue ? turn.finishedRunId : null,
+      continueStopMessage: turn.canContinue ? turn.finishedStopMessage : null,
+      resolvedModelCode: turn.resolvedModelCode,
+    );
+  }
+
+  AIChatStreamTurnOutcome completeErrorTurn(
+    AIStreamChunk chunk, {
+    String? sseCursorRunId,
+  }) {
+    final snap = snapshotForCancel();
+    final resumeId = chunk.runId ?? runId ?? sseCursorRunId;
+    final offerContinue = chunk.canContinue == true || resumeId != null;
+    return AIChatStreamTurnOutcome(
+      status: AIChatStreamTurnStatus.chunkError,
+      hasVisibleOutput: snap != null,
+      applyContinue: offerContinue,
+      errorMessage: chunk.error,
+      errorRecoverable: chunk.recoverable,
+      errorCode: chunk.errorCode,
+      suggestedAction: chunk.suggestedAction,
+      continueRunId: offerContinue ? resumeId : null,
+      continueStopMessage: offerContinue
+          ? (chunk.agentBudget?.stopMessageFa ?? agentBudget?.stopMessageFa)
+          : null,
+      partialContent: snap?.partialContent,
+      partialCreatedAt: snap?.createdAt,
+      partialFunctionResults: functionResultsWithTrace(null),
+    );
+  }
+
+  static const stallTimeout = Duration(seconds: 20);
+
+  /// حلقهٔ نوبت استریم بدون BuildContext — dialog فقط نتیجه را به UI می‌زند.
+  Future<AIChatStreamTurnOutcome> consume(
+    Stream<AIStreamChunk> chunks, {
+    required AIChatToolLabelResolver resolveToolLabel,
+    String? sseCursorRunId,
+    void Function()? onContentTick,
+  }) async {
+    final turn = AIChatStreamTurn();
+    var completed = false;
+    try {
+      await for (final chunk in chunks.timeout(stallTimeout)) {
+        if (chunk.error != null) {
+          return completeErrorTurn(chunk, sseCursorRunId: sseCursorRunId);
+        }
+        final action = ingestLiveChunk(
+          chunk,
+          turn,
+          resolveToolLabel: resolveToolLabel,
+          sseCursorRunId: sseCursorRunId,
+          onContentTick: onContentTick,
+        );
+        if (action == AIChatLiveChunkAction.completed) {
+          completed = true;
+          break;
+        }
+      }
+    } on TimeoutException {
+      return completeErrorTurn(
+        AIStreamChunk(
+          error: 'ارتباط لحظه‌ای قطع شد. پاسخ تا اینجا ذخیره شده است.',
+          errorCode: 'STREAM_STALL',
+          recoverable: true,
+          suggestedAction: 'reconnect',
+          done: true,
+          canContinue: true,
+          runId: runId ?? sseCursorRunId,
+        ),
+        sseCursorRunId: sseCursorRunId,
+      );
+    }
+    if (!completed) {
+      return completeErrorTurn(
+        AIStreamChunk(
+          error: 'پاسخ کامل نرسید؛ اتصال قبل از اتمام بسته شد.',
+          errorCode: 'EMPTY_STREAM',
+          recoverable: true,
+          suggestedAction: 'reconnect',
+          done: true,
+          canContinue: true,
+          runId: runId ?? sseCursorRunId,
+        ),
+        sseCursorRunId: sseCursorRunId,
+      );
+    }
+    return completeSuccessTurn(turn);
   }
 }

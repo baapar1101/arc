@@ -4,6 +4,7 @@ import '../../core/api_client.dart';
 import '../../services/admin_notification_event_types_service.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 class NotificationEventTypesAdminPage extends StatefulWidget {
   const NotificationEventTypesAdminPage({super.key});
@@ -248,16 +249,16 @@ class _NotificationEventTypesAdminPageState
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
                                       if (hasSms)
-                                        const Tooltip(
+                                        Tooltip(
                                           message: 'پیامک',
-                                          child: Icon(Icons.sms, size: 18, color: Colors.green),
+                                          child: Icon(Icons.sms, size: 18, color: SemanticColorResolver.positive(context)),
                                         ),
                                       if (hasEmail)
-                                        const Padding(
+                                        Padding(
                                           padding: EdgeInsets.only(left: 6),
                                           child: Tooltip(
                                             message: 'ایمیل',
-                                            child: Icon(Icons.email, size: 18, color: Colors.blue),
+                                            child: Icon(Icons.email, size: 18, color: SemanticColorResolver.info(context)),
                                           ),
                                         ),
                                       const SizedBox(width: 8),

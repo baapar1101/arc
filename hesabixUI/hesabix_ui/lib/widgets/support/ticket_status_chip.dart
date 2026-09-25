@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:hesabix_ui/models/support_models.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 class TicketStatusChip extends StatelessWidget {
   final SupportStatus status;
@@ -14,8 +15,8 @@ class TicketStatusChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final color = _getStatusColor(theme);
-    
+    final color = _getStatusColor(context, theme);
+
     return Container(
       padding: EdgeInsets.symmetric(
         horizontal: isSmall ? 8 : 12,
@@ -56,7 +57,7 @@ class TicketStatusChip extends StatelessWidget {
     );
   }
 
-  Color _getStatusColor(ThemeData theme) {
+  Color _getStatusColor(BuildContext context, ThemeData theme) {
     if (status.color != null) {
       try {
         return Color(int.parse(status.color!.replaceFirst('#', '0xFF')));
@@ -65,18 +66,23 @@ class TicketStatusChip extends StatelessWidget {
       }
     }
 
-    // Default colors based on status name
+    final semantics = SemanticColorResolver.of(context);
     switch (status.name.toLowerCase()) {
       case 'باز':
-        return Colors.grey;
+      case 'open':
+        return semantics.info;
       case 'در حال پیگیری':
-        return Colors.purple;
+      case 'in progress':
+        return theme.colorScheme.tertiary;
       case 'در انتظار کاربر':
-        return Colors.cyan;
+      case 'waiting':
+        return semantics.warning;
       case 'بسته':
-        return Colors.grey;
+      case 'closed':
+        return theme.colorScheme.outline;
       case 'حل شده':
-        return Colors.green;
+      case 'resolved':
+        return semantics.positive;
       default:
         return theme.colorScheme.primary;
     }

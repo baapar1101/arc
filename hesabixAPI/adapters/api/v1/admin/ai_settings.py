@@ -183,3 +183,27 @@ async def test_ai_connection(
         logger.error(f"AI connection test failed: {e}", exc_info=True)
         raise ApiError("CONNECTION_FAILED", f"خطا در اتصال: {str(e)}", http_status=400)
 
+
+@router.get("/ops-metrics", summary="شمارندهٔ خطا و زبان تفکر AI این فرآیند")
+async def get_ai_ops_metrics(
+    request: Request,
+    ctx: AuthContext = Depends(get_current_user),
+) -> Dict[str, Any]:
+    """CHAT-14: reasoning_language_mismatch و tool_error بدون خواندن جلسه."""
+    if not ctx.has_any_permission("system_settings", "superadmin"):
+        raise ApiError("FORBIDDEN", "فقط مدیر سیستم می‌تواند متریک AI را ببیند", http_status=403)
+    from app.services.ai.ai_ops_metrics import metric_snapshot
+
+    counters = metric_snapshot()
+    return success_response(
+        {
+            "counters": counters,
+            "reasoning_language_mismatch": int(
+                counters.get("reasoning_language_mismatch", 0)
+            ),
+            "tool_error": int(counters.get("tool_error", 0)),
+        },
+        request,
+    )
+
+

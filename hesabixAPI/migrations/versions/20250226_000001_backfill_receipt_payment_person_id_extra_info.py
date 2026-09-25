@@ -12,7 +12,7 @@ Create Date: 2025-02-26
 from __future__ import annotations
 
 from alembic import op
-from sqlalchemy import text
+from sqlalchemy import inspect, text
 
 
 revision = "20250226_000001_backfill_receipt_payment_person_id_extra_info"
@@ -25,6 +25,11 @@ def upgrade() -> None:
     conn = op.get_bind()
     # فقط برای PostgreSQL از JSON/JSONB پشتیبانی می‌کنیم
     if conn.dialect.name != "postgresql":
+        return
+    inspector = inspect(conn)
+    tables = set(inspector.get_table_names())
+    if "document_lines" not in tables or "documents" not in tables:
+        # Seed/base schema not restored yet (fresh DB or incomplete pg_restore).
         return
     # خطوط سند دریافت/پرداخت که person_id دارند ولی در extra_info ندارند را به‌روز کن
     # استفاده از jsonb برای merge تا با همه نسخه‌های پشتیبانی‌شده PostgreSQL کار کند

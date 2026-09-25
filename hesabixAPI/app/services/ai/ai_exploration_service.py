@@ -127,9 +127,15 @@ def resolve_exploration_enabled(
         return False
     if mode == EXPLORATION_MODE_EXPLORE:
         return True
-    # auto
+    # auto: علاوه بر پیچیدگی، وقتی سوال قطعاً نیاز به ابزار دارد (Phase 3) هم
+    # exploration باید فعال باشد — یک سوال ساده اما داده‌محور نباید کاوش را
+    # از دست بدهد.
     complexity = estimate_query_complexity(user_query, history_messages)
-    return complexity in ("medium", "complex")
+    if complexity in ("medium", "complex"):
+        return True
+    from app.services.ai.ai_tool_intent import query_expects_tool_use
+
+    return query_expects_tool_use(user_query, history_messages)
 
 
 def new_bundle_id(iteration: int) -> str:
@@ -237,6 +243,8 @@ def _extract_claims_from_result(tool_name: str, result: Any) -> List[str]:
 def build_thought_markdown_rule_based(
     bundle: ExplorationBundle,
     user_query: Optional[str],
+    *,
+    language: str = "fa",
 ) -> Tuple[str, Optional[str], str, List[str]]:
     """
     Thought بدون LLM — سریع و پایدار.
@@ -259,35 +267,71 @@ def build_thought_markdown_rule_based(
                 )
 
     findings = findings[:7]
-    body_lines = ["### Important findings", ""]
+    findings_header = (
+        "### یافته‌های مهم" if language == "fa" else "### Important findings"
+    )
+    body_lines = [findings_header, ""]
     for i, f in enumerate(findings, 1):
         body_lines.append(f"{i}. {mask_sensitive_text(f)}")
 
     hypothesis: Optional[str] = None
     confidence = "medium"
     if errors == len(bundle.observations) and bundle.tool_count > 0:
-        hypothesis = "اجرای ابزارها با خطا مواجه شد؛ داده کافی برای نتیجه‌گیری نیست."
+        hypothesis = (
+            "اجرای ابزارها با خطا مواجه شد؛ داده کافی برای نتیجه‌گیری نیست."
+            if language == "fa"
+            else "Tool execution failed; not enough data to conclude."
+        )
         confidence = "low"
-        open_questions.append("آیا پارامترهای جستجو (شناسه کسب‌وکار، فاکتور و …) درست است؟")
+        open_questions.append(
+            "آیا پارامترهای جستجو (شناسه کسب‌وکار، فاکتور و …) درست است؟"
+            if language == "fa"
+            else "Are search parameters (business id, invoice, etc.) correct?"
+        )
     elif errors > 0:
-        hypothesis = "بخشی از داده‌ها در دسترس نبود؛ پاسخ بر اساس شواهد موجود است."
+        hypothesis = (
+            "بخشی از داده‌ها در دسترس نبود؛ پاسخ بر اساس شواهد موجود است."
+            if language == "fa"
+            else "Some data was unavailable; answer is based on available evidence."
+        )
         confidence = "medium"
     elif len(findings) >= 3:
-        hypothesis = "شواهد کافی جمع شد؛ می‌توان پاسخ نهایی یا کاوش تکمیلی ارائه داد."
+        hypothesis = (
+            "شواهد کافی جمع شد؛ می‌توان پاسخ نهایی یا کاوش تکمیلی ارائه داد."
+            if language == "fa"
+            else "Enough evidence gathered; ready for a final answer or follow-up exploration."
+        )
         confidence = "high"
     elif findings:
-        hypothesis = "یافته‌های اولیه ثبت شد؛ در صورت نیاز کاوش تکمیلی پیشنهاد می‌شود."
+        hypothesis = (
+            "یافته‌های اولیه ثبت شد؛ در صورت نیاز کاوش تکمیلی پیشنهاد می‌شود."
+            if language == "fa"
+            else "Initial findings recorded; follow-up exploration may be needed."
+        )
         confidence = "medium"
     else:
-        hypothesis = "نتیجهٔ ابزارها خالی یا غیرقابل تفسیر بود."
+        hypothesis = (
+            "نتیجهٔ ابزارها خالی یا غیرقابل تفسیر بود."
+            if language == "fa"
+            else "Tool results were empty or not interpretable."
+        )
         confidence = "low"
-        open_questions.append("سوال را دقیق‌تر یا با شناسه مشخص تکرار کنید.")
+        open_questions.append(
+            "سوال را دقیق‌تر یا با شناسه مشخص تکرار کنید."
+            if language == "fa"
+            else "Please rephrase the question or include a specific identifier."
+        )
 
     if hypothesis:
-        body_lines.extend(["", f"**فرضیه:** {hypothesis}"])
+        hypothesis_label = "**فرضیه:**" if language == "fa" else "**Hypothesis:**"
+        body_lines.extend(["", f"{hypothesis_label} {hypothesis}"])
 
     body = "\n".join(body_lines)
     return body, hypothesis, confidence, open_questions
+
+
+def observation_store_has_evidence(store: ObservationStore) -> bool:
+    return bool(store.bundles) or bool(store.thoughts)
 
 
 def should_continue_exploring(
@@ -295,15 +339,20 @@ def should_continue_exploring(
     iteration: int,
     max_iterations: int,
 ) -> bool:
-    """آیا پس از Thought هنوز کاوش لازم است؟"""
+    """آیا بر اساس evidence هنوز کاوش لازم است؟"""
     if iteration >= max_iterations:
         return False
+
+    if not observation_store_has_evidence(store):
+        return iteration < max_iterations
+
     if not store.thoughts:
         return True
+
     last = store.thoughts[-1]
     if last.confidence == "high" and not last.open_questions:
         return False
-    if last.confidence == "low" and iteration < max_iterations - 1:
+    if last.confidence == "low" and iteration < max_iterations:
         return True
     return bool(last.open_questions) and iteration < max_iterations
 
@@ -336,6 +385,7 @@ def should_agent_continue_after_text(
     iteration: int,
     max_iterations: int,
     budget: Any = None,
+    round_text: str = "",
 ) -> bool:
     """
     توقف/ادامهٔ سراسری پس از پاسخ متنی مدل (بدون tool call).
@@ -348,7 +398,11 @@ def should_agent_continue_after_text(
         return False
     if not exploration_enabled or observation_store is None:
         return False
-    return should_continue_exploring(observation_store, iteration, max_iterations)
+    return should_continue_exploring(
+        observation_store,
+        iteration,
+        max_iterations,
+    )
 
 
 async def synthesize_thought_with_llm(
@@ -360,6 +414,8 @@ async def synthesize_thought_with_llm(
     user_query: Optional[str],
     explored_markdown: str,
     db: Optional[Session] = None,
+    *,
+    language: str = "fa",
 ) -> Optional[str]:
     """Thought غنی با LLM (اختیاری، فقط explore صریح)."""
     import asyncio
@@ -367,11 +423,18 @@ async def synthesize_thought_with_llm(
     from app.services.ai.prompt_service import get_prompt_by_key
 
     system = get_prompt_by_key(db, "aux.exploration")
-    user_content = (
-        f"User question: {user_query or ''}\n\n"
-        f"Tools in this bundle: {bundle.title}\n\n"
-        f"Results:\n{explored_markdown[:6000]}"
-    )
+    if language == "fa":
+        user_content = (
+            f"سوال کاربر: {user_query or ''}\n\n"
+            f"ابزارهای این دسته: {bundle.title}\n\n"
+            f"نتایج:\n{explored_markdown[:6000]}"
+        )
+    else:
+        user_content = (
+            f"User question: {user_query or ''}\n\n"
+            f"Tools in this bundle: {bundle.title}\n\n"
+            f"Results:\n{explored_markdown[:6000]}"
+        )
     messages = [
         {"role": "system", "content": system},
         {"role": "user", "content": user_content},

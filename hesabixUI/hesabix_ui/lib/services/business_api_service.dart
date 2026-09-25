@@ -204,8 +204,11 @@ class BusinessApiService {
   static Future<Map<String, dynamic>> deleteBusiness({
     required int businessId,
     String? deletionReason,
+    bool skipRestorePeriod = false,
   }) async {
-    final data = <String, dynamic>{};
+    final data = <String, dynamic>{
+      'skip_restore_period': skipRestorePeriod,
+    };
     if (deletionReason != null && deletionReason.isNotEmpty) {
       data['deletion_reason'] = deletionReason;
     }

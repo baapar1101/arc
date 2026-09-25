@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hesabix_ui/constants/invoice_print_paper.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 
 /// نتیجهٔ تأیید در برگهٔ پایین تنظیمات چاپ فاکتور (هم‌تراز با پارامترهای query در API PDF).
@@ -22,6 +23,7 @@ class InvoicePrintOptionsResult {
 Future<InvoicePrintOptionsResult?> showInvoicePrintOptionsBottomSheet({
   required BuildContext context,
   required List<Map<String, dynamic>> templates,
+  List<Map<String, dynamic>> receiptTemplates = const [],
   required bool loadingTemplates,
   String? initialPaperSize,
   String initialOrientation = 'landscape',
@@ -38,6 +40,7 @@ Future<InvoicePrintOptionsResult?> showInvoicePrintOptionsBottomSheet({
     builder: (context) {
       return _InvoicePrintOptionsSheet(
         templates: templates,
+        receiptTemplates: receiptTemplates,
         loadingTemplates: loadingTemplates,
         initialPaperSize: initialPaperSize,
         initialOrientation: initialOrientation,
@@ -52,6 +55,7 @@ Future<InvoicePrintOptionsResult?> showInvoicePrintOptionsBottomSheet({
 
 class _InvoicePrintOptionsSheet extends StatefulWidget {
   final List<Map<String, dynamic>> templates;
+  final List<Map<String, dynamic>> receiptTemplates;
   final bool loadingTemplates;
   final String? initialPaperSize;
   final String initialOrientation;
@@ -62,6 +66,7 @@ class _InvoicePrintOptionsSheet extends StatefulWidget {
 
   const _InvoicePrintOptionsSheet({
     required this.templates,
+    required this.receiptTemplates,
     required this.loadingTemplates,
     required this.initialPaperSize,
     required this.initialOrientation,
@@ -86,10 +91,30 @@ class _InvoicePrintOptionsSheetState extends State<_InvoicePrintOptionsSheet> {
   void initState() {
     super.initState();
     _paperSize = widget.initialPaperSize;
-    _orientation = widget.initialOrientation;
+    _orientation = invoicePrintOrientationForPaper(widget.initialPaperSize, widget.initialOrientation);
     _showStamp = widget.initialShowStamp;
     _showShareQr = widget.initialShowShareQr;
     _templateId = widget.initialTemplateId;
+    final ids = _visibleTemplates.map((tpl) => (tpl['id'] as num?)?.toInt()).whereType<int>().toSet();
+    if (_templateId != null && !ids.contains(_templateId)) {
+      _templateId = null;
+    }
+  }
+
+  bool get _isReceipt => isInvoiceReceiptPaper(_paperSize);
+
+  List<Map<String, dynamic>> get _visibleTemplates =>
+      _isReceipt ? widget.receiptTemplates : widget.templates;
+
+  void _onPaperSizeChanged(String? v) {
+    setState(() {
+      _paperSize = v;
+      _orientation = invoicePrintOrientationForPaper(v, _orientation);
+      final ids = _visibleTemplates.map((tpl) => (tpl['id'] as num?)?.toInt()).whereType<int>().toSet();
+      if (_templateId != null && !ids.contains(_templateId)) {
+        _templateId = null;
+      }
+    });
   }
 
   @override
@@ -127,31 +152,36 @@ class _InvoicePrintOptionsSheetState extends State<_InvoicePrintOptionsSheet> {
                   border: OutlineInputBorder(),
                   isDense: true,
                 ),
-                items: const [
-                  DropdownMenuItem<String?>(
+                items: [
+                  const DropdownMenuItem<String?>(
                     value: null,
                     child: Text('پیش‌فرض'),
                   ),
-                  DropdownMenuItem(value: 'A4', child: Text('A4')),
-                  DropdownMenuItem(value: 'A5', child: Text('A5')),
-                  DropdownMenuItem(value: 'A6', child: Text('A6')),
-                  DropdownMenuItem(value: '80mm', child: Text('80mm (فیش)')),
+                  ...kInvoicePrintPaperOptions.map(
+                    (o) => DropdownMenuItem<String?>(
+                      value: o.value,
+                      child: Text(o.labelFa),
+                    ),
+                  ),
                 ],
-                onChanged: (v) => setState(() => _paperSize = v),
+                onChanged: _onPaperSizeChanged,
               ),
               const SizedBox(height: 16),
               DropdownButtonFormField<String>(
                 value: _orientation,
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   labelText: 'جهت چاپ',
-                  border: OutlineInputBorder(),
+                  border: const OutlineInputBorder(),
                   isDense: true,
+                  helperText: _isReceipt ? 'فیش پرینتر همیشه عمودی چاپ می‌شود' : null,
                 ),
                 items: const [
                   DropdownMenuItem(value: 'portrait', child: Text('عمودی (Portrait)')),
                   DropdownMenuItem(value: 'landscape', child: Text('افقی (Landscape)')),
                 ],
-                onChanged: (v) => setState(() => _orientation = v ?? 'landscape'),
+                onChanged: _isReceipt
+                    ? null
+                    : (v) => setState(() => _orientation = v ?? 'landscape'),
               ),
               const SizedBox(height: 8),
               SwitchListTile(
@@ -191,7 +221,7 @@ class _InvoicePrintOptionsSheetState extends State<_InvoicePrintOptionsSheet> {
                       value: null,
                       child: Text(t.noCustomTemplate),
                     ),
-                    ...widget.templates.map((tpl) {
+                    ..._visibleTemplates.map((tpl) {
                       final id = (tpl['id'] as num).toInt();
                       final name = (tpl['name'] ?? 'Template').toString();
                       final isDefault = tpl['is_default'] == true;

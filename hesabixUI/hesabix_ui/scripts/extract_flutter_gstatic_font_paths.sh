@@ -41,6 +41,8 @@ count="$(grep -oE "'[^']+\.woff2'" "$flutter_data" | tr -d "'" | sort -u | wc -l
   echo "# تعداد مسیر: $count (+ roboto زیر)"
   echo "# بازتولید: bash scripts/extract_flutter_gstatic_font_paths.sh"
   echo "# پر کردن باندل: bash scripts/populate_gstatic_font_bundle.sh"
+  echo "# sync به web: bash scripts/sync_font_fallback_mirror.sh"
+  echo "# ایموجی: shardهای واقعی notocoloremoji در باندل؛ runtime بدون fonts.gstatic.com"
   echo "#"
   echo "# Roboto برای CanvasKit / fallback اضطراری (در font_fallback_data نیست)"
   echo "roboto/v32/KFOmCnqEu92Fr1Me4GZLCzYlKw.woff2"

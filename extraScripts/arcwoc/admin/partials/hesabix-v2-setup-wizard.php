@@ -17,7 +17,7 @@ if (!defined('WPINC')) {
 	<?php if (get_option('hesabix_v2_setup_completed') && get_option('hesabix_v2_api_key')): ?>
 		<div class="notice notice-warning hesabix-v2-setup-reconnect-note">
 			<p><strong><?php esc_html_e('هشدار', 'hesabix-v2'); ?></strong></p>
-			<p><?php esc_html_e('برای اتصال کسب‌وکار دیگری به افزونه، ابتدا افزونه را حذف و مجدد نصب کنید تا ارتباطات کسب‌وکار قبلی پاک شود.', 'hesabix-v2'); ?></p>
+			<p><?php esc_html_e('با تکمیل این ویزارد، اتصال فعلی قطع و نگاشت‌ها/صف/شناسه‌های وابسته به کسب‌وکار قبلی پاک می‌شوند؛ سپس به کسب‌وکار جدید متصل می‌شوید. اگر فقط می‌خواهید قطع کنید بدون اتصال مجدد، از تنظیمات → قطع اتصال استفاده کنید.', 'hesabix-v2'); ?></p>
 		</div>
 	<?php endif; ?>
 	

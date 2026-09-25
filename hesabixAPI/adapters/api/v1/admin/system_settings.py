@@ -48,6 +48,58 @@ logger = structlog.get_logger()
 
 router = APIRouter(prefix="/admin/system-settings", tags=["مدیریت سیستم"])
 
+_NOTIFICATION_SECRET_KEYS = (
+	"telegram_bot_token",
+	"telegram_webhook_secret",
+	"telegram_secret_header",
+	"telegram_proxy_api_key",
+	"bale_bot_token",
+	"bale_webhook_secret",
+	"sms_api_key",
+	"sms_provider_password",
+)
+
+
+def _mask_secret_value(value: str | None) -> str | None:
+	"""نمایش امن برای UI بدون برگرداندن مقدار کامل."""
+	if not value:
+		return None
+	if len(value) > 8:
+		return f"{value[:2]}***{value[-2:]}"
+	return "***"
+
+
+def _mask_notifications_secrets(data: Dict[str, Any]) -> Dict[str, Any]:
+	masked = dict(data)
+	for key in _NOTIFICATION_SECRET_KEYS:
+		raw = masked.get(key)
+		masked[key] = _mask_secret_value(raw if isinstance(raw, str) else None)
+		masked[f"{key}_configured"] = bool(raw)
+	return masked
+
+
+def _is_masked_or_unchanged_secret(value: str | None) -> bool:
+	"""اگر کلاینت مقدار ماسک‌شده را دوباره بفرستد، آن را به‌عنوان «بدون تغییر» در نظر بگیر."""
+	if value is None:
+		return True
+	v = value.strip()
+	if not v:
+		return True
+	if v == "***":
+		return True
+	if "***" in v and len(v) <= 12:
+		return True
+	return False
+
+
+def _unwrap_notifications_payload(payload: NotificationsConfigPayload) -> Dict[str, Any]:
+	"""ماسک‌ها را به None تبدیل می‌کند تا set_notifications_settings آن‌ها را overwrite نکند."""
+	raw = payload.model_dump(exclude_unset=True)
+	for key in _NOTIFICATION_SECRET_KEYS:
+		if key in raw and _is_masked_or_unchanged_secret(raw.get(key)):
+			raw[key] = None
+	return raw
+
 
 @router.get(
 	"/wallet",
@@ -106,7 +158,7 @@ class NotificationsConfigPayload(BaseModel):
 @router.get(
 	"/notifications",
 	summary="دریافت تنظیمات یکپارچه‌سازی نوتیفیکیشن‌ها (تلگرام/SMS)",
-	description="خواندن کانفیگ‌های ربات تلگرام و SMS از تنظیمات سیستم",
+	description="خواندن کانفیگ‌های ربات تلگرام و SMS از تنظیمات سیستم. مقادیر حساس ماسک می‌شوند.",
 )
 def get_notifications_settings_endpoint(
 	request: Request,
@@ -116,7 +168,7 @@ def get_notifications_settings_endpoint(
 	if not ctx.has_any_permission("system_settings", "superadmin"):
 		raise ApiError("FORBIDDEN", "Missing permission: system_settings", http_status=403)
 	data = get_notifications_settings(db)
-	return success_response(data, request)
+	return success_response(_mask_notifications_secrets(data), request)
 
 
 class ShareLinkSettingsPayload(BaseModel):
@@ -222,28 +274,29 @@ def put_notifications_settings_endpoint(
 ) -> dict:
 	if not ctx.has_any_permission("system_settings", "superadmin"):
 		raise ApiError("FORBIDDEN", "Missing permission: system_settings", http_status=403)
+	fields = _unwrap_notifications_payload(payload)
 	data = set_notifications_settings(
 		db,
-		telegram_bot_token=payload.telegram_bot_token,
-		telegram_bot_username=payload.telegram_bot_username,
-		telegram_webhook_secret=payload.telegram_webhook_secret,
-		telegram_secret_header=payload.telegram_secret_header,
-		bale_bot_token=payload.bale_bot_token,
-		bale_bot_username=payload.bale_bot_username,
-		bale_webhook_secret=payload.bale_webhook_secret,
-		sms_provider_name=payload.sms_provider_name,
-		sms_api_key=payload.sms_api_key,
-		sms_sender=payload.sms_sender,
-		sms_provider_username=payload.sms_provider_username,
-		sms_provider_password=payload.sms_provider_password,
-		sms_is_flash=payload.sms_is_flash,
-		telegram_proxy_enabled=payload.telegram_proxy_enabled,
-		telegram_proxy_base_url=payload.telegram_proxy_base_url,
-		telegram_proxy_api_key=payload.telegram_proxy_api_key,
-		inapp_read_retention_enabled=payload.inapp_read_retention_enabled,
-		inapp_read_retention_days=payload.inapp_read_retention_days,
+		telegram_bot_token=fields.get("telegram_bot_token"),
+		telegram_bot_username=fields.get("telegram_bot_username"),
+		telegram_webhook_secret=fields.get("telegram_webhook_secret"),
+		telegram_secret_header=fields.get("telegram_secret_header"),
+		bale_bot_token=fields.get("bale_bot_token"),
+		bale_bot_username=fields.get("bale_bot_username"),
+		bale_webhook_secret=fields.get("bale_webhook_secret"),
+		sms_provider_name=fields.get("sms_provider_name"),
+		sms_api_key=fields.get("sms_api_key"),
+		sms_sender=fields.get("sms_sender"),
+		sms_provider_username=fields.get("sms_provider_username"),
+		sms_provider_password=fields.get("sms_provider_password"),
+		sms_is_flash=fields.get("sms_is_flash"),
+		telegram_proxy_enabled=fields.get("telegram_proxy_enabled"),
+		telegram_proxy_base_url=fields.get("telegram_proxy_base_url"),
+		telegram_proxy_api_key=fields.get("telegram_proxy_api_key"),
+		inapp_read_retention_enabled=fields.get("inapp_read_retention_enabled"),
+		inapp_read_retention_days=fields.get("inapp_read_retention_days"),
 	)
-	return success_response(data, request)
+	return success_response(_mask_notifications_secrets(data), request)
 
 
 @router.post(
@@ -397,6 +450,11 @@ class SystemConfigurationPayload(BaseModel):
 	app_version: str | None = None
 	default_language: str | None = None
 	default_theme: str | None = None
+	default_theme_id: str | None = Field(
+		default=None,
+		description="شناسه پالت رنگی پیش‌فرض: classic_blue | turquoise_sea | emerald_forest | warm_copper",
+		max_length=64,
+	)
 	default_timezone: str | None = Field(
 		default=None,
 		description="نام منطقهٔ زمانی IANA برای نمایش تاریخ/زمان در کل سیستم (مثال Asia/Tehran)",
@@ -414,6 +472,24 @@ class SystemConfigurationPayload(BaseModel):
 		description="متن دلخواه مدیر؛ در صورت خالی نمایش پیش‌فرض در خطا و عمومی برای کاربر",
 		max_length=8192,
 	)
+	legacy_api_import_enabled: bool | None = Field(
+		default=None,
+		description="اگر False باشد گزینه انتقال از حسابیکس قبلی برای کاربران عادی مخفی و API مربوطه قطع می‌شود",
+	)
+	legacy_api_import_disabled_message: str | None = Field(
+		default=None,
+		description="متن دلخواه مدیر وقتی انتقال از حسابیکس قبلی غیرفعال است",
+		max_length=8192,
+	)
+	support_billing_mode: str | None = Field(default=None, description="free | paid | hybrid")
+	support_free_quota_per_month: int | None = None
+	support_grace_period_days: int | None = None
+	support_allow_read_without_subscription: bool | None = None
+	support_require_subscription_to_reply: bool | None = None
+	support_default_gateway_id: int | None = None
+	support_invoice_prefix: str | None = None
+	support_expiry_notify_days: list[int] | None = None
+	support_paid_priority_boost: bool | None = None
 	session_timeout: int | None = None
 	max_file_size: int | None = None
 	max_users: int | None = None
@@ -486,12 +562,24 @@ def set_system_configuration_endpoint(
 		app_version=payload.app_version,
 		default_language=payload.default_language,
 		default_theme=payload.default_theme,
+		default_theme_id=payload.default_theme_id,
 		default_timezone=payload.default_timezone,
 		enable_registration=payload.enable_registration,
 		enable_email_verification=payload.enable_email_verification,
 		enable_maintenance_mode=payload.enable_maintenance_mode,
 		support_tickets_enabled=payload.support_tickets_enabled,
 		support_tickets_disabled_message=payload.support_tickets_disabled_message,
+		legacy_api_import_enabled=payload.legacy_api_import_enabled,
+		legacy_api_import_disabled_message=payload.legacy_api_import_disabled_message,
+		support_billing_mode=payload.support_billing_mode,
+		support_free_quota_per_month=payload.support_free_quota_per_month,
+		support_grace_period_days=payload.support_grace_period_days,
+		support_allow_read_without_subscription=payload.support_allow_read_without_subscription,
+		support_require_subscription_to_reply=payload.support_require_subscription_to_reply,
+		support_default_gateway_id=payload.support_default_gateway_id,
+		support_invoice_prefix=payload.support_invoice_prefix,
+		support_expiry_notify_days=payload.support_expiry_notify_days,
+		support_paid_priority_boost=payload.support_paid_priority_boost,
 		session_timeout=payload.session_timeout,
 		max_file_size=payload.max_file_size,
 		max_users=payload.max_users,

@@ -153,6 +153,10 @@ def is_auto_routing_available(db: Session, plan: Optional[AIPlan]) -> bool:
     """آیا گزینه auto برای این پلن قابل ارائه است."""
     if not plan:
         return False
+    from app.services.ai.business_ai_provider_service import is_byok_plan
+
+    if is_byok_plan(plan):
+        return False
     pricing = _load_pricing_config(plan)
     allowed_codes = get_plan_allowed_model_codes(plan)
     if allowed_codes and AUTO_MODEL_CODE in allowed_codes:
@@ -269,10 +273,39 @@ def resolve_requested_model_code(
     subscription: Optional[UserAISubscription],
     plan: Optional[AIPlan],
     config: Optional[AIConfig],
+    business_id: Optional[int] = None,
 ) -> str:
     """
     کد مدل انتخاب‌شده (ممکن است «auto») بدون resolve کردن auto به مدل واقعی.
     """
+    from app.services.ai.business_ai_provider_service import (
+        get_byok_default_model,
+        is_byok_model_allowed,
+        is_byok_plan,
+        list_byok_models_for_user,
+    )
+
+    if is_byok_plan(plan) and business_id:
+        byok_candidates: List[Optional[str]] = []
+        if request_model and str(request_model).strip():
+            byok_candidates.append(str(request_model).strip())
+        if subscription and getattr(subscription, "preferred_model_code", None):
+            byok_candidates.append(str(subscription.preferred_model_code).strip())
+        default = get_byok_default_model(db, int(business_id))
+        if default:
+            byok_candidates.append(default)
+        for code in byok_candidates:
+            if code and is_byok_model_allowed(db, int(business_id), code):
+                return code
+        models = list_byok_models_for_user(db, int(business_id), plan)
+        if models:
+            return models[0]["code"]
+        raise ApiError(
+            "BYOK_NO_MODELS",
+            "مدلی برای ارائه‌دهنده اختصاصی تعریف نشده است",
+            http_status=400,
+        )
+
     candidates: List[Optional[str]] = []
     if request_model and str(request_model).strip():
         candidates.append(str(request_model).strip())
@@ -322,6 +355,7 @@ def resolve_effective_model_code(
     subscription: Optional[UserAISubscription],
     plan: Optional[AIPlan],
     config: Optional[AIConfig],
+    business_id: Optional[int] = None,
     operation: str = AI_OPERATION_CHAT,
     user_query: Optional[str] = None,
     history_messages: Optional[List[dict]] = None,
@@ -338,6 +372,7 @@ def resolve_effective_model_code(
         subscription=subscription,
         plan=plan,
         config=config,
+        business_id=business_id,
     )
     if is_auto_model_code(selected):
         return resolve_auto_model(
@@ -512,7 +547,13 @@ def list_models_for_user(
     plan: Optional[AIPlan],
     *,
     include_pricing: bool = True,
+    business_id: Optional[int] = None,
 ) -> List[Dict[str, Any]]:
+    from app.services.ai.business_ai_provider_service import is_byok_plan, list_byok_models_for_user
+
+    if is_byok_plan(plan) and business_id:
+        return list_byok_models_for_user(db, int(business_id), plan)
+
     repo = AIModelRepository(db)
     allowed_codes = get_plan_allowed_model_codes(plan)
     if allowed_codes is not None:
@@ -598,7 +639,32 @@ def validate_model_selection(
     db: Session,
     plan: Optional[AIPlan],
     model_code: str,
+    *,
+    business_id: Optional[int] = None,
 ) -> Optional[AIModel]:
+    from app.services.ai.business_ai_provider_service import is_byok_model_allowed, is_byok_plan
+
+    if is_byok_plan(plan):
+        if not business_id:
+            raise ApiError(
+                "BUSINESS_REQUIRED",
+                "برای پلن ارائه‌دهنده اختصاصی، شناسه کسب‌وکار الزامی است",
+                http_status=400,
+            )
+        if is_auto_model_code(model_code):
+            raise ApiError(
+                "MODEL_NOT_ALLOWED",
+                "مدل خودکار در پلن ارائه‌دهنده اختصاصی مجاز نیست",
+                http_status=403,
+            )
+        if not is_byok_model_allowed(db, int(business_id), model_code):
+            raise ApiError(
+                "MODEL_NOT_ALLOWED",
+                "مدل انتخاب‌شده در تنظیمات ارائه‌دهنده شما تعریف نشده است",
+                http_status=403,
+            )
+        return None
+
     if is_auto_model_code(model_code):
         if not is_auto_routing_available(db, plan):
             raise ApiError(

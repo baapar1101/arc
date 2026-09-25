@@ -169,7 +169,35 @@ class TelegramProvider:
 				return bool(j.get("ok"))
 		except Exception:
 			return False
-	
+
+	def send_chat_action(self, chat_id: int, action: str = "typing") -> bool:
+		"""وضعیت «در حال نوشتن» در تلگرام (CHN-01)."""
+		if not self.is_configured():
+			return False
+		if self._proxy_enabled():
+			ok, _ = self._proxy_request(
+				"sendChatAction",
+				{"chat_id": chat_id, "action": action},
+			)
+			return ok
+		token = self.bot_token
+		assert token
+		url = f"https://api.telegram.org/bot{token}/sendChatAction"
+		body = json.dumps(
+			{"chat_id": chat_id, "action": action},
+			ensure_ascii=False,
+		).encode("utf-8")
+		req = request.Request(url, data=body, method="POST")
+		req.add_header("Content-Type", "application/json")
+		try:
+			with request.urlopen(req, timeout=5) as resp:
+				if resp.status != 200:
+					return False
+				raw = resp.read().decode("utf-8")
+				return bool(json.loads(raw).get("ok"))
+		except Exception:
+			return False
+
 	def edit_message_text(
 		self,
 		chat_id: int,
@@ -331,7 +359,7 @@ class TelegramProvider:
 		assert token
 		telegram_url = f"https://api.telegram.org/bot{token}/setWebhook"
 		
-		logger.info("telegram_set_webhook_direct", telegram_url=telegram_url)
+		logger.info("telegram_set_webhook_direct", has_token=True, method="setWebhook")
 		
 		data = json.dumps(payload, ensure_ascii=False).encode("utf-8")
 		req = request.Request(telegram_url, data=data, method="POST")
@@ -373,7 +401,6 @@ class TelegramProvider:
 		except Exception as exc:
 			logger.error("telegram_set_webhook_exception", 
 				webhook_url=url,
-				telegram_url=telegram_url,
 				exception_type=type(exc).__name__,
 				exception_message=str(exc)
 			)

@@ -1,3 +1,5 @@
+import '../core/date_utils.dart';
+
 class WarehouseDocument {
   final int? id;
   final int businessId;
@@ -76,9 +78,10 @@ class WarehouseDocument {
       code: (json['code'] ?? '') as String,
       docType: (json['doc_type'] ?? json['docType'] ?? '') as String,
       status: (json['status'] ?? '') as String,
-      documentDate: json['document_date'] != null
-          ? DateTime.tryParse(json['document_date'].toString())
-          : null,
+      documentDate: HesabixDateUtils.parseApiDate(
+        json['document_date'],
+        rawValue: json['document_date_raw'],
+      ),
       warehouseIdFrom: json['warehouse_id_from'] as int?,
       warehouseIdTo: json['warehouse_id_to'] as int?,
       warehouseNameFrom: json['warehouse_name_from'] as String?,
@@ -91,12 +94,14 @@ class WarehouseDocument {
       sourceInvoiceTypeLabelFa: json['source_invoice_type_label_fa'] as String?,
       sourceInvoicePartyName: json['source_invoice_party_name'] as String?,
       notes: json['notes'] as String?,
-      createdAt: json['created_at'] != null
-          ? DateTime.tryParse(json['created_at'].toString())
-          : null,
-      updatedAt: json['updated_at'] != null
-          ? DateTime.tryParse(json['updated_at'].toString())
-          : null,
+      createdAt: HesabixDateUtils.parseApiDate(
+        json['created_at'],
+        rawValue: json['created_at_raw'],
+      ),
+      updatedAt: HesabixDateUtils.parseApiDate(
+        json['updated_at'],
+        rawValue: json['updated_at_raw'],
+      ),
       totalQuantity: json['total_quantity'] != null
           ? (json['total_quantity'] as num).toDouble()
           : null,

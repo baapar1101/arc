@@ -481,6 +481,17 @@ ORDER BY date DESC;
 
 ### همگام‌سازی با شرط
 
+فقط محصولات با وضعیت مجاز (پیش‌فرض: `publish`) همگام می‌شوند. برای افزودن وضعیت‌های دیگر:
+
+```php
+add_filter('hesabix_v2_syncable_product_statuses', function ($statuses) {
+    $statuses[] = 'private';
+    return $statuses;
+});
+```
+
+شرط سفارشی روی هر محصول:
+
 ```php
 add_filter('hesabix_v2_should_sync_product', function($should_sync, $product) {
     // فقط محصولات با قیمت بالای 10000 تومان

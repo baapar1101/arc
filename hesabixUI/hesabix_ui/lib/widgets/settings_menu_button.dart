@@ -4,6 +4,7 @@ import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'calendar_switcher.dart';
 import 'language_switcher.dart';
 import 'theme_mode_switcher.dart';
+import 'theme_palette_switcher.dart';
 import '../core/locale_controller.dart';
 import '../core/calendar_controller.dart';
 import '../theme/theme_controller.dart';
@@ -51,6 +52,14 @@ class SettingsMenuButton extends StatelessWidget {
               const SizedBox(height: 16),
             ],
             if (themeController != null) ...[
+              Row(
+                children: [
+                  Text(t.colorTheme),
+                  const Spacer(),
+                  ThemePaletteSwitcher(controller: themeController!),
+                ],
+              ),
+              const SizedBox(height: 12),
               Row(
                 children: [
                   Text(t.theme),

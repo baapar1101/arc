@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/android_sms_bank_platform.dart';
 import '../../system_settings/models/settings_category.dart';
 import '../../system_settings/models/settings_item.dart';
 import 'business_settings_context.dart';
@@ -122,7 +123,7 @@ class BusinessSettingsCategorizationService {
           categoryId: 'business_finance',
           order: 2,
         ),
-      if (ctx.canManageBusiness)
+      if (ctx.canManageBusiness && ctx.isMultiCurrency)
         _item(
           id: 'fx_revaluation',
           title: 'settingsInvoiceFxPolicyTitle',
@@ -133,6 +134,28 @@ class BusinessSettingsCategorizationService {
           categoryId: 'business_finance',
           order: 3,
         ),
+      if (ctx.canManageBusiness && ctx.isMultiCurrency)
+        _item(
+          id: 'fx_auto_sync',
+          title: 'settingsFxAutoSyncTitle',
+          description: 'settingsFxAutoSyncSubtitle',
+          icon: Icons.autorenew_rounded,
+          color: const Color(0xFF00695C),
+          route: ctx.panelRoute('settings/fx-auto-sync'),
+          categoryId: 'business_finance',
+          order: 4,
+        ),
+      if (ctx.canManageBusiness && ctx.isMultiCurrency)
+        _item(
+          id: 'period_end_fx',
+          title: 'تسعیر پایان دوره',
+          description: 'سند تعدیلی سود/زیان تسعیر تحقق‌نیافته برای مانده‌های ارزی',
+          icon: Icons.balance_outlined,
+          color: const Color(0xFF455A64),
+          route: ctx.panelRoute('settings/period-end-fx'),
+          categoryId: 'business_finance',
+          order: 5,
+        ),
       if (ctx.canEditFiscalYear)
         _item(
           id: 'fiscal_year',
@@ -142,7 +165,7 @@ class BusinessSettingsCategorizationService {
           color: const Color(0xFF00897B),
           route: ctx.panelRoute('settings/fiscal-year'),
           categoryId: 'business_finance',
-          order: 4,
+          order: 6,
         ),
       if (ctx.canJoinSettings)
         _item(
@@ -153,7 +176,19 @@ class BusinessSettingsCategorizationService {
           color: const Color(0xFFEF6C00),
           route: ctx.panelRoute('settings/credit'),
           categoryId: 'business_finance',
-          order: 5,
+          order: 7,
+        ),
+      if (supportsAndroidSmsBankAssistant && ctx.canJoinSettings)
+        _item(
+          id: 'sms_bank_assistant',
+          title: 'smsBankAssistantSettingsTitle',
+          description: 'smsBankAssistantSettingsDescription',
+          icon: Icons.sms_outlined,
+          color: const Color(0xFF00838F),
+          route: ctx.panelRoute('settings/sms-bank'),
+          categoryId: 'business_finance',
+          order: 8,
+          tags: const ['android', 'new'],
         ),
     ];
 
@@ -389,6 +424,17 @@ class BusinessSettingsCategorizationService {
           categoryId: 'modules',
           order: 4,
         ),
+      if (ctx.canAccessPayroll)
+        _item(
+          id: 'payroll',
+          title: 'businessSettingsPayroll',
+          description: 'businessSettingsPayrollDescription',
+          icon: Icons.payments_outlined,
+          color: const Color(0xFF283593),
+          route: ctx.panelRoute('settings/payroll'),
+          categoryId: 'modules',
+          order: 5,
+        ),
     ];
 
     return SettingsCategory(
@@ -480,6 +526,19 @@ class BusinessSettingsCategorizationService {
           categoryId: 'personalization',
           order: 1,
         ),
+        // Also listed under business_finance for discoverability; keep here as Android device feature.
+        if (supportsAndroidSmsBankAssistant && ctx.canJoinSettings)
+          _item(
+            id: 'sms_bank_assistant_personalization',
+            title: 'smsBankAssistantSettingsTitle',
+            description: 'smsBankAssistantSettingsDescription',
+            icon: Icons.sms_outlined,
+            color: const Color(0xFF00838F),
+            route: ctx.panelRoute('settings/sms-bank'),
+            categoryId: 'personalization',
+            order: 2,
+            tags: const ['android', 'new'],
+          ),
       ],
     );
   }
@@ -510,6 +569,18 @@ class BusinessSettingsCategorizationService {
           order: 2,
           tags: const ['advanced'],
         ),
+      if (ctx.canManageAiProvider)
+        _item(
+          id: 'ai_provider',
+          title: 'businessSettingsAiProviderTitle',
+          description: 'businessSettingsAiProviderDescription',
+          icon: Icons.smart_toy_outlined,
+          color: const Color(0xFF00695C),
+          route: ctx.panelRoute('settings/ai-provider'),
+          categoryId: 'advanced',
+          order: 3,
+          tags: const ['advanced', 'ai'],
+        ),
       if (ctx.canJoinSettings)
         _item(
           id: 'restore',
@@ -519,7 +590,7 @@ class BusinessSettingsCategorizationService {
           color: const Color(0xFF006064),
           route: ctx.panelRoute('settings/restore'),
           categoryId: 'advanced',
-          order: 3,
+          order: 4,
           tags: const ['advanced'],
         ),
     ];

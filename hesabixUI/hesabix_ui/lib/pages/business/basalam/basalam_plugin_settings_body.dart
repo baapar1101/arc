@@ -5,6 +5,7 @@ import '../../../l10n/app_localizations.dart';
 import '../../../services/basalam_integration_service.dart';
 import '../../../utils/error_extractor.dart';
 import '../../../utils/snackbar_helper.dart';
+import 'package:hesabix_ui/config/brand_config.dart';
 
 /// فرم تنظیمات افزونهٔ باسلام (کلید API، سینک، وب‌هوک، واحد پولی).
 class BasalamPluginSettingsBody extends StatefulWidget {
@@ -369,7 +370,7 @@ class _BasalamPluginSettingsBodyState extends State<BasalamPluginSettingsBody> {
               : null,
           decoration: InputDecoration(
             labelText: t.basalamSettingsMonetaryUnit,
-            helperText: t.basalamSettingsMonetaryUnitHelper,
+            helperText: t.branded(t.basalamSettingsMonetaryUnitHelper),
           ),
           items: [
             DropdownMenuItem(

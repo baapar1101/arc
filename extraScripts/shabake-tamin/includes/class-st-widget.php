@@ -72,7 +72,9 @@ class Shabake_Tamin_Catalog_Widget extends WP_Widget {
 				'category_id'       => '',
 				'province'          => '',
 				'city'              => '',
+				'brand'             => '',
 				'location_filters'    => '0',
+				'brand_filters'       => '0',
 				'province_suggest'    => '1',
 				'show_details'        => '1',
 				'columns'             => '4',
@@ -107,7 +109,9 @@ class Shabake_Tamin_Catalog_Widget extends WP_Widget {
 			'categoryId'            => $category_id,
 			'province'              => (string) $instance['province'],
 			'city'                  => (string) $instance['city'],
+			'brand'                 => (string) $instance['brand'],
 			'locationFilters'       => in_array( (string) $instance['location_filters'], array( '1', 'true', 'yes' ), true ),
+			'brandFilters'          => in_array( (string) $instance['brand_filters'], array( '1', 'true', 'yes' ), true ),
 			'provinceSuggestions'   => ! in_array( (string) $instance['province_suggest'], array( '0', 'false', 'no' ), true ),
 			'showProductDetails'    => ! in_array( (string) $instance['show_details'], array( '0', 'false', 'no' ), true ),
 			'columns'               => (int) $instance['columns'],
@@ -138,7 +142,9 @@ class Shabake_Tamin_Catalog_Widget extends WP_Widget {
 				'category_id'       => '',
 				'province'          => '',
 				'city'              => '',
+				'brand'             => '',
 				'location_filters'    => '0',
+				'brand_filters'       => '0',
 				'province_suggest'    => '1',
 				'show_details'        => '1',
 				'columns'             => '4',
@@ -174,9 +180,19 @@ class Shabake_Tamin_Catalog_Widget extends WP_Widget {
 				type="text" value="<?php echo esc_attr( (string) $instance['city'] ); ?>" />
 		</p>
 		<p>
+			<label for="<?php echo esc_attr( $this->get_field_id( 'brand' ) ); ?>"><?php esc_html_e( 'برند / مدل (پیش‌فرض متن)', 'shabake-tamin' ); ?></label>
+			<input class="widefat" id="<?php echo esc_attr( $this->get_field_id( 'brand' ) ); ?>" name="<?php echo esc_attr( $this->get_field_name( 'brand' ) ); ?>"
+				type="text" value="<?php echo esc_attr( (string) $instance['brand'] ); ?>" />
+		</p>
+		<p>
 			<input id="<?php echo esc_attr( $this->get_field_id( 'location_filters' ) ); ?>" name="<?php echo esc_attr( $this->get_field_name( 'location_filters' ) ); ?>"
 				type="checkbox" value="1" <?php checked( '1', (string) $instance['location_filters'] ); ?> />
 			<label for="<?php echo esc_attr( $this->get_field_id( 'location_filters' ) ); ?>"><?php esc_html_e( 'نمایش فیلدهای استان/شهر برای بازدیدکننده', 'shabake-tamin' ); ?></label>
+		</p>
+		<p>
+			<input id="<?php echo esc_attr( $this->get_field_id( 'brand_filters' ) ); ?>" name="<?php echo esc_attr( $this->get_field_name( 'brand_filters' ) ); ?>"
+				type="checkbox" value="1" <?php checked( '1', (string) $instance['brand_filters'] ); ?> />
+			<label for="<?php echo esc_attr( $this->get_field_id( 'brand_filters' ) ); ?>"><?php esc_html_e( 'نمایش فیلد برند/مدل برای بازدیدکننده', 'shabake-tamin' ); ?></label>
 		</p>
 		<p>
 			<input id="<?php echo esc_attr( $this->get_field_id( 'province_suggest' ) ); ?>" name="<?php echo esc_attr( $this->get_field_name( 'province_suggest' ) ); ?>"
@@ -221,7 +237,9 @@ class Shabake_Tamin_Catalog_Widget extends WP_Widget {
 		$out['category_id']         = isset( $new_instance['category_id'] ) ? sanitize_text_field( (string) $new_instance['category_id'] ) : '';
 		$out['province']            = isset( $new_instance['province'] ) ? sanitize_text_field( (string) $new_instance['province'] ) : '';
 		$out['city']                = isset( $new_instance['city'] ) ? sanitize_text_field( (string) $new_instance['city'] ) : '';
+		$out['brand']               = isset( $new_instance['brand'] ) ? sanitize_text_field( (string) $new_instance['brand'] ) : '';
 		$out['location_filters']    = ! empty( $new_instance['location_filters'] ) ? '1' : '0';
+		$out['brand_filters']       = ! empty( $new_instance['brand_filters'] ) ? '1' : '0';
 		$out['province_suggest']    = ! empty( $new_instance['province_suggest'] ) ? '1' : '0';
 		$out['show_details']        = ! empty( $new_instance['show_details'] ) ? '1' : '0';
 		$out['columns']             = isset( $new_instance['columns'] ) ? max( 2, min( 6, (int) $new_instance['columns'] ) ) : 4;

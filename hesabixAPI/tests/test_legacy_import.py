@@ -27,6 +27,76 @@ def test_normalize_server_url():
     assert normalize_server_url("https://app.hesabix.ir/") == "https://app.hesabix.ir"
 
 
+def test_format_legacy_validation_error_economic_id_too_long():
+    from pydantic import ValidationError
+
+    from adapters.api.v1.schemas import BusinessCreateRequest, BusinessField, BusinessType
+    from app.services.legacy_import.errors import format_legacy_validation_error
+
+    long_text = "یک زراعت کار، " + ("توضیح " * 20) + "معاف از پرداخت مالیات است."
+    with pytest.raises(ValidationError) as exc_info:
+        BusinessCreateRequest(
+            name="تست",
+            business_type=BusinessType.INDIVIDUAL,
+            business_field=BusinessField.OTHER,
+            default_currency_id=1,
+            economic_id=long_text,
+        )
+    msg = format_legacy_validation_error(exc_info.value, stage="ایجاد کسب‌وکار")
+    assert "شناسه اقتصادی" in msg
+    assert "50" in msg
+    assert "حسابیکس قبلی" in msg
+    assert "errors.pydantic.dev" not in msg
+    assert "string_too_long" not in msg
+
+
+def test_format_legacy_import_exception_uses_api_error_message():
+    from app.core.responses import ApiError
+    from app.services.legacy_import.errors import format_legacy_import_exception
+
+    exc = ApiError(
+        "LEGACY_BUSINESS_DATA_INVALID",
+        "پیام واضح برای کاربر",
+        http_status=400,
+    )
+    assert format_legacy_import_exception(exc) == "پیام واضح برای کاربر"
+
+
+def test_legacy_response_indicates_accpro_required():
+    from app.services.legacy_import.client import legacy_response_indicates_accpro_required
+
+    assert legacy_response_indicates_accpro_required(
+        '{"result":0,"message":"این قابلیت فقط برای کاربران افزونه accpro در دسترس است."}'
+    )
+    assert legacy_response_indicates_accpro_required("افزونه حسابداری پیشرفته فعال نیست")
+    assert not legacy_response_indicates_accpro_required('{"result":0,"message":"خطای دیگر"}')
+    assert not legacy_response_indicates_accpro_required("")
+
+
+def test_legacy_api_unauthorized_does_not_return_http_401():
+    """401 از سرور قدیم نباید باعث logout کاربر در پنل جدید شود."""
+    from unittest.mock import MagicMock
+
+    import httpx
+    import pytest
+
+    from app.core.responses import ApiError
+    from app.services.legacy_import.client import LegacyApiClient
+
+    client = LegacyApiClient("https://app.hesabix.ir", "test-api-key-12345")
+    response = MagicMock(spec=httpx.Response)
+    response.status_code = 401
+    response.text = "Unauthorized"
+    response.request = MagicMock()
+    response.request.url = "https://app.hesabix.ir/api/business/list"
+
+    with pytest.raises(ApiError) as exc_info:
+        client._raise_for_status(response, context="business/list")
+    assert exc_info.value.status_code == 400
+    assert exc_info.value.detail["error"]["code"] == "LEGACY_API_UNAUTHORIZED"
+    assert "کلید API نسخه قدیم" in exc_info.value.detail["error"]["message"]
+
+
 def test_map_legacy_person_types_defaults():
     assert map_legacy_person_types([]) == ["مشتری"]
     assert "مشتری" in map_legacy_person_types([1])
@@ -123,3 +193,187 @@ def test_build_expense_income_payload_income():
     )
     assert items[0]["amount"] == 100.0
     assert counterparties[0]["bank_id"] == 2002
+
+
+def test_build_invoice_lines_extra_info_pricing():
+    """قیمت واحد و جمع سطر باید در extra_info باشند (قرارداد create_invoice)."""
+    from app.services.legacy_import.document_importer import LegacyDocumentImporter
+    from app.services.legacy_import.id_map import LegacyIdMap, LegacyImportStats
+
+    id_map = LegacyIdMap()
+    id_map.products[769] = 5001
+    stats = LegacyImportStats()
+    importer = LegacyDocumentImporter(None, 1, 1, 1, id_map, stats)
+
+    rows = [
+        {
+            "commodity_id": 769,
+            "commdityCount": 20,
+            "bs": "69400000",
+            "bd": "0",
+            "discount": "0",
+            "tax": "0",
+        }
+    ]
+    lines = importer._build_invoice_lines(rows)
+    assert len(lines) == 1
+    info = lines[0]["extra_info"]
+    assert info["unit_price"] == 3470000.0
+    assert info["line_total"] == 69400000.0
+    assert "unit_price" not in lines[0] or lines[0].get("unit_price") is None
+
+
+def test_extract_invoice_header_discount():
+    from app.services.legacy_import.document_importer import LegacyDocumentImporter
+    from app.services.legacy_import.id_map import LegacyIdMap, LegacyImportStats
+
+    importer = LegacyDocumentImporter(None, 1, 1, 1, LegacyIdMap(), LegacyImportStats())
+    rows = [
+        {"bd": "5000", "bs": "0", "des": "تخفیف فاکتور"},
+        {"commodity_id": 1, "bs": "1000", "bd": "0", "commdityCount": 1},
+    ]
+    assert float(importer._extract_invoice_header_discount(rows)) == 5000.0
+
+
+def test_invoice_payload_requires_person_in_extra_info():
+    """create_invoice reads person_id from extra_info, not root payload."""
+    from app.services.legacy_import.document_importer import LegacyDocumentImporter
+    from app.services.legacy_import.id_map import LegacyIdMap, LegacyImportStats
+    from app.services.legacy_import.mappers import parse_legacy_date
+
+    id_map = LegacyIdMap()
+    id_map.persons[33] = 9001
+    id_map.products[769] = 5001
+    stats = LegacyImportStats()
+
+    doc = {"id": 132, "code": "1129", "type": "sell", "date": "1404/05/22"}
+    rows = [
+        {
+            "commodity_id": 769,
+            "commdityCount": 2,
+            "bs": "100000",
+            "person_id": 33,
+        }
+    ]
+
+    importer = LegacyDocumentImporter(None, 1, 1, 1, id_map, stats)
+    person_id = importer._resolve_person_for_doc(doc, rows)
+    lines = importer._build_invoice_lines(rows)
+    payload = {
+        "invoice_type": "invoice_sales",
+        "document_date": parse_legacy_date(doc["date"]).isoformat(),
+        "currency_id": 1,
+        "lines": lines,
+        "extra_info": {
+            "person_id": int(person_id),
+            "legacy_import": True,
+        },
+    }
+    assert payload["extra_info"]["person_id"] == 9001
+    assert payload["lines"][0]["extra_info"]["unit_price"] == 50000.0
+
+
+def test_parse_legacy_invoice_code_patterns():
+    from app.services.legacy_import.invoice_settlement import parse_legacy_invoice_code
+
+    assert parse_legacy_invoice_code("بابت تسویه فاکتور 1192") == "1192"
+    assert parse_legacy_invoice_code("بابت تسویه فاکتور فروش 1182") == "1182"
+    assert parse_legacy_invoice_code("پرداخت وجه فاکتور شماره 1000") == "1000"
+    assert parse_legacy_invoice_code("دریافت وجه فاکتور شماره ۱٬۱۲۹") == "1129"
+    assert parse_legacy_invoice_code("بابت فاکتور فروش بارمان شیمی") is None
+
+
+def test_extract_linked_invoice_legacy_code_from_rows():
+    from app.services.legacy_import.invoice_settlement import extract_linked_invoice_legacy_code
+
+    doc = {"des": ""}
+    rows = [{"des": "بابت تسویه فاکتور فروش 1188"}]
+    assert extract_linked_invoice_legacy_code(doc, rows) == "1188"
+
+
+def test_apply_related_docs_to_link_map():
+    from app.services.legacy_import.invoice_settlement import apply_related_docs_to_link_map
+
+    link_map: dict[str, str] = {}
+    apply_related_docs_to_link_map(
+        link_map,
+        "2034",
+        [
+            {"type": "sell_receive", "code": "2035", "des": "بابت دریافت فاکتور فروش"},
+            {"type": "cost", "code": "9999", "des": "ignored"},
+        ],
+    )
+    assert link_map == {"2035": "2034"}
+
+
+def test_resolve_linked_invoice_legacy_code_prefers_related_docs():
+    from app.services.legacy_import.invoice_settlement import resolve_linked_invoice_legacy_code
+
+    doc = {"des": "توضیح قدیمی بدون کد فاکتور"}
+    rows = [{"des": "توضیح تغییر یافته"}]
+    code = resolve_linked_invoice_legacy_code(
+        receipt_payment_code="2035",
+        related_docs_link_map={"2035": "2034"},
+        doc=doc,
+        rows=rows,
+    )
+    assert code == "2034"
+
+
+def test_resolve_linked_invoice_legacy_code_falls_back_to_description():
+    from app.services.legacy_import.invoice_settlement import resolve_linked_invoice_legacy_code
+
+    code = resolve_linked_invoice_legacy_code(
+        receipt_payment_code="1194",
+        related_docs_link_map={},
+        doc={"des": "بابت تسویه فاکتور 1192"},
+        rows=[],
+    )
+    assert code == "1192"
+
+
+def test_receipt_payment_person_lines_get_invoice_id():
+    """sell_receive/buy_send must attach invoice_id to person_lines for settlement."""
+    from app.services.legacy_import.document_importer import LegacyDocumentImporter
+    from app.services.legacy_import.id_map import LegacyIdMap, LegacyImportStats
+
+    id_map = LegacyIdMap()
+    id_map.invoice_codes["1192"] = 7001
+    id_map.persons[33] = 9001
+    id_map.bank_accounts[36] = 1001
+    stats = LegacyImportStats()
+    importer = LegacyDocumentImporter(None, 1, 1, 1, id_map, stats)
+
+    doc = {
+        "id": 197,
+        "code": "1194",
+        "type": "sell_receive",
+        "date": "1404/06/15",
+        "des": "بابت تسویه فاکتور 1192",
+    }
+    rows = [
+        {"person_id": 33, "bs": "5000000", "des": "بابت تسویه فاکتور 1192"},
+        {"bank_id": 36, "bd": "5000000", "des": "بابت تسویه فاکتور 1192"},
+    ]
+    from app.services.legacy_import.document_rows import build_receipt_payment_lines
+    from app.services.legacy_import.invoice_settlement import (
+        INVOICE_LINKED_RECEIPT_PAYMENT_TYPES,
+        resolve_linked_invoice_legacy_code,
+    )
+
+    person_lines, account_lines = build_receipt_payment_lines(rows, id_map=id_map)
+    legacy_type = str(doc.get("type") or "").strip()
+    assert legacy_type in INVOICE_LINKED_RECEIPT_PAYMENT_TYPES
+    linked_code = resolve_linked_invoice_legacy_code(
+        receipt_payment_code=doc.get("code"),
+        related_docs_link_map={"1194": "1192"},
+        doc=doc,
+        rows=rows,
+    )
+    assert linked_code == "1192"
+    linked_id = id_map.invoice_codes.get(linked_code)
+    assert linked_id == 7001
+    for pl in person_lines:
+        pl.setdefault("extra_info", {})
+        pl["extra_info"]["invoice_id"] = int(linked_id)
+    assert person_lines[0]["extra_info"]["invoice_id"] == 7001

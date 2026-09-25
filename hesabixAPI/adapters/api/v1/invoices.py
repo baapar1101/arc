@@ -41,7 +41,7 @@ from adapters.db.models.business import Business
 from adapters.db.models.business_print_settings import BusinessPrintSettings
 from adapters.db.models.user import User
 from app.core.responses import ApiError
-from app.services import invoice_service
+from app.services.invoice_adjustments_service import payable_total_from_extra_info
 from app.services.invoice_bulk_upsert_service import bulk_upsert_invoices_integration
 from app.services.invoice_service import (
     create_invoice,
@@ -49,6 +49,9 @@ from app.services.invoice_service import (
     delete_invoice,
     bulk_delete_invoices,
     invoice_document_to_dict,
+    invoice_documents_to_list_dicts,
+    batch_calculate_invoices_remaining,
+    batch_add_counterparty_to_invoice_items,
     calculate_invoice_remaining,
     SUPPORTED_INVOICE_TYPES,
     get_invoice_installment_plan,
@@ -71,6 +74,7 @@ from app.services.tax_submission_service import (
     build_tax_status_fields_for_api,
     build_tax_failure_details,
     enrich_tax_timeline_event,
+    normalize_stored_tax_status,
 )
 from app.services.tax_reference_service import (
     link_reference_invoice,
@@ -396,6 +400,7 @@ def search_installments_endpoint(
       "group_by": "invoice"?,
       "person_id": int?,
       "invoice_id": int?,
+      "currency_id": int?, // null/absent: base-equivalent amounts; set: native document currency
       "take": 200,
       "skip": 0
     }
@@ -647,6 +652,14 @@ def update_invoice_endpoint(
         raise ApiError("DOCUMENT_NOT_FOUND", "Invoice document not found", http_status=404)
     if not has_invoice_type_permission_for_business(ctx, db, business_id, doc.document_type, "edit"):
         raise ApiError("FORBIDDEN", f"Missing invoice type permission for {doc.document_type}", http_status=403)
+    requested_type = str(payload.get("invoice_type") or doc.document_type or "").strip()
+    if requested_type not in SUPPORTED_INVOICE_TYPES:
+        requested_type = str(doc.document_type or "")
+    if (
+        requested_type != doc.document_type
+        and not has_invoice_type_permission_for_business(ctx, db, business_id, requested_type, "edit")
+    ):
+        raise ApiError("FORBIDDEN", f"Missing invoice type permission for {requested_type}", http_status=403)
     try:
         can_pick = _user_can_select_fx_rate_for_business(db, ctx, business_id)
         can_change_unit = user_can_change_invoice_unit_price(ctx, db, business_id)
@@ -1310,8 +1323,9 @@ def recalculate_invoice_profits_endpoint(
     "/business/{business_id}/{invoice_id}/pdf",
     summary="PDF یک فاکتور",
     description=(
-        "دریافت فایل PDF تک‌فاکتور. اولویت قالب: `template_id` منتشرشده، سپس قالب پیش‌فرض ماژول `invoices/detail`، "
-        "در نهایت HTML پیش‌فرض. پارامترهای query مانند `show_stamp` می‌توانند چاپ را کنترل کنند."
+        "دریافت فایل PDF تک‌فاکتور. اولویت قالب: `template_id` منتشرشده، سپس قالب پیش‌فرض همان scope "
+        "(`invoices/detail` یا `invoices/receipt` برای سایز فیش)، در نهایت HTML پیش‌فرض. "
+        "پارامترهای query مانند `paper_size` (A4/A5/A6 یا 60mm/80mm/100mm)، `orientation` و `show_stamp` چاپ را کنترل می‌کنند."
     ),
 )
 @require_business_access("business_id")
@@ -1329,9 +1343,10 @@ async def export_single_invoice_pdf(
 ):
     """
     خروجی PDF تک‌سند فاکتور با پشتیبانی از قالب سفارشی:
-    - اگر template_id داده شود و منتشرشده باشد، همان استفاده می‌شود.
-    - در غیر این صورت اگر قالب پیش‌فرض منتشرشده برای invoices/detail موجود باشد، استفاده می‌شود.
-    - در نبود قالب، خروجی HTML پیش‌فرض تولید می‌شود.
+    - اگر template_id داده شود و منتشرشده و هم‌خوان با scope باشد، همان استفاده می‌شود.
+    - سایزهای فیش (60mm/80mm/100mm) از قالب invoices/receipt و HTML فیش استفاده می‌کنند.
+    - در غیر این صورت اگر قالب پیش‌فرض منتشرشده برای همان scope موجود باشد، استفاده می‌شود.
+    - در نبود قالب، خروجی HTML پیش‌فرض (جزئیات یا فیش) تولید می‌شود.
     """
     from weasyprint import HTML
     from weasyprint.text.fonts import FontConfiguration
@@ -1381,21 +1396,22 @@ async def export_single_invoice_pdf(
 
     show_stamp_override = None
 
+    from app.services.business_print_settings_resolver import (
+        default_print_settings_dict,
+        pick_print_settings,
+    )
+    from app.services.print_tax_discount_display import (
+        build_global_discount_print_info,
+        build_invoice_tax_discount_display_flags,
+        enrich_line_amount_fields,
+        line_amounts_before_global_discount,
+        parse_discount_meta,
+        should_restore_line_amounts_before_global,
+    )
+
     # تنظیمات چاپ کسب‌وکار (لوگو، مهر، پرداخت‌ها، اقساط و متن انتهایی)
     # یک کانفیگ پیش‌فرض تعریف می‌کنیم تا در صورت بروز خطا یا نبود کسب‌وکار، همچنان در دسترس باشد
-    print_settings: Dict[str, Any] = {
-        "show_logo": True,
-        "show_stamp": True,
-        "show_payments": True,
-        "show_installment_plan": True,
-        "show_share_qr": False,
-        "show_footer_print_time": True,
-        "show_footer_preparer": True,
-        "footer_note": None,
-        "show_customer_balance": True,
-        "show_seller_signature_area": True,
-        "show_buyer_signature_area": True,
-    }
+    print_settings: Dict[str, Any] = default_print_settings_dict()
     invoice_footer_note: Optional[str] = None
 
     try:
@@ -1429,68 +1445,7 @@ async def export_single_invoice_pdf(
                 print_rows = []
 
             def _pick_print_settings() -> dict:
-                # از print_settings فعلی به‌عنوان مقدار اولیه استفاده می‌کنیم
-                default_cfg = dict(print_settings)
-                per_type_cfg = None
-                for r in print_rows:
-                    if r.document_type == "all":
-                        default_cfg = {
-                            "show_logo": bool(getattr(r, "show_logo", True)),
-                            "show_stamp": bool(getattr(r, "show_stamp", True)),
-                            "show_payments": bool(getattr(r, "show_payments", True)),
-                            "show_installment_plan": bool(
-                                getattr(r, "show_installment_plan", True)
-                            ),
-                            "show_share_qr": bool(getattr(r, "show_share_qr", False)),
-                            "show_footer_print_time": bool(
-                                getattr(r, "show_footer_print_time", True)
-                            ),
-                            "show_footer_preparer": bool(
-                                getattr(r, "show_footer_preparer", True)
-                            ),
-                            "footer_note": getattr(r, "footer_note", None),
-                            "show_customer_balance": bool(
-                                getattr(r, "show_customer_balance", True)
-                            ),
-                            "show_seller_signature_area": bool(
-                                getattr(r, "show_seller_signature_area", True)
-                            ),
-                            "show_buyer_signature_area": bool(
-                                getattr(r, "show_buyer_signature_area", True)
-                            ),
-                        }
-                    elif r.document_type == doc.document_type:
-                        per_type_cfg = {
-                            "show_logo": bool(getattr(r, "show_logo", True)),
-                            "show_stamp": bool(getattr(r, "show_stamp", True)),
-                            "show_payments": bool(getattr(r, "show_payments", True)),
-                            "show_installment_plan": bool(
-                                getattr(r, "show_installment_plan", True)
-                            ),
-                            "show_share_qr": bool(getattr(r, "show_share_qr", False)),
-                            "show_footer_print_time": bool(
-                                getattr(r, "show_footer_print_time", True)
-                            ),
-                            "show_footer_preparer": bool(
-                                getattr(r, "show_footer_preparer", True)
-                            ),
-                            "footer_note": getattr(r, "footer_note", None),
-                            "show_customer_balance": bool(
-                                getattr(r, "show_customer_balance", True)
-                            ),
-                            "show_seller_signature_area": bool(
-                                getattr(r, "show_seller_signature_area", True)
-                            ),
-                            "show_buyer_signature_area": bool(
-                                getattr(r, "show_buyer_signature_area", True)
-                            ),
-                        }
-                if per_type_cfg is None:
-                    return default_cfg
-                # per_type روی default override می‌شود
-                merged = dict(default_cfg)
-                merged.update({k: v for k, v in per_type_cfg.items() if v is not None})
-                return merged
+                return pick_print_settings(print_rows, doc.document_type, base=print_settings)
 
             print_settings = _pick_print_settings()
 
@@ -1509,7 +1464,7 @@ async def export_single_invoice_pdf(
                         return False
                 return None
 
-            # پارامترهای query: مهر و QR
+            # پارامترهای query: مهر، QR و مقیاس مهر/امضا
             try:
                 _qp_print = request.query_params
                 _st_q = _normalize_bool(_qp_print.get("show_stamp"))
@@ -1524,6 +1479,18 @@ async def export_single_invoice_pdf(
                 _sfp = _normalize_bool(_qp_print.get("show_footer_preparer"))
                 if _sfp is not None:
                     print_settings["show_footer_preparer"] = _sfp
+                from app.services.print_stamp_scale import clamp_scale_percent
+
+                if _qp_print.get("stamp_scale_percent") is not None:
+                    print_settings["stamp_scale_percent"] = clamp_scale_percent(
+                        _qp_print.get("stamp_scale_percent"),
+                        print_settings.get("stamp_scale_percent", 100),
+                    )
+                if _qp_print.get("signature_scale_percent") is not None:
+                    print_settings["signature_scale_percent"] = clamp_scale_percent(
+                        _qp_print.get("signature_scale_percent"),
+                        print_settings.get("signature_scale_percent", 100),
+                    )
             except Exception:
                 pass
 
@@ -1592,6 +1559,18 @@ async def export_single_invoice_pdf(
         _qfp = _norm_bool_pdf(_qp_fb.get("show_footer_preparer"))
         if _qfp is not None:
             print_settings["show_footer_preparer"] = _qfp
+        from app.services.print_stamp_scale import clamp_scale_percent
+
+        if _qp_fb.get("stamp_scale_percent") is not None:
+            print_settings["stamp_scale_percent"] = clamp_scale_percent(
+                _qp_fb.get("stamp_scale_percent"),
+                print_settings.get("stamp_scale_percent", 100),
+            )
+        if _qp_fb.get("signature_scale_percent") is not None:
+            print_settings["signature_scale_percent"] = clamp_scale_percent(
+                _qp_fb.get("signature_scale_percent"),
+                print_settings.get("signature_scale_percent", 100),
+            )
     except Exception:
         pass
 
@@ -1725,6 +1704,14 @@ async def export_single_invoice_pdf(
     )
 
     # خطوط فاکتور (کالا/خدمت)
+    # اگر تخفیف کلی با حالت مالیات متناسب روی سطرها پخش شده باشد،
+    # برای نمایش پرینت مبالغ سطر را به حالت قبل از تخفیف کلی برمی‌گردانیم
+    # تا کاربر حس نکند تخفیف کلی روی فیلد تخفیف سطری نشسته است.
+    _gd_preview = (extra.get("global_discount") if isinstance(extra, dict) else None) or {}
+    _restore_pre_global = should_restore_line_amounts_before_global(
+        _gd_preview if isinstance(_gd_preview, dict) else None
+    )
+
     normalized_lines: list[dict[str, Any]] = []
     try:
         for pl in item.get("product_lines", []) or []:
@@ -1734,6 +1721,7 @@ async def export_single_invoice_pdf(
             line_discount = info.get("line_discount") or 0
             tax_amount = info.get("tax_amount") or 0
             line_total = info.get("line_total")
+            discount_type, discount_value = parse_discount_meta(info)
             qty_display = None
             try:
                 qf = float(qty or 0)
@@ -1742,6 +1730,15 @@ async def export_single_invoice_pdf(
                 taxf = float(tax_amount or 0)
                 if line_total is None:
                     line_total = (qf * upf) - discf + taxf
+                if _restore_pre_global:
+                    restored = line_amounts_before_global_discount(
+                        quantity=qf,
+                        unit_price=upf,
+                        line_discount=discf,
+                        tax_rate=info.get("tax_rate"),
+                    )
+                    tax_amount = restored["tax_amount"]
+                    line_total = restored["line_total"]
                 # نمایش تعداد: بدون اعشار اگر عدد صحیح باشد
                 if qf.is_integer():
                     qty_display = f"{int(qf):,}"
@@ -1754,20 +1751,25 @@ async def export_single_invoice_pdf(
             if not isinstance(lc_attrs, dict):
                 lc_attrs = {}
             normalized_lines.append(
-                {
-                    "product_code": pl.get("product_code"),
-                    "product_name": pl.get("product_name"),
-                    "description": pl.get("description"),
-                    "quantity": qty,
-                    "quantity_display": qty_display,
-                    "unit_display": _invoice_line_unit_display_for_pdf(pl if isinstance(pl, dict) else {}),
-                    "unit_price": unit_price,
-                    "discount": line_discount,
-                    "tax_amount": tax_amount,
-                    "line_total": line_total,
-                    "line_custom_attributes": lc_attrs,
-                    "attributes_display": attrs_display,
-                }
+                enrich_line_amount_fields(
+                    {
+                        "product_code": pl.get("product_code"),
+                        "product_name": pl.get("product_name"),
+                        "description": pl.get("description"),
+                        "quantity": qty,
+                        "quantity_display": qty_display,
+                        "unit_display": _invoice_line_unit_display_for_pdf(pl if isinstance(pl, dict) else {}),
+                        "unit_price": unit_price,
+                        "discount": line_discount,
+                        "discount_type": discount_type,
+                        "discount_value": discount_value,
+                        "tax_amount": tax_amount,
+                        "line_total": line_total,
+                        "line_custom_attributes": lc_attrs,
+                        "attributes_display": attrs_display,
+                    },
+                    is_fa=is_fa,
+                )
             )
     except Exception:
         normalized_lines = []
@@ -2018,6 +2020,59 @@ async def export_single_invoice_pdf(
                         "amount": ln.get("amount", 0),
                         "description": description,
                     })
+
+                # اطلاعات تسویه بین‌ارزی از person_lines / extra_info سند
+                fx_display = None
+                try:
+                    fx_src = None
+                    for pl in (rp.get("person_lines") or []):
+                        if not isinstance(pl, dict):
+                            continue
+                        if pl.get("fx_settlement"):
+                            fx_src = pl.get("fx_settlement")
+                            break
+                        extra_pl = pl.get("extra_info")
+                        if isinstance(extra_pl, dict) and extra_pl.get("fx_settlement"):
+                            fx_src = extra_pl.get("fx_settlement")
+                            break
+                    doc_extra = rp.get("extra_info") if isinstance(rp.get("extra_info"), dict) else {}
+                    if fx_src is None and isinstance(doc_extra, dict):
+                        if isinstance(doc_extra.get("fx_settlement"), dict):
+                            fx_src = doc_extra.get("fx_settlement")
+                        elif isinstance(doc_extra.get("settlements"), list) and doc_extra["settlements"]:
+                            first_st = doc_extra["settlements"][0]
+                            if isinstance(first_st, dict) and first_st.get("fx_settlement"):
+                                fx_src = first_st.get("fx_settlement")
+                    if isinstance(fx_src, dict):
+                        settles_amount = fx_src.get("settles_amount")
+                        payment_amount = fx_src.get("payment_amount") or rp.get("total_amount")
+                        rate = fx_src.get("rate") or fx_src.get("tx_rate")
+                        settles_cur_id = fx_src.get("settles_currency_id")
+                        pay_cur_id = fx_src.get("payment_currency_id")
+                        base_cur_id = fx_src.get("base_currency_id")
+                        from adapters.db.models.currency import Currency as _Cur
+
+                        def _cur_label(cid):
+                            if not cid:
+                                return ""
+                            c = db.query(_Cur).filter(_Cur.id == int(cid)).first()
+                            if not c:
+                                return ""
+                            return (c.symbol or c.code or "") or ""
+
+                        settles_unit = _cur_label(settles_cur_id) or (item.get("currency_code") if isinstance(item, dict) else "") or ""
+                        pay_unit = _cur_label(pay_cur_id)
+                        base_unit = _cur_label(base_cur_id) or "ریال"
+                        fx_display = {
+                            "settles_amount": settles_amount,
+                            "settles_unit": settles_unit,
+                            "payment_amount": payment_amount,
+                            "payment_unit": pay_unit or base_unit,
+                            "rate": rate,
+                            "base_unit": base_unit,
+                        }
+                except Exception:
+                    fx_display = None
                 
                 payments.append(
                     {
@@ -2030,6 +2085,7 @@ async def export_single_invoice_pdf(
                         "methods": ", ".join(methods),
                         "account_details": account_details,
                         "description": rp.get("description") or "",
+                        "fx_display": fx_display,
                     }
                 )
         logger.info(
@@ -2248,6 +2304,41 @@ async def export_single_invoice_pdf(
     except Exception:
         item["is_installment_sale"] = False
 
+    tax_discount_display_flags = build_invoice_tax_discount_display_flags(
+        print_settings,
+        has_line_discount=has_line_discount,
+        has_line_tax=has_line_tax,
+        discount_total=discount_total,
+        tax_total=tax_total,
+        amount_without_tax=amount_without_tax,
+        subtotal=subtotal,
+    )
+
+    # جمع تخفیف سطری (بدون تخفیف کلی) برای تفکیک در خلاصه مالی پرینت
+    line_discount_total = 0.0
+    try:
+        for ln in normalized_lines:
+            line_discount_total += float(ln.get("discount") or 0)
+    except Exception:
+        line_discount_total = 0.0
+
+    global_discount_print = build_global_discount_print_info(
+        extra if isinstance(extra, dict) else {},
+        line_discount_total=line_discount_total,
+        is_fa=is_fa,
+    )
+    item["line_discount_total"] = global_discount_print["line_discount_total"]
+    item["global_discount_amount"] = global_discount_print["global_discount_amount"]
+    item["global_discount_type"] = global_discount_print["global_discount_type"]
+    item["global_discount_value"] = global_discount_print["global_discount_value"]
+    item["global_discount_display"] = global_discount_print["global_discount_display"]
+    item["show_discount_breakdown"] = global_discount_print["show_discount_breakdown"]
+    item["discount_summary_label"] = global_discount_print["discount_summary_label"]
+    item["discount_line_label"] = global_discount_print["discount_line_label"]
+    item["discount_global_label"] = global_discount_print["discount_global_label"]
+    item["discount_summary_display"] = global_discount_print["discount_summary_display"]
+    item["has_global_discount"] = global_discount_print["has_global_discount"]
+
     # نام کاربر صادرکننده فاکتور
     issuer_name: Optional[str] = None
     try:
@@ -2317,6 +2408,12 @@ async def export_single_invoice_pdf(
             invoice_verify_qr_data_uri = None
 
     # کانتکست قالب
+    from app.services.print_stamp_scale import invoice_stamp_signature_sizes
+
+    _stamp_sig_sizes = invoice_stamp_signature_sizes(
+        print_settings.get("stamp_scale_percent", 100),
+        print_settings.get("signature_scale_percent", 100),
+    )
     template_context = {
         "business_id": business_id,
         "business_name": business_name,
@@ -2328,13 +2425,26 @@ async def export_single_invoice_pdf(
         "lines": normalized_lines,
         "buyer": buyer_info,
         "seller": seller_info,
-        "has_line_discount": has_line_discount,
-        "has_line_tax": has_line_tax,
+        "has_line_discount": tax_discount_display_flags["has_line_discount"],
+        "has_line_tax": tax_discount_display_flags["has_line_tax"],
+        "show_line_discount_column": tax_discount_display_flags["show_line_discount_column"],
+        "show_line_tax_column": tax_discount_display_flags["show_line_tax_column"],
+        "show_line_amount_before_discount_column": tax_discount_display_flags[
+            "show_line_amount_before_discount_column"
+        ],
+        "show_line_amount_before_tax_column": tax_discount_display_flags[
+            "show_line_amount_before_tax_column"
+        ],
+        "show_summary_discount": tax_discount_display_flags["show_summary_discount"],
+        "show_summary_tax": tax_discount_display_flags["show_summary_tax"],
+        "show_summary_amount_without_tax": tax_discount_display_flags[
+            "show_summary_amount_without_tax"
+        ],
         "payments": payments,
         "installment_plan": installment_plan,
         "invoice_date_jalali": invoice_date_jalali,
         "invoice_date_gregorian": invoice_date_gregorian,
-        "generated_at": datetime.datetime.now(),
+        "generated_at": None,  # پایین‌تر با timezone کسب‌وکار پر می‌شود
         "is_fa": is_fa,
         "issuer_name": issuer_name,
         "fa_font_url_regular": fa_font_url_regular,
@@ -2351,31 +2461,22 @@ async def export_single_invoice_pdf(
         "show_buyer_signature_area": bool(
             print_settings.get("show_buyer_signature_area", True)
         ),
+        "stamp_scale_percent": _stamp_sig_sizes["stamp_scale_percent"],
+        "signature_scale_percent": _stamp_sig_sizes["signature_scale_percent"],
+        "stamp_max_width_px": _stamp_sig_sizes["stamp_max_width_px"],
+        "signature_max_width_px": _stamp_sig_sizes["signature_max_width_px"],
+        "is_multi_currency": False,
+        "base_currency": item.get("base_currency") if isinstance(item.get("base_currency"), dict) else {},
     }
-
-    # تلاش برای رندر با قالب سفارشی
-    resolved_html = None
     try:
-        from app.services.report_template_service import ReportTemplateService
-        explicit_template_id = None
-        try:
-            if template_id is not None:
-                explicit_template_id = int(template_id)
-        except Exception:
-            explicit_template_id = None
-        resolved_html = ReportTemplateService.try_render_resolved(
-            db=db,
-            business_id=business_id,
-            module_key="invoices",
-            subtype="detail",
-            context=template_context,
-            explicit_template_id=explicit_template_id,
-        )
-    except Exception:
-        resolved_html = None
+        from app.services.fx_rate_provider_service import business_is_multi_currency as _biz_mc
 
-    # HTML پیش‌فرض در نبود قالب: استفاده از قالب فایل
-    # پارامترهای صفحه از کوئری (اختیاری)
+        template_context["is_multi_currency"] = bool(_biz_mc(db, int(business_id)))
+    except Exception:
+        fx_t = item.get("fx_totals") if isinstance(item.get("fx_totals"), dict) else {}
+        template_context["is_multi_currency"] = bool(fx_t.get("show_dual"))
+
+    # پارامترهای صفحه از کوئری (اختیاری) — قبل از رزولوشن قالب، چون فیش scope جدا دارد
     show_stamp_override = None
     try:
         qp = request.query_params
@@ -2389,44 +2490,102 @@ async def export_single_invoice_pdf(
         disposition = "attachment"
         show_stamp_override = None
 
-    # حالت پیش‌فرض صفحه برای فاکتور: افقی (landscape)، مگر این‌که صراحتاً چیز دیگری ارسال شده باشد
-    if not orientation:
-        orientation = "landscape"
-    # متن فوتر با زمان چاپ (بر اساس تقویم انتخاب‌شده کاربر) و نام تهیه‌کنندهٔ سند
+    from app.services.pdf.page_size import (
+        RECEIPT_SUBTYPE,
+        build_page_size_css,
+        is_receipt_paper,
+    )
+
+    explicit_template_id = None
     try:
-        now = template_context["generated_at"]
+        if template_id is not None:
+            explicit_template_id = int(template_id)
+    except Exception:
+        explicit_template_id = None
+
+    receipt_mode = is_receipt_paper(paper_size)
+    if not receipt_mode and explicit_template_id is not None:
+        try:
+            from app.services.report_template_service import ReportTemplateService as _RTS
+
+            _tpl = _RTS.get_template(db, explicit_template_id, business_id)
+            if _tpl and _tpl.module_key == "invoices" and (_tpl.subtype or "") == RECEIPT_SUBTYPE:
+                receipt_mode = True
+                if not (paper_size or "").strip():
+                    paper_size = (_tpl.paper_size or "80mm")
+        except Exception:
+            pass
+
+    if receipt_mode:
+        orientation = "portrait"
+        if not (paper_size or "").strip():
+            paper_size = "80mm"
+    elif not orientation:
+        # حالت پیش‌فرض صفحه برای فاکتور A4: افقی
+        orientation = "landscape"
+
+    invoice_template_subtype = RECEIPT_SUBTYPE if receipt_mode else "detail"
+
+    # متن فوتر با زمان چاپ (timezone کسب‌وکار + تقویم کاربر) و نام تهیه‌کنندهٔ سند
+    try:
+        from app.core.datetime_utils import (
+            business_wall_clock_now,
+            export_filename_timestamp,
+            format_generated_at_for_pdf,
+        )
+
+        generated_at_now = business_wall_clock_now(business_id)
+        template_context["generated_at"] = generated_at_now
+
         footer_text = ""
         show_ft = bool(print_settings.get("show_footer_print_time", True))
         show_prep = bool(print_settings.get("show_footer_preparer", True))
-        if isinstance(now, datetime.datetime):
-            footer_label = "زمان چاپ" if is_fa else "Printed at"
-            preparer_label = "تهیه‌کننده" if is_fa else "Prepared by"
-            printed_at_str = ""
-            try:
-                if calendar_type == "jalali":
-                    fd = CalendarConverter.format_datetime(now, "jalali")
-                else:
-                    fd = CalendarConverter.format_datetime(now, "gregorian")
-                printed_at_str = fd.get("formatted") or fd.get("date_only", "") or ""
-            except Exception:
-                printed_at_str = now.strftime("%Y/%m/%d %H:%M")
-            parts: List[str] = []
-            if show_ft and printed_at_str:
+        parts: List[str] = []
+        if show_ft:
+            printed_at_str = format_generated_at_for_pdf(business_id, calendar_type)
+            if printed_at_str:
+                footer_label = "زمان چاپ" if is_fa else "Printed at"
                 parts.append(f"{footer_label}: {printed_at_str}")
-            if show_prep and issuer_name:
-                parts.append(f"{preparer_label}: {issuer_name}")
-            footer_text = " | ".join(parts)
+        if show_prep and issuer_name:
+            preparer_label = "تهیه‌کننده" if is_fa else "Prepared by"
+            parts.append(f"{preparer_label}: {issuer_name}")
+        footer_text = " | ".join(parts)
+        pdf_filename_ts = export_filename_timestamp(business_id)
     except Exception:
         footer_text = ""
+        pdf_filename_ts = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+        if template_context.get("generated_at") is None:
+            template_context["generated_at"] = datetime.datetime.now()
+
+    # تلاش برای رندر با قالب سفارشی (بعد از پر شدن generated_at)
+    resolved_html = None
+    try:
+        from app.services.report_template_service import ReportTemplateService
+        resolved_html = ReportTemplateService.try_render_resolved(
+            db=db,
+            business_id=business_id,
+            module_key="invoices",
+            subtype=invoice_template_subtype,
+            context=template_context,
+            explicit_template_id=explicit_template_id,
+            page_paper_size=paper_size,
+            page_orientation=orientation,
+        )
+    except Exception:
+        resolved_html = None
 
     default_ctx = {
         **template_context,
         "title_text": item.get("title") or ("فاکتور" if is_fa else "Invoice"),
         "paper_size": paper_size,
         "orientation": orientation,
+        "page_size_css": build_page_size_css(paper_size, orientation),
+        "hide_page_numbers": receipt_mode,
+        "is_receipt_paper": receipt_mode,
         "footer_text": footer_text,
     }
-    html_content = resolved_html or render_template("pdf/invoices/detail.html", default_ctx)
+    fallback_template = "pdf/invoices/receipt.html" if receipt_mode else "pdf/invoices/detail.html"
+    html_content = resolved_html or render_template(fallback_template, default_ctx)
 
     font_config = FontConfiguration()
     pdf_bytes = HTML(string=html_content).write_pdf(font_config=font_config)
@@ -2434,7 +2593,7 @@ async def export_single_invoice_pdf(
     # نام فایل
     def _slugify(text: str) -> str:
         return re.sub(r"[^A-Za-z0-9_-]+", "_", (text or "")).strip("_") or "invoice"
-    filename = f"invoice_{_slugify(item.get('code'))}_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.pdf"
+    filename = f"invoice_{_slugify(item.get('code'))}_{pdf_filename_ts}.pdf"
 
     return Response(
         content=pdf_bytes,
@@ -2782,17 +2941,10 @@ async def search_invoices_endpoint(
 
 	data_items: List[Dict[str, Any]] = []
 	_log = logging.getLogger(__name__)
-	for d in items:
-		try:
-			item = invoice_document_to_dict(db, d, include_tags=False)
-		except Exception as e:
-			_log.exception("invoice_document_to_dict failed for document_id=%s business_id=%s", d.id, business_id)
-			raise ApiError(
-				"INVOICE_DATA_ERROR",
-				f"خطا در بارگذاری فاکتور با شناسه {d.id}. داده‌های سند را بررسی کنید.",
-				http_status=500,
-			)
-
+	list_dicts = invoice_documents_to_list_dicts(db, items)
+	remaining_by_id = batch_calculate_invoices_remaining(db, business_id, items)
+	for item in list_dicts:
+		d_id = int(item.get("id") or 0)
 		# Tax workspace fields from extra_info
 		try:
 			extra = item.get("extra_info") or {}
@@ -2812,31 +2964,17 @@ async def search_invoices_endpoint(
 		except Exception:
 			item["is_installment_sale"] = False
 
-		# total_amount from extra_info.totals.net if available
+		# total_amount = مبلغ قابل پرداخت (شامل اضافات/کسورات)
 		total_amount = None
 		try:
-			totals = (item.get('extra_info') or {}).get('totals') or {}
-			if isinstance(totals, dict) and 'net' in totals:
-				total_amount = totals.get('net')
+			payable = payable_total_from_extra_info(item.get("extra_info"))
+			if payable is not None:
+				total_amount = float(payable)
 		except Exception:
 			total_amount = None
-		# Fallback compute from product lines
 		if total_amount is None:
-			try:
-				net_sum = 0.0
-				for pl in item.get('product_lines', []) or []:
-					info = pl.get('extra_info') or {}
-					qty = float(pl.get('quantity') or 0)
-					unit_price = float(info.get('unit_price') or 0)
-					line_discount = float(info.get('line_discount') or 0)
-					tax_amount = float(info.get('tax_amount') or 0)
-					line_total = info.get('line_total')
-					if line_total is None:
-						line_total = (qty * unit_price) - line_discount + tax_amount
-					net_sum += float(line_total)
-				total_amount = float(net_sum)
-			except Exception:
-				total_amount = None
+			remaining_result = remaining_by_id.get(d_id) or {}
+			total_amount = remaining_result.get("total_amount")
 
 		item['document_type_name'] = _type_name(item.get('document_type'))
 		if total_amount is not None:
@@ -2844,7 +2982,7 @@ async def search_invoices_endpoint(
 
 		# مبلغ پرداخت‌شده و مبلغ باقی‌مانده فاکتور
 		try:
-			remaining_result = calculate_invoice_remaining(db, business_id, d.id)
+			remaining_result = remaining_by_id.get(d_id) or {}
 			item["paid_amount"] = remaining_result.get("paid_amount")
 			item["remaining_amount"] = remaining_result.get("remaining")
 		except Exception:
@@ -2868,10 +3006,10 @@ async def search_invoices_endpoint(
 			item["installment_status"] = None
 			item["remaining_total"] = None
 
-		# افزودن counterparty
-		_add_counterparty_to_invoice_item(db, item)
+		data_items.append(item)
 
-		data_items.append(format_datetime_fields(item, request))
+	batch_add_counterparty_to_invoice_items(db, data_items)
+	data_items = [format_datetime_fields(item, request) for item in data_items]
 
 	attach_tags_to_invoice_items(db, business_id, data_items)
 
@@ -3074,16 +3212,25 @@ async def search_tax_workspace_endpoint(
     requested_status = requested_status.strip() if isinstance(requested_status, str) else None
 
     workspace_docs: List[Document] = []
+    status_counts: Dict[str, int] = {
+        "not_sent": 0,
+        "pending": 0,
+        "success": 0,
+        "failed": 0,
+        "cancelled": 0,
+        "all": 0,
+    }
     for d in all_docs:
         extra = d.extra_info or {}
         in_workspace = bool(extra.get("tax_workspace"))
         if not in_workspace:
             continue
-        status = extra.get("tax_status")
-        if isinstance(status, str):
-            status = status.strip()
-        if not status:
-            status = "not_sent"
+        status = normalize_stored_tax_status(extra)
+        status_counts["all"] += 1
+        if status in status_counts:
+            status_counts[status] += 1
+        else:
+            status_counts[status] = status_counts.get(status, 0) + 1
         if requested_status and status != requested_status:
             continue
         workspace_docs.append(d)
@@ -3111,52 +3258,32 @@ async def search_tax_workspace_endpoint(
         return mapping.get(str(tp), str(tp))
 
     data_items: List[Dict[str, Any]] = []
-    for d in page_docs:
-        item = invoice_document_to_dict(db, d, include_tags=False)
+    list_dicts = invoice_documents_to_list_dicts(db, page_docs)
+    for item in list_dicts:
         extra = item.get("extra_info") or {}
-        tax_status = extra.get("tax_status")
-        if isinstance(tax_status, str):
-            tax_status = tax_status.strip()
-        if not tax_status:
-            tax_status = "not_sent"
+        tax_status = normalize_stored_tax_status(extra)
         item["tax_status"] = tax_status
         item["tax_tracking_code"] = extra.get("tax_tracking_code")
         item["tax_last_send_at"] = extra.get("tax_last_send_at")
         item.update(build_tax_status_fields_for_api(extra))
 
-        # total_amount from totals.net or recomputed
+        # total_amount = مبلغ قابل پرداخت (شامل اضافات/کسورات)
         total_amount = None
         try:
-            totals = (item.get("extra_info") or {}).get("totals") or {}
-            if isinstance(totals, dict) and "net" in totals:
-                total_amount = totals.get("net")
+            payable = payable_total_from_extra_info(item.get("extra_info"))
+            if payable is not None:
+                total_amount = float(payable)
         except Exception:
             total_amount = None
-        if total_amount is None:
-            try:
-                net_sum = 0.0
-                for pl in item.get("product_lines", []) or []:
-                    info = pl.get("extra_info") or {}
-                    qty = float(pl.get("quantity") or 0)
-                    unit_price = float(info.get("unit_price") or 0)
-                    line_discount = float(info.get("line_discount") or 0)
-                    tax_amount = float(info.get("tax_amount") or 0)
-                    line_total = info.get("line_total")
-                    if line_total is None:
-                        line_total = (qty * unit_price) - line_discount + tax_amount
-                    net_sum += float(line_total)
-                total_amount = float(net_sum)
-            except Exception:
-                total_amount = None
 
         item["document_type_name"] = _type_name(item.get("document_type"))
         if total_amount is not None:
             item["total_amount"] = total_amount
-        
-        # افزودن counterparty
-        _add_counterparty_to_invoice_item(db, item)
-        
-        data_items.append(format_datetime_fields(item, request))
+
+        data_items.append(item)
+
+    batch_add_counterparty_to_invoice_items(db, data_items)
+    data_items = [format_datetime_fields(item, request) for item in data_items]
 
     attach_tags_to_invoice_items(db, business_id, data_items)
 
@@ -3178,6 +3305,8 @@ async def search_tax_workspace_endpoint(
             "page": page,
             "limit": take,
             "total_pages": total_pages,
+            "status_counts": status_counts,
+            "summary": {"status_counts": status_counts},
         },
         request=request,
         message="INVOICE_TAX_WORKSPACE_LIST",
@@ -3420,7 +3549,10 @@ def send_invoice_to_tax_system(
             http_status=400,
         )
     status = (extra.get("tax_status") or "").strip() if isinstance(extra.get("tax_status"), str) else extra.get("tax_status")
-    if status in ("sent", "finalized"):
+    if status in ("sent", "finalized") or (
+        normalize_stored_tax_status(extra) in ("sent", "finalized", "pending")
+        and extra.get("tax_tracking_code")
+    ):
         raise ApiError(
             "TAX_ALREADY_SENT",
             "Invoice has already been sent to tax system",
@@ -3583,7 +3715,10 @@ def send_invoices_to_tax_system_batch(
             if not bool(extra.get("tax_workspace")):
                 raise ApiError("TAX_WORKSPACE_NOT_SET", "Invoice is not in tax workspace", http_status=400)
             status = (extra.get("tax_status") or "").strip() if isinstance(extra.get("tax_status"), str) else extra.get("tax_status")
-            if status in ("sent", "finalized"):
+            if status in ("sent", "finalized") or (
+                normalize_stored_tax_status(extra) in ("sent", "finalized", "pending")
+                and extra.get("tax_tracking_code")
+            ):
                 raise ApiError("TAX_ALREADY_SENT", "Invoice has already been sent to tax system", http_status=409)
 
             submission = send_document_to_tax_system(db, doc)
@@ -4279,41 +4414,25 @@ async def export_invoices_excel(
         return mapping.get(str(tp), str(tp))
 
     items: List[Dict[str, Any]] = []
-    for d in docs:
-        item = invoice_document_to_dict(db, d, include_tags=False)
-        # total_amount
+    list_dicts = invoice_documents_to_list_dicts(db, docs)
+    for item in list_dicts:
+        # total_amount = مبلغ قابل پرداخت (شامل اضافات/کسورات)
         total_amount = None
         try:
-            totals = (item.get('extra_info') or {}).get('totals') or {}
-            if isinstance(totals, dict) and 'net' in totals:
-                total_amount = totals.get('net')
+            payable = payable_total_from_extra_info(item.get("extra_info"))
+            if payable is not None:
+                total_amount = float(payable)
         except Exception:
             total_amount = None
-        if total_amount is None:
-            try:
-                net_sum = 0.0
-                for pl in item.get('product_lines', []) or []:
-                    info = pl.get('extra_info') or {}
-                    qty = float(pl.get('quantity') or 0)
-                    unit_price = float(info.get('unit_price') or 0)
-                    line_discount = float(info.get('line_discount') or 0)
-                    tax_amount = float(info.get('tax_amount') or 0)
-                    line_total = info.get('line_total')
-                    if line_total is None:
-                        line_total = (qty * unit_price) - line_discount + tax_amount
-                    net_sum += float(line_total)
-                total_amount = float(net_sum)
-            except Exception:
-                total_amount = None
 
         item['document_type_name'] = _type_name(item.get('document_type'))
         if total_amount is not None:
             item['total_amount'] = total_amount
-        
-        # افزودن counterparty
-        _add_counterparty_to_invoice_item(db, item)
-        
-        items.append(format_datetime_fields(item, request))
+
+        items.append(item)
+
+    batch_add_counterparty_to_invoice_items(db, items)
+    items = [format_datetime_fields(item, request) for item in items]
 
     attach_tags_to_invoice_items(db, business_id, items)
 
@@ -4593,9 +4712,9 @@ async def export_invoices_pdf(
         item = invoice_document_to_dict(db, d, include_tags=False)
         total_amount = None
         try:
-            totals = (item.get('extra_info') or {}).get('totals') or {}
-            if isinstance(totals, dict) and 'net' in totals:
-                total_amount = totals.get('net')
+            payable = payable_total_from_extra_info(item.get("extra_info"))
+            if payable is not None:
+                total_amount = float(payable)
         except Exception:
             total_amount = None
         if total_amount is None:
@@ -4710,9 +4829,9 @@ async def export_invoices_pdf(
     except Exception:
         cal_type = "jalali" if is_fa else "gregorian"
     try:
-        _now = datetime.datetime.now()
-        _fd = CalendarConverter.format_datetime(_now, cal_type)
-        now = _fd.get("formatted") or _fd.get("date_only") or _now.strftime('%Y/%m/%d %H:%M')
+        from app.core.datetime_utils import format_generated_at_for_pdf
+
+        now = format_generated_at_for_pdf(business_id, cal_type)
     except Exception:
         now = datetime.datetime.now().strftime('%Y/%m/%d %H:%M')
     title_text = "لیست فاکتورها" if is_fa else "Invoices List"

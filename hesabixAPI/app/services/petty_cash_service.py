@@ -233,40 +233,28 @@ def _calculate_petty_cash_balance(
 	business_id: int,
 	fiscal_year_id: Optional[int] = None,
 ) -> Decimal:
-	"""
-	محاسبه موجودی یک تنخواه
-	
-	Args:
-		db: نشست پایگاه داده
-		petty_cash_id: شناسه تنخواه
-		business_id: شناسه کسب‌وکار
-		fiscal_year_id: شناسه سال مالی (اختیاری)
-	
-	Returns:
-		Decimal: موجودی تنخواه (debit - credit)
-	"""
-	query = db.query(
-		func.coalesce(func.sum(DocumentLine.debit), 0).label('total_debit'),
-		func.coalesce(func.sum(DocumentLine.credit), 0).label('total_credit')
-	).join(
+	"""موجودی تنخواه به ارز همان تنخواه (با پشتیبانی مبلغ بومی بین‌ارزی)."""
+	from app.services.account_native_balance import line_native_signed_amount_for_account
+
+	pc = db.query(PettyCash).filter(PettyCash.id == int(petty_cash_id)).first()
+	pc_currency_id = int(pc.currency_id) if pc else None
+
+	query = db.query(DocumentLine, Document).join(
 		Document, DocumentLine.document_id == Document.id
 	).filter(
 		Document.business_id == business_id,
 		Document.is_proforma == False,
-		DocumentLine.petty_cash_id == petty_cash_id
+		DocumentLine.petty_cash_id == petty_cash_id,
 	)
-	
-	# فیلتر سال مالی
 	if fiscal_year_id:
 		query = query.filter(Document.fiscal_year_id == fiscal_year_id)
-	
-	result = query.first()
-	if result:
-		total_debit = Decimal(str(result.total_debit or 0))
-		total_credit = Decimal(str(result.total_credit or 0))
-		return total_debit - total_credit
-	
-	return Decimal(0)
+
+	total = Decimal(0)
+	for line, doc in query.all():
+		total += line_native_signed_amount_for_account(
+			line, doc, account_currency_id=pc_currency_id
+		)
+	return total
 
 
 def _calculate_petty_cash_balances_bulk(
@@ -275,54 +263,36 @@ def _calculate_petty_cash_balances_bulk(
 	business_id: int,
 	fiscal_year_id: Optional[int] = None,
 ) -> Dict[int, Decimal]:
-	"""
-	محاسبه موجودی چند تنخواه به صورت bulk
-	
-	Args:
-		db: نشست پایگاه داده
-		petty_cash_ids: لیست شناسه‌های تنخواه‌ها
-		business_id: شناسه کسب‌وکار
-		fiscal_year_id: شناسه سال مالی (اختیاری)
-	
-	Returns:
-		Dict[int, Decimal]: دیکشنری {petty_cash_id: balance}
-	"""
+	"""موجودی چند تنخواه bulk با پشتیبانی مبلغ بومی."""
+	from app.services.account_native_balance import line_native_signed_amount_for_account
+
 	if not petty_cash_ids:
 		return {}
-	
-	query = db.query(
-		DocumentLine.petty_cash_id,
-		func.coalesce(func.sum(DocumentLine.debit), 0).label('total_debit'),
-		func.coalesce(func.sum(DocumentLine.credit), 0).label('total_credit')
-	).join(
+
+	pcs = {
+		int(p.id): p
+		for p in db.query(PettyCash).filter(PettyCash.id.in_(petty_cash_ids)).all()
+	}
+	out: Dict[int, Decimal] = {int(i): Decimal(0) for i in petty_cash_ids}
+
+	query = db.query(DocumentLine, Document).join(
 		Document, DocumentLine.document_id == Document.id
 	).filter(
 		Document.business_id == business_id,
 		Document.is_proforma == False,
-		DocumentLine.petty_cash_id.in_(petty_cash_ids)
-	).group_by(
-		DocumentLine.petty_cash_id
+		DocumentLine.petty_cash_id.in_(petty_cash_ids),
 	)
-	
-	# فیلتر سال مالی
 	if fiscal_year_id:
 		query = query.filter(Document.fiscal_year_id == fiscal_year_id)
-	
-	results = query.all()
-	
-	balances = {}
-	for result in results:
-		pc_id = result.petty_cash_id
-		total_debit = Decimal(str(result.total_debit or 0))
-		total_credit = Decimal(str(result.total_credit or 0))
-		balances[pc_id] = total_debit - total_credit
-	
-	# برای تنخواه‌هایی که تراکنشی ندارند، موجودی صفر است
-	for pc_id in petty_cash_ids:
-		if pc_id not in balances:
-			balances[pc_id] = Decimal(0)
-	
-	return balances
+
+	for line, doc in query.all():
+		pid = int(line.petty_cash_id)
+		pc = pcs.get(pid)
+		pc_currency_id = int(pc.currency_id) if pc else None
+		out[pid] += line_native_signed_amount_for_account(
+			line, doc, account_currency_id=pc_currency_id
+		)
+	return out
 
 
 def list_petty_cash(db: Session, business_id: int, query: Dict[str, Any]) -> Dict[str, Any]:

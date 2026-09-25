@@ -44,4 +44,10 @@ class AIChatSession(Base):
         cascade="all, delete-orphan",
         order_by="AISessionTodo.sort_order",
     )
+    agent_runs = relationship(
+        "AIAgentRun",
+        back_populates="session",
+        cascade="all, delete-orphan",
+        order_by="AIAgentRun.created_at",
+    )
 

@@ -10,6 +10,8 @@ import 'package:hesabix_ui/utils/error_extractor.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table_config.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table_widget.dart';
 import 'package:fl_chart/fl_chart.dart';
+import 'package:hesabix_ui/core/hesabix_back.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 class BasalamReportsOverviewPage extends StatefulWidget {
   final int businessId;
@@ -69,10 +71,7 @@ class _BasalamReportsOverviewPageState extends State<BasalamReportsOverviewPage>
     return Scaffold(
       appBar: AppBar(
         title: Text(t.reportsBasalamOverviewTitle),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.pop(),
-        ),
+        leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
         actions: [
           IconButton(onPressed: _load, icon: const Icon(Icons.refresh)),
         ],
@@ -362,10 +361,7 @@ class _BasalamSyncedInvoicesReportPageState
     return Scaffold(
       appBar: AppBar(
         title: Text(t.reportsBasalamSyncedInvoicesTitle),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.pop(),
-        ),
+        leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
       ),
       body: SafeArea(
         child: Padding(
@@ -491,10 +487,7 @@ class _BasalamDeadLetterReportPageState extends State<BasalamDeadLetterReportPag
     return Scaffold(
       appBar: AppBar(
         title: Text(t.reportsBasalamDeadLetterTitle),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.pop(),
-        ),
+        leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
         actions: [
           IconButton(onPressed: _load, icon: const Icon(Icons.refresh)),
         ],
@@ -635,9 +628,9 @@ class _BasalamProductConflictsReportPageState
         : <String, dynamic>{};
 
     final palette = [
-      Colors.blue,
-      Colors.orange,
-      Colors.green,
+      SemanticColorResolver.info(context),
+      SemanticColorResolver.warning(context),
+      SemanticColorResolver.positive(context),
       Colors.purple,
       Colors.teal,
       Colors.deepOrange,
@@ -657,10 +650,7 @@ class _BasalamProductConflictsReportPageState
     return Scaffold(
       appBar: AppBar(
         title: Text(t.reportsBasalamProductConflictsTitle),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.pop(),
-        ),
+        leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
         actions: [
           IconButton(onPressed: _load, icon: const Icon(Icons.refresh)),
         ],

@@ -64,6 +64,26 @@ def update_schedule(db: Session, data: Dict[str, Any]) -> AIEvalSchedule:
     return row
 
 
+def _local_slot_key(dt: datetime, timezone_name: str) -> str:
+    try:
+        tz = pytz.timezone(timezone_name or "Asia/Tehran")
+    except Exception:
+        tz = pytz.UTC
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=pytz.UTC)
+    return dt.astimezone(tz).strftime("%Y%m%d%H%M")
+
+
+def already_fired_for_slot(
+    last_run_at: Optional[datetime],
+    timezone_name: str,
+    slot_key: str,
+) -> bool:
+    if not last_run_at or not slot_key:
+        return False
+    return _local_slot_key(last_run_at, timezone_name) == slot_key
+
+
 def _cron_should_fire(schedule: str, timezone_name: str, now_utc: datetime) -> Tuple[bool, str]:
     if not schedule or not str(schedule).strip():
         return False, ""
@@ -121,7 +141,20 @@ async def run_scheduled_eval_if_due(db: Session, now_utc: Optional[datetime] = N
         return {"fired": False, "reason": "not_due"}
     if slot_key in _schedule_fired:
         return {"fired": False, "reason": "already_fired"}
+
+    locked = (
+        db.query(AIEvalSchedule)
+        .filter(AIEvalSchedule.id == sched.id)
+        .with_for_update()
+        .first()
+    )
+    if locked is not None:
+        sched = locked
+    if already_fired_for_slot(sched.last_run_at, sched.timezone, slot_key):
+        return {"fired": False, "reason": "already_fired"}
     _schedule_fired.add(slot_key)
+    sched.last_run_at = datetime.utcnow()
+    db.flush()
 
     ctx = _scheduler_auth_context(db)
     if not ctx:

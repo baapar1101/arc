@@ -4,6 +4,7 @@ import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/services/admin_users_service.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 class UserAppPermissionsPage extends StatefulWidget {
   final int userId;
@@ -71,7 +72,7 @@ class _UserAppPermissionsPageState extends State<UserAppPermissionsPage> {
             content: Text(
               '${t.errorLoadingSettings}: ${ErrorExtractor.forContext(e, context)}',
             ),
-            backgroundColor: Colors.red,
+            backgroundColor: SemanticColorResolver.negative(context),
           ),
         );
       }
@@ -89,7 +90,7 @@ class _UserAppPermissionsPageState extends State<UserAppPermissionsPage> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(t.settingsSavedSuccessfully),
-            backgroundColor: Colors.green,
+            backgroundColor: SemanticColorResolver.positive(context),
           ),
         );
         Navigator.of(context).pop(true);
@@ -102,7 +103,7 @@ class _UserAppPermissionsPageState extends State<UserAppPermissionsPage> {
             content: Text(
               '${t.errorSavingSettings}: ${ErrorExtractor.forContext(e, context)}',
             ),
-            backgroundColor: Colors.red,
+            backgroundColor: SemanticColorResolver.negative(context),
           ),
         );
       }

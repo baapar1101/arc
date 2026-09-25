@@ -12,6 +12,7 @@ import '../../widgets/product/category_tree_widget.dart';
 import '../../utils/responsive_helper.dart';
 import '../../utils/general_barcode_utils.dart';
 import '../../utils/number_formatters.dart' show formatWithThousands;
+import '../../utils/product_search_overlay_policy.dart';
 
 /// متن خلاصه‌ی نمایشی کالا (کد - نام یا فقط نام)
 String _pickerProductDisplayLine(Map<String, dynamic>? p) {
@@ -38,16 +39,22 @@ class _ProductSearchSuggestionTile extends StatelessWidget {
     this.highlighted = false,
     this.showPurchaseInMetrics = true,
     this.showGeneralBarcodeLine = false,
+    this.commitOnPointerDown = false,
   });
 
   final Map<String, dynamic> item;
   final VoidCallback onTap;
   final bool dense;
   final bool highlighted;
+
   /// اگر false باشد، بخش «خرید …» در خط خلاصه نمایش داده نمی‌شود (بدون دسترسی به قیمت خرید).
   final bool showPurchaseInMetrics;
+
   /// در موبایل false تا بارکد عمومی در نتایج نشان داده نشود.
   final bool showGeneralBarcodeLine;
+
+  /// در overlay دسکتاپ true تا کلیک موس قبل از بسته شدن لایه ثبت شود.
+  final bool commitOnPointerDown;
 
   @override
   Widget build(BuildContext context) {
@@ -75,16 +82,20 @@ class _ProductSearchSuggestionTile extends StatelessWidget {
           : 'موجودی انبار ${_pickerFormatQty(wh ?? acc ?? 0)} · حساب ${_pickerFormatQty(acc ?? wh ?? 0)}';
       metricsLine = '${purchaseSeg}فروش $salesStr · $stockPart';
     }
-    final barcodeLine =
-        showGeneralBarcodeLine ? productPrimaryBarcodeForSearchDisplay(item) : null;
+    final barcodeLine = showGeneralBarcodeLine
+        ? productPrimaryBarcodeForSearchDisplay(item)
+        : null;
 
     final padH = dense ? 10.0 : 14.0;
     final padV = dense ? 8.0 : 10.0;
 
     return Material(
-      color: highlighted ? cs.primary.withValues(alpha: 0.08) : Colors.transparent,
+      color: highlighted
+          ? cs.primary.withValues(alpha: 0.08)
+          : Colors.transparent,
       child: InkWell(
-        onTap: onTap,
+        onTap: commitOnPointerDown ? null : onTap,
+        onTapDown: commitOnPointerDown ? (_) => onTap() : null,
         mouseCursor: SystemMouseCursors.click,
         hoverColor: cs.primary.withValues(alpha: 0.06),
         child: Padding(
@@ -100,14 +111,21 @@ class _ProductSearchSuggestionTile extends StatelessWidget {
               PositionedDirectional(
                 start: -30,
                 top: dense ? 1 : 2,
-                child: Icon(Icons.inventory_2_outlined, size: dense ? 18 : 20, color: cs.primary),
+                child: Icon(
+                  Icons.inventory_2_outlined,
+                  size: dense ? 18 : 20,
+                  color: cs.primary,
+                ),
               ),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Text(
                     title,
-                    style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600, height: 1.25),
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                      height: 1.25,
+                    ),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     textAlign: TextAlign.right,
@@ -116,7 +134,10 @@ class _ProductSearchSuggestionTile extends StatelessWidget {
                     const SizedBox(height: 2),
                     Text(
                       itemType,
-                      style: theme.textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant, height: 1.2),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: cs.onSurfaceVariant,
+                        height: 1.2,
+                      ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       textAlign: TextAlign.right,
@@ -126,7 +147,10 @@ class _ProductSearchSuggestionTile extends StatelessWidget {
                     const SizedBox(height: 4),
                     Text(
                       'بارکد: $barcodeLine',
-                      style: theme.textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant, height: 1.2),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: cs.onSurfaceVariant,
+                        height: 1.2,
+                      ),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       textAlign: TextAlign.right,
@@ -163,6 +187,7 @@ Widget _buildProductSuggestionsScrollArea({
   bool dense = false,
   bool showPurchaseInMetrics = true,
   bool showGeneralBarcodeLine = false,
+  bool commitOnPointerDown = false,
 }) {
   final theme = Theme.of(context);
   final colorScheme = theme.colorScheme;
@@ -172,7 +197,11 @@ Widget _buildProductSuggestionsScrollArea({
       child: Padding(
         padding: const EdgeInsets.all(24),
         child: Center(
-          child: SizedBox(width: dense ? 24 : 32, height: dense ? 24 : 32, child: CircularProgressIndicator(strokeWidth: 2)),
+          child: SizedBox(
+            width: dense ? 24 : 32,
+            height: dense ? 24 : 32,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
         ),
       ),
     );
@@ -186,11 +215,17 @@ Widget _buildProductSuggestionsScrollArea({
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.inventory_2_outlined, size: dense ? 40 : 48, color: colorScheme.onSurface.withValues(alpha: 0.45)),
+              Icon(
+                Icons.inventory_2_outlined,
+                size: dense ? 40 : 48,
+                color: colorScheme.onSurface.withValues(alpha: 0.45),
+              ),
               const SizedBox(height: 12),
               Text(
                 'کالایی یافت نشد',
-                style: theme.textTheme.bodyLarge?.copyWith(color: colorScheme.onSurface.withValues(alpha: 0.72)),
+                style: theme.textTheme.bodyLarge?.copyWith(
+                  color: colorScheme.onSurface.withValues(alpha: 0.72),
+                ),
               ),
             ],
           ),
@@ -208,19 +243,32 @@ Widget _buildProductSuggestionsScrollArea({
         child: ListView.separated(
           controller: scrollController,
           padding: EdgeInsets.symmetric(vertical: dense ? 4 : 6),
-          itemCount: state.items.length +
-              ((state.isLoadingMore || (state.isLoading && state.items.isNotEmpty)) ? 1 : 0),
+          itemCount:
+              state.items.length +
+              ((state.isLoadingMore ||
+                      (state.isLoading && state.items.isNotEmpty))
+                  ? 1
+                  : 0),
           separatorBuilder: (separatorContext, separatorIndex) {
-            if (separatorIndex >= state.items.length - 1) return const SizedBox.shrink();
-            return Divider(height: 1, color: colorScheme.outline.withValues(alpha: 0.12));
+            if (separatorIndex >= state.items.length - 1)
+              return const SizedBox.shrink();
+            return Divider(
+              height: 1,
+              color: colorScheme.outline.withValues(alpha: 0.12),
+            );
           },
           itemBuilder: (context, index) {
             if (index == state.items.length &&
-                (state.isLoadingMore || (state.isLoading && state.items.isNotEmpty))) {
+                (state.isLoadingMore ||
+                    (state.isLoading && state.items.isNotEmpty))) {
               return const Padding(
                 padding: EdgeInsets.all(14),
                 child: Center(
-                  child: SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2)),
+                  child: SizedBox(
+                    width: 22,
+                    height: 22,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
                 ),
               );
             }
@@ -232,6 +280,7 @@ Widget _buildProductSuggestionsScrollArea({
               highlighted: index == highlightedIndex,
               showPurchaseInMetrics: showPurchaseInMetrics,
               showGeneralBarcodeLine: showGeneralBarcodeLine,
+              commitOnPointerDown: commitOnPointerDown,
               onTap: () => onProductSelected(it),
             );
           },
@@ -296,7 +345,8 @@ class ProductComboboxWidget extends StatefulWidget {
 class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
   /// افزودن کالای جدید در API نیازمند `products.add` است؛ صرفاً وجود [AuthStore] کافی نیست.
   bool get _canCreateProducts =>
-      widget.authStore != null && widget.authStore!.hasBusinessPermission('products', 'add');
+      widget.authStore != null &&
+      widget.authStore!.hasBusinessPermission('products', 'add');
 
   final ProductService _service = ProductService(apiClient: ApiClient());
   final CategoryService _categoryService = CategoryService(ApiClient());
@@ -318,7 +368,9 @@ class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
   OverlayEntry? _desktopOverlayEntry;
   double _desktopFieldWidth = 0;
   bool _suppressFieldNotifications = false;
+  bool _selectingFromOverlay = false;
   int _highlightedIndex = -1;
+  int _searchRequestGeneration = 0;
 
   // دسته‌بندی‌ها
   List<CategoryNode> _categoryTree = [];
@@ -328,7 +380,10 @@ class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
   double _desktopOverlayHeight(_ProductPickerState state) {
     if (state.isLoading && state.items.isEmpty) return 120;
     if (!state.isLoading && state.items.isEmpty) return 100;
-    final extraRow = (state.isLoadingMore || (state.isLoading && state.items.isNotEmpty)) ? 1 : 0;
+    final extraRow =
+        (state.isLoadingMore || (state.isLoading && state.items.isNotEmpty))
+        ? 1
+        : 0;
     final rows = state.items.length + extraRow;
     const rowHeight = 84.0;
     final raw = (rows * rowHeight) + (state.isLoading ? 6 : 0) + 8;
@@ -360,10 +415,14 @@ class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
       _loadingCategories = true;
     });
     try {
-      final categories = await _categoryService.getCategoriesTree(businessId: widget.businessId);
+      final categories = await _categoryService.getCategoriesTree(
+        businessId: widget.businessId,
+      );
       if (mounted) {
         setState(() {
-          _categoryTree = categories.map((e) => CategoryNode.fromMap(e)).toList();
+          _categoryTree = categories
+              .map((e) => CategoryNode.fromMap(e))
+              .toList();
           _loadingCategories = false;
         });
       }
@@ -379,11 +438,11 @@ class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
 
   List<int> _getCategoryIdsForFilter(int? categoryId) {
     if (categoryId == null) return [];
-    
+
     // پیدا کردن node مربوط به دسته انتخاب شده
     final node = findCategoryNode(_categoryTree, categoryId);
     if (node == null) return [categoryId];
-    
+
     // جمع‌آوری تمام IDهای زیردسته‌ها
     return getAllCategoryIds(node);
   }
@@ -394,48 +453,62 @@ class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
     debugPrint('[ProductCombobox] didUpdateWidget called');
     debugPrint('[ProductCombobox] oldProduct: ${oldWidget.selectedProduct}');
     debugPrint('[ProductCombobox] newProduct: ${widget.selectedProduct}');
-    debugPrint('[ProductCombobox] current _searchCtrl.text: "${_searchCtrl.text}"');
-    
+    debugPrint(
+      '[ProductCombobox] current _searchCtrl.text: "${_searchCtrl.text}"',
+    );
+
     // بررسی تغییر در id
     final oldId = oldWidget.selectedProduct?['id'];
     final newId = widget.selectedProduct?['id'];
     if (oldId != newId) {
-      debugPrint('[ProductCombobox] ID changed: $oldId -> $newId, calling _initializeSelectedProduct');
+      debugPrint(
+        '[ProductCombobox] ID changed: $oldId -> $newId, calling _initializeSelectedProduct',
+      );
       _initializeSelectedProduct();
       return;
     }
-    
+
     // اگر id تغییر نکرده اما selectedProduct تغییر کرده (مثلاً name یا code به‌روز شده)
     // باید نمایش را به‌روزرسانی کنیم
     final oldProduct = oldWidget.selectedProduct;
     final newProduct = widget.selectedProduct;
-    
+
     // بررسی تغییر در null بودن
     if (oldProduct == null && newProduct != null) {
-      debugPrint('[ProductCombobox] Product changed from null to not null, calling _initializeSelectedProduct');
+      debugPrint(
+        '[ProductCombobox] Product changed from null to not null, calling _initializeSelectedProduct',
+      );
       _initializeSelectedProduct();
       return;
     }
     if (oldProduct != null && newProduct == null) {
-      debugPrint('[ProductCombobox] Product changed from not null to null, calling _initializeSelectedProduct');
+      debugPrint(
+        '[ProductCombobox] Product changed from not null to null, calling _initializeSelectedProduct',
+      );
       _initializeSelectedProduct();
       return;
     }
-    
+
     // اگر هر دو null یا هر دو not null هستند، مقایسه فیلدها
     if (oldProduct != null && newProduct != null) {
       final oldCode = oldProduct['code']?.toString();
       final newCode = newProduct['code']?.toString();
       final oldName = oldProduct['name']?.toString();
       final newName = newProduct['name']?.toString();
-      
-      debugPrint('[ProductCombobox] Comparing fields - oldCode: "$oldCode", newCode: "$newCode", oldName: "$oldName", newName: "$newName"');
-      
+
+      debugPrint(
+        '[ProductCombobox] Comparing fields - oldCode: "$oldCode", newCode: "$newCode", oldName: "$oldName", newName: "$newName"',
+      );
+
       if (oldCode != newCode || oldName != newName) {
-        debugPrint('[ProductCombobox] Code or name changed, calling _initializeSelectedProduct');
+        debugPrint(
+          '[ProductCombobox] Code or name changed, calling _initializeSelectedProduct',
+        );
         _initializeSelectedProduct();
       } else {
-        debugPrint('[ProductCombobox] No changes detected, skipping _initializeSelectedProduct');
+        debugPrint(
+          '[ProductCombobox] No changes detected, skipping _initializeSelectedProduct',
+        );
       }
     }
   }
@@ -443,7 +516,9 @@ class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
   Future<void> _initializeSelectedProduct() async {
     debugPrint('[ProductCombobox] _initializeSelectedProduct called');
     if (widget.selectedProduct == null) {
-      debugPrint('[ProductCombobox] selectedProduct is null, clearing _searchCtrl');
+      debugPrint(
+        '[ProductCombobox] selectedProduct is null, clearing _searchCtrl',
+      );
       _setFieldQuiet('');
       return;
     }
@@ -452,11 +527,17 @@ class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
     final hasCode = widget.selectedProduct!['code'] != null;
     final hasName = widget.selectedProduct!['name'] != null;
 
-    debugPrint('[ProductCombobox] productId: $productId, hasCode: $hasCode, hasName: $hasName');
+    debugPrint(
+      '[ProductCombobox] productId: $productId, hasCode: $hasCode, hasName: $hasName',
+    );
 
     if (hasCode || hasName) {
-      final displayText = _pickerProductDisplayLine(Map<String, dynamic>.from(widget.selectedProduct!));
-      debugPrint('[ProductCombobox] Setting _searchCtrl.text to: "$displayText"');
+      final displayText = _pickerProductDisplayLine(
+        Map<String, dynamic>.from(widget.selectedProduct!),
+      );
+      debugPrint(
+        '[ProductCombobox] Setting _searchCtrl.text to: "$displayText"',
+      );
       _setFieldQuiet(displayText);
       if (mounted) setState(() {});
       return;
@@ -471,7 +552,9 @@ class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
         if (mounted && product.isNotEmpty) {
           _setFieldQuiet(_pickerProductDisplayLine(product));
           if (mounted) {
-            final existsInList = _items.any((item) => (item['id'] as num?)?.toInt() == productId);
+            final existsInList = _items.any(
+              (item) => (item['id'] as num?)?.toInt() == productId,
+            );
             if (!existsInList) {
               setState(() {
                 _items = [product, ..._items];
@@ -503,17 +586,46 @@ class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
   void _onDesktopFocusChanged() {
     if (!mounted) return;
     if (ResponsiveHelper.isMobile(context)) return;
-    if (_fieldFocus.hasFocus) {
-      _showDesktopOverlay();
-      if (_searchCtrl.text.trim().isEmpty) {
-        unawaited(_loadRecent());
-      }
-    } else {
+    if (!_fieldFocus.hasFocus) {
       Future.delayed(const Duration(milliseconds: 180), () {
-        if (!mounted || _fieldFocus.hasFocus) return;
+        if (!mounted || _fieldFocus.hasFocus || _selectingFromOverlay) return;
         _removeDesktopOverlay();
       });
     }
+  }
+
+  /// موقعیت فیلد نسبت به Overlay تا کلیک موس روی لیست پیشنهادها hit-test شود.
+  /// [CompositedTransformFollower] داخل دیالوگ/شیت اغلب رویداد موس را به مانع پشت لیست می‌دهد.
+  Rect? _desktopFieldRectInOverlay() {
+    final overlay = Overlay.maybeOf(context);
+    if (overlay == null) return null;
+    final overlayBox = overlay.context.findRenderObject();
+    final targetBox = context.findRenderObject();
+    if (overlayBox is! RenderBox || targetBox is! RenderBox) return null;
+    if (!overlayBox.hasSize ||
+        !targetBox.hasSize ||
+        !overlayBox.attached ||
+        !targetBox.attached) {
+      return null;
+    }
+    try {
+      final topLeft = targetBox.localToGlobal(
+        Offset.zero,
+        ancestor: overlayBox,
+      );
+      return topLeft & targetBox.size;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  void _selectFromOverlay(Map<String, dynamic> product) {
+    if (_selectingFromOverlay) return;
+    _selectingFromOverlay = true;
+    _select(product);
+    _removeDesktopOverlay();
+    _fieldFocus.unfocus();
+    _selectingFromOverlay = false;
   }
 
   void _removeDesktopOverlay() {
@@ -537,60 +649,96 @@ class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
   }
 
   Widget _buildDesktopOverlayStack(BuildContext overlayContext) {
-    final width = math.max(_desktopFieldWidth, 280.0);
     final cs = Theme.of(overlayContext).colorScheme;
+    final media = MediaQuery.sizeOf(overlayContext);
 
-    return Stack(
-      clipBehavior: Clip.none,
-      children: [
-        Positioned.fill(
-          child: GestureDetector(
-            behavior: HitTestBehavior.translucent,
-            onTapDown: (_) {
-              _fieldFocus.unfocus();
-              _removeDesktopOverlay();
-            },
+    return ValueListenableBuilder<_ProductPickerState>(
+      valueListenable: _pickerStateNotifier,
+      builder: (context, state, _) {
+        final overlayHeight = _desktopOverlayHeight(state);
+        final fieldRect = _desktopFieldRectInOverlay();
+        final width = math.max(fieldRect?.width ?? _desktopFieldWidth, 280.0);
+
+        final panel = TextFieldTapRegion(
+          child: Material(
+            elevation: 14,
+            surfaceTintColor: cs.surfaceTint,
+            color: cs.surfaceContainerHigh,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            clipBehavior: Clip.antiAlias,
+            shadowColor: Colors.black.withValues(alpha: 0.22),
+            child: SizedBox(
+              width: width,
+              height: overlayHeight,
+              child: _buildProductSuggestionsScrollArea(
+                context: context,
+                state: state,
+                scrollController: _overlayScrollController,
+                onProductSelected: _selectFromOverlay,
+                highlightedIndex: _highlightedIndex,
+                dense: true,
+                showPurchaseInMetrics:
+                    widget.authStore?.canViewPurchasePrice() ?? false,
+                showGeneralBarcodeLine: true,
+                commitOnPointerDown: true,
+              ),
+            ),
           ),
-        ),
-        CompositedTransformFollower(
-          link: _layerLink,
-          showWhenUnlinked: false,
-          followerAnchor: Alignment.topCenter,
-          targetAnchor: Alignment.bottomCenter,
-          offset: const Offset(0, 6),
-          child: ValueListenableBuilder<_ProductPickerState>(
-            valueListenable: _pickerStateNotifier,
-            builder: (context, state, _) {
-              final overlayHeight = _desktopOverlayHeight(state);
-              return Material(
-                elevation: 14,
-                surfaceTintColor: cs.surfaceTint,
-                color: cs.surfaceContainerHigh,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                clipBehavior: Clip.antiAlias,
-                shadowColor: Colors.black.withValues(alpha: 0.22),
-                child: SizedBox(
-                  width: width,
-                  height: overlayHeight,
-                  child: _buildProductSuggestionsScrollArea(
-                    context: context,
-                    state: state,
-                    scrollController: _overlayScrollController,
-                    onProductSelected: (p) {
-                      _select(p);
-                      _removeDesktopOverlay();
-                    },
-                    highlightedIndex: _highlightedIndex,
-                    dense: true,
-                    showPurchaseInMetrics: widget.authStore?.canViewPurchasePrice() ?? false,
-                    showGeneralBarcodeLine: true,
-                  ),
-                ),
-              );
-            },
-          ),
-        ),
-      ],
+        );
+
+        Widget dropdown;
+        if (fieldRect != null) {
+          var left = fieldRect.left;
+          if (left + width > media.width - 8) {
+            left = media.width - width - 8;
+          }
+          if (left < 8) left = 8;
+          var top = fieldRect.bottom + 6;
+          if (top + overlayHeight > media.height - 8) {
+            top = fieldRect.top - overlayHeight - 6;
+          }
+          if (top < 8) top = 8;
+          dropdown = Positioned(
+            left: left,
+            top: top,
+            width: width,
+            height: overlayHeight,
+            child: GestureDetector(
+              onTap: () {},
+              onTapDown: (_) {},
+              behavior: HitTestBehavior.opaque,
+              child: panel,
+            ),
+          );
+        } else {
+          dropdown = CompositedTransformFollower(
+            link: _layerLink,
+            showWhenUnlinked: false,
+            followerAnchor: Alignment.topCenter,
+            targetAnchor: Alignment.bottomCenter,
+            offset: const Offset(0, 6),
+            child: panel,
+          );
+        }
+
+        return Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Positioned.fill(
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () {
+                  _fieldFocus.unfocus();
+                  _removeDesktopOverlay();
+                },
+              ),
+            ),
+            dropdown,
+          ],
+        );
+      },
     );
   }
 
@@ -603,12 +751,31 @@ class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
       }
     } else {
       final sel = widget.selectedProduct;
-      if (sel != null && trimmed != _pickerProductDisplayLine(Map<String, dynamic>.from(sel)).trim()) {
+      if (sel != null &&
+          trimmed !=
+              _pickerProductDisplayLine(
+                Map<String, dynamic>.from(sel),
+              ).trim()) {
         widget.onChanged(null);
       }
     }
+    if (!shouldShowProductSearchSuggestions(value)) {
+      _debounce?.cancel();
+      _searchRequestGeneration++;
+      if (_loading || _loadingMore) {
+        setState(() {
+          _loading = false;
+          _loadingMore = false;
+        });
+        _syncPickerState();
+      }
+      _removeDesktopOverlay();
+      return;
+    }
     _onQueryChanged(value);
-    if (_fieldFocus.hasFocus && !ResponsiveHelper.isMobile(context) && _desktopOverlayEntry == null) {
+    if (_fieldFocus.hasFocus &&
+        !ResponsiveHelper.isMobile(context) &&
+        _desktopOverlayEntry == null) {
       _showDesktopOverlay();
     }
   }
@@ -652,10 +819,10 @@ class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
 
   void _selectHighlightedOrFirst() {
     if (_items.isEmpty) return;
-    final idx = (_highlightedIndex >= 0 && _highlightedIndex < _items.length) ? _highlightedIndex : 0;
-    _select(_items[idx]);
-    _removeDesktopOverlay();
-    _fieldFocus.unfocus();
+    final idx = (_highlightedIndex >= 0 && _highlightedIndex < _items.length)
+        ? _highlightedIndex
+        : 0;
+    _selectFromOverlay(_items[idx]);
   }
 
   KeyEventResult _onDesktopFieldKeyEvent(FocusNode node, KeyEvent event) {
@@ -715,7 +882,8 @@ class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
 
   void _onPickerListScroll() {
     if (!_scrollController.hasClients) return;
-    if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 200) {
+    if (_scrollController.position.pixels >=
+        _scrollController.position.maxScrollExtent - 200) {
       if (_hasMore && !_loadingMore && !_loading) {
         _loadMore();
       }
@@ -733,6 +901,7 @@ class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
   }
 
   Future<void> _loadRecent() async {
+    final requestGeneration = ++_searchRequestGeneration;
     if (_scrollController.hasClients) {
       _scrollController.jumpTo(0);
     }
@@ -757,7 +926,7 @@ class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
         categoryIds: categoryIds.isNotEmpty ? categoryIds : null,
         includeInventory: true,
       );
-      if (!mounted) return;
+      if (!mounted || requestGeneration != _searchRequestGeneration) return;
       setState(() {
         _items = items;
         _hasMore = items.length >= _pageSize;
@@ -770,7 +939,7 @@ class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
         widget.onProductsLoaded?.call(items);
       }
     } catch (_) {
-      if (!mounted) return;
+      if (!mounted || requestGeneration != _searchRequestGeneration) return;
       setState(() {
         _items = const <Map<String, dynamic>>[];
         _hasMore = false;
@@ -783,7 +952,7 @@ class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
         widget.onProductsLoaded?.call(const <Map<String, dynamic>>[]);
       }
     } finally {
-      if (mounted) {
+      if (mounted && requestGeneration == _searchRequestGeneration) {
         setState(() => _loading = false);
         _syncPickerState();
       }
@@ -792,7 +961,24 @@ class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
 
   void _onQueryChanged(String q) {
     _debounce?.cancel();
-    _debounce = Timer(const Duration(milliseconds: 300), () => _performSearch(q.trim()));
+    _searchRequestGeneration++;
+    final query = q.trim();
+    if (mounted) {
+      setState(() {
+        _items = const <Map<String, dynamic>>[];
+        _loading = true;
+        _loadingMore = false;
+        _hasMore = false;
+        _currentSkip = 0;
+        _currentSearchQuery = query.isEmpty ? null : query;
+        _highlightedIndex = -1;
+      });
+      _syncPickerState();
+    }
+    _debounce = Timer(
+      const Duration(milliseconds: 300),
+      () => _performSearch(query),
+    );
   }
 
   Future<void> _performSearch(String q) async {
@@ -800,6 +986,7 @@ class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
       await _loadRecent();
       return;
     }
+    final requestGeneration = ++_searchRequestGeneration;
     // Reset scroll position when starting a new search
     if (_scrollController.hasClients) {
       _scrollController.jumpTo(0);
@@ -825,7 +1012,11 @@ class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
         categoryIds: categoryIds.isNotEmpty ? categoryIds : null,
         includeInventory: true,
       );
-      if (!mounted) return;
+      if (!mounted ||
+          requestGeneration != _searchRequestGeneration ||
+          _searchCtrl.text.trim() != q) {
+        return;
+      }
       setState(() {
         _items = items;
         _hasMore = items.length >= _pageSize;
@@ -833,7 +1024,7 @@ class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
       });
       _syncPickerState();
     } catch (_) {
-      if (!mounted) return;
+      if (!mounted || requestGeneration != _searchRequestGeneration) return;
       setState(() {
         _items = const <Map<String, dynamic>>[];
         _hasMore = false;
@@ -841,7 +1032,7 @@ class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
       });
       _syncPickerState();
     } finally {
-      if (mounted) {
+      if (mounted && requestGeneration == _searchRequestGeneration) {
         setState(() => _loading = false);
         _syncPickerState();
       }
@@ -850,21 +1041,27 @@ class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
 
   Future<void> _loadMore() async {
     if (_loadingMore || !_hasMore) return;
-    
+
+    final requestGeneration = _searchRequestGeneration;
+    final searchQuery = _currentSearchQuery;
     setState(() => _loadingMore = true);
     _syncPickerState();
     try {
       final categoryIds = _getCategoryIdsForFilter(_selectedCategoryId);
       final items = await _service.searchProducts(
         businessId: widget.businessId,
-        searchQuery: _currentSearchQuery,
+        searchQuery: searchQuery,
         limit: _pageSize,
         skip: _currentSkip,
         searchFields: const ['code', 'name', 'barcode'],
         categoryIds: categoryIds.isNotEmpty ? categoryIds : null,
         includeInventory: true,
       );
-      if (!mounted) return;
+      if (!mounted ||
+          requestGeneration != _searchRequestGeneration ||
+          searchQuery != _currentSearchQuery) {
+        return;
+      }
       setState(() {
         _items = [..._items, ...items];
         _hasMore = items.length >= _pageSize;
@@ -872,11 +1069,11 @@ class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
       });
       _syncPickerState();
     } catch (_) {
-      if (!mounted) return;
+      if (!mounted || requestGeneration != _searchRequestGeneration) return;
       setState(() => _hasMore = false);
       _syncPickerState();
     } finally {
-      if (mounted) {
+      if (mounted && requestGeneration == _searchRequestGeneration) {
         setState(() => _loadingMore = false);
         _syncPickerState();
       }
@@ -899,7 +1096,9 @@ class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
     debugPrint('[ProductCombobox] Calling widget.onChanged with item: $item');
     _setFieldQuiet(displayText);
     widget.onChanged(item);
-    debugPrint('[ProductCombobox] After onChanged, _searchCtrl.text is: "${_searchCtrl.text}"');
+    debugPrint(
+      '[ProductCombobox] After onChanged, _searchCtrl.text is: "${_searchCtrl.text}"',
+    );
     if (mounted) {
       debugPrint('[ProductCombobox] Calling setState to update UI');
       setState(() {}); // به‌روزرسانی UI برای نمایش تغییرات
@@ -1008,7 +1207,9 @@ class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
             selectedCategoryId: _selectedCategoryId,
             loadingCategories: _loadingCategories,
             onClose: () => Navigator.pop(ctx),
-            onAddNewProduct: _canCreateProducts ? (bottomSheetContext) => _addNewProduct(bottomSheetContext) : null,
+            onAddNewProduct: _canCreateProducts
+                ? (bottomSheetContext) => _addNewProduct(bottomSheetContext)
+                : null,
             onQueryChanged: _onQueryChanged,
             onCategorySelected: (categoryId) {
               setState(() {
@@ -1021,7 +1222,8 @@ class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
               Navigator.pop(ctx);
             },
             isMobile: isMobile,
-            showPurchaseInMetrics: widget.authStore?.canViewPurchasePrice() ?? false,
+            showPurchaseInMetrics:
+                widget.authStore?.canViewPurchasePrice() ?? false,
             showGeneralBarcodeLine: false,
           );
         },
@@ -1042,7 +1244,9 @@ class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
             selectedCategoryId: _selectedCategoryId,
             loadingCategories: _loadingCategories,
             onClose: () => Navigator.pop(ctx),
-            onAddNewProduct: _canCreateProducts ? (dialogContext) => _addNewProduct(dialogContext) : null,
+            onAddNewProduct: _canCreateProducts
+                ? (dialogContext) => _addNewProduct(dialogContext)
+                : null,
             onQueryChanged: _onQueryChanged,
             onCategorySelected: (categoryId) {
               setState(() {
@@ -1054,7 +1258,8 @@ class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
               _select(product);
               Navigator.pop(ctx);
             },
-            showPurchaseInMetrics: widget.authStore?.canViewPurchasePrice() ?? false,
+            showPurchaseInMetrics:
+                widget.authStore?.canViewPurchasePrice() ?? false,
             showGeneralBarcodeLine: true,
           );
         },
@@ -1072,7 +1277,9 @@ class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
     if (_searchCtrl.text.isNotEmpty) {
       displayTooltip = _searchCtrl.text;
     } else if (widget.selectedProduct != null) {
-      displayTooltip = _pickerProductDisplayLine(Map<String, dynamic>.from(widget.selectedProduct!));
+      displayTooltip = _pickerProductDisplayLine(
+        Map<String, dynamic>.from(widget.selectedProduct!),
+      );
       if (displayTooltip.isEmpty) displayTooltip = widget.hintText;
     } else {
       displayTooltip = widget.hintText;
@@ -1088,7 +1295,9 @@ class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
             decoration: BoxDecoration(
-              border: Border.all(color: colorScheme.outline.withValues(alpha: 0.5)),
+              border: Border.all(
+                color: colorScheme.outline.withValues(alpha: 0.5),
+              ),
               borderRadius: BorderRadius.circular(8),
               color: colorScheme.surface,
             ),
@@ -1096,7 +1305,11 @@ class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
               mainAxisSize: MainAxisSize.max,
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                Icon(Icons.inventory_2_outlined, color: colorScheme.primary, size: 18),
+                Icon(
+                  Icons.inventory_2_outlined,
+                  color: colorScheme.primary,
+                  size: 18,
+                ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
@@ -1115,16 +1328,27 @@ class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
                     message: 'افزودن کالای جدید',
                     child: IconButton(
                       visualDensity: VisualDensity.compact,
-                      icon: Icon(Icons.add, color: colorScheme.primary, size: 22),
+                      icon: Icon(
+                        Icons.add,
+                        color: colorScheme.primary,
+                        size: 22,
+                      ),
                       onPressed: _addNewProductFromField,
                       padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                      constraints: const BoxConstraints(
+                        minWidth: 36,
+                        minHeight: 36,
+                      ),
                     ),
                   ),
                   const SizedBox(width: 2),
                 ],
                 const SizedBox(width: 4),
-                Icon(Icons.arrow_drop_down, color: colorScheme.onSurface.withValues(alpha: 0.6), size: 20),
+                Icon(
+                  Icons.arrow_drop_down,
+                  color: colorScheme.onSurface.withValues(alpha: 0.6),
+                  size: 20,
+                ),
               ],
             ),
           ),
@@ -1148,7 +1372,9 @@ class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
           }
 
           return Tooltip(
-            message: displayTooltip.length > 120 ? '${displayTooltip.substring(0, 120)}…' : displayTooltip,
+            message: displayTooltip.length > 120
+                ? '${displayTooltip.substring(0, 120)}…'
+                : displayTooltip,
             waitDuration: const Duration(milliseconds: 600),
             child: Focus(
               onKeyEvent: _onDesktopFieldKeyEvent,
@@ -1168,14 +1394,29 @@ class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
                   hintText: widget.hintText,
                   labelText: widget.label,
                   floatingLabelBehavior: FloatingLabelBehavior.auto,
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 10,
+                  ),
                   prefixIcon: Padding(
                     padding: const EdgeInsetsDirectional.only(end: 8),
-                    child: Icon(Icons.inventory_2_outlined, color: colorScheme.primary, size: 20),
+                    child: Icon(
+                      Icons.inventory_2_outlined,
+                      color: colorScheme.primary,
+                      size: 20,
+                    ),
                   ),
-                  prefixIconConstraints: const BoxConstraints(minWidth: 40, minHeight: 40),
-                  suffixIconConstraints: const BoxConstraints(minHeight: 44, minWidth: 140),
+                  prefixIconConstraints: const BoxConstraints(
+                    minWidth: 40,
+                    minHeight: 40,
+                  ),
+                  suffixIconConstraints: const BoxConstraints(
+                    minHeight: 44,
+                    minWidth: 140,
+                  ),
                   suffixIcon: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -1195,29 +1436,32 @@ class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
                           icon: Icon(Icons.add, color: colorScheme.primary),
                           onPressed: _addNewProductFromField,
                           padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+                          constraints: const BoxConstraints(
+                            minWidth: 40,
+                            minHeight: 40,
+                          ),
                         ),
                       IconButton(
                         visualDensity: VisualDensity.compact,
                         tooltip: 'انتخاب پیشرفته (دسته‌ها و افزودن)',
-                        icon: Icon(Icons.manage_search_rounded, color: colorScheme.primary),
+                        icon: Icon(
+                          Icons.manage_search_rounded,
+                          color: colorScheme.primary,
+                        ),
                         onPressed: () => _openPicker(),
                         padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+                        constraints: const BoxConstraints(
+                          minWidth: 40,
+                          minHeight: 40,
+                        ),
                       ),
                     ],
                   ),
                 ),
                 onTap: () {
-                  final allowOverlay = !ResponsiveHelper.isMobile(context);
                   Future.microtask(() {
                     if (!mounted) return;
                     if (!_fieldFocus.hasFocus) _fieldFocus.requestFocus();
-                    if (!allowOverlay) return;
-                    _showDesktopOverlay();
-                    if (_searchCtrl.text.trim().isEmpty) {
-                      unawaited(_loadRecent());
-                    }
                   });
                 },
                 onChanged: _onDesktopFieldChanged,
@@ -1270,7 +1514,8 @@ class _ProductPickerBottomSheet extends StatefulWidget {
   });
 
   @override
-  State<_ProductPickerBottomSheet> createState() => _ProductPickerBottomSheetState();
+  State<_ProductPickerBottomSheet> createState() =>
+      _ProductPickerBottomSheetState();
 }
 
 class _ProductPickerBottomSheetState extends State<_ProductPickerBottomSheet> {
@@ -1302,8 +1547,8 @@ class _ProductPickerBottomSheetState extends State<_ProductPickerBottomSheet> {
                   Text(
                     'انتخاب دسته‌بندی',
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                   const Spacer(),
                   IconButton(
@@ -1348,7 +1593,9 @@ class _ProductPickerBottomSheetState extends State<_ProductPickerBottomSheet> {
               children: [
                 Text(
                   widget.label,
-                  style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
                 const Spacer(),
                 if (widget.canAddNewProduct && widget.onAddNewProduct != null)
@@ -1358,7 +1605,10 @@ class _ProductPickerBottomSheetState extends State<_ProductPickerBottomSheet> {
                     tooltip: 'افزودن کالا/خدمت جدید',
                     color: colorScheme.primary,
                   ),
-                IconButton(onPressed: widget.onClose, icon: const Icon(Icons.close)),
+                IconButton(
+                  onPressed: widget.onClose,
+                  icon: const Icon(Icons.close),
+                ),
               ],
             ),
             const SizedBox(height: 12),
@@ -1369,7 +1619,9 @@ class _ProductPickerBottomSheetState extends State<_ProductPickerBottomSheet> {
                   children: [
                     Expanded(
                       child: Chip(
-                        label: Text(_getCategoryLabel(widget.selectedCategoryId!)),
+                        label: Text(
+                          _getCategoryLabel(widget.selectedCategoryId!),
+                        ),
                         onDeleted: () => widget.onCategorySelected(null),
                         deleteIcon: const Icon(Icons.close, size: 18),
                         avatar: const Icon(Icons.category, size: 18),
@@ -1404,7 +1656,9 @@ class _ProductPickerBottomSheetState extends State<_ProductPickerBottomSheet> {
                     decoration: InputDecoration(
                       hintText: widget.hintText,
                       prefixIcon: const Icon(Icons.search),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
                     ),
                     onChanged: widget.onQueryChanged,
                   ),
@@ -1511,7 +1765,9 @@ class _ProductPickerDialog extends StatelessWidget {
               decoration: BoxDecoration(
                 color: colorScheme.surfaceContainerHighest,
                 border: Border(
-                  bottom: BorderSide(color: colorScheme.outline.withValues(alpha: 0.2)),
+                  bottom: BorderSide(
+                    color: colorScheme.outline.withValues(alpha: 0.2),
+                  ),
                 ),
               ),
               child: Row(
@@ -1530,10 +1786,7 @@ class _ProductPickerDialog extends StatelessWidget {
                       tooltip: 'افزودن کالا/خدمت جدید',
                       color: colorScheme.primary,
                     ),
-                  IconButton(
-                    onPressed: onClose,
-                    icon: const Icon(Icons.close),
-                  ),
+                  IconButton(onPressed: onClose, icon: const Icon(Icons.close)),
                 ],
               ),
             ),
@@ -1545,7 +1798,9 @@ class _ProductPickerDialog extends StatelessWidget {
                 decoration: InputDecoration(
                   hintText: hintText,
                   prefixIcon: const Icon(Icons.search),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
                 ),
                 onChanged: onQueryChanged,
               ),
@@ -1559,7 +1814,9 @@ class _ProductPickerDialog extends StatelessWidget {
                     width: 280,
                     decoration: BoxDecoration(
                       border: Border(
-                        right: BorderSide(color: colorScheme.outline.withValues(alpha: 0.2)),
+                        right: BorderSide(
+                          color: colorScheme.outline.withValues(alpha: 0.2),
+                        ),
                       ),
                     ),
                     child: Column(
@@ -1570,7 +1827,11 @@ class _ProductPickerDialog extends StatelessWidget {
                           decoration: BoxDecoration(
                             color: colorScheme.surfaceContainerHighest,
                             border: Border(
-                              bottom: BorderSide(color: colorScheme.outline.withValues(alpha: 0.2)),
+                              bottom: BorderSide(
+                                color: colorScheme.outline.withValues(
+                                  alpha: 0.2,
+                                ),
+                              ),
                             ),
                           ),
                           child: Row(
@@ -1625,5 +1886,3 @@ class _ProductPickerDialog extends StatelessWidget {
     );
   }
 }
-
-

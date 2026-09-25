@@ -196,6 +196,64 @@ class Hesabix_V2_Currency_Service
 	}
 
 	/**
+	 * قالب‌بندی مبلغ در واحد ارز حسابیکس (نه لزوماً ارز ووکامرس).
+	 *
+	 * سود فاکتور همیشه به ارز سند حسابیکس است؛ اگر با wc_price و ارز فروشگاه
+	 * (مثلاً IRT/تومان) فرمت شود، عدد ریالی با برچسب تومان دیده می‌شود.
+	 *
+	 * @param float       $amount
+	 * @param string|null $currency_code  مثلاً IRR
+	 * @param string|null $currency_title مثلاً ریال ایران
+	 * @return string
+	 */
+	public static function format_hesabix_money($amount, $currency_code = null, $currency_title = null)
+	{
+		$amount = (float) $amount;
+		$code = strtoupper(trim((string) $currency_code));
+		$title = trim((string) $currency_title);
+		$formatted = number_format_i18n($amount, 0);
+
+		if ($code === 'IRR' || $code === 'RIAL') {
+			/* translators: %s: amount in Iranian Rial */
+			return sprintf(__('%s ریال', 'hesabix-v2'), $formatted);
+		}
+
+		if ($title !== '') {
+			return $formatted . ' ' . $title;
+		}
+
+		if ($code !== '') {
+			// اگر ارز در ووکامرس تعریف شده باشد از wc_price استفاده کن
+			if (function_exists('wc_price') && function_exists('get_woocommerce_currencies')) {
+				$known = get_woocommerce_currencies();
+				if (is_array($known) && isset($known[ $code ])) {
+					return wp_strip_all_tags(
+						wc_price(
+							$amount,
+							array(
+								'currency' => $code,
+							)
+						)
+					);
+				}
+			}
+			return $formatted . ' ' . $code;
+		}
+
+		// fallback: ارز پیش‌فرض فاکتور از تنظیمات افزونه
+		$row = self::resolve_invoice_currency_row();
+		if ($row) {
+			return self::format_hesabix_money(
+				$amount,
+				isset($row['code']) ? (string) $row['code'] : '',
+				isset($row['title']) ? (string) $row['title'] : ''
+			);
+		}
+
+		return $formatted;
+	}
+
+	/**
 	 * ارزیابی هم‌خوانی ارز ووکامرس با ارز فاکتور حسابیکس و ضریب تبدیل مبلغ.
 	 *
 	 * @param Hesabix_V2_Api|null $api

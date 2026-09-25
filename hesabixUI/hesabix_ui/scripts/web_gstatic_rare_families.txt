@@ -1,0 +1,37 @@
+# خانواده‌های تاریخی/نادر — در sync پیش‌فرض به web کپی نمی‌شوند (حجم دیپلوی).
+# موتور فقط در صورت ظاهر شدن آن اسکریپت‌ها درخواست می‌دهد؛ برای ERP فارسی معمولاً لازم نیست.
+# برای دیپلوی کامل: SYNC_FONT_INCLUDE_RARE=1 bash scripts/sync_font_fallback_mirror.sh
+# نام‌ها باید با اولین بخش مسیر در web_gstatic_fallback_font_paths.txt یکی باشند.
+notosansanatolianhieroglyphs
+notosanscuneiform
+notosansegyptianhieroglyphs
+notosansduployan
+notosansugaritic
+notosansgothic
+notosansoldhungarian
+notosansolditalic
+notosansoldnortharabian
+notosansoldpermic
+notosansoldpersian
+notosansoldsogdian
+notosansoldsoutharabian
+notosansoldturkic
+notosanslineara
+notosanslinearb
+notosanslycian
+notosanslydian
+notosansmeroitic
+notosansnabataean
+notosansnushu
+notosansogham
+notosansosmanya
+notosanspalmyrene
+notosansphagspa
+notosansphoenician
+notosansrunic
+notosanssharada
+notosanssiddham
+notosanssoyombo
+notosanstirhuta
+notosanszanabazarsquare
+notomusic

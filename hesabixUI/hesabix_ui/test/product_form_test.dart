@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hesabix_ui/models/product_form_data.dart';
+import 'package:hesabix_ui/models/product_supplier_item.dart';
 import 'package:hesabix_ui/utils/product_form_validator.dart';
 
 void main() {
@@ -85,6 +86,36 @@ void main() {
       expect(payload.containsKey('description'), false); // null values removed
     });
 
+    test('should always include tax fields in payload for backend update', () {
+      final formData = ProductFormData(
+        name: 'کالای تست',
+        taxTypeId: 5,
+        taxCode: '1234567890123',
+        taxUnitId: 3,
+        isSalesTaxable: true,
+        salesTaxRate: 9,
+      );
+
+      final payload = formData.toPayload();
+
+      expect(payload['tax_type_id'], 5);
+      expect(payload['tax_code'], '1234567890123');
+      expect(payload['tax_unit_id'], 3);
+      expect(payload['is_sales_taxable'], true);
+      expect(payload['sales_tax_rate'], 9);
+    });
+
+    test('should parse tax ids from numeric API values', () {
+      final formData = ProductFormData.fromProduct({
+        'name': 'کالا',
+        'tax_type_id': 5.0,
+        'tax_unit_id': 3,
+      });
+
+      expect(formData.taxTypeId, 5);
+      expect(formData.taxUnitId, 3);
+    });
+
     test('auto code mode never sends manual code in payload', () {
       final formData = ProductFormData(
         name: 'کالای تست',
@@ -164,6 +195,49 @@ void main() {
       expect(errors.containsKey('baseSalesPrice'), true);
       expect(errors.containsKey('salesTaxRate'), true);
       expect(errors.containsKey('unitConversionFactor'), true);
+    });
+
+    test('should include suppliers in payload', () {
+      final formData = ProductFormData(
+        name: 'کالا',
+        suppliers: [
+          ProductSupplierItem(
+            name: 'تأمین الف',
+            phone: '02112345678',
+            socialContacts: [
+              ProductSupplierSocialContact(platformKey: 'whatsapp', value: '09121234567'),
+            ],
+          ),
+        ],
+      );
+
+      final payload = formData.toPayload();
+      expect(payload['suppliers'], isA<List>());
+      final suppliers = payload['suppliers'] as List;
+      expect(suppliers, hasLength(1));
+      expect(suppliers.first['name'], 'تأمین الف');
+      expect(suppliers.first['social_contacts'], hasLength(1));
+    });
+
+    test('should parse suppliers from product json', () {
+      final formData = ProductFormData.fromProduct({
+        'name': 'کالا',
+        'suppliers': [
+          {
+            'id': 1,
+            'name': 'شرکت ب',
+            'is_preferred': true,
+            'social_contacts': [
+              {'platform_key': 'telegram', 'value': '@shop'},
+            ],
+          },
+        ],
+      });
+
+      expect(formData.suppliers, hasLength(1));
+      expect(formData.suppliers.first.name, 'شرکت ب');
+      expect(formData.suppliers.first.isPreferred, true);
+      expect(formData.suppliers.first.socialContacts.first.value, '@shop');
     });
   });
 }

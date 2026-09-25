@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../l10n/app_localizations.dart';
 import '../../models/workflow_editor_models.dart';
 import '../../utils/workflow_basalam_guard.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 /// پالت node های قابل افزودن به workflow
 class WorkflowNodePalette extends StatelessWidget {
@@ -281,7 +282,7 @@ class _WorkflowNodePaletteContentState extends State<WorkflowNodePaletteContent>
                       context,
                       title: 'Trigger ها',
                       icon: Icons.bolt,
-                      color: Colors.green,
+                      color: SemanticColorResolver.positive(context),
                       items: filteredTriggers,
                       type: WorkflowNodeType.trigger,
                     ),
@@ -308,7 +309,7 @@ class _WorkflowNodePaletteContentState extends State<WorkflowNodePaletteContent>
                       context,
                       title: 'Condition ها',
                       icon: Icons.code,
-                      color: Colors.orange,
+                      color: SemanticColorResolver.warning(context),
                       items: filteredConditions,
                       type: WorkflowNodeType.condition,
                     ),

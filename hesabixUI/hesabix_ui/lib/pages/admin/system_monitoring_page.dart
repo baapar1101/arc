@@ -11,6 +11,7 @@ import '../../widgets/monitoring/metric_line_chart.dart';
 import '../../widgets/monitoring/metric_gauge.dart';
 import '../../widgets/monitoring/area_chart_widget.dart';
 import '../../utils/error_extractor.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 class SystemMonitoringPage extends StatefulWidget {
   const SystemMonitoringPage({super.key});
@@ -186,7 +187,7 @@ class _SystemMonitoringPageState extends State<SystemMonitoringPage> with Single
               content: Text(
                 'خطا در بارگذاری داده‌ها: ${ErrorExtractor.forContext(e, context)}',
               ),
-              backgroundColor: Colors.red,
+              backgroundColor: SemanticColorResolver.negative(context),
             ),
           );
         }
@@ -227,7 +228,7 @@ class _SystemMonitoringPageState extends State<SystemMonitoringPage> with Single
             content: Text(
               'خطا در بارگذاری صف اعلان: ${ErrorExtractor.forContext(e, context)}',
             ),
-            backgroundColor: Colors.red,
+            backgroundColor: SemanticColorResolver.negative(context),
           ),
         );
       }
@@ -290,7 +291,7 @@ class _SystemMonitoringPageState extends State<SystemMonitoringPage> with Single
             tooltip: _autoRefresh ? 'توقف بروزرسانی خودکار' : 'شروع بروزرسانی خودکار',
           ),
           IconButton(
-            icon: const Icon(Icons.refresh),
+            icon: Icon(Icons.refresh),
             onPressed: () => _loadData(),
             tooltip: 'بروزرسانی',
           ),
@@ -305,7 +306,7 @@ class _SystemMonitoringPageState extends State<SystemMonitoringPage> with Single
                     children: [
                       Text(
                         'خطا در بارگذاری داده‌ها',
-                        style: TextStyle(color: Colors.red),
+                        style: TextStyle(color: SemanticColorResolver.negative(context)),
                       ),
                       const SizedBox(height: 16),
                       ElevatedButton(
@@ -337,7 +338,7 @@ class _SystemMonitoringPageState extends State<SystemMonitoringPage> with Single
           // کارت‌های خلاصه
           if (_hardwareMetrics != null) ...[
             _buildSectionTitle(theme, 'خلاصه منابع'),
-            const SizedBox(height: 12),
+            SizedBox(height: 12),
             _buildSummaryCards(theme),
             const SizedBox(height: 24),
           ],
@@ -347,11 +348,11 @@ class _SystemMonitoringPageState extends State<SystemMonitoringPage> with Single
             MetricLineChart(
               data: _cpuHistory,
               title: 'استفاده CPU',
-              color: Colors.blue,
+              color: SemanticColorResolver.info(context),
               unit: '%',
               maxY: 100,
             ),
-            const SizedBox(height: 16),
+            SizedBox(height: 16),
           ],
 
           // نمودار Memory
@@ -359,7 +360,7 @@ class _SystemMonitoringPageState extends State<SystemMonitoringPage> with Single
             AreaChartWidget(
               data: _memoryHistory,
               title: 'استفاده حافظه',
-              color: Colors.green,
+              color: SemanticColorResolver.positive(context),
               unit: '%',
               maxY: 100,
             ),
@@ -401,7 +402,7 @@ class _SystemMonitoringPageState extends State<SystemMonitoringPage> with Single
                   unit: '%',
                 ),
               ),
-              const SizedBox(width: 12),
+              SizedBox(width: 12),
               Expanded(
                 child: MetricGauge(
                   value: memory['percent'] as double? ?? 0.0,
@@ -432,15 +433,15 @@ class _SystemMonitoringPageState extends State<SystemMonitoringPage> with Single
             MetricLineChart(
               data: _cpuHistory,
               title: 'تاریخچه CPU',
-              color: Colors.blue,
+              color: SemanticColorResolver.info(context),
               unit: '%',
             ),
-          const SizedBox(height: 16),
+          SizedBox(height: 16),
           if (_memoryHistory.isNotEmpty)
             AreaChartWidget(
               data: _memoryHistory,
               title: 'تاریخچه حافظه',
-              color: Colors.green,
+              color: SemanticColorResolver.positive(context),
               unit: '%',
             ),
         ],
@@ -467,7 +468,7 @@ class _SystemMonitoringPageState extends State<SystemMonitoringPage> with Single
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.check_circle, size: 64, color: Colors.green),
+                  Icon(Icons.check_circle, size: 64, color: SemanticColorResolver.positive(context)),
                   const SizedBox(height: 16),
                   Text(
                     'هشدار فعالی وجود ندارد',
@@ -689,14 +690,14 @@ class _SystemMonitoringPageState extends State<SystemMonitoringPage> with Single
                     shape: BoxShape.circle,
                   ),
                 ),
-                const SizedBox(width: 16),
+                SizedBox(width: 16),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Row(
                         children: [
-                          const Icon(Icons.auto_awesome, size: 20),
+                          Icon(Icons.auto_awesome, size: 20),
                           const SizedBox(width: 8),
                           Text(
                             'AI Moderation Worker',
@@ -735,17 +736,17 @@ class _SystemMonitoringPageState extends State<SystemMonitoringPage> with Single
                     'در صف',
                     pending.toString(),
                     Icons.hourglass_empty,
-                    pending > 10 ? Colors.orange : Colors.blue,
+                    pending > 10 ? SemanticColorResolver.warning(context) : SemanticColorResolver.info(context),
                   ),
                 ),
-                const SizedBox(width: 12),
+                SizedBox(width: 12),
                 Expanded(
                   child: _buildStatItem(
                     theme,
                     'امروز',
                     reviewedToday.toString(),
                     Icons.check_circle_outline,
-                    Colors.green,
+                    SemanticColorResolver.positive(context),
                   ),
                 ),
               ],
@@ -829,15 +830,15 @@ class _SystemMonitoringPageState extends State<SystemMonitoringPage> with Single
               ...warnings.map((w) {
                 final m = w as Map;
                 return Card(
-                  color: Colors.orange.shade50,
+                  color: SemanticColorResolver.warning(context).withValues(alpha: 0.12),
                   child: ListTile(
-                    leading: Icon(Icons.warning_amber_rounded, color: Colors.orange.shade800),
+                    leading: Icon(Icons.warning_amber_rounded, color: SemanticColorResolver.warning(context)),
                     title: Text(m['message'] as String? ?? ''),
                     subtitle: Text(m['code'] as String? ?? ''),
                   ),
                 );
               }),
-              const SizedBox(height: 8),
+              SizedBox(height: 8),
             ],
             Wrap(
               spacing: 8,
@@ -848,7 +849,7 @@ class _SystemMonitoringPageState extends State<SystemMonitoringPage> with Single
                   'آماده retry (اکنون)',
                   '$dueNow',
                   Icons.schedule,
-                  dueNow >= dueWarn ? Colors.red : Colors.blue,
+                  dueNow >= dueWarn ? SemanticColorResolver.negative(context) : SemanticColorResolver.info(context),
                 ),
                 _buildStatItem(
                   theme,
@@ -862,14 +863,14 @@ class _SystemMonitoringPageState extends State<SystemMonitoringPage> with Single
                   'pending پیامک',
                   '$pendSms',
                   Icons.sms,
-                  pendSms >= pendWarn ? Colors.red : Colors.teal,
+                  pendSms >= pendWarn ? SemanticColorResolver.negative(context) : Colors.teal,
                 ),
                 _buildStatItem(
                   theme,
                   'Redis کش',
                   (_outboxSummary!['redis_cache_enabled'] == true) ? 'فعال' : 'غیرفعال',
                   Icons.storage,
-                  (_outboxSummary!['redis_cache_enabled'] == true) ? Colors.green : Colors.red,
+                  (_outboxSummary!['redis_cache_enabled'] == true) ? SemanticColorResolver.positive(context) : SemanticColorResolver.negative(context),
                 ),
               ],
             ),
@@ -1047,14 +1048,14 @@ class _SystemMonitoringPageState extends State<SystemMonitoringPage> with Single
                   messenger.showSnackBar(
                     SnackBar(
                       content: Text('انجام شد: ${r['abandoned_count'] ?? r['message'] ?? r}'),
-                      backgroundColor: Colors.green,
+                      backgroundColor: SemanticColorResolver.positive(context),
                     ),
                   );
                   await _loadOutboxSummary();
                 } catch (e) {
                   if (!context.mounted) return;
                   messenger.showSnackBar(
-                    SnackBar(content: Text('خطا: ${ErrorExtractor.forContext(e, context)}'), backgroundColor: Colors.red),
+                    SnackBar(content: Text('خطا: ${ErrorExtractor.forContext(e, context)}'), backgroundColor: SemanticColorResolver.negative(context)),
                   );
                 }
               },
@@ -1161,9 +1162,9 @@ class _SystemMonitoringPageState extends State<SystemMonitoringPage> with Single
       
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
+          SnackBar(
             content: Text('✅ Worker با موفقیت restart شد'),
-            backgroundColor: Colors.green,
+            backgroundColor: SemanticColorResolver.positive(context),
           ),
         );
       }
@@ -1179,7 +1180,7 @@ class _SystemMonitoringPageState extends State<SystemMonitoringPage> with Single
             content: Text(
               'خطا در restart: ${ErrorExtractor.forContext(e, context)}',
             ),
-            backgroundColor: Colors.red,
+            backgroundColor: SemanticColorResolver.negative(context),
           ),
         );
       }
@@ -1257,19 +1258,19 @@ class _SystemMonitoringPageState extends State<SystemMonitoringPage> with Single
   }
 
   Color _getStatusColor(double percent) {
-    if (percent < 50) return Colors.green;
-    if (percent < 80) return Colors.orange;
-    return Colors.red;
+    if (percent < 50) return SemanticColorResolver.positive(context);
+    if (percent < 80) return SemanticColorResolver.warning(context);
+    return SemanticColorResolver.negative(context);
   }
 
   Color _getServiceStatusColor(String status) {
     switch (status.toLowerCase()) {
       case 'online':
-        return Colors.green;
+        return SemanticColorResolver.positive(context);
       case 'offline':
-        return Colors.red;
+        return SemanticColorResolver.negative(context);
       case 'degraded':
-        return Colors.orange;
+        return SemanticColorResolver.warning(context);
       case 'disabled':
         return Colors.grey;
       default:
@@ -1280,11 +1281,11 @@ class _SystemMonitoringPageState extends State<SystemMonitoringPage> with Single
   Color _getSeverityColor(String severity) {
     switch (severity.toLowerCase()) {
       case 'critical':
-        return Colors.red;
+        return SemanticColorResolver.negative(context);
       case 'warning':
-        return Colors.orange;
+        return SemanticColorResolver.warning(context);
       case 'info':
-        return Colors.blue;
+        return SemanticColorResolver.info(context);
       default:
         return Colors.grey;
     }

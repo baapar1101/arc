@@ -1239,6 +1239,14 @@ async def restore_backup(
                                     source_business_id=int(snapshot_business_id) if snapshot_business_id else None,
                                     target_business_id=new_business_id,
                                 )
+                                from app.services.business_service import ensure_business_default_document_policies
+
+                                ensure_business_default_document_policies(
+                                    db,
+                                    new_business_id,
+                                    user_id=ctx.get_user_id(),
+                                    commit=True,
+                                )
                         except Exception as e:
                             db.rollback()
                             _reset_session_replication_role(conn, replica_role_ok)

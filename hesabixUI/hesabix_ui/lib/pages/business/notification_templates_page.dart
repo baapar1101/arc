@@ -5,6 +5,7 @@ import '../../core/api_client.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../widgets/business_subpage_back_leading.dart';
 import '../../utils/error_extractor.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 
 /// صفحه مدیریت قالب‌های نوتیفیکیشن کسب‌وکار
@@ -404,9 +405,9 @@ class _NotificationTemplatesPageState extends State<NotificationTemplatesPage> {
   Color _getStatusColor(String status, bool isActive) {
     if (!isActive) return Colors.grey;
     switch (status) {
-      case 'approved': return Colors.green;
-      case 'pending_approval': return Colors.orange;
-      case 'rejected': return Colors.red;
+      case 'approved': return SemanticColorResolver.positive(context);
+      case 'pending_approval': return SemanticColorResolver.warning(context);
+      case 'rejected': return SemanticColorResolver.negative(context);
       default: return Colors.grey;
     }
   }
@@ -467,14 +468,14 @@ class _NotificationTemplatesPageState extends State<NotificationTemplatesPage> {
               // نمایش توضیحات/یادداشت برای مالک (دلیل تایید یا رد + نظر AI)
               if ((rejectionReason?.trim().isNotEmpty == true) ||
                   (adminNotes?.trim().isNotEmpty == true)) ...[
-                const SizedBox(height: 12),
+                SizedBox(height: 12),
                 const Divider(),
-                const Text('توضیحات بررسی (برای مالک کسب‌وکار):', style: TextStyle(fontWeight: FontWeight.bold)),
+                Text('توضیحات بررسی (برای مالک کسب‌وکار):', style: TextStyle(fontWeight: FontWeight.bold)),
                 const SizedBox(height: 6),
                 if (rejectionReason != null && rejectionReason.trim().isNotEmpty) ...[
                   SelectableText(
                     rejectionReason,
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.red.shade700),
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: SemanticColorResolver.negative(context)),
                   ),
                   if (adminNotes != null && adminNotes.trim().isNotEmpty) const SizedBox(height: 8),
                 ],

@@ -104,6 +104,20 @@ async def run_scheduled_task(
     if not prompt:
         return {"task_id": task_id, "success": False, "reason": "no_prompt"}
 
+    # بدون اشتراک/سهمیه به provider نزن
+    availability = ai_service.check_availability(
+        estimated_tokens=2000,
+        user_query=prompt[:500],
+    )
+    if not availability.get("can_use"):
+        return {
+            "task_id": task_id,
+            "success": False,
+            "reason": availability.get("reason") or "AI_UNAVAILABLE",
+            "details": availability.get("details"),
+            "ran_at": datetime.utcnow().isoformat(),
+        }
+
     try:
         response = await ai_service.chat_completion(
             messages=[{"role": "user", "content": prompt}],
@@ -112,11 +126,31 @@ async def run_scheduled_task(
             session_id=session_id,
             max_tokens_override=2000,
         )
+        usage = response.get("usage") or {}
+        input_tokens = int(usage.get("input_tokens", 0) or 0)
+        output_tokens = int(usage.get("output_tokens", 0) or 0)
+        charge_result = None
+        if input_tokens or output_tokens:
+            charge_result = ai_service._charge_and_log_usage(
+                input_tokens=input_tokens,
+                output_tokens=output_tokens,
+                usage={**(usage or {}), "source": "scheduled_task", "task_id": task_id},
+            )
         content = (response.get("message") or {}).get("content", "")
         return {
             "task_id": task_id,
             "success": True,
             "content": content,
+            "usage": {
+                "input_tokens": input_tokens,
+                "output_tokens": output_tokens,
+            },
+            "charge": {
+                "payment_method": (charge_result or {}).get("payment_method"),
+                "cost": float((charge_result or {}).get("cost") or 0),
+            }
+            if charge_result
+            else None,
             "ran_at": datetime.utcnow().isoformat(),
         }
     except Exception as exc:

@@ -1,8 +1,12 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:hesabix_ui/theme/glass.dart';
 import 'package:hesabix_ui/core/api_client.dart';
+import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/services/ai_service.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
+import 'package:hesabix_ui/widgets/ai/ai_channel_assist_stream.dart';
+import 'package:hesabix_ui/widgets/ai/ai_chat_l10n.dart';
 import '../../utils/snackbar_helper.dart';
 
 /// Widget برای کمک AI در پاسخ به تیکت‌های پشتیبانی
@@ -30,8 +34,10 @@ class _AITicketAssistantState extends State<AITicketAssistant>
   bool _suggesting = false;
   bool _autoReplying = false;
   String? _suggestedReply;
+  String? _phase;
   String? _error;
   bool _isExpanded = false;
+  CancelToken? _suggestCancel;
 
   @override
   void initState() {
@@ -40,42 +46,60 @@ class _AITicketAssistantState extends State<AITicketAssistant>
     _aiService = AIService(api);
   }
 
+  @override
+  void dispose() {
+    _suggestCancel?.cancel('disposed');
+    super.dispose();
+  }
+
   Future<void> _suggestReply() async {
+    _suggestCancel?.cancel('replaced');
+    final token = CancelToken();
+    _suggestCancel = token;
     setState(() {
       _suggesting = true;
       _error = null;
-      _suggestedReply = null;
+      _suggestedReply = '';
+      _phase = 'connecting';
     });
 
     try {
-      final result = await _aiService.suggestTicketReply(
-        ticketId: widget.ticketId,
-        context: widget.ticketContext,
+      final outcome = await consumeChannelAssistStream(
+        _aiService.streamTicketSuggestReply(
+          ticketId: widget.ticketId,
+          context: widget.ticketContext,
+          cancelToken: token,
+        ),
+        onProgress: (progress) {
+          if (!mounted || token.isCancelled) return;
+          setState(() {
+            _suggestedReply = progress.text;
+            _phase = progress.phase;
+          });
+        },
       );
-
-      final data = result['data'] as Map<String, dynamic>?;
-      final suggestedText = data?['suggested_reply'] as String? ??
-          data?['message'] as String? ??
-          result['message'] as String? ??
-          'پیشنهادی دریافت نشد';
-
+      if (!mounted || token.isCancelled) return;
       setState(() {
-        _suggestedReply = suggestedText;
+        _suggestedReply =
+            outcome.text.isNotEmpty ? outcome.text : _suggestedReply;
         _suggesting = false;
+        _phase = null;
+        _error = outcome.error;
       });
-
-      // پیشنهاد تنها هنگام فشردن دکمهٔ «استفاده از این پاسخ» به فیلد منتقل می‌شود
     } catch (e) {
+      if (token.isCancelled) return;
+      if (!mounted) return;
       setState(() {
         _error = ErrorExtractor.forContext(e, context);
         _suggesting = false;
+        _phase = null;
       });
-      if (mounted) {
-        SnackBarHelper.show(
-          context,
-          message: 'خطا در دریافت پیشنهاد: ${ErrorExtractor.forContext(e, context)}',
-        );
-      }
+      SnackBarHelper.show(
+        context,
+        message: AppLocalizations.of(context).aiTicketSuggestFailed(
+          ErrorExtractor.forContext(e, context),
+        ),
+      );
     }
   }
 
@@ -83,9 +107,9 @@ class _AITicketAssistantState extends State<AITicketAssistant>
     if (await showGlassDialog<bool>(
           context: context,
           builder: (context) => AlertDialog(
-            title: const Text('پاسخ خودکار'),
-            content: const Text(
-              'آیا می‌خواهید AI به صورت خودکار به این تیکت پاسخ دهد؟',
+            title: Text(AppLocalizations.of(context).aiTicketAutoReplyConfirmTitle),
+            content: Text(
+              AppLocalizations.of(context).aiTicketAutoReplyConfirmBody,
             ),
             actions: [
               TextButton(
@@ -146,6 +170,7 @@ class _AITicketAssistantState extends State<AITicketAssistant>
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context);
 
     final suggestButton = OutlinedButton.icon(
       onPressed: _suggesting ? null : _suggestReply,
@@ -156,7 +181,11 @@ class _AITicketAssistantState extends State<AITicketAssistant>
               child: CircularProgressIndicator(strokeWidth: 2),
             )
           : const Icon(Icons.lightbulb_outline),
-      label: const Text('پیشنهاد پاسخ'),
+      label: Text(
+        _suggesting && _phase != null
+            ? aiStreamStatusLabel(l10n, phase: _phase!)
+            : l10n.aiTicketSuggestReply,
+      ),
     );
 
     final autoReplyButton = FilledButton.icon(
@@ -171,11 +200,11 @@ class _AITicketAssistantState extends State<AITicketAssistant>
               ),
             )
           : const Icon(Icons.send),
-      label: const Text('پاسخ خودکار'),
+      label: Text(l10n.aiTicketAutoReply),
     );
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
       child: AnimatedSize(
         duration: const Duration(milliseconds: 200),
         curve: Curves.easeInOut,
@@ -207,7 +236,7 @@ class _AITicketAssistantState extends State<AITicketAssistant>
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'کمک هوش مصنوعی',
+                            l10n.aiTicketAssistantTitle,
                             style: theme.textTheme.titleSmall?.copyWith(
                               color: theme.colorScheme.primary,
                               fontWeight: FontWeight.bold,
@@ -215,8 +244,8 @@ class _AITicketAssistantState extends State<AITicketAssistant>
                           ),
                           Text(
                             _isExpanded
-                                ? 'دستیار فعال است. پیشنهاد یا پاسخ خودکار دریافت کنید.'
-                                : 'برای نمایش دستیار و دکمه‌های AI ضربه بزنید.',
+                                ? l10n.aiTicketAssistantHintExpanded
+                                : l10n.aiTicketAssistantHintCollapsed,
                             style: theme.textTheme.bodySmall?.copyWith(
                               color: theme.colorScheme.primary.withOpacity(0.8),
                             ),
@@ -263,7 +292,8 @@ class _AITicketAssistantState extends State<AITicketAssistant>
                         );
                       },
                     ),
-                    if (_suggestedReply != null) ...[
+                    if (_suggestedReply != null &&
+                        _suggestedReply!.isNotEmpty) ...[
                       const SizedBox(height: 16),
                       Container(
                         padding: const EdgeInsets.all(12),
@@ -284,7 +314,7 @@ class _AITicketAssistantState extends State<AITicketAssistant>
                                 ),
                                 const SizedBox(width: 8),
                                 Text(
-                                  'پیشنهاد AI',
+                                  l10n.aiTicketSuggestionLabel,
                                   style: theme.textTheme.bodyMedium?.copyWith(
                                     color: theme.colorScheme.primary,
                                     fontWeight: FontWeight.bold,
@@ -315,7 +345,7 @@ class _AITicketAssistantState extends State<AITicketAssistant>
                                   }
                                 },
                                 icon: const Icon(Icons.content_paste_go),
-                                label: const Text('استفاده از این پاسخ'),
+                                label: Text(l10n.aiTicketUseSuggestion),
                               ),
                             ),
                           ],

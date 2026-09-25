@@ -29,7 +29,6 @@ from app.core.permissions import (
 from app.core.cache import get_cache
 from app.services.business_service import (
     create_business,
-    get_business_by_id,
     get_businesses_by_owner,
     get_user_businesses,
     update_business,
@@ -44,7 +43,7 @@ from app.services.business_service import (
     update_business_invoice_share_settings,
     add_business_currency,
     remove_business_currency,
-    check_currency_usage_in_documents,
+    get_business_currency_usage,
 )
 from app.services.file_storage_service import FileStorageService
 from adapters.db.models.business import Business
@@ -416,6 +415,14 @@ async def import_business_from_backup(
                             else None,
                             target_business_id=new_business_id,
                         )
+                        from app.services.business_service import ensure_business_default_document_policies
+
+                        ensure_business_default_document_policies(
+                            db,
+                            new_business_id,
+                            user_id=ctx.get_user_id(),
+                            commit=True,
+                        )
                     except Exception:
                         db.rollback()
                         _reset_session_replication_role(conn, replica_role_ok)
@@ -483,6 +490,8 @@ def preview_import_from_legacy_api(
 ) -> dict:
     from app.services.business_service import check_business_creation_permission
     from app.services.legacy_import.preview_service import preview_legacy_import
+    from app.services.system_settings_service import assert_legacy_api_import_allowed
+    assert_legacy_api_import_allowed(db)
     can_create, error_message = check_business_creation_permission(db, ctx.get_user_id())
     if not can_create:
         raise ApiError(
@@ -511,6 +520,8 @@ async def import_business_from_legacy_api(
     from app.services.business_service import check_business_creation_permission
     from app.services.legacy_import.importer import LegacyBusinessImporter
     from app.services.legacy_import.preview_service import LegacyImportOptions
+    from app.services.system_settings_service import assert_legacy_api_import_allowed
+    assert_legacy_api_import_allowed(db)
     can_create, error_message = check_business_creation_permission(db, ctx.get_user_id())
     if not can_create:
         raise ApiError(
@@ -563,18 +574,20 @@ async def import_business_from_legacy_api(
                     progress_callback=on_progress,
                 )
                 result = importer.run()
-                jm.succeed(job_id, result, "Legacy import completed")
+                jm.succeed(job_id, result, "انتقال از نسخه قدیم با موفقیت انجام شد")
             except Exception as e:
-                error_msg = str(e)
-                error_code = None
-                if isinstance(e, ApiError) and isinstance(e.detail, dict):
-                    err = e.detail.get("error", e.detail)
-                    if isinstance(err, dict):
-                        error_code = err.get("code")
-                        error_msg = err.get("message", error_msg)
-                final_error = f"{error_code}: {error_msg}" if error_code else error_msg
-                jm.fail(job_id, final_error, "Legacy import failed")
-                raise
+                from app.services.legacy_import.errors import format_legacy_import_exception
+
+                error_msg = format_legacy_import_exception(e)
+                # پیام واضح برای کاربر؛ از متن عمومی انگلیسی استفاده نمی‌شود
+                jm.fail(job_id, error_msg, error_msg)
+                # خطا قبلاً در وضعیت job ثبت شده؛ از پرتاب مجدد برای جلوگیری از
+                # لاگ «Unhandled exception» گمراه‌کننده خودداری می‌کنیم.
+                import logging
+
+                logging.getLogger(__name__).exception(
+                    "Legacy API import job %s failed: %s", job_id, error_msg
+                )
 
     background.add_task(task)
     return success_response(
@@ -674,7 +687,7 @@ def list_user_businesses(
 @router.get(
     "/{business_id}/print-settings",
     summary="تنظیمات چاپ فاکتورهای کسب‌وکار",
-    description="دریافت تنظیمات چاپ فاکتور (لوگو، مهر، پرداخت‌ها، اقساط و متن انتهایی) به‌صورت پیش‌فرض و به تفکیک نوع فاکتور.",
+    description="دریافت تنظیمات چاپ فاکتور (لوگو، مهر، مقیاس مهر/امضا، پرداخت‌ها، اقساط و متن انتهایی) به‌صورت پیش‌فرض و به تفکیک نوع فاکتور.",
     response_model=SuccessResponse,
 )
 async def get_business_print_settings_endpoint(
@@ -697,7 +710,7 @@ async def get_business_print_settings_endpoint(
 @router.put(
     "/{business_id}/print-settings",
     summary="ویرایش تنظیمات چاپ فاکتورهای کسب‌وکار",
-    description="ذخیره تنظیمات چاپ فاکتور (لوگو، مهر، پرداخت‌ها، اقساط و متن انتهایی) به‌صورت پیش‌فرض و به تفکیک نوع فاکتور.",
+    description="ذخیره تنظیمات چاپ فاکتور (لوگو، مهر، مقیاس مهر/امضا، پرداخت‌ها، اقساط و متن انتهایی) به‌صورت پیش‌فرض و به تفکیک نوع فاکتور.",
     response_model=SuccessResponse,
 )
 async def update_business_print_settings_endpoint(
@@ -788,6 +801,9 @@ async def update_business_invoice_share_settings_endpoint(
         401: {
             "description": "کاربر احراز هویت نشده است"
         },
+        403: {
+            "description": "دسترسی غیرمجاز به کسب و کار"
+        },
         404: {
             "description": "کسب و کار یافت نشد"
         }
@@ -822,6 +838,9 @@ async def update_business_invoice_share_settings_endpoint(
         401: {
             "description": "کاربر احراز هویت نشده است"
         },
+        403: {
+            "description": "دسترسی غیرمجاز به کسب و کار"
+        },
         404: {
             "description": "کسب و کار یافت نشد"
         }
@@ -834,13 +853,17 @@ def get_business(
     db: Session = Depends(get_db)
 ) -> dict:
     """دریافت جزئیات کسب و کار"""
-    owner_id = ctx.get_user_id()
-    business = get_business_by_id(db, business_id, owner_id)
-    
-    if not business:
-        raise HTTPException(status_code=404, detail="کسب و کار یافت نشد")
-    
-    formatted_data = format_datetime_fields(business, request)
+    from adapters.db.repositories.business_repo import BusinessRepository
+    from app.services.business_service import _business_to_dict
+
+    business_repo = BusinessRepository(db)
+    business = business_repo.get_by_id(business_id)
+    if not business or getattr(business, "deleted_at", None) is not None:
+        raise ApiError("NOT_FOUND", "کسب و کار یافت نشد", http_status=404)
+    if not ctx.can_access_business(business_id):
+        raise ApiError("FORBIDDEN", "دسترسی غیرمجاز به این کسب و کار", http_status=403)
+
+    formatted_data = format_datetime_fields(_business_to_dict(business), request)
     return success_response(formatted_data, request)
 
 
@@ -959,6 +982,7 @@ def delete_business_info(
     request: Request,
     business_id: int,
     deletion_reason: str | None = Body(None, embed=True),
+    skip_restore_period: bool = Body(False, embed=True),
     ctx: AuthContext = Depends(get_current_user),
     db: Session = Depends(get_db),
     _: None = Depends(require_business_permission_dep("settings", "business")),
@@ -968,7 +992,8 @@ def delete_business_info(
     - فقط مالک می‌تواند حذف کند
     - قبل از حذف، بکاپ خودکار ایجاد می‌شود
     - اطلاع‌رسانی به مالک ارسال می‌شود
-    - کسب و کار 30 روز قابل بازیابی است
+    - به‌طور پیش‌فرض کسب و کار 30 روز قابل بازیابی است
+    - با skip_restore_period=true مهلت بازیابی اعمال نمی‌شود (حذف سریع)
     """
     from app.services.notification_service import NotificationService
     
@@ -978,8 +1003,15 @@ def delete_business_info(
         business_id=business_id,
         owner_id=owner_id,
         deletion_reason=deletion_reason,
-        requested_by=owner_id
+        requested_by=owner_id,
+        skip_restore_period=skip_restore_period,
     )
+    
+    restore_days = int(result.get("restore_deadline_days") or 0)
+    if skip_restore_period:
+        success_message = "کسب و کار با موفقیت حذف شد. مهلت بازیابی فعال نیست."
+    else:
+        success_message = "کسب و کار با موفقیت حذف شد. شما 30 روز فرصت دارید آن را بازیابی کنید."
     
     # ارسال اطلاع‌رسانی
     try:
@@ -994,7 +1026,8 @@ def delete_business_info(
                     "business_id": business_id,
                     "deletion_date": result["deleted_at"],
                     "restore_deadline": result["auto_delete_at"],
-                    "restore_days": 30,
+                    "restore_days": restore_days,
+                    "skip_restore_period": skip_restore_period,
                 },
                 preferred_channels=["email", "telegram", "inapp"]
             )
@@ -1006,7 +1039,7 @@ def delete_business_info(
     return success_response(
         result, 
         request, 
-        "کسب و کار با موفقیت حذف شد. شما 30 روز فرصت دارید آن را بازیابی کنید."
+        success_message,
     )
 
 
@@ -1032,7 +1065,6 @@ def delete_business_info(
         }
     }
 )
-@require_business_access("business_id")
 def restore_business_endpoint(
     request: Request,
     business_id: int,
@@ -1382,10 +1414,15 @@ def check_currency_usage_endpoint(
     ctx: AuthContext = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> dict:
-    """بررسی استفاده ارز در اسناد"""
-    document_count = check_currency_usage_in_documents(db, business_id, currency_id)
+    """بررسی استفاده ارز در اسناد، حساب‌ها و کالاها (V2-P7 D6)"""
+    usage = get_business_currency_usage(db, business_id, currency_id)
     return success_response({
-        "is_used": document_count > 0,
-        "document_count": document_count,
-        "can_delete": document_count == 0,
+        "is_used": usage["is_used"],
+        "document_count": usage["document_count"],
+        "total": usage["total"],
+        "can_delete": usage["can_delete"],
+        "is_last_secondary": usage["is_last_secondary"],
+        "secondary_count": usage["secondary_count"],
+        "breakdown": usage["breakdown"],
+        "blockers": usage["blockers"],
     }, request)

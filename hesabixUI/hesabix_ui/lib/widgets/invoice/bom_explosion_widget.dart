@@ -6,6 +6,7 @@ import '../../services/product_service.dart';
 import '../../widgets/invoice/product_combobox_widget.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 /// ویجت انفجار فرمول تولید برای استفاده در فاکتور تولید
 /// این ویجت فقط در فاکتور تولید نمایش داده می‌شود
@@ -93,7 +94,7 @@ class _BomExplosionWidgetState extends State<BomExplosionWidget> {
               },
               hintText: 'کالای تولیدی را انتخاب کنید',
             ),
-            const SizedBox(height: 16),
+            SizedBox(height: 16),
             // انتخاب فرمول (اگر کالا انتخاب شده باشد)
             if (_selectedProduct != null && _selectedProduct!['id'] != null) ...[
               if (_isLoadingBoms)
@@ -136,7 +137,7 @@ class _BomExplosionWidgetState extends State<BomExplosionWidget> {
                   decoration: InputDecoration(
                     labelText: 'فرمول تولید',
                     hintText: 'فرمول را انتخاب کنید',
-                    prefixIcon: const Icon(Icons.assignment_outlined),
+                    prefixIcon: Icon(Icons.assignment_outlined),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
@@ -168,13 +169,13 @@ class _BomExplosionWidgetState extends State<BomExplosionWidget> {
                               margin: const EdgeInsets.only(left: 8),
                               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                               decoration: BoxDecoration(
-                                color: Colors.orange.withValues(alpha: 0.2),
+                                color: SemanticColorResolver.warning(context).withValues(alpha: 0.2),
                                 borderRadius: BorderRadius.circular(4),
                               ),
                               child: Text(
                                 'پیش‌فرض',
                                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                  color: Colors.orange.shade700,
+                                  color: SemanticColorResolver.warning(context),
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),

@@ -4,7 +4,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple, Union
 
 from app.services.ai.ai_constants import (
     CONTEXT_INPUT_TOKEN_BUDGET,
@@ -13,6 +13,10 @@ from app.services.ai.ai_constants import (
     CONTEXT_SUMMARIZE_THRESHOLD_RATIO,
 )
 from app.services.ai.ai_message_budget import trim_messages_for_llm, trim_system_prompt
+from app.services.ai.ai_system_prompt import (
+    StructuredSystemPrompt,
+    coerce_structured_system_prompt,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -61,6 +65,15 @@ def compute_context_usage(
     }
 
 
+def is_strict_tool_pairing_error(exc: BaseException) -> bool:
+    msg = str(exc).lower()
+    return (
+        "tool role" in msg
+        and "no previous assistant message" in msg
+        and "tool call" in msg
+    )
+
+
 def is_context_overflow_error(exc: BaseException) -> bool:
     msg = str(exc).lower()
     if "context length" in msg and ("exceed" in msg or "too long" in msg):
@@ -92,6 +105,24 @@ def _split_history_messages(
     return system_msgs, head, middle, tail
 
 
+def _align_tail_tool_boundary(
+    middle: List[Dict[str, Any]],
+    tail: List[Dict[str, Any]],
+) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+    """جلوگیری از شروع tail با tool یتیم (assistant مربوطه در middle مانده)."""
+    middle = list(middle)
+    tail = list(tail)
+    while tail and tail[0].get("role") == "tool":
+        if middle and middle[-1].get("role") == "assistant" and middle[-1].get("tool_calls"):
+            group = [middle.pop()]
+            while middle and middle[-1].get("role") == "tool":
+                group.insert(0, middle.pop())
+            tail = group + tail
+            continue
+        tail.pop(0)
+    return middle, tail
+
+
 def compress_history_messages(
     messages: List[Dict[str, Any]],
     summarize_fn: Optional[SummarizeFn] = None,
@@ -113,6 +144,8 @@ def compress_history_messages(
             return messages, False
     elif not middle:
         return messages, False
+
+    middle, tail = _align_tail_tool_boundary(middle, tail)
 
     if summarize_fn:
         try:
@@ -143,20 +176,31 @@ def compress_history_messages(
 
 
 def prepare_messages_for_context(
-    system_prompt: str,
+    system_prompt: Union[str, StructuredSystemPrompt],
     messages: List[Dict[str, Any]],
     provider: Any = None,
     *,
     budget_tokens: int = CONTEXT_INPUT_TOKEN_BUDGET,
     summarize_fn: Optional[SummarizeFn] = None,
     force_summarize: bool = False,
+    structured_role: str = "user",
+    structured_business_id: Optional[int] = None,
 ) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
     """
     آماده‌سازی پیام‌ها: در صورت نزدیک شدن به سقف، خلاصه‌سازی تاریخچه و trim.
     """
-    system_content = trim_system_prompt(system_prompt)
+    structured = coerce_structured_system_prompt(
+        system_prompt,
+        role=structured_role,
+        business_id=structured_business_id,
+    )
+    system_content = structured.full_text()
     bundled: List[Dict[str, Any]] = [
-        {"role": "system", "content": system_content},
+        {
+            "role": "system",
+            "content": system_content,
+            "_structured_system": structured,
+        },
         *messages,
     ]
 
@@ -172,7 +216,46 @@ def prepare_messages_for_context(
         usage = compute_context_usage(bundled, provider, budget_tokens)
 
     trimmed = trim_messages_for_llm(bundled)
+    from app.services.ai.chat_message_builder import repair_llm_tool_messages
+
+    trimmed = repair_llm_tool_messages(trimmed)
     usage["history_summarized"] = history_summarized
     usage["message_count"] = len(trimmed)
+    usage["structured_system"] = structured
+    usage["static_token_estimate"] = structured.estimate_static_tokens(provider)
+    usage["prompt_cache_key"] = structured.cache_key()
+    usage.update(structured.estimate_section_tokens(provider))
     return trimmed, usage
+
+
+def context_usage_event_payload(
+    meta: Dict[str, Any],
+    *,
+    history_summarized: Optional[bool] = None,
+    context_retried: bool = False,
+) -> Dict[str, Any]:
+    """رویداد SSE بودجهٔ context به‌همراه تفکیک لایهٔ prompt (PRM-04)."""
+    payload: Dict[str, Any] = {
+        "event": "context_usage",
+        "estimated_tokens": meta.get("estimated_tokens"),
+        "budget_tokens": meta.get("budget_tokens"),
+        "usage_ratio": meta.get("usage_ratio"),
+        "usage_percent": meta.get("usage_percent"),
+        "history_summarized": (
+            bool(history_summarized)
+            if history_summarized is not None
+            else bool(meta.get("history_summarized", False))
+        ),
+        "context_retried": context_retried,
+        "done": False,
+    }
+    for key in (
+        "static_tokens",
+        "semi_static_tokens",
+        "insights_tokens",
+        "runtime_tokens",
+    ):
+        if meta.get(key) is not None:
+            payload[key] = meta.get(key)
+    return payload
 

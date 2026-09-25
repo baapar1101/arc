@@ -1,8 +1,35 @@
 from __future__ import annotations
 
-from typing import List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 from adapters.api.v1.schemas import QueryInfo, SortItem
+
+
+def query_info_for_sort(
+	data: Optional[Dict[str, Any]] = None,
+	*,
+	default_sort_desc: bool = False,
+) -> QueryInfo:
+	"""
+	ساخت QueryInfo فقط برای تعیین مرتب‌سازی.
+
+	take/skip عمداً از ورودی خوانده نمی‌شود تا سقف صفحه‌بندی لیست (مثلاً 100)
+	خروجی اکسل/PDF با take بزرگ را با ValidationError خراب نکند.
+	"""
+	d = data or {}
+	raw_sort = d.get("sort")
+	payload: Dict[str, Any] = {
+		"sort_by": d.get("sort_by"),
+		"sort_desc": bool(d.get("sort_desc", default_sort_desc)),
+		"sort": raw_sort if isinstance(raw_sort, list) else None,
+	}
+	try:
+		return QueryInfo.model_validate(payload)
+	except Exception:
+		return QueryInfo(
+			sort_by=d.get("sort_by") if isinstance(d.get("sort_by"), str) else None,
+			sort_desc=bool(d.get("sort_desc", default_sort_desc)),
+		)
 
 
 def effective_sort_specs(

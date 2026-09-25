@@ -11,6 +11,7 @@ import 'package:hesabix_ui/widgets/crm/crm_responsive_dialog.dart';
 import 'package:hesabix_ui/widgets/crm/crm_section_card.dart';
 import 'package:hesabix_ui/widgets/permission/permission_widgets.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
+import 'package:hesabix_ui/core/hesabix_back.dart';
 
 /// صفحه لیست فرایندهای CRM (فانل سرنخ، pipeline فروش و ...)
 class CrmProcessDefinitionsPage extends StatefulWidget {
@@ -81,13 +82,8 @@ class _CrmProcessDefinitionsPageState extends State<CrmProcessDefinitionsPage> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('فرایندها و زون ارجاعات'),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () {
-            if (context.canPop()) context.pop();
-          },
-        ),
+        title: const Text('فرایندها و مراحل قیف'),
+        leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
         actions: [
           if (widget.authStore.hasBusinessPermission('crm', 'write'))
             IconButton(

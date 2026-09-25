@@ -29,6 +29,7 @@ class _FxRevaluationSettingsPageState extends State<FxRevaluationSettingsPage> {
   String _asOfSource = 'document_date';
   String _dateEffective = 'end_of_day';
   String _whenNoRate = 'block';
+  String _rateDisplayUnit = 'as_base';
 
   @override
   void initState() {
@@ -48,6 +49,7 @@ class _FxRevaluationSettingsPageState extends State<FxRevaluationSettingsPage> {
           _asOfSource = (raw['as_of_source'] as String?) ?? 'document_date';
           _dateEffective = (raw['document_date_effective'] as String?) ?? 'end_of_day';
           _whenNoRate = (raw['when_no_rate'] as String?) ?? 'block';
+          _rateDisplayUnit = (raw['rate_display_unit'] as String?) ?? 'as_base';
         });
       }
     } catch (e) {
@@ -71,6 +73,7 @@ class _FxRevaluationSettingsPageState extends State<FxRevaluationSettingsPage> {
             'as_of_source': _asOfSource,
             'document_date_effective': _dateEffective,
             'when_no_rate': _whenNoRate,
+            'rate_display_unit': _rateDisplayUnit,
           },
         },
       );
@@ -189,6 +192,34 @@ class _FxRevaluationSettingsPageState extends State<FxRevaluationSettingsPage> {
                   onChanged: _canEdit
                       ? (v) {
                           if (v != null) setState(() => _whenNoRate = v);
+                        }
+                      : null,
+                ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  value: _rateDisplayUnit,
+                  decoration: const InputDecoration(
+                    labelText: 'واحد نمایش نرخ (فقط UI)',
+                    helperText: 'نرخ ذخیره‌شده همیشه نسبت به ارز پایه است؛ این فقط برچسب نمایش را تغییر می‌دهد',
+                    border: OutlineInputBorder(),
+                  ),
+                  items: const [
+                    DropdownMenuItem(
+                      value: 'as_base',
+                      child: Text('همان ارز پایه کسب‌وکار'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'irr',
+                      child: Text('نمایش به‌صورت ریال'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'toman',
+                      child: Text('نمایش به‌صورت تومان'),
+                    ),
+                  ],
+                  onChanged: _canEdit
+                      ? (v) {
+                          if (v != null) setState(() => _rateDisplayUnit = v);
                         }
                       : null,
                 ),

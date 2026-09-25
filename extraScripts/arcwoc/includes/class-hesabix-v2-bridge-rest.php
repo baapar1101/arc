@@ -56,6 +56,16 @@ class Hesabix_V2_Bridge_Rest
 	}
 
 	/**
+	 * حذف هش توکن پل محلی (پس از قطع اتصال یا چرخش اجباری).
+	 *
+	 * @return void
+	 */
+	public static function clear_token()
+	{
+		delete_option(self::OPT_TOKEN_HASH);
+	}
+
+	/**
 	 * @param string $plain
 	 * @return bool
 	 */
@@ -73,10 +83,41 @@ class Hesabix_V2_Bridge_Rest
 	}
 
 	/**
+	 * هدرهای ضدکش برای پاسخ‌های پل (LiteSpeed گاهی با وجود Cache-Control وردپرس کش می‌کند).
+	 *
+	 * @param WP_REST_Response|WP_HTTP_Response|WP_Error|mixed $response
+	 * @param WP_REST_Server                                    $server
+	 * @param WP_REST_Request                                   $request
+	 * @return WP_REST_Response|WP_HTTP_Response|WP_Error|mixed
+	 */
+	public static function filter_rest_post_dispatch_nocache($response, $server, $request)
+	{
+		unset($server);
+		if (!($response instanceof WP_REST_Response) || !($request instanceof WP_REST_Request)) {
+			return $response;
+		}
+		$route = (string) $request->get_route();
+		if (strpos($route, '/' . self::NS) !== 0) {
+			return $response;
+		}
+		$response->header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+		$response->header('Pragma', 'no-cache');
+		$response->header('Expires', '0');
+		$response->header('X-LiteSpeed-Cache-Control', 'no-cache');
+		return $response;
+	}
+
+	/**
 	 * @return void
 	 */
 	public static function register_routes()
 	{
+		static $nocache_hooked = false;
+		if (!$nocache_hooked) {
+			add_filter('rest_post_dispatch', array(__CLASS__, 'filter_rest_post_dispatch_nocache'), 10, 3);
+			$nocache_hooked = true;
+		}
+
 		register_rest_route(
 			self::NS,
 			'/health',
@@ -371,6 +412,36 @@ class Hesabix_V2_Bridge_Rest
 				'permission_callback' => array(__CLASS__, 'permission_with_token'),
 			)
 		);
+
+		register_rest_route(
+			self::NS,
+			'/control/stock-pull/run',
+			array(
+				'methods'             => 'POST',
+				'callback'            => array(__CLASS__, 'route_control_stock_pull_run'),
+				'permission_callback' => array(__CLASS__, 'permission_with_token'),
+			)
+		);
+
+		register_rest_route(
+			self::NS,
+			'/control/stock-status',
+			array(
+				'methods'             => 'GET',
+				'callback'            => array(__CLASS__, 'route_control_stock_status'),
+				'permission_callback' => array(__CLASS__, 'permission_with_token'),
+			)
+		);
+
+		register_rest_route(
+			self::NS,
+			'/control/stock-conflicts',
+			array(
+				'methods'             => 'GET',
+				'callback'            => array(__CLASS__, 'route_control_stock_conflicts'),
+				'permission_callback' => array(__CLASS__, 'permission_with_token'),
+			)
+		);
 	}
 
 	/**
@@ -610,10 +681,15 @@ class Hesabix_V2_Bridge_Rest
 		);
 
 		$customers_total = 0;
-		if (function_exists('count_users')) {
+		if (class_exists('Hesabix_V2_Customer_Service')) {
+			$customers_total = (int) Hesabix_V2_Customer_Service::count_sync_customers();
+		} elseif (function_exists('count_users')) {
 			$uc = count_users();
 			if (isset($uc['avail_roles']['customer'])) {
 				$customers_total = (int) $uc['avail_roles']['customer'];
+			}
+			if (isset($uc['avail_roles']['subscriber'])) {
+				$customers_total += (int) $uc['avail_roles']['subscriber'];
 			}
 		}
 
@@ -665,7 +741,7 @@ class Hesabix_V2_Bridge_Rest
 			array(
 				'success' => true,
 				'data'    => array(
-					'bridge_version' => 3,
+					'bridge_version' => 4,
 					'plugin_version' => defined('HESABIX_V2_VERSION') ? HESABIX_V2_VERSION : '',
 					'wc_version'     => defined('WC_VERSION') ? WC_VERSION : '',
 					'wp_version'     => get_bloginfo('version'),
@@ -871,6 +947,10 @@ class Hesabix_V2_Bridge_Rest
 	}
 
 	/**
+	 * فهرست مشتریان/مشترکین (هم‌راستا با صفحهٔ همگام‌سازی افزونه).
+	 *
+	 * WC_Customer_Query در ووکامرس‌های جدید وجود ندارد؛ قبلاً باعث می‌شد همیشه items خالی برگردد.
+	 *
 	 * @param WP_REST_Request $request
 	 * @return WP_REST_Response|WP_Error
 	 */
@@ -880,22 +960,46 @@ class Hesabix_V2_Bridge_Rest
 		$per_page = min(self::MAX_PER_PAGE, max(1, (int) $request->get_param('per_page')));
 		$search   = trim((string) $request->get_param('search'));
 
-		if (!class_exists('WC_Customer_Query')) {
-			return new WP_REST_Response(array('success' => true, 'data' => array('items' => array(), 'total' => 0, 'page' => $page, 'per_page' => $per_page)), 200);
+		$roles = array('customer', 'subscriber');
+		if (class_exists('Hesabix_V2_Customer_Service')) {
+			$roles = Hesabix_V2_Customer_Service::get_customer_list_roles();
+		}
+		if ($roles === array()) {
+			return new WP_REST_Response(
+				array(
+					'success' => true,
+					'data'    => array(
+						'items'    => array(),
+						'total'    => 0,
+						'page'     => $page,
+						'per_page' => $per_page,
+					),
+				),
+				200
+			);
 		}
 
-		$cq_args = array(
-			'limit'   => $per_page,
-			'offset'  => ($page - 1) * $per_page,
-			'orderby' => 'registered_date',
-			'order'   => 'DESC',
+		$args = array(
+			'role__in'     => $roles,
+			'number'       => $per_page,
+			'offset'       => ($page - 1) * $per_page,
+			'orderby'      => 'registered',
+			'order'        => 'DESC',
+			'fields'       => 'ID',
+			'count_total'  => true,
 		);
 		if ($search !== '') {
-			$cq_args['search'] = '*' . wc_clean($search) . '*';
+			$term = function_exists('wc_clean') ? wc_clean($search) : sanitize_text_field($search);
+			$args['search']         = '*' . $term . '*';
+			$args['search_columns'] = array('user_login', 'user_email', 'user_nicename', 'display_name');
 		}
-		$q     = new WC_Customer_Query($cq_args);
+
+		$q     = new WP_User_Query($args);
 		$ids   = $q->get_results();
-		$total = method_exists($q, 'get_total') ? (int) $q->get_total() : count($ids);
+		$total = (int) $q->get_total();
+		if (!is_array($ids)) {
+			$ids = array();
+		}
 
 		$items = array();
 		foreach ($ids as $uid) {
@@ -903,19 +1007,38 @@ class Hesabix_V2_Bridge_Rest
 			if ($uid <= 0) {
 				continue;
 			}
-			$c = new WC_Customer($uid);
+			if (class_exists('WC_Customer')) {
+				$c = new WC_Customer($uid);
+				$email      = (string) $c->get_email();
+				$first_name = (string) $c->get_first_name();
+				$last_name  = (string) $c->get_last_name();
+				$username   = (string) $c->get_username();
+				$created    = $c->get_date_created() ? $c->get_date_created()->date('c') : null;
+			} else {
+				$u = get_userdata($uid);
+				if (!($u instanceof WP_User)) {
+					continue;
+				}
+				$email      = (string) $u->user_email;
+				$first_name = (string) $u->first_name;
+				$last_name  = (string) $u->last_name;
+				$username   = (string) $u->user_login;
+				$created    = !empty($u->user_registered)
+					? gmdate('c', strtotime((string) $u->user_registered))
+					: null;
+			}
 			$map = self::hesabix_mapping_summary('customer', $uid, null);
 			$items[] = array(
-				'id'         => $uid,
-				'email'      => (string) $c->get_email(),
-				'first_name' => (string) $c->get_first_name(),
-				'last_name'  => (string) $c->get_last_name(),
-				'username'   => (string) $c->get_username(),
-				'date_created' => $c->get_date_created() ? $c->get_date_created()->date('c') : null,
-				'hesabix_id' => $map['hesabix_id'],
-				'sync_status' => $map['sync_status'],
-				'hesabix_last_sync_at' => $map['last_sync_at'],
-				'hesabix_error_message' => $map['error_message'],
+				'id'                      => $uid,
+				'email'                   => $email,
+				'first_name'              => $first_name,
+				'last_name'               => $last_name,
+				'username'                => $username,
+				'date_created'            => $created,
+				'hesabix_id'              => $map['hesabix_id'],
+				'sync_status'             => $map['sync_status'],
+				'hesabix_last_sync_at'    => $map['last_sync_at'],
+				'hesabix_error_message'   => $map['error_message'],
 			);
 		}
 
@@ -1002,6 +1125,12 @@ class Hesabix_V2_Bridge_Rest
 			'sync_settings'                => $sync,
 			'bulk_sync_options'          => is_array($bulk) ? $bulk : array(),
 			'stock_pull'                 => is_array($stock) ? $stock : array(),
+			'inventory_policy'           => class_exists('Hesabix_V2_Inventory_Policy')
+				? Hesabix_V2_Inventory_Policy::get_options()
+				: array(),
+			'inventory_status'           => class_exists('Hesabix_V2_Inventory_Policy')
+				? Hesabix_V2_Inventory_Policy::status_summary()
+				: array(),
 		);
 
 		return new WP_REST_Response(array('success' => true, 'data' => $data), 200);
@@ -1566,10 +1695,47 @@ class Hesabix_V2_Bridge_Rest
 			update_option('hesabix_v2_debug_mode', $applied['hesabix_v2_debug_mode'], false);
 		}
 
+		if (array_key_exists('inventory_policy', $params) && is_array($params['inventory_policy']) && class_exists('Hesabix_V2_Inventory_Policy')) {
+			$applied['inventory_policy'] = Hesabix_V2_Inventory_Policy::sanitize_and_save($params['inventory_policy']);
+		}
+
+		if (array_key_exists('stock_pull', $params) && is_array($params['stock_pull']) && class_exists('Hesabix_V2_Stock_Pull_Service')) {
+			$cur = Hesabix_V2_Stock_Pull_Service::get_options();
+			$sp = $params['stock_pull'];
+			$scope = isset($sp['warehouse_scope']) ? sanitize_key((string) $sp['warehouse_scope']) : $cur['warehouse_scope'];
+			if (!in_array($scope, array('default', 'selected', 'all'), true)) {
+				$scope = $cur['warehouse_scope'];
+			}
+			$wh_ids = $cur['warehouse_ids'];
+			if (isset($sp['warehouse_ids']) && is_array($sp['warehouse_ids'])) {
+				$wh_ids = array();
+				foreach ($sp['warehouse_ids'] as $wid) {
+					$i = absint($wid);
+					if ($i > 0) {
+						$wh_ids[] = $i;
+					}
+				}
+				$wh_ids = array_values(array_unique($wh_ids));
+			}
+			$cron_min = isset($sp['cron_minutes']) ? max(5, min(180, absint($sp['cron_minutes']))) : (int) $cur['cron_minutes'];
+			$next = array(
+				'enabled' => array_key_exists('enabled', $sp) ? !empty($sp['enabled']) : !empty($cur['enabled']),
+				'warehouse_scope' => $scope,
+				'warehouse_ids' => $wh_ids,
+				'cron_minutes' => $cron_min,
+				'force_manage_stock' => array_key_exists('force_manage_stock', $sp) ? !empty($sp['force_manage_stock']) : !empty($cur['force_manage_stock']),
+				'disable_wc_stock_reduction' => array_key_exists('disable_wc_stock_reduction', $sp) ? !empty($sp['disable_wc_stock_reduction']) : !empty($cur['disable_wc_stock_reduction']),
+				'skip_zero_overwrite' => array_key_exists('skip_zero_overwrite', $sp) ? !empty($sp['skip_zero_overwrite']) : !empty($cur['skip_zero_overwrite']),
+			);
+			update_option('hesabix_v2_stock_pull', $next, false);
+			Hesabix_V2_Stock_Pull_Service::reschedule_cron();
+			$applied['stock_pull'] = $next;
+		}
+
 		if (empty($applied)) {
 			return new WP_Error(
 				'no_allowed_keys',
-				__('هیچ فیلد مجاز برای به‌روزرسانی ارسال نشد. در حال حاضر فقط hesabix_v2_debug_mode پشتیبانی می‌شود.', 'hesabix-v2'),
+				__('هیچ فیلد مجاز برای به‌روزرسانی ارسال نشد. کلیدهای مجاز: hesabix_v2_debug_mode، inventory_policy، stock_pull.', 'hesabix-v2'),
 				array('status' => 400)
 			);
 		}
@@ -1578,6 +1744,106 @@ class Hesabix_V2_Bridge_Rest
 			array(
 				'success' => true,
 				'data'    => array('applied' => $applied),
+			),
+			200
+		);
+	}
+
+	/**
+	 * کشش موجودی از حسابیکس به ووکامرس (از راه دور / پس از حواله انبار).
+	 *
+	 * @param WP_REST_Request $request
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public static function route_control_stock_pull_run($request)
+	{
+		if (!get_option('hesabix_v2_enabled')) {
+			return new WP_Error('plugin_disabled', __('افزونه حسابیکس غیرفعال است.', 'hesabix-v2'), array('status' => 400));
+		}
+		if (!class_exists('Hesabix_V2_Stock_Pull_Service')) {
+			return new WP_Error('missing_service', __('سرویس کشش موجودی در دسترس نیست.', 'hesabix-v2'), array('status' => 500));
+		}
+
+		$params = self::read_json_body($request);
+		$source = isset($params['source']) ? sanitize_key((string) $params['source']) : 'hesabix_push';
+		if (!in_array($source, array('manual', 'ajax', 'hesabix_push'), true)) {
+			$source = 'hesabix_push';
+		}
+
+		$product_ids = array();
+		if (!empty($params['product_ids']) && is_array($params['product_ids'])) {
+			foreach ($params['product_ids'] as $pid) {
+				$i = absint($pid);
+				if ($i > 0) {
+					$product_ids[] = $i;
+				}
+			}
+			$product_ids = array_values(array_unique($product_ids));
+		}
+
+		$ctx = array(
+			'source' => $source,
+			'force_zero' => !empty($params['force_zero']),
+		);
+		if (!empty($product_ids)) {
+			$ctx['product_ids'] = $product_ids;
+		}
+		if (!empty($params['ignore_source_policy'])) {
+			$ctx['ignore_source_policy'] = true;
+		}
+
+		$result = Hesabix_V2_Stock_Pull_Service::execute_pull($ctx);
+		return new WP_REST_Response(
+			array(
+				'success' => true,
+				'data'    => $result,
+				'message' => isset($result['message']) ? (string) $result['message'] : '',
+			),
+			200
+		);
+	}
+
+	/**
+	 * خلاصه سیاست و وضعیت موجودی.
+	 *
+	 * @param WP_REST_Request $request
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public static function route_control_stock_status($request)
+	{
+		if (!class_exists('Hesabix_V2_Inventory_Policy')) {
+			return new WP_Error('missing_service', __('سیاست موجودی در دسترس نیست.', 'hesabix-v2'), array('status' => 500));
+		}
+		return new WP_REST_Response(
+			array(
+				'success' => true,
+				'data'    => Hesabix_V2_Inventory_Policy::status_summary(),
+			),
+			200
+		);
+	}
+
+	/**
+	 * نمونه اختلاف موجودی.
+	 *
+	 * @param WP_REST_Request $request
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public static function route_control_stock_conflicts($request)
+	{
+		if (!get_option('hesabix_v2_enabled')) {
+			return new WP_Error('plugin_disabled', __('افزونه حسابیکس غیرفعال است.', 'hesabix-v2'), array('status' => 400));
+		}
+		$limit = absint($request->get_param('limit'));
+		if ($limit < 1) {
+			$limit = 25;
+		}
+		$result = Hesabix_V2_Stock_Pull_Service::detect_conflicts($limit);
+		return new WP_REST_Response(
+			array(
+				'success' => true,
+				'data'    => $result,
+				'message' => isset($result['message']) ? (string) $result['message'] : '',
 			),
 			200
 		);

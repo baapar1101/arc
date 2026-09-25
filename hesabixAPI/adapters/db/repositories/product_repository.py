@@ -1,13 +1,10 @@
 from __future__ import annotations
 
-import re
 from typing import Any, Dict, List, Optional
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import select, and_, or_, func, exists, text, case, literal
 from app.core.query_timeout import query_timeout
 
-from adapters.api.v1.schemas import QueryInfo
-from app.services.sort_resolution import effective_sort_specs
 from .base_repo import BaseRepository
 from ..models.product import Product
 from ..models.product_general_barcode_alias import ProductGeneralBarcodeAlias
@@ -16,34 +13,13 @@ from ..models.product_attribute_link import ProductAttributeLink
 from ..models.category import BusinessCategory
 
 from app.services.product_general_barcode_service import split_raw_general_barcodes
-
-# فاصله، خط جدید، انواع خط تیره (بدون نیم‌فاصلهٔ ZWNJ که در فارسی پیوند واژه است)
-_SEARCH_SPLIT_RE = re.compile(r"(?:\s+|(?:[\-‐‑–—])+)+")
-
-
-def _search_query_tokens(search: str) -> List[str]:
-    """جدا کردن عبارت جستجو به توکن‌های غیرخالی (فاصله، خط تیره و مشابه)."""
-    s = str(search).strip()
-    if not s:
-        return []
-    parts = [p for p in _SEARCH_SPLIT_RE.split(s) if p]
-    if parts:
-        return parts
-    return [s]
-
-
-def _like_escape(s: str) -> str:
-    """ایمن‌سازی متن ورودی برای الگوهای ILIKE (PostgreSQL با escape '\\')."""
-    return s.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
-
-
-def _column_contains_all_tokens(column, tokens: List[str]):
-    """هر توکن باید به‌صورت زیررشته‌ای در مقدار ستون باشد (AND بین توکن‌ها)."""
-    if not tokens:
-        return True
-    if len(tokens) == 1:
-        return column.ilike(f"%{tokens[0]}%")
-    return and_(*[column.ilike(f"%{t}%") for t in tokens])
+from app.services.product_catalog_profile_service import catalog_profile_from_product
+from adapters.db.repositories.product_list_filters import (
+    _apply_product_list_filters,
+    _column_contains_all_tokens,
+    _like_escape,
+    _search_query_tokens,
+)
 
 
 class ProductRepository(BaseRepository[Product]):
@@ -147,74 +123,8 @@ class ProductRepository(BaseRepository[Product]):
             if ors:
                 stmt = stmt.where(or_(*ors))
 
-        # Apply filters (supports minimal set used by clients)
-        if filters:
-            for f in filters:
-                # Support both dict and pydantic-like objects
-                if isinstance(f, dict):
-                    field = f.get("property")
-                    operator = f.get("operator")
-                    value = f.get("value")
-                else:
-                    field = getattr(f, "property", None)
-                    operator = getattr(f, "operator", None)
-                    value = getattr(f, "value", None)
-
-                if not field or not operator:
-                    continue
-
-                # Code filters
-                if field == "code":
-                    if operator == "=":
-                        stmt = stmt.where(Product.code == value)
-                    elif operator == "in" and isinstance(value, (list, tuple)):
-                        stmt = stmt.where(Product.code.in_(list(value)))
-                    continue
-
-                # Name contains
-                if field == "name":
-                    if operator in {"contains", "ilike"} and isinstance(value, str):
-                        nt = _search_query_tokens(value)
-                        if nt:
-                            stmt = stmt.where(_column_contains_all_tokens(Product.name, nt))
-                    elif operator == "=":
-                        stmt = stmt.where(Product.name == value)
-                    continue
-
-                if field == "item_type" and operator == "=" and value is not None:
-                    # مقدار رشته‌ای enum (مثلاً product / service)
-                    try:
-                        from adapters.db.models.product import ProductItemType
-                        iv = str(value).strip().lower()
-                        if iv in (ProductItemType.PRODUCT.value, "product"):
-                            stmt = stmt.where(Product.item_type == ProductItemType.PRODUCT)
-                        elif iv in (ProductItemType.SERVICE.value, "service"):
-                            stmt = stmt.where(Product.item_type == ProductItemType.SERVICE)
-                    except Exception:
-                        pass
-                    continue
-
-                # Category ID filter (supports "in" operator for multi-select)
-                if field == "category_id":
-                    if operator == "in" and isinstance(value, (list, tuple)):
-                        # Convert string IDs to integers with error handling
-                        category_ids = []
-                        for v in value:
-                            if v:
-                                try:
-                                    category_ids.append(int(v))
-                                except (ValueError, TypeError):
-                                    pass
-                        if category_ids:
-                            stmt = stmt.where(Product.category_id.in_(category_ids))
-                    elif operator == "=":
-                        try:
-                            category_id = int(value) if value else None
-                            if category_id:
-                                stmt = stmt.where(Product.category_id == category_id)
-                        except (ValueError, TypeError):
-                            pass
-                    continue
+        # فیلترهای ستونی DataTable (عملگرهای * / *? / ?* / = / in و فیلدهای شناخته‌شده)
+        stmt = _apply_product_list_filters(stmt, filters, business_id=business_id)
 
         if category_ids:
             stmt = stmt.where(Product.category_id.in_(list(category_ids)))
@@ -226,6 +136,9 @@ class ProductRepository(BaseRepository[Product]):
             # Sorting: آرایه sort در اولویت، وگرنه sort_by/sort_desc (سازگار با کلاینت قدیمی)
             _allowed_product_sort = frozenset({"name", "code", "created_at"})
             try:
+                from adapters.api.v1.schemas import QueryInfo
+                from app.services.sort_resolution import effective_sort_specs
+
                 qi = QueryInfo(sort_by=sort_by, sort_desc=sort_desc, sort=sort)  # type: ignore[arg-type]
                 specs = effective_sort_specs(qi, allowed=_allowed_product_sort, default_when_empty=None)
             except Exception:
@@ -289,7 +202,7 @@ class ProductRepository(BaseRepository[Product]):
                 try:
                     from app.services.invoice_service import get_financial_stock_bulk
 
-                    with query_timeout(self.db, timeout_seconds=30):
+                    with query_timeout(self.db, timeout_seconds=120):
                         accounting_stocks = get_financial_stock_bulk(
                             db=self.db,
                             business_id=business_id,
@@ -308,7 +221,7 @@ class ProductRepository(BaseRepository[Product]):
                 try:
                     from app.services.warehouse_service import get_physical_stock_bulk
 
-                    with query_timeout(self.db, timeout_seconds=30):
+                    with query_timeout(self.db, timeout_seconds=120):
                         warehouse_stocks = get_physical_stock_bulk(
                             db=self.db,
                             business_id=business_id,
@@ -321,10 +234,23 @@ class ProductRepository(BaseRepository[Product]):
                 except Exception:
                     pass
 
+        # Bulk-load attribute links (avoid N+1 for large list/export)
+        attr_ids_by_product: dict[int, list[int]] = {}
+        if rows:
+            row_ids = [p.id for p in rows]
+            try:
+                link_rows = (
+                    self.db.query(ProductAttributeLink.product_id, ProductAttributeLink.attribute_id)
+                    .filter(ProductAttributeLink.product_id.in_(row_ids))
+                    .all()
+                )
+                for product_id, attribute_id in link_rows:
+                    attr_ids_by_product.setdefault(int(product_id), []).append(int(attribute_id))
+            except Exception:
+                attr_ids_by_product = {}
+
         def _to_dict(p: Product) -> dict[str, Any]:
-            # دریافت attribute_ids از ProductAttributeLink
-            links = self.db.query(ProductAttributeLink).filter(ProductAttributeLink.product_id == p.id).all()
-            attribute_ids = [link.attribute_id for link in links]
+            attribute_ids = attr_ids_by_product.get(p.id, [])
 
             gb_raw = getattr(p, "general_barcodes", None)
             gb_tokens = split_raw_general_barcodes(gb_raw) if gb_raw else []
@@ -350,6 +276,10 @@ class ProductRepository(BaseRepository[Product]):
                 "base_sales_note": p.base_sales_note,
                 "base_purchase_price": p.base_purchase_price,
                 "base_purchase_note": p.base_purchase_note,
+                "sales_price_fx": getattr(p, "sales_price_fx", None),
+                "purchase_price_fx": getattr(p, "purchase_price_fx", None),
+                "price_fx_currency_id": getattr(p, "price_fx_currency_id", None),
+                "auto_update_base_from_fx": bool(getattr(p, "auto_update_base_from_fx", False)),
                 "track_inventory": p.track_inventory,
                 "reorder_point": p.reorder_point,
                 "min_order_qty": p.min_order_qty,
@@ -376,6 +306,7 @@ class ProductRepository(BaseRepository[Product]):
                 "is_active": getattr(p, 'is_active', True),  # اضافه کردن فیلد is_active
                 "is_public_catalog": bool(getattr(p, "is_public_catalog", False)),
                 "catalog_public_uuid": getattr(p, "catalog_public_uuid", None),
+                **catalog_profile_from_product(p),
                 "created_at": p.created_at,
                 "updated_at": p.updated_at,
             }
@@ -434,6 +365,19 @@ class ProductRepository(BaseRepository[Product]):
             "base_sales_price",
             "base_purchase_price",
             "general_barcodes",
+            "sales_tax_rate",
+            "purchase_tax_rate",
+            "tax_type_id",
+            "tax_code",
+            "tax_unit_id",
+            "catalog_short_description",
+            "catalog_expert_review",
+            "catalog_specifications",
+            "catalog_brand",
+            "catalog_model",
+            "catalog_country_of_origin",
+            "catalog_video_url",
+            "catalog_gallery_file_ids",
         }
         # فیلدهای بولی NOT NULL: فقط با مقدار bool واقعی به‌روزرسانی شوند (None = بدون تغییر)
         boolean_fields = {"is_public_catalog", "is_active", "track_inventory", "track_serial", "track_barcode", "is_sales_taxable", "is_purchase_taxable"}

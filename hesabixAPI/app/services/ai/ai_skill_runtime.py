@@ -75,8 +75,11 @@ def select_skills_for_query(
     scored: List[tuple[int, SkillMetadata]] = []
     for m in metadata:
         desc_tokens = set(_tokenize(m.description))
-        slug_tokens = set(_tokenize(m.skill_slug.replace("-", " ")))
+        slug_tokens = set(_tokenize(m.skill_slug.replace("-", " ").replace("_", " ")))
         overlap = len(q_tokens & desc_tokens) + len(q_tokens & slug_tokens) * 2
+        slug_l = (m.skill_slug or "").lower()
+        if slug_l and slug_l in (user_query or "").lower():
+            overlap += 3
         if overlap > 0:
             scored.append((overlap, m))
 

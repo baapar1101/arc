@@ -25,6 +25,7 @@ bool FlutterWindow::OnCreate() {
     return false;
   }
   RegisterPlugins(flutter_controller_->engine());
+  SetupCloseChannel();
   SetChildContent(flutter_controller_->view()->GetNativeWindow());
 
   flutter_controller_->engine()->SetNextFrameCallback([&]() {
@@ -43,8 +44,31 @@ void FlutterWindow::OnDestroy() {
   if (flutter_controller_) {
     flutter_controller_ = nullptr;
   }
+  close_channel_ = nullptr;
 
   Win32Window::OnDestroy();
+}
+
+void FlutterWindow::SetupCloseChannel() {
+  close_channel_ =
+      std::make_unique<flutter::MethodChannel<flutter::EncodableValue>>(
+          flutter_controller_->engine()->messenger(), "hesabix/window_close",
+          &flutter::StandardMethodCodec::GetInstance());
+
+  close_channel_->SetMethodCallHandler(
+      [this](const flutter::MethodCall<flutter::EncodableValue>& call,
+             std::unique_ptr<flutter::MethodResult<flutter::EncodableValue>>
+                 result) {
+        if (call.method_name().compare("close") == 0) {
+          HWND hwnd = GetHandle();
+          if (hwnd != nullptr) {
+            DestroyWindow(hwnd);
+          }
+          result->Success();
+          return;
+        }
+        result->NotImplemented();
+      });
 }
 
 LRESULT
@@ -62,6 +86,12 @@ FlutterWindow::MessageHandler(HWND hwnd, UINT const message,
   }
 
   switch (message) {
+    case WM_CLOSE:
+      if (close_channel_) {
+        close_channel_->InvokeMethod("requestClose", nullptr);
+        return 0;
+      }
+      break;
     case WM_FONTCHANGE:
       flutter_controller_->engine()->ReloadSystemFonts();
       break;

@@ -156,6 +156,19 @@ async def handle_telegram_callback_query(
 					send=_crm_send,
 				)
 			)
+		if parts[0] == "ai":
+			action = parts[1] if len(parts) > 1 else ""
+			approval_id = parts[2] if len(parts) > 2 else ""
+			if action == "approve":
+				return await service.confirm_pending_write(
+					approval_id, user_context, approved=True
+				)
+			if action == "reject":
+				return await service.confirm_pending_write(
+					approval_id, user_context, approved=False
+				)
+			logger.warning(f"Unknown ai callback_data: {callback_data}")
+			return False
 		if parts[0] == "menu":
 			return await handle_menu_callback(service, user_context, parts[1:])
 		elif parts[0] == "chat":
@@ -349,7 +362,7 @@ async def send_tickets_menu(
 	from adapters.api.v1.schemas import QueryInfo
 	
 	ticket_repo = TicketRepository(service.db)
-	query_info = QueryInfo(skip=0, take=20, filters=None, sort_by="created_at", sort_desc=True)
+	query_info = QueryInfo(skip=0, take=20, filters=None, sort_by="last_message_at", sort_desc=True)
 	tickets, total = ticket_repo.get_operator_tickets(query_info)
 	
 	if not tickets:
@@ -679,14 +692,16 @@ async def handle_auto_reply(
 				operator_name = f"{user_context.user.first_name or ''} {user_context.user.last_name or ''}".strip() or "اپراتور پشتیبانی"
 				message_preview = suggested_reply[:200] + ("..." if len(suggested_reply) > 200 else "")
 				
-				context = {
+				from app.services.support.notification_helpers import support_notification_context
+
+				context = support_notification_context({
 					"subject": f"پاسخ جدید به تیکت #{ticket_id}",
 					"message": f"اپراتور {operator_name} به تیکت شما پاسخ داد:\n\n{message_preview}",
-					"ticket_id": ticket_id,
 					"ticket_title": ticket.title if hasattr(ticket, 'title') else "تیکت",
 					"operator_name": operator_name,
-					"message_preview": message_preview
-				}
+					"message_preview": message_preview,
+					"user_id": ticket.user_id,
+				}, ticket_id)
 
 				notification_service.send(
 					user_id=ticket.user_id,

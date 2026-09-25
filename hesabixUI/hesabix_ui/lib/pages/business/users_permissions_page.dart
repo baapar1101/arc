@@ -14,6 +14,7 @@ import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../widgets/business_subpage_back_leading.dart';
 import '../../widgets/jalali_date_picker.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 DateTime _membershipEndOfLocalDayUtc(DateTime d) {
   final endLocal = DateTime(d.year, d.month, d.day, 23, 59, 59);
@@ -264,7 +265,7 @@ class _UsersPermissionsPageState extends State<UsersPermissionsPage> {
       builder: (context) => AlertDialog(
         title: Row(
           children: [
-            Icon(Icons.warning, color: Colors.orange),
+            Icon(Icons.warning, color: SemanticColorResolver.warning(context)),
             const SizedBox(width: 8),
             Text(t.ownerWarningTitle),
           ],
@@ -287,7 +288,7 @@ class _UsersPermissionsPageState extends State<UsersPermissionsPage> {
       builder: (context) => AlertDialog(
         title: Row(
           children: [
-            Icon(Icons.info, color: Colors.blue),
+            Icon(Icons.info, color: SemanticColorResolver.info(context)),
             const SizedBox(width: 8),
             Text(t.alreadyAddedWarningTitle),
           ],
@@ -332,7 +333,7 @@ class _UsersPermissionsPageState extends State<UsersPermissionsPage> {
               ),
               child: Row(
                 children: [
-                  businessSubpageBackLeading(context, int.parse(widget.businessId)),
+                  HesabixBackButton(businessId: int.parse(widget.businessId)),
                   const SizedBox(width: 8),
                   Container(
                     padding: const EdgeInsets.all(12),
@@ -848,10 +849,10 @@ class _UsersPermissionsPageState extends State<UsersPermissionsPage> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: Colors.orange.withValues(alpha: 0.1),
+        color: SemanticColorResolver.warning(context).withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: Colors.orange.withValues(alpha: 0.3),
+          color: SemanticColorResolver.warning(context).withValues(alpha: 0.3),
           width: 1,
         ),
       ),
@@ -860,14 +861,14 @@ class _UsersPermissionsPageState extends State<UsersPermissionsPage> {
         children: [
           Icon(
             Icons.star,
-            color: Colors.orange,
+            color: SemanticColorResolver.warning(context),
             size: 12,
           ),
-          const SizedBox(width: 4),
+          SizedBox(width: 4),
           Text(
             AppLocalizations.of(context).owner,
             style: TextStyle(
-              color: Colors.orange.shade700,
+              color: SemanticColorResolver.warning(context),
               fontSize: 11,
               fontWeight: FontWeight.w600,
             ),
@@ -1169,6 +1170,17 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
         'delete': '${t.delete} ${t.expensesIncome}',
         'draft': '${t.draft} ${t.expensesIncome}',
       },
+      'goods_expense_income': {
+        'view': 'مشاهده کالای هزینه/درآمد شده',
+        'add': 'ایجاد کالای هزینه/درآمد شده',
+        'edit': 'ویرایش کالای هزینه/درآمد شده',
+        'delete': 'حذف کالای هزینه/درآمد شده',
+        'submit': 'ارسال به حسابداری',
+        'allocate': 'تخصیص حساب معین',
+        'post': 'قطعی‌سازی (انبار + دفتر)',
+        'cancel': 'ابطال سند قطعی',
+        'change_unit_cost': 'تغییر دستی بهای واحد',
+      },
       'accounting_documents': {
         'add': '${t.add} ${t.accountingDocuments}',
         'view': '${t.view} ${t.accountingDocuments}',
@@ -1211,6 +1223,7 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
         'history': t.eventHistory,
         'users': t.usersAndPermissions,
         'manage_ftp': t.settingsPermissionManageFtp,
+        'manage_ai_provider': 'مدیریت ارائه‌دهنده هوش مصنوعی',
       },
       'storage': {
         'view': '${t.view} ${t.storageSpace}',
@@ -1229,6 +1242,13 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
         'view': '${t.view} ${t.reports}',
         'export': '${t.export} ${t.reports}',
       },
+      'hscript': {
+        'view': t.localeName.startsWith('fa') ? 'مشاهده گزارش‌ساز اسکریپتی' : 'View script report builder',
+        'write': t.localeName.startsWith('fa') ? 'ویرایش و ساخت اسکریپت' : 'Edit & create scripts',
+        'publish': t.localeName.startsWith('fa') ? 'انتشار گزارش اسکریپتی' : 'Publish script reports',
+        'export': t.localeName.startsWith('fa') ? 'خروجی PDF/Excel اسکریپت' : 'Export script PDF/Excel',
+        'schedule': t.localeName.startsWith('fa') ? 'زمان‌بندی گزارش اسکریپتی' : 'Schedule script reports',
+      },
       'fiscal_years': {
         'view': '${t.view} ${t.fiscalYears}',
         'edit': t.permissionFiscalYearEditCurrent,
@@ -1240,6 +1260,11 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
         'write': '${t.edit} ${t.warranty}',
         'delete': '${t.delete} ${t.warranty}',
         'manage': '${t.manage} ${t.warranty}',
+      },
+      'barcode_labels': {
+        'view': '${t.view} ${t.barcodeLabelsMenu}',
+        'design': t.barcodeLabelPermissionDesign,
+        'print': t.barcodeLabelPermissionPrint,
       },
       'customer_club': {
         'view': '${t.view} ${t.customerClubTitle}',
@@ -1265,6 +1290,27 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
         'manage': t.distributionPermissionManage,
         'operate': t.distributionPermissionOperate,
         'reports_team': t.distributionPermissionReportsTeam,
+        'settle': t.distributionPermissionSettle,
+        'approve_returns': t.distributionPermissionApproveReturns,
+      },
+      'payroll': {
+        'view': '${t.view} ${t.payrollMenu}',
+        'manage': t.payrollPermissionManage,
+        'operate': t.payrollPermissionOperate,
+        'post': t.payrollPermissionPost,
+        'approve': t.payrollPermissionApprove,
+      },
+      'telephony': {
+        'view': t.localeName.startsWith('fa') ? 'مشاهده مرکز تماس' : 'View telephony center',
+        'manage': t.localeName.startsWith('fa') ? 'مدیریت اتصال و داخلی‌ها' : 'Manage PBX & extensions',
+        'click_to_call': t.localeName.startsWith('fa') ? 'Click-to-Call' : 'Click to call',
+        'softphone': t.localeName.startsWith('fa') ? 'Softphone داخل‌برنامه' : 'In-app softphone',
+        'softphone_manage': t.localeName.startsWith('fa') ? 'مدیریت Softphone و حالت رسانه' : 'Manage softphone media modes',
+        'softphone_quality': t.localeName.startsWith('fa') ? 'مشاهده کیفیت Softphone' : 'View softphone quality',
+        'listen_recordings': t.localeName.startsWith('fa') ? 'پخش ضبط مکالمات' : 'Listen to recordings',
+        'live_monitor': t.localeName.startsWith('fa') ? 'مانیتورینگ زنده' : 'Live monitor',
+        'reports': t.localeName.startsWith('fa') ? 'گزارش‌های تماس' : 'Call reports',
+        'control_calls': t.localeName.startsWith('fa') ? 'کنترل تماس از CRM' : 'Control calls from CRM',
       },
       'basalam': {
         'view': t.localeName.startsWith('fa') ? 'مشاهدهٔ اتصال باسلام' : 'View Basalam integration',
@@ -1801,13 +1847,13 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
       {
         'title': t.warehouseManagement,
         'icon': Icons.warehouse,
-        'sections': ['warehouses', 'warehouse_transfers'],
+        'sections': ['warehouses', 'warehouse_transfers', 'goods_expense_income'],
         'permissionHintKey': 'warehouse_inventory_bridge',
       },
       {
         'title': t.reports,
         'icon': Icons.assessment,
-        'sections': ['reports'],
+        'sections': ['reports', 'hscript'],
       },
       {
         'title': t.workflowCategoryCrm,
@@ -1825,6 +1871,11 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
         'sections': ['warranty'],
       },
       {
+        'title': t.barcodeLabelsMenu,
+        'icon': Icons.qr_code_2_outlined,
+        'sections': ['barcode_labels'],
+      },
+      {
         'title': t.customerClubMenu,
         'icon': Icons.card_giftcard,
         'sections': ['customer_club'],
@@ -1833,6 +1884,16 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
         'title': t.distributionMenu,
         'icon': Icons.local_shipping_outlined,
         'sections': ['distribution'],
+      },
+      {
+        'title': t.payrollMenu,
+        'icon': Icons.payments_outlined,
+        'sections': ['payroll'],
+      },
+      {
+        'title': t.localeName.startsWith('fa') ? 'مرکز تماس' : 'Telephony',
+        'icon': Icons.phone_in_talk_outlined,
+        'sections': ['telephony'],
       },
       {
         'title': t.localeName.startsWith('fa') ? 'اتصال فروشگاه' : 'Store integrations',
@@ -1970,6 +2031,8 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
         return t.warehouses;
       case 'warehouse_transfers':
         return t.warehouseTransfers;
+      case 'goods_expense_income':
+        return 'کالای هزینه/درآمد شده';
       case 'settings':
         return t.settings;
       case 'storage':
@@ -1980,14 +2043,22 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
         return t.marketplace;
       case 'reports':
         return t.reports;
+      case 'hscript':
+        return t.localeName.startsWith('fa') ? 'گزارش‌ساز اسکریپتی' : 'Script report builder';
       case 'fiscal_years':
         return t.fiscalYears;
       case 'warranty':
         return t.warranty;
+      case 'barcode_labels':
+        return t.barcodeLabelsMenu;
       case 'customer_club':
         return t.customerClubMenu;
       case 'distribution':
         return t.distributionMenu;
+      case 'payroll':
+        return t.payrollMenu;
+      case 'telephony':
+        return t.localeName.startsWith('fa') ? 'مرکز تماس' : 'Telephony';
       case 'basalam':
         return t.localeName.startsWith('fa') ? 'اتصال باسلام' : 'Basalam';
       case 'woocommerce':
@@ -2033,6 +2104,16 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
         return t.delete;
       case 'draft':
         return t.draft;
+      case 'submit':
+        return 'ارسال به حسابداری';
+      case 'allocate':
+        return 'تخصیص حساب';
+      case 'post':
+        return 'قطعی‌سازی';
+      case 'cancel':
+        return 'ابطال';
+      case 'change_unit_cost':
+        return 'تغییر بهای واحد';
       case 'read':
         return t.view;
       case 'write':
@@ -2056,6 +2137,8 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
         return t.business;
       case 'manage_ftp':
         return t.settingsPermissionManageFtp;
+      case 'manage_ai_provider':
+        return 'مدیریت ارائه‌دهنده هوش مصنوعی';
       case 'collect':
         return t.collect;
       case 'transfer':
@@ -2073,7 +2156,14 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
       case 'change_unit_price':
         return t.permissionInvoiceChangeUnitPrice;
       case 'manage':
+        if (sectionKey == 'payroll') {
+          return t.payrollPermissionManage;
+        }
         return t.manage;
+      case 'design':
+        return sectionKey == 'barcode_labels' ? t.barcodeLabelPermissionDesign : action;
+      case 'print':
+        return sectionKey == 'barcode_labels' ? t.barcodeLabelPermissionPrint : (t.printDocuments);
       case 'adjust':
         return t.customerClubActionAdjust;
       case 'redeem':
@@ -2087,7 +2177,14 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
       case 'delete_messages':
         return t.permissionCrmWebChatDeleteMessages;
       case 'operate':
+        if (sectionKey == 'payroll') {
+          return t.payrollPermissionOperate;
+        }
         return t.distributionPermissionOperate;
+      case 'post':
+        return t.payrollPermissionPost;
+      case 'approve':
+        return t.payrollPermissionApprove;
       case 'sync':
         if (sectionKey == 'basalam') {
           return t.localeName.startsWith('fa') ? 'همگام‌سازی باسلام' : 'Basalam sync';
@@ -2098,8 +2195,16 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
           return t.permissionCrmTeamPerformanceReports;
         }
         return t.distributionPermissionReportsTeam;
+      case 'settle':
+        return t.distributionPermissionSettle;
+      case 'approve_returns':
+        return t.distributionPermissionApproveReturns;
       case 'reports':
         return sectionKey == 'crm' ? t.permissionCrmViewReports : t.reports;
+      case 'schedule':
+        return t.localeName.startsWith('fa') ? 'زمان‌بندی' : 'Schedule';
+      case 'publish':
+        return t.localeName.startsWith('fa') ? 'انتشار' : 'Publish';
       default:
         return action;
     }

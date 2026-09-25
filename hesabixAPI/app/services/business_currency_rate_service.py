@@ -244,3 +244,116 @@ def resolve_rate_to_base_or_one(
 		return r if isinstance(r, Decimal) else Decimal(str(r))
 	except Exception:
 		return Decimal(1)
+
+
+def list_latest_rates_for_business(db: Session, business_id: int) -> Dict[str, Any]:
+	"""آخرین نرخ تسعیر هر ارز فرعی (نوار ابزار). فقط چندارزی."""
+	from app.services.fx_rate_provider_service import assert_multi_currency
+
+	assert_multi_currency(db, business_id)
+	b = db.get(Business, int(business_id))
+	if not b or b.default_currency_id is None:
+		raise ApiError("BUSINESS_CURRENCY", "ارز اصلی کسب‌وکار تعریف نشده است", http_status=400)
+	default_id = int(b.default_currency_id)
+	base = db.get(Currency, default_id)
+	secondary = db.execute(
+		select(Currency)
+		.join(BusinessCurrency, BusinessCurrency.currency_id == Currency.id)
+		.where(
+			BusinessCurrency.business_id == int(business_id),
+			Currency.id != default_id,
+		)
+		.order_by(Currency.code)
+	).scalars().all()
+
+	now = datetime.now(timezone.utc)
+	items: List[Dict[str, Any]] = []
+	for cur in secondary:
+		q = (
+			select(BusinessCurrencyRate)
+			.where(
+				and_(
+					BusinessCurrencyRate.business_id == int(business_id),
+					BusinessCurrencyRate.currency_id == int(cur.id),
+				)
+			)
+			.order_by(desc(BusinessCurrencyRate.effective_at), desc(BusinessCurrencyRate.id))
+			.limit(1)
+		)
+		row = db.execute(q).scalar_one_or_none()
+		age_hours = None
+		if row and row.effective_at is not None:
+			eff = row.effective_at
+			if eff.tzinfo is None:
+				eff = eff.replace(tzinfo=timezone.utc)
+			age_hours = round((now - eff).total_seconds() / 3600.0, 2)
+		items.append(
+			{
+				"currency_id": cur.id,
+				"currency_code": cur.code,
+				"currency_title": cur.title,
+				"currency_symbol": cur.symbol,
+				"rate": str(row.rate) if row else None,
+				"rate_row_id": row.id if row else None,
+				"effective_at": row.effective_at if row else None,
+				"note": row.note if row else None,
+				"age_hours": age_hours,
+				"missing": row is None,
+			}
+		)
+
+	return {
+		"is_multi_currency": True,
+		"base_currency": {
+			"id": base.id if base else default_id,
+			"code": base.code if base else None,
+			"title": base.title if base else None,
+			"symbol": base.symbol if base else None,
+		},
+		"items": items,
+		"missing_count": sum(1 for i in items if i["missing"]),
+		"as_of": now,
+	}
+
+
+def bulk_create_business_currency_rates(
+	db: Session, business_id: int, user_id: int, payload: Dict[str, Any]
+) -> Dict[str, Any]:
+	"""ثبت چند نرخ دستی یکجا (نوار ابزار)."""
+	from app.services.fx_rate_provider_service import assert_multi_currency
+
+	assert_multi_currency(db, business_id)
+	items = payload.get("items") or []
+	if not isinstance(items, list) or not items:
+		raise ApiError("FX_BULK_ITEMS_REQUIRED", "لیست items الزامی است", http_status=400)
+	note_default = payload.get("note")
+	raw_eff = payload.get("effective_at")
+	if raw_eff is None:
+		effective_at = datetime.now(timezone.utc)
+	elif isinstance(raw_eff, str):
+		effective_at = _to_utc_aware(datetime.fromisoformat(raw_eff.replace("Z", "+00:00")))
+	elif isinstance(raw_eff, datetime):
+		effective_at = _to_utc_aware(raw_eff)
+	else:
+		raise ApiError("EFFECTIVE_AT_INVALID", "زمان مؤثر نامعتبر است", http_status=400)
+
+	created: List[Dict[str, Any]] = []
+	for raw in items:
+		if not isinstance(raw, dict):
+			continue
+		body = {
+			"currency_id": raw.get("currency_id"),
+			"rate": raw.get("rate"),
+			"effective_at": effective_at,
+			"note": raw.get("note") if raw.get("note") is not None else note_default,
+		}
+		created.append(create_business_currency_rate(db, business_id, user_id, body))
+	# P6: همگام‌سازی اختیاری قیمت پایه کالاهایی که auto_update دارند
+	product_sync: Dict[str, Any] = {}
+	try:
+		from app.services.product_fx_price_service import sync_business_products_base_from_fx
+
+		product_sync = sync_business_products_base_from_fx(db, business_id, only_auto=True)
+	except Exception:
+		product_sync = {"updated_count": 0, "error": "sync_skipped"}
+	return {"created": created, "count": len(created), "product_price_sync": product_sync}

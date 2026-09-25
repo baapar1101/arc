@@ -7,6 +7,8 @@ import 'package:hesabix_ui/models/project_model.dart';
 import 'package:hesabix_ui/services/project_service.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
 import 'package:hesabix_ui/widgets/project/project_form_dialog.dart';
+import 'package:hesabix_ui/widgets/invoice/invoice_form_layout.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 /// ویجت انتخاب پروژه (کمبوباکس)
 class ProjectSelectorWidget extends StatefulWidget {
@@ -90,22 +92,28 @@ class _ProjectSelectorWidgetState extends State<ProjectSelectorWidget> {
     return DropdownButtonFormField<int?>(
       value: _loading ? null : widget.selectedProjectId,
       isDense: widget.isDense,
-      decoration: InputDecoration(
-        labelText: widget.labelText ?? 'پروژه',
-        border: const OutlineInputBorder(),
-        errorText: _error != null ? 'خطا در بارگذاری پروژه‌ها' : null,
-        suffixIcon: _buildSuffixIcon(),
-        suffixIconConstraints: BoxConstraints(
-          minWidth: widget.isDense ? 36 : 40,
-          maxWidth: 120,
-          minHeight: widget.isDense ? 36 : 40,
-          maxHeight: widget.isDense ? 44 : 48,
-        ),
-        isDense: widget.isDense,
-        contentPadding: widget.isDense
-            ? const EdgeInsetsDirectional.only(start: 12, top: 10, bottom: 10, end: 12)
-            : null,
-      ),
+      decoration: widget.isDense
+          ? InvoiceFormFieldMetrics.mergeDecoration(
+              context,
+              InputDecoration(
+                labelText: widget.labelText ?? 'پروژه',
+                errorText: _error != null ? 'خطا در بارگذاری پروژه‌ها' : null,
+                suffixIcon: _buildSuffixIcon(),
+                suffixIconConstraints: InvoiceFormFieldMetrics.suffixIconConstraints,
+              ),
+            )
+          : InputDecoration(
+              labelText: widget.labelText ?? 'پروژه',
+              border: const OutlineInputBorder(),
+              errorText: _error != null ? 'خطا در بارگذاری پروژه‌ها' : null,
+              suffixIcon: _buildSuffixIcon(),
+              suffixIconConstraints: BoxConstraints(
+                minWidth: 40,
+                maxWidth: 120,
+                minHeight: 40,
+                maxHeight: 48,
+              ),
+            ),
       isExpanded: true,
       items: [
         if (widget.allowNull)
@@ -156,13 +164,13 @@ class _ProjectSelectorWidgetState extends State<ProjectSelectorWidget> {
   Color _getStatusColor(String status) {
     switch (status) {
       case 'active':
-        return Colors.green;
+        return SemanticColorResolver.positive(context);
       case 'completed':
-        return Colors.blue;
+        return SemanticColorResolver.info(context);
       case 'on_hold':
-        return Colors.orange;
+        return SemanticColorResolver.warning(context);
       case 'cancelled':
-        return Colors.red;
+        return SemanticColorResolver.negative(context);
       default:
         return Colors.grey;
     }
@@ -254,7 +262,7 @@ class _ProjectSelectorWidgetState extends State<ProjectSelectorWidget> {
           if (canCreate)
             IconButton(
               style: _suffixIconButtonStyle(),
-              icon: const Icon(Icons.add_circle, color: Colors.blue),
+              icon: Icon(Icons.add_circle, color: SemanticColorResolver.info(context)),
               onPressed: widget.enabled ? _showQuickCreateDialog : null,
               tooltip: 'ایجاد پروژه جدید',
               iconSize: 20,
@@ -278,12 +286,12 @@ class _ProjectSelectorWidgetState extends State<ProjectSelectorWidget> {
           if (canCreate)
             IconButton(
               style: _suffixIconButtonStyle(),
-              icon: const Icon(Icons.add_circle, color: Colors.blue),
+              icon: Icon(Icons.add_circle, color: SemanticColorResolver.info(context)),
               onPressed: widget.enabled ? _showQuickCreateDialog : null,
               tooltip: 'ایجاد پروژه جدید',
               iconSize: 20,
             ),
-          const Icon(Icons.warning_amber, color: Colors.orange, size: 20),
+          Icon(Icons.warning_amber, color: SemanticColorResolver.warning(context), size: 20),
         ],
       );
     }
@@ -292,7 +300,7 @@ class _ProjectSelectorWidgetState extends State<ProjectSelectorWidget> {
     if (canCreate) {
       return IconButton(
         style: _suffixIconButtonStyle(),
-        icon: const Icon(Icons.add_circle, color: Colors.blue),
+        icon: Icon(Icons.add_circle, color: SemanticColorResolver.info(context)),
         onPressed: widget.enabled ? _showQuickCreateDialog : null,
         tooltip: 'ایجاد پروژه جدید',
         iconSize: 20,

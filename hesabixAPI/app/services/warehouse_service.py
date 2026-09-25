@@ -5,8 +5,11 @@ from decimal import Decimal
 from datetime import datetime, date
 import logging
 
-from sqlalchemy.orm import Session
-from sqlalchemy import and_, or_
+from collections import defaultdict
+
+from sqlalchemy.orm import Session, joinedload
+from sqlalchemy import Integer, and_, cast, func, or_
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.exc import IntegrityError
 
 logger = logging.getLogger(__name__)
@@ -44,7 +47,77 @@ _SOURCE_TYPE_LABELS_FA = {
 	"manual": "دستی",
 	"invoice": "فاکتور",
 	"api": "API",
+	"goods_expense_income": "کالای هزینه/درآمد شده",
 }
+
+
+def _warehouse_document_source_is_invoice(db: Session, business_id: int, wh: WarehouseDocument) -> bool:
+	"""آیا موجودی این حواله از مسیر فاکتور (نه خطوط حواله) شمرده می‌شود؟"""
+	st = (getattr(wh, "source_type", None) or "").strip().lower()
+	if st == "invoice":
+		return True
+	src_doc_id = getattr(wh, "source_document_id", None)
+	if src_doc_id is None:
+		return False
+	from app.services.invoice_service import SUPPORTED_INVOICE_TYPES
+
+	row = (
+		db.query(Document.document_type)
+		.filter(Document.id == int(src_doc_id), Document.business_id == int(business_id))
+		.first()
+	)
+	if row is None:
+		return False
+	return str(row[0] or "") in SUPPORTED_INVOICE_TYPES
+
+
+def should_seal_warehouse_cancel_reversal(db: Session, business_id: int, wh: WarehouseDocument) -> bool:
+	"""
+	اگر True باشد، لغو حوالهٔ اصلی خودش موجودی فیزیکی را اصلاح می‌کند
+	(اصل به cancelled می‌رود و از مجموع posted حذف می‌شود)؛ بنابراین حوالهٔ معکوس
+	فقط بایگانی است و نباید draft/قابل‌پست بماند.
+	برای حواله‌های فاکتور، جریان فعلی draft→post برای بایگانی حفظ می‌شود.
+	"""
+	return not _warehouse_document_source_is_invoice(db, business_id, wh)
+
+
+def assert_cancel_reversal_postable(db: Session, wh: WarehouseDocument) -> None:
+	"""جلوگیری از پست حوالهٔ معکوس وقتی موجودی قبلاً با لغو اصل اصلاح شده است."""
+	ex = wh.extra_info or {}
+	if not isinstance(ex, dict):
+		return
+	cancel_id = ex.get("cancels_warehouse_document_id")
+	if cancel_id is None:
+		return
+	if ex.get("audit_only_reversal") or ex.get("stock_already_corrected_by_cancel"):
+		raise ApiError(
+			"CANCEL_REVERSAL_NOT_POSTABLE",
+			"این حوالهٔ معکوس فقط برای بایگانی است؛ موجودی با لغو حوالهٔ اصلی اصلاح شده و قابل قطعی‌سازی نیست",
+			http_status=400,
+		)
+	try:
+		cid = int(cancel_id)
+	except (TypeError, ValueError):
+		return
+	original = (
+		db.query(WarehouseDocument)
+		.filter(
+			WarehouseDocument.id == cid,
+			WarehouseDocument.business_id == int(wh.business_id),
+		)
+		.first()
+	)
+	if not original:
+		return
+	if (original.status or "").strip().lower() != "cancelled":
+		return
+	# اصل لغو شده و موجودی از خطوط حواله شمرده می‌شود → پست معکوس دوبرابر می‌کند
+	if should_seal_warehouse_cancel_reversal(db, int(wh.business_id), original):
+		raise ApiError(
+			"CANCEL_REVERSAL_NOT_POSTABLE",
+			"این حوالهٔ معکوس قابل قطعی‌سازی نیست؛ موجودی با لغو حوالهٔ اصلی اصلاح شده است",
+			http_status=400,
+		)
 
 _WH_DOC_TYPE_EXPORT_FA = {
 	"receipt": "ورود",
@@ -60,6 +133,92 @@ _WH_STATUS_EXPORT_FA = {
 	"posted": "قطعی",
 	"cancelled": "لغو شده",
 }
+
+_WAREHOUSE_DOC_SEARCH_FIELDS_DEFAULT = frozenset({"code", "counterparty"})
+
+
+def _warehouse_doc_search_fields_set(search_fields: Optional[List[Any]]) -> set[str]:
+	if search_fields:
+		sf_set = {str(x).lower() for x in search_fields}
+	else:
+		sf_set = set(_WAREHOUSE_DOC_SEARCH_FIELDS_DEFAULT)
+	if "source_invoice_party_name" in sf_set:
+		sf_set.add("counterparty")
+	return sf_set
+
+
+def _invoice_ids_matching_warehouse_party_search(
+	db: Session,
+	business_id: int,
+	search: str,
+) -> List[int]:
+	"""فاکتورهایی که نام طرف حساب (person_name یا Person) با عبارت جستجو match می‌شود."""
+	s = f"%{search.strip()}%"
+	_jb = cast(Document.extra_info, JSONB)
+	pid_expr = cast(_jb["person_id"].astext, Integer)
+	person_name_expr = _jb["person_name"].astext
+	q = db.query(Document.id).filter(Document.business_id == business_id)
+	q = q.outerjoin(
+		Person,
+		and_(Person.id == pid_expr, Person.business_id == business_id),
+	)
+	full_name = func.nullif(func.trim(func.concat_ws(" ", Person.first_name, Person.last_name)), "")
+	party_match = or_(
+		person_name_expr.ilike(s),
+		Person.alias_name.ilike(s),
+		Person.first_name.ilike(s),
+		Person.last_name.ilike(s),
+		Person.company_name.ilike(s),
+		full_name.ilike(s),
+	)
+	return [r[0] for r in q.filter(party_match).limit(500).all()]
+
+
+def _apply_warehouse_documents_text_search(
+	q,
+	*,
+	db: Session,
+	business_id: int,
+	search: Optional[str],
+	search_fields: Optional[List[Any]] = None,
+):
+	"""جستجوی متنی لیست حواله انبار: کد حواله، کد فاکتور مبدأ، نام طرف حساب."""
+	if not isinstance(search, str) or not search.strip():
+		return q
+	s = f"%{search.strip()}%"
+	sf_set = _warehouse_doc_search_fields_set(search_fields)
+
+	or_parts: List[Any] = []
+	if "code" in sf_set:
+		or_parts.append(WarehouseDocument.code.ilike(s))
+		invoice_ids_code = [
+			r[0]
+			for r in db.query(Document.id)
+			.filter(and_(Document.business_id == business_id, Document.code.ilike(s)))
+			.limit(500)
+			.all()
+		]
+		if invoice_ids_code:
+			or_parts.append(
+				and_(
+					WarehouseDocument.source_type == "invoice",
+					WarehouseDocument.source_document_id.in_(invoice_ids_code),
+				)
+			)
+
+	if "counterparty" in sf_set:
+		invoice_ids_party = _invoice_ids_matching_warehouse_party_search(db, business_id, search)
+		if invoice_ids_party:
+			or_parts.append(
+				and_(
+					WarehouseDocument.source_type == "invoice",
+					WarehouseDocument.source_document_id.in_(invoice_ids_party),
+				)
+			)
+
+	if not or_parts:
+		or_parts.append(WarehouseDocument.code.ilike(s))
+	return q.filter(or_(*or_parts))
 
 
 def warehouse_documents_filtered_query(db: Session, business_id: int, body: Dict[str, Any]):
@@ -157,35 +316,20 @@ def warehouse_documents_filtered_query(db: Session, business_id: int, body: Dict
 				)
 			)
 
-	search = body.get("search")
-	if isinstance(search, str) and search.strip():
-		search_term = f"%{search.strip()}%"
-		invoice_ids_matching = [
-			r[0]
-			for r in db.query(Document.id)
-			.filter(and_(Document.business_id == business_id, Document.code.like(search_term)))
-			.limit(500)
-			.all()
-		]
-		if invoice_ids_matching:
-			q = q.filter(
-				or_(
-					WarehouseDocument.code.like(search_term),
-					and_(
-						WarehouseDocument.source_type == "invoice",
-						WarehouseDocument.source_document_id.in_(invoice_ids_matching),
-					),
-				)
-			)
-		else:
-			q = q.filter(WarehouseDocument.code.like(search_term))
+	q = _apply_warehouse_documents_text_search(
+		q,
+		db=db,
+		business_id=business_id,
+		search=body.get("search"),
+		search_fields=body.get("search_fields"),
+	)
 
 	return q
 
 
 def apply_warehouse_documents_sort(q, body: Dict[str, Any]):
 	"""همان مرتب‌سازی جستجوی حواله انبار."""
-	from app.services.sort_resolution import effective_sort_specs
+	from app.services.sort_resolution import effective_sort_specs, query_info_for_sort
 
 	_wh_sort_allowed = frozenset({"code", "doc_type", "status", "created_at", "document_date"})
 
@@ -200,13 +344,7 @@ def apply_warehouse_documents_sort(q, body: Dict[str, Any]):
 			return WarehouseDocument.created_at
 		return WarehouseDocument.document_date
 
-	_qi = QueryInfo.model_validate({
-		"take": int(body.get("take", 20) or 20),
-		"skip": int(body.get("skip", 0) or 0),
-		"sort_by": body.get("sort_by"),
-		"sort_desc": bool(body.get("sort_desc", True)),
-		"sort": body.get("sort") if isinstance(body.get("sort"), list) else None,
-	})
+	_qi = query_info_for_sort(body, default_sort_desc=True)
 	_specs = effective_sort_specs(_qi, allowed=_wh_sort_allowed, default_when_empty=("document_date", True))
 	_order_parts = []
 	for _n, _d in _specs:
@@ -437,41 +575,23 @@ def _warehouse_line_matches_invoice_movement(invoice_document_type: str, movemen
 	return False
 
 
-def compute_invoice_line_quantities(
-	db: Session,
-	business_id: int,
-	invoice: Document,
+_WAREHOUSE_QTY_EPSILON = Decimal("0.000001")
+
+
+def _compute_line_quantities_core(
+	invoice_document_type: str,
+	item_rows: List[Any],
+	warehouse_docs: List[WarehouseDocument],
 ) -> List[Dict[str, Any]]:
-	"""مقادیر مورد نیاز، پردازش‌شده و باقی‌مانده برای هر ردیف فاکتور (بر اساس invoice_item_line_id)."""
-	from adapters.db.models.invoice_item_line import InvoiceItemLine
-
-	item_rows = (
-		db.query(InvoiceItemLine)
-		.filter(InvoiceItemLine.document_id == invoice.id)
-		.order_by(InvoiceItemLine.id.asc())
-		.all()
-	)
-
-	warehouse_docs = (
-		db.query(WarehouseDocument)
-		.filter(
-			and_(
-				WarehouseDocument.business_id == business_id,
-				WarehouseDocument.source_type == "invoice",
-				WarehouseDocument.source_document_id == invoice.id,
-			)
-		)
-		.all()
-	)
-
+	"""هستهٔ محاسبه required/processed/remaining برای ردیف‌های فاکتور."""
 	processed_by_line: Dict[int, Decimal] = {}
 	orphan_by_product: Dict[int, Decimal] = {}
 
 	for wh_doc in warehouse_docs:
-		if wh_doc.status != "posted":
+		if (wh_doc.status or "").strip().lower() != "posted":
 			continue
 		for wh_line in wh_doc.lines:
-			if not _warehouse_line_matches_invoice_movement(invoice.document_type, str(wh_line.movement or "")):
+			if not _warehouse_line_matches_invoice_movement(invoice_document_type, str(wh_line.movement or "")):
 				continue
 			qty = Decimal(str(wh_line.quantity or 0))
 			if qty <= 0:
@@ -499,7 +619,7 @@ def compute_invoice_line_quantities(
 				"product_id": int(row.product_id),
 				"required_quantity": float(required),
 				"processed_quantity": float(processed),
-				"remaining_quantity": float(remaining) if remaining > 0 else 0.0,
+				"remaining_quantity": float(remaining) if remaining > _WAREHOUSE_QTY_EPSILON else 0.0,
 			}
 		)
 
@@ -520,9 +640,360 @@ def compute_invoice_line_quantities(
 			left -= take
 			entry["processed_quantity"] = float(proc)
 			rem = req - proc
-			entry["remaining_quantity"] = float(rem) if rem > 0 else 0.0
+			entry["remaining_quantity"] = float(rem) if rem > _WAREHOUSE_QTY_EPSILON else 0.0
 
 	return line_quantities
+
+
+def compute_invoice_line_quantities(
+	db: Session,
+	business_id: int,
+	invoice: Document,
+) -> List[Dict[str, Any]]:
+	"""مقادیر مورد نیاز، پردازش‌شده و باقی‌مانده برای هر ردیف فاکتور (بر اساس invoice_item_line_id)."""
+	from adapters.db.models.invoice_item_line import InvoiceItemLine
+
+	item_rows = (
+		db.query(InvoiceItemLine)
+		.filter(InvoiceItemLine.document_id == invoice.id)
+		.order_by(InvoiceItemLine.id.asc())
+		.all()
+	)
+
+	warehouse_docs = (
+		db.query(WarehouseDocument)
+		.options(joinedload(WarehouseDocument.lines))
+		.filter(
+			and_(
+				WarehouseDocument.business_id == business_id,
+				WarehouseDocument.source_type == "invoice",
+				WarehouseDocument.source_document_id == invoice.id,
+			)
+		)
+		.all()
+	)
+
+	return _compute_line_quantities_core(invoice.document_type, item_rows, warehouse_docs)
+
+
+def compute_invoice_line_quantities_batch(
+	db: Session,
+	business_id: int,
+	invoices: List[Document],
+) -> Dict[int, List[Dict[str, Any]]]:
+	"""محاسبه batch مقادیر خطوط برای چند فاکتور (برای لیست جستجوی حواله)."""
+	from adapters.db.models.invoice_item_line import InvoiceItemLine
+
+	if not invoices:
+		return {}
+
+	invoice_ids = [int(inv.id) for inv in invoices]
+	item_rows = (
+		db.query(InvoiceItemLine)
+		.filter(InvoiceItemLine.document_id.in_(invoice_ids))
+		.order_by(InvoiceItemLine.document_id.asc(), InvoiceItemLine.id.asc())
+		.all()
+	)
+	items_by_invoice: Dict[int, List[Any]] = defaultdict(list)
+	for row in item_rows:
+		items_by_invoice[int(row.document_id)].append(row)
+
+	warehouse_docs = (
+		db.query(WarehouseDocument)
+		.options(joinedload(WarehouseDocument.lines))
+		.filter(
+			and_(
+				WarehouseDocument.business_id == business_id,
+				WarehouseDocument.source_type == "invoice",
+				WarehouseDocument.source_document_id.in_(invoice_ids),
+			)
+		)
+		.all()
+	)
+	wh_by_invoice: Dict[int, List[WarehouseDocument]] = defaultdict(list)
+	for wh in warehouse_docs:
+		if wh.source_document_id is not None:
+			wh_by_invoice[int(wh.source_document_id)].append(wh)
+
+	result: Dict[int, List[Dict[str, Any]]] = {}
+	for inv in invoices:
+		inv_id = int(inv.id)
+		result[inv_id] = _compute_line_quantities_core(
+			inv.document_type,
+			items_by_invoice.get(inv_id, []),
+			wh_by_invoice.get(inv_id, []),
+		)
+	return result
+
+
+def line_quantities_has_remaining(line_quantities: List[Dict[str, Any]]) -> bool:
+	"""آیا حداقل یک ردیف فاکتور مقدار باقی‌مانده برای حواله دارد؟"""
+	for entry in line_quantities:
+		if Decimal(str(entry.get("remaining_quantity") or 0)) > _WAREHOUSE_QTY_EPSILON:
+			return True
+	return False
+
+
+def _active_invoice_warehouse_documents(warehouse_docs: List[WarehouseDocument]) -> List[WarehouseDocument]:
+	return [
+		wh for wh in warehouse_docs
+		if (wh.status or "").strip().lower() != "cancelled"
+	]
+
+
+def resolve_invoice_warehouse_state(
+	warehouse_docs: List[WarehouseDocument],
+	line_quantities: List[Dict[str, Any]],
+) -> str:
+	"""
+	وضعیت حوالهٔ فاکتور برای UI:
+	missing | draft | partial | posted
+
+	«posted» یعنی همهٔ مقادیر قابل‌رهگیری حواله شده و حوالهٔ پیش‌نویس باز ندارد.
+	«partial» یعنی حوالهٔ posted ناقص است یا همزمان پیش‌نویس باز دارد.
+	"""
+	active = _active_invoice_warehouse_documents(warehouse_docs)
+	if not active:
+		return "missing"
+
+	statuses = [(wh.status or "").strip().lower() for wh in active]
+	has_posted = any(st == "posted" for st in statuses)
+	has_draft = any(st == "draft" for st in statuses)
+	has_remaining = line_quantities_has_remaining(line_quantities)
+
+	if has_remaining:
+		if has_posted:
+			return "partial"
+		return "draft" if has_draft else "missing"
+
+	if has_draft:
+		return "partial"
+	if has_posted:
+		return "posted"
+	return "draft"
+
+
+def invoice_warehouse_fulfillment_is_complete(
+	warehouse_docs: List[WarehouseDocument],
+	line_quantities: List[Dict[str, Any]],
+) -> bool:
+	"""فاکتور از نظر مقدار حواله کامل شده و پیش‌نویس باز ندارد."""
+	if line_quantities_has_remaining(line_quantities):
+		return False
+	active = _active_invoice_warehouse_documents(warehouse_docs)
+	if not active:
+		return False
+	statuses = [(wh.status or "").strip().lower() for wh in active]
+	if not any(st == "posted" for st in statuses):
+		return False
+	return not any(st == "draft" for st in statuses)
+
+
+def remaining_invoice_lines_for_warehouse(
+	db: Session,
+	business_id: int,
+	invoice: Document,
+	*,
+	line_quantities: Optional[List[Dict[str, Any]]] = None,
+) -> List[Dict[str, Any]]:
+	"""خطوط فاکتور با مقدار باقی‌مانده برای ساخت حواله (پیش‌نویس یا دستی)."""
+	from adapters.db.models.invoice_item_line import InvoiceItemLine
+
+	if line_quantities is None:
+		line_quantities = compute_invoice_line_quantities(db, business_id, invoice)
+	by_line = {
+		int(entry["invoice_item_line_id"]): entry
+		for entry in line_quantities
+		if entry.get("invoice_item_line_id") is not None
+	}
+
+	item_rows = (
+		db.query(InvoiceItemLine)
+		.filter(InvoiceItemLine.document_id == invoice.id)
+		.order_by(InvoiceItemLine.id.asc())
+		.all()
+	)
+	lines: List[Dict[str, Any]] = []
+	for row in item_rows:
+		entry = by_line.get(int(row.id))
+		if not entry:
+			continue
+		rem = Decimal(str(entry.get("remaining_quantity") or 0))
+		if rem <= _WAREHOUSE_QTY_EPSILON:
+			continue
+		extra = row.extra_info or {}
+		warehouse_id = extra.get("warehouse_id") if isinstance(extra, dict) else None
+		lines.append(
+			{
+				"invoice_item_line_id": int(row.id),
+				"product_id": row.product_id,
+				"quantity": float(rem),
+				"warehouse_id": warehouse_id,
+				"extra_info": extra,
+			}
+		)
+	return lines
+
+
+def search_invoices_for_warehouse_sources(
+	db: Session,
+	business_id: int,
+	invoice_types: List[str],
+	*,
+	doc_type_hint: Optional[str] = None,
+	search_term: str = "",
+	include_completed: bool = False,
+	skip: int = 0,
+	take: int = 20,
+) -> Dict[str, Any]:
+	"""فهرست فاکتورهای قابل انتخاب برای صدور حواله با فیلتر تکمیل مبتنی بر مقدار."""
+	q = db.query(Document).filter(
+		and_(
+			Document.business_id == business_id,
+			Document.document_type.in_(invoice_types),
+			Document.is_proforma == False,  # noqa: E712
+		)
+	)
+	if search_term:
+		q = q.filter(Document.code.ilike(f"%{search_term.strip()}%"))
+
+	ordered = q.order_by(Document.document_date.desc(), Document.id.desc())
+
+	if include_completed:
+		total = ordered.count()
+		rows = ordered.offset(skip).limit(take).all()
+	else:
+		matched: List[Document] = []
+		scan_offset = 0
+		scan_batch = max(take * 5, 50)
+		while True:
+			batch = ordered.offset(scan_offset).limit(scan_batch).all()
+			if not batch:
+				break
+			qty_map = compute_invoice_line_quantities_batch(db, business_id, batch)
+			wh_rows = (
+				db.query(WarehouseDocument)
+				.filter(
+					and_(
+						WarehouseDocument.business_id == business_id,
+						WarehouseDocument.source_type == "invoice",
+						WarehouseDocument.source_document_id.in_([int(d.id) for d in batch]),
+					)
+				)
+				.all()
+			)
+			wh_map: Dict[int, List[WarehouseDocument]] = defaultdict(list)
+			for wh in wh_rows:
+				if wh.source_document_id is not None:
+					wh_map[int(wh.source_document_id)].append(wh)
+			for doc in batch:
+				line_qty = qty_map.get(int(doc.id), [])
+				wh_list = wh_map.get(int(doc.id), [])
+				if not invoice_warehouse_fulfillment_is_complete(wh_list, line_qty):
+					matched.append(doc)
+			scan_offset += scan_batch
+		total = len(matched)
+		rows = matched[skip : skip + take]
+
+	invoice_ids = [int(doc.id) for doc in rows]
+	warehouse_map: Dict[int, List[WarehouseDocument]] = defaultdict(list)
+	if invoice_ids:
+		wh_rows = (
+			db.query(WarehouseDocument)
+			.filter(
+				and_(
+					WarehouseDocument.business_id == business_id,
+					WarehouseDocument.source_type == "invoice",
+					WarehouseDocument.source_document_id.in_(invoice_ids),
+				)
+			)
+			.all()
+		)
+		for wh in wh_rows:
+			if wh.source_document_id is not None:
+				warehouse_map[int(wh.source_document_id)].append(wh)
+
+	line_qty_map = compute_invoice_line_quantities_batch(db, business_id, rows) if rows else {}
+
+	person_ids: List[int] = []
+	for doc in rows:
+		extra = doc.extra_info or {}
+		pid = extra.get("person_id")
+		if pid:
+			try:
+				person_ids.append(int(pid))
+			except (TypeError, ValueError):
+				continue
+	person_ids = list({pid for pid in person_ids})
+	person_map: Dict[int, str] = {}
+	if person_ids:
+		person_rows = (
+			db.query(Person)
+			.filter(and_(Person.id.in_(person_ids), Person.business_id == business_id))
+			.all()
+		)
+		for prow in person_rows:
+			name = prow.alias_name
+			if not name:
+				parts = filter(None, [getattr(prow, "first_name", None), getattr(prow, "last_name", None)])
+				joined = " ".join(parts).strip()
+				name = joined or getattr(prow, "company_name", None) or ""
+			person_map[int(prow.id)] = name
+
+	items: List[Dict[str, Any]] = []
+	for doc in rows:
+		extra = doc.extra_info or {}
+		person_name = extra.get("person_name")
+		person_id = extra.get("person_id")
+		if not person_name and person_id:
+			try:
+				person_name = person_map.get(int(person_id))
+			except (TypeError, ValueError):
+				person_name = None
+
+		totals = extra.get("totals") if isinstance(extra, dict) else None
+		net_amount = None
+		if isinstance(totals, dict):
+			try:
+				net_amount = float(totals.get("net") or 0)
+			except (TypeError, ValueError):
+				net_amount = None
+
+		wh_list = warehouse_map.get(int(doc.id), [])
+		line_qty = line_qty_map.get(int(doc.id), [])
+		state = resolve_invoice_warehouse_state(wh_list, line_qty)
+
+		items.append(
+			{
+				"invoice_id": doc.id,
+				"code": doc.code,
+				"document_date": doc.document_date.isoformat(),
+				"invoice_type": doc.document_type,
+				"person_name": person_name,
+				"person_id": person_id,
+				"net_amount": net_amount,
+				"warehouse_state": state,
+				"warehouse_doc_type_hint": doc_type_hint,
+				"warehouse_documents": [
+					{
+						"id": wh.id,
+						"code": wh.code,
+						"status": wh.status,
+						"doc_type": wh.doc_type,
+					}
+					for wh in wh_list
+				],
+			}
+		)
+
+	return {
+		"items": items,
+		"total": total,
+		"take": take,
+		"skip": skip,
+		"page": (skip // take) + 1 if take else 1,
+		"total_pages": (total + take - 1) // take if take else 1,
+	}
 
 
 def _remaining_quantity_for_invoice_line(
@@ -712,8 +1183,8 @@ def create_from_invoice(
 			continue
 
 		extra = ln.get("extra_info") or {}
-		movement_override = ln.get("movement")
-		mv = movement_override or extra.get("movement") or ("out" if wh_doc_type in ("issue", "production_out") else "in")
+		# حرکت خط حواله باید با نوع حواله (issue/receipt) هم‌خوان باشد، نه movement ذخیره‌شده در فاکتور.
+		mv = "out" if wh_doc_type in ("issue", "production_out") else "in"
 
 		# دریافت warehouse_id از سطح ردیف خط یا از extra_info
 		# منطق fallback: اگر انبار در سطح ردیف مشخص نشده باشد، از انبار سطح سند حواله استفاده می‌شود
@@ -2189,6 +2660,14 @@ def post_warehouse_document(
 		raise ApiError("NOT_FOUND", "Warehouse document not found", http_status=404)
 	if wh.status == "posted":
 		return {"id": wh.id, "status": wh.status}
+	if (wh.status or "").strip().lower() == "cancelled":
+		raise ApiError(
+			"NOT_POSTABLE",
+			"حوالهٔ لغوشده قابل قطعی‌سازی نیست",
+			http_status=400,
+		)
+
+	assert_cancel_reversal_postable(db, wh)
 
 	lines = db.query(WarehouseDocumentLine).filter(WarehouseDocumentLine.warehouse_document_id == wh.id).all()
 	if not lines:
@@ -2466,8 +2945,7 @@ def post_warehouse_document(
 		wh.extra_info["accounting_document_id"] = accounting_doc.id
 		db.flush()
 	
-	# توجه: محاسبات COGS و ثبت سطرهای حسابداری در بخش فاکتورها انجام می‌شود
-	# بخش انبارداری فقط مسئولیت مدیریت موجودی فیزیکی را دارد
+	# شناسایی بهای تمام‌شده قطعی روی خطوط فاکتور و ثبت COGS در دفتر کل
 
 	# ورک‌فلو: موجودی کم (reorder_point)
 	try:
@@ -2522,6 +3000,27 @@ def post_warehouse_document(
 			"warehouse_post grni clearance failed wh_id=%s err=%s",
 			getattr(wh, "id", None),
 			grni_err,
+			exc_info=True,
+		)
+
+	try:
+		from app.services.woocommerce_stock_push_hook import (
+			collect_product_ids_from_warehouse_lines,
+			schedule_woocommerce_stock_push_after_warehouse_post,
+		)
+
+		schedule_woocommerce_stock_push_after_warehouse_post(
+			db,
+			business_id=int(business_id),
+			warehouse_document_id=int(wh.id),
+			product_ids=collect_product_ids_from_warehouse_lines(lines),
+			extra_info=wh.extra_info if isinstance(wh.extra_info, dict) else {},
+		)
+	except Exception as woo_push_err:
+		logger.warning(
+			"warehouse_post woocommerce stock push schedule failed wh_id=%s err=%s",
+			getattr(wh, "id", None),
+			woo_push_err,
 			exc_info=True,
 		)
 
@@ -3069,8 +3568,20 @@ def bulk_delete_warehouse_documents(db: Session, business_id: int, doc_ids: List
 	}
 
 
-def cancel_warehouse_document(db: Session, business_id: int, wh_id: int, user_id: int) -> WarehouseDocument:
-	"""لغو حواله posted با ایجاد حواله معکوس."""
+def cancel_warehouse_document(
+	db: Session,
+	business_id: int,
+	wh_id: int,
+	user_id: int,
+	*,
+	seal_reversal: Optional[bool] = None,
+) -> WarehouseDocument:
+	"""لغو حواله posted با ایجاد حواله معکوس.
+
+	برای حواله‌هایی که موجودی از خطوط حواله شمرده می‌شود (دستی، کالای هزینه/درآمد، …)
+	حوالهٔ معکوس به‌صورت cancelled/بایگانی پلمپ می‌شود تا با پست مجدد موجودی دوبار اصلاح نشود.
+	برای حوالهٔ فاکتور، پیش‌فرض draft می‌ماند تا جریان لغو فاکتور بتواند آن را پست کند.
+	"""
 	wh = db.query(WarehouseDocument).filter(WarehouseDocument.id == wh_id).first()
 	if not wh or wh.business_id != business_id:
 		raise ApiError("NOT_FOUND", "Warehouse document not found", http_status=404)
@@ -3097,6 +3608,21 @@ def cancel_warehouse_document(db: Session, business_id: int, wh_id: int, user_id
 		reverse_doc_type = "receipt"
 	# برای transfer و adjustment همان نوع باقی می‌ماند
 
+	do_seal = (
+		should_seal_warehouse_cancel_reversal(db, business_id, wh)
+		if seal_reversal is None
+		else bool(seal_reversal)
+	)
+	reverse_status = "cancelled" if do_seal else "draft"
+	reverse_extra: Dict[str, Any] = {
+		"cancels_warehouse_document_id": wh.id,
+		"cancellation_reason": "لغو حواله",
+		"cancelled_source_type": (wh.source_type or None),
+	}
+	if do_seal:
+		reverse_extra["audit_only_reversal"] = True
+		reverse_extra["stock_already_corrected_by_cancel"] = True
+
 	cancel_wh: Optional[WarehouseDocument] = None
 	for attempt in range(10):
 		code = _generate_warehouse_document_code(db, business_id, wh.document_date)
@@ -3107,17 +3633,14 @@ def cancel_warehouse_document(db: Session, business_id: int, wh_id: int, user_id
 					fiscal_year_id=fy.id,
 					code=code,
 					document_date=wh.document_date,
-					status="draft",  # حواله معکوس به صورت draft ایجاد می‌شود
+					status=reverse_status,
 					doc_type=reverse_doc_type,
 					warehouse_id_from=wh.warehouse_id_to,  # معکوس
 					warehouse_id_to=wh.warehouse_id_from,  # معکوس
 					source_type="manual",
 					source_document_id=wh.id,  # لینک به حواله اصلی
 					created_by_user_id=user_id,
-					extra_info={
-						"cancels_warehouse_document_id": wh.id,
-						"cancellation_reason": "لغو حواله",
-					},
+					extra_info=reverse_extra,
 				)
 				db.add(cancel_wh)
 				db.flush()
@@ -3179,6 +3702,22 @@ def cancel_warehouse_document(db: Session, business_id: int, wh_id: int, user_id
 	# تغییر وضعیت حواله اصلی به cancelled
 	wh.status = "cancelled"
 	wh.touch()
+
+	try:
+		from app.services.invoice_cogs_gl_service import on_warehouse_invoice_cogs_gl_cancel_sync
+
+		on_warehouse_invoice_cogs_gl_cancel_sync(
+			db,
+			source_type=getattr(wh, "source_type", None),
+			source_document_id=getattr(wh, "source_document_id", None),
+		)
+	except Exception as cogs_cancel_err:
+		logger.warning(
+			"invoice_cogs_gl sync after warehouse cancel failed wh_id=%s err=%s",
+			wh.id,
+			cogs_cancel_err,
+			exc_info=True,
+		)
 	
 	db.flush()
 	

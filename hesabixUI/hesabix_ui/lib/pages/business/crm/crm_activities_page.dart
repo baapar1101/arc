@@ -7,6 +7,7 @@ import 'package:hesabix_ui/core/calendar_controller.dart';
 import 'package:hesabix_ui/models/person_model.dart';
 import 'package:hesabix_ui/services/crm_service.dart';
 import 'package:hesabix_ui/services/person_service.dart';
+import 'package:hesabix_ui/services/business_user_service.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/utils/snackbar_helper.dart';
 import 'package:hesabix_ui/widgets/crm/crm_delete_confirm_dialog.dart';
@@ -19,6 +20,8 @@ import 'package:hesabix_ui/widgets/invoice/person_combobox_widget.dart';
 import 'package:hesabix_ui/widgets/permission/permission_widgets.dart';
 import 'package:intl/intl.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
+import 'package:hesabix_ui/core/hesabix_back.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 /// صفحه لیست فعالیت‌های CRM
 class CrmActivitiesPage extends StatefulWidget {
@@ -44,8 +47,14 @@ class _CrmActivitiesPageState extends State<CrmActivitiesPage> {
   List<Map<String, dynamic>> _filterPersons = [];
   int? _filterPersonId;
   String? _filterActivityType;
+  bool _openTasksOnly = false;
   bool _loading = true;
   String? _error;
+
+  List<Map<String, dynamic>> get _visibleItems {
+    if (!_openTasksOnly) return _items;
+    return _items.where((e) => e['is_task'] == true && (e['status'] == null || e['status'] == 'open')).toList();
+  }
 
   static const Map<String, String> _activityTypes = {
     'call': 'تماس',
@@ -138,6 +147,36 @@ class _CrmActivitiesPageState extends State<CrmActivitiesPage> {
 
   String _activityLabel(String type) => _activityTypes[type] ?? type;
 
+  String _priorityLabel(String? priority) {
+    switch (priority) {
+      case 'urgent':
+        return 'فوری';
+      case 'high':
+        return 'زیاد';
+      case 'low':
+        return 'کم';
+      default:
+        return 'معمولی';
+    }
+  }
+
+  Future<void> _completeTask(int id) async {
+    try {
+      await _crmService.updateActivity(
+        businessId: widget.businessId,
+        activityId: id,
+        status: 'done',
+        completedAt: DateTime.now(),
+      );
+      if (!mounted) return;
+      SnackBarHelper.show(context, message: 'تسک تکمیل شد');
+      _load();
+    } catch (e) {
+      if (!mounted) return;
+      SnackBarHelper.show(context, message: 'خطا: ${ErrorExtractor.forContext(e, context)}', isError: true);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (!widget.authStore.canReadSection('crm')) {
@@ -147,12 +186,7 @@ class _CrmActivitiesPageState extends State<CrmActivitiesPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('فعالیت‌ها'),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () {
-            if (context.canPop()) context.pop();
-          },
-        ),
+        leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
         actions: [
           if (widget.authStore.hasBusinessPermission('crm', 'write'))
             IconButton(
@@ -210,6 +244,11 @@ class _CrmActivitiesPageState extends State<CrmActivitiesPage> {
                     },
                   ),
                 ),
+                FilterChip(
+                  label: const Text('فقط تسک‌های باز'),
+                  selected: _openTasksOnly,
+                  onSelected: (v) => setState(() => _openTasksOnly = v),
+                ),
               ],
             ),
           ),
@@ -231,14 +270,14 @@ class _CrmActivitiesPageState extends State<CrmActivitiesPage> {
                           ],
                         ),
                       )
-                    : _items.isEmpty
+                    : _visibleItems.isEmpty
                         ? Center(
                             child: Column(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
                                 Icon(Icons.history, size: 64, color: Theme.of(context).colorScheme.outline),
                                 const SizedBox(height: 16),
-                                const Text('هنوز فعالیتی ثبت نشده است.'),
+                                Text(_openTasksOnly ? 'تسک باز یافت نشد.' : 'هنوز فعالیتی ثبت نشده است.'),
                                 const SizedBox(height: 8),
                                 Text(
                                   'با دکمه افزودن می‌توانید فعالیت جدید (تماس، جلسه، یادداشت و ...) ثبت کنید.',
@@ -252,9 +291,9 @@ class _CrmActivitiesPageState extends State<CrmActivitiesPage> {
                             onRefresh: _load,
                             child: ListView.builder(
                               padding: const EdgeInsets.all(16),
-                              itemCount: _items.length,
+                              itemCount: _visibleItems.length,
                               itemBuilder: (context, index) {
-                                final item = _items[index];
+                                final item = _visibleItems[index];
                                 final type = item['activity_type']?.toString() ?? '';
                                 final code = item['code']?.toString() ?? '';
                                 final subject = item['subject']?.toString() ?? '';
@@ -263,24 +302,67 @@ class _CrmActivitiesPageState extends State<CrmActivitiesPage> {
                                 final dateStr = date != null ? _formatDate(date.toString()) : '';
                                 final typeLabel = _activityLabel(type);
                                 final id = item['id'] as int?;
+                                final isTask = item['is_task'] == true;
+                                final status = item['status']?.toString();
+                                final isOpenTask = isTask && (status == null || status == 'open');
+                                final dueRaw = item['due_at']?.toString();
+                                final dueDt = (dueRaw != null && dueRaw.isNotEmpty) ? DateTime.tryParse(dueRaw) : null;
+                                final overdue = isOpenTask && dueDt != null && dueDt.isBefore(DateTime.now());
+                                final priority = item['priority']?.toString();
+                                final canWrite = widget.authStore.hasBusinessPermission('crm', 'write');
+                                final subtitleParts = <String>[
+                                  if (code.isNotEmpty) code,
+                                  if (desc.isNotEmpty) desc,
+                                  if (dateStr.isNotEmpty) dateStr,
+                                  if (isTask && dueDt != null) 'سررسید: ${_formatDate(dueRaw!)}',
+                                  if (isTask && status == 'done') 'تکمیل‌شده',
+                                ];
                                 return Card(
                                   margin: const EdgeInsets.only(bottom: 8),
                                   child: ListTile(
                                     leading: CircleAvatar(
-                                      backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-                                      child: Icon(_activityIcon(type), color: Theme.of(context).colorScheme.onPrimaryContainer),
+                                      backgroundColor: isTask
+                                          ? (overdue ? SemanticColorResolver.negative(context).withValues(alpha: 0.18) : Theme.of(context).colorScheme.tertiaryContainer)
+                                          : Theme.of(context).colorScheme.primaryContainer,
+                                      child: Icon(
+                                        isTask ? (isOpenTask ? Icons.check_box_outlined : Icons.check_box) : _activityIcon(type),
+                                        color: overdue ? SemanticColorResolver.negative(context) : Theme.of(context).colorScheme.onPrimaryContainer,
+                                      ),
                                     ),
-                                    title: Text(subject.isNotEmpty ? subject : typeLabel),
-                                    subtitle: Text([if (code.isNotEmpty) code, desc.isNotEmpty ? desc : null, dateStr].whereType<String>().join(' · ')),
-                                    trailing: widget.authStore.hasBusinessPermission('crm', 'write')
-                                        ? PopupMenuButton<String>(
-                                            onSelected: (v) {
-                                              if (v == 'edit') _onEdit(item);
-                                              if (v == 'delete' && id != null) _onDelete(id, subject);
-                                            },
-                                            itemBuilder: (_) => [
-                                              const PopupMenuItem(value: 'edit', child: Text('ویرایش')),
-                                              const PopupMenuItem(value: 'delete', child: Text('حذف')),
+                                    title: Row(
+                                      children: [
+                                        Expanded(child: Text(subject.isNotEmpty ? subject : typeLabel)),
+                                        if (isTask && priority != null && priority.isNotEmpty && priority != 'normal')
+                                          Chip(
+                                            label: Text(_priorityLabel(priority), style: TextStyle(fontSize: 11)),
+                                            visualDensity: VisualDensity.compact,
+                                          ),
+                                      ],
+                                    ),
+                                    subtitle: Text(
+                                      subtitleParts.join(' · '),
+                                      style: overdue ? TextStyle(color: SemanticColorResolver.negative(context)) : null,
+                                    ),
+                                    trailing: canWrite
+                                        ? Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              if (isOpenTask)
+                                                IconButton(
+                                                  icon: const Icon(Icons.done),
+                                                  tooltip: 'تکمیل تسک',
+                                                  onPressed: id == null ? null : () => _completeTask(id),
+                                                ),
+                                              PopupMenuButton<String>(
+                                                onSelected: (v) {
+                                                  if (v == 'edit') _onEdit(item);
+                                                  if (v == 'delete' && id != null) _onDelete(id, subject);
+                                                },
+                                                itemBuilder: (_) => [
+                                                  const PopupMenuItem(value: 'edit', child: Text('ویرایش')),
+                                                  const PopupMenuItem(value: 'delete', child: Text('حذف')),
+                                                ],
+                                              ),
                                             ],
                                           )
                                         : null,
@@ -396,11 +478,24 @@ class _ActivityFormDialogState extends State<_ActivityFormDialog> {
   int? _dealId;
   bool _saving = false;
   bool _loadingSuggest = false;
+  bool _isTask = false;
+  DateTime? _dueAt;
+  String _priority = 'normal';
+  String _status = 'open';
+  int? _assignedToUserId;
+  List<Map<String, dynamic>> _businessUsers = [];
 
   @override
   void initState() {
     super.initState();
     final i = widget.initial ?? <String, dynamic>{};
+    _isTask = i['is_task'] == true;
+    final dueRaw = i['due_at']?.toString();
+    if (dueRaw != null && dueRaw.isNotEmpty) _dueAt = DateTime.tryParse(dueRaw);
+    _priority = i['priority']?.toString() ?? 'normal';
+    _status = i['status']?.toString() ?? 'open';
+    _assignedToUserId = (i['assigned_to_user_id'] as num?)?.toInt();
+    _loadBusinessUsers();
     _subjectController = TextEditingController(text: i['subject']?.toString() ?? '');
     _codeController = TextEditingController(text: i['code']?.toString() ?? '');
     _codeAuto = i['id'] == null;
@@ -422,6 +517,17 @@ class _ActivityFormDialogState extends State<_ActivityFormDialog> {
     _dealId = (i['deal_id'] as num?)?.toInt();
     final date = i['activity_date'];
     _activityDate = date != null ? DateTime.tryParse(date.toString()) ?? DateTime.now() : DateTime.now();
+  }
+
+  Future<void> _loadBusinessUsers() async {
+    try {
+      final service = BusinessUserService(ApiClient());
+      final res = await service.getBusinessUsers(widget.businessId);
+      if (!mounted) return;
+      setState(() {
+        _businessUsers = res.users.map((u) => <String, dynamic>{'id': u.userId, 'name': u.userName}).toList();
+      });
+    } catch (_) {}
   }
 
   @override
@@ -655,9 +761,101 @@ class _ActivityFormDialogState extends State<_ActivityFormDialog> {
               ],
             ),
           ),
+          const SizedBox(height: 16),
+          CrmSectionCard(
+            title: 'وظیفه / پیگیری',
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('ثبت به‌عنوان تسک'),
+                  subtitle: const Text('برای پیگیری با سررسید و مسئول'),
+                  value: _isTask,
+                  onChanged: (v) => setState(() => _isTask = v),
+                ),
+                if (_isTask) ...[
+                  const SizedBox(height: 8),
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8), side: BorderSide(color: Theme.of(context).colorScheme.outlineVariant)),
+                    title: Text(_dueAt == null ? 'سررسید: تعیین نشده' : 'سررسید: ${DateFormat('y/MM/dd HH:mm').format(_dueAt!)}'),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        TextButton(
+                          onPressed: _pickDueAt,
+                          child: const Text('انتخاب'),
+                        ),
+                        if (_dueAt != null)
+                          TextButton(
+                            onPressed: () => setState(() => _dueAt = null),
+                            child: const Text('پاک کردن'),
+                          ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<String>(
+                    value: _priority,
+                    decoration: const InputDecoration(labelText: 'اولویت', isDense: true, border: OutlineInputBorder()),
+                    items: const [
+                      DropdownMenuItem(value: 'low', child: Text('کم')),
+                      DropdownMenuItem(value: 'normal', child: Text('معمولی')),
+                      DropdownMenuItem(value: 'high', child: Text('زیاد')),
+                      DropdownMenuItem(value: 'urgent', child: Text('فوری')),
+                    ],
+                    onChanged: (v) => setState(() => _priority = v ?? 'normal'),
+                  ),
+                  const SizedBox(height: 12),
+                  if (_businessUsers.isNotEmpty)
+                    DropdownButtonFormField<int?>(
+                      value: _assignedToUserId,
+                      decoration: const InputDecoration(labelText: 'مسئول', isDense: true, border: OutlineInputBorder()),
+                      items: [
+                        const DropdownMenuItem<int?>(value: null, child: Text('انتخاب نشده')),
+                        ..._businessUsers.map((u) => DropdownMenuItem<int?>(
+                              value: (u['id'] as num?)?.toInt(),
+                              child: Text(u['name']?.toString() ?? ''),
+                            )),
+                      ],
+                      onChanged: (v) => setState(() => _assignedToUserId = v),
+                    ),
+                  if (_businessUsers.isNotEmpty) const SizedBox(height: 12),
+                  DropdownButtonFormField<String>(
+                    value: _status,
+                    decoration: const InputDecoration(labelText: 'وضعیت', isDense: true, border: OutlineInputBorder()),
+                    items: const [
+                      DropdownMenuItem(value: 'open', child: Text('باز')),
+                      DropdownMenuItem(value: 'done', child: Text('تکمیل‌شده')),
+                      DropdownMenuItem(value: 'cancelled', child: Text('لغوشده')),
+                    ],
+                    onChanged: (v) => setState(() => _status = v ?? 'open'),
+                  ),
+                ],
+              ],
+            ),
+          ),
         ],
       ),
     );
+  }
+
+  Future<void> _pickDueAt() async {
+    final picked = await showAdaptiveDatePicker(
+      context: context,
+      calendarController: widget.calendarController,
+      initialDate: _dueAt ?? DateTime.now(),
+      firstDate: DateTime(2000),
+      lastDate: DateTime(2100),
+    );
+    if (picked == null || !mounted) return;
+    final tod = await showTimePicker(
+      context: context,
+      initialTime: _dueAt != null ? TimeOfDay.fromDateTime(_dueAt!) : TimeOfDay.now(),
+    );
+    if (!mounted) return;
+    setState(() => _dueAt = DateTime(picked.year, picked.month, picked.day, tod?.hour ?? 9, tod?.minute ?? 0));
   }
 
   Future<void> _suggestActivityText() async {
@@ -704,6 +902,11 @@ class _ActivityFormDialogState extends State<_ActivityFormDialog> {
           description: _descController.text.trim().isEmpty ? null : _descController.text.trim(),
           activityDate: _activityDate,
           dealId: _dealId,
+          isTask: _isTask,
+          dueAt: _isTask ? _dueAt : null,
+          status: _isTask ? _status : null,
+          priority: _isTask ? _priority : null,
+          assignedToUserId: _isTask ? _assignedToUserId : null,
         );
       } else {
         await widget.crmService.createActivity(
@@ -716,6 +919,11 @@ class _ActivityFormDialogState extends State<_ActivityFormDialog> {
           description: _descController.text.trim().isEmpty ? null : _descController.text.trim(),
           activityDate: _activityDate,
           dealId: _dealId,
+          isTask: _isTask,
+          dueAt: _isTask ? _dueAt : null,
+          status: _isTask ? _status : null,
+          priority: _isTask ? _priority : null,
+          assignedToUserId: _isTask ? _assignedToUserId : null,
         );
       }
       if (!mounted) return;

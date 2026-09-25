@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:hesabix_ui/config/brand_config.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 
 String formatWooInteger(BuildContext context, Object? value) {
@@ -136,7 +137,7 @@ String wooBridgeFieldTitle(AppLocalizations t, String key) {
     case 'wp_version':
       return t.wooBridgeFieldWpVersion;
     case 'plugin_version':
-      return t.wooBridgeFieldPluginVersion;
+      return t.branded(t.wooBridgeFieldPluginVersion);
     case 'site_url':
       return t.wooBridgeFieldSiteUrl;
     case 'bridge_enabled':

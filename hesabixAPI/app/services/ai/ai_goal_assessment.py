@@ -1,9 +1,8 @@
 """
-ارزیابی میانی هدف agent — ادامهٔ هوشمند + ضد loop.
+ارزیابی میانی هدف agent — ادامهٔ evidence-based + ضد loop.
 
-پس از هر نوبت tool، سیستم بررسی می‌کند آیا به هدف رسیده‌ایم یا نه.
-اگر نه و بودجه تمام شده باشد، تا سقف مطلق تمدید می‌شود؛
-تکرار همان tool+args مانع تمدید و ادامه می‌شود.
+Plan C: تصمیم continue/stop فقط از tool evidence، نوع سوال، و session todos —
+بدون regex یا heuristic طول متن.
 """
 from __future__ import annotations
 
@@ -12,19 +11,56 @@ import json
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional, TYPE_CHECKING
 
-from app.services.ai.ai_constants import AGENT_MAX_IDENTICAL_TOOL_REPEATS
-from app.services.ai.ai_budget import AgentBudget, BudgetStatus, STOP_REASON_ITERATIONS
+from app.services.ai.ai_agent_continuation import (
+    assess_text_round_evidence,
+    resolve_needs_tools,
+)
+from app.services.ai.ai_constants import (
+    AGENT_MAX_IDENTICAL_TOOL_FAILURES,
+    AGENT_MAX_IDENTICAL_TOOL_REPEATS,
+)
+from app.services.ai.ai_budget import AgentBudget, BudgetStatus, STOP_REASON_ITERATIONS, STOP_REASON_UNPRODUCTIVE
 from app.services.ai.ai_exploration_service import (
     ExplorationBundle,
     ObservationStore,
     ToolObservation,
     assess_tool_round_productivity,
     build_thought_markdown_rule_based,
+    observation_store_has_evidence,
     should_continue_exploring,
 )
 
 if TYPE_CHECKING:
     from app.services.ai.ai_session_todo_service import SessionTodoGoalState
+
+
+def classify_tool_result_outcome(result: Any) -> str:
+    """ok / error / empty / approval — برای معافیت تکرار پس از شکست (AGT-08)."""
+    if result is None:
+        return "empty"
+    if isinstance(result, str) and not result.strip():
+        return "empty"
+    if isinstance(result, list):
+        return "ok" if result else "empty"
+    if not isinstance(result, dict):
+        return "ok"
+
+    err = result.get("error")
+    if err == "APPROVAL_REQUIRED":
+        return "approval"
+    if err:
+        return "error"
+
+    from app.services.ai.ai_tool_result import extract_record_list
+
+    records, _ = extract_record_list(result)
+    if records:
+        return "ok"
+    for key in ("message", "summary", "total", "ok", "success", "note"):
+        val = result.get(key)
+        if val not in (None, "", [], {}):
+            return "ok"
+    return "empty"
 
 
 @dataclass
@@ -44,6 +80,7 @@ class ToolCallTracker:
 
     def __init__(self) -> None:
         self._counts: Dict[str, int] = {}
+        self._failures: Dict[str, int] = {}
 
     @staticmethod
     def fingerprint(tool_name: str, arguments: Any) -> str:
@@ -55,22 +92,43 @@ class ToolCallTracker:
         )
         return hashlib.sha256(canonical.encode()).hexdigest()[:16]
 
-    def record(self, function_calls: List[Dict[str, Any]]) -> int:
-        """تعداد فراخوانی‌هایی که از آستانهٔ تکرار عبور کرده‌اند."""
+    def record(
+        self,
+        function_calls: List[Dict[str, Any]],
+        *,
+        function_results: Optional[Dict[str, Any]] = None,
+        lookup_result: Optional[Callable[[Dict[str, Any], Dict[str, Any]], Any]] = None,
+    ) -> int:
         over_limit = 0
         for call in function_calls:
             fp = self.fingerprint(
                 call.get("name", "unknown"),
                 call.get("arguments", {}),
             )
+            outcome = "ok"
+            if lookup_result is not None and function_results is not None:
+                outcome = classify_tool_result_outcome(
+                    lookup_result(function_results, call)
+                )
+            if outcome in ("error", "empty", "approval"):
+                self._failures[fp] = self._failures.get(fp, 0) + 1
+                if self._failures[fp] > AGENT_MAX_IDENTICAL_TOOL_FAILURES:
+                    over_limit += 1
+                continue
             self._counts[fp] = self._counts.get(fp, 0) + 1
             if self._counts[fp] > AGENT_MAX_IDENTICAL_TOOL_REPEATS:
                 over_limit += 1
         return over_limit
 
     def has_loop(self) -> bool:
+        if any(
+            count > AGENT_MAX_IDENTICAL_TOOL_REPEATS
+            for count in self._counts.values()
+        ):
+            return True
         return any(
-            count > AGENT_MAX_IDENTICAL_TOOL_REPEATS for count in self._counts.values()
+            count > AGENT_MAX_IDENTICAL_TOOL_FAILURES
+            for count in self._failures.values()
         )
 
 
@@ -92,7 +150,11 @@ class AgentGoalTracker:
         session_todo_state: Optional["SessionTodoGoalState"] = None,
     ) -> RoundAssessment:
         self.last_session_todo_state = session_todo_state
-        self.tool_tracker.record(function_calls)
+        self.tool_tracker.record(
+            function_calls,
+            function_results=function_results,
+            lookup_result=lookup_result,
+        )
         loop_detected = self.tool_tracker.has_loop()
         productive = assess_tool_round_productivity(
             function_calls, function_results, lookup_result
@@ -171,6 +233,53 @@ class AgentGoalTracker:
                 reason_fa=hypothesis,
             )
 
+        self.last_assessment = assessment
+        return assessment
+
+    def assess_after_text_round(
+        self,
+        round_text: str,
+        *,
+        user_query: Optional[str] = None,
+        observation_store: Optional[ObservationStore] = None,
+        needs_tools: bool = True,
+        history_messages: Optional[List[dict]] = None,
+        tools_enabled: bool = True,
+    ) -> RoundAssessment:
+        """ارزیابی پس از پاسخ متنی بدون tool call — evidence-based (Plan C)."""
+        from app.services.ai.ai_tool_catalog import is_tool_discovery_query
+
+        if not tools_enabled:
+            needs_tools = False
+        elif needs_tools:
+            needs_tools = resolve_needs_tools(
+                user_query,
+                history_messages,
+                tools_enabled=True,
+            )
+
+        prior = self.last_assessment
+        evidence = assess_text_round_evidence(
+            round_text=round_text,
+            user_query=user_query,
+            observation_store=observation_store,
+            needs_tools=needs_tools,
+            tool_discovery=is_tool_discovery_query(user_query),
+            session_has_open_todos=bool(
+                self.last_session_todo_state
+                and self.last_session_todo_state.has_open
+            ),
+            prior_goal_reached=bool(prior and prior.goal_reached),
+            prior_should_continue=bool(prior and prior.should_continue),
+            prior_loop_detected=bool(prior and prior.loop_detected),
+        )
+
+        assessment = RoundAssessment(
+            goal_reached=evidence.goal_reached,
+            should_continue=evidence.should_continue,
+            confidence="high" if evidence.goal_reached else "medium",
+            reason_fa=evidence.reason_fa,
+        )
         self.last_assessment = assessment
         return assessment
 
@@ -260,7 +369,6 @@ class AgentGoalTracker:
 def try_extend_budget_for_goal(
     budget: AgentBudget, assessment: Optional[RoundAssessment]
 ) -> bool:
-    """تمدید بودجه وقتی هدف محقق نشده و به سقف نوبت رسیده‌ایم."""
     if assessment is None or assessment.loop_detected:
         return False
     if assessment.goal_reached or not assessment.should_continue:
@@ -273,11 +381,15 @@ def resolve_budget_gate(
     iteration: int,
     goal_tracker: Optional[AgentGoalTracker],
 ) -> BudgetStatus:
-    """بررسی بودجه با امکان تمدید پویا پیش از توقف."""
     status = budget.check(iteration)
-    if status.stop and status.reason == STOP_REASON_ITERATIONS:
+    if status.stop and status.reason in (
+        STOP_REASON_ITERATIONS,
+        STOP_REASON_UNPRODUCTIVE,
+    ):
         assessment = goal_tracker.last_assessment if goal_tracker else None
         if try_extend_budget_for_goal(budget, assessment):
+            if status.reason == STOP_REASON_UNPRODUCTIVE:
+                budget.unproductive_rounds = 0
             return BudgetStatus(stop=False)
     return status
 
@@ -289,33 +401,42 @@ def should_agent_continue_after_text_round(
     exploration_enabled: bool,
     iteration: int,
     budget: AgentBudget,
+    round_text: str = "",
+    user_query: Optional[str] = None,
+    history_messages: Optional[List[dict]] = None,
+    needs_tools: bool = True,
+    tools_enabled: bool = True,
 ) -> bool:
-    """ادامه پس از پاسخ متنی مدل (بدون tool call)."""
+    """ادامه پس از پاسخ متنی — evidence-based، بدون regex/LLM."""
+    if goal_tracker is None:
+        return False
+
+    assessment = goal_tracker.assess_after_text_round(
+        round_text,
+        user_query=user_query,
+        observation_store=observation_store,
+        needs_tools=needs_tools,
+        history_messages=history_messages,
+        tools_enabled=tools_enabled,
+    )
+
     if budget.remaining_iterations(iteration) <= 0:
-        assessment = goal_tracker.last_assessment if goal_tracker else None
         if (
             exploration_enabled
             and observation_store is not None
             and should_continue_exploring(
-                observation_store, iteration, budget.max_iterations
+                observation_store,
+                iteration,
+                budget.max_iterations,
             )
         ):
             return budget.try_extend()
         return try_extend_budget_for_goal(budget, assessment)
 
-    if exploration_enabled and observation_store is not None:
-        return should_continue_exploring(
-            observation_store, iteration, budget.max_iterations
-        )
+    if assessment.loop_detected:
+        return False
 
-    if goal_tracker and goal_tracker.last_assessment:
-        last = goal_tracker.last_assessment
-        if last.should_continue and not last.loop_detected:
-            return True
-
-    if goal_tracker and goal_tracker.last_session_todo_state:
-        state = goal_tracker.last_session_todo_state
-        if state.has_open:
-            return budget.try_extend() if budget.remaining_iterations(iteration) <= 0 else True
+    if assessment.should_continue and not assessment.goal_reached:
+        return iteration < budget.max_iterations
 
     return False

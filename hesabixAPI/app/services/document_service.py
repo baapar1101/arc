@@ -570,6 +570,12 @@ def create_manual_document(
             "description": line.get("description"),
             "extra_info": line.get("extra_info"),
         }
+        if line.get("exchange_rate") is not None:
+            line_dict["exchange_rate"] = line.get("exchange_rate")
+        if line.get("debit_base") is not None:
+            line_dict["debit_base"] = line.get("debit_base")
+        if line.get("credit_base") is not None:
+            line_dict["credit_base"] = line.get("credit_base")
         lines_for_db.append(line_dict)
     
     # اعتبارسنجی پروژه (اگر ارسال شده باشد)

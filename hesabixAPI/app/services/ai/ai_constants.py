@@ -11,12 +11,19 @@ AI_OPERATION_CHAT = "chat"
 AI_OPERATION_TITLE = "title"
 AI_OPERATION_HISTORY_SUMMARY = "history_summary"
 AI_OPERATION_THOUGHT = "thought_synthesis"
+AI_OPERATION_SUBAGENT = "subagent"
+AI_OPERATION_MEMORY_CURATE = "memory_curate"
 
 LIGHT_AI_OPERATIONS: frozenset[str] = frozenset({
     AI_OPERATION_TITLE,
     AI_OPERATION_HISTORY_SUMMARY,
     AI_OPERATION_THOUGHT,
+    AI_OPERATION_MEMORY_CURATE,
 })
+
+# timeout ارتباط با AI Provider (ثانیه)
+AI_PROVIDER_TIMEOUT_SEC = 120.0
+AI_PROVIDER_STREAM_TIMEOUT_SEC = 180.0
 
 # حداکثر نوبت LLM ↔ tool در یک پاسخ (پیش‌فرض)
 MAX_AGENT_ITERATIONS = 8
@@ -30,11 +37,78 @@ QUERY_COMPLEXITY_ITERATIONS: dict[str, int] = {
 
 # حداکثر ابزار ارسالی به مدل در هر درخواست (پس از intent filter)
 MAX_TOOLS_PER_REQUEST = 48
+# حالت خودکار/با تأیید: کاتالوگ کامل تا سقف ایمنی ارائه‌دهنده؛
+# ابزارهای نوشتنی هرگز به‌خاطر ranking حذف نمی‌شوند.
+MAX_TOOLS_AUTONOMOUS = 128
+# سقف مطلق Discovery — Consumer نمی‌تواند کل کاتالوگ نامحدود را بخواهد.
+DISCOVERY_HARD_MAX = 256
+
+# Progressive schema loading: construction/dedup always on.
+# Sending a smaller initial schema set than Discovery K is eval/opt-in.
+# Production Discovery K stays 48/128.
+PROGRESSIVE_SCHEMA_LOADING = False
+PROGRESSIVE_SCHEMA_INITIAL_K = 15
+# Adaptive Top-K after ranking. Production stays fixed 48/128 until rollout.
+ADAPTIVE_DISCOVERY_K = False
+# Independent canary percent: 0, 5, 10, 25, 50, 100. Does not turn the global flag on.
+ADAPTIVE_K_ROLLOUT_PERCENT = 0
+ADAPTIVE_K_CANARY_SALT = "adaptive-k-v1"
+# Do not promote from Gold alone; need this many live discovery requests per arm.
+ADAPTIVE_K_MIN_LIVE_SAMPLES = 500
+# Hybrid lexical+semantic add-on. Default ranker stays keyword/intent.
+HYBRID_TOOL_DISCOVERY = False
+# Derived inverted index → candidate N → existing ranker.
+# False = not 100%. Percent canary is independent. Set False + percent 0, or
+# HESABIX_INDEXED_CANDIDATE_KILL=1, to stop canary without touching Adaptive K.
+INDEXED_CANDIDATE_RETRIEVAL = False
+# First live canary. Allowed: 0, 5, 10, 25, 50, 100. Does not enable Adaptive K.
+INDEXED_CANDIDATE_ROLLOUT_PERCENT = 5
+INDEXED_CANDIDATE_CANARY_SALT = "indexed-retrieval-v1"
+INDEXED_CANDIDATE_MIN_LIVE_SAMPLES = 500
+INDEXED_CANDIDATE_KILL_SWITCH = False
+# Default N is eval-calibrated; Gold sweep overwrites if a smaller N hits 99%.
+CANDIDATE_RETRIEVAL_N = 100
+# Canary: empty / weak / inconsistent index → full authorized ranker, never fail open.
+INDEXED_CANDIDATE_FALLBACK = True
+# Channel names forced to control without killing the whole canary. Empty = none.
+# Runtime: HESABIX_INDEXED_CANDIDATE_CHANNEL_HOLD=ticket,crm
+INDEXED_CANDIDATE_CHANNEL_HOLD: tuple = ()
+# Optional ANN candidate generator. Never replaces keyword retrieval.
+VECTOR_CANDIDATE_RETRIEVAL = False
+# Refuse O(N) hashed-ngram scan above this authorized-set size.
+VECTOR_BRUTE_FORCE_MAX = 512
+# off | eval | canary | majority | full — never bypasses PROGRESSIVE_SCHEMA_LOADING.
+PROGRESSIVE_ROLLOUT_STAGE = "off"
+PROGRESSIVE_CANARY_PERCENT = 5
+MAX_DISCOVERY_RETRIES = 1
+
+# سقف همزمانی ابزارهای read-only در یک نوبت (writeها همیشه سریال‌اند)
+MAX_PARALLEL_READ_TOOLS = 4
+
+# سقف subagent موقت (AGT-06) — فقط چت درون‌برنامه
+MAX_SUBAGENTS_PER_PARENT = 2
+MAX_SUBAGENT_ITERATIONS = 4
+SUBAGENT_TIMEOUT_SEC = 90.0
+# providerهایی که tool_choice اجباری را به API می‌فرستند
+PROVIDERS_WITH_FORCED_TOOLS = frozenset({"openai", "anthropic"})
+
+# بافر SSE برای Last-Event-ID — حافظه + Redis در صورت فعال بودن
+SSE_EVENT_BUFFER_MAX = 400
+SSE_EVENT_BUFFER_TTL_SEC = 15 * 60
+SSE_EVENT_REDIS_KEY_PREFIX = "hesabix:ai:sse:"
+SSE_SCHEMA_VERSION = 1
+# اگر producer روی این worker نباشد، RUNNING تازه یعنی هنوز زنده است
+LIVE_RUN_STALE_SEC = 180
+# کلاینت اگر به این مدت heartbeat نبیند استریم را fail می‌کند
+SSE_CLIENT_STALL_SEC = 20
 
 # محدودیت پیام‌ها برای context
 MAX_HISTORY_MESSAGES = 40
 MAX_SINGLE_MESSAGE_CHARS = 12_000
 MAX_SYSTEM_PROMPT_CHARS = 32_000
+
+# دروازهٔ CI برای suite طلایی آفلاین (بدون فراخوانی مدل زنده)
+MIN_OFFLINE_EVAL_PASS_RATE = 100
 
 # بودجهٔ تخمینی توکن ورودی (قبل از ارسال به مدل)
 CONTEXT_INPUT_TOKEN_BUDGET = 28_000
@@ -43,12 +117,26 @@ CONTEXT_KEEP_RECENT_MESSAGES = 24
 CONTEXT_KEEP_HEAD_MESSAGES = 4
 
 # حافظه بلندمدت — فاصلهٔ به‌روزرسانی خودکار (پیام کاربر)
+# منسوخ: یادگیری regex دیگر در مسیر production صدا زده نمی‌شود.
 AUTO_SUMMARIZE_USER_MESSAGE_INTERVAL = 6
 MAX_MEMORY_FEEDBACK_UPDATES_PER_DAY = 8
 MAX_LLM_SUMMARIZE_PER_USER_DAY = 24
+MAX_LLM_MEMORY_CURATE_PER_USER_DAY = 80
+MEMORY_CURATE_MAX_OPS = 4
+MEMORY_CURATE_MIN_CONFIDENCE = 0.55
+MEMORY_CURATE_MAX_TOKENS = 500
+MEMORY_ALWAYS_KIND_CHAR_BUDGET = 2200
+MEMORY_RECALL_KIND_CHAR_BUDGET = 1400
+MEMORY_RECALL_MAX_ITEMS = 12
+
+# سقف صفحه‌بندی ابزارهای لیست (هم‌تراز QueryInfo.le=100)
+AI_LIST_TAKE_MAX = 100
+AI_LIST_TAKE_DEFAULT = 50
 
 # حداکثر طول JSON نتیجه tool در پیام role=tool
 MAX_TOOL_RESULT_JSON_CHARS = 6_000
+# سقف ردیف در envelope ارسالی به مدل (بقیه در summary.total)
+MAX_TOOL_RESULT_RECORDS = 15
 
 # کش بینش کسب‌وکار در prompt (ثانیه)
 INSIGHTS_CACHE_TTL_SEC = 300
@@ -72,6 +160,23 @@ MAX_LLM_RETRIES = 3
 MAX_MEMORY_ITEMS_PER_USER = 200
 MAX_MEMORY_ITEM_CONTENT_CHARS = 2048
 MEMORY_AUTO_APPROVE_CATEGORIES = frozenset({"fact", "term", "preference"})
+MEMORY_KINDS = frozenset({
+    "instruction",
+    "identity",
+    "preference",
+    "context",
+    "goal",
+    "constraint",
+})
+MEMORY_ALWAYS_KINDS = frozenset({"instruction", "identity", "preference", "constraint"})
+MEMORY_RECALL_KINDS = frozenset({"context", "goal"})
+MEMORY_CURATOR_AUTO_KINDS = frozenset({
+    "identity",
+    "preference",
+    "context",
+    "goal",
+    "constraint",
+})
 
 # Exploration mode
 EXPLORATION_COMPLEXITY_ITERATIONS: dict[str, int] = {
@@ -108,8 +213,10 @@ MAX_UNPRODUCTIVE_ROUNDS = 2
 AGENT_BUDGET_EXTENSIONS_MAX = 2
 AGENT_BUDGET_EXTENSION_ITERATIONS = 2
 AGENT_BUDGET_ABSOLUTE_MAX_ITERATIONS = 15
-# بیش از این تکرار همان tool+args → تشخیص loop و توقف تمدید
+# بیش از این تکرار همان tool+args با نتیجهٔ موفق → تشخیص loop و توقف تمدید
 AGENT_MAX_IDENTICAL_TOOL_REPEATS = 1
+# تکرار همان فراخوانی وقتی نتیجه خطا/خالی است؛ سومی حلقه محسوب می‌شود
+AGENT_MAX_IDENTICAL_TOOL_FAILURES = 2
 
 # ---- کنترل استدلال درون‌مدلی (reasoning effort) ----
 # سطوح مجاز تلاش استدلال برای مدل‌های reasoning (OpenAI o-series/gpt-5 و Anthropic).
@@ -135,3 +242,22 @@ REASONING_EFFORT_BY_COMPLEXITY: dict[str, str] = {
 
 # حداکثر انتظار برای هر loader زمینهٔ prompt (ثانیه)
 PROMPT_LOADER_TIMEOUT_SEC = 4.0
+
+# حداکثر انتظار برای نوبت اضطراری «سنتز اجباری» (بدون ابزار) وقتی حلقه با
+# شواهد explored/thought اما بدون پاسخ متنی تمام شده است (Phase 1).
+FORCED_SYNTHESIS_TIMEOUT_SEC = 25.0
+
+# حداقل طول پاسخ متنی برای «کافی بودن» بدون فراخوانی ابزار (agent loop)
+SUBSTANTIVE_TEXT_MIN_CHARS = 160
+# پاسخ کوتاه‌تر از این — ممکن است یک نوبت دیگر مجاز باشد
+TEXT_ANSWER_SHORT_THRESHOLD_CHARS = 80
+
+# ---- Prompt Caching (Provider-level) ----
+# فعال‌سازی cache_control (Anthropic) و prompt_cache_key (OpenAI)
+PROMPT_CACHE_ENABLED = True
+# حداقل توکن تخمینی prefix ثابت برای فعال‌سازی (Anthropic Sonnet ≈1024)
+PROMPT_CACHE_MIN_STATIC_TOKENS = 1024
+# TTL Anthropic: "5m" (پیش‌فرض) یا "1h"
+ANTHROPIC_PROMPT_CACHE_TTL = "5m"
+# OpenAI extended retention: "in_memory" (پیش‌فرض) یا "24h"
+OPENAI_PROMPT_CACHE_RETENTION = "in_memory"

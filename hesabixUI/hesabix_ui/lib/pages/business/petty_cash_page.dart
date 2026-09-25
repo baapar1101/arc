@@ -15,6 +15,7 @@ import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../utils/number_formatters.dart';
 import '../../services/list_filter_preferences_service.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 class PettyCashPage extends StatefulWidget {
 	final int businessId;
@@ -243,7 +244,7 @@ class _PettyCashPageState extends State<PettyCashPage> {
 						DataTableAction(
 							icon: Icons.delete,
 							label: t.delete,
-							color: Colors.red,
+							color: SemanticColorResolver.negative(context),
 							onTap: (row) => _delete(row),
 						),
 					],

@@ -65,7 +65,6 @@ class Hesabix_V2_Mapper
 			'item_type' => $product->is_virtual() ? 'خدمت' : 'کالا',
 			'main_unit' => 'عدد',
 			'base_sales_price' => $sell_price,
-			'base_purchase_price' => null,
 			'barcode' => Hesabix_V2_Validation::sanitize_barcode($product->get_sku()),
 			'category_id' => $category_id,
 			'track_inventory' => $product->managing_stock(),
@@ -126,7 +125,6 @@ class Hesabix_V2_Mapper
 			'item_type' => $variation->is_virtual() ? 'خدمت' : 'کالا',
 			'main_unit' => 'عدد',
 			'base_sales_price' => $sell_price,
-			'base_purchase_price' => null,
 			'barcode' => Hesabix_V2_Validation::sanitize_barcode($variation->get_sku()),
 			'category_id' => $category_id,
 			'track_inventory' => $variation->managing_stock(),
@@ -580,24 +578,32 @@ class Hesabix_V2_Mapper
 				continue;
 			}
 
-			$variation_id = $item->get_variation_id();
-			$product_id = $variation_id ?: $item->get_product_id();
+			$variation_id = absint($item->get_variation_id());
+			$parent_id = absint($item->get_product_id());
 
-			$hesabix_product_id = $db_service->get_hesabix_id(
-				'product',
-				$product_id,
-				$variation_id ? $item->get_product_id() : null
-			);
+			if ($variation_id > 0) {
+				$hesabix_product_id = $db_service->get_hesabix_id('product', $variation_id, $parent_id);
+				$sync_product_id = $parent_id;
+				$sync_variation_id = $variation_id;
+				$log_wc_id = $variation_id;
+			} else {
+				$hesabix_product_id = $db_service->get_hesabix_id('product', $parent_id, null);
+				$sync_product_id = $parent_id;
+				$sync_variation_id = null;
+				$log_wc_id = $parent_id;
+			}
 
 			if (!$hesabix_product_id) {
 				$sync_service = new Hesabix_V2_Sync_Service();
-				$sync_result = $sync_service->sync_product($product_id, $variation_id, $order->get_currency());
-				if ($sync_result['success']) {
+				$sync_result = $sync_service->sync_product($sync_product_id, $sync_variation_id, $order->get_currency());
+				if (!empty($sync_result['success']) && !empty($sync_result['hesabix_id'])) {
 					$hesabix_product_id = $sync_result['hesabix_id'];
 				} else {
 					Hesabix_V2_Log_Service::warning('Product not synced, skipping from invoice', array(
-						'wc_product_id' => $product_id,
+						'wc_product_id' => $log_wc_id,
+						'wc_parent_id' => $variation_id > 0 ? $parent_id : null,
 						'order_id' => $order->get_id(),
+						'message' => isset($sync_result['message']) ? (string) $sync_result['message'] : '',
 					));
 					continue;
 				}

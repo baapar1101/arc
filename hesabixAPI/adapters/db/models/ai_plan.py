@@ -12,6 +12,7 @@ class AIPlanType(str, enum.Enum):
     SUBSCRIPTION = "subscription"
     PAY_AS_GO = "pay_as_go"
     HYBRID = "hybrid"
+    BYOK = "byok"  # ارائه‌دهنده اختصاصی کسب‌وکار؛ هزینه LLM با مالک
 
 
 class AIPlan(Base):

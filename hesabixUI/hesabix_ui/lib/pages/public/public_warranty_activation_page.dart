@@ -7,6 +7,7 @@ import '../../models/warranty_models.dart';
 import '../../core/api_client.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 class PublicWarrantyActivationPage extends StatefulWidget {
   final int businessId;
@@ -251,7 +252,7 @@ class _PublicWarrantyActivationPageState extends State<PublicWarrantyActivationP
         Icon(
           Icons.check_circle,
           size: 80,
-          color: Colors.green,
+          color: SemanticColorResolver.positive(context),
         ),
         const SizedBox(height: 24),
         Text(

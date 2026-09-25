@@ -19,19 +19,28 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.add_column(
-        "ai_models",
-        sa.Column(
-            "supports_reasoning",
-            sa.Boolean(),
-            nullable=False,
-            server_default=sa.text("false"),
-        ),
-    )
-    op.add_column(
-        "ai_models",
-        sa.Column("reasoning_effort", sa.String(20), nullable=True),
-    )
+    bind = op.get_bind()
+    if bind is None:
+        return
+
+    insp = sa.inspect(bind)
+    ai_model_columns = {col["name"] for col in insp.get_columns("ai_models")}
+
+    if "supports_reasoning" not in ai_model_columns:
+        op.add_column(
+            "ai_models",
+            sa.Column(
+                "supports_reasoning",
+                sa.Boolean(),
+                nullable=False,
+                server_default=sa.text("false"),
+            ),
+        )
+    if "reasoning_effort" not in ai_model_columns:
+        op.add_column(
+            "ai_models",
+            sa.Column("reasoning_effort", sa.String(20), nullable=True),
+        )
 
 
 def downgrade() -> None:

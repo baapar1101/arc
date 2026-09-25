@@ -28,6 +28,52 @@ if (!defined('WPINC')) {
 		</ul>
 	</div>
 
+	<div class="hesabix-v2-card hesabix-v2-orphan-cleanup" style="margin:12px 0;">
+		<h2 style="margin-top:0;"><?php esc_html_e('پاک‌سازی کالاهای یتیم (والد متغیر)', 'hesabix-v2'); ?></h2>
+		<p class="description">
+			<?php esc_html_e('اگر قبلاً محصول متغیر به‌اشتباه به‌عنوان یک کالای ساده در حسابیکس ساخته شده، اینجا می‌توانید آن‌ها را پیدا کنید. فقط کالاهایی که در فاکتور/سند/انبار استفاده نشده‌اند حذف می‌شوند؛ در غیر این صورت فقط غیرفعال می‌شوند.', 'hesabix-v2'); ?>
+		</p>
+		<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:10px 0;">
+			<button type="button" class="button" id="hesabix-v2-orphans-scan" <?php disabled(!get_option('hesabix_v2_enabled')); ?>>
+				<?php esc_html_e('اسکن کاندیداها', 'hesabix-v2'); ?>
+			</button>
+			<label style="margin-inline-start:4px;">
+				<input type="checkbox" id="hesabix-v2-orphans-include-heuristic" value="1" />
+				<?php esc_html_e('شامل تشخیص نام (سطح متوسط — نیاز به تأیید)', 'hesabix-v2'); ?>
+			</label>
+		</div>
+		<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:10px 0;">
+			<button type="button" class="button" id="hesabix-v2-orphans-dry-run" disabled>
+				<?php esc_html_e('پیش‌نمایش انتخاب‌شده‌ها', 'hesabix-v2'); ?>
+			</button>
+			<button type="button" class="button button-primary" id="hesabix-v2-orphans-cleanup" disabled>
+				<?php esc_html_e('پاک‌سازی امن انتخاب‌شده‌ها', 'hesabix-v2'); ?>
+			</button>
+			<label style="margin-inline-start:4px;">
+				<input type="checkbox" id="hesabix-v2-orphans-allow-medium" value="1" />
+				<?php esc_html_e('اجازهٔ پاک‌سازی سطح متوسط', 'hesabix-v2'); ?>
+			</label>
+		</div>
+		<div id="hesabix-v2-orphans-summary" class="description" style="margin:8px 0;"></div>
+		<div id="hesabix-v2-orphans-table-wrap" style="overflow:auto;max-height:360px;display:none;">
+			<table class="widefat striped" id="hesabix-v2-orphans-table">
+				<thead>
+					<tr>
+						<td class="check-column"><input type="checkbox" id="hesabix-v2-orphans-select-all" /></td>
+						<th><?php esc_html_e('شناسه حسابیکس', 'hesabix-v2'); ?></th>
+						<th><?php esc_html_e('محصول ووکامرس', 'hesabix-v2'); ?></th>
+						<th><?php esc_html_e('سطح', 'hesabix-v2'); ?></th>
+						<th><?php esc_html_e('منبع', 'hesabix-v2'); ?></th>
+						<th><?php esc_html_e('وضعیت', 'hesabix-v2'); ?></th>
+						<th><?php esc_html_e('توضیح', 'hesabix-v2'); ?></th>
+					</tr>
+				</thead>
+				<tbody></tbody>
+			</table>
+		</div>
+		<div id="hesabix-v2-orphans-feedback" class="hesabix-v2-orders-feedback" aria-live="polite" style="margin-top:8px;"></div>
+	</div>
+
 	<div class="hesabix-v2-products-toolbar hesabix-v2-card" style="margin:12px 0;display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
 		<button type="button" class="button button-primary" id="hesabix-v2-products-bulk-sync" <?php disabled(!get_option('hesabix_v2_enabled')); ?>>
 			<?php esc_html_e('همگام‌سازی انتخاب‌شده‌ها با حسابیکس', 'hesabix-v2'); ?>

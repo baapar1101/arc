@@ -5,9 +5,15 @@ import '../../controllers/product_form_controller.dart';
 import 'sections/product_basic_info_section.dart';
 import 'sections/product_pricing_inventory_section.dart';
 import 'sections/product_tax_section.dart';
+import 'sections/product_supply_network_section.dart';
 import 'sections/product_bom_section.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../utils/responsive_helper.dart';
+import '../../utils/general_barcode_utils.dart';
+import '../../utils/error_extractor.dart';
+import '../../services/marketplace_service.dart';
+import '../barcode_label/label_print_job_dialog.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 class ProductFormDialog extends StatefulWidget {
   final int businessId;
@@ -170,7 +176,7 @@ class _ProductFormDialogState extends State<ProductFormDialog> {
   Widget _buildFormContent() {
     final isMobile = ResponsiveHelper.isMobile(context);
     return DefaultTabController(
-      length: 4,
+      length: 5,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -185,6 +191,7 @@ class _ProductFormDialogState extends State<ProductFormDialog> {
                   _buildBasicInfoTab(),
                   _buildPricingInventoryTab(),
                   _buildTaxTab(),
+                  _buildSupplyNetworkTab(),
                   _buildBomTab(),
                 ],
               ),
@@ -205,6 +212,7 @@ class _ProductFormDialogState extends State<ProductFormDialog> {
         Tab(text: t.productGeneralInfo),
         Tab(text: t.pricingAndInventory),
         Tab(text: t.tax),
+        const Tab(text: 'شبکهٔ تأمین'),
         const Tab(text: 'فرمول تولید'),
       ],
     );
@@ -248,6 +256,8 @@ class _ProductFormDialogState extends State<ProductFormDialog> {
         },
         controller: _controller,
         productId: widget.product?['id'] as int?,
+        authStore: widget.authStore,
+        isMultiCurrency: widget.authStore.isMultiCurrency,
       ),
     );
   }
@@ -261,6 +271,20 @@ class _ProductFormDialogState extends State<ProductFormDialog> {
         onChanged: _controller.updateFormData,
         taxTypes: _controller.taxTypes,
         taxUnits: _controller.taxUnits,
+      ),
+    );
+  }
+
+  Widget _buildSupplyNetworkTab() {
+    final isMobile = ResponsiveHelper.isMobile(context);
+    return SingleChildScrollView(
+      padding: EdgeInsets.symmetric(horizontal: isMobile ? 4 : 8, vertical: 8),
+      child: ProductSupplyNetworkSection(
+        businessId: widget.businessId,
+        formData: _controller.formData,
+        onChanged: _controller.updateFormData,
+        controller: _controller,
+        authStore: widget.authStore,
       ),
     );
   }
@@ -282,15 +306,15 @@ class _ProductFormDialogState extends State<ProductFormDialog> {
       margin: const EdgeInsets.only(top: 16),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.red.shade50,
-        border: Border.all(color: Colors.red.shade200),
+        color: SemanticColorResolver.negative(context).withValues(alpha: 0.12),
+        border: Border.all(color: SemanticColorResolver.negative(context).withValues(alpha: 0.35)),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(Icons.error_outline, color: Colors.red.shade600, size: 20),
-          const SizedBox(width: 8),
+          Icon(Icons.error_outline, color: SemanticColorResolver.negative(context), size: 20),
+          SizedBox(width: 8),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -298,16 +322,16 @@ class _ProductFormDialogState extends State<ProductFormDialog> {
                 Text(
                   'خطا',
                   style: TextStyle(
-                    color: Colors.red.shade900,
+                    color: SemanticColorResolver.negative(context),
                     fontWeight: FontWeight.bold,
                     fontSize: 14,
                   ),
                 ),
-                const SizedBox(height: 4),
+                SizedBox(height: 4),
                 Text(
                   _controller.errorMessage!,
                   style: TextStyle(
-                    color: Colors.red.shade700,
+                    color: SemanticColorResolver.negative(context),
                     fontSize: 13,
                   ),
                 ),
@@ -315,8 +339,8 @@ class _ProductFormDialogState extends State<ProductFormDialog> {
             ),
           ),
           IconButton(
-            icon: const Icon(Icons.close, size: 18),
-            color: Colors.red.shade600,
+            icon: Icon(Icons.close, size: 18),
+            color: SemanticColorResolver.negative(context),
             padding: EdgeInsets.zero,
             constraints: const BoxConstraints(),
             onPressed: () {
@@ -329,9 +353,21 @@ class _ProductFormDialogState extends State<ProductFormDialog> {
   }
 
   Widget _buildActions(AppLocalizations t, bool isMobile) {
+    final printBtn = _isEditMode
+        ? OutlinedButton.icon(
+            onPressed: _controller.isLoading ? null : _printWithTemplate,
+            icon: const Icon(Icons.qr_code_2_outlined),
+            label: Text(t.barcodeLabelPrintFromProductForm),
+          )
+        : null;
+
     if (isMobile) {
       return Column(
         children: [
+          if (printBtn != null) ...[
+            SizedBox(width: double.infinity, child: printBtn),
+            const SizedBox(height: 8),
+          ],
           SizedBox(
             width: double.infinity,
             child: FilledButton(
@@ -349,8 +385,8 @@ class _ProductFormDialogState extends State<ProductFormDialog> {
           SizedBox(
             width: double.infinity,
             child: TextButton(
-              onPressed: _controller.isLoading 
-                  ? null 
+              onPressed: _controller.isLoading
+                  ? null
                   : () {
                       _controller.resetForm();
                       if (mounted) {
@@ -364,11 +400,12 @@ class _ProductFormDialogState extends State<ProductFormDialog> {
       );
     }
     return Row(
-      mainAxisAlignment: MainAxisAlignment.end,
       children: [
+        if (printBtn != null) printBtn,
+        const Spacer(),
         TextButton(
-          onPressed: _controller.isLoading 
-              ? null 
+          onPressed: _controller.isLoading
+              ? null
               : () {
                   _controller.resetForm();
                   if (mounted) {
@@ -390,6 +427,66 @@ class _ProductFormDialogState extends State<ProductFormDialog> {
         ),
       ],
     );
+  }
+
+  Future<bool> _isBarcodeLabelPluginActive() async {
+    try {
+      final plugins = await MarketplaceService().listBusinessPlugins(businessId: widget.businessId);
+      for (final p in plugins) {
+        if (p['plugin_code'] != 'barcode_label_studio') continue;
+        if (p['is_active'] == true || p['is_active'] == 1) return true;
+        if (p['is_trial'] == true && p['is_expired'] != true) return true;
+      }
+    } catch (_) {}
+    return false;
+  }
+
+  Future<void> _printWithTemplate() async {
+    final t = AppLocalizations.of(context);
+    if (!widget.authStore.hasBusinessPermission('barcode_labels', 'print') &&
+        !widget.authStore.hasBusinessPermission('barcode_labels', 'view') &&
+        !widget.authStore.hasBusinessPermission('products', 'view')) {
+      SnackBarHelper.showError(context, message: t.error);
+      return;
+    }
+    if (!await _isBarcodeLabelPluginActive()) {
+      if (!mounted) return;
+      SnackBarHelper.showError(context, message: t.barcodeLabelPluginNotActive);
+      return;
+    }
+    final fd = _controller.formData;
+    final productId = widget.product?['id'];
+    final productMap = <String, dynamic>{
+      'id': productId,
+      'name': fd.name,
+      'code': fd.code ?? widget.product?['code'] ?? '',
+      'general_barcodes': fd.generalBarcodes ?? widget.product?['general_barcodes'] ?? '',
+      'price': fd.baseSalesPrice ?? widget.product?['price'],
+      'sale_price': fd.baseSalesPrice ?? widget.product?['sale_price'],
+      'buy_price': fd.basePurchasePrice ?? widget.product?['buy_price'],
+      'base_sales_price': fd.baseSalesPrice ?? widget.product?['base_sales_price'],
+      'base_purchase_price': fd.basePurchasePrice ?? widget.product?['base_purchase_price'],
+    };
+    final tokens = parseGeneralBarcodeTokens(productMap['general_barcodes']?.toString());
+    final rows = <LabelPrintJobRow>[];
+    if (tokens.isEmpty) {
+      rows.add(LabelPrintJobDialog.fromProductMap(productMap));
+    } else {
+      for (final tok in tokens) {
+        rows.add(LabelPrintJobDialog.fromProductMap(productMap, barcodeOverride: tok));
+      }
+    }
+    if (!mounted) return;
+    try {
+      await LabelPrintJobDialog.show(
+        context,
+        businessId: widget.businessId,
+        rows: rows,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
+    }
   }
 
   Future<void> _handleSubmit() async {

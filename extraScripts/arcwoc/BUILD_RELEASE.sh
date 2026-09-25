@@ -3,7 +3,7 @@
 # Build Release Package for Hesabix V2 WooCommerce Plugin
 # Usage: ./BUILD_RELEASE.sh
 
-VERSION="2.0.0"
+VERSION="4.10.0"
 PLUGIN_NAME="arcwoc"
 RELEASE_DIR="releases"
 RELEASE_FILE="${PLUGIN_NAME}-${VERSION}.zip"

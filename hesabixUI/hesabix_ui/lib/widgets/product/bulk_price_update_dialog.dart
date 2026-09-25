@@ -17,6 +17,7 @@ import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../services/errors/api_error.dart';
 import '../../utils/responsive_helper.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 class BulkPriceUpdateDialog extends StatefulWidget {
   final int businessId;
@@ -180,23 +181,23 @@ class _BulkPriceUpdateDialogState extends State<BulkPriceUpdateDialog> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(AppLocalizations.of(ctx).confirmApplyChangesForNProducts(_previewResponse!.affectedProducts.length)),
-            const SizedBox(height: 16),
+            SizedBox(height: 16),
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.orange.withValues(alpha: 0.1),
+                color: SemanticColorResolver.warning(context).withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.orange.withValues(alpha: 0.3)),
+                border: Border.all(color: SemanticColorResolver.warning(context).withValues(alpha: 0.3)),
               ),
               child: Row(
                 children: [
-                  Icon(Icons.warning, color: Colors.orange[700], size: 20),
-                  const SizedBox(width: 8),
+                  Icon(Icons.warning, color: SemanticColorResolver.warning(context), size: 20),
+                  SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       AppLocalizations.of(ctx).irreversibleWarning,
                       style: TextStyle(
-                        color: Colors.orange[700],
+                        color: SemanticColorResolver.warning(context),
                         fontSize: 14,
                       ),
                     ),
@@ -213,7 +214,7 @@ class _BulkPriceUpdateDialogState extends State<BulkPriceUpdateDialog> {
           ),
           FilledButton(
             onPressed: () => Navigator.of(ctx).pop(true),
-            style: FilledButton.styleFrom(backgroundColor: Colors.orange),
+            style: FilledButton.styleFrom(backgroundColor: SemanticColorResolver.warning(context)),
             child: Text(AppLocalizations.of(ctx).confirm),
           ),
         ],
@@ -877,13 +878,13 @@ class _BulkPriceUpdateDialogState extends State<BulkPriceUpdateDialog> {
             children: [
               Row(
                 children: [
-                  Icon(Icons.info_outline, color: Colors.blue[700]),
-                  const SizedBox(width: 8),
+                  Icon(Icons.info_outline, color: SemanticColorResolver.info(context)),
+                  SizedBox(width: 8),
                   Text(
                     t.bulkPriceUpdateStatsTitle,
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
-                      color: Colors.blue[700],
+                      color: SemanticColorResolver.info(context),
                     ),
                   ),
                 ],

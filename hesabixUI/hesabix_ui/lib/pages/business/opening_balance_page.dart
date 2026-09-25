@@ -27,6 +27,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:hesabix_ui/utils/number_normalizer.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
+import '../../widgets/business_subpage_back_leading.dart';
 
 /// اقدامات سروری که تا پایان درخواست دکمه‌ها را در حالت بارگذاری نگه می‌دارند.
 enum _OpeningBalanceSubmitting { save, finalize, unpost }
@@ -737,6 +738,7 @@ class _OpeningBalancePageState extends State<OpeningBalancePage> {
     return Scaffold(
       appBar: AppBar(
         title: Text(t.openingBalance),
+        leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
         actions: isCompactAppBar
             ? [
                 PopupMenuButton<String>(

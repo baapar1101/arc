@@ -5,6 +5,17 @@ from typing import Optional, Literal
 from pydantic import BaseModel, Field, field_validator, FieldValidationInfo
 
 
+class TaxSettingsTestConnectionRequest(BaseModel):
+    """مقادیر فرم UI برای تست اتصال (بدون نیاز به ذخیره قبلی)."""
+    tax_memory_id: Optional[str] = Field(default=None, max_length=128)
+    economic_code: Optional[str] = Field(default=None, max_length=64)
+    private_key: Optional[str] = Field(default=None)
+    public_key: Optional[str] = Field(default=None)
+    certificate: Optional[str] = Field(default=None)
+    certificate_request: Optional[str] = Field(default=None)
+    sandbox_mode: Optional[bool] = Field(default=None)
+
+
 class TaxSettingsSaveRequest(BaseModel):
     tax_memory_id: str = Field(..., min_length=3, max_length=128, description="شناسه حافظه مالیاتی")
     economic_code: str = Field(..., min_length=3, max_length=64, description="کد اقتصادی کسب‌وکار")

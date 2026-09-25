@@ -1,5 +1,5 @@
 /**
- * پیش‌بار منابع سنگین Flutter Web با fetch و به‌روزرسانی UI لودینگ (متن، نوار، مرحله).
+ * پیش‌بار منابع Flutter Web + پیام‌های کاربرپسند.
  */
 (function () {
   'use strict';
@@ -12,22 +12,23 @@
     }
   }
 
-  function formatBytes(n) {
-    if (n < 1024) return n + ' B';
-    if (n < 1048576) return (n / 1024).toFixed(1) + ' KB';
-    return (n / 1048576).toFixed(2) + ' MB';
-  }
-
   function ui() {
     return window.__hesabixLoaderUI;
   }
 
-  function setStatus(line) {
-    var el = document.getElementById('loading-status');
-    if (el) el.textContent = line;
+  function setStatusKey(key) {
+    var L = ui();
+    if (L && typeof L.setStatusKey === 'function') {
+      L.setStatusKey(key);
+      return;
+    }
+    if (L && typeof L.setStatus === 'function') {
+      var s = L.t ? L.t() : null;
+      if (s && s[key]) L.setStatus(s[key]);
+    }
   }
 
-  function setBarOverall(received, total, rangeStart, rangeEnd) {
+  function setBarOverall(received, total, rangeStart, rangeEnd, step, totalSteps) {
     var L = ui();
     if (!L || typeof L.setDownloadProgress !== 'function') return;
     if (!total || total <= 0) {
@@ -36,14 +37,30 @@
     }
     var frac = Math.min(1, received / total);
     var overall = rangeStart + frac * (rangeEnd - rangeStart);
-    L.setDownloadProgress(Math.min(100, Math.max(0, overall)));
+    if (typeof L.setInitProgress === 'function' && step > 0 && totalSteps > 0) {
+      L.setInitProgress(
+        Math.min(100, Math.max(0, overall)),
+        step,
+        totalSteps,
+        null
+      );
+    } else {
+      L.setDownloadProgress(Math.min(100, Math.max(0, overall)));
+    }
   }
 
-  function setBarEnd(rangeEnd) {
+  function setBarEnd(rangeEnd, step, totalSteps, statusKey) {
     var L = ui();
-    if (L && typeof L.setDownloadProgress === 'function') {
-      L.setDownloadProgress(Math.min(100, rangeEnd));
+    if (!L) return;
+    var percent = Math.min(100, rangeEnd);
+    if (typeof L.setInitProgress === 'function' && step > 0 && totalSteps > 0) {
+      L.setInitProgress(percent, step, totalSteps, statusKey || null);
+      return;
     }
+    if (typeof L.setDownloadProgress === 'function') {
+      L.setDownloadProgress(percent);
+    }
+    if (statusKey) setStatusKey(statusKey);
   }
 
   function setLoadingPhase(p) {
@@ -90,15 +107,16 @@
     return null;
   }
 
-  async function fetchWithProgress(url, label, rangeStart, rangeEnd) {
+  async function fetchWithProgress(url, statusKey, rangeStart, rangeEnd, step, totalSteps) {
+    setStatusKey(statusKey);
     var res = await fetch(url);
-    if (!res.ok) throw new Error(label + ': ' + res.status);
+    if (!res.ok) throw new Error(statusKey + ': ' + res.status);
     var total = 0;
     var cl = res.headers.get('Content-Length');
     if (cl) total = parseInt(cl, 10) || 0;
 
     if (total > 0) {
-      setBarOverall(0, 1, rangeStart, rangeEnd);
+      setBarOverall(0, 1, rangeStart, rangeEnd, step, totalSteps);
     } else {
       var Lx = ui();
       if (Lx && typeof Lx.setDownloadProgress === 'function') Lx.setDownloadProgress(null);
@@ -107,43 +125,39 @@
     var reader = res.body && res.body.getReader();
     if (!reader) {
       await res.arrayBuffer();
-      setBarEnd(rangeEnd);
-      setStatus(label + ' — انجام شد');
+      setBarEnd(rangeEnd, step, totalSteps, statusKey);
       return;
     }
 
     var received = 0;
     for (;;) {
-      var step = await reader.read();
-      if (step.done) break;
-      var chunk = step.value;
-      received += chunk.length;
+      var stepRead = await reader.read();
+      if (stepRead.done) break;
+      received += stepRead.value.length;
       if (total > 0) {
-        setBarOverall(received, total, rangeStart, rangeEnd);
-        var pct = Math.min(100, Math.round((received / total) * 100));
-        setStatus(label + ' — ' + pct + '% (' + formatBytes(received) + ' / ' + formatBytes(total) + ')');
-      } else {
-        setStatus(label + ' — ' + formatBytes(received));
+        setBarOverall(received, total, rangeStart, rangeEnd, step, totalSteps);
       }
     }
-    setBarEnd(rangeEnd);
-    setStatus(label + ' — انجام شد');
+    setBarEnd(rangeEnd, step, totalSteps, statusKey);
   }
 
   window.__hesabixFlutterWebPreload = async function () {
     var cfg = window._flutter && window._flutter.buildConfig;
     if (!cfg || !cfg.builds) {
       setLoadingPhase(2);
+      setStatusKey('statusEngine');
       return;
     }
 
     var build = pickDart2JsBuild(cfg.builds);
     if (!build || build.compileTarget !== 'dart2js') {
       setLoadingPhase(2);
+      setStatusKey('statusEngine');
       return;
     }
 
     setLoadingPhase(1);
+    setStatusKey('statusApp');
 
     var userConfig = window._flutterConfig || {};
     var mainPath = build.mainJsPath || 'main.dart.js';
@@ -151,19 +165,19 @@
     var ckDir = canvasKitFolderFromConfig(userConfig);
     var ckJs = resolveUrl(ckDir + 'canvaskit.js');
     var ckWasm = resolveUrl(ckDir + 'canvaskit.wasm');
+    var webTotalSteps = 8;
 
-    setStatus('در حال دریافت ' + mainPath + '…');
-    await fetchWithProgress(mainUrl, mainPath, 0, 38);
-    setStatus('در حال دریافت canvaskit.js…');
-    await fetchWithProgress(ckJs, 'canvaskit.js', 38, 48);
-    setStatus('در حال دریافت canvaskit.wasm…');
-    await fetchWithProgress(ckWasm, 'canvaskit.wasm', 48, 92);
+    await fetchWithProgress(mainUrl, 'statusApp', 0, 42, 1, webTotalSteps);
+    await fetchWithProgress(ckJs, 'statusUi', 42, 58, 2, webTotalSteps);
+    await fetchWithProgress(ckWasm, 'statusUi', 58, 94, 3, webTotalSteps);
 
     setLoadingPhase(2);
-    setStatus('آماده‌سازی موتور Flutter…');
+    setStatusKey('statusEngine');
     var L = ui();
-    if (L && typeof L.setDownloadProgress === 'function') {
-      L.setDownloadProgress(100);
+    if (L && typeof L.setInitProgress === 'function') {
+      L.setInitProgress(96, 3, webTotalSteps, 'statusEngine');
+    } else if (L && typeof L.setDownloadProgress === 'function') {
+      L.setDownloadProgress(96);
     }
   };
 })();

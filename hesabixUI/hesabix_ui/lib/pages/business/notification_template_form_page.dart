@@ -5,6 +5,8 @@ import 'package:go_router/go_router.dart';
 import '../../core/api_client.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../utils/error_extractor.dart';
+import '../../widgets/business_subpage_back_leading.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 
 /// صفحه فرم ایجاد/ویرایش قالب نوتیفیکیشن
@@ -430,6 +432,7 @@ class _NotificationTemplateFormPageState extends State<NotificationTemplateFormP
       return Scaffold(
         appBar: AppBar(
           title: Text(widget.templateId == null ? 'قالب جدید' : 'ویرایش قالب'),
+          leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
         ),
         body: const Center(child: CircularProgressIndicator()),
       );
@@ -438,6 +441,7 @@ class _NotificationTemplateFormPageState extends State<NotificationTemplateFormP
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.templateId == null ? 'قالب جدید' : 'ویرایش قالب'),
+        leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
         actions: [
           if (!_isSaving)
             IconButton(
@@ -741,7 +745,7 @@ class _NotificationTemplateFormPageState extends State<NotificationTemplateFormP
                           }
                         },
                       ),
-                      const SizedBox(height: 8),
+                      SizedBox(height: 8),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
@@ -751,7 +755,7 @@ class _NotificationTemplateFormPageState extends State<NotificationTemplateFormP
                                 : 'تعداد کاراکتر: ${_bodyController.text.length}',
                             style: theme.textTheme.bodySmall?.copyWith(
                               color: _bodyController.text.length > 500 && _selectedChannel == 'sms'
-                                  ? Colors.red
+                                  ? SemanticColorResolver.negative(context)
                                   : Colors.grey,
                             ),
                           ),
@@ -760,7 +764,7 @@ class _NotificationTemplateFormPageState extends State<NotificationTemplateFormP
                               'حداکثر توصیه شده: 2000 کاراکتر',
                               style: theme.textTheme.bodySmall?.copyWith(
                                 color: _bodyController.text.length > 2000
-                                    ? Colors.orange
+                                    ? SemanticColorResolver.warning(context)
                                     : Colors.grey,
                               ),
                             ),
@@ -977,7 +981,7 @@ class _NotificationTemplateFormPageState extends State<NotificationTemplateFormP
                               child: Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                                 decoration: BoxDecoration(
-                                  color: Colors.blue.withOpacity(0.1),
+                                  color: SemanticColorResolver.info(context).withValues(alpha: 0.1),
                                   borderRadius: BorderRadius.circular(4),
                                 ),
                                 child: Text(

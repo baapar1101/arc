@@ -140,23 +140,19 @@ class _BarChartBody extends StatelessWidget {
         .fold(0, (a, b) => a > b ? a : b);
     if (maxLen == 0) return const SizedBox.shrink();
 
-    double maxY = 0;
-    for (final s in seriesList) {
-      for (final v in s.values) {
-        if (v > maxY) maxY = v;
-      }
-    }
-    final chartMax = maxY <= 0 ? 1.0 : maxY * 1.15;
+    final (chartMin, chartMax) = spec.yAxisBounds;
+    final gridInterval = spec.yGridInterval;
     final groupCount = maxLen;
     final barWidth = seriesList.length > 1 ? 10.0 : 18.0;
 
     return BarChart(
       BarChartData(
+        minY: chartMin,
         maxY: chartMax,
         gridData: FlGridData(
           show: true,
           drawVerticalLine: false,
-          horizontalInterval: chartMax / 4,
+          horizontalInterval: gridInterval,
           getDrawingHorizontalLine: (v) => FlLine(
             color: scheme.outlineVariant.withValues(alpha: 0.25),
             strokeWidth: 1,
@@ -170,6 +166,7 @@ class _BarChartBody extends StatelessWidget {
             sideTitles: SideTitles(
               showTitles: true,
               reservedSize: 44,
+              interval: gridInterval,
               getTitlesWidget: (value, meta) => Text(
                 _compactNumber(value),
                 style: theme.textTheme.labelSmall?.copyWith(fontSize: 10),
@@ -234,23 +231,17 @@ class _LineChartBody extends StatelessWidget {
   Widget build(BuildContext context) {
     final seriesList = spec.effectiveSeries;
     final colors = AIChatChartWidget._chartColors(scheme, seriesList.length);
-
-    double maxY = 0;
-    for (final s in seriesList) {
-      for (final v in s.values) {
-        if (v > maxY) maxY = v;
-      }
-    }
-    final chartMax = maxY <= 0 ? 1.0 : maxY * 1.15;
+    final (chartMin, chartMax) = spec.yAxisBounds;
+    final gridInterval = spec.yGridInterval;
 
     return LineChart(
       LineChartData(
-        minY: 0,
+        minY: chartMin,
         maxY: chartMax,
         gridData: FlGridData(
           show: true,
           drawVerticalLine: false,
-          horizontalInterval: chartMax / 4,
+          horizontalInterval: gridInterval,
           getDrawingHorizontalLine: (v) => FlLine(
             color: scheme.outlineVariant.withValues(alpha: 0.25),
             strokeWidth: 1,
@@ -264,7 +255,7 @@ class _LineChartBody extends StatelessWidget {
             sideTitles: SideTitles(
               showTitles: true,
               reservedSize: 44,
-              interval: chartMax / 4,
+              interval: gridInterval,
               getTitlesWidget: (value, meta) => Text(
                 _compactNumber(value),
                 style: theme.textTheme.labelSmall?.copyWith(fontSize: 10),
@@ -416,8 +407,10 @@ class _PieChartBody extends StatelessWidget {
 }
 
 String _compactNumber(double n) {
-  if (n >= 1e9) return '${(n / 1e9).toStringAsFixed(1)}B';
-  if (n >= 1e6) return '${(n / 1e6).toStringAsFixed(1)}M';
-  if (n >= 1e3) return '${(n / 1e3).toStringAsFixed(0)}K';
-  return n.toStringAsFixed(0);
+  final sign = n < 0 ? '-' : '';
+  final a = n.abs();
+  if (a >= 1e9) return '$sign${(a / 1e9).toStringAsFixed(1)}B';
+  if (a >= 1e6) return '$sign${(a / 1e6).toStringAsFixed(1)}M';
+  if (a >= 1e3) return '$sign${(a / 1e3).toStringAsFixed(0)}K';
+  return '$sign${a.toStringAsFixed(0)}';
 }

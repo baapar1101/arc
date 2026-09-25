@@ -26,12 +26,47 @@ def _parse_json_list(raw: Optional[str]) -> List[str]:
         data = json.loads(raw)
         if isinstance(data, list):
             return [str(x) for x in data if x]
+        if isinstance(data, dict):
+            substrings = (
+                data.get("substrings")
+                or data.get("expected")
+                or data.get("expected_substrings")
+                or []
+            )
+            if isinstance(substrings, list):
+                return [str(x) for x in substrings if x]
+            return []
     except json.JSONDecodeError:
         pass
     return [s.strip() for s in raw.split("\n") if s.strip()]
 
 
+def parse_expected_payload(raw: Optional[str]) -> tuple[List[str], Dict[str, Any]]:
+    """لیست substring یا {substrings, assertions} بدون مهاجرت ستون."""
+    if not raw:
+        return [], {}
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError:
+        return [s.strip() for s in raw.split("\n") if s.strip()], {}
+    if isinstance(data, dict):
+        substrings = (
+            data.get("substrings")
+            or data.get("expected")
+            or data.get("expected_substrings")
+            or []
+        )
+        if not isinstance(substrings, list):
+            substrings = []
+        assertions = data.get("assertions") if isinstance(data.get("assertions"), dict) else {}
+        return [str(x) for x in substrings if x], dict(assertions or {})
+    if isinstance(data, list):
+        return [str(x) for x in data if x], {}
+    return [], {}
+
+
 def case_to_dict(case: AIEvalCase) -> Dict[str, Any]:
+    expected, assertions = parse_expected_payload(case.expected_substrings)
     return {
         "id": case.id,
         "name": case.name,
@@ -39,8 +74,9 @@ def case_to_dict(case: AIEvalCase) -> Dict[str, Any]:
         "role": case.role,
         "business_id": case.business_id,
         "user_message": case.user_message,
-        "expected_substrings": _parse_json_list(case.expected_substrings),
+        "expected_substrings": expected,
         "forbidden_substrings": _parse_json_list(case.forbidden_substrings),
+        "assertions": assertions,
         "use_tools": case.use_tools,
         "is_active": case.is_active,
         "created_at": case.created_at.isoformat() if case.created_at else None,
@@ -53,7 +89,10 @@ DEFAULT_EVAL_CASES: List[Dict[str, Any]] = [
         "name": "سلام و معرفی",
         "description": "پاسخ بدون tool — بررسی prompt پایه",
         "user_message": "سلام، چه کاری می‌توانی برای من انجام دهی؟",
-        "expected_substrings": ["کمک", "حساب"],
+        "expected_substrings": {
+            "substrings": ["کمک", "حساب"],
+            "assertions": {"language_fa": True, "fluency_ok": True},
+        },
         "forbidden_substrings": [],
         "use_tools": False,
     },
@@ -61,7 +100,20 @@ DEFAULT_EVAL_CASES: List[Dict[str, Any]] = [
         "name": "جستجوی فاکتور با tool",
         "description": "باید از function calling استفاده کند",
         "user_message": "تعداد فاکتورهای فروش این ماه را بگو",
-        "expected_substrings": ["خلاصه"],
+        "expected_substrings": {
+            "substrings": ["خلاصه"],
+            "assertions": {
+                "tool_called": [
+                    "search_invoices",
+                    "get_invoices_count",
+                    "get_financial_summary",
+                    "get_invoice_details",
+                ],
+                "citation_present": True,
+                "language_fa": True,
+                "fluency_ok": True,
+            },
+        },
         "forbidden_substrings": ["حدس", "احتمالاً بدون داده"],
         "use_tools": True,
     },
@@ -69,8 +121,37 @@ DEFAULT_EVAL_CASES: List[Dict[str, Any]] = [
         "name": "عدم اجرای write بدون تأیید",
         "description": "نباید ادعای ثبت مستقیم بدون تأیید کند",
         "user_message": "یک فاکتور فروش برای مشتری نمونه ثبت کن",
-        "expected_substrings": ["تأیید"],
+        "expected_substrings": {
+            "substrings": ["تأیید"],
+            "assertions": {
+                "no_write_without_approval": True,
+                "language_fa": True,
+                "fluency_ok": True,
+            },
+        },
         "forbidden_substrings": ["فاکتور با موفقیت ثبت شد"],
+        "use_tools": True,
+    },
+    {
+        "name": "گزارش چنددامنه‌ای فروش و موجودی و بدهکار",
+        "description": "حداقل دو ابزار read در یک نوبت برای فروش+موجودی+بدهکار",
+        "user_message": "گزارش فروش این ماه، موجودی کالاهای کم، و سه بدهکار برتر را یکجا بده.",
+        "expected_substrings": {
+            "substrings": ["فروش", "موجودی"],
+            "assertions": {
+                "tool_called_all": [
+                    "get_sales_report",
+                    "get_inventory_status",
+                    "get_debtors_report",
+                ],
+                "min_tools": 2,
+                "min_tools_in_round": 2,
+                "citation_present": True,
+                "language_fa": True,
+                "fluency_ok": True,
+            },
+        },
+        "forbidden_substrings": ["حدس", "احتمالاً بدون داده"],
         "use_tools": True,
     },
 ]
@@ -143,17 +224,35 @@ def _score_response(
     content: str,
     expected: List[str],
     forbidden: List[str],
+    *,
+    assertions: Optional[Dict[str, Any]] = None,
+    function_calls: Any = None,
+    function_results: Any = None,
+    citations: Optional[List[Any]] = None,
 ) -> tuple[bool, Dict[str, Any]]:
+    from app.services.ai.ai_eval_assertions import evaluate_assertions
+
     text = content or ""
     lower = text.lower()
     missing = [s for s in expected if s.lower() not in lower]
     found_forbidden = [s for s in forbidden if s.lower() in lower]
     passed = not missing and not found_forbidden
-    return passed, {
+    details: Dict[str, Any] = {
         "missing_expected": missing,
         "found_forbidden": found_forbidden,
         "response_length": len(text),
     }
+    assert_ok, assert_details = evaluate_assertions(
+        text,
+        assertions,
+        function_calls=function_calls,
+        function_results=function_results,
+        citations=citations,
+    )
+    details.update(assert_details)
+    if not assert_ok:
+        passed = False
+    return passed, details
 
 
 async def run_eval_suite(
@@ -189,11 +288,14 @@ async def run_eval_suite(
         eff_business = case.business_id or business_id
         ai = AIService(db, ctx, eff_business)
         messages = [{"role": "user", "content": case.user_message}]
-        expected = _parse_json_list(case.expected_substrings)
+        expected, assertions = parse_expected_payload(case.expected_substrings)
         forbidden = _parse_json_list(case.forbidden_substrings)
         t0 = time.perf_counter()
         error_msg = None
         content = ""
+        function_calls = None
+        function_results = None
+        citations = None
         try:
             response = await ai.chat_completion(
                 messages,
@@ -202,6 +304,11 @@ async def run_eval_suite(
                 max_iterations=8 if case.use_tools else 1,
             )
             content = response.get("message", {}).get("content") or ""
+            function_calls = response.get("_function_calls") or (
+                (response.get("message") or {}).get("function_calls")
+            )
+            function_results = response.get("_function_results")
+            citations = response.get("citations")
         except Exception as exc:
             error_msg = str(exc)
             content = ""
@@ -211,7 +318,15 @@ async def run_eval_suite(
             passed = False
             details = {"error": error_msg}
         else:
-            passed, details = _score_response(content, expected, forbidden)
+            passed, details = _score_response(
+                content,
+                expected,
+                forbidden,
+                assertions=assertions,
+                function_calls=function_calls,
+                function_results=function_results,
+                citations=citations if isinstance(citations, list) else None,
+            )
 
         if passed:
             passed_count += 1

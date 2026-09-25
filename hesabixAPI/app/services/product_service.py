@@ -28,9 +28,19 @@ from app.services.product_general_barcode_service import (
     split_raw_general_barcodes,
 )
 from app.services.public_catalog_service import invalidate_public_catalog_caches
+from app.services.product_catalog_profile_service import (
+    catalog_profile_from_product,
+    normalize_catalog_gallery_file_ids,
+    normalize_catalog_specifications,
+    validate_catalog_profile_for_publish,
+)
 from app.services.product_inventory_tracking_sync import (
     product_has_stale_inventory_tracking_lines,
     sync_product_inventory_tracking_change,
+)
+from app.services.product_supplier_service import (
+    load_product_suppliers,
+    upsert_product_suppliers,
 )
 
 logger = logging.getLogger(__name__)
@@ -48,6 +58,59 @@ def _resolve_create_general_barcodes_raw(payload: ProductCreateRequest) -> Optio
 def _legacy_barcode_field_from_general_csv(csv_val: Optional[str]) -> Optional[str]:
     tokens = split_raw_general_barcodes(csv_val)
     return tokens[0] if tokens else None
+
+
+def _catalog_profile_create_kwargs(payload: ProductCreateRequest) -> Dict[str, Any]:
+    specs = None
+    if payload.catalog_specifications is not None:
+        specs = normalize_catalog_specifications(
+            [item.model_dump() for item in payload.catalog_specifications]
+        )
+    gallery = None
+    if payload.catalog_gallery_file_ids is not None:
+        gallery = normalize_catalog_gallery_file_ids(payload.catalog_gallery_file_ids)
+    return {
+        "catalog_short_description": (payload.catalog_short_description or "").strip() or None,
+        "catalog_expert_review": (payload.catalog_expert_review or "").strip() or None,
+        "catalog_specifications": specs,
+        "catalog_brand": (payload.catalog_brand or "").strip() or None,
+        "catalog_model": (payload.catalog_model or "").strip() or None,
+        "catalog_country_of_origin": (payload.catalog_country_of_origin or "").strip() or None,
+        "catalog_video_url": (payload.catalog_video_url or "").strip() or None,
+        "catalog_gallery_file_ids": gallery,
+    }
+
+
+def _catalog_profile_update_kwargs(payload: ProductUpdateRequest, fields_set: set) -> Dict[str, Any]:
+    out: Dict[str, Any] = {}
+    if "catalog_short_description" in fields_set:
+        v = payload.catalog_short_description
+        out["catalog_short_description"] = (v or "").strip() or None if v is not None else None
+    if "catalog_expert_review" in fields_set:
+        v = payload.catalog_expert_review
+        out["catalog_expert_review"] = (v or "").strip() or None if v is not None else None
+    if "catalog_specifications" in fields_set:
+        if payload.catalog_specifications is None:
+            out["catalog_specifications"] = None
+        else:
+            out["catalog_specifications"] = normalize_catalog_specifications(
+                [item.model_dump() for item in payload.catalog_specifications]
+            )
+    for key in (
+        "catalog_brand",
+        "catalog_model",
+        "catalog_country_of_origin",
+        "catalog_video_url",
+    ):
+        if key in fields_set:
+            v = getattr(payload, key)
+            out[key] = (v or "").strip() or None if v is not None else None
+    if "catalog_gallery_file_ids" in fields_set:
+        if payload.catalog_gallery_file_ids is None:
+            out["catalog_gallery_file_ids"] = None
+        else:
+            out["catalog_gallery_file_ids"] = normalize_catalog_gallery_file_ids(payload.catalog_gallery_file_ids)
+    return out
 
 
 def invalidate_products_cache(business_id: int, product_id: Optional[int] = None, category_id: Optional[int] = None):
@@ -102,6 +165,18 @@ def invalidate_products_cache(business_id: int, product_id: Optional[int] = None
 			"category_id": category_id,
 			"timestamp": None
 		}
+		# روش 4: حذف response cache برای GET /api/v1/products/* (middleware ResponseCacheMiddleware)
+		try:
+			from app.core.response_cache import invalidate_response_cache
+			deleted_response_cache = invalidate_response_cache(path="/api/v1/products")
+			if deleted_response_cache > 0:
+				logger.info(
+					f"Invalidated {deleted_response_cache} response cache keys for /api/v1/products "
+					f"(business_id={business_id}, product_id={product_id})"
+				)
+		except Exception as exc:
+			logger.warning(f"Failed to invalidate product response cache: {exc}")
+
 		try:
 			import time
 			invalidation_message["timestamp"] = time.time()
@@ -389,6 +464,13 @@ def create_product(
             else:
                 logger.info(f"[CREATE_PRODUCT] Using manual code: '{code}'")
 
+            validate_catalog_profile_for_publish(
+                db,
+                business_id,
+                is_public_catalog=bool(payload.is_public_catalog),
+                catalog_specifications=_catalog_profile_create_kwargs(payload).get("catalog_specifications"),
+            )
+
             # ایجاد Product مستقیماً (بدون استفاده از repo.create که commit می‌کند)
             # تا همه چیز در یک transaction باشد و بتوانیم در صورت خطا rollback کنیم
             obj = Product(
@@ -405,6 +487,10 @@ def create_product(
                 base_sales_note=payload.base_sales_note,
                 base_purchase_price=payload.base_purchase_price,
                 base_purchase_note=payload.base_purchase_note,
+                sales_price_fx=getattr(payload, "sales_price_fx", None),
+                purchase_price_fx=getattr(payload, "purchase_price_fx", None),
+                price_fx_currency_id=getattr(payload, "price_fx_currency_id", None),
+                auto_update_base_from_fx=bool(getattr(payload, "auto_update_base_from_fx", False) or False),
                 track_inventory=payload.track_inventory,
                 reorder_point=payload.reorder_point,
                 min_order_qty=payload.min_order_qty,
@@ -425,6 +511,7 @@ def create_product(
                 general_barcodes=stored_gb_create,
                 is_public_catalog=bool(payload.is_public_catalog),
                 catalog_public_uuid=str(uuid_module.uuid4()) if payload.is_public_catalog else None,
+                **_catalog_profile_create_kwargs(payload),
             )
             logger.debug(f"[CREATE_PRODUCT] Adding product to session - code='{code}', name='{payload.name}'")
             db.add(obj)
@@ -439,6 +526,7 @@ def create_product(
             # _upsert_attributes را بدون commit صدا می‌زنیم تا همه چیز در یک transaction باشد
             logger.debug(f"[CREATE_PRODUCT] Upserting attributes - attribute_ids={payload.attribute_ids}")
             _upsert_attributes(db, obj.id, business_id, payload.attribute_ids, auto_commit=False)
+            upsert_product_suppliers(db, obj.id, business_id, payload.suppliers, auto_commit=False)
             
             # Commit همه چیز (product و attributes)
             logger.info(f"[CREATE_PRODUCT] Committing transaction for product ID={obj.id}...")
@@ -757,6 +845,40 @@ def update_product(
     if "is_public_catalog" in fields_set and payload.is_public_catalog and not getattr(obj, "catalog_public_uuid", None):
         catalog_uuid_kw["catalog_public_uuid"] = str(uuid_module.uuid4())
 
+    catalog_profile_kw = _catalog_profile_update_kwargs(payload, fields_set)
+    effective_public = (
+        bool(payload.is_public_catalog)
+        if "is_public_catalog" in fields_set and payload.is_public_catalog is not None
+        else bool(getattr(obj, "is_public_catalog", False))
+    )
+    effective_specs = catalog_profile_kw.get("catalog_specifications")
+    if effective_specs is None and "catalog_specifications" not in fields_set:
+        effective_specs = getattr(obj, "catalog_specifications", None)
+    validate_catalog_profile_for_publish(
+        db,
+        business_id,
+        is_public_catalog=effective_public,
+        catalog_specifications=effective_specs,
+    )
+
+    price_update_kwargs: Dict[str, Any] = {}
+    if "base_sales_price" in fields_set:
+        price_update_kwargs["base_sales_price"] = payload.base_sales_price
+    if "base_sales_note" in fields_set:
+        price_update_kwargs["base_sales_note"] = payload.base_sales_note
+    if "base_purchase_price" in fields_set:
+        price_update_kwargs["base_purchase_price"] = payload.base_purchase_price
+    if "base_purchase_note" in fields_set:
+        price_update_kwargs["base_purchase_note"] = payload.base_purchase_note
+    if "sales_price_fx" in fields_set:
+        price_update_kwargs["sales_price_fx"] = payload.sales_price_fx
+    if "purchase_price_fx" in fields_set:
+        price_update_kwargs["purchase_price_fx"] = payload.purchase_price_fx
+    if "price_fx_currency_id" in fields_set:
+        price_update_kwargs["price_fx_currency_id"] = payload.price_fx_currency_id
+    if "auto_update_base_from_fx" in fields_set:
+        price_update_kwargs["auto_update_base_from_fx"] = bool(payload.auto_update_base_from_fx)
+
     updated = repo.update(
         product_id,
         commit=False,
@@ -768,10 +890,6 @@ def update_product(
         main_unit=main_unit_val if 'main_unit' in fields_set else None,
         secondary_unit=secondary_unit_val if 'secondary_unit' in fields_set else None,
         unit_conversion_factor=payload.unit_conversion_factor,
-        base_sales_price=payload.base_sales_price,
-        base_sales_note=payload.base_sales_note,
-        base_purchase_price=payload.base_purchase_price,
-        base_purchase_note=payload.base_purchase_note,
         track_inventory=payload.track_inventory if payload.track_inventory is not None else None,
         reorder_point=payload.reorder_point,
         min_order_qty=payload.min_order_qty,
@@ -789,11 +907,11 @@ def update_product(
         is_purchase_taxable=(
             payload.is_purchase_taxable if payload.is_purchase_taxable is not None else False
         ) if 'is_purchase_taxable' in fields_set else None,
-        sales_tax_rate=payload.sales_tax_rate,
-        purchase_tax_rate=payload.purchase_tax_rate,
-        tax_type_id=payload.tax_type_id,
-        tax_code=payload.tax_code,
-        tax_unit_id=payload.tax_unit_id,
+        sales_tax_rate=payload.sales_tax_rate if 'sales_tax_rate' in fields_set else None,
+        purchase_tax_rate=payload.purchase_tax_rate if 'purchase_tax_rate' in fields_set else None,
+        tax_type_id=payload.tax_type_id if 'tax_type_id' in fields_set else None,
+        tax_code=payload.tax_code if 'tax_code' in fields_set else None,
+        tax_unit_id=payload.tax_unit_id if 'tax_unit_id' in fields_set else None,
         image_file_id=payload.image_file_id if 'image_file_id' in fields_set else None,
         is_active=(
             payload.is_active if payload.is_active is not None else True
@@ -809,7 +927,9 @@ def update_product(
             )
         ),
         **catalog_uuid_kw,
+        **catalog_profile_kw,
         **gb_kw,
+        **price_update_kwargs,
     )
     if not updated:
         return None
@@ -818,6 +938,8 @@ def update_product(
         replace_general_barcode_aliases(db, business_id, product_id, general_tokens)
 
     _upsert_attributes(db, product_id, business_id, payload.attribute_ids, auto_commit=False)
+    if "suppliers" in fields_set:
+        upsert_product_suppliers(db, product_id, business_id, payload.suppliers, auto_commit=False)
 
     if track_inventory_changed or (
         new_track_inventory
@@ -1166,6 +1288,30 @@ def check_product_has_related_documents(db: Session, product_id: int) -> tuple[b
     if (bom_component_count and bom_component_count > 0) or (bom_output_count and bom_output_count > 0):
         if "فرمول تولید (BOM)" not in related_types:
             related_types.append("فرمول تولید (BOM)")
+
+    # اسناد هزینه/درآمد کالا (FK: RESTRICT) — باید قبل از حذف چک شود
+    try:
+        from adapters.db.models.goods_expense_income import GoodsExpenseIncomeLine
+        gei_count = db.query(func.count(GoodsExpenseIncomeLine.id)).filter(
+            GoodsExpenseIncomeLine.product_id == product_id
+        ).scalar()
+        if gei_count and gei_count > 0:
+            if "اسناد هزینه/درآمد کالا" not in related_types:
+                related_types.append("اسناد هزینه/درآمد کالا")
+    except Exception:
+        pass
+
+    # قطعات تعمیر (FK: RESTRICT)
+    try:
+        from adapters.db.models.repair_shop import RepairOrderPart
+        repair_count = db.query(func.count(RepairOrderPart.id)).filter(
+            RepairOrderPart.product_id == product_id
+        ).scalar()
+        if repair_count and repair_count > 0:
+            if "قطعات تعمیر" not in related_types:
+                related_types.append("قطعات تعمیر")
+    except Exception:
+        pass
     
     return len(related_types) > 0, related_types
 
@@ -1249,6 +1395,10 @@ def _to_dict(obj: Product, db: Optional[Session] = None) -> Dict[str, Any]:
         "base_sales_note": obj.base_sales_note,
         "base_purchase_price": obj.base_purchase_price,
         "base_purchase_note": obj.base_purchase_note,
+        "sales_price_fx": getattr(obj, "sales_price_fx", None),
+        "purchase_price_fx": getattr(obj, "purchase_price_fx", None),
+        "price_fx_currency_id": getattr(obj, "price_fx_currency_id", None),
+        "auto_update_base_from_fx": bool(getattr(obj, "auto_update_base_from_fx", False)),
         "track_inventory": obj.track_inventory,
         "reorder_point": obj.reorder_point,
         "min_order_qty": obj.min_order_qty,
@@ -1275,6 +1425,8 @@ def _to_dict(obj: Product, db: Optional[Session] = None) -> Dict[str, Any]:
         "is_active": obj.is_active if hasattr(obj, 'is_active') else True,  # مقدار پیش‌فرض True در صورت عدم وجود فیلد
         "is_public_catalog": bool(getattr(obj, "is_public_catalog", False)),
         "catalog_public_uuid": getattr(obj, "catalog_public_uuid", None),
+        **catalog_profile_from_product(obj),
+        "suppliers": load_product_suppliers(db, obj.id) if db is not None else [],
         "created_at": obj.created_at,
         "updated_at": obj.updated_at,
     }
@@ -1691,6 +1843,10 @@ def get_sales_by_product_report(
     
     sales_invoices = sales_invoice_query.all()
     invoice_ids = [inv.id for inv in sales_invoices]
+    invoices_by_id = {inv.id: inv for inv in sales_invoices}
+    rate_cache: Dict[int, Decimal] = {}
+    base_currency_by_business: Dict[int, Optional[int]] = {}
+    amounts_in_base = currency_id is None
     
     if not invoice_ids:
         # اگر هیچ فاکتور فروشی وجود ندارد، فقط لیست کالاها را برگردان
@@ -1784,12 +1940,23 @@ def get_sales_by_product_report(
                 line_total = (unit_price * qty) - line_discount + tax_amount
         
         product_sales[line.product_id]['total_quantity'] += qty
+        invoice = invoices_by_id.get(line.document_id)
+        if invoice is not None and currency_id is None:
+            from app.services.invoice_service import _invoice_amount_for_aggregate
+
+            line_total = _invoice_amount_for_aggregate(
+                db,
+                invoice,
+                line_total,
+                currency_id=currency_id,
+                rate_cache=rate_cache,
+                base_currency_by_business=base_currency_by_business,
+            )
         product_sales[line.product_id]['total_amount'] += line_total
         
         # پیدا کردن تاریخ آخرین فروش
         try:
-            invoice = next((inv for inv in sales_invoices if inv.id == line.document_id), None)
-            if invoice:
+            if invoice is not None:
                 product_sales[line.product_id]['invoice_dates'].append(invoice.document_date)
         except Exception:
             pass
@@ -1873,7 +2040,11 @@ def get_sales_by_product_report(
             'total_pages': total_pages,
             'has_next': current_page < total_pages,
             'has_prev': current_page > 1,
-        }
+        },
+        'meta': {
+            'currency_id': currency_id,
+            'amounts_in_base': amounts_in_base,
+        },
     }
 
 

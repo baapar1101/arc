@@ -5,6 +5,24 @@ class BusinessCurrencyRateService {
 
   BusinessCurrencyRateService(ApiClient api) : _api = api;
 
+  Future<Map<String, dynamic>> latest({required int businessId}) async {
+    final res = await _api.get<Map<String, dynamic>>(
+      '/api/v1/businesses/$businessId/currency-rates/latest',
+    );
+    return _data(res.data);
+  }
+
+  Future<Map<String, dynamic>> bulkCreate(
+    int businessId,
+    Map<String, dynamic> body,
+  ) async {
+    final res = await _api.post<Map<String, dynamic>>(
+      '/api/v1/businesses/$businessId/currency-rates/bulk',
+      data: body,
+    );
+    return _data(res.data);
+  }
+
   Future<Map<String, dynamic>> list({
     required int businessId,
     int skip = 0,

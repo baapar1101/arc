@@ -4,6 +4,7 @@ import 'package:hesabix_ui/l10n/app_localizations.dart';
 import '../../core/auth_store.dart';
 import '../../services/marketplace_service.dart';
 import '../../utils/number_formatters.dart' show formatWithThousands;
+import '../../widgets/business_subpage_back_leading.dart';
 
 class MarketplaceInvoicesPage extends StatefulWidget {
   final int businessId;
@@ -47,7 +48,10 @@ class _MarketplaceInvoicesPageState extends State<MarketplaceInvoicesPage> {
         widget.authStore.hasBusinessPermission('marketplace', 'view');
     if (!canView) {
       return Scaffold(
-        appBar: AppBar(title: Text(t.pluginMarketplaceInvoicesLink)),
+        appBar: AppBar(
+          title: Text(t.pluginMarketplaceInvoicesLink),
+          leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
+        ),
         body: Center(
           child: Text(t.pluginMarketplaceNoPermissionView, style: theme.textTheme.titleMedium),
         ),
@@ -56,6 +60,7 @@ class _MarketplaceInvoicesPageState extends State<MarketplaceInvoicesPage> {
     return Scaffold(
       appBar: AppBar(
         title: Text(t.pluginMarketplaceInvoicesLink),
+        leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
         actions: [
           IconButton(
             tooltip: t.pluginMarketplaceRefresh,

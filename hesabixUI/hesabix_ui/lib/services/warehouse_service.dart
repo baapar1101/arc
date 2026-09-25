@@ -348,6 +348,8 @@ class WarehouseService {
     required String stockCountDate,
     required List<Map<String, dynamic>> items,
     String? notes,
+    /// goods_docs | physical_adjustment — ارسال صریح برای رفع نیاز به انتخاب (needs_choice)
+    String? resultMode,
   }) async {
     final payload = <String, dynamic>{
       'stock_count_code': stockCountCode,
@@ -355,6 +357,7 @@ class WarehouseService {
       'items': items,
     };
     if (notes != null) payload['notes'] = notes;
+    if (resultMode != null && resultMode.isNotEmpty) payload['result_mode'] = resultMode;
     
     final res = await _api.post<Map<String, dynamic>>(
       '/api/v1/warehouse-docs/business/$businessId/stock-count/create-adjustment',

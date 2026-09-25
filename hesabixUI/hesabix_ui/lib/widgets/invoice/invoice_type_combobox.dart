@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../models/invoice_type_model.dart';
+import 'invoice_form_layout.dart';
 
 class InvoiceTypeCombobox extends StatefulWidget {
   final InvoiceType? selectedType;
@@ -9,6 +10,16 @@ class InvoiceTypeCombobox extends StatefulWidget {
   final bool isRequired;
   final String? label;
   final String? hintText;
+  /// اگر false باشد انتخاب نوع فاکتور غیرفعال است (مثلاً پس از ارسال به مودیان).
+  final bool enableTypeChange;
+  /// اگر false باشد سویچ پیش‌فاکتور غیرفعال است.
+  final bool enableDraftToggle;
+  /// محدودیت لیست انواع مجاز؛ null = همه انواع.
+  final List<InvoiceType>? allowedTypes;
+  /// سویچ پیش‌نویس داخل suffix فیلد؛ در فرم فاکتور جدید بیرون فیلد نمایش داده می‌شود.
+  final bool showInlineDraftToggle;
+  /// بدون آیکون prefix برای چیدمان فشرده.
+  final bool compact;
 
   const InvoiceTypeCombobox({
     super.key,
@@ -19,6 +30,11 @@ class InvoiceTypeCombobox extends StatefulWidget {
     this.isRequired = true,
     this.label = 'نوع فاکتور',
     this.hintText = 'انتخاب نوع فاکتور',
+    this.enableTypeChange = true,
+    this.enableDraftToggle = true,
+    this.allowedTypes,
+    this.showInlineDraftToggle = false,
+    this.compact = false,
   });
 
   @override
@@ -69,54 +85,79 @@ class _InvoiceTypeComboboxState extends State<InvoiceTypeCombobox> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final typeOptions = widget.allowedTypes ?? InvoiceType.allTypes;
 
     return DropdownButtonFormField<InvoiceType>(
       initialValue: _selectedType,
-      onChanged: (InvoiceType? newValue) {
-        if (newValue != null) {
-          _selectType(newValue);
-        } else if (!widget.isRequired) {
-          _clearSelection();
-        }
-      },
-      decoration: InputDecoration(
-        labelText: widget.label,
-        hintText: widget.hintText,
-        border: const OutlineInputBorder(),
-        prefixIcon: _selectedType != null 
-            ? Icon(_getTypeIcon(_selectedType!))
-            : const Icon(Icons.category_outlined),
-        suffixIcon: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // سویچ پیش‌نویس کوچک
-            Container(
-              margin: const EdgeInsets.only(right: 8),
-              child: Tooltip(
-                message: _isDraft ? 'حالت پیش‌نویس فعال است' : 'فعال کردن حالت پیش‌نویس',
-                child: Switch(
-                  value: _isDraft,
-                  onChanged: (value) {
-                    setState(() {
-                      _isDraft = value;
-                    });
-                    widget.onDraftChanged(value);
-                  },
-                  materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                ),
-              ),
-            ),
-            // دکمه پاک کردن (اگر نیاز باشد)
-            if (_selectedType != null && !widget.isRequired)
-              IconButton(
-                icon: const Icon(Icons.clear),
-                onPressed: _clearSelection,
-                iconSize: 18,
-              ),
-          ],
+      isDense: widget.compact,
+      onChanged: widget.enableTypeChange
+          ? (InvoiceType? newValue) {
+              if (newValue != null) {
+                _selectType(newValue);
+              } else if (!widget.isRequired) {
+                _clearSelection();
+              }
+            }
+          : null,
+      decoration: InvoiceFormFieldMetrics.mergeDecoration(
+        context,
+        InputDecoration(
+          labelText: widget.label,
+          hintText: widget.hintText,
+          prefixIcon: widget.compact
+              ? null
+              : (_selectedType != null
+                  ? Icon(_getTypeIcon(_selectedType!), size: 20)
+                  : const Icon(Icons.category_outlined, size: 20)),
+          suffixIcon: widget.showInlineDraftToggle
+              ? Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      margin: const EdgeInsets.only(right: 8),
+                      child: Tooltip(
+                        message: _isDraft
+                            ? 'حالت پیش‌نویس فعال است'
+                            : 'فعال کردن حالت پیش‌نویس',
+                        child: Switch(
+                          value: _isDraft,
+                          onChanged: widget.enableDraftToggle
+                              ? (value) {
+                                  setState(() {
+                                    _isDraft = value;
+                                  });
+                                  widget.onDraftChanged(value);
+                                }
+                              : null,
+                          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                      ),
+                    ),
+                    if (_selectedType != null && !widget.isRequired)
+                      IconButton(
+                        icon: const Icon(Icons.clear),
+                        onPressed: _clearSelection,
+                        iconSize: 18,
+                        padding: EdgeInsets.zero,
+                        constraints: InvoiceFormFieldMetrics.compactSuffixIconConstraints,
+                      ),
+                  ],
+                )
+              : (_selectedType != null && !widget.isRequired)
+                  ? IconButton(
+                      icon: const Icon(Icons.clear),
+                      onPressed: _clearSelection,
+                      iconSize: 18,
+                      padding: EdgeInsets.zero,
+                      constraints: InvoiceFormFieldMetrics.compactSuffixIconConstraints,
+                    )
+                  : null,
+          suffixIconConstraints: widget.showInlineDraftToggle
+              ? InvoiceFormFieldMetrics.suffixIconConstraints
+              : InvoiceFormFieldMetrics.compactSuffixIconConstraints,
         ),
       ),
-      items: InvoiceType.allTypes.map((InvoiceType type) {
+      items: typeOptions.map((InvoiceType type) {
         return DropdownMenuItem<InvoiceType>(
           value: type,
           child: Row(

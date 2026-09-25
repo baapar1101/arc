@@ -11,6 +11,8 @@ import '../../services/warehouse_service.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../widgets/invoice/code_field_widget.dart';
+import '../../core/hesabix_back.dart';
+import '../../core/hesabix_back.dart';
 
 const _kLocationKinds = <String, String>{
   'zone': 'منطقه',
@@ -335,6 +337,7 @@ class _WarehouseLocationsPageState extends State<WarehouseLocationsPage> {
                           autoGenerateCode: existing == null,
                           warehouseLocationCode: true,
                           showAutoManualToggle: existing == null,
+                          showInlineAutoToggle: existing == null,
                           isRequired: true,
                           label: 'کد محل',
                           hintText: 'مثال: LOC-20260419-0001',
@@ -827,14 +830,7 @@ class _WarehouseLocationsPageState extends State<WarehouseLocationsPage> {
     return Scaffold(
       appBar: AppBar(
         title: Text(title),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () {
-            if (context.canPop()) {
-              context.pop();
-            }
-          },
-        ),
+        leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
         actions: [
           IconButton(
             tooltip: 'تطبیق موجودی با قرارگیری',

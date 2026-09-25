@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../../l10n/app_localizations.dart';
 import 'package:latlong2/latlong.dart';
 
+import '../../core/distribution_map_tiles.dart';
 import '../../services/distribution_service.dart';
 import '../../services/memaps_places_service.dart';
 import '../../utils/distribution_location_helper.dart';
@@ -20,6 +21,7 @@ Future<bool?> showDistributionPersonLocationSheet({
   required DistributionService distributionService,
   double? initialLat,
   double? initialLng,
+  DistributionMapTileConfig? tileConfig,
 }) async {
   return showModalBottomSheet<bool>(
     context: context,
@@ -32,6 +34,7 @@ Future<bool?> showDistributionPersonLocationSheet({
       distributionService: distributionService,
       initialLat: initialLat,
       initialLng: initialLng,
+      tileConfig: tileConfig,
     ),
   );
 }
@@ -43,6 +46,7 @@ class _DistributionPersonLocationSheet extends StatefulWidget {
   final DistributionService distributionService;
   final double? initialLat;
   final double? initialLng;
+  final DistributionMapTileConfig? tileConfig;
 
   const _DistributionPersonLocationSheet({
     required this.businessId,
@@ -51,6 +55,7 @@ class _DistributionPersonLocationSheet extends StatefulWidget {
     required this.distributionService,
     this.initialLat,
     this.initialLng,
+    this.tileConfig,
   });
 
   @override
@@ -65,12 +70,30 @@ class _DistributionPersonLocationSheetState extends State<_DistributionPersonLoc
   bool _searching = false;
   bool _saving = false;
   LatLng? _picked;
+  DistributionMapTileConfig _tileConfig = const DistributionMapTileConfig();
 
   @override
   void initState() {
     super.initState();
     if (widget.initialLat != null && widget.initialLng != null) {
       _picked = LatLng(widget.initialLat!, widget.initialLng!);
+    }
+    if (widget.tileConfig != null) {
+      _tileConfig = widget.tileConfig!;
+    } else {
+      _loadTileConfig();
+    }
+  }
+
+  Future<void> _loadTileConfig() async {
+    try {
+      final settings = await widget.distributionService.getDistributionSettings(
+        businessId: widget.businessId,
+      );
+      if (!mounted) return;
+      setState(() => _tileConfig = DistributionMapTileConfig.fromSettings(settings));
+    } catch (_) {
+      // پیش‌فرض OSM اگر تنظیمات در دسترس نباشد
     }
   }
 
@@ -93,6 +116,7 @@ class _DistributionPersonLocationSheetState extends State<_DistributionPersonLoc
           nearLat: near?.latitude,
           nearLng: near?.longitude,
           limit: 8,
+          apiKey: _tileConfig.memapsApiKey,
         );
         if (mounted) setState(() => _suggestions = list);
       } catch (_) {
@@ -205,6 +229,7 @@ class _DistributionPersonLocationSheetState extends State<_DistributionPersonLoc
               markers: const [],
               selectedPoint: _picked,
               pickMode: true,
+              tileConfig: _tileConfig,
               onPick: (p) => setState(() => _picked = p),
             ),
             const SizedBox(height: 12),

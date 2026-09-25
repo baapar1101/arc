@@ -13,6 +13,8 @@ import '../../widgets/invoice/price_list_combobox_widget.dart';
 import '../../widgets/banking/currency_picker_widget.dart';
 import '../../models/customer_model.dart';
 import '../../widgets/business_subpage_back_leading.dart';
+import '../../constants/invoice_print_paper.dart';
+import '../../services/report_template_service.dart';
 
 class QuickSalesSettingsPage extends StatefulWidget {
   final int businessId;
@@ -46,6 +48,11 @@ class _QuickSalesSettingsPageState extends State<QuickSalesSettingsPage> {
   // Boolean settings
   bool _autoCreateAnonymousCustomer = true;
   bool _autoPrint = false;
+  String? _printPaperSize = '80mm';
+  int? _printTemplateId;
+  List<Map<String, dynamic>> _detailPrintTemplates = const [];
+  List<Map<String, dynamic>> _receiptPrintTemplates = const [];
+  bool _loadingPrintTemplates = false;
   bool _enableWarehouseDocument = true;
   String _warehouseDocumentType = 'posted'; // 'draft' or 'posted'
   bool _autoPostWarehouse = true; // برای سازگاری با گذشته
@@ -93,6 +100,8 @@ class _QuickSalesSettingsPageState extends State<QuickSalesSettingsPage> {
         _selectedCurrencyId = settings['default_currency_id'];
         _selectedPriceListId = settings['default_price_list_id'];
         _autoPrint = settings['auto_print'] ?? false;
+        _printPaperSize = (settings['print_paper_size'] ?? '80mm')?.toString();
+        _printTemplateId = (settings['print_template_id'] as num?)?.toInt();
         _enableWarehouseDocument = settings['enable_warehouse_document'] ?? true;
         _warehouseDocumentType = settings['warehouse_document_type'] ?? 'posted';
         _autoPostWarehouse = settings['auto_post_warehouse'] ?? true;
@@ -112,6 +121,7 @@ class _QuickSalesSettingsPageState extends State<QuickSalesSettingsPage> {
       });
 
       await _loadShareGateways();
+      await _loadPrintTemplates();
       
       // بارگذاری مشتری ناشناس اگر وجود دارد
       if (settings['default_anonymous_customer_id'] != null) {
@@ -125,6 +135,51 @@ class _QuickSalesSettingsPageState extends State<QuickSalesSettingsPage> {
       setState(() {
         _loading = false;
       });
+    }
+  }
+
+  Future<void> _loadPrintTemplates() async {
+    setState(() => _loadingPrintTemplates = true);
+    try {
+      final service = ReportTemplateService(ApiClient());
+      final results = await Future.wait([
+        service.listTemplates(
+          businessId: widget.businessId,
+          moduleKey: 'invoices',
+          subtype: 'detail',
+          status: 'published',
+        ),
+        service.listTemplates(
+          businessId: widget.businessId,
+          moduleKey: 'invoices',
+          subtype: 'receipt',
+          status: 'published',
+        ),
+      ]);
+      if (!mounted) return;
+      setState(() {
+        _detailPrintTemplates = results[0];
+        _receiptPrintTemplates = results[1];
+        _loadingPrintTemplates = false;
+        _syncPrintTemplateWithPaper();
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _detailPrintTemplates = const [];
+        _receiptPrintTemplates = const [];
+        _loadingPrintTemplates = false;
+      });
+    }
+  }
+
+  List<Map<String, dynamic>> get _printTemplatesForPaper =>
+      isInvoiceReceiptPaper(_printPaperSize) ? _receiptPrintTemplates : _detailPrintTemplates;
+
+  void _syncPrintTemplateWithPaper() {
+    final ids = _printTemplatesForPaper.map((t) => (t['id'] as num?)?.toInt()).whereType<int>().toSet();
+    if (_printTemplateId != null && !ids.contains(_printTemplateId)) {
+      _printTemplateId = null;
     }
   }
 
@@ -188,6 +243,8 @@ class _QuickSalesSettingsPageState extends State<QuickSalesSettingsPage> {
         if (_selectedPriceListId != null)
           'default_price_list_id': _selectedPriceListId,
         'auto_print': _autoPrint,
+        'print_paper_size': _printPaperSize,
+        'print_template_id': _printTemplateId,
         'enable_warehouse_document': _enableWarehouseDocument,
         'warehouse_document_type': _warehouseDocumentType,
         'auto_post_warehouse': _autoPostWarehouse,
@@ -359,6 +416,54 @@ class _QuickSalesSettingsPageState extends State<QuickSalesSettingsPage> {
                                   });
                                 },
                               ),
+                              const SizedBox(height: 8),
+                              DropdownButtonFormField<String>(
+                                value: kInvoicePrintPaperOptions.any((o) => o.value == _printPaperSize)
+                                    ? _printPaperSize
+                                    : '80mm',
+                                decoration: const InputDecoration(
+                                  labelText: 'سایز کاغذ',
+                                  border: OutlineInputBorder(),
+                                  helperText: 'برای فیش‌پرینتر ۶ / ۸ / ۱۰ سانتی‌متر را انتخاب کنید',
+                                ),
+                                items: [
+                                  ...kInvoicePrintPaperOptions.map(
+                                    (o) => DropdownMenuItem(value: o.value, child: Text(o.labelFa)),
+                                  ),
+                                ],
+                                onChanged: (v) {
+                                  setState(() {
+                                    _printPaperSize = v ?? '80mm';
+                                    _syncPrintTemplateWithPaper();
+                                  });
+                                },
+                              ),
+                              const SizedBox(height: 12),
+                              if (_loadingPrintTemplates)
+                                const Center(child: CircularProgressIndicator())
+                              else
+                                DropdownButtonFormField<int?>(
+                                  value: _printTemplateId,
+                                  isExpanded: true,
+                                  decoration: const InputDecoration(
+                                    labelText: 'قالب چاپ',
+                                    border: OutlineInputBorder(),
+                                  ),
+                                  items: [
+                                    const DropdownMenuItem<int?>(
+                                      value: null,
+                                      child: Text('— بدون قالب سفارشی —'),
+                                    ),
+                                    ..._printTemplatesForPaper.map((tpl) {
+                                      final id = (tpl['id'] as num?)?.toInt();
+                                      return DropdownMenuItem<int?>(
+                                        value: id,
+                                        child: Text((tpl['name'] ?? 'Template').toString()),
+                                      );
+                                    }),
+                                  ],
+                                  onChanged: (v) => setState(() => _printTemplateId = v),
+                                ),
                             ],
                           ),
                           const SizedBox(height: 24),

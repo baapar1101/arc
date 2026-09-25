@@ -19,10 +19,14 @@ import '../../services/person_group_service.dart';
 import '../../services/list_filter_preferences_service.dart';
 import '../../services/person_service.dart';
 import '../../core/auth_store.dart';
+import '../../utils/currency_display_utils.dart';
 import 'person_details_dialog.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
+import '../../utils/bulk_delete_feedback.dart';
 import '../../services/marketplace_service.dart';
+import '../../widgets/business_subpage_back_leading.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 class PersonsPage extends StatefulWidget {
   final int businessId;
@@ -243,9 +247,7 @@ class _PersonsPageState extends State<PersonsPage> {
       showBackButton: true,
       onBack: () {
         if (!mounted) return;
-        if (context.canPop()) {
-          context.pop();
-        }
+        popBusinessOrLauncher(context, widget.businessId);
       },
       showTableIcon: false,
       showRowNumbers: true,
@@ -473,29 +475,68 @@ class _PersonsPageState extends State<PersonsPage> {
           formatter: (person) {
             final balance = person.balance ?? 0.0;
             final formatter = NumberFormat('#,##0', 'en_US');
-            return formatter.format(balance);
+            return formatter.format(balance.abs());
           },
           builder: (person, index) {
             final balance = person.balance ?? 0.0;
             final formatter = NumberFormat('#,##0', 'en_US');
-            final formattedBalance = formatter.format(balance);
+            final formattedBalance = formatter.format(balance.abs());
             
             Color balanceColor;
             if (balance > 0) {
-              balanceColor = Colors.green;
+              balanceColor = SemanticColorResolver.positive(context);
             } else if (balance < 0) {
-              balanceColor = Colors.red;
+              balanceColor = SemanticColorResolver.negative(context);
             } else {
               balanceColor = Colors.grey;
             }
+
+            final fxCodes = person.foreignCurrencyCodes;
+            final showFx = widget.authStore.isMultiCurrency && fxCodes.isNotEmpty;
+            final baseLabel = widget.authStore.currentBusiness?.defaultCurrency?.symbol
+                    ?? widget.authStore.currentBusiness?.defaultCurrency?.code
+                    ?? 'ریال';
             
-            return Text(
-              formattedBalance,
-              style: TextStyle(
-                color: balanceColor,
-                fontWeight: FontWeight.bold,
+            return Tooltip(
+              message: showFx
+                  ? 'مانده معادل پایه ($baseLabel)\nفعال در ارزها: ${fxCodes.join(' · ')}\nبرای جزئیات هر ارز، جزئیات شخص را باز کنید.'
+                  : 'مانده به $baseLabel',
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    formattedBalance,
+                    style: TextStyle(
+                      color: balanceColor,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  Text(
+                    baseLabel,
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  if (showFx)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: Text(
+                        'چندارزی: ${fxCodes.join(' · ')}',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: Theme.of(context).colorScheme.primary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                        textAlign: TextAlign.center,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                ],
               ),
-              textAlign: TextAlign.center,
             );
           },
         ),
@@ -507,22 +548,25 @@ class _PersonsPageState extends State<PersonsPage> {
           filterOptions: [
             FilterOption(value: 'بستانکار', label: 'بستانکار'),
             FilterOption(value: 'بدهکار', label: 'بدهکار'),
-            FilterOption(value: 'بالانس', label: 'بالانس'),
+            FilterOption(value: 'بالانس', label: 'تسویه'),
             FilterOption(value: 'بدون تراکنش', label: 'بدون تراکنش'),
           ],
-          formatter: (person) => person.status ?? '-',
+          formatter: (person) => personBalanceStatusLabel(person.status).isEmpty
+              ? '-'
+              : personBalanceStatusLabel(person.status),
           builder: (person, index) {
-            final status = person.status ?? '-';
+            final status = personBalanceStatusLabel(person.status);
+            final raw = status.isEmpty ? '-' : status;
             Color statusColor;
-            switch (status) {
+            switch (raw) {
               case 'بستانکار':
-                statusColor = Colors.green;
+                statusColor = SemanticColorResolver.positive(context);
                 break;
               case 'بدهکار':
-                statusColor = Colors.red;
+                statusColor = SemanticColorResolver.negative(context);
                 break;
-              case 'بالانس':
-                statusColor = Colors.blue;
+              case 'تسویه':
+                statusColor = SemanticColorResolver.info(context);
                 break;
               case 'بدون تراکنش':
                 statusColor = Colors.grey;
@@ -538,7 +582,7 @@ class _PersonsPageState extends State<PersonsPage> {
                 border: Border.all(color: statusColor.withValues(alpha: 0.3)),
               ),
               child: Text(
-                status,
+                raw,
                 style: TextStyle(
                   color: statusColor,
                   fontWeight: FontWeight.bold,
@@ -578,7 +622,7 @@ class _PersonsPageState extends State<PersonsPage> {
             DataTableAction(
               icon: Icons.delete,
               label: t.delete,
-              color: Colors.red,
+              color: SemanticColorResolver.negative(context),
               onTap: (person) => _deletePerson(person),
             ),
           ],
@@ -674,15 +718,20 @@ class _PersonsPageState extends State<PersonsPage> {
                   if (confirm != true) return;
 
                   final client = ApiClient();
-                  await client.post<Map<String, dynamic>>(
+                  final response = await client.post<Map<String, dynamic>>(
                     '/api/v1/persons/businesses/${widget.businessId}/persons/bulk-delete',
                     data: { 'ids': ids },
                   );
                   try { ( _personsTableKey.currentState as dynamic)?.refresh(); } catch (_) {}
-                  if (mounted) {
-                    // Reuse generic success text available in l10n
-                    SnackBarHelper.show(context, message: t.productsDeletedSuccessfully);
-                  }
+                  if (!context.mounted) return;
+
+                  final result = BulkDeleteResult.fromResponseBody(response.data);
+                  await BulkDeleteFeedback.show(
+                    context,
+                    t,
+                    result: result,
+                    allDeletedMessage: t.personsDeletedSuccessfully,
+                  );
                 } catch (e) {
                   if (mounted) {
                     final t = AppLocalizations.of(context);
@@ -795,7 +844,7 @@ class _PersonsPageState extends State<PersonsPage> {
               Navigator.of(context).pop();
               await _performDelete(person);
             },
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            style: TextButton.styleFrom(foregroundColor: SemanticColorResolver.negative(context)),
             child: Text(t.delete),
           ),
         ],

@@ -4,7 +4,7 @@ Schema models کامل برای محصولات (Products)
 این ماژول شامل تمام schema های مورد نیاز برای مدیریت محصولات است.
 """
 from typing import Optional, List, Literal, Dict, Any
-from pydantic import BaseModel, Field, field_validator, model_validator, ValidationInfo
+from pydantic import BaseModel, Field, field_validator, model_validator, ValidationInfo, ConfigDict
 from datetime import datetime
 from decimal import Decimal
 from enum import Enum
@@ -22,7 +22,139 @@ class ProductAttributeValue(BaseModel):
     value: str = Field(..., description="مقدار ویژگی", max_length=200)
 
 
-class ProductCreateRequest(BaseModel):
+class CatalogSpecificationItem(BaseModel):
+    """یک ردیف مشخصات فنی کاتالوگ"""
+    field_id: Optional[int] = Field(None, description="شناسه قالب فیلد کسب‌وکار (اختیاری)")
+    label: str = Field(..., min_length=1, max_length=255, description="عنوان مشخصه")
+    value: str = Field(default="", max_length=2000, description="مقدار مشخصه")
+    sort_order: int = Field(default=0, ge=0)
+
+
+class ProductSupplierSocialContactInput(BaseModel):
+    """راه ارتباط پیام‌رسان برای تأمین‌کنندهٔ کالا"""
+    model_config = ConfigDict(extra="ignore")
+
+    platform_key: str = Field(..., min_length=1, max_length=64)
+    custom_label: Optional[str] = Field(default=None, max_length=128)
+    value: str = Field(..., min_length=1, max_length=2000)
+
+    @field_validator("platform_key", mode="before")
+    @classmethod
+    def _norm_platform_key(cls, v) -> str:
+        return ("" if v is None else str(v)).strip().lower()
+
+    @field_validator("custom_label", mode="before")
+    @classmethod
+    def _empty_custom_to_none(cls, v):
+        if v is None:
+            return None
+        t = str(v).strip()
+        return t if t else None
+
+    @field_validator("value", mode="before")
+    @classmethod
+    def _norm_value(cls, v) -> str:
+        return ("" if v is None else str(v)).strip()
+
+    @model_validator(mode="after")
+    def _other_needs_label(self):
+        if self.platform_key == "other" and not self.custom_label:
+            raise ValueError("برای پلتفرم «سایر» باید نام/برچسب وارد شود")
+        return self
+
+
+class ProductSupplierInput(BaseModel):
+    """تأمین‌کنندهٔ یک کالا (ورودی ایجاد/ویرایش)"""
+    model_config = ConfigDict(extra="ignore")
+
+    id: Optional[int] = Field(default=None, description="شناسه (فقط برای نمایش؛ در ذخیره نادیده گرفته می‌شود)")
+    person_id: Optional[int] = Field(default=None, gt=0, description="لینک به شخص تأمین‌کننده (اختیاری)")
+    name: Optional[str] = Field(default=None, max_length=255, description="نام/عنوان")
+    website: Optional[str] = Field(default=None, max_length=512)
+    phone: Optional[str] = Field(default=None, max_length=64)
+    email: Optional[str] = Field(default=None, max_length=255)
+    notes: Optional[str] = Field(default=None, max_length=4000)
+    is_preferred: bool = Field(default=False)
+    sort_order: int = Field(default=0, ge=0)
+    social_contacts: List[ProductSupplierSocialContactInput] = Field(default_factory=list)
+
+
+class ProductSupplierResponse(BaseModel):
+    """تأمین‌کنندهٔ یک کالا (خروجی API)"""
+    id: int
+    person_id: Optional[int] = None
+    person_name: Optional[str] = None
+    name: str
+    website: Optional[str] = None
+    phone: Optional[str] = None
+    email: Optional[str] = None
+    notes: Optional[str] = None
+    is_preferred: bool = False
+    sort_order: int = 0
+    social_contacts: List[Dict[str, Any]] = Field(default_factory=list)
+
+
+class ProductOpeningBalanceInput(BaseModel):
+    """تعداد اولیه کالا — فقط در سند تراز افتتاحیه ذخیره می‌شود."""
+    model_config = ConfigDict(extra="ignore")
+
+    quantity: float = Field(default=0, ge=0, description="تعداد اولیه (۰ همراه clear برای حذف)")
+    cost_price: float = Field(
+        default=0,
+        ge=0,
+        description="بهای تمام‌شده هر واحد برای ارزش‌گذاری حساب موجودی کالا",
+    )
+    warehouse_id: Optional[int] = Field(
+        default=None,
+        gt=0,
+        description="انبار (در صورت عدم ارسال، از default_warehouse_id کالا استفاده می‌شود)",
+    )
+    fiscal_year_id: Optional[int] = Field(
+        default=None,
+        description="سال مالی (در صورت عدم ارسال، سال جاری)",
+    )
+    clear: bool = Field(
+        default=False,
+        description="حذف خط موجودی اولیه از سند تراز افتتاحیه (فقط در ویرایش)",
+    )
+
+    @model_validator(mode="after")
+    def _validate_quantity_or_clear(self):
+        if self.clear:
+            return self
+        if self.quantity <= 0:
+            raise ValueError("تعداد اولیه باید بزرگتر از صفر باشد")
+        return self
+
+
+class ProductCatalogProfileMixin(BaseModel):
+    """فیلدهای پروفایل شبکهٔ تأمین (کاتالوگ عمومی)"""
+    catalog_short_description: Optional[str] = Field(
+        None,
+        description="خلاصه کوتاه برای نمایش در کاتالوگ",
+        max_length=1000,
+    )
+    catalog_expert_review: Optional[str] = Field(
+        None,
+        description="بررسی تخصصی محصول",
+        max_length=16000,
+    )
+    catalog_specifications: Optional[List[CatalogSpecificationItem]] = Field(
+        None,
+        description="مشخصات فنی (جدول key-value)",
+    )
+    catalog_brand: Optional[str] = Field(None, max_length=255)
+    catalog_model: Optional[str] = Field(None, max_length=255)
+    catalog_country_of_origin: Optional[str] = Field(None, max_length=128)
+    catalog_video_url: Optional[str] = Field(None, max_length=512)
+    catalog_gallery_file_ids: Optional[List[str]] = Field(
+        None,
+        description="شناسه‌های فایل گالری کاتالوگ (حداکثر ۱۲ تصویر)",
+        max_length=12,
+    )
+
+
+class ProductCreateRequest(ProductCatalogProfileMixin):
     """درخواست ایجاد محصول جدید"""
     code: Optional[str] = Field(
         None, 
@@ -87,6 +219,25 @@ class ProductCreateRequest(BaseModel):
         description="قیمت خرید پایه",
         ge=0,
         example=12000000
+    )
+    sales_price_fx: Optional[Decimal] = Field(
+        None,
+        description="قیمت فروش ارزی (چندارزی)",
+        ge=0,
+    )
+    purchase_price_fx: Optional[Decimal] = Field(
+        None,
+        description="قیمت خرید ارزی (چندارزی)",
+        ge=0,
+    )
+    price_fx_currency_id: Optional[int] = Field(
+        None,
+        description="ارز قیمت‌های ارزی",
+        gt=0,
+    )
+    auto_update_base_from_fx: bool = Field(
+        default=False,
+        description="به‌روزرسانی خودکار قیمت پایه از نرخ × قیمت ارزی",
     )
     
     # موجودی و انبارداری
@@ -214,6 +365,16 @@ class ProductCreateRequest(BaseModel):
         default=False,
         description="انتشار عمومی در شبکهٔ کاتالوگ (API عمومی بدون احراز هویت)",
     )
+
+    opening_balance: Optional[ProductOpeningBalanceInput] = Field(
+        default=None,
+        description="تعداد اولیه — در سند تراز افتتاحیه سال مالی جاری ثبت می‌شود",
+    )
+
+    suppliers: Optional[List[ProductSupplierInput]] = Field(
+        default=None,
+        description="تأمین‌کنندگان کالا (جایگزینی کامل در ویرایش)",
+    )
     
     class Config:
         json_schema_extra = {
@@ -236,7 +397,7 @@ class ProductCreateRequest(BaseModel):
         }
 
 
-class ProductUpdateRequest(BaseModel):
+class ProductUpdateRequest(ProductCatalogProfileMixin):
     """درخواست ویرایش محصول"""
     code: Optional[str] = Field(None, max_length=50)
     name: Optional[str] = Field(None, max_length=200)
@@ -250,6 +411,10 @@ class ProductUpdateRequest(BaseModel):
     
     base_sales_price: Optional[Decimal] = Field(None, ge=0)
     base_purchase_price: Optional[Decimal] = Field(None, ge=0)
+    sales_price_fx: Optional[Decimal] = Field(None, ge=0)
+    purchase_price_fx: Optional[Decimal] = Field(None, ge=0)
+    price_fx_currency_id: Optional[int] = Field(None, gt=0)
+    auto_update_base_from_fx: Optional[bool] = None
     
     track_inventory: Optional[bool] = None
     default_warehouse_id: Optional[int] = Field(None, gt=0)
@@ -278,6 +443,16 @@ class ProductUpdateRequest(BaseModel):
     general_barcodes: Optional[str] = Field(None, max_length=8192)
     is_active: Optional[bool] = None
     is_public_catalog: Optional[bool] = None
+
+    opening_balance: Optional[ProductOpeningBalanceInput] = Field(
+        default=None,
+        description="تعداد اولیه — در سند تراز افتتاحیه سال مالی جاری ثبت/به‌روزرسانی می‌شود",
+    )
+
+    suppliers: Optional[List[ProductSupplierInput]] = Field(
+        default=None,
+        description="تأمین‌کنندگان کالا؛ اگر ارسال شود جایگزین کامل است",
+    )
 
 
 class BulkDefaultWarehouseApplyScope(str, Enum):
@@ -357,6 +532,10 @@ class ProductResponse(BaseModel):
     
     base_sales_price: Optional[Decimal] = None
     base_purchase_price: Optional[Decimal] = None
+    sales_price_fx: Optional[Decimal] = None
+    purchase_price_fx: Optional[Decimal] = None
+    price_fx_currency_id: Optional[int] = None
+    auto_update_base_from_fx: bool = False
     
     track_inventory: bool
     default_warehouse_id: Optional[int] = None
@@ -395,6 +574,15 @@ class ProductResponse(BaseModel):
         None,
         description="شناسهٔ عمومی برای لینک کاتالوگ (پس از فعال‌سازی انتشار)",
     )
+
+    catalog_short_description: Optional[str] = None
+    catalog_expert_review: Optional[str] = None
+    catalog_specifications: Optional[List[CatalogSpecificationItem]] = None
+    catalog_brand: Optional[str] = None
+    catalog_model: Optional[str] = None
+    catalog_country_of_origin: Optional[str] = None
+    catalog_video_url: Optional[str] = None
+    catalog_gallery_file_ids: Optional[List[str]] = None
     
     # اطلاعات موجودی (اختیاری - بسته به درخواست)
     inventory: Optional[List[ProductInventoryInfo]] = Field(
@@ -413,6 +601,11 @@ class ProductResponse(BaseModel):
     # ویژگی‌ها
     attributes: Optional[List[dict]] = None
     attribute_ids: Optional[List[int]] = None
+
+    suppliers: Optional[List[ProductSupplierResponse]] = Field(
+        default=None,
+        description="تأمین‌کنندگان کالا",
+    )
     
     # موجودی (برای جستجو با include_inventory)
     inventory_stock_accounting: Optional[Decimal] = None

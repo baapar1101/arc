@@ -47,6 +47,8 @@ from .fiscal_year import FiscalYear  # noqa: F401
 # Currency models
 from .currency import Currency, BusinessCurrency  # noqa: F401
 from .business_currency_rate import BusinessCurrencyRate  # noqa: F401
+from .fx_rate_provider import FxRateProvider, FxGlobalRate  # noqa: F401
+from .business_fx_auto_sync import BusinessFxAutoSyncSettings, BusinessFxAutoSyncCurrencyRule  # noqa: F401
 
 # Documents
 from .document import Document  # noqa: F401
@@ -56,10 +58,14 @@ from .document_line import DocumentLine  # noqa: F401
 from .account import Account  # noqa: F401
 from .category import BusinessCategory  # noqa: F401
 from .product_attribute import ProductAttribute  # noqa: F401
+from .business_catalog_spec_field import BusinessCatalogSpecField  # noqa: F401
 from .product import Product  # noqa: F401
+from .product_supplier import ProductSupplier, ProductSupplierSocialContact  # noqa: F401
 from .public_catalog_contact_message import PublicCatalogContactMessage  # noqa: F401
 from .product_general_barcode_alias import ProductGeneralBarcodeAlias  # noqa: F401
 from .product_instance import ProductInstance  # noqa: F401
+from .label_template import LabelTemplate, LabelTemplateRevision  # noqa: F401
+from .barcode_label_settings import BarcodeLabelSettings  # noqa: F401
 from .price_list import PriceList, PriceItem  # noqa: F401
 from .product_attribute_link import ProductAttributeLink  # noqa: F401
 from .tax_unit import TaxUnit  # noqa: F401
@@ -80,6 +86,8 @@ from .warehouse_location import WarehouseLocation  # noqa: F401
 from .warehouse_product_placement import WarehouseProductPlacement  # noqa: F401
 from .warehouse_document import WarehouseDocument  # noqa: F401
 from .warehouse_document_line import WarehouseDocumentLine  # noqa: F401
+from .goods_expense_income import GoodsExpenseIncomeDocument, GoodsExpenseIncomeLine  # noqa: F401
+from .hscript_report import HScriptReport, HScriptReportVersion, HScriptReportRun, HScriptReportSchedule  # noqa: F401
 from .product_bom import ProductBOM, ProductBOMItem, ProductBOMOutput, ProductBOMOperation  # noqa: F401
 from .ping_pong_score import PingPongScore  # noqa: F401
 from .storage_plan import StoragePlan, BusinessStorageSubscription, StorageInvoice, StorageUsageTransaction  # noqa: F401
@@ -98,6 +106,7 @@ from .business_backup_import_log import BusinessBackupImportLog  # noqa: F401
 from .ai_config import AIConfig, AIProvider  # noqa: F401
 from .ai_model import AIModel  # noqa: F401
 from .ai_provider_credential import AIProviderCredential  # noqa: F401
+from .business_ai_provider_config import BusinessAIProviderConfig  # noqa: F401
 from .ai_plan import AIPlan, AIPlanType  # noqa: F401
 from .ai_subscription import UserAISubscription, SubscriptionType  # noqa: F401
 from .ai_invoice import AIInvoice, AIInvoiceType, AIInvoiceStatus  # noqa: F401
@@ -105,6 +114,8 @@ from .ai_usage_log import AIUsageLog, PaymentMethod  # noqa: F401
 from .ai_chat_session import AIChatSession  # noqa: F401
 from .ai_chat_message import AIChatMessage, MessageRole  # noqa: F401
 from .ai_session_todo import AISessionTodo  # noqa: F401
+from .ai_agent_run import AIAgentRun  # noqa: F401
+from .ai_subagent_run import AISubagentRun  # noqa: F401
 from .ai_business_memory import AIBusinessMemory  # noqa: F401
 from .ai_chat_attachment import AIChatAttachment  # noqa: F401
 from .ai_knowledge_document import AIKnowledgeDocument  # noqa: F401
@@ -125,6 +136,7 @@ from .ai_skill import (  # noqa: F401
     AISkillVisibility,
 )
 from .ai_voice_interaction import AIVoiceInteraction  # noqa: F401
+from .ai_voice_model import AIVoiceModel, AIVoicePolicy, BusinessAIVoiceSettings  # noqa: F401
 # Activity Log models
 from .activity_log import ActivityLog  # noqa: F401
 from .admin_script_run import AdminScriptRun, AdminScriptRunLog  # noqa: F401
@@ -175,6 +187,16 @@ from .crm import (  # noqa: F401
     CrmNoteAclUser,
     CrmNoteComment,
     CrmNoteAuditEvent,
+    CrmCloseReason,
+    CrmDealLine,
+    CrmTag,
+    CrmLeadTagLink,
+    CrmDealTagLink,
+    CrmCustomFieldDefinition,
+    CrmSequence,
+    CrmSequenceStep,
+    CrmSequenceEnrollment,
+    CrmReminderDedup,
 )
 from .customer_club import (  # noqa: F401
 	CustomerClubSettings,
@@ -194,4 +216,34 @@ from .distribution import (  # noqa: F401
 	DistributionReturnRequest,
 	DistributionVan,
 	DistributionOfflineSyncBatch,
+	DistributionSalesTarget,
+	DistributionDailySettlement,
+	DistributionVisitHeartbeat,
+	DistributionUserLiveLocation,
+	DistributionVisitOrder,
+	DistributionTradePromotion,
+	DistributionDeliveryTrip,
+	DistributionDeliveryStop,
+	DistributionLoadPlan,
+	DistributionCommissionRule,
+	DistributionCommissionRun,
+	DistributionShelfAudit,
+	DistributionCustomerAsset,
+	DistributionAssortment,
+	DistributionCustomerProfile,
+	DistributionVanLot,
+)
+from .telephony import (  # noqa: F401
+	TelephonySettings,
+	TelephonyPbxConnection,
+	TelephonyExtension,
+	TelephonyUserExtension,
+	TelephonySoftphoneSession,
+	TelephonyQueue,
+	TelephonyCall,
+	TelephonyCallEvent,
+	TelephonyCommand,
+	TelephonyNumberAlias,
+	TelephonyEventDeadLetter,
+	TelephonyMetricCounter,
 )

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hesabix_ui/config/brand_config.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 
 import 'plugin_icon_avatar.dart';
@@ -74,10 +75,10 @@ class _PluginDetailSheetState extends State<PluginDetailSheet> {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
 
-    final name = widget.plugin['name']?.toString() ?? '-';
+    final name = t.branded(widget.plugin['name']?.toString() ?? '-');
     final code = widget.plugin['code']?.toString();
     final category = widget.plugin['category']?.toString();
-    final description = widget.plugin['description']?.toString() ?? '';
+    final description = t.branded(widget.plugin['description']?.toString() ?? '');
     final plans = (widget.plugin['plans'] as List?)?.cast<Map<String, dynamic>>() ?? const [];
     final isPurchased = widget.pluginStatus != null && widget.pluginStatus!.isNotEmpty;
     final showTrial = widget.trialAllowed && !isPurchased && !widget.hasUsedTrial;

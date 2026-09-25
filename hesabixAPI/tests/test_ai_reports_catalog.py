@@ -9,6 +9,10 @@ from app.services.ai.ai_reports_service import list_available_reports
 
 def test_report_types_include_trial_balance():
     assert "trial_balance" in REPORT_TYPES
+
+
+def test_report_types_include_balance_sheet():
+    assert "balance_sheet" in REPORT_TYPES
     assert "basalam_overview" in REPORT_TYPES
 
 

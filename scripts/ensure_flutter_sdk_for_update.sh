@@ -117,6 +117,11 @@ ensure_flutter_dart_sdk() {
   return 1
 }
 
+_web_artifacts_ready() {
+  [[ -d "${FLUTTER_ROOT}/bin/cache/flutter_web_sdk/lib" ]] \
+    && [[ -d "${FLUTTER_ROOT}/bin/cache/pkg/sky_engine/lib" ]]
+}
+
 ensure_flutter_web_artifacts() {
   local flutter_bin="${FLUTTER_ROOT}/bin/flutter"
   [[ -x "$flutter_bin" ]] || flutter_bin="$(command -v flutter 2>/dev/null || true)"
@@ -125,10 +130,20 @@ ensure_flutter_web_artifacts() {
     return 1
   }
 
-  if ! declare -F hesabix_resolve_flutter_storage_base_url >/dev/null 2>&1; then
+  if _web_artifacts_ready; then
+    log "Flutter web artifacts already cached; skipping precache"
+    return 0
+  fi
+
+  local storage_resolved=0
+  if declare -F hesabix_resolve_flutter_storage_base_url >/dev/null 2>&1; then
+    if hesabix_resolve_flutter_storage_base_url; then
+      storage_resolved=1
+    fi
+  fi
+  if [[ "$storage_resolved" -eq 0 ]]; then
     export FLUTTER_STORAGE_BASE_URL="${FLUTTER_STORAGE_BASE_URL:-https://storage.flutter-io.cn}"
-  elif ! hesabix_resolve_flutter_storage_base_url; then
-    return 1
+    log "Storage mirror probe failed; using fallback FLUTTER_STORAGE_BASE_URL=${FLUTTER_STORAGE_BASE_URL}"
   fi
 
   export PUB_HOSTED_URL="${PUB_HOSTED_URL:-https://f.mirror.hesabix.ir/pub}"
@@ -139,6 +154,12 @@ ensure_flutter_web_artifacts() {
     log "Flutter web artifacts precached"
     return 0
   fi
+
+  if _web_artifacts_ready; then
+    log "precache reported failure but web artifacts are present; continuing"
+    return 0
+  fi
+
   log "flutter precache --web failed"
   return 1
 }

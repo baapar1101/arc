@@ -13,6 +13,8 @@ class BusinessSettingsLocalizationHelper {
         return t.settingsSideCurrenciesTitle;
       case 'settingsInvoiceFxPolicyTitle':
         return t.settingsInvoiceFxPolicyTitle;
+      case 'settingsFxAutoSyncTitle':
+        return t.settingsFxAutoSyncTitle;
       case 'businessSettingsFiscalYearEdit':
         return t.businessSettingsFiscalYearEdit;
       case 'creditSettingsTitle':
@@ -55,10 +57,14 @@ class BusinessSettingsLocalizationHelper {
         return t.businessSettingsNotificationTemplates;
       case 'businessSettingsAppearanceProfile':
         return t.appearanceSettingsPageTitle;
+      case 'smsBankAssistantSettingsTitle':
+        return 'دستیار پیامک بانکی';
       case 'dataBackup':
         return t.dataBackup;
       case 'ftpBackupSettingsTitle':
         return t.ftpBackupSettingsTitle;
+      case 'businessSettingsAiProviderTitle':
+        return 'ارائه‌دهنده هوش مصنوعی';
       case 'dataRestore':
         return t.dataRestore;
       case 'systemLogs':
@@ -82,6 +88,8 @@ class BusinessSettingsLocalizationHelper {
         return t.settingsSideCurrenciesSubtitle;
       case 'settingsInvoiceFxPolicySubtitle':
         return t.settingsInvoiceFxPolicySubtitle;
+      case 'settingsFxAutoSyncSubtitle':
+        return t.settingsFxAutoSyncSubtitle;
       case 'businessSettingsFiscalYearEditDescription':
         return t.businessSettingsFiscalYearEditDescription;
       case 'creditSettingsSubtitle':
@@ -124,10 +132,14 @@ class BusinessSettingsLocalizationHelper {
         return t.businessSettingsNotificationTemplatesDescription;
       case 'businessSettingsAppearanceProfileDescription':
         return t.businessSettingsAppearanceProfileDescription;
+      case 'smsBankAssistantSettingsDescription':
+        return 'تشخیص خودکار پیامک بانک و ثبت سریع دریافت/پرداخت، هزینه و درآمد';
       case 'dataBackupDescription':
         return t.dataBackupDescription;
       case 'ftpBackupSettingsDescription':
         return t.ftpBackupSettingsDescription;
+      case 'businessSettingsAiProviderDescription':
+        return 'اتصال URL، API Key و مدل‌های اختصاصی کسب‌وکار';
       case 'dataRestoreDescription':
         return t.dataRestoreDescription;
       case 'systemLogsDescription':

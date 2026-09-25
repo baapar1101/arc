@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:hesabix_ui/config/brand_config.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 
 import '../../core/api_client.dart';
@@ -631,7 +632,7 @@ class _NotificationsSettingsPageState extends State<NotificationsSettingsPage> {
             value: _inapp,
             onChanged: (v) => setState(() => _inapp = v),
             title: Text(t.notificationsChannelInApp),
-            subtitle: Text(t.notificationsChannelInAppDescription),
+            subtitle: Text(t.branded(t.notificationsChannelInAppDescription)),
             secondary: Icon(
               Icons.notifications_active_outlined,
               color: _inapp ? colorScheme.primary : colorScheme.onSurfaceVariant,

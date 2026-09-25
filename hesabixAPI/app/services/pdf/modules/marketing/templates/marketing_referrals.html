@@ -88,13 +88,13 @@
             padding: 15px;
             background-color: #e3f2fd;
             border-radius: 8px;
-            border-right: 4px solid #2196f3;
+            border-right: 4px solid {{ brand_primary|default('#0F4C81') }};
         }
         
         .filters-info h3 {
             font-size: 14px;
             margin-bottom: 10px;
-            color: #1976d2;
+            color: {{ brand_primary|default('#0F4C81') }};
         }
         
         .filter-item {
@@ -105,8 +105,8 @@
             background-color: white;
             border-radius: 15px;
             font-size: 11px;
-            color: #1976d2;
-            border: 1px solid #bbdefb;
+            color: {{ brand_primary|default('#0F4C81') }};
+            border: 1px solid {{ brand_primary|default('#0F4C81') }}33;
         }
         
         .table-container {

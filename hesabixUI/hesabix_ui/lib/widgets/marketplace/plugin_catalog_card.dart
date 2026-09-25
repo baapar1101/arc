@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hesabix_ui/config/brand_config.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 
 import 'plugin_icon_avatar.dart';
@@ -29,9 +30,9 @@ class PluginCatalogCard extends StatelessWidget {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
 
-    final name = plugin['name']?.toString() ?? '-';
+    final name = t.branded(plugin['name']?.toString() ?? '-');
     final category = plugin['category']?.toString();
-    final description = plugin['description']?.toString() ?? '';
+    final description = t.branded(plugin['description']?.toString() ?? '');
     final plans = (plugin['plans'] as List?)?.cast<Map<String, dynamic>>() ?? const [];
     final minPrice = cheapestPlanPrice(plans);
     final symbol = plans.isNotEmpty

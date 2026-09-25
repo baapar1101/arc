@@ -129,7 +129,8 @@ class Error404Page extends StatelessWidget {
                       // دکمه صفحه نخست
                       ElevatedButton.icon(
                         onPressed: () {
-                          context.go('/');
+                          // `/` روی دسکتاپ به last_url برمی‌گردد؛ داشبورد واقعی صفحه نخست است.
+                          context.go('/user/profile/dashboard');
                         },
                         icon: const Icon(Icons.home, size: 20),
                         label: const Text('صفحه نخست'),

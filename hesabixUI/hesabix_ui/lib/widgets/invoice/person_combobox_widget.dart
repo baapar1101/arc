@@ -9,6 +9,7 @@ import '../../widgets/person/person_financial_balance_banner.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/responsive_helper.dart';
 import '../../utils/snackbar_helper.dart';
+import 'invoice_form_layout.dart';
 
 class _PersonPickerState {
   final List<Person> persons;
@@ -57,6 +58,7 @@ class PersonComboboxWidget extends StatefulWidget {
   final String? searchHint;
   /// نمایش مانده حساب و بدهکار/بستانکار زیر فیلد (برای فرم‌های مالی)
   final bool showFinancialBalance;
+  final bool dense;
 
   const PersonComboboxWidget({
     super.key,
@@ -69,6 +71,7 @@ class PersonComboboxWidget extends StatefulWidget {
     this.personTypes,
     this.searchHint,
     this.showFinancialBalance = false,
+    this.dense = false,
   });
 
   @override
@@ -106,6 +109,7 @@ class _PersonComboboxWidgetState extends State<PersonComboboxWidget> {
   OverlayEntry? _desktopOverlayEntry;
   int _highlightedIndex = -1;
   double _desktopFieldWidth = 0;
+  bool _suppressFieldNotifications = false;
 
   double _desktopOverlayHeight(_PersonPickerState state) {
     if (state.isLoading && state.persons.isEmpty) return 120;
@@ -130,8 +134,17 @@ class _PersonComboboxWidgetState extends State<PersonComboboxWidget> {
   void didUpdateWidget(covariant PersonComboboxWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.selectedPerson?.id != widget.selectedPerson?.id) {
-      _searchController.text = widget.selectedPerson?.displayName ?? '';
+      _setFieldQuiet(widget.selectedPerson?.displayName ?? '');
     }
+  }
+
+  void _setFieldQuiet(String text) {
+    _suppressFieldNotifications = true;
+    _searchController.value = TextEditingValue(
+      text: text,
+      selection: TextSelection.collapsed(offset: text.length),
+    );
+    _suppressFieldNotifications = false;
   }
 
   @override
@@ -157,7 +170,7 @@ class _PersonComboboxWidgetState extends State<PersonComboboxWidget> {
         _loadRecentPersons();
       }
     } else {
-      Future.delayed(const Duration(milliseconds: 150), () {
+      Future.delayed(const Duration(milliseconds: 180), () {
         if (!mounted || _fieldFocus.hasFocus) return;
         _removeDesktopOverlay();
       });
@@ -198,7 +211,7 @@ class _PersonComboboxWidgetState extends State<PersonComboboxWidget> {
         Positioned.fill(
           child: GestureDetector(
             behavior: HitTestBehavior.translucent,
-            onTap: () {
+            onTapDown: (_) {
               _fieldFocus.unfocus();
               _removeDesktopOverlay();
             },
@@ -262,11 +275,13 @@ class _PersonComboboxWidgetState extends State<PersonComboboxWidget> {
               final selected = index == _highlightedIndex;
               return Material(
                 color: selected ? cs.primary.withValues(alpha: 0.10) : Colors.transparent,
-                child: ListTile(
-                  dense: true,
-                  title: Text(person.displayName, maxLines: 1, overflow: TextOverflow.ellipsis),
-                  subtitle: person.personTypes.isNotEmpty ? Text(person.personTypes.first.persianName) : null,
-                  onTap: () => _selectPersonFromOverlay(person),
+                child: InkWell(
+                  onTapDown: (_) => _selectPersonFromOverlay(person),
+                  child: ListTile(
+                    dense: true,
+                    title: Text(person.displayName, maxLines: 1, overflow: TextOverflow.ellipsis),
+                    subtitle: person.personTypes.isNotEmpty ? Text(person.personTypes.first.persianName) : null,
+                  ),
                 ),
               );
             },
@@ -525,18 +540,34 @@ class _PersonComboboxWidgetState extends State<PersonComboboxWidget> {
 
   void _selectPerson(Person? person) {
     if (person == null) {
-      _searchController.clear();
+      _setFieldQuiet('');
       widget.onChanged(null);
       return;
     }
-    
-    _searchController.text = person.displayName;
+
+    _setFieldQuiet(person.displayName);
     widget.onChanged(person);
   }
 
   Future<void> _applyNewPersonDialogResult(Person? result) async {
     if (result == null || !mounted) return;
     _selectPerson(result);
+  }
+
+  /// انواع شخص برای پیش‌انتخاب در دیالوگ افزودن، بر اساس فیلتر combobox.
+  List<PersonType>? _initialPersonTypesForNewDialog() {
+    final raw = widget.personTypes;
+    if (raw == null || raw.isEmpty) return null;
+    final types = <PersonType>[];
+    for (final name in raw) {
+      for (final pt in PersonType.values) {
+        if (pt.persianName == name) {
+          types.add(pt);
+          break;
+        }
+      }
+    }
+    return types.isEmpty ? null : types;
   }
 
   Future<void> _addNewPerson(BuildContext bottomSheetContext) async {
@@ -549,6 +580,7 @@ class _PersonComboboxWidgetState extends State<PersonComboboxWidget> {
         businessId: widget.businessId,
         onSuccess: () {},
         initialAliasName: searchQuery.isNotEmpty ? searchQuery : null,
+        initialPersonTypes: _initialPersonTypesForNewDialog(),
       ),
     );
 
@@ -567,6 +599,7 @@ class _PersonComboboxWidgetState extends State<PersonComboboxWidget> {
         businessId: widget.businessId,
         onSuccess: () {},
         initialAliasName: searchQuery.isNotEmpty ? searchQuery : null,
+        initialPersonTypes: _initialPersonTypesForNewDialog(),
       ),
     );
 
@@ -706,51 +739,98 @@ class _PersonComboboxWidgetState extends State<PersonComboboxWidget> {
             child: TextField(
               controller: _searchController,
               focusNode: _fieldFocus,
-              decoration: InputDecoration(
-                labelText: widget.label,
-                hintText: widget.hintText,
-                border: const OutlineInputBorder(),
-                prefixIcon: const Icon(Icons.person_search),
-                suffixIconConstraints: const BoxConstraints(
-                  minHeight: 48,
-                  maxHeight: 48,
-                  minWidth: 80,
-                  maxWidth: 104,
-                ),
-                suffixIcon: Align(
-                  alignment: AlignmentDirectional.centerEnd,
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      IconButton(
-                        tooltip: 'افزودن شخص جدید',
-                        icon: Icon(Icons.add, color: colorScheme.primary),
-                        onPressed: _addNewPersonFromField,
-                        visualDensity: VisualDensity.compact,
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
-                      ),
-                      if (_isSearching)
-                        const Padding(
-                          padding: EdgeInsetsDirectional.only(end: 4),
-                          child: SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2),
+              decoration: widget.dense
+                  ? InvoiceFormFieldMetrics.mergeDecoration(
+                      context,
+                      InputDecoration(
+                        labelText: widget.label,
+                        hintText: widget.hintText,
+                        suffixIconConstraints: const BoxConstraints(
+                          minHeight: 36,
+                          maxHeight: 36,
+                          minWidth: 72,
+                          maxWidth: 104,
+                        ),
+                        suffixIcon: Align(
+                          alignment: AlignmentDirectional.centerEnd,
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              IconButton(
+                                tooltip: 'افزودن شخص جدید',
+                                icon: Icon(Icons.add, color: colorScheme.primary, size: 20),
+                                onPressed: _addNewPersonFromField,
+                                visualDensity: VisualDensity.compact,
+                                padding: EdgeInsets.zero,
+                                constraints: InvoiceFormFieldMetrics.compactSuffixIconConstraints,
+                              ),
+                              if (_isSearching)
+                                const Padding(
+                                  padding: EdgeInsetsDirectional.only(end: 4),
+                                  child: SizedBox(
+                                    width: 16,
+                                    height: 16,
+                                    child: CircularProgressIndicator(strokeWidth: 2),
+                                  ),
+                                ),
+                              IconButton(
+                                tooltip: 'انتخاب پیشرفته',
+                                icon: Icon(Icons.manage_search_rounded, color: colorScheme.primary, size: 20),
+                                onPressed: _showPersonPicker,
+                                visualDensity: VisualDensity.compact,
+                                padding: EdgeInsets.zero,
+                                constraints: InvoiceFormFieldMetrics.compactSuffixIconConstraints,
+                              ),
+                            ],
                           ),
                         ),
-                      IconButton(
-                        tooltip: 'انتخاب پیشرفته',
-                        icon: Icon(Icons.manage_search_rounded, color: colorScheme.primary),
-                        onPressed: _showPersonPicker,
-                        visualDensity: VisualDensity.compact,
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
                       ),
-                    ],
-                  ),
-                ),
-              ),
+                    )
+                  : InputDecoration(
+                      labelText: widget.label,
+                      hintText: widget.hintText,
+                      border: const OutlineInputBorder(),
+                      prefixIcon: const Icon(Icons.person_search),
+                      suffixIconConstraints: const BoxConstraints(
+                        minHeight: 40,
+                        maxHeight: 40,
+                        minWidth: 72,
+                        maxWidth: 104,
+                      ),
+                      suffixIcon: Align(
+                        alignment: AlignmentDirectional.centerEnd,
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            IconButton(
+                              tooltip: 'افزودن شخص جدید',
+                              icon: Icon(Icons.add, color: colorScheme.primary),
+                              onPressed: _addNewPersonFromField,
+                              visualDensity: VisualDensity.compact,
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+                            ),
+                            if (_isSearching)
+                              const Padding(
+                                padding: EdgeInsetsDirectional.only(end: 4),
+                                child: SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(strokeWidth: 2),
+                                ),
+                              ),
+                            IconButton(
+                              tooltip: 'انتخاب پیشرفته',
+                              icon: Icon(Icons.manage_search_rounded, color: colorScheme.primary),
+                              onPressed: _showPersonPicker,
+                              visualDensity: VisualDensity.compact,
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
               onTap: () {
                 _showDesktopOverlay();
                 if (_searchController.text.trim().isEmpty) {
@@ -758,6 +838,7 @@ class _PersonComboboxWidgetState extends State<PersonComboboxWidget> {
                 }
               },
               onChanged: (query) {
+                if (_suppressFieldNotifications) return;
                 final trimmed = query.trim();
                 if (trimmed.isEmpty && widget.selectedPerson != null) {
                   widget.onChanged(null);

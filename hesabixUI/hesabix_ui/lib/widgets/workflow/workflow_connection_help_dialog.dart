@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:hesabix_ui/theme/glass.dart';
 import '../../l10n/app_localizations.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 /// Dialog راهنمای اتصال بین نودها
 class WorkflowConnectionHelpDialog extends StatelessWidget {
@@ -20,8 +21,8 @@ class WorkflowConnectionHelpDialog extends StatelessWidget {
     return AlertDialog(
       title: Row(
         children: [
-          const Icon(Icons.info_outline, color: Colors.blue),
-          const SizedBox(width: 8),
+          Icon(Icons.info_outline, color: SemanticColorResolver.info(context)),
+          SizedBox(width: 8),
           Text(t.workflowConnectionHelpTitle),
         ],
       ),
@@ -39,9 +40,9 @@ class WorkflowConnectionHelpDialog extends StatelessWidget {
                 t.workflowConnectionHelpMethod1Step3,
               ],
               Icons.drag_handle,
-              Colors.blue,
+              SemanticColorResolver.info(context),
             ),
-            const SizedBox(height: 16),
+            SizedBox(height: 16),
             _buildMethodSection(
               context,
               t.workflowConnectionHelpMethod2,
@@ -50,36 +51,36 @@ class WorkflowConnectionHelpDialog extends StatelessWidget {
                 t.workflowConnectionHelpMethod2Step2,
               ],
               Icons.touch_app,
-              Colors.green,
+              SemanticColorResolver.positive(context),
             ),
-            const SizedBox(height: 16),
+            SizedBox(height: 16),
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.orange.shade50,
+                color: SemanticColorResolver.warning(context).withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.orange.shade200),
+                border: Border.all(color: SemanticColorResolver.warning(context).withValues(alpha: 0.35)),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
                     children: [
-                      Icon(Icons.lightbulb_outline, size: 20, color: Colors.orange.shade700),
-                      const SizedBox(width: 8),
+                      Icon(Icons.lightbulb_outline, size: 20, color: SemanticColorResolver.warning(context)),
+                      SizedBox(width: 8),
                       Text(
                         t.workflowConnectionHelpTips,
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
-                          color: Colors.orange.shade900,
+                          color: SemanticColorResolver.warning(context),
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 8),
+                  SizedBox(height: 8),
                   Text(
                     t.workflowConnectionHelpTipsText,
-                    style: TextStyle(fontSize: 12, color: Colors.orange.shade900),
+                    style: TextStyle(fontSize: 12, color: SemanticColorResolver.warning(context)),
                   ),
                 ],
               ),

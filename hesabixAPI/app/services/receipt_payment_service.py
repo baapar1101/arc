@@ -105,6 +105,65 @@ def _parse_iso_date(dt: str | datetime | date) -> date:
     raise ApiError("INVALID_DATE", f"Invalid date format: {dt}", http_status=400)
 
 
+def resolve_receipt_document_date_from_account_lines(
+    default_date: date,
+    account_lines: List[Dict[str, Any]],
+) -> date:
+    """تاریخ سند دریافت/پرداخت: بیشینهٔ تاریخ پیش‌فرض و transaction_date خطوط حساب."""
+    dates: List[date] = [default_date]
+    for line in account_lines or []:
+        raw = line.get("transaction_date")
+        if raw is None:
+            continue
+        try:
+            dates.append(_parse_iso_date(raw))
+        except ApiError:
+            continue
+    return max(dates)
+
+
+def _link_receipt_payment_to_invoices(
+    db: Session,
+    receipt_payment_document_id: int,
+    person_lines: List[Dict[str, Any]],
+    extra_info: Optional[Dict[str, Any]] = None,
+) -> None:
+    """لینک دوطرفه سند دریافت/پرداخت به فاکتور(ها) از person_lines، extra_info و settlements."""
+    from app.services.legacy_import.invoice_settlement import append_receipt_payment_to_invoice
+
+    invoice_ids: set[int] = set()
+    for pl in person_lines or []:
+        pl_extra = pl.get("extra_info") if isinstance(pl.get("extra_info"), dict) else {}
+        inv_id = pl_extra.get("invoice_id")
+        if inv_id is None:
+            continue
+        try:
+            invoice_ids.add(int(inv_id))
+        except (TypeError, ValueError):
+            continue
+
+    if isinstance(extra_info, dict):
+        doc_inv = extra_info.get("invoice_id")
+        if doc_inv is not None:
+            try:
+                invoice_ids.add(int(doc_inv))
+            except (TypeError, ValueError):
+                pass
+        for st in extra_info.get("settlements") or []:
+            if not isinstance(st, dict):
+                continue
+            st_inv = st.get("invoice_id")
+            if st_inv is None:
+                continue
+            try:
+                invoice_ids.add(int(st_inv))
+            except (TypeError, ValueError):
+                continue
+
+    for inv_id in invoice_ids:
+        append_receipt_payment_to_invoice(db, inv_id, int(receipt_payment_document_id))
+
+
 def _get_current_fiscal_year(db: Session, business_id: int) -> FiscalYear:
     """دریافت سال مالی فعلی برای کسب‌وکار"""
     fiscal_year = db.query(FiscalYear).filter(
@@ -232,13 +291,27 @@ def _validate_check_transaction_line(
         )
 
     if int(check.currency_id) != int(document_currency_id):
-        raise ApiError(
-            "CHECK_CURRENCY_MISMATCH",
-            "ارز چک با ارز سند دریافت/پرداخت یکسان نیست",
-            http_status=400,
-        )
+        # بین‌ارزی (E2): سند پایه است؛ ارز بومی چک در account_currency_id می‌آید
+        native_cur = account_line.get("account_currency_id")
+        try:
+            native_cur_i = int(native_cur) if native_cur is not None else None
+        except Exception:
+            native_cur_i = None
+        if native_cur_i is None or int(check.currency_id) != native_cur_i:
+            raise ApiError(
+                "CHECK_CURRENCY_MISMATCH",
+                "ارز چک با ارز سند دریافت/پرداخت یکسان نیست",
+                http_status=400,
+            )
 
-    if amount_decimal != Decimal(str(check.amount)):
+    compare_amount = amount_decimal
+    native_amt = account_line.get("account_currency_amount")
+    if native_amt is not None:
+        try:
+            compare_amount = Decimal(str(native_amt))
+        except Exception:
+            compare_amount = amount_decimal
+    if compare_amount != Decimal(str(check.amount)):
         raise ApiError(
             "CHECK_AMOUNT_MISMATCH",
             "مبلغ تراکنش با مبلغ ثبت‌شده چک برابر نیست",
@@ -304,6 +377,20 @@ def create_receipt_payment(
     is_receipt = (document_type == DOCUMENT_TYPE_RECEIPT)
     logger.info(f"آیا دریافت است: {is_receipt}")
 
+    # V2-P4: بازنویسی بین‌ارزی مستقل به ارز پایه (اگر لازم)
+    try:
+        from app.services.cross_currency_settlement_service import (
+            prepare_standalone_receipt_payment_cross_currency,
+        )
+
+        data = prepare_standalone_receipt_payment_cross_currency(
+            db, business_id, data, is_receipt=is_receipt
+        )
+    except ApiError:
+        raise
+    except Exception:
+        logger.exception("prepare standalone cross-currency failed")
+
     # امکان override نوع حساب طرف‌شخص (دریافتنی/پرداختنی) برای سناریوهایی مثل برگشت فاکتور
     extra_info_all = data.get("extra_info") or {}
     person_is_receivable_override = extra_info_all.get("person_is_receivable")
@@ -313,8 +400,8 @@ def create_receipt_payment(
         # پیش‌فرض: دریافت → دریافتنی، پرداخت → پرداختنی
         is_person_receivable = is_receipt
     
-    # اعتبارسنجی تاریخ
-    document_date = _parse_iso_date(data.get("document_date", datetime.now()))
+    # اعتبارسنجی تاریخ (پس از خواندن account_lines)
+    parsed_doc_date = _parse_iso_date(data.get("document_date", datetime.now()))
     
     # اعتبارسنجی ارز
     currency_id = data.get("currency_id")
@@ -344,17 +431,37 @@ def create_receipt_payment(
     logger.info(f"خطوط حساب‌ها: {account_lines}")
     if not account_lines or not isinstance(account_lines, list):
         raise ApiError("ACCOUNT_LINES_REQUIRED", "At least one account line is required", http_status=400)
+
+    document_date = resolve_receipt_document_date_from_account_lines(parsed_doc_date, account_lines)
     
     # محاسبه مجموع مبالغ
     person_total = sum(float(line.get("amount", 0)) for line in person_lines)
     account_total = sum(float(line.get("amount", 0)) for line in account_lines)
-    
-    # بررسی تعادل مبالغ
-    if abs(person_total - account_total) > 0.01:  # tolerance برای خطای ممیز شناور
+    fx_adjustment_lines = data.get("fx_adjustment_lines") or []
+    fx_adj_debit = sum(
+        float(x.get("amount", 0) or 0)
+        for x in fx_adjustment_lines
+        if str(x.get("side") or "").lower() == "debit"
+    )
+    fx_adj_credit = sum(
+        float(x.get("amount", 0) or 0)
+        for x in fx_adjustment_lines
+        if str(x.get("side") or "").lower() == "credit"
+    )
+    # تعادل: مجموع بدهکار = مجموع بستانکار
+    # دریافت: شخص credit، حساب debit، FX debit/credit
+    # پرداخت: شخص debit، حساب credit، FX debit/credit
+    if is_receipt:
+        left = account_total + fx_adj_debit
+        right = person_total + fx_adj_credit
+    else:
+        left = person_total + fx_adj_debit
+        right = account_total + fx_adj_credit
+    if abs(left - right) > 0.01:
         raise ApiError(
             "UNBALANCED_AMOUNTS",
-            f"Person total ({person_total}) must equal account total ({account_total})",
-            http_status=400
+            f"مبالغ سند نامتوازن است (چپ={left}, راست={right})",
+            http_status=400,
         )
     
     amount_decimal = Decimal(str(person_total))
@@ -465,11 +572,19 @@ def create_receipt_payment(
             if not invoice_doc:
                 raise ApiError("INSTALLMENT_INVOICE_NOT_FOUND", "فاکتور اقساط پیدا نشد", http_status=404)
             if int(invoice_doc.currency_id) != int(currency_id):
-                raise ApiError(
-                    "INSTALLMENT_CURRENCY_MISMATCH",
-                    "ارز فاکتور اقساط با ارز سند دریافت یکسان نیست",
-                    http_status=400,
-                )
+                # V2-P4: پس از بازنویسی بین‌ارزی، ارز سند = پایه؛ ارز تسویه در extra_info است
+                settles_cur = None
+                if isinstance(extra_info_all, dict):
+                    try:
+                        settles_cur = int(extra_info_all.get("settles_currency_id")) if extra_info_all.get("settles_currency_id") is not None else None
+                    except Exception:
+                        settles_cur = None
+                if settles_cur is None or int(invoice_doc.currency_id) != int(settles_cur):
+                    raise ApiError(
+                        "INSTALLMENT_CURRENCY_MISMATCH",
+                        "ارز فاکتور اقساط با ارز سند دریافت یکسان نیست",
+                        http_status=400,
+                    )
             inv_extra = invoice_doc.extra_info or {}
             plan = inv_extra.get("installment_plan")
             schedule = (plan or {}).get("schedule")
@@ -579,6 +694,10 @@ def create_receipt_payment(
                 line_extra_info["invoice_code"] = person_line_extra["invoice_code"]
             if person_line_extra.get("link_to_invoice"):
                 line_extra_info["link_to_invoice"] = person_line_extra["link_to_invoice"]
+            if person_line_extra.get("fx_settlement"):
+                line_extra_info["fx_settlement"] = person_line_extra["fx_settlement"]
+            if person_line_extra.get("side"):
+                line_extra_info["side"] = person_line_extra["side"]
         
         line = DocumentLine(
             document_id=document.id,
@@ -752,8 +871,15 @@ def create_receipt_payment(
                 extra_info["check_id"] = int(account_line.get("check_id"))
             if account_line.get("check_number"):
                 extra_info["check_number"] = account_line.get("check_number")
-        
-        # ایجاد خط سند برای حساب
+
+        # مانده بومی حساب (بین‌ارزی E2: مبلغ خط = پایه)
+        if account_line.get("account_currency_amount") is not None:
+            extra_info["account_currency_amount"] = str(account_line.get("account_currency_amount"))
+        if account_line.get("account_currency_id") is not None:
+            try:
+                extra_info["account_currency_id"] = int(account_line.get("account_currency_id"))
+            except Exception:
+                pass
         # برای چک: منطق حسابداری متفاوت است
         # در دریافت با چک دریافتی: چک از 10403 خارج می‌شود → باید بستانکار شود
         # در پرداخت با چک پرداختی: چک از 20202 خارج می‌شود → باید بدهکار شود
@@ -924,6 +1050,30 @@ def create_receipt_payment(
                 )
                 logger.info(f"خط اضافی برای حساب مبدا چک ایجاد شد: {source_line}")
                 db.add(source_line)
+
+    # خطوط تعدیل تسعیر ارز (پرداخت بین‌ارزی)
+    for fx_line in fx_adjustment_lines:
+        try:
+            fx_amt = Decimal(str(fx_line.get("amount", 0) or 0))
+        except Exception:
+            continue
+        if fx_amt <= 0:
+            continue
+        code = str(fx_line.get("account_code") or "").strip()
+        if not code:
+            continue
+        side = str(fx_line.get("side") or "").strip().lower()
+        fx_account = _get_fixed_account_by_code(db, code)
+        db.add(
+            DocumentLine(
+                document_id=document.id,
+                account_id=fx_account.id,
+                debit=fx_amt if side == "debit" else Decimal(0),
+                credit=fx_amt if side == "credit" else Decimal(0),
+                description=fx_line.get("description") or "تسعیر ارز",
+                extra_info={"fx_adjustment": True, "side": side, "account_code": code},
+            )
+        )
     
     # ایجاد خطوط کارمزد اگر کارمزدی وجود دارد
     if total_commission > 0:
@@ -991,10 +1141,10 @@ def create_receipt_payment(
                     credit=commission_credit,
                     description=f"کارمزد تراکنش {transaction_type}",
                     extra_info={
-                        "transaction_type": transaction_type,
-                        "commission": float(commission_amount),
+                        # بدون transaction_type تا به‌عنوان تراکنش پرداخت مشتری بازخوانی نشود
                         "is_commission_line": True,
                         "original_transaction_index": i,
+                        "commission_type": "settlement_contra",
                     }
                 )
                 logger.info(f"خط کارمزد حساب ایجاد شد: {commission_line}")
@@ -1019,7 +1169,6 @@ def create_receipt_payment(
                     credit=commission_service_credit,
                     description=f"کارمزد خدمات بانکی",
                     extra_info={
-                        "commission": float(commission_amount),
                         "is_commission_line": True,
                         "original_transaction_index": i,
                         "commission_type": "banking_service",
@@ -1134,10 +1283,26 @@ def create_receipt_payment(
                 extra_info={"installment": True, "reclassification": True},
             ))
 
+    # لینک دوطرفه به فاکتور(ها) — person_line.invoice_id، extra_info.invoice_id، settlements
+    _link_receipt_payment_to_invoices(
+        db,
+        int(document.id),
+        person_lines,
+        extra_info_all if isinstance(extra_info_all, dict) else None,
+    )
+
     # ذخیره تغییرات
     logger.info(f"=== ذخیره تغییرات ===")
     # flush کردن تغییرات قبل از commit برای اطمینان از ذخیره شدن
     db.flush()
+
+    try:
+        from app.services.document_line_fx_service import stamp_document_lines_fx_base
+
+        stamp_document_lines_fx_base(db, document, only_missing=False, allow_infer=True)
+        db.flush()
+    except Exception as fx_stamp_ex:
+        logger.warning("receipt_payment fx base stamp failed doc_id=%s err=%s", document.id, fx_stamp_ex)
     
     # تغییر وضعیت چک‌های استفاده شده
     logger.info(f"=== تغییر وضعیت چک‌های استفاده شده ===")
@@ -1652,7 +1817,21 @@ def update_receipt_payment(
         pass
 
     # 2) اعتبارسنجی ورودی‌ها (مشابه create)
-    document_date = _parse_iso_date(data.get("document_date", document.document_date))
+    parsed_doc_date = _parse_iso_date(data.get("document_date", document.document_date))
+    is_receipt = (document.document_type == DOCUMENT_TYPE_RECEIPT)
+    try:
+        from app.services.cross_currency_settlement_service import (
+            prepare_standalone_receipt_payment_cross_currency,
+        )
+
+        data = prepare_standalone_receipt_payment_cross_currency(
+            db, int(document.business_id), data, is_receipt=is_receipt
+        )
+    except ApiError:
+        raise
+    except Exception:
+        logger.exception("prepare standalone cross-currency on update failed")
+
     currency_id = data.get("currency_id", document.currency_id)
     if not currency_id:
         raise ApiError("CURRENCY_REQUIRED", "currency_id is required", http_status=400)
@@ -1669,16 +1848,59 @@ def update_receipt_payment(
 
     person_total = sum(float(line.get("amount", 0)) for line in person_lines)
     account_total = sum(float(line.get("amount", 0)) for line in account_lines)
-    if abs(person_total - account_total) > 0.01:
-        raise ApiError("UNBALANCED_AMOUNTS", "Totals must be balanced", http_status=400)
+    fx_adjustment_lines = data.get("fx_adjustment_lines") or []
+    fx_adj_debit = sum(
+        float(x.get("amount", 0) or 0)
+        for x in fx_adjustment_lines
+        if str(x.get("side") or "").lower() == "debit"
+    )
+    fx_adj_credit = sum(
+        float(x.get("amount", 0) or 0)
+        for x in fx_adjustment_lines
+        if str(x.get("side") or "").lower() == "credit"
+    )
+    if is_receipt:
+        left = account_total + fx_adj_debit
+        right = person_total + fx_adj_credit
+    else:
+        left = person_total + fx_adj_debit
+        right = account_total + fx_adj_credit
+    if abs(left - right) > 0.01:
+        raise ApiError(
+            "UNBALANCED_AMOUNTS",
+            f"مبالغ سند نامتوازن است (چپ={left}, راست={right})",
+            http_status=400,
+        )
+
+    document_date = resolve_receipt_document_date_from_account_lines(parsed_doc_date, account_lines)
 
     # 3) اعمال تغییرات در سند (بدون تغییر code و document_type)
     document.document_date = document_date
     document.currency_id = int(currency_id)
-    if isinstance(data.get("extra_info"), dict) or data.get("extra_info") is None:
+    if "extra_info" in data and (
+        isinstance(data.get("extra_info"), dict) or data.get("extra_info") is None
+    ):
         document.extra_info = data.get("extra_info")
-    if isinstance(data.get("description"), str) or data.get("description") is None:
+    if isinstance(data.get("description"), str) or (
+        "description" in data and data.get("description") is None
+    ):
         document.description = data.get("description")
+    if "project_id" in data:
+        project_id = data.get("project_id")
+        if project_id:
+            from adapters.db.models.project import Project
+            project = db.query(Project).filter(
+                and_(
+                    Project.id == int(project_id),
+                    Project.business_id == document.business_id,
+                    Project.is_active == True,
+                )
+            ).first()
+            if not project:
+                raise ApiError("PROJECT_NOT_FOUND", "پروژه یافت نشد یا غیرفعال است", http_status=404)
+            document.project_id = int(project_id)
+        else:
+            document.project_id = None
 
     # تعیین نوع دریافت/پرداخت برای محاسبات بدهکار/بستانکار
     is_receipt = (document.document_type == DOCUMENT_TYPE_RECEIPT)
@@ -1724,6 +1946,10 @@ def update_receipt_payment(
                 line_extra_info["invoice_code"] = person_line_extra["invoice_code"]
             if person_line_extra.get("link_to_invoice"):
                 line_extra_info["link_to_invoice"] = person_line_extra["link_to_invoice"]
+            if person_line_extra.get("fx_settlement"):
+                line_extra_info["fx_settlement"] = person_line_extra["fx_settlement"]
+            if person_line_extra.get("side"):
+                line_extra_info["side"] = person_line_extra["side"]
         
         line = DocumentLine(
             document_id=document.id,
@@ -1781,7 +2007,14 @@ def update_receipt_payment(
             if not invoice_doc:
                 raise ApiError("INSTALLMENT_INVOICE_NOT_FOUND", "فاکتور اقساط پیدا نشد", http_status=404)
             if int(invoice_doc.currency_id) != int(currency_id):
-                raise ApiError("INSTALLMENT_CURRENCY_MISMATCH", "ارز فاکتور اقساط با ارز سند دریافت یکسان نیست", http_status=400)
+                settles_cur = None
+                if isinstance(extra_info_all, dict):
+                    try:
+                        settles_cur = int(extra_info_all.get("settles_currency_id")) if extra_info_all.get("settles_currency_id") is not None else None
+                    except Exception:
+                        settles_cur = None
+                if settles_cur is None or int(invoice_doc.currency_id) != int(settles_cur):
+                    raise ApiError("INSTALLMENT_CURRENCY_MISMATCH", "ارز فاکتور اقساط با ارز سند دریافت یکسان نیست", http_status=400)
             inv_extra = invoice_doc.extra_info or {}
             plan = inv_extra.get("installment_plan")
             schedule = (plan or {}).get("schedule")
@@ -1917,15 +2150,18 @@ def update_receipt_payment(
             if account_line.get("check_number"):
                 extra_info["check_number"] = account_line.get("check_number")
 
+        if account_line.get("account_currency_amount") is not None:
+            extra_info["account_currency_amount"] = str(account_line.get("account_currency_amount"))
+        if account_line.get("account_currency_id") is not None:
+            try:
+                extra_info["account_currency_id"] = int(account_line.get("account_currency_id"))
+            except Exception:
+                pass
+
         # ایجاد خط سند برای حساب
         # برای چک: منطق حسابداری متفاوت است
-        # در دریافت با چک دریافتی: چک از 10403 خارج می‌شود → باید بستانکار شود
-        # در پرداخت با چک پرداختی: چک از 20202 خارج می‌شود → باید بدهکار شود
         if normalized_transaction_type == "check":
-            # برای چک دریافتی در سند دریافت: حساب 10403 باید بستانکار شود (چک خارج شد)
-            # برای چک پرداختی در سند پرداخت: حساب 20202 باید بدهکار شود (چک پرداخت شد)
             if is_receipt:
-                # دریافت با چک دریافتی: حساب 10403 بستانکار می‌شود
                 debit_amount = Decimal(0)
                 credit_amount = amount
             else:
@@ -1976,6 +2212,30 @@ def update_receipt_payment(
         )
         db.add(line)
 
+    # خطوط تعدیل تسعیر ارز (V2-P4)
+    for fx_line in fx_adjustment_lines:
+        try:
+            fx_amt = Decimal(str(fx_line.get("amount", 0) or 0))
+        except Exception:
+            continue
+        if fx_amt <= 0:
+            continue
+        code = str(fx_line.get("account_code") or "").strip()
+        if not code:
+            continue
+        side = str(fx_line.get("side") or "").strip().lower()
+        fx_account = _get_fixed_account_by_code(db, code)
+        db.add(
+            DocumentLine(
+                document_id=document.id,
+                account_id=fx_account.id,
+                debit=fx_amt if side == "debit" else Decimal(0),
+                credit=fx_amt if side == "credit" else Decimal(0),
+                description=fx_line.get("description") or "تسعیر ارز",
+                extra_info={"fx_adjustment": True, "side": side, "account_code": code},
+            )
+        )
+
     # خطوط کارمزد
     if total_commission > 0:
         for i, account_line in enumerate(account_lines):
@@ -2019,10 +2279,10 @@ def update_receipt_payment(
                     credit=commission_credit,
                     description=f"کارمزد تراکنش {transaction_type}",
                     extra_info={
-                        "transaction_type": transaction_type,
-                        "commission": float(commission_amount),
+                        # بدون transaction_type تا به‌عنوان تراکنش پرداخت مشتری بازخوانی نشود
                         "is_commission_line": True,
                         "original_transaction_index": i,
+                        "commission_type": "settlement_contra",
                     },
                 ))
                 commission_service_account = _get_fixed_account_by_code(db, "70902")
@@ -2035,7 +2295,6 @@ def update_receipt_payment(
                     credit=commission_service_credit,
                     description="کارمزد خدمات بانکی",
                     extra_info={
-                        "commission": float(commission_amount),
                         "is_commission_line": True,
                         "original_transaction_index": i,
                         "commission_type": "banking_service",
@@ -2280,6 +2539,13 @@ def update_receipt_payment(
         except Exception as e:
             logger.error(f"[UPDATE_RECEIPT_PAYMENT] خطا در تغییر وضعیت چک {check_id}: {e}", exc_info=True)
     
+    _link_receipt_payment_to_invoices(
+        db,
+        int(document.id),
+        person_lines,
+        extra_info_all if isinstance(extra_info_all, dict) else None,
+    )
+
     db.commit()
     db.refresh(document)
     # refresh کردن فاکتورهای اقساطی که به‌روزرسانی شدند
@@ -2419,6 +2685,8 @@ def document_to_dict(db: Session, document: Document) -> Dict[str, Any]:
                 line_dict["invoice_code"] = line.extra_info["invoice_code"]
             if "link_to_invoice" in line.extra_info:
                 line_dict["link_to_invoice"] = line.extra_info["link_to_invoice"]
+            if "fx_settlement" in line.extra_info:
+                line_dict["fx_settlement"] = line.extra_info["fx_settlement"]
         
         # اگر person_id موجود است، نام شخص را از دیتابیس دریافت کن
         if line.person_id and "person_name" not in line_dict:

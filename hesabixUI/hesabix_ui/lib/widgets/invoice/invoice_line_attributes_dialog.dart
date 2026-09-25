@@ -272,25 +272,13 @@ Future<Map<String, dynamic>?> showInvoiceLineAttributesEditor({
   final attrService = ProductAttributeService();
   List<Map<String, dynamic>> definitions;
   try {
-    _invoiceLineAttrsDialogLog('search product-attributes limit=1000 ...');
-    final search = await attrService.search(businessId: businessId, limit: 1000);
-    final all = (search['items'] as List<dynamic>?) ?? [];
-    _invoiceLineAttrsDialogLog('search returned items count=${all.length}');
-    final idSet = ids.map((e) {
-      if (e is int) return e;
-      if (e is num) return e.toInt();
-      return int.tryParse(e.toString()) ?? 0;
-    }).where((id) => id > 0).toSet();
-    definitions = all
-        .where((a) => idSet.contains((a as Map)['id'] as int?))
-        .map((a) => Map<String, dynamic>.from(a as Map))
-        .toList();
-    definitions.sort((a, b) => ((a['id'] as num?)?.toInt() ?? 0).compareTo((b['id'] as num?)?.toInt() ?? 0));
+    _invoiceLineAttrsDialogLog('getByIds product-attributes ids=$ids ...');
+    definitions = await attrService.getByIds(businessId: businessId, ids: ids);
     _invoiceLineAttrsDialogLog(
-      'matched definitions count=${definitions.length} idSet=$idSet titles=${definitions.map((a) => a['title']).toList()}',
+      'matched definitions count=${definitions.length} titles=${definitions.map((a) => a['title']).toList()}',
     );
   } catch (e) {
-    _invoiceLineAttrsDialogLog('search FAILED error=$e');
+    _invoiceLineAttrsDialogLog('getByIds FAILED error=$e');
     if (context.mounted) {
       SnackBarHelper.showError(
         context,

@@ -7,6 +7,7 @@ import 'package:hesabix_ui/widgets/data_table/data_table_widget.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table_config.dart';
 import 'package:hesabix_ui/widgets/business_subpage_back_leading.dart';
 import 'package:hesabix_ui/services/list_filter_preferences_service.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 class ActivityLogsPage extends StatefulWidget {
   final int businessId;
@@ -148,13 +149,13 @@ class _ActivityLogsPageState extends State<ActivityLogsPage> {
 
   Color _getCategoryColor(String? category) {
     if (category == null) return Colors.grey;
-    const colors = {
-      'accounting': Colors.blue,
-      'warehouse': Colors.orange,
-      'product': Colors.green,
+    final colors = {
+      'accounting': SemanticColorResolver.info(context),
+      'warehouse': SemanticColorResolver.warning(context),
+      'product': SemanticColorResolver.positive(context),
       'person': Colors.purple,
       'business': Colors.indigo,
-      'user': Colors.red,
+      'user': SemanticColorResolver.negative(context),
       'settings': Colors.teal,
       'invoice': Colors.amber,
       'document': Colors.cyan,

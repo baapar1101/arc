@@ -2,7 +2,7 @@
 
 from typing import Annotated, Dict, Any, Optional, List
 from datetime import date as date_type
-from fastapi import APIRouter, Depends, Request, Body, Query
+from fastapi import APIRouter, Depends, Request, Body, Query, BackgroundTasks
 from sqlalchemy.orm import Session
 from sqlalchemy import and_
 
@@ -40,12 +40,52 @@ from app.services.product_service import (
     get_product,
     update_product,
     delete_product,
+    check_product_has_related_documents,
     preview_bulk_default_warehouse_update,
     apply_bulk_default_warehouse_update,
     get_item_movements_report,
     get_sales_by_product_report,
     get_inventory_kardex_report,
     get_inventory_stock_report,
+)
+from app.services.product_opening_balance_service import (
+    create_product_with_opening_balance,
+    update_product_with_opening_balance,
+)
+from app.services.product_excel_import_opening_balance import (
+    WAREHOUSE_CODE_KEY,
+    WAREHOUSE_NAME_KEY,
+    WarehouseImportIndex,
+    opening_balance_columns_mapped,
+    prepare_opening_balance_for_import_row,
+    resolve_import_default_warehouse,
+    warehouse_columns_mapped,
+)
+from app.services.product_excel_import_spec import (
+    ALL_COLUMN_KEYS,
+    BOOLEAN_KEYS,
+    DECIMAL_KEYS,
+    INT_KEYS,
+    MAX_PRODUCT_IMPORT_DATA_ROWS,
+    MAX_PRODUCT_IMPORT_FILE_BYTES,
+)
+from app.services.product_excel_import_normalize import (
+    api_error_message,
+    build_create_payload,
+    build_update_payload,
+    find_existing_product,
+    format_pydantic_errors,
+    is_sample_import_row,
+    map_headers,
+    parse_bool_strict,
+    parse_inventory_mode,
+    provided_keys_from_raw,
+    resolve_fx_currency,
+    select_products_import_worksheet,
+)
+from app.services.product_excel_import_template_service import (
+    build_products_import_template,
+    category_full_path,
 )
 from app.services.product_commercial_insights_service import get_product_commercial_insights
 from app.services.bulk_price_update_service import (
@@ -65,7 +105,11 @@ from adapters.db.models.currency import Currency
 from app.core.i18n import negotiate_locale
 from fastapi import UploadFile, File, Form, HTTPException
 from fastapi.responses import Response
-from adapters.api.v1.helpers.product_request_helper import process_product_request
+from adapters.api.v1.helpers.product_request_helper import (
+	process_product_request,
+	_upload_product_image,
+	_validate_image_extension,
+)
 import os
 
 
@@ -174,6 +218,121 @@ def _ensure_products_pagination(result: Dict[str, Any], take: int, skip: int) ->
 		result["has_more"] = (skip + take) < total
 
 
+from app.services.product_excel_export_service import (
+	PRODUCT_EXPORT_INVENTORY_KEYS as _PRODUCT_EXPORT_INVENTORY_KEYS,
+	body_truthy as _body_truthy,
+	export_columns_need_inventory as _export_columns_need_inventory,
+	should_include_inventory_for_product_export as _should_include_inventory_for_product_export,
+	enrich_product_export_items as _enrich_product_export_items,
+	build_products_excel_export,
+	upload_export_bytes,
+)
+
+
+def _enqueue_products_excel_export(
+	*,
+	business_id: int,
+	user_id: int,
+	body: dict,
+	calendar_type: str,
+	accept_language: str,
+	background: Optional[BackgroundTasks],
+	request: Request,
+):
+	"""صف RQ یا JobManager؛ در صورت شکست None برمی‌گرداند تا sync اجرا شود."""
+	from app.core.queue import get_queue_service, QUEUE_EXPORTS
+	from app.services.jobs.export_job import export_products_excel_job
+	from app.services.job_manager import JobManager
+
+	job_body = dict(body or {})
+	job_body.pop("async", None)
+	job_body.pop("async_mode", None)
+
+	queue_service = get_queue_service()
+	if queue_service and queue_service.enabled:
+		job = queue_service.enqueue(
+			export_products_excel_job,
+			business_id=business_id,
+			user_id=user_id,
+			body=job_body,
+			calendar_type=calendar_type,
+			accept_language=accept_language,
+			queue_name=QUEUE_EXPORTS,
+			timeout=1800,
+			result_ttl=7200,
+		)
+		if job:
+			try:
+				job.meta = dict(job.meta or {})
+				job.meta.update({
+					"user_id": int(user_id),
+					"business_id": int(business_id),
+					"export_type": "products",
+				})
+				job.save_meta()
+			except Exception:
+				pass
+			return success_response({
+				"async": True,
+				"job_id": job.id,
+				"status": "queued",
+				"queue": QUEUE_EXPORTS,
+			}, request=request, message="PRODUCTS_EXPORT_QUEUED")
+
+	# Fallback: JobManager + BackgroundTasks
+	if background is None:
+		return None
+
+	jm = JobManager.instance()
+	job_id = jm.create("Products excel export queued")
+
+	def _task():
+		from adapters.db.session import get_db_session
+		try:
+			jm.update(job_id, 10, "Building excel")
+			with get_db_session() as db_sess:
+				data, filename, record_count = build_products_excel_export(
+					db_sess,
+					business_id,
+					job_body,
+					calendar_type=calendar_type,
+					accept_language=accept_language,
+				)
+				jm.update(job_id, 80, "Uploading file")
+				saved = upload_export_bytes(
+					db_sess,
+					business_id=business_id,
+					user_id=user_id,
+					data=data,
+					filename=filename,
+				)
+				jm.succeed(
+					job_id,
+					{
+						"success": True,
+						"export_type": "products",
+						"format": "xlsx",
+						"business_id": business_id,
+						"filename": filename,
+						"file_id": saved.get("file_id"),
+						"file": saved,
+						"record_count": record_count,
+						"file_size": len(data),
+					},
+					"Products excel export completed",
+				)
+		except Exception as e:
+			jm.fail(job_id, str(e))
+
+	background.add_task(_task)
+	return success_response({
+		"async": True,
+		"job_id": job_id,
+		"status": "queued",
+		"queue": "job_manager",
+	}, request=request, message="PRODUCTS_EXPORT_QUEUED")
+
+
 @router.post(
     "/business/{business_id}",
     summary="ایجاد محصول جدید",
@@ -270,8 +429,26 @@ async def create_product_endpoint(
     
     if not payload:
         raise ApiError("INVALID_PAYLOAD", "داده‌های محصول ارسال نشده است", http_status=400)
-    
-    result = create_product(db, business_id, payload)
+
+    if payload.opening_balance is not None:
+        if not has_business_permission_for_business(
+            ctx, db, business_id, "opening_balance", "edit"
+        ):
+            raise ApiError(
+                "OPENING_BALANCE_PERMISSION_REQUIRED",
+                "برای ثبت تعداد اولیه به دسترسی ویرایش تراز افتتاحیه نیاز است",
+                http_status=403,
+            )
+        result = create_product_with_opening_balance(
+            db,
+            business_id,
+            ctx.get_user_id(),
+            payload,
+            create_product_fn=create_product,
+            delete_product_fn=delete_product,
+        )
+    else:
+        result = create_product(db, business_id, payload)
     
     # به‌روزرسانی context_id فایل با product_id
     if image_file_id and result.get("data", {}).get("id"):
@@ -289,7 +466,7 @@ async def create_product_endpoint(
     summary="ایجاد/ویرایش گروهی کالا (یکپارچه‌سازی)",
     description=(
         "بدنه: `{\"items\":[{\"client_ref?\":\"...\",\"product_id?\":null|int شناسه کالا در حسابیکس,"
-        '"payload\":{ ... فیلدهای ایجاد/ویرایش مانند endpoint تکی }}],'
+        '"payload\":{ ... فیلدهای ایجاد/ویرایش مانند endpoint تکی، از جمله opening_balance }}],'
         '\"create_if_update_missing\":true}`. حداکثر ۱۰۰۰ آیتم. خروجی: results با status در created|updated|failed.'
     ),
 )
@@ -745,6 +922,57 @@ def get_product_commercial_insights_endpoint(
     return success_response(data=format_datetime_fields(data, request), request=request)
 
 
+@router.post(
+    "/business/{business_id}/{product_id}/sync-base-price-from-fx",
+    summary="به‌روزرسانی قیمت پایه کالا از قیمت ارزی × نرخ روز",
+    tags=["products", "currency_revaluation"],
+)
+@require_business_access("business_id")
+async def sync_product_base_price_from_fx_endpoint(
+    request: Request,
+    business_id: int,
+    product_id: int,
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_by_entity_dep("products", "edit", Product, "product_id")),
+    sync_price_list: bool = Query(False, description="همگام اختیاری با لیست قیمت پیش‌فرض"),
+    price_list_id: Optional[int] = Query(None, description="شناسه لیست قیمت (اختیاری؛ پیش‌فرض Quick Sales)"),
+) -> Dict[str, Any]:
+    from app.services.product_fx_price_service import sync_product_base_from_fx
+
+    data = sync_product_base_from_fx(
+        db,
+        business_id,
+        product_id,
+        force=True,
+        sync_price_list=bool(sync_price_list),
+        price_list_id=price_list_id,
+    )
+    return success_response(data=data, request=request)
+
+
+@router.post(
+    "/business/{business_id}/sync-base-prices-from-fx",
+    summary="به‌روزرسانی گروهی قیمت پایه کالاها از نرخ (auto_update)",
+    tags=["products", "currency_revaluation"],
+)
+@require_business_access("business_id")
+async def sync_business_product_base_prices_from_fx_endpoint(
+    request: Request,
+    business_id: int,
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_dep("products", "edit")),
+    sync_price_list: bool = Query(False, description="همگام اختیاری با لیست قیمت پیش‌فرض"),
+) -> Dict[str, Any]:
+    from app.services.product_fx_price_service import sync_business_products_base_from_fx
+
+    data = sync_business_products_base_from_fx(
+        db, business_id, only_auto=True, sync_price_list=bool(sync_price_list)
+    )
+    return success_response(data=data, request=request)
+
+
 @router.put(
     "/business/{business_id}/{product_id}",
     summary="ویرایش محصول",
@@ -822,182 +1050,61 @@ async def update_product_endpoint(
     if not product or product.business_id != business_id:
         raise ApiError("NOT_FOUND", "Product not found", http_status=404)
     
-    # بررسی اینکه آیا multipart/form-data است یا JSON
-    content_type = request.headers.get("content-type", "")
-    is_multipart = "multipart/form-data" in content_type
-    
-    image_file_id = None
     old_image_file_id = product.image_file_id
-    payload: ProductUpdateRequest | None = None
     
-    # اگر multipart/form-data است، فایل و داده‌ها را از form می‌خوانیم
-    if is_multipart:
-        form_data = await request.form()
-        
-        # آپلود فایل اگر وجود دارد
-        if "file" in form_data:
-            file = form_data["file"]
-            if hasattr(file, 'filename') and file.filename:
-                # بررسی فرمت فایل
-                allowed_extensions = {'.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp'}
-                file_ext = os.path.splitext(file.filename)[1].lower()
-                if file_ext not in allowed_extensions:
-                    raise ApiError("INVALID_FILE_FORMAT", "فرمت فایل معتبر نیست. فقط فرمت‌های JPG, PNG, GIF, WebP و BMP پشتیبانی می‌شوند", http_status=400)
-                
-                # آپلود فایل جدید
-                from app.services.file_storage_service import FileStorageService
-                storage_service = FileStorageService(db)
-                try:
-                    upload_result = await storage_service.upload_file(
-                        file=file,
-                        user_id=ctx.get_user_id(),  # user_id به صورت int ارسال می‌شود
-                        module_context="products",
-                        context_id=str(product_id),
-                        developer_data={"business_id": business_id, "product_id": product_id},
-                        is_temporary=False,
-                        expires_in_days=3650,
-                        business_id=business_id,
-                        check_storage_limit=True,
-                    )
-                    image_file_id = upload_result.get("file_id")
-                except HTTPException as e:
-                    # اگر خطای محدودیت ذخیره‌سازی باشد، جزئیات را برمی‌گردانیم
-                    if e.status_code == 400 and isinstance(e.detail, dict) and e.detail.get("error") == "STORAGE_LIMIT_EXCEEDED":
-                        error_detail = {
-                            "success": False,
-                            "error": {
-                                "code": "STORAGE_LIMIT_EXCEEDED",
-                                "message": e.detail.get("message", "حجم فایل از محدودیت ذخیره‌سازی تجاوز می‌کند"),
-                                "total_limit_gb": e.detail.get("total_limit_gb"),
-                                "current_usage_gb": e.detail.get("current_usage_gb"),
-                                "available_gb": e.detail.get("available_gb"),
-                                "required_gb": e.detail.get("required_gb"),
-                                "over_usage_gb": e.detail.get("over_usage_gb"),
-                            }
-                        }
-                        raise HTTPException(status_code=400, detail=error_detail)
-                    raise ApiError("FILE_UPLOAD_ERROR", f"خطا در آپلود فایل: {str(e.detail)}", http_status=400)
-                except Exception as e:
-                    raise ApiError("FILE_UPLOAD_ERROR", f"خطا در آپلود فایل: {str(e)}", http_status=400)
-        
-        # ساخت payload از form data
-        import json
-        # فیلدهای string که نباید به int تبدیل شوند
-        string_fields = {
-            'code', 'name', 'description', 'main_unit', 'secondary_unit',
-            'base_sales_note', 'base_purchase_note', 'tax_code', 'image_file_id'
-        }
-        product_data = {}
-        for key, value in form_data.items():
-            if key != "file":
-                if isinstance(value, str):
-                    # سعی می‌کنیم به عنوان JSON parse کنیم
-                    try:
-                        parsed = json.loads(value)
-                        product_data[key] = parsed
-                    except (json.JSONDecodeError, ValueError):
-                        # اگر JSON نیست، بررسی می‌کنیم که آیا boolean یا number است
-                        value_lower = value.strip().lower()
-                        if value_lower in ('true', 'false'):
-                            product_data[key] = value_lower == 'true'
-                        elif value_lower == 'null' or value_lower == '':
-                            product_data[key] = None
-                        elif key in string_fields:
-                            # فیلدهای string را به صورت string نگه می‌داریم
-                            product_data[key] = value
-                        elif value.isdigit() or (value.startswith('-') and value[1:].isdigit()):
-                            product_data[key] = int(value)
-                        elif value.replace('.', '', 1).replace('-', '', 1).isdigit():
-                            product_data[key] = float(value)
-                        else:
-                            product_data[key] = value
-                else:
-                    product_data[key] = value
-        
-        try:
-            payload = ProductUpdateRequest(**product_data)
-        except Exception as e:
-            raise ApiError("INVALID_PAYLOAD", f"خطا در پردازش داده‌ها: {str(e)}", http_status=400)
-    else:
-        # اگر JSON است، payload را از body می‌خوانیم
-        try:
-            body_data = await request.json()
-            if not isinstance(body_data, dict):
-                raise ApiError("INVALID_PAYLOAD", "داده‌های ارسالی باید یک object JSON باشد", http_status=400)
-            # اگر default_warehouse_id در body_data وجود دارد (حتی اگر null باشد)، آن را به صورت صریح set می‌کنیم
-            # تا Pydantic آن را در fields_set قرار دهد
-            default_warehouse_id_value = body_data.get('default_warehouse_id')
-            if 'default_warehouse_id' in body_data:
-                # اگر null است، آن را به صورت صریح None set می‌کنیم
-                body_data['default_warehouse_id'] = default_warehouse_id_value
-            payload = ProductUpdateRequest(**body_data)
-            # اضافه کردن به fields_set برای Pydantic v2 (حتی اگر null باشد)
-            if 'default_warehouse_id' in body_data:
-                if hasattr(payload, 'model_fields_set'):
-                    payload.model_fields_set.add('default_warehouse_id')
-                elif hasattr(payload, '__fields_set__'):
-                    payload.__fields_set__.add('default_warehouse_id')
-        except ValueError as e:
-            raise ApiError("INVALID_PAYLOAD", f"خطا در parse کردن JSON: {str(e)}", http_status=400)
-        except Exception as e:
-            raise ApiError("INVALID_PAYLOAD", f"خطا در پردازش داده‌های JSON: {str(e)}", http_status=400)
-        
-        # اگر فایل هم ارسال شده، آن را پردازش می‌کنیم
-        if file and file.filename:
-            # بررسی فرمت فایل
-            allowed_extensions = {'.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp'}
-            file_ext = os.path.splitext(file.filename)[1].lower()
-            if file_ext not in allowed_extensions:
-                raise ApiError("INVALID_FILE_FORMAT", "فرمت فایل معتبر نیست. فقط فرمت‌های JPG, PNG, GIF, WebP و BMP پشتیبانی می‌شوند", http_status=400)
-            
-            # آپلود فایل جدید
-            from app.services.file_storage_service import FileStorageService
-            storage_service = FileStorageService(db)
-            try:
-                upload_result = await storage_service.upload_file(
-                    file=file,
-                    user_id=ctx.get_user_id(),  # user_id به صورت int ارسال می‌شود
-                    module_context="products",
-                    context_id=str(product_id),
-                    developer_data={"business_id": business_id, "product_id": product_id},
-                    is_temporary=False,
-                    expires_in_days=3650,
-                    business_id=business_id,
-                    check_storage_limit=True,
-                )
-                image_file_id = upload_result.get("file_id")
-            except HTTPException as e:
-                # اگر خطای محدودیت ذخیره‌سازی باشد، جزئیات را برمی‌گردانیم
-                if e.status_code == 400 and isinstance(e.detail, dict) and e.detail.get("error") == "STORAGE_LIMIT_EXCEEDED":
-                    error_detail = {
-                        "success": False,
-                        "error": {
-                            "code": "STORAGE_LIMIT_EXCEEDED",
-                            "message": e.detail.get("message", "حجم فایل از محدودیت ذخیره‌سازی تجاوز می‌کند"),
-                            "total_limit_gb": e.detail.get("total_limit_gb"),
-                            "current_usage_gb": e.detail.get("current_usage_gb"),
-                            "available_gb": e.detail.get("available_gb"),
-                            "required_gb": e.detail.get("required_gb"),
-                            "over_usage_gb": e.detail.get("over_usage_gb"),
-                        }
-                    }
-                    raise HTTPException(status_code=400, detail=error_detail)
-                raise ApiError("FILE_UPLOAD_ERROR", f"خطا در آپلود فایل: {str(e.detail)}", http_status=400)
-            except Exception as e:
-                raise ApiError("FILE_UPLOAD_ERROR", f"خطا در آپلود فایل: {str(e)}", http_status=400)
-    
-    # تنظیم image_file_id در payload
-    if image_file_id and payload:
-        payload.image_file_id = image_file_id
-        if hasattr(payload, "model_fields_set"):
-            payload.model_fields_set.add("image_file_id")
-        elif hasattr(payload, "__fields_set__"):
-            payload.__fields_set__.add("image_file_id")
+    processed_payload, processed_file, image_file_id = await process_product_request(
+        request=request,
+        business_id=business_id,
+        ctx=ctx,
+        db=db,
+        is_update=True,
+        product_id=product_id,
+    )
+    payload = processed_payload
+
+    # سازگاری با درخواست JSON همراه با فایل جداگانه
+    if not image_file_id and file and file.filename:
+        _validate_image_extension(file.filename)
+        image_file_id = await _upload_product_image(
+            file=file,
+            user_id=ctx.get_user_id(),
+            business_id=business_id,
+            db=db,
+            context_id=str(product_id),
+            developer_data={"business_id": business_id, "product_id": product_id},
+        )
+        if payload:
+            payload.image_file_id = image_file_id
+            if hasattr(payload, "model_fields_set"):
+                payload.model_fields_set.add("image_file_id")
+            elif hasattr(payload, "__fields_set__"):
+                payload.__fields_set__.add("image_file_id")
     
     if not payload:
         raise ApiError("INVALID_PAYLOAD", "داده‌های محصول ارسال نشده است", http_status=400)
-    
-    result = update_product(db, product_id, business_id, payload, user_id=ctx.get_user_id())
+
+    previous_warehouse_id = product.default_warehouse_id
+
+    if payload.opening_balance is not None:
+        if not has_business_permission_for_business(
+            ctx, db, business_id, "opening_balance", "edit"
+        ):
+            raise ApiError(
+                "OPENING_BALANCE_PERMISSION_REQUIRED",
+                "برای ثبت تعداد اولیه به دسترسی ویرایش تراز افتتاحیه نیاز است",
+                http_status=403,
+            )
+        result = update_product_with_opening_balance(
+            db,
+            business_id,
+            ctx.get_user_id(),
+            product_id,
+            payload,
+            update_product_fn=update_product,
+            previous_warehouse_id=previous_warehouse_id,
+        )
+    else:
+        result = update_product(db, product_id, business_id, payload, user_id=ctx.get_user_id())
     if not result:
         raise ApiError("NOT_FOUND", "Product not found", http_status=404)
     
@@ -1092,6 +1199,49 @@ def delete_product_endpoint(
         raise HTTPException(status_code=404, detail="کالا یافت نشد")
     
     return success_response({"deleted": True}, request, message="کالا با موفقیت حذف شد")
+
+
+@router.get(
+    "/business/{business_id}/{product_id}/usage-check",
+    summary="بررسی امکان حذف کالا (اسناد مرتبط)",
+    description="""
+    بررسی می‌کند آیا کالا در فاکتور، سند حسابداری، حواله انبار، BOM یا سایر وابستگی‌ها استفاده شده است.
+    برای پیش‌نمایش پاک‌سازی امن (بدون حذف واقعی) مناسب است.
+    """,
+    response_model=SuccessResponse[Dict[str, Any]],
+    responses={
+        200: {"description": "نتیجه بررسی استفاده"},
+        404: {"description": "کالا یافت نشد"},
+    },
+)
+@require_business_access("business_id")
+def check_product_usage_endpoint(
+    request: Request,
+    business_id: int,
+    product_id: int,
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_by_entity_dep("products", "view", Product, "product_id")),
+) -> Dict[str, Any]:
+    obj = db.get(Product, product_id)
+    if not obj or int(obj.business_id) != int(business_id):
+        raise HTTPException(status_code=404, detail="کالا یافت نشد")
+
+    has_documents, document_types = check_product_has_related_documents(db, product_id)
+
+    return success_response(
+        {
+            "product_id": product_id,
+            "is_used": bool(has_documents),
+            "can_delete": not bool(has_documents),
+            "document_types": document_types or [],
+            "is_active": bool(getattr(obj, "is_active", True)),
+            "name": getattr(obj, "name", None),
+            "code": getattr(obj, "code", None),
+        },
+        request,
+        message="بررسی استفاده کالا انجام شد",
+    )
 
 
 @router.post(
@@ -1282,261 +1432,41 @@ async def export_products_excel(
     request: Request,
     business_id: int,
     body: dict,
+    background: BackgroundTasks,
     ctx: AuthContext = Depends(get_current_user),
     db: Session = Depends(get_db),
     _: None = Depends(require_business_permission_dep("products", "export")),
 ):
-    import io
-    import re
-    import datetime
     from fastapi.responses import Response
-    from openpyxl import Workbook
-    from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
 
-    query_dict = {
-        "take": int(body.get("take", 1000)),
-        "skip": int(body.get("skip", 0)),
-        "sort_by": body.get("sort_by"),
-        "sort_desc": bool(body.get("sort_desc", False)),
-        "sort": body.get("sort") if isinstance(body.get("sort"), list) else None,
-        "search": body.get("search"),
-        "search_fields": body.get("search_fields") or body.get("searchFields"),
-        "filters": body.get("filters"),
-        "category_ids": body.get("category_ids") or body.get("categoryIds"),
-    }
-    result = list_products(db, business_id, query_dict)
-    items = result.get("items", []) if isinstance(result, dict) else result.get("items", [])
-    items = [format_datetime_fields(item, request) for item in items]
+    want_async = _body_truthy(body.get("async")) or _body_truthy(body.get("async_mode"))
+    calendar_type = (
+        request.headers.get("X-Calendar-Type")
+        or getattr(getattr(request, "state", None), "calendar_type", None)
+        or "jalali"
+    )
+    accept_language = request.headers.get("Accept-Language") or "fa"
 
-    # Apply selected rows filter if requested
-    selected_only = bool(body.get('selected_only', False))
-    selected_row_keys = body.get('selected_row_keys')
-    selected_indices = body.get('selected_indices')
-    if selected_only and isinstance(selected_row_keys, list):
-        try:
-            wanted_ids = set()
-            for key in selected_row_keys:
-                if isinstance(key, dict) and key.get("id") is not None:
-                    wanted_ids.add(int(key.get("id")))
-            if wanted_ids:
-                filtered = []
-                for it in items:
-                    try:
-                        if int(it.get("id")) in wanted_ids:
-                            filtered.append(it)
-                    except Exception:
-                        continue
-                items = filtered
-        except Exception:
-            pass
-    if selected_only and selected_indices is not None and (not isinstance(selected_row_keys, list) or not selected_row_keys or not items):
-        indices = None
-        if isinstance(selected_indices, str):
-            try:
-                import json as _json
-                indices = _json.loads(selected_indices)
-            except Exception:
-                indices = None
-        elif isinstance(selected_indices, list):
-            indices = selected_indices
-        if isinstance(indices, list):
-            items = [items[i] for i in indices if isinstance(i, int) and 0 <= i < len(items)]
+    if want_async:
+        queued = _enqueue_products_excel_export(
+            business_id=business_id,
+            user_id=int(ctx.get_user_id()),
+            body=body,
+            calendar_type=str(calendar_type),
+            accept_language=str(accept_language),
+            background=background,
+            request=request,
+        )
+        if queued is not None:
+            return queued
 
-    report_mode = str(body.get("report_mode") or "base_plus_price_lists").strip().lower()
-    if report_mode not in {"base_only", "price_lists_only", "base_plus_price_lists"}:
-        report_mode = "base_plus_price_lists"
-
-    raw_price_list_ids = body.get("price_list_ids") or []
-    price_list_ids = []
-    if isinstance(raw_price_list_ids, list):
-        seen = set()
-        for v in raw_price_list_ids:
-            try:
-                pid = int(v)
-            except Exception:
-                continue
-            if pid not in seen:
-                seen.add(pid)
-                price_list_ids.append(pid)
-
-    max_items = body.get("limit")
-    try:
-        max_items = int(max_items) if max_items is not None else None
-    except Exception:
-        max_items = None
-    if max_items is not None:
-        max_items = max(1, min(max_items, 10000))
-        items = items[:max_items]
-
-    def _format_price_list_value(rows):
-        if not rows:
-            return ""
-        parts = []
-        for price, currency_code, tier_name, min_qty in rows:
-            tier_label = (tier_name or "").strip() or "base"
-            cur_label = (currency_code or "").strip() or "-"
-            qty_text = ""
-            try:
-                if min_qty is not None and float(min_qty) > 0:
-                    qty_text = f" (>= {min_qty})"
-            except Exception:
-                qty_text = ""
-            parts.append(f"{tier_label}{qty_text} [{cur_label}]: {price}")
-        return " | ".join(parts)
-
-    dynamic_price_columns = []
-    if report_mode in {"price_lists_only", "base_plus_price_lists"} and price_list_ids and items:
-        product_ids = []
-        for it in items:
-            try:
-                product_ids.append(int(it.get("id")))
-            except Exception:
-                continue
-        if product_ids:
-            pl_rows = db.query(PriceList.id, PriceList.name).filter(
-                PriceList.business_id == business_id,
-                PriceList.id.in_(price_list_ids),
-            ).all()
-            price_list_name_by_id = {int(pid): (name or f"#{pid}") for pid, name in pl_rows}
-
-            pi_rows = (
-                db.query(
-                    PriceItem.product_id,
-                    PriceItem.price_list_id,
-                    PriceItem.price,
-                    Currency.code,
-                    PriceItem.tier_name,
-                    PriceItem.min_qty,
-                )
-                .join(PriceList, PriceList.id == PriceItem.price_list_id)
-                .outerjoin(Currency, Currency.id == PriceItem.currency_id)
-                .filter(
-                    PriceList.business_id == business_id,
-                    PriceItem.product_id.in_(product_ids),
-                    PriceItem.price_list_id.in_(price_list_ids),
-                )
-                .order_by(PriceItem.price_list_id.asc(), PriceItem.min_qty.asc(), PriceItem.tier_name.asc())
-                .all()
-            )
-
-            grouped = {}
-            for product_id, price_list_id, price, currency_code, tier_name, min_qty in pi_rows:
-                key = (int(product_id), int(price_list_id))
-                grouped.setdefault(key, []).append((price, currency_code, tier_name, min_qty))
-
-            for price_list_id in price_list_ids:
-                if price_list_id not in price_list_name_by_id:
-                    continue
-                col_key = f"price_list_{price_list_id}"
-                col_label = f"لیست قیمت: {price_list_name_by_id[price_list_id]}"
-                dynamic_price_columns.append((col_key, col_label))
-                for it in items:
-                    try:
-                        pid = int(it.get("id"))
-                    except Exception:
-                        continue
-                    it[col_key] = _format_price_list_value(grouped.get((pid, price_list_id), []))
-
-    columns_profile = str(body.get("columns_profile") or "").strip().lower()
-    force_price_report_columns = columns_profile in {"price_report", "product_price_report"}
-
-    export_columns = body.get("export_columns")
-    if export_columns and isinstance(export_columns, list) and not force_price_report_columns:
-        headers = [col.get("label") or col.get("key") for col in export_columns]
-        keys = [col.get("key") for col in export_columns]
-    else:
-        default_cols = [
-            ("code", "کد"),
-            ("name", "نام"),
-            ("category_name", "دسته"),
-        ]
-        if report_mode in {"base_only", "base_plus_price_lists"}:
-            default_cols.extend([
-                ("base_sales_price", "قیمت فروش پایه"),
-                ("base_purchase_price", "قیمت خرید پایه"),
-            ])
-        if dynamic_price_columns:
-            default_cols.extend(dynamic_price_columns)
-        if not force_price_report_columns:
-            default_cols.extend([
-                ("main_unit", "واحد اصلی"),
-                ("secondary_unit", "واحد فرعی"),
-                ("track_inventory", "کنترل موجودی"),
-                ("created_at_formatted", "ایجاد"),
-            ])
-        keys = [k for k, _ in default_cols]
-        headers = [v for _, v in default_cols]
-
-    wb = Workbook()
-    ws = wb.active
-    ws.title = "Products"
-
-    # Locale and RTL/LTR handling for Excel
-    locale = negotiate_locale(request.headers.get("Accept-Language"))
-    if locale == 'fa':
-        try:
-            ws.sheet_view.rightToLeft = True
-        except Exception:
-            pass
-
-    # Header style
-    header_font = Font(bold=True)
-    header_fill = PatternFill(start_color="DDDDDD", end_color="DDDDDD", fill_type="solid")
-    thin_border = Border(left=Side(style='thin'), right=Side(style='thin'), top=Side(style='thin'), bottom=Side(style='thin'))
-
-    ws.append(headers)
-    for cell in ws[1]:
-        cell.font = header_font
-        cell.fill = header_fill
-        cell.alignment = Alignment(horizontal="center")
-        cell.border = thin_border
-
-    for it in items:
-        row = []
-        for k in keys:
-            row.append(it.get(k))
-        ws.append(row)
-        for cell in ws[ws.max_row]:
-            cell.border = thin_border
-            # Align data cells based on locale
-            if locale == 'fa':
-                cell.alignment = Alignment(horizontal="right")
-
-    # Auto width columns
-    try:
-        for column in ws.columns:
-            max_length = 0
-            column_letter = column[0].column_letter
-            for cell in column:
-                try:
-                    if cell.value is not None and len(str(cell.value)) > max_length:
-                        max_length = len(str(cell.value))
-                except Exception:
-                    pass
-            ws.column_dimensions[column_letter].width = min(max_length + 2, 50)
-    except Exception:
-        pass
-
-    output = io.BytesIO()
-    wb.save(output)
-    data = output.getvalue()
-
-    # Build meaningful filename
-    biz_name = ""
-    try:
-        b = db.query(Business).filter(Business.id == business_id).first()
-        if b is not None:
-            biz_name = b.name or ""
-    except Exception:
-        biz_name = ""
-    def slugify(text: str) -> str:
-        return re.sub(r"[^A-Za-z0-9_-]+", "_", text).strip("_")
-    base = "products"
-    if biz_name:
-        base += f"_{slugify(biz_name)}"
-    if selected_only:
-        base += "_selected"
-    filename = f"{base}_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+    data, filename, _record_count = build_products_excel_export(
+        db,
+        business_id,
+        body,
+        calendar_type=str(calendar_type),
+        accept_language=str(accept_language),
+    )
 
     return Response(
         content=data,
@@ -1631,105 +1561,12 @@ async def download_products_import_template(
     db: Session = Depends(get_db),
     _: None = Depends(require_business_permission_dep("products", "edit")),
 ):
-    import io
-    import datetime
     from fastapi.responses import Response
-    from openpyxl import Workbook
-    from openpyxl.styles import Font, Alignment
-
-    wb = Workbook()
-    ws = wb.active
-    ws.title = "Template"
 
     locale = negotiate_locale(request.headers.get("Accept-Language"))
-    if locale == 'fa':
-        try:
-            ws.sheet_view.rightToLeft = True
-        except Exception:
-            pass
-
-    # Template headers should be user-friendly and localized.
-    # Import endpoint will map these localized headers back to internal keys.
-    #
-    # NOTE: For reference fields (category, tax, attributes), we provide both ID columns
-    # and human-friendly columns (name/code). Users can fill either; import will resolve.
-    columns = [
-        ("code", {"fa": "کد", "en": "Code"}),
-        ("name", {"fa": "نام", "en": "Name"}),
-        ("item_type", {"fa": "نوع", "en": "Type"}),
-        ("description", {"fa": "توضیحات", "en": "Description"}),
-        ("category_id", {"fa": "شناسه دسته‌بندی", "en": "Category ID"}),
-        ("category_path", {"fa": "مسیر دسته‌بندی", "en": "Category Path"}),
-        ("main_unit", {"fa": "واحد اصلی", "en": "Main Unit"}),
-        ("secondary_unit", {"fa": "واحد فرعی", "en": "Secondary Unit"}),
-        ("unit_conversion_factor", {"fa": "ضریب تبدیل", "en": "Unit Conversion Factor"}),
-        ("base_sales_price", {"fa": "قیمت فروش", "en": "Sales Price"}),
-        ("base_purchase_price", {"fa": "قیمت خرید", "en": "Purchase Price"}),
-        ("track_inventory", {"fa": "کنترل موجودی", "en": "Track Inventory"}),
-        ("reorder_point", {"fa": "نقطه سفارش مجدد", "en": "Reorder Point"}),
-        ("min_order_qty", {"fa": "حداقل مقدار سفارش", "en": "Min Order Qty"}),
-        ("lead_time_days", {"fa": "زمان تامین (روز)", "en": "Lead Time (Days)"}),
-        ("is_sales_taxable", {"fa": "مشمول مالیات فروش", "en": "Sales Taxable"}),
-        ("is_purchase_taxable", {"fa": "مشمول مالیات خرید", "en": "Purchase Taxable"}),
-        ("sales_tax_rate", {"fa": "نرخ مالیات فروش (%)", "en": "Sales Tax Rate (%)"}),
-        ("purchase_tax_rate", {"fa": "نرخ مالیات خرید (%)", "en": "Purchase Tax Rate (%)"}),
-        ("tax_type_id", {"fa": "شناسه نوع مالیات", "en": "Tax Type ID"}),
-        ("tax_type_code", {"fa": "کد نوع مالیات", "en": "Tax Type Code"}),
-        ("tax_type_title", {"fa": "عنوان نوع مالیات", "en": "Tax Type Title"}),
-        ("tax_code", {"fa": "کد مالیاتی", "en": "Tax Code"}),
-        ("tax_unit_id", {"fa": "شناسه واحد مالیاتی", "en": "Tax Unit ID"}),
-        ("tax_unit_code", {"fa": "کد واحد مالیاتی", "en": "Tax Unit Code"}),
-        ("tax_unit_name", {"fa": "نام واحد مالیاتی", "en": "Tax Unit Name"}),
-        ("attribute_ids", {"fa": "شناسه ویژگی‌ها", "en": "Attribute IDs"}),
-        ("attribute_titles", {"fa": "نام ویژگی‌ها", "en": "Attribute Titles"}),
-    ]
-
-    headers = [labels.get(locale, labels.get("en", key)) for key, labels in columns]
-    for col, header in enumerate(headers, 1):
-        cell = ws.cell(row=1, column=col, value=header)
-        cell.font = Font(bold=True)
-        cell.alignment = Alignment(horizontal="center")
-
-    # Sample data row (row 2)
-    if locale == 'fa':
-        sample = [
-            "P1001", "نمونه کالا", "کالا", "توضیح اختیاری", "",
-            "مواد اولیه > پلاستیک", "", "", "",
-            "150000", "120000", "TRUE",
-            "0", "0", "",
-            "FALSE", "FALSE", "", "",
-            "", "", "", "", "", "", "",
-            "1,2,3", "رنگ, سایز",
-        ]
-    else:
-        sample = [
-            "P1001", "Sample product", "product", "Optional description", "",
-            "Raw materials > Plastics", "", "", "",
-            "150000", "120000", "TRUE",
-            "0", "0", "",
-            "FALSE", "FALSE", "", "",
-            "", "", "", "", "", "", "",
-            "1,2,3", "Color, Size",
-        ]
-    for col, val in enumerate(sample, 1):
-        ws.cell(row=2, column=col, value=val)
-
-    # Auto width
-    for column in ws.columns:
-        try:
-            letter = column[0].column_letter
-            max_len = max(len(str(c.value)) if c.value is not None else 0 for c in column)
-            ws.column_dimensions[letter].width = min(max_len + 2, 50)
-        except Exception:
-            pass
-
-    buf = io.BytesIO()
-    wb.save(buf)
-    buf.seek(0)
-
-    filename = f"products_import_template_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+    content, filename = build_products_import_template(db, business_id, locale=locale)
     return Response(
-        content=buf.getvalue(),
+        content=content,
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={
             "Content-Disposition": f"attachment; filename={filename}",
@@ -1748,7 +1585,7 @@ async def download_products_import_template(
     - پشتیبانی از فایل Excel (.xlsx)
     - پردازش به صورت dry-run (پیش‌نمایش) یا واقعی
     - ایجاد یا به‌روزرسانی محصولات بر اساس کد
-    - پشتیبانی از دسته‌بندی، مالیات، ویژگی‌ها و سایر فیلدها
+    - پشتیبانی از دسته‌بندی، مالیات، ویژگی‌ها، انبار پیش‌فرض و تعداد اولیه (تراز افتتاحیه)
     - گزارش خطاها و هشدارها
     
     ### نکات مهم:
@@ -1814,7 +1651,6 @@ async def import_products_excel(
     _: None = Depends(require_business_permission_dep("products", "edit")),
 ):
     import io
-    import json
     import logging
     import re
     import zipfile
@@ -1826,6 +1662,7 @@ async def import_products_excel(
     from adapters.db.models.product_attribute import ProductAttribute
     from adapters.db.models.tax_type import TaxType
     from adapters.db.models.tax_unit import TaxUnit
+    from adapters.db.models.warehouse import Warehouse
 
     logger = logging.getLogger(__name__)
 
@@ -1855,6 +1692,8 @@ async def import_products_excel(
                 "tax_type": 0,
                 "tax_unit": 0,
                 "attributes": 0,
+                "warehouse": 0,
+                "currency": 0,
             },
             "would_create": {
                 "categories": 0,
@@ -1863,6 +1702,10 @@ async def import_products_excel(
             "created": {
                 "categories": 0,
                 "attributes": 0,
+            },
+            "opening_balance": {
+                "rows_with_opening_balance": 0,
+                "rows_cleared": 0,
             },
             "policies": {
                 "on_missing_category": on_missing_category,
@@ -1875,6 +1718,8 @@ async def import_products_excel(
 
         content = await file.read()
         logger.info(f"[IMPORT] File received - filename={file.filename}, size={len(content)} bytes")
+        if len(content) > MAX_PRODUCT_IMPORT_FILE_BYTES:
+            raise ApiError("FILE_TOO_LARGE", "حجم فایل بیش از حد مجاز است (حداکثر ۱۵ مگابایت)", http_status=413)
         if len(content) < 100 or not _validate_excel_signature(content):
             raise ApiError("INVALID_FILE", "فایل Excel معتبر نیست یا خالی است", http_status=400)
 
@@ -1883,121 +1728,43 @@ async def import_products_excel(
         except zipfile.BadZipFile:
             raise ApiError("INVALID_FILE", "فایل Excel خراب است یا فرمت آن معتبر نیست", http_status=400)
 
-        ws = wb.active
+        ws = select_products_import_worksheet(wb)
         rows = list(ws.iter_rows(values_only=True))
-        logger.info(f"[IMPORT] Excel file loaded - total rows={len(rows)}")
+        logger.info(f"[IMPORT] Excel file loaded - sheet={ws.title}, total rows={len(rows)}")
         if not rows:
             return success_response(data={"summary": {"total": 0}}, request=request, message="EMPTY_FILE")
 
-        # Headers may be localized (fa/en). Normalize them to internal keys.
         raw_headers = [str(h).strip() if h is not None else "" for h in rows[0]]
-
-        def _normalize_header(v: object) -> str:
-            s = "" if v is None else str(v)
-            s = s.replace("\u200c", " ")  # ZWNJ -> space
-            s = re.sub(r"\s+", " ", s).strip()
-            return s.lower()
-
-        # Aliases for headers (localized labels -> internal keys)
-        header_aliases: dict[str, str] = {}
-        internal_keys = [
-            "code","name","item_type","description","category_id",
-            "category_path","category",
-            "main_unit","secondary_unit","unit_conversion_factor",
-            "base_sales_price","base_purchase_price","track_inventory",
-            "reorder_point","min_order_qty","lead_time_days",
-            "is_sales_taxable","is_purchase_taxable","sales_tax_rate","purchase_tax_rate",
-            "tax_type_id","tax_type_code","tax_type_title","tax_code",
-            "tax_unit_id","tax_unit_code","tax_unit_name",
-            "attribute_ids","attribute_titles",
-        ]
-        for k in internal_keys:
-            header_aliases[_normalize_header(k)] = k
-
-        # Persian labels
-        header_aliases.update({
-            _normalize_header("کد"): "code",
-            _normalize_header("نام"): "name",
-            _normalize_header("نوع"): "item_type",
-            _normalize_header("توضیحات"): "description",
-            _normalize_header("شناسه دسته‌بندی"): "category_id",
-            _normalize_header("شناسه دسته بندی"): "category_id",
-            _normalize_header("مسیر دسته‌بندی"): "category_path",
-            _normalize_header("مسیر دسته بندی"): "category_path",
-            _normalize_header("دسته‌بندی"): "category",
-            _normalize_header("دسته بندی"): "category",
-            _normalize_header("واحد اصلی"): "main_unit",
-            _normalize_header("واحد فرعی"): "secondary_unit",
-            _normalize_header("ضریب تبدیل"): "unit_conversion_factor",
-            _normalize_header("قیمت فروش"): "base_sales_price",
-            _normalize_header("قیمت خرید"): "base_purchase_price",
-            _normalize_header("کنترل موجودی"): "track_inventory",
-            _normalize_header("نقطه سفارش مجدد"): "reorder_point",
-            _normalize_header("حداقل مقدار سفارش"): "min_order_qty",
-            _normalize_header("زمان تامین (روز)"): "lead_time_days",
-            _normalize_header("زمان تأمین (روز)"): "lead_time_days",
-            _normalize_header("مشمول مالیات فروش"): "is_sales_taxable",
-            _normalize_header("مشمول مالیات خرید"): "is_purchase_taxable",
-            _normalize_header("نرخ مالیات فروش (%)"): "sales_tax_rate",
-            _normalize_header("نرخ مالیات خرید (%)"): "purchase_tax_rate",
-            _normalize_header("شناسه نوع مالیات"): "tax_type_id",
-            _normalize_header("کد نوع مالیات"): "tax_type_code",
-            _normalize_header("عنوان نوع مالیات"): "tax_type_title",
-            _normalize_header("کد مالیاتی"): "tax_code",
-            _normalize_header("شناسه واحد مالیاتی"): "tax_unit_id",
-            _normalize_header("کد واحد مالیاتی"): "tax_unit_code",
-            _normalize_header("نام واحد مالیاتی"): "tax_unit_name",
-            _normalize_header("شناسه ویژگی‌ها"): "attribute_ids",
-            _normalize_header("شناسه ویژگی ها"): "attribute_ids",
-            _normalize_header("نام ویژگی‌ها"): "attribute_titles",
-            _normalize_header("نام ویژگی ها"): "attribute_titles",
-        })
-
-        # English labels
-        header_aliases.update({
-            _normalize_header("code"): "code",
-            _normalize_header("name"): "name",
-            _normalize_header("type"): "item_type",
-            _normalize_header("description"): "description",
-            _normalize_header("category id"): "category_id",
-            _normalize_header("category path"): "category_path",
-            _normalize_header("category"): "category",
-            _normalize_header("main unit"): "main_unit",
-            _normalize_header("secondary unit"): "secondary_unit",
-            _normalize_header("unit conversion factor"): "unit_conversion_factor",
-            _normalize_header("sales price"): "base_sales_price",
-            _normalize_header("purchase price"): "base_purchase_price",
-            _normalize_header("track inventory"): "track_inventory",
-            _normalize_header("reorder point"): "reorder_point",
-            _normalize_header("min order qty"): "min_order_qty",
-            _normalize_header("lead time (days)"): "lead_time_days",
-            _normalize_header("sales taxable"): "is_sales_taxable",
-            _normalize_header("purchase taxable"): "is_purchase_taxable",
-            _normalize_header("sales tax rate (%)"): "sales_tax_rate",
-            _normalize_header("purchase tax rate (%)"): "purchase_tax_rate",
-            _normalize_header("tax type id"): "tax_type_id",
-            _normalize_header("tax type code"): "tax_type_code",
-            _normalize_header("tax type title"): "tax_type_title",
-            _normalize_header("tax code"): "tax_code",
-            _normalize_header("tax unit id"): "tax_unit_id",
-            _normalize_header("tax unit code"): "tax_unit_code",
-            _normalize_header("tax unit name"): "tax_unit_name",
-            _normalize_header("attribute ids"): "attribute_ids",
-            _normalize_header("attribute titles"): "attribute_titles",
-        })
-
-        headers = [header_aliases.get(_normalize_header(h), h) for h in raw_headers]
+        headers = map_headers(raw_headers)
         data_rows = rows[1:]
+        if len(data_rows) > MAX_PRODUCT_IMPORT_DATA_ROWS:
+            raise ApiError(
+                "TOO_MANY_ROWS",
+                f"تعداد ردیف‌ها بیشتر از حد مجاز است (حداکثر {MAX_PRODUCT_IMPORT_DATA_ROWS})",
+                http_status=400,
+            )
+        mapped_keys = {h for h in headers if h in ALL_COLUMN_KEYS}
+        can_edit_opening_balance = has_business_permission_for_business(
+            ctx, db, business_id, "opening_balance", "edit"
+        )
+        warehouse_rows = db.query(Warehouse).filter(Warehouse.business_id == business_id).all()
+        warehouse_index = WarehouseImportIndex(warehouse_rows)
+        if "name" not in mapped_keys:
+            unmapped = [raw_headers[i] for i, h in enumerate(headers) if h not in ALL_COLUMN_KEYS]
+            raise ApiError(
+                "MISSING_COLUMNS",
+                "ستون الزامی «نام» در شیت کالاها یافت نشد. از تمپلیت رسمی استفاده کنید."
+                + (f" (ستون‌های ناشناخته: {', '.join(unmapped[:5])})" if unmapped else ""),
+                http_status=400,
+            )
         logger.info(f"[IMPORT] Headers parsed: {headers}, data rows count: {len(data_rows)}")
 
-        def _parse_bool(v: object) -> Optional[bool]:
-            if v is None: return None
-            s = str(v).strip().lower()
-            if s in ("true","1","yes","on","بله","هست"):
-                return True
-            if s in ("false","0","no","off","خیر","نیست"):
-                return False
-            return None
+        match_by = str(match_by or "code").strip().lower()
+        if match_by not in ("code", "name"):
+            match_by = "code"
+        conflict_policy = str(conflict_policy or "upsert").strip().lower()
+        if conflict_policy not in ("insert", "update", "upsert"):
+            conflict_policy = "upsert"
 
         def _normalize_number_text(v: object) -> str:
             if v is None:
@@ -2044,13 +1811,18 @@ async def import_products_excel(
                 return None
 
         def _normalize_item_type(v: object) -> Optional[str]:
-            if v is None: return None
+            if v is None:
+                return None
             s = str(v).strip()
+            if s == "":
+                return None
             mapping = {"product": "کالا", "service": "خدمت"}
             low = s.lower()
-            if low in mapping: return mapping[low]
-            if s in ("کالا","خدمت"): return s
-            return None
+            if low in mapping:
+                return mapping[low]
+            if s in ("کالا", "خدمت"):
+                return s
+            raise ValueError("نوع باید کالا یا خدمت باشد")
 
         def _norm_text(v: object) -> str:
             if v is None:
@@ -2175,8 +1947,11 @@ async def import_products_excel(
                     parent_id = current_id
                     continue
                 if len(candidates) > 1:
-                    opts = [f"{c.id}:{(_get_category_titles(c)[0] if _get_category_titles(c) else '')}" for c in candidates[:5]]
-                    return None, f"دسته‌بندی مبهم است: '{seg}' (گزینه‌ها: {', '.join(opts)})", created_paths
+                    by_id = {c.id: c for c in cats}
+                    opts = [category_full_path(c, by_id, "fa") or _get_category_titles(c)[0] for c in candidates[:5]]
+                    return None, (
+                        f"دسته‌بندی «{seg}» مبهم است. مسیر کامل را بنویسید، مثلاً: {opts[0]}"
+                    ), created_paths
 
                 # no match
                 if on_missing_category == "create" and is_dry_run:
@@ -2328,6 +2103,10 @@ async def import_products_excel(
                     out.append(p.split(":", 1)[1])
             return out
 
+        def _find_existing_product_row(data: dict) -> Optional[Product]:
+            found, _err = find_existing_product(db, business_id, match_by, data)
+            return found
+
         errors: list[dict] = []
         valid_items: list[dict] = []
 
@@ -2345,32 +2124,83 @@ async def import_products_excel(
                     val = val.strip()
                 item[key] = val
 
-            # normalize & cast
-            if 'item_type' in item:
-                item['item_type'] = _normalize_item_type(item.get('item_type')) or 'کالا'
-            for k in ['base_sales_price','base_purchase_price','sales_tax_rate','purchase_tax_rate','unit_conversion_factor']:
-                if k in item:
-                    item[k] = _parse_decimal(item.get(k))
-            for k in ['reorder_point','min_order_qty','lead_time_days','category_id','tax_type_id','tax_unit_id']:
-                if k in item:
-                    item[k] = _parse_int(item.get(k))
-            # Handle boolean fields - always set them, default to False if not provided or invalid
-            for k in ['track_inventory','is_sales_taxable','is_purchase_taxable']:
-                if k in item:
-                    parsed = _parse_bool(item.get(k))
-                    # For boolean fields, if None or invalid, use False as default
-                    item[k] = parsed if parsed is not None else False
-                else:
-                    # If field doesn't exist in item, set default to False
-                    item[k] = False
+            if not any(v not in (None, "") for v in item.values()):
+                continue
 
-            # attribute_ids: comma-separated
-            if 'attribute_ids' in item and item['attribute_ids']:
+            if is_sample_import_row(item):
+                row_warnings.append("ردیف نمونه نادیده گرفته شد")
+                row_preview["warnings"] = row_warnings
+                preview_rows.append(row_preview)
+                continue
+
+            item["_row"] = idx
+            item["_provided_keys"] = provided_keys_from_raw(item)
+
+            if "item_type" in item:
                 try:
-                    parts = [p.strip() for p in str(item['attribute_ids']).split(',') if p and p.strip()]
-                    item['attribute_ids'] = [int(p) for p in parts if p.isdigit()]
+                    normalized_type = _normalize_item_type(item.get("item_type"))
+                except ValueError as exc:
+                    row_errors.append(str(exc))
+                    normalized_type = None
+                if normalized_type is None:
+                    item.pop("item_type", None)
+                else:
+                    item["item_type"] = normalized_type
+
+            for k in DECIMAL_KEYS:
+                if k in item:
+                    raw = item.get(k)
+                    if raw in (None, ""):
+                        item[k] = None
+                    else:
+                        parsed_dec = _parse_decimal(raw)
+                        if parsed_dec is None:
+                            row_errors.append(f"مقدار عددی نامعتبر در ستون {k}")
+                        item[k] = parsed_dec
+            for k in INT_KEYS:
+                if k in item:
+                    raw = item.get(k)
+                    if raw in (None, ""):
+                        item[k] = None
+                    else:
+                        parsed_int = _parse_int(raw)
+                        if parsed_int is None:
+                            row_errors.append(f"مقدار عددی نامعتبر در ستون {k}")
+                        item[k] = parsed_int
+            for k in BOOLEAN_KEYS:
+                if k not in item:
+                    continue
+                try:
+                    parsed_bool = parse_bool_strict(item.get(k))
+                except ValueError:
+                    row_errors.append(f"مقدار بله/خیر نامعتبر در ستون {k}")
+                    item.pop(k, None)
+                    continue
+                if parsed_bool is None:
+                    item.pop(k, None)
+                else:
+                    item[k] = parsed_bool
+
+            if "inventory_mode" in item:
+                try:
+                    mode = parse_inventory_mode(item.get("inventory_mode"))
+                except ValueError as exc:
+                    row_errors.append(str(exc))
+                    item.pop("inventory_mode", None)
+                else:
+                    if mode is None:
+                        item.pop("inventory_mode", None)
+                    else:
+                        item["inventory_mode"] = mode
+
+            if "attribute_ids" in item and item["attribute_ids"]:
+                try:
+                    parts = [p.strip() for p in str(item["attribute_ids"]).split(",") if p and p.strip()]
+                    item["attribute_ids"] = [int(p) for p in parts if p.isdigit()]
                 except Exception:
-                    item['attribute_ids'] = []
+                    item["attribute_ids"] = []
+            elif "attribute_ids" in item:
+                item.pop("attribute_ids", None)
 
             # Resolve references: category, tax, attributes
             # Category: accept category_id, or resolve from category_path/category (name), optionally create
@@ -2435,20 +2265,87 @@ async def import_products_excel(
                     reference_summary["would_create"]["attributes"] += len(would_titles)
                     row_warnings.append("برخی ویژگی‌ها وجود ندارند و در حالت create ساخته خواهند شد")
 
-            # validations
-            name = item.get('name')
-            if not name or str(name).strip() == "":
-                row_errors.append('name الزامی است')
+            resolve_fx_currency(item, db, business_id, row_errors)
+            if item.get("price_fx_currency_id") is not None and "price_fx_currency_code" in (item.get("_provided_keys") or set()):
+                row_preview["resolved"]["currency"] = {"price_fx_currency_id": item.get("price_fx_currency_id")}
+                reference_summary["resolved"]["currency"] += 1
 
-            # if code is empty, it will be auto-generated in service
-            code = item.get('code')
+            existing_for_type = _find_existing_product_row(item)
+            effective_item_type = item.get("item_type")
+            if not effective_item_type and existing_for_type is not None:
+                existing_type = existing_for_type.item_type
+                effective_item_type = existing_type.value if hasattr(existing_type, "value") else str(existing_type)
+            if str(effective_item_type or "کالا").strip() == "خدمت":
+                if warehouse_columns_mapped(mapped_keys) and (
+                    item.get("default_warehouse_id") is not None
+                    or item.get(WAREHOUSE_CODE_KEY)
+                    or item.get(WAREHOUSE_NAME_KEY)
+                ):
+                    row_warnings.append("کالاهای خدماتی انبار پیش‌فرض ندارند؛ مقدار انبار نادیده گرفته می‌شود")
+                item.pop("default_warehouse_id", None)
+            else:
+                wh_errors, wh_preview = resolve_import_default_warehouse(
+                    item, mapped_keys, warehouse_index
+                )
+                if wh_errors:
+                    row_errors.extend(wh_errors)
+                elif wh_preview:
+                    row_preview["resolved"]["warehouse"] = wh_preview
+                    reference_summary["resolved"]["warehouse"] += 1
+
+            existing_for_ob = None
+            if opening_balance_columns_mapped(mapped_keys):
+                existing_for_ob = _find_existing_product_row(item)
+                ob_item = dict(item)
+                if existing_for_ob is not None:
+                    if "track_inventory" not in item:
+                        ob_item["track_inventory"] = existing_for_ob.track_inventory
+                    if "item_type" not in item:
+                        existing_type = existing_for_ob.item_type
+                        ob_item["item_type"] = existing_type.value if hasattr(existing_type, "value") else str(existing_type)
+                    if item.get("default_warehouse_id") is None:
+                        ob_item["default_warehouse_id"] = existing_for_ob.default_warehouse_id
+                ob_input, ob_errors, ob_warnings, ob_preview = prepare_opening_balance_for_import_row(
+                    item=ob_item,
+                    mapped_keys=mapped_keys,
+                    business_id=business_id,
+                    db=db,
+                    can_edit_opening_balance=can_edit_opening_balance,
+                    is_update=existing_for_ob is not None,
+                    existing_product=existing_for_ob,
+                    warehouse_index=warehouse_index,
+                )
+                if ob_item.get("default_warehouse_id") is not None:
+                    item["default_warehouse_id"] = ob_item.get("default_warehouse_id")
+                row_errors.extend(ob_errors)
+                row_warnings.extend(ob_warnings)
+                if ob_preview:
+                    row_preview["opening_balance"] = ob_preview
+                    if ob_preview.get("action") == "clear":
+                        reference_summary["opening_balance"]["rows_cleared"] += 1
+                    elif ob_preview.get("action") == "upsert":
+                        reference_summary["opening_balance"]["rows_with_opening_balance"] += 1
+                if ob_input is not None:
+                    item["opening_balance"] = ob_input.model_dump()
+
+            name = item.get("name")
+            if not name or str(name).strip() == "":
+                row_errors.append("نام الزامی است")
+
+            code = item.get("code")
             if code is not None:
                 code_str = str(code).strip()
-                # Handle string "None" or empty string
                 if code_str == "" or code_str.lower() == "none":
-                    item['code'] = None
+                    item["code"] = None
+                    provided = item.get("_provided_keys")
+                    if isinstance(provided, set):
+                        provided.discard("code")
                 else:
-                    item['code'] = code_str
+                    item["code"] = code_str
+
+            _, match_err = find_existing_product(db, business_id, match_by, item)
+            if match_err:
+                row_errors.append(match_err)
 
             if row_errors:
                 errors.append({"row": idx, "errors": row_errors})
@@ -2458,11 +2355,8 @@ async def import_products_excel(
                     preview_rows.append(row_preview)
                 continue
 
-            # Remove helper keys not part of schema
-            if "_created_attribute_titles" in item:
-                item.pop("_created_attribute_titles", None)
-            if "_would_create_attribute_titles" in item:
-                item.pop("_would_create_attribute_titles", None)
+            item.pop("_created_attribute_titles", None)
+            item.pop("_would_create_attribute_titles", None)
 
             valid_items.append(item)
             logger.debug(f"[IMPORT] Row {idx} validated successfully - name={item.get('name')}, code={item.get('code')}")
@@ -2473,92 +2367,112 @@ async def import_products_excel(
         inserted = 0
         updated = 0
         skipped = 0
+        skipped_apply = 0
+        would_insert = 0
+        would_update = 0
+        would_skip_conflict = 0
 
         logger.info(f"[IMPORT] Processing summary - total_rows={len(data_rows)}, valid_items={len(valid_items)}, errors={len(errors)}, is_dry_run={is_dry_run}")
 
+        from adapters.api.v1.schema_models.product import ProductCreateRequest, ProductUpdateRequest
+        from app.services.product_service import create_product, update_product
+        from pydantic import ValidationError
+
+        user_id = ctx.get_user_id()
+
+        for data in valid_items:
+            existing, _match_err = find_existing_product(db, business_id, match_by, data)
+            if existing is None:
+                if conflict_policy == "update":
+                    would_skip_conflict += 1
+                else:
+                    would_insert += 1
+            elif conflict_policy == "insert":
+                would_skip_conflict += 1
+            else:
+                would_update += 1
+
         if not is_dry_run and valid_items:
             logger.info(f"[IMPORT] Starting REAL import (not dry-run) for {len(valid_items)} items")
-            from sqlalchemy import and_ as _and
-            from adapters.db.models.product import Product
-            from adapters.api.v1.schema_models.product import ProductCreateRequest, ProductUpdateRequest
-            from app.services.product_service import create_product, update_product
+            for data in valid_items:
+                row_idx = data.get("_row")
+                item_name = data.get("name", "N/A")
+                provided = data.get("_provided_keys") if isinstance(data.get("_provided_keys"), set) else provided_keys_from_raw(data)
+                existing, _match_err = find_existing_product(db, business_id, match_by, data)
 
-            def _find_existing(session: Session, data: dict) -> Optional[Product]:
-                if match_by == 'code' and data.get('code'):
-                    result = session.query(Product).filter(_and(Product.business_id == business_id, Product.code == str(data['code']).strip())).first()
-                    logger.debug(f"[IMPORT] Searching by code='{data.get('code')}' - found: {result is not None}")
-                    return result
-                if match_by == 'name' and data.get('name'):
-                    result = session.query(Product).filter(_and(Product.business_id == business_id, Product.name == str(data['name']).strip())).first()
-                    logger.debug(f"[IMPORT] Searching by name='{data.get('name')}' - found: {result is not None}")
-                    return result
-                logger.debug(f"[IMPORT] No match criteria - match_by={match_by}, code={data.get('code')}, name={data.get('name')}")
-                return None
-
-            for idx, data in enumerate(valid_items, start=1):
-                item_name = data.get('name', 'N/A')
-                item_code = data.get('code', 'N/A')
-                logger.info(f"[IMPORT] Processing item {idx}/{len(valid_items)}: name='{item_name}', code='{item_code}'")
-                logger.debug(f"[IMPORT] Full item data: {data}")
-                
-                existing = _find_existing(db, data)
                 if existing is None:
-                    logger.info(f"[IMPORT] Item '{item_name}' not found - will CREATE new product")
+                    if conflict_policy == "update":
+                        skipped += 1
+                        errors.append({"row": row_idx, "errors": ["کالای منطبق یافت نشد؛ سیاست فقط به‌روزرسانی است"]})
+                        continue
                     try:
-                        logger.debug(f"[IMPORT] Calling create_product with business_id={business_id}, data keys: {list(data.keys())}")
-                        # Log data before creating ProductCreateRequest to see what's being passed
-                        logger.debug(f"[IMPORT] Data to create ProductCreateRequest: {json.dumps({k: str(v) for k, v in data.items()}, ensure_ascii=False, default=str)}")
+                        create_payload = build_create_payload(data)
                         try:
-                            product_request = ProductCreateRequest(**data)
-                            logger.debug(f"[IMPORT] ProductCreateRequest created successfully")
-                        except Exception as validation_error:
-                            logger.error(f"[IMPORT] ❌ ValidationError creating ProductCreateRequest for '{item_name}': {validation_error}")
-                            # Try to get detailed validation errors
-                            try:
-                                if hasattr(validation_error, 'errors'):
-                                    errors_list = validation_error.errors()
-                                    logger.error(f"[IMPORT] Validation errors details: {json.dumps(errors_list, ensure_ascii=False, indent=2)}")
-                                elif hasattr(validation_error, 'error_dict'):
-                                    logger.error(f"[IMPORT] Validation error_dict: {json.dumps(validation_error.error_dict(), ensure_ascii=False, indent=2)}")
-                                # Log the string representation as fallback
-                                logger.error(f"[IMPORT] Full validation error: {str(validation_error)}")
-                            except Exception as log_error:
-                                logger.error(f"[IMPORT] Could not serialize validation error: {log_error}")
-                            raise
-                        result = create_product(db, business_id, product_request)
-                        logger.info(f"[IMPORT] ✅ Successfully CREATED product '{item_name}' - result: {result.get('message', 'N/A')}")
-                        if result.get('data', {}).get('id'):
-                            logger.info(f"[IMPORT] Created product ID: {result['data']['id']}")
+                            product_request = ProductCreateRequest(**create_payload)
+                        except ValidationError as validation_error:
+                            errors.append({"row": row_idx, "errors": format_pydantic_errors(validation_error)})
+                            skipped_apply += 1
+                            continue
+                        if product_request.opening_balance is not None:
+                            create_product_with_opening_balance(
+                                db,
+                                business_id,
+                                user_id,
+                                product_request,
+                                create_product_fn=create_product,
+                                delete_product_fn=delete_product,
+                            )
+                        else:
+                            create_product(db, business_id, product_request)
                         inserted += 1
-                        logger.info(f"[IMPORT] Insert counter: {inserted}")
+                    except ApiError as e:
+                        logger.warning("product import create failed business_id=%s row=%s: %s", business_id, row_idx, api_error_message(e))
+                        errors.append({"row": row_idx, "errors": [api_error_message(e)]})
+                        skipped_apply += 1
                     except Exception as e:
-                        logger.error(f"[IMPORT] ❌ Create product failed for '{item_name}': {e}", exc_info=True)
-                        logger.error(f"[IMPORT] Exception type: {type(e).__name__}, args: {e.args}")
-                        if hasattr(e, 'errors'):
-                            logger.error(f"[IMPORT] Validation errors: {json.dumps(e.errors(), ensure_ascii=False, indent=2)}")
-                        skipped += 1
+                        logger.error("product import create failed for '%s': %s", item_name, e, exc_info=True)
+                        errors.append({"row": row_idx, "errors": ["خطای غیرمنتظره در ایجاد کالا"]})
+                        skipped_apply += 1
+                elif conflict_policy == "insert":
+                    skipped += 1
                 else:
-                    logger.info(f"[IMPORT] Item '{item_name}' EXISTS (id={existing.id}) - conflict_policy={conflict_policy}")
-                    if conflict_policy == 'insert':
-                        logger.info(f"[IMPORT] Skipping existing item due to conflict_policy='insert'")
-                        skipped += 1
-                    elif conflict_policy in ('update','upsert'):
-                        logger.info(f"[IMPORT] Will UPDATE existing product id={existing.id}")
+                    try:
+                        update_payload = build_update_payload(data, provided)
                         try:
-                            logger.debug(f"[IMPORT] Calling update_product with id={existing.id}, business_id={business_id}")
-                            result = update_product(db, existing.id, business_id, ProductUpdateRequest(**data))
-                            logger.info(f"[IMPORT] ✅ Successfully UPDATED product '{item_name}' (id={existing.id})")
-                            updated += 1
-                            logger.info(f"[IMPORT] Update counter: {updated}")
-                        except Exception as e:
-                            logger.error(f"[IMPORT] ❌ Update product failed for '{item_name}' (id={existing.id}): {e}", exc_info=True)
-                            logger.error(f"[IMPORT] Exception type: {type(e).__name__}, args: {e.args}")
-                            skipped += 1
+                            update_request = ProductUpdateRequest(**update_payload)
+                        except ValidationError as validation_error:
+                            errors.append({"row": row_idx, "errors": format_pydantic_errors(validation_error)})
+                            skipped_apply += 1
+                            continue
+                        previous_warehouse_id = existing.default_warehouse_id
+                        if update_request.opening_balance is not None:
+                            update_product_with_opening_balance(
+                                db,
+                                business_id,
+                                user_id,
+                                existing.id,
+                                update_request,
+                                update_product_fn=update_product,
+                                previous_warehouse_id=previous_warehouse_id,
+                            )
+                        else:
+                            update_product(
+                                db, existing.id, business_id, update_request, user_id=user_id
+                            )
+                        updated += 1
+                    except ApiError as e:
+                        logger.warning("product import update failed business_id=%s row=%s: %s", business_id, row_idx, api_error_message(e))
+                        errors.append({"row": row_idx, "errors": [api_error_message(e)]})
+                        skipped_apply += 1
+                    except Exception as e:
+                        logger.error("product import update failed for '%s': %s", item_name, e, exc_info=True)
+                        errors.append({"row": row_idx, "errors": ["خطای غیرمنتظره در به‌روزرسانی کالا"]})
+                        skipped_apply += 1
         else:
             if is_dry_run:
-                logger.info(f"[IMPORT] DRY-RUN mode - skipping actual database operations")
+                logger.info("[IMPORT] DRY-RUN mode - skipping actual database operations")
             else:
-                logger.warning(f"[IMPORT] No valid items to process (valid_items is empty)")
+                logger.warning("[IMPORT] No valid items to process (valid_items is empty)")
 
         summary = {
             "total": len(data_rows),
@@ -2567,7 +2481,11 @@ async def import_products_excel(
             "inserted": inserted,
             "updated": updated,
             "skipped": skipped,
+            "skipped_apply": skipped_apply,
             "dry_run": is_dry_run,
+            "would_insert": would_insert,
+            "would_update": would_update,
+            "would_skip_conflict": would_skip_conflict,
         }
 
         logger.info(f"[IMPORT] Final summary: {summary}")
@@ -2653,9 +2571,29 @@ async def export_products_pdf(
     from weasyprint import HTML, CSS
     from weasyprint.text.fonts import FontConfiguration
 
+    # Apply selected rows filter if requested
+    selected_only = bool(body.get('selected_only', False))
+    selected_row_keys = body.get('selected_row_keys')
+    selected_indices = body.get('selected_indices')
+    has_selected_row_keys = (
+        selected_only
+        and isinstance(selected_row_keys, list)
+        and any(isinstance(k, dict) and k.get("id") is not None for k in selected_row_keys)
+    )
+
+    # خروجی کامل (یا انتخاب با id): کل نتایج فیلترشده؛ نه فقط صفحه UI.
+    max_export_records = 10000
+    if selected_only and not has_selected_row_keys:
+        take = max(1, min(int(body.get("take", 1000)), max_export_records))
+        skip = max(0, int(body.get("skip", 0)))
+    else:
+        take = max_export_records
+        skip = 0
+
+    include_inventory = _should_include_inventory_for_product_export(body)
     query_dict = {
-        "take": int(body.get("take", 100)),
-        "skip": int(body.get("skip", 0)),
+        "take": take,
+        "skip": skip,
         "sort_by": body.get("sort_by"),
         "sort_desc": bool(body.get("sort_desc", False)),
         "sort": body.get("sort") if isinstance(body.get("sort"), list) else None,
@@ -2663,15 +2601,13 @@ async def export_products_pdf(
         "search_fields": body.get("search_fields") or body.get("searchFields"),
         "filters": body.get("filters"),
         "category_ids": body.get("category_ids") or body.get("categoryIds"),
+        "include_inventory": include_inventory,
+        "inventory_as_of_date": body.get("inventory_as_of_date") or body.get("inventoryAsOfDate"),
     }
     result = list_products(db, business_id, query_dict)
     items = result.get("items", [])
     items = [format_datetime_fields(item, request) for item in items]
 
-    # Apply selected rows filter if requested
-    selected_only = bool(body.get('selected_only', False))
-    selected_row_keys = body.get('selected_row_keys')
-    selected_indices = body.get('selected_indices')
     if selected_only and isinstance(selected_row_keys, list):
         try:
             wanted_ids = set()
@@ -2831,6 +2767,7 @@ async def export_products_pdf(
     is_fa = (locale == 'fa')
     html_lang = 'fa' if is_fa else 'en'
     html_dir = 'rtl' if is_fa else 'ltr'
+    _enrich_product_export_items(items, is_fa=is_fa)
 
     # Load business info for header
     business_name = ""
@@ -6271,4 +6208,51 @@ async def export_sales_by_product_report_excel(
         },
     )
 
+
+@router.post(
+    "/businesses/{business_id}/reports/sales-by-product/export/pdf",
+    summary="خروجی PDF گزارش فروش به تفکیک کالا",
+)
+@require_business_access("business_id")
+async def export_sales_by_product_report_pdf(
+    request: Request,
+    business_id: int,
+    body: Dict[str, Any] = Body(default={}),
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    _: None = Depends(require_business_permission_dep("reports", "export")),
+):
+    from app.services.turnover_report_export_service import (
+        SALES_BY_PRODUCT_COLUMNS,
+        turnover_pdf_response,
+    )
+
+    product_ids = body.get("product_ids")
+    if product_ids is not None and not isinstance(product_ids, list):
+        product_ids = None
+    category_ids = body.get("category_ids")
+    if category_ids is not None and not isinstance(category_ids, list):
+        category_ids = None
+    warehouse_ids = body.get("warehouse_ids")
+    if warehouse_ids is not None and not isinstance(warehouse_ids, list):
+        warehouse_ids = None
+
+    return turnover_pdf_response(
+        request,
+        business_id,
+        body,
+        ctx,
+        db,
+        fetch_fn=get_sales_by_product_report,
+        columns=SALES_BY_PRODUCT_COLUMNS,
+        filename_prefix="sales_by_product",
+        title_fa="گزارش فروش به تفکیک کالا",
+        title_en="Sales by Product Report",
+        fetch_kwargs={
+            "product_ids": product_ids,
+            "category_ids": category_ids,
+            "warehouse_ids": warehouse_ids,
+            "include_zero_sales": bool(body.get("include_zero_sales", False)),
+        },
+    )
 

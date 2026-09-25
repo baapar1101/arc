@@ -17,7 +17,9 @@ $cfg = wp_parse_args(
 		'categoryId'            => null,
 		'province'              => null,
 		'city'                  => null,
+		'brand'                 => null,
 		'locationFilters'       => false,
+		'brandFilters'          => false,
 		'provinceSuggestions'   => false,
 		'showProductDetails'    => true,
 		'columns'               => 4,
@@ -39,9 +41,11 @@ $cols                    = (int) $cfg['columns'];
 $page_layout             = ! empty( $cfg['pageLayout'] );
 $show_search             = ! empty( $cfg['search'] );
 $show_loc_ui             = ! empty( $cfg['locationFilters'] );
-$show_toolbar            = $show_search || $show_loc_ui;
+$show_brand_ui           = ! empty( $cfg['brandFilters'] );
+$show_toolbar            = $show_search || $show_loc_ui || $show_brand_ui;
 $prov_val                = isset( $cfg['province'] ) && is_string( $cfg['province'] ) ? $cfg['province'] : '';
 $city_val                = isset( $cfg['city'] ) && is_string( $cfg['city'] ) ? $cfg['city'] : '';
+$brand_val               = isset( $cfg['brand'] ) && is_string( $cfg['brand'] ) ? $cfg['brand'] : '';
 $provinces_list_id       = $uid . '-provinces';
 $show_province_datalist  = $show_loc_ui && ! empty( $cfg['provinceSuggestions'] );
 ?>
@@ -56,9 +60,16 @@ $show_province_datalist  = $show_loc_ui && ! empty( $cfg['provinceSuggestions'] 
 					<button type="button" class="st-search-btn button"><?php esc_html_e( 'جستجو', 'shabake-tamin' ); ?></button>
 				</div>
 			<?php endif; ?>
-			<?php if ( $show_loc_ui ) : ?>
+			<?php if ( $show_loc_ui || $show_brand_ui ) : ?>
 				<div class="st-toolbar st-toolbar--filters">
 					<div class="st-filter-fields">
+						<?php if ( $show_brand_ui ) : ?>
+							<label class="st-filter-label">
+								<span class="st-filter-label-text"><?php esc_html_e( 'برند / مدل', 'shabake-tamin' ); ?></span>
+								<input type="search" class="st-filter-brand" maxlength="255" value="<?php echo esc_attr( $brand_val ); ?>" autocomplete="off" />
+							</label>
+						<?php endif; ?>
+						<?php if ( $show_loc_ui ) : ?>
 						<label class="st-filter-label">
 							<span class="st-filter-label-text"><?php esc_html_e( 'استان', 'shabake-tamin' ); ?></span>
 							<input type="text" class="st-filter-province" maxlength="100" value="<?php echo esc_attr( $prov_val ); ?>" autocomplete="address-level1"<?php echo $show_province_datalist ? ' list="' . esc_attr( $provinces_list_id ) . '"' : ''; ?> />
@@ -67,9 +78,10 @@ $show_province_datalist  = $show_loc_ui && ! empty( $cfg['provinceSuggestions'] 
 							<span class="st-filter-label-text"><?php esc_html_e( 'شهر', 'shabake-tamin' ); ?></span>
 							<input type="text" class="st-filter-city" maxlength="100" value="<?php echo esc_attr( $city_val ); ?>" autocomplete="address-level2" />
 						</label>
+						<?php endif; ?>
 					</div>
-					<button type="button" class="st-filter-apply button"><?php esc_html_e( 'اعمال فیلتر مکان', 'shabake-tamin' ); ?></button>
-					<?php if ( $show_province_datalist ) : ?>
+					<button type="button" class="st-filter-apply button"><?php esc_html_e( 'اعمال فیلتر', 'shabake-tamin' ); ?></button>
+					<?php if ( $show_loc_ui && $show_province_datalist ) : ?>
 						<?php require_once ST_PLUGIN_DIR . 'includes/iran-provinces-list.php'; ?>
 						<datalist id="<?php echo esc_attr( $provinces_list_id ); ?>">
 							<?php foreach ( shabake_tamin_get_iran_provinces() as $st_province_name ) : ?>
@@ -86,6 +98,7 @@ $show_province_datalist  = $show_loc_ui && ! empty( $cfg['provinceSuggestions'] 
 			<span class="st-pub-result-stats"></span>
 		</div>
 	<?php endif; ?>
+	<div class="st-supplier-banner" hidden aria-live="polite"></div>
 	<div class="st-catalog-status" hidden></div>
 	<div class="st-grid" aria-live="polite"></div>
 	<div class="st-loadmore-wrap">

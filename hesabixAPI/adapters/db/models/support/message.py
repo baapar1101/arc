@@ -33,3 +33,4 @@ class Message(Base):
     # Relationships
     ticket = relationship("Ticket", back_populates="messages")
     sender = relationship("User")
+    attachments = relationship("SupportAttachment", back_populates="message")

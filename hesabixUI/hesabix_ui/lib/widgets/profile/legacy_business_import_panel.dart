@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:hesabix_ui/config/brand_config.dart';
+import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/widgets/profile/legacy_import_wizard.dart';
+import 'package:hesabix_ui/widgets/profile/new_business/new_business_shared.dart';
 
-/// کارت ورود به ویزارد انتقال از نسخه قدیم مارک‌استریت.
+/// کارت ورود به ویزارد انتقال از نسخه قدیم حسابیکس.
 class LegacyBusinessImportPanel extends StatefulWidget {
   final bool isLoading;
   final ValueChanged<bool>? onLoadingChanged;
@@ -36,74 +39,31 @@ class _LegacyBusinessImportPanelState extends State<LegacyBusinessImportPanel> {
 
   @override
   Widget build(BuildContext context) {
+    final t = AppLocalizations.of(context);
     final disabled = widget.isLoading || _wizardOpen;
+
     return Stack(
       children: [
-        Card(
-          elevation: 2,
-          child: InkWell(
-            onTap: disabled ? null : _openWizard,
-            borderRadius: BorderRadius.circular(12),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Row(
-                children: [
-                  Icon(
-                    Icons.cloud_sync,
-                    color: Theme.of(context).colorScheme.primary,
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'انتقال از مارک‌استریت قبلی',
-                          style: Theme.of(context)
-                              .textTheme
-                              .titleMedium
-                              ?.copyWith(fontWeight: FontWeight.w600),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'ویزارد انتقال با پیش‌نمایش، پیشرفت زنده و گزارش نتیجه',
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                color: Theme.of(context)
-                                    .colorScheme
-                                    .onSurface
-                                    .withValues(alpha: 0.7),
-                              ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  if (_wizardOpen)
-                    const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  else
-                    Icon(
-                      Icons.arrow_forward_ios,
-                      size: 16,
-                      color: Theme.of(context)
-                          .colorScheme
-                          .onSurface
-                          .withValues(alpha: 0.5),
-                    ),
-                ],
-              ),
-            ),
-          ),
+        NewBusinessChoiceCard(
+          icon: Icons.cloud_sync_rounded,
+          title: t.branded(t.newBusinessImportLegacyTitle),
+          subtitle: t.branded(t.newBusinessImportLegacySubtitle),
+          onTap: disabled ? null : _openWizard,
         ),
         if (_wizardOpen)
           Positioned.fill(
             child: AbsorbPointer(
-              child: Container(
+              child: DecoratedBox(
                 decoration: BoxDecoration(
                   color: Colors.black.withValues(alpha: 0.04),
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(18),
+                ),
+                child: const Center(
+                  child: SizedBox(
+                    width: 22,
+                    height: 22,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
                 ),
               ),
             ),

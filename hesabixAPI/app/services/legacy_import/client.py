@@ -9,6 +9,7 @@ import httpx
 from app.core.responses import ApiError
 from app.services.legacy_import.constants import (
     DEFAULT_LEGACY_SERVER_URL,
+    LEGACY_ACCOUNTING_DOC_GET_PATH,
     LEGACY_ARCHIVE_CREATE_PATH,
     LEGACY_BUSINESS_INFO_PATH,
     LEGACY_BUSINESS_LIST_PATH,
@@ -20,6 +21,30 @@ from app.services.legacy_import.constants import (
 from app.services.legacy_import.mappers import normalize_server_url
 
 logger = logging.getLogger(__name__)
+
+LEGACY_ACCPRO_REQUIRED_MESSAGE = (
+    "برای انجام این کار، افزونه «حسابداری پیشرفته» را در نسخه قدیم حسابیکس فعال یا تمدید کنید."
+)
+
+
+def legacy_response_indicates_accpro_required(body: str) -> bool:
+    """True when legacy Hesabix v1 rejected the call due to inactive accpro plugin."""
+    text = (body or "").strip()
+    if not text:
+        return False
+    lowered = text.lower()
+    if "accpro" in lowered:
+        return True
+    return "حسابداری پیشرفته" in text
+
+
+def _raise_accpro_required(*, context: str, legacy_message: str | None = None) -> None:
+    raise ApiError(
+        "LEGACY_ACCPRO_REQUIRED",
+        LEGACY_ACCPRO_REQUIRED_MESSAGE,
+        http_status=400,
+        details={"context": context, "legacy_message": legacy_message},
+    )
 
 
 class LegacyApiClient:
@@ -74,14 +99,18 @@ class LegacyApiClient:
         )
 
     def _raise_for_status(self, response: httpx.Response, *, context: str) -> None:
+        body_preview = (response.text or "")[:500]
+        if legacy_response_indicates_accpro_required(body_preview):
+            _raise_accpro_required(context=context, legacy_message=body_preview[:500] or None)
         if response.status_code < 400:
             return
-        body_preview = (response.text or "")[:500]
         if response.status_code in (401, 403):
+            # هرگز 401 به کلاینت پنل برنگردان: interceptor فرانت‌اند آن را
+            # به‌معنای انقضای نشست کاربر فعلی می‌گیرد و به صفحه ورود می‌فرستد.
             raise ApiError(
                 "LEGACY_API_UNAUTHORIZED",
-                "کلید API نسخه قدیم نامعتبر است یا دسترسی ندارد",
-                http_status=401,
+                "کلید API نسخه قدیم نامعتبر است یا دسترسی ندارد. لطفاً کلید را در حسابیکس قبلی بررسی کنید.",
+                http_status=400,
                 details={"context": context, "status": response.status_code},
             )
         if response.status_code == 404:
@@ -159,8 +188,14 @@ class LegacyApiClient:
                 continue
             rid = row.get("id")
             label = row.get("label") or row.get("name")
-            if rid is not None and label:
-                mapping[int(rid)] = str(label)
+            if label:
+                if rid is not None:
+                    mapping[int(rid)] = str(label)
+                else:
+                    # API قدیم گاهی id ندارد؛ از index مبتنی بر ۱ استفاده می‌کنیم
+                    idx = items.index(row) + 1
+                    if idx not in mapping:
+                        mapping[idx] = str(label)
         return mapping
 
     def get_document_detail(self, document_id: int) -> Dict[str, Any]:
@@ -180,12 +215,40 @@ class LegacyApiClient:
             http_status=502,
         )
 
+    def get_document_by_code(self, code: str) -> Dict[str, Any]:
+        """جزئیات سند با کد (accounting/doc/get) — شامل relatedDocs."""
+        code_str = str(code or "").strip()
+        if not code_str:
+            raise ApiError(
+                "LEGACY_DOC_CODE_REQUIRED",
+                "کد سند برای دریافت جزئیات الزامی است",
+                http_status=400,
+            )
+        with self._client() as client:
+            resp = client.post(LEGACY_ACCOUNTING_DOC_GET_PATH, json={"code": code_str})
+            self._raise_for_status(resp, context="accounting/doc/get")
+            payload = resp.json()
+        if not isinstance(payload, dict):
+            raise ApiError(
+                "LEGACY_INVALID_RESPONSE",
+                "پاسخ نامعتبر از جزئیات سند",
+                http_status=502,
+            )
+        return payload
+
     def download_archive(self) -> bytes:
         """Download full business archive ZIP from legacy server."""
         with self._client() as client:
             resp = client.post(LEGACY_ARCHIVE_CREATE_PATH, json={})
             self._raise_for_status(resp, context="backup/archive/create")
             content = resp.content
+            if content[:1] in (b"{", b"[") and legacy_response_indicates_accpro_required(
+                content.decode("utf-8", errors="replace")
+            ):
+                _raise_accpro_required(
+                    context="backup/archive/create",
+                    legacy_message=content.decode("utf-8", errors="replace")[:500] or None,
+                )
             if len(content) > self.max_archive_bytes:
                 raise ApiError(
                     "LEGACY_ARCHIVE_TOO_LARGE",

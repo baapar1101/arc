@@ -109,6 +109,7 @@ class Hesabix_V2_Activator
 
 		add_option('hesabix_v2_opening_inventory_completed', false);
 		add_option('hesabix_v2_opening_inventory_prefs', array());
+		add_option('hesabix_v2_delete_data_on_uninstall', false);
 
 		add_option(
 			'hesabix_v2_stock_pull',
@@ -119,6 +120,17 @@ class Hesabix_V2_Activator
 				'cron_minutes' => 15,
 				'force_manage_stock' => true,
 				'disable_wc_stock_reduction' => false,
+				'skip_zero_overwrite' => true,
+			)
+		);
+
+		add_option(
+			'hesabix_v2_inventory_policy',
+			array(
+				'source_of_truth' => 'hesabix',
+				'push_wc_qty_to_hesabix' => false,
+				'accept_remote_stock_push' => true,
+				'conflict_sample_limit' => 25,
 			)
 		);
 
@@ -136,6 +148,10 @@ class Hesabix_V2_Activator
 			'auto_sync_customers' => true,
 			'auto_sync_orders' => true,
 			'sync_on_product_update' => true,
+			'product_sync_preset' => 'accounting',
+			'sync_product_name' => false,
+			'sync_product_description' => false,
+			'sync_product_barcode' => false,
 			'sync_product_price' => true,
 			'sync_product_stock' => true,
 			'track_inventory_policy' => 'wc',

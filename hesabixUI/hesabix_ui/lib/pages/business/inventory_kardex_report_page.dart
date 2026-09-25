@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
 import 'package:hesabix_ui/core/api_client.dart';
+import 'package:hesabix_ui/core/fiscal_year_controller.dart';
 import 'package:hesabix_ui/widgets/date_input_field.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table_widget.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table_config.dart';
@@ -15,6 +16,7 @@ import 'package:hesabix_ui/widgets/invoice/product_combobox_widget.dart';
 import 'package:hesabix_ui/widgets/category/category_picker_field.dart';
 import 'package:hesabix_ui/models/warehouse_model.dart';
 import 'package:hesabix_ui/core/date_utils.dart';
+import 'package:hesabix_ui/core/hesabix_back.dart';
 
 class InventoryKardexReportPage extends StatefulWidget {
   final int businessId;
@@ -56,17 +58,11 @@ class _InventoryKardexReportPageState extends State<InventoryKardexReportPage> {
     try {
       final svc = BusinessDashboardService(ApiClient());
       final items = await svc.listFiscalYears(widget.businessId);
+      final defaultFyId = await FiscalYearController.resolveDefaultId(widget.businessId, items);
       if (!mounted) return;
       setState(() {
         _fiscalYears = items;
-        final current = items.firstWhere(
-          (e) => (e['is_current'] == true),
-          orElse: () => const <String, dynamic>{},
-        );
-        final id = current['id'];
-        if (id is int) {
-          _selectedFiscalYearId = id;
-        }
+        _selectedFiscalYearId = defaultFyId;
       });
     } catch (_) {
       // ignore errors
@@ -263,10 +259,7 @@ class _InventoryKardexReportPageState extends State<InventoryKardexReportPage> {
     return Scaffold(
       backgroundColor: cs.surface,
       appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.pop(),
-        ),
+        leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
         title: Text(t.reportsInventoryKardexTitle),
         actions: [
           IconButton(

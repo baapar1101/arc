@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <cache-path name="cache" path="." />
+    <external-cache-path name="external_cache" path="." />
+    <files-path name="files" path="." />
+    <!--
+      Flutter path_provider applicationDocuments lives at
+      <app-data>/app_flutter (sibling of getFilesDir()), not under files/.
+      Sideloaded APK updates are stored there; FileProvider must expose it.
+    -->
+    <files-path name="app_flutter" path="../app_flutter" />
+    <external-files-path name="external_files" path="." />
+</paths>

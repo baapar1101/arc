@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/api_client.dart';
 import '../../services/system_settings_service.dart';
 import '../../utils/error_extractor.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 class ShareLinkSettingsPage extends StatefulWidget {
   const ShareLinkSettingsPage({super.key});
@@ -73,7 +74,7 @@ class _ShareLinkSettingsPageState extends State<ShareLinkSettingsPage> {
       );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('تنظیمات با موفقیت ذخیره شد'), backgroundColor: Colors.green),
+          SnackBar(content: Text('تنظیمات با موفقیت ذخیره شد'), backgroundColor: SemanticColorResolver.positive(context)),
         );
       }
     } catch (e) {
@@ -83,7 +84,7 @@ class _ShareLinkSettingsPageState extends State<ShareLinkSettingsPage> {
             content: Text(
               'خطا در ذخیره: ${ErrorExtractor.forContext(e, context)}',
             ),
-            backgroundColor: Colors.red,
+            backgroundColor: SemanticColorResolver.negative(context),
           ),
         );
       }
@@ -143,7 +144,7 @@ class _ShareLinkSettingsPageState extends State<ShareLinkSettingsPage> {
                         const SizedBox(height: 8),
                         Text(
                           'دامنه یا آدرس اصلی را وارد کنید (مثلاً https://app.hesabix.com). بخش /public به‌صورت خودکار اضافه می‌شود. '
-                          'همین مقدار برای لینک کارت حساب (شخص) و لینک اشتراک فایل از فضای ذخیره‌سازی استفاده می‌شود.',
+                          'همین مقدار برای لینک کارت حساب، لینک اشتراک فایل، و بازگشت کاربر از درگاه پرداخت اشتراک پشتیبانی استفاده می‌شود.',
                           style: theme.textTheme.bodySmall,
                         ),
                         const SizedBox(height: 16),

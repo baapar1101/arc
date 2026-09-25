@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:hesabix_ui/theme/glass.dart';
 
@@ -9,7 +8,7 @@ import '../../services/report_template_service.dart';
 import '../../services/warehouse_service.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
-import '../../utils/web/web_utils.dart' as web_utils;
+import 'package:hesabix_ui/services/bytes_export/bytes_export_service.dart';
 
 /// دیالوگ انتخاب سایز کاغذ، جهت، قالب و فیلدهای برگه مرسوله پستی حواله انبار.
 Future<void> showWarehousePostalLabelPrintDialog({
@@ -132,18 +131,19 @@ class _WarehousePostalLabelPrintDialogState extends State<_WarehousePostalLabelP
         query: query,
       );
       if (!mounted) return;
-      if (kIsWeb) {
-        await web_utils.saveBytesAsFileWeb(
-          bytes,
-          'postal_label_${widget.documentId}.pdf',
-          mimeType: 'application/pdf',
-        );
-        if (!mounted) return;
-        SnackBarHelper.showSuccess(context, message: t.warehousePostalLabelDownload);
+      final result = await BytesExportService.export(
+        bytes: bytes,
+        filename: 'postal_label_${widget.documentId}.pdf',
+        mimeType: 'application/pdf',
+      );
+      if (!mounted) return;
+      BytesExportService.showFeedback(
+        context,
+        result,
+        successOverride: t.warehousePostalLabelDownload,
+      );
+      if (result.isSuccess) {
         Navigator.of(context).pop();
-      } else {
-        if (!mounted) return;
-        SnackBarHelper.show(context, message: 'دانلود PDF در این پلتفرم پشتیبانی نشده است');
       }
     } catch (e) {
       if (mounted) {

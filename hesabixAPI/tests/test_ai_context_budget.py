@@ -46,3 +46,37 @@ def test_prepare_messages_trims_when_large():
 def test_is_context_overflow_error_detects_phrase():
     assert is_context_overflow_error(Exception("context length exceeded"))
     assert not is_context_overflow_error(Exception("other error"))
+
+
+def test_is_strict_tool_pairing_error_detects_phrase():
+    from app.services.ai.ai_context_budget import is_strict_tool_pairing_error
+
+    err = Exception(
+        "Message has tool role, but there was no previous assistant message with a tool call!"
+    )
+    assert is_strict_tool_pairing_error(err)
+    assert not is_strict_tool_pairing_error(Exception("other error"))
+
+
+def test_prepare_messages_includes_section_token_breakdown():
+    from app.services.ai.ai_system_prompt import compose_structured_system_prompt
+
+    structured = compose_structured_system_prompt(
+        static_core="S" * 40,
+        business_anchor="B",
+        semi_static_sections=("insights-block",),
+        insights_section="insights-block",
+        runtime_sections=("now",),
+        role="user",
+        business_id=1,
+    )
+    _msgs, meta = prepare_messages_for_context(
+        structured,
+        [{"role": "user", "content": "hi"}],
+        _FakeProvider(),
+        budget_tokens=5000,
+    )
+    assert meta["static_tokens"] > 0
+    assert meta["semi_static_tokens"] > 0
+    assert meta["insights_tokens"] > 0
+    assert meta["runtime_tokens"] > 0

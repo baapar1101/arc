@@ -106,6 +106,10 @@ class Hesabix_V2_Invoice_Helper
 			$sync = Hesabix_V2_Gateway_Fee_Service::normalize_sync_settings($sync);
 		}
 
+		if (class_exists('Hesabix_V2_Product_Sync_Payload')) {
+			$sync = Hesabix_V2_Product_Sync_Payload::normalize_sync_settings($sync);
+		}
+
 		return $sync;
 	}
 

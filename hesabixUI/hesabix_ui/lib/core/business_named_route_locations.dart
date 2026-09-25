@@ -19,6 +19,7 @@ abstract final class BusinessNamedRoutes {
     'business_wallet': 'wallet',
     'business_ai_chat': 'ai/chat',
     'business_ai_subscription': 'ai/subscription',
+    'business_ai_provider_settings': 'settings/ai-provider',
     'business_ai_usage': 'ai/usage',
     'business_ai_skills_marketplace': 'ai/skills/marketplace',
     'business_ai_skills_publisher': 'ai/skills/publisher',
@@ -33,19 +34,29 @@ abstract final class BusinessNamedRoutes {
     'business_repair_shop_technicians': 'repair-shop-technicians',
     'business_repair_shop_settings': 'repair-shop-settings',
     'business_customer_club': 'customer-club',
+    'business_payroll': 'payroll',
+    'business_payroll_new': 'payroll/new',
+    'business_payroll_reports': 'payroll/reports',
+    'business_payroll_run': 'payroll/:run_id',
     'business_distribution': 'distribution',
     'business_notification_templates': 'notification-templates',
     'business_notification_template_new': 'notification-templates/new',
-    'business_notification_template_edit': 'notification-templates/:template_id/edit',
+    'business_notification_template_edit':
+        'notification-templates/:template_id/edit',
     'business_workflows': 'workflows',
     'business_workflow_marketplace': 'workflows/marketplace',
     'business_crm_dashboard': 'crm',
     'business_crm_dashboard_page': 'crm/dashboard',
     'business_crm_process_definitions': 'crm/process-definitions',
     'business_crm_leads': 'crm/leads',
+    'business_crm_lead_record': 'crm/leads/:leadId',
     'business_crm_deals': 'crm/deals',
+    'business_crm_deal_record': 'crm/deals/:dealId',
     'business_crm_activities': 'crm/activities',
     'business_crm_reports': 'crm/reports',
+    'business_crm_tasks': 'crm/tasks',
+    'business_crm_customer_360': 'crm/customer-360',
+    'business_crm_sequences': 'crm/sequences',
     'business_crm_notes_calendar': 'crm/notes-calendar',
     'business_crm_web_chat': 'crm/web-chat',
     'business_invoice': 'invoice',
@@ -56,19 +67,28 @@ abstract final class BusinessNamedRoutes {
     'business_reports_kardex': 'reports/kardex',
     'business_reports_debtors': 'reports/debtors',
     'business_reports_creditors': 'reports/creditors',
+    'business_reports_ar_aging': 'reports/ar-aging',
+    'business_reports_ap_aging': 'reports/ap-aging',
+    'business_reports_person_balances_by_currency':
+        'reports/person-balances-by-currency',
+    'business_reports_cash_flow': 'reports/cash-flow',
+    'business_reports_fx_revaluation': 'reports/fx-revaluation',
     'business_reports_people_transactions': 'reports/people-transactions',
     'business_reports_item_movements': 'reports/item-movements',
     'business_reports_sales_by_product': 'reports/sales-by-product',
     'business_reports_inventory_kardex': 'reports/inventory-kardex',
     'business_reports_inventory_stock': 'reports/inventory-stock',
     'business_reports_stock_count': 'reports/stock-count',
-    'business_reports_warehouse_documents_summary': 'reports/warehouse-documents-summary',
+    'business_reports_warehouse_documents_summary':
+        'reports/warehouse-documents-summary',
     'business_reports_slow_moving_items': 'reports/slow-moving-items',
     'business_reports_critical_stock': 'reports/critical-stock',
-    'business_reports_inter_warehouse_transfers': 'reports/inter-warehouse-transfers',
+    'business_reports_inter_warehouse_transfers':
+        'reports/inter-warehouse-transfers',
     'business_reports_adjustment_documents': 'reports/adjustment-documents',
     'business_reports_warehouse_performance': 'reports/warehouse-performance',
-    'business_reports_product_movement_history': 'reports/product-movement-history',
+    'business_reports_product_movement_history':
+        'reports/product-movement-history',
     'business_reports_inventory_valuation': 'reports/inventory-valuation',
     'business_reports_pending_documents': 'reports/pending-documents',
     'business_reports_inventory_turnover': 'reports/inventory-turnover',
@@ -87,16 +107,22 @@ abstract final class BusinessNamedRoutes {
     'business_reports_journal_ledger': 'reports/journal-ledger',
     'business_reports_pnl_period': 'reports/pnl-period',
     'business_reports_pnl_cumulative': 'reports/pnl-cumulative',
+    'business_reports_balance_sheet': 'reports/balance-sheet',
+    'business_reports_financial_package': 'reports/financial-package',
     'business_reports_accounts_review': 'reports/accounts-review',
     'business_reports_activity_logs': 'reports/activity-logs',
     'business_reports_basalam_overview': 'reports/basalam/overview',
-    'business_reports_basalam_synced_invoices': 'reports/basalam/synced-invoices',
+    'business_reports_basalam_synced_invoices':
+        'reports/basalam/synced-invoices',
     'business_reports_basalam_dead_letter': 'reports/basalam/dead-letter',
-    'business_reports_basalam_product_conflicts': 'reports/basalam/product-conflicts',
+    'business_reports_basalam_product_conflicts':
+        'reports/basalam/product-conflicts',
     'business_reports_woocommerce_overview': 'reports/woocommerce/overview',
-    'business_reports_woocommerce_recent_orders': 'reports/woocommerce/recent-orders',
+    'business_reports_woocommerce_recent_orders':
+        'reports/woocommerce/recent-orders',
     'business_reports_woocommerce_catalog': 'reports/woocommerce/catalog',
-    'business_reports_woocommerce_bridge_health': 'reports/woocommerce/bridge-health',
+    'business_reports_woocommerce_bridge_health':
+        'reports/woocommerce/bridge-health',
     'business_basalam': 'basalam',
     'business_woocommerce': 'woocommerce',
     'business_woocommerce_opening_inventory': 'woocommerce/opening-inventory',
@@ -109,6 +135,7 @@ abstract final class BusinessNamedRoutes {
     'business_settings_business': 'settings/business',
     'business_settings_currencies': 'settings/currencies',
     'business_settings_fx_revaluation': 'settings/fx-revaluation',
+    'business_settings_fx_auto_sync': 'settings/fx-auto-sync',
     'business_settings_quick_sales': 'settings/quick-sales',
     'business_quick_sales': 'quick-sales',
     'business_settings_credit': 'settings/credit',
@@ -116,6 +143,7 @@ abstract final class BusinessNamedRoutes {
     'business_settings_basalam': 'settings/basalam',
     'business_settings_woocommerce': 'settings/woocommerce',
     'business_settings_customer_club': 'settings/customer-club',
+    'business_settings_payroll': 'settings/payroll',
     'business_settings_document_numbering': 'settings/document-numbering',
     'business_settings_tax': 'settings/tax',
     'business_settings_fiscal_year': 'settings/fiscal-year',
@@ -124,8 +152,13 @@ abstract final class BusinessNamedRoutes {
     'business_settings_installments': 'settings/installments',
     'business_document_monetization': 'document-monetization',
     'business_product_attributes': 'product-attributes',
+    'business_catalog_spec_fields': 'catalog-spec-fields',
     'business_product_bulk_prices_sheet': 'products/bulk-prices-sheet',
     'business_products': 'products',
+    'business_barcode_labels': 'barcode-labels',
+    'business_barcode_label_studio_new': 'barcode-labels/studio/new',
+    'business_barcode_label_studio': 'barcode-labels/studio/:template_id',
+    'business_barcode_label_printers': 'barcode-labels/printers',
     'business_price_lists': 'price-lists',
     'business_price_list_items': 'price-lists/:price_list_id/items',
     'business_persons': 'persons',
@@ -139,20 +172,26 @@ abstract final class BusinessNamedRoutes {
     'business_warehouse_docs': 'warehouse-docs',
     'business_warehouse_doc_details': 'warehouse-docs/:doc_id',
     'business_stock_count': 'stock-count',
+    'business_goods_expense_income': 'goods-expense-income',
     'business_documents': 'documents',
     'business_storage_files': 'storage-files',
     'business_storage_file_manager': 'storage-files/file-manager',
     'business_report_templates': 'report-templates',
     'business_report_template_studio_new': 'report-templates/studio/new',
-    'business_report_template_studio_edit': 'report-templates/studio/:template_id',
+    'business_report_template_studio_edit':
+        'report-templates/studio/:template_id',
     'business_report_template_html_new': 'report-templates/html/new',
-    'business_report_template_html_edit': 'report-templates/html/:template_id/edit',
+    'business_report_template_html_edit':
+        'report-templates/html/:template_id/edit',
+    'business_hscript_reports': 'hscript',
+    'business_hscript_studio_new': 'hscript/studio/new',
+    'business_hscript_studio_edit': 'hscript/studio/:report_id',
     'business_plugin_marketplace': 'plugin-marketplace',
     'business_plugin_marketplace_invoices': 'plugin-marketplace/invoices',
     'business_checks': 'checks',
     'business_new_check': 'checks/new',
     'business_edit_check': 'checks/:check_id/edit',
-    'business_checks_reconciliation': 'checks/reconciliation'
+    'business_checks_reconciliation': 'checks/reconciliation',
   };
 
   static String fillTemplate(String template, Map<String, String> params) {
@@ -173,14 +212,20 @@ abstract final class BusinessNamedRoutes {
   }) {
     final tpl = _suffixByName[routeName];
     if (tpl == null) {
-      throw ArgumentError.value(routeName, 'routeName', 'Unknown business route name');
+      throw ArgumentError.value(
+        routeName,
+        'routeName',
+        'Unknown business route name',
+      );
     }
     final filled = fillTemplate(tpl, pathParameters);
     final path = BusinessRoutePaths.uri(businessId, tabSlot, filled);
     final q = queryParameters == null
         ? null
         : Map<String, String>.fromEntries(
-            queryParameters.entries.map((e) => MapEntry(e.key.toString(), e.value?.toString() ?? '')),
+            queryParameters.entries.map(
+              (e) => MapEntry(e.key.toString(), e.value?.toString() ?? ''),
+            ),
           );
     return Uri(path: path, queryParameters: q);
   }

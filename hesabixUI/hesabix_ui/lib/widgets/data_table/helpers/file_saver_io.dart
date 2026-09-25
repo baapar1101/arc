@@ -1,16 +1,13 @@
-import 'dart:io';
+import 'package:hesabix_ui/services/bytes_export/bytes_export_service.dart';
 
+/// Legacy helper — prefer [BytesExportService] directly in new code.
 class FileSaver {
   static Future<String?> saveBytes(List<int> bytes, String filename) async {
-    final homeDir = Platform.environment['HOME'] ?? Directory.current.path;
-    final downloadsDir = Directory('$homeDir/Downloads');
-    if (!await downloadsDir.exists()) {
-      await downloadsDir.create(recursive: true);
-    }
-    final file = File('${downloadsDir.path}/$filename');
-    await file.writeAsBytes(bytes, flush: true);
-    return file.path;
+    final result = await BytesExportService.export(
+      bytes: bytes,
+      filename: filename,
+    );
+    if (result.isCancelled) return null;
+    return result.path ?? result.filename;
   }
 }
-
-

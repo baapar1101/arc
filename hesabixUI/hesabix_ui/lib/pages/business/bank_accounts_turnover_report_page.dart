@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
 import 'package:hesabix_ui/core/api_client.dart';
+import 'package:hesabix_ui/core/fiscal_year_controller.dart';
 import 'package:hesabix_ui/widgets/date_input_field.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table_widget.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table_config.dart';
@@ -12,6 +13,7 @@ import 'package:hesabix_ui/services/currency_service.dart';
 import 'package:hesabix_ui/services/bank_account_service.dart';
 import 'package:hesabix_ui/widgets/data_table/helpers/data_table_utils.dart';
 import 'package:hesabix_ui/core/date_utils.dart';
+import 'package:hesabix_ui/core/hesabix_back.dart';
 
 class BankAccountsTurnoverReportPage extends StatefulWidget {
   final int businessId;
@@ -52,17 +54,11 @@ class _BankAccountsTurnoverReportPageState extends State<BankAccountsTurnoverRep
     try {
       final svc = BusinessDashboardService(ApiClient());
       final items = await svc.listFiscalYears(widget.businessId);
+      final defaultFyId = await FiscalYearController.resolveDefaultId(widget.businessId, items);
       if (!mounted) return;
       setState(() {
         _fiscalYears = items;
-        final current = items.firstWhere(
-          (e) => (e['is_current'] == true),
-          orElse: () => const <String, dynamic>{},
-        );
-        final id = current['id'];
-        if (id is int) {
-          _selectedFiscalYearId = id;
-        }
+        _selectedFiscalYearId = defaultFyId;
       });
     } catch (_) {
       // ignore errors
@@ -76,14 +72,8 @@ class _BankAccountsTurnoverReportPageState extends State<BankAccountsTurnoverRep
       if (!mounted) return;
       setState(() {
         _currencies = items;
-        // انتخاب ارز پیش‌فرض
-        if (items.isNotEmpty) {
-          final defaultCurrency = items.firstWhere(
-            (c) => c['is_default'] == true,
-            orElse: () => items.first,
-          );
-          _selectedCurrencyId = defaultCurrency['id'] as int?;
-        }
+        // قرارداد چندارزی: null = همه ارزها → معادل پایه
+        _selectedCurrencyId = null;
       });
     } catch (_) {
       // ignore errors
@@ -218,10 +208,7 @@ class _BankAccountsTurnoverReportPageState extends State<BankAccountsTurnoverRep
     return Scaffold(
       backgroundColor: cs.surface,
       appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.pop(),
-        ),
+        leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
         title: Text(t.reportsBankAccountsTurnoverTitle),
         actions: [
           IconButton(
@@ -275,7 +262,7 @@ class _BankAccountsTurnoverReportPageState extends State<BankAccountsTurnoverRep
                   ),
                   SizedBox(
                     width: 220,
-                    child: DropdownButtonFormField<int>(
+                    child: DropdownButtonFormField<int?>(
                       value: _selectedCurrencyId,
                       decoration: InputDecoration(
                         labelText: t.currency,
@@ -283,11 +270,16 @@ class _BankAccountsTurnoverReportPageState extends State<BankAccountsTurnoverRep
                         isDense: true,
                         contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
                       ),
-                      items: _currencies.map<DropdownMenuItem<int>>((c) {
+                      items: [
+                        const DropdownMenuItem<int?>(
+                          value: null,
+                          child: Text('همه ارزها (معادل پایه)'),
+                        ),
+                        ..._currencies.map<DropdownMenuItem<int?>>((c) {
                         final id = c['id'] as int?;
                         final code = (c['code'] ?? '').toString();
                         final title = (c['title'] ?? code).toString();
-                        return DropdownMenuItem<int>(
+                        return DropdownMenuItem<int?>(
                           value: id,
                           child: Text(
                             '$code - $title',
@@ -295,7 +287,8 @@ class _BankAccountsTurnoverReportPageState extends State<BankAccountsTurnoverRep
                             maxLines: 1,
                           ),
                         );
-                      }).toList(),
+                      }),
+                      ],
                       menuMaxHeight: 300,
                       onChanged: (val) {
                         setState(() {

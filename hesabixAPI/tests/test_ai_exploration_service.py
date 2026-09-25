@@ -8,6 +8,7 @@ from app.services.ai.ai_exploration_service import (
     EXPLORATION_MODE_OFF,
     ExplorationBundle,
     ObservationStore,
+    ThoughtRecord,
     ToolObservation,
     build_explored_body_markdown,
     build_thought_markdown_rule_based,
@@ -16,10 +17,10 @@ from app.services.ai.ai_exploration_service import (
     resolve_exploration_enabled,
     should_continue_exploring,
     assess_tool_round_productivity,
+)
 from app.services.ai.ai_goal_assessment import (
     AgentGoalTracker,
     should_agent_continue_after_text_round,
-)
 )
 from app.services.ai.ai_trace import trace_step
 
@@ -66,7 +67,7 @@ def test_build_thought_and_explored_bundle():
     body, hypothesis, confidence, open_qs = build_thought_markdown_rule_based(
         bundle, "خطای fiscalId"
     )
-    assert "Important findings" in body
+    assert "یافته‌های مهم" in body
     assert hypothesis
     assert confidence in ("low", "medium", "high")
 
@@ -103,8 +104,6 @@ def test_observation_store_context():
     )
     store.add_bundle(bundle)
     body, hyp, conf, oq = build_thought_markdown_rule_based(bundle, "q")
-    from app.services.ai.ai_exploration_service import ThoughtRecord
-
     store.add_thought(
         ThoughtRecord(
             thought_id="th1",
@@ -121,10 +120,8 @@ def test_observation_store_context():
     assert "[agent_thought]" in ctx
 
 
-def test_should_continue_exploring():
+def test_should_continue_exploring_stops_on_high_confidence():
     store = ObservationStore()
-    from app.services.ai.ai_exploration_service import ThoughtRecord
-
     store.add_thought(
         ThoughtRecord(
             thought_id="t",
@@ -136,6 +133,16 @@ def test_should_continue_exploring():
         )
     )
     assert should_continue_exploring(store, 2, 8) is False
+
+
+def test_should_continue_exploring_without_evidence():
+    store = ObservationStore()
+    assert should_continue_exploring(store, 1, 4) is True
+
+
+def test_should_stop_exploring_at_max_iteration():
+    store = ObservationStore()
+    assert should_continue_exploring(store, 4, 4) is False
 
 
 def test_assess_tool_round_productivity():
@@ -155,13 +162,31 @@ def test_assess_tool_round_productivity():
     ) is False
 
 
-def test_should_agent_continue_after_text_respects_budget():
+def test_should_agent_continue_stops_when_goal_reached_at_budget():
     budget = build_agent_budget("medium", max_iterations=2)
+    result = should_agent_continue_after_text_round(
+        goal_tracker=AgentGoalTracker(),
+        observation_store=ObservationStore(),
+        exploration_enabled=False,
+        iteration=2,
+        budget=budget,
+        round_text="سلام! چطور می‌توانم کمک کنم؟",
+        user_query="سلام",
+    )
+    assert result is False
+
+
+def test_should_agent_continue_on_narrative_without_evidence():
+    budget = build_agent_budget("medium", max_iterations=6)
     store = ObservationStore()
-    assert should_agent_continue_after_text_round(
+    text = "We will call resolve_date_range then get_financial_summary."
+    result = should_agent_continue_after_text_round(
         goal_tracker=AgentGoalTracker(),
         observation_store=store,
         exploration_enabled=True,
         iteration=2,
         budget=budget,
-    ) is False
+        round_text=text,
+        user_query="بررسی مالی انجام بده",
+    )
+    assert result is True

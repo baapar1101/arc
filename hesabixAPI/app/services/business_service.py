@@ -26,6 +26,30 @@ from app.services.system_settings_service import get_wallet_settings
 logger = logging.getLogger(__name__)
 
 
+def invalidate_user_businesses_list_cache() -> None:
+    """پاک‌سازی کش لیست کسب‌وکارهای کاربر پس از حذف/بازیابی."""
+    from app.core.cache import get_cache
+
+    cache = get_cache()
+    if not cache.enabled:
+        return
+    try:
+        cache.delete_pattern("user_businesses:*")
+    except Exception as e:
+        logger.warning("Failed to invalidate user_businesses cache: %s", e)
+
+
+def _business_is_restorable(business: Business, *, now: datetime | None = None) -> bool:
+    """کسب‌وکار soft-delete شده هنوز در مهلت بازیابی است."""
+    if getattr(business, "deleted_at", None) is None:
+        return False
+    auto_delete_at = getattr(business, "auto_delete_at", None)
+    if auto_delete_at is None:
+        return True
+    ref = now or datetime.utcnow()
+    return ref < auto_delete_at
+
+
 def _normalize_invoice_warehouse_release_mode(value) -> str:
     if value is None:
         return "draft"
@@ -43,6 +67,31 @@ def _normalize_purchase_accounting_mode_for_response(value) -> str:
     from app.services.purchase_accounting_service import normalize_purchase_accounting_mode
 
     return normalize_purchase_accounting_mode(value)
+
+
+def ensure_business_default_document_policies(
+    db: Session,
+    business_id: int,
+    user_id: int | None = None,
+    *,
+    commit: bool = True,
+) -> None:
+    """اعمال idempotent سیاست‌های پیش‌فرض درآمدزایی اسناد برای یک کسب‌وکار."""
+    try:
+        # Lazy import to avoid circular imports (document_monetization_service <-> wallet_service <-> business_service)
+        from app.services.document_monetization_service import apply_default_policies_to_business
+
+        apply_default_policies_to_business(
+            db,
+            int(business_id),
+            user_id=user_id,
+            commit=commit,
+        )
+    except Exception:
+        logger.exception(
+            "failed_to_apply_default_policies business_id=%s",
+            business_id,
+        )
 
 
 def ensure_wallet_currency_in_business(db: Session, business_id: int) -> bool:
@@ -293,15 +342,12 @@ def create_business(
 
     # اعمال خودکار سیاست‌های پیش‌فرض درآمدزایی اسناد
     if not defer_commit:
-        try:
-            # Lazy import to avoid circular imports (document_monetization_service <-> wallet_service <-> business_service)
-            from app.services.document_monetization_service import apply_default_policies_to_business
-            apply_default_policies_to_business(db, created_business.id, user_id=owner_id)
-        except Exception as e:
-            # در صورت خطا، لاگ می‌کنیم اما ایجاد کسب‌وکار را متوقف نمی‌کنیم
-            import structlog
-            logger = structlog.get_logger()
-            logger.warning("failed_to_apply_default_policies", business_id=created_business.id, error=str(e))
+        ensure_business_default_document_policies(
+            db,
+            created_business.id,
+            user_id=owner_id,
+            commit=True,
+        )
 
     # تبدیل به response format (+ دادهٔ نمونه در صورت درخواست)
     result = _business_to_dict(created_business)
@@ -323,14 +369,19 @@ def create_business(
     return result
 
 
-def get_business_by_id(db: Session, business_id: int, owner_id: int) -> Optional[Dict[str, Any]]:
-    """دریافت کسب و کار بر اساس شناسه"""
+def get_business_by_id(db: Session, business_id: int, user_id: int) -> Optional[Dict[str, Any]]:
+    """دریافت کسب و کار برای مالک یا عضو با دسترسی join فعال."""
+    from app.core.auth_dependency import _user_can_access_business
+
     business_repo = BusinessRepository(db)
     business = business_repo.get_by_id(business_id)
-    
-    if not business or business.owner_id != owner_id:
+
+    if not business or getattr(business, "deleted_at", None) is not None:
         return None
-    
+
+    if not _user_can_access_business(db, user_id, business_id):
+        return None
+
     return _business_to_dict(business)
 
 
@@ -541,6 +592,20 @@ def update_business(db: Session, business_id: int, business_data, owner_id: int)
                 "کسب‌وکار شما قبلاً ارز پیش‌فرض تنظیم کرده است و امکان تغییر آن وجود ندارد",
                 http_status=400
             )
+
+        # V2-P7 دفاع: حتی برای اولین تنظیم، پس از وجود سند قفل
+        has_docs = (
+            db.query(Document.id)
+            .filter(Document.business_id == business_id)
+            .limit(1)
+            .first()
+        )
+        if has_docs is not None:
+            raise ApiError(
+                "CANNOT_SET_DEFAULT_CURRENCY_AFTER_DOCUMENTS",
+                "پس از ثبت سند حسابداری امکان تنظیم ارز پایه وجود ندارد",
+                http_status=400,
+            )
         
         # بررسی وجود ارز
         if new_default_currency_id is not None:
@@ -569,29 +634,35 @@ def update_business(db: Session, business_id: int, business_data, owner_id: int)
                 db.flush()
     
     # به‌روزرسانی سایر فیلدها
+    if "display_timezone" in update_data:
+        from app.services.business_timezone_service import (
+            invalidate_business_display_timezone_cache,
+            normalize_business_display_timezone,
+        )
+
+        update_data["display_timezone"] = normalize_business_display_timezone(
+            update_data.get("display_timezone")
+        )
+
     for field, value in update_data.items():
         setattr(business, field, value)
-    
+
     # ذخیره تغییرات
     updated_business = business_repo.update(business)
-    
+
+    if "display_timezone" in update_data:
+        from app.services.business_timezone_service import invalidate_business_display_timezone_cache
+
+        invalidate_business_display_timezone_cache(business_id)
+
     return _business_to_dict(updated_business)
 
 
 def check_currency_usage_in_documents(db: Session, business_id: int, currency_id: int) -> int:
     """
-    بررسی تعداد اسناد استفاده‌کننده از یک ارز در کسب‌وکار
-    
-    Args:
-        db: Database session
-        business_id: شناسه کسب‌وکار
-        currency_id: شناسه ارز
-        
-    Returns:
-        تعداد اسناد استفاده‌کننده از این ارز
+    تعداد اسناد با currency_id مستقیم.
+    برای بررسی کامل حذف ارز از get_business_currency_usage استفاده کنید.
     """
-    from sqlalchemy import func
-    
     count = (
         db.query(func.count(Document.id))
         .filter(
@@ -603,6 +674,155 @@ def check_currency_usage_in_documents(db: Session, business_id: int, currency_id
         .scalar()
     )
     return count or 0
+
+
+def get_business_currency_usage(db: Session, business_id: int, currency_id: int) -> Dict[str, Any]:
+    """
+    V2-P7 / D6: شمارش استفاده ارز در اسناد، خطوط (account_currency در extra)،
+    حساب‌های بانکی/صندوق/تنخواه، چک، قیمت ارزی کالا و اقلام لیست قیمت.
+    """
+    from adapters.db.models.bank_account import BankAccount
+    from adapters.db.models.cash_register import CashRegister
+    from adapters.db.models.petty_cash import PettyCash
+    from adapters.db.models.check import Check
+    from adapters.db.models.document_line import DocumentLine
+    from adapters.db.models.price_list import PriceList, PriceItem
+    from sqlalchemy import cast, String, or_
+
+    bid = int(business_id)
+    cid = int(currency_id)
+    cid_str = str(cid)
+
+    def _cnt(q) -> int:
+        n = q.scalar()
+        return int(n or 0)
+
+    documents = _cnt(
+        db.query(func.count(Document.id)).filter(
+            Document.business_id == bid,
+            Document.currency_id == cid,
+        )
+    )
+
+    # اسناد بازنویسی‌شده به پایه با settles_currency_id در extra_info
+    documents_settles = 0
+    try:
+        documents_settles = _cnt(
+            db.query(func.count(Document.id)).filter(
+                Document.business_id == bid,
+                Document.currency_id != cid,
+                or_(
+                    cast(Document.extra_info["settles_currency_id"], String) == cid_str,
+                    cast(Document.extra_info["fx_settlement"]["settles_currency_id"], String) == cid_str,
+                ),
+            )
+        )
+    except Exception:
+        documents_settles = 0
+
+    # خطوط با account_currency_id بومی
+    document_lines_native = 0
+    try:
+        document_lines_native = _cnt(
+            db.query(func.count(DocumentLine.id))
+            .join(Document, Document.id == DocumentLine.document_id)
+            .filter(
+                Document.business_id == bid,
+                cast(DocumentLine.extra_info["account_currency_id"], String) == cid_str,
+            )
+        )
+    except Exception:
+        document_lines_native = 0
+
+    bank_accounts = _cnt(
+        db.query(func.count(BankAccount.id)).filter(
+            BankAccount.business_id == bid,
+            BankAccount.currency_id == cid,
+        )
+    )
+    cash_registers = _cnt(
+        db.query(func.count(CashRegister.id)).filter(
+            CashRegister.business_id == bid,
+            CashRegister.currency_id == cid,
+        )
+    )
+    petty_cashes = _cnt(
+        db.query(func.count(PettyCash.id)).filter(
+            PettyCash.business_id == bid,
+            PettyCash.currency_id == cid,
+        )
+    )
+    checks = _cnt(
+        db.query(func.count(Check.id)).filter(
+            Check.business_id == bid,
+            Check.currency_id == cid,
+        )
+    )
+    products_fx = _cnt(
+        db.query(func.count(Product.id)).filter(
+            Product.business_id == bid,
+            Product.price_fx_currency_id == cid,
+        )
+    )
+    price_items = _cnt(
+        db.query(func.count(PriceItem.id))
+        .join(PriceList, PriceList.id == PriceItem.price_list_id)
+        .filter(
+            PriceList.business_id == bid,
+            PriceItem.currency_id == cid,
+        )
+    )
+
+    breakdown = {
+        "documents": documents,
+        "documents_settles_extra": documents_settles,
+        "document_lines_native": document_lines_native,
+        "bank_accounts": bank_accounts,
+        "cash_registers": cash_registers,
+        "petty_cashes": petty_cashes,
+        "checks": checks,
+        "products_fx": products_fx,
+        "price_items": price_items,
+    }
+    total = sum(int(v) for v in breakdown.values())
+
+    # تعداد ارزهای فرعی فعال کسب‌وکار
+    secondary_count = _cnt(
+        db.query(func.count(BusinessCurrency.id)).filter(
+            BusinessCurrency.business_id == bid,
+        )
+    )
+    is_last_secondary = secondary_count <= 1
+
+    blockers: List[str] = []
+    labels = {
+        "documents": "اسناد حسابداری",
+        "documents_settles_extra": "اسناد با تسویه این ارز",
+        "document_lines_native": "خطوط سند با مبلغ بومی این ارز",
+        "bank_accounts": "حساب‌های بانکی",
+        "cash_registers": "صندوق‌ها",
+        "petty_cashes": "تنخواه‌ها",
+        "checks": "چک‌ها",
+        "products_fx": "کالاها با قیمت ارزی",
+        "price_items": "اقلام لیست قیمت",
+    }
+    for key, n in breakdown.items():
+        if n > 0:
+            blockers.append(f"{labels.get(key, key)} ({n} مورد)")
+
+    if is_last_secondary and total > 0:
+        blockers.append("آخرین ارز فرعی کسب‌وکار در حضور اسناد/حساب‌های ارزی قابل حذف نیست")
+
+    return {
+        "breakdown": breakdown,
+        "total": total,
+        "is_used": total > 0,
+        "document_count": documents + documents_settles,  # سازگاری با UI قبلی
+        "can_delete": total == 0,
+        "is_last_secondary": is_last_secondary,
+        "secondary_count": secondary_count,
+        "blockers": blockers,
+    }
 
 
 def add_business_currency(db: Session, business_id: int, currency_id: int, owner_id: int) -> Dict[str, Any]:
@@ -719,13 +939,15 @@ def remove_business_currency(db: Session, business_id: int, currency_id: int, ow
             http_status=400
         )
     
-    # بررسی استفاده در اسناد
-    document_count = check_currency_usage_in_documents(db, business_id, currency_id)
-    if document_count > 0:
+    # بررسی استفاده در اسناد / حساب‌ها / کالا (V2-P7 D6)
+    usage = get_business_currency_usage(db, business_id, currency_id)
+    if usage.get("is_used"):
+        blockers = usage.get("blockers") or []
+        detail = "؛ ".join(blockers) if blockers else f"{usage.get('total')} مورد"
         raise ApiError(
             "CURRENCY_IN_USE",
-            f"این ارز در {document_count} سند حسابداری استفاده شده و قابل حذف نیست",
-            http_status=400
+            f"این ارز قابل حذف نیست: {detail}",
+            http_status=400,
         )
     
     # حذف ارز
@@ -875,10 +1097,14 @@ def delete_business_soft(
     business_id: int,
     owner_id: int,
     deletion_reason: str | None = None,
-    requested_by: int | None = None
+    requested_by: int | None = None,
+    skip_restore_period: bool = False,
 ) -> Dict[str, Any] | None:
     """
-    حذف نرم کسب و کار با بررسی‌های امنیتی و ایجاد بکاپ خودکار
+    حذف نرم کسب و کار با بررسی‌های امنیتی و ایجاد بکاپ خودکار.
+
+    اگر skip_restore_period=True باشد، auto_delete_at بلافاصله تنظیم می‌شود
+    و مهلت ۳۰ روزه بازیابی اعمال نمی‌شود (حذف سریع soft delete).
     """
     business_repo = BusinessRepository(db)
     business = business_repo.get_by_id(business_id)
@@ -946,14 +1172,17 @@ def delete_business_soft(
     
     # انجام Soft Delete
     now = datetime.utcnow()
+    restore_deadline_days = 0 if skip_restore_period else 30
     business.deleted_at = now
     business.deletion_requested_at = now
     business.deletion_requested_by = requested_by or owner_id
     business.deletion_reason = deletion_reason
-    business.auto_delete_at = now + timedelta(days=30)  # 30 روز بعد
+    business.auto_delete_at = now if skip_restore_period else now + timedelta(days=30)
     
     db.commit()
     db.refresh(business)
+
+    invalidate_user_businesses_list_cache()
     
     # لاگ عملیات
     logger.info(
@@ -964,6 +1193,7 @@ def delete_business_soft(
             "deleted_at": now.isoformat(),
             "auto_delete_at": business.auto_delete_at.isoformat(),
             "backup_created": backup_result is not None,
+            "skip_restore_period": skip_restore_period,
         }
     )
     
@@ -971,7 +1201,8 @@ def delete_business_soft(
         "business_id": business_id,
         "deleted_at": business.deleted_at.isoformat(),
         "auto_delete_at": business.auto_delete_at.isoformat(),
-        "restore_deadline_days": 30,
+        "restore_deadline_days": restore_deadline_days,
+        "skip_restore_period": skip_restore_period,
         "backup_created": backup_result is not None,
         "backup_id": backup_result.get("id") if backup_result else None,
     }
@@ -1009,6 +1240,8 @@ def restore_business(db: Session, business_id: int, owner_id: int) -> Dict[str, 
     
     db.commit()
     db.refresh(business)
+
+    invalidate_user_businesses_list_cache()
     
     logger.info(f"Business {business_id} restored by user {owner_id}")
     
@@ -1048,6 +1281,15 @@ def get_business_print_settings(db: Session, business_id: int) -> Dict[str, Any]
     - در صورت وجود رکورد برای نوع سند خاص، همان برای آن نوع استفاده می‌شود.
     - اگر هیچ رکوردی وجود نداشته باشد، مقادیر پیش‌فرض (همه روشن، بدون متن پاورقی) برگردانده می‌شود.
     """
+    from app.services.print_stamp_scale import (
+        STAMP_SCALE_DEFAULT,
+        clamp_scale_percent,
+    )
+    from app.services.print_tax_discount_display import (
+        DEFAULT_TAX_DISCOUNT_DISPLAY_SETTINGS,
+        normalize_display_mode,
+    )
+
     rows = (
         db.query(BusinessPrintSettings)
         .filter(BusinessPrintSettings.business_id == business_id)
@@ -1068,6 +1310,16 @@ def get_business_print_settings(db: Session, business_id: int) -> Dict[str, Any]
             "show_customer_balance": bool(getattr(row, "show_customer_balance", True)),
             "show_seller_signature_area": bool(getattr(row, "show_seller_signature_area", True)),
             "show_buyer_signature_area": bool(getattr(row, "show_buyer_signature_area", True)),
+            "stamp_scale_percent": clamp_scale_percent(
+                getattr(row, "stamp_scale_percent", STAMP_SCALE_DEFAULT)
+            ),
+            "signature_scale_percent": clamp_scale_percent(
+                getattr(row, "signature_scale_percent", STAMP_SCALE_DEFAULT)
+            ),
+            **{
+                key: normalize_display_mode(getattr(row, key, None))
+                for key in DEFAULT_TAX_DISCOUNT_DISPLAY_SETTINGS
+            },
         }
 
     default_settings: Dict[str, Any] = {
@@ -1083,6 +1335,9 @@ def get_business_print_settings(db: Session, business_id: int) -> Dict[str, Any]
         "show_customer_balance": True,
         "show_seller_signature_area": True,
         "show_buyer_signature_area": True,
+        "stamp_scale_percent": STAMP_SCALE_DEFAULT,
+        "signature_scale_percent": STAMP_SCALE_DEFAULT,
+        **DEFAULT_TAX_DISCOUNT_DISPLAY_SETTINGS,
     }
     per_type: Dict[str, Any] = {}
 
@@ -1117,6 +1372,15 @@ def update_business_print_settings(
       }
     }
     """
+    from app.services.print_stamp_scale import (
+        STAMP_SCALE_DEFAULT,
+        clamp_scale_percent,
+    )
+    from app.services.print_tax_discount_display import (
+        DEFAULT_TAX_DISCOUNT_DISPLAY_SETTINGS,
+        normalize_display_mode,
+    )
+
     default_data = (settings_payload or {}).get("default") or {}
     per_type_data: Dict[str, Any] = (settings_payload or {}).get("per_type") or {}
 
@@ -1135,6 +1399,35 @@ def update_business_print_settings(
                 return False
         return default
 
+    def _apply_print_cfg_to_row(row: BusinessPrintSettings, cfg: Dict[str, Any]) -> None:
+        row.show_logo = _get_bool(cfg, "show_logo", True)
+        row.show_stamp = _get_bool(cfg, "show_stamp", True)
+        row.show_payments = _get_bool(cfg, "show_payments", True)
+        row.show_installment_plan = _get_bool(cfg, "show_installment_plan", True)
+        row.show_share_qr = _get_bool(cfg, "show_share_qr", False)
+        row.show_footer_print_time = _get_bool(cfg, "show_footer_print_time", True)
+        row.show_footer_preparer = _get_bool(cfg, "show_footer_preparer", True)
+        row.show_customer_balance = _get_bool(cfg, "show_customer_balance", True)
+        row.show_seller_signature_area = _get_bool(
+            cfg, "show_seller_signature_area", True
+        )
+        row.show_buyer_signature_area = _get_bool(
+            cfg, "show_buyer_signature_area", True
+        )
+        row.stamp_scale_percent = clamp_scale_percent(
+            cfg.get("stamp_scale_percent"), STAMP_SCALE_DEFAULT
+        )
+        row.signature_scale_percent = clamp_scale_percent(
+            cfg.get("signature_scale_percent"), STAMP_SCALE_DEFAULT
+        )
+        row.footer_note = (
+            (cfg.get("footer_note") or None)
+            if isinstance(cfg.get("footer_note"), str)
+            else cfg.get("footer_note")
+        )
+        for key in DEFAULT_TAX_DISCOUNT_DISPLAY_SETTINGS:
+            setattr(row, key, normalize_display_mode(cfg.get(key)))
+
     # ابتدا رکورد تنظیمات عمومی (all) را به‌روزرسانی یا ایجاد می‌کنیم
     default_row = (
         db.query(BusinessPrintSettings)
@@ -1151,35 +1444,7 @@ def update_business_print_settings(
                 document_type="all",
             )
             db.add(default_row)
-        default_row.show_logo = _get_bool(default_data, "show_logo", True)
-        default_row.show_stamp = _get_bool(default_data, "show_stamp", True)
-        default_row.show_payments = _get_bool(default_data, "show_payments", True)
-        default_row.show_installment_plan = _get_bool(
-            default_data,
-            "show_installment_plan",
-            True,
-        )
-        default_row.show_share_qr = _get_bool(default_data, "show_share_qr", False)
-        default_row.show_footer_print_time = _get_bool(
-            default_data, "show_footer_print_time", True
-        )
-        default_row.show_footer_preparer = _get_bool(
-            default_data, "show_footer_preparer", True
-        )
-        default_row.show_customer_balance = _get_bool(
-            default_data, "show_customer_balance", True
-        )
-        default_row.show_seller_signature_area = _get_bool(
-            default_data, "show_seller_signature_area", True
-        )
-        default_row.show_buyer_signature_area = _get_bool(
-            default_data, "show_buyer_signature_area", True
-        )
-        default_row.footer_note = (
-            (default_data.get("footer_note") or None)
-            if isinstance(default_data.get("footer_note"), str)
-            else default_data.get("footer_note")
-        )
+        _apply_print_cfg_to_row(default_row, default_data)
 
     # سپس تنظیمات اختصاصی هر نوع سند را به‌روزرسانی / ایجاد می‌کنیم
     # document_type فقط برای انواعی نگهداری می‌شود که در per_type ارسال شده‌اند.
@@ -1212,25 +1477,7 @@ def update_business_print_settings(
                 document_type=doc_type_str,
             )
             db.add(row)
-        row.show_logo = _get_bool(cfg, "show_logo", True)
-        row.show_stamp = _get_bool(cfg, "show_stamp", True)
-        row.show_payments = _get_bool(cfg, "show_payments", True)
-        row.show_installment_plan = _get_bool(
-            cfg,
-            "show_installment_plan",
-            True,
-        )
-        row.show_share_qr = _get_bool(cfg, "show_share_qr", False)
-        row.show_footer_print_time = _get_bool(cfg, "show_footer_print_time", True)
-        row.show_footer_preparer = _get_bool(cfg, "show_footer_preparer", True)
-        row.show_customer_balance = _get_bool(cfg, "show_customer_balance", True)
-        row.show_seller_signature_area = _get_bool(cfg, "show_seller_signature_area", True)
-        row.show_buyer_signature_area = _get_bool(cfg, "show_buyer_signature_area", True)
-        row.footer_note = (
-            (cfg.get("footer_note") or None)
-            if isinstance(cfg.get("footer_note"), str)
-            else cfg.get("footer_note")
-        )
+        _apply_print_cfg_to_row(row, cfg)
 
     # سایر رکوردهای موجود که دیگر در per_type نیستند حذف می‌شوند
     for doc_type, row in existing_map.items():
@@ -1384,6 +1631,7 @@ def _business_to_dict(business: Business) -> Dict[str, Any]:
         "check_credit_enabled_by_default": bool(getattr(business, "check_credit_enabled_by_default", False)),
         "public_catalog_show_contact": bool(getattr(business, "public_catalog_show_contact", False)),
         "public_catalog_show_base_sales_price": bool(getattr(business, "public_catalog_show_base_sales_price", True)),
+        "display_timezone": getattr(business, "display_timezone", None),
         # تنظیمات محاسبه سود فاکتور
         "invoice_profit_calculation_method": getattr(business, "invoice_profit_calculation_method", None),
         "invoice_profit_calculation_basis": getattr(business, "invoice_profit_calculation_basis", None),
@@ -1419,6 +1667,27 @@ def _business_to_dict(business: Business) -> Dict[str, Any]:
         "warehouse_transfer_require_positive_stock": bool(
             getattr(business, "warehouse_transfer_require_positive_stock", True),
         ),
+        "goods_expense_income_workflow_mode": str(
+            getattr(business, "goods_expense_income_workflow_mode", None) or "simple",
+        ),
+        "goods_expense_income_auto_post_in_simple_mode": bool(
+            getattr(business, "goods_expense_income_auto_post_in_simple_mode", True),
+        ),
+        "goods_expense_income_default_expense_account_code": str(
+            getattr(business, "goods_expense_income_default_expense_account_code", None) or "70407",
+        ),
+        "goods_expense_income_default_income_account_code": str(
+            getattr(business, "goods_expense_income_default_income_account_code", None) or "60103",
+        ),
+        "goods_expense_income_stock_count_mode": str(
+            getattr(business, "goods_expense_income_stock_count_mode", None) or "goods_docs",
+        ),
+        "goods_expense_income_allow_manual_unit_cost": bool(
+            getattr(business, "goods_expense_income_allow_manual_unit_cost", False),
+        ),
+        "goods_expense_income_require_person": bool(
+            getattr(business, "goods_expense_income_require_person", False),
+        ),
         "invoice_global_discount_percent_basis": str(
             getattr(business, "invoice_global_discount_percent_basis", None)
             or "subtotal_after_line_discount",
@@ -1445,11 +1714,7 @@ def _business_to_dict(business: Business) -> Dict[str, Any]:
         "deletion_requested_at": business.deletion_requested_at.isoformat() if getattr(business, "deletion_requested_at", None) else None,
         "auto_delete_at": business.auto_delete_at.isoformat() if getattr(business, "auto_delete_at", None) else None,
         "is_deleted": getattr(business, "deleted_at", None) is not None,
-        "is_deletion_pending": (
-            getattr(business, "deleted_at", None) is not None and
-            getattr(business, "auto_delete_at", None) is not None and
-            datetime.utcnow() < business.auto_delete_at
-        ),
+        "is_deletion_pending": _business_is_restorable(business),
     }
 
     # ارز پیشفرض
@@ -1460,6 +1725,7 @@ def _business_to_dict(business: Business) -> Dict[str, Any]:
             "code": c.code,
             "title": c.title,
             "symbol": c.symbol,
+            "decimal_places": int(getattr(c, "decimal_places", None) or 0),
         }
     else:
         data["default_currency"] = None
@@ -1467,11 +1733,21 @@ def _business_to_dict(business: Business) -> Dict[str, Any]:
     # ارزهای فعال کسب‌وکار
     if getattr(business, "currencies", None):
         data["currencies"] = [
-            {"id": c.id, "code": c.code, "title": c.title, "symbol": c.symbol}
+            {"id": c.id, "code": c.code, "title": c.title, "symbol": c.symbol, "decimal_places": int(getattr(c, "decimal_places", None) or 0)}
             for c in business.currencies
         ]
     else:
         data["currencies"] = []
+
+    # چندارزی: حداقل یک ارز فرعی غیر از ارز اصلی
+    default_id = getattr(business, "default_currency_id", None)
+    currencies_list = data.get("currencies") or []
+    if default_id is None:
+        data["is_multi_currency"] = False
+    else:
+        data["is_multi_currency"] = any(
+            int(c.get("id")) != int(default_id) for c in currencies_list if c.get("id") is not None
+        )
 
     return data
 

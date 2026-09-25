@@ -360,6 +360,8 @@ class BusinessResponse {
   final bool checkCreditEnabledByDefault;
   final bool publicCatalogShowContact;
   final bool publicCatalogShowBaseSalesPrice;
+  /// منطقهٔ زمانی نمایش (IANA)؛ null = پیش‌فرض سیستم
+  final String? displayTimezone;
   // تنظیمات محاسبه سود فاکتور
   final String? invoiceProfitCalculationMethod;
   final String? invoiceProfitCalculationBasis;
@@ -389,6 +391,16 @@ class BusinessResponse {
   final bool allowNegativeInventoryForUnique;
   /// حواله انتقال همیشه کنترل کسری کامل
   final bool warehouseTransferRequirePositiveStock;
+  // تنظیمات کالای هزینه‌شده / کالای درآمدشده
+  /// simple | two_step
+  final String goodsExpenseIncomeWorkflowMode;
+  final bool goodsExpenseIncomeAutoPostInSimpleMode;
+  final String goodsExpenseIncomeDefaultExpenseAccountCode;
+  final String goodsExpenseIncomeDefaultIncomeAccountCode;
+  /// goods_docs | physical_adjustment | ask
+  final String goodsExpenseIncomeStockCountMode;
+  final bool goodsExpenseIncomeAllowManualUnitCost;
+  final bool goodsExpenseIncomeRequirePerson;
   /// مبنای درصد تخفیف کلی فاکتور (کد API)
   final String invoiceGlobalDiscountPercentBasis;
   /// اثر تخفیف کلی بر مالیات (کد API)
@@ -431,6 +443,7 @@ class BusinessResponse {
     this.checkCreditEnabledByDefault = false,
     this.publicCatalogShowContact = false,
     this.publicCatalogShowBaseSalesPrice = true,
+    this.displayTimezone,
     this.invoiceProfitCalculationMethod,
     this.invoiceProfitCalculationBasis,
     this.invoiceProfitIncludeOverhead = false,
@@ -451,6 +464,13 @@ class BusinessResponse {
     this.allowNegativeInventoryForBulk = false,
     this.allowNegativeInventoryForUnique = false,
     this.warehouseTransferRequirePositiveStock = true,
+    this.goodsExpenseIncomeWorkflowMode = 'simple',
+    this.goodsExpenseIncomeAutoPostInSimpleMode = true,
+    this.goodsExpenseIncomeDefaultExpenseAccountCode = '70407',
+    this.goodsExpenseIncomeDefaultIncomeAccountCode = '60103',
+    this.goodsExpenseIncomeStockCountMode = 'goods_docs',
+    this.goodsExpenseIncomeAllowManualUnitCost = false,
+    this.goodsExpenseIncomeRequirePerson = false,
     this.invoiceGlobalDiscountPercentBasis = 'subtotal_after_line_discount',
     this.invoiceGlobalDiscountTaxMode = 'recalculate_tax_proportional',
     this.invoiceGlobalDiscountMaxPercent,
@@ -513,6 +533,7 @@ class BusinessResponse {
       checkCreditEnabledByDefault: (json['check_credit_enabled_by_default'] as bool?) ?? false,
       publicCatalogShowContact: (json['public_catalog_show_contact'] as bool?) ?? false,
       publicCatalogShowBaseSalesPrice: (json['public_catalog_show_base_sales_price'] as bool?) ?? true,
+      displayTimezone: json['display_timezone'] as String?,
       invoiceProfitCalculationMethod: json['invoice_profit_calculation_method'] as String?,
       invoiceProfitCalculationBasis: json['invoice_profit_calculation_basis'] as String?,
       invoiceProfitIncludeOverhead: (json['invoice_profit_include_overhead'] as bool?) ?? false,
@@ -546,6 +567,20 @@ class BusinessResponse {
       allowNegativeInventoryForUnique: (json['allow_negative_inventory_for_unique'] as bool?) ?? false,
       warehouseTransferRequirePositiveStock:
           (json['warehouse_transfer_require_positive_stock'] as bool?) ?? true,
+      goodsExpenseIncomeWorkflowMode:
+          (json['goods_expense_income_workflow_mode'] as String?) ?? 'simple',
+      goodsExpenseIncomeAutoPostInSimpleMode:
+          (json['goods_expense_income_auto_post_in_simple_mode'] as bool?) ?? true,
+      goodsExpenseIncomeDefaultExpenseAccountCode:
+          (json['goods_expense_income_default_expense_account_code'] as String?) ?? '70407',
+      goodsExpenseIncomeDefaultIncomeAccountCode:
+          (json['goods_expense_income_default_income_account_code'] as String?) ?? '60103',
+      goodsExpenseIncomeStockCountMode:
+          (json['goods_expense_income_stock_count_mode'] as String?) ?? 'goods_docs',
+      goodsExpenseIncomeAllowManualUnitCost:
+          (json['goods_expense_income_allow_manual_unit_cost'] as bool?) ?? false,
+      goodsExpenseIncomeRequirePerson:
+          (json['goods_expense_income_require_person'] as bool?) ?? false,
       invoiceGlobalDiscountPercentBasis:
           (json['invoice_global_discount_percent_basis'] as String?) ??
               'subtotal_after_line_discount',

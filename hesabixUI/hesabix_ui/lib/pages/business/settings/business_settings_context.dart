@@ -32,6 +32,13 @@ class BusinessSettingsContext {
     return current != null && current.id == businessId && !isOwner;
   }
 
+  /// چندارزی بودن کسب‌وکار فعلی (برای مخفی‌سازی تنظیمات تسعیر و …).
+  bool get isMultiCurrency {
+    final current = authStore.currentBusiness;
+    if (current == null || current.id != businessId) return false;
+    return current.isMultiCurrency;
+  }
+
   String route(String relativePath) => '/business/$businessId/$relativePath';
 
   /// Tab-aware route for settings opened from a specific business panel tab.
@@ -64,6 +71,9 @@ class BusinessSettingsContext {
   bool get canManageFtp =>
       isOwner || authStore.hasBusinessPermission('settings', 'manage_ftp');
 
+  bool get canManageAiProvider =>
+      isOwner || authStore.hasBusinessPermission('settings', 'manage_ai_provider');
+
   bool get canManageUsers =>
       isOwner || authStore.hasBusinessPermission('settings', 'users');
 
@@ -94,6 +104,13 @@ class BusinessSettingsContext {
     if (!pluginActive('distribution')) return false;
     if (isOwner) return true;
     return authStore.hasBusinessPermission('distribution', 'view');
+  }
+
+  bool get canAccessPayroll {
+    if (!pluginActive('payroll')) return false;
+    if (isOwner) return true;
+    return authStore.hasBusinessPermission('payroll', 'view') ||
+        authStore.hasBusinessPermission('payroll', 'manage');
   }
 
   bool get canAccessMoadian {

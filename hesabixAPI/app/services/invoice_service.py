@@ -2,14 +2,15 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional, Tuple
 from datetime import datetime, date, timedelta, timezone
+from app.core.datetime_utils import utc_now, utc_now_aware, utc_naive_to_iso_z
 from decimal import Decimal, ROUND_HALF_UP
 import logging
 import re
 from collections import defaultdict, deque
 
-from sqlalchemy.orm import Session, aliased
+from sqlalchemy.orm import Session, aliased, selectinload
 from sqlalchemy.orm.attributes import flag_modified
-from sqlalchemy import and_, or_, func, cast
+from sqlalchemy import and_, or_, func, cast, Integer
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.exc import IntegrityError
 
@@ -969,6 +970,46 @@ def _build_product_tax_snapshot_map(
     return result
 
 
+def refresh_invoice_line_tax_snapshots(db: Session, document: Document) -> int:
+    """
+    به‌روزرسانی snapshot مالیاتی خطوط فاکتور از اطلاعات فعلی کالا.
+
+    فاکتور هنگام ثبت/ویرایش، وضعیت مالیاتی کالا را در extra_info هر ردیف ذخیره می‌کند.
+    اگر بعداً کد مالیاتی کالا تکمیل شود، بدون ویرایش مجدد فاکتور snapshot قدیمی
+    (بدون tax_code) باقی می‌ماند و ارسال به مودیان با خطا متوقف می‌شود.
+    """
+    lines = (
+        db.query(InvoiceItemLine)
+        .filter(InvoiceItemLine.document_id == document.id)
+        .all()
+    )
+    if not lines:
+        return 0
+
+    product_ids = [int(line.product_id) for line in lines if line.product_id]
+    tax_map = _build_product_tax_snapshot_map(db, int(document.business_id), product_ids)
+    updated = 0
+    for line in lines:
+        if not line.product_id:
+            continue
+        tax_meta = tax_map.get(int(line.product_id))
+        if not tax_meta:
+            continue
+        snapshot = {k: v for k, v in tax_meta.items() if v is not None}
+        if not snapshot:
+            continue
+        snapshot["captured_at"] = datetime.utcnow().isoformat()
+        info = dict(line.extra_info or {})
+        info["tax_snapshot"] = snapshot
+        line.extra_info = info
+        flag_modified(line, "extra_info")
+        updated += 1
+
+    if updated:
+        db.flush()
+    return updated
+
+
 def _iter_product_movements(
     db: Session,
     business_id: int,
@@ -1238,8 +1279,12 @@ def _compute_available_stock(
                 )
             )
 
-    wh_movements = wh_movements_query.all()
-    for wh_mv in wh_movements:
+    wh_movements = wh_movements_query.with_entities(WarehouseDocumentLine, WarehouseDocument).all()
+    for wh_mv, wh_doc in wh_movements:
+        # حوالهٔ معکوس لغو: موجودی با cancelled شدن اصل اصلاح شده؛ شمارش مجدد دوبرابر می‌کند.
+        # (شامل معکوس فاکتور و معکوس دستی/کالای هزینه-درآمد)
+        if _warehouse_doc_is_cancel_reversal_of_cancelled(db, business_id, wh_doc):
+            continue
         if wh_mv.movement == "in":
             bal += Decimal(str(wh_mv.quantity))
         elif wh_mv.movement == "out":
@@ -1930,10 +1975,22 @@ def _calculate_seller_commission(
 
 
 def _person_id_from_header(data: Dict[str, Any]) -> Optional[int]:
+    """شخص فاکتور از extra_info یا ریشهٔ payload (قرارداد ابزار AI)."""
     try:
-        ei = data.get("extra_info") or {}
-        pid = ei.get("person_id")
-        return int(pid) if pid is not None else None
+        ei = data.get("extra_info") if isinstance(data.get("extra_info"), dict) else {}
+        for candidate in (
+            (ei or {}).get("person_id"),
+            data.get("person_id"),
+            data.get("customer_id"),
+            data.get("supplier_id"),
+            (ei or {}).get("customer_id"),
+        ):
+            if candidate is None or candidate == "":
+                continue
+            parsed = int(candidate)
+            if parsed > 0:
+                return parsed
+        return None
     except Exception:
         return None
 
@@ -2010,6 +2067,814 @@ def _movement_from_type(invoice_type: str) -> Tuple[Optional[str], Optional[str]
         # production has both out (materials) and in (finished)
         return (None, None)
     return (None, None)
+
+
+def _resolve_invoice_type_from_payload(
+    data: Dict[str, Any],
+    *,
+    fallback: Optional[str] = None,
+) -> str:
+    """نوع فاکتور را از payload (invoice_type) یا مقدار فعلی سند برمی‌گرداند."""
+    requested = str(data.get("invoice_type") or "").strip()
+    if requested in SUPPORTED_INVOICE_TYPES:
+        return requested
+    fb = str(fallback or "").strip()
+    if fb in SUPPORTED_INVOICE_TYPES:
+        return fb
+    return requested or fb
+
+
+def _stamp_movement_on_invoice_lines(invoice_type: str, lines_input: List[Dict[str, Any]]) -> None:
+    """movement ردیف‌ها را با نوع فاکتور هم‌راستا می‌کند (به‌جز تولید که in/out صریح دارد)."""
+    if invoice_type == INVOICE_PRODUCTION:
+        return
+    default_move, _ = _movement_from_type(invoice_type)
+    if default_move not in ("in", "out"):
+        return
+    for ln in lines_input:
+        info = dict(ln.get("extra_info") or {})
+        info["movement"] = default_move
+        ln["extra_info"] = info
+
+
+def _extra_info_fields_incompatible_with_invoice_type(invoice_type: str) -> frozenset:
+    incompatible: set[str] = set()
+    if invoice_type not in (INVOICE_SALES, INVOICE_SALES_RETURN):
+        incompatible.update({"installment_plan", "seller_id", "commission"})
+    if invoice_type not in (INVOICE_SALES, INVOICE_PURCHASE):
+        incompatible.update({"invoice_adjustments", "global_discount"})
+    if invoice_type not in (INVOICE_PURCHASE, INVOICE_PURCHASE_RETURN):
+        incompatible.add("purchase_accounting_mode")
+    if invoice_type != INVOICE_SALES:
+        incompatible.add("customer_club")
+    return frozenset(incompatible)
+
+
+def _sanitize_extra_info_for_invoice_type_change(
+    extra: Dict[str, Any],
+    new_invoice_type: str,
+    old_invoice_type: str,
+) -> Dict[str, Any]:
+    if new_invoice_type == old_invoice_type:
+        return extra
+    ex = dict(extra)
+    for key in _extra_info_fields_incompatible_with_invoice_type(new_invoice_type):
+        ex.pop(key, None)
+    return ex
+
+
+def _warehouse_document_is_invoice_sourced(db: Session, business_id: int, wh_doc: Any) -> bool:
+    from adapters.db.models.warehouse_document import WarehouseDocument as _WhDoc
+
+    if not isinstance(wh_doc, _WhDoc):
+        return False
+    if str(getattr(wh_doc, "source_type", None) or "").strip().lower() == "invoice":
+        return True
+    src_doc_id = getattr(wh_doc, "source_document_id", None)
+    if src_doc_id is None:
+        return False
+    row = (
+        db.query(Document.document_type)
+        .filter(Document.id == int(src_doc_id), Document.business_id == int(business_id))
+        .first()
+    )
+    if row is None:
+        return False
+    return str(row[0] or "") in SUPPORTED_INVOICE_TYPES
+
+
+def _warehouse_doc_cancels_invoice_sourced_wh(db: Session, business_id: int, wh_doc: Any) -> bool:
+    from adapters.db.models.warehouse_document import WarehouseDocument
+
+    ex = getattr(wh_doc, "extra_info", None) or {}
+    if not isinstance(ex, dict):
+        return False
+    cancel_id = ex.get("cancels_warehouse_document_id")
+    if cancel_id is None:
+        return False
+    try:
+        cid = int(cancel_id)
+    except (TypeError, ValueError):
+        return False
+    src = (
+        db.query(WarehouseDocument)
+        .filter(WarehouseDocument.id == cid, WarehouseDocument.business_id == int(business_id))
+        .first()
+    )
+    if not src:
+        return False
+    return _warehouse_document_is_invoice_sourced(db, business_id, src)
+
+
+def _warehouse_doc_is_cancel_reversal_of_cancelled(db: Session, business_id: int, wh_doc: Any) -> bool:
+    """حوالهٔ معکوسِ لغو وقتی اصل cancelled است؛ موجودی با حذف اصل اصلاح شده و شمارش معکوس دوبرابر می‌کند."""
+    from adapters.db.models.warehouse_document import WarehouseDocument
+
+    ex = getattr(wh_doc, "extra_info", None) or {}
+    if not isinstance(ex, dict):
+        return False
+    if ex.get("audit_only_reversal") or ex.get("stock_already_corrected_by_cancel"):
+        return True
+    cancel_id = ex.get("cancels_warehouse_document_id")
+    if cancel_id is None:
+        return False
+    try:
+        cid = int(cancel_id)
+    except (TypeError, ValueError):
+        return False
+    src = (
+        db.query(WarehouseDocument)
+        .filter(WarehouseDocument.id == cid, WarehouseDocument.business_id == int(business_id))
+        .first()
+    )
+    if not src:
+        return False
+    return (src.status or "").strip().lower() == "cancelled"
+
+
+_INVENTORY_LEDGER_REFRESH_TYPES = frozenset({INVOICE_PURCHASE, INVOICE_PURCHASE_RETURN})
+
+
+def _validate_production_invoice_lines(
+    db: Session,
+    business_id: int,
+    lines_input: List[Dict[str, Any]],
+    header_extra: Dict[str, Any],
+) -> None:
+    """اعتبارسنجی ردیف‌ها و فرمول تولید برای فاکتور تولید."""
+    has_out = False
+    has_in = False
+
+    for i, line in enumerate(lines_input, start=1):
+        extra_info = line.get("extra_info") or {}
+        movement = extra_info.get("movement")
+
+        if movement is None or (movement != "in" and movement != "out"):
+            raise ApiError(
+                "INVALID_PRODUCTION_LINE",
+                f"ردیف {i} باید movement مشخص داشته باشد ('in' یا 'out'). برای فاکتور تولید، باید از فرمول تولید استفاده کنید.",
+                http_status=400,
+            )
+
+        if movement == "out":
+            has_out = True
+        elif movement == "in":
+            has_in = True
+
+    if not has_out:
+        raise ApiError(
+            "INVALID_PRODUCTION_INVOICE",
+            "فاکتور تولید باید حداقل یک ردیف با movement: 'out' داشته باشد (مواد اولیه). برای فاکتور تولید، باید از فرمول تولید استفاده کنید.",
+            http_status=400,
+        )
+
+    if not has_in:
+        raise ApiError(
+            "INVALID_PRODUCTION_INVOICE",
+            "فاکتور تولید باید حداقل یک ردیف با movement: 'in' داشته باشد (محصول نهایی). برای فاکتور تولید، باید از فرمول تولید استفاده کنید.",
+            http_status=400,
+        )
+
+    bom_ids = header_extra.get("bom_ids")
+    if not bom_ids or not isinstance(bom_ids, list) or len(bom_ids) == 0:
+        raise ApiError(
+            "BOM_REQUIRED",
+            "برای فاکتور تولید، باید حداقل یک فرمول تولید را منفجر کنید. فاکتور تولید بدون فرمول تولید قابل ثبت نیست.",
+            http_status=400,
+        )
+
+    output_product_ids_in_invoice: set[int] = set()
+    for line in lines_input:
+        line_extra = line.get("extra_info") or {}
+        if line_extra.get("movement") == "in":
+            product_id = line.get("product_id")
+            if product_id:
+                output_product_ids_in_invoice.add(int(product_id))
+
+    for bom_id in bom_ids:
+        try:
+            bom_id_int = int(bom_id)
+        except (ValueError, TypeError):
+            continue
+
+        bom = db.get(ProductBOM, bom_id_int)
+        if not bom or bom.business_id != business_id:
+            continue
+
+        bom_outputs = db.query(ProductBOMOutput).filter(ProductBOMOutput.bom_id == bom_id_int).all()
+
+        if not bom_outputs:
+            logger.warning(
+                "فرمول تولید %s (کالا: %s) هیچ خروجی تعریف نشده است",
+                bom_id_int,
+                bom.product_id,
+            )
+            continue
+
+        bom_product_in_outputs = any(
+            output.output_product_id == bom.product_id for output in bom_outputs
+        )
+        if not bom_product_in_outputs:
+            logger.warning(
+                "کالای فرمول تولید %s (product_id: %s) در خروجی‌های فرمول تعریف نشده است.",
+                bom_id_int,
+                bom.product_id,
+            )
+
+        missing_outputs: List[str] = []
+        for output in bom_outputs:
+            if output.output_product_id not in output_product_ids_in_invoice:
+                output_product = db.get(Product, output.output_product_id)
+                product_name = output_product.name if output_product else f"کالا #{output.output_product_id}"
+                missing_outputs.append(product_name)
+
+        if missing_outputs:
+            missing_names = "، ".join(missing_outputs)
+            raise ApiError(
+                "MISSING_BOM_OUTPUTS",
+                f"خروجی‌های فرمول تولید '{bom.name}' (نسخه: {bom.version}) که در فاکتور وجود ندارند: {missing_names}. "
+                f"لطفاً همه خروجی‌های فرمول تولید را در فاکتور شامل کنید.",
+                http_status=400,
+            )
+
+
+def _build_invoice_payment_account_line(p: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """ساخت یک خط حساب برای پرداخت فاکتور؛ مبالغ غیرمثبت نادیده گرفته می‌شوند."""
+    amount = Decimal(str(p.get("amount", 0) or 0))
+    if amount <= 0:
+        return None
+    transaction_type_value = p.get("transaction_type") or p.get("type")
+    account_line: Dict[str, Any] = {
+        "transaction_type": transaction_type_value,
+        "amount": float(amount),
+        "description": p.get("description"),
+        "transaction_date": p.get("transaction_date"),
+        "commission": p.get("commission"),
+    }
+    for key in (
+        "bank_id",
+        "bank_name",
+        "cash_register_id",
+        "cash_register_name",
+        "petty_cash_id",
+        "petty_cash_name",
+        "check_id",
+        "check_number",
+        "person_id",
+        "account_id",
+    ):
+        if p.get(key) is not None:
+            account_line[key] = p.get(key)
+    return account_line
+
+
+def _validate_invoice_payment_item_currency(
+    db: Session,
+    invoice_currency_id: int,
+    payment_item: Dict[str, Any],
+    invoice_type: str,
+    *,
+    business_id: Optional[int] = None,
+    invoice: Optional[Document] = None,
+    allow_cross_currency: bool = False,
+) -> Optional[Dict[str, Any]]:
+    """اعتبارسنجی ارز حساب پرداخت.
+
+    اگر allow_cross_currency و MC: طرح تسویه بین‌ارزی برمی‌گرداند؛ وگرنه None.
+    """
+    from app.services.cross_currency_settlement_service import (
+        get_payment_item_account_currency_id,
+        resolve_cross_currency_payment_plan,
+    )
+
+    ttype = (payment_item.get("transaction_type") or payment_item.get("type") or "").strip().lower()
+    if ttype not in ("bank", "cash_register", "petty_cash", "check"):
+        return None
+
+    pay_cur = get_payment_item_account_currency_id(db, payment_item)
+
+    # مسیر بین‌ارزی
+    if (
+        allow_cross_currency
+        and business_id is not None
+        and invoice is not None
+        and pay_cur is not None
+        and int(pay_cur) != int(invoice_currency_id)
+    ):
+        plan = resolve_cross_currency_payment_plan(
+            db,
+            business_id=int(business_id),
+            invoice=invoice,
+            payment_item=payment_item,
+        )
+        # چک نوع چک همچنان اعمال شود
+        if ttype == "check":
+            ref_id = payment_item.get("check_id")
+            if ref_id:
+                chk = db.query(Check).filter(Check.id == int(ref_id)).first()
+                if chk:
+                    is_receipt_invoice = invoice_type in {INVOICE_SALES, INVOICE_PURCHASE_RETURN}
+                    expected_check_type = CheckType.RECEIVED if is_receipt_invoice else CheckType.TRANSFERRED
+                    if chk.type != expected_check_type:
+                        check_type_name = "دریافتی" if chk.type == CheckType.RECEIVED else "پرداختی"
+                        expected_type_name = "دریافتی" if expected_check_type == CheckType.RECEIVED else "پرداختی"
+                        invoice_type_name = "فروش/برگشت از فروش" if is_receipt_invoice else "خرید/برگشت از خرید"
+                        raise ApiError(
+                            "CHECK_TYPE_MISMATCH_WITH_INVOICE",
+                            f"نوع چک با نوع فاکتور هم‌خوانی ندارد. چک {check_type_name} نمی‌تواند در فاکتور {invoice_type_name} استفاده شود. باید چک {expected_type_name} استفاده شود.",
+                            http_status=400,
+                        )
+        return plan
+
+    if ttype == "bank":
+        ref_id = payment_item.get("bank_id")
+        if ref_id:
+            acct = db.query(BankAccount).filter(BankAccount.id == int(ref_id)).first()
+            if not acct:
+                raise ApiError("PAYMENT_ACCOUNT_NOT_FOUND", "Bank account not found", http_status=404)
+            if business_id is not None and int(acct.business_id) != int(business_id):
+                raise ApiError(
+                    "PAYMENT_ACCOUNT_BUSINESS_MISMATCH",
+                    "Bank account does not belong to this business",
+                    http_status=400,
+                )
+            if int(acct.currency_id) != invoice_currency_id:
+                raise ApiError(
+                    "PAYMENT_CURRENCY_MISMATCH",
+                    "Currency of bank account does not match invoice currency",
+                    http_status=400,
+                )
+    elif ttype == "cash_register":
+        ref_id = payment_item.get("cash_register_id")
+        if ref_id:
+            acct = db.query(CashRegister).filter(CashRegister.id == int(ref_id)).first()
+            if not acct:
+                raise ApiError("PAYMENT_ACCOUNT_NOT_FOUND", "Cash register not found", http_status=404)
+            if business_id is not None and int(acct.business_id) != int(business_id):
+                raise ApiError(
+                    "PAYMENT_ACCOUNT_BUSINESS_MISMATCH",
+                    "Cash register does not belong to this business",
+                    http_status=400,
+                )
+            if int(acct.currency_id) != invoice_currency_id:
+                raise ApiError(
+                    "PAYMENT_CURRENCY_MISMATCH",
+                    "Currency of cash register does not match invoice currency",
+                    http_status=400,
+                )
+    elif ttype == "petty_cash":
+        ref_id = payment_item.get("petty_cash_id")
+        if ref_id:
+            acct = db.query(PettyCash).filter(PettyCash.id == int(ref_id)).first()
+            if not acct:
+                raise ApiError("PAYMENT_ACCOUNT_NOT_FOUND", "Petty cash not found", http_status=404)
+            if business_id is not None and int(acct.business_id) != int(business_id):
+                raise ApiError(
+                    "PAYMENT_ACCOUNT_BUSINESS_MISMATCH",
+                    "Petty cash does not belong to this business",
+                    http_status=400,
+                )
+            if int(acct.currency_id) != invoice_currency_id:
+                raise ApiError(
+                    "PAYMENT_CURRENCY_MISMATCH",
+                    "Currency of petty cash does not match invoice currency",
+                    http_status=400,
+                )
+    elif ttype == "check":
+        ref_id = payment_item.get("check_id")
+        if not ref_id:
+            return None
+        chk = db.query(Check).filter(Check.id == int(ref_id)).first()
+        if not chk:
+            raise ApiError("PAYMENT_ACCOUNT_NOT_FOUND", "Check not found", http_status=404)
+        if business_id is not None and int(chk.business_id) != int(business_id):
+            raise ApiError(
+                "PAYMENT_ACCOUNT_BUSINESS_MISMATCH",
+                "Check does not belong to this business",
+                http_status=400,
+            )
+        if int(chk.currency_id) != invoice_currency_id:
+            raise ApiError(
+                "PAYMENT_CURRENCY_MISMATCH",
+                "Currency of check does not match invoice currency",
+                http_status=400,
+            )
+
+        is_receipt_invoice = invoice_type in {INVOICE_SALES, INVOICE_PURCHASE_RETURN}
+        expected_check_type = CheckType.RECEIVED if is_receipt_invoice else CheckType.TRANSFERRED
+        if chk.type != expected_check_type:
+            check_type_name = "دریافتی" if chk.type == CheckType.RECEIVED else "پرداختی"
+            expected_type_name = "دریافتی" if expected_check_type == CheckType.RECEIVED else "پرداختی"
+            invoice_type_name = "فروش/برگشت از فروش" if is_receipt_invoice else "خرید/برگشت از خرید"
+            raise ApiError(
+                "CHECK_TYPE_MISMATCH_WITH_INVOICE",
+                f"نوع چک با نوع فاکتور هم‌خوانی ندارد. چک {check_type_name} نمی‌تواند در فاکتور {invoice_type_name} استفاده شود. باید چک {expected_type_name} استفاده شود.",
+                http_status=400,
+            )
+    return None
+
+
+def _create_receipt_payment_documents_for_invoice_payments(
+    db: Session,
+    *,
+    business_id: int,
+    user_id: int,
+    document: Document,
+    person_id: int,
+    payments: List[Dict[str, Any]],
+    invoice_type: str,
+) -> List[int]:
+    """ایجاد یک سند دریافت/پرداخت جداگانه برای هر آیتم پرداخت فاکتور."""
+    from app.services.receipt_payment_service import (
+        create_receipt_payment,
+        resolve_receipt_document_date_from_account_lines,
+    )
+    from app.services.cross_currency_settlement_service import (
+        FX_GAIN_ACCOUNT_CODE,
+        FX_LOSS_ACCOUNT_CODE,
+        build_fx_settlement_extra,
+    )
+    from app.services.fx_rate_provider_service import business_is_multi_currency
+
+    payment_docs: List[int] = []
+    invoice_currency_id = int(document.currency_id)
+    is_receipt = invoice_type in {INVOICE_SALES, INVOICE_PURCHASE_RETURN}
+    person_is_receivable = invoice_type in {INVOICE_SALES, INVOICE_SALES_RETURN}
+    allow_x = business_is_multi_currency(db, int(business_id))
+
+    for p in payments:
+        amount = Decimal(str(p.get("amount", 0) or 0))
+        if amount <= 0:
+            continue
+
+        xplan = _validate_invoice_payment_item_currency(
+            db,
+            invoice_currency_id,
+            p,
+            invoice_type,
+            business_id=business_id,
+            invoice=document,
+            allow_cross_currency=allow_x,
+        )
+        account_line = _build_invoice_payment_account_line(p)
+        if not account_line:
+            continue
+
+        rp_document_date = resolve_receipt_document_date_from_account_lines(
+            document.document_date,
+            [account_line],
+        )
+
+        if xplan is None:
+            # مسیر هم‌ارز (بدون تغییر رفتار)
+            rp_data = {
+                "document_type": "receipt" if is_receipt else "payment",
+                "document_date": rp_document_date.isoformat(),
+                "currency_id": document.currency_id,
+                "description": f"تسویه مرتبط با فاکتور {document.code}",
+                "person_lines": [{
+                    "person_id": person_id,
+                    "amount": float(amount),
+                    "description": f"طرف حساب فاکتور {document.code}",
+                }],
+                "account_lines": [account_line],
+                "extra_info": {
+                    "source": "invoice",
+                    "invoice_id": document.id,
+                    "person_is_receivable": person_is_receivable,
+                },
+            }
+        else:
+            # مسیر بین‌ارزی (E2): سند همیشه به ارز پایه؛ مانده بومی حساب با account_currency_amount
+            pay_cur = int(xplan["payment_currency_id"])
+            base_id = int(xplan["base_currency_id"])
+            doc_cur = int(xplan.get("document_currency_id") or base_id)
+            fx_settlement = build_fx_settlement_extra(xplan)
+            fx_diff = Decimal(str(xplan["fx_diff"]))
+            person_amount = float(xplan["ar_base"])
+            cash_base = float(xplan["cash_base"])
+            payment_native = float(xplan["payment_amount"])
+            extra_account_lines: List[Dict[str, Any]] = []
+
+            if abs(fx_diff) > 0:
+                if is_receipt:
+                    if fx_diff > 0:
+                        extra_account_lines.append({
+                            "account_code": FX_LOSS_ACCOUNT_CODE,
+                            "amount": float(fx_diff),
+                            "description": "زیان تسعیر ارز تسویه فاکتور",
+                            "side": "debit",
+                        })
+                    elif fx_diff < 0:
+                        extra_account_lines.append({
+                            "account_code": FX_GAIN_ACCOUNT_CODE,
+                            "amount": float(-fx_diff),
+                            "description": "سود تسعیر ارز تسویه فاکتور",
+                            "side": "credit",
+                        })
+                else:
+                    if fx_diff > 0:
+                        extra_account_lines.append({
+                            "account_code": FX_GAIN_ACCOUNT_CODE,
+                            "amount": float(fx_diff),
+                            "description": "سود تسعیر ارز تسویه فاکتور",
+                            "side": "credit",
+                        })
+                    elif fx_diff < 0:
+                        extra_account_lines.append({
+                            "account_code": FX_LOSS_ACCOUNT_CODE,
+                            "amount": float(-fx_diff),
+                            "description": "زیان تسعیر ارز تسویه فاکتور",
+                            "side": "debit",
+                        })
+
+            # مبلغ خط حساب = ارزش پایه؛ بومی در account_currency_amount
+            account_line = {
+                **account_line,
+                "amount": cash_base,
+                "account_currency_amount": payment_native,
+                "account_currency_id": pay_cur,
+            }
+
+            person_line_extra = {
+                "fx_settlement": fx_settlement,
+                "side": "person",
+                "person_id": person_id,
+                "invoice_id": document.id,
+                "invoice_code": document.code,
+                "link_to_invoice": True,
+            }
+            rp_data = {
+                "document_type": "receipt" if is_receipt else "payment",
+                "document_date": rp_document_date.isoformat(),
+                "currency_id": doc_cur,
+                "description": f"تسویه بین‌ارزی فاکتور {document.code}",
+                "person_lines": [{
+                    "person_id": person_id,
+                    "amount": float(person_amount),
+                    "description": f"تسویه ارزی فاکتور {document.code}",
+                    "extra_info": person_line_extra,
+                }],
+                "account_lines": [account_line],
+                "fx_adjustment_lines": extra_account_lines,
+                "extra_info": {
+                    "source": "invoice",
+                    "invoice_id": document.id,
+                    "person_is_receivable": person_is_receivable,
+                    "fx_settlement": fx_settlement,
+                    "cross_currency": True,
+                },
+            }
+
+        rp_doc = create_receipt_payment(
+            db=db,
+            business_id=business_id,
+            user_id=user_id,
+            data=rp_data,
+            commit=False,
+        )
+        if isinstance(rp_doc, dict) and rp_doc.get("id"):
+            payment_docs.append(int(rp_doc["id"]))
+        else:
+            raise ApiError(
+                "RECEIPT_PAYMENT_CREATE_FAILED",
+                "ایجاد سند دریافت/پرداخت مرتبط با فاکتور ناموفق بود.",
+                http_status=500,
+            )
+
+    return payment_docs
+
+
+def _sum_receipt_payment_amounts_for_invoice(
+    db: Session,
+    business_id: int,
+    invoice_id: int,
+    receipt_payment_ids: List[int],
+) -> Decimal:
+    """جمع مبالغ تسویه‌شدهٔ فاکتور از اسناد دریافت/پرداخت پیوندی."""
+    total = Decimal(0)
+    for rp_id in receipt_payment_ids:
+        rp_doc = (
+            db.query(Document)
+            .filter(Document.id == int(rp_id), Document.business_id == int(business_id))
+            .first()
+        )
+        if not rp_doc:
+            continue
+        via_person = _sum_receipt_doc_payments_for_invoice(rp_doc, int(invoice_id), via_person_line=True)
+        if via_person > 0:
+            total += via_person
+        else:
+            total += _sum_receipt_doc_payments_for_invoice(rp_doc, int(invoice_id), via_person_line=False)
+    return total
+
+
+def _previous_sales_ar_effect_for_update(
+    db: Session,
+    business_id: int,
+    document: Document,
+    *,
+    old_document_type: str,
+    was_proforma: bool,
+    linked_receipt_payment_ids: List[int],
+) -> Decimal:
+    """
+    اثر قبلی فاکتور فروش قطعی روی ماندهٔ دریافتنی شخص (برای جلوگیری از شمارش دوبل در ویرایش).
+    """
+    if was_proforma or old_document_type != INVOICE_SALES:
+        return Decimal(0)
+    from app.services.invoice_adjustments_service import total_with_tax_from_totals_dict
+
+    old_totals = dict((document.extra_info or {}).get("totals") or {})
+    try:
+        old_total_with_tax = total_with_tax_from_totals_dict(old_totals)
+    except Exception:
+        old_total_with_tax = Decimal(0)
+    old_paid = _sum_receipt_payment_amounts_for_invoice(
+        db,
+        int(business_id),
+        int(document.id),
+        linked_receipt_payment_ids,
+    )
+    effect = old_total_with_tax - old_paid
+    return effect if effect > 0 else Decimal(0)
+
+
+def _validate_and_apply_sales_credit_checks(
+    db: Session,
+    business_id: int,
+    fiscal_year: Optional[FiscalYear],
+    person_id: Optional[int],
+    totals: Dict[str, Any],
+    header_extra: Dict[str, Any],
+    data: Dict[str, Any],
+    *,
+    previous_ar_effect: Decimal = Decimal(0),
+) -> Dict[str, Any]:
+    """
+    کنترل سقف اعتبار و مسدودی اقساط معوق برای فاکتور فروش.
+    previous_ar_effect: اثر AR قبلی همین سند در ویرایش (برای کسر از ماندهٔ فعلی).
+    """
+    if not person_id:
+        return header_extra
+
+    from adapters.db.models.person import Person as _PersonModel
+    from adapters.db.models.business import Business as _BusinessModel
+    from app.services.invoice_adjustments_service import total_with_tax_from_totals_dict
+    from app.services.person_service import calculate_person_balance
+
+    person_obj = db.query(_PersonModel).filter(_PersonModel.id == int(person_id)).first()
+    business_obj = db.query(_BusinessModel).filter(_BusinessModel.id == int(business_id)).first()
+
+    check_enabled = None
+    credit_limit_val = None
+    if person_obj:
+        check_enabled = getattr(person_obj, "credit_check_enabled", None)
+        credit_limit_val = getattr(person_obj, "credit_limit", None)
+    if check_enabled is None and business_obj:
+        check_enabled = bool(getattr(business_obj, "check_credit_enabled_by_default", False))
+    if credit_limit_val is None and business_obj:
+        credit_limit_val = getattr(business_obj, "default_credit_limit", None)
+
+    if not check_enabled or credit_limit_val is None:
+        return header_extra
+
+    bal, _status = calculate_person_balance(
+        db, int(person_id), fiscal_year_id=fiscal_year.id if fiscal_year else None
+    )
+    current_debt = Decimal(0)
+    try:
+        if bal is not None:
+            bdec = Decimal(str(bal))
+            current_debt = (-bdec) if bdec < 0 else Decimal(0)
+    except Exception:
+        current_debt = Decimal(0)
+
+    total_with_tax = total_with_tax_from_totals_dict(totals)
+    planned_paid = Decimal(0)
+    try:
+        for p in data.get("payments") or []:
+            amt = Decimal(str(p.get("amount", 0) or 0))
+            if amt > 0:
+                planned_paid += amt
+    except Exception:
+        planned_paid = Decimal(0)
+
+    invoice_effect = total_with_tax - planned_paid
+    if invoice_effect < 0:
+        invoice_effect = Decimal(0)
+
+    adjusted_current = current_debt - previous_ar_effect
+    if adjusted_current < 0:
+        adjusted_current = Decimal(0)
+    new_debt = adjusted_current + invoice_effect
+
+    limit_dec = Decimal(str(credit_limit_val))
+    ignore_flag = bool((data.get("extra_info") or {}).get("ignore_credit_check", False))
+    ex_out = dict(header_extra)
+
+    if new_debt > limit_dec:
+        if not ignore_flag:
+            raise ApiError(
+                "CREDIT_LIMIT_EXCEEDED",
+                f"اعتبار مشتری کافی نیست. مانده فعلی: {float(adjusted_current):.2f}، "
+                f"اثر فاکتور: {float(invoice_effect):.2f}، سقف: {float(limit_dec):.2f}",
+                http_status=400,
+            )
+        warns = list(ex_out.get("warnings") or [])
+        warns.append({
+            "code": "CREDIT_LIMIT_EXCEEDED",
+            "message": "اعتبار مشتری از سقف عبور کرده است اما نادیده گرفته شد",
+            "current_debt": float(adjusted_current),
+            "invoice_effect": float(invoice_effect),
+            "new_debt": float(new_debt),
+            "limit": float(limit_dec),
+        })
+        ex_out["warnings"] = warns
+
+    credit_cfg = get_business_credit_settings(db, business_id)
+    auto_block_days_raw = credit_cfg.get("auto_block_after_days")
+    auto_block_days = int(auto_block_days_raw) if auto_block_days_raw is not None else None
+    if auto_block_days and auto_block_days > 0:
+        inst_data = search_installments(
+            db=db,
+            business_id=business_id,
+            query={"person_id": int(person_id), "status": "overdue"},
+            disable_pagination=True,
+        )
+        max_overdue = 0
+        for it in inst_data.get("items", []):
+            od = int(it.get("overdue_days") or 0)
+            if od > max_overdue:
+                max_overdue = od
+        if max_overdue > auto_block_days:
+            if not ignore_flag:
+                raise ApiError(
+                    "CREDIT_AUTO_BLOCKED",
+                    f"به دلیل اقساط معوق بیش از {auto_block_days} روز، ثبت فاکتور جدید مجاز نیست.",
+                    http_status=400,
+                )
+            warns = list(ex_out.get("warnings") or [])
+            warns.append({
+                "code": "CREDIT_AUTO_BLOCKED_OVERRIDDEN",
+                "message": "به دلیل اقساط معوق، حساب به صورت خودکار باید مسدود می‌شد اما نادیده گرفته شد",
+                "auto_block_after_days": auto_block_days,
+                "max_overdue_days": max_overdue,
+            })
+            ex_out["warnings"] = warns
+
+    return ex_out
+
+
+def _clear_invoice_linked_receipt_payments(
+    db: Session,
+    business_id: int,
+    invoice_id: int,
+    document: Document,
+) -> None:
+    """حذف اسناد دریافت/پرداخت پیوندی و پاک‌سازی لینک‌ها."""
+    from app.services.receipt_payment_service import delete_receipt_payment
+
+    extra_info = document.extra_info or {}
+    linked_ids = _get_receipt_payment_ids_linked_to_invoice(
+        db, int(business_id), int(invoice_id), extra_info=extra_info
+    )
+    for rp_id in linked_ids:
+        delete_receipt_payment(db, int(rp_id), commit=False)
+    extra = dict(document.extra_info) if document.extra_info else {}
+    links = dict(extra.get("links") or {})
+    links.pop(INVOICE_LINK_RECEIPT_PAYMENT_IDS, None)
+    extra["links"] = links
+    document.extra_info = _normalize_document_extra_info_for_storage(extra)
+    flag_modified(document, "extra_info")
+
+
+def _refresh_inventory_chain_ledgers_if_needed(
+    db: Session,
+    business_id: int,
+    fiscal_year_id: Optional[int],
+    inv_type: str,
+    old_document_type: str,
+    product_ids: List[int],
+    *,
+    is_proforma: bool,
+) -> None:
+    """هم‌رسانی FIFO/COGS پس از تغییرات روی فاکتورهای خرید یا خروج از آن‌ها."""
+    if is_proforma:
+        return
+    if inv_type not in _INVENTORY_LEDGER_REFRESH_TYPES and old_document_type not in _INVENTORY_LEDGER_REFRESH_TYPES:
+        return
+    ids = sorted({int(x) for x in product_ids if x is not None})
+    if not ids:
+        return
+    from app.services.invoice_profit_ledger_service import refresh_sales_ledgers_after_inventory_invoice_change
+
+    refresh_sales_ledgers_after_inventory_invoice_change(
+        db,
+        int(business_id),
+        ids,
+        fiscal_year_id=fiscal_year_id,
+    )
 
 
 def _compute_installment_plan(
@@ -2272,6 +3137,8 @@ def _empty_profit_response() -> Dict[str, Any]:
         "total_profit": 0.0,
         "total_profit_percent": 0.0,
         "total_overhead": 0.0,
+        "total_cost": 0.0,
+        "total_sales": 0.0,
         "line_profits": []
     }
 
@@ -3653,6 +4520,11 @@ def _calculate_invoice_profit(
 
         total_net_profit = total_gross_profit - total_overhead
 
+    if document.document_type == INVOICE_PRODUCTION:
+        total_cost = sum(
+            Decimal(str(lp.get("total_cost", 0) or 0)) for lp in line_profits
+        )
+
     # محاسبه درصد سود
     revenue_basis = total_sales + adjustments_net_total
     denom_total = abs(revenue_basis) if revenue_basis != Decimal(0) else Decimal(0)
@@ -3666,7 +4538,9 @@ def _calculate_invoice_profit(
     # ساخت response
     result = {
         "total_overhead": float(total_overhead),
-        "line_profits": line_profits
+        "total_cost": float(total_cost),
+        "total_sales": float(total_sales),
+        "line_profits": line_profits,
     }
     
     if normalized_type in ["gross", "both"]:
@@ -3722,110 +4596,10 @@ def create_invoice(
 
     # اعتبارسنجی ویژه برای فاکتور تولید
     if invoice_type == INVOICE_PRODUCTION:
-        has_out = False
-        has_in = False
-        
-        for i, line in enumerate(lines_input, start=1):
-            extra_info = line.get("extra_info") or {}
-            movement = extra_info.get("movement")
-            
-            if movement is None or (movement != "in" and movement != "out"):
-                raise ApiError(
-                    "INVALID_PRODUCTION_LINE",
-                    f"ردیف {i} باید movement مشخص داشته باشد ('in' یا 'out'). برای فاکتور تولید، باید از فرمول تولید استفاده کنید.",
-                    http_status=400
-                )
-            
-            if movement == "out":
-                has_out = True
-            elif movement == "in":
-                has_in = True
-        
-        if not has_out:
-            raise ApiError(
-                "INVALID_PRODUCTION_INVOICE",
-                "فاکتور تولید باید حداقل یک ردیف با movement: 'out' داشته باشد (مواد اولیه). برای فاکتور تولید، باید از فرمول تولید استفاده کنید.",
-                http_status=400
-            )
-        
-        if not has_in:
-            raise ApiError(
-                "INVALID_PRODUCTION_INVOICE",
-                "فاکتور تولید باید حداقل یک ردیف با movement: 'in' داشته باشد (محصول نهایی). برای فاکتور تولید، باید از فرمول تولید استفاده کنید.",
-                http_status=400
-            )
-        
-        # بررسی وجود bom_ids در extra_info فاکتور (برای ردیابی)
         header_extra_check = data.get("extra_info") or {}
-        bom_ids = header_extra_check.get("bom_ids")
-        if not bom_ids or not isinstance(bom_ids, list) or len(bom_ids) == 0:
-            raise ApiError(
-                "BOM_REQUIRED",
-                "برای فاکتور تولید، باید حداقل یک فرمول تولید را منفجر کنید. فاکتور تولید بدون فرمول تولید قابل ثبت نیست.",
-                http_status=400
-            )
-        
-        # اعتبارسنجی خروجی‌های فرمول تولید
-        # جمع‌آوری product_id های موجود در ردیف‌های فاکتور با movement='in'
-        output_product_ids_in_invoice = set()
-        for line in lines_input:
-            extra_info = line.get("extra_info") or {}
-            movement = extra_info.get("movement")
-            if movement == "in":
-                product_id = line.get("product_id")
-                if product_id:
-                    output_product_ids_in_invoice.add(int(product_id))
-        
-        # بررسی برای هر فرمول تولید
-        for bom_id in bom_ids:
-            try:
-                bom_id_int = int(bom_id)
-            except (ValueError, TypeError):
-                continue
-            
-            # دریافت فرمول تولید
-            bom = db.get(ProductBOM, bom_id_int)
-            if not bom or bom.business_id != business_id:
-                continue
-            
-            # دریافت خروجی‌های فرمول
-            bom_outputs = db.query(ProductBOMOutput).filter(
-                ProductBOMOutput.bom_id == bom_id_int
-            ).all()
-            
-            if not bom_outputs:
-                # اگر فرمول خروجی ندارد، هشدار می‌دهیم اما خطا نمی‌دهیم
-                logger.warning(f"فرمول تولید {bom_id_int} (کالا: {bom.product_id}) هیچ خروجی تعریف نشده است")
-                continue
-            
-            # بررسی اینکه product_id فرمول در خروجی‌ها باشد
-            bom_product_in_outputs = any(
-                output.output_product_id == bom.product_id 
-                for output in bom_outputs
-            )
-            if not bom_product_in_outputs:
-                logger.warning(
-                    f"کالای فرمول تولید {bom_id_int} (product_id: {bom.product_id}) "
-                    f"در خروجی‌های فرمول تعریف نشده است. این ممکن است باعث سردرگمی شود."
-                )
-            
-            # بررسی اینکه همه خروجی‌های فرمول در فاکتور وجود داشته باشند
-            missing_outputs = []
-            for output in bom_outputs:
-                if output.output_product_id not in output_product_ids_in_invoice:
-                    # دریافت نام کالا برای پیام خطا
-                    output_product = db.get(Product, output.output_product_id)
-                    product_name = output_product.name if output_product else f"کالا #{output.output_product_id}"
-                    missing_outputs.append(product_name)
-            
-            if missing_outputs:
-                missing_names = "، ".join(missing_outputs)
-                raise ApiError(
-                    "MISSING_BOM_OUTPUTS",
-                    f"خروجی‌های فرمول تولید '{bom.name}' (نسخه: {bom.version}) که در فاکتور وجود ندارند: {missing_names}. "
-                    f"لطفاً همه خروجی‌های فرمول تولید را در فاکتور شامل کنید.",
-                    http_status=400
-                )
+        _validate_production_invoice_lines(db, business_id, lines_input, header_extra_check)
+
+    _stamp_movement_on_invoice_lines(invoice_type, lines_input)
 
     # Basic person requirement for AR/AP invoices
     person_id = _person_id_from_header(data)
@@ -3835,6 +4609,8 @@ def create_invoice(
     # جمع‌ها: تخفیف کلی (در صورت وجود) سپس totals از extra_info یا خطوط
     raw_extra = data.get("extra_info")
     header_extra: Dict[str, Any] = dict(raw_extra) if isinstance(raw_extra, dict) else {}
+    if person_id and header_extra.get("person_id") is None:
+        header_extra["person_id"] = int(person_id)
     dd_top = data.get("due_date")
     if dd_top is not None and str(dd_top).strip():
         try:
@@ -3902,115 +4678,18 @@ def create_invoice(
 
     # --- اعتبارسنجی اعتبار مشتری (قبل از ایجاد سند) ---
     is_proforma_req = bool(data.get("is_proforma", False))
-    # فقط برای فروش (افزایش دریافتنی) و غیر پروفرما
     if not is_proforma_req and invoice_type == INVOICE_SALES and person_id:
-        # تنظیمات شخص و کسب‌وکار
-        from adapters.db.models.person import Person as _PersonModel
-        from adapters.db.models.business import Business as _BusinessModel
-        person_obj = db.query(_PersonModel).filter(_PersonModel.id == int(person_id)).first()
-        business_obj = db.query(_BusinessModel).filter(_BusinessModel.id == int(business_id)).first()
-        # تعیین محدودیت و فعال بودن بررسی
-        check_enabled = None
-        credit_limit_val = None
-        if person_obj:
-            check_enabled = getattr(person_obj, "credit_check_enabled", None)
-            credit_limit_val = getattr(person_obj, "credit_limit", None)
-        if (check_enabled is None) and business_obj:
-            check_enabled = bool(getattr(business_obj, "check_credit_enabled_by_default", False))
-        if (credit_limit_val is None) and business_obj:
-            credit_limit_val = getattr(business_obj, "default_credit_limit", None)
-        # اگر بررسی غیرفعال است یا سقف تعریف نشده، رد شو
-        if check_enabled and (credit_limit_val is not None):
-            # محاسبه بدهی فعلی
-            from app.services.person_service import calculate_person_balance
-            bal, _status = calculate_person_balance(db, int(person_id), fiscal_year_id=fiscal_year.id if fiscal_year else None)
-            # اگر balance منفی باشد یعنی بدهکار
-            current_debt = Decimal(str(0))
-            try:
-                if bal is not None:
-                    bdec = Decimal(str(bal))
-                    current_debt = (-bdec) if bdec < 0 else Decimal(0)
-            except Exception:
-                current_debt = Decimal(0)
-            # مبلغ کل فاکتور (با مالیات و اضافات/کسورات) که AR را افزایش می‌دهد
-            from app.services.invoice_adjustments_service import total_with_tax_from_totals_dict
-
-            total_with_tax = total_with_tax_from_totals_dict(totals)
-            # پرداخت‌های همزمان ارسالی با فاکتور
-            planned_paid = Decimal(0)
-            try:
-                for p in (data.get("payments") or []):
-                    amt = Decimal(str(p.get("amount", 0) or 0))
-                    if amt > 0:
-                        planned_paid += amt
-            except Exception:
-                planned_paid = Decimal(0)
-            invoice_effect = total_with_tax - planned_paid
-            if invoice_effect < 0:
-                invoice_effect = Decimal(0)
-            new_debt = current_debt + invoice_effect
-            limit_dec = Decimal(str(credit_limit_val))
-            ignore_flag = bool((data.get("extra_info") or {}).get("ignore_credit_check", False))
-            # --- کنترل سقف اعتبار ---
-            if new_debt > limit_dec:
-                if not ignore_flag:
-                    # توقف با خطا
-                    raise ApiError(
-                        "CREDIT_LIMIT_EXCEEDED",
-                        f"اعتبار مشتری کافی نیست. مانده فعلی: {float(current_debt):.2f}، اثر فاکتور: {float(invoice_effect):.2f}، سقف: {float(limit_dec):.2f}",
-                        http_status=400
-                    )
-                else:
-                    # اجازه ادامه؛ هشدار را در extra_info ذخیره خواهیم کرد (پس از ساخت سند)
-                    header_extra = dict(header_extra or {})
-                    warns = list((header_extra.get("warnings") or []))
-                    warns.append({
-                        "code": "CREDIT_LIMIT_EXCEEDED",
-                        "message": "اعتبار مشتری از سقف عبور کرده است اما نادیده گرفته شد",
-                        "current_debt": float(current_debt),
-                        "invoice_effect": float(invoice_effect),
-                        "new_debt": float(new_debt),
-                        "limit": float(limit_dec),
-                    })
-                    header_extra["warnings"] = warns
-                    data["extra_info"] = header_extra
-
-            # --- کنترل بلاک خودکار بر اساس اقساط معوق ---
-            auto_block_days = None
-            credit_cfg = get_business_credit_settings(db, business_id)
-            auto_block_days_raw = credit_cfg.get("auto_block_after_days")
-            if auto_block_days_raw is not None:
-                auto_block_days = int(auto_block_days_raw)
-            if auto_block_days and auto_block_days > 0:
-                inst_data = search_installments(
-                    db=db,
-                    business_id=business_id,
-                    query={"person_id": int(person_id), "status": "overdue"},
-                    disable_pagination=True,
-                )
-                max_overdue = 0
-                for it in inst_data.get("items", []):
-                    od = int(it.get("overdue_days") or 0)
-                    if od > max_overdue:
-                        max_overdue = od
-                if max_overdue > auto_block_days:
-                    if not ignore_flag:
-                        raise ApiError(
-                            "CREDIT_AUTO_BLOCKED",
-                            f"به دلیل اقساط معوق بیش از {auto_block_days} روز، ثبت فاکتور جدید مجاز نیست.",
-                            http_status=400,
-                        )
-                    else:
-                        header_extra = dict(header_extra or {})
-                        warns = list((header_extra.get("warnings") or []))
-                        warns.append({
-                            "code": "CREDIT_AUTO_BLOCKED_OVERRIDDEN",
-                            "message": "به دلیل اقساط معوق، حساب به صورت خودکار باید مسدود می‌شد اما نادیده گرفته شد",
-                            "auto_block_after_days": auto_block_days,
-                            "max_overdue_days": max_overdue,
-                        })
-                        header_extra["warnings"] = warns
-                        data["extra_info"] = header_extra
+        header_extra = _validate_and_apply_sales_credit_checks(
+            db,
+            business_id,
+            fiscal_year,
+            int(person_id),
+            totals,
+            header_extra,
+            data,
+            previous_ar_effect=Decimal(0),
+        )
+        data["extra_info"] = header_extra
 
     # Resolve inventory tracking per product and annotate lines
     all_product_ids = [int(ln.get("product_id")) for ln in lines_input if ln.get("product_id")]
@@ -4048,7 +4727,7 @@ def create_invoice(
 
     # Costing method (only for tracked products)
     costing_method = _get_costing_method(data)
-    # محاسبه COGS به پست حواله منتقل می‌شود
+    # COGS دفتر کل در invoice_cogs_gl_service هم‌رسانی می‌شود (پس از ثبت فاکتور یا پست حواله).
 
     gross = Decimal(str(totals["gross"]))
     discount = Decimal(str(totals["discount"]))
@@ -4122,6 +4801,8 @@ def create_invoice(
             raise ApiError("PROJECT_NOT_FOUND", "پروژه یافت نشد یا غیرفعال است", http_status=404)
 
     requested_code = str(data.get("code") or "").strip()
+    code_reservation_id = str(data.get("code_reservation_id") or "").strip() or None
+
     if requested_code:
         if not re.match(r"^[A-Za-z0-9_-]+$", requested_code):
             raise ApiError(
@@ -4137,7 +4818,7 @@ def create_invoice(
             document_date=document_date,
             currency_id=int(currency_id),
             created_by_user_id=user_id,
-            registered_at=datetime.utcnow(),
+            registered_at=utc_now_aware(),
             is_proforma=bool(data.get("is_proforma", False)),
             description=data.get("description"),
             extra_info=new_extra_info,
@@ -4158,6 +4839,50 @@ def create_invoice(
             raise
         document = candidate_manual
 
+    if not document and code_reservation_id:
+        from app.services.document_code_reservation_service import (
+            mark_reservation_used,
+            validate_reservation_for_invoice_create,
+        )
+
+        reserved_document = validate_reservation_for_invoice_create(
+            db,
+            business_id=business_id,
+            user_id=user_id,
+            reservation_id=code_reservation_id,
+            invoice_type=invoice_type,
+            document_date=document_date,
+        )
+        candidate_reserved = Document(
+            business_id=business_id,
+            fiscal_year_id=fiscal_year.id,
+            code=reserved_document.code,
+            document_type=invoice_type,
+            document_date=document_date,
+            currency_id=int(currency_id),
+            created_by_user_id=user_id,
+            registered_at=utc_now_aware(),
+            is_proforma=bool(data.get("is_proforma", False)),
+            description=data.get("description"),
+            extra_info=new_extra_info,
+            project_id=project_id,
+        )
+        try:
+            with db.begin_nested():
+                db.add(candidate_reserved)
+                db.flush()
+                mark_reservation_used(db, reserved_document)
+        except IntegrityError as exc:
+            msg = str(getattr(exc.orig, "args", exc))
+            if "uq_documents_business_code" in msg or "Duplicate entry" in msg:
+                raise ApiError(
+                    "DUPLICATE_DOCUMENT_CODE",
+                    "شماره رزروشده دیگر در دسترس نیست. لطفاً شماره جدید دریافت کنید.",
+                    http_status=409,
+                )
+            raise
+        document = candidate_reserved
+
     if not document:
         for attempt in range(max_code_attempts):
             doc_code = generate_document_code(db, business_id, invoice_type, document_date)
@@ -4169,7 +4894,7 @@ def create_invoice(
                 document_date=document_date,
                 currency_id=int(currency_id),
                 created_by_user_id=user_id,
-                registered_at=datetime.utcnow(),
+                registered_at=utc_now_aware(),
                 is_proforma=bool(data.get("is_proforma", False)),
                 description=data.get("description"),
                 extra_info=new_extra_info,
@@ -4233,7 +4958,7 @@ def create_invoice(
             extra_info=extra_info,
         ))
 
-    # Accounting lines for finalized invoices (بدون خطوط COGS/Inventory؛ به حواله موکول شد)
+    # Accounting lines for finalized invoices (COGS/Inventory در invoice_cogs_gl_service ثبت می‌شود)
     if not document.is_proforma:
         from app.services.invoice_adjustments_service import add_adjustment_document_lines
 
@@ -4244,11 +4969,10 @@ def create_invoice(
         _adj_extra = dict(document.extra_info or {})
         _purchase_mode = (_adj_extra.get("purchase_accounting_mode") or "").strip()
 
-        # COGS به پست حواله منتقل شد
+        # COGS/Inventory در invoice_cogs_gl_service ثبت می‌شود
 
         # Sales
         if invoice_type == INVOICE_SALES:
-            # AR (person) Dr, Revenue Cr, VAT out Cr, COGS Dr, Inventory Cr (optional)
             if person_id:
                 db.add(DocumentLine(
                     document_id=document.id,
@@ -4293,7 +5017,6 @@ def create_invoice(
                 accounts=accounts,
                 header_extra=_adj_extra,
             )
-            # COGS/Inventory در پست حواله ثبت خواهد شد
             # --- فروش اقساطی (ثبت سود تحقق‌نیافته و افزایش AR) ---
             plan_dict, total_interest = _compute_installment_plan(total_with_tax, header_extra, document_date)
             if plan_dict:
@@ -4743,127 +5466,22 @@ def create_invoice(
 
     if not document.is_proforma and payments and isinstance(payments, list):
         if person_id:
-            from app.services.receipt_payment_service import create_receipt_payment
-
-            # Aggregate amounts into one receipt/payment with multiple account_lines
-            account_lines: List[Dict[str, Any]] = []
-            total_amount = Decimal(0)
-            # Validate currency of payment accounts vs invoice currency
-            invoice_currency_id = int(currency_id)
-            for p in payments:
-                amount = Decimal(str(p.get("amount", 0) or 0))
-                if amount <= 0:
-                    continue
-                total_amount += amount
-                # پشتیبانی از هر دو فیلد 'type' و 'transaction_type'
-                ttype = (p.get("transaction_type") or p.get("type") or "").strip().lower()
-                # Currency match checks for money accounts
-                if ttype in ("bank", "cash_register", "petty_cash", "check"):
-                    if ttype == "bank":
-                        ref_id = p.get("bank_id")
-                        if ref_id:
-                            acct = db.query(BankAccount).filter(BankAccount.id == int(ref_id)).first()
-                            if not acct:
-                                raise ApiError("PAYMENT_ACCOUNT_NOT_FOUND", "Bank account not found", http_status=404)
-                            if int(acct.currency_id) != invoice_currency_id:
-                                raise ApiError("PAYMENT_CURRENCY_MISMATCH", "Currency of bank account does not match invoice currency", http_status=400)
-                    elif ttype == "cash_register":
-                        ref_id = p.get("cash_register_id")
-                        if ref_id:
-                            acct = db.query(CashRegister).filter(CashRegister.id == int(ref_id)).first()
-                            if not acct:
-                                raise ApiError("PAYMENT_ACCOUNT_NOT_FOUND", "Cash register not found", http_status=404)
-                            if int(acct.currency_id) != invoice_currency_id:
-                                raise ApiError("PAYMENT_CURRENCY_MISMATCH", "Currency of cash register does not match invoice currency", http_status=400)
-                    elif ttype == "petty_cash":
-                        ref_id = p.get("petty_cash_id")
-                        if ref_id:
-                            acct = db.query(PettyCash).filter(PettyCash.id == int(ref_id)).first()
-                            if not acct:
-                                raise ApiError("PAYMENT_ACCOUNT_NOT_FOUND", "Petty cash not found", http_status=404)
-                            if int(acct.currency_id) != invoice_currency_id:
-                                raise ApiError("PAYMENT_CURRENCY_MISMATCH", "Currency of petty cash does not match invoice currency", http_status=400)
-                    elif ttype == "check":
-                        ref_id = p.get("check_id")
-                        if ref_id:
-                            chk = db.query(Check).filter(Check.id == int(ref_id)).first()
-                            if not chk:
-                                raise ApiError("PAYMENT_ACCOUNT_NOT_FOUND", "Check not found", http_status=404)
-                            if int(chk.currency_id) != invoice_currency_id:
-                                raise ApiError("PAYMENT_CURRENCY_MISMATCH", "Currency of check does not match invoice currency", http_status=400)
-
-                            # بررسی تطابق نوع چک با نوع فاکتور
-                            # چک دریافتی فقط در فاکتور فروش/برگشت از فروش استفاده می‌شود
-                            # چک پرداختی فقط در فاکتور خرید/برگشت از خرید استفاده می‌شود
-                            is_receipt_invoice = invoice_type in {INVOICE_SALES, INVOICE_PURCHASE_RETURN}
-                            expected_check_type = CheckType.RECEIVED if is_receipt_invoice else CheckType.TRANSFERRED
-
-                            if chk.type != expected_check_type:
-                                check_type_name = "دریافتی" if chk.type == CheckType.RECEIVED else "پرداختی"
-                                expected_type_name = "دریافتی" if expected_check_type == CheckType.RECEIVED else "پرداختی"
-                                invoice_type_name = "فروش/برگشت از فروش" if is_receipt_invoice else "خرید/برگشت از خرید"
-                                raise ApiError(
-                                    "CHECK_TYPE_MISMATCH_WITH_INVOICE",
-                                    f"نوع چک با نوع فاکتور هم‌خوانی ندارد. چک {check_type_name} نمی‌تواند در فاکتور {invoice_type_name} استفاده شود. باید چک {expected_type_name} استفاده شود.",
-                                    http_status=400
-                                )
-
-                # Build account line entry including ids/names for linking
-                transaction_type_value = p.get("transaction_type") or p.get("type")
-                logger.info(f"Payment item: type={p.get('type')}, transaction_type={p.get('transaction_type')}, resolved={transaction_type_value}")
-                account_line: Dict[str, Any] = {
-                    "transaction_type": transaction_type_value,
-                    "amount": float(amount),
-                    "description": p.get("description"),
-                    "transaction_date": p.get("transaction_date"),
-                    "commission": p.get("commission"),
-                }
-                logger.info(f"Created account_line: {account_line}")
-                for key in ("bank_id", "bank_name", "cash_register_id", "cash_register_name", "petty_cash_id", "petty_cash_name", "check_id", "check_number", "person_id", "account_id"):
-                    if p.get(key) is not None:
-                        account_line[key] = p.get(key)
-                account_lines.append(account_line)
-
-            if total_amount > 0 and account_lines:
-                if is_quick_sale and not auto_create_payment_doc:
-                    logger.info(f"Skipping auto-create payment document for quick sale invoice {document.id} (auto_create_payment_document is False)")
-                else:
-                    is_receipt = invoice_type in {INVOICE_SALES, INVOICE_PURCHASE_RETURN}
-                    person_is_receivable = invoice_type in {INVOICE_SALES, INVOICE_SALES_RETURN}
-                    rp_data = {
-                        "document_type": "receipt" if is_receipt else "payment",
-                        "document_date": document.document_date.isoformat(),
-                        "currency_id": document.currency_id,
-                        "description": f"تسویه مرتبط با فاکتور {document.code}",
-                        "person_lines": [{
-                            "person_id": person_id,
-                            "amount": float(total_amount),
-                            "description": f"طرف حساب فاکتور {document.code}",
-                        }],
-                        "account_lines": account_lines,
-                        "extra_info": {
-                            "source": "invoice",
-                            "invoice_id": document.id,
-                            "person_is_receivable": person_is_receivable,
-                        },
-                    }
-                    rp_doc = create_receipt_payment(
-                        db=db,
-                        business_id=business_id,
-                        user_id=user_id,
-                        data=rp_data,
-                        commit=False,
-                    )
-                    logger.info(f"create_receipt_payment returned: type={type(rp_doc)}, value={rp_doc}")
-                    if isinstance(rp_doc, dict) and rp_doc.get("id"):
-                        payment_docs.append(int(rp_doc["id"]))
-                        logger.info(f"Added receipt/payment document ID {payment_docs[-1]} to payment_docs.")
-                    else:
-                        raise ApiError(
-                            "RECEIPT_PAYMENT_CREATE_FAILED",
-                            "ایجاد سند دریافت/پرداخت مرتبط با فاکتور ناموفق بود.",
-                            http_status=500,
-                        )
+            if is_quick_sale and not auto_create_payment_doc:
+                logger.info(
+                    "Skipping auto-create payment document for quick sale invoice %s "
+                    "(auto_create_payment_document is False)",
+                    document.id,
+                )
+            else:
+                payment_docs = _create_receipt_payment_documents_for_invoice_payments(
+                    db,
+                    business_id=business_id,
+                    user_id=user_id,
+                    document=document,
+                    person_id=int(person_id),
+                    payments=payments,
+                    invoice_type=invoice_type,
+                )
 
     if payment_docs:
         logger.info(f"Linking payment_docs to invoice {document.id}: {payment_docs}")
@@ -4914,19 +5532,33 @@ def create_invoice(
         db.flush()
 
     # پس از خرید/برگشت از خرید: هم‌رسانی ledger فاکتورهای فروش/تولید همان کالاها (FIFO به‌روز)
-    if not document.is_proforma and invoice_type in (INVOICE_PURCHASE, INVOICE_PURCHASE_RETURN):
-        from app.services.invoice_profit_ledger_service import (
-            refresh_sales_ledgers_after_inventory_invoice_change,
-        )
-
-        _pids = _distinct_product_ids_for_invoice(db, int(document.id))
-        refresh_sales_ledgers_after_inventory_invoice_change(
+    if not document.is_proforma:
+        _refresh_inventory_chain_ledgers_if_needed(
             db,
             business_id,
-            _pids,
-            fiscal_year_id=int(document.fiscal_year_id),
+            int(document.fiscal_year_id) if document.fiscal_year_id else None,
+            invoice_type,
+            invoice_type,
+            _distinct_product_ids_for_invoice(db, int(document.id)),
+            is_proforma=False,
         )
         db.flush()
+
+    # P2.5: قفل مبالغ پایه روی خطوط پس از تکمیل همه ثبت‌های حسابداری فاکتور
+    try:
+        from app.services.document_line_fx_service import stamp_document_lines_fx_base
+
+        stamp_document_lines_fx_base(
+            db,
+            document,
+            business=db.get(Business, int(business_id)),
+            only_missing=False,
+            allow_infer=True,
+        )
+        db.flush()
+    except Exception:
+        logger.exception("stamp_document_lines_fx_base failed (create) doc_id=%s", getattr(document, "id", None))
+        raise ApiError("FX_BASE_STAMP_ERROR", "خطا در ثبت مبالغ پایه خطوط سند", http_status=400)
 
     if commit:
         db.commit()
@@ -5021,14 +5653,27 @@ def update_invoice(
     _old_expense_income_ids = list(_pre_links_wh.get(INVOICE_LINK_EXPENSE_INCOME_IDS) or [])
 
     # Only editable in current fiscal year
+    fiscal_year = (
+        db.query(FiscalYear).filter(FiscalYear.id == document.fiscal_year_id).first()
+    )
     try:
-        fiscal_year = db.query(FiscalYear).filter(FiscalYear.id == document.fiscal_year_id).first()
         if fiscal_year is not None and getattr(fiscal_year, "is_last", False) is not True:
             raise ApiError("FISCAL_YEAR_LOCKED", "سند متعلق به سال مالی جاری نیست و قابل ویرایش نمی‌باشد", http_status=409)
     except ApiError:
         raise
     except Exception:
         pass
+
+    _old_document_type = str(document.document_type or "")
+    inv_type = _resolve_invoice_type_from_payload(data, fallback=_old_document_type)
+    if inv_type not in SUPPORTED_INVOICE_TYPES:
+        raise ApiError("INVALID_INVOICE_TYPE", "Unsupported invoice_type", http_status=400)
+    if inv_type != _old_document_type:
+        from app.services.tax_reference_service import validate_invoice_type_change_for_tax
+
+        validate_invoice_type_change_for_tax(document, _old_document_type, inv_type)
+        document.document_type = inv_type
+    data["invoice_type"] = inv_type
 
     # Update header
     document_date = _parse_iso_date(data.get("document_date", document.document_date))
@@ -5043,7 +5688,16 @@ def update_invoice(
     document.currency_id = int(currency_id)
     # به‌روزرسانی وضعیت پیش‌فاکتور
     if "is_proforma" in data:
-        document.is_proforma = bool(data.get("is_proforma", False))
+        _new_is_proforma = bool(data.get("is_proforma", False))
+        if _new_is_proforma != _old_is_proforma:
+            from app.services.tax_reference_service import validate_invoice_proforma_change_for_tax
+
+            validate_invoice_proforma_change_for_tax(
+                document,
+                old_is_proforma=_old_is_proforma,
+                new_is_proforma=_new_is_proforma,
+            )
+        document.is_proforma = _new_is_proforma
     # به‌روزرسانی پروژه
     if "project_id" in data:
         project_id = data.get("project_id")
@@ -5070,6 +5724,10 @@ def update_invoice(
                 pass
         # merge کردن: new_extra فیلدهای old_extra را override می‌کند؛ نرمال‌سازی برای ذخیره یکسان
         merged_extra = _normalize_document_extra_info_for_storage({**old_extra, **new_extra})
+        if inv_type != _old_document_type:
+            merged_extra = _sanitize_extra_info_for_invoice_type_change(
+                merged_extra, inv_type, _old_document_type
+            )
         document.extra_info = merged_extra
     # پیش‌فاکتور: با برگشت از قطعی، اسناد دریافت/پرداخت و هزینه/درآمد پیوندی حذف می‌شوند؛ لینک‌ها از extra حذف می‌گردد
     if not _old_is_proforma and document.is_proforma:
@@ -5143,6 +5801,16 @@ def update_invoice(
         # اگر خطایی رخ داد، فقط log می‌کنیم و ادامه می‌دهیم
         logger.warning(f"Failed to release instances for invoice {document.id}: {e}")
     
+    _old_invoice_product_ids = _distinct_product_ids_for_invoice(db, int(document.id))
+    _previous_sales_ar_effect = _previous_sales_ar_effect_for_update(
+        db,
+        int(document.business_id),
+        document,
+        old_document_type=_old_document_type,
+        was_proforma=_old_is_proforma,
+        linked_receipt_payment_ids=_old_receipt_payment_ids,
+    )
+
     # Recreate lines: حذف سطرهای حسابداری و اقلام فاکتور و بازایجاد
     db.query(DocumentLine).filter(DocumentLine.document_id == document.id).delete(synchronize_session=False)
     db.query(InvoiceItemLine).filter(InvoiceItemLine.document_id == document.id).delete(synchronize_session=False)
@@ -5151,8 +5819,15 @@ def update_invoice(
     if not lines_input:
         raise ApiError("LINES_REQUIRED", "At least one line is required", http_status=400)
 
+    if inv_type == INVOICE_PRODUCTION:
+        prod_extra = dict(data.get("extra_info") or document.extra_info or {})
+        _validate_production_invoice_lines(
+            db, int(document.business_id), lines_input, prod_extra
+        )
+
+    _stamp_movement_on_invoice_lines(inv_type, lines_input)
+
     # Inventory decoupled from invoices
-    inv_type = document.document_type
     movement_hint, _ = _movement_from_type(inv_type)
 
     # Resolve and annotate inventory tracking for all lines
@@ -5222,6 +5897,22 @@ def update_invoice(
         lines_input,
         user_can_change_invoice_unit_price,
     )
+
+    if not document.is_proforma and inv_type in {
+        INVOICE_SALES,
+        INVOICE_SALES_RETURN,
+        INVOICE_PURCHASE,
+        INVOICE_PURCHASE_RETURN,
+    }:
+        person_id_required = _person_id_from_header(
+            {"extra_info": document.extra_info or {}, **(data or {})}
+        )
+        if not person_id_required:
+            raise ApiError(
+                "PERSON_REQUIRED",
+                "person_id is required for this invoice type",
+                http_status=400,
+            )
 
     header_for_costing = data if data else {"extra_info": document.extra_info}
     post_inventory_update: bool = _is_inventory_posting_enabled(header_for_costing)
@@ -5337,6 +6028,24 @@ def update_invoice(
         total_with_tax = total_with_tax_from_totals_dict(totals)
         person_id = _person_id_from_header({"extra_info": header_extra})
         person_id = _resolve_and_validate_person_id(db, document.business_id, person_id)
+
+        if inv_type == INVOICE_SALES and person_id:
+            header_extra = _validate_and_apply_sales_credit_checks(
+                db,
+                int(document.business_id),
+                fiscal_year,
+                int(person_id),
+                totals,
+                header_extra,
+                data,
+                previous_ar_effect=_previous_sales_ar_effect,
+            )
+            if header_extra.get("warnings"):
+                ex_merge_warn = dict(document.extra_info or {})
+                ex_merge_warn["warnings"] = header_extra["warnings"]
+                document.extra_info = _normalize_document_extra_info_for_storage(ex_merge_warn)
+                flag_modified(document, "extra_info")
+
         # inventory/COGS handled in warehouse posting
 
         if inv_type == INVOICE_SALES:
@@ -5763,17 +6472,32 @@ def update_invoice(
 
     # پردازش تراکنش‌های پرداخت (مشابه create_invoice)
     payment_docs: List[int] = []
+    _invoice_type_changed = inv_type != _old_document_type
     payments_provided = "payments" in data and isinstance(data.get("payments"), list)
     payments = list(data["payments"]) if payments_provided else []
+
+    # تغییر نوع فاکتور بدون ارسال payments: اسناد دریافت/پرداخت قبلی با نوع قدیم نامعتبرند
+    if _invoice_type_changed and not document.is_proforma and not payments_provided:
+        _clear_invoice_linked_receipt_payments(
+            db,
+            int(document.business_id),
+            int(document.id),
+            document,
+        )
+
     if payments_provided and not document.is_proforma:
-        from app.services.receipt_payment_service import create_receipt_payment, delete_receipt_payment
+        from app.services.receipt_payment_service import delete_receipt_payment
 
         # person_id از extra_info مرج‌شده روی خود سند (نه فقط payload خام) تا با API ناقص هم‌خوان باشد
         header_extra_pm = document.extra_info or {}
         person_id_pm = _person_id_from_header({"extra_info": header_extra_pm})
 
-        old_links = dict(header_extra_pm.get("links") or {})
-        old_receipt_payment_ids = list(old_links.get(INVOICE_LINK_RECEIPT_PAYMENT_IDS) or [])
+        old_receipt_payment_ids = _get_receipt_payment_ids_linked_to_invoice(
+            db,
+            document.business_id,
+            int(document.id),
+            extra_info=header_extra_pm,
+        )
 
         has_positive_payment = any(
             Decimal(str(p.get("amount", 0) or 0)) > 0 for p in payments
@@ -5799,115 +6523,15 @@ def update_invoice(
             document.extra_info = _normalize_document_extra_info_for_storage(extra)
             flag_modified(document, "extra_info")
         else:
-            # ایجاد سند جدید (person_id_pm در شاخه non-empty payments تضمین شده است)
-            account_lines: List[Dict[str, Any]] = []
-            total_amount = Decimal(0)
-            invoice_currency_id = int(document.currency_id)
-
-            for p in payments:
-                amount = Decimal(str(p.get("amount", 0) or 0))
-                if amount <= 0:
-                    continue
-                total_amount += amount
-                ttype = (p.get("transaction_type") or p.get("type") or "").strip().lower()
-
-                # Currency match checks
-                if ttype in ("bank", "cash_register", "petty_cash", "check"):
-                    if ttype == "bank":
-                        ref_id = p.get("bank_id")
-                        if ref_id:
-                            acct = db.query(BankAccount).filter(BankAccount.id == int(ref_id)).first()
-                            if not acct:
-                                raise ApiError("PAYMENT_ACCOUNT_NOT_FOUND", "Bank account not found", http_status=404)
-                            if int(acct.currency_id) != invoice_currency_id:
-                                raise ApiError("PAYMENT_CURRENCY_MISMATCH", "Currency of bank account does not match invoice currency", http_status=400)
-                    elif ttype == "cash_register":
-                        ref_id = p.get("cash_register_id")
-                        if ref_id:
-                            acct = db.query(CashRegister).filter(CashRegister.id == int(ref_id)).first()
-                            if not acct:
-                                raise ApiError("PAYMENT_ACCOUNT_NOT_FOUND", "Cash register not found", http_status=404)
-                            if int(acct.currency_id) != invoice_currency_id:
-                                raise ApiError("PAYMENT_CURRENCY_MISMATCH", "Currency of cash register does not match invoice currency", http_status=400)
-                    elif ttype == "petty_cash":
-                        ref_id = p.get("petty_cash_id")
-                        if ref_id:
-                            acct = db.query(PettyCash).filter(PettyCash.id == int(ref_id)).first()
-                            if not acct:
-                                raise ApiError("PAYMENT_ACCOUNT_NOT_FOUND", "Petty cash not found", http_status=404)
-                            if int(acct.currency_id) != invoice_currency_id:
-                                raise ApiError("PAYMENT_CURRENCY_MISMATCH", "Currency of petty cash does not match invoice currency", http_status=400)
-                    elif ttype == "check":
-                        ref_id = p.get("check_id")
-                        if ref_id:
-                            chk = db.query(Check).filter(Check.id == int(ref_id)).first()
-                            if not chk:
-                                raise ApiError("PAYMENT_ACCOUNT_NOT_FOUND", "Check not found", http_status=404)
-                            if int(chk.currency_id) != invoice_currency_id:
-                                raise ApiError("PAYMENT_CURRENCY_MISMATCH", "Currency of check does not match invoice currency", http_status=400)
-
-                            # بررسی تطابق نوع چک با نوع فاکتور (در update)
-                            # چک دریافتی فقط در فاکتور فروش/برگشت از فروش استفاده می‌شود
-                            # چک پرداختی فقط در فاکتور خرید/برگشت از خرید استفاده می‌شود
-                            is_receipt_invoice = inv_type in {INVOICE_SALES, INVOICE_PURCHASE_RETURN}
-                            expected_check_type = CheckType.RECEIVED if is_receipt_invoice else CheckType.TRANSFERRED
-
-                            if chk.type != expected_check_type:
-                                check_type_name = "دریافتی" if chk.type == CheckType.RECEIVED else "پرداختی"
-                                expected_type_name = "دریافتی" if expected_check_type == CheckType.RECEIVED else "پرداختی"
-                                invoice_type_name = "فروش/برگشت از فروش" if is_receipt_invoice else "خرید/برگشت از خرید"
-                                raise ApiError(
-                                    "CHECK_TYPE_MISMATCH_WITH_INVOICE",
-                                    f"نوع چک با نوع فاکتور هم‌خوانی ندارد. چک {check_type_name} نمی‌تواند در فاکتور {invoice_type_name} استفاده شود. باید چک {expected_type_name} استفاده شود.",
-                                    http_status=400
-                                )
-
-                transaction_type_value = p.get("transaction_type") or p.get("type")
-                account_line: Dict[str, Any] = {
-                    "transaction_type": transaction_type_value,
-                    "amount": float(amount),
-                    "description": p.get("description"),
-                    "transaction_date": p.get("transaction_date"),
-                    "commission": p.get("commission"),
-                }
-                for key in ("bank_id", "bank_name", "cash_register_id", "cash_register_name", "petty_cash_id", "petty_cash_name", "check_id", "check_number", "person_id", "account_id"):
-                    if p.get(key) is not None:
-                        account_line[key] = p.get(key)
-                account_lines.append(account_line)
-
-            if total_amount > 0 and account_lines:
-                is_receipt = inv_type in {INVOICE_SALES, INVOICE_PURCHASE_RETURN}
-                person_is_receivable = inv_type in {INVOICE_SALES, INVOICE_SALES_RETURN}
-                rp_data = {
-                    "document_type": "receipt" if is_receipt else "payment",
-                    "document_date": document.document_date.isoformat(),
-                    "currency_id": document.currency_id,
-                    "description": f"تسویه مرتبط با فاکتور {document.code}",
-                    "person_lines": [{
-                        "person_id": person_id_pm,
-                        "amount": float(total_amount),
-                        "description": f"طرف حساب فاکتور {document.code}",
-                    }],
-                    "account_lines": account_lines,
-                    "extra_info": {
-                        "source": "invoice",
-                        "invoice_id": document.id,
-                        "person_is_receivable": person_is_receivable,
-                    },
-                }
-                rp_doc = create_receipt_payment(
-                    db=db,
-                    business_id=document.business_id,
-                    user_id=user_id,
-                    data=rp_data,
-                    commit=False,
-                )
-                if isinstance(rp_doc, dict) and rp_doc.get("id"):
-                    rp_id = int(rp_doc["id"])
-                    payment_docs.append(rp_id)
-                    logger.info(f"Created receipt/payment document {rp_id} for invoice {document.id}")
-
-            # به‌روزرسانی لینک‌ها در extra_info
+            payment_docs = _create_receipt_payment_documents_for_invoice_payments(
+                db,
+                business_id=int(document.business_id),
+                user_id=user_id,
+                document=document,
+                person_id=int(person_id_pm),
+                payments=payments,
+                invoice_type=inv_type,
+            )
             if payment_docs:
                 extra = dict(document.extra_info) if document.extra_info else {}
                 links = dict(extra.get("links", {}))
@@ -5980,18 +6604,20 @@ def update_invoice(
                 exc_info=True,
             )
 
-    if not document.is_proforma and inv_type in (INVOICE_PURCHASE, INVOICE_PURCHASE_RETURN):
+    if not document.is_proforma:
         try:
-            from app.services.invoice_profit_ledger_service import (
-                refresh_sales_ledgers_after_inventory_invoice_change,
-            )
-
-            _pids_u = _distinct_product_ids_for_invoice(db, int(document.id))
-            refresh_sales_ledgers_after_inventory_invoice_change(
+            _ledger_product_ids = sorted({
+                int(x) for x in (_old_invoice_product_ids + _distinct_product_ids_for_invoice(db, int(document.id)))
+                if x is not None
+            })
+            _refresh_inventory_chain_ledgers_if_needed(
                 db,
                 int(document.business_id),
-                _pids_u,
-                fiscal_year_id=int(document.fiscal_year_id),
+                int(document.fiscal_year_id) if document.fiscal_year_id else None,
+                inv_type,
+                _old_document_type,
+                _ledger_product_ids,
+                is_proforma=False,
             )
         except Exception as inv_chain_u_ex:
             logger.warning(
@@ -6052,6 +6678,25 @@ def update_invoice(
             db, int(document.business_id), int(document.id), data.get("tag_ids")
         )
 
+    _validate_outgoing_stock_before_invoice_commit(
+        db, int(document.business_id), document, inv_type, lines_input, data
+    )
+
+    # P2.5: قفل مبالغ پایه روی خطوط پس از تکمیل به‌روزرسانی فاکتور
+    try:
+        from app.services.document_line_fx_service import stamp_document_lines_fx_base
+
+        stamp_document_lines_fx_base(
+            db,
+            document,
+            business=biz_fx if "biz_fx" in locals() else None,
+            only_missing=False,
+            allow_infer=True,
+        )
+    except Exception:
+        logger.exception("stamp_document_lines_fx_base failed (update) doc_id=%s", getattr(document, "id", None))
+        raise ApiError("FX_BASE_STAMP_ERROR", "خطا در ثبت مبالغ پایه خطوط سند", http_status=400)
+
     db.commit()
     db.refresh(document)
     result = invoice_document_to_dict(db, document)
@@ -6064,6 +6709,14 @@ def update_invoice(
         document_type=document.document_type,
         project_id=document.project_id
     )
+    if _old_document_type != document.document_type:
+        invalidate_invoices_cache(
+            business_id=document.business_id,
+            fiscal_year_id=document.fiscal_year_id,
+            invoice_id=document.id,
+            document_type=_old_document_type,
+            project_id=document.project_id,
+        )
     
     # همچنین اسناد عمومی را هم invalidate کن (چون فاکتورها از Document ارث‌بری دارند)
     from app.services.document_service import invalidate_documents_cache
@@ -6072,6 +6725,12 @@ def update_invoice(
         fiscal_year_id=document.fiscal_year_id,
         document_type=document.document_type
     )
+    if _old_document_type != document.document_type:
+        invalidate_documents_cache(
+            business_id=document.business_id,
+            fiscal_year_id=document.fiscal_year_id,
+            document_type=_old_document_type,
+        )
     
     # اگر expense/income باشد، cache آن را هم invalidate کن
     if document.document_type in ['expense', 'income']:
@@ -6539,6 +7198,8 @@ def invoice_document_to_dict(
             "product_name": getattr(product, "name", None),
             "product_main_unit": getattr(product, "main_unit", None) if product else None,
             "product_secondary_unit": getattr(product, "secondary_unit", None) if product else None,
+            "product_tax_code": getattr(product, "tax_code", None) if product else None,
+            "product_tax_unit_id": getattr(product, "tax_unit_id", None) if product else None,
             "quantity": float(it.quantity) if it.quantity else None,
             "description": it.description,
             "extra_info": it.extra_info,
@@ -6631,9 +7292,11 @@ def invoice_document_to_dict(
         "business_id": document.business_id,
         "document_type": document.document_type,
         "document_date": document.document_date.isoformat(),
-        "registered_at": document.registered_at.isoformat(),
+        "registered_at": utc_naive_to_iso_z(document.registered_at),
         "currency_id": document.currency_id,
         "currency_code": getattr(currency, "code", None),
+        "currency_title": getattr(currency, "title", None) if currency else None,
+        "currency_name": getattr(currency, "name", None) if currency else None,
         "created_by_user_id": document.created_by_user_id,
         "created_by_name": created_by_name,
         "is_proforma": document.is_proforma,
@@ -6659,6 +7322,8 @@ def invoice_document_to_dict(
             result["total_profit"] = profit_data["total_profit"]
             result["total_profit_percent"] = profit_data["total_profit_percent"]
         result["total_overhead"] = profit_data.get("total_overhead", 0.0)
+        result["total_cost"] = profit_data.get("total_cost", 0.0)
+        result["total_sales"] = profit_data.get("total_sales", 0.0)
         result["line_profits"] = profit_data.get("line_profits", [])
         # پس‌زمینه: gross_profit / line_profits = محاسبه تحلیلی زنده (تنظیمات جاری)
         result["profit_calculation_context"] = "analytical_live"
@@ -6683,6 +7348,47 @@ def invoice_document_to_dict(
     else:
         result["tags"] = []
         result["tags_display"] = ""
+
+    try:
+        from app.services.tax_reference_service import build_tax_edit_constraints_for_api
+        from app.services.tax_submission_service import build_tax_status_fields_for_api
+
+        _tax_extra = dict(document.extra_info or {})
+        result.update(build_tax_status_fields_for_api(_tax_extra))
+        result.update(build_tax_edit_constraints_for_api(document))
+    except Exception as tax_meta_ex:
+        logger.warning(
+            "tax edit constraints for invoice %s failed: %s",
+            document.id,
+            tax_meta_ex,
+            exc_info=True,
+        )
+
+    # P2: جمع دوگانه (ارزی + پایه) برای UI چندارزی؛ تک‌ارزی show_dual=false
+    try:
+        from app.services.document_line_fx_service import build_invoice_dual_totals
+
+        dual = build_invoice_dual_totals(db, document, business=business)
+        result["fx_totals"] = dual
+        # ارز پایه برای نمایش برچسب در کلاینت
+        if business and getattr(business, "default_currency", None):
+            bc = business.default_currency
+            result["base_currency"] = {
+                "id": bc.id,
+                "code": getattr(bc, "code", None),
+                "title": getattr(bc, "title", None),
+                "symbol": getattr(bc, "symbol", None),
+                "decimal_places": getattr(bc, "decimal_places", 0),
+            }
+        elif business and business.default_currency_id:
+            result["base_currency"] = {"id": int(business.default_currency_id)}
+    except Exception as fx_tot_ex:
+        logger.warning(
+            "fx dual totals for invoice %s failed: %s",
+            document.id,
+            fx_tot_ex,
+            exc_info=True,
+        )
 
     return result
 
@@ -6765,6 +7471,9 @@ def _build_grouped_installment_invoices(items: List[Dict[str, Any]]) -> List[Dic
             "person_name": first.get("person_name"),
             "person_mobile": first.get("person_mobile"),
             "document_date": first.get("document_date"),
+            "currency_id": first.get("currency_id"),
+            "currency_code": first.get("currency_code"),
+            "amounts_in_base": first.get("amounts_in_base", False),
             "installment_count": len(rows),
             "paid_installment_count": paid_count,
             "overdue_installment_count": od_count,
@@ -6973,6 +7682,7 @@ def search_installments(
       - group_by: invoice برای صفحه‌بندی و خروجی خلاصه به ازای هر فاکتور
       - person_id: فیلتر بر اساس شخص
       - invoice_id: فاکتور خاص
+      - currency_id: ارز سند؛ در نبود آن همهٔ مبالغ معادل ارز پایه هستند
       - take/skip: صفحه‌بندی روی ردیف اقساط یا روی فاکتورها وقتی group_by=invoice
     """
     # تاریخ امروز برای تشخیص overdue
@@ -6996,6 +7706,13 @@ def search_installments(
     group_by_invoice = (query.get("group_by") or "").strip().lower() == "invoice"
     person_id_filter = query.get("person_id")
     invoice_id_filter = query.get("invoice_id")
+    currency_id_filter: int | None = None
+    try:
+        raw_currency_id = query.get("currency_id")
+        if raw_currency_id is not None and str(raw_currency_id).strip() != "":
+            currency_id_filter = int(raw_currency_id)
+    except (TypeError, ValueError):
+        currency_id_filter = None
     try:
         take = int(query.get("take", 200))
     except Exception:
@@ -7061,8 +7778,24 @@ def search_installments(
             docs_q = docs_q.filter(Document.id == int(invoice_id_filter))
         except Exception:
             pass
+    if currency_id_filter is not None:
+        docs_q = docs_q.filter(Document.currency_id == currency_id_filter)
 
     docs = docs_q.order_by(Document.id.desc()).all()
+    business = db.get(Business, int(business_id))
+    base_currency_id = (
+        int(business.default_currency_id)
+        if business and business.default_currency_id is not None
+        else None
+    )
+    base_currency = db.get(Currency, base_currency_id) if base_currency_id is not None else None
+    amounts_in_base = currency_id_filter is None
+    rate_cache: Dict[int, Decimal] = {}
+    base_currency_by_business: Dict[int, Optional[int]] = {
+        int(business_id): base_currency_id,
+    }
+    if amounts_in_base:
+        from app.services.person_service import amount_in_document_currency_to_base
 
     items: List[Dict[str, Any]] = []
     sum_principal = Decimal(0)
@@ -7073,6 +7806,8 @@ def search_installments(
     sum_late_fee = Decimal(0)
     status_counts: Dict[str, int] = {"pending": 0, "partial": 0, "paid": 0, "overdue": 0}
     for doc in docs:
+        document_currency_id = int(doc.currency_id)
+        document_currency_code = getattr(doc.currency, "code", None)
         extra = doc.extra_info or {}
         plan = extra.get("installment_plan") if isinstance(extra, dict) else None
         if not isinstance(plan, dict):
@@ -7165,6 +7900,31 @@ def search_installments(
                         )
                     except Exception:
                         late_fee_amount = Decimal(0)
+            if amounts_in_base:
+                principal = amount_in_document_currency_to_base(
+                    db, doc, principal, rate_cache=rate_cache,
+                    base_currency_by_business=base_currency_by_business,
+                )
+                interest = amount_in_document_currency_to_base(
+                    db, doc, interest, rate_cache=rate_cache,
+                    base_currency_by_business=base_currency_by_business,
+                )
+                total = amount_in_document_currency_to_base(
+                    db, doc, total, rate_cache=rate_cache,
+                    base_currency_by_business=base_currency_by_business,
+                )
+                paid = amount_in_document_currency_to_base(
+                    db, doc, paid, rate_cache=rate_cache,
+                    base_currency_by_business=base_currency_by_business,
+                )
+                remaining = amount_in_document_currency_to_base(
+                    db, doc, remaining, rate_cache=rate_cache,
+                    base_currency_by_business=base_currency_by_business,
+                )
+                late_fee_amount = amount_in_document_currency_to_base(
+                    db, doc, late_fee_amount, rate_cache=rate_cache,
+                    base_currency_by_business=base_currency_by_business,
+                )
             sum_principal += principal
             sum_interest += interest
             sum_total += total
@@ -7179,6 +7939,9 @@ def search_installments(
                 "person_name": person_name,
                 "person_mobile": person_mobile,
                 "document_date": doc.document_date,
+                "currency_id": document_currency_id,
+                "currency_code": document_currency_code,
+                "amounts_in_base": amounts_in_base,
                 "seq": int(it.get("seq") or 0),
                 "due_date": due,
                 "principal": float(principal),
@@ -7240,6 +8003,12 @@ def search_installments(
             "has_next": has_next,
         },
         "stats": stats,
+        "meta": {
+            "currency_id": currency_id_filter,
+            "amounts_in_base": amounts_in_base,
+            "base_currency_id": base_currency_id,
+            "base_currency_code": getattr(base_currency, "code", None),
+        },
         "filters": {
             "fiscal_year_id": fiscal_year_id,
             "due_from": due_from,
@@ -7251,6 +8020,7 @@ def search_installments(
             "group_by": "invoice" if group_by_invoice else None,
             "person_id": person_id_filter,
             "invoice_id": invoice_id_filter,
+            "currency_id": currency_id_filter,
         },
     }
 
@@ -7394,6 +8164,30 @@ def export_installments_xlsx(
         return content, "text/csv; charset=utf-8", "csv"
 
 
+def _invoice_amount_for_aggregate(
+    db: Session,
+    document: Document,
+    amount: Any,
+    *,
+    currency_id: Optional[int],
+    rate_cache: Dict[int, Decimal],
+    base_currency_by_business: Dict[int, Optional[int]],
+) -> Decimal:
+    """برای تجمیع گزارش‌ها: بدون فیلتر ارز → معادل پایه؛ با فیلتر → مبلغ بومی."""
+    native = Decimal(str(amount or 0))
+    if currency_id is not None:
+        return native
+    from app.services.person_service import amount_in_document_currency_to_base
+
+    return amount_in_document_currency_to_base(
+        db,
+        document,
+        native,
+        rate_cache=rate_cache,
+        base_currency_by_business=base_currency_by_business,
+    )
+
+
 def get_daily_sales_report(
     db: Session,
     business_id: int,
@@ -7411,7 +8205,7 @@ def get_daily_sales_report(
         db: نشست پایگاه داده
         business_id: شناسه کسب‌وکار
         fiscal_year_id: شناسه سال مالی (اختیاری)
-        currency_id: شناسه ارز (اختیاری)
+        currency_id: شناسه ارز (اختیاری؛ خالی = جمع معادل ارز پایه)
         date_from: از تاریخ (اختیاری، فرمت YYYY-MM-DD)
         date_to: تا تاریخ (اختیاری، فرمت YYYY-MM-DD)
         skip: تعداد رکوردهای رد شده برای pagination
@@ -7469,12 +8263,8 @@ def get_daily_sales_report(
     if date_from_obj is None:
         date_from_obj = date.today()
     
-    # Query فاکتورهای فروش
-    sales_query = db.query(
-        Document.document_date,
-        Document.extra_info,
-        Document.currency_id,
-    ).filter(
+    # Query فاکتورهای فروش (کل Document برای تبدیل FX)
+    sales_query = db.query(Document).filter(
         and_(
             Document.business_id == business_id,
             Document.document_type == INVOICE_SALES,
@@ -7491,6 +8281,9 @@ def get_daily_sales_report(
         sales_query = sales_query.filter(Document.fiscal_year_id == fiscal_year_id)
     
     sales_documents = sales_query.order_by(Document.document_date.asc()).all()
+    rate_cache: Dict[int, Decimal] = {}
+    base_currency_by_business: Dict[int, Optional[int]] = {}
+    amounts_in_base = currency_id is None
     
     # گروه‌بندی بر اساس روز
     daily_stats: Dict[str, Dict[str, Any]] = defaultdict(lambda: {
@@ -7513,10 +8306,22 @@ def get_daily_sales_report(
         
         daily_stats[date_key]['date'] = doc_date.isoformat()
         daily_stats[date_key]['invoice_count'] += 1
-        daily_stats[date_key]['total_gross'] += Decimal(str(totals.get('gross', 0) or 0))
-        daily_stats[date_key]['total_discount'] += Decimal(str(totals.get('discount', 0) or 0))
-        daily_stats[date_key]['total_tax'] += Decimal(str(totals.get('tax', 0) or 0))
-        daily_stats[date_key]['total_net'] += Decimal(str(totals.get('net', 0) or 0))
+        daily_stats[date_key]['total_gross'] += _invoice_amount_for_aggregate(
+            db, doc, totals.get('gross', 0), currency_id=currency_id,
+            rate_cache=rate_cache, base_currency_by_business=base_currency_by_business,
+        )
+        daily_stats[date_key]['total_discount'] += _invoice_amount_for_aggregate(
+            db, doc, totals.get('discount', 0), currency_id=currency_id,
+            rate_cache=rate_cache, base_currency_by_business=base_currency_by_business,
+        )
+        daily_stats[date_key]['total_tax'] += _invoice_amount_for_aggregate(
+            db, doc, totals.get('tax', 0), currency_id=currency_id,
+            rate_cache=rate_cache, base_currency_by_business=base_currency_by_business,
+        )
+        daily_stats[date_key]['total_net'] += _invoice_amount_for_aggregate(
+            db, doc, totals.get('net', 0), currency_id=currency_id,
+            rate_cache=rate_cache, base_currency_by_business=base_currency_by_business,
+        )
     
     # تبدیل به لیست و مرتب‌سازی (ترتیب نزولی)
     items = []
@@ -7559,7 +8364,11 @@ def get_daily_sales_report(
             'total_pages': total_pages,
             'has_next': current_page < total_pages,
             'has_prev': current_page > 1,
-        }
+        },
+        'meta': {
+            'currency_id': currency_id,
+            'amounts_in_base': amounts_in_base,
+        },
     }
 
 
@@ -7638,12 +8447,8 @@ def get_daily_purchases_report(
     if date_from_obj is None:
         date_from_obj = date.today()
     
-    # Query فاکتورهای خرید
-    purchases_query = db.query(
-        Document.document_date,
-        Document.extra_info,
-        Document.currency_id,
-    ).filter(
+    # Query فاکتورهای خرید (کل Document برای تبدیل FX)
+    purchases_query = db.query(Document).filter(
         and_(
             Document.business_id == business_id,
             Document.document_type == INVOICE_PURCHASE,
@@ -7660,6 +8465,9 @@ def get_daily_purchases_report(
         purchases_query = purchases_query.filter(Document.fiscal_year_id == fiscal_year_id)
     
     purchases_documents = purchases_query.order_by(Document.document_date.asc()).all()
+    rate_cache: Dict[int, Decimal] = {}
+    base_currency_by_business: Dict[int, Optional[int]] = {}
+    amounts_in_base = currency_id is None
     
     # گروه‌بندی بر اساس روز
     daily_stats: Dict[str, Dict[str, Any]] = defaultdict(lambda: {
@@ -7682,10 +8490,22 @@ def get_daily_purchases_report(
         
         daily_stats[date_key]['date'] = doc_date.isoformat()
         daily_stats[date_key]['invoice_count'] += 1
-        daily_stats[date_key]['total_gross'] += Decimal(str(totals.get('gross', 0) or 0))
-        daily_stats[date_key]['total_discount'] += Decimal(str(totals.get('discount', 0) or 0))
-        daily_stats[date_key]['total_tax'] += Decimal(str(totals.get('tax', 0) or 0))
-        daily_stats[date_key]['total_net'] += Decimal(str(totals.get('net', 0) or 0))
+        daily_stats[date_key]['total_gross'] += _invoice_amount_for_aggregate(
+            db, doc, totals.get('gross', 0), currency_id=currency_id,
+            rate_cache=rate_cache, base_currency_by_business=base_currency_by_business,
+        )
+        daily_stats[date_key]['total_discount'] += _invoice_amount_for_aggregate(
+            db, doc, totals.get('discount', 0), currency_id=currency_id,
+            rate_cache=rate_cache, base_currency_by_business=base_currency_by_business,
+        )
+        daily_stats[date_key]['total_tax'] += _invoice_amount_for_aggregate(
+            db, doc, totals.get('tax', 0), currency_id=currency_id,
+            rate_cache=rate_cache, base_currency_by_business=base_currency_by_business,
+        )
+        daily_stats[date_key]['total_net'] += _invoice_amount_for_aggregate(
+            db, doc, totals.get('net', 0), currency_id=currency_id,
+            rate_cache=rate_cache, base_currency_by_business=base_currency_by_business,
+        )
     
     # تبدیل به لیست و مرتب‌سازی (ترتیب نزولی)
     items = []
@@ -7728,7 +8548,11 @@ def get_daily_purchases_report(
             'total_pages': total_pages,
             'has_next': current_page < total_pages,
             'has_prev': current_page > 1,
-        }
+        },
+        'meta': {
+            'currency_id': currency_id,
+            'amounts_in_base': amounts_in_base,
+        },
     }
 
 
@@ -7807,12 +8631,8 @@ def get_monthly_sales_report(
     if date_from_obj is None:
         date_from_obj = date.today()
     
-    # Query فاکتورهای فروش
-    sales_query = db.query(
-        Document.document_date,
-        Document.extra_info,
-        Document.currency_id,
-    ).filter(
+    # Query فاکتورهای فروش (کل Document برای تبدیل FX)
+    sales_query = db.query(Document).filter(
         and_(
             Document.business_id == business_id,
             Document.document_type == INVOICE_SALES,
@@ -7829,6 +8649,9 @@ def get_monthly_sales_report(
         sales_query = sales_query.filter(Document.fiscal_year_id == fiscal_year_id)
     
     sales_documents = sales_query.order_by(Document.document_date.asc()).all()
+    rate_cache: Dict[int, Decimal] = {}
+    base_currency_by_business: Dict[int, Optional[int]] = {}
+    amounts_in_base = currency_id is None
     
     # گروه‌بندی بر اساس ماه
     monthly_stats: Dict[str, Dict[str, Any]] = defaultdict(lambda: {
@@ -7856,10 +8679,22 @@ def get_monthly_sales_report(
         monthly_stats[month_key]['month'] = doc_date.month
         monthly_stats[month_key]['month_key'] = month_key
         monthly_stats[month_key]['invoice_count'] += 1
-        monthly_stats[month_key]['total_gross'] += Decimal(str(totals.get('gross', 0) or 0))
-        monthly_stats[month_key]['total_discount'] += Decimal(str(totals.get('discount', 0) or 0))
-        monthly_stats[month_key]['total_tax'] += Decimal(str(totals.get('tax', 0) or 0))
-        monthly_stats[month_key]['total_net'] += Decimal(str(totals.get('net', 0) or 0))
+        monthly_stats[month_key]['total_gross'] += _invoice_amount_for_aggregate(
+            db, doc, totals.get('gross', 0), currency_id=currency_id,
+            rate_cache=rate_cache, base_currency_by_business=base_currency_by_business,
+        )
+        monthly_stats[month_key]['total_discount'] += _invoice_amount_for_aggregate(
+            db, doc, totals.get('discount', 0), currency_id=currency_id,
+            rate_cache=rate_cache, base_currency_by_business=base_currency_by_business,
+        )
+        monthly_stats[month_key]['total_tax'] += _invoice_amount_for_aggregate(
+            db, doc, totals.get('tax', 0), currency_id=currency_id,
+            rate_cache=rate_cache, base_currency_by_business=base_currency_by_business,
+        )
+        monthly_stats[month_key]['total_net'] += _invoice_amount_for_aggregate(
+            db, doc, totals.get('net', 0), currency_id=currency_id,
+            rate_cache=rate_cache, base_currency_by_business=base_currency_by_business,
+        )
     
     # تبدیل به لیست و مرتب‌سازی (ترتیب نزولی)
     items = []
@@ -7913,7 +8748,11 @@ def get_monthly_sales_report(
             'total_pages': total_pages,
             'has_next': current_page < total_pages,
             'has_prev': current_page > 1,
-        }
+        },
+        'meta': {
+            'currency_id': currency_id,
+            'amounts_in_base': amounts_in_base,
+        },
     }
 
 
@@ -8568,7 +9407,10 @@ def get_materials_consumption_report(
     production_documents = production_query.order_by(Document.document_date.asc()).all()
     
     doc_ids = [doc.id for doc in production_documents]
-    
+    rate_cache: Dict[int, Decimal] = {}
+    base_currency_by_business: Dict[int, Optional[int]] = {}
+    amounts_in_base = currency_id is None
+
     if not doc_ids:
         return {
             'items': [],
@@ -8627,11 +9469,20 @@ def get_materials_consumption_report(
         if line_warehouse_id:
             warehouse_ids_set.add(line_warehouse_id)
         
-        # محاسبه مبلغ
+        # محاسبه مبلغ (بدون فیلتر ارز → معادل پایه)
         unit_price = Decimal(str(line_info.get('unit_price', 0) or 0))
         quantity = Decimal(str(line.quantity or 0))
         amount = unit_price * quantity
-        
+        amount = _invoice_amount_for_aggregate(
+            db,
+            doc,
+            amount,
+            currency_id=currency_id,
+            rate_cache=rate_cache,
+            base_currency_by_business=base_currency_by_business,
+        )
+        unit_price_out = float(amount / quantity) if quantity != 0 else float(unit_price)
+
         items.append({
             'document_id': doc.id,
             'document_code': doc.code,
@@ -8639,9 +9490,11 @@ def get_materials_consumption_report(
             'product_id': line.product_id,
             'warehouse_id': line_warehouse_id,
             'quantity': float(quantity),
-            'unit_price': float(unit_price),
+            'unit_price': unit_price_out,
             'amount': float(amount),
             'description': line.description,
+            'document_currency_id': doc.currency_id,
+            'amounts_in_base': amounts_in_base,
         })
     
     # دریافت اطلاعات محصولات
@@ -8722,7 +9575,11 @@ def get_materials_consumption_report(
             'total_pages': total_pages,
             'has_next': current_page < total_pages,
             'has_prev': current_page > 1,
-        }
+        },
+        'meta': {
+            'currency_id': currency_id,
+            'amounts_in_base': amounts_in_base,
+        },
     }
 
 
@@ -8830,7 +9687,10 @@ def get_production_report(
     production_documents = production_query.order_by(Document.document_date.asc()).all()
     
     doc_ids = [doc.id for doc in production_documents]
-    
+    rate_cache: Dict[int, Decimal] = {}
+    base_currency_by_business: Dict[int, Optional[int]] = {}
+    amounts_in_base = currency_id is None
+
     if not doc_ids:
         return {
             'items': [],
@@ -8889,11 +9749,20 @@ def get_production_report(
         if line_warehouse_id:
             warehouse_ids_set.add(line_warehouse_id)
         
-        # محاسبه مبلغ
+        # محاسبه مبلغ (بدون فیلتر ارز → معادل پایه)
         unit_price = Decimal(str(line_info.get('unit_price', 0) or 0))
         quantity = Decimal(str(line.quantity or 0))
         amount = unit_price * quantity
-        
+        amount = _invoice_amount_for_aggregate(
+            db,
+            doc,
+            amount,
+            currency_id=currency_id,
+            rate_cache=rate_cache,
+            base_currency_by_business=base_currency_by_business,
+        )
+        unit_price_out = float(amount / quantity) if quantity != 0 else float(unit_price)
+
         items.append({
             'document_id': doc.id,
             'document_code': doc.code,
@@ -8901,9 +9770,11 @@ def get_production_report(
             'product_id': line.product_id,
             'warehouse_id': line_warehouse_id,
             'quantity': float(quantity),
-            'unit_price': float(unit_price),
+            'unit_price': unit_price_out,
             'amount': float(amount),
             'description': line.description,
+            'document_currency_id': doc.currency_id,
+            'amounts_in_base': amounts_in_base,
         })
     
     # دریافت اطلاعات محصولات
@@ -8984,9 +9855,411 @@ def get_production_report(
             'total_pages': total_pages,
             'has_next': current_page < total_pages,
             'has_prev': current_page > 1,
-        }
+        },
+        'meta': {
+            'currency_id': currency_id,
+            'amounts_in_base': amounts_in_base,
+        },
     }
 
+
+
+
+def _is_account_payment_line(line: DocumentLine) -> bool:
+    line_extra = line.extra_info or {}
+    if line_extra.get("is_commission_line"):
+        return False
+    if line_extra.get("is_check_target_account") or line_extra.get("is_check_source_account"):
+        return False
+    tt = str(line_extra.get("transaction_type") or "").strip().lower()
+    is_wallet_line = line.person_id is None and tt == "wallet"
+    if line.person_id is None and (
+        line.bank_account_id is not None
+        or line.cash_register_id is not None
+        or line.petty_cash_id is not None
+        or line.check_id is not None
+        or is_wallet_line
+    ):
+        return True
+    return False
+
+
+def _sum_receipt_doc_account_payments(doc: Document) -> Decimal:
+    total = Decimal(0)
+    for line in doc.lines:
+        if _is_account_payment_line(line):
+            total += Decimal(str(line.debit)) + Decimal(str(line.credit))
+    return total
+
+
+def _sum_receipt_doc_payments_for_invoice(doc: Document, invoice_id: int, *, via_person_line: bool) -> Decimal:
+    """مبلغ پرداخت‌شدهٔ سند دریافت/پرداخت نسبت به یک فاکتور (به ارز فاکتور)."""
+    inv_id = int(invoice_id)
+    doc_extra = doc.extra_info if isinstance(doc.extra_info, dict) else {}
+    doc_inv = doc_extra.get("invoice_id")
+    try:
+        doc_matches = doc_inv is not None and int(doc_inv) == inv_id
+    except (TypeError, ValueError):
+        doc_matches = False
+
+    if via_person_line:
+        total = Decimal(0)
+        for line in doc.lines:
+            if line.person_id is None:
+                continue
+            extra = line.extra_info or {}
+            raw_inv = extra.get("invoice_id")
+            line_matches = False
+            if raw_inv is not None:
+                try:
+                    line_matches = int(raw_inv) == inv_id
+                except (TypeError, ValueError):
+                    line_matches = False
+            if not line_matches and not doc_matches:
+                continue
+            # پرداخت بین‌ارزی: مبلغ تسویه به ارز فاکتور
+            fx_set = extra.get("fx_settlement") if isinstance(extra, dict) else None
+            if isinstance(fx_set, dict) and fx_set.get("settles_amount") is not None:
+                try:
+                    total += Decimal(str(fx_set["settles_amount"]))
+                    continue
+                except Exception:
+                    pass
+            if isinstance(doc_extra.get("fx_settlement"), dict) and doc_extra["fx_settlement"].get("settles_amount") is not None:
+                try:
+                    total += Decimal(str(doc_extra["fx_settlement"]["settles_amount"]))
+                    continue
+                except Exception:
+                    pass
+            total += Decimal(str(line.debit)) + Decimal(str(line.credit))
+        return total
+    if doc_matches and isinstance(doc_extra.get("fx_settlement"), dict):
+        try:
+            return Decimal(str(doc_extra["fx_settlement"].get("settles_amount") or 0))
+        except Exception:
+            pass
+    return _sum_receipt_doc_account_payments(doc)
+
+
+def _get_receipt_payment_ids_linked_to_invoice(
+    db: Session,
+    business_id: int,
+    invoice_id: int,
+    *,
+    extra_info: Optional[Dict[str, Any]] = None,
+) -> List[int]:
+    """شناسهٔ اسناد دریافت/پرداخت مرتبط با فاکتور (لینک مستقیم + person_line.invoice_id)."""
+    ids: set[int] = set()
+    if isinstance(extra_info, dict):
+        links = extra_info.get("links") or {}
+        for raw in links.get(INVOICE_LINK_RECEIPT_PAYMENT_IDS) or []:
+            try:
+                ids.add(int(raw))
+            except (TypeError, ValueError):
+                continue
+
+    line_invoice_id_expr = cast(
+        cast(DocumentLine.extra_info, JSONB)["invoice_id"].astext,
+        Integer,
+    )
+    rows = (
+        db.query(DocumentLine.document_id)
+        .join(Document, DocumentLine.document_id == Document.id)
+        .filter(
+            Document.business_id == business_id,
+            Document.document_type.in_(["receipt", "payment"]),
+            DocumentLine.person_id.isnot(None),
+            line_invoice_id_expr == int(invoice_id),
+        )
+        .distinct()
+        .all()
+    )
+    for row in rows:
+        ids.add(int(row[0]))
+    return list(ids)
+
+
+def _invoice_total_amount_for_document(
+    document: Document,
+    item_lines: Optional[List[InvoiceItemLine]] = None,
+) -> Decimal:
+    total_amount = Decimal(0)
+    extra_info = document.extra_info or {}
+    totals = extra_info.get("totals", {})
+    if isinstance(totals, dict):
+        if "net" in totals or "gross" in totals:
+            try:
+                from app.services.invoice_adjustments_service import payable_total_from_totals_dict
+                return payable_total_from_totals_dict(totals)
+            except (ValueError, TypeError):
+                pass
+        if "net" in totals:
+            try:
+                total_amount = Decimal(str(totals["net"]))
+            except (ValueError, TypeError):
+                pass
+    if total_amount != 0:
+        return total_amount
+    if item_lines is None:
+        return total_amount
+    for item_line in item_lines:
+        item_extra = item_line.extra_info or {}
+        line_total = item_extra.get("line_total")
+        if line_total is not None:
+            total_amount += Decimal(str(line_total))
+        else:
+            qty = Decimal(str(item_line.quantity or 0))
+            unit_price = Decimal(str(item_extra.get("unit_price", 0)))
+            line_discount = Decimal(str(item_extra.get("line_discount", 0)))
+            tax_amount = Decimal(str(item_extra.get("tax_amount", 0)))
+            total_amount += (qty * unit_price) - line_discount + tax_amount
+    return total_amount
+
+
+def invoice_documents_to_list_dicts(
+    db: Session,
+    documents: List[Document],
+) -> List[Dict[str, Any]]:
+    """سریال‌سازی سبک فاکتورها برای لیست (بدون بارگذاری خطوط و محاسبه سود)."""
+    if not documents:
+        return []
+
+    user_ids = {int(d.created_by_user_id) for d in documents if d.created_by_user_id}
+    currency_ids = {int(d.currency_id) for d in documents if d.currency_id}
+    project_ids = {int(d.project_id) for d in documents if d.project_id}
+
+    users_by_id: Dict[int, User] = {}
+    if user_ids:
+        for u in db.query(User).filter(User.id.in_(list(user_ids))).all():
+            users_by_id[int(u.id)] = u
+
+    currencies_by_id: Dict[int, Currency] = {}
+    if currency_ids:
+        for c in db.query(Currency).filter(Currency.id.in_(list(currency_ids))).all():
+            currencies_by_id[int(c.id)] = c
+
+    projects_by_id: Dict[int, Any] = {}
+    if project_ids:
+        from adapters.db.models.project import Project
+
+        for p in db.query(Project).filter(Project.id.in_(list(project_ids))).all():
+            projects_by_id[int(p.id)] = p
+
+    results: List[Dict[str, Any]] = []
+    for doc in documents:
+        created_by = users_by_id.get(int(doc.created_by_user_id)) if doc.created_by_user_id else None
+        created_by_name = (
+            f"{getattr(created_by, 'first_name', '')} {getattr(created_by, 'last_name', '')}".strip()
+            if created_by
+            else None
+        )
+        currency = currencies_by_id.get(int(doc.currency_id)) if doc.currency_id else None
+        project_name = None
+        if doc.project_id and int(doc.project_id) in projects_by_id:
+            project_name = projects_by_id[int(doc.project_id)].name
+
+        results.append(
+            {
+                "id": doc.id,
+                "code": doc.code,
+                "business_id": doc.business_id,
+                "document_type": doc.document_type,
+                "document_date": doc.document_date.isoformat(),
+                "registered_at": utc_naive_to_iso_z(doc.registered_at),
+                "currency_id": doc.currency_id,
+                "currency_code": getattr(currency, "code", None),
+                "created_by_user_id": doc.created_by_user_id,
+                "created_by_name": created_by_name,
+                "is_proforma": doc.is_proforma,
+                "description": doc.description,
+                "project_id": doc.project_id,
+                "project_name": project_name,
+                "extra_info": _normalize_document_extra_info_for_storage(doc.extra_info),
+                "product_lines": [],
+                "account_lines": [],
+                "tags": [],
+                "tags_display": "",
+                "created_at": doc.created_at.isoformat(),
+                "updated_at": doc.updated_at.isoformat(),
+            }
+        )
+    return results
+
+
+def batch_add_counterparty_to_invoice_items(
+    db: Session,
+    items: List[Dict[str, Any]],
+) -> None:
+    """افزودن counterparty به چند آیتم فاکتور با یک query."""
+    person_ids: set[int] = set()
+    for item in items:
+        extra = item.get("extra_info") or {}
+        pid = extra.get("person_id")
+        if pid is not None:
+            try:
+                person_ids.add(int(pid))
+            except (ValueError, TypeError):
+                pass
+
+    if not person_ids:
+        for item in items:
+            item["counterparty"] = ""
+        return
+
+    persons_by_id: Dict[int, Person] = {}
+    for p in db.query(Person).filter(Person.id.in_(list(person_ids))).all():
+        persons_by_id[int(p.id)] = p
+
+    for item in items:
+        try:
+            extra = item.get("extra_info") or {}
+            person_id = extra.get("person_id")
+            person_name = None
+            if person_id is not None:
+                p = persons_by_id.get(int(person_id))
+                if p is not None:
+                    person_name = getattr(p, "display_name", None) or getattr(p, "name", None)
+                    if not person_name:
+                        person_name = getattr(p, "alias_name", None)
+                    if not person_name and (
+                        getattr(p, "first_name", None) or getattr(p, "last_name", None)
+                    ):
+                        name_parts = []
+                        if getattr(p, "first_name", None):
+                            name_parts.append(p.first_name)
+                        if getattr(p, "last_name", None):
+                            name_parts.append(p.last_name)
+                        person_name = " ".join(name_parts) if name_parts else None
+                    if not person_name and getattr(p, "company_name", None):
+                        person_name = p.company_name
+            item["counterparty"] = person_name or ""
+        except Exception:
+            item["counterparty"] = ""
+
+
+def batch_calculate_invoices_remaining(
+    db: Session,
+    business_id: int,
+    documents: List[Document],
+) -> Dict[int, Dict[str, Any]]:
+    """محاسبه batch مانده فاکتورها برای لیست."""
+    if not documents:
+        return {}
+
+    invoice_ids = [int(d.id) for d in documents]
+    need_item_lines: List[int] = []
+    link_doc_ids: set[int] = set()
+
+    for doc in documents:
+        extra = doc.extra_info or {}
+        totals = extra.get("totals", {})
+        has_net = isinstance(totals, dict) and "net" in totals
+        if not has_net:
+            need_item_lines.append(int(doc.id))
+        links = extra.get("links", {}) or {}
+        for doc_id in links.get("receipt_payment_document_ids", []) or []:
+            try:
+                link_doc_ids.add(int(doc_id))
+            except (ValueError, TypeError):
+                pass
+
+    item_lines_by_doc: Dict[int, List[InvoiceItemLine]] = defaultdict(list)
+    if need_item_lines:
+        rows = db.query(InvoiceItemLine).filter(
+            InvoiceItemLine.document_id.in_(need_item_lines)
+        ).all()
+        for row in rows:
+            item_lines_by_doc[int(row.document_id)].append(row)
+
+    totals_by_id = {
+        int(doc.id): _invoice_total_amount_for_document(
+            doc, item_lines_by_doc.get(int(doc.id))
+        )
+        for doc in documents
+    }
+
+    invoice_id_set = set(invoice_ids)
+    line_invoice_id_expr = cast(
+        cast(DocumentLine.extra_info, JSONB)["invoice_id"].astext,
+        Integer,
+    )
+
+    person_linked_doc_ids: set[int] = set()
+    invoice_to_person_rp: Dict[int, set[int]] = defaultdict(set)
+    if invoice_id_set:
+        plines = (
+            db.query(DocumentLine.document_id, line_invoice_id_expr)
+            .join(Document, DocumentLine.document_id == Document.id)
+            .filter(
+                Document.business_id == business_id,
+                Document.document_type.in_(["receipt", "payment"]),
+                DocumentLine.person_id.isnot(None),
+                line_invoice_id_expr.in_(list(invoice_id_set)),
+            )
+            .all()
+        )
+        for doc_id, inv_id in plines:
+            if inv_id is None:
+                continue
+            doc_id_int = int(doc_id)
+            inv_id_int = int(inv_id)
+            person_linked_doc_ids.add(doc_id_int)
+            invoice_to_person_rp[inv_id_int].add(doc_id_int)
+
+    all_rp_doc_ids = link_doc_ids | person_linked_doc_ids
+    rp_docs_by_id: Dict[int, Document] = {}
+    if all_rp_doc_ids:
+        rp_docs = (
+            db.query(Document)
+            .options(selectinload(Document.lines))
+            .filter(
+                Document.id.in_(list(all_rp_doc_ids)),
+                Document.business_id == business_id,
+                Document.document_type.in_(["receipt", "payment"]),
+            )
+            .all()
+        )
+        rp_docs_by_id = {int(d.id): d for d in rp_docs}
+
+    results: Dict[int, Dict[str, Any]] = {}
+    for doc in documents:
+        inv_id = int(doc.id)
+        total_amount = totals_by_id.get(inv_id, Decimal(0))
+        total_paid = Decimal(0)
+        processed_doc_ids: set[int] = set()
+
+        extra = doc.extra_info or {}
+        links = extra.get("links", {}) or {}
+        for doc_id in links.get("receipt_payment_document_ids", []) or []:
+            try:
+                doc_id_int = int(doc_id)
+            except (ValueError, TypeError):
+                continue
+            rp_doc = rp_docs_by_id.get(doc_id_int)
+            if not rp_doc:
+                continue
+            processed_doc_ids.add(doc_id_int)
+            total_paid += _sum_receipt_doc_payments_for_invoice(rp_doc, inv_id, via_person_line=False)
+
+        for doc_id_int in invoice_to_person_rp.get(inv_id, set()):
+            if doc_id_int in processed_doc_ids:
+                continue
+            rp_doc = rp_docs_by_id.get(doc_id_int)
+            if not rp_doc:
+                continue
+            processed_doc_ids.add(doc_id_int)
+            total_paid += _sum_receipt_doc_payments_for_invoice(rp_doc, inv_id, via_person_line=True)
+
+        remaining = total_amount - total_paid
+        results[inv_id] = {
+            "invoice_id": inv_id,
+            "total_amount": float(total_amount),
+            "paid_amount": float(total_paid),
+            "remaining": float(remaining),
+            "is_settled": float(remaining) <= 0.01,
+        }
+
+    return results
 
 
 def calculate_invoice_remaining(
@@ -9012,7 +10285,7 @@ def calculate_invoice_remaining(
         }
     """
     try:
-        logger.info(f"شروع محاسبه مانده فاکتور - invoice_id: {invoice_id}, business_id: {business_id}")
+        logger.debug("calculate_invoice_remaining invoice_id=%s business_id=%s", invoice_id, business_id)
         
         # دریافت فاکتور
         invoice = db.query(Document).filter(
@@ -9021,10 +10294,8 @@ def calculate_invoice_remaining(
         ).first()
         
         if not invoice:
-            logger.warning(f"فاکتور یافت نشد - invoice_id: {invoice_id}, business_id: {business_id}")
+            logger.warning("Invoice not found invoice_id=%s business_id=%s", invoice_id, business_id)
             raise ApiError("INVOICE_NOT_FOUND", "فاکتور یافت نشد", http_status=404)
-        
-        logger.info(f"فاکتور یافت شد - code: {invoice.code}, document_type: {invoice.document_type}")
         
         # پاک‌سازی لینک‌های مرده قبل از محاسبه مانده
         try:
@@ -9037,43 +10308,14 @@ def calculate_invoice_remaining(
             db.rollback()
         
         # محاسبه مبلغ کل فاکتور
-        total_amount = Decimal(0)
         extra_info = invoice.extra_info or {}
-        
-        # اول از extra_info.totals.net
+        item_lines = None
         totals = extra_info.get('totals', {})
-        if isinstance(totals, dict) and 'net' in totals:
-            try:
-                total_amount = Decimal(str(totals['net']))
-                logger.info(f"total_amount از extra_info.totals.net: {total_amount}")
-            except (ValueError, TypeError) as e:
-                logger.warning(f"خطا در خواندن totals.net: {e}")
-                pass
-        
-        # اگر total_amount هنوز 0 است، از InvoiceItemLine محاسبه کن
-        if total_amount == 0:
-            try:
-                logger.info("محاسبه total_amount از InvoiceItemLine")
-                item_lines = db.query(InvoiceItemLine).filter(
-                    InvoiceItemLine.document_id == invoice_id
-                ).all()
-                
-                for item_line in item_lines:
-                    item_extra = item_line.extra_info or {}
-                    line_total = item_extra.get('line_total')
-                    if line_total is not None:
-                        total_amount += Decimal(str(line_total))
-                    else:
-                        # محاسبه از quantity و unit_price
-                        qty = Decimal(str(item_line.quantity or 0))
-                        unit_price = Decimal(str(item_extra.get('unit_price', 0)))
-                        line_discount = Decimal(str(item_extra.get('line_discount', 0)))
-                        tax_amount = Decimal(str(item_extra.get('tax_amount', 0)))
-                        line_total = (qty * unit_price) - line_discount + tax_amount
-                        total_amount += line_total
-                logger.info(f"total_amount از InvoiceItemLine: {total_amount}")
-            except Exception as e:
-                logger.exception(f"خطا در محاسبه total_amount از InvoiceItemLine: {e}")
+        if not (isinstance(totals, dict) and 'net' in totals):
+            item_lines = db.query(InvoiceItemLine).filter(
+                InvoiceItemLine.document_id == invoice_id
+            ).all()
+        total_amount = _invoice_total_amount_for_document(invoice, item_lines)
     
         # محاسبه مبلغ پرداخت شده
         total_paid = Decimal(0)
@@ -9086,7 +10328,9 @@ def calculate_invoice_remaining(
         for doc_id in receipt_payment_ids:
             try:
                 doc_id_int = int(doc_id)
-                doc = db.query(Document).filter(
+                doc = db.query(Document).options(
+                    selectinload(Document.lines)
+                ).filter(
                     Document.id == doc_id_int,
                     Document.business_id == business_id,
                     Document.document_type.in_(['receipt', 'payment']),
@@ -9096,110 +10340,51 @@ def calculate_invoice_remaining(
                     continue
                 
                 processed_doc_ids.add(doc_id_int)
-                
-                # مجموع account_lines (بدون کارمزد)
-                # account_lines خطوطی هستند که bank_account_id, cash_register_id, petty_cash_id یا check_id دارند
-                for line in doc.lines:
-                    # بررسی اینکه آیا این خط مربوط به حساب است (نه person)
-                    line_extra = line.extra_info or {}
-                    tt = str(line_extra.get("transaction_type") or "").strip().lower()
-                    is_wallet_line = line.person_id is None and tt == "wallet"
-                    if line.person_id is None and (
-                        line.bank_account_id is not None
-                        or line.cash_register_id is not None
-                        or line.petty_cash_id is not None
-                        or line.check_id is not None
-                        or is_wallet_line
-                    ):
-                        if not line_extra.get('is_commission_line'):
-                            # amount = debit + credit (همیشه یکی از آنها 0 است)
-                            line_amount = Decimal(str(line.debit)) + Decimal(str(line.credit))
-                            total_paid += line_amount
+                total_paid += _sum_receipt_doc_payments_for_invoice(doc, invoice_id, via_person_line=False)
             except (ValueError, TypeError) as e:
-                logger.warning(f"خطا در پردازش receipt_payment_id {doc_id}: {e}")
+                logger.warning("receipt_payment_id parse error %s: %s", doc_id, e)
                 continue
         
-        # 2. بررسی از طریق person_lines که invoice_id دارند
-        # جستجوی receipts-payments که در person_lines به این فاکتور لینک شده‌اند
-        # بهینه‌سازی: فقط خطوطی که invoice_id در extra_info دارند را بررسی کن
-        receipt_payment_lines = db.query(DocumentLine).join(
-            Document, DocumentLine.document_id == Document.id
-        ).filter(
-            Document.business_id == business_id,
-            Document.document_type.in_(['receipt', 'payment']),
-            DocumentLine.person_id.isnot(None),
-        ).all()
-        
-        # استخراج document_ids منحصر به فرد
-        receipt_payment_doc_ids = set()
-        for line in receipt_payment_lines:
-            line_extra = line.extra_info or {}
-            line_invoice_id = line_extra.get('invoice_id')
-            if line_invoice_id is not None:
-                try:
-                    if isinstance(line_invoice_id, (int, float)):
-                        line_invoice_id_int = int(line_invoice_id)
-                    else:
-                        line_invoice_id_int = int(str(line_invoice_id))
-                    
-                    if line_invoice_id_int == invoice_id:
-                        receipt_payment_doc_ids.add(line.document_id)
-                except (ValueError, TypeError):
-                    continue
-        
-        # دریافت documents
-        receipt_payment_docs = []
-        if receipt_payment_doc_ids:
-            receipt_payment_docs = db.query(Document).filter(
-                Document.id.in_(list(receipt_payment_doc_ids)),
+        # 2. receipts/payments لینک‌شده از person_lines
+        line_invoice_id_expr = cast(
+            cast(DocumentLine.extra_info, JSONB)['invoice_id'].astext,
+            Integer,
+        )
+        person_linked_rows = (
+            db.query(DocumentLine.document_id)
+            .join(Document, DocumentLine.document_id == Document.id)
+            .filter(
                 Document.business_id == business_id,
-            ).all()
-        
-        for doc in receipt_payment_docs:
-            if doc.id in processed_doc_ids:
-                continue
-            
-            # بررسی person_lines (خطوطی که person_id دارند)
-            for line in doc.lines:
-                if line.person_id is not None:
-                    line_extra = line.extra_info or {}
-                    line_invoice_id = line_extra.get('invoice_id')
-                    
-                    # تبدیل به int برای مقایسه
-                    if line_invoice_id is not None:
-                        try:
-                            if isinstance(line_invoice_id, (int, float)):
-                                line_invoice_id_int = int(line_invoice_id)
-                            else:
-                                line_invoice_id_int = int(str(line_invoice_id))
-                            
-                            if line_invoice_id_int == invoice_id:
-                                processed_doc_ids.add(doc.id)
-                                
-                                # مجموع account_lines (بدون کارمزد)
-                                # account_lines خطوطی هستند که bank_account_id, cash_register_id, petty_cash_id یا check_id دارند
-                                for acc_line in doc.lines:
-                                    acc_extra = acc_line.extra_info or {}
-                                    tt = str(acc_extra.get("transaction_type") or "").strip().lower()
-                                    is_wallet_line = acc_line.person_id is None and tt == "wallet"
-                                    if acc_line.person_id is None and (
-                                        acc_line.bank_account_id is not None
-                                        or acc_line.cash_register_id is not None
-                                        or acc_line.petty_cash_id is not None
-                                        or acc_line.check_id is not None
-                                        or is_wallet_line
-                                    ):
-                                        if not acc_extra.get('is_commission_line'):
-                                            # amount = debit + credit (همیشه یکی از آنها 0 است)
-                                            acc_line_amount = Decimal(str(acc_line.debit)) + Decimal(str(acc_line.credit))
-                                            total_paid += acc_line_amount
-                                break
-                        except (ValueError, TypeError):
-                            continue
+                Document.document_type.in_(['receipt', 'payment']),
+                DocumentLine.person_id.isnot(None),
+                line_invoice_id_expr == int(invoice_id),
+            )
+            .distinct()
+            .all()
+        )
+        person_doc_ids = [int(r[0]) for r in person_linked_rows]
+        if person_doc_ids:
+            receipt_payment_docs = (
+                db.query(Document)
+                .options(selectinload(Document.lines))
+                .filter(
+                    Document.id.in_(person_doc_ids),
+                    Document.business_id == business_id,
+                )
+                .all()
+            )
+            for doc in receipt_payment_docs:
+                if doc.id in processed_doc_ids:
+                    continue
+                processed_doc_ids.add(doc.id)
+                total_paid += _sum_receipt_doc_payments_for_invoice(doc, invoice_id, via_person_line=True)
         
         remaining = total_amount - total_paid
         
-        logger.info(f"محاسبه مانده تمام شد - invoice_id: {invoice_id}, total_amount: {total_amount}, paid_amount: {total_paid}, remaining: {remaining}")
+        logger.debug(
+            "calculate_invoice_remaining done invoice_id=%s total=%s paid=%s remaining=%s",
+            invoice_id, total_amount, total_paid, remaining,
+        )
         
         return {
             'invoice_id': invoice_id,

@@ -15,6 +15,7 @@ import '../../../utils/image_cache.dart';
 import '../../../utils/error_extractor.dart';
 import '../../../utils/snackbar_helper.dart';
 import '../../../utils/responsive_helper.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 
 class ProductBasicInfoSection extends StatefulWidget {
@@ -286,14 +287,6 @@ class _ProductBasicInfoSectionState extends State<ProductBasicInfoSection> {
           SizedBox(height: spacing),
           _buildUnitsSection(context),
         ],
-        
-        SwitchListTile(
-          contentPadding: EdgeInsets.zero,
-          title: Text(t.productPublicCatalogTitle),
-          subtitle: Text(t.productPublicCatalogSubtitle),
-          value: widget.formData.isPublicCatalog,
-          onChanged: (v) => _updateFormData(widget.formData.copyWith(isPublicCatalog: v)),
-        ),
         
         if (widget.attributes.isNotEmpty) ...[
           SizedBox(height: spacing * 2),
@@ -663,7 +656,7 @@ class _ProductBasicInfoSectionState extends State<ProductBasicInfoSection> {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           IconButton(
-                            icon: const Icon(Icons.edit, size: 20),
+                            icon: Icon(Icons.edit, size: 20),
                             onPressed: () => _pickImage(context),
                             tooltip: 'تغییر عکس',
                             style: IconButton.styleFrom(
@@ -671,9 +664,9 @@ class _ProductBasicInfoSectionState extends State<ProductBasicInfoSection> {
                               padding: const EdgeInsets.all(8),
                             ),
                           ),
-                          const SizedBox(width: 4),
+                          SizedBox(width: 4),
                           IconButton(
-                            icon: const Icon(Icons.delete, size: 20, color: Colors.red),
+                            icon: Icon(Icons.delete, size: 20, color: SemanticColorResolver.negative(context)),
                             onPressed: () {
                               widget.controller?.clearProductImage();
                             },

@@ -7,14 +7,13 @@ import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/services.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
-import 'package:printing/printing.dart';
 
 import '../../l10n/app_localizations.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
-import '../data_table/helpers/file_saver.dart';
 import 'label_pdf_preview_embed.dart';
 import 'product_label_pdf_text.dart';
+import 'package:hesabix_ui/services/bytes_export/bytes_export_service.dart';
 
 /// یک واحد کالای یونیک (یا تجمیع چند کالا) برای چاپ برچسب بارکد / QR.
 class ProductLabelPrintItem {
@@ -387,9 +386,17 @@ class _ProductLabelPrintDialogState extends State<ProductLabelPrintDialog> {
     try {
       final bytes = await _buildPdf(_pageFormat);
       final name = 'product-labels-${DateTime.now().millisecondsSinceEpoch}.pdf';
-      await FileSaver.saveBytes(bytes, name);
+      final result = await BytesExportService.export(
+        bytes: bytes,
+        filename: name,
+        mimeType: 'application/pdf',
+      );
       if (!context.mounted) return;
-      SnackBarHelper.show(context, message: t.labelPdfSaved);
+      BytesExportService.showFeedback(
+        context,
+        result,
+        successOverride: t.labelPdfSaved,
+      );
     } catch (e) {
       if (!context.mounted) return;
       SnackBarHelper.showError(
@@ -403,7 +410,14 @@ class _ProductLabelPrintDialogState extends State<ProductLabelPrintDialog> {
     final t = AppLocalizations.of(context);
     try {
       final bytes = await _buildPdf(_pageFormat);
-      await Printing.sharePdf(bytes: bytes, filename: 'product-labels.pdf');
+      final result = await BytesExportService.export(
+        bytes: bytes,
+        filename: 'product-labels.pdf',
+        mimeType: 'application/pdf',
+        mode: BytesExportMode.share,
+      );
+      if (!context.mounted) return;
+      BytesExportService.showFeedback(context, result);
     } catch (e) {
       if (!context.mounted) return;
       SnackBarHelper.showError(

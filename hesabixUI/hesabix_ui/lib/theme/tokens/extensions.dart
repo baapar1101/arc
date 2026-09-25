@@ -1,5 +1,11 @@
 import 'package:flutter/material.dart';
 
+import 'semantic_colors.dart';
+import 'theme_catalog.dart';
+
+export 'semantic_colors.dart';
+export 'theme_catalog.dart';
+
 @immutable
 class AppSpacing extends ThemeExtension<AppSpacing> {
   final double xs;
@@ -120,4 +126,15 @@ extension AppThemeExtensions on BuildContext {
   AppShellColors get shellColors =>
       Theme.of(this).extension<AppShellColors>() ??
       AppShellColors.fromScheme(Theme.of(this).colorScheme, isDark: Theme.of(this).brightness == Brightness.dark);
+  AppSemanticColors get appSemantics {
+    final existing = Theme.of(this).extension<AppSemanticColors>();
+    if (existing != null) return existing;
+    final scheme = Theme.of(this).colorScheme;
+    final isDark = Theme.of(this).brightness == Brightness.dark;
+    return AppSemanticColors.fromDefinition(
+      themeDefinitionById(kDefaultThemeId),
+      isDark: isDark,
+      scheme: scheme,
+    );
+  }
 }

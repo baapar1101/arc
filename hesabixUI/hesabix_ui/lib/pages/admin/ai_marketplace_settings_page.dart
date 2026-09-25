@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../../core/api_client.dart';
 import '../../services/system_settings_service.dart';
 import '../../utils/error_extractor.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 /// تنظیمات مارکت‌پلیس مهارت‌های AI (سهم ناشر و …)
 class AIMarketplaceSettingsPage extends StatefulWidget {
@@ -57,7 +58,7 @@ class _AIMarketplaceSettingsPageState extends State<AIMarketplaceSettingsPage> {
       await _service.updateMarketplaceSettings(publisherSharePercent: share);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('تنظیمات ذخیره شد'), backgroundColor: Colors.green),
+          SnackBar(content: Text('تنظیمات ذخیره شد'), backgroundColor: SemanticColorResolver.positive(context)),
         );
       }
     } catch (e) {
@@ -65,7 +66,7 @@ class _AIMarketplaceSettingsPageState extends State<AIMarketplaceSettingsPage> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('خطا: ${ErrorExtractor.forContext(e, context)}'),
-            backgroundColor: Colors.red,
+            backgroundColor: SemanticColorResolver.negative(context),
           ),
         );
       }

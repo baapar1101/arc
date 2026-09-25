@@ -7,6 +7,7 @@ import '../../core/auth_store.dart';
 import '../../utils/date_formatters.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 class PriceListsPage extends StatefulWidget {
   final int businessId;
@@ -234,12 +235,12 @@ class _PriceListsPageState extends State<PriceListsPage> {
                               mainAxisSize: MainAxisSize.min,
                               children: [
                                 IconButton(
-                                  icon: const Icon(Icons.edit),
+                                  icon: Icon(Icons.edit),
                                   onPressed: () => _openEditDialog(context, priceList),
                                   tooltip: 'ویرایش',
                                 ),
                                 IconButton(
-                                  icon: const Icon(Icons.delete, color: Colors.red),
+                                  icon: Icon(Icons.delete, color: SemanticColorResolver.negative(context)),
                                   onPressed: () => _deletePriceList(context, priceList),
                                   tooltip: 'حذف',
                                 ),
@@ -399,29 +400,29 @@ class _PriceListsPageState extends State<PriceListsPage> {
     final confirmed = await showGlassDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('حذف لیست قیمت'),
+        title: Text('حذف لیست قیمت'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text('آیا از حذف لیست قیمت "$priceListName" اطمینان دارید؟'),
-            const SizedBox(height: 16),
+            SizedBox(height: 16),
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.red.withValues(alpha: 0.1),
+                color: SemanticColorResolver.negative(context).withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
+                border: Border.all(color: SemanticColorResolver.negative(context).withValues(alpha: 0.3)),
               ),
               child: Row(
                 children: [
-                  Icon(Icons.warning, color: Colors.red[700], size: 20),
-                  const SizedBox(width: 8),
+                  Icon(Icons.warning, color: SemanticColorResolver.negative(context), size: 20),
+                  SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       'تمام آیتم‌های قیمت این لیست نیز حذف خواهند شد.',
                       style: TextStyle(
-                        color: Colors.red[700],
+                        color: SemanticColorResolver.negative(context),
                         fontSize: 14,
                       ),
                     ),
@@ -434,11 +435,11 @@ class _PriceListsPageState extends State<PriceListsPage> {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('انصراف'),
+            child: Text('انصراف'),
           ),
           FilledButton(
             onPressed: () => Navigator.of(ctx).pop(true),
-            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            style: FilledButton.styleFrom(backgroundColor: SemanticColorResolver.negative(context)),
             child: const Text('حذف'),
           ),
         ],

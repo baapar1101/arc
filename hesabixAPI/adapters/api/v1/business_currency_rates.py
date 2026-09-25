@@ -16,6 +16,8 @@ from app.services.business_currency_rate_service import (
 	update_business_currency_rate,
 	delete_business_currency_rate,
 	resolve_rate_to_base,
+	list_latest_rates_for_business,
+	bulk_create_business_currency_rates,
 )
 
 router = APIRouter(tags=["currency_revaluation", "حسابداری"], prefix="")
@@ -46,6 +48,25 @@ def list_currency_rates(
 		),
 		request=request,
 		message="CURRENCY_RATES_LIST",
+	)
+
+
+@router.get(
+	"/businesses/{business_id}/currency-rates/latest",
+	summary="آخرین نرخ هر ارز فرعی (نوار ابزار)",
+)
+def latest_currency_rates(
+	request: Request,
+	business_id: int,
+	db: Session = Depends(get_db),
+	_ctx: AuthContext = Depends(get_current_user),
+	_: None = Depends(require_business_permission_dep("currency_revaluation", "view")),
+) -> dict:
+	data = list_latest_rates_for_business(db, business_id)
+	return success_response(
+		data=format_datetime_fields(data, request),
+		request=request,
+		message="CURRENCY_RATES_LATEST",
 	)
 
 
@@ -95,6 +116,31 @@ def create_currency_rate(
 		data=format_datetime_fields(out, request),
 		request=request,
 		message="CURRENCY_RATE_CREATED",
+	)
+
+
+@router.post(
+	"/businesses/{business_id}/currency-rates/bulk",
+	summary="ثبت چند نرخ تسعیر یکجا",
+)
+def bulk_create_currency_rates(
+	request: Request,
+	business_id: int,
+	body: Dict[str, Any] = Body(...),
+	db: Session = Depends(get_db),
+	ctx: AuthContext = Depends(get_current_user),
+	_: None = Depends(require_business_permission_dep("currency_revaluation", "add")),
+) -> dict:
+	out = bulk_create_business_currency_rates(db, business_id, int(ctx.get_user_id()), body)
+	# normalize Decimal rates in created rows
+	created = []
+	for row in out.get("created") or []:
+		created.append({**row, "rate": str(row["rate"])})
+	payload = {**out, "created": created}
+	return success_response(
+		data=format_datetime_fields(payload, request),
+		request=request,
+		message="CURRENCY_RATES_BULK_CREATED",
 	)
 
 

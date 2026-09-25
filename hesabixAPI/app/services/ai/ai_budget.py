@@ -85,6 +85,11 @@ class AgentBudget:
     def elapsed_sec(self) -> float:
         return time.monotonic() - self.started_at
 
+    def remaining_wall_clock_sec(self) -> Optional[float]:
+        if self.wall_clock_sec is None:
+            return None
+        return max(0.0, self.wall_clock_sec - self.elapsed_sec)
+
     def remaining_iterations(self, current_iteration: int) -> int:
         return max(0, self.max_iterations - current_iteration)
 

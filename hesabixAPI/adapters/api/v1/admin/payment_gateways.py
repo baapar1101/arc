@@ -20,7 +20,7 @@ def _mask_config(cfg: dict) -> dict:
 	if not isinstance(cfg, dict):
 		return {}
 	masked = dict(cfg)
-	for key in ["merchant_id", "terminal_id", "username", "password", "secret", "secret_key", "api_key", "api"]:
+	for key in ["merchant_id", "terminal_id", "pin", "login_account", "username", "password", "secret", "secret_key", "api_key", "api"]:
 		if key in masked and masked[key]:
 			val = str(masked[key])
 			if len(val) > 6:
@@ -120,7 +120,7 @@ def get_payment_gateway(
 		"display_name": gw.display_name,
 		"is_active": gw.is_active,
 		"is_sandbox": gw.is_sandbox,
-		"config": _mask_config(cfg),
+		"config": cfg,
 	}
 	return success_response(data, request)
 

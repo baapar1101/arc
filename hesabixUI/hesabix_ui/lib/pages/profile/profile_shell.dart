@@ -11,9 +11,12 @@ import '../../theme/theme_controller.dart';
 import '../../widgets/language_switcher.dart';
 import '../../widgets/calendar_switcher.dart';
 import '../../widgets/theme_mode_switcher.dart';
+import '../../widgets/theme_palette_switcher.dart';
 import '../../widgets/logout_button.dart';
 import '../../widgets/notification/notification_bell_button.dart';
+import 'package:hesabix_ui/config/brand_config.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
+import '../../theme/brand_logo.dart';
 import '../../theme/tokens/extensions.dart';
 import '../../utils/responsive_helper.dart';
 
@@ -86,11 +89,6 @@ class _ProfileShellState extends State<ProfileShell> with WidgetsBindingObserver
     } catch (e) {
       // اگر GoRouterState در دسترس نیست، از default استفاده کن
     }
-    final bool isDark = Theme.of(context).brightness == Brightness.dark;
-    final String logoAsset = isDark
-        ? 'assets/images/logo-light.png'
-        : 'assets/images/logo-light.png';
-
     final t = AppLocalizations.of(context);
     final destinations = <_Dest>[
       _Dest(t.dashboard, Icons.dashboard_outlined, Icons.dashboard, '/user/profile/dashboard'),
@@ -103,7 +101,8 @@ class _ProfileShellState extends State<ProfileShell> with WidgetsBindingObserver
 
     // اضافه کردن منوی اپراتور پشتیبانی
     final operatorDestinations = <_Dest>[
-      _Dest(t.operatorPanel, Icons.support_agent, Icons.support_agent, '/user/profile/operator'),
+      _Dest('صندوق ورودی', Icons.inbox_outlined, Icons.inbox, '/user/profile/operator'),
+      _Dest('داشبورد پشتیبانی', Icons.dashboard_outlined, Icons.dashboard, '/user/profile/operator/dashboard'),
     ];
 
     // اضافه کردن منوی تنظیمات سیستم برای ادمین‌ها
@@ -165,10 +164,10 @@ class _ProfileShellState extends State<ProfileShell> with WidgetsBindingObserver
       title: Row(
         children: [
           SizedBox(width: useRail ? 12 : 8),
-          Image.asset(logoAsset, height: 22),
+          const BrandLogo(height: 22),
           const SizedBox(width: 10),
           Text(
-            t.appTitle,
+            BrandConfig.appTitle(t),
             style: Theme.of(context).textTheme.titleSmall?.copyWith(
               color: appBarFg,
               fontWeight: FontWeight.w700,
@@ -205,6 +204,8 @@ class _ProfileShellState extends State<ProfileShell> with WidgetsBindingObserver
           ),
         ],
         if (widget.themeController != null) ...[
+          ThemePaletteSwitcher(controller: widget.themeController!, toolbarCompact: true),
+          const SizedBox(width: 4),
           ThemeModeSwitcher(controller: widget.themeController!, toolbarCompact: true),
           const SizedBox(width: 6),
         ],

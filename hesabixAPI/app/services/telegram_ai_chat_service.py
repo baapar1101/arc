@@ -7,6 +7,8 @@ import logging
 
 from app.core.auth_dependency import AuthContext
 from app.services.ai.ai_service import AIService
+from app.services.ai.ai_content_sanitize import sanitize_assistant_content
+from app.core.json_safe import json_dumps_safe
 from app.services.providers.telegram_provider import TelegramProvider
 from adapters.db.repositories.telegram_repo import TelegramAISessionRepository
 from adapters.db.repositories.ai_chat_repository import AIChatSessionRepository, AIChatMessageRepository
@@ -14,6 +16,13 @@ from adapters.db.repositories.business_repo import BusinessRepository
 from adapters.db.repositories.business_permission_repo import BusinessPermissionRepository
 from app.services.business_service import get_user_businesses
 from app.services.messenger_operator.crm_web_chat_access import user_has_crm_web_chat_messenger_access
+
+from app.services.telegram_ai_chat_text import (
+	TELEGRAM_APPROVAL_HINT_FA,
+	split_telegram_text,
+	telegram_approval_inline_rows,
+)
+from app.services.ai.ai_write_guard import extract_pending_approval_ops
 
 logger = logging.getLogger(__name__)
 
@@ -268,11 +277,8 @@ class TelegramAIChatService:
 		if not availability["can_use"]:
 			return self._send_availability_error(availability)
 		
-		# ارسال پیام "در حال پردازش..."
-		self.telegram_provider.send_text(
-			chat_id=self.chat_id,
-			text="⏳ در حال پردازش..."
-		)
+		# وضعیت «در حال نوشتن» به‌جای پیام جدا (CHN-01)
+		self.telegram_provider.send_chat_action(self.chat_id, "typing")
 		
 		try:
 			
@@ -312,7 +318,10 @@ class TelegramAIChatService:
 			response = await ai_service.chat_completion(
 				messages=messages,
 				use_function_calling=True,
-				session_business_id=active_session.business_id
+				session_business_id=active_session.business_id,
+				session_id=active_session.session_id,
+				execution_mode="supervised",
+				approve_writes=False,
 			)
 			
 			# بررسی سهمیه و شارژ
@@ -321,13 +330,25 @@ class TelegramAIChatService:
 			output_tokens = usage.get("output_tokens", 0)
 			
 			charge_result = ai_service.check_quota_and_charge(input_tokens, output_tokens)
-			
+
+			assistant_content = sanitize_assistant_content(
+				response["message"]["content"] or ""
+			)
+			if response.get("awaiting_approval"):
+				assistant_content = (assistant_content or "").rstrip() + TELEGRAM_APPROVAL_HINT_FA
+
 			# ذخیره پاسخ AI
 			assistant_message = AIChatMessage(
 				session_id=active_session.session_id,
 				role=MessageRole.ASSISTANT.value,
-				content=response["message"]["content"],
-				tokens_used=input_tokens + output_tokens
+				content=assistant_content,
+				tokens_used=input_tokens + output_tokens,
+				function_calls=json_dumps_safe(response.get("_function_calls"))
+				if response.get("_function_calls")
+				else None,
+				function_results=json_dumps_safe(response.get("_function_results"))
+				if response.get("_function_results")
+				else None,
 			)
 			self.db.add(assistant_message)
 			
@@ -354,24 +375,39 @@ class TelegramAIChatService:
 						ai_session.title = generated_title[:80]
 			
 			self.db.commit()
-			
-			# ارسال پاسخ
-			response_text = response["message"]["content"]
-			# محدود کردن طول پیام (حداکثر 4096 کاراکتر)
-			if len(response_text) > 4000:
-				response_text = response_text[:4000] + "\n\n... (متن کامل در برنامه قابل مشاهده است)"
-			
-			buttons = [
-				[{"text": "💬 سوال دیگر", "callback_data": "chat:ask"}],
-				[{"text": "⬅️ بازگشت", "callback_data": "back:chat"}]
-			]
-			keyboard = self._build_inline_keyboard(buttons)
-			
-			return self.telegram_provider.send_text(
-				chat_id=self.chat_id,
-				text=response_text,
-				reply_markup=keyboard
+
+			from app.services.ai.ai_memory_hooks import schedule_memory_update_after_chat
+
+			if active_session.business_id:
+				schedule_memory_update_after_chat(
+					active_session.session_id,
+					int(active_session.business_id),
+					user_context,
+				)
+
+			# ارسال پاسخ (صفحه‌بندی به‌جای برش ۴۰۰۰ کاراکتر)
+			chunks = split_telegram_text(assistant_content)
+			pending_ops = extract_pending_approval_ops(
+				response.get("_function_results")
 			)
+			buttons = telegram_approval_inline_rows(pending_ops)
+			buttons.extend(
+				[
+					[{"text": "💬 سوال دیگر", "callback_data": "chat:ask"}],
+					[{"text": "⬅️ بازگشت", "callback_data": "back:chat"}],
+				]
+			)
+			keyboard = self._build_inline_keyboard(buttons)
+			sent_ok = True
+			for index, chunk in enumerate(chunks):
+				ok = self.telegram_provider.send_text(
+					chat_id=self.chat_id,
+					text=chunk,
+					parse_mode=None,
+					reply_markup=keyboard if index == len(chunks) - 1 else None,
+				)
+				sent_ok = sent_ok and bool(ok)
+			return sent_ok
 			
 		except Exception as e:
 			logger.error(f"Error processing AI message: {e}", exc_info=True)
@@ -426,6 +462,172 @@ class TelegramAIChatService:
 			return self.telegram_provider.send_text(
 				chat_id=self.chat_id,
 				text=error_message
+			)
+
+	async def confirm_pending_write(
+		self,
+		approval_id: str,
+		user_context: AuthContext,
+		*,
+		approved: bool,
+	) -> bool:
+		"""تأیید یا رد کارت نوشتن از دکمهٔ inline تلگرام (CHN-01)."""
+		aid = (approval_id or "").strip()
+		if not aid:
+			return self.telegram_provider.send_text(
+				chat_id=self.chat_id,
+				text="❌ شناسهٔ تأیید نامعتبر است.",
+			)
+
+		active_session = self.session_repo.get_active_session(self.user_id, self.chat_id)
+		if not active_session or not active_session.session_id or not active_session.business_id:
+			return self.telegram_provider.send_text(
+				chat_id=self.chat_id,
+				text="❌ ابتدا یک کسب‌وکار را انتخاب کنید.",
+				reply_markup=self._build_inline_keyboard([
+					[{"text": "🏢 انتخاب کسب‌وکار", "callback_data": "menu:chat"}]
+				]),
+			)
+
+		if not approved:
+			return self.telegram_provider.send_text(
+				chat_id=self.chat_id,
+				text="عملیات رد شد. تغییری اعمال نشد.",
+				reply_markup=self._build_inline_keyboard([
+					[{"text": "💬 سوال دیگر", "callback_data": "chat:ask"}],
+					[{"text": "⬅️ بازگشت", "callback_data": "back:chat"}],
+				]),
+			)
+
+		from adapters.db.models.ai_chat_message import AIChatMessage, MessageRole
+		import json
+
+		last_assistant = (
+			self.db.query(AIChatMessage)
+			.filter(
+				AIChatMessage.session_id == active_session.session_id,
+				AIChatMessage.role == MessageRole.ASSISTANT.value,
+			)
+			.order_by(AIChatMessage.created_at.desc())
+			.first()
+		)
+		if not last_assistant or not last_assistant.function_results:
+			return self.telegram_provider.send_text(
+				chat_id=self.chat_id,
+				text="❌ کارت تأیید منقضی شده است. دوباره درخواست را بفرستید.",
+			)
+		try:
+			stored = json.loads(last_assistant.function_results)
+		except (TypeError, ValueError, json.JSONDecodeError):
+			stored = {}
+		matched = [
+			op
+			for op in extract_pending_approval_ops(stored)
+			if str(op.get("approval_id") or "") == aid
+		]
+		if not matched:
+			return self.telegram_provider.send_text(
+				chat_id=self.chat_id,
+				text="❌ این تأیید دیگر معتبر نیست.",
+			)
+
+		self.telegram_provider.send_chat_action(self.chat_id, "typing")
+		confirm_text = "کاربر عملیات را از تلگرام تأیید کرد. همان عملیات تأییدشده را اجرا کن."
+		previous_messages = self.ai_message_repo.get_session_messages(
+			active_session.session_id,
+			limit=50,
+		)
+		messages = []
+		for msg in previous_messages:
+			messages.append({
+				"role": msg.role if isinstance(msg.role, str) else getattr(msg.role, "value", msg.role),
+				"content": msg.content,
+			})
+		messages.append({"role": "user", "content": confirm_text})
+
+		user_message = AIChatMessage(
+			session_id=active_session.session_id,
+			role=MessageRole.USER.value,
+			content=confirm_text,
+			tokens_used=0,
+		)
+		self.db.add(user_message)
+		self.db.commit()
+
+		ai_service = AIService(self.db, user_context, active_session.business_id)
+		availability = ai_service.check_availability(estimated_tokens=400)
+		if not availability["can_use"]:
+			return self._send_availability_error(availability)
+
+		try:
+			response = await ai_service.chat_completion(
+				messages=messages,
+				use_function_calling=True,
+				session_business_id=active_session.business_id,
+				session_id=active_session.session_id,
+				execution_mode="supervised",
+				approve_writes=True,
+				approved_write_calls=matched,
+			)
+			usage = response.get("usage") or {}
+			input_tokens = usage.get("input_tokens", 0)
+			output_tokens = usage.get("output_tokens", 0)
+			charge_result = ai_service.check_quota_and_charge(input_tokens, output_tokens)
+			assistant_content = sanitize_assistant_content(
+				response["message"]["content"] or ""
+			)
+			assistant_message = AIChatMessage(
+				session_id=active_session.session_id,
+				role=MessageRole.ASSISTANT.value,
+				content=assistant_content,
+				tokens_used=input_tokens + output_tokens,
+				function_calls=json_dumps_safe(response.get("_function_calls"))
+				if response.get("_function_calls")
+				else None,
+				function_results=json_dumps_safe(response.get("_function_results"))
+				if response.get("_function_results")
+				else None,
+			)
+			self.db.add(assistant_message)
+			ai_service.log_usage(
+				provider=ai_service.config.provider if ai_service.config else "openai",
+				model=ai_service.config.model_name if ai_service.config else "gpt-4",
+				input_tokens=input_tokens,
+				output_tokens=output_tokens,
+				cost=charge_result.get("cost", 0),
+				payment_method=charge_result.get("payment_method", "free"),
+				wallet_transaction_id=charge_result.get("wallet_transaction_id"),
+				document_id=charge_result.get("document_id"),
+			)
+			self.db.commit()
+			from app.services.ai.ai_memory_hooks import schedule_memory_update_after_chat
+
+			if active_session.business_id:
+				schedule_memory_update_after_chat(
+					active_session.session_id,
+					int(active_session.business_id),
+					user_context,
+				)
+			chunks = split_telegram_text(assistant_content)
+			keyboard = self._build_inline_keyboard([
+				[{"text": "💬 سوال دیگر", "callback_data": "chat:ask"}],
+				[{"text": "⬅️ بازگشت", "callback_data": "back:chat"}],
+			])
+			sent_ok = True
+			for index, chunk in enumerate(chunks):
+				ok = self.telegram_provider.send_text(
+					chat_id=self.chat_id,
+					text=chunk,
+					parse_mode=None,
+					reply_markup=keyboard if index == len(chunks) - 1 else None,
+				)
+				sent_ok = sent_ok and bool(ok)
+			return sent_ok
+		except Exception as e:
+			logger.error(f"Error confirming telegram write: {e}", exc_info=True)
+			return self.telegram_provider.send_text(
+				chat_id=self.chat_id,
+				text="❌ خطا در اجرای عملیات تأییدشده. لطفاً دوباره امتحان کنید.",
 			)
 	
 	def _send_availability_error(self, availability: Dict[str, Any]) -> bool:

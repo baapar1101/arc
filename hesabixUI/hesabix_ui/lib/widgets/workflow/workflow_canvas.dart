@@ -9,6 +9,7 @@ import '../../models/workflow_editor_state.dart';
 import '../../utils/workflow_constants.dart';
 import 'workflow_connection_painter.dart';
 import 'workflow_node_widget.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 /// Canvas اصلی برای نمایش و ویرایش workflow
 class WorkflowCanvas extends StatefulWidget {
@@ -295,6 +296,7 @@ class _WorkflowCanvasState extends State<WorkflowCanvas> with SingleTickerProvid
                   painter: SelectionBoxPainter(
                     start: widget.state.selectionStart!,
                     end: widget.state.selectionEnd!,
+                    color: Theme.of(context).colorScheme.primary,
                   ),
                   size: Size.infinite,
                 ),
@@ -456,7 +458,7 @@ class _WorkflowCanvasState extends State<WorkflowCanvas> with SingleTickerProvid
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.error_outline, size: 48, color: Colors.red),
+            Icon(Icons.error_outline, size: 48, color: SemanticColorResolver.negative(context)),
             const SizedBox(height: 16),
             Text(
               '${AppLocalizations.of(context).workflowErrorDisplay}: ${ErrorExtractor.forContext(e, context)}',
@@ -675,10 +677,12 @@ class GridPainter extends CustomPainter {
 class SelectionBoxPainter extends CustomPainter {
   final Offset start;
   final Offset end;
+  final Color color;
 
   SelectionBoxPainter({
     required this.start,
     required this.end,
+    required this.color,
   });
 
   @override
@@ -692,13 +696,13 @@ class SelectionBoxPainter extends CustomPainter {
     
     // رسم پس‌زمینه
     final fillPaint = Paint()
-      ..color = Colors.blue.withOpacity(0.1)
+      ..color = color.withValues(alpha: 0.1)
       ..style = PaintingStyle.fill;
     canvas.drawRect(rect, fillPaint);
     
     // رسم border
     final borderPaint = Paint()
-      ..color = Colors.blue
+      ..color = color
       ..style = PaintingStyle.stroke
       ..strokeWidth = 2.0;
     canvas.drawRect(rect, borderPaint);
@@ -706,7 +710,7 @@ class SelectionBoxPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(SelectionBoxPainter oldDelegate) {
-    return oldDelegate.start != start || oldDelegate.end != end;
+    return oldDelegate.start != start || oldDelegate.end != end || oldDelegate.color != color;
   }
 }
 

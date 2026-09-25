@@ -54,6 +54,26 @@ class TransferCreateRequest(BaseModel):
         example=1,
         gt=0
     )
+    destination_amount: Optional[Decimal] = Field(
+        None,
+        description="مبلغ مقصد به ارز حساب مقصد (انتقال بین‌ارزی)",
+        gt=0,
+    )
+    fx_rate: Optional[Decimal] = Field(
+        None,
+        description="نرخ تبدیل: ۱ واحد ارز غیرپایه = fx_rate × ارز پایه (یا نرخ متقاطع مبدأ→مقصد برای فرعی↔فرعی)",
+        gt=0,
+    )
+    source_rate_to_base: Optional[Decimal] = Field(
+        None,
+        description="نرخ مبدأ به پایه (E1)؛ در صورت نبود از جدول نرخ‌ها خوانده می‌شود",
+        gt=0,
+    )
+    destination_rate_to_base: Optional[Decimal] = Field(
+        None,
+        description="نرخ مقصد به پایه (E1)؛ در صورت نبود از جدول نرخ‌ها خوانده می‌شود",
+        gt=0,
+    )
     description: Optional[str] = Field(
         None, 
         description="توضیحات سند (حداکثر 1000 کاراکتر)",

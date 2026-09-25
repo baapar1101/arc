@@ -1,8 +1,5 @@
 import 'dart:convert';
-import 'dart:typed_data';
 
-import 'package:file_saver/file_saver.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/services.dart';
@@ -15,7 +12,9 @@ import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../widgets/business_subpage_back_leading.dart';
 import '../../widgets/marketplace/moadian_plugin_gate.dart';
-import '../../utils/web/web_utils.dart' as web_utils;
+import 'package:hesabix_ui/config/brand_config.dart';
+import 'package:hesabix_ui/services/bytes_export/bytes_export_service.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 class TaxSettingsPage extends StatefulWidget {
   final int businessId;
@@ -175,14 +174,34 @@ class _TaxSettingsPageState extends State<TaxSettingsPage> {
 
   Future<void> _testConnection() async {
     final t = AppLocalizations.of(context);
-    
+
     setState(() {
       _saving = true;
       _error = null;
     });
-    
+
     try {
-      final result = await _service.testConnection(widget.businessId);
+      final memoryId = _normalizeTaxMemoryId(_taxMemoryIdController.text);
+      final economicCode = _convertDigitsToEnglish(
+        _economicCodeController.text.trim(),
+      );
+      final formPayload = <String, dynamic>{
+        'tax_memory_id': memoryId,
+        'economic_code': economicCode,
+        'private_key': _privateKeyController.text.trim(),
+        if (_publicKeyController.text.trim().isNotEmpty)
+          'public_key': _publicKeyController.text.trim(),
+        if (_certificateController.text.trim().isNotEmpty)
+          'certificate': _certificateController.text.trim(),
+        if (_certificateRequestController.text.trim().isNotEmpty)
+          'certificate_request': _certificateRequestController.text.trim(),
+        'sandbox_mode': _sandboxMode,
+      };
+
+      final result = await _service.testConnection(
+        widget.businessId,
+        formPayload: formPayload,
+      );
       
       if (!mounted) return;
       
@@ -215,12 +234,12 @@ class _TaxSettingsPageState extends State<TaxSettingsPage> {
                         ? Icons.gpp_bad
                         : Icons.warning_amber,
                 color: isOk
-                    ? Colors.green
+                    ? SemanticColorResolver.positive(context)
                     : isIdentityIssue
-                        ? Colors.red
-                        : Colors.orange,
+                        ? SemanticColorResolver.negative(context)
+                        : SemanticColorResolver.warning(context),
               ),
-              const SizedBox(width: 8),
+              SizedBox(width: 8),
               Expanded(child: Text(t.taxTestConnectionResultTitle)),
             ],
           ),
@@ -277,12 +296,12 @@ class _TaxSettingsPageState extends State<TaxSettingsPage> {
                     Container(
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
-                        color: Colors.orange.shade100,
+                        color: SemanticColorResolver.warning(context).withValues(alpha: 0.18),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Row(
                         children: [
-                          const Icon(Icons.warning_amber, color: Colors.orange),
+                          Icon(Icons.warning_amber, color: SemanticColorResolver.warning(context)),
                           const SizedBox(width: 8),
                           Expanded(child: Text(t.taxSandboxModeActive)),
                         ],
@@ -346,7 +365,7 @@ class _TaxSettingsPageState extends State<TaxSettingsPage> {
         ? Theme.of(context).colorScheme.error
         : level == 'info'
             ? Theme.of(context).colorScheme.primary
-            : Colors.orange.shade800;
+            : SemanticColorResolver.warning(context);
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: Row(
@@ -418,12 +437,12 @@ class _TaxSettingsPageState extends State<TaxSettingsPage> {
       decoration: BoxDecoration(
         color: hasError
             ? Theme.of(context).colorScheme.errorContainer.withOpacity(0.5)
-            : Colors.orange.shade50,
+            : SemanticColorResolver.warning(context).withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
           color: hasError
               ? Theme.of(context).colorScheme.error
-              : Colors.orange.shade300,
+              : SemanticColorResolver.warning(context).withValues(alpha: 0.5),
         ),
       ),
       child: Column(
@@ -435,7 +454,7 @@ class _TaxSettingsPageState extends State<TaxSettingsPage> {
                 hasError ? Icons.gpp_bad : Icons.warning_amber,
                 color: hasError
                     ? Theme.of(context).colorScheme.error
-                    : Colors.orange.shade800,
+                    : SemanticColorResolver.warning(context),
               ),
               const SizedBox(width: 8),
               Text(
@@ -882,19 +901,12 @@ class _TaxSettingsPageState extends State<TaxSettingsPage> {
     final bytes = utf8.encode(trimmed);
 
     try {
-      if (kIsWeb) {
-        await web_utils.saveBytesAsFileWeb(
-          bytes,
-          safeName,
-          mimeType: 'text/plain',
-        );
-      } else {
-        await FileSaver.instance.saveFile(
-          name: safeName,
-          bytes: Uint8List.fromList(bytes),
-          ext: _extractExtension(safeName),
-        );
-      }
+      final result = await BytesExportService.export(
+        bytes: bytes,
+        filename: safeName,
+        mimeType: 'text/plain',
+      );
+      if (mounted) BytesExportService.showFeedback(context, result);
     } catch (e) {
       if (mounted) {
         SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
@@ -902,13 +914,6 @@ class _TaxSettingsPageState extends State<TaxSettingsPage> {
     }
   }
 
-  String _extractExtension(String filename) {
-    final dotIndex = filename.lastIndexOf('.');
-    if (dotIndex == -1 || dotIndex == filename.length - 1) {
-      return 'txt';
-    }
-    return filename.substring(dotIndex + 1);
-  }
 
   String _convertDigitsToEnglish(String input) {
     if (input.isEmpty) return input;
@@ -1512,6 +1517,7 @@ class _TaxSettingsPageState extends State<TaxSettingsPage> {
   }
 
   Widget _buildGuideIntro(AppLocalizations t, ColorScheme cs) {
+    String _b(String s) => BrandConfig.rebrandText(t, s);
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -1524,7 +1530,7 @@ class _TaxSettingsPageState extends State<TaxSettingsPage> {
             ),
             const SizedBox(height: 8),
             Text(
-              t.taxGuideIntroDescription,
+              _b(t.taxGuideIntroDescription),
               style: Theme.of(context).textTheme.bodyMedium,
             ),
             const SizedBox(height: 16),
@@ -1533,7 +1539,7 @@ class _TaxSettingsPageState extends State<TaxSettingsPage> {
               style: Theme.of(context).textTheme.titleSmall,
             ),
             const SizedBox(height: 8),
-            _buildGuideBullet(t.taxGuidePrereqItem1, cs),
+            _buildGuideBullet(_b(t.taxGuidePrereqItem1), cs),
             _buildGuideBullet(t.taxGuidePrereqItem2, cs),
             _buildGuideBullet(t.taxGuidePrereqItem3, cs),
           ],
@@ -1618,9 +1624,10 @@ class _TaxSettingsPageState extends State<TaxSettingsPage> {
   }
 
   List<_TaxGuideStep> _buildGuideSteps(AppLocalizations t) {
+    String _b(String s) => BrandConfig.rebrandText(t, s);
     return [
       _TaxGuideStep(
-        title: t.taxGuideStep1Title,
+        title: _b(t.taxGuideStep1Title),
         description: t.taxGuideStep1Description,
         bullets: [
           t.taxGuideStep1Bullet1,
@@ -1649,12 +1656,12 @@ class _TaxSettingsPageState extends State<TaxSettingsPage> {
         bullets: [
           t.taxGuideStep3Bullet1,
           t.taxGuideStep3Bullet2,
-          t.taxGuideStep3Bullet3,
+          _b(t.taxGuideStep3Bullet3),
         ],
         assetPaths: const ['assets/images/moadian/5.jpg'],
       ),
       _TaxGuideStep(
-        title: t.taxGuideStep4Title,
+        title: _b(t.taxGuideStep4Title),
         description: t.taxGuideStep4Description,
         bullets: [
           t.taxGuideStep4Bullet1,
@@ -1668,7 +1675,7 @@ class _TaxSettingsPageState extends State<TaxSettingsPage> {
         bullets: [
           t.taxGuideStep5Bullet1,
           t.taxGuideStep5Bullet2,
-          t.taxGuideStep5Bullet3,
+          _b(t.taxGuideStep5Bullet3),
         ],
         assetPaths: const ['assets/images/moadian/6.jpg'],
       ),

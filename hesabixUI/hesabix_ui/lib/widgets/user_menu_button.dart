@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'calendar_switcher.dart';
 import 'language_switcher.dart';
 import 'theme_mode_switcher.dart';
+import 'theme_palette_switcher.dart';
 import 'logout_button.dart';
 import '../core/auth_store.dart';
 import '../core/locale_controller.dart';
@@ -36,6 +37,8 @@ class UserMenuButton extends StatelessWidget {
           const SizedBox(width: 8),
         ],
         if (themeController != null) ...[
+          ThemePaletteSwitcher(controller: themeController!),
+          const SizedBox(width: 8),
           ThemeModeSwitcher(controller: themeController!),
           const SizedBox(width: 8),
         ],

@@ -65,7 +65,8 @@ enum AIPlanType {
   free,
   subscription,
   payAsGo,
-  hybrid;
+  hybrid,
+  byok;
 
   String get value {
     switch (this) {
@@ -77,6 +78,8 @@ enum AIPlanType {
         return 'pay_as_go';
       case AIPlanType.hybrid:
         return 'hybrid';
+      case AIPlanType.byok:
+        return 'byok';
     }
   }
 
@@ -90,6 +93,8 @@ enum AIPlanType {
         return AIPlanType.payAsGo;
       case 'hybrid':
         return AIPlanType.hybrid;
+      case 'byok':
+        return AIPlanType.byok;
       default:
         return AIPlanType.free;
     }
@@ -307,6 +312,40 @@ class AIChatSession {
       updatedAt: updatedAt ?? this.updatedAt,
     );
   }
+}
+
+class AIChatActiveRun {
+  final String runId;
+  final String status;
+  final bool live;
+  final bool canContinue;
+  final int lastEventId;
+  final String? stopReason;
+  final String? stopMessageFa;
+
+  const AIChatActiveRun({
+    required this.runId,
+    required this.status,
+    this.live = false,
+    this.canContinue = false,
+    this.lastEventId = 0,
+    this.stopReason,
+    this.stopMessageFa,
+  });
+
+  factory AIChatActiveRun.fromJson(Map<String, dynamic> json) {
+    return AIChatActiveRun(
+      runId: json['run_id']?.toString() ?? '',
+      status: json['status']?.toString() ?? '',
+      live: json['live'] as bool? ?? false,
+      canContinue: json['can_continue'] as bool? ?? false,
+      lastEventId: (json['last_event_id'] as num?)?.toInt() ?? 0,
+      stopReason: json['stop_reason'] as String?,
+      stopMessageFa: json['stop_message_fa'] as String?,
+    );
+  }
+
+  bool get isGenerating => live || status == 'running';
 }
 
 enum MessageRole {

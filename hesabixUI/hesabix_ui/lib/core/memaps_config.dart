@@ -1,9 +1,8 @@
-/// تنظیمات عمومی سرویس نقشه می‌مپس (فاز A — تایل + جستجو).
+/// تنظیمات پیش‌فرض سرویس می‌مپس (جستجو و مرکز نقشه).
 abstract final class MemapsConfig {
-  static const String tileUrlTemplate = 'https://memaps.ir/hot/{z}/{x}/{y}.png';
-  static const String tileUrlRetinaTemplate = 'https://memaps.ir/hot/{z}/{x}/{y}@2x.png';
   static const String searchPlacesUrl = 'https://memaps.ir/api/search/places';
-  static const String attribution = '© OpenStreetMap · © می‌مپس';
+  static const String usageGuideUrl = 'https://memaps.ir/usage';
+  static const String panelUrl = 'https://memaps.ir/';
 
   /// مرکز پیش‌فرض (تهران) وقتی مارکری نیست.
   static const double defaultLat = 35.6892;

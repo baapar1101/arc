@@ -26,6 +26,18 @@ class Ticket(Base):
     # Additional fields
     is_internal: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)  # آیا تیکت داخلی است؟
     closed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+    first_response_due_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    resolution_due_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    first_responded_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    sla_breached: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+
+    user_last_read_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    operator_last_read_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    csat_rating: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    csat_comment: Mapped[str | None] = mapped_column(Text, nullable=True)
+    csat_submitted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    last_message_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, index=True)
     
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
@@ -38,3 +50,5 @@ class Ticket(Base):
     priority = relationship("Priority", back_populates="tickets")
     status = relationship("Status", back_populates="tickets")
     messages = relationship("Message", back_populates="ticket", cascade="all, delete-orphan", order_by="Message.created_at")
+    events = relationship("TicketEvent", back_populates="ticket", cascade="all, delete-orphan", order_by="TicketEvent.created_at")
+    attachments = relationship("SupportAttachment", back_populates="ticket", cascade="all, delete-orphan")

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import re
 from typing import Dict, Any, List
 
 from sqlalchemy.orm import Session
@@ -10,22 +9,26 @@ from adapters.db.models.product import Product
 from adapters.db.models.invoice_item_line import InvoiceItemLine
 from app.integrations.moadian.utils import (
     validate_tax_code,
-    validate_national_id,
-    validate_economic_code,
 )
 
 
 def validate_document_for_tax(db: Session, document) -> Dict[str, Any]:
     """
     بررسی کامل داده‌های لازم برای ارسال فاکتور به سامانه مودیان.
-    
+
     بررسی‌ها:
-    - اطلاعات طرف حساب (کد ملی، کد اقتصادی)
+    - وجود طرف حساب (برای ثبت حسابداری فاکتور)
     - کد مالیاتی کالاها (13 رقم)
     - واحد مالیاتی کالاها
     - صحیح بودن مبالغ مالیات (بدون اعشار)
     - محدودیت‌های دیگر
-    
+
+    شناسه مالیاتی خریدار (کد ملی / کد اقتصادی) الزامی نیست:
+    در صورت نبود هویت کامل خریدار، سازنده فاکتور آن را به‌صورت نوع ۲
+    (مصرف‌کننده نهایی، بدون فیلد خریدار) به مودیان می‌فرستد.
+    کدهای نامعتبر نیز در builder نادیده گرفته می‌شوند و به نوع ۲ می‌انجامند؛
+    اینجا بلاک نمی‌شوند تا با رفتار سامانه و builder هم‌خوان باشد.
+
     Returns:
         {
             "valid": bool,
@@ -35,10 +38,10 @@ def validate_document_for_tax(db: Session, document) -> Dict[str, Any]:
     issues: List[Dict[str, Any]] = []
     extra = document.extra_info or {}
 
-    # 1. بررسی اطلاعات شخص
+    # 1. بررسی اطلاعات شخص (وجود طرف‌حساب؛ نه الزام شناسه مالیاتی)
     person_id = extra.get("person_id")
     person: Person | None = None
-    
+
     if not person_id:
         issues.append({
             "code": "PERSON_MISSING",
@@ -46,48 +49,13 @@ def validate_document_for_tax(db: Session, document) -> Dict[str, Any]:
         })
     else:
         person = db.query(Person).filter(Person.id == int(person_id)).first()
-        
+
         if not person:
             issues.append({
                 "code": "PERSON_NOT_FOUND",
                 "message": "طرف حساب انتخاب شده یافت نشد.",
             })
-        else:
-            # بررسی کد ملی
-            national_id = (person.national_id or "").strip()
-            economic_code = (person.economic_id or "").strip()
-            
-            # استخراج نام شخص برای استفاده در پیام‌های خطا
-            person_name = person.alias_name or (
-                f"{person.first_name or ''} {person.last_name or ''}".strip() 
-                if person.first_name or person.last_name 
-                else person.company_name or "نامشخص"
-            )
-            
-            if not national_id and not economic_code:
-                issues.append({
-                    "code": "PERSON_TAX_ID_MISSING",
-                    "message": "طرف حساب فاقد کد ملی و شناسه اقتصادی است.",
-                    "meta": {"person_id": person.id, "person_name": person_name},
-                })
-            else:
-                # اعتبارسنجی کد ملی
-                if national_id:
-                    is_valid, person_type = validate_national_id(national_id)
-                    if not is_valid:
-                        issues.append({
-                            "code": "PERSON_NATIONAL_ID_INVALID",
-                            "message": f"کد ملی طرف حساب '{person_name}' نامعتبر است (باید 10 یا 11 رقم باشد).",
-                            "meta": {"person_id": person.id, "national_id": national_id},
-                        })
-                
-                # اعتبارسنجی کد اقتصادی
-                if economic_code and not validate_economic_code(economic_code):
-                    issues.append({
-                        "code": "PERSON_ECONOMIC_CODE_INVALID",
-                        "message": f"کد اقتصادی طرف حساب '{person_name}' نامعتبر است (باید 11 یا 14 رقم باشد).",
-                        "meta": {"person_id": person.id, "economic_code": economic_code},
-                    })
+        # else: کد ملی/اقتصادی اختیاری است → نوع ۱ یا ۲ در invoice_builder تعیین می‌شود
 
     # 2. بررسی اقلام فاکتور
     item_lines: List[InvoiceItemLine] = (

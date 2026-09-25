@@ -1,0 +1,22 @@
+[Unit]
+Description=Hesabix Telephony Connector (Issabel/Asterisk ↔ Hesabix)
+Documentation=https://source.hesabix.ir/hesabix/arc/src/branch/master/extraScripts/HesabixTelephonyConnector
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/HesabixTelephonyConnector
+EnvironmentFile=/opt/HesabixTelephonyConnector/.env
+# مفسر توسط hesabix-pbx install/update به پایتون ≥3.8 بازنویسی می‌شود
+# (روی Issabel/Rocky8 مسیر /usr/bin/python3 معمولاً 3.6 است و کار نمی‌کند)
+ExecStart=/usr/bin/python3 /opt/HesabixTelephonyConnector/app/main.py
+Restart=always
+RestartSec=5
+TimeoutStopSec=20
+# امنیت پایه
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

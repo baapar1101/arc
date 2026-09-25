@@ -9,6 +9,7 @@ import 'package:hesabix_ui/constants/frequent_description_scope.dart';
 import 'package:hesabix_ui/widgets/inputs/frequent_description_text_field.dart';
 import 'package:hesabix_ui/widgets/invoice/account_tree_combobox_widget.dart';
 import '../../utils/snackbar_helper.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 int _documentLineUidSeq = 0;
 String _newDocumentLineUid() => '${DateTime.now().microsecondsSinceEpoch}_${_documentLineUidSeq++}';
@@ -324,7 +325,7 @@ class _DocumentLinesEditorState extends State<DocumentLinesEditor> {
                 IconButton(
                   tooltip: 'حذف سطر',
                   onPressed: () => _removeLine(index),
-                  icon: const Icon(Icons.delete, color: Colors.red),
+                  icon: Icon(Icons.delete, color: SemanticColorResolver.negative(context)),
                 ),
               ],
             ),
@@ -648,13 +649,13 @@ class _DocumentLinesEditorState extends State<DocumentLinesEditor> {
               },
             ),
           ),
-          const SizedBox(width: 8),
+          SizedBox(width: 8),
 
           // دکمه حذف
           SizedBox(
             width: 48,
             child: IconButton(
-              icon: const Icon(Icons.delete, color: Colors.red),
+              icon: Icon(Icons.delete, color: SemanticColorResolver.negative(context)),
               tooltip: 'حذف سطر',
               onPressed: () => _removeLine(index),
             ),
@@ -670,7 +671,7 @@ class _DocumentLinesEditorState extends State<DocumentLinesEditor> {
       elevation: 2,
       color: _isBalanced
           ? theme.colorScheme.primaryContainer.withValues(alpha: 0.3)
-          : Colors.orange.shade50,
+          : SemanticColorResolver.warning(context).withValues(alpha: 0.12),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Row(
@@ -679,19 +680,19 @@ class _DocumentLinesEditorState extends State<DocumentLinesEditor> {
             // جمع بدهکار
             Column(
               children: [
-                const Text(
+                Text(
                   'جمع بدهکار',
                   style: TextStyle(
                     fontWeight: FontWeight.w600,
                     color: Colors.grey,
                   ),
                 ),
-                const SizedBox(height: 8),
+                SizedBox(height: 8),
                 Text(
                   formatWithThousands(_totalDebit),
                   style: theme.textTheme.titleLarge?.copyWith(
                     fontWeight: FontWeight.bold,
-                    color: Colors.red,
+                    color: SemanticColorResolver.negative(context),
                   ),
                   textDirection: TextDirection.ltr,
                 ),
@@ -707,19 +708,19 @@ class _DocumentLinesEditorState extends State<DocumentLinesEditor> {
             // جمع بستانکار
             Column(
               children: [
-                const Text(
+                Text(
                   'جمع بستانکار',
                   style: TextStyle(
                     fontWeight: FontWeight.w600,
                     color: Colors.grey,
                   ),
                 ),
-                const SizedBox(height: 8),
+                SizedBox(height: 8),
                 Text(
                   formatWithThousands(_totalCredit),
                   style: theme.textTheme.titleLarge?.copyWith(
                     fontWeight: FontWeight.bold,
-                    color: Colors.green,
+                    color: SemanticColorResolver.positive(context),
                   ),
                   textDirection: TextDirection.ltr,
                 ),
@@ -735,28 +736,28 @@ class _DocumentLinesEditorState extends State<DocumentLinesEditor> {
             // مانده
             Column(
               children: [
-                const Text(
+                Text(
                   'مانده',
                   style: TextStyle(
                     fontWeight: FontWeight.w600,
                     color: Colors.grey,
                   ),
                 ),
-                const SizedBox(height: 8),
+                SizedBox(height: 8),
                 Row(
                   children: [
                     Text(
                       formatWithThousands(_balance.abs()),
                       style: theme.textTheme.titleLarge?.copyWith(
                         fontWeight: FontWeight.bold,
-                        color: _isBalanced ? Colors.green : Colors.orange,
+                        color: _isBalanced ? SemanticColorResolver.positive(context) : SemanticColorResolver.warning(context),
                       ),
                       textDirection: TextDirection.ltr,
                     ),
-                    const SizedBox(width: 8),
+                    SizedBox(width: 8),
                     Icon(
                       _isBalanced ? Icons.check_circle : Icons.warning,
-                      color: _isBalanced ? Colors.green : Colors.orange,
+                      color: _isBalanced ? SemanticColorResolver.positive(context) : SemanticColorResolver.warning(context),
                       size: 20,
                     ),
                   ],
@@ -769,10 +770,10 @@ class _DocumentLinesEditorState extends State<DocumentLinesEditor> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
-                  color: Colors.orange,
+                  color: SemanticColorResolver.warning(context),
                   borderRadius: BorderRadius.circular(16),
                 ),
-                child: const Text(
+                child: Text(
                   '⚠️ سند متوازن نیست',
                   style: TextStyle(
                     color: Colors.white,
@@ -784,7 +785,7 @@ class _DocumentLinesEditorState extends State<DocumentLinesEditor> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 decoration: BoxDecoration(
-                  color: Colors.green,
+                  color: SemanticColorResolver.positive(context),
                   borderRadius: BorderRadius.circular(16),
                 ),
                 child: const Text(

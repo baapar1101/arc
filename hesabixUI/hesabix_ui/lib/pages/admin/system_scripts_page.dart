@@ -5,6 +5,7 @@ import '../../core/api_client.dart';
 import '../../services/admin_scripts_service.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 class SystemScriptsPage extends StatefulWidget {
   const SystemScriptsPage({super.key});
@@ -135,13 +136,13 @@ class _SystemScriptsPageState extends State<SystemScriptsPage> {
   Color _statusColor(String status, ColorScheme scheme) {
     switch (status) {
       case 'completed':
-        return Colors.green;
+        return SemanticColorResolver.positive(context);
       case 'running':
         return scheme.primary;
       case 'failed':
         return scheme.error;
       case 'cancelled':
-        return Colors.orange;
+        return SemanticColorResolver.warning(context);
       default:
         return scheme.secondary;
     }
@@ -281,15 +282,15 @@ class _SystemScriptsPageState extends State<SystemScriptsPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('جزئیات اجرا #${run['id'] ?? ''}', style: const TextStyle(fontWeight: FontWeight.bold)),
-        const SizedBox(height: 8),
+        Text('جزئیات اجرا #${run['id'] ?? ''}', style: TextStyle(fontWeight: FontWeight.bold)),
+        SizedBox(height: 8),
         Text('وضعیت: ${run['status'] ?? '-'}'),
         Text('dry_run: ${run['dry_run'] == true ? 'true' : 'false'}'),
         Text('updated: ${run['updated_count'] ?? 0} / scanned: ${run['scanned_count'] ?? 0}'),
         if ((run['error_text'] ?? '').toString().isNotEmpty)
           Padding(
             padding: const EdgeInsets.only(top: 8),
-            child: Text('خطا: ${run['error_text']}', style: const TextStyle(color: Colors.red)),
+            child: Text('خطا: ${run['error_text']}', style: TextStyle(color: SemanticColorResolver.negative(context))),
           ),
         const SizedBox(height: 12),
         const Text('لاگ اجرا', style: TextStyle(fontWeight: FontWeight.bold)),

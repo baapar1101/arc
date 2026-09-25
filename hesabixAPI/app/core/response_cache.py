@@ -15,7 +15,7 @@ from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.core.cache import get_cache
-from app.core.auth_dependency import get_current_user, AuthContext
+from app.core.auth_dependency import get_current_user, AuthContext, resolve_response_cache_vary_ids
 from adapters.db.session import get_db_session
 from app.core.responses import ApiError
 
@@ -64,22 +64,22 @@ def generate_cache_key(request: Request, vary_params: list[str] = None) -> str:
         if header in request.headers:
             headers[header] = request.headers[header]
 
-    # استخراج user_id/business_id به صورت امن:
-    # نکته امنیتی: به X-Business-ID اعتماد نمی‌کنیم؛ از AuthContext (که خودش validate می‌کند) استفاده می‌کنیم.
+    # استخراج user_id/business_id — ابتدا از Redis (بدون query users)، در غیر این صورت auth کامل
     user_id: Optional[int] = None
     business_id: Optional[int] = None
-    try:
-        with get_db_session() as db:
-            ctx = get_current_user(request, db)
-            user_id = ctx.get_user_id()
-            business_id = ctx.business_id
-    except ApiError:
-        # اگر احراز هویت نشد یا خطای دسترسی داشت، در cache-key user/business را لحاظ نمی‌کنیم
-        user_id = None
-        business_id = None
-    except Exception:
-        user_id = None
-        business_id = None
+    user_id, business_id = resolve_response_cache_vary_ids(request)
+    if user_id is None:
+        try:
+            with get_db_session() as db:
+                ctx = get_current_user(request, db)
+                user_id = ctx.get_user_id()
+                business_id = ctx.business_id
+        except ApiError:
+            user_id = None
+            business_id = None
+        except Exception:
+            user_id = None
+            business_id = None
 
     # fiscal_year_id هنوز از header می‌آید (کم‌ریسک برای cache-key)، اما به int محدودش می‌کنیم
     fiscal_year_id: Optional[int] = None

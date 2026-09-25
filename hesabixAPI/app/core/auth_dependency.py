@@ -618,6 +618,11 @@ def get_current_user(
 	# تشخیص سال مالی از هدر X-Fiscal-Year-ID (آینده)
 	fiscal_year_id = _detect_fiscal_year_id(request)
 
+	try:
+		request.state.business_id = business_id
+	except Exception:
+		pass
+
 	auth_context = AuthContext(
 		user=user, 
 		api_key_id=obj.id,
@@ -706,4 +711,27 @@ def _detect_fiscal_year_id(request: Request) -> Optional[int]:
 			pass
 	return None
 
+
+def resolve_response_cache_vary_ids(request: Request) -> tuple[Optional[int], Optional[int]]:
+	"""
+	استخراج سبک user_id و business_id برای ساخت cache key (بدون query روی users).
+	اگر API key در Redis cache نباشد، (None, None) برمی‌گرداند تا caller به مسیر کامل auth برود.
+	"""
+	auth_header = request.headers.get("Authorization")
+	if not auth_header or not auth_header.startswith("ApiKey "):
+		return None, None
+
+	api_key = auth_header[len("ApiKey ") :].strip()
+	key_hash = hash_api_key(api_key)
+	cache = get_cache()
+	cached_data = cache.get(f"api_key:{key_hash}") if cache.enabled else None
+	if not cached_data:
+		return None, None
+
+	user_id = cached_data.get("user_id")
+	if not user_id:
+		return None, None
+
+	business_id = _detect_business_id(request)
+	return int(user_id), business_id
 

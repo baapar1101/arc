@@ -36,8 +36,11 @@ IFS=$'\n\t'
 # Notes:
 # - Designed for Ubuntu 22.04+/Debian 12+
 # - Minimum install RAM: ~5.5 GiB — see check_minimum_ram
-# - Nginx: after SSL, use scripts/update_nginx_domains.sh to change domains only;
-#   this script configures listen 443 and /p/ and /i/ paths with Let's Encrypt (or SSL_LETSENCRYPT_LIVE in .deploy_env).
+# - Standalone curl|bash: deploy.sh must not require sibling files before clone.
+#   Python/mirror helpers are inlined when scripts/ is missing; after clone,
+#   DEPLOY_SCRIPT_DIR is rebound to ${APP_ROOT}/app so scripts/ resolve.
+# - Nginx/domains: after install, use `sudo hesabix -domains set` or `sudo hesabix -domains apply`;
+#   legacy: scripts/update_nginx_domains.sh. SSL: `sudo hesabix -ssl enable`. Let's Encrypt or SSL_LETSENCRYPT_LIVE in .deploy_env.
 # - Web build API URL: auto http/https from certificate at
 #   /etc/letsencrypt/live/<API_DOMAIN>; for TLS without that path, export API_PUBLIC_SCHEME.
 #   Manual hesabix-api HTTP-only config can send https traffic to the wrong default 443 vhost (e.g. pgAdmin).
@@ -50,6 +53,7 @@ IFS=$'\n\t'
 #   China mirrors, pub-azs.ir, or custom URL. Non-interactive: PIP_MIRROR=hesabix|official|tuna|aliyun|custom
 #   and FLUTTER_MIRROR=hesabix|pub_azs|flutter_io_cn|tuna|sjtu|official|custom. Saved in .deploy_saved_vars and .deploy_env.
 #   Direct URL override: PIP_INDEX_URL, PUB_HOSTED_URL, FLUTTER_STORAGE_BASE_URL.
+#   Aliyun (China) is always attached as pip extra-index unless PIP_DISABLE_CHINA_FALLBACK=1.
 # - Flutter SDK tarball: shell.hesabix.ir (internal); pub packages use selected FLUTTER_MIRROR.
 # - Flutter SDK git clone: official (GitHub) is tried first; if it fails, alternatives are tried (FLUTTER_SDK_GIT_URL if set, then Tsinghua, Gitee).
 # - Flutter SDK: first try internal tarball (FLUTTER_SDK_TARBALL_URL_INTERNAL = shell.hesabix.ir/...), then snap, then git clone; pub packages via PUB_HOSTED_URL.
@@ -69,6 +73,10 @@ IFS=$'\n\t'
 # - Apt/needrestart: by default NEEDRESTART_SUSPEND=1 during deploy so post-install service
 #   restarts (e.g. fwupd-refresh) do not run and fail on headless VPS. Set NEEDRESTART_SUSPEND=0
 #   to allow needrestart behavior.
+# - Install telemetry (optional): after a successful deploy, a non-blocking POST is sent to
+#   https://hesabix.ir/wp-json/hesabix-stats/v1/event with domain, public IP, RAM/CPU, OS, branch.
+#   Opt out: HESABIX_TELEMETRY=0. Override endpoint/token: HESABIX_STATS_URL / HESABIX_STATS_TOKEN.
+#   Persistent anonymous id: INSTALL_ID in ${APP_ROOT}/.deploy_env (see scripts/hesabix_telemetry.sh).
 #
 # ============================================================================
 
@@ -88,6 +96,33 @@ CROSS_MARK=$'\xE2\x9D\x8C'
 WARNING_MARK=$'\xE2\x9A\xA0'
 
 DEPLOY_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# When deploy.sh is curl'd to /tmp/installer.sh, DEPLOY_SCRIPT_DIR is /tmp and has no scripts/.
+# After the repo is cloned (or already present), rebind to the app tree so scripts/ resolve.
+hesabix_bind_deploy_script_dir_to_repo() {
+  if [[ -d "${APP_ROOT}/app/scripts" ]]; then
+    DEPLOY_SCRIPT_DIR="${APP_ROOT}/app"
+  fi
+}
+
+# Prefer cloned repo scripts, then the directory beside this deploy.sh (dev checkout).
+hesabix_find_repo_script() {
+  local name="$1"
+  local f
+  for f in \
+    "${APP_ROOT}/app/scripts/${name}" \
+    "${DEPLOY_SCRIPT_DIR}/scripts/${name}"; do
+    if [[ -f "${f}" ]]; then
+      printf '%s' "${f}"
+      return 0
+    fi
+  done
+  return 1
+}
+
+# If already installed (resume / re-run), bind early so helper sources can use repo scripts.
+hesabix_bind_deploy_script_dir_to_repo
+
 # shellcheck source=scripts/api_public_scheme.sh
 if [[ -r "${DEPLOY_SCRIPT_DIR}/scripts/api_public_scheme.sh" ]]; then
   # shellcheck disable=SC1091
@@ -104,6 +139,105 @@ if ! declare -F hesabix_resolve_api_public_scheme >/dev/null 2>&1; then
     printf '%s' "http"
   }
 fi
+# shellcheck source=scripts/hesabix_python.sh
+for _hesabix_py_lib in \
+  "${DEPLOY_SCRIPT_DIR}/scripts/hesabix_python.sh" \
+  "${APP_ROOT}/app/scripts/hesabix_python.sh"; do
+  if [[ -r "${_hesabix_py_lib}" ]]; then
+    # shellcheck disable=SC1090
+    source "${_hesabix_py_lib}"
+    break
+  fi
+done
+unset _hesabix_py_lib
+if ! declare -F hesabix_resolve_backend_python >/dev/null 2>&1; then
+  # Standalone: curl raw deploy.sh to /tmp — no scripts/ beside installer.sh
+  # shellcheck disable=SC1091
+  source /dev/stdin <<'HESABIX_PYTHON_INLINE'
+: "${HESABIX_MIN_PYTHON_MAJOR:=3}"
+: "${HESABIX_MIN_PYTHON_MINOR:=11}"
+hesabix_python_version_ge() {
+  local ver="${1#Python }"
+  ver="${ver%% *}"
+  local req_major="$2" req_minor="$3"
+  local major minor
+  IFS=. read -r major minor _ <<< "${ver}"
+  major=${major:-0}
+  minor=${minor:-0}
+  if [[ "${major}" -gt "${req_major}" ]]; then return 0; fi
+  if [[ "${major}" -lt "${req_major}" ]]; then return 1; fi
+  [[ "${minor}" -ge "${req_minor}" ]]
+}
+hesabix_python_cmd_version() {
+  local cmd="$1"
+  "$cmd" --version 2>&1 | awk '{print $2}'
+}
+hesabix_python_cmd_meets_minimum() {
+  local cmd="$1" ver
+  command -v "${cmd}" >/dev/null 2>&1 || return 1
+  ver=$(hesabix_python_cmd_version "${cmd}")
+  hesabix_python_version_ge "${ver}" "${HESABIX_MIN_PYTHON_MAJOR}" "${HESABIX_MIN_PYTHON_MINOR}"
+}
+hesabix_resolve_backend_python() {
+  local cmd ver path
+  if [[ -n "${HESABIX_PYTHON:-}" ]]; then
+    if [[ -x "${HESABIX_PYTHON}" ]] && hesabix_python_cmd_meets_minimum "${HESABIX_PYTHON}"; then
+      printf '%s' "${HESABIX_PYTHON}"
+      return 0
+    fi
+    return 1
+  fi
+  for cmd in python3.13 python3.12 python3.11 python3; do
+    if hesabix_python_cmd_meets_minimum "${cmd}"; then
+      path=$(command -v "${cmd}")
+      HESABIX_PYTHON="${path}"
+      printf '%s' "${path}"
+      return 0
+    fi
+  done
+  return 1
+}
+hesabix_install_backend_python_packages() {
+  if hesabix_resolve_backend_python >/dev/null 2>&1; then return 0; fi
+  if ! command -v apt-get >/dev/null 2>&1; then return 1; fi
+  export DEBIAN_FRONTEND=noninteractive
+  local minor pkgs=()
+  for minor in 12 11; do
+    pkgs=("python3.${minor}" "python3.${minor}-venv" "python3.${minor}-dev")
+    if apt-get install -y "${pkgs[@]}"; then
+      if command -v "python3.${minor}" >/dev/null 2>&1; then return 0; fi
+    fi
+  done
+  return 1
+}
+hesabix_ensure_backend_python() {
+  if hesabix_resolve_backend_python >/dev/null 2>&1; then return 0; fi
+  hesabix_install_backend_python_packages || return 1
+  hesabix_resolve_backend_python >/dev/null 2>&1
+}
+hesabix_ensure_backend_venv() {
+  local api_dir="$1" python_bin="$2"
+  local venv_dir="${api_dir}/.venv"
+  local venv_py="${venv_dir}/bin/python"
+  HESABIX_VENV_RECREATED=0
+  if [[ ! -x "${python_bin}" ]]; then return 1; fi
+  if ! hesabix_python_cmd_meets_minimum "${python_bin}"; then return 1; fi
+  if [[ -d "${venv_dir}" ]] && [[ -x "${venv_py}" ]]; then
+    local venv_ver
+    venv_ver=$(hesabix_python_cmd_version "${venv_py}")
+    if ! hesabix_python_version_ge "${venv_ver}" "${HESABIX_MIN_PYTHON_MAJOR}" "${HESABIX_MIN_PYTHON_MINOR}"; then
+      rm -rf "${venv_dir}"
+      HESABIX_VENV_RECREATED=1
+    fi
+  fi
+  if [[ ! -d "${venv_dir}" ]]; then
+    "${python_bin}" -m venv "${venv_dir}" || return 1
+    HESABIX_VENV_RECREATED=1
+  fi
+  [[ -x "${venv_py}" ]]
+}
+HESABIX_PYTHON_INLINE
+fi
 # Load PyPI/Flutter mirror helpers: repo scripts/mirror_config.sh, or inline fallback for curl installer.
 hesabix_load_mirror_config() {
   if declare -F configure_pip_hesabix_mirror >/dev/null 2>&1; then
@@ -119,11 +253,14 @@ hesabix_load_mirror_config() {
       return 0
     fi
   done
-  # Standalone: curl shell.hesabix.ir/deploy.sh — no scripts/ beside installer.sh
+  # Standalone: curl raw deploy.sh to /tmp — no scripts/ beside installer.sh
   # shellcheck disable=SC1091
   source /dev/stdin <<'HESABIX_MIRROR_CONFIG_INLINE'
 HESABIX_PIP_INDEX_URL="https://p.mirror.hesabix.ir/simple"
 HESABIX_PIP_TRUSTED_HOST="p.mirror.hesabix.ir"
+HESABIX_PIP_CHINA_INDEX_URL="https://mirrors.aliyun.com/pypi/simple"
+HESABIX_PIP_CHINA_TRUSTED_HOST="mirrors.aliyun.com"
+HESABIX_PIP_CHINA_SECONDARY_INDEX_URL="https://mirrors.cloud.tencent.com/pypi/simple"
 HESABIX_PUB_HOSTED_URL="https://f.mirror.hesabix.ir/pub"
 HESABIX_FLUTTER_STORAGE_BASE_URL="https://f.mirror.hesabix.ir/gcs"
 hesabix_mirror_log_info() {
@@ -150,6 +287,58 @@ hesabix_set_pip_mirror_for_url() {
   if [[ "${index_url}" != *"pypi.org"* ]]; then
     export PIP_TRUSTED_HOST="$(hesabix_pip_trusted_host_from_url "${index_url}")"
   else unset PIP_TRUSTED_HOST; fi
+}
+hesabix_pip_append_trusted_host() {
+  local host="$1"; [[ -n "${host}" ]] || return 0
+  case " ${PIP_TRUSTED_HOST:-} " in *" ${host} "*) return 0 ;; esac
+  if [[ -n "${PIP_TRUSTED_HOST:-}" ]]; then export PIP_TRUSTED_HOST="${PIP_TRUSTED_HOST} ${host}"
+  else export PIP_TRUSTED_HOST="${host}"; fi
+}
+hesabix_apply_pip_china_fallback() {
+  [[ "${PIP_DISABLE_CHINA_FALLBACK:-0}" == "1" ]] && return 0
+  local china="${HESABIX_PIP_CHINA_INDEX_URL}" primary="${PIP_INDEX_URL:-}"
+  if [[ -z "${PIP_EXTRA_INDEX_URL:-}" ]]; then
+    if [[ "${primary}" == "${china}" ]]; then
+      export PIP_EXTRA_INDEX_URL="${HESABIX_PIP_CHINA_SECONDARY_INDEX_URL}"
+      hesabix_pip_append_trusted_host "mirrors.cloud.tencent.com"
+    else
+      export PIP_EXTRA_INDEX_URL="${china}"
+      hesabix_pip_append_trusted_host "${HESABIX_PIP_CHINA_TRUSTED_HOST}"
+    fi
+  else
+    local extra_host; extra_host="$(hesabix_pip_trusted_host_from_url "${PIP_EXTRA_INDEX_URL%% *}")"
+    [[ -n "${extra_host}" ]] && hesabix_pip_append_trusted_host "${extra_host}"
+  fi
+  hesabix_mirror_log_info "PyPI extra index (China fallback): ${PIP_EXTRA_INDEX_URL}"
+}
+hesabix_pip_index_fallback_urls() {
+  local -a urls=(); local u
+  [[ -n "${PIP_INDEX_URL:-}" ]] && urls+=("${PIP_INDEX_URL}")
+  [[ -n "${PIP_EXTRA_INDEX_URL:-}" ]] && urls+=("${PIP_EXTRA_INDEX_URL%% *}")
+  urls+=("${HESABIX_PIP_CHINA_INDEX_URL}" "${HESABIX_PIP_CHINA_SECONDARY_INDEX_URL}" "${HESABIX_PIP_INDEX_URL}")
+  local -A seen=()
+  for u in "${urls[@]}"; do
+    u="${u%/}"; [[ -n "$u" && -z "${seen[$u]:-}" ]] || continue
+    seen[$u]=1; printf '%s\n' "$u"
+  done
+}
+hesabix_pip_cmd_with_fallback() {
+  local pip_bin="$1"; shift
+  if [[ "${PIP_DISABLE_CHINA_FALLBACK:-0}" == "1" ]]; then "${pip_bin}" "$@"; return $?; fi
+  "${pip_bin}" "$@" && return 0
+  local url orig_index orig_extra orig_trust
+  orig_index="${PIP_INDEX_URL:-}"; orig_extra="${PIP_EXTRA_INDEX_URL:-}"; orig_trust="${PIP_TRUSTED_HOST:-}"
+  while IFS= read -r url; do
+    [[ -n "$url" && "$url" != "${orig_index}" ]] || continue
+    hesabix_mirror_log_warning "pip failed on ${orig_index:-<unset>}; retrying ${url}"
+    hesabix_set_pip_mirror_for_url "$url"
+    if [[ "$url" == "${HESABIX_PIP_CHINA_INDEX_URL}" ]]; then export PIP_EXTRA_INDEX_URL="${HESABIX_PIP_CHINA_SECONDARY_INDEX_URL}"
+    else export PIP_EXTRA_INDEX_URL="${HESABIX_PIP_CHINA_INDEX_URL}"; fi
+    hesabix_pip_append_trusted_host "$(hesabix_pip_trusted_host_from_url "${PIP_EXTRA_INDEX_URL}")"
+    if "${pip_bin}" "$@"; then hesabix_mirror_log_info "pip succeeded from ${url}"; return 0; fi
+  done < <(hesabix_pip_index_fallback_urls)
+  export PIP_INDEX_URL="${orig_index}" PIP_EXTRA_INDEX_URL="${orig_extra}" PIP_TRUSTED_HOST="${orig_trust}"
+  return 1
 }
 hesabix_resolve_pip_mirror_from_preset() {
   local preset="${1:-hesabix}"; preset="${preset,,}"
@@ -210,10 +399,12 @@ hesabix_resolve_flutter_mirror_from_preset() {
 hesabix_apply_pip_mirror_env() {
   if [[ -n "${PIP_INDEX_URL:-}" ]]; then
     hesabix_mirror_log_info "Using PyPI index from environment: PIP_INDEX_URL=${PIP_INDEX_URL}"
-    hesabix_set_pip_mirror_for_url "${PIP_INDEX_URL}"; return 0
+    hesabix_set_pip_mirror_for_url "${PIP_INDEX_URL}"
+    hesabix_apply_pip_china_fallback; return 0
   fi
   PIP_MIRROR="${PIP_MIRROR:-hesabix}"; export PIP_MIRROR
   hesabix_resolve_pip_mirror_from_preset "${PIP_MIRROR}"
+  hesabix_apply_pip_china_fallback
   hesabix_mirror_log_info "Using PyPI mirror (${PIP_MIRROR}): ${PIP_INDEX_URL}"
 }
 hesabix_apply_flutter_mirror_env() {
@@ -230,7 +421,9 @@ hesabix_configure_pip_mirror() {
   hesabix_apply_pip_mirror_env
   python3 -m pip config --user set global.index "${PIP_INDEX_URL}" 2>/dev/null || true
   python3 -m pip config --user set global.index-url "${PIP_INDEX_URL}" 2>/dev/null || true
-  [[ -n "${PIP_TRUSTED_HOST:-}" ]] && python3 -m pip config --user set global.trusted-host "${PIP_TRUSTED_HOST}" 2>/dev/null || true
+  local primary_host; primary_host="$(hesabix_pip_trusted_host_from_url "${PIP_INDEX_URL}")"
+  [[ -n "${primary_host}" ]] && python3 -m pip config --user set global.trusted-host "${primary_host}" 2>/dev/null || true
+  [[ -n "${PIP_EXTRA_INDEX_URL:-}" ]] && python3 -m pip config --user set global.extra-index-url "${PIP_EXTRA_INDEX_URL%% *}" 2>/dev/null || true
   hesabix_mirror_log_info "pip user config: ${PIP_INDEX_URL}"
 }
 hesabix_prompt_pip_mirror() {
@@ -286,6 +479,8 @@ hesabix_mirror_summary_pip() {
   if [[ "${PIP_MIRROR:-}" == "custom" ]]; then
     echo "  • PyPI (pip):     custom — ${PIP_INDEX_URL:-}"
   else echo "  • PyPI (pip):     ${PIP_MIRROR:-hesabix} — ${PIP_INDEX_URL:-}"; fi
+  if [[ -n "${PIP_EXTRA_INDEX_URL:-}" && "${PIP_DISABLE_CHINA_FALLBACK:-0}" != "1" ]]; then
+    echo "  • PyPI extra:     ${PIP_EXTRA_INDEX_URL}"; fi
 }
 hesabix_mirror_summary_flutter() {
   hesabix_apply_flutter_mirror_env >/dev/null 2>&1 || true
@@ -840,6 +1035,7 @@ save_deploy_saved_vars() {
     echo "PIP_MIRROR=${PIP_MIRROR:-hesabix}"
     echo "FLUTTER_MIRROR=${FLUTTER_MIRROR:-hesabix}"
     echo "PIP_INDEX_URL=${PIP_INDEX_URL:-}"
+    echo "PIP_EXTRA_INDEX_URL=${PIP_EXTRA_INDEX_URL:-}"
     echo "PIP_TRUSTED_HOST=${PIP_TRUSTED_HOST:-}"
     echo "PUB_HOSTED_URL=${PUB_HOSTED_URL:-}"
     echo "FLUTTER_STORAGE_BASE_URL=${FLUTTER_STORAGE_BASE_URL:-}"
@@ -1034,6 +1230,22 @@ install_hesabix_command() {
     hesabix_apply_pip_mirror_env
     hesabix_apply_flutter_mirror_env
   fi
+
+  # Stable anonymous install id for telemetry (preserve across re-deploys).
+  local telem=""
+  if telem="$(hesabix_find_repo_script hesabix_telemetry.sh 2>/dev/null)"; then
+    # shellcheck source=scripts/hesabix_telemetry.sh
+    # shellcheck disable=SC1090
+    source "${telem}"
+    hesabix_ensure_install_id || true
+  elif [[ -z "${INSTALL_ID:-}" ]]; then
+    if command -v uuidgen >/dev/null 2>&1; then
+      INSTALL_ID="$(uuidgen | tr '[:upper:]' '[:lower:]')"
+    elif [[ -r /proc/sys/kernel/random/uuid ]]; then
+      INSTALL_ID="$(tr '[:upper:]' '[:lower:]' < /proc/sys/kernel/random/uuid)"
+    fi
+  fi
+
   cat > "${env_file}" <<ENV
 API_DOMAIN=${API_DOMAIN}
 UI_DOMAIN=${UI_DOMAIN}
@@ -1043,19 +1255,18 @@ INSTALL_VOICE=${INSTALL_VOICE:-N}
 PIP_MIRROR=${PIP_MIRROR:-hesabix}
 FLUTTER_MIRROR=${FLUTTER_MIRROR:-hesabix}
 PIP_INDEX_URL=${PIP_INDEX_URL:-}
+PIP_EXTRA_INDEX_URL=${PIP_EXTRA_INDEX_URL:-}
 PIP_TRUSTED_HOST=${PIP_TRUSTED_HOST:-}
 PUB_HOSTED_URL=${PUB_HOSTED_URL:-}
 FLUTTER_STORAGE_BASE_URL=${FLUTTER_STORAGE_BASE_URL:-}
+INSTALL_ID=${INSTALL_ID:-}
 ENV
   chmod 600 "${env_file}"
   log_info "Saved deployment config to ${env_file}"
 
   local bin_hesabix="/usr/local/bin/hesabix"
-  local cli_src="${APP_ROOT}/app/scripts/hesabix"
-  if [[ ! -f "${cli_src}" ]]; then
-    cli_src="$(pwd)/scripts/hesabix"
-  fi
-  if [[ ! -f "${cli_src}" ]]; then
+  local cli_src=""
+  if ! cli_src="$(hesabix_find_repo_script hesabix)"; then
     log_error "CLI source not found: scripts/hesabix (expected at ${APP_ROOT}/app/scripts/hesabix)"
     return 1
   fi
@@ -1065,7 +1276,7 @@ ENV
     cp -f "${cli_src}" "${bin_hesabix}"
     chmod 755 "${bin_hesabix}" 2>/dev/null || true
   fi
-  log_success "Command installed: hesabix (e.g. sudo hesabix -update | sudo hesabix -services restart | sudo hesabix -cli reload)"
+  log_success "Command installed: hesabix (e.g. sudo hesabix -update | sudo hesabix -domains show | sudo hesabix -ssl status | sudo hesabix -cli reload)"
 }
 
 reset_deployment_state() {
@@ -1284,7 +1495,7 @@ prompt_vars() {
   fi
   
   save_deploy_saved_vars
-  export API_DOMAIN UI_DOMAIN BRANCH DB_PASSWORD UVICORN_WORKERS FLUTTER_VERSION INSTALL_PGADMIN4 PGADMIN4_DOMAIN PGADMIN4_EMAIL PGADMIN4_PASSWORD INSTALL_VOICE DB_POOL_SIZE DB_MAX_OVERFLOW PIP_MIRROR FLUTTER_MIRROR PIP_INDEX_URL PIP_TRUSTED_HOST PUB_HOSTED_URL FLUTTER_STORAGE_BASE_URL
+  export API_DOMAIN UI_DOMAIN BRANCH DB_PASSWORD UVICORN_WORKERS FLUTTER_VERSION INSTALL_PGADMIN4 PGADMIN4_DOMAIN PGADMIN4_EMAIL PGADMIN4_PASSWORD INSTALL_VOICE DB_POOL_SIZE DB_MAX_OVERFLOW PIP_MIRROR FLUTTER_MIRROR PIP_INDEX_URL PIP_EXTRA_INDEX_URL PIP_TRUSTED_HOST PUB_HOSTED_URL FLUTTER_STORAGE_BASE_URL
 }
 
 # Show configuration summary and ask for confirmation
@@ -1388,19 +1599,27 @@ install_prereqs() {
   log_info "Updating package list..."
   apt-get update -y
   
-  # Detect Python 3 version and install appropriate packages
-  # Ubuntu 24.04 uses python3.12 by default, Ubuntu 22.04 uses python3.10/3.11
-  # We'll use python3 and python3-venv which work on all versions
+  # hesabix-api requires Python >= 3.11 (pyproject.toml). Ubuntu 24.04: python3=3.12;
+  # Ubuntu 22.04: python3=3.10 — install python3.11 when needed (scripts/hesabix_python.sh).
   # WeasyPrint (PDF) requires: libcairo2, libpango*, libgdk-pixbuf-2.0-0 (note: hyphen in package name on Ubuntu 24)
-  log_info "Installing: git, curl, unzip, xz-utils, ca-certificates, python3, python3-venv, python3-pip, build-essential, nginx, postgresql, postgresql-contrib, postgresql-client, redis-server, WeasyPrint system deps (libpango/cairo)..."
-  apt-get install -y git curl unzip xz-utils ca-certificates \
+  log_info "Installing: git, curl, unzip, xz-utils, ca-certificates, rsync, python3, python3-venv, python3-pip, build-essential, nginx, postgresql, postgresql-contrib, postgresql-client, redis-server, WeasyPrint system deps (libpango/cairo)..."
+  apt-get install -y git curl unzip xz-utils ca-certificates rsync \
     python3 python3-venv python3-pip build-essential \
     nginx postgresql postgresql-contrib postgresql-client redis-server \
     libcairo2 libpango-1.0-0 libpangocairo-1.0-0 libgdk-pixbuf-2.0-0 libffi-dev shared-mime-info
-  
-  # Detect Python version for logging
-  PYTHON_VERSION=$(python3 --version 2>&1 | awk '{print $2}')
-  log_info "Python version detected: ${PYTHON_VERSION}"
+
+  if ! hesabix_ensure_backend_python; then
+    log_error "hesabix-api requires Python >= 3.11. Install python3.11 (or newer) and re-run deploy."
+    exit 1
+  fi
+  local backend_python backend_py_ver
+  backend_python=$(hesabix_resolve_backend_python)
+  backend_py_ver=$("${backend_python}" --version 2>&1)
+  log_info "Backend Python: ${backend_py_ver} (${backend_python})"
+  if command -v python3 >/dev/null 2>&1; then
+    PYTHON_VERSION=$(python3 --version 2>&1 | awk '{print $2}')
+    log_info "System default python3: ${PYTHON_VERSION}"
+  fi
   
   # Ensure PostgreSQL service is enabled and started
   if command -v systemctl >/dev/null 2>&1; then
@@ -1429,10 +1648,11 @@ install_prereqs() {
   fi
 
   # pgvector for semantic RAG search (optional; non-fatal if apt package missing)
-  if [[ -f "${DEPLOY_SCRIPT_DIR}/scripts/ensure_pgvector.sh" ]]; then
-    chmod +x "${DEPLOY_SCRIPT_DIR}/scripts/ensure_pgvector.sh" 2>/dev/null || true
+  local pgvector_script=""
+  if pgvector_script="$(hesabix_find_repo_script ensure_pgvector.sh)"; then
+    chmod +x "${pgvector_script}" 2>/dev/null || true
     log_info "Ensuring PostgreSQL pgvector package (optional)..."
-    if bash "${DEPLOY_SCRIPT_DIR}/scripts/ensure_pgvector.sh"; then
+    if bash "${pgvector_script}"; then
       log_success "pgvector package check completed."
     else
       log_warning "pgvector package install skipped or failed (non-fatal)."
@@ -1509,6 +1729,8 @@ clone_repo() {
   local actual_branch
   actual_branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unknown")
   log_success "Repository ready at ${APP_ROOT}/app (branch: ${actual_branch})"
+  # Standalone curl installs: switch script root from /tmp to the cloned tree.
+  hesabix_bind_deploy_script_dir_to_repo
 }
 
 setup_db() {
@@ -1639,6 +1861,12 @@ setup_db() {
   
   # Grant privileges
   sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON DATABASE hesabix TO hesabix;"
+  # hesabix must own public schema so pg_restore/CREATE TABLE works (Ubuntu default owner is postgres).
+  sudo -u postgres psql -d hesabix -v ON_ERROR_STOP=1 <<'SQL'
+ALTER SCHEMA public OWNER TO hesabix;
+GRANT ALL ON SCHEMA public TO hesabix;
+GRANT CREATE ON SCHEMA public TO hesabix;
+SQL
   
   # Verify connection
   if PGPASSWORD="${DB_PASSWORD}" psql -U hesabix -h 127.0.0.1 -d hesabix -c "SELECT 1" >/dev/null 2>&1; then
@@ -1651,6 +1879,373 @@ setup_db() {
     log_info "Applying PostgreSQL settings after service is up (version ${pg_version})..."
     write_postgresql_hesabix_optimization_conf "${pg_version}"
     restart_postgresql_after_config_change "${pg_version}" "${pg_service:-}"
+  fi
+}
+
+hesabix_db_table_exists() {
+  local table="$1"
+  # Use postgres superuser: pg_restore --no-owner leaves objects owned by postgres;
+  # hesabix cannot see them in information_schema until grants/ownership are fixed.
+  sudo -u postgres psql -d hesabix -tAc \
+    "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='${table}');" \
+    2>/dev/null | tr -d '[:space:]'
+}
+
+hesabix_current_alembic_revision() {
+  if [[ "$(hesabix_db_table_exists alembic_version)" != "t" ]]; then
+    return 0
+  fi
+  PGPASSWORD="${DB_PASSWORD}" psql -h 127.0.0.1 -p 5432 -U hesabix -d hesabix -tAc \
+    "SELECT version_num FROM alembic_version LIMIT 1;" 2>/dev/null | tr -d '[:space:]'
+}
+
+hesabix_validate_seed_schema() {
+  local t missing=()
+  for t in documents document_lines businesses users accounts; do
+    if [[ "$(hesabix_db_table_exists "${t}")" != "t" ]]; then
+      missing+=("${t}")
+    fi
+  done
+  if [[ ${#missing[@]} -gt 0 ]]; then
+    log_error "Seed import incomplete. Missing core tables: ${missing[*]}"
+    log_error "See ${APP_ROOT}/pg_restore_seed.log — drop/recreate DB and re-run deploy, or fix the seed dump."
+    exit 1
+  fi
+}
+
+# True when seed/base schema is present (not just alembic_version from a failed run).
+hesabix_db_is_fully_initialized() {
+  [[ "$(hesabix_db_table_exists businesses)" == "t" ]] \
+    && [[ "$(hesabix_db_table_exists document_lines)" == "t" ]] \
+    && [[ "$(hesabix_db_table_exists documents)" == "t" ]]
+}
+
+hesabix_dump_archive_format_version() {
+  local dump="$1"
+  python3 - "${dump}" <<'PY'
+import struct, sys
+path = sys.argv[1]
+try:
+    with open(path, "rb") as f:
+        if f.read(5) != b"PGDMP":
+            raise SystemExit(0)
+        vmaj, vmin = struct.unpack(">BB", f.read(2))
+        print(f"{vmaj}.{vmin}")
+except OSError:
+    pass
+PY
+}
+
+# Minimum pg_restore major required to read a custom archive format (not the dump source version).
+hesabix_pg_major_for_archive_format() {
+  local fmt="${1:-}"
+  case "${fmt}" in
+    1.16) printf '%s' "17" ;;
+    1.15|1.14) printf '%s' "16" ;;
+    1.13) printf '%s' "15" ;;
+    1.12) printf '%s' "14" ;;
+    1.11|1.10) printf '%s' "13" ;;
+    *) return 1 ;;
+  esac
+}
+
+hesabix_detect_postgresql_server_major() {
+  local ver_num v
+  ver_num=$(sudo -u postgres psql -tAc "SHOW server_version_num;" 2>/dev/null | tr -d '[:space:]')
+  if [[ -n "${ver_num}" ]] && [[ "${ver_num}" =~ ^[0-9]+$ ]]; then
+    echo $((10#${ver_num} / 10000))
+    return 0
+  fi
+  detect_postgresql_major_version_for_config 2>/dev/null || return 1
+}
+
+hesabix_list_installed_pg_client_majors() {
+  local m bin
+  for m in 18 17 16 15 14 13; do
+    bin="/usr/lib/postgresql/${m}/bin/pg_restore"
+    [[ -x "${bin}" ]] && echo "${m}"
+  done
+}
+
+hesabix_ensure_pgdg_apt_repo() {
+  if [[ -f /etc/apt/sources.list.d/pgdg.list ]]; then
+    return 0
+  fi
+  export DEBIAN_FRONTEND=noninteractive
+  apt-get install -y curl ca-certificates gnupg lsb-release >/dev/null 2>&1 || true
+  install -d /usr/share/postgresql-common/pgdg
+  if ! curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc \
+    | gpg --batch --yes --dearmor -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.gpg 2>/dev/null; then
+    return 1
+  fi
+  local codename
+  codename=$(. /etc/os-release 2>/dev/null && printf '%s' "${VERSION_CODENAME:-${UBUNTU_CODENAME:-}}")
+  [[ -z "${codename}" ]] && return 1
+  printf '%s\n' \
+    "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.gpg] https://apt.postgresql.org/pub/repos/apt ${codename}-pgdg main" \
+    > /etc/apt/sources.list.d/pgdg.list
+  apt-get update -y >/dev/null 2>&1 || return 1
+}
+
+hesabix_ensure_postgresql_client_major() {
+  local major="$1"
+  local bin="/usr/lib/postgresql/${major}/bin/pg_restore"
+  [[ -x "${bin}" ]] && return 0
+  log_info "Installing postgresql-client-${major} (required to read seed dump format)..."
+  hesabix_ensure_pgdg_apt_repo || return 1
+  apt-get install -y "postgresql-client-${major}" || return 1
+  [[ -x "${bin}" ]]
+}
+
+# Pick pg_restore that can read the dump and preferably matches the target server major
+# (pg_restore newer than server may emit SET transaction_timeout on PG < 17).
+hesabix_resolve_pg_restore_for_dump() {
+  local dump="$1" fmt min_major server_major m bin install_m
+  local -a installed=()
+  fmt=$(hesabix_dump_archive_format_version "${dump}")
+  min_major=""
+  if [[ -n "${fmt}" ]]; then
+    min_major=$(hesabix_pg_major_for_archive_format "${fmt}" 2>/dev/null) || min_major=""
+  fi
+  server_major=$(hesabix_detect_postgresql_server_major 2>/dev/null) || server_major=""
+  while IFS= read -r m; do
+    [[ -n "${m}" ]] && installed+=("${m}")
+  done < <(hesabix_list_installed_pg_client_majors)
+
+  if [[ -n "${min_major}" ]]; then
+    if [[ -n "${server_major}" ]] && [[ "${server_major}" -ge "${min_major}" ]]; then
+      bin="/usr/lib/postgresql/${server_major}/bin/pg_restore"
+      if [[ -x "${bin}" ]]; then
+        log_info "pg_restore: PostgreSQL ${server_major} client (matches server; dump format ${fmt})."
+        printf '%s' "${bin}"
+        return 0
+      fi
+    fi
+    if [[ -n "${server_major}" ]]; then
+      for m in "${installed[@]}"; do
+        if [[ "${m}" -ge "${min_major}" ]] && [[ "${m}" -le "${server_major}" ]]; then
+          log_info "pg_restore: PostgreSQL ${m} client (dump format ${fmt}; server ${server_major})."
+          printf '%s' "/usr/lib/postgresql/${m}/bin/pg_restore"
+          return 0
+        fi
+      done
+    fi
+    for m in "${installed[@]}"; do
+      if [[ "${m}" -ge "${min_major}" ]]; then
+        if [[ -n "${server_major}" ]] && [[ "${m}" -gt "${server_major}" ]]; then
+          log_warning "pg_restore ${m} for dump format ${fmt} on PostgreSQL ${server_major} server — may cause transaction_timeout errors; prefer matching client or upgrade PostgreSQL."
+        fi
+        printf '%s' "/usr/lib/postgresql/${m}/bin/pg_restore"
+        return 0
+      fi
+    done
+    install_m="${min_major}"
+    if [[ -n "${server_major}" ]] && [[ "${server_major}" -ge "${min_major}" ]]; then
+      install_m="${server_major}"
+    fi
+    hesabix_ensure_postgresql_client_major "${install_m}" || true
+    bin="/usr/lib/postgresql/${install_m}/bin/pg_restore"
+    if [[ -x "${bin}" ]]; then
+      printf '%s' "${bin}"
+      return 0
+    fi
+    for m in 18 17 16 15 14 13; do
+      [[ "${m}" -ge "${min_major}" ]] || continue
+      hesabix_ensure_postgresql_client_major "${m}" || continue
+      bin="/usr/lib/postgresql/${m}/bin/pg_restore"
+      if [[ -x "${bin}" ]]; then
+        if [[ -n "${server_major}" ]] && [[ "${m}" -gt "${server_major}" ]]; then
+          log_warning "Installed pg_restore ${m} for format ${fmt}; target server is PostgreSQL ${server_major}."
+        fi
+        printf '%s' "${bin}"
+        return 0
+      fi
+    done
+  fi
+
+  if [[ -n "${server_major}" ]]; then
+    bin="/usr/lib/postgresql/${server_major}/bin/pg_restore"
+    [[ -x "${bin}" ]] && { printf '%s' "${bin}"; return 0; }
+  fi
+  for m in 18 17 16 15 14 13; do
+    bin="/usr/lib/postgresql/${m}/bin/pg_restore"
+    [[ -x "${bin}" ]] && { printf '%s' "${bin}"; return 0; }
+  done
+  command -v pg_restore 2>/dev/null || true
+}
+
+# Revision bundled with seed dump (sidecar file, env, or embedded alembic_version data).
+hesabix_read_seed_alembic_revision() {
+  local dump="$1" backup_dir="$2" rev="" f pg_restore_bin
+  if [[ -n "${HESABIX_SEED_ALEMBIC_REVISION:-}" ]]; then
+    printf '%s' "${HESABIX_SEED_ALEMBIC_REVISION}"
+    return 0
+  fi
+  for f in "${dump}.revision" "${backup_dir}/hesabix_seed.revision"; do
+    if [[ -f "${f}" ]]; then
+      rev=$(tr -d '[:space:]' < "${f}")
+      if [[ -n "${rev}" ]]; then
+        printf '%s' "${rev}"
+        return 0
+      fi
+    fi
+  done
+  if [[ -f "${dump}" ]]; then
+    pg_restore_bin=$(hesabix_resolve_pg_restore_for_dump "${dump}")
+    if [[ -n "${pg_restore_bin}" && -x "${pg_restore_bin}" ]]; then
+      rev=$(
+        "${pg_restore_bin}" -a -t alembic_version "${dump}" 2>/dev/null | awk '
+          /^COPY / { copy=1; next }
+          copy && $0 == "\\." { exit }
+          copy && $0 !~ /^--/ && NF { gsub(/\r/, ""); print; exit }
+        '
+      )
+      if [[ -n "${rev}" ]]; then
+        printf '%s' "${rev}"
+        return 0
+      fi
+    fi
+  fi
+  return 1
+}
+
+hesabix_ensure_alembic_version_schema() {
+  log_info "Ensuring alembic_version schema compatibility..."
+  sudo -u postgres psql -d hesabix -v ON_ERROR_STOP=0 <<'SQL' 2>/dev/null || true
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public' AND table_name='alembic_version') THEN
+    ALTER TABLE public.alembic_version ALTER COLUMN version_num TYPE VARCHAR(255);
+  ELSE
+    CREATE TABLE public.alembic_version (version_num VARCHAR(255) PRIMARY KEY);
+  END IF;
+EXCEPTION WHEN OTHERS THEN NULL;
+END $$;
+SQL
+}
+
+hesabix_reset_public_schema_for_seed() {
+  local table_count="$1"
+  log_warning "Database is not fully initialized (${table_count} table(s), core schema missing)."
+  log_warning "Resetting public schema before seed import (safe for fresh install; no Hesabix data yet)."
+  sudo -u postgres psql -d hesabix -v ON_ERROR_STOP=1 <<'SQL'
+DROP SCHEMA IF EXISTS public CASCADE;
+CREATE SCHEMA public AUTHORIZATION hesabix;
+GRANT ALL ON SCHEMA public TO hesabix;
+GRANT ALL ON SCHEMA public TO public;
+SQL
+}
+
+hesabix_run_pg_restore_seed() {
+  local seed_dump="$1" restore_log="$2"
+  local pg_restore_bin
+  pg_restore_bin=$(hesabix_resolve_pg_restore_for_dump "${seed_dump}")
+  if [[ -z "${pg_restore_bin}" || ! -x "${pg_restore_bin}" ]]; then
+    log_error "pg_restore not found."
+    return 1
+  fi
+  log_info "Using $(${pg_restore_bin} --version 2>&1 | head -1)"
+  sudo -u postgres "${pg_restore_bin}" -d hesabix --no-owner --no-acl "${seed_dump}" >>"${restore_log}" 2>&1
+}
+
+hesabix_seed_restore_failed_fatal() {
+  local restore_log="$1"
+  [[ -f "${restore_log}" ]] || return 1
+  grep -qE 'unsupported version|could not read from input file|input file appears to be a text format|unrecognized configuration parameter .transaction_timeout' "${restore_log}" 2>/dev/null
+}
+
+hesabix_seed_restore_client_server_mismatch() {
+  local restore_log="$1"
+  [[ -f "${restore_log}" ]] || return 1
+  grep -qE 'unrecognized configuration parameter .transaction_timeout' "${restore_log}" 2>/dev/null
+}
+
+hesabix_ensure_public_schema_owner() {
+  sudo -u postgres psql -d hesabix -v ON_ERROR_STOP=1 <<'SQL' 2>/dev/null || true
+ALTER SCHEMA public OWNER TO hesabix;
+GRANT ALL ON SCHEMA public TO hesabix;
+GRANT CREATE ON SCHEMA public TO hesabix;
+SQL
+}
+
+# pg_restore --no-owner leaves objects owned by postgres without ACLs.
+# Grant and reassign owners so hesabix (app user) can run Alembic and the API.
+hesabix_fixup_seed_object_privileges() {
+  local fixup_script=""
+  if fixup_script="$(hesabix_find_repo_script hesabix_fixup_db_privileges.sh)"; then
+    chmod +x "${fixup_script}" 2>/dev/null || true
+    bash "${fixup_script}"
+    return 0
+  fi
+  sudo -u postgres psql -d hesabix -v ON_ERROR_STOP=1 <<'SQL'
+ALTER SCHEMA public OWNER TO hesabix;
+GRANT ALL ON SCHEMA public TO hesabix;
+GRANT ALL ON ALL TABLES IN SCHEMA public TO hesabix;
+GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO hesabix;
+GRANT ALL ON ALL FUNCTIONS IN SCHEMA public TO hesabix;
+DO $$
+DECLARE r RECORD;
+BEGIN
+  FOR r IN
+    SELECT c.relname
+    FROM pg_class c
+    JOIN pg_namespace n ON n.oid = c.relnamespace
+    WHERE n.nspname = 'public'
+      AND c.relkind IN ('r', 'p', 'v', 'm')
+      AND pg_get_userbyid(c.relowner) = 'postgres'
+  LOOP
+    EXECUTE format('ALTER TABLE public.%I OWNER TO hesabix', r.relname);
+  END LOOP;
+END $$;
+SQL
+}
+
+hesabix_import_seed_database() {
+  local seed_dump="$1" backup_dir="$2"
+  local restore_log="${APP_ROOT}/pg_restore_seed.log"
+  echo "Importing seed database from: ${seed_dump}"
+  : > "${restore_log}"
+  if hesabix_run_pg_restore_seed "${seed_dump}" "${restore_log}"; then
+    log_success "Seed database imported successfully."
+  else
+    if hesabix_seed_restore_failed_fatal "${restore_log}"; then
+      if hesabix_seed_restore_client_server_mismatch "${restore_log}"; then
+        log_error "pg_restore client is newer than the PostgreSQL server (see ${restore_log})."
+        log_error "Use a pg_restore matching the server major (e.g. postgresql-client-16 on Ubuntu 24.04), or upgrade PostgreSQL."
+        log_error "Alternatively regenerate the seed dump with pg_dump from the same major as the target server."
+      else
+        log_error "Seed dump format is newer than pg_restore on this server (see ${restore_log})."
+        log_error "Install postgresql-client-N from PGDG when possible, or regenerate seed with pg_dump / plain SQL for this server version."
+      fi
+      exit 1
+    fi
+    if PGPASSWORD="${DB_PASSWORD}" psql -h 127.0.0.1 -p 5432 -U hesabix -d hesabix -c "SELECT 1" >/dev/null 2>&1; then
+      log_warning "Seed import finished with warnings (see ${restore_log})."
+    else
+      log_error "Error importing seed database. Check ${restore_log}"
+      exit 1
+    fi
+  fi
+  hesabix_fixup_seed_object_privileges
+  hesabix_validate_seed_schema
+  hesabix_ensure_alembic_revision_after_seed "${seed_dump}" "${backup_dir}"
+}
+
+hesabix_ensure_alembic_revision_after_seed() {
+  local seed_dump="$1" backup_dir="$2" current rev
+  current=$(hesabix_current_alembic_revision)
+  if [[ -n "${current}" ]]; then
+    log_info "Alembic revision after seed: ${current}"
+    return 0
+  fi
+  if ! rev=$(hesabix_read_seed_alembic_revision "${seed_dump}" "${backup_dir}"); then
+    log_warning "alembic_version empty after seed; Alembic will run incremental migrations from base."
+    return 0
+  fi
+  log_info "Stamping database to seed Alembic revision: ${rev}"
+  if ! alembic stamp "${rev}"; then
+    log_error "alembic stamp ${rev} failed"
+    exit 1
   fi
 }
 
@@ -1667,43 +2262,69 @@ deploy_backend() {
 
   configure_pip_hesabix_mirror
   set_pip_mirror_env
-  # Python venv + install
-  if [[ ! -d ".venv" ]]; then
-    python3 -m venv .venv
+
+  local backend_python
+  if ! backend_python=$(hesabix_resolve_backend_python); then
+    log_info "Python >= 3.11 not found; installing packages..."
+    if ! hesabix_install_backend_python_packages || ! backend_python=$(hesabix_resolve_backend_python); then
+      log_error "hesabix-api requires Python >= 3.11. Could not install or locate a suitable interpreter."
+      exit 1
+    fi
+  fi
+  if ! hesabix_ensure_backend_venv "${api_dir}" "${backend_python}"; then
+    log_error "Failed to create backend virtualenv with ${backend_python}"
+    exit 1
+  fi
+  if [[ "${HESABIX_VENV_RECREATED:-0}" == "1" ]]; then
+    log_info "Backend virtualenv created/rebuilt with Python >= 3.11."
   fi
   # shellcheck disable=SC1091
   source .venv/bin/activate
   log_info "Installing backend deps from PyPI: ${PIP_INDEX_URL}"
-  if pip install --upgrade pip setuptools wheel && pip install -e .; then
+  local backend_pip_ok=0
+  if declare -F hesabix_pip_cmd_with_fallback >/dev/null 2>&1; then
+    if hesabix_pip_cmd_with_fallback pip install --upgrade pip setuptools wheel \
+      && hesabix_pip_cmd_with_fallback pip install -e .; then
+      backend_pip_ok=1
+    fi
+  elif pip install --upgrade pip setuptools wheel && pip install -e .; then
+    backend_pip_ok=1
+  fi
+  if [[ "${backend_pip_ok}" == "1" ]]; then
     log_success "Backend dependencies installed from ${PIP_INDEX_URL}"
   else
     log_error "Failed to install backend dependencies from ${PIP_INDEX_URL}. Check mirror reachability or PIP_INDEX_URL override."
     exit 1
   fi
 
-  # env.example as base, then merge production keys (DB_PASSWORD etc. safe for special chars)
+  # env.example as base for first install; later deploys only merge keys (preserve secrets).
   local env_file=".env"
-  if [[ -f "env.example" ]]; then
-    cp env.example "${env_file}"
-  else
-    : > "${env_file}"
+  if [[ ! -f "${env_file}" ]]; then
+    if [[ -f "env.example" ]]; then
+      cp env.example "${env_file}"
+    else
+      : > "${env_file}"
+    fi
   fi
   merge_hesabix_api_env_file "${env_file}"
-  local ensure_secrets="${DEPLOY_SCRIPT_DIR}/scripts/ensure_api_production_secrets.sh"
-  if [[ -f "${ensure_secrets}" ]]; then
-    chmod +x "${ensure_secrets}" 2>/dev/null || true
-    log_info "Ensuring API production secrets in .env..."
-    if APP_ROOT="${APP_ROOT}" bash "${ensure_secrets}"; then
-      log_success "API production secrets verified."
-    else
-      log_error "Failed to ensure API production secrets."
-      exit 1
-    fi
+  local ensure_secrets=""
+  if ! ensure_secrets="$(hesabix_find_repo_script ensure_api_production_secrets.sh)"; then
+    log_error "ensure_api_production_secrets.sh not found (expected under ${APP_ROOT}/app/scripts after clone)."
+    log_error "Standalone install must complete the repository clone step first."
+    exit 1
+  fi
+  chmod +x "${ensure_secrets}" 2>/dev/null || true
+  log_info "Ensuring API production secrets in .env..."
+  if APP_ROOT="${APP_ROOT}" bash "${ensure_secrets}"; then
+    log_success "API production secrets verified."
+  else
+    log_error "Failed to ensure API production secrets."
+    exit 1
   fi
 
   if [[ "${INSTALL_VOICE:-N}" =~ ^[Yy]$ ]]; then
-    local voice_script="${DEPLOY_SCRIPT_DIR}/scripts/ensure_voice_chat.sh"
-    if [[ -f "${voice_script}" ]]; then
+    local voice_script=""
+    if voice_script="$(hesabix_find_repo_script ensure_voice_chat.sh)"; then
       chmod +x "${voice_script}" 2>/dev/null || true
       log_info "Installing AI voice chat prerequisites (local STT/TTS)..."
       if INSTALL_VOICE=Y bash "${voice_script}" --non-interactive; then
@@ -1724,7 +2345,7 @@ deploy_backend() {
 
   # Verify database connection before init
   echo "Verifying database connection..."
-  if ! python3 -c "
+  if ! .venv/bin/python -c "
 import sys
 sys.path.insert(0, '.')
 from app.core.settings import get_settings
@@ -1743,40 +2364,50 @@ print('Connection successful')
   local seed_dump
   seed_dump=$(ls -t "${backup_dir}"/hesabix_seed*.dump 2>/dev/null | head -1)
   local table_count
-  table_count=$(PGPASSWORD="${DB_PASSWORD}" psql -h 127.0.0.1 -p 5432 -U hesabix -d hesabix -tAc "SELECT count(*) FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE';" 2>/dev/null | tr -d '[:space:]')
+  table_count=$(sudo -u postgres psql -d hesabix -tAc "SELECT count(*) FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE';" 2>/dev/null | tr -d '[:space:]')
   if [[ ! "${table_count}" =~ ^[0-9]+$ ]]; then
     table_count=999
   fi
 
-  if [[ "${table_count}" -eq 0 ]] && [[ -n "${seed_dump}" && -f "${seed_dump}" ]]; then
-    echo "Importing seed database from: ${seed_dump}"
-    if PGPASSWORD="${DB_PASSWORD}" pg_restore -h 127.0.0.1 -p 5432 -U hesabix -d hesabix --no-owner --no-acl "${seed_dump}" 2>/dev/null; then
-      log_success "Seed database imported successfully."
+  if [[ -n "${seed_dump}" && -f "${seed_dump}" ]]; then
+    hesabix_ensure_public_schema_owner
+    if hesabix_db_is_fully_initialized; then
+      log_info "Database already initialized (${table_count} tables). Skipping seed import."
     else
-      # pg_restore may exit 1 for non-fatal warnings; verify DB is usable
-      if PGPASSWORD="${DB_PASSWORD}" psql -h 127.0.0.1 -p 5432 -U hesabix -d hesabix -c "SELECT 1" >/dev/null 2>&1; then
-        log_success "Seed database imported (some non-fatal warnings may have occurred)."
-      else
-        log_error "Error importing seed database. Check pg_restore output."
-        exit 1
+      if [[ "${table_count}" -gt 0 ]]; then
+        hesabix_reset_public_schema_for_seed "${table_count}"
+        table_count=0
       fi
+      hesabix_import_seed_database "${seed_dump}" "${backup_dir}"
+      table_count=$(sudo -u postgres psql -d hesabix -tAc "SELECT count(*) FROM information_schema.tables WHERE table_schema='public' AND table_type='BASE TABLE';" 2>/dev/null | tr -d '[:space:]')
     fi
-  elif [[ "${table_count}" -gt "0" ]]; then
-    log_info "Database already initialized (${table_count} tables). Skipping seed import."
+  elif [[ "${table_count}" -eq 0 ]]; then
+    echo "$WARNING_MARK Seed dump not found in ${backup_dir}/hesabix_seed*.dump"
+  elif ! hesabix_db_is_fully_initialized; then
+    log_error "Database has ${table_count} tables but core schema is missing and no seed dump was found."
+    log_error "Add hesabix_seed*.dump under ${backup_dir} or drop/recreate the hesabix database."
+    exit 1
   else
-    if [[ -z "${seed_dump}" || ! -f "${seed_dump}" ]]; then
-      echo "$WARNING_MARK Seed dump not found in ${backup_dir}/hesabix_seed*.dump"
-    fi
+    log_info "Database already initialized (${table_count} tables). Skipping seed import."
   fi
 
   # pgvector (for servers where prereqs step was skipped earlier)
-  if [[ -f "${DEPLOY_SCRIPT_DIR}/scripts/ensure_pgvector.sh" ]]; then
-    chmod +x "${DEPLOY_SCRIPT_DIR}/scripts/ensure_pgvector.sh" 2>/dev/null || true
+  local pgvector_script=""
+  if pgvector_script="$(hesabix_find_repo_script ensure_pgvector.sh)"; then
+    chmod +x "${pgvector_script}" 2>/dev/null || true
     log_info "Ensuring PostgreSQL pgvector package before migrations..."
-    bash "${DEPLOY_SCRIPT_DIR}/scripts/ensure_pgvector.sh" || log_warning "pgvector install skipped (non-fatal)."
+    bash "${pgvector_script}" || log_warning "pgvector install skipped (non-fatal)."
   fi
 
   # Always run migrations (after optional seed import, or when DB was already initialized)
+  if ! hesabix_db_is_fully_initialized && [[ "${table_count}" -gt 0 ]]; then
+    log_error "Core schema still missing after seed/migration prep (${table_count} tables)."
+    log_error "Check ${APP_ROOT}/pg_restore_seed.log or recreate the hesabix database."
+    exit 1
+  fi
+  log_info "Ensuring hesabix owns public schema objects (Alembic/API access)..."
+  hesabix_fixup_seed_object_privileges
+  hesabix_ensure_alembic_version_schema
   log_step "Running Alembic migrations..."
   if ! alembic upgrade head; then
     echo "$CROSS_MARK Error running migrations"
@@ -1811,6 +2442,7 @@ Group=www-data
 WorkingDirectory=${api_dir}
 Environment=PATH=/usr/bin:/usr/local/bin:${api_dir}/.venv/bin
 Environment=PYTHONUNBUFFERED=1
+Environment=TZ=UTC
 # ! = run as root: daemon-reload + pip from deploy mirrors if needed (before alembic)
 ExecStartPre=!${api_dir}/deployment/systemd/hesabix-api-prestart.sh
 # Before start/restart: run migrations; service does not start if migrations fail
@@ -1864,6 +2496,7 @@ Group=www-data
 WorkingDirectory=${api_dir}
 Environment=PATH=${api_dir}/.venv/bin
 Environment=PYTHONUNBUFFERED=1
+Environment=TZ=UTC
 ExecStart=${api_dir}/.venv/bin/python ${api_dir}/rq_worker.py
 Restart=on-failure
 RestartSec=10
@@ -1910,6 +2543,7 @@ Group=www-data
 WorkingDirectory=${api_dir}
 Environment=PATH=${api_dir}/.venv/bin
 Environment=PYTHONUNBUFFERED=1
+Environment=TZ=UTC
 Environment=PYTHONPATH=${api_dir}
 ExecStart=${api_dir}/.venv/bin/python -m app.workers.notification_moderation_worker
 Restart=always
@@ -2181,9 +2815,9 @@ ensure_flutter_sdk() {
       exit 1
     fi
   else
-    local ensure_flutter_script="${DEPLOY_SCRIPT_DIR}/scripts/ensure_flutter_sdk_for_update.sh"
+    local ensure_flutter_script=""
     export HESABIX_UPDATE_FLUTTER_SDK="${HESABIX_UPDATE_FLUTTER_SDK:-1}"
-    if [[ -f "${ensure_flutter_script}" ]]; then
+    if ensure_flutter_script="$(hesabix_find_repo_script ensure_flutter_sdk_for_update.sh)"; then
       chmod +x "${ensure_flutter_script}" 2>/dev/null || true
       if ! bash "${ensure_flutter_script}"; then
         log_warning "Flutter SDK ensure failed after git update; trying flutter doctor..."
@@ -2241,6 +2875,12 @@ ensure_swap_for_flutter_build() {
 install_flutter_and_build_frontend() {
   log_step "Building Flutter frontend..."
   set_flutter_mirror_env
+  if declare -F hesabix_resolve_flutter_pub_hosted_url >/dev/null 2>&1; then
+    hesabix_resolve_flutter_pub_hosted_url || true
+  fi
+  if declare -F hesabix_resolve_flutter_storage_base_url >/dev/null 2>&1; then
+    hesabix_resolve_flutter_storage_base_url || true
+  fi
   ensure_flutter_sdk
   ensure_swap_for_flutter_build
   export PATH="/opt/flutter/bin:/snap/bin:$PATH"
@@ -2273,6 +2913,7 @@ install_flutter_and_build_frontend() {
   echo "  Mode: release"
   echo "  API URL: ${api_url} (scheme from TLS detection or API_PUBLIC_SCHEME)"
   echo "  Output: /var/www/${UI_DOMAIN}"
+  echo "  Branding: ${BRANDING_MODE:-default}"
   echo
   echo "$CHECK_MARK Flutter build uses mirror: ${PUB_HOSTED_URL:-f.mirror.hesabix.ir}"
 
@@ -2280,6 +2921,10 @@ install_flutter_and_build_frontend() {
   log_info "Building Flutter web (pub/storage via ${PUB_HOSTED_URL})"
   if ! env PATH="/opt/flutter/bin:/snap/bin:$PATH" \
       PUB_HOSTED_URL="${PUB_HOSTED_URL}" FLUTTER_STORAGE_BASE_URL="${FLUTTER_STORAGE_BASE_URL}" \
+      BRANDING_MODE="${BRANDING_MODE:-}" \
+      BRANDING_DIR="${BRANDING_DIR:-}" \
+      APP_NAME_FA="${APP_NAME_FA:-}" \
+      APP_NAME_EN="${APP_NAME_EN:-}" \
       bash build_web.sh \
     --mode release \
     --api-base-url "${api_url}" \
@@ -2316,6 +2961,14 @@ install_flutter_and_build_frontend() {
   log_info "  Destination: /var/www/${UI_DOMAIN}/"
   
   mkdir -p "/var/www/${UI_DOMAIN}"
+  if ! command -v rsync >/dev/null 2>&1; then
+    log_info "Installing rsync (required to publish Flutter web build)..."
+    apt-get install -y -qq rsync >/dev/null 2>&1 || true
+  fi
+  if ! command -v rsync >/dev/null 2>&1; then
+    log_error "rsync is required but not installed. Run: apt-get install -y rsync"
+    exit 1
+  fi
   rsync -a --delete "${build_output}/" "/var/www/${UI_DOMAIN}/"
   
   # Verify deployment
@@ -2998,7 +3651,16 @@ install_pgadmin4() {
     echo "Creating Python venv for pgAdmin4..."
     python3 -m venv "${pgadmin_venv}"
     log_info "Installing pgAdmin4 from PyPI: ${PIP_INDEX_URL}"
-    if "${pgadmin_venv}/bin/pip" install -U pip -q && "${pgadmin_venv}/bin/pip" install pgadmin4 gunicorn -q; then
+    local pgadmin_pip_ok=0
+    if declare -F hesabix_pip_cmd_with_fallback >/dev/null 2>&1; then
+      if hesabix_pip_cmd_with_fallback "${pgadmin_venv}/bin/pip" install -U pip -q \
+        && hesabix_pip_cmd_with_fallback "${pgadmin_venv}/bin/pip" install pgadmin4 gunicorn -q; then
+        pgadmin_pip_ok=1
+      fi
+    elif "${pgadmin_venv}/bin/pip" install -U pip -q && "${pgadmin_venv}/bin/pip" install pgadmin4 gunicorn -q; then
+      pgadmin_pip_ok=1
+    fi
+    if [[ "${pgadmin_pip_ok}" == "1" ]]; then
       log_success "pgAdmin4 installed from ${PIP_INDEX_URL}"
     else
       log_error "Failed to install pgAdmin4 from ${PIP_INDEX_URL}. Check mirror reachability or PIP_INDEX_URL override."
@@ -3281,6 +3943,18 @@ main() {
   else
     echo "$CHECK_MARK Repository already cloned/updated. Skipping..."
   fi
+  # Critical for curl|bash installs: DEPLOY_SCRIPT_DIR must point at cloned app (not /tmp).
+  hesabix_bind_deploy_script_dir_to_repo
+  if [[ ! -d "${DEPLOY_SCRIPT_DIR}/scripts" ]]; then
+    log_error "App scripts directory missing after clone: ${APP_ROOT}/app/scripts"
+    log_error "Cannot continue standalone deploy without repository scripts."
+    exit 1
+  fi
+  # Prefer full mirror helpers from the cloned repo when available.
+  if [[ -r "${DEPLOY_SCRIPT_DIR}/scripts/mirror_config.sh" ]]; then
+    # shellcheck disable=SC1090
+    source "${DEPLOY_SCRIPT_DIR}/scripts/mirror_config.sh" || true
+  fi
   echo
   
   # Setup database (idempotent)
@@ -3426,11 +4100,19 @@ main() {
   echo "  sudo hesabix -update -source https://source.hesabix.ir/hesabix/arc.git   # override repo"
   echo "  sudo hesabix -cli reload                              # update /usr/local/bin/hesabix from repo"
   echo
+  log_info "To change domains or SSL after install:"
+  echo "  sudo hesabix -domains show"
+  echo "  sudo hesabix -domains set --api api.example.com --ui app.example.com --ssl"
+  echo "  sudo hesabix -domains apply                           # refresh Nginx from .deploy_env"
+  echo "  sudo hesabix -ssl status"
+  echo "  sudo hesabix -ssl enable --all"
+  echo
   log_info "To start/stop/restart all Hesabix app services (systemd):"
   echo "  sudo hesabix -services start"
   echo "  sudo hesabix -services stop"
   echo "  sudo hesabix -services restart"
-  echo "  sudo hesabix -services status"
+  echo "  sudo hesabix -services status   # alias: show"
+  echo "  # includes hesabix-api-media (Softphone Media Edge) when installed"
   echo
   log_info "To re-run deploy (resume from last step or full upgrade):"
   echo "  BRANCH=${BRANCH} API_DOMAIN=${API_DOMAIN} UI_DOMAIN=${UI_DOMAIN} sudo -E bash deploy.sh"
@@ -3439,6 +4121,21 @@ main() {
   log_info "Database password is stored in:"
   echo "  ${APP_ROOT}/.db_password"
   echo
+
+  # Anonymous install telemetry (non-blocking; never fails the deploy).
+  # Opt out: HESABIX_TELEMETRY=0
+  local telem_script=""
+  if telem_script="$(hesabix_find_repo_script hesabix_telemetry.sh 2>/dev/null)"; then
+    # shellcheck source=scripts/hesabix_telemetry.sh
+    # shellcheck disable=SC1090
+    source "${telem_script}"
+    if hesabix_telemetry_enabled; then
+      log_info "Sending anonymous install stats to hesabix.ir (set HESABIX_TELEMETRY=0 to disable)..."
+      hesabix_telemetry_send "install" "deploy" || true
+    else
+      log_info "Install telemetry disabled (HESABIX_TELEMETRY=0)."
+    fi
+  fi
 }
 
 main "$@"

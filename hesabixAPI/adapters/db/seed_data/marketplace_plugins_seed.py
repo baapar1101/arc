@@ -90,8 +90,9 @@ _DEFAULT_PLUGINS: Tuple[_PluginSeed, ...] = (
 		code="distribution",
 		name="پخش مویرگی و ویزیتوری",
 		description=(
-			"مدیریت مسیرهای پخش، برنامه روز ویزیتور، ثبت ویزیت میدانی، "
-			"مرجوعی و گزارش عملکرد با اتصال به CRM و اتوماسیون workflow."
+			"مدیریت مسیر و قلمرو، برنامه روز ویزیتور، ویزیت میدانی با GPS، "
+			"فروش ون و پیش‌فروش، مرجوعی، تسویه روزانه با چک، تحویل با POD، "
+			"پروموشن تجاری، پورسانت، KPI و اتصال به CRM/workflow."
 		),
 		category="sales",
 		icon_url=None,
@@ -137,6 +138,61 @@ _DEFAULT_PLUGINS: Tuple[_PluginSeed, ...] = (
 		trial_days=14,
 		trial_allowed=True,
 		plans=(("monthly", 120_000), ("yearly", 1_200_000)),
+	),
+	_PluginSeed(
+		code="payroll",
+		name="حقوق و دستمزد",
+		description=(
+			"مدیریت جامع حقوق و دستمزد: تعریف انعطاف‌پذیر آیتم‌های حقوق (مزایا، کسورات، هزینه کارفرما) "
+			"با نگاشت حساب از دفتر کل، ثبت پرسنل، دوره‌های حقوق، اجرای حقوق و صدور اسناد حسابداری."
+		),
+		category="hr_payroll",
+		icon_url=None,
+		trial_days=14,
+		trial_allowed=True,
+		plans=(("monthly", 180_000), ("yearly", 1_800_000)),
+	),
+	_PluginSeed(
+		code="hscript_custom_reports",
+		name="گزارش‌ساز اسکریپتی (HScript)",
+		description=(
+			"ساخت گزارش و داشبورد سفارشی با زبان امن HScript: KPI، جدول، نمودار، PDF و Excel. "
+			"بدون لایسنس هم با سقف رایگان قابل استفاده است؛ با فعال‌سازی افزونه سقف ذخیره‌سازی و اجرا افزایش می‌یابد."
+		),
+		category="reporting",
+		icon_url=None,
+		trial_days=14,
+		trial_allowed=True,
+		plans=(("monthly", 220_000), ("yearly", 2_200_000), ("lifetime", 8_800_000)),
+	),
+	_PluginSeed(
+		code="asterisk_issabel_connector",
+		name="اتصال به استریسک و ایزابل",
+		description=(
+			"یکپارچگی مرکز تلفن Issabel/Asterisk با حسابیکس: Screen Pop، Click-to-Call، "
+			"تاریخچه تماس، نگاشت داخلی کاربران، اعلان لحظه‌ای و ثبت خودکار در CRM. "
+			"نیاز به نصب Hesabix Telephony Connector روی سرور تلفن دارد."
+		),
+		category="integration",
+		icon_url=None,
+		trial_days=14,
+		trial_allowed=True,
+		plans=(("monthly", 350_000), ("yearly", 3_500_000)),
+	),
+	_PluginSeed(
+		code="barcode_label_studio",
+		name="طراحی و چاپ برچسب بارکد",
+		description=(
+			"استودیوی حرفه‌ای طراحی برچسب کالا: Drag & Drop، چند طرح ذخیره‌شونده، "
+			"طرح پیش‌فرض، انواع بارکد استاندارد (Code128/39/93، EAN، QR، DataMatrix)، "
+			"چینش سطر و ستون، چاپ از لیست کالا و اکسل سریالی. "
+			"خروجی PDF دقیق با مقیاس میلی‌متر روی وب، ویندوز و اندروید."
+		),
+		category="product_management",
+		icon_url=None,
+		trial_days=14,
+		trial_allowed=True,
+		plans=(("monthly", 180_000), ("yearly", 1_800_000), ("lifetime", 7_200_000)),
 	),
 )
 

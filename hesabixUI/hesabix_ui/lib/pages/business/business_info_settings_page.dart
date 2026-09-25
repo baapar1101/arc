@@ -6,7 +6,9 @@ import 'package:dio/dio.dart' as dio;
 import 'package:file_picker/file_picker.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:go_router/go_router.dart';
+import 'package:hesabix_ui/models/account_model.dart';
 import 'package:hesabix_ui/models/business_models.dart';
+import 'package:hesabix_ui/services/account_service.dart';
 import 'package:hesabix_ui/services/business_api_service.dart';
 import 'package:hesabix_ui/services/currency_service.dart';
 import 'package:hesabix_ui/core/api_client.dart';
@@ -15,6 +17,7 @@ import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../utils/responsive_helper.dart';
 import '../../widgets/business_subpage_back_leading.dart';
+import '../../widgets/invoice/account_tree_combobox_widget.dart';
 import '../../widgets/invoice/warehouse_combobox_widget.dart';
 
 class BusinessInfoSettingsPage extends StatefulWidget {
@@ -46,6 +49,7 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
   final _countryController = TextEditingController();
   final _provinceController = TextEditingController();
   final _cityController = TextEditingController();
+  final _displayTimezoneController = TextEditingController();
 
   BusinessType? _businessType;
   BusinessField? _businessField;
@@ -90,6 +94,16 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
   bool _allowNegativeInventoryForUnique = false;
   bool _warehouseTransferRequirePositiveStock = true;
 
+  // کالای هزینه‌شده / کالای درآمدشده
+  String _geiWorkflowMode = 'simple';
+  bool _geiAutoPostInSimpleMode = true;
+  Account? _geiDefaultExpenseAccount;
+  Account? _geiDefaultIncomeAccount;
+  String _geiStockCountMode = 'goods_docs';
+  bool _geiAllowManualUnitCost = false;
+  bool _geiRequirePerson = false;
+  final AccountService _accountService = AccountService();
+
   /// reject | use_default_warehouse — وقتی ردیف انبارداری بدون انبار و ثبت انبار فعال است
   String _invoiceMissingLineWarehousePolicy = 'reject';
   int? _invoiceDefaultWarehouseId;
@@ -130,11 +144,33 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
     _countryController.dispose();
     _provinceController.dispose();
     _cityController.dispose();
+    _displayTimezoneController.dispose();
     _defaultCreditLimitController.dispose();
     _invoiceProfitOverheadPercentController.dispose();
     _invoiceGlobalDiscountMaxPercentController.dispose();
     _invoiceGlobalDiscountMaxAmountController.dispose();
     super.dispose();
+  }
+
+  Future<Account?> _resolveAccountByCode(String? code) async {
+    final trimmed = (code ?? '').trim();
+    if (trimmed.isEmpty) return null;
+    try {
+      final res = await _accountService.searchAccounts(
+        businessId: widget.businessId,
+        searchQuery: trimmed,
+        limit: 30,
+      );
+      final items = (res['items'] as List<dynamic>?) ?? const [];
+      for (final raw in items) {
+        if (raw is! Map) continue;
+        final account = Account.fromJson(Map<String, dynamic>.from(raw));
+        if (account.code.trim() == trimmed) return account;
+      }
+    } catch (_) {
+      // اگر جستجو شکست خورد، حداقل کد را برای نمایش نگه می‌داریم
+    }
+    return Account(code: trimmed, name: trimmed, accountType: '');
   }
 
   Future<void> _loadData() async {
@@ -156,6 +192,7 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
       _countryController.text = resp.country ?? '';
       _provinceController.text = resp.province ?? '';
       _cityController.text = resp.city ?? '';
+      _displayTimezoneController.text = resp.displayTimezone ?? '';
       _businessType = _resolveBusinessType(resp.businessType);
       _businessField = _resolveBusinessField(resp.businessField);
       _checkCreditEnabledByDefault = resp.checkCreditEnabledByDefault;
@@ -191,6 +228,17 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
       _allowNegativeInventoryForBulk = resp.allowNegativeInventoryForBulk;
       _allowNegativeInventoryForUnique = resp.allowNegativeInventoryForUnique;
       _warehouseTransferRequirePositiveStock = resp.warehouseTransferRequirePositiveStock;
+      _geiWorkflowMode = resp.goodsExpenseIncomeWorkflowMode;
+      _geiAutoPostInSimpleMode = resp.goodsExpenseIncomeAutoPostInSimpleMode;
+      final geiAccounts = await Future.wait([
+        _resolveAccountByCode(resp.goodsExpenseIncomeDefaultExpenseAccountCode),
+        _resolveAccountByCode(resp.goodsExpenseIncomeDefaultIncomeAccountCode),
+      ]);
+      _geiDefaultExpenseAccount = geiAccounts[0];
+      _geiDefaultIncomeAccount = geiAccounts[1];
+      _geiStockCountMode = resp.goodsExpenseIncomeStockCountMode;
+      _geiAllowManualUnitCost = resp.goodsExpenseIncomeAllowManualUnitCost;
+      _geiRequirePerson = resp.goodsExpenseIncomeRequirePerson;
       _invoiceMissingLineWarehousePolicy = resp.invoiceMissingLineWarehousePolicy;
       _invoiceDefaultWarehouseId = resp.invoiceDefaultWarehouseId;
       _invoiceDefaultWarehouseFillDocumentHeader = resp.invoiceDefaultWarehouseFillDocumentHeader;
@@ -282,6 +330,10 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
     if ((orig.province ?? '') != province) payload['province'] = province.isEmpty ? null : province;
     final city = _cityController.text.trim();
     if ((orig.city ?? '') != city) payload['city'] = city.isEmpty ? null : city;
+    final displayTz = _displayTimezoneController.text.trim();
+    if ((orig.displayTimezone ?? '') != displayTz) {
+      payload['display_timezone'] = displayTz.isEmpty ? null : displayTz;
+    }
     // تنظیمات اعتبار
     final defaultCreditLimitStr = _defaultCreditLimitController.text.trim();
     final parsedLimit = double.tryParse(defaultCreditLimitStr.replaceAll(',', ''));
@@ -371,6 +423,29 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
     }
     if (_warehouseTransferRequirePositiveStock != orig.warehouseTransferRequirePositiveStock) {
       payload['warehouse_transfer_require_positive_stock'] = _warehouseTransferRequirePositiveStock;
+    }
+    if (_geiWorkflowMode != orig.goodsExpenseIncomeWorkflowMode) {
+      payload['goods_expense_income_workflow_mode'] = _geiWorkflowMode;
+    }
+    if (_geiAutoPostInSimpleMode != orig.goodsExpenseIncomeAutoPostInSimpleMode) {
+      payload['goods_expense_income_auto_post_in_simple_mode'] = _geiAutoPostInSimpleMode;
+    }
+    final geiExp = (_geiDefaultExpenseAccount?.code ?? '').trim();
+    if (geiExp.isNotEmpty && geiExp != orig.goodsExpenseIncomeDefaultExpenseAccountCode) {
+      payload['goods_expense_income_default_expense_account_code'] = geiExp;
+    }
+    final geiInc = (_geiDefaultIncomeAccount?.code ?? '').trim();
+    if (geiInc.isNotEmpty && geiInc != orig.goodsExpenseIncomeDefaultIncomeAccountCode) {
+      payload['goods_expense_income_default_income_account_code'] = geiInc;
+    }
+    if (_geiStockCountMode != orig.goodsExpenseIncomeStockCountMode) {
+      payload['goods_expense_income_stock_count_mode'] = _geiStockCountMode;
+    }
+    if (_geiAllowManualUnitCost != orig.goodsExpenseIncomeAllowManualUnitCost) {
+      payload['goods_expense_income_allow_manual_unit_cost'] = _geiAllowManualUnitCost;
+    }
+    if (_geiRequirePerson != orig.goodsExpenseIncomeRequirePerson) {
+      payload['goods_expense_income_require_person'] = _geiRequirePerson;
     }
     if (_invoiceMissingLineWarehousePolicy != orig.invoiceMissingLineWarehousePolicy) {
       payload['invoice_missing_line_warehouse_policy'] = _invoiceMissingLineWarehousePolicy;
@@ -1058,6 +1133,13 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
               ),
               const SizedBox(height: 12),
               _buildTextField(controller: _cityController, label: t.city),
+              const SizedBox(height: 12),
+              _buildTextField(
+                controller: _displayTimezoneController,
+                label: 'منطقهٔ زمانی نمایش',
+                hint: 'Asia/Tehran',
+                helperText: 'خالی = پیش‌فرض سیستم. فرمت IANA (مثل Asia/Tehran، Europe/Berlin)',
+              ),
               
               // بخش ارز پیش‌فرض (فقط برای کسب‌وکارهایی که ارز پیش‌فرض ندارند)
               if (_original?.defaultCurrency == null) ...[
@@ -1179,6 +1261,11 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
               _buildSectionTitle(AppLocalizations.of(context).inventoryNegativePolicySectionTitle, cs),
               const SizedBox(height: 8),
               _buildInventoryNegativePolicySettings(cs),
+
+              const SizedBox(height: 24),
+              _buildSectionTitle('کالای هزینه‌شده / کالای درآمدشده', cs),
+              const SizedBox(height: 8),
+              _buildGoodsExpenseIncomeSettings(cs),
 
             ],
           ),
@@ -1577,6 +1664,103 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
               subtitle: Text(t.inventoryNegativePolicyTransferSubtitle),
               value: _warehouseTransferRequirePositiveStock,
               onChanged: (v) => setState(() => _warehouseTransferRequirePositiveStock = v),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildGoodsExpenseIncomeSettings(ColorScheme cs) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'برای سازمان‌های کوچک حالت «ساده» و برای تفکیک انباردار/حسابدار حالت «دو مرحله‌ای» را انتخاب کنید.',
+              style: TextStyle(color: cs.onSurfaceVariant, fontSize: 13, height: 1.4),
+            ),
+            const SizedBox(height: 14),
+            Text('گردش‌کار', style: TextStyle(color: cs.onSurface, fontWeight: FontWeight.w600)),
+            const SizedBox(height: 8),
+            SegmentedButton<String>(
+              segments: const [
+                ButtonSegment(value: 'simple', label: Text('ساده')),
+                ButtonSegment(value: 'two_step', label: Text('دو مرحله‌ای')),
+              ],
+              selected: {_geiWorkflowMode},
+              onSelectionChanged: (s) => setState(() => _geiWorkflowMode = s.first),
+            ),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('قطعی خودکار در حالت ساده'),
+              subtitle: const Text('اگر کاربر مجوز قطعی‌سازی داشته باشد، سند هنگام ثبت قطعی می‌شود'),
+              value: _geiAutoPostInSimpleMode,
+              onChanged: _geiWorkflowMode == 'simple'
+                  ? (v) => setState(() => _geiAutoPostInSimpleMode = v)
+                  : null,
+            ),
+            const SizedBox(height: 8),
+            AccountTreeComboboxWidget(
+              businessId: widget.businessId,
+              selectedAccount: _geiDefaultExpenseAccount,
+              label: 'حساب پیش‌فرض کالای هزینه‌شده',
+              hintText: 'انتخاب از درخت حساب‌ها',
+              isRequired: true,
+              dense: true,
+              onChanged: (account) => setState(() => _geiDefaultExpenseAccount = account),
+            ),
+            const SizedBox(height: 12),
+            AccountTreeComboboxWidget(
+              businessId: widget.businessId,
+              selectedAccount: _geiDefaultIncomeAccount,
+              label: 'حساب پیش‌فرض کالای درآمدشده',
+              hintText: 'انتخاب از درخت حساب‌ها',
+              isRequired: true,
+              dense: true,
+              documentTypeFilter: 'income',
+              onChanged: (account) => setState(() => _geiDefaultIncomeAccount = account),
+            ),
+            const SizedBox(height: 12),
+            DropdownButtonFormField<String>(
+              value: _geiStockCountMode,
+              decoration: const InputDecoration(
+                labelText: 'خروجی انبارگردانی',
+                border: OutlineInputBorder(),
+              ),
+              items: const [
+                DropdownMenuItem(
+                  value: 'goods_docs',
+                  child: Text('اسناد کالای هزینه/درآمد (با اثر مالی)'),
+                ),
+                DropdownMenuItem(
+                  value: 'physical_adjustment',
+                  child: Text('فقط حواله تعدیل فیزیکی'),
+                ),
+                DropdownMenuItem(
+                  value: 'ask',
+                  child: Text('پرسش از کاربر هنگام ثبت'),
+                ),
+              ],
+              onChanged: (v) {
+                if (v == null) return;
+                setState(() => _geiStockCountMode = v);
+              },
+            ),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('اجازه تغییر دستی بهای واحد'),
+              subtitle: const Text('نیاز به مجوز جداگانه change_unit_cost دارد'),
+              value: _geiAllowManualUnitCost,
+              onChanged: (v) => setState(() => _geiAllowManualUnitCost = v),
+            ),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('الزام انتخاب شخص'),
+              value: _geiRequirePerson,
+              onChanged: (v) => setState(() => _geiRequirePerson = v),
             ),
           ],
         ),
@@ -2080,11 +2264,17 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
     required String label,
     bool required = false,
     int maxLines = 1,
+    String? hint,
+    String? helperText,
   }) {
     return TextFormField(
       controller: controller,
       maxLines: maxLines,
-      decoration: InputDecoration(labelText: label),
+      decoration: InputDecoration(
+        labelText: label,
+        hintText: hint,
+        helperText: helperText,
+      ),
       validator: (val) {
         if (required && (val == null || val.trim().isEmpty)) {
           return label;

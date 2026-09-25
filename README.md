@@ -24,7 +24,7 @@ Hesabix is an open-source accounting software that provides comprehensive financ
 - PostgreSQL - Robust relational database
 - SQLAlchemy - Powerful ORM
 - Alembic - Database migration management
-- Python 3.10+ (Python 3.12 on Ubuntu 24.04, Python 3.10/3.11 on Ubuntu 22.04)
+- Python 3.11+ (Python 3.12 on Ubuntu 24.04; Ubuntu 22.04: deploy installs python3.11 automatically)
 
 **Frontend:**
 - Flutter Web - Cross-platform web framework
@@ -79,21 +79,21 @@ The installation script automatically installs all required software:
 
 ### Quick Installation
 
-The easiest way to install Hesabix is using the automated installation script:
+The easiest way to install Hesabix is using the automated installation script from the project repository:
 
 ```bash
-cd /tmp && curl -sSL --http1.1 https://shell.hesabix.ir/deploy.sh | tr -d '\r' > installer.sh && chmod +x installer.sh && sudo bash installer.sh
+cd /tmp && curl -sSL --http1.1 https://source.hesabix.ir/hesabix/arc/raw/branch/master/deploy.sh | tr -d '\r' > installer.sh && chmod +x installer.sh && sudo bash installer.sh
 ```
 
 > **HTTP/2 issue on some servers**: On some servers (e.g. older curl versions or specific network/firewall configuration), using HTTP/2 may cause errors. The command above uses the `--http1.1` flag to always use HTTP/1.1. If you get a curl error, see the [Troubleshooting HTTP/2](#troubleshooting-http2-when-downloading-install-script) section.
 
 **Alternative method using wget** (if curl still fails):
 ```bash
-cd /tmp && wget -qO- https://shell.hesabix.ir/deploy.sh | tr -d '\r' > installer.sh && chmod +x installer.sh && sudo bash installer.sh
+cd /tmp && wget -qO- https://source.hesabix.ir/hesabix/arc/raw/branch/master/deploy.sh | tr -d '\r' > installer.sh && chmod +x installer.sh && sudo bash installer.sh
 ```
 
 This command will:
-1. Download the installation script
+1. Download the installation script from `https://source.hesabix.ir/hesabix/arc`
 2. Make it executable
 3. Run the installation with root privileges
 
@@ -176,7 +176,7 @@ You can upgrade in either of the following ways.
 To upgrade by downloading and running the deployment script again:
 
 ```bash
-cd /tmp && curl -sSL --http1.1 https://shell.hesabix.ir/deploy.sh | tr -d '\r' > installer.sh && chmod +x installer.sh && sudo bash installer.sh
+cd /tmp && curl -sSL --http1.1 https://source.hesabix.ir/hesabix/arc/raw/branch/master/deploy.sh | tr -d '\r' > installer.sh && chmod +x installer.sh && sudo bash installer.sh
 ```
 
 The script is idempotent and safe to re-run. It will update the code and restart services.
@@ -191,7 +191,7 @@ After a standard installation, a small CLI is available at `/usr/local/bin/hesab
 sudo hesabix -update
 ```
 
-This runs `update.sh` in the deployed app directory. It typically: pulls the latest code from the saved remote and branch, applies database migrations, restarts Hesabix systemd units (API, RQ worker, notification moderation—and pgAdmin4 if installed), rebuilds the Flutter web frontend, and reloads Nginx. Progress and errors are also written to `/opt/hesabix/update.log`.
+This runs `update.sh` in the deployed app directory. It typically: pulls the latest code from the saved remote and branch, applies database migrations, restarts Hesabix systemd units (API, RQ worker, notification moderation—and Softphone Media Edge / pgAdmin4 if installed), rebuilds the Flutter web frontend, and reloads Nginx. Progress and errors are also written to `/opt/hesabix/update.log`.
 
 Optional overrides (useful for forks or testing a branch):
 
@@ -203,7 +203,13 @@ sudo hesabix -update -source https://example.com/your/repo.git -branch develop
 
 Other `hesabix` commands:
 
-- `sudo hesabix -services {start|stop|restart|status}` — control Hesabix-related systemd units without updating code.
+- `sudo hesabix -services {start|stop|restart|status|show}` — control Hesabix-related systemd units (API, RQ, notification worker, and `hesabix-api-media` / pgAdmin4 when installed). `show` is an alias for `status`.
+- `sudo hesabix -domains show` — show configured API/UI/pgAdmin domains and URLs.
+- `sudo hesabix -domains set --api api.example.com --ui app.example.com [--ssl]` — change domain(s), update Nginx, rebuild frontend, optionally issue Let's Encrypt certs.
+- `sudo hesabix -domains apply` — regenerate Nginx from current `/opt/hesabix/.deploy_env` without changing domains.
+- `sudo hesabix -ssl status` — show TLS certificate status.
+- `sudo hesabix -ssl enable [--api|--ui|--pgadmin|--all] [--email you@example.com]` — request Let's Encrypt certificates.
+- `sudo hesabix -ssl renew [--dry-run]` — run certbot renewal.
 - `sudo hesabix -cli reload` — refresh `/usr/local/bin/hesabix` from the repo if the CLI script was updated.
 
 `hesabix -update` requires a completed prior deploy (`/opt/hesabix/.deploy_env`, app clone under `/opt/hesabix/app`, and `/opt/hesabix/app/update.sh`). If those are missing, use the installer method above.
@@ -255,7 +261,7 @@ Some servers have issues with HTTP/2 due to curl version, network configuration,
 1. **Use HTTP/1.1 with curl**  
    Always include the `--http1.1` flag in the command:
    ```bash
-   curl -sSL --http1.1 -o installer.sh https://shell.hesabix.ir/deploy.sh
+   curl -sSL --http1.1 -o installer.sh https://source.hesabix.ir/hesabix/arc/raw/branch/master/deploy.sh
    ```
    Then run:
    ```bash
@@ -265,7 +271,7 @@ Some servers have issues with HTTP/2 due to curl version, network configuration,
 2. **Use wget instead of curl**  
    wget uses HTTP/1.1 by default:
    ```bash
-   cd /tmp && wget -qO- https://shell.hesabix.ir/deploy.sh | tr -d '\r' > installer.sh && chmod +x installer.sh && sudo bash installer.sh
+   cd /tmp && wget -qO- https://source.hesabix.ir/hesabix/arc/raw/branch/master/deploy.sh | tr -d '\r' > installer.sh && chmod +x installer.sh && sudo bash installer.sh
    ```
    If you get an SSL certificate error, you can add `--no-check-certificate` to the wget command (only in test environments or when you are sure it is safe).
 
@@ -326,6 +332,14 @@ The installation script automatically sets appropriate file permissions:
 - `.env` file: `600` (read/write for owner only)
 - Application files: Owned by `www-data` user
 - Database password: Stored securely with restricted access
+
+### Install telemetry (anonymous / semi-anonymous)
+
+After a **successful** install (`deploy.sh`) or update (`hesabix -update`), Hesabix may send a small JSON report to `https://hesabix.ir` so the maintainers can understand real-world usage (domains, public IP, RAM/CPU, OS, git branch/commit, SSL and optional feature flags). No database passwords, JWT secrets, or business/user data are included. A stable random `INSTALL_ID` is stored in `/opt/hesabix/.deploy_env`.
+
+- **Disable**: `HESABIX_TELEMETRY=0` (environment variable) before running deploy/update
+- **Override endpoint/token** (advanced): `HESABIX_STATS_URL`, `HESABIX_STATS_TOKEN`
+- Implementation: `scripts/hesabix_telemetry.sh`; WordPress receiver (for hesabix.ir only): `extraScripts/hesabix-install-stats/`
 
 ## License
 

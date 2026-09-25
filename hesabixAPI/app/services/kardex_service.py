@@ -50,16 +50,9 @@ def _kardex_sort_column(sort_key: str):
 
 
 def _apply_kardex_sort(q, query: Dict[str, Any]):
-    from adapters.api.v1.schemas import QueryInfo
-    from app.services.sort_resolution import effective_sort_specs
+    from app.services.sort_resolution import effective_sort_specs, query_info_for_sort
 
-    qi = QueryInfo.model_validate({
-        "take": int(query.get("take", 20) or 20),
-        "skip": int(query.get("skip", 0) or 0),
-        "sort_by": query.get("sort_by"),
-        "sort_desc": bool(query.get("sort_desc", True)),
-        "sort": query.get("sort") if isinstance(query.get("sort"), list) else None,
-    })
+    qi = query_info_for_sort(query, default_sort_desc=True)
     specs = effective_sort_specs(qi, allowed=KARDEX_SORT_ALLOWED, default_when_empty=("document_date", True))
     parts = []
     for name, desc in specs:
@@ -138,6 +131,20 @@ def list_kardex_lines(db: Session, business_id: int, query: Dict[str, Any]) -> D
             q = q.filter(Document.document_date <= _parse_iso_date(to_date))
         except Exception:
             pass
+
+    # فیلتر ارز سند + حالت نمایش معادل پایه
+    currency_id = query.get("currency_id")
+    try:
+        currency_id_int = int(currency_id) if currency_id is not None else None
+    except Exception:
+        currency_id_int = None
+    amounts_in_base = bool(query.get("amounts_in_base")) or currency_id_int is None
+    # وقتی ارز مشخص است: فیلتر همان ارز؛ وقتی null: همه ارزها (مبالغ می‌توانند معادل پایه شوند)
+    if currency_id_int is not None:
+        q = q.filter(Document.currency_id == currency_id_int)
+        # اگر کاربر صراحتاً amounts_in_base نفرستاده، برای ارز مشخص بومی نشان بده
+        if "amounts_in_base" not in query:
+            amounts_in_base = False
 
     # Read selected IDs
     person_ids = _collect_ids(query, "person_ids")
@@ -241,11 +248,11 @@ def list_kardex_lines(db: Session, business_id: int, query: Dict[str, Any]) -> D
 
     # Pagination
     try:
-        skip = int(query.get("skip", 0))
+        skip = max(int(query.get("skip", 0)), 0)
     except Exception:
         skip = 0
     try:
-        take = int(query.get("take", 20))
+        take = max(int(query.get("take", 20)), 1)
     except Exception:
         take = 20
 
@@ -259,9 +266,19 @@ def list_kardex_lines(db: Session, business_id: int, query: Dict[str, Any]) -> D
     }
     try:
         from sqlalchemy import func
+        debit_col = (
+            func.coalesce(DocumentLine.debit_base, DocumentLine.debit)
+            if amounts_in_base
+            else DocumentLine.debit
+        )
+        credit_col = (
+            func.coalesce(DocumentLine.credit_base, DocumentLine.credit)
+            if amounts_in_base
+            else DocumentLine.credit
+        )
         sum_q = q.order_by(None).with_entities(
-            func.coalesce(func.sum(DocumentLine.debit), 0),
-            func.coalesce(func.sum(DocumentLine.credit), 0),
+            func.coalesce(func.sum(debit_col), 0),
+            func.coalesce(func.sum(credit_col), 0),
             func.sum(DocumentLine.quantity),
         ).one()
         totals["debit"] = float(sum_q[0] or 0)
@@ -273,12 +290,42 @@ def list_kardex_lines(db: Session, business_id: int, query: Dict[str, Any]) -> D
         logger.debug("KARDEX query total=%s (after filters)", total)
     except Exception:
         pass
-    rows: List[Tuple[DocumentLine, Document]] = q.offset(skip).limit(take).all()
 
-    # Running balance (optional)
+    def _line_amounts(line: DocumentLine) -> Tuple[float, float]:
+        if amounts_in_base:
+            debit = float(
+                line.debit_base if getattr(line, "debit_base", None) is not None else (line.debit or 0)
+            )
+            credit = float(
+                line.credit_base if getattr(line, "credit_base", None) is not None else (line.credit or 0)
+            )
+        else:
+            debit = float(line.debit or 0)
+            credit = float(line.credit or 0)
+        return debit, credit
+
+    # Running balance (optional) — must continue across pages in the same sort order
     include_running = bool(query.get("include_running_balance", False))
     running_amount: float = 0.0
     running_quantity: float = 0.0
+
+    if include_running and skip > 0:
+        # Load prefix + current page so مانده on page N continues from page N-1
+        window: List[Tuple[DocumentLine, Document]] = q.limit(skip + take).all()
+        for line, _doc in window[:skip]:
+            debit, credit = _line_amounts(line)
+            try:
+                running_amount += debit - credit
+            except Exception:
+                pass
+            try:
+                if line.quantity is not None:
+                    running_quantity += float(line.quantity or 0)
+            except Exception:
+                pass
+        rows = window[skip:]
+    else:
+        rows = q.offset(skip).limit(take).all()
 
     # گردآوری شناسه‌های انبار جهت نام‌گذاری
     wh_ids_in_page: set[int] = set()
@@ -362,6 +409,9 @@ def list_kardex_lines(db: Session, business_id: int, query: Dict[str, Any]) -> D
     items: List[Dict[str, Any]] = []
     for line, doc in rows:
         doc_type = getattr(doc, "document_type", None)
+        debit_native = float(line.debit or 0)
+        credit_native = float(line.credit or 0)
+        debit, credit = _line_amounts(line)
         item: Dict[str, Any] = {
             "line_id": line.id,
             "document_id": doc.id,
@@ -370,8 +420,13 @@ def list_kardex_lines(db: Session, business_id: int, query: Dict[str, Any]) -> D
             "document_type": doc_type,
             "document_type_name": _get_document_type_name(doc_type),
             "description": line.description,
-            "debit": float(line.debit or 0),
-            "credit": float(line.credit or 0),
+            "debit": debit,
+            "credit": credit,
+            "debit_native": debit_native,
+            "credit_native": credit_native,
+            "document_currency_id": getattr(doc, "currency_id", None),
+            "exchange_rate": float(line.exchange_rate) if getattr(line, "exchange_rate", None) is not None else None,
+            "amounts_in_base": amounts_in_base,
             "quantity": float(line.quantity or 0) if line.quantity is not None else None,
             "account_id": line.account_id,
             "person_id": line.person_id,
@@ -405,7 +460,7 @@ def list_kardex_lines(db: Session, business_id: int, query: Dict[str, Any]) -> D
 
         if include_running:
             try:
-                running_amount += float(line.debit or 0) - float(line.credit or 0)
+                running_amount += float(debit) - float(credit)
             except Exception:
                 pass
             try:
@@ -432,6 +487,10 @@ def list_kardex_lines(db: Session, business_id: int, query: Dict[str, Any]) -> D
             "has_prev": skip > 0,
         },
         "query_info": query,
+        "meta": {
+            "currency_id": currency_id_int,
+            "amounts_in_base": amounts_in_base,
+        },
     }
 
 

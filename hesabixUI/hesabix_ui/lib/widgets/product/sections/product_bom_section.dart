@@ -6,6 +6,7 @@ import '../../product/bom_editor_dialog.dart';
 import '../production_settings_dialog.dart';
 import '../../../../utils/error_extractor.dart';
 import '../../../../utils/snackbar_helper.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 class ProductBomSection extends StatefulWidget {
   final int businessId;
@@ -65,7 +66,7 @@ class _ProductBomSectionState extends State<ProductBomSection> {
       return const Center(child: CircularProgressIndicator());
     }
     if (_error != null) {
-      return Center(child: Text(_error!, style: TextStyle(color: Colors.red.shade700)));
+      return Center(child: Text(_error!, style: TextStyle(color: SemanticColorResolver.negative(context))));
     }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -158,13 +159,13 @@ class _ProductBomSectionState extends State<ProductBomSection> {
                           padding: const EdgeInsets.all(8),
                           decoration: BoxDecoration(
                             color: bom.isDefault 
-                                ? Colors.orange.withValues(alpha: 0.2)
+                                ? SemanticColorResolver.warning(context).withValues(alpha: 0.2)
                                 : Theme.of(context).colorScheme.surfaceContainerHighest,
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Icon(
                             bom.isDefault ? Icons.star : Icons.blur_on,
-                            color: bom.isDefault ? Colors.orange : Theme.of(context).colorScheme.onSurfaceVariant,
+                            color: bom.isDefault ? SemanticColorResolver.warning(context) : Theme.of(context).colorScheme.onSurfaceVariant,
                             size: 24,
                           ),
                         ),
@@ -182,18 +183,18 @@ class _ProductBomSectionState extends State<ProductBomSection> {
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                                 decoration: BoxDecoration(
-                                  color: Colors.orange.withValues(alpha: 0.2),
+                                  color: SemanticColorResolver.warning(context).withValues(alpha: 0.2),
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                                 child: Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    Icon(Icons.star, size: 14, color: Colors.orange.shade700),
-                                    const SizedBox(width: 4),
+                                    Icon(Icons.star, size: 14, color: SemanticColorResolver.warning(context)),
+                                    SizedBox(width: 4),
                                     Text(
                                       'پیش‌فرض',
                                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                        color: Colors.orange.shade700,
+                                        color: SemanticColorResolver.warning(context),
                                         fontWeight: FontWeight.bold,
                                       ),
                                     ),
@@ -205,7 +206,7 @@ class _ProductBomSectionState extends State<ProductBomSection> {
                         subtitle: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const SizedBox(height: 4),
+                            SizedBox(height: 4),
                             Row(
                               children: [
                                 Chip(
@@ -275,7 +276,7 @@ class _ProductBomSectionState extends State<ProductBomSection> {
                         trailing: Wrap(spacing: 4, children: [
                           IconButton(
                             tooltip: 'ویرایش جزئیات (مواد، خروجی‌ها، عملیات)',
-                            icon: const Icon(Icons.tune),
+                            icon: Icon(Icons.tune),
                             onPressed: () => _openEditor(bom),
                           ),
                           IconButton(
@@ -286,7 +287,7 @@ class _ProductBomSectionState extends State<ProductBomSection> {
                           IconButton(
                             tooltip: 'حذف فرمول',
                             icon: const Icon(Icons.delete_outline),
-                            color: Colors.red.shade700,
+                            color: SemanticColorResolver.negative(context),
                             onPressed: () => _delete(bom),
                           ),
                         ]),
@@ -345,7 +346,7 @@ class _ProductBomSectionState extends State<ProductBomSection> {
       case 'draft':
         return Colors.grey;
       case 'approved':
-        return Colors.green;
+        return SemanticColorResolver.positive(context);
       case 'archived':
         return Colors.blueGrey;
       default:
@@ -422,8 +423,8 @@ class _ProductBomSectionState extends State<ProductBomSection> {
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Row(
           children: [
-            Icon(Icons.warning_amber_rounded, color: Colors.red.shade700),
-            const SizedBox(width: 8),
+            Icon(Icons.warning_amber_rounded, color: SemanticColorResolver.negative(context)),
+            SizedBox(width: 8),
             const Expanded(child: Text('حذف فرمول تولید')),
           ],
         ),
@@ -439,9 +440,9 @@ class _ProductBomSectionState extends State<ProductBomSection> {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.red.shade50,
+                color: SemanticColorResolver.negative(context).withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.red.shade200),
+                border: Border.all(color: SemanticColorResolver.negative(context).withValues(alpha: 0.35)),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -450,46 +451,46 @@ class _ProductBomSectionState extends State<ProductBomSection> {
                     'این فرمول شامل:',
                     style: Theme.of(context).textTheme.titleSmall?.copyWith(
                       fontWeight: FontWeight.bold,
-                      color: Colors.red.shade900,
+                      color: SemanticColorResolver.negative(context),
                     ),
                   ),
-                  const SizedBox(height: 8),
+                  SizedBox(height: 8),
                   if (itemsCount > 0)
                     Row(
                       children: [
-                        Icon(Icons.inventory_2, size: 16, color: Colors.red.shade700),
-                        const SizedBox(width: 8),
-                        Text('$itemsCount ماده اولیه', style: TextStyle(color: Colors.red.shade700)),
+                        Icon(Icons.inventory_2, size: 16, color: SemanticColorResolver.negative(context)),
+                        SizedBox(width: 8),
+                        Text('$itemsCount ماده اولیه', style: TextStyle(color: SemanticColorResolver.negative(context))),
                       ],
                     ),
                   if (outputsCount > 0) ...[
-                    const SizedBox(height: 4),
+                    SizedBox(height: 4),
                     Row(
                       children: [
-                        Icon(Icons.output, size: 16, color: Colors.red.shade700),
-                        const SizedBox(width: 8),
-                        Text('$outputsCount محصول خروجی', style: TextStyle(color: Colors.red.shade700)),
+                        Icon(Icons.output, size: 16, color: SemanticColorResolver.negative(context)),
+                        SizedBox(width: 8),
+                        Text('$outputsCount محصول خروجی', style: TextStyle(color: SemanticColorResolver.negative(context))),
                       ],
                     ),
                   ],
                   if (operationsCount > 0) ...[
-                    const SizedBox(height: 4),
+                    SizedBox(height: 4),
                     Row(
                       children: [
-                        Icon(Icons.build, size: 16, color: Colors.red.shade700),
-                        const SizedBox(width: 8),
-                        Text('$operationsCount عملیات', style: TextStyle(color: Colors.red.shade700)),
+                        Icon(Icons.build, size: 16, color: SemanticColorResolver.negative(context)),
+                        SizedBox(width: 8),
+                        Text('$operationsCount عملیات', style: TextStyle(color: SemanticColorResolver.negative(context))),
                       ],
                     ),
                   ],
                 ],
               ),
             ),
-            const SizedBox(height: 8),
+            SizedBox(height: 8),
             Text(
               'این عمل قابل بازگشت نیست.',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: Colors.red.shade700,
+                color: SemanticColorResolver.negative(context),
                 fontWeight: FontWeight.bold,
               ),
             ),
@@ -498,12 +499,12 @@ class _ProductBomSectionState extends State<ProductBomSection> {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('انصراف'),
+            child: Text('انصراف'),
           ),
           FilledButton(
             onPressed: () => Navigator.of(context).pop(true),
             style: FilledButton.styleFrom(
-              backgroundColor: Colors.red.shade700,
+              backgroundColor: SemanticColorResolver.negative(context),
             ),
             child: const Text('حذف'),
           ),
@@ -758,7 +759,7 @@ class _CreateBomDialogState extends State<_CreateBomDialog> {
                           return null;
                         },
                       ),
-                      const SizedBox(height: 16),
+                      SizedBox(height: 16),
                       // Default checkbox with better styling
                       Container(
                         padding: const EdgeInsets.all(16),
@@ -777,11 +778,11 @@ class _CreateBomDialogState extends State<_CreateBomDialog> {
                             Icon(
                               _isDefault ? Icons.star : Icons.star_border,
                               color: _isDefault
-                                  ? Colors.orange
+                                  ? SemanticColorResolver.warning(context)
                                   : theme.colorScheme.onSurface.withValues(alpha: 0.6),
                               size: 28,
                             ),
-                            const SizedBox(width: 12),
+                            SizedBox(width: 12),
                             Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -817,18 +818,18 @@ class _CreateBomDialogState extends State<_CreateBomDialog> {
                         Container(
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            color: Colors.red.shade50,
+                            color: SemanticColorResolver.negative(context).withValues(alpha: 0.12),
                             borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: Colors.red.shade300),
+                            border: Border.all(color: SemanticColorResolver.negative(context).withValues(alpha: 0.5)),
                           ),
                           child: Row(
                             children: [
-                              Icon(Icons.error_outline, color: Colors.red.shade700),
-                              const SizedBox(width: 8),
+                              Icon(Icons.error_outline, color: SemanticColorResolver.negative(context)),
+                              SizedBox(width: 8),
                               Expanded(
                                 child: Text(
                                   _errorMessage!,
-                                  style: TextStyle(color: Colors.red.shade700),
+                                  style: TextStyle(color: SemanticColorResolver.negative(context)),
                                 ),
                               ),
                             ],
@@ -1047,7 +1048,7 @@ class _EditBomDialogState extends State<_EditBomDialog> {
                       color: theme.colorScheme.onPrimary,
                       size: 28,
                     ),
-                    const SizedBox(width: 12),
+                    SizedBox(width: 12),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1064,7 +1065,7 @@ class _EditBomDialogState extends State<_EditBomDialog> {
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                               decoration: BoxDecoration(
-                                color: Colors.orange.withValues(alpha: 0.3),
+                                color: SemanticColorResolver.warning(context).withValues(alpha: 0.3),
                                 borderRadius: BorderRadius.circular(4),
                               ),
                               child: Row(
@@ -1190,7 +1191,7 @@ class _EditBomDialogState extends State<_EditBomDialog> {
                           }
                         },
                       ),
-                      const SizedBox(height: 16),
+                      SizedBox(height: 16),
                       // Default checkbox with better styling
                       Container(
                         padding: const EdgeInsets.all(16),
@@ -1209,7 +1210,7 @@ class _EditBomDialogState extends State<_EditBomDialog> {
                             Icon(
                               _isDefault ? Icons.star : Icons.star_border,
                               color: _isDefault
-                                  ? Colors.orange
+                                  ? SemanticColorResolver.warning(context)
                                   : theme.colorScheme.onSurface.withValues(alpha: 0.6),
                               size: 28,
                             ),
@@ -1250,22 +1251,22 @@ class _EditBomDialogState extends State<_EditBomDialog> {
                       ),
                       // Error message
                       if (_errorMessage != null) ...[
-                        const SizedBox(height: 16),
+                        SizedBox(height: 16),
                         Container(
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            color: Colors.red.shade50,
+                            color: SemanticColorResolver.negative(context).withValues(alpha: 0.12),
                             borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: Colors.red.shade300),
+                            border: Border.all(color: SemanticColorResolver.negative(context).withValues(alpha: 0.5)),
                           ),
                           child: Row(
                             children: [
-                              Icon(Icons.error_outline, color: Colors.red.shade700),
-                              const SizedBox(width: 8),
+                              Icon(Icons.error_outline, color: SemanticColorResolver.negative(context)),
+                              SizedBox(width: 8),
                               Expanded(
                                 child: Text(
                                   _errorMessage!,
-                                  style: TextStyle(color: Colors.red.shade700),
+                                  style: TextStyle(color: SemanticColorResolver.negative(context)),
                                 ),
                               ),
                             ],

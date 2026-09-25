@@ -1,0 +1,417 @@
+{
+  "offline_gold": {
+    "source": "offline_gold",
+    "not_production": true,
+    "candidate_recall_at_100": 1.0,
+    "indexed_final": [
+      {
+        "k": 10,
+        "candidate_n": 100,
+        "recall": 0.9616,
+        "mrr": 0.7931,
+        "ndcg": 0.8091
+      },
+      {
+        "k": 15,
+        "candidate_n": 100,
+        "recall": 0.9819,
+        "mrr": 0.7945,
+        "ndcg": 0.8166
+      },
+      {
+        "k": 20,
+        "candidate_n": 100,
+        "recall": 0.9887,
+        "mrr": 0.7948,
+        "ndcg": 0.8191
+      },
+      {
+        "k": 48,
+        "candidate_n": 100,
+        "recall": 0.9887,
+        "mrr": 0.7947,
+        "ndcg": 0.8233
+      }
+    ],
+    "baseline_final": [
+      {
+        "k": 10,
+        "recall": 0.9616
+      },
+      {
+        "k": 15,
+        "recall": 0.9819
+      },
+      {
+        "k": 20,
+        "recall": 0.9887
+      },
+      {
+        "k": 48,
+        "recall": 0.9887
+      }
+    ],
+    "note": "Gold Recall is offline design evidence. Do not report as Production Recall."
+  },
+  "offline_performance": {
+    "source": "offline_performance_evidence",
+    "not_production": true,
+    "indexed_10k_ms": 6,
+    "full_rank_10k_ms": 110,
+    "note": "Synthetic catalog bench from Phase 10/11. Measure production latency separately."
+  },
+  "production_live": {
+    "source": "production_live",
+    "offline_gold_mixed": false,
+    "control_requests": 0,
+    "experiment_requests": 0,
+    "experiment_enabled_requests": 0,
+    "experiment_fallback_requests": 0,
+    "exposure": 0,
+    "indexed_retrieval_hit": 0,
+    "indexed_retrieval_miss": 0,
+    "indexed_retrieval_empty": 0,
+    "indexed_retrieval_stale": 0,
+    "indexed_hit_rate": null,
+    "indexed_miss_rate": null,
+    "fallback_rate": null,
+    "fallback_reasons": {},
+    "task_success": null,
+    "task_success_source": null,
+    "index_success": null,
+    "tool_execution_success": null,
+    "security": {
+      "authorization_bypass": 0,
+      "tenant_leakage": 0,
+      "permission_violation": 0
+    },
+    "latency": {
+      "discovery": {
+        "control": {
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "avg_ms": 0.0
+        },
+        "experiment": {
+          "p50": 0,
+          "p95": 0,
+          "p99": 0,
+          "avg_ms": 0.0
+        }
+      },
+      "index": {
+        "control": {
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "experiment": {
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        }
+      },
+      "rank": {
+        "control": {
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "experiment": {
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        }
+      },
+      "total_ai_request": {
+        "control": {
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        },
+        "experiment": {
+          "p50": 0,
+          "p95": 0,
+          "p99": 0
+        }
+      },
+      "p50": null,
+      "p95": null,
+      "p99": null
+    },
+    "by_channel": {
+      "control": {},
+      "experiment": {}
+    },
+    "high_risk": {
+      "delete": {
+        "control": {
+          "success": 0,
+          "failure": 0,
+          "approval": 0,
+          "unexpected_rejection": 0
+        },
+        "experiment": {
+          "success": 0,
+          "failure": 0,
+          "approval": 0,
+          "unexpected_rejection": 0
+        }
+      },
+      "write": {
+        "control": {
+          "success": 0,
+          "failure": 0,
+          "approval": 0,
+          "unexpected_rejection": 0
+        },
+        "experiment": {
+          "success": 0,
+          "failure": 0,
+          "approval": 0,
+          "unexpected_rejection": 0
+        }
+      },
+      "export": {
+        "control": {
+          "success": 0,
+          "failure": 0,
+          "approval": 0,
+          "unexpected_rejection": 0
+        },
+        "experiment": {
+          "success": 0,
+          "failure": 0,
+          "approval": 0,
+          "unexpected_rejection": 0
+        }
+      },
+      "execute": {
+        "control": {
+          "success": 0,
+          "failure": 0,
+          "approval": 0,
+          "unexpected_rejection": 0
+        },
+        "experiment": {
+          "success": 0,
+          "failure": 0,
+          "approval": 0,
+          "unexpected_rejection": 0
+        }
+      },
+      "financial_mutation": {
+        "control": {
+          "success": 0,
+          "failure": 0,
+          "approval": 0,
+          "unexpected_rejection": 0
+        },
+        "experiment": {
+          "success": 0,
+          "failure": 0,
+          "approval": 0,
+          "unexpected_rejection": 0
+        }
+      }
+    },
+    "index_health": {
+      "active_tool_count": 180,
+      "indexed_tool_count": 180,
+      "stale_tool_count": 0,
+      "disabled_tool_count": 0,
+      "last_refresh": 1787270043.0258942,
+      "healthy": true
+    },
+    "comparison": {
+      "task_completion": {
+        "control": {
+          "n": 0,
+          "rate": null,
+          "ci95": [
+            null,
+            null
+          ]
+        },
+        "experiment": {
+          "n": 0,
+          "rate": null,
+          "ci95": [
+            null,
+            null
+          ]
+        },
+        "delta": null,
+        "ci_overlap": null,
+        "enough_for_significance": false
+      },
+      "fallback_rate": {
+        "control": {
+          "n": 0,
+          "rate": null,
+          "ci95": [
+            null,
+            null
+          ]
+        },
+        "experiment": {
+          "n": 0,
+          "rate": null,
+          "ci95": [
+            null,
+            null
+          ]
+        },
+        "delta": null,
+        "ci_overlap": null,
+        "enough_for_significance": false
+      },
+      "indexed_retrieval_miss": {
+        "control": {
+          "n": 0,
+          "rate": null,
+          "ci95": [
+            null,
+            null
+          ]
+        },
+        "experiment": {
+          "n": 0,
+          "rate": null,
+          "ci95": [
+            null,
+            null
+          ]
+        },
+        "delta": null,
+        "ci_overlap": null,
+        "enough_for_significance": false
+      },
+      "tool_success": {
+        "control": {
+          "n": 0,
+          "rate": null,
+          "ci95": [
+            null,
+            null
+          ]
+        },
+        "experiment": {
+          "n": 0,
+          "rate": null,
+          "ci95": [
+            null,
+            null
+          ]
+        },
+        "delta": null,
+        "ci_overlap": null,
+        "enough_for_significance": false
+      }
+    },
+    "promotion": {
+      "control_requests": 0,
+      "experiment_requests": 0,
+      "min_samples": 500,
+      "auto_promotion": false,
+      "allow_operator_promote": false,
+      "security_events": 0,
+      "gates": {
+        "A_security": "pass",
+        "B_task": "unknown",
+        "C_index_miss": "unknown",
+        "D_fallback": "unknown",
+        "E_latency": "unknown"
+      },
+      "decision": "HOLD",
+      "case": "insufficient_samples",
+      "reason": "need_500_per_arm"
+    },
+    "rollout": {
+      "current_percent": 5,
+      "ladder": [
+        5,
+        10,
+        25,
+        50,
+        100
+      ],
+      "next_percent": 10,
+      "auto_promotion": false,
+      "promotion_requires": "explicit_operator_decision",
+      "global_flag": false,
+      "killed": false
+    },
+    "flags": {
+      "INDEXED_CANDIDATE_RETRIEVAL": false,
+      "INDEXED_CANDIDATE_ROLLOUT_PERCENT": 5,
+      "INDEXED_CANDIDATE_FALLBACK": true,
+      "INDEXED_CANDIDATE_KILL_SWITCH": false,
+      "ADAPTIVE_DISCOVERY_K": false,
+      "HYBRID_TOOL_DISCOVERY": false,
+      "PROGRESSIVE_SCHEMA_LOADING": false,
+      "min_live_samples": 500,
+      "rollout_ladder": [
+        5,
+        10,
+        25,
+        50,
+        100
+      ]
+    },
+    "note": "Production Live only. Offline gold metrics are not included. Empty rates mean no live traffic — HOLD, do not fabricate."
+  },
+  "flags": {
+    "INDEXED_CANDIDATE_RETRIEVAL": false,
+    "INDEXED_CANDIDATE_ROLLOUT_PERCENT": 5,
+    "INDEXED_CANDIDATE_FALLBACK": true,
+    "INDEXED_CANDIDATE_KILL_SWITCH": false,
+    "ADAPTIVE_DISCOVERY_K": false,
+    "HYBRID_TOOL_DISCOVERY": false,
+    "PROGRESSIVE_SCHEMA_LOADING": false,
+    "CANDIDATE_RETRIEVAL_N": 100,
+    "MAX_TOOLS_PER_REQUEST": 48,
+    "MAX_TOOLS_AUTONOMOUS": 128,
+    "min_live_samples": 500,
+    "rollout_ladder": [
+      5,
+      10,
+      25,
+      50,
+      100
+    ]
+  },
+  "index_health": {
+    "active_tool_count": 180,
+    "indexed_tool_count": 180,
+    "stale_tool_count": 0,
+    "disabled_tool_count": 0,
+    "last_refresh": 1787270043.0258942,
+    "healthy": true
+  },
+  "promotion": {
+    "control_requests": 0,
+    "experiment_requests": 0,
+    "min_samples": 500,
+    "auto_promotion": false,
+    "allow_operator_promote": false,
+    "security_events": 0,
+    "gates": {
+      "A_security": "pass",
+      "B_task": "unknown",
+      "C_index_miss": "unknown",
+      "D_fallback": "unknown",
+      "E_latency": "unknown"
+    },
+    "decision": "HOLD",
+    "case": "insufficient_samples",
+    "reason": "need_500_per_arm"
+  },
+  "decision": {
+    "promotion": "HOLD",
+    "reason": "need_500_per_arm",
+    "auto_promotion": false
+  },
+  "note": "No live evidence, no promotion. Gold proves the design is plausible; production evidence proves the feature is safe and useful."
+}

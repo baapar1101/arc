@@ -1,0 +1,35 @@
+[
+  {
+    "id": "pending_fa_search",
+    "user_query": "فاکتورهای فروش را بررسی کن",
+    "round_text": "در حال جستجوی فاکتورهای فروش برای بازهٔ «از 1405/01/23 تا 1405/04/23».",
+    "needs_tools": true,
+    "expect_continue": true,
+    "expect_goal_reached": false
+  },
+  {
+    "id": "pending_en_will_call",
+    "user_query": "بررسی مالی انجام بده",
+    "round_text": "We will call resolve_date_range then get_financial_summary.",
+    "needs_tools": true,
+    "expect_continue": true,
+    "expect_goal_reached": false
+  },
+  {
+    "id": "greeting_simple",
+    "user_query": "سلام",
+    "round_text": "سلام! چطور می‌توانم کمک کنم؟",
+    "needs_tools": false,
+    "expect_continue": false,
+    "expect_goal_reached": true
+  },
+  {
+    "id": "debtors_with_evidence",
+    "user_query": "لیست بدهکاران",
+    "round_text": "",
+    "needs_tools": true,
+    "has_high_confidence_thought": true,
+    "expect_continue": true,
+    "expect_goal_reached": false
+  }
+]

@@ -18,6 +18,8 @@ import 'package:hesabix_ui/widgets/date_input_field.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
 import 'package:hesabix_ui/utils/snackbar_helper.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
+import 'package:hesabix_ui/widgets/business_subpage_back_leading.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 class YearEndClosingPage extends StatefulWidget {
   final int businessId;
@@ -322,7 +324,7 @@ class _YearEndClosingPageState extends State<YearEndClosingPage> {
         title: Row(
           children: [
             Icon(Icons.warning_amber_rounded, color: Theme.of(context).colorScheme.error),
-            const SizedBox(width: 8),
+            SizedBox(width: 8),
             const Expanded(child: Text('تأیید بستن سال مالی')),
           ],
         ),
@@ -334,12 +336,12 @@ class _YearEndClosingPageState extends State<YearEndClosingPage> {
               if (currentFiscalYearTitle.isNotEmpty) ...[
                 Text(
                   'سال مالی جاری: $currentFiscalYearTitle',
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                 ),
                 const SizedBox(height: 12),
               ],
               Text(profitLossText, style: TextStyle(
-                color: isProfit ? Colors.green : Colors.red,
+                color: isProfit ? SemanticColorResolver.positive(context) : SemanticColorResolver.negative(context),
                 fontWeight: FontWeight.bold,
               )),
               const SizedBox(height: 16),
@@ -475,8 +477,8 @@ class _YearEndClosingPageState extends State<YearEndClosingPage> {
             builder: (dialogContext) => AlertDialog(
               title: Row(
                 children: [
-                  Icon(Icons.check_circle, color: Colors.green, size: 28),
-                  const SizedBox(width: 8),
+                  Icon(Icons.check_circle, color: SemanticColorResolver.positive(context), size: 28),
+                  SizedBox(width: 8),
                   const Expanded(child: Text('بستن سال مالی با موفقیت انجام شد')),
                 ],
               ),
@@ -488,14 +490,14 @@ class _YearEndClosingPageState extends State<YearEndClosingPage> {
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: Colors.green.shade50,
+                        color: SemanticColorResolver.positive(context).withValues(alpha: 0.12),
                         borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.green.shade200),
+                        border: Border.all(color: SemanticColorResolver.positive(context).withValues(alpha: 0.35)),
                       ),
                       child: Row(
                         children: [
-                          Icon(Icons.check_circle, color: Colors.green.shade700, size: 24),
-                          const SizedBox(width: 8),
+                          Icon(Icons.check_circle, color: SemanticColorResolver.positive(context), size: 24),
+                          SizedBox(width: 8),
                           const Expanded(
                             child: Text(
                               'سال مالی با موفقیت بسته شد و تمام عملیات‌های لازم انجام شد.',
@@ -518,14 +520,14 @@ class _YearEndClosingPageState extends State<YearEndClosingPage> {
                       Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: Colors.blue.shade50,
+                          color: SemanticColorResolver.info(context).withValues(alpha: 0.12),
                           borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Colors.blue.shade200),
+                          border: Border.all(color: SemanticColorResolver.info(context).withValues(alpha: 0.35)),
                         ),
                         child: Row(
                           children: [
-                            Icon(Icons.info_outline, color: Colors.blue.shade700, size: 20),
-                            const SizedBox(width: 8),
+                            Icon(Icons.info_outline, color: SemanticColorResolver.info(context), size: 20),
+                            SizedBox(width: 8),
                             const Expanded(
                               child: Text(
                                 'تراز افتتاحیه سال مالی جدید به صورت خودکار ایجاد شد.',
@@ -539,19 +541,19 @@ class _YearEndClosingPageState extends State<YearEndClosingPage> {
                       Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: Colors.orange.shade50,
+                          color: SemanticColorResolver.warning(context).withValues(alpha: 0.12),
                           borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Colors.orange.shade200),
+                          border: Border.all(color: SemanticColorResolver.warning(context).withValues(alpha: 0.35)),
                         ),
                         child: Row(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Icon(Icons.warning_amber_rounded, color: Colors.orange.shade700, size: 20),
-                            const SizedBox(width: 8),
+                            Icon(Icons.warning_amber_rounded, color: SemanticColorResolver.warning(context), size: 20),
+                            SizedBox(width: 8),
                             Expanded(
                               child: Text(
                                 openingBalanceNote,
-                                style: TextStyle(fontSize: 13, color: Colors.orange.shade900),
+                                style: TextStyle(fontSize: 13, color: SemanticColorResolver.warning(context)),
                               ),
                             ),
                           ],
@@ -746,7 +748,8 @@ class _YearEndClosingPageState extends State<YearEndClosingPage> {
     
     return Scaffold(
         appBar: AppBar(
-          title: const Text('بستن سال مالی'),
+          title: Text('بستن سال مالی'),
+          leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
         ),
         body: _loading
             ? const Center(child: CircularProgressIndicator())
@@ -756,7 +759,7 @@ class _YearEndClosingPageState extends State<YearEndClosingPage> {
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Icon(Icons.error_outline, size: 64, color: colorScheme.error),
-                        const SizedBox(height: 16),
+                        SizedBox(height: 16),
                         Text(_error ?? 'خطا'),
                         const SizedBox(height: 16),
                         ElevatedButton(
@@ -802,39 +805,39 @@ class _YearEndClosingPageState extends State<YearEndClosingPage> {
                                 _buildAccountsList(
                                   'حساب‌های درآمد',
                                   _previewData!['revenue_accounts'],
-                                  Colors.green,
+                                  SemanticColorResolver.positive(context),
                                 ),
                               
                               if ((_previewData!['revenue_accounts'] as List?)?.isNotEmpty == true)
-                                const SizedBox(height: 16),
+                                SizedBox(height: 16),
                               
                               // لیست حساب‌های هزینه
                               if ((_previewData!['expense_accounts'] as List?)?.isNotEmpty == true)
                                 _buildAccountsList(
                                   'حساب‌های هزینه',
                                   _previewData!['expense_accounts'],
-                                  Colors.red,
+                                  SemanticColorResolver.negative(context),
                                 ),
                               
-                              const SizedBox(height: 24),
+                              SizedBox(height: 24),
                               
                               // هشدار پشتیبان‌گیری
                               Card(
-                                color: Colors.orange.shade50,
+                                color: SemanticColorResolver.warning(context).withValues(alpha: 0.12),
                                 child: Padding(
                                   padding: const EdgeInsets.all(16),
                                   child: Row(
                                     children: [
                                       Icon(
                                         Icons.backup,
-                                        color: Colors.orange.shade700,
+                                        color: SemanticColorResolver.warning(context),
                                       ),
-                                      const SizedBox(width: 12),
+                                      SizedBox(width: 12),
                                       Expanded(
                                         child: Text(
                                           'قبل از بستن دوره مالی، سیستم به طور خودکار از دیتابیس شما یک نسخه پشتیبان تهیه می‌کند. در صورتی که ثبتی را فراموش کرده باشید، می‌توانید دیتابیس خود را به قبل از بستن سال مالی برگردانید.',
                                           style: TextStyle(
-                                            color: Colors.orange.shade900,
+                                            color: SemanticColorResolver.warning(context),
                                           ),
                                         ),
                                       ),
@@ -1098,7 +1101,7 @@ class _YearEndClosingPageState extends State<YearEndClosingPage> {
     final isProfit = netProfitLoss >= 0;
     
     return Card(
-      color: isProfit ? Colors.green.shade50 : Colors.red.shade50,
+      color: isProfit ? SemanticColorResolver.positive(context).withValues(alpha: 0.12) : SemanticColorResolver.negative(context).withValues(alpha: 0.12),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -1110,25 +1113,25 @@ class _YearEndClosingPageState extends State<YearEndClosingPage> {
                 fontWeight: FontWeight.bold,
               ),
             ),
-            const SizedBox(height: 16),
+            SizedBox(height: 16),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text('جمع درآمدها:'),
+                Text('جمع درآمدها:'),
                 Text(
                   formatWithThousands(summary['total_revenue'] as double? ?? 0.0),
-                  style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.green),
+                  style: TextStyle(fontWeight: FontWeight.bold, color: SemanticColorResolver.positive(context)),
                 ),
               ],
             ),
-            const SizedBox(height: 8),
+            SizedBox(height: 8),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text('جمع هزینه‌ها:'),
+                Text('جمع هزینه‌ها:'),
                 Text(
                   formatWithThousands(summary['total_expense'] as double? ?? 0.0),
-                  style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.red),
+                  style: TextStyle(fontWeight: FontWeight.bold, color: SemanticColorResolver.negative(context)),
                 ),
               ],
             ),
@@ -1147,7 +1150,7 @@ class _YearEndClosingPageState extends State<YearEndClosingPage> {
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
                     fontSize: 18,
-                    color: isProfit ? Colors.green : Colors.red,
+                    color: isProfit ? SemanticColorResolver.positive(context) : SemanticColorResolver.negative(context),
                   ),
                 ),
               ],
@@ -1171,11 +1174,11 @@ class _YearEndClosingPageState extends State<YearEndClosingPage> {
                 fontWeight: FontWeight.bold,
               ),
             ),
-            const SizedBox(height: 16),
+            SizedBox(height: 16),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text('مانده ابتدای سال:'),
+                Text('مانده ابتدای سال:'),
                 Text(formatWithThousands(
                   retainedEarnings['opening_balance'] as double? ?? 0.0,
                 )),
@@ -1192,8 +1195,8 @@ class _YearEndClosingPageState extends State<YearEndClosingPage> {
                   ),
                   style: TextStyle(
                     color: (retainedEarnings['current_year_profit_loss'] as double? ?? 0.0) >= 0
-                        ? Colors.green
-                        : Colors.red,
+                        ? SemanticColorResolver.positive(context)
+                        : SemanticColorResolver.negative(context),
                   ),
                 ),
               ],

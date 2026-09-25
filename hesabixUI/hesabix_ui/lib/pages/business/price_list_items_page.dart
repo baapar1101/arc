@@ -10,6 +10,8 @@ import '../../utils/number_normalizer.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../utils/api_datetime_display.dart';
+import '../../widgets/business_subpage_back_leading.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 class PriceListItemsPage extends StatefulWidget {
   final int businessId;
@@ -62,6 +64,7 @@ class _PriceListItemsPageState extends State<PriceListItemsPage> {
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.priceListName ?? t.priceLists),
+        leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
         actions: [
           IconButton(onPressed: _load, icon: const Icon(Icons.refresh)),
           IconButton(
@@ -105,11 +108,11 @@ class _PriceListItemsPageState extends State<PriceListItemsPage> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       IconButton(
-                        icon: const Icon(Icons.edit),
+                        icon: Icon(Icons.edit),
                         onPressed: () => _openEditor(item: it),
                       ),
                       IconButton(
-                        icon: const Icon(Icons.delete, color: Colors.red),
+                        icon: Icon(Icons.delete, color: SemanticColorResolver.negative(context)),
                         onPressed: () async {
                           final ok = await _svc.deleteItem(businessId: widget.businessId, itemId: it['id'] as int);
                           if (ok) _load();

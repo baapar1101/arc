@@ -18,6 +18,9 @@ from adapters.db.models.crm import (
     Deal,
     CrmActivity,
     CrmChangeHistory,
+    CrmSequence,
+    CrmSequenceStep,
+    CrmSequenceEnrollment,
 )
 from adapters.api.v1.schema_models.crm import (
     CrmProcessDefinitionCreate,
@@ -41,7 +44,26 @@ from adapters.api.v1.schema_models.crm import (
     CrmNoteCreate,
     CrmNoteUpdate,
     CrmNoteCommentCreate,
+    CrmTagCreate,
+    CrmTagUpdate,
+    CrmSetTagsRequest,
+    CrmCloseReasonCreate,
+    CrmCloseReasonUpdate,
+    CrmCustomFieldCreate,
+    CrmCustomFieldUpdate,
+    CrmDealLinesReplaceRequest,
+    CrmSequenceCreate,
+    CrmSequenceUpdate,
+    CrmSequenceEnrollRequest,
+    CrmDealConvertToInvoiceRequest,
+    CrmAutomationSettingsUpdate,
 )
+from app.services import crm_tag_service
+from app.services import crm_close_reason_service
+from app.services import crm_custom_field_service
+from app.services import crm_deal_line_service
+from app.services import crm_customer_360_service
+from app.services import crm_automation_service
 from adapters.db.models.person import Person, PersonType
 from adapters.api.v1.schema_models.person import PersonCreateRequest
 from app.services.person_service import create_person
@@ -960,7 +982,7 @@ async def delete_stage(
 # --- سرنخ (Leads) ---
 
 
-def _lead_to_dict(lead: Lead, request: Request = None) -> Dict[str, Any]:
+def _lead_to_dict(lead: Lead, request: Request = None, tags: Optional[List[Dict[str, Any]]] = None) -> Dict[str, Any]:
     d = {
         "id": lead.id,
         "business_id": lead.business_id,
@@ -983,6 +1005,11 @@ def _lead_to_dict(lead: Lead, request: Request = None) -> Dict[str, Any]:
         "person_id": lead.person_id,
         "person_name": lead.person.alias_name if lead.person else None,
         "converted_at": lead.converted_at.isoformat() if lead.converted_at else None,
+        "score": lead.score,
+        "sla_due_at": lead.sla_due_at.isoformat() if lead.sla_due_at else None,
+        "first_touched_at": lead.first_touched_at.isoformat() if lead.first_touched_at else None,
+        "last_activity_at": lead.last_activity_at.isoformat() if lead.last_activity_at else None,
+        "tags": tags,
         "created_at": lead.created_at.isoformat(),
         "updated_at": lead.updated_at.isoformat(),
         "created_by_user_id": lead.created_by_user_id,
@@ -1139,6 +1166,11 @@ async def create_lead(
     else:
         code_val = generate_document_code(db, business_id, "crm_lead", date.today())
 
+    # ادغام فیلدهای سفارشی در extra_info تحت کلید _custom
+    extra_info_val = crm_custom_field_service.validate_and_merge_custom_values(
+        db, business_id, "lead", body.extra_info, getattr(body, "custom_fields", None)
+    )
+
     lead = Lead(
         business_id=business_id,
         process_definition_id=body.process_definition_id,
@@ -1152,12 +1184,26 @@ async def create_lead(
         description=body.description,
         assigned_to_user_id=body.assigned_to_user_id,
         next_follow_up_at=body.next_follow_up_at,
-        extra_info=body.extra_info,
+        extra_info=extra_info_val,
         created_by_user_id=ctx.get_user_id(),
     )
+    # بارگذاری مرحله برای امتیازدهی
+    lead.stage = stage
+    # اتوماسیون: تخصیص خودکار، SLA، امتیازدهی
+    try:
+        crm_automation_service.apply_auto_assign(db, business_id, lead)
+        crm_automation_service.set_lead_sla(db, business_id, lead)
+        crm_automation_service.apply_lead_score(db, business_id, lead)
+    except Exception:
+        pass
     db.add(lead)
+    db.flush()
+    # اعمال برچسب‌ها در صورت ارسال
+    if getattr(body, "tag_ids", None) is not None:
+        crm_tag_service.set_lead_tags(db, business_id, lead.id, body.tag_ids)
     db.commit()
     db.refresh(lead)
+    _lead_tags = crm_tag_service.get_lead_tags(db, business_id, lead.id)
     try:
         from app.services.workflow.workflow_trigger_service import trigger_lead_created
         trigger_lead_created(
@@ -1170,7 +1216,7 @@ async def create_lead(
         )
     except Exception:
         pass
-    return success_response(data=_lead_to_dict(lead, request), request=request, message="CRM_LEAD_CREATED")
+    return success_response(data=_lead_to_dict(lead, request, tags=_lead_tags), request=request, message="CRM_LEAD_CREATED")
 
 
 @router.get(
@@ -1199,7 +1245,8 @@ async def get_lead(
     )
     if not lead:
         raise ApiError("NOT_FOUND", "سرنخ یافت نشد.", http_status=404)
-    return success_response(data=_lead_to_dict(lead, request), request=request)
+    tags = crm_tag_service.get_lead_tags(db, business_id, lead_id)
+    return success_response(data=_lead_to_dict(lead, request, tags=tags), request=request)
 
 
 @router.get(
@@ -1334,9 +1381,16 @@ async def update_lead(
         lead.next_follow_up_at = body.next_follow_up_at
     if body.extra_info is not None:
         lead.extra_info = body.extra_info
+    if getattr(body, "custom_fields", None) is not None:
+        lead.extra_info = crm_custom_field_service.validate_and_merge_custom_values(
+            db, business_id, "lead", lead.extra_info, body.custom_fields
+        )
+    if getattr(body, "tag_ids", None) is not None:
+        crm_tag_service.set_lead_tags(db, business_id, lead_id, body.tag_ids)
     db.commit()
     db.refresh(lead)
-    return success_response(data=_lead_to_dict(lead, request), request=request, message="CRM_LEAD_UPDATED")
+    tags = crm_tag_service.get_lead_tags(db, business_id, lead_id)
+    return success_response(data=_lead_to_dict(lead, request, tags=tags), request=request, message="CRM_LEAD_UPDATED")
 
 
 @router.post(
@@ -1468,7 +1522,7 @@ async def delete_lead(
 # --- فرصت فروش (Deals) ---
 
 
-def _deal_to_dict(deal: Deal, request: Request = None) -> Dict[str, Any]:
+def _deal_to_dict(deal: Deal, request: Request = None, tags: Optional[List[Dict[str, Any]]] = None) -> Dict[str, Any]:
     d = {
         "id": deal.id,
         "business_id": deal.business_id,
@@ -1491,6 +1545,11 @@ def _deal_to_dict(deal: Deal, request: Request = None) -> Dict[str, Any]:
             f"{deal.assigned_to.first_name or ''} {deal.assigned_to.last_name or ''}".strip()
             if deal.assigned_to else None
         ),
+        "won_reason_code": deal.won_reason_code,
+        "lost_reason_code": deal.lost_reason_code,
+        "competitor_name": deal.competitor_name,
+        "stage_entered_at": deal.stage_entered_at.isoformat() if deal.stage_entered_at else None,
+        "tags": tags,
         "created_at": deal.created_at.isoformat(),
         "updated_at": deal.updated_at.isoformat(),
         "created_by_user_id": deal.created_by_user_id,
@@ -1632,6 +1691,10 @@ async def create_deal(
     else:
         code_val = generate_document_code(db, business_id, "crm_deal", date.today())
 
+    from datetime import datetime as _dt_now
+    extra_info_val = crm_custom_field_service.validate_and_merge_custom_values(
+        db, business_id, "deal", body.extra_info, getattr(body, "custom_fields", None)
+    )
     deal = Deal(
         business_id=business_id,
         person_id=body.person_id,
@@ -1646,12 +1709,17 @@ async def create_deal(
         next_follow_up_at=body.next_follow_up_at,
         assigned_to_user_id=body.assigned_to_user_id,
         description=body.description,
-        extra_info=body.extra_info,
+        extra_info=extra_info_val,
+        stage_entered_at=_dt_now.utcnow(),
         created_by_user_id=ctx.get_user_id(),
     )
     db.add(deal)
+    db.flush()
+    if getattr(body, "tag_ids", None) is not None:
+        crm_tag_service.set_deal_tags(db, business_id, deal.id, body.tag_ids)
     db.commit()
     db.refresh(deal)
+    _deal_tags = crm_tag_service.get_deal_tags(db, business_id, deal.id)
     try:
         from app.services.workflow.workflow_trigger_service import trigger_deal_created
         trigger_deal_created(
@@ -1666,7 +1734,7 @@ async def create_deal(
         )
     except Exception:
         pass
-    return success_response(data=_deal_to_dict(deal, request), request=request, message="CRM_DEAL_CREATED")
+    return success_response(data=_deal_to_dict(deal, request, tags=_deal_tags), request=request, message="CRM_DEAL_CREATED")
 
 
 @router.get(
@@ -1695,7 +1763,8 @@ async def get_deal(
     )
     if not deal:
         raise ApiError("NOT_FOUND", "فرصت فروش یافت نشد.", http_status=404)
-    return success_response(data=_deal_to_dict(deal, request), request=request)
+    tags = crm_tag_service.get_deal_tags(db, business_id, deal_id)
+    return success_response(data=_deal_to_dict(deal, request, tags=tags), request=request)
 
 
 @router.get(
@@ -1772,6 +1841,7 @@ async def update_deal(
     )
     if not deal:
         raise ApiError("NOT_FOUND", "فرصت فروش یافت نشد.", http_status=404)
+    from datetime import datetime as _dt_now
     old_assigned_to_user_id = deal.assigned_to_user_id
     if body.stage_id is not None:
         stage = db.query(CrmProcessStage).filter(
@@ -1782,8 +1852,26 @@ async def update_deal(
         ).first()
         if not stage:
             raise ApiError("NOT_FOUND", "مرحله یافت نشد.", http_status=404)
+        # هنگام رفتن به مرحله برد/باخت، دلیل مربوطه الزامی و باید معتبر باشد
+        if body.stage_id != deal.stage_id:
+            if stage.is_win:
+                won_code = body.won_reason_code or deal.won_reason_code
+                if not won_code:
+                    raise ApiError("CRM_DEAL_WON_REASON_REQUIRED", "برای بردن معامله، دلیل برد الزامی است.", http_status=400)
+                if not crm_close_reason_service.is_valid_reason_code(db, business_id, "won", won_code):
+                    raise ApiError("CRM_DEAL_WON_REASON_INVALID", "کد دلیل برد نامعتبر است.", http_status=400)
+                deal.won_reason_code = won_code
+            if stage.is_lost:
+                lost_code = body.lost_reason_code or deal.lost_reason_code
+                if not lost_code:
+                    raise ApiError("CRM_DEAL_LOST_REASON_REQUIRED", "برای باختن معامله، دلیل باخت الزامی است.", http_status=400)
+                if not crm_close_reason_service.is_valid_reason_code(db, business_id, "lost", lost_code):
+                    raise ApiError("CRM_DEAL_LOST_REASON_INVALID", "کد دلیل باخت نامعتبر است.", http_status=400)
+                deal.lost_reason_code = lost_code
         old_stage_name = (deal.stage.name if deal.stage else None) or str(deal.stage_id)
         old_stage_id = deal.stage_id
+        if body.stage_id != deal.stage_id:
+            deal.stage_entered_at = _dt_now.utcnow()
         deal.stage_id = body.stage_id
         _log_crm_change(db, business_id, "deal", deal_id, "stage_id", old_stage_name, stage.name, ctx.get_user_id())
         try:
@@ -1833,6 +1921,18 @@ async def update_deal(
         deal.description = body.description
     if body.extra_info is not None:
         deal.extra_info = body.extra_info
+    if getattr(body, "won_reason_code", None) is not None:
+        deal.won_reason_code = body.won_reason_code or None
+    if getattr(body, "lost_reason_code", None) is not None:
+        deal.lost_reason_code = body.lost_reason_code or None
+    if getattr(body, "competitor_name", None) is not None:
+        deal.competitor_name = body.competitor_name or None
+    if getattr(body, "custom_fields", None) is not None:
+        deal.extra_info = crm_custom_field_service.validate_and_merge_custom_values(
+            db, business_id, "deal", deal.extra_info, body.custom_fields
+        )
+    if getattr(body, "tag_ids", None) is not None:
+        crm_tag_service.set_deal_tags(db, business_id, deal_id, body.tag_ids)
     if body.closed_at is not None:
         deal.closed_at = body.closed_at
         try:
@@ -1855,7 +1955,8 @@ async def update_deal(
             pass
     db.commit()
     db.refresh(deal)
-    return success_response(data=_deal_to_dict(deal, request), request=request, message="CRM_DEAL_UPDATED")
+    tags = crm_tag_service.get_deal_tags(db, business_id, deal_id)
+    return success_response(data=_deal_to_dict(deal, request, tags=tags), request=request, message="CRM_DEAL_UPDATED")
 
 
 @router.delete(
@@ -1896,6 +1997,17 @@ def _activity_to_dict(a: CrmActivity, request: Request = None) -> Dict[str, Any]
         "description": a.description,
         "activity_date": a.activity_date.isoformat(),
         "deal_id": a.deal_id,
+        "is_task": bool(a.is_task),
+        "due_at": a.due_at.isoformat() if a.due_at else None,
+        "status": a.status,
+        "completed_at": a.completed_at.isoformat() if a.completed_at else None,
+        "assigned_to_user_id": a.assigned_to_user_id,
+        "assigned_to_name": (
+            f"{a.assigned_to.first_name or ''} {a.assigned_to.last_name or ''}".strip()
+            if getattr(a, "assigned_to", None) else None
+        ),
+        "outcome": a.outcome,
+        "priority": a.priority,
         "created_by_user_id": a.created_by_user_id,
         "created_by_name": (
             f"{a.created_by.first_name or ''} {a.created_by.last_name or ''}".strip()
@@ -1933,6 +2045,7 @@ async def list_activities(
             selectinload(CrmActivity.created_by),
             selectinload(CrmActivity.lead),
             selectinload(CrmActivity.person),
+            selectinload(CrmActivity.assigned_to),
         )
         .filter(CrmActivity.business_id == business_id)
     )
@@ -1995,6 +2108,12 @@ async def create_activity(
     else:
         code_val = generate_document_code(db, business_id, "crm_activity", body.activity_date.date())
 
+    from datetime import datetime as _dt_now
+    extra_info_val = crm_custom_field_service.validate_and_merge_custom_values(
+        db, business_id, "activity", body.extra_info, getattr(body, "custom_fields", None)
+    )
+    status_val = body.status or "open"
+    completed_at_val = _dt_now.utcnow() if status_val == "done" else None
     activity = CrmActivity(
         business_id=business_id,
         person_id=person_id_val,
@@ -2005,15 +2124,35 @@ async def create_activity(
         description=body.description,
         activity_date=body.activity_date,
         deal_id=body.deal_id,
+        is_task=bool(body.is_task),
+        due_at=body.due_at,
+        status=status_val,
+        completed_at=completed_at_val,
+        assigned_to_user_id=body.assigned_to_user_id,
+        outcome=body.outcome,
+        priority=body.priority or "normal",
         created_by_user_id=ctx.get_user_id(),
-        extra_info=body.extra_info,
+        extra_info=extra_info_val,
     )
     db.add(activity)
+    # به‌روزرسانی نشانه‌های تماس سرنخ (اولین برخورد / آخرین فعالیت) — فقط برای لاگ فعالیت نه وظیفهٔ آینده
+    if lead_id_val is not None and not body.is_task:
+        _lead_obj = db.query(Lead).filter(Lead.id == lead_id_val, Lead.business_id == business_id).first()
+        if _lead_obj is not None:
+            now_touch = _dt_now.utcnow()
+            if _lead_obj.first_touched_at is None:
+                _lead_obj.first_touched_at = now_touch
+            _lead_obj.last_activity_at = now_touch
     db.commit()
     db.refresh(activity)
     activity = (
         db.query(CrmActivity)
-        .options(selectinload(CrmActivity.lead), selectinload(CrmActivity.created_by), selectinload(CrmActivity.person))
+        .options(
+            selectinload(CrmActivity.lead),
+            selectinload(CrmActivity.created_by),
+            selectinload(CrmActivity.person),
+            selectinload(CrmActivity.assigned_to),
+        )
         .filter(CrmActivity.id == activity.id)
         .first()
     )
@@ -2045,6 +2184,7 @@ async def get_activity(
             selectinload(CrmActivity.lead),
             selectinload(CrmActivity.person),
             selectinload(CrmActivity.created_by),
+            selectinload(CrmActivity.assigned_to),
         )
         .filter(and_(CrmActivity.id == activity_id, CrmActivity.business_id == business_id))
         .first()
@@ -2095,8 +2235,38 @@ async def update_activity(
         activity.deal_id = body.deal_id
     if body.extra_info is not None:
         activity.extra_info = body.extra_info
+    if body.is_task is not None:
+        activity.is_task = body.is_task
+    if body.due_at is not None:
+        activity.due_at = body.due_at
+    if body.assigned_to_user_id is not None:
+        activity.assigned_to_user_id = body.assigned_to_user_id
+    if body.outcome is not None:
+        activity.outcome = body.outcome
+    if body.priority is not None:
+        activity.priority = body.priority
+    if body.status is not None:
+        from datetime import datetime as _dt_now
+        if body.status not in ("open", "done", "cancelled"):
+            raise ApiError("CRM_ACTIVITY_INVALID_STATUS", "وضعیت نامعتبر است.", http_status=400)
+        activity.status = body.status
+        activity.completed_at = _dt_now.utcnow() if body.status == "done" else None
+    if getattr(body, "custom_fields", None) is not None:
+        activity.extra_info = crm_custom_field_service.validate_and_merge_custom_values(
+            db, business_id, "activity", activity.extra_info, body.custom_fields
+        )
     db.commit()
-    db.refresh(activity)
+    activity = (
+        db.query(CrmActivity)
+        .options(
+            selectinload(CrmActivity.lead),
+            selectinload(CrmActivity.created_by),
+            selectinload(CrmActivity.person),
+            selectinload(CrmActivity.assigned_to),
+        )
+        .filter(CrmActivity.id == activity.id)
+        .first()
+    )
     return success_response(data=_activity_to_dict(activity, request), request=request, message="CRM_ACTIVITY_UPDATED")
 
 
@@ -2457,6 +2627,847 @@ async def list_crm_note_audit(
     items = crm_cal_notes.list_audit(db, ctx, business_id, note_id)
     db.commit()
     return success_response(data={"items": format_datetime_fields(items, request)}, request=request)
+
+
+# ============================================================================
+# برچسب‌ها (Tags)
+# ============================================================================
+
+
+@router.get("/businesses/{business_id}/tags", summary="لیست برچسب‌های CRM")
+@require_business_access("business_id")
+async def list_crm_tags(
+    request: Request,
+    business_id: int = Path(..., gt=0),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+    _: None = Depends(require_business_permission_dep("crm", "view")),
+) -> Dict[str, Any]:
+    items = crm_tag_service.list_tags(db, business_id)
+    db.commit()
+    return success_response(data={"items": items}, request=request)
+
+
+@router.post("/businesses/{business_id}/tags", summary="ایجاد برچسب")
+@require_business_access("business_id")
+async def create_crm_tag(
+    request: Request,
+    business_id: int = Path(..., gt=0),
+    body: CrmTagCreate = Body(...),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+    _: None = Depends(require_business_permission_dep("crm", "write")),
+) -> Dict[str, Any]:
+    tag = crm_tag_service.create_tag(db, business_id, name=body.name, color=body.color, sort_order=body.sort_order)
+    db.commit()
+    return success_response(data=crm_tag_service.tag_to_dict(tag), request=request, message="CRM_TAG_CREATED")
+
+
+@router.patch("/businesses/{business_id}/tags/{tag_id}", summary="ویرایش برچسب")
+@require_business_access("business_id")
+async def update_crm_tag(
+    request: Request,
+    business_id: int = Path(..., gt=0),
+    tag_id: int = Path(..., gt=0),
+    body: CrmTagUpdate = Body(...),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+    _: None = Depends(require_business_permission_dep("crm", "write")),
+) -> Dict[str, Any]:
+    tag = crm_tag_service.update_tag(
+        db, business_id, tag_id,
+        name=body.name, color=body.color, is_active=body.is_active, sort_order=body.sort_order,
+    )
+    db.commit()
+    return success_response(data=crm_tag_service.tag_to_dict(tag), request=request, message="CRM_TAG_UPDATED")
+
+
+@router.delete("/businesses/{business_id}/tags/{tag_id}", summary="حذف برچسب")
+@require_business_access("business_id")
+async def delete_crm_tag(
+    request: Request,
+    business_id: int = Path(..., gt=0),
+    tag_id: int = Path(..., gt=0),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+    _: None = Depends(require_business_permission_dep("crm", "write")),
+) -> Dict[str, Any]:
+    crm_tag_service.delete_tag(db, business_id, tag_id)
+    db.commit()
+    return success_response(message="CRM_TAG_DELETED", request=request)
+
+
+@router.put("/businesses/{business_id}/leads/{lead_id}/tags", summary="تنظیم برچسب‌های سرنخ")
+@require_business_access("business_id")
+async def set_lead_tags_endpoint(
+    request: Request,
+    business_id: int = Path(..., gt=0),
+    lead_id: int = Path(..., gt=0),
+    body: CrmSetTagsRequest = Body(...),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+    _: None = Depends(require_business_permission_dep("crm", "write")),
+) -> Dict[str, Any]:
+    tags = crm_tag_service.set_lead_tags(db, business_id, lead_id, body.tag_ids)
+    db.commit()
+    return success_response(data={"tags": tags}, request=request, message="CRM_LEAD_TAGS_SET")
+
+
+@router.put("/businesses/{business_id}/deals/{deal_id}/tags", summary="تنظیم برچسب‌های فرصت فروش")
+@require_business_access("business_id")
+async def set_deal_tags_endpoint(
+    request: Request,
+    business_id: int = Path(..., gt=0),
+    deal_id: int = Path(..., gt=0),
+    body: CrmSetTagsRequest = Body(...),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+    _: None = Depends(require_business_permission_dep("crm", "write")),
+) -> Dict[str, Any]:
+    tags = crm_tag_service.set_deal_tags(db, business_id, deal_id, body.tag_ids)
+    db.commit()
+    return success_response(data={"tags": tags}, request=request, message="CRM_DEAL_TAGS_SET")
+
+
+# ============================================================================
+# دلایل بستن معامله (Close Reasons)
+# ============================================================================
+
+
+@router.get("/businesses/{business_id}/close-reasons", summary="لیست دلایل برد/باخت")
+@require_business_access("business_id")
+async def list_close_reasons(
+    request: Request,
+    business_id: int = Path(..., gt=0),
+    reason_type: Optional[str] = Query(None, description="won | lost"),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+    _: None = Depends(require_business_permission_dep("crm", "view")),
+) -> Dict[str, Any]:
+    items = crm_close_reason_service.list_reasons(db, business_id, reason_type=reason_type)
+    db.commit()
+    return success_response(data={"items": items}, request=request)
+
+
+@router.post("/businesses/{business_id}/close-reasons", summary="ایجاد دلیل برد/باخت")
+@require_business_access("business_id")
+async def create_close_reason(
+    request: Request,
+    business_id: int = Path(..., gt=0),
+    body: CrmCloseReasonCreate = Body(...),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+    _: None = Depends(require_business_permission_dep("crm", "write")),
+) -> Dict[str, Any]:
+    r = crm_close_reason_service.create_reason(
+        db, business_id,
+        reason_type=body.reason_type, code=body.code, name=body.name, sort_order=body.sort_order,
+    )
+    db.commit()
+    return success_response(data=crm_close_reason_service.reason_to_dict(r), request=request, message="CRM_CLOSE_REASON_CREATED")
+
+
+@router.patch("/businesses/{business_id}/close-reasons/{reason_id}", summary="ویرایش دلیل")
+@require_business_access("business_id")
+async def update_close_reason(
+    request: Request,
+    business_id: int = Path(..., gt=0),
+    reason_id: int = Path(..., gt=0),
+    body: CrmCloseReasonUpdate = Body(...),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+    _: None = Depends(require_business_permission_dep("crm", "write")),
+) -> Dict[str, Any]:
+    r = crm_close_reason_service.update_reason(
+        db, business_id, reason_id,
+        name=body.name, is_active=body.is_active, sort_order=body.sort_order,
+    )
+    db.commit()
+    return success_response(data=crm_close_reason_service.reason_to_dict(r), request=request, message="CRM_CLOSE_REASON_UPDATED")
+
+
+@router.delete("/businesses/{business_id}/close-reasons/{reason_id}", summary="حذف دلیل")
+@require_business_access("business_id")
+async def delete_close_reason(
+    request: Request,
+    business_id: int = Path(..., gt=0),
+    reason_id: int = Path(..., gt=0),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+    _: None = Depends(require_business_permission_dep("crm", "write")),
+) -> Dict[str, Any]:
+    crm_close_reason_service.delete_reason(db, business_id, reason_id)
+    db.commit()
+    return success_response(message="CRM_CLOSE_REASON_DELETED", request=request)
+
+
+# ============================================================================
+# فیلدهای سفارشی (Custom Fields)
+# ============================================================================
+
+
+@router.get("/businesses/{business_id}/custom-fields", summary="لیست فیلدهای سفارشی")
+@require_business_access("business_id")
+async def list_custom_fields(
+    request: Request,
+    business_id: int = Path(..., gt=0),
+    entity_type: Optional[str] = Query(None, description="lead | deal | activity"),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+    _: None = Depends(require_business_permission_dep("crm", "view")),
+) -> Dict[str, Any]:
+    items = crm_custom_field_service.list_definitions(db, business_id, entity_type=entity_type)
+    return success_response(data={"items": items}, request=request)
+
+
+@router.post("/businesses/{business_id}/custom-fields", summary="ایجاد فیلد سفارشی")
+@require_business_access("business_id")
+async def create_custom_field(
+    request: Request,
+    business_id: int = Path(..., gt=0),
+    body: CrmCustomFieldCreate = Body(...),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+    _: None = Depends(require_business_permission_dep("crm", "write")),
+) -> Dict[str, Any]:
+    d = crm_custom_field_service.create_definition(
+        db, business_id,
+        entity_type=body.entity_type, field_key=body.field_key, label=body.label,
+        field_type=body.field_type, options=body.options, is_required=body.is_required,
+        sort_order=body.sort_order,
+    )
+    db.commit()
+    return success_response(data=crm_custom_field_service.definition_to_dict(d), request=request, message="CRM_CUSTOM_FIELD_CREATED")
+
+
+@router.patch("/businesses/{business_id}/custom-fields/{field_id}", summary="ویرایش فیلد سفارشی")
+@require_business_access("business_id")
+async def update_custom_field(
+    request: Request,
+    business_id: int = Path(..., gt=0),
+    field_id: int = Path(..., gt=0),
+    body: CrmCustomFieldUpdate = Body(...),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+    _: None = Depends(require_business_permission_dep("crm", "write")),
+) -> Dict[str, Any]:
+    d = crm_custom_field_service.update_definition(
+        db, business_id, field_id,
+        label=body.label, options=body.options, is_required=body.is_required,
+        sort_order=body.sort_order, is_active=body.is_active,
+    )
+    db.commit()
+    return success_response(data=crm_custom_field_service.definition_to_dict(d), request=request, message="CRM_CUSTOM_FIELD_UPDATED")
+
+
+@router.delete("/businesses/{business_id}/custom-fields/{field_id}", summary="حذف فیلد سفارشی")
+@require_business_access("business_id")
+async def delete_custom_field(
+    request: Request,
+    business_id: int = Path(..., gt=0),
+    field_id: int = Path(..., gt=0),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+    _: None = Depends(require_business_permission_dep("crm", "write")),
+) -> Dict[str, Any]:
+    crm_custom_field_service.delete_definition(db, business_id, field_id)
+    db.commit()
+    return success_response(message="CRM_CUSTOM_FIELD_DELETED", request=request)
+
+
+# ============================================================================
+# خطوط فرصت فروش (Deal Lines)
+# ============================================================================
+
+
+@router.get("/businesses/{business_id}/deals/{deal_id}/lines", summary="خطوط فرصت فروش")
+@require_business_access("business_id")
+async def list_deal_lines(
+    request: Request,
+    business_id: int = Path(..., gt=0),
+    deal_id: int = Path(..., gt=0),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+    _: None = Depends(require_business_permission_dep("crm", "view")),
+) -> Dict[str, Any]:
+    lines = crm_deal_line_service.list_lines(db, business_id, deal_id)
+    return success_response(data={"items": lines}, request=request)
+
+
+@router.put("/businesses/{business_id}/deals/{deal_id}/lines", summary="جایگزینی خطوط فرصت فروش")
+@require_business_access("business_id")
+async def replace_deal_lines(
+    request: Request,
+    business_id: int = Path(..., gt=0),
+    deal_id: int = Path(..., gt=0),
+    body: CrmDealLinesReplaceRequest = Body(...),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+    _: None = Depends(require_business_permission_dep("crm", "write")),
+) -> Dict[str, Any]:
+    lines_input = [l.model_dump() for l in body.lines]
+    result = crm_deal_line_service.replace_lines(db, business_id, deal_id, lines_input)
+    db.commit()
+    return success_response(data=result, request=request, message="CRM_DEAL_LINES_SAVED")
+
+
+# ============================================================================
+# دید ۳۶۰ مشتری
+# ============================================================================
+
+
+@router.get("/businesses/{business_id}/persons/{person_id}/customer-360", summary="دید ۳۶۰ درجه مشتری")
+@require_business_access("business_id")
+async def get_customer_360(
+    request: Request,
+    business_id: int = Path(..., gt=0),
+    person_id: int = Path(..., gt=0),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+    _: None = Depends(require_business_permission_dep("crm", "view")),
+) -> Dict[str, Any]:
+    data = crm_customer_360_service.get_customer_360(db, business_id, person_id)
+    return success_response(data=format_datetime_fields(data, request), request=request)
+
+
+# ============================================================================
+# صف کاری من
+# ============================================================================
+
+
+@router.get("/businesses/{business_id}/my-work-queue", summary="صف کاری من")
+@require_business_access("business_id")
+async def my_work_queue(
+    request: Request,
+    business_id: int = Path(..., gt=0),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+    _: None = Depends(require_business_permission_dep("crm", "view")),
+) -> Dict[str, Any]:
+    from datetime import datetime, timedelta
+
+    user_id = ctx.get_user_id()
+    now = datetime.utcnow()
+    horizon = now + timedelta(hours=24)
+
+    # وظایف باز تخصیص‌یافته به من
+    tasks = (
+        db.query(CrmActivity)
+        .options(selectinload(CrmActivity.assigned_to), selectinload(CrmActivity.created_by))
+        .filter(
+            CrmActivity.business_id == business_id,
+            CrmActivity.is_task.is_(True),
+            CrmActivity.status == "open",
+            CrmActivity.assigned_to_user_id == user_id,
+        )
+        .order_by(CrmActivity.due_at.asc().nullslast())
+        .limit(100)
+        .all()
+    )
+    # پیگیری‌های نزدیک سرنخ‌های من
+    lead_follow_ups = (
+        db.query(Lead)
+        .options(selectinload(Lead.stage), selectinload(Lead.assigned_to))
+        .filter(
+            Lead.business_id == business_id,
+            Lead.assigned_to_user_id == user_id,
+            Lead.person_id.is_(None),
+            Lead.next_follow_up_at.isnot(None),
+            Lead.next_follow_up_at <= horizon,
+        )
+        .order_by(Lead.next_follow_up_at.asc())
+        .limit(100)
+        .all()
+    )
+    # پیگیری‌های نزدیک فرصت‌های من
+    deal_follow_ups = (
+        db.query(Deal)
+        .options(selectinload(Deal.stage), selectinload(Deal.assigned_to), selectinload(Deal.person))
+        .filter(
+            Deal.business_id == business_id,
+            Deal.assigned_to_user_id == user_id,
+            Deal.closed_at.is_(None),
+            Deal.next_follow_up_at.isnot(None),
+            Deal.next_follow_up_at <= horizon,
+        )
+        .order_by(Deal.next_follow_up_at.asc())
+        .limit(100)
+        .all()
+    )
+    data = {
+        "tasks": [_activity_to_dict(t, request) for t in tasks],
+        "overdue_tasks_count": sum(1 for t in tasks if t.due_at and t.due_at < now),
+        "lead_follow_ups": [_lead_to_dict(l, request) for l in lead_follow_ups],
+        "deal_follow_ups": [_deal_to_dict(d, request) for d in deal_follow_ups],
+    }
+    return success_response(data=data, request=request)
+
+
+# ============================================================================
+# گزارش دلایل برد/باخت
+# ============================================================================
+
+
+@router.get("/businesses/{business_id}/reports/lost-reasons", summary="گزارش دلایل باخت")
+@require_business_access("business_id")
+async def report_lost_reasons(
+    request: Request,
+    business_id: int = Path(..., gt=0),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+    _: None = Depends(require_business_permission_dep("crm", "view")),
+) -> Dict[str, Any]:
+    from sqlalchemy import func
+
+    rows = (
+        db.query(
+            Deal.lost_reason_code,
+            func.count(Deal.id).label("count"),
+            func.coalesce(func.sum(Deal.amount), 0).label("total_amount"),
+        )
+        .filter(Deal.business_id == business_id, Deal.lost_reason_code.isnot(None), Deal.lost_reason_code != "")
+        .group_by(Deal.lost_reason_code)
+        .all()
+    )
+    reason_names = {
+        r["code"]: r["name"]
+        for r in crm_close_reason_service.list_reasons(db, business_id, reason_type="lost")
+    }
+    db.commit()
+    data = [
+        {
+            "reason_code": r.lost_reason_code,
+            "reason_name": reason_names.get(r.lost_reason_code, r.lost_reason_code),
+            "count": int(r.count or 0),
+            "total_amount": float(r.total_amount or 0),
+        }
+        for r in rows
+    ]
+    return success_response(data=data, request=request)
+
+
+@router.get("/businesses/{business_id}/reports/won-reasons", summary="گزارش دلایل برد")
+@require_business_access("business_id")
+async def report_won_reasons(
+    request: Request,
+    business_id: int = Path(..., gt=0),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+    _: None = Depends(require_business_permission_dep("crm", "view")),
+) -> Dict[str, Any]:
+    from sqlalchemy import func
+
+    rows = (
+        db.query(
+            Deal.won_reason_code,
+            func.count(Deal.id).label("count"),
+            func.coalesce(func.sum(Deal.amount), 0).label("total_amount"),
+        )
+        .filter(Deal.business_id == business_id, Deal.won_reason_code.isnot(None), Deal.won_reason_code != "")
+        .group_by(Deal.won_reason_code)
+        .all()
+    )
+    reason_names = {
+        r["code"]: r["name"]
+        for r in crm_close_reason_service.list_reasons(db, business_id, reason_type="won")
+    }
+    db.commit()
+    data = [
+        {
+            "reason_code": r.won_reason_code,
+            "reason_name": reason_names.get(r.won_reason_code, r.won_reason_code),
+            "count": int(r.count or 0),
+            "total_amount": float(r.total_amount or 0),
+        }
+        for r in rows
+    ]
+    return success_response(data=data, request=request)
+
+
+# ============================================================================
+# تبدیل فرصت فروش به فاکتور
+# ============================================================================
+
+
+@router.post("/businesses/{business_id}/deals/{deal_id}/convert-to-invoice", summary="تبدیل فرصت فروش به فاکتور/پیش‌فاکتور")
+@require_business_access("business_id")
+async def convert_deal_to_invoice(
+    request: Request,
+    business_id: int = Path(..., gt=0),
+    deal_id: int = Path(..., gt=0),
+    body: CrmDealConvertToInvoiceRequest = Body(default=CrmDealConvertToInvoiceRequest()),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+    _: None = Depends(require_business_permission_dep("crm", "write")),
+) -> Dict[str, Any]:
+    from datetime import date, datetime
+    from decimal import Decimal
+
+    deal = (
+        db.query(Deal)
+        .options(selectinload(Deal.lines), selectinload(Deal.stage))
+        .filter(and_(Deal.id == deal_id, Deal.business_id == business_id))
+        .first()
+    )
+    if not deal:
+        raise ApiError("NOT_FOUND", "فرصت فروش یافت نشد.", http_status=404)
+    if deal.document_id:
+        raise ApiError("CRM_DEAL_ALREADY_INVOICED", "برای این فرصت فروش قبلاً فاکتور صادر شده است.", http_status=400)
+
+    # تعیین ارز: ارز معامله یا ارز پیش‌فرض کسب‌وکار
+    from adapters.db.models.business import Business as _Biz
+    biz = db.query(_Biz).filter(_Biz.id == business_id).first()
+    currency_id = deal.currency_id or (biz.default_currency_id if biz else None)
+    if not currency_id:
+        raise ApiError("CRM_DEAL_NO_CURRENCY", "ارز فرصت فروش مشخص نیست و ارز پیش‌فرض کسب‌وکار نیز تنظیم نشده است.", http_status=400)
+
+    # ساخت خطوط فاکتور از خطوط دارای کالا
+    invoice_lines: List[Dict[str, Any]] = []
+    for ln in sorted(deal.lines, key=lambda x: (x.sort_order or 0, x.id)):
+        if not ln.product_id:
+            # خطوط بدون کالا در فاکتور حسابداری قابل ثبت نیستند و نادیده گرفته می‌شوند
+            continue
+        qty = Decimal(str(ln.quantity or 0))
+        unit_price = Decimal(str(ln.unit_price or 0))
+        gross = qty * unit_price
+        discount_percent = Decimal(str(ln.discount_percent or 0))
+        line_discount = (gross * discount_percent / Decimal(100)) if discount_percent else Decimal(0)
+        line_total = Decimal(str(ln.line_total or (gross - line_discount)))
+        extra: Dict[str, Any] = {
+            "unit_price": float(unit_price),
+            "line_discount": float(line_discount),
+            "line_total": float(line_total),
+        }
+        if body.warehouse_id:
+            extra["warehouse_id"] = int(body.warehouse_id)
+        invoice_lines.append(
+            {
+                "product_id": int(ln.product_id),
+                "quantity": float(qty),
+                "description": ln.description,
+                "extra_info": extra,
+            }
+        )
+
+    if not invoice_lines:
+        raise ApiError(
+            "CRM_DEAL_NO_INVOICEABLE_LINES",
+            "برای صدور فاکتور، حداقل یک خط دارای کالا لازم است. لطفاً ابتدا خطوط فرصت فروش را با کالا تکمیل کنید.",
+            http_status=400,
+        )
+
+    invoice_data: Dict[str, Any] = {
+        "invoice_type": "invoice_sales",
+        "currency_id": int(currency_id),
+        "document_date": date.today().isoformat(),
+        "is_proforma": bool(body.is_proforma),
+        "lines": invoice_lines,
+        "extra_info": {"person_id": int(deal.person_id)},
+        "description": f"صادر شده از فرصت فروش {deal.code or deal.id}",
+    }
+
+    try:
+        from app.services.invoice_service import create_invoice
+
+        result = create_invoice(db, business_id, ctx.get_user_id(), invoice_data)
+    except ApiError:
+        raise
+    except Exception as e:
+        raise ApiError("CRM_DEAL_INVOICE_FAILED", f"ایجاد فاکتور ناموفق بود: {e}", http_status=500)
+
+    document_id = result.get("id") if isinstance(result, dict) else None
+    if document_id:
+        deal.document_id = int(document_id)
+
+    # بستن معامله به‌عنوان برد در صورت درخواست
+    if body.close_as_won:
+        won_code = body.won_reason_code or deal.won_reason_code
+        if won_code and crm_close_reason_service.is_valid_reason_code(db, business_id, "won", won_code):
+            deal.won_reason_code = won_code
+        deal.closed_at = datetime.utcnow()
+        # انتقال به مرحله برد در صورت وجود
+        win_stage = (
+            db.query(CrmProcessStage)
+            .filter(
+                CrmProcessStage.process_definition_id == deal.process_definition_id,
+                CrmProcessStage.is_win.is_(True),
+            )
+            .order_by(CrmProcessStage.order_index.desc())
+            .first()
+        )
+        if win_stage:
+            deal.stage_id = win_stage.id
+            deal.stage_entered_at = datetime.utcnow()
+
+    db.commit()
+    db.refresh(deal)
+    tags = crm_tag_service.get_deal_tags(db, business_id, deal_id)
+    return success_response(
+        data={"deal": _deal_to_dict(deal, request, tags=tags), "invoice": result},
+        request=request,
+        message="CRM_DEAL_CONVERTED_TO_INVOICE",
+    )
+
+
+# ============================================================================
+# توالی‌های خودکار (Sequences)
+# ============================================================================
+
+
+def _sequence_to_dict(seq: CrmSequence, include_steps: bool = True) -> Dict[str, Any]:
+    d = {
+        "id": seq.id,
+        "business_id": seq.business_id,
+        "name": seq.name,
+        "description": seq.description,
+        "is_active": bool(seq.is_active),
+        "created_at": seq.created_at.isoformat() if seq.created_at else None,
+        "updated_at": seq.updated_at.isoformat() if seq.updated_at else None,
+        "created_by_user_id": seq.created_by_user_id,
+    }
+    if include_steps:
+        d["steps"] = [
+            {
+                "id": s.id,
+                "step_order": s.step_order,
+                "delay_hours": s.delay_hours,
+                "action_type": s.action_type,
+                "action_config": s.action_config,
+            }
+            for s in sorted(seq.steps, key=lambda x: x.step_order)
+        ]
+    return d
+
+
+@router.get("/businesses/{business_id}/sequences", summary="لیست توالی‌های خودکار")
+@require_business_access("business_id")
+async def list_sequences(
+    request: Request,
+    business_id: int = Path(..., gt=0),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+    _: None = Depends(require_business_permission_dep("crm", "view")),
+) -> Dict[str, Any]:
+    rows = (
+        db.query(CrmSequence)
+        .options(selectinload(CrmSequence.steps))
+        .filter(CrmSequence.business_id == business_id)
+        .order_by(CrmSequence.created_at.desc())
+        .all()
+    )
+    return success_response(data={"items": [_sequence_to_dict(s) for s in rows]}, request=request)
+
+
+@router.post("/businesses/{business_id}/sequences", summary="ایجاد توالی خودکار")
+@require_business_access("business_id")
+async def create_sequence(
+    request: Request,
+    business_id: int = Path(..., gt=0),
+    body: CrmSequenceCreate = Body(...),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+    _: None = Depends(require_business_permission_dep("crm", "write")),
+) -> Dict[str, Any]:
+    seq = CrmSequence(
+        business_id=business_id,
+        name=body.name,
+        description=body.description,
+        is_active=body.is_active,
+        created_by_user_id=ctx.get_user_id(),
+    )
+    db.add(seq)
+    db.flush()
+    for s in body.steps or []:
+        db.add(
+            CrmSequenceStep(
+                sequence_id=seq.id,
+                step_order=s.step_order,
+                delay_hours=s.delay_hours,
+                action_type=s.action_type,
+                action_config=s.action_config,
+            )
+        )
+    db.commit()
+    db.refresh(seq)
+    return success_response(data=_sequence_to_dict(seq), request=request, message="CRM_SEQUENCE_CREATED")
+
+
+@router.get("/businesses/{business_id}/sequences/{sequence_id}", summary="جزئیات توالی")
+@require_business_access("business_id")
+async def get_sequence(
+    request: Request,
+    business_id: int = Path(..., gt=0),
+    sequence_id: int = Path(..., gt=0),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+    _: None = Depends(require_business_permission_dep("crm", "view")),
+) -> Dict[str, Any]:
+    seq = (
+        db.query(CrmSequence)
+        .options(selectinload(CrmSequence.steps))
+        .filter(and_(CrmSequence.id == sequence_id, CrmSequence.business_id == business_id))
+        .first()
+    )
+    if not seq:
+        raise ApiError("NOT_FOUND", "توالی یافت نشد.", http_status=404)
+    return success_response(data=_sequence_to_dict(seq), request=request)
+
+
+@router.patch("/businesses/{business_id}/sequences/{sequence_id}", summary="ویرایش توالی")
+@require_business_access("business_id")
+async def update_sequence(
+    request: Request,
+    business_id: int = Path(..., gt=0),
+    sequence_id: int = Path(..., gt=0),
+    body: CrmSequenceUpdate = Body(...),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+    _: None = Depends(require_business_permission_dep("crm", "write")),
+) -> Dict[str, Any]:
+    seq = (
+        db.query(CrmSequence)
+        .options(selectinload(CrmSequence.steps))
+        .filter(and_(CrmSequence.id == sequence_id, CrmSequence.business_id == business_id))
+        .first()
+    )
+    if not seq:
+        raise ApiError("NOT_FOUND", "توالی یافت نشد.", http_status=404)
+    if body.name is not None:
+        seq.name = body.name
+    if body.description is not None:
+        seq.description = body.description
+    if body.is_active is not None:
+        seq.is_active = body.is_active
+    if body.steps is not None:
+        db.query(CrmSequenceStep).filter(CrmSequenceStep.sequence_id == seq.id).delete(synchronize_session=False)
+        for s in body.steps:
+            db.add(
+                CrmSequenceStep(
+                    sequence_id=seq.id,
+                    step_order=s.step_order,
+                    delay_hours=s.delay_hours,
+                    action_type=s.action_type,
+                    action_config=s.action_config,
+                )
+            )
+    db.commit()
+    db.refresh(seq)
+    return success_response(data=_sequence_to_dict(seq), request=request, message="CRM_SEQUENCE_UPDATED")
+
+
+@router.delete("/businesses/{business_id}/sequences/{sequence_id}", summary="حذف توالی")
+@require_business_access("business_id")
+async def delete_sequence(
+    request: Request,
+    business_id: int = Path(..., gt=0),
+    sequence_id: int = Path(..., gt=0),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+    _: None = Depends(require_business_permission_dep("crm", "write")),
+) -> Dict[str, Any]:
+    seq = (
+        db.query(CrmSequence)
+        .filter(and_(CrmSequence.id == sequence_id, CrmSequence.business_id == business_id))
+        .first()
+    )
+    if not seq:
+        raise ApiError("NOT_FOUND", "توالی یافت نشد.", http_status=404)
+    db.delete(seq)
+    db.commit()
+    return success_response(message="CRM_SEQUENCE_DELETED", request=request)
+
+
+@router.post("/businesses/{business_id}/sequences/{sequence_id}/enroll", summary="ثبت‌نام در توالی")
+@require_business_access("business_id")
+async def enroll_sequence(
+    request: Request,
+    business_id: int = Path(..., gt=0),
+    sequence_id: int = Path(..., gt=0),
+    body: CrmSequenceEnrollRequest = Body(...),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+    _: None = Depends(require_business_permission_dep("crm", "write")),
+) -> Dict[str, Any]:
+    enrollment = crm_automation_service.enroll_in_sequence(
+        db, business_id, sequence_id, body.entity_type, body.entity_id
+    )
+    db.commit()
+    db.refresh(enrollment)
+    data = {
+        "id": enrollment.id,
+        "sequence_id": enrollment.sequence_id,
+        "entity_type": enrollment.entity_type,
+        "entity_id": enrollment.entity_id,
+        "status": enrollment.status,
+        "current_step_order": enrollment.current_step_order,
+        "next_run_at": enrollment.next_run_at.isoformat() if enrollment.next_run_at else None,
+    }
+    return success_response(data=format_datetime_fields(data, request), request=request, message="CRM_SEQUENCE_ENROLLED")
+
+
+# ============================================================================
+# تنظیمات اتوماسیون CRM
+# ============================================================================
+
+
+def _automation_settings_to_dict(s) -> Dict[str, Any]:
+    return {
+        "business_id": s.business_id,
+        "lead_sla_hours": s.lead_sla_hours,
+        "auto_assign_enabled": bool(s.auto_assign_enabled),
+        "auto_assign_user_ids": s.auto_assign_user_ids or [],
+        "auto_assign_cursor": s.auto_assign_cursor,
+        "follow_up_notify_enabled": bool(s.follow_up_notify_enabled),
+        "stale_deal_days": s.stale_deal_days,
+        "score_rules": s.score_rules,
+    }
+
+
+@router.get("/businesses/{business_id}/automation-settings", summary="تنظیمات اتوماسیون CRM")
+@require_business_access("business_id")
+async def get_automation_settings(
+    request: Request,
+    business_id: int = Path(..., gt=0),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+    _: None = Depends(require_business_permission_dep("crm", "view")),
+) -> Dict[str, Any]:
+    from app.services.crm_chat_service import get_or_create_crm_settings
+
+    s = get_or_create_crm_settings(db, business_id)
+    return success_response(data=_automation_settings_to_dict(s), request=request)
+
+
+@router.patch("/businesses/{business_id}/automation-settings", summary="ویرایش تنظیمات اتوماسیون CRM")
+@require_business_access("business_id")
+async def update_automation_settings(
+    request: Request,
+    business_id: int = Path(..., gt=0),
+    body: CrmAutomationSettingsUpdate = Body(...),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+    _: None = Depends(require_business_permission_dep("crm", "write")),
+) -> Dict[str, Any]:
+    from datetime import datetime
+    from app.services.crm_chat_service import get_or_create_crm_settings
+
+    s = get_or_create_crm_settings(db, business_id)
+    if body.lead_sla_hours is not None:
+        s.lead_sla_hours = body.lead_sla_hours
+    if body.auto_assign_enabled is not None:
+        s.auto_assign_enabled = body.auto_assign_enabled
+    if body.auto_assign_user_ids is not None:
+        s.auto_assign_user_ids = body.auto_assign_user_ids
+    if body.follow_up_notify_enabled is not None:
+        s.follow_up_notify_enabled = body.follow_up_notify_enabled
+    if body.stale_deal_days is not None:
+        s.stale_deal_days = body.stale_deal_days
+    if body.score_rules is not None:
+        s.score_rules = body.score_rules
+    s.updated_at = datetime.utcnow()
+    db.commit()
+    db.refresh(s)
+    return success_response(data=_automation_settings_to_dict(s), request=request, message="CRM_AUTOMATION_SETTINGS_SAVED")
 
 
 from adapters.api.v1.crm_chat import router as _crm_web_chat_router  # noqa: E402

@@ -17,6 +17,82 @@ from adapters.db.models.support.status import Status
 class TicketRepository(BaseRepository[Ticket]):
     def __init__(self, db: Session):
         super().__init__(db, Ticket)
+
+    def _apply_ticket_sort(self, query, query_info: QueryInfo):
+        """مرتب‌سازی تیکت‌ها؛ پیش‌فرض: آخرین فعالیت مکالمه (last_message_at یا created_at)."""
+        sort_key = (query_info.sort_by or "last_message_at").strip()
+        sort_desc = query_info.sort_desc if query_info.sort_desc is not None else True
+
+        activity = func.coalesce(Ticket.last_message_at, Ticket.created_at)
+        if sort_key in ("last_message_at", "last_activity_at", "updated_at", "created_at"):
+            sort_col = activity
+        elif hasattr(Ticket, sort_key):
+            sort_col = getattr(Ticket, sort_key)
+        else:
+            sort_col = activity
+
+        if sort_desc:
+            return query.order_by(sort_col.desc(), Ticket.id.desc())
+        return query.order_by(sort_col.asc(), Ticket.id.asc())
+
+    def _last_public_message_subquery(self):
+        return (
+            self.db.query(
+                Message.ticket_id,
+                func.max(Message.created_at).label("max_created_at"),
+            )
+            .filter(Message.is_internal.is_(False))
+            .group_by(Message.ticket_id)
+            .subquery()
+        )
+
+    def _last_public_message_meta_subquery(self):
+        last_sub = self._last_public_message_subquery()
+        return (
+            self.db.query(
+                Message.ticket_id.label("ticket_id"),
+                Message.sender_type.label("sender_type"),
+                Message.created_at.label("created_at"),
+            )
+            .join(
+                last_sub,
+                and_(
+                    Message.ticket_id == last_sub.c.ticket_id,
+                    Message.created_at == last_sub.c.max_created_at,
+                    Message.is_internal.is_(False),
+                ),
+            )
+            .subquery("last_public_message")
+        )
+
+    def _apply_last_message_from_user_filter(self, query, filter_value: str):
+        filter_value = str(filter_value).lower() if filter_value else ""
+        last_msg = self._last_public_message_meta_subquery()
+        query = query.join(last_msg, Ticket.id == last_msg.c.ticket_id)
+        if filter_value in ("true", "1"):
+            return query.filter(last_msg.c.sender_type == "user")
+        if filter_value in ("false", "0"):
+            return query.filter(last_msg.c.sender_type == "operator")
+        return query
+
+    def _apply_unread_filter(self, query, role: str):
+        last_msg = self._last_public_message_meta_subquery()
+        query = query.join(last_msg, Ticket.id == last_msg.c.ticket_id)
+        if role == "operator":
+            return query.filter(
+                last_msg.c.sender_type == "user",
+                or_(
+                    Ticket.operator_last_read_at.is_(None),
+                    last_msg.c.created_at > Ticket.operator_last_read_at,
+                ),
+            )
+        return query.filter(
+            last_msg.c.sender_type == "operator",
+            or_(
+                Ticket.user_last_read_at.is_(None),
+                last_msg.c.created_at > Ticket.user_last_read_at,
+            ),
+        )
     
     def create(self, ticket_data: Dict[str, Any]) -> Ticket:
         """ایجاد تیکت جدید"""
@@ -125,6 +201,11 @@ class TicketRepository(BaseRepository[Ticket]):
                         query = query.filter(Ticket.description.ilike(f"%{filter_item.value}"))
                     elif filter_item.operator == "=":
                         query = query.filter(Ticket.description == filter_item.value)
+                elif filter_item.property == "last_message_from_user":
+                    query = self._apply_last_message_from_user_filter(query, filter_item.value)
+                elif filter_item.property == "is_unread_for_user":
+                    if str(filter_item.value).lower() in ("true", "1"):
+                        query = self._apply_unread_filter(query, "user")
         
         # اعمال جستجو
         if query_info.search and query_info.search_fields:
@@ -139,14 +220,7 @@ class TicketRepository(BaseRepository[Ticket]):
         total = query.count()
         
         # اعمال مرتب‌سازی
-        if query_info.sort_by and hasattr(Ticket, query_info.sort_by):
-            sort_column = getattr(Ticket, query_info.sort_by)
-            if query_info.sort_desc:
-                query = query.order_by(sort_column.desc())
-            else:
-                query = query.order_by(sort_column.asc())
-        else:
-            query = query.order_by(Ticket.created_at.desc())
+        query = self._apply_ticket_sort(query, query_info)
         
         # اعمال صفحه‌بندی
         query = query.offset(query_info.skip).limit(query_info.take)
@@ -234,95 +308,83 @@ class TicketRepository(BaseRepository[Ticket]):
                         query = query.filter(Ticket.category_id.in_(filter_item.value))
                     else:
                         query = query.filter(Ticket.category_id == filter_item.value)
+                elif filter_item.property == "assigned_operator_id":
+                    if filter_item.operator in ("is_null", "==") and filter_item.value is None:
+                        query = query.filter(Ticket.assigned_operator_id.is_(None))
+                    elif filter_item.operator == "==":
+                        query = query.filter(Ticket.assigned_operator_id == filter_item.value)
                 elif filter_item.property == "last_message_from_user":
-                    # فیلتر تیکت‌هایی که آخرین پیام از کاربر است
-                    # تبدیل value به boolean
-                    filter_value = str(filter_item.value).lower() if filter_item.value else None
-                    
-                    if filter_value in ("true", "1"):
-                        # آخرین پیام از کاربر - استفاده از subquery بهینه
-                        # پیدا کردن آخرین پیام هر تیکت
-                        last_message_subquery = self.db.query(
-                            Message.ticket_id,
-                            func.max(Message.created_at).label('max_created_at')
-                        ).group_by(Message.ticket_id).subquery()
-                        
-                        # پیدا کردن sender_type آخرین پیام
-                        last_message_with_sender = self.db.query(
-                            Message.ticket_id,
-                            Message.sender_type
-                        ).join(
-                            last_message_subquery,
-                            and_(
-                                Message.ticket_id == last_message_subquery.c.ticket_id,
-                                Message.created_at == last_message_subquery.c.max_created_at
-                            )
-                        ).subquery()
-                        
-                        # Join با query و فیلتر
-                        query = query.join(
-                            last_message_with_sender,
-                            Ticket.id == last_message_with_sender.c.ticket_id
-                        ).filter(last_message_with_sender.c.sender_type == "user")
-                        
-                    elif filter_value in ("false", "0"):
-                        # آخرین پیام از اپراتور
-                        last_message_subquery = self.db.query(
-                            Message.ticket_id,
-                            func.max(Message.created_at).label('max_created_at')
-                        ).group_by(Message.ticket_id).subquery()
-                        
-                        last_message_with_sender = self.db.query(
-                            Message.ticket_id,
-                            Message.sender_type
-                        ).join(
-                            last_message_subquery,
-                            and_(
-                                Message.ticket_id == last_message_subquery.c.ticket_id,
-                                Message.created_at == last_message_subquery.c.max_created_at
-                            )
-                        ).subquery()
-                        
-                        query = query.join(
-                            last_message_with_sender,
-                            Ticket.id == last_message_with_sender.c.ticket_id
-                        ).filter(last_message_with_sender.c.sender_type == "operator")
+                    query = self._apply_last_message_from_user_filter(query, filter_item.value)
+                elif filter_item.property == "is_unread_for_operator":
+                    if str(filter_item.value).lower() in ("true", "1"):
+                        query = self._apply_unread_filter(query, "operator")
+                elif filter_item.property == "sla_breached":
+                    if str(filter_item.value).lower() in ("true", "1"):
+                        query = query.filter(Ticket.sla_breached.is_(True))
+                    elif str(filter_item.value).lower() in ("false", "0"):
+                        query = query.filter(Ticket.sla_breached.is_(False))
         
-        # اعمال جستجو
-        if query_info.search and query_info.search_fields:
-            search_conditions = []
-            for field in query_info.search_fields:
-                if hasattr(Ticket, field):
-                    search_conditions.append(getattr(Ticket, field).ilike(f"%{query_info.search}%"))
-                elif field == "user_email" and hasattr(Ticket.user, "email"):
-                    search_conditions.append(Ticket.user.email.ilike(f"%{query_info.search}%"))
-                elif field == "user_name":
-                    search_conditions.append(
-                        or_(
-                            Ticket.user.first_name.ilike(f"%{query_info.search}%"),
-                            Ticket.user.last_name.ilike(f"%{query_info.search}%")
-                        )
-                    )
-            if search_conditions:
-                query = query.filter(or_(*search_conditions))
+        # اعمال جستجو (عنوان، توضیحات، کاربر، شماره تیکت)
+        query = self._apply_operator_search(query, query_info)
         
         # شمارش کل
         total = query.count()
         
         # اعمال مرتب‌سازی
-        if query_info.sort_by and hasattr(Ticket, query_info.sort_by):
-            sort_column = getattr(Ticket, query_info.sort_by)
-            if query_info.sort_desc:
-                query = query.order_by(sort_column.desc())
-            else:
-                query = query.order_by(sort_column.asc())
-        else:
-            query = query.order_by(Ticket.created_at.desc())
+        query = self._apply_ticket_sort(query, query_info)
         
         # اعمال صفحه‌بندی
         query = query.offset(query_info.skip).limit(query_info.take)
         
         return query.all(), total
+
+    def _apply_operator_search(self, query, query_info: QueryInfo):
+        """جستجوی اپراتور: title/description/user + شماره تیکت (بدون join تکراری)."""
+        raw = (query_info.search or "").strip()
+        if not raw:
+            return query
+
+        fields = list(query_info.search_fields or [])
+        search_conditions = []
+        term = raw
+        id_candidate = term[1:] if term.startswith("#") else term
+        if id_candidate.isdigit():
+            search_conditions.append(Ticket.id == int(id_candidate))
+
+        pattern = f"%{term}%"
+        effective_fields = fields or [
+            "title",
+            "description",
+            "user.email",
+            "user.first_name",
+            "user.last_name",
+        ]
+        for field in effective_fields:
+            if field == "title" and hasattr(Ticket, "title"):
+                search_conditions.append(Ticket.title.ilike(pattern))
+            elif field == "description" and hasattr(Ticket, "description"):
+                search_conditions.append(Ticket.description.ilike(pattern))
+            elif field in ("user_email", "user.email"):
+                search_conditions.append(Ticket.user.has(User.email.ilike(pattern)))
+            elif field == "user.first_name":
+                search_conditions.append(Ticket.user.has(User.first_name.ilike(pattern)))
+            elif field == "user.last_name":
+                search_conditions.append(Ticket.user.has(User.last_name.ilike(pattern)))
+            elif field == "user_name":
+                search_conditions.append(
+                    or_(
+                        Ticket.user.has(User.first_name.ilike(pattern)),
+                        Ticket.user.has(User.last_name.ilike(pattern)),
+                    )
+                )
+            elif hasattr(Ticket, field):
+                col = getattr(Ticket, field)
+                if hasattr(col, "ilike"):
+                    search_conditions.append(col.ilike(pattern))
+
+        if search_conditions:
+            query = query.filter(or_(*search_conditions))
+        return query
     
     def update_ticket_status(self, ticket_id: int, status_id: int, operator_id: Optional[int] = None) -> Optional[Ticket]:
         """تغییر وضعیت تیکت"""
@@ -334,11 +396,12 @@ class TicketRepository(BaseRepository[Ticket]):
         if operator_id:
             ticket.assigned_operator_id = operator_id
         
-        # اگر وضعیت نهایی است، تاریخ بسته شدن را تنظیم کن
         status = self.db.query(Status).filter(Status.id == status_id).first()
+        from datetime import datetime
         if status and status.is_final:
-            from datetime import datetime
             ticket.closed_at = datetime.utcnow()
+        else:
+            ticket.closed_at = None
         
         self.db.commit()
         self.db.refresh(ticket)
@@ -369,11 +432,12 @@ class TicketRepository(BaseRepository[Ticket]):
         if operator_id:
             update_dict[Ticket.assigned_operator_id] = operator_id
         
-        # بررسی وضعیت نهایی برای تنظیم closed_at
         status = self.db.query(Status).filter(Status.id == status_id).first()
+        from datetime import datetime
         if status and status.is_final:
-            from datetime import datetime
             update_dict[Ticket.closed_at] = datetime.utcnow()
+        else:
+            update_dict[Ticket.closed_at] = None
         
         updated = self.db.query(Ticket)\
             .filter(Ticket.id.in_(ticket_ids))\

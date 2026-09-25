@@ -18,6 +18,7 @@ import 'check_details_dialog.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../services/list_filter_preferences_service.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 class ChecksPage extends StatefulWidget {
   final int businessId;
@@ -724,15 +725,15 @@ class _ChecksPageState extends State<ChecksPage> {
     final ok = await showGlassDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('حذف چک'),
+        title: Text('حذف چک'),
         content: Text(
           'آیا از حذف چک شماره $checkNumber مطمئن هستید؟\n\nتوجه: تمام اسناد حسابداری مرتبط با این چک نیز حذف خواهند شد.',
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('انصراف')),
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text('انصراف')),
           FilledButton(
             onPressed: () => Navigator.pop(ctx, true),
-            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            style: FilledButton.styleFrom(backgroundColor: SemanticColorResolver.negative(context)),
             child: const Text('حذف'),
           ),
         ],

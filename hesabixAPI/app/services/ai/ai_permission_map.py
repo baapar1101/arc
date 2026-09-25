@@ -71,6 +71,7 @@ PERMISSION_ALIASES: dict[str, List[Tuple[str, str]]] = {
     "categories.view": [("categories", "view")],
     "categories.write": [("categories", "add"), ("categories", "edit")],
     "price_lists.view": [("price_lists", "view")],
+    "price_lists.edit": [("price_lists", "edit"), ("price_lists", "add")],
     "opening_balance.view": [("opening_balance", "view")],
     "opening_balance.edit": [("opening_balance", "edit")],
     "petty_cash.view": [("petty_cash", "view")],
@@ -96,6 +97,7 @@ PERMISSION_ALIASES: dict[str, List[Tuple[str, str]]] = {
     "credit.view": [("credit", "view")],
     "woocommerce.view": [("woocommerce", "view"), ("marketplace", "view")],
     "basalam.view": [("basalam", "view"), ("marketplace", "view")],
+    "wallet.view": [("wallet", "view"), ("settings", "business")],
 }
 
 

@@ -27,6 +27,7 @@ def backfill_invoice_profit_ledger_job(
             from app.services.invoice_profit_ledger_service import (
                 backfill_recognized_profit_for_business,
             )
+            from app.services.invoice_cogs_gl_service import backfill_cogs_gl_for_business
 
             result = backfill_recognized_profit_for_business(
                 db,
@@ -35,7 +36,18 @@ def backfill_invoice_profit_ledger_job(
                 invoice_ids=invoice_ids,
                 limit=limit,
             )
-            return {"success": True, **result}
+            cogs_result = backfill_cogs_gl_for_business(
+                db,
+                int(business_id),
+                fiscal_year_id=fiscal_year_id,
+                invoice_ids=invoice_ids,
+                limit=limit,
+            )
+            return {
+                "success": True,
+                **result,
+                "cogs_gl": cogs_result,
+            }
     except Exception as e:
         logger.exception("backfill_invoice_profit_ledger_job failed: %s", e)
         return {"success": False, "error": str(e), "processed": 0, "skipped": 0}

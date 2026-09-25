@@ -10,7 +10,9 @@ import '../../core/date_utils.dart';
 import '../../models/public_person_share_payload.dart';
 import '../../models/public_invoice_details.dart';
 import '../../services/public_person_share_service.dart';
+import '../../utils/currency_display_utils.dart';
 import '../../utils/error_extractor.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 class PublicPersonShareLinkPage extends StatefulWidget {
   final String code;
@@ -305,13 +307,17 @@ class _PublicPersonShareLinkPageState extends State<PublicPersonShareLinkPage> {
   Widget _buildSummaryCards(ThemeData theme, PublicPersonSharePayload data, NumberFormat formatter) {
     final summary = data.summary;
     final balance = summary.balance ?? 0;
+    final statusText = personBalanceStatusLabel(summary.status);
     Color balanceColor;
-        if (balance > 0) {
-      balanceColor = Colors.green[700] ?? Colors.green;
-    } else if (balance < 0) {
-      balanceColor = theme.colorScheme.error;
-    } else {
-      balanceColor = theme.colorScheme.primary;
+    switch (statusText) {
+      case 'بستانکار':
+        balanceColor = SemanticColorResolver.positive(context);
+        break;
+      case 'بدهکار':
+        balanceColor = theme.colorScheme.error;
+        break;
+      default:
+        balanceColor = theme.colorScheme.primary;
     }
 
     return Wrap(
@@ -320,21 +326,21 @@ class _PublicPersonShareLinkPageState extends State<PublicPersonShareLinkPage> {
       children: [
         _summaryCard(
           theme: theme,
-          title: 'تراز جاری',
-          value: formatter.format(balance),
+          title: 'مانده',
+          value: formatPersonNetBalanceDisplay(balance: balance, status: summary.status),
           color: balanceColor,
         ),
         _summaryCard(
           theme: theme,
           title: 'وضعیت حساب',
-          value: summary.status ?? 'نامشخص',
+          value: statusText.isEmpty ? 'نامشخص' : statusText,
           color: theme.colorScheme.onSurface,
         ),
         _summaryCard(
           theme: theme,
           title: 'جمع بستانکار',
           value: formatter.format(summary.totalCredit ?? 0),
-          color: Colors.green[700] ?? theme.colorScheme.primary,
+          color: SemanticColorResolver.positive(context),
         ),
         _summaryCard(
           theme: theme,
@@ -409,16 +415,37 @@ class _PublicPersonShareLinkPageState extends State<PublicPersonShareLinkPage> {
                   if (dateText.isNotEmpty) {
                     subtitleParts.add(dateText);
                   }
+                  final productName = item.productName?.trim();
+                  if (productName != null && productName.isNotEmpty) {
+                    final code = item.productCode?.trim();
+                    subtitleParts.add(
+                      (code != null && code.isNotEmpty) ? '$code — $productName' : productName,
+                    );
+                  }
+                  if (item.quantity != null) {
+                    subtitleParts.add('تعداد: ${formatter.format(item.quantity)}');
+                  }
+                  if (item.unitPrice != null) {
+                    subtitleParts.add('فی: ${formatter.format(item.unitPrice)}');
+                  }
                   final subtitleText = subtitleParts.join(' • ');
                   final desc = item.description?.trim();
+                  final titleText = (productName != null && productName.isNotEmpty)
+                      ? productName
+                      : (item.documentCode ?? '-');
                   return ListTile(
                     contentPadding: EdgeInsets.zero,
                     isThreeLine: desc != null && desc.isNotEmpty,
                     leading: CircleAvatar(
                       backgroundColor: theme.colorScheme.primary.withOpacity(0.1),
-                      child: Icon(Icons.receipt_long, color: theme.colorScheme.primary),
+                      child: Icon(
+                        (item.rowKind == 'invoice_item')
+                            ? Icons.inventory_2_outlined
+                            : Icons.receipt_long,
+                        color: theme.colorScheme.primary,
+                      ),
                     ),
-                    title: Text(item.documentCode ?? '-', style: theme.textTheme.titleMedium),
+                    title: Text(titleText, style: theme.textTheme.titleMedium),
                     subtitle: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -426,6 +453,18 @@ class _PublicPersonShareLinkPageState extends State<PublicPersonShareLinkPage> {
                           subtitleText.isEmpty ? '-' : subtitleText,
                           style: theme.textTheme.bodySmall,
                         ),
+                        if (item.documentCode != null &&
+                            productName != null &&
+                            productName.isNotEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 2),
+                            child: Text(
+                              'سند: ${item.documentCode}',
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: theme.colorScheme.outline,
+                              ),
+                            ),
+                          ),
                         if (desc != null && desc.isNotEmpty)
                           Padding(
                             padding: const EdgeInsets.only(top: 4),

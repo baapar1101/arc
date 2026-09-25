@@ -12,6 +12,7 @@ import '../../utils/snackbar_helper.dart';
 import '../../widgets/data_table/data_table_config.dart';
 import '../../widgets/data_table/data_table_widget.dart';
 import '../../widgets/person/file_picker_bridge.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 class TaxProductCodesPage extends StatefulWidget {
   const TaxProductCodesPage({super.key});
@@ -172,15 +173,15 @@ class _TaxProductCodesPageState extends State<TaxProductCodesPage> {
     IconData icon;
     switch (state) {
       case 'succeeded':
-        color = Colors.green;
+        color = SemanticColorResolver.positive(context);
         icon = Icons.check_circle_outline;
         break;
       case 'failed':
-        color = Colors.red;
+        color = SemanticColorResolver.negative(context);
         icon = Icons.error_outline;
         break;
       case 'running':
-        color = Colors.orange;
+        color = SemanticColorResolver.warning(context);
         icon = Icons.work_outline;
         break;
       default:

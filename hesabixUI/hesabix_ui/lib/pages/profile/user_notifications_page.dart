@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:hesabix_ui/config/brand_config.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 
@@ -15,6 +16,8 @@ import '../../services/bale_integration_service.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
 import '../../widgets/in_app_notification_behavior_section.dart';
+import '../../widgets/android_system_notification_settings_section.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 class UserNotificationsPage extends StatefulWidget {
   final CalendarController calendarController;
@@ -630,7 +633,7 @@ class _UserNotificationsPageState extends State<UserNotificationsPage> {
         enabled: _inapp,
         icon: Icons.notifications_active_outlined,
         title: t.notificationsChannelInApp,
-        description: t.notificationsChannelInAppDescription,
+        description: t.branded(t.notificationsChannelInAppDescription),
         onChanged: (v) => setState(() => _inapp = v),
         canEnable: true, // InApp همیشه قابل استفاده است
       ),
@@ -720,22 +723,22 @@ class _UserNotificationsPageState extends State<UserNotificationsPage> {
                   children: [
                     Text(options[i].description),
                     if (!options[i].canEnable && options[i].disabledReason != null) ...[
-                      const SizedBox(height: 8),
+                      SizedBox(height: 8),
                       Container(
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
-                          color: Colors.orange.withValues(alpha: 0.1),
+                          color: SemanticColorResolver.warning(context).withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Colors.orange.withValues(alpha: 0.3)),
+                          border: Border.all(color: SemanticColorResolver.warning(context).withValues(alpha: 0.3)),
                         ),
                         child: Row(
                           children: [
-                            Icon(Icons.info_outline, size: 16, color: Colors.orange.shade700),
-                            const SizedBox(width: 8),
+                            Icon(Icons.info_outline, size: 16, color: SemanticColorResolver.warning(context)),
+                            SizedBox(width: 8),
                             Expanded(
                               child: Text(
                                 options[i].disabledReason!,
-                                style: theme.textTheme.bodySmall?.copyWith(color: Colors.orange.shade700),
+                                style: theme.textTheme.bodySmall?.copyWith(color: SemanticColorResolver.warning(context)),
                               ),
                             ),
                           ],
@@ -780,14 +783,23 @@ class _UserNotificationsPageState extends State<UserNotificationsPage> {
         ),
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-          child: InAppNotificationBehaviorSection(
-            enabled: option.enabled,
-            alertMode: _inappAlertMode,
-            soundEnabled: _inappSoundEnabled,
-            soundAssetId: _inappSoundAssetId,
-            onAlertModeChanged: (m) => setState(() => _inappAlertMode = m),
-            onSoundEnabledChanged: (v) => setState(() => _inappSoundEnabled = v),
-            onSoundAssetChanged: (id) => setState(() => _inappSoundAssetId = id),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              InAppNotificationBehaviorSection(
+                enabled: option.enabled,
+                alertMode: _inappAlertMode,
+                soundEnabled: _inappSoundEnabled,
+                soundAssetId: _inappSoundAssetId,
+                onAlertModeChanged: (m) => setState(() => _inappAlertMode = m),
+                onSoundEnabledChanged: (v) => setState(() => _inappSoundEnabled = v),
+                onSoundAssetChanged: (id) => setState(() => _inappSoundAssetId = id),
+              ),
+              AndroidSystemNotificationSettingsSection(
+                enabled: option.enabled,
+                calendarController: widget.calendarController,
+              ),
+            ],
           ),
         ),
       ],
@@ -807,46 +819,46 @@ class _UserNotificationsPageState extends State<UserNotificationsPage> {
             children: [
               Text(option.description),
               if (!option.canEnable && option.disabledReason != null) ...[
-                const SizedBox(height: 8),
+                SizedBox(height: 8),
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: Colors.orange.withValues(alpha: 0.1),
+                    color: SemanticColorResolver.warning(context).withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.orange.withValues(alpha: 0.3)),
+                    border: Border.all(color: SemanticColorResolver.warning(context).withValues(alpha: 0.3)),
                   ),
                   child: Row(
                     children: [
-                      Icon(Icons.info_outline, size: 16, color: Colors.orange.shade700),
-                      const SizedBox(width: 8),
+                      Icon(Icons.info_outline, size: 16, color: SemanticColorResolver.warning(context)),
+                      SizedBox(width: 8),
                       Expanded(
                         child: Text(
                           option.disabledReason!,
-                          style: theme.textTheme.bodySmall?.copyWith(color: Colors.orange.shade700),
+                          style: theme.textTheme.bodySmall?.copyWith(color: SemanticColorResolver.warning(context)),
                         ),
                       ),
                     ],
                   ),
                 ),
               ] else ...[
-                const SizedBox(height: 8),
+                SizedBox(height: 8),
                 Row(
                   children: [
                     Icon(
                       _telegramLinked ? Icons.check_circle : Icons.cancel,
                       size: 16,
-                      color: _telegramLinked ? Colors.green : Colors.red,
+                      color: _telegramLinked ? SemanticColorResolver.positive(context) : SemanticColorResolver.negative(context),
                     ),
-                    const SizedBox(width: 4),
+                    SizedBox(width: 4),
                     Text(
                       _telegramLinked ? t.notificationsTelegramConnected : t.notificationsTelegramNotConnected,
                       style: theme.textTheme.bodySmall?.copyWith(
-                        color: _telegramLinked ? Colors.green : Colors.red,
+                        color: _telegramLinked ? SemanticColorResolver.positive(context) : SemanticColorResolver.negative(context),
                         fontWeight: FontWeight.w500,
                       ),
                     ),
                     if (_telegramLinked && _telegramConnectedAt != null) ...[
-                      const SizedBox(width: 8),
+                      SizedBox(width: 8),
                       Expanded(
                         child: Text(
                           t.notificationsTelegramConnectedSince(
@@ -867,18 +879,18 @@ class _UserNotificationsPageState extends State<UserNotificationsPage> {
                   Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: Colors.orange.withValues(alpha: 0.1),
+                      color: SemanticColorResolver.warning(context).withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.orange.withValues(alpha: 0.3)),
+                      border: Border.all(color: SemanticColorResolver.warning(context).withValues(alpha: 0.3)),
                     ),
                     child: Row(
                       children: [
-                        Icon(Icons.warning_amber_rounded, size: 16, color: Colors.orange),
-                        const SizedBox(width: 8),
+                        Icon(Icons.warning_amber_rounded, size: 16, color: SemanticColorResolver.warning(context)),
+                        SizedBox(width: 8),
                         Expanded(
                           child: Text(
                             t.notificationsTelegramConnectionWarning,
-                            style: theme.textTheme.bodySmall?.copyWith(color: Colors.orange.shade700),
+                            style: theme.textTheme.bodySmall?.copyWith(color: SemanticColorResolver.warning(context)),
                           ),
                         ),
                       ],
@@ -932,7 +944,7 @@ class _UserNotificationsPageState extends State<UserNotificationsPage> {
               debugPrint('[TelegramUI] Building QR section');
               return Column(
                 children: [
-                  const SizedBox(height: 8),
+                  SizedBox(height: 8),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
                     child: Container(
@@ -993,7 +1005,7 @@ class _UserNotificationsPageState extends State<UserNotificationsPage> {
                                       const SizedBox(height: 8),
                                       OutlinedButton.icon(
                                         onPressed: () => _copyToClipboard(_telegramDeepLink!, t.copied),
-                                        icon: const Icon(Icons.copy_all_outlined, size: 16),
+                                        icon: Icon(Icons.copy_all_outlined, size: 16),
                                         label: Text(t.copyLink),
                                         style: OutlinedButton.styleFrom(
                                           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -1011,16 +1023,16 @@ class _UserNotificationsPageState extends State<UserNotificationsPage> {
                               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                               decoration: BoxDecoration(
                                 color: _remainingSeconds <= 0
-                                    ? Colors.orange.withValues(alpha: 0.1)
+                                    ? SemanticColorResolver.warning(context).withValues(alpha: 0.1)
                                     : (_remainingSeconds < 60 
-                                        ? Colors.red.withValues(alpha: 0.1)
+                                        ? SemanticColorResolver.negative(context).withValues(alpha: 0.1)
                                         : colorScheme.primaryContainer.withValues(alpha: 0.3)),
                                 borderRadius: BorderRadius.circular(8),
                                 border: Border.all(
                                   color: _remainingSeconds <= 0
-                                      ? Colors.orange.withValues(alpha: 0.3)
+                                      ? SemanticColorResolver.warning(context).withValues(alpha: 0.3)
                                       : (_remainingSeconds < 60 
-                                          ? Colors.red.withValues(alpha: 0.3)
+                                          ? SemanticColorResolver.negative(context).withValues(alpha: 0.3)
                                           : colorScheme.primary.withValues(alpha: 0.3)),
                                 ),
                               ),
@@ -1030,12 +1042,12 @@ class _UserNotificationsPageState extends State<UserNotificationsPage> {
                                     _remainingSeconds <= 0 ? Icons.warning_amber_rounded : Icons.timer_outlined,
                                     size: 16,
                                     color: _remainingSeconds <= 0
-                                        ? Colors.orange
+                                        ? SemanticColorResolver.warning(context)
                                         : (_remainingSeconds < 60 
-                                            ? Colors.red
+                                            ? SemanticColorResolver.negative(context)
                                             : colorScheme.primary),
                                   ),
-                                  const SizedBox(width: 8),
+                                  SizedBox(width: 8),
                                   Expanded(
                                     child: Text(
                                       _remainingSeconds <= 0 
@@ -1043,9 +1055,9 @@ class _UserNotificationsPageState extends State<UserNotificationsPage> {
                                           : _formatRemainingTime(_remainingSeconds),
                                       style: theme.textTheme.bodySmall?.copyWith(
                                         color: _remainingSeconds <= 0
-                                            ? Colors.orange.shade700
+                                            ? SemanticColorResolver.warning(context)
                                             : (_remainingSeconds < 60 
-                                                ? Colors.red.shade700
+                                                ? SemanticColorResolver.negative(context)
                                                 : colorScheme.onPrimaryContainer),
                                         fontWeight: FontWeight.w500,
                                       ),
@@ -1083,24 +1095,24 @@ class _UserNotificationsPageState extends State<UserNotificationsPage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(option.description),
-              const SizedBox(height: 8),
+              SizedBox(height: 8),
               Row(
                 children: [
                   Icon(
                     _baleLinked ? Icons.check_circle : Icons.cancel,
                     size: 16,
-                    color: _baleLinked ? Colors.green : Colors.red,
+                    color: _baleLinked ? SemanticColorResolver.positive(context) : SemanticColorResolver.negative(context),
                   ),
-                  const SizedBox(width: 4),
+                  SizedBox(width: 4),
                   Text(
                     _baleLinked ? t.notificationsBaleConnected : t.notificationsBaleNotConnected,
                     style: theme.textTheme.bodySmall?.copyWith(
-                      color: _baleLinked ? Colors.green : Colors.red,
+                      color: _baleLinked ? SemanticColorResolver.positive(context) : SemanticColorResolver.negative(context),
                       fontWeight: FontWeight.w500,
                     ),
                   ),
                   if (_baleLinked && _baleConnectedAt != null) ...[
-                    const SizedBox(width: 8),
+                    SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         t.notificationsBaleConnectedSince(
@@ -1121,18 +1133,18 @@ class _UserNotificationsPageState extends State<UserNotificationsPage> {
                 Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: Colors.orange.withValues(alpha: 0.1),
+                    color: SemanticColorResolver.warning(context).withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.orange.withValues(alpha: 0.3)),
+                    border: Border.all(color: SemanticColorResolver.warning(context).withValues(alpha: 0.3)),
                   ),
                   child: Row(
                     children: [
-                      Icon(Icons.warning_amber_rounded, size: 16, color: Colors.orange),
-                      const SizedBox(width: 8),
+                      Icon(Icons.warning_amber_rounded, size: 16, color: SemanticColorResolver.warning(context)),
+                      SizedBox(width: 8),
                       Expanded(
                         child: Text(
                           t.notificationsBaleConnectionWarning,
-                          style: theme.textTheme.bodySmall?.copyWith(color: Colors.orange.shade700),
+                          style: theme.textTheme.bodySmall?.copyWith(color: SemanticColorResolver.warning(context)),
                         ),
                       ),
                     ],
@@ -1157,8 +1169,8 @@ class _UserNotificationsPageState extends State<UserNotificationsPage> {
                   child: OutlinedButton.icon(
                     onPressed: _baleLoading ? null : () => _disconnectBale(t),
                     icon: _baleLoading
-                        ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
-                        : const Icon(Icons.link_off, size: 18),
+                        ? SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                        : Icon(Icons.link_off, size: 18),
                     label: Text(t.notificationsBaleDisconnectButton),
                   ),
                 ),
@@ -1253,16 +1265,16 @@ class _UserNotificationsPageState extends State<UserNotificationsPage> {
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                       decoration: BoxDecoration(
                         color: _baleRemainingSeconds <= 0
-                            ? Colors.orange.withValues(alpha: 0.1)
+                            ? SemanticColorResolver.warning(context).withValues(alpha: 0.1)
                             : (_baleRemainingSeconds < 60
-                                ? Colors.red.withValues(alpha: 0.1)
+                                ? SemanticColorResolver.negative(context).withValues(alpha: 0.1)
                                 : colorScheme.primaryContainer.withValues(alpha: 0.3)),
                         borderRadius: BorderRadius.circular(8),
                         border: Border.all(
                           color: _baleRemainingSeconds <= 0
-                              ? Colors.orange.withValues(alpha: 0.3)
+                              ? SemanticColorResolver.warning(context).withValues(alpha: 0.3)
                               : (_baleRemainingSeconds < 60
-                                  ? Colors.red.withValues(alpha: 0.3)
+                                  ? SemanticColorResolver.negative(context).withValues(alpha: 0.3)
                                   : colorScheme.primary.withValues(alpha: 0.3)),
                         ),
                       ),
@@ -1272,10 +1284,10 @@ class _UserNotificationsPageState extends State<UserNotificationsPage> {
                             _baleRemainingSeconds <= 0 ? Icons.warning_amber_rounded : Icons.timer_outlined,
                             size: 16,
                             color: _baleRemainingSeconds <= 0
-                                ? Colors.orange
-                                : (_baleRemainingSeconds < 60 ? Colors.red : colorScheme.primary),
+                                ? SemanticColorResolver.warning(context)
+                                : (_baleRemainingSeconds < 60 ? SemanticColorResolver.negative(context) : colorScheme.primary),
                           ),
-                          const SizedBox(width: 8),
+                          SizedBox(width: 8),
                           Expanded(
                             child: Text(
                               _baleRemainingSeconds <= 0
@@ -1283,9 +1295,9 @@ class _UserNotificationsPageState extends State<UserNotificationsPage> {
                                   : _formatRemainingTime(_baleRemainingSeconds),
                               style: theme.textTheme.bodySmall?.copyWith(
                                 color: _baleRemainingSeconds <= 0
-                                    ? Colors.orange.shade700
+                                    ? SemanticColorResolver.warning(context)
                                     : (_baleRemainingSeconds < 60
-                                        ? Colors.red.shade700
+                                        ? SemanticColorResolver.negative(context)
                                         : colorScheme.onPrimaryContainer),
                                 fontWeight: FontWeight.w500,
                               ),

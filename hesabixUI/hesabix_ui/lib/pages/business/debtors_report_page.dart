@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
 import 'package:hesabix_ui/core/api_client.dart';
+import 'package:hesabix_ui/core/fiscal_year_controller.dart';
 import 'package:hesabix_ui/widgets/date_input_field.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table_widget.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table_config.dart';
@@ -13,6 +14,8 @@ import 'package:hesabix_ui/services/currency_service.dart';
 import 'package:hesabix_ui/utils/number_formatters.dart';
 import 'package:hesabix_ui/utils/number_normalizer.dart';
 import 'package:hesabix_ui/core/date_utils.dart';
+import 'package:hesabix_ui/core/hesabix_back.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 class DebtorsReportPage extends StatefulWidget {
   final int businessId;
@@ -59,17 +62,11 @@ class _DebtorsReportPageState extends State<DebtorsReportPage> {
     try {
       final svc = BusinessDashboardService(ApiClient());
       final items = await svc.listFiscalYears(widget.businessId);
+      final defaultFyId = await FiscalYearController.resolveDefaultId(widget.businessId, items);
       if (!mounted) return;
       setState(() {
         _fiscalYears = items;
-        final current = items.firstWhere(
-          (e) => (e['is_current'] == true),
-          orElse: () => const <String, dynamic>{},
-        );
-        final id = current['id'];
-        if (id is int) {
-          _selectedFiscalYearId = id;
-        }
+        _selectedFiscalYearId = defaultFyId;
       });
     } catch (_) {
       // ignore errors
@@ -83,14 +80,8 @@ class _DebtorsReportPageState extends State<DebtorsReportPage> {
       if (!mounted) return;
       setState(() {
         _currencies = items;
-        // انتخاب ارز پیش‌فرض
-        if (items.isNotEmpty) {
-          final defaultCurrency = items.firstWhere(
-            (c) => c['is_default'] == true,
-            orElse: () => items.first,
-          );
-          _selectedCurrencyId = defaultCurrency['id'] as int?;
-        }
+        // پیش‌فرض: همه ارزها → معادل پایه در بک‌اند
+        _selectedCurrencyId = null;
       });
     } catch (_) {
       // ignore errors
@@ -197,11 +188,11 @@ class _DebtorsReportPageState extends State<DebtorsReportPage> {
             
             Color? color;
             if (b < 0) {
-              color = Colors.red[700];
+              color = SemanticColorResolver.negative(context);
             } else if (b == 0) {
               color = Colors.grey;
             } else {
-              color = Colors.green[700];
+              color = SemanticColorResolver.positive(context);
             }
             
             return Text(
@@ -224,7 +215,7 @@ class _DebtorsReportPageState extends State<DebtorsReportPage> {
           final balance = m['balance'];
           final b = balance is num ? balance.toDouble() : double.tryParse(balance?.toString() ?? '0') ?? 0.0;
           if (b < 0) {
-            return Colors.red.withValues(alpha: 0.05);
+            return SemanticColorResolver.negative(context).withValues(alpha: 0.05);
           }
         } catch (_) {}
         return null;
@@ -246,10 +237,7 @@ class _DebtorsReportPageState extends State<DebtorsReportPage> {
     return Scaffold(
       backgroundColor: cs.surface,
       appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => context.pop(),
-        ),
+        leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
         title: Text(t.reportsDebtorsTitle),
         actions: [
           IconButton(
@@ -302,8 +290,8 @@ class _DebtorsReportPageState extends State<DebtorsReportPage> {
                     ),
                   ),
                   SizedBox(
-                    width: 220,
-                    child: DropdownButtonFormField<int>(
+                    width: 240,
+                    child: DropdownButtonFormField<int?>(
                       value: _selectedCurrencyId,
                       decoration: InputDecoration(
                         labelText: t.currency,
@@ -311,20 +299,26 @@ class _DebtorsReportPageState extends State<DebtorsReportPage> {
                         isDense: true,
                         contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
                       ),
-                      items: _currencies.map<DropdownMenuItem<int>>((c) {
-                        final id = c['id'] as int?;
-                        final code = (c['code'] ?? '').toString();
-                        final title = (c['title'] ?? code).toString();
-                        final isDefault = c['is_default'] == true;
-                        return DropdownMenuItem<int>(
-                          value: id,
-                          child: Text(
-                            isDefault ? '$title (پیش‌فرض)' : title,
-                            overflow: TextOverflow.ellipsis,
-                            maxLines: 1,
-                          ),
-                        );
-                      }).toList(),
+                      items: [
+                        const DropdownMenuItem<int?>(
+                          value: null,
+                          child: Text('همه ارزها (معادل پایه)'),
+                        ),
+                        ..._currencies.map<DropdownMenuItem<int?>>((c) {
+                          final id = c['id'] as int?;
+                          final code = (c['code'] ?? '').toString();
+                          final title = (c['title'] ?? code).toString();
+                          final isDefault = c['is_default'] == true;
+                          return DropdownMenuItem<int?>(
+                            value: id,
+                            child: Text(
+                              isDefault ? '$title (پایه)' : title,
+                              overflow: TextOverflow.ellipsis,
+                              maxLines: 1,
+                            ),
+                          );
+                        }),
+                      ],
                       menuMaxHeight: 300,
                       onChanged: (val) {
                         setState(() {

@@ -20,6 +20,7 @@ from app.services.public_catalog_service import (
 	create_public_catalog_contact_message,
 	get_public_product_by_uuid,
 	list_public_catalog_feed,
+	resolve_public_catalog_gallery_image,
 	resolve_public_catalog_product_image,
 	search_public_catalog,
 )
@@ -84,6 +85,7 @@ async def public_catalog_list_products(
 	request: Request,
 	db: Session = Depends(get_db),
 	search: Optional[str] = Query(None, max_length=500),
+	brand: Optional[str] = Query(None, max_length=255),
 	business_id: Optional[int] = Query(None),
 	category_id: Optional[int] = Query(None),
 	province: Optional[str] = Query(None, max_length=100),
@@ -95,6 +97,7 @@ async def public_catalog_list_products(
 	data = search_public_catalog(
 		db,
 		search=search,
+		brand=brand,
 		business_id=business_id,
 		category_id=category_id,
 		province=province,
@@ -165,6 +168,66 @@ async def public_catalog_get_product_image(
 		fid = UUID(str(file_id))
 	except Exception:
 		raise _public_http_error(status.HTTP_404_NOT_FOUND, "NOT_FOUND", "تصویر در دسترس نیست") from None
+
+	size_l = (size or "original").strip().lower()
+	if size_l in ("small", "thumb", "thumbnail"):
+		file_data = await storage.download_image_thumbnail(fid, size="small")
+	elif size_l == "medium":
+		file_data = await storage.download_image_thumbnail(fid, size="medium")
+	else:
+		file_data = await storage.download_file(fid)
+
+	filename = file_data.get("filename") or "image"
+	mime = file_data.get("mime_type") or "application/octet-stream"
+	content = file_data.get("content") or b""
+	disp = "inline" if str(mime).lower().startswith("image/") else "attachment"
+	return StreamingResponse(
+		io.BytesIO(content),
+		media_type=mime,
+		headers={"Content-Disposition": f'{disp}; filename="{filename}"'},
+	)
+
+
+@router.get("/api/v1/public/catalog/products/{catalog_public_uuid}/gallery/{index}/image")
+async def public_catalog_get_gallery_image(
+	request: Request,
+	catalog_public_uuid: str,
+	index: int,
+	db: Session = Depends(get_db),
+	size: str = Query("original", description="original | small | medium"),
+):
+	_rate_or_raise(request, bucket="image", max_requests=200, window_seconds=60)
+	try:
+		normalize_catalog_public_uuid(catalog_public_uuid)
+	except ValueError:
+		raise _public_http_error(
+			status.HTTP_422_UNPROCESSABLE_ENTITY,
+			"INVALID_CATALOG_UUID",
+			"شناسهٔ عمومی کالا نامعتبر است.",
+		) from None
+	p, file_id = resolve_public_catalog_gallery_image(db, catalog_public_uuid, int(index))
+	if not p or not file_id:
+		raise _public_http_error(status.HTTP_404_NOT_FOUND, "NOT_FOUND", "تصویر گالری در دسترس نیست")
+
+	fs = (
+		db.query(FileStorage)
+		.filter(
+			FileStorage.id == str(file_id),
+			FileStorage.business_id == int(p.business_id),
+			FileStorage.deleted_at.is_(None),
+		)
+		.first()
+	)
+	if not fs:
+		raise _public_http_error(status.HTTP_404_NOT_FOUND, "NOT_FOUND", "تصویر گالری در دسترس نیست")
+
+	storage = FileStorageService(db)
+	from uuid import UUID
+
+	try:
+		fid = UUID(str(file_id))
+	except Exception:
+		raise _public_http_error(status.HTTP_404_NOT_FOUND, "NOT_FOUND", "تصویر گالری در دسترس نیست") from None
 
 	size_l = (size or "original").strip().lower()
 	if size_l in ("small", "thumb", "thumbnail"):

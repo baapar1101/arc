@@ -24,6 +24,13 @@ class InvoiceLineItem {
   final num? baseSalesPriceMainUnit;
   final num? basePurchasePriceMainUnit;
 
+  /// قیمت فروش ارزی کالا (واحد اصلی) — وقتی [priceFxCurrencyId] با ارز فاکتور یکی باشد استفاده می‌شود
+  final num? salesPriceFxMainUnit;
+  /// قیمت خرید ارزی کالا (واحد اصلی)
+  final num? purchasePriceFxMainUnit;
+  /// ارز قیمت‌های ارزی کالا
+  final int? priceFxCurrencyId;
+
   // discount
   String discountType; // percent | amount
   num discountValue; // either percentage (0-100) or absolute amount
@@ -46,8 +53,11 @@ class InvoiceLineItem {
   final Map<String, dynamic>? extraInfo;
 
   static final _uuid = Uuid();
-  /// مقدار پیش‌فرض copyWith برای [basePurchasePriceMainUnit] یعنی «فیلد را عوض نکن».
+  /// مقدار پیش‌فرض copyWith برای فیلدهای nullable یعنی «فیلد را عوض نکن».
   static const Object _basePurchaseUnset = Object();
+  static const Object _salesFxUnset = Object();
+  static const Object _purchaseFxUnset = Object();
+  static const Object _fxCurrencyUnset = Object();
 
   InvoiceLineItem({
     String? lineKey,
@@ -67,6 +77,9 @@ class InvoiceLineItem {
     this.taxRate = 0,
     this.baseSalesPriceMainUnit,
     this.basePurchasePriceMainUnit,
+    this.salesPriceFxMainUnit,
+    this.purchasePriceFxMainUnit,
+    this.priceFxCurrencyId,
     this.minOrderQty,
     this.trackInventory = false,
     this.warehouseId,
@@ -92,6 +105,9 @@ class InvoiceLineItem {
     String? description,
     num? baseSalesPriceMainUnit,
     Object? basePurchasePriceMainUnit = _basePurchaseUnset,
+    Object? salesPriceFxMainUnit = _salesFxUnset,
+    Object? purchasePriceFxMainUnit = _purchaseFxUnset,
+    Object? priceFxCurrencyId = _fxCurrencyUnset,
     int? minOrderQty,
     bool? trackInventory,
     int? warehouseId,
@@ -118,6 +134,15 @@ class InvoiceLineItem {
       basePurchasePriceMainUnit: identical(basePurchasePriceMainUnit, _basePurchaseUnset)
           ? this.basePurchasePriceMainUnit
           : basePurchasePriceMainUnit as num?,
+      salesPriceFxMainUnit: identical(salesPriceFxMainUnit, _salesFxUnset)
+          ? this.salesPriceFxMainUnit
+          : salesPriceFxMainUnit as num?,
+      purchasePriceFxMainUnit: identical(purchasePriceFxMainUnit, _purchaseFxUnset)
+          ? this.purchasePriceFxMainUnit
+          : purchasePriceFxMainUnit as num?,
+      priceFxCurrencyId: identical(priceFxCurrencyId, _fxCurrencyUnset)
+          ? this.priceFxCurrencyId
+          : priceFxCurrencyId as int?,
       minOrderQty: minOrderQty ?? this.minOrderQty,
       trackInventory: trackInventory ?? this.trackInventory,
       warehouseId: warehouseId ?? this.warehouseId,
@@ -146,5 +171,3 @@ class InvoiceLineItem {
 
   num get total => taxableAmount + taxAmount;
 }
-
-

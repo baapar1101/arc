@@ -231,16 +231,9 @@ class DocumentRepository:
         total_count = query.count()
 
         # مرتب‌سازی (چندستونه sort یا تک‌ستونه sort_by)
-        from adapters.api.v1.schemas import QueryInfo
         from app.services.document_list_sort import apply_document_accounting_list_ordering
-
-        _qi = QueryInfo.model_validate({
-            "take": int(filters.get("take", 50) or 50),
-            "skip": int(filters.get("skip", 0) or 0),
-            "sort_by": filters.get("sort_by"),
-            "sort_desc": bool(filters.get("sort_desc", True)),
-            "sort": filters.get("sort") if isinstance(filters.get("sort"), list) else None,
-        })
+        from app.services.sort_resolution import query_info_for_sort
+        _qi = query_info_for_sort(filters, default_sort_desc=True)
         query = apply_document_accounting_list_ordering(query, _qi)
 
         # صفحه‌بندی
@@ -635,14 +628,15 @@ class DocumentRepository:
         if not lines_data or len(lines_data) < 2:
             return False, "سند باید حداقل 2 سطر داشته باشد"
         
-        total_debit = sum(float(line.get("debit", 0)) for line in lines_data)
-        total_credit = sum(float(line.get("credit", 0)) for line in lines_data)
-        
-        # تلرانس برای خطاهای اعشاری
-        tolerance = 0.01
-        if abs(total_debit - total_credit) > tolerance:
-            diff = total_debit - total_credit
-            return False, f"سند متوازن نیست. تفاوت: {diff:,.2f}"
+        # مقایسه با دقت ریالی تا خطای float مثل 0.0100000002 سند سالم را رد نکند
+        from decimal import Decimal
+
+        debit_d = sum(Decimal(str(line.get("debit", 0) or 0)) for line in lines_data)
+        credit_d = sum(Decimal(str(line.get("credit", 0) or 0)) for line in lines_data)
+        diff_d = (debit_d - credit_d).quantize(Decimal("0.01"))
+        tolerance = Decimal("0.01")
+        if abs(diff_d) > tolerance:
+            return False, f"سند متوازن نیست. تفاوت: {float(diff_d):,.2f}"
         
         # حداقل یک سطر باید بدهکار و یک سطر بستانکار داشته باشد
         has_debit = any(float(line.get("debit", 0)) > 0 for line in lines_data)

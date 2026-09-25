@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import json
+import logging
 from dataclasses import dataclass
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Dict, Optional
 
 import httpx
 from sqlalchemy.orm import Session
@@ -10,7 +11,52 @@ from sqlalchemy.orm import Session
 from app.core.responses import ApiError
 from adapters.db.models.payment_gateway import PaymentGateway
 from adapters.db.models.wallet import WalletTransaction
+from app.services.parsian_gateway import (
+	WALLET_ORDER_BASE,
+	build_startpay_url,
+	callback_paid,
+	confirm_payment,
+	decode_order_id,
+	is_test_token,
+	make_order_id,
+	parse_amount,
+	resolve_login_account,
+	resolve_startpay_base,
+	sale_error_message,
+	sale_payment_request,
+)
 from app.services.wallet_service import confirm_top_up
+
+logger = logging.getLogger(__name__)
+
+_BITPAY_ERROR_MESSAGES: Dict[int, str] = {
+	-1: "کلید API بیت‌پی با نوع درگاه سازگار نیست",
+	-2: "مبلغ نامعتبر است یا کمتر از حداقل مجاز بیت‌پی است",
+	-3: "آدرس بازگشت (callback) نامعتبر است",
+	-4: "درگاه بیت‌پی فعال نیست یا یافت نشد",
+	-5: "شناسه فاکتور تکراری است",
+}
+
+# API بیت‌پی مبلغ را به ریال می‌گیرد. حداقل ۵۰٬۰۰۰ ریال (۵٬۰۰۰ تومان).
+# amount_unit=toman فقط برای درگاه‌هایی است که صریحاً تومان تنظیم شده‌اند.
+_BITPAY_WIRE_MIN = {"toman": 5000, "rial": 50_000}
+_BITPAY_WIRE_MAX = {"toman": 50_000_000, "rial": 500_000_000}
+
+
+def _bitpay_amount_unit(cfg: Dict[str, Any]) -> str:
+	"""واحد ارسال مبلغ به بیت‌پی: rial (پیش‌فرض، مطابق API) یا toman."""
+	raw = str(cfg.get("amount_unit") or cfg.get("currency") or "rial").strip().lower()
+	if raw in ("t", "toman", "irt", "tmn"):
+		return "toman"
+	return "rial"
+
+
+def _bitpay_wire_amount(internal_rial_amount: float, cfg: Dict[str, Any]) -> int:
+	"""تبدیل مبلغ داخلی (ریال حسابیکس) به واحد ارسالی بیت‌پی."""
+	amt = float(internal_rial_amount)
+	if _bitpay_amount_unit(cfg) == "toman":
+		return int(round(amt / 10.0))
+	return int(round(amt))
 
 
 @dataclass
@@ -171,17 +217,19 @@ def _verify_zarinpal(db: Session, params: Dict[str, Any]) -> Dict[str, Any]:
 	fee_amount = None
 	ref_id = None
 	success = False
-	if tx_id > 0 and is_ok:
-		# Load tx and gateway to verify via v4 endpoint
+	tx = None
+	if tx_id > 0:
 		tx = db.query(WalletTransaction).filter(WalletTransaction.id == int(tx_id)).first()
+	if tx_id > 0 and is_ok and tx:
+		# Load gateway to verify via v4 endpoint
 		gateway_id = None
 		try:
-			extra = json.loads(tx.extra_info or "{}") if tx and tx.extra_info else {}
+			extra = json.loads(tx.extra_info or "{}") if tx.extra_info else {}
 			gateway_id = extra.get("gateway_id")
 		except Exception:
 			gateway_id = None
 		gw = db.query(PaymentGateway).filter(PaymentGateway.id == int(gateway_id)).first() if gateway_id else None
-		if tx and gw:
+		if gw:
 			cfg = _load_config(gw)
 			merchant_id = str(cfg.get("merchant_id") or "").strip()
 			if merchant_id:
@@ -219,25 +267,26 @@ def _verify_zarinpal(db: Session, params: Dict[str, Any]) -> Dict[str, Any]:
 			tx.fee_amount = Decimal(str(fee_amount))
 			db.flush()
 		confirm_top_up(db, tx_id, success=(success or is_ok), external_ref=authority or None, user_id=user_id)
-	return {"transaction_id": tx_id, "success": (success or is_ok), "external_ref": authority, "fee_amount": fee_amount, "ref_id": ref_id}
+	amount_out = float(tx.amount or 0) if tx else 0.0
+	return {
+		"transaction_id": tx_id,
+		"success": (success or is_ok),
+		"external_ref": authority,
+		"fee_amount": fee_amount,
+		"ref_id": ref_id,
+		"amount": amount_out,
+	}
 
 
 # --------------------------
 # PARSIAN
 # --------------------------
 def _initiate_parsian(db: Session, gw: PaymentGateway, cfg: Dict[str, Any], business_id: int, tx_id: int, amount: float) -> InitiateResult:
-	"""
-	Minimal integration:
-	- expects cfg fields: terminal_id, merchant_id(optional), callback_url, api_base(optional), startpay_base(optional)
-	- returns token with redirect to StartPay
-	"""
-	terminal_id = str(cfg.get("terminal_id") or "").strip()
+	"""Sale SOAP رسمی پارسیان: LoginAccount=PIN، مبلغ به ریال."""
+	login_account = resolve_login_account(cfg)
 	callback_url = str(cfg.get("callback_url") or "").strip()
-	if not terminal_id or not callback_url:
-		raise ApiError("INVALID_CONFIG", "terminal_id و callback_url الزامی هستند", http_status=400)
-	api_base = str(cfg.get("api_base") or ("https://sandbox.banktest.ir/parsian" if gw.is_sandbox else "https://pec.shaparak.ir"))
-	startpay_base = str(cfg.get("startpay_base") or ("https://sandbox.banktest.ir/parsian/startpay" if gw.is_sandbox else "https://pec.shaparak.ir/NewIPG/?Token"))
-	# append tx_id to callback
+	if not login_account or not callback_url:
+		raise ApiError("INVALID_CONFIG", "شناسه پذیرنده (PIN) و callback_url الزامی هستند", http_status=400)
 	cb_url = callback_url
 	try:
 		from urllib.parse import urlencode, urlparse, parse_qsl, urlunparse
@@ -248,26 +297,26 @@ def _initiate_parsian(db: Session, gw: PaymentGateway, cfg: Dict[str, Any], busi
 	except Exception:
 		cb_url = f"{callback_url}{'&' if '?' in callback_url else '?'}tx_id={tx_id}"
 
+	order_id = make_order_id("wallet", int(tx_id))
+	wire_amount = parse_amount(amount)
 	token: Optional[str] = None
-	try:
-		with httpx.Client(timeout=10.0) as client:
-			# This is a placeholder; real Parsian API may differ
-			resp = client.post(f"{api_base}/SalePaymentRequest", json={
-				"TerminalId": terminal_id,
-				"Amount": int(round(float(amount))),
-				"CallbackUrl": cb_url,
-				"OrderId": tx_id,
-			})
-			data = resp.json() if resp.headers.get("content-type","").startswith("application/json") else {}
-			if (data.get("Status") in (0, "0", 100, "100")) and data.get("Token"):
-				token = str(data["Token"])
-	except Exception:
-		token = token or f"TEST-TOKEN-{tx_id}"
+	sale = sale_payment_request(
+		cfg,
+		is_sandbox=bool(gw.is_sandbox),
+		order_id=order_id,
+		amount=wire_amount,
+		callback_url=cb_url,
+	)
+	if sale.ok and sale.token:
+		token = str(sale.token)
+	elif gw.is_sandbox:
+		logger.warning("parsian_wallet_sandbox_fallback tx_id=%s status=%s", tx_id, sale.status)
+		token = f"TEST-TOKEN-{tx_id}"
+	else:
+		raise ApiError("GATEWAY_INIT_FAILED", sale_error_message(sale), http_status=502)
 
-	if not token:
-		raise ApiError("GATEWAY_INIT_FAILED", "امکان ایجاد تراکنش در پارسیان نیست", http_status=502)
-
-	payment_url = f"{startpay_base}={token}" if "Token" in startpay_base or startpay_base.endswith("=") else f"{startpay_base}/{token}"
+	startpay_base = resolve_startpay_base(cfg, is_sandbox=bool(gw.is_sandbox))
+	payment_url = build_startpay_url(startpay_base, token)
 	_tx = db.query(WalletTransaction).filter(WalletTransaction.id == int(tx_id)).first()
 	if _tx:
 		extra = {}
@@ -280,6 +329,7 @@ def _initiate_parsian(db: Session, gw: PaymentGateway, cfg: Dict[str, Any], busi
 			"provider": "parsian",
 			"token": token,
 			"payment_url": payment_url,
+			"parsian_order_id": order_id,
 		})
 		_tx.external_ref = token
 		_tx.extra_info = json.dumps(extra, ensure_ascii=False)
@@ -288,25 +338,83 @@ def _initiate_parsian(db: Session, gw: PaymentGateway, cfg: Dict[str, Any], busi
 
 
 def _verify_parsian(db: Session, params: Dict[str, Any]) -> Dict[str, Any]:
-	# Params expected: Token, status, tx_id
+	"""تأیید پرداخت پارسیان با همان ConfirmPayment نمونه رسمی درگاه."""
 	token = str(params.get("Token") or params.get("token") or "").strip()
-	status = str(params.get("status") or "").lower()
-	tx_id = int(params.get("tx_id") or 0)
-	success = status in ("ok", "success", "0", "100")
+	cb_status = params.get("status") if params.get("status") is not None else params.get("Status")
+	try:
+		tx_id = int(params.get("tx_id") or 0)
+	except (TypeError, ValueError):
+		tx_id = parse_amount(params.get("tx_id"))
+	if tx_id <= 0:
+		raw_oid = parse_amount(params.get("OrderId") or 0)
+		scope, decoded = decode_order_id(raw_oid)
+		if scope == "wallet" and decoded > 0:
+			tx_id = decoded
+		elif raw_oid > 0 and raw_oid < WALLET_ORDER_BASE:
+			tx_id = raw_oid
+	success = False
 	fee_amount = None
 	user_id = None
+	ref_id = params.get("RRN") or params.get("rrn")
+	card_num = None
+	tx = None
+	extra: Dict[str, Any] = {}
 	if tx_id > 0:
-		# بارگذاری تراکنش برای استخراج user_id
-		from adapters.db.models.wallet import WalletTransaction
 		tx = db.query(WalletTransaction).filter(WalletTransaction.id == int(tx_id)).first()
 		if tx:
 			try:
 				extra = json.loads(tx.extra_info or "{}") if tx.extra_info else {}
 				user_id = extra.get("created_by_user_id")
 			except Exception:
-				pass
-		confirm_top_up(db, tx_id, success=success, external_ref=token or None, user_id=user_id)
-	return {"transaction_id": tx_id, "success": success, "external_ref": token, "fee_amount": fee_amount}
+				extra = {}
+		if not token:
+			token = str((extra.get("token") if extra else None) or (tx.external_ref if tx else "") or "").strip()
+		gateway_id = extra.get("gateway_id") if extra else None
+		gw = db.query(PaymentGateway).filter(PaymentGateway.id == int(gateway_id)).first() if gateway_id else None
+		paid_at_bank = callback_paid(cb_status)
+		callback_rrn = parse_amount(params.get("RRN") or params.get("rrn"))
+		if gw and paid_at_bank and callback_rrn > 0 and token:
+			if gw.is_sandbox and is_test_token(token):
+				success = True
+			else:
+				cfg = _load_config(gw)
+				confirm = confirm_payment(
+					cfg,
+					is_sandbox=bool(gw.is_sandbox),
+					token=token,
+					order_id=parse_amount(params.get("OrderId") or extra.get("parsian_order_id") or make_order_id("wallet", tx_id)),
+					amount=parse_amount(params.get("Amount")) or parse_amount(tx.amount if tx else 0),
+				)
+				success = bool(confirm.ok)
+				if confirm.rrn:
+					ref_id = confirm.rrn
+				card_num = confirm.card_number
+				if extra is not None:
+					extra["parsian_confirm_status"] = confirm.status
+					if confirm.rrn:
+						extra["parsian_rrn"] = confirm.rrn
+					if confirm.card_number:
+						extra["parsian_card"] = confirm.card_number
+					if tx:
+						tx.extra_info = json.dumps(extra, ensure_ascii=False)
+		elif paid_at_bank and gw is None and is_test_token(token):
+			success = True
+		confirm_top_up(db, tx_id, success=success, external_ref=(str(ref_id) if ref_id else token) or None, user_id=user_id)
+	amount_out = 0.0
+	if tx is not None:
+		amount_out = float(tx.amount or 0)
+	cb_amount = parse_amount(params.get("Amount"))
+	if cb_amount > 0:
+		amount_out = float(cb_amount)
+	return {
+		"transaction_id": tx_id,
+		"success": success,
+		"external_ref": (str(ref_id) if ref_id else token) or None,
+		"fee_amount": fee_amount,
+		"ref_id": ref_id,
+		"card_num": card_num,
+		"amount": amount_out,
+	}
 
 
 # --------------------------
@@ -316,7 +424,7 @@ def _initiate_bitpay(db: Session, gw: PaymentGateway, cfg: Dict[str, Any], busin
 	"""
 	BitPay integration:
 	- expects cfg fields: api (52 characters), callback_url (redirect)
-	- amount must be at least 5000 Rials (500 Tomans)
+	- amount_unit (اختیاری): rial (پیش‌فرض، مطابق API بیت‌پی) | toman — مبلغ داخلی همیشه ریال است
 	- returns id_get which is used to build payment URL
 	"""
 	api_key = str(cfg.get("api") or "").strip()
@@ -325,14 +433,25 @@ def _initiate_bitpay(db: Session, gw: PaymentGateway, cfg: Dict[str, Any], busin
 		raise ApiError("INVALID_CONFIG", "api و callback_url الزامی هستند", http_status=400)
 	if len(api_key) != 52:
 		raise ApiError("INVALID_CONFIG", "API key باید 52 کاراکتر باشد", http_status=400)
-	# حداقل مبلغ 5000 ریال
-	if amount < 5000:
-		raise ApiError("INVALID_AMOUNT", "حداقل مبلغ 5000 ریال (500 تومان) است", http_status=400)
+	unit = _bitpay_amount_unit(cfg)
+	wire_amount = _bitpay_wire_amount(amount, cfg)
+	if wire_amount < _BITPAY_WIRE_MIN[unit]:
+		raise ApiError(
+			"INVALID_AMOUNT",
+			"حداقل مبلغ پرداخت ۵۰٬۰۰۰ ریال (۵٬۰۰۰ تومان) است",
+			http_status=400,
+		)
+	if wire_amount > _BITPAY_WIRE_MAX[unit]:
+		raise ApiError(
+			"AMOUNT_TOO_LARGE",
+			"حداکثر مبلغ هر تراکنش در بیت‌پی ۵۰۰٬۰۰۰٬۰۰۰ ریال (۵۰٬۰۰۰٬۰۰۰ تومان) است",
+			http_status=400,
+		)
 	# تعیین URL بر اساس sandbox
 	base_url = "https://bitpay.ir/payment-test" if gw.is_sandbox else "https://bitpay.ir/payment"
 	gateway_send_url = f"{base_url}/gateway-send"
-	# encode کردن callback_url و اضافه کردن tx_id و source
-	from urllib.parse import urlencode, urlparse, parse_qsl, urlunparse, quote
+	# اضافه کردن tx_id و source به callback
+	from urllib.parse import urlencode, urlparse, parse_qsl, urlunparse
 	
 	# استخراج source از extra_info تراکنش
 	source = "app"  # پیش‌فرض
@@ -350,11 +469,8 @@ def _initiate_bitpay(db: Session, gw: PaymentGateway, cfg: Dict[str, Any], busin
 		q["tx_id"] = str(tx_id)
 		q["source"] = source
 		cb_url = urlunparse((u.scheme, u.netloc, u.path, u.params, urlencode(q), u.fragment))
-		# encode کردن کل URL برای BitPay (مطابق مستندات)
-		cb_url = quote(cb_url, safe='')
 	except Exception:
-		cb_url_temp = f"{callback_url}{'&' if '?' in callback_url else '?'}tx_id={tx_id}&source={source}"
-		cb_url = quote(cb_url_temp, safe='')
+		cb_url = f"{callback_url}{'&' if '?' in callback_url else '?'}tx_id={tx_id}&source={source}"
 	# بارگذاری اطلاعات کاربر از تراکنش
 	_tx = db.query(WalletTransaction).filter(WalletTransaction.id == int(tx_id)).first()
 	user_name = None
@@ -375,7 +491,7 @@ def _initiate_bitpay(db: Session, gw: PaymentGateway, cfg: Dict[str, Any], busin
 	data = {
 		"api": api_key,
 		"redirect": cb_url,
-		"amount": int(round(float(amount))),
+		"amount": wire_amount,
 		"factorId": str(tx_id),  # شماره فاکتور
 	}
 	
@@ -387,6 +503,7 @@ def _initiate_bitpay(db: Session, gw: PaymentGateway, cfg: Dict[str, Any], busin
 	# توضیحات از تراکنش
 	data["description"] = str(user_description)
 	id_get: Optional[str] = None
+	response_text = ""
 	try:
 		with httpx.Client(timeout=10.0) as client:
 			# ارسال به صورت form data (نه JSON)
@@ -402,11 +519,28 @@ def _initiate_bitpay(db: Session, gw: PaymentGateway, cfg: Dict[str, Any], busin
 				# اگر عدد نبود، ممکن است خطا باشد
 				id_get = None
 	except Exception as e:
-		# در محیط توسعه، می‌توان یک id_get تستی تولید کرد
+		logger.warning("bitpay_gateway_send_request_failed tx_id=%s amount=%s error=%s", tx_id, amount, e)
 		id_get = None
 	if not id_get:
-		# بررسی خطاهای احتمالی بر اساس مستندات
 		error_msg = "امکان ایجاد تراکنش در بیت‌پی نیست"
+		try:
+			err_code = int(response_text)
+			if err_code < 0:
+				error_msg = _BITPAY_ERROR_MESSAGES.get(err_code, f"خطای بیت‌پی (کد {err_code})")
+				logger.warning(
+					"bitpay_gateway_send_rejected tx_id=%s amount=%s code=%s",
+					tx_id,
+					amount,
+					err_code,
+				)
+		except ValueError:
+			if response_text:
+				logger.warning(
+					"bitpay_gateway_send_unexpected_response tx_id=%s amount=%s response=%s",
+					tx_id,
+					amount,
+					response_text[:200],
+				)
 		raise ApiError("GATEWAY_INIT_FAILED", error_msg, http_status=502)
 	# ساخت لینک پرداخت
 	payment_url = f"{base_url}/gateway-{id_get}-get"
@@ -423,6 +557,8 @@ def _initiate_bitpay(db: Session, gw: PaymentGateway, cfg: Dict[str, Any], busin
 			"provider": "bitpay",
 			"id_get": id_get,
 			"payment_url": payment_url,
+			"bitpay_amount_unit": unit,
+			"bitpay_wire_amount": wire_amount,
 		})
 		_tx.external_ref = id_get
 		_tx.extra_info = json.dumps(extra, ensure_ascii=False)
@@ -544,12 +680,17 @@ def _verify_bitpay(db: Session, params: Dict[str, Any]) -> Dict[str, Any]:
 			pass
 		# به‌روزرسانی fee_amount در صورت وجود (BitPay معمولاً fee را برنمی‌گرداند)
 		confirm_top_up(db, tx_id, success=success, external_ref=id_get, user_id=user_id)
+	if amount is None and tx is not None:
+		try:
+			amount = float(tx.amount or 0)
+		except (TypeError, ValueError):
+			amount = 0.0
 	return {
 		"transaction_id": tx_id,
 		"success": success,
 		"external_ref": id_get,
 		"fee_amount": fee_amount,
-		"amount": amount,
+		"amount": amount if amount is not None else 0.0,
 		"card_num": card_num,
 		"factor_id": factor_id,
 	}

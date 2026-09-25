@@ -26,6 +26,31 @@ class BusinessShellMenuGlyph extends StatelessWidget {
   }
 }
 
+/// آیکن «مرکز تماس» در منوی کناری — بدون وابستگی به فونت MaterialIcons.
+class BusinessShellTelephonyGlyph extends StatelessWidget {
+  const BusinessShellTelephonyGlyph({
+    super.key,
+    required this.color,
+    this.size = 24,
+    this.filled = false,
+  });
+
+  final Color color;
+  final double size;
+  final bool filled;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: size,
+      height: size,
+      child: CustomPaint(
+        painter: _TelephonyGlyphPainter(color: color, filled: filled),
+      ),
+    );
+  }
+}
+
 class BusinessShellStorefrontGlyph extends StatelessWidget {
   const BusinessShellStorefrontGlyph({
     super.key,
@@ -84,6 +109,67 @@ class _MenuGlyphPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _MenuGlyphPainter oldDelegate) =>
       oldDelegate.color != color || oldDelegate.sidebarOpen != sidebarOpen;
+}
+
+class _TelephonyGlyphPainter extends CustomPainter {
+  _TelephonyGlyphPainter({required this.color, required this.filled});
+
+  final Color color;
+  final bool filled;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final sw = (size.shortestSide * 0.085).clamp(1.2, 2.8);
+    final stroke = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = sw
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+
+    final w = size.width;
+    final h = size.height;
+
+    final phone = RRect.fromRectAndRadius(
+      Rect.fromLTWH(w * 0.18, h * 0.16, w * 0.42, h * 0.68),
+      Radius.circular(w * 0.12),
+    );
+    if (filled) {
+      canvas.drawRRect(
+        phone,
+        Paint()
+          ..color = color.withValues(alpha: 0.18)
+          ..style = PaintingStyle.fill,
+      );
+    }
+    canvas.drawRRect(phone, stroke);
+
+    canvas.drawLine(Offset(w * 0.30, h * 0.74), Offset(w * 0.48, h * 0.74), stroke);
+
+    final wave = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = sw
+      ..strokeCap = StrokeCap.round;
+    canvas.drawArc(
+      Rect.fromLTWH(w * 0.56, h * 0.30, w * 0.16, h * 0.20),
+      -0.9,
+      1.4,
+      false,
+      wave,
+    );
+    canvas.drawArc(
+      Rect.fromLTWH(w * 0.66, h * 0.24, w * 0.20, h * 0.28),
+      -0.9,
+      1.4,
+      false,
+      wave,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _TelephonyGlyphPainter oldDelegate) =>
+      oldDelegate.color != color || oldDelegate.filled != filled;
 }
 
 class _StorefrontGlyphPainter extends CustomPainter {

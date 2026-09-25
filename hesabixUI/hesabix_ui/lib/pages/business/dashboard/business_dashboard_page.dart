@@ -44,10 +44,18 @@ class _BusinessDashboardPageState extends State<BusinessDashboardPage> {
   late final FiscalYearController _fiscalController;
   late final BusinessDashboardService _service;
 
+  /// ویجت‌هایی که معمولاً وارد صف پس‌زمینه می‌شوند — جدا از batch سبک لود می‌شوند.
+  static const Set<String> _heavyWidgetKeys = {
+    'top_selling_products',
+    'sales_bar_chart',
+  };
+
   DashboardDefinitionsResponse? _definitions;
   DashboardLayoutProfile? _layout;
   Map<String, dynamic> _data = <String, dynamic>{};
   bool _loading = true;
+  /// تا وقتی دادهٔ ویجت‌ها در حال آمدن است (بعد از paint چیدمان).
+  bool _widgetsLoading = false;
   String? _error;
   bool _editMode = false;
   Timer? _saveDebounce;
@@ -87,21 +95,28 @@ class _BusinessDashboardPageState extends State<BusinessDashboardPage> {
   @override
   void dispose() {
     widget.calendarController?.removeListener(_onCalendarTypeChanged);
+    try {
+      _fiscalController.removeListener(_reloadDataOnly);
+    } catch (_) {}
     _saveDebounce?.cancel();
     super.dispose();
   }
 
   Future<void> _init() async {
     _fiscalController = await FiscalYearController.load(widget.businessId);
-    final fiscalListSvc = BusinessDashboardService(ApiClient());
-    final fiscalYears = await fiscalListSvc.listFiscalYears(widget.businessId);
+    final bootSvc = BusinessDashboardService(ApiClient());
+    // سال مالی و تعاریف ویجت موازی — تعاریف به سال مالی وابسته نیست
+    final boot = await Future.wait<Object>([
+      bootSvc.listFiscalYears(widget.businessId),
+      bootSvc.getWidgetDefinitions(widget.businessId),
+    ]);
+    final fiscalYears = boot[0] as List<Map<String, dynamic>>;
+    final defs = boot[1] as DashboardDefinitionsResponse;
     await _fiscalController.reconcileWithList(fiscalYears);
+    _definitions = defs;
     _service = BusinessDashboardService(ApiClient(), fiscalYearController: _fiscalController);
-    ApiClient.bindFiscalYear(ValueNotifier<int?>(_fiscalController.fiscalYearId));
-    _fiscalController.addListener(() {
-      ApiClient.bindFiscalYear(ValueNotifier<int?>(_fiscalController.fiscalYearId));
-      _reloadDataOnly();
-    });
+    // هدر از FiscalYearController.apiBoundId هم‌زمان می‌شود
+    _fiscalController.addListener(_reloadDataOnly);
     await _loadAll();
   }
 
@@ -192,7 +207,9 @@ class _BusinessDashboardPageState extends State<BusinessDashboardPage> {
     try {
       setState(() {
         _loading = true;
+        _widgetsLoading = false;
         _error = null;
+        _data = <String, dynamic>{};
       });
       final defs = await _definitionsOrLoad();
       if (!context.mounted) return;
@@ -237,24 +254,66 @@ class _BusinessDashboardPageState extends State<BusinessDashboardPage> {
       if (mustPersist) {
         layout = await _service.putLayoutProfile(businessId: widget.businessId, breakpoint: bp, items: items);
       }
-      // فیلتر ویجت‌ها بر اساس دسترسی قبل از درخواست داده
-      final visibleItems = layout.items.where((e) => !e.hidden).toList();
-      final keys = visibleItems.where((item) {
-        // بررسی دسترسی برای هر ویجت
-        final widgetDef = defs.items.firstWhere(
-          (d) => d.key == item.key,
-          orElse: () => DashboardWidgetDefinition(
-            key: item.key,
-            title: item.key,
-            icon: 'widgets',
-            version: 1,
-            permissionsRequired: const [],
-            defaults: const {},
-          ),
-        );
-        return _hasWidgetPermission(widgetDef);
-      }).map((e) => e.key).toList();
-      
+
+      // Progressive paint: چیدمان را فوری نشان بده
+      if (!mounted) return;
+      setState(() {
+        _definitions = defs;
+        _layout = layout;
+        _loading = false;
+        _widgetsLoading = true;
+      });
+
+      final keys = _visiblePermittedKeys(layout, defs);
+      await _fetchWidgetsProgressive(keys);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = ErrorExtractor.forContext(e, context);
+        _loading = false;
+        _widgetsLoading = false;
+      });
+    }
+  }
+
+  List<String> _visiblePermittedKeys(DashboardLayoutProfile layout, DashboardDefinitionsResponse defs) {
+    final visibleItems = layout.items.where((e) => !e.hidden).toList();
+    return visibleItems.where((item) {
+      final widgetDef = defs.items.firstWhere(
+        (d) => d.key == item.key,
+        orElse: () => DashboardWidgetDefinition(
+          key: item.key,
+          title: item.key,
+          icon: 'widgets',
+          version: 1,
+          permissionsRequired: const [],
+          defaults: const {},
+        ),
+      );
+      return _hasWidgetPermission(widgetDef);
+    }).map((e) => e.key).toList();
+  }
+
+  /// ویجت‌های سبک را sync می‌گیرد؛ سنگین‌ها جدا و موازی (ممکن است صف شوند).
+  Future<void> _fetchWidgetsProgressive(List<String> keys) async {
+    if (keys.isEmpty) {
+      if (mounted) setState(() => _widgetsLoading = false);
+      return;
+    }
+    final lightKeys = keys.where((k) => !_heavyWidgetKeys.contains(k)).toList();
+    final heavyKeys = keys.where((k) => _heavyWidgetKeys.contains(k)).toList();
+
+    final tasks = <Future<void>>[
+      if (lightKeys.isNotEmpty) _fetchAndMergeWidgetKeys(lightKeys),
+      if (heavyKeys.isNotEmpty) _fetchAndMergeWidgetKeys(heavyKeys),
+    ];
+    await Future.wait(tasks);
+    if (!mounted) return;
+    setState(() => _widgetsLoading = false);
+  }
+
+  Future<void> _fetchAndMergeWidgetKeys(List<String> keys) async {
+    try {
       final data = await _service.getWidgetsBatchData(
         businessId: widget.businessId,
         widgetKeys: keys,
@@ -262,16 +321,17 @@ class _BusinessDashboardPageState extends State<BusinessDashboardPage> {
       );
       if (!mounted) return;
       setState(() {
-        _definitions = defs;
-        _layout = layout;
-        _data = data;
-        _loading = false;
+        _data = {..._data, ...data};
       });
-    } catch (e) {
+    } catch (_) {
       if (!mounted) return;
+      // جلوگیری از اسپینر بی‌نهایت روی ویجت‌های شکست‌خورده
       setState(() {
-        _error = ErrorExtractor.forContext(e, context);
-        _loading = false;
+        final next = Map<String, dynamic>.from(_data);
+        for (final k in keys) {
+          next.putIfAbsent(k, () => <String, dynamic>{'error': 'load_failed', 'items': const []});
+        }
+        _data = next;
       });
     }
   }
@@ -281,35 +341,12 @@ class _BusinessDashboardPageState extends State<BusinessDashboardPage> {
       final layout = _layout;
       final defs = _definitions;
       if (layout == null || defs == null) return;
-      
-      // فیلتر ویجت‌ها بر اساس دسترسی قبل از درخواست داده
-      final visibleItems = layout.items.where((e) => !e.hidden).toList();
-      final keys = visibleItems.where((item) {
-        // بررسی دسترسی برای هر ویجت
-        final widgetDef = defs.items.firstWhere(
-          (d) => d.key == item.key,
-          orElse: () => DashboardWidgetDefinition(
-            key: item.key,
-            title: item.key,
-            icon: 'widgets',
-            version: 1,
-            permissionsRequired: const [],
-            defaults: const {},
-          ),
-        );
-        return _hasWidgetPermission(widgetDef);
-      }).map((e) => e.key).toList();
-      
-      final data = await _service.getWidgetsBatchData(
-        businessId: widget.businessId,
-        widgetKeys: keys,
-        filters: _dashboardBatchFilters(keys),
-      );
-      if (!mounted) return;
-      setState(() {
-        _data = data;
-      });
-    } catch (_) {}
+      if (mounted) setState(() => _widgetsLoading = true);
+      final keys = _visiblePermittedKeys(layout, defs);
+      await _fetchWidgetsProgressive(keys);
+    } catch (_) {
+      if (mounted) setState(() => _widgetsLoading = false);
+    }
   }
 
   Future<DashboardDefinitionsResponse> _definitionsOrLoad() async {
@@ -414,21 +451,39 @@ class _BusinessDashboardPageState extends State<BusinessDashboardPage> {
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
+    final dashBg = context.shellColors.dashboardBackground;
+    final padding = _getPadding(context);
 
     if (_loading) {
-      return const Center(child: CircularProgressIndicator());
+      return Container(
+        color: dashBg,
+        child: Padding(
+          padding: EdgeInsets.all(padding),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _BusinessDashboardSkeleton.header(context),
+              SizedBox(height: _isMobile(context) ? 12 : 16),
+              Expanded(child: _BusinessDashboardSkeleton.grid(context)),
+            ],
+          ),
+        ),
+      );
     }
     if (_error != null) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.error, size: 56, color: Theme.of(context).colorScheme.error),
-            const SizedBox(height: 12),
-            Text('خطا در بارگذاری داشبورد:\n$_error', textAlign: TextAlign.center),
-            const SizedBox(height: 12),
-            ElevatedButton(onPressed: _loadAll, child: Text(t.retry)),
-          ],
+      return Container(
+        color: dashBg,
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.error, size: 56, color: Theme.of(context).colorScheme.error),
+              const SizedBox(height: 12),
+              Text('خطا در بارگذاری داشبورد:\n$_error', textAlign: TextAlign.center),
+              const SizedBox(height: 12),
+              ElevatedButton(onPressed: _loadAll, child: Text(t.retry)),
+            ],
+          ),
         ),
       );
     }
@@ -437,136 +492,144 @@ class _BusinessDashboardPageState extends State<BusinessDashboardPage> {
     final items = List<DashboardLayoutItem>.from(layout.items)..sort((a, b) => a.order.compareTo(b.order));
     final visible = items.where((e) => !e.hidden).toList();
     final crossAxisCount = layout.columns;
-    final padding = _getPadding(context);
-
-    final dashBg = context.shellColors.dashboardBackground;
 
     return Container(
       color: dashBg,
-      child: Padding(
-        padding: EdgeInsets.all(padding),
-        child: Column(
-          children: [
-            _buildHeaderRow(t),
-          SizedBox(height: _isMobile(context) ? 12 : 16),
-          if (!_editMode)
-            Expanded(
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  final totalWidth = constraints.maxWidth;
-                  final spacing = _getGridSpacing(context);
-                  final minTileUnit = _getMinTileUnit(context);
-                  double unit = (totalWidth - (crossAxisCount - 1) * spacing) / crossAxisCount;
-                  if (unit <= 0) {
-                    unit = minTileUnit;
-                  } else if (unit < minTileUnit) {
-                    unit = minTileUnit;
-                  }
-                  if (unit > 0 && _columnUnitPx != unit) {
-                    _columnUnitPx = unit;
-                  }
-                  final children = <Widget>[];
-                  for (final it in visible) {
-                    final w = (unit * it.colSpan) + spacing * (it.colSpan - 1);
-                    final cw = w > totalWidth ? totalWidth : (w < unit ? unit : w);
-                    children.add(AnimatedContainer(
-                      duration: const Duration(milliseconds: 180),
-                      curve: Curves.easeInOut,
-                      key: ValueKey('dash_item_view_${it.key}'),
-                      width: cw,
-                      child: _buildGridTile(it, crossAxisCount),
-                    ));
-                  }
-                  return SingleChildScrollView(
-                    child: Wrap(
-                      spacing: spacing,
-                      runSpacing: spacing,
-                      children: children,
-                    ),
-                  );
-                },
-              ),
-            )
-          else
-            Expanded(
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  final totalWidth = constraints.maxWidth;
-                  final spacing = _getGridSpacing(context);
-                  final minTileUnit = _getMinTileUnit(context);
-                  double unit = (totalWidth - (crossAxisCount - 1) * spacing) / crossAxisCount;
-                  if (unit <= 0) {
-                    unit = minTileUnit;
-                  } else if (unit < minTileUnit) {
-                    unit = minTileUnit;
-                  }
-                  // ذخیره آخرین اندازه واحد ستون برای رزایز اسنپی
-                  if (unit > 0 && _columnUnitPx != unit) {
-                    _columnUnitPx = unit;
-                  }
-
-                  final children = <Widget>[];
-                  for (final it in visible) {
-                    final w = (unit * it.colSpan) + spacing * (it.colSpan - 1);
-                    final cw = w > totalWidth ? totalWidth : (w < unit ? unit : w);
-                    children.add(AnimatedContainer(
-                      duration: const Duration(milliseconds: 180),
-                      curve: Curves.easeInOut,
-                      key: ValueKey('dash_item_${it.key}'),
-                      width: cw,
-                      child: _buildGridTile(it, crossAxisCount),
-                    ));
-                  }
-
-          return SingleChildScrollView(
-                    child: Stack(
-                      children: [
-                        // خطوط راهنمای ستون‌ها در حالت ویرایش
-                if (_editMode)
-                  SizedBox(
-                            width: totalWidth,
-                            child: CustomPaint(
-                              painter: _GridGuidesPainter(
-                                columns: crossAxisCount,
-                                unitWidth: unit,
-                                spacing: spacing,
-                                color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.06),
-                              ),
-                      child: SizedBox(height: children.isEmpty ? 0 : 1), // ارتفاع حداقلی برای render
+      child: Column(
+        children: [
+          if (_widgetsLoading)
+            LinearProgressIndicator(
+              minHeight: 2,
+              backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+            ),
+          Expanded(
+            child: Padding(
+              padding: EdgeInsets.all(padding),
+              child: Column(
+                children: [
+                  _buildHeaderRow(t),
+                  SizedBox(height: _isMobile(context) ? 12 : 16),
+                  if (!_editMode)
+                    Expanded(
+                      child: LayoutBuilder(
+                        builder: (context, constraints) {
+                          final totalWidth = constraints.maxWidth;
+                          final spacing = _getGridSpacing(context);
+                          final minTileUnit = _getMinTileUnit(context);
+                          double unit = (totalWidth - (crossAxisCount - 1) * spacing) / crossAxisCount;
+                          if (unit <= 0) {
+                            unit = minTileUnit;
+                          } else if (unit < minTileUnit) {
+                            unit = minTileUnit;
+                          }
+                          if (unit > 0 && _columnUnitPx != unit) {
+                            _columnUnitPx = unit;
+                          }
+                          final children = <Widget>[];
+                          for (final it in visible) {
+                            final w = (unit * it.colSpan) + spacing * (it.colSpan - 1);
+                            final cw = w > totalWidth ? totalWidth : (w < unit ? unit : w);
+                            children.add(AnimatedContainer(
+                              duration: const Duration(milliseconds: 180),
+                              curve: Curves.easeInOut,
+                              key: ValueKey('dash_item_view_${it.key}'),
+                              width: cw,
+                              child: _buildGridTile(it, crossAxisCount),
+                            ));
+                          }
+                          return SingleChildScrollView(
+                            child: Wrap(
+                              spacing: spacing,
+                              runSpacing: spacing,
+                              children: children,
                             ),
-                          ),
-                        ReorderableWrap(
-                          spacing: spacing,
-                          runSpacing: spacing,
-                          needsLongPressDraggable: true,
-                          onReorder: (oldIndex, newIndex) {
-                            final list = List<DashboardLayoutItem>.from(visible);
-                            final moved = list.removeAt(oldIndex);
-                            list.insert(newIndex, moved);
-                            final profile = _layout!;
-                            final newItems = <DashboardLayoutItem>[];
-                            final visibleKeys = list.map((e) => e.key).toSet();
-                            newItems.addAll(list);
-                            for (final it in profile.items) {
-                              if (!visibleKeys.contains(it.key) && it.hidden == false) continue;
-                              if (it.hidden) newItems.add(it);
-                            }
-                            _reindexAndSave(newItems);
-                          },
-                          children: children,
-                        ),
-                      ],
+                          );
+                        },
+                      ),
+                    )
+                  else
+                    Expanded(
+                      child: LayoutBuilder(
+                        builder: (context, constraints) {
+                          final totalWidth = constraints.maxWidth;
+                          final spacing = _getGridSpacing(context);
+                          final minTileUnit = _getMinTileUnit(context);
+                          double unit = (totalWidth - (crossAxisCount - 1) * spacing) / crossAxisCount;
+                          if (unit <= 0) {
+                            unit = minTileUnit;
+                          } else if (unit < minTileUnit) {
+                            unit = minTileUnit;
+                          }
+                          // ذخیره آخرین اندازه واحد ستون برای رزایز اسنپی
+                          if (unit > 0 && _columnUnitPx != unit) {
+                            _columnUnitPx = unit;
+                          }
+
+                          final children = <Widget>[];
+                          for (final it in visible) {
+                            final w = (unit * it.colSpan) + spacing * (it.colSpan - 1);
+                            final cw = w > totalWidth ? totalWidth : (w < unit ? unit : w);
+                            children.add(AnimatedContainer(
+                              duration: const Duration(milliseconds: 180),
+                              curve: Curves.easeInOut,
+                              key: ValueKey('dash_item_${it.key}'),
+                              width: cw,
+                              child: _buildGridTile(it, crossAxisCount),
+                            ));
+                          }
+
+                          return SingleChildScrollView(
+                            child: Stack(
+                              children: [
+                                // خطوط راهنمای ستون‌ها در حالت ویرایش
+                                if (_editMode)
+                                  SizedBox(
+                                    width: totalWidth,
+                                    child: CustomPaint(
+                                      painter: _GridGuidesPainter(
+                                        columns: crossAxisCount,
+                                        unitWidth: unit,
+                                        spacing: spacing,
+                                        color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.06),
+                                      ),
+                                      child: SizedBox(height: children.isEmpty ? 0 : 1), // ارتفاع حداقلی برای render
+                                    ),
+                                  ),
+                                ReorderableWrap(
+                                  spacing: spacing,
+                                  runSpacing: spacing,
+                                  needsLongPressDraggable: true,
+                                  onReorder: (oldIndex, newIndex) {
+                                    final list = List<DashboardLayoutItem>.from(visible);
+                                    final moved = list.removeAt(oldIndex);
+                                    list.insert(newIndex, moved);
+                                    final profile = _layout!;
+                                    final newItems = <DashboardLayoutItem>[];
+                                    final visibleKeys = list.map((e) => e.key).toSet();
+                                    newItems.addAll(list);
+                                    for (final it in profile.items) {
+                                      if (!visibleKeys.contains(it.key) && it.hidden == false) continue;
+                                      if (it.hidden) newItems.add(it);
+                                    }
+                                    _reindexAndSave(newItems);
+                                  },
+                                  children: children,
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
                     ),
-                  );
-                },
+                  if (_editMode) ...[
+                    const SizedBox(height: 12),
+                    _buildHiddenSection(),
+                  ],
+                ],
               ),
             ),
-          if (_editMode) ...[
-            const SizedBox(height: 12),
-            _buildHiddenSection(),
-          ],
+          ),
         ],
-      ),
       ),
     );
   }
@@ -3357,5 +3420,75 @@ class _GridGuidesPainter extends CustomPainter {
         oldDelegate.unitWidth != unitWidth ||
         oldDelegate.spacing != spacing ||
         oldDelegate.color != color;
+  }
+}
+
+class _BusinessDashboardSkeleton {
+  static Widget header(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return _DashShimmerBox(height: 28, width: 200, color: cs.surfaceContainerHighest);
+  }
+
+  static Widget grid(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final isMobile = ResponsiveHelper.isMobile(context);
+    final count = isMobile ? 3 : 4;
+    return Column(
+      children: List.generate(count, (i) {
+        return Padding(
+          padding: EdgeInsets.only(bottom: i < count - 1 ? 12 : 0),
+          child: _DashShimmerBox(height: isMobile ? 140 : 180, color: cs.surfaceContainerHighest),
+        );
+      }),
+    );
+  }
+}
+
+class _DashShimmerBox extends StatefulWidget {
+  final double height;
+  final double? width;
+  final Color color;
+
+  const _DashShimmerBox({required this.height, required this.color, this.width});
+
+  @override
+  State<_DashShimmerBox> createState() => _DashShimmerBoxState();
+}
+
+class _DashShimmerBoxState extends State<_DashShimmerBox> with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(vsync: this, duration: const Duration(milliseconds: 1200))
+      ..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) {
+        return Opacity(
+          opacity: 0.45 + _controller.value * 0.35,
+          child: child,
+        );
+      },
+      child: Container(
+        height: widget.height,
+        width: widget.width ?? double.infinity,
+        decoration: BoxDecoration(
+          color: widget.color,
+          borderRadius: BorderRadius.circular(12),
+        ),
+      ),
+    );
   }
 }

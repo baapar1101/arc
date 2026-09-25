@@ -51,6 +51,34 @@ async def create_expense_income_endpoint(
 
 
 @router.post(
+    "/businesses/{business_id}/expense-income/bulk-upsert",
+    summary="ایجاد/ویرایش گروهی هزینه و درآمد",
+    description=(
+        "بدنه: `{ items:[{client_ref?, document_id?, payload}], migration_mode? }`؛ "
+        "حداکثر ۲۰۰ آیتم؛ payload همان بدنه ایجاد تکی است."
+    ),
+)
+@require_business_access("business_id")
+async def bulk_upsert_expense_income_endpoint(
+    request: Request,
+    business_id: int,
+    body: Dict[str, Any] = Body(...),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+):
+    from app.services.expense_income_bulk_upsert_service import (
+        bulk_upsert_expense_income_integration,
+    )
+
+    data = bulk_upsert_expense_income_integration(db, business_id, ctx, body)
+    return success_response(
+        data=data,
+        request=request,
+        message="BULK_EXPENSE_INCOME_UPSERT_COMPLETED",
+    )
+
+
+@router.post(
     "/businesses/{business_id}/expense-income",
     summary="لیست اسناد هزینه/درآمد",
     description="دریافت لیست اسناد هزینه/درآمد با جستجو و صفحه‌بندی",

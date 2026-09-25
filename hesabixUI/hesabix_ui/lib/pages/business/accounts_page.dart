@@ -7,6 +7,7 @@ import 'package:hesabix_ui/core/auth_store.dart';
 import 'package:hesabix_ui/services/account_service.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/snackbar_helper.dart';
+import '../../utils/tree_level_colors.dart';
 
 
 class AccountNode {
@@ -371,6 +372,109 @@ class _AccountsPageState extends State<AccountsPage> {
 		});
 	}
 
+	Widget _buildTreeRow({
+		required AppLocalizations t,
+		required AccountNode node,
+		required int level,
+		required bool isExpanded,
+		required bool canExpand,
+	}) {
+		final cs = Theme.of(context).colorScheme;
+		final levelStyle = TreeLevelColors.styleFor(context, level);
+		final titleStyle = TextStyle(
+			fontWeight: canExpand ? FontWeight.w600 : FontWeight.w400,
+		);
+		final typeStyle = TextStyle(
+			fontSize: 12,
+			color: cs.onSurfaceVariant,
+		);
+
+		return Material(
+			color: levelStyle.backgroundColor,
+			child: InkWell(
+				onTap: canExpand ? () => _toggleExpand(node) : null,
+				child: DecoratedBox(
+					decoration: BoxDecoration(
+						border: BorderDirectional(
+							start: BorderSide(
+								color: levelStyle.accentColor,
+								width: TreeLevelColors.accentBarWidth,
+							),
+							bottom: BorderSide(
+								color: cs.outlineVariant.withValues(alpha: 0.12),
+							),
+						),
+					),
+					child: Padding(
+						padding: const EdgeInsetsDirectional.only(end: 12, top: 6, bottom: 6),
+						child: Row(
+							children: [
+								SizedBox(width: levelStyle.indent),
+								SizedBox(
+									width: 28,
+									child: canExpand
+										? IconButton(
+											padding: EdgeInsets.zero,
+											iconSize: 20,
+											visualDensity: VisualDensity.compact,
+											icon: Icon(isExpanded ? Icons.expand_more : Icons.chevron_right),
+											onPressed: () => _toggleExpand(node),
+										)
+										: const SizedBox.shrink(),
+								),
+								if (node.businessId == null)
+									SizedBox(
+										width: 20,
+										child: Icon(Icons.lock_outline, size: 16, color: cs.onSurfaceVariant),
+									),
+								Expanded(
+									flex: 2,
+									child: Text(node.code, style: titleStyle),
+								),
+								Expanded(flex: 5, child: Text(node.name, style: titleStyle)),
+								Expanded(
+									flex: 3,
+									child: Text(_localizedAccountType(t, node.accountType), style: typeStyle),
+								),
+								SizedBox(
+									width: 40,
+									child: PopupMenuButton<String>(
+										padding: EdgeInsets.zero,
+										onSelected: (v) {
+											if (v == 'add_child') _openCreateDialog(parent: node);
+											if (v == 'edit') _openEditDialog(node);
+											if (v == 'delete') _confirmDelete(node);
+										},
+										itemBuilder: (context) {
+											final bool isOwned = node.businessId != null && node.businessId == widget.businessId;
+											final bool canEdit = isOwned;
+											final bool canDelete = isOwned && !node.hasChildren;
+											final bool canAddChild = widget.authStore.canWriteSection('accounting') && ((node.businessId == null && node.hasChildren) || isOwned);
+											final List<PopupMenuEntry<String>> items = <PopupMenuEntry<String>>[];
+											if (canAddChild) {
+												items.add(const PopupMenuItem<String>(value: 'add_child', child: Text('افزودن ریز حساب')));
+											}
+											if (canEdit) {
+												items.add(const PopupMenuItem<String>(value: 'edit', child: Text('ویرایش')));
+											}
+											if (canDelete) {
+												items.add(const PopupMenuItem<String>(value: 'delete', child: Text('حذف')));
+											}
+											if (items.isEmpty) {
+												return [const PopupMenuItem<String>(value: 'noop', enabled: false, child: Text('غیرقابل ویرایش'))];
+											}
+											return items;
+										},
+									),
+								),
+							],
+						),
+					),
+				),
+			),
+		);
+	}
+
 	Future<void> _openEditDialog(AccountNode node) async {
 		final t = AppLocalizations.of(context);
 		final codeCtrl = TextEditingController(text: node.code);
@@ -643,63 +747,12 @@ class _AccountsPageState extends State<AccountsPage> {
 								final level = item.level;
 								final isExpanded = _expandedIds.contains(node.id);
 								final canExpand = node.hasChildren;
-								return InkWell(
-									onTap: canExpand ? () => _toggleExpand(node) : null,
-									child: Container(
-										padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-										child: Row(
-											children: [
-												SizedBox(width: 12.0 * level),
-												SizedBox(
-													width: 28,
-													child: canExpand
-														? IconButton(
-															padding: EdgeInsets.zero,
-															iconSize: 20,
-															visualDensity: VisualDensity.compact,
-															icon: Icon(isExpanded ? Icons.expand_more : Icons.chevron_right),
-															onPressed: () => _toggleExpand(node),
-														)
-														: const SizedBox.shrink(),
-												),
-												if (node.businessId == null) const SizedBox(width: 20, child: Icon(Icons.lock_outline, size: 16)),
-												Expanded(flex: 2, child: Text(node.code, style: const TextStyle(fontFeatures: []))),
-												Expanded(flex: 5, child: Text(node.name)),
-												Expanded(flex: 3, child: Text(_localizedAccountType(t, node.accountType))),
-												SizedBox(
-													width: 40,
-													child: PopupMenuButton<String>(
-														padding: EdgeInsets.zero,
-														onSelected: (v) {
-															if (v == 'add_child') _openCreateDialog(parent: node);
-															if (v == 'edit') _openEditDialog(node);
-															if (v == 'delete') _confirmDelete(node);
-														},
-														itemBuilder: (context) {
-															final bool isOwned = node.businessId != null && node.businessId == widget.businessId;
-															final bool canEdit = isOwned;
-															final bool canDelete = isOwned && !node.hasChildren;
-															final bool canAddChild = widget.authStore.canWriteSection('accounting') && ((node.businessId == null && node.hasChildren) || isOwned);
-															final List<PopupMenuEntry<String>> items = <PopupMenuEntry<String>>[];
-															if (canAddChild) {
-																items.add(const PopupMenuItem<String>(value: 'add_child', child: Text('افزودن ریز حساب')));
-															}
-															if (canEdit) {
-																items.add(const PopupMenuItem<String>(value: 'edit', child: Text('ویرایش')));
-															}
-															if (canDelete) {
-																items.add(const PopupMenuItem<String>(value: 'delete', child: Text('حذف')));
-															}
-															if (items.isEmpty) {
-																return [const PopupMenuItem<String>(value: 'noop', enabled: false, child: Text('غیرقابل ویرایش'))];
-															}
-															return items;
-														},
-													),
-												),
-											],
-										),
-									),
+								return _buildTreeRow(
+									t: t,
+									node: node,
+									level: level,
+									isExpanded: isExpanded,
+									canExpand: canExpand,
 								);
 							},
 						),

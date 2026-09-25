@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../constants/report_template_constants.dart';
+import '../../core/business_named_route_locations.dart';
 import '../../core/api_client.dart';
 import '../../core/auth_store.dart';
 import '../../l10n/app_localizations.dart';
@@ -16,6 +17,7 @@ import '../../utils/snackbar_helper.dart';
 import '../../widgets/loading_indicator.dart';
 import '../../widgets/permission/permission_widgets.dart';
 import '../../widgets/report_template/embedded_pdf_iframe.dart';
+import '../../core/hesabix_back.dart';
 
 /// Pre-filled content when opening the HTML editor from Studio (advanced mode).
 class ReportTemplateHtmlEditorSeed {
@@ -106,6 +108,14 @@ class _ReportTemplateHtmlEditorPageState extends State<ReportTemplateHtmlEditorP
     _moduleKey = widget.moduleKey ?? widget.seed?.moduleKey ?? 'invoices';
     _subtype = widget.subtype ?? widget.seed?.subtype ?? 'list';
     _convertFromStudio = widget.seed?.convertFromStudio ?? false;
+    if (_moduleKey == 'invoices' && _subtype == 'receipt') {
+      _paperSize = '80mm';
+      _orientation = 'portrait';
+      _marginTopCtrl.text = '3';
+      _marginRightCtrl.text = '2';
+      _marginBottomCtrl.text = '4';
+      _marginLeftCtrl.text = '2';
+    }
     _bootstrap();
   }
 
@@ -231,11 +241,17 @@ class _ReportTemplateHtmlEditorPageState extends State<ReportTemplateHtmlEditorP
   }
 
   List<DropdownMenuItem<String>> _paperSizeDropdownItems(String? current) {
-    final items = List<String>.from(kReportTemplatePaperSizeOptions);
+    final items = List<String>.from(
+      (_moduleKey == 'invoices' && _subtype == 'receipt')
+          ? kInvoiceReceiptPaperSizeOptions
+          : kReportTemplatePaperSizeOptions,
+    );
     if (current != null && current.isNotEmpty && !items.contains(current)) {
       items.insert(0, current);
     }
-    return items.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList();
+    return items
+        .map((e) => DropdownMenuItem(value: e, child: Text(reportTemplatePaperSizeLabel(e))))
+        .toList();
   }
 
   Future<bool> _confirmDiscard() async {
@@ -252,6 +268,19 @@ class _ReportTemplateHtmlEditorPageState extends State<ReportTemplateHtmlEditorP
       ),
     );
     return ok == true;
+  }
+
+  void _navigateBackAfterSave() {
+    if (!mounted) return;
+    if (context.canPop()) {
+      context.pop(true);
+      return;
+    }
+    BusinessNamedRoutes.goNamed(
+      context,
+      businessId: widget.businessId,
+      routeName: 'business_report_templates',
+    );
   }
 
   Future<void> _save() async {
@@ -311,7 +340,7 @@ class _ReportTemplateHtmlEditorPageState extends State<ReportTemplateHtmlEditorP
       _lastSavedFingerprint = _fingerprint();
       if (mounted) {
         SnackBarHelper.show(context, message: t.save);
-        context.pop(true);
+        _navigateBackAfterSave();
       }
     } catch (e) {
       if (mounted) {
@@ -409,21 +438,12 @@ class _ReportTemplateHtmlEditorPageState extends State<ReportTemplateHtmlEditorP
     final t = AppLocalizations.of(context);
     final title = widget.isNew ? t.reportTemplateNewHtml : t.reportTemplateEdit;
 
-    return PopScope(
-      canPop: false,
-      onPopInvokedWithResult: (didPop, result) async {
-        if (didPop) return;
-        if (await _confirmDiscard() && context.mounted) context.pop();
-      },
+    return HesabixBackInterceptor(
+      onWillPop: _confirmDiscard,
       child: Scaffold(
         appBar: AppBar(
           title: Text(title),
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back_ios_new),
-            onPressed: () async {
-              if (await _confirmDiscard() && mounted) context.pop();
-            },
-          ),
+          leading: hesabixBackAppBarLeading(context, businessId: widget.businessId),
           actions: [
             if (_convertFromStudio)
               const Padding(

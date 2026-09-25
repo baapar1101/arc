@@ -3,19 +3,20 @@ import 'dart:convert';
 import 'dart:math' as math;
 import 'dart:ui' show FontFeature;
 import 'package:flutter/foundation.dart';
-import 'package:file_saver/file_saver.dart';
 import 'package:flutter/material.dart';
 import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:data_table_2/data_table_2.dart';
 import 'package:dio/dio.dart';
-import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
 import 'package:hesabix_ui/services/report_template_service.dart';
 import 'package:hesabix_ui/services/list_filter_preferences_service.dart';
+import 'package:hesabix_ui/services/bytes_export/bytes_export_service.dart';
+import 'package:hesabix_ui/services/business_storage_service.dart';
+import 'package:hesabix_ui/services/job_service.dart';
 import 'data_table_config.dart';
 import 'data_table_search_dialog.dart';
 import 'column_settings_dialog.dart';
@@ -24,6 +25,8 @@ import 'helpers/column_settings_service.dart';
 import '../../utils/error_extractor.dart';
 import '../../utils/responsive_helper.dart';
 import '../../utils/snackbar_helper.dart';
+import '../../core/hesabix_back.dart';
+import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
 
 /// مقایسهٔ مقدارمحور [additionalParams] تا با rebuild والد که هر بار Map جدید می‌سازد،
 /// بارگذاری بی‌دلیل تکرار نشود؛ فقط وقتی محتوا عوض شده باشد refetch می‌شود.
@@ -911,8 +914,15 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
 
       // Extract summary from API response if available
       Map<String, dynamic>? summaryData;
+      Map<String, dynamic>? responseDataMap;
       if (body['data'] is Map<String, dynamic>) {
-        summaryData = body['data']['summary'] as Map<String, dynamic>?;
+        responseDataMap = Map<String, dynamic>.from(body['data'] as Map);
+        summaryData = responseDataMap['summary'] as Map<String, dynamic>?;
+        if (summaryData == null && responseDataMap['status_counts'] is Map) {
+          summaryData = {
+            'status_counts': responseDataMap['status_counts'],
+          };
+        }
       }
 
       if (mounted) {
@@ -929,6 +939,9 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
           _lastSelectedRowIndex = null;
         });
         _notifyTableDataChanged();
+        if (responseDataMap != null) {
+          widget.config.onResponseData?.call(responseDataMap);
+        }
       }
 
       // Auto-fit columns on first load if configured
@@ -1236,6 +1249,20 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
         _columnDateFromValues.isNotEmpty;
   }
 
+  bool _columnHasActiveFilter(String columnKey) {
+    if (_columnSearchValues.containsKey(columnKey) ||
+        (_columnMultiSelectValues[columnKey]?.isNotEmpty ?? false) ||
+        (_columnDateFromValues[columnKey] != null &&
+            _columnDateToValues[columnKey] != null)) {
+      return true;
+    }
+    // ستون category_name فیلتر درختی را زیر کلید category_id ذخیره می‌کند
+    if (columnKey == 'category_name') {
+      return _columnMultiSelectValues['category_id']?.isNotEmpty ?? false;
+    }
+    return false;
+  }
+
   void _clearAllFilters() {
     _persistTableFiltersDebounce?.cancel();
     if (_tableFiltersPersistenceEnabled) {
@@ -1452,6 +1479,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
     required bool selectedOnly,
     required Map<String, dynamic> mergedBodyParams,
     int? pdfTemplateId,
+    String? endpointOverride,
   }) async {
     return _runExport(
       format,
@@ -1459,6 +1487,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
       mergedBodyParamsOverride: mergedBodyParams,
       useGetExportParams: false,
       pdfTemplateOverride: pdfTemplateId,
+      endpointOverride: endpointOverride,
     );
   }
 
@@ -1468,8 +1497,10 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
     Map<String, dynamic>? mergedBodyParamsOverride,
     required bool useGetExportParams,
     int? pdfTemplateOverride,
+    String? endpointOverride,
   }) async {
-    if (widget.config.excelEndpoint == null &&
+    if (endpointOverride == null &&
+        widget.config.excelEndpoint == null &&
         widget.config.pdfEndpoint == null) {
       return false;
     }
@@ -1482,9 +1513,10 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
 
     try {
       final api = ApiClient();
-      final endpoint = format == 'excel'
-          ? widget.config.excelEndpoint!
-          : widget.config.pdfEndpoint!;
+      final endpoint = endpointOverride ??
+          (format == 'excel'
+              ? widget.config.excelEndpoint!
+              : widget.config.pdfEndpoint!);
 
       // Build QueryInfo object
       final filters = <Map<String, dynamic>>[];
@@ -1517,11 +1549,37 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
         }
       });
 
+      // خروجی «همه»: کل نتایج فیلترشده (نه فقط صفحه فعلی جدول).
+      // خروجی «انتخاب‌شده»: همان صفحه فعلی — ایندکس‌های انتخاب نسبت به صفحه هستند.
+      const exportAllTake = 10000;
+      final inventoryAsOfDate =
+          widget.config.additionalParams?['inventory_as_of_date'] as String?;
+
+      final columnsToShow =
+          widget.config.enableColumnSettings && _visibleColumns.isNotEmpty
+          ? _visibleColumns
+          : widget.config.columns;
+      final dataColumnsToShow = columnsToShow
+          .where((c) => c is! ActionColumn)
+          .toList();
+
+      // فقط وقتی ستون‌های موجودی در خروجی هستند، موجودی را محاسبه کن
+      const inventoryExportKeys = {
+        'inventory_stock_warehouse',
+        'inventory_stock_accounting',
+        'inventory_stock_physical',
+        'inventory_stock_financial',
+        'warehouse_recharge',
+      };
+      final needsInventory = dataColumnsToShow.any(
+        (c) => inventoryExportKeys.contains(c.key),
+      );
+
       final queryInfo = <String, dynamic>{
         'sort_by': _sortBy,
         'sort_desc': _sortDesc,
-        'take': _limit,
-        'skip': (_page - 1) * _limit,
+        'take': selectedOnly ? _limit : exportAllTake,
+        'skip': selectedOnly ? (_page - 1) * _limit : 0,
         'search': _searchCtrl.text.isNotEmpty ? _searchCtrl.text : null,
         'search_fields':
             _searchCtrl.text.isNotEmpty && widget.config.searchFields.isNotEmpty
@@ -1529,6 +1587,12 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
             : null,
         'filters': filters.isNotEmpty ? filters : null,
       };
+      if (needsInventory) {
+        queryInfo['include_inventory'] = true;
+        if (inventoryAsOfDate != null && inventoryAsOfDate.isNotEmpty) {
+          queryInfo['inventory_as_of_date'] = inventoryAsOfDate;
+        }
+      }
       if (_multiSort.isNotEmpty) {
         queryInfo['sort'] = _multiSort
             .map((s) => <String, dynamic>{'by': s.by, 'desc': s.desc})
@@ -1554,13 +1618,6 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
         } catch (_) {}
       }
 
-      final columnsToShow =
-          widget.config.enableColumnSettings && _visibleColumns.isNotEmpty
-          ? _visibleColumns
-          : widget.config.columns;
-      final dataColumnsToShow = columnsToShow
-          .where((c) => c is! ActionColumn)
-          .toList();
       params['export_columns'] = dataColumnsToShow
           .map((c) => {'key': c.key, 'label': c.label})
           .toList();
@@ -1579,77 +1636,125 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
         params.addAll(mergedBodyParamsOverride);
       }
 
+      final exportHeaders = <String, dynamic>{
+        'X-Calendar-Type': (() {
+          final cc = widget.calendarController;
+          if (cc != null) {
+            return cc.isJalali ? 'jalali' : 'gregorian';
+          }
+          final pref = _exportCalendarType;
+          if (pref == 'jalali' || pref == 'gregorian') return pref;
+          final loc = Localizations.localeOf(context);
+          final lang = (loc.languageCode).toLowerCase();
+          return (lang == 'fa') ? 'jalali' : 'gregorian';
+        })(),
+        'Accept-Language': (() {
+          final loc = Localizations.localeOf(context);
+          final lang = loc.languageCode;
+          final country = loc.countryCode;
+          return (country != null && country.isNotEmpty)
+              ? '$lang-$country'
+              : lang;
+        })(),
+      };
+
+      // خروجی کامل Excel کالاها (و جداول مشابه): جاب پس‌زمینه
+      final useAsyncExcel = format == 'excel' &&
+          !selectedOnly &&
+          widget.config.preferAsyncExcelExport &&
+          (widget.config.businessId != null);
+
+      if (useAsyncExcel) {
+        params['async'] = true;
+        final enqueueRes = await api.post<Map<String, dynamic>>(
+          endpoint,
+          data: {...queryInfo, ...params},
+          options: Options(
+            headers: exportHeaders,
+            receiveTimeout: const Duration(minutes: 2),
+            sendTimeout: const Duration(minutes: 1),
+          ),
+          responseType: ResponseType.json,
+        );
+        final payload = enqueueRes.data;
+        Map<String, dynamic>? data;
+        if (payload is Map<String, dynamic>) {
+          final raw = payload['data'];
+          if (raw is Map<String, dynamic>) {
+            data = raw;
+          } else if (raw is Map) {
+            data = raw.cast<String, dynamic>();
+          } else if (payload['job_id'] != null) {
+            data = payload;
+          }
+        }
+        final jobId = data?['job_id']?.toString();
+        if (jobId == null || jobId.isEmpty) {
+          throw StateError(t.exportError);
+        }
+
+        final poll = await JobService(apiClient: api).pollUntilComplete(
+          jobId,
+          interval: const Duration(seconds: 1),
+          timeout: const Duration(minutes: 25),
+        );
+        if (!poll.isSuccess) {
+          throw StateError(poll.errorMessage ?? t.exportError);
+        }
+        final result = poll.result ?? const <String, dynamic>{};
+        final fileId = (result['file_id'] ??
+                (result['file'] is Map ? result['file']['file_id'] : null))
+            ?.toString();
+        if (fileId == null || fileId.isEmpty) {
+          throw StateError(t.exportError);
+        }
+        final filename = (result['filename'] as String?) ??
+            'export_${DateTime.now().millisecondsSinceEpoch}.xlsx';
+        final bizId = widget.config.businessId!;
+        final bytes = await BusinessStorageService(api).downloadFile(
+          businessId: bizId,
+          fileId: fileId,
+        );
+        if (bytes.isEmpty) {
+          throw StateError(t.exportError);
+        }
+        final exportResult = await BytesExportService.export(
+          bytes: bytes,
+          filename: filename,
+          mimeType:
+              'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        );
+        if (mounted) {
+          BytesExportService.showFeedback(context, exportResult);
+        }
+        return exportResult.isSuccess;
+      }
+
       final response = await api.post(
         endpoint,
         data: {...queryInfo, ...params},
         options: Options(
-          headers: {
-            'X-Calendar-Type': (() {
-              final cc = widget.calendarController;
-              if (cc != null) {
-                return cc.isJalali ? 'jalali' : 'gregorian';
-              }
-              final pref = _exportCalendarType;
-              if (pref == 'jalali' || pref == 'gregorian') return pref;
-              final loc = Localizations.localeOf(context);
-              final lang = (loc.languageCode).toLowerCase();
-              return (lang == 'fa') ? 'jalali' : 'gregorian';
-            })(),
-            'Accept-Language': (() {
-              final loc = Localizations.localeOf(context);
-              final lang = loc.languageCode;
-              final country = loc.countryCode;
-              return (country != null && country.isNotEmpty)
-                  ? '$lang-$country'
-                  : lang;
-            })(),
-          },
+          headers: exportHeaders,
+          // خروجی‌های سنگین (Excel/PDF) ممکن است چند دقیقه طول بکشند
+          receiveTimeout: const Duration(minutes: 5),
+          sendTimeout: const Duration(minutes: 2),
         ),
         responseType: ResponseType.bytes,
       );
 
       if (response.data != null) {
-        String? contentDisposition = response.headers.value(
-          'content-disposition',
+        final ext = format == 'pdf' ? 'pdf' : 'xlsx';
+        final result = await BytesExportService.exportResponse(
+          response: response,
+          fallbackBaseName:
+              'export_${DateTime.now().millisecondsSinceEpoch}',
+          fallbackExt: ext,
         );
-        String filename =
-            'export_${DateTime.now().millisecondsSinceEpoch}.${format == 'pdf' ? 'pdf' : 'xlsx'}';
-        if (contentDisposition != null) {
-          try {
-            final parts = contentDisposition.split(';').map((s) => s.trim());
-            for (final p in parts) {
-              if (p.toLowerCase().startsWith('filename=')) {
-                var name = p.substring('filename='.length).trim();
-                if (name.startsWith('"') &&
-                    name.endsWith('"') &&
-                    name.length >= 2) {
-                  name = name.substring(1, name.length - 1);
-                }
-                if (name.isNotEmpty) {
-                  filename = name;
-                }
-                break;
-              }
-            }
-          } catch (_) {
-            // Fallback to default filename
-          }
-        }
-        final expectedExt = format == 'pdf' ? '.pdf' : '.xlsx';
-        if (!filename.toLowerCase().endsWith(expectedExt)) {
-          filename = '$filename$expectedExt';
-        }
-
-        if (format == 'pdf') {
-          await _downloadPdf(response.data, filename);
-        } else if (format == 'excel') {
-          await _downloadExcel(response.data, filename);
-        }
 
         if (mounted) {
-          SnackBarHelper.showSuccess(context, message: t.exportSuccess);
+          BytesExportService.showFeedback(context, result);
         }
-        return true;
+        return result.isSuccess;
       }
       return false;
     } catch (e) {
@@ -1690,44 +1795,6 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
       if (v != null && '$v'.isNotEmpty) out[k] = v;
     }
     return out;
-  }
-
-  // Cross-platform save using conditional FileSaver
-  Future<void> _saveBytesToDownloads(dynamic data, String filename) async {
-    Uint8List bytes;
-    if (data is List<int>) {
-      bytes = Uint8List.fromList(data);
-    } else if (data is Uint8List) {
-      bytes = data;
-    } else {
-      throw Exception('Unsupported binary data type: ${data.runtimeType}');
-    }
-
-    // Use file_saver package for cross-platform file saving
-    try {
-      final fileSaver = FileSaver.instance;
-      final extension = filename.split('.').last;
-      await fileSaver.saveFile(name: filename, bytes: bytes, ext: extension);
-    } catch (e) {
-      rethrow;
-    }
-  }
-
-  // Platform-specific download functions for Linux
-  Future<void> _downloadPdf(dynamic data, String filename) async {
-    try {
-      await _saveBytesToDownloads(data, filename);
-    } catch (e) {
-      rethrow;
-    }
-  }
-
-  Future<void> _downloadExcel(dynamic data, String filename) async {
-    try {
-      await _saveBytesToDownloads(data, filename);
-    } catch (e) {
-      rethrow;
-    }
   }
 
   // Cache for measured text widths to reduce TextPainter.layout calls
@@ -1953,6 +2020,10 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
                 const ClearSelectionIntent(),
             LogicalKeySet(LogicalKeyboardKey.keyA, LogicalKeyboardKey.control):
                 const SelectAllIntent(),
+            if (widget.config.onRowShortcutReply != null)
+              LogicalKeySet(LogicalKeyboardKey.keyR): const ReplyRowIntent(),
+            if (widget.config.onRowShortcutAssign != null)
+              LogicalKeySet(LogicalKeyboardKey.keyA): const AssignRowIntent(),
           },
           child: Actions(
             actions: <Type, Action<Intent>>{
@@ -1978,6 +2049,28 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
                       _activeRowIndex < _items.length &&
                       widget.config.onRowTap != null) {
                     widget.config.onRowTap!(_items[_activeRowIndex]);
+                  }
+                  return null;
+                },
+              ),
+              ReplyRowIntent: CallbackAction<ReplyRowIntent>(
+                onInvoke: (intent) {
+                  if (_searchFocusNode.hasFocus) return null;
+                  if (_activeRowIndex >= 0 &&
+                      _activeRowIndex < _items.length &&
+                      widget.config.onRowShortcutReply != null) {
+                    widget.config.onRowShortcutReply!(_items[_activeRowIndex]);
+                  }
+                  return null;
+                },
+              ),
+              AssignRowIntent: CallbackAction<AssignRowIntent>(
+                onInvoke: (intent) {
+                  if (_searchFocusNode.hasFocus) return null;
+                  if (_activeRowIndex >= 0 &&
+                      _activeRowIndex < _items.length &&
+                      widget.config.onRowShortcutAssign != null) {
+                    widget.config.onRowShortcutAssign!(_items[_activeRowIndex]);
                   }
                   return null;
                 },
@@ -2066,20 +2159,9 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
 
     return Row(
       children: [
-        if (widget.config.showBackButton) ...[
-          Tooltip(
-            message: MaterialLocalizations.of(context).backButtonTooltip,
-            child: IconButton(
-              onPressed:
-                  widget.config.onBack ??
-                  () {
-                    if (!mounted) return;
-                    if (context.canPop()) {
-                      context.pop();
-                    }
-                  },
-              icon: const Icon(Icons.arrow_back),
-            ),
+        if (widget.config.showBackButton && shouldShowHesabixBackButton()) ...[
+          HesabixBackButton(
+            businessId: widget.config.businessId,
           ),
           const SizedBox(width: 8),
         ],
@@ -2228,8 +2310,8 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
                 value: 'refresh',
                 child: Row(
                   children: [
-                    const Icon(Icons.refresh, size: 20),
-                    const SizedBox(width: 8),
+                    Icon(Icons.refresh, size: 20),
+                    SizedBox(width: 8),
                     Text(t.refresh),
                   ],
                 ),
@@ -2241,8 +2323,8 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
                 enabled: !_isExporting,
                 child: Row(
                   children: [
-                    Icon(Icons.table_chart, size: 20, color: Colors.green[700]),
-                    const SizedBox(width: 8),
+                    Icon(Icons.table_chart, size: 20, color: SemanticColorResolver.positive(context)),
+                    SizedBox(width: 8),
                     Text(t.exportToExcel),
                     const SizedBox(width: 6),
                     Text('(${t.exportAll})', style: theme.textTheme.bodySmall),
@@ -2258,9 +2340,9 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
                       Icon(
                         Icons.table_chart_outlined,
                         size: 20,
-                        color: Colors.green[700],
+                        color: SemanticColorResolver.positive(context),
                       ),
-                      const SizedBox(width: 8),
+                      SizedBox(width: 8),
                       Text(t.exportToExcel),
                       const SizedBox(width: 6),
                       Text(
@@ -2281,9 +2363,9 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
                     Icon(
                       Icons.picture_as_pdf,
                       size: 20,
-                      color: Colors.red[700],
+                      color: SemanticColorResolver.negative(context),
                     ),
-                    const SizedBox(width: 8),
+                    SizedBox(width: 8),
                     Text(t.exportToPdf),
                     const SizedBox(width: 6),
                     Text('(${t.exportAll})', style: theme.textTheme.bodySmall),
@@ -2299,7 +2381,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
                       Icon(
                         Icons.picture_as_pdf_outlined,
                         size: 20,
-                        color: Colors.red[700],
+                        color: SemanticColorResolver.negative(context),
                       ),
                       const SizedBox(width: 8),
                       Text(t.exportToPdf),
@@ -2542,12 +2624,12 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
                       color: theme.colorScheme.onSurfaceVariant,
                     ),
                   ),
-                  const SizedBox(height: 8),
+                  SizedBox(height: 8),
                   if (widget.config.excelEndpoint != null)
                     ListTile(
                       leading: Icon(
                         Icons.table_chart,
-                        color: Colors.green[700],
+                        color: SemanticColorResolver.positive(context),
                       ),
                       title: Text(t.exportToExcel),
                       subtitle: Text(t.exportAll),
@@ -2564,7 +2646,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
                     ListTile(
                       leading: Icon(
                         Icons.table_chart_outlined,
-                        color: Colors.green[700],
+                        color: SemanticColorResolver.positive(context),
                       ),
                       title: Text(t.exportToExcel),
                       subtitle: Text(t.exportSelected),
@@ -2579,7 +2661,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
                     ListTile(
                       leading: Icon(
                         Icons.picture_as_pdf,
-                        color: Colors.red[700],
+                        color: SemanticColorResolver.negative(context),
                       ),
                       title: Text(t.exportToPdf),
                       subtitle: Text(t.exportAll),
@@ -2596,7 +2678,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
                     ListTile(
                       leading: Icon(
                         Icons.picture_as_pdf_outlined,
-                        color: Colors.red[700],
+                        color: SemanticColorResolver.negative(context),
                       ),
                       title: Text(t.exportToPdf),
                       subtitle: Text(t.exportSelected),
@@ -2869,7 +2951,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
                                     });
                                     ensureTemplatesLoaded();
                                   },
-                            icon: const Icon(Icons.refresh),
+                            icon: Icon(Icons.refresh),
                           ),
                         ],
                       ),
@@ -2881,7 +2963,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
                 // Excel options
                 if (widget.config.excelEndpoint != null) ...[
                   ListTile(
-                    leading: Icon(Icons.table_chart, color: Colors.green[600]),
+                    leading: Icon(Icons.table_chart, color: SemanticColorResolver.positive(context)),
                     title: Text(t.exportToExcel),
                     subtitle: Text(t.exportAll),
                     onTap: () {
@@ -2912,7 +2994,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
                     const Divider(height: 1),
 
                   ListTile(
-                    leading: Icon(Icons.picture_as_pdf, color: Colors.red[600]),
+                    leading: Icon(Icons.picture_as_pdf, color: SemanticColorResolver.negative(context)),
                     title: Text(t.exportToPdf),
                     subtitle: Text(t.exportAll),
                     onTap: () {
@@ -3555,7 +3637,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
             onSearch: widget.config.showColumnSearch && column.searchable
                 ? () => _openColumnSearchDialog(column.key, column.label)
                 : () {},
-            hasActiveFilter: _columnSearchValues.containsKey(column.key),
+            hasActiveFilter: _columnHasActiveFilter(column.key),
             enabled: widget.config.enableSorting && column.sortable,
             onResizeDrag: widget.config.enableColumnSettings
                 ? (dx) {
@@ -4014,7 +4096,18 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
 
     // 4) Fallback: get property value from Map items by key
     final value = DataTableUtils.getCellValue(item, column.key);
-    final formattedValue = DataTableUtils.formatCellValue(value, column);
+    final rawValue = column is DateColumn
+        ? DataTableUtils.getCellValue(item, '${column.key}_raw')
+        : null;
+    final isJalali = widget.calendarController?.isJalali ??
+        ApiClient.getCalendarController()?.isJalali ??
+        false;
+    final formattedValue = DataTableUtils.formatCellValue(
+      value,
+      column,
+      isJalali: isJalali,
+      rawValue: rawValue,
+    );
     final overflow = _getOverflow(column);
     final align = _getTextAlign(column);
     final textWidget = Text(
@@ -4656,6 +4749,14 @@ class ClearSelectionIntent extends Intent {
 
 class SelectAllIntent extends Intent {
   const SelectAllIntent();
+}
+
+class ReplyRowIntent extends Intent {
+  const ReplyRowIntent();
+}
+
+class AssignRowIntent extends Intent {
+  const AssignRowIntent();
 }
 
 class _SortSpec {
