@@ -35,8 +35,8 @@ InputDecorationTheme appInputDecorationTheme(
     focusedErrorBorder: focusedError,
     filled: true,
     fillColor: _isDark(scheme)
-        ? Colors.white.withValues(alpha: 0.055)
-        : Colors.white.withValues(alpha: 0.72),
+        ? Colors.white.withValues(alpha: 0.045)
+        : Colors.white.withValues(alpha: 0.42),
     hintStyle: textTheme.bodyMedium?.copyWith(
       color: scheme.onSurfaceVariant.withValues(alpha: 0.72),
     ),
@@ -143,8 +143,8 @@ TextButtonThemeData appTextButtonTheme(
 
 AppBarTheme appAppBarTheme(ColorScheme scheme, TextTheme textTheme) => AppBarTheme(
       backgroundColor: _isDark(scheme)
-          ? const Color(0xB30F172A)
-          : const Color(0xCCFFFFFF),
+          ? const Color(0x73111827)
+          : const Color(0x80FFFFFF),
       foregroundColor: scheme.onSurface,
       surfaceTintColor: Colors.transparent,
       elevation: 0,
@@ -163,8 +163,8 @@ CardThemeData appCardTheme(ColorScheme scheme, AppRadii radii) => CardThemeData(
       margin: EdgeInsets.zero,
       surfaceTintColor: Colors.transparent,
       color: _isDark(scheme)
-          ? Colors.white.withValues(alpha: 0.075)
-          : Colors.white.withValues(alpha: 0.78),
+          ? Colors.white.withValues(alpha: 0.065)
+          : Colors.white.withValues(alpha: 0.50),
       shadowColor: Colors.black.withValues(alpha: 0.22),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
@@ -193,8 +193,8 @@ ListTileThemeData appListTileTheme(ColorScheme scheme, TextTheme textTheme) => L
 NavigationRailThemeData appNavigationRailTheme(ColorScheme scheme, TextTheme textTheme) =>
     NavigationRailThemeData(
       backgroundColor: _isDark(scheme)
-          ? const Color(0x99111827)
-          : const Color(0xCCFFFFFF),
+          ? const Color(0x66111827)
+          : const Color(0x73FFFFFF),
       indicatorColor: scheme.primary.withValues(alpha: 0.18),
       selectedIconTheme: IconThemeData(color: scheme.primary, size: 20),
       unselectedIconTheme: IconThemeData(color: scheme.onSurfaceVariant, size: 20),
@@ -234,8 +234,11 @@ IconButtonThemeData appIconButtonTheme(ColorScheme scheme) => IconButtonThemeDat
 DialogThemeData appDialogTheme(ColorScheme scheme, AppRadii radii, TextTheme textTheme) =>
     DialogThemeData(
       backgroundColor: _isDark(scheme)
-          ? const Color(0x8A111827)
-          : const Color(0xB8FFFFFF),
+          ? const Color(0x7A111827)
+          : const Color(0xA3FFFFFF),
+      barrierColor: _isDark(scheme)
+          ? const Color(0xA8000000)
+          : const Color(0x660F172A),
       surfaceTintColor: Colors.transparent,
       elevation: 12,
       shadowColor: Colors.black.withValues(alpha: 0.35),
