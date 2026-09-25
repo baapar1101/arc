@@ -68,12 +68,109 @@ class AppTheme {
         textStyle: textTheme.bodySmall?.copyWith(color: scheme.onInverseSurface),
       ),
       popupMenuTheme: PopupMenuThemeData(
-        color: isDark ? const Color(0xB8111827) : const Color(0xC9FFFFFF),
+        color: isDark ? const Color(0x8F111827) : const Color(0xA6FFFFFF),
         surfaceTintColor: Colors.transparent,
         elevation: 12,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
           side: BorderSide(color: scheme.onSurface.withValues(alpha: 0.10)),
+        ),
+      ),
+      menuTheme: MenuThemeData(
+        style: MenuStyle(
+          backgroundColor: WidgetStatePropertyAll(
+            isDark ? const Color(0x8F111827) : const Color(0xA6FFFFFF),
+          ),
+          surfaceTintColor: const WidgetStatePropertyAll(Colors.transparent),
+          elevation: const WidgetStatePropertyAll(12),
+          shape: WidgetStatePropertyAll(
+            RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: BorderSide(
+                color: scheme.onSurface.withValues(alpha: 0.10),
+              ),
+            ),
+          ),
+        ),
+      ),
+      dropdownMenuTheme: DropdownMenuThemeData(
+        inputDecorationTheme: appInputDecorationTheme(scheme, radii, textTheme),
+        menuStyle: MenuStyle(
+          backgroundColor: WidgetStatePropertyAll(
+            isDark ? const Color(0x8F111827) : const Color(0xA6FFFFFF),
+          ),
+          surfaceTintColor: const WidgetStatePropertyAll(Colors.transparent),
+          elevation: const WidgetStatePropertyAll(12),
+          shape: WidgetStatePropertyAll(
+            RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: BorderSide(
+                color: scheme.onSurface.withValues(alpha: 0.10),
+              ),
+            ),
+          ),
+        ),
+      ),
+      drawerTheme: DrawerThemeData(
+        backgroundColor:
+            isDark ? const Color(0x8A111827) : const Color(0xA6FFFFFF),
+        surfaceTintColor: Colors.transparent,
+        elevation: 12,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(18),
+          side: BorderSide(
+            color: scheme.onSurface.withValues(alpha: 0.10),
+          ),
+        ),
+      ),
+      navigationDrawerTheme: NavigationDrawerThemeData(
+        backgroundColor:
+            isDark ? const Color(0x80111827) : const Color(0x99FFFFFF),
+        surfaceTintColor: Colors.transparent,
+        elevation: 8,
+        indicatorColor: scheme.primary.withValues(alpha: 0.16),
+      ),
+      searchBarTheme: SearchBarThemeData(
+        backgroundColor: WidgetStatePropertyAll(
+          isDark ? const Color(0x66111827) : const Color(0x80FFFFFF),
+        ),
+        surfaceTintColor: const WidgetStatePropertyAll(Colors.transparent),
+        elevation: const WidgetStatePropertyAll(0),
+        side: WidgetStatePropertyAll(
+          BorderSide(
+            color: scheme.onSurface.withValues(alpha: 0.12),
+          ),
+        ),
+        shape: WidgetStatePropertyAll(
+          RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
+        ),
+      ),
+      datePickerTheme: DatePickerThemeData(
+        backgroundColor:
+            isDark ? const Color(0x8F111827) : const Color(0xA6FFFFFF),
+        surfaceTintColor: Colors.transparent,
+        elevation: 12,
+        headerBackgroundColor: scheme.primary.withValues(alpha: 0.14),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(18),
+          side: BorderSide(
+            color: scheme.onSurface.withValues(alpha: 0.10),
+          ),
+        ),
+      ),
+      timePickerTheme: TimePickerThemeData(
+        backgroundColor:
+            isDark ? const Color(0xA6111827) : const Color(0xB8FFFFFF),
+        elevation: 12,
+        dialBackgroundColor: scheme.onSurface.withValues(alpha: 0.07),
+        hourMinuteColor: scheme.onSurface.withValues(alpha: 0.07),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(18),
+          side: BorderSide(
+            color: scheme.onSurface.withValues(alpha: 0.10),
+          ),
         ),
       ),
       bottomSheetTheme: BottomSheetThemeData(
@@ -94,7 +191,7 @@ class AppTheme {
         ),
       ),
       navigationBarTheme: NavigationBarThemeData(
-        backgroundColor: isDark ? const Color(0x8F111827) : const Color(0x99FFFFFF),
+        backgroundColor: isDark ? const Color(0x73111827) : const Color(0x80FFFFFF),
         indicatorColor: scheme.primary.withValues(alpha: 0.18),
         surfaceTintColor: Colors.transparent,
       ),
