@@ -90,8 +90,8 @@ class AppShellColors extends ThemeExtension<AppShellColors> {
   static AppShellColors fromScheme(ColorScheme scheme, {required bool isDark}) {
     return AppShellColors(
       topBarBackground: isDark
-          ? const Color(0xB30F172A)
-          : const Color(0xCCFFFFFF),
+          ? const Color(0x73111827)
+          : const Color(0x80FFFFFF),
       topBarForeground: scheme.onSurface,
       dashboardBackground: Colors.transparent,
     );
