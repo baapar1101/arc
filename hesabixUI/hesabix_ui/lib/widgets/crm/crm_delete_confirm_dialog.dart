@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 
 /// تأیید حذف یکسان برای ماژول CRM (آیکن، هشدار ثانویه، دکمهٔ خطر).
@@ -8,7 +9,7 @@ Future<bool?> showCrmDeleteConfirmDialog(
   required String message,
   String? irreversibleOverride,
 }) {
-  return showDialog<bool>(
+  return showGlassDialog<bool>(
     context: context,
     builder: (ctx) {
       final theme = Theme.of(ctx);

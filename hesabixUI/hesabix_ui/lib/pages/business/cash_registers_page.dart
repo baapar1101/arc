@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/core/api_client.dart';
@@ -296,7 +297,7 @@ class _CashRegistersPageState extends State<CashRegistersPage> {
 	}
 
 	void _add() async {
-		await showDialog<bool>(
+		await showGlassDialog<bool>(
 			context: context,
 			builder: (ctx) => CashRegisterFormDialog(
 				businessId: widget.businessId,
@@ -308,7 +309,7 @@ class _CashRegistersPageState extends State<CashRegistersPage> {
 	}
 
 	void _edit(CashRegister row) async {
-		await showDialog<bool>(
+		await showGlassDialog<bool>(
 			context: context,
 			builder: (ctx) => CashRegisterFormDialog(
 				businessId: widget.businessId,
@@ -322,7 +323,7 @@ class _CashRegistersPageState extends State<CashRegistersPage> {
 
 	Future<void> _delete(CashRegister row) async {
 		final t = AppLocalizations.of(context);
-		final confirm = await showDialog<bool>(
+		final confirm = await showGlassDialog<bool>(
 			context: context,
 			builder: (ctx) => AlertDialog(
 				title: Text(t.delete),
@@ -373,7 +374,7 @@ class _CashRegistersPageState extends State<CashRegistersPage> {
 				}
 			}
 			if (ids.isEmpty) return;
-			final confirm = await showDialog<bool>(
+			final confirm = await showGlassDialog<bool>(
 				context: context,
 				builder: (ctx) => AlertDialog(
 					title: Text(t.deleteSelected),

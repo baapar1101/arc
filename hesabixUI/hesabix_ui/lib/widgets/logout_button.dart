@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:go_router/go_router.dart';
 
 import '../core/auth_store.dart';
@@ -11,7 +12,7 @@ class LogoutButton extends StatelessWidget {
 
   Future<void> _confirmAndLogout(BuildContext context) async {
     final t = AppLocalizations.of(context);
-    final bool? ok = await showDialog<bool>(
+    final bool? ok = await showGlassDialog<bool>(
       context: context,
       builder: (ctx) {
         return AlertDialog(

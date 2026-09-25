@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/services.dart';
 import '../widgets/ping_pong/ping_pong_dialog.dart';
 import '../widgets/memorial/hesabix_developers_memorial_dialog.dart';
@@ -323,7 +324,7 @@ class _KeyboardShortcutListenerState extends State<KeyboardShortcutListener> {
         }
       }
 
-      showDialog<void>(
+      showGlassDialog<void>(
         context: dialogContext,
         barrierDismissible: barrierDismissible,
         useRootNavigator: true,

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:go_router/go_router.dart';
 import '../../services/warehouse_service.dart';
@@ -63,7 +64,7 @@ class _WarehouseDocsPageState extends State<WarehouseDocsPage> {
   }
 
   Future<void> _onAddNew() async {
-    final wizardResult = await showDialog<WarehouseDocWizardResult>(
+    final wizardResult = await showGlassDialog<WarehouseDocWizardResult>(
       context: context,
       builder: (_) => WarehouseDocWizardDialog(
         businessId: widget.businessId,
@@ -73,7 +74,7 @@ class _WarehouseDocsPageState extends State<WarehouseDocsPage> {
     );
     if (wizardResult == null) return;
     if (wizardResult.isManual) {
-      await showDialog(
+      await showGlassDialog(
         context: context,
         builder: (_) => WarehouseDocumentFormDialog(
           businessId: widget.businessId,
@@ -101,7 +102,7 @@ class _WarehouseDocsPageState extends State<WarehouseDocsPage> {
     }
 
     try {
-      final result = await showDialog<bool>(
+      final result = await showGlassDialog<bool>(
         context: context,
         barrierDismissible: false,
         builder: (context) => WarehouseDocumentFormDialog(
@@ -139,7 +140,7 @@ class _WarehouseDocsPageState extends State<WarehouseDocsPage> {
       }
     }
 
-    showDialog(
+    showGlassDialog(
       context: context,
       barrierDismissible: false,
       builder: (_) => const Center(child: CircularProgressIndicator()),
@@ -175,7 +176,7 @@ class _WarehouseDocsPageState extends State<WarehouseDocsPage> {
         );
         return;
       }
-      await showDialog(
+      await showGlassDialog(
         context: context,
         builder: (_) => WarehouseDocumentFormDialog(
           businessId: widget.businessId,
@@ -317,7 +318,7 @@ class _WarehouseDocsPageState extends State<WarehouseDocsPage> {
     AppLocalizations t,
   ) async {
     if (doc.id == null) return;
-    final confirm = await showDialog<bool>(
+    final confirm = await showGlassDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(t.deleteWarehouseDocument),
@@ -373,7 +374,7 @@ class _WarehouseDocsPageState extends State<WarehouseDocsPage> {
       return;
     }
 
-    final confirm = await showDialog<bool>(
+    final confirm = await showGlassDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(t.deleteWarehouseDocument),
@@ -475,7 +476,7 @@ class _WarehouseDocsPageState extends State<WarehouseDocsPage> {
                 label: t.viewWarehouseDocument,
                 onTap: (item) {
                   if (item is WarehouseDocument && item.id != null) {
-                    showDialog(
+                    showGlassDialog(
                       context: context,
                       builder: (_) => WarehouseDocumentDetailsDialog(
                         businessId: widget.businessId,
@@ -655,7 +656,7 @@ class _WarehouseDocsPageState extends State<WarehouseDocsPage> {
           ],
           onRowTap: (item) {
             if (item is WarehouseDocument && item.id != null) {
-              showDialog(
+              showGlassDialog(
                 context: context,
                 builder: (_) => WarehouseDocumentDetailsDialog(
                   businessId: widget.businessId,

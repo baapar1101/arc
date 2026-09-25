@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/core/auth_store.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
@@ -361,7 +362,7 @@ class _ProjectsPageState extends State<ProjectsPage> {
   }
 
   void _onAddProject() async {
-    final result = await showDialog<bool>(
+    final result = await showGlassDialog<bool>(
       context: context,
       builder: (context) => ProjectFormDialog(
         businessId: widget.businessId,
@@ -386,7 +387,7 @@ class _ProjectsPageState extends State<ProjectsPage> {
       
       if (!mounted) return;
       
-      showDialog(
+      showGlassDialog(
         context: context,
         builder: (context) => AlertDialog(
           title: Text('جزئیات پروژه: ${result['project']['name']}'),
@@ -452,7 +453,7 @@ class _ProjectsPageState extends State<ProjectsPage> {
       
       if (!mounted) return;
       
-      final result = await showDialog<bool>(
+      final result = await showGlassDialog<bool>(
         context: context,
         builder: (context) => ProjectFormDialog(
           businessId: widget.businessId,
@@ -482,7 +483,7 @@ class _ProjectsPageState extends State<ProjectsPage> {
     final projectId = item.id;
     final projectName = item.name;
 
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showGlassDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('حذف پروژه'),
@@ -522,7 +523,7 @@ class _ProjectsPageState extends State<ProjectsPage> {
   }
 
   void _onBulkDelete(List<dynamic> selectedItems) async {
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showGlassDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('حذف گروهی'),
