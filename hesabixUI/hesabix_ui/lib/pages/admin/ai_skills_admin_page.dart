@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
@@ -75,7 +76,7 @@ class _AISkillsAdminPageState extends State<AISkillsAdminPage> {
 
   Future<void> _reject(int packageId) async {
     final reasonCtrl = TextEditingController();
-    final ok = await showDialog<bool>(
+    final ok = await showGlassDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('رد مهارت'),

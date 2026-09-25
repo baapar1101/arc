@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import '../../core/auth_store.dart';
 import '../../widgets/permission/access_denied_page.dart';
@@ -183,7 +184,7 @@ class _WalletPageState extends State<WalletPage> {
     int? bankId;
     final amountCtrl = TextEditingController();
     final descCtrl = TextEditingController();
-    final result = await showDialog<bool>(
+    final result = await showGlassDialog<bool>(
       context: context,
       builder: (ctx) {
         return AlertDialog(
@@ -287,7 +288,7 @@ class _WalletPageState extends State<WalletPage> {
 
   Future<void> _cancelBusinessPayout(int payoutId) async {
     final t = AppLocalizations.of(context);
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showGlassDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(t.walletPayoutCancelRequest),

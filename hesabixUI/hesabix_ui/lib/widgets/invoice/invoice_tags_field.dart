@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hesabix_ui/theme/glass.dart';
 import '../../core/api_client.dart';
 import '../../models/invoice_tag_ref.dart';
 import '../../utils/error_extractor.dart';
@@ -68,7 +69,7 @@ class _InvoiceTagsFieldState extends State<InvoiceTagsField> {
 
   Future<void> _createTag() async {
     final ctrl = TextEditingController();
-    final name = await showDialog<String>(
+    final name = await showGlassDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('برچسب جدید'),

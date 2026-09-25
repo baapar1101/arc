@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/services.dart';
 import '../../core/api_client.dart';
 import '../../core/calendar_controller.dart';
@@ -59,7 +60,7 @@ class _ApiKeysPageState extends State<ApiKeysPage> {
   }
 
   Future<void> _createApiKey() async {
-    final result = await showDialog<Map<String, dynamic>>(
+    final result = await showGlassDialog<Map<String, dynamic>>(
       context: context,
       builder: (context) => _CreateApiKeyDialog(calendarController: widget.calendarController),
     );
@@ -96,7 +97,7 @@ class _ApiKeysPageState extends State<ApiKeysPage> {
 
   Future<void> _showApiKeyDialog(String apiKey) async {
     final t = AppLocalizations.of(context);
-    return showDialog(
+    return showGlassDialog(
       context: context,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -172,7 +173,7 @@ class _ApiKeysPageState extends State<ApiKeysPage> {
   }
 
   Future<void> _editApiKey(Map<String, dynamic> apiKey) async {
-    final result = await showDialog<Map<String, dynamic>>(
+    final result = await showGlassDialog<Map<String, dynamic>>(
       context: context,
       builder: (context) => _EditApiKeyDialog(
         apiKey: apiKey,
@@ -211,7 +212,7 @@ class _ApiKeysPageState extends State<ApiKeysPage> {
   Future<void> _deleteApiKey(Map<String, dynamic> apiKey) async {
     final t = AppLocalizations.of(context);
     final keyName = apiKey['name'] ?? t.apiKeyWithoutName;
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showGlassDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),

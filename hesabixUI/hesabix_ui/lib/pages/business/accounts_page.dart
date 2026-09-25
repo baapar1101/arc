@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/core/auth_store.dart';
@@ -218,7 +219,7 @@ class _AccountsPageState extends State<AccountsPage> {
 		String? selectedType;
 		String? selectedParentId = parent?.id;
 		final parents = _flattenNodes();
-		final result = await showDialog<bool>(
+		final result = await showGlassDialog<bool>(
 			context: context,
 			builder: (ctx) {
 				return AlertDialog(
@@ -377,7 +378,7 @@ class _AccountsPageState extends State<AccountsPage> {
 		String? selectedType = node.accountType;
 		final parents = _flattenNodes();
 		String? selectedParentId;
-		final result = await showDialog<bool>(
+		final result = await showGlassDialog<bool>(
 			context: context,
 			builder: (ctx) {
 				return AlertDialog(
@@ -465,7 +466,7 @@ class _AccountsPageState extends State<AccountsPage> {
 		final t = AppLocalizations.of(context);
 		final id = int.tryParse(node.id);
 		if (id == null) return;
-		final ok = await showDialog<bool>(
+		final ok = await showGlassDialog<bool>(
 			context: context,
 			builder: (ctx) => AlertDialog(
 				title: Text(t.delete),

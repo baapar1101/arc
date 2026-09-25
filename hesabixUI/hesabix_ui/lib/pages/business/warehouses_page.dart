@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:go_router/go_router.dart';
 import '../../services/errors/api_error.dart';
 import '../../services/warehouse_service.dart';
@@ -158,7 +159,7 @@ class _WarehousesPageState extends State<WarehousesPage> {
   }
 
   Future<void> _delete(Warehouse w) async {
-    final ok = await showDialog<bool>(
+    final ok = await showGlassDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('حذف انبار'),
