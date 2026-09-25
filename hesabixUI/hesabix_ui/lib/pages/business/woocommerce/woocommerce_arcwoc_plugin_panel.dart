@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:hesabix_ui/theme/glass.dart';
 
 import '../../../core/auth_store.dart';
 import '../../../l10n/app_localizations.dart';
@@ -143,7 +144,7 @@ class _WooArcwocPluginSettingsPanelState
     required String title,
     required String body,
   }) async {
-    final r = await showDialog<bool>(
+    final r = await showGlassDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(title),

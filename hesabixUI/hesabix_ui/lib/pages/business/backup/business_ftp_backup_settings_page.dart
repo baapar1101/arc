@@ -3,6 +3,7 @@ import 'dart:async';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/services/business_ftp_backup_service.dart';
@@ -232,7 +233,7 @@ class _BusinessFtpBackupSettingsPageState extends State<BusinessFtpBackupSetting
 
   Future<void> _delete() async {
     final t = AppLocalizations.of(context);
-    final ok = await showDialog<bool>(
+    final ok = await showGlassDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(t.ftpDeleteSettingsConfirmTitle),
@@ -384,7 +385,7 @@ class _BusinessFtpBackupSettingsPageState extends State<BusinessFtpBackupSetting
 
   void _showResultDialog(String title, String body) {
     final t = AppLocalizations.of(context);
-    showDialog<void>(
+    showGlassDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(title),

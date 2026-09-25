@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/auth_store.dart';
@@ -138,7 +139,7 @@ class _WoocommercePluginSettingsBodyState
           context,
           message: t.woocommerceConnectionTestSuccess,
         );
-        await showDialog<void>(
+        await showGlassDialog<void>(
           context: context,
           builder: (ctx) {
             final remote = data['remote'];
