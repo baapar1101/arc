@@ -36,62 +36,76 @@ jobs:
           git remote remove upstream 2>/dev/null || true
           git remote add upstream https://source.hesabix.ir/hesabix/arc.git
           git fetch upstream master --tags --prune
-          git fetch origin upstream-snapshot:refs/remotes/origin/upstream-snapshot 2>/dev/null || true
 
-      - name: Apply upstream changes selectively
+      - name: Merge upstream while preserving custom UI
         shell: bash
         run: |
           set -euo pipefail
           git checkout master
 
-          NEW_UPSTREAM="$(git rev-parse upstream/master)"
-          if git show-ref --verify --quiet refs/remotes/origin/upstream-snapshot; then
-            OLD_UPSTREAM="$(git rev-parse refs/remotes/origin/upstream-snapshot)"
-          else
-            echo "No upstream baseline exists yet."
-            echo "Initializing upstream-snapshot at ${NEW_UPSTREAM}."
-            git branch -f upstream-snapshot "${NEW_UPSTREAM}"
-            git push --force origin upstream-snapshot
+          if git merge-base --is-ancestor upstream/master HEAD; then
+            echo "Already contains current upstream master."
             exit 0
           fi
 
-          if [[ "${OLD_UPSTREAM}" == "${NEW_UPSTREAM}" ]]; then
-            echo "No new upstream commits."
+          LOCAL_HEAD="$(git rev-parse HEAD)"
+          UPSTREAM_HEAD="$(git rev-parse upstream/master)"
+          CUSTOM_BASE="dfa3c1ad6bcf378e2c986987db4d4fbd792a2b0d"
+
+          echo "Merging upstream ${UPSTREAM_HEAD} into ${LOCAL_HEAD}"
+          set +e
+          git merge --no-ff --no-commit upstream/master
+          MERGE_RC=$?
+          set -e
+
+          mapfile -t CONFLICTS < <(git diff --name-only --diff-filter=U)
+          echo "Conflict count: ${#CONFLICTS[@]}"
+
+          for file in "${CONFLICTS[@]}"; do
+            keep_local="false"
+
+            case "$file" in
+              .github/*|\
+              hesabixUI/hesabix_ui/lib/theme/*|\
+              hesabixUI/hesabix_ui/lib/pages/login_page.dart|\
+              hesabixUI/hesabix_ui/lib/main.dart|\
+              hesabixUI/hesabix_ui/web/index.html|\
+              hesabixUI/hesabix_ui/lib/widgets/auth_footer.dart)
+                keep_local="true"
+                ;;
+            esac
+
+            # Any file changed by the recent custom UI/glass work is treated
+            # as part of the local visual overlay when it conflicts.
+            if git cat-file -e "${CUSTOM_BASE}^{commit}" 2>/dev/null && \
+               ! git diff --quiet "${CUSTOM_BASE}" "${LOCAL_HEAD}" -- "$file"; then
+              keep_local="true"
+            fi
+
+            if [[ "$keep_local" == "true" ]]; then
+              echo "KEEP LOCAL: $file"
+              git checkout --ours -- "$file"
+            else
+              echo "TAKE UPSTREAM: $file"
+              git checkout --theirs -- "$file"
+            fi
+            git add -- "$file"
+          done
+
+          if git diff --name-only --diff-filter=U | grep -q .; then
+            echo "::error::Unresolved merge conflicts remain."
+            git diff --name-only --diff-filter=U
+            exit 1
+          fi
+
+          if git diff --cached --quiet; then
+            echo "Merge produced no tree changes."
+            git merge --abort 2>/dev/null || true
             exit 0
           fi
 
-          echo "Applying upstream delta ${OLD_UPSTREAM}..${NEW_UPSTREAM}"
-
-          # Keep the custom visual layer owned by this fork. Everything else
-          # is updated from the upstream delta. git apply --3way preserves
-          # local edits where possible and fails rather than silently
-          # overwriting a conflicting customization.
-          git diff --binary "${OLD_UPSTREAM}" "${NEW_UPSTREAM}" -- . \
-            ':(exclude).github/**' \
-            ':(exclude)hesabixUI/hesabix_ui/lib/theme/**' \
-            ':(exclude)hesabixUI/hesabix_ui/lib/pages/login_page.dart' \
-            ':(exclude)hesabixUI/hesabix_ui/lib/main.dart' \
-            ':(exclude)hesabixUI/hesabix_ui/web/index.html' \
-            ':(exclude)hesabixUI/hesabix_ui/lib/widgets/auth_footer.dart' \
-            > /tmp/hesabix-upstream.patch
-
-          if [[ -s /tmp/hesabix-upstream.patch ]]; then
-            if ! git apply --3way --index /tmp/hesabix-upstream.patch; then
-              echo "::error::Upstream changes conflict with local code. No partial sync will be pushed."
-              git status --short
-              exit 1
-            fi
-
-            if ! git diff --cached --quiet; then
-              git commit -m "Sync Hesabix upstream ${OLD_UPSTREAM:0:12}..${NEW_UPSTREAM:0:12}"
-              git push origin master
-            fi
-          else
-            echo "Upstream changed only protected visual/deployment files."
-          fi
-
-          git branch -f upstream-snapshot "${NEW_UPSTREAM}"
-          git push --force origin upstream-snapshot
+          git commit -m "Merge Hesabix upstream ${UPSTREAM_HEAD:0:12} preserving custom UI"
+          git push origin master
 
       - name: Push upstream tags
         if: success()
