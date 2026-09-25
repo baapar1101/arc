@@ -247,6 +247,38 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
     }
   }
 
+  int _tabIndexForKind(_LoginTabKind kind) {
+    if (_registrationEnabled) {
+      switch (kind) {
+        case _LoginTabKind.login:
+          return 0;
+        case _LoginTabKind.register:
+          return 1;
+        case _LoginTabKind.forgot:
+          return 2;
+        case _LoginTabKind.otp:
+          return 3;
+      }
+    }
+    switch (kind) {
+      case _LoginTabKind.login:
+        return 0;
+      case _LoginTabKind.forgot:
+        return 1;
+      case _LoginTabKind.otp:
+        return 2;
+      case _LoginTabKind.register:
+        return 0;
+    }
+  }
+
+  void _switchAuthMode(_LoginTabKind kind) {
+    final target = _tabIndexForKind(kind);
+    if (_tabController.index == target) return;
+    _tabController.animateTo(target);
+    setState(() {});
+  }
+
   void _applyRegistrationEnabledFromServer(bool enabled) {
     if (_registrationEnabled == enabled) return;
     final oldLen = _tabController.length;
@@ -1263,13 +1295,55 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
     final baseTheme = Theme.of(context);
     final isDark = baseTheme.brightness == Brightness.dark;
     final mobile = ResponsiveHelper.isMobile(context);
+    final isFa = Localizations.localeOf(context).languageCode.toLowerCase() == 'fa';
+    final currentKind = _tabKindAt(_tabController.index);
+    late final String authTitle;
+    late final String authSubtitle;
+    switch (currentKind) {
+      case _LoginTabKind.login:
+        authTitle = isFa ? 'خوش آمدید' : 'Welcome Back';
+        authSubtitle = isFa ? 'برای ادامه وارد حساب خود شوید' : 'Sign in to continue';
+        break;
+      case _LoginTabKind.register:
+        authTitle = t.register;
+        authSubtitle = isFa ? 'حساب کاربری جدید بسازید' : 'Create your account';
+        break;
+      case _LoginTabKind.forgot:
+        authTitle = t.forgotPassword;
+        authSubtitle = isFa ? 'دسترسی به حساب خود را بازیابی کنید' : 'Recover access to your account';
+        break;
+      case _LoginTabKind.otp:
+        authTitle = t.otpLogin;
+        authSubtitle = t.otpLoginSubtitle;
+        break;
+    }
+    final underline = UnderlineInputBorder(
+      borderSide: BorderSide(
+        color: baseTheme.colorScheme.onSurface.withValues(alpha: isDark ? 0.30 : 0.22),
+        width: 1,
+      ),
+    );
     final compactTheme = baseTheme.copyWith(
       visualDensity: const VisualDensity(horizontal: -2, vertical: -3),
       inputDecorationTheme: baseTheme.inputDecorationTheme.copyWith(
         isDense: true,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-        prefixIconConstraints: const BoxConstraints(minWidth: 34, minHeight: 34),
-        suffixIconConstraints: const BoxConstraints(minWidth: 34, minHeight: 34),
+        filled: false,
+        fillColor: Colors.transparent,
+        border: underline,
+        enabledBorder: underline,
+        disabledBorder: underline,
+        focusedBorder: UnderlineInputBorder(
+          borderSide: BorderSide(color: baseTheme.colorScheme.primary, width: 2),
+        ),
+        errorBorder: UnderlineInputBorder(
+          borderSide: BorderSide(color: baseTheme.colorScheme.error, width: 1.2),
+        ),
+        focusedErrorBorder: UnderlineInputBorder(
+          borderSide: BorderSide(color: baseTheme.colorScheme.error, width: 2),
+        ),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 0, vertical: 9),
+        prefixIconConstraints: const BoxConstraints(minWidth: 30, minHeight: 30),
+        suffixIconConstraints: const BoxConstraints(minWidth: 30, minHeight: 30),
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: baseTheme.filledButtonTheme.style?.copyWith(
@@ -1320,41 +1394,65 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                 child: Center(
                   child: ConstrainedBox(
                     constraints: BoxConstraints(
-                      maxWidth: mobile ? 420 : 430,
+                      maxWidth: 390,
                     ),
-                    child: Card(
-                      elevation: 0,
-                      color: Colors.transparent,
-                      surfaceTintColor: Colors.transparent,
-                      shadowColor: Colors.transparent,
-                      margin: EdgeInsets.zero,
-                      child: Padding(
-                        padding: EdgeInsets.all(mobile ? 12 : 14),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            Row(
-                              children: [
-                                Image.asset(logoAsset, height: 24),
-                                const SizedBox(width: 6),
-                                Text(t.welcomeTitle, style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
-                              ],
+                    child: GlassSurface(
+                      borderRadius: BorderRadius.circular(22),
+                      blur: 26,
+                      opacity: isDark ? 0.12 : 0.52,
+                      padding: EdgeInsets.symmetric(
+                        horizontal: mobile ? 16 : 22,
+                        vertical: mobile ? 16 : 20,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: isDark ? 0.34 : 0.15),
+                          blurRadius: 42,
+                          spreadRadius: -12,
+                          offset: const Offset(0, 18),
+                        ),
+                        BoxShadow(
+                          color: baseTheme.colorScheme.primary.withValues(alpha: 0.12),
+                          blurRadius: 34,
+                          spreadRadius: -18,
+                        ),
+                      ],
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Image.asset(logoAsset, height: 26),
+                              const SizedBox(width: 8),
+                              Text(
+                                t.welcomeTitle,
+                                style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: 0.2,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 14),
+                          Text(
+                            authTitle,
+                            textAlign: TextAlign.center,
+                            style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: -0.4,
                             ),
-                            const SizedBox(height: 6),
-                            Text(t.welcomeSubtitle, style: Theme.of(context).textTheme.bodySmall?.copyWith(fontSize: 11)),
-                            const SizedBox(height: 6),
-                            TabBar(
-                              controller: _tabController,
-                              isScrollable: true,
-                              tabs: [
-                                Tab(height: 32, text: t.login),
-                                if (_registrationEnabled) Tab(height: 32, text: t.register),
-                                Tab(height: 32, text: t.forgotPassword),
-                                Tab(height: 32, text: t.otpLogin),
-                              ],
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            authSubtitle,
+                            textAlign: TextAlign.center,
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: Theme.of(context).colorScheme.onSurfaceVariant,
                             ),
-                            const SizedBox(height: 10),
+                          ),
+                          const SizedBox(height: 18),
                             AnimatedBuilder(
                               animation: _tabController,
                               builder: (context, _) {
@@ -1958,7 +2056,6 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                           ],
                         ),
                       ),
-                    ),
                   ),
                 ),
               );
