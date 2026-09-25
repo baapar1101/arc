@@ -71,10 +71,10 @@ class AppTheme {
           side: BorderSide(color: scheme.onSurface.withValues(alpha: 0.10)),
         ),
       ),
-      bottomSheetTheme: BottomSheetThemeData(
-        backgroundColor: isDark ? const Color(0xF2111827) : const Color(0xF7FFFFFF),
+      bottomSheetTheme: const BottomSheetThemeData(
+        backgroundColor: Colors.transparent,
         surfaceTintColor: Colors.transparent,
-        modalBackgroundColor: isDark ? const Color(0xF2111827) : const Color(0xF7FFFFFF),
+        modalBackgroundColor: Colors.transparent,
         shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
         ),
