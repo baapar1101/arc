@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/widgets/admin/file_storage/storage_config_list_widget.dart';
@@ -76,7 +77,7 @@ class _AdminStorageManagementPageState extends State<AdminStorageManagementPage>
   }
 
   void _showCreateDialog(BuildContext context) {
-    showDialog(
+    showGlassDialog(
       context: context,
       builder: (context) => StorageConfigFormDialog(
         onSaved: () {
