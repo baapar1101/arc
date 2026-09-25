@@ -233,3 +233,70 @@ Future<T?> showGlassDialog<T>({
     ),
   );
 }
+
+
+/// Drop-in glass replacement for Material [showModalBottomSheet].
+/// The sheet itself uses a real BackdropFilter while retaining the standard
+/// bottom-sheet route behavior (dragging, scrolling, safe-area handling, etc.).
+Future<T?> showGlassModalBottomSheet<T>({
+  required BuildContext context,
+  required WidgetBuilder builder,
+  Color? backgroundColor,
+  String? barrierLabel,
+  double? elevation,
+  ShapeBorder? shape,
+  Clip? clipBehavior,
+  BoxConstraints? constraints,
+  Color? barrierColor,
+  bool isScrollControlled = false,
+  double scrollControlDisabledMaxHeightRatio = 9.0 / 16.0,
+  bool useRootNavigator = false,
+  bool isDismissible = true,
+  bool enableDrag = true,
+  bool? showDragHandle,
+  bool useSafeArea = false,
+  RouteSettings? routeSettings,
+  AnimationController? transitionAnimationController,
+  Offset? anchorPoint,
+  AnimationStyle? sheetAnimationStyle,
+  bool? requestFocus,
+}) {
+  const radius = BorderRadius.vertical(top: Radius.circular(22));
+
+  return showModalBottomSheet<T>(
+    context: context,
+    builder: (sheetContext) => GlassSurface(
+      borderRadius: radius,
+      blur: GlassStyle.strongModalBlur,
+      opacity: Theme.of(sheetContext).brightness == Brightness.dark ? 0.22 : 0.56,
+      boxShadow: [
+        BoxShadow(
+          color: Colors.black.withValues(alpha: 0.28),
+          blurRadius: 36,
+          spreadRadius: -10,
+          offset: const Offset(0, -8),
+        ),
+      ],
+      child: builder(sheetContext),
+    ),
+    backgroundColor: Colors.transparent,
+    barrierLabel: barrierLabel,
+    elevation: elevation ?? 0,
+    shape: shape ?? const RoundedRectangleBorder(borderRadius: radius),
+    clipBehavior: clipBehavior ?? Clip.antiAlias,
+    constraints: constraints,
+    barrierColor: barrierColor ?? GlassStyle.modalBarrier(context),
+    isScrollControlled: isScrollControlled,
+    scrollControlDisabledMaxHeightRatio: scrollControlDisabledMaxHeightRatio,
+    useRootNavigator: useRootNavigator,
+    isDismissible: isDismissible,
+    enableDrag: enableDrag,
+    showDragHandle: showDragHandle,
+    useSafeArea: useSafeArea,
+    routeSettings: routeSettings,
+    transitionAnimationController: transitionAnimationController,
+    anchorPoint: anchorPoint,
+    sheetAnimationStyle: sheetAnimationStyle,
+    requestFocus: requestFocus,
+  );
+}
