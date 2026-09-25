@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/services.dart';
 import 'package:hesabix_ui/widgets/support/operator_inbox_list.dart';
 
@@ -20,7 +21,7 @@ class OperatorCommandPalette extends StatefulWidget {
   });
 
   static Future<void> show(BuildContext context, OperatorCommandPalette palette) {
-    return showDialog(
+    return showGlassDialog(
       context: context,
       builder: (_) => palette,
     );
@@ -68,7 +69,7 @@ class _OperatorCommandPaletteState extends State<OperatorCommandPalette> {
 
   Future<void> _promptTicketId() async {
     final controller = TextEditingController();
-    final id = await showDialog<int>(
+    final id = await showGlassDialog<int>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('باز کردن تیکت'),
