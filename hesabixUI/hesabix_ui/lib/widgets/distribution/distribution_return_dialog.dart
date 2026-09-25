@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/models/person_model.dart';
 import 'package:hesabix_ui/widgets/invoice/person_combobox_widget.dart';
@@ -40,7 +41,7 @@ Future<void> showDistributionReturnDialog({
   final lines = <_ReturnLineRow>[_ReturnLineRow()];
   final noteCtl = TextEditingController();
 
-  await showDialog<void>(
+  await showGlassDialog<void>(
     context: context,
     builder: (ctx) => StatefulBuilder(
       builder: (context, setD) {

@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/models/support_models.dart';
@@ -67,7 +68,7 @@ class _TicketDetailsDialogState extends State<TicketDetailsDialog> {
   Future<void> _showTemplatesDialog() async {
     if (!mounted) return;
     
-    final selectedTemplate = await showDialog<ResponseTemplate>(
+    final selectedTemplate = await showGlassDialog<ResponseTemplate>(
       context: context,
       builder: (context) => _TemplatesDialog(templates: _templates),
     );
