@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/services.dart' show Clipboard, ClipboardData;
 import 'package:go_router/go_router.dart';
 
@@ -181,7 +182,7 @@ class _WorkflowsPageState extends State<WorkflowsPage> {
             tooltip: 'آمار و تحلیل',
             icon: const Icon(Icons.analytics_outlined),
             onPressed: () {
-              showDialog(
+              showGlassDialog(
                 context: context,
                 builder: (context) => WorkflowAnalyticsDialog(
                   businessId: widget.businessId,
@@ -510,7 +511,7 @@ class _WorkflowsPageState extends State<WorkflowsPage> {
 
   Future<void> _deleteWorkflow(Map<String, dynamic> workflow, AppLocalizations t) async {
     // نمایش دیالوگ تایید
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showGlassDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: Text(t.workflowDeleteWorkflow),
@@ -717,7 +718,7 @@ class _WorkflowsPageState extends State<WorkflowsPage> {
       );
       if (!mounted) return;
       
-      await showDialog<void>(
+      await showGlassDialog<void>(
         context: bottomSheetContext,
         builder: (dialogContext) {
           // محاسبه عرض و ارتفاع بر اساس اندازه صفحه

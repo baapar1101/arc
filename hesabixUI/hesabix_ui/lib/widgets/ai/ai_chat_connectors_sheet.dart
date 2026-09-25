@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:hesabix_ui/services/ai_service.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
 import 'package:hesabix_ui/utils/snackbar_helper.dart' show SnackBarHelper;
@@ -66,7 +67,7 @@ class _AIChatConnectorsSheetState extends State<_AIChatConnectorsSheet> {
     final urlCtrl = TextEditingController();
     final descCtrl = TextEditingController();
     var method = 'GET';
-    final ok = await showDialog<bool>(
+    final ok = await showGlassDialog<bool>(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (context, setLocal) => AlertDialog(

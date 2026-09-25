@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hesabix_ui/theme/glass.dart';
 import 'dart:math' as math;
 import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
@@ -53,7 +54,7 @@ class _NotificationBellButtonState extends State<NotificationBellButton> {
 
   Future<void> _confirmClearAllNotifications(BuildContext dialogContext, StateSetter dialogSetState) async {
     final t = AppLocalizations.of(dialogContext);
-    final ok = await showDialog<bool>(
+    final ok = await showGlassDialog<bool>(
       context: dialogContext,
       builder: (ctx) => AlertDialog(
         title: Text(t.notificationCenterClearAllTitle),
@@ -160,7 +161,7 @@ class _NotificationBellButtonState extends State<NotificationBellButton> {
     setState(() {
       _unreadCount = 0;
     });
-    showDialog<void>(
+    showGlassDialog<void>(
       context: context,
       builder: (context) {
         return StatefulBuilder(

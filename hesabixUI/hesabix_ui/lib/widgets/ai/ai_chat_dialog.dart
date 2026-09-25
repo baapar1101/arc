@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:dio/dio.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/core/api_client.dart';
@@ -221,7 +222,7 @@ class _AIChatDialogState extends State<AIChatDialog> {
       return;
     }
     if (AIExecutionMode.requiresAutonomousConfirmation(_executionMode, next)) {
-      final confirmed = await showDialog<bool>(
+      final confirmed = await showGlassDialog<bool>(
         context: context,
         builder: (ctx) => AlertDialog(
           title: const Text('فعال‌سازی حالت خودکار'),
@@ -539,7 +540,7 @@ class _AIChatDialogState extends State<AIChatDialog> {
     int rating = 4;
     final ctrl = TextEditingController();
     final ok =
-        await showDialog<bool>(
+        await showGlassDialog<bool>(
           context: context,
           builder: (context) {
             return AlertDialog(
@@ -1017,7 +1018,7 @@ class _AIChatDialogState extends State<AIChatDialog> {
 
   Future<void> _deleteSession(AIChatSession session) async {
     final confirm =
-        await showDialog<bool>(
+        await showGlassDialog<bool>(
           context: context,
           builder: (context) => AlertDialog(
             title: const Text('حذف گفت‌وگو'),
@@ -1066,7 +1067,7 @@ class _AIChatDialogState extends State<AIChatDialog> {
   }) async {
     if (_sending || _currentSession?.id == null || msg.id == null) return;
     final ctrl = TextEditingController(text: msg.content);
-    final newText = await showDialog<String>(
+    final newText = await showGlassDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('ویرایش پیام'),
@@ -1887,7 +1888,7 @@ class _AIChatDialogState extends State<AIChatDialog> {
         ];
     }
 
-    showDialog<void>(
+    showGlassDialog<void>(
       context: context,
       builder: (context) => AlertDialog(
         title: Row(

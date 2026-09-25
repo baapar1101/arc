@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
 import 'package:hesabix_ui/core/api_client.dart';
@@ -170,7 +171,7 @@ class _SupportPageState extends State<SupportPage> with WidgetsBindingObserver {
   }
 
   void _navigateToCreateTicket() async {
-    final result = await showDialog<bool>(
+    final result = await showGlassDialog<bool>(
       context: context,
       builder: (context) => const CreateTicketPage(),
     );
@@ -189,7 +190,7 @@ class _SupportPageState extends State<SupportPage> with WidgetsBindingObserver {
 
   void _navigateToTicketDetail(Map<String, dynamic> ticketData) {
     final ticket = SupportTicket.fromJson(ticketData);
-    showDialog(
+    showGlassDialog(
       context: context,
       builder: (context) => TicketDetailsDialog(
         ticket: ticket,
@@ -644,7 +645,7 @@ class _SupportPageState extends State<SupportPage> with WidgetsBindingObserver {
     if (!mounted) return;
     
     final controller = TextEditingController();
-    final result = await showDialog<String>(
+    final result = await showGlassDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('ذخیره فیلتر'),
@@ -708,7 +709,7 @@ class _SupportPageState extends State<SupportPage> with WidgetsBindingObserver {
   }
 
   Future<void> _deleteSavedFilter(String filterName) async {
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showGlassDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('حذف فیلتر'),
