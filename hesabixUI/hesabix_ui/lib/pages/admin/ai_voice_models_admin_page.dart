@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/material.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
@@ -96,7 +97,7 @@ class _AIVoiceModelsAdminPageState extends State<AIVoiceModelsAdminPage> {
     bool isActive = model?.isActive ?? true;
     bool isDefault = model?.isDefault ?? false;
 
-    await showDialog<void>(
+    await showGlassDialog<void>(
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) {

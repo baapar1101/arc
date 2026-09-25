@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/material.dart';
 import '../../l10n/app_localizations.dart';
 import '../../utils/error_extractor.dart';
@@ -176,7 +177,7 @@ class _WorkflowCanvasState extends State<WorkflowCanvas> with SingleTickerProvid
             if (fromNodeId != null && droppedNode != null && mounted) {
               final fromNode = widget.state.getNodeById(fromNodeId);
               if (fromNode?.type == WorkflowNodeType.condition) {
-                sourceOutputId = await showDialog<String>(
+                sourceOutputId = await showGlassDialog<String>(
                   context: context,
                   builder: (ctx) => AlertDialog(
                     title: const Text('شاخه شرط'),
@@ -205,7 +206,7 @@ class _WorkflowCanvasState extends State<WorkflowCanvas> with SingleTickerProvid
                   return;
                 }
               } else if (fromNode?.type == WorkflowNodeType.loop) {
-                sourceOutputId = await showDialog<String>(
+                sourceOutputId = await showGlassDialog<String>(
                   context: context,
                   builder: (ctx) => AlertDialog(
                     title: const Text('خروجی حلقه'),
@@ -387,7 +388,7 @@ class _WorkflowCanvasState extends State<WorkflowCanvas> with SingleTickerProvid
                         if (fromNodeId != null && mounted) {
                           final fromNode = widget.state.getNodeById(fromNodeId);
                           if (fromNode?.type == WorkflowNodeType.condition) {
-                            sourceOutputId = await showDialog<String>(
+                            sourceOutputId = await showGlassDialog<String>(
                               context: context,
                               builder: (ctx) => AlertDialog(
                                 title: const Text('شاخه شرط'),
@@ -529,7 +530,7 @@ class _WorkflowCanvasState extends State<WorkflowCanvas> with SingleTickerProvid
     if (fromNodeId != null && droppedNode != null && mounted) {
       final fromNode = widget.state.getNodeById(fromNodeId);
       if (fromNode?.type == WorkflowNodeType.condition) {
-        sourceOutputId = await showDialog<String>(
+        sourceOutputId = await showGlassDialog<String>(
           context: context,
           builder: (ctx) => AlertDialog(
             title: const Text('شاخه شرط'),

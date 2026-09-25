@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'dart:async';
 import 'dart:convert';
 
@@ -182,7 +183,7 @@ class _StockCountPageState extends State<StockCountPage> {
           ? 'می‌توانید همان شمارش را ادامه دهید یا از نو شروع کنید.'
           : 'آخرین ذخیرهٔ خودکار: $savedAt\nمی‌توانید همان شمارش را ادامه دهید یا از نو شروع کنید.';
 
-      final choice = await showDialog<String>(
+      final choice = await showGlassDialog<String>(
         context: context,
         barrierDismissible: false,
         builder: (ctx) => AlertDialog(
@@ -470,7 +471,7 @@ class _StockCountPageState extends State<StockCountPage> {
       return;
     }
 
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showGlassDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('تایید ثبت اختلاف انبارگردانی'),
@@ -506,7 +507,7 @@ class _StockCountPageState extends State<StockCountPage> {
 
       if (data['needs_choice'] == true) {
         setState(() => _loading = false);
-        final choice = await showDialog<String>(
+        final choice = await showGlassDialog<String>(
           context: context,
           builder: (ctx) => AlertDialog(
             title: const Text('نوع ثبت اختلاف انبارگردانی'),

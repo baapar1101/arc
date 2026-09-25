@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'dart:ui';
 
 import 'package:dio/dio.dart';
@@ -882,7 +883,7 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
         if (!mounted || _calendarController == null) return;
       }
       if (!mounted) return;
-      showDialog(
+      showGlassDialog(
         context: context,
         builder: (_) => DocumentDetailsDialog(
           documentId: docId,
@@ -1143,7 +1144,7 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
             if (calendarController == null) {
               CalendarController.load().then((c) {
                 if (mounted) {
-                  showDialog(
+                  showGlassDialog(
                     context: context,
                     builder: (context) => WarrantyCodeDetailsDialog(
                       warrantyCode: warranty,
@@ -1153,7 +1154,7 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
                 }
               });
             } else {
-              showDialog(
+              showGlassDialog(
                 context: context,
                 builder: (context) => WarrantyCodeDetailsDialog(
                   warrantyCode: warranty,
@@ -1479,7 +1480,7 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
       if (firstCode != null && firstCode.isNotEmpty) selectedType = firstCode;
     }
     var selectedDate = DateTime.now();
-    final ok = await showDialog<bool>(
+    final ok = await showGlassDialog<bool>(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (context, setState) => AlertDialog(
@@ -1561,7 +1562,7 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
     final descController = TextEditingController(text: a['description']?.toString() ?? '');
     var selectedType = a['activity_type']?.toString() ?? 'call';
     var selectedDate = a['activity_date'] != null ? DateTime.tryParse(a['activity_date'].toString()) ?? DateTime.now() : DateTime.now();
-    final ok = await showDialog<bool>(
+    final ok = await showGlassDialog<bool>(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (context, setState) => AlertDialog(
@@ -1631,7 +1632,7 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
   }
 
   Future<void> _deleteActivity(CrmService crmService, int activityId, VoidCallback onSaved) async {
-    final ok = await showDialog<bool>(
+    final ok = await showGlassDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('حذف فعالیت'),
@@ -2308,7 +2309,7 @@ class _PersonDetailsDialogState extends State<PersonDetailsDialog> with SingleTi
     final overUsage = (error['over_usage_gb'] as num?)?.toDouble() ?? 0;
 
     if (!mounted) return;
-    await showDialog(
+    await showGlassDialog(
       context: context,
       builder: (ctx) {
         final theme = Theme.of(ctx);

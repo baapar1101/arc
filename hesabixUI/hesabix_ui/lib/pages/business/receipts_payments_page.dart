@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/material.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import '../../core/calendar_controller.dart';
@@ -71,7 +72,7 @@ class _ReceiptsPaymentsPageState extends State<ReceiptsPaymentsPage> {
                   ),
                   FilledButton.icon(
                     onPressed: () async {
-                      final draft = await showDialog<_BulkSettlementDraft>(
+                      final draft = await showGlassDialog<_BulkSettlementDraft>(
                         context: context,
                         builder: (_) => _BulkSettlementDialog(
                           businessId: widget.businessId,
@@ -115,7 +116,7 @@ class _ReceiptsPaymentsPageState extends State<ReceiptsPaymentsPage> {
                   calendarController: widget.calendarController,
                   drafts: _drafts.where((d) => d.isReceipt == (_tabIndex == 0)).toList(),
                   onEdit: (d) async {
-                    final updated = await showDialog<_BulkSettlementDraft>(
+                    final updated = await showGlassDialog<_BulkSettlementDraft>(
                       context: context,
                       builder: (_) => _BulkSettlementDialog(
                         businessId: widget.businessId,
@@ -861,7 +862,7 @@ class _BulkSettlementDialogState extends State<_BulkSettlementDialog> {
     if (!mounted) return;
     
     // نمایش loading
-    showDialog(
+    showGlassDialog(
       context: context,
       barrierDismissible: false,
       builder: (ctx) => const Center(child: CircularProgressIndicator()),

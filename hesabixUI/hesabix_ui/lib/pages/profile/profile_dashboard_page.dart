@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -175,7 +176,7 @@ class _ProfileDashboardPageState extends State<ProfileDashboardPage>
       context.go('/business/$businessId/dashboard');
       return;
     }
-    final mode = await showModalBottomSheet<MobileBusinessEntryMode>(
+    final mode = await showGlassModalBottomSheet<MobileBusinessEntryMode>(
       context: context,
       showDragHandle: true,
       builder: (sheetCtx) {
@@ -240,7 +241,7 @@ class _ProfileDashboardPageState extends State<ProfileDashboardPage>
     try {
       final ticket = await SupportService(ApiClient()).getTicket(ticketId);
       if (!mounted) return;
-      await showDialog<void>(
+      await showGlassDialog<void>(
         context: context,
         builder: (ctx) => TicketDetailsDialog(
           ticket: ticket,

@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -151,7 +152,7 @@ class _MobileLauncherHomePageState extends State<MobileLauncherHomePage> {
   }
 
   Future<void> _showBusinessSwitcher(AppLocalizations t) async {
-    await showModalBottomSheet<void>(
+    await showGlassModalBottomSheet<void>(
       context: context,
       showDragHandle: true,
       isScrollControlled: true,

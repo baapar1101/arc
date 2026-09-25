@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -22,7 +23,7 @@ Future<bool> showDistributionVanTransferSheet({
   AuthStore? authStore,
   List<Map<String, dynamic>> vanStockItems = const [],
 }) async {
-  final ok = await showModalBottomSheet<bool>(
+  final ok = await showGlassModalBottomSheet<bool>(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,

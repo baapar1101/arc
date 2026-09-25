@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -216,7 +217,7 @@ class _CrmLeadRecordPageState extends State<CrmLeadRecordPage> {
 
   Future<void> _openFullEdit() async {
     if (_lead == null) return;
-    await showDialog<void>(
+    await showGlassDialog<void>(
       context: context,
       builder: (ctx) => CrmLeadFormDialog(
         businessId: widget.businessId,
@@ -235,7 +236,7 @@ class _CrmLeadRecordPageState extends State<CrmLeadRecordPage> {
 
   Future<void> _convert() async {
     final name = _lead?['name']?.toString() ?? '';
-    final result = await showDialog<Map<String, dynamic>?>(
+    final result = await showGlassDialog<Map<String, dynamic>?>(
       context: context,
       builder: (ctx) => CrmConvertLeadDialog(
         businessId: widget.businessId,
@@ -293,7 +294,7 @@ class _CrmLeadRecordPageState extends State<CrmLeadRecordPage> {
       'note': 'یادداشت',
     };
     final subjectCtrl = TextEditingController(text: labels[type] ?? type);
-    final ok = await showDialog<bool>(
+    final ok = await showGlassDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text('ثبت ${labels[type] ?? type}'),

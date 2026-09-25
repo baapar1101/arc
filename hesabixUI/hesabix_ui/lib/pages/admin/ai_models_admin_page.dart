@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hesabix_ui/core/api_client.dart';
@@ -27,7 +28,7 @@ class _AIModelsAdminPageState extends State<AIModelsAdminPage> {
   }
 
   Future<void> _seedFromConfig() async {
-    final force = await showDialog<bool>(
+    final force = await showGlassDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('ایجاد خودکار مدل‌ها'),
@@ -100,7 +101,7 @@ class _AIModelsAdminPageState extends State<AIModelsAdminPage> {
     bool isActive = model?.isActive ?? true;
     int sortOrder = 0;
 
-    await showDialog<void>(
+    await showGlassDialog<void>(
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) {
@@ -362,7 +363,7 @@ class _AIModelsAdminPageState extends State<AIModelsAdminPage> {
                                 IconButton(
                                   icon: const Icon(Icons.delete_outline),
                                   onPressed: () async {
-                                    final ok = await showDialog<bool>(
+                                    final ok = await showGlassDialog<bool>(
                                       context: context,
                                       builder: (ctx) => AlertDialog(
                                         title: const Text('غیرفعال کردن مدل'),

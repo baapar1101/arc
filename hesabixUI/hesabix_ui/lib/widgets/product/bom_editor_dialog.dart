@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -888,7 +889,7 @@ class _BomEditorDialogState extends State<BomEditorDialog> with SingleTickerProv
                           child: Icon(Icons.delete, color: Colors.white, size: 32),
                         ),
                         confirmDismiss: (direction) async {
-                          return await showDialog<bool>(
+                          return await showGlassDialog<bool>(
                             context: context,
                             builder: (context) => AlertDialog(
                               title: Text('تأیید حذف'),
@@ -1371,7 +1372,7 @@ class _BomEditorDialogState extends State<BomEditorDialog> with SingleTickerProv
                               child: Icon(Icons.delete, color: Colors.white, size: 32),
                             ),
                             confirmDismiss: (direction) async {
-                              return await showDialog<bool>(
+                              return await showGlassDialog<bool>(
                                 context: context,
                                 builder: (context) => AlertDialog(
                                   title: Text('تأیید حذف'),
@@ -1723,7 +1724,7 @@ class _BomEditorDialogState extends State<BomEditorDialog> with SingleTickerProv
                               child: Icon(Icons.delete, color: Colors.white, size: 32),
                             ),
                             confirmDismiss: (direction) async {
-                              return await showDialog<bool>(
+                              return await showGlassDialog<bool>(
                                 context: context,
                                 builder: (context) => AlertDialog(
                                   title: Text('تأیید حذف'),
@@ -2430,7 +2431,7 @@ class _BomEditorDialogState extends State<BomEditorDialog> with SingleTickerProv
   }
 
   Future<bool> _showProductIdMissingDialog(String productName) async {
-    final result = await showDialog<bool>(
+    final result = await showGlassDialog<bool>(
       context: context,
       barrierDismissible: false,
       builder: (context) => AlertDialog(

@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -365,7 +366,7 @@ Future<void> showDistributionVisitCompleteSheet({
   }
 
   try {
-    await showModalBottomSheet<void>(
+    await showGlassModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
@@ -399,7 +400,7 @@ Future<void> showDistributionVisitCompleteSheet({
                   Map<String, dynamic>? selected;
                   final qtyCtl = TextEditingController(text: '1');
                   try {
-                    await showDialog<void>(
+                    await showGlassDialog<void>(
                       context: context,
                       builder: (dctx) => StatefulBuilder(
                         builder: (context, setD) => AlertDialog(
@@ -1085,7 +1086,7 @@ Future<void> showDistributionVisitCompleteSheet({
                                   Map<String, dynamic>? picked;
                                   final qtyCtl = TextEditingController(text: '1');
                                   final discCtl = TextEditingController(text: '0');
-                                  final ok = await showDialog<bool>(
+                                  final ok = await showGlassDialog<bool>(
                                     context: context,
                                     builder: (dctx) => StatefulBuilder(
                                       builder: (context, setD) => AlertDialog(

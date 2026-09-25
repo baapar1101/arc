@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/core/api_client.dart';
@@ -317,7 +318,7 @@ class _YearEndClosingPageState extends State<YearEndClosingPage> {
         : 'زیان خالص: ${formatWithThousands(netProfitLoss.abs())}';
 
     // تأیید از کاربر
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showGlassDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: Row(
@@ -470,7 +471,7 @@ class _YearEndClosingPageState extends State<YearEndClosingPage> {
           final relocWh =
               (reloc?['moved_warehouse_documents_count'] as num?)?.toInt() ?? 0;
 
-          final leave = await showDialog<bool>(
+          final leave = await showGlassDialog<bool>(
             context: context,
             barrierDismissible: false,
             builder: (dialogContext) => AlertDialog(
@@ -621,7 +622,7 @@ class _YearEndClosingPageState extends State<YearEndClosingPage> {
         });
         
         // نمایش Dialog خطا با جزئیات بیشتر
-        showDialog(
+        showGlassDialog(
           context: context,
           builder: (context) => AlertDialog(
             title: Row(

@@ -1,4 +1,5 @@
 ﻿import 'package:flutter/material.dart';
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 
@@ -90,7 +91,7 @@ class _LabelTemplatesPageState extends State<LabelTemplatesPage> {
   Future<void> _openCreateSheet() async {
     if (!_canDesign) return;
     final t = AppLocalizations.of(context);
-    await showModalBottomSheet<void>(
+    await showGlassModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       showDragHandle: true,

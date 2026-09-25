@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -251,7 +252,7 @@ class _ServiceLogsPageState extends State<ServiceLogsPage> with WidgetsBindingOb
   Future<void> _restartService() async {
     final t = AppLocalizations.of(context);
     _restartConfirmController.clear();
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showGlassDialog<bool>(
       context: context,
       builder: (dialogContext) {
         return StatefulBuilder(
@@ -405,7 +406,7 @@ class _ServiceLogsPageState extends State<ServiceLogsPage> with WidgetsBindingOb
 
   void _showStatusDetails(AppLocalizations t) {
     final out = _serviceStatus?['status_output'] as String?;
-    showDialog<void>(
+    showGlassDialog<void>(
       context: context,
       builder: (c) => AlertDialog(
         title: Text(t.serviceLogsStatusDetails),

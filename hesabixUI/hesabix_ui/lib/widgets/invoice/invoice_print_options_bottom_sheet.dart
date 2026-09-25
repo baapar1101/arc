@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/material.dart';
 import 'package:hesabix_ui/constants/invoice_print_paper.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
@@ -32,7 +33,7 @@ Future<InvoicePrintOptionsResult?> showInvoicePrintOptionsBottomSheet({
   bool initialShowShareQr = false,
   int? initialTemplateId,
 }) {
-  return showModalBottomSheet<InvoicePrintOptionsResult>(
+  return showGlassModalBottomSheet<InvoicePrintOptionsResult>(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,

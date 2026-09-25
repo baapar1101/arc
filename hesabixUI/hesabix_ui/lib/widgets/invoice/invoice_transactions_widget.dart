@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:uuid/uuid.dart';
@@ -737,7 +738,7 @@ class _InvoiceTransactionsWidgetState extends State<InvoiceTransactionsWidget> {
   }
 
   void _removeTransaction(int index) {
-    showDialog(
+    showGlassDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('حذف تراکنش'),
@@ -788,7 +789,7 @@ class _InvoiceTransactionsWidgetState extends State<InvoiceTransactionsWidget> {
       if (!mounted) return;
     }
 
-    showDialog(
+    showGlassDialog(
       context: context,
       builder: (context) => TransactionDialog(
         transaction: transaction,
@@ -1619,7 +1620,7 @@ class _TransactionDialogState extends State<TransactionDialog> {
 
       if (latest['stale'] == true && mounted) {
         final age = latest['max_age_hours'];
-        final cont = await showDialog<bool>(
+        final cont = await showGlassDialog<bool>(
           context: context,
           builder: (ctx) => AlertDialog(
             title: const Text('اسنپ‌شات قدیمی'),
@@ -2477,7 +2478,7 @@ class _TransactionDialogState extends State<TransactionDialog> {
           final fxDiffRatio =
               expected == 0 ? 0.0 : (expected - amount).abs() / expected;
           if (fxDiffRatio > 0.25) {
-            final cont = await showDialog<bool>(
+            final cont = await showGlassDialog<bool>(
               context: context,
               builder: (ctx) => AlertDialog(
                 title: const Text('اختلاف تسعیر غیرعادی'),

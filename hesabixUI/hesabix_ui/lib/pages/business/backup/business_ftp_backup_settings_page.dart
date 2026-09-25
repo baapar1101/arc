@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'dart:async';
 
 
@@ -232,7 +233,7 @@ class _BusinessFtpBackupSettingsPageState extends State<BusinessFtpBackupSetting
 
   Future<void> _delete() async {
     final t = AppLocalizations.of(context);
-    final ok = await showDialog<bool>(
+    final ok = await showGlassDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(t.ftpDeleteSettingsConfirmTitle),
@@ -384,7 +385,7 @@ class _BusinessFtpBackupSettingsPageState extends State<BusinessFtpBackupSetting
 
   void _showResultDialog(String title, String body) {
     final t = AppLocalizations.of(context);
-    showDialog<void>(
+    showGlassDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(title),

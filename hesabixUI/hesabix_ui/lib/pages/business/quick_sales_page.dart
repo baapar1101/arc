@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
@@ -805,7 +806,7 @@ class _QuickSalesPageState extends State<QuickSalesPage>
         : sale.isBlank(anonymousCustomerId: _anonymousCustomer?.id);
     if (!isBlank) {
       final t = AppLocalizations.of(context);
-      final confirmed = await showDialog<bool>(
+      final confirmed = await showGlassDialog<bool>(
         context: context,
         builder: (context) => AlertDialog(
           title: Text(t.quickSalesParkedDiscardTitle),
@@ -1424,7 +1425,7 @@ class _QuickSalesPageState extends State<QuickSalesPage>
           if (!showMultipleResultsDialog) return;
           // اگر چند نتیجه پیدا شد، دیالوگ انتخاب نمایش بده
           if (!mounted) return;
-          final selected = await showDialog<Map<String, dynamic>>(
+          final selected = await showGlassDialog<Map<String, dynamic>>(
             context: context,
             builder: (context) => _InstanceSelectionDialog(
               instances: items,
@@ -1551,7 +1552,7 @@ class _QuickSalesPageState extends State<QuickSalesPage>
       if (products.length > 1) {
         if (!showMultipleResultsDialog) return;
         if (!mounted) return;
-        final selected = await showDialog<Map<String, dynamic>>(
+        final selected = await showGlassDialog<Map<String, dynamic>>(
           context: context,
           builder: (context) => _ProductSelectionDialog(
             products: products,
@@ -1638,7 +1639,7 @@ class _QuickSalesPageState extends State<QuickSalesPage>
     _removeBarcodeOverlay();
     final name = (presetName ?? _barcodeController.text).trim();
     try {
-      final result = await showDialog<dynamic>(
+      final result = await showGlassDialog<dynamic>(
         context: context,
         builder: (context) => ProductFormDialog(
           businessId: widget.businessId,
@@ -2162,7 +2163,7 @@ class _QuickSalesPageState extends State<QuickSalesPage>
     if (_cartItems.isEmpty) return;
 
     // نمایش دیالوگ تأیید
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showGlassDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('پاک کردن سبد'),
@@ -2609,7 +2610,7 @@ class _QuickSalesPageState extends State<QuickSalesPage>
 
   Future<void> _editCartItem(int index) async {
     final item = _cartItems[index];
-    final result = await showDialog<InvoiceLineItem>(
+    final result = await showGlassDialog<InvoiceLineItem>(
       context: context,
       builder: (context) => _CartItemEditDialog(
         item: item,
@@ -4718,7 +4719,7 @@ class _QuickSalesPageState extends State<QuickSalesPage>
 
     if (isMobile) {
       // موبایل: bottom sheet
-      showModalBottomSheet(
+      showGlassModalBottomSheet(
         context: context,
         isScrollControlled: true,
         builder: (ctx) {
@@ -4765,7 +4766,7 @@ class _QuickSalesPageState extends State<QuickSalesPage>
       );
     } else {
       // دسکتاپ: Dialog
-      showDialog(
+      showGlassDialog(
         context: context,
         builder: (ctx) {
           return Dialog(
@@ -5514,7 +5515,7 @@ class _QuickSalesPageState extends State<QuickSalesPage>
   Future<void> _openCheckoutSheet(ColorScheme cs) async {
     if (_cartItems.isEmpty) return;
 
-    await showModalBottomSheet<void>(
+    await showGlassModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       showDragHandle: true,

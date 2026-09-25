@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
@@ -250,7 +251,7 @@ class _ProductSupplyNetworkSectionState extends State<ProductSupplyNetworkSectio
     final titleCtrl = TextEditingController();
     final descCtrl = TextEditingController();
     var isRequired = false;
-    final ok = await showDialog<bool>(
+    final ok = await showGlassDialog<bool>(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setLocal) => AlertDialog(

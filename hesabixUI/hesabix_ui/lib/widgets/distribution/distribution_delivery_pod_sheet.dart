@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:hesabix_ui/core/api_client.dart';
@@ -18,7 +19,7 @@ Future<void> showDistributionDeliveryPodSheet({
   bool requireSignature = false,
   bool requirePhoto = false,
 }) async {
-  await showModalBottomSheet<void>(
+  await showGlassModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
     showDragHandle: true,

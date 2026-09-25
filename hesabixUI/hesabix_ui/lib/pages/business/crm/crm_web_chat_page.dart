@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'dart:async';
 import 'dart:typed_data';
 
@@ -241,7 +242,7 @@ class _CrmWebChatPageState extends State<CrmWebChatPage> {
     final body = _statusFilter == null
         ? t.crmWebChatBulkDeleteConfirmAll
         : t.crmWebChatBulkDeleteConfirmStatus(_statusLabelForBulk(t, _statusFilter!));
-    final ok = await showDialog<bool>(
+    final ok = await showGlassDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(t.crmWebChatBulkDeleteTitle),
@@ -848,7 +849,7 @@ class _CrmWebChatPageState extends State<CrmWebChatPage> {
     final mid = (msg['id'] as num?)?.toInt();
     if (cid == null || mid == null) return;
     final controller = TextEditingController(text: msg['body']?.toString() ?? '');
-    final ok = await showDialog<bool>(
+    final ok = await showGlassDialog<bool>(
       context: context,
       builder: (ctx) {
         final loc = AppLocalizations.of(ctx);
@@ -1450,7 +1451,7 @@ class _CrmWebChatPageState extends State<CrmWebChatPage> {
     final leadCtrl = TextEditingController(text: c['lead_id'] != null ? '${c['lead_id']}' : '');
     final personCtrl = TextEditingController(text: c['person_id'] != null ? '${c['person_id']}' : '');
 
-    final ok = await showModalBottomSheet<Object?>(
+    final ok = await showGlassModalBottomSheet<Object?>(
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
@@ -1896,7 +1897,7 @@ class _CrmWebChatPageState extends State<CrmWebChatPage> {
                                           padding: EdgeInsets.zero,
                                           onSelected: (v) async {
                                             if (v != 'delete') return;
-                                            final ok = await showDialog<bool>(
+                                            final ok = await showGlassDialog<bool>(
                                               context: context,
                                               builder: (ctx) => AlertDialog(
                                                 title: Text(t.crmWebChatDeleteConversation),
@@ -2187,7 +2188,7 @@ class _CrmWebChatPageState extends State<CrmWebChatPage> {
                               onPressed: () async {
                                 final id = (m['id'] as num?)?.toInt();
                                 if (id == null) return;
-                                final ok = await showDialog<bool>(
+                                final ok = await showGlassDialog<bool>(
                                   context: context,
                                   builder: (ctx) => AlertDialog(
                                     title: Text(t.crmWebChatDeleteMessage),

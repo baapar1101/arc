@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/material.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
@@ -613,7 +614,7 @@ class _DocumentsPageState extends State<DocumentsPage> {
 
   /// ایجاد سند جدید
   Future<void> _createNewDocument() async {
-    final result = await showDialog<bool>(
+    final result = await showGlassDialog<bool>(
       context: context,
       barrierDismissible: false,
       builder: (context) => DocumentFormDialog(
@@ -887,7 +888,7 @@ class _DocumentsPageState extends State<DocumentsPage> {
 
   /// نمایش جزئیات سند
   Future<void> _showDocumentDetails(DocumentModel doc) async {
-    await showDialog(
+    await showGlassDialog(
       context: context,
       builder: (context) => DocumentDetailsDialog(
         documentId: doc.id,
@@ -909,7 +910,7 @@ class _DocumentsPageState extends State<DocumentsPage> {
       
       if (!mounted) return;
       
-      final result = await showDialog<bool>(
+      final result = await showGlassDialog<bool>(
         context: context,
         barrierDismissible: false,
         builder: (context) => DocumentFormDialog(
@@ -943,7 +944,7 @@ class _DocumentsPageState extends State<DocumentsPage> {
       return;
     }
 
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showGlassDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: Text('تأیید حذف'),
@@ -985,7 +986,7 @@ class _DocumentsPageState extends State<DocumentsPage> {
 
   /// حذف گروهی اسناد
   Future<void> _handleBulkDelete() async {
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showGlassDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: Text('تأیید حذف گروهی'),

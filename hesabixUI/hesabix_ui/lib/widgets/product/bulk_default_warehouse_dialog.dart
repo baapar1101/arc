@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../core/api_client.dart';
@@ -118,7 +119,7 @@ class _BulkDefaultWarehouseDialogState extends State<BulkDefaultWarehouseDialog>
 
   Future<void> _applyRequest() async {
     final t = AppLocalizations.of(context);
-    final confirm = await showDialog<bool>(
+    final confirm = await showGlassDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(t.bulkDefaultWarehouseConfirmTitle),
@@ -144,7 +145,7 @@ class _BulkDefaultWarehouseDialogState extends State<BulkDefaultWarehouseDialog>
       setState(() => _lastApplyResult = data);
       SnackBarHelper.show(context, message: t.bulkDefaultWarehouseApplySuccess(updated?.toString() ?? '-'));
       widget.onSuccess?.call();
-      await showDialog<void>(
+      await showGlassDialog<void>(
         context: context,
         builder: (_) => AlertDialog(
           title: Text(t.operationSuccessful),

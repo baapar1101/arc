@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -238,7 +239,7 @@ class _BusinessCrmSettingsPageState extends State<BusinessCrmSettingsPage> {
   Future<void> _addTagDialog() async {
     final nameCtrl = TextEditingController();
     final colorCtrl = TextEditingController();
-    final ok = await showDialog<bool>(
+    final ok = await showGlassDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('برچسب جدید'),
@@ -285,7 +286,7 @@ class _BusinessCrmSettingsPageState extends State<BusinessCrmSettingsPage> {
   Future<void> _addCloseReasonDialog(String reasonType) async {
     final codeCtrl = TextEditingController();
     final nameCtrl = TextEditingController();
-    final ok = await showDialog<bool>(
+    final ok = await showGlassDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(reasonType == 'won' ? 'دلیل برد جدید' : 'دلیل باخت جدید'),
@@ -349,7 +350,7 @@ class _BusinessCrmSettingsPageState extends State<BusinessCrmSettingsPage> {
     }
     final nameCtrl = TextEditingController();
     final originsCtrl = TextEditingController();
-    final res = await showDialog<Map<String, dynamic>>(
+    final res = await showGlassDialog<Map<String, dynamic>>(
       context: context,
       barrierDismissible: false,
       builder: (ctx) => CrmWebChatWidgetFormDialog(
@@ -426,7 +427,7 @@ class _BusinessCrmSettingsPageState extends State<BusinessCrmSettingsPage> {
     final originsCtrl = TextEditingController(
       text: (w['allowed_origins'] is List) ? (w['allowed_origins'] as List).map((e) => e.toString()).join('، ') : '',
     );
-    final res = await showDialog<Map<String, dynamic>>(
+    final res = await showGlassDialog<Map<String, dynamic>>(
       context: context,
       barrierDismissible: false,
       builder: (ctx) => CrmWebChatWidgetFormDialog(

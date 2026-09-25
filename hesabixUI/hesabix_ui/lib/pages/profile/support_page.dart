@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -172,7 +173,7 @@ class _SupportPageState extends State<SupportPage> with WidgetsBindingObserver {
       if (!mounted) return;
       setState(() => _entitlement = ent);
       if (ent['can_create_ticket'] != true) {
-        final goBilling = await showDialog<bool>(
+        final goBilling = await showGlassDialog<bool>(
           context: context,
           builder: (ctx) => AlertDialog(
             title: const Text('نیاز به اشتراک پشتیبانی'),
@@ -213,7 +214,7 @@ class _SupportPageState extends State<SupportPage> with WidgetsBindingObserver {
       return;
     }
 
-    final result = await showDialog<bool>(
+    final result = await showGlassDialog<bool>(
       context: context,
       builder: (context) => const CreateTicketPage(),
     );
@@ -552,7 +553,7 @@ class _SupportPageState extends State<SupportPage> with WidgetsBindingObserver {
     if (!mounted) return;
     
     final controller = TextEditingController();
-    final result = await showDialog<String>(
+    final result = await showGlassDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('ذخیره فیلتر'),
@@ -610,7 +611,7 @@ class _SupportPageState extends State<SupportPage> with WidgetsBindingObserver {
   }
 
   Future<void> _deleteSavedFilter(String filterName) async {
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showGlassDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: Text('حذف فیلتر'),
@@ -648,7 +649,7 @@ class _SupportPageState extends State<SupportPage> with WidgetsBindingObserver {
   }
 
   void _showMobileFiltersBottomSheet(AppLocalizations t, ThemeData theme) {
-    showModalBottomSheet(
+    showGlassModalBottomSheet(
       context: context,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(

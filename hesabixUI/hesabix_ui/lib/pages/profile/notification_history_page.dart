@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
@@ -289,7 +290,7 @@ class _NotificationHistoryPageState extends State<NotificationHistoryPage> {
   }
 
   void _showNotificationDetails(BuildContext context, Map<String, dynamic> notification) {
-    showDialog(
+    showGlassDialog(
       context: context,
       builder: (context) => _NotificationDetailsDialog(
         notification: notification,

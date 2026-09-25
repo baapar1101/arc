@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/material.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 
@@ -24,7 +25,7 @@ class PayrollRunImportDialog extends StatefulWidget {
     required int businessId,
     required int runId,
   }) {
-    return showDialog<bool>(
+    return showGlassDialog<bool>(
       context: context,
       builder: (_) => PayrollRunImportDialog(businessId: businessId, runId: runId),
     );

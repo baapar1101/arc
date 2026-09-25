@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/material.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/models/ai_models.dart';
@@ -60,7 +61,7 @@ Future<void> showAIChatMessageActionSheet({
     message,
     canApplyHScript: canApplyHScript,
   );
-  return showModalBottomSheet<void>(
+  return showGlassModalBottomSheet<void>(
     context: context,
     showDragHandle: true,
     builder: (sheetContext) {

@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hesabix_ui/core/api_client.dart';
@@ -227,7 +228,7 @@ class _AIPlansAdminPageState extends State<AIPlansAdminPage> {
       };
     }
 
-    await showDialog<void>(
+    await showGlassDialog<void>(
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) {
@@ -790,7 +791,7 @@ class _AIPlansAdminPageState extends State<AIPlansAdminPage> {
                           IconButton(
                             icon: const Icon(Icons.delete),
                             onPressed: () async {
-                              if (await showDialog<bool>(
+                              if (await showGlassDialog<bool>(
                                     context: context,
                                     builder: (context) => AlertDialog(
                                       title: const Text('حذف پلن'),

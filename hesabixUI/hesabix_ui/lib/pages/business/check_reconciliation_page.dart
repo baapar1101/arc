@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
@@ -332,7 +333,7 @@ class _CheckReconciliationPageState extends State<CheckReconciliationPage> with 
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
-    await showDialog(
+    await showGlassDialog(
       context: context,
       barrierDismissible: true,
       builder: (context) => Dialog(
@@ -739,7 +740,7 @@ class _CheckReconciliationPageState extends State<CheckReconciliationPage> with 
     final nameController = TextEditingController();
     final descriptionController = TextEditingController();
 
-    final saved = await showDialog<bool>(
+    final saved = await showGlassDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('ذخیره جلسه راس‌گیری'),
@@ -897,7 +898,7 @@ class _CheckReconciliationPageState extends State<CheckReconciliationPage> with 
     final id = row['id'] as int?;
     if (id == null) return;
 
-    showDialog(
+    showGlassDialog(
       context: context,
       builder: (ctx) => FutureBuilder<Map<String, dynamic>>(
         future: _checkService.getReconciliationById(id),
@@ -987,7 +988,7 @@ class _CheckReconciliationPageState extends State<CheckReconciliationPage> with 
     final name = row['name']?.toString() ?? 'نامشخص';
     if (id == null) return;
 
-    final ok = await showDialog<bool>(
+    final ok = await showGlassDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text('حذف جلسه راس‌گیری'),

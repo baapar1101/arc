@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -225,7 +226,7 @@ class _TelephonyLiveDashboardPageState extends State<TelephonyLiveDashboardPage>
                                     tooltip: 'انتقال',
                                     onPressed: () async {
                                       final ctrl = TextEditingController();
-                                      final ok = await showDialog<bool>(
+                                      final ok = await showGlassDialog<bool>(
                                         context: context,
                                         builder: (ctx) => AlertDialog(
                                           title: const Text('انتقال تماس'),

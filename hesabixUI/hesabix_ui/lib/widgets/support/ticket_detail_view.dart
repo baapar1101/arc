@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
@@ -302,7 +303,7 @@ class _TicketDetailViewState extends State<TicketDetailView> {
   Future<void> _showTemplatesDialog() async {
     if (!mounted) return;
     
-    final selectedTemplate = await showDialog<ResponseTemplate>(
+    final selectedTemplate = await showGlassDialog<ResponseTemplate>(
       context: context,
       builder: (context) => _TemplatesDialog(templates: _templates),
     );
@@ -632,7 +633,7 @@ class _TicketDetailViewState extends State<TicketDetailView> {
   }
 
   Future<void> _showAiAssistantSheet() async {
-    await showModalBottomSheet<void>(
+    await showGlassModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       showDragHandle: true,

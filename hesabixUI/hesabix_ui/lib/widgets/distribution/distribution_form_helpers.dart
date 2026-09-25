@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/material.dart';
 import '../../l10n/app_localizations.dart';
 import '../../models/person_model.dart';
@@ -66,7 +67,7 @@ Future<bool> confirmDistributionDelete({
   String? confirmLabel,
 }) async {
   final t = AppLocalizations.of(context);
-  final ok = await showDialog<bool>(
+  final ok = await showGlassDialog<bool>(
     context: context,
     builder: (ctx) => AlertDialog(
       icon: Icon(Icons.delete_outline, color: Theme.of(ctx).colorScheme.error),
@@ -98,7 +99,7 @@ Future<T?> showDistributionChoiceDialog<T>({
   bool Function(T item)? selectedOf,
 }) async {
   final t = AppLocalizations.of(context);
-  return showDialog<T>(
+  return showGlassDialog<T>(
     context: context,
     builder: (ctx) {
       return AlertDialog(

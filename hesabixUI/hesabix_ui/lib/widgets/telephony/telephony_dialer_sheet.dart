@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -11,7 +12,7 @@ Future<void> showTelephonyDialerSheet(
   required int businessId,
   required TelephonySessionController session,
 }) {
-  return showDialog<void>(
+  return showGlassDialog<void>(
     context: context,
     barrierDismissible: true,
     builder: (ctx) {

@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'dart:async';
 import 'dart:ui';
 
@@ -506,7 +507,7 @@ class _KeyboardShortcutListenerState extends State<KeyboardShortcutListener> {
         }
       }
 
-      showDialog<void>(
+      showGlassDialog<void>(
         context: dialogContext,
         barrierDismissible: barrierDismissible,
         useRootNavigator: true,

@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/material.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
@@ -87,7 +88,7 @@ class _DistributionVanPanelState extends State<DistributionVanPanel> {
 
     if (!mounted) return;
     final editing = existing != null;
-    await showDialog<void>(
+    await showGlassDialog<void>(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (context, setD) => AlertDialog(

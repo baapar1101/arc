@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/core/api_client.dart';
@@ -56,7 +57,7 @@ class _CurrenciesAdminPageState extends State<CurrenciesAdminPage> {
     var dp = int.tryParse(row?['decimal_places']?.toString() ?? '') ?? 2;
     var round = row?['round_monetary_amounts'] != false;
 
-    final ok = await showDialog<bool>(
+    final ok = await showGlassDialog<bool>(
       context: context,
       builder: (ctx) {
         return StatefulBuilder(
@@ -167,7 +168,7 @@ class _CurrenciesAdminPageState extends State<CurrenciesAdminPage> {
     final canDelete = check['can_delete'] == true;
     final blockers = (check['blockers'] as List?) ?? const [];
 
-    final ok = await showDialog<bool>(
+    final ok = await showGlassDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('حذف ارز'),

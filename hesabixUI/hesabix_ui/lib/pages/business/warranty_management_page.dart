@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
@@ -376,7 +377,7 @@ class _WarrantyManagementPageState extends State<WarrantyManagementPage> {
   }
 
   void _showCodeDetails(BuildContext context, WarrantyCode code) {
-    showDialog(
+    showGlassDialog(
       context: context,
       builder: (context) => WarrantyCodeDetailsDialog(
         warrantyCode: code,
@@ -386,7 +387,7 @@ class _WarrantyManagementPageState extends State<WarrantyManagementPage> {
   }
 
   Future<void> _showGenerateDialog(BuildContext context) async {
-    final result = await showDialog<List<WarrantyCode>>(
+    final result = await showGlassDialog<List<WarrantyCode>>(
       context: context,
       builder: (context) => GenerateWarrantyCodesDialog(
         businessId: widget.businessId,
@@ -411,7 +412,7 @@ class _WarrantyManagementPageState extends State<WarrantyManagementPage> {
     final baseUrl = Uri.base.origin;
     final activationLink = '$baseUrl/public/warranty/activate/${widget.businessId}';
     
-    showDialog(
+    showGlassDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: Row(
@@ -479,7 +480,7 @@ class _WarrantyManagementPageState extends State<WarrantyManagementPage> {
     // بررسی وضعیت کد
     final isActivated = code.status == WarrantyStatus.activated || code.status == WarrantyStatus.used;
     
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showGlassDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: Row(
@@ -577,7 +578,7 @@ class _WarrantyManagementPageState extends State<WarrantyManagementPage> {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showGlassDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: Row(
@@ -698,7 +699,7 @@ class _WarrantyManagementPageState extends State<WarrantyManagementPage> {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     
-    showDialog(
+    showGlassDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: Row(

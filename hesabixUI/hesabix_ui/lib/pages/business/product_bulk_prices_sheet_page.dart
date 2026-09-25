@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:data_table_2/data_table_2.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -347,7 +348,7 @@ class _ProductBulkPricesSheetPageState extends State<ProductBulkPricesSheetPage>
   Future<bool> _confirmDiscardIfDirty() async {
     if (_collectDirtyItems().isEmpty) return true;
     final t = AppLocalizations.of(context);
-    final go = await showDialog<bool>(
+    final go = await showGlassDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(t.bulkProductPricesSheetUnsavedTitle),
@@ -625,7 +626,7 @@ class _ProductBulkPricesSheetPageState extends State<ProductBulkPricesSheetPage>
   }
 
   void _showExcelHelp(AppLocalizations t) {
-    showDialog<void>(
+    showGlassDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(t.bulkProductPricesSheetGuideTitle),

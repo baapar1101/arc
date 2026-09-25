@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:convert';
@@ -199,7 +200,7 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
       return;
     }
     int? selectedId = (_items.first['id'] as num?)?.toInt();
-    final ok = await showDialog<bool>(
+    final ok = await showGlassDialog<bool>(
       context: context,
       builder: (ctx) {
         return AlertDialog(
@@ -247,7 +248,7 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
         templateId: (item['id'] as num).toInt(),
       );
       if (!mounted) return;
-      await showDialog(
+      await showGlassDialog(
         context: context,
         builder: (ctx) {
           return AlertDialog(
@@ -290,7 +291,7 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
 
   Future<void> _importJsonFlow(AppLocalizations t) async {
     final ctrl = TextEditingController();
-    final ok = await showDialog<bool>(
+    final ok = await showGlassDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(t.reportTemplateImportJson),
@@ -467,7 +468,7 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
               .where((e) => e.trim().isNotEmpty)
               .toList();
           if (errors.isNotEmpty) {
-            await showDialog<void>(
+            await showGlassDialog<void>(
               context: context,
               builder: (ctx) => AlertDialog(
                 title: Text(AppLocalizations.of(ctx).reportTemplatePublish),
@@ -485,7 +486,7 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
             return;
           }
           if (warnings.isNotEmpty) {
-            final proceed = await showDialog<bool>(
+            final proceed = await showGlassDialog<bool>(
               context: context,
               builder: (ctx) => AlertDialog(
                 title: Text(AppLocalizations.of(ctx).reportTemplatePublish),
@@ -520,7 +521,7 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
         final details = message.split(':').length > 1
             ? message.substring(message.indexOf(':') + 1).trim()
             : message;
-        await showDialog<void>(
+        await showGlassDialog<void>(
           context: context,
           builder: (ctx) => AlertDialog(
             title: Text(AppLocalizations.of(ctx).reportTemplatePublish),
@@ -546,7 +547,7 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
       String? reason;
       if (toStatus == 'deprecated' || toStatus == 'draft') {
         final ctrl = TextEditingController();
-        final ok = await showDialog<bool>(
+        final ok = await showGlassDialog<bool>(
           context: context,
           builder: (ctx) => AlertDialog(
             title: Text(toStatus == 'deprecated' ? 'دلیل منسوخ کردن' : 'دلیل بازگشت به پیش‌نویس'),
@@ -600,7 +601,7 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
         templateId: (item['id'] as num).toInt(),
       );
       if (!mounted) return;
-      await showDialog<void>(
+      await showGlassDialog<void>(
         context: context,
         builder: (ctx) => AlertDialog(
           title: const Text('تاریخچه وضعیت قالب'),
@@ -833,7 +834,7 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
     }
 
     if (!mounted) return;
-    await showDialog<void>(
+    await showGlassDialog<void>(
       context: context,
       builder: (ctx) {
         return StatefulBuilder(
@@ -1137,7 +1138,7 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
   Future<void> _previewTemplate(Map<String, dynamic> item) async {
     final t = AppLocalizations.of(context);
     var loadingOpen = true;
-    showDialog<void>(
+    showGlassDialog<void>(
       context: context,
       barrierDismissible: false,
       builder: (c) => const AlertDialog(
@@ -1257,7 +1258,7 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
       final html = (res['html'] ?? '').toString();
       final lenFromPreview = res['content_length'] ?? 0;
       if (!mounted) return;
-      await showDialog<void>(
+      await showGlassDialog<void>(
         context: context,
         builder: (ctx) {
           return DefaultTabController(
@@ -1423,7 +1424,7 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
 
   Future<void> _setDefault(Map<String, dynamic> item) async {
     final loc = AppLocalizations.of(context);
-    final ok = await showDialog<bool>(
+    final ok = await showGlassDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(loc.reportTemplateSetDefaultTitle),
@@ -1449,7 +1450,7 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
 
   Future<void> _delete(Map<String, dynamic> item) async {
     final loc = AppLocalizations.of(context);
-    final ok = await showDialog<bool>(
+    final ok = await showGlassDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(loc.reportTemplateDeleteConfirmTitle),
@@ -1586,7 +1587,7 @@ class _ReportTemplatesPageState extends State<ReportTemplatesPage> {
                       );
                       if (!ctx.mounted) return;
                       final keys = (data['keys'] as List? ?? const []).cast<Map>();
-                      await showDialog(
+                      await showGlassDialog(
                         context: ctx,
                         builder: (dctx) {
                           final loc = AppLocalizations.of(dctx);

@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
@@ -188,7 +189,7 @@ class _CatalogSpecFieldsPageState extends State<CatalogSpecFieldsPage> {
       optionControllers.add(TextEditingController());
     }
 
-    final saved = await showDialog<bool>(
+    final saved = await showGlassDialog<bool>(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setLocal) => AlertDialog(
@@ -323,7 +324,7 @@ class _CatalogSpecFieldsPageState extends State<CatalogSpecFieldsPage> {
 
   Future<void> _confirmDelete(CatalogSpecFieldItem item) async {
     final t = AppLocalizations.of(context);
-    final ok = await showDialog<bool>(
+    final ok = await showGlassDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(t.delete),

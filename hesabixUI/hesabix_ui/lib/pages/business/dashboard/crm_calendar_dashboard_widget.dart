@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/material.dart';
 import 'package:shamsi_date/shamsi_date.dart';
 
@@ -135,7 +136,7 @@ void _showDayEventsSheet(BuildContext context, String dayKey, List<Map<String, d
   }
   initial = initial.clamp(minChild, maxChild);
 
-  showModalBottomSheet<void>(
+  showGlassModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,
@@ -276,7 +277,7 @@ class _CrmCalendarDashboardWidgetState extends State<CrmCalendarDashboardWidget>
     final screenH = MediaQuery.sizeOf(context).height;
     final sheetH = (screenH * 0.58).clamp(320.0, 560.0);
 
-    showModalBottomSheet<void>(
+    showGlassModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       useSafeArea: true,

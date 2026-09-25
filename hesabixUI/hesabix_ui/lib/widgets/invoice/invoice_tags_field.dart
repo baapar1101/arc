@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/material.dart';
 import '../../core/api_client.dart';
 import '../../models/invoice_tag_ref.dart';
@@ -74,7 +75,7 @@ class _InvoiceTagsFieldState extends State<InvoiceTagsField> {
     String? initial,
   }) async {
     final ctrl = TextEditingController(text: initial ?? '');
-    final name = await showDialog<String>(
+    final name = await showGlassDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(title),
@@ -152,7 +153,7 @@ class _InvoiceTagsFieldState extends State<InvoiceTagsField> {
   Future<void> _deleteTag(InvoiceTagRef tag) async {
     if (tag.isSystem) return;
     final theme = Theme.of(context);
-    final ok = await showDialog<bool>(
+    final ok = await showGlassDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('حذف برچسب'),
@@ -188,7 +189,7 @@ class _InvoiceTagsFieldState extends State<InvoiceTagsField> {
   void _showTagMenu(InvoiceTagRef tag) {
     if (tag.isSystem) return;
     final theme = Theme.of(context);
-    showModalBottomSheet<void>(
+    showGlassModalBottomSheet<void>(
       context: context,
       showDragHandle: true,
       builder: (ctx) => SafeArea(

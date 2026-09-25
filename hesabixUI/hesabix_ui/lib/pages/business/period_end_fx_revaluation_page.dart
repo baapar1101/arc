@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/material.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/core/auth_store.dart';
@@ -72,7 +73,7 @@ class _PeriodEndFxRevaluationPageState extends State<PeriodEndFxRevaluationPage>
 
   Future<void> _createDocument() async {
     if (!_canAdd) return;
-    final ok = await showDialog<bool>(
+    final ok = await showGlassDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('ایجاد سند تسعیر'),

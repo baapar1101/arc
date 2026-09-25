@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hesabix_ui/core/api_client.dart';
@@ -75,7 +76,7 @@ class _SupportPlansAdminPageState extends State<SupportPlansAdminPage> {
     bool priority = initial?['includes_priority_support'] == true;
     final formKey = GlobalKey<FormState>();
 
-    final ok = await showDialog<bool>(
+    final ok = await showGlassDialog<bool>(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setLocal) => AlertDialog(
@@ -204,7 +205,7 @@ class _SupportPlansAdminPageState extends State<SupportPlansAdminPage> {
   }
 
   Future<void> _delete(Map<String, dynamic> plan) async {
-    final confirm = await showDialog<bool>(
+    final confirm = await showGlassDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('حذف/غیرفعال‌سازی'),

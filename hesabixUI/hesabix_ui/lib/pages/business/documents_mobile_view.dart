@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -230,7 +231,7 @@ class _DocumentsMobileViewState extends State<DocumentsMobileView> {
     int? draftProject = _projectId;
     Person? draftPerson = _filterPerson;
 
-    await showModalBottomSheet(
+    await showGlassModalBottomSheet(
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
@@ -542,7 +543,7 @@ class _DocumentsMobileViewState extends State<DocumentsMobileView> {
 
   Future<void> _confirmBulkDelete() async {
     if (_selectedIds.isEmpty) return;
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showGlassDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('تأیید حذف'),
@@ -570,7 +571,7 @@ class _DocumentsMobileViewState extends State<DocumentsMobileView> {
   }
 
   Future<void> _openDocActions(DocumentModel doc) async {
-    await showModalBottomSheet(
+    await showGlassModalBottomSheet(
       context: context,
       showDragHandle: true,
       builder: (context) {

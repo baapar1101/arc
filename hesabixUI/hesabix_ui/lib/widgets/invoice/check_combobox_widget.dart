@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../services/check_service.dart';
@@ -312,7 +313,7 @@ class _CheckComboboxWidgetState extends State<CheckComboboxWidget> {
       return;
     }
 
-    final result = await showDialog<bool>(
+    final result = await showGlassDialog<bool>(
       context: context,
       builder: (context) => CheckFormDialog(
         businessId: widget.businessId,
@@ -340,7 +341,7 @@ class _CheckComboboxWidgetState extends State<CheckComboboxWidget> {
   }
 
   void _openPicker() {
-    showModalBottomSheet(
+    showGlassModalBottomSheet(
       context: context,
       isScrollControlled: true,
       builder: (context) => StatefulBuilder(

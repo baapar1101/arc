@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -397,7 +398,7 @@ class _BusinessesPageState extends State<BusinessesPage> {
   Future<void> _showEntryModeSheet(int businessId) async {
     final t = AppLocalizations.of(context);
 
-    final mode = await showModalBottomSheet<MobileBusinessEntryMode>(
+    final mode = await showGlassModalBottomSheet<MobileBusinessEntryMode>(
       context: context,
       showDragHandle: true,
       builder: (sheetCtx) {

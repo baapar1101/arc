@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/material.dart';
 import 'package:hesabix_ui/models/credit_models.dart';
 import 'package:hesabix_ui/services/credit_api_service.dart';
@@ -51,7 +52,7 @@ class _InstallmentPlansPageState extends State<InstallmentPlansPage> {
   }
 
   Future<void> _openCreateDialog() async {
-    final created = await showDialog<bool>(
+    final created = await showGlassDialog<bool>(
       context: context,
       builder: (context) => InstallmentPlanDialog(businessId: widget.businessId),
     );
@@ -61,7 +62,7 @@ class _InstallmentPlansPageState extends State<InstallmentPlansPage> {
   }
 
   Future<void> _openEditDialog(InstallmentPlan plan) async {
-    final updated = await showDialog<bool>(
+    final updated = await showGlassDialog<bool>(
       context: context,
       builder: (context) => InstallmentPlanDialog(businessId: widget.businessId, plan: plan),
     );
@@ -71,7 +72,7 @@ class _InstallmentPlansPageState extends State<InstallmentPlansPage> {
   }
 
   Future<void> _deletePlan(InstallmentPlan plan) async {
-    final ok = await showDialog<bool>(
+    final ok = await showGlassDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(AppLocalizations.of(context).deletePlan),

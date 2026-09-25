@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
@@ -215,7 +216,7 @@ class PayrollUi {
     required List<Widget> Function(BuildContext dialogContext) actionsBuilder,
     double maxWidth = 520,
   }) {
-    return showDialog<T>(
+    return showGlassDialog<T>(
       context: context,
       builder: (ctx) => dialogShell(
         context: ctx,

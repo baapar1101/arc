@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -749,7 +750,7 @@ class _CrmLeadsPageState extends State<CrmLeadsPage> {
 
   void _onAdd({int? stageId}) {
     if (!widget.authStore.hasBusinessPermission('crm', 'write') || _processDefs.isEmpty) return;
-    showDialog<Map<String, dynamic>?>(
+    showGlassDialog<Map<String, dynamic>?>(
       context: context,
       builder: (ctx) => CrmLeadQuickCreateDialog(
         businessId: widget.businessId,
@@ -771,7 +772,7 @@ class _CrmLeadsPageState extends State<CrmLeadsPage> {
   }
 
   Future<void> _onConvertToCustomer(int id, String name) async {
-    final result = await showDialog<Map<String, dynamic>?>(
+    final result = await showGlassDialog<Map<String, dynamic>?>(
       context: context,
       builder: (ctx) => CrmConvertLeadDialog(
         businessId: widget.businessId,

@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/api_client.dart';
@@ -156,7 +157,7 @@ class _GoodsExpenseIncomeListPageState extends State<GoodsExpenseIncomeListPage>
   }
 
   Future<void> _openForm({Map<String, dynamic>? doc, String? initialDocKind}) async {
-    final result = await showDialog<bool>(
+    final result = await showGlassDialog<bool>(
       context: context,
       barrierDismissible: false,
       builder: (_) => GoodsExpenseIncomeFormDialog(
@@ -197,7 +198,7 @@ class _GoodsExpenseIncomeListPageState extends State<GoodsExpenseIncomeListPage>
   }
 
   Future<void> _postDoc(Map<String, dynamic> doc) async {
-    final confirm = await showDialog<bool>(
+    final confirm = await showGlassDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('قطعی‌سازی سند'),
@@ -221,7 +222,7 @@ class _GoodsExpenseIncomeListPageState extends State<GoodsExpenseIncomeListPage>
   }
 
   Future<void> _cancelDoc(Map<String, dynamic> doc) async {
-    final confirm = await showDialog<bool>(
+    final confirm = await showGlassDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text('ابطال سند'),
@@ -249,7 +250,7 @@ class _GoodsExpenseIncomeListPageState extends State<GoodsExpenseIncomeListPage>
   }
 
   Future<void> _deleteDoc(Map<String, dynamic> doc) async {
-    final confirm = await showDialog<bool>(
+    final confirm = await showGlassDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text('حذف سند'),

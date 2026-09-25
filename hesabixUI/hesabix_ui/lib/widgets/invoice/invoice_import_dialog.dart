@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/material.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 
@@ -108,7 +109,7 @@ class _InvoiceImportDialogState extends State<InvoiceImportDialog> {
   }
 
   void _showHelp() {
-    showDialog(
+    showGlassDialog(
       context: context,
       builder: (context) => const _ImportHelpDialog(),
     );

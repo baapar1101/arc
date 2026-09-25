@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:hesabix_ui/core/hesabix_back.dart';
 import 'package:flutter/material.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table_widget.dart';
@@ -626,7 +627,7 @@ class _KardexPageState extends State<KardexPage> {
                 final m = item as Map<String, dynamic>;
                 final docId = (m['document_id'] as num?)?.toInt();
                 if (docId == null) return;
-                showDialog(
+                showGlassDialog(
                   context: context,
                   builder: (_) => DocumentDetailsDialog(
                     documentId: docId,
@@ -1148,7 +1149,7 @@ class _KardexPageState extends State<KardexPage> {
             TextButton.icon(
               onPressed: () async {
                 final controller = TextEditingController();
-                final name = await showDialog<String>(
+                final name = await showGlassDialog<String>(
                   context: context,
                   builder: (ctx) => AlertDialog(
                     title: Text(t.savePresetTitle),

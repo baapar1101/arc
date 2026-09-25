@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/material.dart';
 import 'package:hesabix_ui/config/brand_config.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
@@ -103,7 +104,7 @@ class WindowsUpdateFlow {
     final remote = result.remote!;
     final t = AppLocalizations.of(context);
 
-    final action = await showDialog<bool>(
+    final action = await showGlassDialog<bool>(
       context: context,
       barrierDismissible: false,
       builder: (ctx) {
@@ -209,7 +210,7 @@ class WindowsUpdateFlow {
     final progressNotifier =
         ValueNotifier<WindowsUpdateDownloadProgress?>(null);
 
-    showDialog<void>(
+    showGlassDialog<void>(
       context: context,
       barrierDismissible: false,
       builder: (ctx) {
@@ -312,7 +313,7 @@ class WindowsUpdateFlow {
     required bool isMsi,
   }) async {
     final t = AppLocalizations.of(context);
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showGlassDialog<bool>(
       context: context,
       barrierDismissible: false,
       builder: (ctx) => AlertDialog(

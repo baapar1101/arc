@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../../models/workflow_editor_models.dart';
@@ -1617,7 +1618,7 @@ class _WorkflowNodeConfigDialogState extends State<WorkflowNodeConfigDialog> {
     final insertReference = _fieldKeyPrefersInsertReference(fieldKey, fieldSchema);
     _ensureWorkflowTextController(fieldKey);
 
-    showDialog(
+    showGlassDialog(
       context: context,
       builder: (dialogContext) => _ReferenceSelectorDialog(
         allNodes: widget.allNodes!,

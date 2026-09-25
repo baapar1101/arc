@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
@@ -15,7 +16,7 @@ class LabelExcelPrintDialog extends StatefulWidget {
   const LabelExcelPrintDialog({super.key, required this.businessId});
 
   static Future<void> show(BuildContext context, {required int businessId}) {
-    return showDialog<void>(
+    return showGlassDialog<void>(
       context: context,
       builder: (ctx) => LabelExcelPrintDialog(businessId: businessId),
     );

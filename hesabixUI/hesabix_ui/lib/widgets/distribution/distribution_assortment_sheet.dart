@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/material.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/services/distribution_service.dart';
@@ -10,7 +11,7 @@ Future<void> showDistributionAssortmentSheet({
   required int businessId,
   required DistributionService service,
 }) async {
-  await showModalBottomSheet<void>(
+  await showGlassModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
     showDragHandle: true,
@@ -61,7 +62,7 @@ class _AssortmentSheetState extends State<_AssortmentSheet> {
           .whereType<int>(),
     };
     final names = <int, String>{};
-    await showDialog<void>(
+    await showGlassDialog<void>(
       context: context,
       builder: (dctx) => StatefulBuilder(
         builder: (context, setD) => AlertDialog(

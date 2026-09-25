@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/material.dart';
 import 'package:hesabix_ui/services/business_storage_service.dart';
 import 'package:hesabix_ui/core/api_client.dart';
@@ -206,7 +207,7 @@ class _AttachedFilesWidgetState extends State<AttachedFilesWidget> {
 
     final theme = Theme.of(context);
 
-    return showDialog<bool>(
+    return showGlassDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: Text('حذف فایل'),

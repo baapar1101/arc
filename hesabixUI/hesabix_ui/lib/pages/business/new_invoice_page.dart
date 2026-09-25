@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
@@ -2638,7 +2639,7 @@ class _NewInvoicePageState extends State<NewInvoicePage> with SingleTickerProvid
   /// نمایش هشدار برای فاکتور با مبلغ صفر
   Future<bool> _showZeroAmountWarning() async {
     final theme = Theme.of(context);
-    final result = await showDialog<bool>(
+    final result = await showGlassDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         icon: Icon(

@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/core/api_client.dart';
@@ -157,7 +158,7 @@ class _AISubscriptionPageState extends State<AISubscriptionPage> {
     if (!_planRequiresPayment(plan)) return true;
     final periodLabel = _billingPeriod == 'yearly' ? 'سالانه' : 'ماهانه';
     final action = isUpgrade ? 'ارتقا به' : 'فعال‌سازی';
-    return await showDialog<bool>(
+    return await showGlassDialog<bool>(
           context: context,
           builder: (context) => AlertDialog(
             title: Text('$action ${plan.name}'),
@@ -193,7 +194,7 @@ class _AISubscriptionPageState extends State<AISubscriptionPage> {
         SnackBarHelper.show(context, message: 'اشتراک با موفقیت فعال شد');
         _load();
         if (plan.planType == AIPlanType.byok) {
-          final go = await showDialog<bool>(
+          final go = await showGlassDialog<bool>(
                 context: context,
                 builder: (context) => AlertDialog(
                   title: const Text('تنظیم ارائه‌دهنده'),
@@ -261,7 +262,7 @@ class _AISubscriptionPageState extends State<AISubscriptionPage> {
   }
 
   Future<void> _cancelSubscription() async {
-    if (await showDialog<bool>(
+    if (await showGlassDialog<bool>(
           context: context,
           builder: (context) => AlertDialog(
             title: const Text('لغو اشتراک'),

@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'dart:typed_data';
 import 'package:dio/dio.dart';
 import 'package:file_picker/file_picker.dart';
@@ -201,7 +202,7 @@ class _ProductsPageState extends State<ProductsPage> {
   }
 
   Future<void> _showProductPriceReportExportDialog() async {
-    await showDialog<void>(
+    await showGlassDialog<void>(
       context: context,
       builder: (ctx) => _ProductPriceReportExportDialog(
         businessId: widget.businessId,
@@ -1045,7 +1046,7 @@ class _ProductsPageState extends State<ProductsPage> {
     final overUsage = (error['over_usage_gb'] as num?)?.toDouble() ?? 0.0;
     final required = (error['required_gb'] as num?)?.toDouble() ?? 0.0;
     
-    await showDialog(
+    await showGlassDialog(
       context: context,
       builder: (ctx) {
         final theme = Theme.of(ctx);
@@ -1171,7 +1172,7 @@ class _ProductsPageState extends State<ProductsPage> {
     final attachmentsKey = AttachedFilesWidgetKey();
     bool uploadingFile = false;
     
-    await showDialog<void>(
+    await showGlassDialog<void>(
       context: context,
       builder: (dialogContext) {
         return StatefulBuilder(
@@ -1381,7 +1382,7 @@ class _ProductsPageState extends State<ProductsPage> {
   /// نمایش دیالوگ تصویر
   void _showImageDialog(BuildContext context, String imageUrl) {
     final isMobile = ResponsiveHelper.isMobile(context);
-    showDialog(
+    showGlassDialog(
       context: context,
       builder: (dialogContext) => Dialog(
         backgroundColor: Colors.transparent,
@@ -1861,7 +1862,7 @@ class _ProductsPageState extends State<ProductsPage> {
                 icon: Icons.edit,
                 label: t.edit,
                 onTap: (row) async {
-                  await showDialog<Object?>(
+                  await showGlassDialog<Object?>(
                     context: context,
                     builder: (ctx) => ProductFormDialog(
                       businessId: widget.businessId,
@@ -1893,7 +1894,7 @@ class _ProductsPageState extends State<ProductsPage> {
                       );
                       return;
                     }
-                    await showDialog<Object?>(
+                    await showGlassDialog<Object?>(
                       context: context,
                       builder: (ctx) => ProductFormDialog(
                         businessId: widget.businessId,
@@ -1914,7 +1915,7 @@ class _ProductsPageState extends State<ProductsPage> {
                 isDestructive: true,
                 onTap: (row) async {
                   final t = AppLocalizations.of(context);
-                  final confirm = await showDialog<bool>(
+                  final confirm = await showGlassDialog<bool>(
                     context: context,
                     builder: (ctx) => AlertDialog(
                       title: Text(t.deleteProducts),
@@ -1984,7 +1985,7 @@ class _ProductsPageState extends State<ProductsPage> {
                         }
                       }
                       if (ids.isEmpty) return;
-                      final confirm = await showDialog<bool>(
+                      final confirm = await showGlassDialog<bool>(
                         context: context,
                         builder: (ctx) => AlertDialog(
                           title: Text(t.deleteProducts),
@@ -2106,7 +2107,7 @@ class _ProductsPageState extends State<ProductsPage> {
                       }
                       if (ids.isEmpty) return;
 
-                      await showDialog<bool>(
+                      await showGlassDialog<bool>(
                         context: context,
                         builder: (ctx) => BulkDefaultWarehouseDialog(
                           businessId: widget.businessId,
@@ -2133,7 +2134,7 @@ class _ProductsPageState extends State<ProductsPage> {
               message: t.importFromExcel,
               child: IconButton(
                 onPressed: () async {
-                  final ok = await showDialog<bool>(
+                  final ok = await showGlassDialog<bool>(
                     context: context,
                     builder: (ctx) => ProductImportDialog(
                       businessId: widget.businessId,
@@ -2152,7 +2153,7 @@ class _ProductsPageState extends State<ProductsPage> {
               message: t.bulkPriceUpdateTitle,
               child: IconButton(
                 onPressed: () async {
-                  await showDialog<bool>(
+                  await showGlassDialog<bool>(
                     context: context,
                     builder: (ctx) => BulkPriceUpdateDialog(
                       businessId: widget.businessId,
@@ -2189,7 +2190,7 @@ class _ProductsPageState extends State<ProductsPage> {
               message: t.addProduct,
               child: IconButton(
                 onPressed: () async {
-                  await showDialog<Object?>(
+                  await showGlassDialog<Object?>(
                     context: context,
                     builder: (ctx) => ProductFormDialog(
                       businessId: widget.businessId,
@@ -2209,7 +2210,7 @@ class _ProductsPageState extends State<ProductsPage> {
               message: t.managePriceLists,
               child: IconButton(
                 onPressed: () async {
-                  await showDialog<void>(
+                  await showGlassDialog<void>(
                     context: context,
                     builder: (ctx) => AlertDialog(
                       title: Text(t.managePriceLists),

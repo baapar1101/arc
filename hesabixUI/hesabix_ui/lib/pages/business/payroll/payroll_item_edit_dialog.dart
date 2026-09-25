@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/material.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 
@@ -24,7 +25,7 @@ class PayrollItemEditDialog extends StatefulWidget {
     Map<String, dynamic>? existing,
     required List<Map<String, dynamic>> categories,
   }) {
-    return showDialog<Map<String, dynamic>?>(
+    return showGlassDialog<Map<String, dynamic>?>(
       context: context,
       builder: (_) => PayrollItemEditDialog(
         businessId: businessId,

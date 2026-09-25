@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/material.dart';
 import 'package:reorderables/reorderables.dart';
 import 'dart:async';
@@ -1203,7 +1204,7 @@ class _BusinessDashboardPageState extends State<BusinessDashboardPage> {
             onTap: () {
               final docId = it['id'] as int?;
               if (docId != null && calendarController != null) {
-                showDialog(
+                showGlassDialog(
                   context: context,
                   builder: (_) => DocumentDetailsDialog(
                     documentId: docId,
@@ -1396,7 +1397,7 @@ class _BusinessDashboardPageState extends State<BusinessDashboardPage> {
             onTap: () {
               final invoiceId = it['id'] as int?;
               if (invoiceId != null && calendarController != null) {
-                showDialog(
+                showGlassDialog(
                   context: context,
                   builder: (_) => DocumentDetailsDialog(
                     documentId: invoiceId,
@@ -1572,7 +1573,7 @@ class _BusinessDashboardPageState extends State<BusinessDashboardPage> {
                     onTap: () {
                       final invoiceId = it['id'] as int?;
                       if (invoiceId != null && calendarController != null) {
-                        showDialog(
+                        showGlassDialog(
                           context: context,
                           builder: (_) => DocumentDetailsDialog(
                             documentId: invoiceId,
@@ -2129,7 +2130,7 @@ class _BusinessDashboardPageState extends State<BusinessDashboardPage> {
     final profile = _layout!;
     final rows = List<DashboardWidgetDefinition>.from(defs.items);
     String query = '';
-    await showDialog<void>(
+    await showGlassDialog<void>(
       context: context,
       builder: (context) {
         return AlertDialog(

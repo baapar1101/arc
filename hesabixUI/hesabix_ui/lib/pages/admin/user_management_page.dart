@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -400,7 +401,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
 
     if (action == _BulkUserAction.resetPassword) {
       var sendNotif = true;
-      final go = await showDialog<bool>(
+      final go = await showGlassDialog<bool>(
         context: context,
         builder: (c) => StatefulBuilder(
           builder: (ctx, setSt) {
@@ -460,7 +461,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
     final title = action == _BulkUserAction.activate
         ? 'فعال‌سازی ${ids.length} کاربر؟'
         : 'تعلیق ${ids.length} کاربر؟';
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showGlassDialog<bool>(
       context: context,
       builder: (c) => AlertDialog(
         title: Text(title),
@@ -517,7 +518,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
         final userData = response.data?['data'] as Map<String, dynamic>?;
         if (userData != null) {
           if (mounted) {
-            showDialog(
+            showGlassDialog(
               context: context,
               builder: (context) => _UserDetailsDialog(user: userData),
             );
@@ -527,7 +528,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
     } catch (e) {
       // در صورت خطا، از داده‌های موجود استفاده می‌کنیم
       if (mounted) {
-        showDialog(
+        showGlassDialog(
           context: context,
           builder: (context) => _UserDetailsDialog(user: user),
         );
@@ -539,7 +540,7 @@ class _UserManagementPageState extends State<UserManagementPage> {
     final userId = user['id'] as int?;
     if (userId == null) return;
     
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showGlassDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: Text('تعلیق کاربر'),

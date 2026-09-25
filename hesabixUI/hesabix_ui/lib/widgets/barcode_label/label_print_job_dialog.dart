@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
@@ -57,7 +58,7 @@ class LabelPrintJobDialog extends StatefulWidget {
     int? initialTemplateId,
   }) {
     if (rows.isEmpty) return Future.value();
-    return showDialog<void>(
+    return showGlassDialog<void>(
       context: context,
       barrierDismissible: false,
       builder: (ctx) => LabelPrintJobDialog(

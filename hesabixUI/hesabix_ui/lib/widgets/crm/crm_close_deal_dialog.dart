@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/material.dart';
 import 'package:hesabix_ui/services/crm_service.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
@@ -16,7 +17,7 @@ Future<bool> showCrmCloseDealDialog(
   int? documentId,
   VoidCallback? onClosed,
 }) async {
-  final result = await showDialog<bool>(
+  final result = await showGlassDialog<bool>(
     context: context,
     barrierDismissible: false,
     builder: (ctx) => _CrmCloseDealDialog(

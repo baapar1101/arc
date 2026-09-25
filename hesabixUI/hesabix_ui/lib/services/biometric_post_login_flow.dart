@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:go_router/go_router.dart';
@@ -55,7 +56,7 @@ class BiometricPostLoginFlow {
     if (!context.mounted) return;
     final t = AppLocalizations.of(context);
 
-    final enable = await showDialog<bool>(
+    final enable = await showGlassDialog<bool>(
       context: context,
       barrierDismissible: false,
       builder: (ctx) {

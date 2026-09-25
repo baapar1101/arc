@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hesabix_ui/widgets/zohal/zohal_inquiry_form_widget.dart';
@@ -154,7 +155,7 @@ class IdentityInquiryWidget extends ZohalInquiryFormWidget {
     // در حال حاضر فقط یک placeholder
     // می‌توان در آینده DatePicker شمسی اضافه کرد
     final textController = TextEditingController(text: controller.text);
-    await showDialog<String>(
+    await showGlassDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('تاریخ تولد'),

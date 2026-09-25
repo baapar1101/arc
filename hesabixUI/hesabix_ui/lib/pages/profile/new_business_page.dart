@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:dio/dio.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -504,7 +505,7 @@ class _NewBusinessPageState extends State<NewBusinessPage> {
 
   Future<void> _showVerificationRequiredDialog(String message) async {
     final t = AppLocalizations.of(context);
-    final result = await showDialog<bool>(
+    final result = await showGlassDialog<bool>(
       context: context,
       barrierDismissible: false,
       builder: (ctx) => AlertDialog(

@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
@@ -189,7 +190,7 @@ class _UsersPermissionsPageState extends State<UsersPermissionsPage> {
 
   Future<void> _removeUser(BusinessUser user) async {
     final t = AppLocalizations.of(context);
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showGlassDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: Text(t.removeUser),
@@ -259,7 +260,7 @@ class _UsersPermissionsPageState extends State<UsersPermissionsPage> {
 
   void _showOwnerWarning() {
     final t = AppLocalizations.of(context);
-    showDialog(
+    showGlassDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: Row(
@@ -282,7 +283,7 @@ class _UsersPermissionsPageState extends State<UsersPermissionsPage> {
 
   void _showAlreadyAddedWarning() {
     final t = AppLocalizations.of(context);
-    showDialog(
+    showGlassDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: Row(
@@ -884,7 +885,7 @@ class _UsersPermissionsPageState extends State<UsersPermissionsPage> {
       final freshUser = await _userService.getUserDetails(int.parse(widget.businessId), user.userId);
       
       if (mounted) {
-    showDialog(
+    showGlassDialog(
       context: context,
           builder: (context) => _PermissionsDialog(
             user: freshUser,
@@ -959,7 +960,7 @@ class _UsersPermissionsPageState extends State<UsersPermissionsPage> {
     final t = AppLocalizations.of(context);
     
     // Show confirmation dialog
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showGlassDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('خروج از کسب و کار'),
@@ -1624,7 +1625,7 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
       return;
     }
     final t = AppLocalizations.of(context);
-    final ok = await showDialog<bool>(
+    final ok = await showGlassDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(t.permissionsConfirmDisableAllTitle),
@@ -1657,7 +1658,7 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
       return;
     }
     final t = AppLocalizations.of(context);
-    final ok = await showDialog<bool>(
+    final ok = await showGlassDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(t.permissionsConfirmDisableCategoryTitle),

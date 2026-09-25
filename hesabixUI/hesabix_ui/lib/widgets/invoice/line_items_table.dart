@@ -1,5 +1,6 @@
 import 'dart:async' show unawaited;
 
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -576,7 +577,7 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
       return;
     }
     
-    final selectedIds = await showDialog<List<int>>(
+    final selectedIds = await showGlassDialog<List<int>>(
       context: context,
       builder: (context) => UniqueProductInstanceSelectorDialog(
         businessId: widget.businessId,
@@ -2169,7 +2170,7 @@ class _InvoiceLineItemsTableState extends State<InvoiceLineItemsTable> {
   // فوتر جمع‌ها حذف شد؛ جمع‌ها در صفحهٔ والد نمایش داده می‌شوند
 
   void _showUnitSelectorDialog(InvoiceLineItem item, ValueChanged<String?> onChanged) {
-    showDialog(
+    showGlassDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: Text(AppLocalizations.of(context).selectUnitTitle),
@@ -2757,7 +2758,7 @@ class _UnitPriceCellState extends State<_UnitPriceCell> {
   }
 
   Future<void> _openPricePicker(BuildContext context) async {
-    showModalBottomSheet(
+    showGlassModalBottomSheet(
       context: context,
       isScrollControlled: true,
       builder: (ctx) {

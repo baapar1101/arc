@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/material.dart';
 
 import '../../l10n/app_localizations.dart';
@@ -221,7 +222,7 @@ class _FrequentDescriptionTextFieldState extends State<FrequentDescriptionTextFi
   Future<void> _openManageSheet(BuildContext context) async {
     _removeOverlay();
     final t = AppLocalizations.of(context);
-    await showModalBottomSheet<void>(
+    await showGlassModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
@@ -382,7 +383,7 @@ class _ManageFrequentDescriptionsSheetState extends State<_ManageFrequentDescrip
 
   Future<void> _delete(FrequentDescriptionItem it) async {
     final t = AppLocalizations.of(context);
-    final ok = await showDialog<bool>(
+    final ok = await showGlassDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(t.frequentDescriptionsDeleteTitle),

@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/material.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
@@ -74,7 +75,7 @@ class _DistributionTargetsSectionState extends State<DistributionTargetsSection>
     } catch (_) {}
 
     if (!mounted) return;
-    await showDialog<void>(
+    await showGlassDialog<void>(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (context, setD) => AlertDialog(

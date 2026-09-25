@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../services/petty_cash_service.dart';
@@ -232,7 +233,7 @@ class _PettyCashComboboxWidgetState extends State<PettyCashComboboxWidget> {
   }
 
   Future<void> _addNewPettyCash() async {
-    final result = await showDialog<bool>(
+    final result = await showGlassDialog<bool>(
       context: context,
       builder: (context) => PettyCashFormDialog(
         businessId: widget.businessId,
@@ -253,7 +254,7 @@ class _PettyCashComboboxWidgetState extends State<PettyCashComboboxWidget> {
   }
 
   void _openPicker() {
-    showModalBottomSheet(
+    showGlassModalBottomSheet(
       context: context,
       isScrollControlled: true,
       builder: (context) => StatefulBuilder(

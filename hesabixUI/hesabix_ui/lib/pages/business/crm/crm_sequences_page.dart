@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/core/api_client.dart';
@@ -165,7 +166,7 @@ class _CrmSequencesPageState extends State<CrmSequencesPage> {
 
   void _onAdd() {
     if (!widget.authStore.hasBusinessPermission('crm', 'write')) return;
-    showDialog<void>(
+    showGlassDialog<void>(
       context: context,
       builder: (ctx) => _SequenceFormDialog(
         businessId: widget.businessId,
@@ -176,7 +177,7 @@ class _CrmSequencesPageState extends State<CrmSequencesPage> {
   }
 
   void _onEdit(Map<String, dynamic> seq) {
-    showDialog<void>(
+    showGlassDialog<void>(
       context: context,
       builder: (ctx) => _SequenceFormDialog(
         businessId: widget.businessId,

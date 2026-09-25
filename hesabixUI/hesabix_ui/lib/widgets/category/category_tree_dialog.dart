@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/material.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import '../../services/category_service.dart';
@@ -483,7 +484,7 @@ class _CategoryTreeDialogState extends State<CategoryTreeDialog> {
     final sortOrder = (item['sort_order'] as num?)?.toInt();
     final currentParentId = (item['parent_id'] as num?)?.toInt();
 
-    showModalBottomSheet<void>(
+    showGlassModalBottomSheet<void>(
       context: context,
       showDragHandle: true,
       isScrollControlled: true,
@@ -979,7 +980,7 @@ class _CategoryTreeDialogState extends State<CategoryTreeDialog> {
   Future<void> _confirmDelete(int? id) async {
     if (id == null) return;
     final t = AppLocalizations.of(context);
-    final ok = await showDialog<bool>(
+    final ok = await showGlassDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(t.deleteCategory),
@@ -1110,7 +1111,7 @@ class _CategoryTreeDialogState extends State<CategoryTreeDialog> {
     Map<String, dynamic>? result;
     try {
       if (isMobile) {
-        result = await showModalBottomSheet<Map<String, dynamic>?>(
+        result = await showGlassModalBottomSheet<Map<String, dynamic>?>(
         context: context,
         isScrollControlled: true,
         useSafeArea: true,
@@ -1184,7 +1185,7 @@ class _CategoryTreeDialogState extends State<CategoryTreeDialog> {
         },
       );
       } else {
-        result = await showDialog<Map<String, dynamic>?>(
+        result = await showGlassDialog<Map<String, dynamic>?>(
         context: context,
         builder: (ctx) => Dialog(
           child: ConstrainedBox(

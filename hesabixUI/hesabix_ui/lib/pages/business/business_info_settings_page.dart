@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/material.dart';
 import 'dart:typed_data';
 
@@ -685,7 +686,7 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
         'هیچ بستهٔ فعال فضای ذخیره‌سازی برای این کسب‌وکار وجود ندارد.';
     final theme = Theme.of(context);
     final stateContext = context;
-    await showDialog<void>(
+    await showGlassDialog<void>(
       context: stateContext,
       builder: (dialogContext) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
@@ -750,7 +751,7 @@ class _BusinessInfoSettingsPageState extends State<BusinessInfoSettingsPage> {
     
     final theme = Theme.of(context);
     
-    await showDialog(
+    await showGlassDialog(
       context: context,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),

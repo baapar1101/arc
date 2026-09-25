@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../utils/calculator_engine.dart';
@@ -23,7 +24,7 @@ class CalculatorDialog extends StatefulWidget {
         ),
       );
     }
-    return showDialog<double>(
+    return showGlassDialog<double>(
       context: context,
       barrierDismissible: true,
       builder: (_) => const CalculatorDialog(),

@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -22,7 +23,7 @@ class LegacyImportWizard extends StatefulWidget {
   const LegacyImportWizard({super.key});
 
   static Future<void> show(BuildContext context) {
-    return showDialog<void>(
+    return showGlassDialog<void>(
       context: context,
       barrierDismissible: false,
       builder: (ctx) => const LegacyImportWizard(),

@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/material.dart';
 import 'package:hesabix_ui/utils/number_formatters.dart' show formatWithThousands;
 
@@ -155,7 +156,7 @@ class _SmsBankAssistantSettingsPageState extends State<SmsBankAssistantSettingsP
   }
 
   Future<void> _openPatternEditor({SmsBankPattern? existing}) async {
-    final result = await showDialog<SmsBankPattern>(
+    final result = await showGlassDialog<SmsBankPattern>(
       context: context,
       builder: (ctx) => SmsBankPatternEditorDialog(
         businessId: widget.businessId,
@@ -430,7 +431,7 @@ class _SmsBankAssistantSettingsPageState extends State<SmsBankAssistantSettingsP
                       ),
                       onTap: () => _openPatternEditor(existing: p),
                       onLongPress: () async {
-                        final ok = await showDialog<bool>(
+                        final ok = await showGlassDialog<bool>(
                           context: context,
                           builder: (ctx) => AlertDialog(
                             title: const Text('حذف الگو؟'),

@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/material.dart';
 
 /// ویرایشگر HTML سبک برای «بررسی تخصصی» کاتالوگ.
@@ -85,7 +86,7 @@ class _CatalogHtmlEditorState extends State<CatalogHtmlEditor> {
   Future<void> _insertLink() async {
     final urlCtrl = TextEditingController();
     final labelCtrl = TextEditingController();
-    final ok = await showDialog<bool>(
+    final ok = await showGlassDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('درج لینک'),

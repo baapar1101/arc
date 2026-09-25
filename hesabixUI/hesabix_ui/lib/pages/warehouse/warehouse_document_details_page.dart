@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/material.dart';
 import '../../services/warehouse_service.dart';
 import '../../core/api_client.dart';
@@ -307,7 +308,7 @@ class _WarehouseDocumentDetailsPageState extends State<WarehouseDocumentDetailsP
   }
 
   Future<void> _deleteDoc() async {
-    final ok = await showDialog<bool>(
+    final ok = await showGlassDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('حذف حواله'),
@@ -343,7 +344,7 @@ class _WarehouseDocumentDetailsPageState extends State<WarehouseDocumentDetailsP
   }
 
   Future<void> _cancelDoc() async {
-    final ok = await showDialog<bool>(
+    final ok = await showGlassDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('لغو حواله'),
@@ -558,7 +559,7 @@ class _WarehouseDocumentDetailsPageState extends State<WarehouseDocumentDetailsP
                                   ? doc['accounting_document_id'] as int
                                   : int.tryParse('${doc['accounting_document_id']}');
                               if (aid == null) return;
-                              showDialog(
+                              showGlassDialog(
                                 context: context,
                                 builder: (_) => DocumentDetailsDialog(
                                   documentId: aid,

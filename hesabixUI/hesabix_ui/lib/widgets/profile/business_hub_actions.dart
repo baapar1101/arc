@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/material.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import '../../core/auth_store.dart';
@@ -22,7 +23,7 @@ class BusinessHubActions {
     BusinessHubRefreshCallback? onRefresh,
   }) async {
     final t = AppLocalizations.of(context);
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showGlassDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(t.businessesHubLeaveConfirmTitle),
@@ -66,7 +67,7 @@ class BusinessHubActions {
     BusinessHubRefreshCallback? onRefresh,
   }) async {
     final t = AppLocalizations.of(context);
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showGlassDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(t.businessesHubRestoreConfirmTitle),

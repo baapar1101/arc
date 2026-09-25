@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/material.dart';
 import '../../core/auth_store.dart';
 import '../../models/person_model.dart';
@@ -159,7 +160,7 @@ class _SellerPickerWidgetState extends State<SellerPickerWidget> {
   }
 
   void _showSellerPicker() {
-    showModalBottomSheet(
+    showGlassModalBottomSheet(
       context: context,
       isScrollControlled: true,
       builder: (context) => StatefulBuilder(

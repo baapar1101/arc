@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/material.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 
@@ -12,7 +13,7 @@ class PayrollPostPaymentDialog extends StatefulWidget {
   const PayrollPostPaymentDialog({super.key, required this.businessId});
 
   static Future<int?> show(BuildContext context, {required int businessId}) {
-    return showDialog<int>(
+    return showGlassDialog<int>(
       context: context,
       builder: (_) => PayrollPostPaymentDialog(businessId: businessId),
     );

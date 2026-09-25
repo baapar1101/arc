@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -101,7 +102,7 @@ class _ProductTaxSectionState extends State<ProductTaxSection> {
       return;
     }
 
-    final selected = await showModalBottomSheet<Map<String, dynamic>>(
+    final selected = await showGlassModalBottomSheet<Map<String, dynamic>>(
       context: context,
       isScrollControlled: true,
       builder: (ctx) => TaxCodeSearchSheet(service: _taxCodeService),

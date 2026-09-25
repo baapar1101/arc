@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'dart:async';
 import 'dart:convert';
 
@@ -329,7 +330,7 @@ class _HScriptStudioPageState extends State<HScriptStudioPage> {
   }
 
   Future<void> _openAiAssist() async {
-    final result = await showDialog<_HScriptAiAssistResult>(
+    final result = await showGlassDialog<_HScriptAiAssistResult>(
       context: context,
       builder: (ctx) => _HScriptAiAssistDialog(businessId: widget.businessId),
     );
@@ -415,7 +416,7 @@ class _HScriptStudioPageState extends State<HScriptStudioPage> {
     );
     if (code == null || code.isEmpty || !mounted) return;
     final replace = _codeCtrl.text.trim().isEmpty ||
-        await showDialog<bool>(
+        await showGlassDialog<bool>(
               context: context,
               builder: (ctx) => AlertDialog(
                 title: const Text('اعمال دستورپخت'),
@@ -467,7 +468,7 @@ class _HScriptStudioPageState extends State<HScriptStudioPage> {
         reportId: _reportId!,
       );
       if (!mounted) return;
-      await showModalBottomSheet<void>(
+      await showGlassModalBottomSheet<void>(
         context: context,
         showDragHandle: true,
         builder: (ctx) {
@@ -526,7 +527,7 @@ class _HScriptStudioPageState extends State<HScriptStudioPage> {
 
   Future<void> _archive() async {
     if (_reportId == null) return;
-    final ok = await showDialog<bool>(
+    final ok = await showGlassDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('بایگانی گزارش'),

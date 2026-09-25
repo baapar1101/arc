@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/api_client.dart';
@@ -451,7 +452,7 @@ class _NotificationTemplatesPageState extends State<NotificationTemplatesPage> {
     final rawId = template['id'];
     final templateId = rawId is int ? rawId : int.tryParse(rawId?.toString() ?? '');
 
-    showDialog(
+    showGlassDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: Text(name.isEmpty ? 'قالب' : name),
@@ -547,7 +548,7 @@ class _NotificationTemplatesPageState extends State<NotificationTemplatesPage> {
   }
 
   void _showHelp() {
-    showDialog(
+    showGlassDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('راهنمای قالب‌های نوتیفیکیشن'),

@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -248,7 +249,7 @@ class _BankAccountComboboxWidgetState extends State<BankAccountComboboxWidget> {
   }
 
   Future<void> _addNewBankAccount() async {
-    final result = await showDialog<bool>(
+    final result = await showGlassDialog<bool>(
       context: context,
       builder: (context) => BankAccountFormDialog(
         businessId: widget.businessId,
@@ -269,7 +270,7 @@ class _BankAccountComboboxWidgetState extends State<BankAccountComboboxWidget> {
   }
 
   void _openPicker() {
-    showModalBottomSheet(
+    showGlassModalBottomSheet(
       context: context,
       isScrollControlled: true,
       builder: (context) => StatefulBuilder(

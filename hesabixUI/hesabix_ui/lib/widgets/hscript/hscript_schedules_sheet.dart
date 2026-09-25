@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/material.dart';
 
 import '../../services/hscript_report_service.dart';
@@ -11,7 +12,7 @@ Future<void> showHScriptSchedulesSheet({
   required String reportTitle,
   required HScriptReportService service,
 }) {
-  return showModalBottomSheet<void>(
+  return showGlassModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,
@@ -73,7 +74,7 @@ class _SchedulesSheetState extends State<_SchedulesSheet> {
   }
 
   Future<void> _createOrEdit({Map<String, dynamic>? existing}) async {
-    final result = await showDialog<Map<String, dynamic>>(
+    final result = await showGlassDialog<Map<String, dynamic>>(
       context: context,
       builder: (ctx) => _ScheduleEditorDialog(
         reportTitle: widget.reportTitle,
@@ -113,7 +114,7 @@ class _SchedulesSheetState extends State<_SchedulesSheet> {
   Future<void> _delete(Map<String, dynamic> item) async {
     final id = (item['id'] as num?)?.toInt();
     if (id == null) return;
-    final ok = await showDialog<bool>(
+    final ok = await showGlassDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('حذف زمان‌بندی'),

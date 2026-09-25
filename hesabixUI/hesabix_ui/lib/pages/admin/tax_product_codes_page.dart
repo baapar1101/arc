@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'dart:async';
 import 'dart:typed_data';
 
@@ -218,7 +219,7 @@ class _TaxProductCodesPageState extends State<TaxProductCodesPage> {
               tooltip: 'جزئیات خطا',
               onPressed: () {
                 final err = _jobStatus?['error'] ?? 'نامشخص';
-                showDialog(
+                showGlassDialog(
                   context: context,
                   builder: (ctx) => AlertDialog(
                     title: const Text('جزئیات خطا'),

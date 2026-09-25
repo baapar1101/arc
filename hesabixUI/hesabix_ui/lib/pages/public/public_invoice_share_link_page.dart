@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -1263,7 +1264,7 @@ class _PublicInvoiceShareLinkPageState extends State<PublicInvoiceShareLinkPage>
     final ctrl = TextEditingController(text: formatNumberForInput(maxRemaining.round()));
     double? amount;
     try {
-      amount = await showDialog<double>(
+      amount = await showGlassDialog<double>(
         context: context,
         builder: (ctx) => AlertDialog(
           title: Text('مبلغ پرداخت$currencyLabel'),

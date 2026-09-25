@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -206,7 +207,7 @@ class _CrmDealRecordPageState extends State<CrmDealRecordPage> {
 
   Future<void> _openFullEdit() async {
     if (_deal == null) return;
-    await showDialog<void>(
+    await showGlassDialog<void>(
       context: context,
       builder: (ctx) => CrmDealFormDialog(
         businessId: widget.businessId,
@@ -276,7 +277,7 @@ class _CrmDealRecordPageState extends State<CrmDealRecordPage> {
     if (!_canWrite) return;
     final labels = {'call': 'تماس', 'email': 'ایمیل', 'meeting': 'جلسه', 'note': 'یادداشت'};
     final subjectCtrl = TextEditingController(text: labels[type] ?? type);
-    final ok = await showDialog<bool>(
+    final ok = await showGlassDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text('ثبت ${labels[type] ?? type}'),

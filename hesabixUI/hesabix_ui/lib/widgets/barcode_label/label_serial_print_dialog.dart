@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/material.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 
@@ -11,7 +12,7 @@ class LabelSerialPrintDialog extends StatefulWidget {
   const LabelSerialPrintDialog({super.key, required this.businessId});
 
   static Future<void> show(BuildContext context, {required int businessId}) {
-    return showDialog<void>(
+    return showGlassDialog<void>(
       context: context,
       builder: (ctx) => LabelSerialPrintDialog(businessId: businessId),
     );

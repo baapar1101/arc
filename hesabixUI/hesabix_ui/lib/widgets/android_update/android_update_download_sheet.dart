@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/material.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 
@@ -67,7 +68,7 @@ Future<AndroidUpdateDownloadSheetResult> showAndroidUpdateDownloadSheet({
     bool Function()? isCancelled,
   }) startDownload,
 }) {
-  return showModalBottomSheet<AndroidUpdateDownloadSheetResult>(
+  return showGlassModalBottomSheet<AndroidUpdateDownloadSheetResult>(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,

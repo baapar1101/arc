@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/material.dart';
 
 import '../../services/hscript_report_service.dart';
@@ -10,7 +11,7 @@ Future<Map<String, dynamic>?> showHScriptVersionsSheet({
   required int reportId,
   required HScriptReportService service,
 }) {
-  return showModalBottomSheet<Map<String, dynamic>>(
+  return showGlassModalBottomSheet<Map<String, dynamic>>(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,
@@ -100,7 +101,7 @@ class _VersionsSheetState extends State<_VersionsSheet> {
   Future<void> _restore(Map<String, dynamic> item) async {
     final id = (item['id'] as num?)?.toInt();
     if (id == null) return;
-    final ok = await showDialog<bool>(
+    final ok = await showGlassDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('بازگردانی نسخه'),

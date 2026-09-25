@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../models/warehouse_model.dart';
@@ -33,7 +34,7 @@ class WarehouseFormDialog extends StatefulWidget {
     final isMobile = width < 700;
 
     if (isMobile) {
-      return showModalBottomSheet<bool>(
+      return showGlassModalBottomSheet<bool>(
         context: context,
         isScrollControlled: true,
         backgroundColor: Colors.transparent,
@@ -60,7 +61,7 @@ class WarehouseFormDialog extends StatefulWidget {
       );
     }
 
-    return showDialog<bool>(
+    return showGlassDialog<bool>(
       context: context,
       builder: (_) => WarehouseFormDialog(
         businessId: businessId,

@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/material.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/services/support_service.dart';
@@ -10,7 +11,7 @@ class TicketCsatDialog extends StatefulWidget {
   const TicketCsatDialog({super.key, required this.ticketId});
 
   static Future<bool?> show(BuildContext context, int ticketId) {
-    return showDialog<bool>(
+    return showGlassDialog<bool>(
       context: context,
       barrierDismissible: false,
       builder: (_) => TicketCsatDialog(ticketId: ticketId),

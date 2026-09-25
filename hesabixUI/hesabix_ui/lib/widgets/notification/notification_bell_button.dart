@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'dart:async';
 import 'dart:math' as math;
 
@@ -117,7 +118,7 @@ class _NotificationBellButtonState extends State<NotificationBellButton> {
 
   Future<void> _confirmClearAllNotifications(BuildContext dialogContext, StateSetter dialogSetState) async {
     final t = AppLocalizations.of(dialogContext);
-    final ok = await showDialog<bool>(
+    final ok = await showGlassDialog<bool>(
       context: dialogContext,
       builder: (ctx) => AlertDialog(
         title: Text(t.notificationCenterClearAllTitle),
@@ -150,7 +151,7 @@ class _NotificationBellButtonState extends State<NotificationBellButton> {
   }
 
   void _openNotificationCenter() {
-    showDialog<void>(
+    showGlassDialog<void>(
       context: context,
       builder: (context) {
         return StatefulBuilder(

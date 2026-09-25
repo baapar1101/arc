@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -192,7 +193,7 @@ class _TaxWorkspacePageState extends State<TaxWorkspacePage> {
   void _showHealthDetails() {
     final t = AppLocalizations.of(context);
     final checks = _healthDetails?['checks'];
-    showDialog<void>(
+    showGlassDialog<void>(
       context: context,
       builder: (context) => AlertDialog(
         title: Text(t.taxHealthDetailsTitle),
@@ -315,7 +316,7 @@ class _TaxWorkspacePageState extends State<TaxWorkspacePage> {
   }
 
   void _showMobileQuickActionsSheet(AppLocalizations t) {
-    showModalBottomSheet<void>(
+    showGlassModalBottomSheet<void>(
       context: context,
       showDragHandle: true,
       builder: (context) => SafeArea(
@@ -499,7 +500,7 @@ class _TaxWorkspacePageState extends State<TaxWorkspacePage> {
 
   void _showHelpDialog() {
     final t = AppLocalizations.of(context);
-    showDialog<void>(
+    showGlassDialog<void>(
       context: context,
       builder: (context) => AlertDialog(
         title: Row(
@@ -1178,7 +1179,7 @@ class _TaxWorkspacePageState extends State<TaxWorkspacePage> {
       SnackBarHelper.showWarning(context, message: t.taxLinkReferenceEmpty);
       return null;
     }
-    return showDialog<int>(
+    return showGlassDialog<int>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(t.taxLinkReferenceDialogTitle),
@@ -1212,7 +1213,7 @@ class _TaxWorkspacePageState extends State<TaxWorkspacePage> {
     if (refId == null || !mounted) return;
 
     final navigator = Navigator.of(context, rootNavigator: true);
-    showDialog<void>(
+    showGlassDialog<void>(
       context: context,
       useRootNavigator: true,
       barrierDismissible: false,
@@ -1239,7 +1240,7 @@ class _TaxWorkspacePageState extends State<TaxWorkspacePage> {
 
   Future<void> _onCancelInModian(Map<String, dynamic> item) async {
     final t = AppLocalizations.of(context);
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showGlassDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: Text(t.taxCancelInModianDialogTitle),
@@ -1264,7 +1265,7 @@ class _TaxWorkspacePageState extends State<TaxWorkspacePage> {
 
   Future<void> _onSendCorrective(Map<String, dynamic> item) async {
     final t = AppLocalizations.of(context);
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showGlassDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: Text(t.taxSendCorrectiveDialogTitle),
@@ -1293,7 +1294,7 @@ class _TaxWorkspacePageState extends State<TaxWorkspacePage> {
     required String successMessage,
   }) async {
     final navigator = Navigator.of(context, rootNavigator: true);
-    showDialog<void>(
+    showGlassDialog<void>(
       context: context,
       useRootNavigator: true,
       barrierDismissible: false,
@@ -1323,7 +1324,7 @@ class _TaxWorkspacePageState extends State<TaxWorkspacePage> {
 
   Future<void> _onSendSingleToSystem(Map<String, dynamic> item) async {
     final t = AppLocalizations.of(context);
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showGlassDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: Text(t.taxSendSingleDialogTitle),
@@ -1345,7 +1346,7 @@ class _TaxWorkspacePageState extends State<TaxWorkspacePage> {
     if (confirmed != true || !mounted) return;
 
     final navigator = Navigator.of(context, rootNavigator: true);
-    showDialog<void>(
+    showGlassDialog<void>(
       context: context,
       useRootNavigator: true,
       barrierDismissible: false,
@@ -1382,7 +1383,7 @@ class _TaxWorkspacePageState extends State<TaxWorkspacePage> {
 
   Future<void> _onRemoveSingleFromWorkspace(Map<String, dynamic> item) async {
     final t = AppLocalizations.of(context);
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showGlassDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: Text(t.taxRemoveFromWorkspaceDialogTitle),
@@ -1404,7 +1405,7 @@ class _TaxWorkspacePageState extends State<TaxWorkspacePage> {
     if (confirmed != true || !mounted) return;
 
     final navigator = Navigator.of(context, rootNavigator: true);
-    showDialog<void>(
+    showGlassDialog<void>(
       context: context,
       useRootNavigator: true,
       barrierDismissible: false,
@@ -1464,7 +1465,7 @@ class _TaxWorkspacePageState extends State<TaxWorkspacePage> {
 
     if (sendableItems.length < selectedItems.length) {
       final skippedCount = selectedItems.length - sendableItems.length;
-      final confirmed = await showDialog<bool>(
+      final confirmed = await showGlassDialog<bool>(
         context: context,
         builder: (context) => AlertDialog(
           title: Text(t.taxSendSelectedDialogTitle),
@@ -1484,7 +1485,7 @@ class _TaxWorkspacePageState extends State<TaxWorkspacePage> {
       );
       if (confirmed != true || !mounted) return;
     } else {
-      final confirmed = await showDialog<bool>(
+      final confirmed = await showGlassDialog<bool>(
         context: context,
         builder: (context) => AlertDialog(
           title: Text(t.taxSendSelectedDialogTitle),
@@ -1552,7 +1553,7 @@ class _TaxWorkspacePageState extends State<TaxWorkspacePage> {
     final ids = sendableItems.map((e) => e['id']).toList();
 
     final navigator = Navigator.of(context, rootNavigator: true);
-    showDialog<void>(
+    showGlassDialog<void>(
       context: context,
       useRootNavigator: true,
       barrierDismissible: false,
@@ -1591,7 +1592,7 @@ class _TaxWorkspacePageState extends State<TaxWorkspacePage> {
       return validated;
     }
 
-    final choice = await showDialog<String>(
+    final choice = await showGlassDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
         title: Text(t.taxPreflightTitle),
@@ -1667,7 +1668,7 @@ class _TaxWorkspacePageState extends State<TaxWorkspacePage> {
     bool isCompleted = false;
     List<dynamic> failedItems = [];
     
-    showDialog<void>(
+    showGlassDialog<void>(
       context: context,
       barrierDismissible: false,
       builder: (dialogContext) => StatefulBuilder(
@@ -1828,7 +1829,7 @@ class _TaxWorkspacePageState extends State<TaxWorkspacePage> {
 
     if (removableItems.length < selectedItems.length) {
       final skippedCount = selectedItems.length - removableItems.length;
-      final confirmed = await showDialog<bool>(
+      final confirmed = await showGlassDialog<bool>(
         context: context,
         builder: (context) => AlertDialog(
           title: Text(t.taxRemoveSelectedDialogTitle),
@@ -1848,7 +1849,7 @@ class _TaxWorkspacePageState extends State<TaxWorkspacePage> {
       );
       if (confirmed != true || !mounted) return;
     } else {
-      final confirmed = await showDialog<bool>(
+      final confirmed = await showGlassDialog<bool>(
         context: context,
         builder: (context) => AlertDialog(
           title: Text(t.taxRemoveSelectedDialogTitle),
@@ -1870,7 +1871,7 @@ class _TaxWorkspacePageState extends State<TaxWorkspacePage> {
     }
 
     final navigator = Navigator.of(context, rootNavigator: true);
-    showDialog<void>(
+    showGlassDialog<void>(
       context: context,
       useRootNavigator: true,
       barrierDismissible: false,
@@ -1914,7 +1915,7 @@ class _TaxWorkspacePageState extends State<TaxWorkspacePage> {
     }
     if (selectedItems.isEmpty) return;
 
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showGlassDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: Text(t.taxInquireSelectedDialogTitle),
@@ -1936,7 +1937,7 @@ class _TaxWorkspacePageState extends State<TaxWorkspacePage> {
     if (confirmed != true || !mounted) return;
 
     final navigator = Navigator.of(context, rootNavigator: true);
-    showDialog<void>(
+    showGlassDialog<void>(
       context: context,
       useRootNavigator: true,
       barrierDismissible: false,
@@ -2074,7 +2075,7 @@ class _TaxWorkspacePageState extends State<TaxWorkspacePage> {
     }
     final technicalJson = _pickTechnicalJson(resolvedDetails);
 
-    showDialog<void>(
+    showGlassDialog<void>(
       context: context,
       builder: (context) {
         return AlertDialog(
@@ -2302,7 +2303,7 @@ class _TaxWorkspacePageState extends State<TaxWorkspacePage> {
 
   void _showBatchResultDialog(int successCount, List<dynamic> failedItems) {
     final t = AppLocalizations.of(context);
-    showDialog<void>(
+    showGlassDialog<void>(
       context: context,
       builder: (context) {
         // دسته‌بندی خطاها
@@ -2524,7 +2525,7 @@ class _TaxWorkspacePageState extends State<TaxWorkspacePage> {
 
   void _showValidationIssuesDialog(List<dynamic> issues, {int? invoiceId}) {
     final t = AppLocalizations.of(context);
-    showDialog<void>(
+    showGlassDialog<void>(
       context: context,
       builder: (context) {
         // دسته‌بندی خطاها بر اساس نوع
@@ -2830,7 +2831,7 @@ class _TaxWorkspacePageState extends State<TaxWorkspacePage> {
 
   void _showInquiryResultDialog(List<dynamic> results) {
     final t = AppLocalizations.of(context);
-    showDialog<void>(
+    showGlassDialog<void>(
       context: context,
       builder: (context) {
         return AlertDialog(

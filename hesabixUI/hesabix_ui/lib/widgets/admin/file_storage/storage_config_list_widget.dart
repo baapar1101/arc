@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/material.dart';
 import 'package:hesabix_ui/widgets/admin/file_storage/storage_config_form_dialog.dart';
 import 'package:hesabix_ui/widgets/admin/file_storage/storage_config_card.dart';
@@ -83,7 +84,7 @@ class StorageConfigListWidgetState extends State<StorageConfigListWidget> {
   }
 
   Future<void> _deleteConfig(String configId) async {
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showGlassDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: Text('تأیید حذف'),
@@ -168,7 +169,7 @@ class StorageConfigListWidgetState extends State<StorageConfigListWidget> {
   }
 
   void _editStorageConfig(Map<String, dynamic> config) {
-    showDialog(
+    showGlassDialog(
       context: context,
       builder: (context) => StorageConfigFormDialog(
         config: config,

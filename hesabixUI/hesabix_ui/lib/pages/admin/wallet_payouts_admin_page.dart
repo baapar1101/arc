@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -160,7 +161,7 @@ class _WalletPayoutsAdminPageState extends State<WalletPayoutsAdminPage> {
       final payout = await _service.getById(payoutId);
       if (!mounted) return;
       final st = payout['status']?.toString().toLowerCase() ?? '';
-      await showModalBottomSheet(
+      await showGlassModalBottomSheet(
         context: context,
         isScrollControlled: true,
         builder: (sheetCtx) => _PayoutDetailSheet(
@@ -210,7 +211,7 @@ class _WalletPayoutsAdminPageState extends State<WalletPayoutsAdminPage> {
         : double.tryParse('${payout['gross_amount']}') ?? 0.0;
 
     try {
-      final confirmed = await showDialog<bool>(
+      final confirmed = await showGlassDialog<bool>(
         context: context,
         builder: (ctx) {
           return StatefulBuilder(

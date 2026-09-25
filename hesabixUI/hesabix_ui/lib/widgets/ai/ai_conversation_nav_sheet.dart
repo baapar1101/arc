@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
@@ -14,7 +15,7 @@ Future<void> showAIConversationNavSheet({
   final theme = Theme.of(context);
   final scheme = theme.colorScheme;
 
-  return showModalBottomSheet<void>(
+  return showGlassModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
     showDragHandle: true,

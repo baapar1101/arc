@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/api_client.dart';
@@ -21,7 +22,7 @@ Future<int?> showDistributionSetupPlanSheet({
   required List<dynamic> routes,
   required DateTime planDate,
 }) {
-  return showModalBottomSheet<int>(
+  return showGlassModalBottomSheet<int>(
     context: context,
     isScrollControlled: true,
     showDragHandle: true,

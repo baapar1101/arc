@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -70,7 +71,7 @@ Future<void> showQuickLinksEditorDialog({
   final useSheet = w < _kMobileEditorBreakpoint;
 
   if (useSheet) {
-    await showModalBottomSheet<void>(
+    await showGlassModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
@@ -99,7 +100,7 @@ Future<void> showQuickLinksEditorDialog({
       },
     );
   } else {
-    await showDialog<void>(
+    await showGlassDialog<void>(
       context: context,
       barrierDismissible: true,
       builder: (ctx) {
@@ -232,7 +233,7 @@ class _QuickLinksEditorViewState extends State<_QuickLinksEditorView> {
 
   void _openPresetsWithSearch() {
     HapticFeedback.selectionClick();
-    showModalBottomSheet<void>(
+    showGlassModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
@@ -257,7 +258,7 @@ class _QuickLinksEditorViewState extends State<_QuickLinksEditorView> {
     HapticFeedback.selectionClick();
     final cTitle = TextEditingController();
     final cUrl = TextEditingController();
-    showDialog<void>(
+    showGlassDialog<void>(
       context: context,
       barrierDismissible: true,
       builder: (ctx) => LayoutBuilder(

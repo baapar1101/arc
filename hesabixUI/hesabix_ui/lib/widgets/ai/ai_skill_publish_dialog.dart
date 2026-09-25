@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:hesabix_ui/core/api_client.dart';
@@ -25,7 +26,7 @@ class AISkillPublishDialog extends StatefulWidget {
     required int packageId,
     required String defaultTitle,
   }) {
-    return showDialog<bool>(
+    return showGlassDialog<bool>(
       context: context,
       builder: (ctx) => AISkillPublishDialog(
         businessId: businessId,

@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -298,7 +299,7 @@ class _OperatorTicketsPageState extends State<OperatorTicketsPage> {
 
   Future<void> _deleteTicket(int ticketId) async {
     final t = AppLocalizations.of(context);
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showGlassDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('تأیید حذف'),

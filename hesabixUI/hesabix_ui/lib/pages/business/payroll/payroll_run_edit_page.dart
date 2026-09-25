@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
@@ -318,7 +319,7 @@ class _PayrollRunEditPageState extends State<PayrollRunEditPage> {
     if (widget.runId == null || !_canApprove) return;
     final t = AppLocalizations.of(context);
     final reasonCtrl = TextEditingController();
-    final ok = await showDialog<bool>(
+    final ok = await showGlassDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(t.payrollRejectRun),
@@ -359,7 +360,7 @@ class _PayrollRunEditPageState extends State<PayrollRunEditPage> {
   Future<void> _postAccounting() async {
     if (widget.runId == null || !_canPost) return;
     final t = AppLocalizations.of(context);
-    final ok = await showDialog<bool>(
+    final ok = await showGlassDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(t.payrollPostAccounting),
@@ -437,7 +438,7 @@ class _PayrollRunEditPageState extends State<PayrollRunEditPage> {
     final openPeriods = _periods.where((p) => p['status'] != 'closed').toList();
     int? targetPeriodId = _periodId;
     if (openPeriods.isNotEmpty) {
-      targetPeriodId = await showDialog<int?>(
+      targetPeriodId = await showGlassDialog<int?>(
         context: context,
         builder: (ctx) => SimpleDialog(
           title: Text(t.payrollPeriod),

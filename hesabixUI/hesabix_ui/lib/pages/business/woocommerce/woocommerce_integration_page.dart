@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
@@ -131,7 +132,7 @@ class _WoocommerceIntegrationPageState extends State<WoocommerceIntegrationPage>
     required String title,
     required String body,
   }) async {
-    final r = await showDialog<bool>(
+    final r = await showGlassDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(title),

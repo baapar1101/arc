@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/material.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/services/admin_users_service.dart';
@@ -51,7 +52,7 @@ class _SupportOperatorsPageState extends State<SupportOperatorsPage> {
   Future<void> _removeOperator(int userId, String email) async {
     final t = AppLocalizations.of(context);
     
-    final confirm = await showDialog<bool>(
+    final confirm = await showGlassDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: Text(t.supportOperatorsRemoveOperatorTitle),

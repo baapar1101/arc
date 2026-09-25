@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
@@ -465,7 +466,7 @@ class _TelephonyCallsPageState extends State<TelephonyCallsPage> {
                           onTap: () async {
                             final note = TextEditingController(text: '${c['note'] ?? ''}');
                             final category = TextEditingController(text: '${c['category'] ?? ''}');
-                            final ok = await showDialog<bool>(
+                            final ok = await showGlassDialog<bool>(
                               context: context,
                               builder: (ctx) => AlertDialog(
                                 title: const Text('جزئیات تماس'),
@@ -565,7 +566,7 @@ class _TelephonySettingsPageState extends State<TelephonySettingsPage> {
 
   Future<void> _addPbx() async {
     final nameCtrl = TextEditingController(text: 'مرکز تلفن اصلی');
-    final ok = await showDialog<bool>(
+    final ok = await showGlassDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('افزودن مرکز تلفن'),
@@ -593,7 +594,7 @@ class _TelephonySettingsPageState extends State<TelephonySettingsPage> {
     final extCtrl = TextEditingController();
     final nameCtrl = TextEditingController();
     final pbxId = _pbx.first['id'];
-    final ok = await showDialog<bool>(
+    final ok = await showGlassDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('افزودن داخلی'),
@@ -651,7 +652,7 @@ class _TelephonySettingsPageState extends State<TelephonySettingsPage> {
     var primary = isPrimary;
     final sipCtrl = TextEditingController(text: directSipUser ?? '');
 
-    final ok = await showDialog<bool>(
+    final ok = await showGlassDialog<bool>(
       context: context,
       builder: (ctx) {
         return StatefulBuilder(
@@ -759,7 +760,7 @@ class _TelephonySettingsPageState extends State<TelephonySettingsPage> {
       text: '${soft['audiosocket_port'] ?? 9092}',
     );
 
-    final ok = await showDialog<bool>(
+    final ok = await showGlassDialog<bool>(
       context: context,
       builder: (ctx) {
         return StatefulBuilder(
@@ -1161,7 +1162,7 @@ class _TelephonySettingsPageState extends State<TelephonySettingsPage> {
                         final metrics = await _api.opsMetrics(widget.businessId);
                         final dlq = await _api.deadLetters(widget.businessId);
                         if (!mounted) return;
-                        await showModalBottomSheet<void>(
+                        await showGlassModalBottomSheet<void>(
                           context: context,
                           isScrollControlled: true,
                           showDragHandle: true,

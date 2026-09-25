@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/material.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/services/ai_service.dart';
@@ -11,7 +12,7 @@ Future<void> showAIChatMemorySheet({
   required AIService aiService,
   required int? businessId,
 }) async {
-  await showModalBottomSheet<void>(
+  await showGlassModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
     showDragHandle: true,
@@ -150,7 +151,7 @@ class _AIChatMemorySheetState extends State<_AIChatMemorySheet> {
 
   Future<void> _clearAll() async {
     final l10n = AppLocalizations.of(context);
-    final ok = await showDialog<bool>(
+    final ok = await showGlassDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(l10n.aiMemoryClearTitle),
@@ -190,7 +191,7 @@ class _AIChatMemorySheetState extends State<_AIChatMemorySheet> {
   Future<void> _editItem(_LearnedItem item) async {
     final l10n = AppLocalizations.of(context);
     final ctrl = TextEditingController(text: item.content);
-    final saved = await showDialog<String>(
+    final saved = await showGlassDialog<String>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(l10n.aiMemoryEditTitle),
@@ -246,7 +247,7 @@ class _AIChatMemorySheetState extends State<_AIChatMemorySheet> {
 
   Future<void> _deleteItem(_LearnedItem item) async {
     final l10n = AppLocalizations.of(context);
-    final ok = await showDialog<bool>(
+    final ok = await showGlassDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(l10n.aiMemoryDeleteItemTitle),

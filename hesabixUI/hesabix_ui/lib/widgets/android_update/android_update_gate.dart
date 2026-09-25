@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -120,7 +121,7 @@ class _AndroidUpdateGateState extends State<AndroidUpdateGate>
       final promptContext = _dialogContext;
       if (promptContext == null || !promptContext.mounted) return;
 
-      final install = await showDialog<bool>(
+      final install = await showGlassDialog<bool>(
         context: promptContext,
         useRootNavigator: true,
         builder: (ctx) => AlertDialog(
@@ -227,7 +228,7 @@ class AndroidUpdateFlow {
     final remote = result.remote!;
     final t = AppLocalizations.of(context);
 
-    final action = await showDialog<bool>(
+    final action = await showGlassDialog<bool>(
       context: context,
       barrierDismissible: false,
       useRootNavigator: true,
@@ -406,7 +407,7 @@ class AndroidUpdateFlow {
       final allowed = await _service.canRequestPackageInstalls();
       if (!allowed) {
         if (!context.mounted) return;
-        final openSettings = await showDialog<bool>(
+        final openSettings = await showGlassDialog<bool>(
           context: context,
           useRootNavigator: true,
           builder: (ctx) => AlertDialog(

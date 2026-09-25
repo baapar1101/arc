@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -240,7 +241,7 @@ class _BasalamIntegrationPageState extends State<BasalamIntegrationPage> {
 
   Future<void> _confirmClearDlq() async {
     final t = AppLocalizations.of(context);
-    final ok = await showDialog<bool>(
+    final ok = await showGlassDialog<bool>(
       context: context,
       builder: (ctx) {
         final d = AppLocalizations.of(ctx);
@@ -416,7 +417,7 @@ class _BasalamIntegrationPageState extends State<BasalamIntegrationPage> {
   Future<void> _showConflictDetailsDialog(Map<String, dynamic> item) async {
     final isFa = AppLocalizations.of(context).localeName.startsWith('fa');
     final conflictId = item['conflict_id']?.toString() ?? '';
-    await showDialog<void>(
+    await showGlassDialog<void>(
       context: context,
       builder: (ctx) {
         return AlertDialog(

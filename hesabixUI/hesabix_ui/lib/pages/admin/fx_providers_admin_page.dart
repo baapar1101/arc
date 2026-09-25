@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/core/api_client.dart';
@@ -78,7 +79,7 @@ class _FxProvidersAdminPageState extends State<FxProvidersAdminPage> {
     var isActive = p['is_active'] == true;
     final hasKey = p['has_api_key'] == true;
 
-    final ok = await showDialog<bool>(
+    final ok = await showGlassDialog<bool>(
       context: context,
       builder: (ctx) {
         return StatefulBuilder(

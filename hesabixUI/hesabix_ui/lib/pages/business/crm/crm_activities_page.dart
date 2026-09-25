@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/core/api_client.dart';
@@ -387,7 +388,7 @@ class _CrmActivitiesPageState extends State<CrmActivitiesPage> {
   }
 
   void _onEdit(Map<String, dynamic> item) {
-    showDialog<void>(
+    showGlassDialog<void>(
       context: context,
       builder: (ctx) => _ActivityFormDialog(
         businessId: widget.businessId,
@@ -401,7 +402,7 @@ class _CrmActivitiesPageState extends State<CrmActivitiesPage> {
 
   void _onAdd() {
     if (!widget.authStore.hasBusinessPermission('crm', 'write')) return;
-    showDialog<void>(
+    showGlassDialog<void>(
       context: context,
       builder: (ctx) => _ActivityFormDialog(
         businessId: widget.businessId,

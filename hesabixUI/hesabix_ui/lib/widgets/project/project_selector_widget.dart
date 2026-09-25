@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/material.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/core/auth_store.dart';
@@ -190,7 +191,7 @@ class _ProjectSelectorWidgetState extends State<ProjectSelectorWidget> {
     // ذخیره تعداد پروژه‌های فعلی برای تشخیص پروژه جدید
     final projectsCountBefore = _projects.length;
 
-    final result = await showDialog<bool>(
+    final result = await showGlassDialog<bool>(
       context: context,
       builder: (context) => ProjectFormDialog(
         businessId: widget.businessId,

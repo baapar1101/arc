@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -53,7 +54,7 @@ Future<void> _confirmClose() async {
   _confirming = true;
   try {
     final t = AppLocalizations.of(ctx);
-    final ok = await showDialog<bool>(
+    final ok = await showGlassDialog<bool>(
       context: ctx,
       builder: (dialogCtx) {
         return AlertDialog(

@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/material.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/core/auth_store.dart';
@@ -207,7 +208,7 @@ class _CrmDealFormDialogState extends State<CrmDealFormDialog> {
     if (!mounted) return;
     String? selectedCode = isWon ? _wonReasonCode : _lostReasonCode;
     final competitorController = TextEditingController(text: _competitorName ?? '');
-    final result = await showDialog<Map<String, dynamic>>(
+    final result = await showGlassDialog<Map<String, dynamic>>(
       context: context,
       builder: (ctx) {
         String? localCode = selectedCode;

@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -18,7 +19,7 @@ Future<void> showAIChatSkillsSheet({
     SnackBarHelper.show(context, message: 'ابتدا یک کسب‌وکار انتخاب کنید', isError: true);
     return;
   }
-  await showModalBottomSheet<void>(
+  await showGlassModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
     showDragHandle: true,
@@ -144,7 +145,7 @@ class _AIChatSkillsSheetState extends State<_AIChatSkillsSheet> {
 
   Future<void> _importGit() async {
     final ctrl = TextEditingController();
-    final ok = await showDialog<bool>(
+    final ok = await showGlassDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('وارد کردن از گیت‌هاب'),

@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
@@ -123,7 +124,7 @@ class _WorkflowMarketplacePageState extends State<WorkflowMarketplacePage> with 
           : await _service.getPackage(packageId);
       if (!mounted) return;
 
-      await showModalBottomSheet<void>(
+      await showGlassModalBottomSheet<void>(
         context: context,
         isScrollControlled: true,
         useSafeArea: true,
@@ -251,7 +252,7 @@ class _WorkflowMarketplacePageState extends State<WorkflowMarketplacePage> with 
                             if (isPublished) ...[
                               OutlinedButton.icon(
                                 onPressed: () async {
-                                  final ok = await showDialog<bool>(
+                                  final ok = await showGlassDialog<bool>(
                                     context: ctx,
                                     builder: (dCtx) {
                                       return AlertDialog(

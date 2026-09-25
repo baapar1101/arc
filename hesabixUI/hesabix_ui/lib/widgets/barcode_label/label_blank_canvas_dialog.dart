@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/material.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 
@@ -6,7 +7,7 @@ class LabelBlankCanvasDialog extends StatefulWidget {
   const LabelBlankCanvasDialog({super.key});
 
   static Future<LabelBlankCanvasResult?> show(BuildContext context) {
-    return showDialog<LabelBlankCanvasResult>(
+    return showGlassDialog<LabelBlankCanvasResult>(
       context: context,
       builder: (_) => const LabelBlankCanvasDialog(),
     );

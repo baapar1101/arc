@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/material.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 
@@ -13,7 +14,7 @@ class PayrollDepartmentFormDialog extends StatefulWidget {
     BuildContext context, {
     Map<String, dynamic>? existing,
   }) {
-    return showDialog<Map<String, dynamic>>(
+    return showGlassDialog<Map<String, dynamic>>(
       context: context,
       builder: (_) => PayrollDepartmentFormDialog(existing: existing),
     );

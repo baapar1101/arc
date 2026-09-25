@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:hesabix_ui/core/api_client.dart';
@@ -155,7 +156,7 @@ class _SupportBillingStatsAdminPageState extends State<SupportBillingStatsAdminP
   }
 
   Future<void> _openInvoiceDetail(Map<String, dynamic> inv) async {
-    final result = await showModalBottomSheet<String>(
+    final result = await showGlassModalBottomSheet<String>(
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
@@ -177,7 +178,7 @@ class _SupportBillingStatsAdminPageState extends State<SupportBillingStatsAdminP
     required String title,
     required List<(String, String)> rows,
   }) {
-    showDialog<void>(
+    showGlassDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(title),
@@ -211,7 +212,7 @@ class _SupportBillingStatsAdminPageState extends State<SupportBillingStatsAdminP
     final list = (_stats?['expiring_soon'] as List? ?? [])
         .map((e) => Map<String, dynamic>.from(e as Map))
         .toList();
-    showDialog<void>(
+    showGlassDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('اشتراک‌های در شرف انقضا'),
@@ -920,7 +921,7 @@ class _InvoiceDetailSheetState extends State<_InvoiceDetailSheet> {
   bool _voiding = false;
 
   Future<void> _voidInvoice() async {
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showGlassDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('ابطال صورت‌حساب'),

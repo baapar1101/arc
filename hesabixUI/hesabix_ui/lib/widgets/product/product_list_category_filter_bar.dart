@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'dart:async';
 
 import 'package:flutter/gestures.dart';
@@ -58,7 +59,7 @@ class _ProductListCategoryFilterBarState extends State<ProductListCategoryFilter
   Future<void> _openFullPicker() async {
     final t = AppLocalizations.of(context);
     final isMobile = ResponsiveHelper.isMobile(context);
-    final picked = await showDialog<Object?>(
+    final picked = await showGlassDialog<Object?>(
       context: context,
       barrierDismissible: false,
       builder: (ctx) {

@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -23,7 +24,7 @@ Future<bool?> showDistributionPersonLocationSheet({
   double? initialLng,
   DistributionMapTileConfig? tileConfig,
 }) async {
-  return showModalBottomSheet<bool>(
+  return showGlassModalBottomSheet<bool>(
     context: context,
     isScrollControlled: true,
     showDragHandle: true,

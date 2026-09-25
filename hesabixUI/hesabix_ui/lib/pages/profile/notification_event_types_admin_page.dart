@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/material.dart';
 import '../../core/api_client.dart';
 import '../../services/admin_notification_event_types_service.dart';
@@ -84,7 +85,7 @@ class _NotificationEventTypesAdminPageState
       text: item['default_email_subject'] as String? ?? '',
     );
 
-    final saved = await showDialog<bool>(
+    final saved = await showGlassDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text('قالب پیش‌فرض — ${item['name'] ?? code}'),

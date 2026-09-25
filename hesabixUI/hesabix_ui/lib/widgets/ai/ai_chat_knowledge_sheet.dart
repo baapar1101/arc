@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
@@ -11,7 +12,7 @@ Future<void> showAIChatKnowledgeSheet({
   required AIService aiService,
   required int? businessId,
 }) async {
-  await showModalBottomSheet<void>(
+  await showGlassModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
     showDragHandle: true,
@@ -73,7 +74,7 @@ class _AIChatKnowledgeSheetState extends State<_AIChatKnowledgeSheet> {
     final l10n = AppLocalizations.of(context);
     final titleCtrl = TextEditingController();
     final bodyCtrl = TextEditingController();
-    final ok = await showDialog<bool>(
+    final ok = await showGlassDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(l10n.aiKnowledgeNewDocument),

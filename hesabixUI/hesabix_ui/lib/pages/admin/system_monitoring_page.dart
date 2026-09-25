@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -931,7 +932,7 @@ class _SystemMonitoringPageState extends State<SystemMonitoringPage> with Single
 
   Future<void> _showAbandonOutboxDialog(ThemeData theme, String expectedPhrase) async {
     _abandonConfirmController.clear();
-    await showDialog<void>(
+    await showGlassDialog<void>(
       context: context,
       builder: (ctx) {
         return AlertDialog(
@@ -1126,7 +1127,7 @@ class _SystemMonitoringPageState extends State<SystemMonitoringPage> with Single
 
   Future<void> _restartNotificationModerationWorker() async {
     try {
-      final confirmed = await showDialog<bool>(
+      final confirmed = await showGlassDialog<bool>(
         context: context,
         builder: (context) => AlertDialog(
           title: const Text('Restart Worker'),

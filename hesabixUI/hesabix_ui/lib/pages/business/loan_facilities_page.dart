@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'dart:async';
 import 'dart:math' as math;
 
@@ -63,7 +64,7 @@ class LoanFacilitiesPage extends StatefulWidget {
     } else {
       if (!authStore.hasBusinessPermission('loan_facilities', 'edit')) return;
     }
-    await showDialog<bool>(
+    await showGlassDialog<bool>(
       context: context,
       barrierDismissible: false,
       builder: (ctx) => LoanFacilityUpsertDialog(
@@ -175,7 +176,7 @@ class _LoanFacilitiesPageState extends State<LoanFacilitiesPage> {
 
   Future<void> _showFacilitySheet(int facilityId) async {
     if (!mounted) return;
-    await showModalBottomSheet<void>(
+    await showGlassModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
@@ -975,7 +976,7 @@ class _FacilityDetailSheetState extends State<_FacilityDetailSheet> {
 
   Future<void> _deleteFacility() async {
     final t = AppLocalizations.of(context);
-    final ok = await showDialog<bool>(
+    final ok = await showGlassDialog<bool>(
       context: context,
       builder: (dCtx) {
         final dt = AppLocalizations.of(dCtx);
@@ -1013,7 +1014,7 @@ class _FacilityDetailSheetState extends State<_FacilityDetailSheet> {
     final d = _detail;
     if (d == null) return;
     final t = AppLocalizations.of(context);
-    final ok = await showDialog<bool>(
+    final ok = await showGlassDialog<bool>(
       context: context,
       builder: (dlgCtx) => _RegenerateScheduleDialog(
         businessId: widget.businessId,
@@ -1034,7 +1035,7 @@ class _FacilityDetailSheetState extends State<_FacilityDetailSheet> {
   }
 
   void _showDocument(BuildContext ctx, int documentId) {
-    showDialog<void>(
+    showGlassDialog<void>(
       context: ctx,
       builder: (_) => DocumentDetailsDialog(
         documentId: documentId,
@@ -1050,7 +1051,7 @@ class _FacilityDetailSheetState extends State<_FacilityDetailSheet> {
   }) async {
     final pid = _asInt(pay['id']);
     if (pid == null) return;
-    final ok = await showDialog<bool>(
+    final ok = await showGlassDialog<bool>(
       context: ctx,
       builder: (dCtx) {
         final dt = AppLocalizations.of(dCtx);
@@ -1105,7 +1106,7 @@ class _FacilityDetailSheetState extends State<_FacilityDetailSheet> {
     String? bankIdStr;
     final allowPayDec = moneyDp > 0;
 
-    final submitted = await showDialog<bool>(
+    final submitted = await showGlassDialog<bool>(
       context: sheetCtx,
       builder: (dlgCtx) {
         final dt = AppLocalizations.of(dlgCtx);

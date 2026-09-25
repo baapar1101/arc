@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
@@ -484,7 +485,7 @@ class _TransfersPageState extends State<TransfersPage> {
     DateTime? fromDate = _fromDate;
     DateTime? toDate = _toDate;
 
-    final applied = await showModalBottomSheet<bool>(
+    final applied = await showGlassModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
@@ -920,7 +921,7 @@ class _TransfersPageState extends State<TransfersPage> {
   }
 
   void _onAddNew() async {
-    final result = await showDialog<bool>(
+    final result = await showGlassDialog<bool>(
       context: context,
       builder: (context) => TransferFormDialog(
         businessId: widget.businessId,
@@ -937,7 +938,7 @@ class _TransfersPageState extends State<TransfersPage> {
     final svc = TransferService(widget.apiClient);
     final full = await svc.getById(item.id);
     if (!mounted) return;
-    showDialog(
+    showGlassDialog(
       context: context,
       builder: (_) => TransferDetailsDialog(
         document: full,
@@ -950,7 +951,7 @@ class _TransfersPageState extends State<TransfersPage> {
     final svc = TransferService(widget.apiClient);
     final full = await svc.getById(item.id);
     if (!mounted) return;
-    final result = await showDialog<bool>(
+    final result = await showGlassDialog<bool>(
       context: context,
       builder: (_) => TransferFormDialog(
         businessId: widget.businessId,
@@ -965,7 +966,7 @@ class _TransfersPageState extends State<TransfersPage> {
   }
 
   void _onDelete(TransferDocument item) async {
-    final confirm = await showDialog<bool>(
+    final confirm = await showGlassDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('حذف انتقال'),

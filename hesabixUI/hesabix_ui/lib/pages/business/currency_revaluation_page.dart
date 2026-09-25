@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
@@ -111,7 +112,7 @@ class _CurrencyRevaluationPageState extends State<CurrencyRevaluationPage> {
       }
       if (payload['stale'] == true) {
         final age = payload['max_age_hours'];
-        final cont = await showDialog<bool>(
+        final cont = await showGlassDialog<bool>(
           context: context,
           builder: (ctx) => AlertDialog(
             title: const Text('اسنپ‌شات قدیمی'),
@@ -130,7 +131,7 @@ class _CurrencyRevaluationPageState extends State<CurrencyRevaluationPage> {
         for (final it in items)
           if (it['business_currency_id'] != null) (it['business_currency_id'] as num).toInt(),
       };
-      final apply = await showDialog<bool>(
+      final apply = await showGlassDialog<bool>(
         context: context,
         builder: (ctx) {
           return StatefulBuilder(
@@ -282,7 +283,7 @@ class _CurrencyRevaluationPageState extends State<CurrencyRevaluationPage> {
     if (!context.mounted) return;
     final t = AppLocalizations.of(context);
     final cal = widget.calendarController;
-    final result = await showDialog<bool>(
+    final result = await showGlassDialog<bool>(
       context: context,
       builder: (ctx) {
         return StatefulBuilder(
@@ -457,7 +458,7 @@ class _CurrencyRevaluationPageState extends State<CurrencyRevaluationPage> {
     final id = _toInt(row['id']);
     if (id == null) return;
     final t = AppLocalizations.of(context);
-    final ok = await showDialog<bool>(
+    final ok = await showGlassDialog<bool>(
       context: context,
       builder: (c) => AlertDialog(
         title: Text(t.delete),

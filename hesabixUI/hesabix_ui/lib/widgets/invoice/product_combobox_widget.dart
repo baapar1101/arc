@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
@@ -1149,7 +1150,7 @@ class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
     Navigator.pop(bottomSheetContext);
 
     final preset = _searchCtrl.text.trim();
-    final result = await showDialog<dynamic>(
+    final result = await showGlassDialog<dynamic>(
       context: context,
       builder: (context) => ProductFormDialog(
         businessId: widget.businessId,
@@ -1171,7 +1172,7 @@ class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
     FocusManager.instance.primaryFocus?.unfocus();
 
     final preset = _searchCtrl.text.trim();
-    final result = await showDialog<dynamic>(
+    final result = await showGlassDialog<dynamic>(
       context: context,
       builder: (context) => ProductFormDialog(
         businessId: widget.businessId,
@@ -1191,7 +1192,7 @@ class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
 
     if (isMobile) {
       // موبایل: bottom sheet
-      showModalBottomSheet(
+      showGlassModalBottomSheet(
         context: context,
         isScrollControlled: true,
         builder: (ctx) {
@@ -1229,7 +1230,7 @@ class _ProductComboboxWidgetState extends State<ProductComboboxWidget> {
       );
     } else {
       // دسکتاپ: Dialog با split view
-      showDialog(
+      showGlassDialog(
         context: context,
         builder: (ctx) {
           return _ProductPickerDialog(
@@ -1532,7 +1533,7 @@ class _ProductPickerBottomSheetState extends State<_ProductPickerBottomSheet> {
   }
 
   void _showCategoryFilter(BuildContext context) {
-    showModalBottomSheet(
+    showGlassModalBottomSheet(
       context: context,
       isScrollControlled: true,
       builder: (ctx) {

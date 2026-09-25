@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
@@ -166,7 +167,7 @@ class _DailyFxRatesToolbarChipState extends State<DailyFxRatesToolbarChip> {
   Future<void> _openSheet() async {
     await _load(force: true);
     if (!mounted) return;
-    await showModalBottomSheet<void>(
+    await showGlassModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
@@ -433,7 +434,7 @@ class _FxRatesSheetState extends State<_FxRatesSheet> {
       }
       if (latest['stale'] == true && mounted) {
         final age = latest['max_age_hours'];
-        final cont = await showDialog<bool>(
+        final cont = await showGlassDialog<bool>(
           context: context,
           builder: (ctx) => AlertDialog(
             title: const Text('اسنپ‌شات قدیمی'),

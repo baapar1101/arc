@@ -1,5 +1,6 @@
 ﻿import 'dart:math' as math;
 
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -246,7 +247,7 @@ class _LabelStudioPageState extends State<LabelStudioPage> {
   Future<bool> _confirmLeave() async {
     if (!_dirty) return true;
     final isFa = Localizations.localeOf(context).languageCode == 'fa';
-    final result = await showDialog<bool>(
+    final result = await showGlassDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(isFa ? 'خروج' : 'Leave'),

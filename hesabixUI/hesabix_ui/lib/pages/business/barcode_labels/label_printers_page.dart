@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
@@ -85,7 +86,7 @@ class _LabelPrintersPageState extends State<LabelPrintersPage> {
 
   Future<void> _addOrEdit([LabelPrinterProfile? existing]) async {
     if (!_canEdit) return;
-    final result = await showDialog<LabelPrinterProfile>(
+    final result = await showGlassDialog<LabelPrinterProfile>(
       context: context,
       builder: (ctx) => _PrinterProfileDialog(initial: existing),
     );
@@ -103,7 +104,7 @@ class _LabelPrintersPageState extends State<LabelPrintersPage> {
   }
 
   Future<void> _delete(LabelPrinterProfile profile) async {
-    final ok = await showDialog<bool>(
+    final ok = await showGlassDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(AppLocalizations.of(context).delete),

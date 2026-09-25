@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -750,7 +751,7 @@ class _CrmDealsPageState extends State<CrmDealsPage> {
 
   void _onAdd({int? stageId}) {
     if (!widget.authStore.hasBusinessPermission('crm', 'write') || _processDefs.isEmpty) return;
-    showDialog<Map<String, dynamic>?>(
+    showGlassDialog<Map<String, dynamic>?>(
       context: context,
       builder: (ctx) => CrmDealQuickCreateDialog(
         businessId: widget.businessId,

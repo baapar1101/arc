@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/material.dart';
 import 'package:hesabix_ui/services/ai_service.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
@@ -8,7 +9,7 @@ Future<void> showAIChatConnectorsSheet({
   required AIService aiService,
   required int? businessId,
 }) async {
-  await showModalBottomSheet<void>(
+  await showGlassModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
     showDragHandle: true,
@@ -66,7 +67,7 @@ class _AIChatConnectorsSheetState extends State<_AIChatConnectorsSheet> {
     final urlCtrl = TextEditingController();
     final descCtrl = TextEditingController();
     var method = 'GET';
-    final ok = await showDialog<bool>(
+    final ok = await showGlassDialog<bool>(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (context, setLocal) => AlertDialog(

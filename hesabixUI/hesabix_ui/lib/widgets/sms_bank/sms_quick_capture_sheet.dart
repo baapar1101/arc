@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/utils/number_formatters.dart' show formatWithThousands;
@@ -22,7 +23,7 @@ Future<void> showSmsQuickCaptureSheet({
   CalendarController? calendarController,
 }) async {
   final service = createSmsBankAssistantService();
-  await showModalBottomSheet<void>(
+  await showGlassModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,
@@ -249,7 +250,7 @@ class _SmsQuickCaptureBodyState extends State<_SmsQuickCaptureBody> {
       if (!mounted) return;
       Navigator.of(context).pop();
       final isReceipt = _direction == SmsBankDirection.credit;
-      await showDialog<bool>(
+      await showGlassDialog<bool>(
         context: context,
         builder: (ctx) => BulkSettlementDialog(
           businessId: biz.id,
@@ -281,7 +282,7 @@ class _SmsQuickCaptureBodyState extends State<_SmsQuickCaptureBody> {
       if (!mounted) return;
       Navigator.of(context).pop();
       final isIncome = _direction == SmsBankDirection.credit;
-      await showDialog<bool>(
+      await showGlassDialog<bool>(
         context: context,
         builder: (ctx) => ExpenseIncomeFormDialog(
           businessId: biz.id,
@@ -322,7 +323,7 @@ class _SmsQuickCaptureBodyState extends State<_SmsQuickCaptureBody> {
       final cal = widget.calendarController ?? await CalendarController.load();
       if (!mounted) return;
       Navigator.of(context).pop();
-      await showDialog<bool>(
+      await showGlassDialog<bool>(
         context: context,
         builder: (ctx) => TransferFormDialog(
           businessId: biz.id,

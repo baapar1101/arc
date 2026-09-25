@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/material.dart';
 
 import '../../services/telephony/telephony_session_controller.dart';
@@ -32,7 +33,7 @@ Future<void> showTelephonyPostCallSheet(
   };
 
   try {
-    await showModalBottomSheet<void>(
+    await showGlassModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       showDragHandle: true,

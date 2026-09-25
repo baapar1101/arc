@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:dio/dio.dart';
@@ -632,7 +633,7 @@ class _ReceiptsPaymentsListPageState extends State<ReceiptsPaymentsListPage> {
     DateTime? fromDate = _fromDate;
     DateTime? toDate = _toDate;
 
-    final applied = await showModalBottomSheet<bool>(
+    final applied = await showGlassModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
@@ -1100,7 +1101,7 @@ class _ReceiptsPaymentsListPageState extends State<ReceiptsPaymentsListPage> {
 
   /// افزودن سند جدید
   void _onAddNew() async {
-    final result = await showDialog<bool>(
+    final result = await showGlassDialog<bool>(
       context: context,
       builder: (_) => BulkSettlementDialog(
         businessId: widget.businessId,
@@ -1132,7 +1133,7 @@ class _ReceiptsPaymentsListPageState extends State<ReceiptsPaymentsListPage> {
       // نمایش دیالوگ مشاهده جزئیات
       if (!context.mounted) return;
       final ctx = context;
-      await showDialog(
+      await showGlassDialog(
         context: ctx,
         builder: (_) => ReceiptPaymentViewDialog(
           document: fullDoc,
@@ -1163,7 +1164,7 @@ class _ReceiptsPaymentsListPageState extends State<ReceiptsPaymentsListPage> {
 
       if (!context.mounted) return;
       final ctx = context;
-      final result = await showDialog<bool>(
+      final result = await showGlassDialog<bool>(
         context: ctx,
         builder: (_) => BulkSettlementDialog(
           businessId: widget.businessId,
@@ -1193,7 +1194,7 @@ class _ReceiptsPaymentsListPageState extends State<ReceiptsPaymentsListPage> {
   /// تأیید را با [Navigator.pop(ctx, bool)] تمام می‌کنیم و بعد از بسته‌شدن کامل دیالوگ، حذف را اجرا می‌کنیم؛
   /// باز کردن بلافاصلهٔ دیالوگ لودینگ داخل `onPressed` همزمان با بسته‌شدن دیالوگ تأیید باعث ناسازگاری پشتهٔ [Navigator] و صفحهٔ سفید می‌شود.
   Future<void> _onDelete(ReceiptPaymentDocument document) async {
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showGlassDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('تأیید حذف'),
@@ -1219,7 +1220,7 @@ class _ReceiptsPaymentsListPageState extends State<ReceiptsPaymentsListPage> {
     if (!mounted) return;
 
     // لودینگ روی root navigator همان‌جایی که showDialog پیش‌فرض قرار می‌گیرد؛ بستن با context صفحه گاهی نزدیک‌ترین Navigator را می‌پَکد و به‌اشتباه مسیر GoRouter را برمی‌دارد (صفحهٔ سفید).
-    showDialog<void>(
+    showGlassDialog<void>(
       context: context,
       barrierDismissible: false,
       useRootNavigator: true,
@@ -1322,7 +1323,7 @@ class _ReceiptsPaymentsListPageState extends State<ReceiptsPaymentsListPage> {
     final codes = docs.map((d) => d.code).toList();
 
     // تایید کاربر
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showGlassDialog<bool>(
       context: context,
       builder: (ctx) {
         return AlertDialog(
@@ -1351,7 +1352,7 @@ class _ReceiptsPaymentsListPageState extends State<ReceiptsPaymentsListPage> {
     if (confirmed != true) return;
     if (!mounted) return;
 
-    showDialog<void>(
+    showGlassDialog<void>(
       context: context,
       barrierDismissible: false,
       useRootNavigator: true,
@@ -2231,7 +2232,7 @@ class _BulkSettlementDialogState extends State<BulkSettlementDialog>
     }
     
     // نمایش loading
-    showDialog(
+    showGlassDialog(
       context: context,
       barrierDismissible: false,
       builder: (ctx) => const Center(child: CircularProgressIndicator()),
@@ -2531,7 +2532,7 @@ class _BulkSettlementDialogState extends State<BulkSettlementDialog>
   }
 
   Future<void> _pickInvoiceForLine(_PersonLine line) async {
-    final picked = await showDialog<Map<String, dynamic>>(
+    final picked = await showGlassDialog<Map<String, dynamic>>(
       context: context,
       builder: (ctx) => _InstallmentInvoicePickerDialog(
         businessId: widget.businessId,
@@ -3870,7 +3871,7 @@ class _PersonLineTileState extends State<_PersonLineTile> {
                         if (ancestor == null) return;
                         final current = ancestor._defaultInstallmentSelectionStrategy;
                         String temp = current;
-                        await showDialog(
+                        await showGlassDialog(
                           context: context,
                           builder: (ctx) {
                             return AlertDialog(

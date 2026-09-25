@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/material.dart';
 
 import '../../services/hscript_report_service.dart';
@@ -9,7 +10,7 @@ Future<String?> showHScriptRecipesSheet({
   required int businessId,
   required HScriptReportService service,
 }) {
-  return showModalBottomSheet<String>(
+  return showGlassModalBottomSheet<String>(
     context: context,
     isScrollControlled: true,
     useSafeArea: true,

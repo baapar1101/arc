@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/material.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
@@ -741,7 +742,7 @@ class _CrmLeadFormDialogState extends State<CrmLeadFormDialog> {
     final id = widget.initial?['id'] as int?;
     final name = widget.initial?['name']?.toString() ?? '';
     if (id == null) return;
-    final result = await showDialog<Map<String, dynamic>?>(
+    final result = await showGlassDialog<Map<String, dynamic>?>(
       context: context,
       builder: (ctx) => CrmConvertLeadDialog(
         businessId: widget.businessId,

@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -488,7 +489,7 @@ class _DistributionMainPageState extends State<DistributionMainPage>
     final t = AppLocalizations.of(context);
     final items = await _offlineQueue.peek(widget.businessId);
     if (!mounted) return;
-    await showModalBottomSheet<void>(
+    await showGlassModalBottomSheet<void>(
       context: context,
       showDragHandle: true,
       builder: (ctx) {
@@ -659,7 +660,7 @@ class _DistributionMainPageState extends State<DistributionMainPage>
     }
     if (!mounted || users.isEmpty) return null;
     int? selected;
-    final ok = await showDialog<bool>(
+    final ok = await showGlassDialog<bool>(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (context, setD) => AlertDialog(
@@ -744,7 +745,7 @@ class _DistributionMainPageState extends State<DistributionMainPage>
           return;
         }
         final reasonCtl = TextEditingController();
-        final ok = await showDialog<bool>(
+        final ok = await showGlassDialog<bool>(
           context: context,
           builder: (dctx) => AlertDialog(
             title: Text(t.distributionGeofenceOverride),
@@ -802,7 +803,7 @@ class _DistributionMainPageState extends State<DistributionMainPage>
     final v = _activeVisit;
     if (v == null || !_canOperate) return;
     final t = AppLocalizations.of(context);
-    final ok = await showDialog<bool>(
+    final ok = await showGlassDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(t.distributionCancelVisit),
@@ -1761,7 +1762,7 @@ class _DistributionMainPageState extends State<DistributionMainPage>
               icon: const Icon(Icons.add),
               onPressed: () async {
                 final ctl = TextEditingController();
-                final ok = await showDialog<bool>(
+                final ok = await showGlassDialog<bool>(
                   context: context,
                   builder: (dctx) => AlertDialog(
                     title: Text(t.distributionChecklistAddItem),
@@ -2218,7 +2219,7 @@ class _DistributionMainPageState extends State<DistributionMainPage>
   Future<void> _showTerritoryDialog(AppLocalizations t, {Map<String, dynamic>? existing}) async {
     final nameCtl = TextEditingController(text: existing?['name']?.toString() ?? '');
     final editing = existing != null;
-    await showDialog<void>(
+    await showGlassDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(editing ? t.distributionTerritoryEdit : t.distributionTerritoryCreate),
@@ -2273,7 +2274,7 @@ class _DistributionMainPageState extends State<DistributionMainPage>
     final nameCtl = TextEditingController(text: existing?['name']?.toString() ?? '');
     int? territoryId = int.tryParse('${existing?['territory_id'] ?? ''}');
     final editing = existing != null;
-    await showDialog<void>(
+    await showGlassDialog<void>(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (context, setD) => AlertDialog(
@@ -2369,7 +2370,7 @@ class _DistributionMainPageState extends State<DistributionMainPage>
     var cls = existing?['customer_class']?.toString();
     final offsetCtl = TextEditingController(text: '${existing?['cycle_offset'] ?? 0}');
     int? priceListId = int.tryParse('${existing?['price_list_id'] ?? ''}');
-    await showDialog<void>(
+    await showGlassDialog<void>(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (context, setD) => AlertDialog(
@@ -2512,7 +2513,7 @@ class _DistributionMainPageState extends State<DistributionMainPage>
     } catch (_) {}
 
     if (!mounted) return;
-    await showDialog<void>(
+    await showGlassDialog<void>(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (context, setD) => AlertDialog(

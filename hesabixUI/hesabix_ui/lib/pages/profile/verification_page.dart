@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
@@ -248,7 +249,7 @@ class _VerificationPageState extends State<VerificationPage> {
         SnackBarHelper.showError(context, message: errorMessage);
       } else if (errorCode == 'MOBILE_IN_USE_UNVERIFIED') {
         // نمایش Dialog برای تایید
-        final confirmed = await showDialog<bool>(
+        final confirmed = await showGlassDialog<bool>(
           context: context,
           builder: (ctx) => AlertDialog(
             title: const Text('⚠️ هشدار'),
@@ -313,7 +314,7 @@ class _VerificationPageState extends State<VerificationPage> {
   Future<void> _openMobileOtpDialog(String mobile) async {
     try {
       if (!mounted) return;
-      final verified = await showDialog<bool>(
+      final verified = await showGlassDialog<bool>(
         context: context,
         builder: (ctx) => OtpInputDialog(
           title: 'تایید شماره موبایل',
@@ -428,7 +429,7 @@ class _VerificationPageState extends State<VerificationPage> {
         SnackBarHelper.showError(context, message: errorMessage);
       } else if (errorCode == 'EMAIL_IN_USE_UNVERIFIED') {
         // نمایش Dialog برای تایید
-        final confirmed = await showDialog<bool>(
+        final confirmed = await showGlassDialog<bool>(
           context: context,
           builder: (ctx) => AlertDialog(
             title: const Text('⚠️ هشدار'),

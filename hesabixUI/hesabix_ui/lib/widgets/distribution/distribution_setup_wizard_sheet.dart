@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/material.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
@@ -15,7 +16,7 @@ Future<bool> showDistributionSetupWizard({
   required int businessId,
   required DistributionService service,
 }) async {
-  final ok = await showModalBottomSheet<bool>(
+  final ok = await showGlassModalBottomSheet<bool>(
     context: context,
     isScrollControlled: true,
     showDragHandle: true,

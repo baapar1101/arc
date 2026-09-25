@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
@@ -107,7 +108,7 @@ class _HScriptReportsPageState extends State<HScriptReportsPage> {
   Future<void> _archive(Map<String, dynamic> item) async {
     final id = (item['id'] as num?)?.toInt();
     if (id == null) return;
-    final ok = await showDialog<bool>(
+    final ok = await showGlassDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('بایگانی گزارش'),
@@ -133,7 +134,7 @@ class _HScriptReportsPageState extends State<HScriptReportsPage> {
   Future<void> _delete(Map<String, dynamic> item) async {
     final id = (item['id'] as num?)?.toInt();
     if (id == null) return;
-    final ok = await showDialog<bool>(
+    final ok = await showGlassDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('حذف گزارش'),

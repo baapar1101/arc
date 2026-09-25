@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/material.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
@@ -150,7 +151,7 @@ class _DistributionCommercialPanelState extends State<DistributionCommercialPane
     if (!mounted) return;
     int? vanId;
     int? whId;
-    final ok = await showDialog<bool>(
+    final ok = await showGlassDialog<bool>(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (context, setD) => AlertDialog(
@@ -231,7 +232,7 @@ class _DistributionCommercialPanelState extends State<DistributionCommercialPane
     }..removeWhere((k, _) => k <= 0);
     var ok = true;
     if (lines.isNotEmpty) {
-      ok = await showDialog<bool>(
+      ok = await showGlassDialog<bool>(
             context: context,
             builder: (ctx) => AlertDialog(
               title: Text(t.distributionConfirmLoad),
@@ -312,7 +313,7 @@ class _DistributionCommercialPanelState extends State<DistributionCommercialPane
     } catch (_) {}
     if (!mounted) return;
     int? vanId = vans.isNotEmpty ? int.tryParse('${(vans.first as Map)['id']}') : null;
-    final ok = await showDialog<bool>(
+    final ok = await showGlassDialog<bool>(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (context, setD) => AlertDialog(
@@ -392,7 +393,7 @@ class _DistributionCommercialPanelState extends State<DistributionCommercialPane
     final cfg = existing?['config'] is Map ? Map<String, dynamic>.from(existing!['config'] as Map) : <String, dynamic>{};
     final pctCtl = TextEditingController(text: '${cfg['percent'] ?? 5}');
     final editing = existing != null;
-    await showDialog<void>(
+    await showGlassDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(t.distributionPromoCreate),
@@ -897,7 +898,7 @@ class _DistributionCommercialPanelState extends State<DistributionCommercialPane
     final pctCtl = TextEditingController(text: '1');
     var onCollection = false;
     var coverageFactor = false;
-    await showDialog<void>(
+    await showGlassDialog<void>(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (context, setD) => AlertDialog(
@@ -978,7 +979,7 @@ class _DistributionCommercialPanelState extends State<DistributionCommercialPane
     final now = DateTime.now();
     DateTime from = DateTime(now.year, now.month, 1);
     DateTime to = now;
-    final ok = await showDialog<bool>(
+    final ok = await showGlassDialog<bool>(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (context, setD) => AlertDialog(
@@ -1159,7 +1160,7 @@ class _DistributionCommercialPanelState extends State<DistributionCommercialPane
         name: existing?['person_name']?.toString() ?? '$pid',
       );
     }
-    await showDialog<void>(
+    await showGlassDialog<void>(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (context, setD) => AlertDialog(

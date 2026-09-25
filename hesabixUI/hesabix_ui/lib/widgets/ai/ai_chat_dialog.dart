@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/theme/glass.dart';
 import 'dart:async';
 
 import 'package:dio/dio.dart';
@@ -330,7 +331,7 @@ class _AIChatDialogState extends State<AIChatDialog> {
       return;
     }
     if (AIExecutionMode.requiresAutonomousConfirmation(_executionMode, next)) {
-      final confirmed = await showDialog<bool>(
+      final confirmed = await showGlassDialog<bool>(
         context: context,
         builder: (ctx) => AlertDialog(
           title: const Text('فعال‌سازی حالت خودکار'),
@@ -859,7 +860,7 @@ class _AIChatDialogState extends State<AIChatDialog> {
     final ctrl = TextEditingController();
     final l10n = AppLocalizations.of(context);
     final ok =
-        await showDialog<bool>(
+        await showGlassDialog<bool>(
           context: context,
           builder: (context) {
             return AlertDialog(
@@ -1292,7 +1293,7 @@ class _AIChatDialogState extends State<AIChatDialog> {
     bool searching = false;
 
     if (!mounted) return;
-    await showModalBottomSheet<void>(
+    await showGlassModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
@@ -1503,7 +1504,7 @@ class _AIChatDialogState extends State<AIChatDialog> {
 
   Future<void> _deleteSession(AIChatSession session) async {
     final confirm =
-        await showDialog<bool>(
+        await showGlassDialog<bool>(
           context: context,
           builder: (context) => AlertDialog(
             title: const Text('حذف گفت‌وگو'),
@@ -1553,7 +1554,7 @@ class _AIChatDialogState extends State<AIChatDialog> {
     required bool regenerateAfter,
   }) async {
     if (_sending || _currentSession?.id == null || msg.id == null) return;
-    final newText = await showDialog<String>(
+    final newText = await showGlassDialog<String>(
       context: context,
       builder: (ctx) => _AIChatEditMessageDialog(initialText: msg.content),
     );
@@ -2496,7 +2497,7 @@ class _AIChatDialogState extends State<AIChatDialog> {
         ];
     }
 
-    showDialog<void>(
+    showGlassDialog<void>(
       context: context,
       builder: (context) => AlertDialog(
         title: Row(
@@ -2516,7 +2517,7 @@ class _AIChatDialogState extends State<AIChatDialog> {
   }
 
   Future<void> _openVoiceSettings() async {
-    await showModalBottomSheet<void>(
+    await showGlassModalBottomSheet<void>(
       context: context,
       showDragHandle: true,
       builder: (context) {
