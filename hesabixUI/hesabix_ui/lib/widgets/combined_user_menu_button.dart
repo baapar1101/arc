@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import '../core/auth_store.dart';
@@ -35,7 +36,7 @@ class CombinedUserMenuButton extends StatelessWidget {
     final userMobile = authStore.currentUserMobile;
     final maskedMobile = _maskMobile(userMobile);
 
-    showDialog(
+    showGlassDialog(
       context: context,
       barrierDismissible: true,
       builder: (context) => Dialog(
@@ -366,7 +367,7 @@ class CombinedUserMenuButton extends StatelessWidget {
     final t = AppLocalizations.of(context);
     final cs = Theme.of(context).colorScheme;
     
-    showDialog(
+    showGlassDialog(
       context: context,
       barrierDismissible: true,
       builder: (context) => Dialog(

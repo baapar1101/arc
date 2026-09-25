@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
@@ -1095,7 +1096,7 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
               label: t.view,
               onTap: (item) async {
                 final invoice = item as InvoiceListItem;
-                await showDialog(
+                await showGlassDialog(
                   context: context,
                   builder: (_) => DocumentDetailsDialog(
                     documentId: invoice.id,
@@ -1726,7 +1727,7 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
 
   Future<void> _onImport() async {
     if (!mounted) return;
-    final result = await showDialog<bool>(
+    final result = await showGlassDialog<bool>(
       context: context,
       builder: (_) => InvoiceImportDialog(
         businessId: widget.businessId,
@@ -1752,7 +1753,7 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
   }
 
   Future<void> _onView(InvoiceListItem item) async {
-    await showDialog(
+    await showGlassDialog(
       context: context,
       builder: (_) => DocumentDetailsDialog(
         documentId: item.id,
@@ -1804,7 +1805,7 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
     final ids = items.map((e) => e.id).toList();
     final codes = items.map((e) => e.code).toList();
 
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showGlassDialog<bool>(
       context: context,
       builder: (ctx) {
         return AlertDialog(
@@ -1841,7 +1842,7 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
     if (confirmed != true || !mounted) return;
 
     final rootNavigator = Navigator.of(context, rootNavigator: true);
-    showDialog<void>(
+    showGlassDialog<void>(
       context: context,
       barrierDismissible: false,
       useRootNavigator: true,
@@ -1919,7 +1920,7 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
     if (items == null || items.isEmpty) return;
 
     String policy = 'post_drafts_only';
-    final chosen = await showDialog<String>(
+    final chosen = await showGlassDialog<String>(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (context, setLocal) {
@@ -2001,7 +2002,7 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
     if (items == null || items.isEmpty) return;
 
     if (!skipConfirmDialog) {
-      final confirmed = await showDialog<bool>(
+      final confirmed = await showGlassDialog<bool>(
         context: context,
         builder: (ctx) => AlertDialog(
           title: Text(title),
@@ -2024,7 +2025,7 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
     }
 
     final rootNav = Navigator.of(context, rootNavigator: true);
-    showDialog<void>(
+    showGlassDialog<void>(
       context: context,
       barrierDismissible: false,
       useRootNavigator: true,
@@ -2061,7 +2062,7 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
 
       if (!mounted) return;
 
-      await showDialog<void>(
+      await showGlassDialog<void>(
         context: context,
         useRootNavigator: true,
         builder: (ctx) => AlertDialog(
@@ -2317,7 +2318,7 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
     }
     
     // نمایش dialog تأیید
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showGlassDialog<bool>(
       context: context,
       useRootNavigator: true,
       builder: (context) => AlertDialog(
@@ -2350,7 +2351,7 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
 
     // نمایش لودینگ
     final navigator = Navigator.of(context, rootNavigator: true);
-    showDialog<void>(
+    showGlassDialog<void>(
       context: context,
       useRootNavigator: true,
       barrierDismissible: false,
@@ -2402,7 +2403,7 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
       return;
     }
 
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showGlassDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: Text(t.taxAddToWorkspaceDialogTitle),
@@ -2424,7 +2425,7 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
     if (confirmed != true || !mounted) return;
 
     final navigator = Navigator.of(context, rootNavigator: true);
-    showDialog<void>(
+    showGlassDialog<void>(
       context: context,
       useRootNavigator: true,
       barrierDismissible: false,
@@ -2466,7 +2467,7 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
   Future<void> _onRemoveFromTaxWorkspace(InvoiceListItem item) async {
     final t = AppLocalizations.of(context);
 
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showGlassDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: Text(t.taxRemoveFromWorkspaceDialogTitle),
@@ -2488,7 +2489,7 @@ class _InvoicesListPageState extends State<InvoicesListPage> {
     if (confirmed != true || !mounted) return;
 
     final navigator = Navigator.of(context, rootNavigator: true);
-    showDialog<void>(
+    showGlassDialog<void>(
       context: context,
       useRootNavigator: true,
       barrierDismissible: false,

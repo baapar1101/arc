@@ -1,5 +1,6 @@
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:hesabix_ui/services/ai_service.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
 import 'package:hesabix_ui/utils/snackbar_helper.dart' show SnackBarHelper;
@@ -69,7 +70,7 @@ class _AIChatKnowledgeSheetState extends State<_AIChatKnowledgeSheet> {
   Future<void> _addManual() async {
     final titleCtrl = TextEditingController();
     final bodyCtrl = TextEditingController();
-    final ok = await showDialog<bool>(
+    final ok = await showGlassDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('سند جدید'),

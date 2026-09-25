@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:intl/intl.dart' as intl;
 import '../../../services/repair_shop_service.dart';
 import '../../../models/repair_order_model.dart';
@@ -91,7 +92,7 @@ class _RepairOrderDetailPageState extends State<RepairOrderDetailPage> {
 
   Future<void> _showStatusMenu() async {
     // نمایش منوی انتخاب وضعیت
-    final newStatus = await showDialog<String>(
+    final newStatus = await showGlassDialog<String>(
       context: context,
       builder: (context) => SimpleDialog(
         title: const Text('انتخاب وضعیت جدید'),
@@ -123,7 +124,7 @@ class _RepairOrderDetailPageState extends State<RepairOrderDetailPage> {
   }
 
   Future<void> _deleteOrder() async {
-    final confirm = await showDialog<bool>(
+    final confirm = await showGlassDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('لغو سفارش'),
@@ -172,7 +173,7 @@ class _RepairOrderDetailPageState extends State<RepairOrderDetailPage> {
 
     if (!mounted) return;
 
-    final selected = await showDialog<RepairTechnician>(
+    final selected = await showGlassDialog<RepairTechnician>(
       context: context,
       builder: (context) => SimpleDialog(
         title: const Text('انتخاب تعمیرکار'),
@@ -209,7 +210,7 @@ class _RepairOrderDetailPageState extends State<RepairOrderDetailPage> {
   }
 
   Future<void> _updateStatus(String newStatus) async {
-    final notes = await showDialog<String>(
+    final notes = await showGlassDialog<String>(
       context: context,
       builder: (context) => _NotesDialog(
         title: 'تغییر وضعیت به ${_statusLabels[newStatus]}',
@@ -238,7 +239,7 @@ class _RepairOrderDetailPageState extends State<RepairOrderDetailPage> {
   }
 
   Future<void> _completeRepair(bool isFixed) async {
-    final notes = await showDialog<String>(
+    final notes = await showGlassDialog<String>(
       context: context,
       builder: (context) => _NotesDialog(
         title: isFixed ? 'تکمیل تعمیر موفق' : 'تعمیر ناموفق',
@@ -268,7 +269,7 @@ class _RepairOrderDetailPageState extends State<RepairOrderDetailPage> {
   }
 
   Future<void> _createInvoice() async {
-    final confirm = await showDialog<bool>(
+    final confirm = await showGlassDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('صدور فاکتور'),

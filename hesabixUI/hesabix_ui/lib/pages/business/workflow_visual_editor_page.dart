@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../core/auth_store.dart';
@@ -440,7 +441,7 @@ class _WorkflowVisualEditorPageState extends State<WorkflowVisualEditorPage> {
                           state: _editorState,
                           basalamPluginActive: _basalamMarketplaceActive,
                           onNodeTap: (node) async {
-                            final result = await showDialog<Map<String, dynamic>>(
+                            final result = await showGlassDialog<Map<String, dynamic>>(
                               context: context,
                               builder: (_) => WorkflowNodeConfigDialog(
                                 node: node,
@@ -465,7 +466,7 @@ class _WorkflowVisualEditorPageState extends State<WorkflowVisualEditorPage> {
                               },
                               onEdit: () async {
                                 if (!mounted) return;
-                                final result = await showDialog<Map<String, dynamic>>(
+                                final result = await showGlassDialog<Map<String, dynamic>>(
                                   context: context,
                                   builder: (_) => WorkflowNodeConfigDialog(
                                     node: node,
@@ -562,7 +563,7 @@ class _WorkflowVisualEditorPageState extends State<WorkflowVisualEditorPage> {
     );
     if (errors.isNotEmpty) {
       if (!mounted) return;
-      await showDialog<void>(
+      await showGlassDialog<void>(
         context: context,
         builder: (context) => AlertDialog(
           title: Text(t.workflowValidationError),
@@ -692,7 +693,7 @@ class _WorkflowVisualEditorPageState extends State<WorkflowVisualEditorPage> {
       text: _workflow?['description'] ?? '',
     );
 
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showGlassDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: Text(t.workflowEditNameDescription),
@@ -780,7 +781,7 @@ class _WorkflowVisualEditorPageState extends State<WorkflowVisualEditorPage> {
 
     if (errors.isNotEmpty) {
       if (!mounted) return;
-      await showDialog(
+      await showGlassDialog(
         context: context,
         builder: (context) => AlertDialog(
           title: Text(AppLocalizations.of(context).workflowValidationError),
@@ -823,7 +824,7 @@ class _WorkflowVisualEditorPageState extends State<WorkflowVisualEditorPage> {
       text: _workflow?['description'] ?? '',
     );
 
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showGlassDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: Text(t.workflowSaveWorkflow),
@@ -951,7 +952,7 @@ class _WorkflowVisualEditorPageState extends State<WorkflowVisualEditorPage> {
     final workflowId = rawId is int ? rawId : int.tryParse(rawId.toString());
     if (workflowId == null) return;
     final defaultTitle = (_workflow?['name'] ?? t.workflow).toString();
-    await showDialog<bool>(
+    await showGlassDialog<bool>(
       context: context,
       builder: (context) => WorkflowPublishToMarketplaceDialog(
         businessId: widget.businessId,
@@ -1151,7 +1152,7 @@ class _WorkflowVisualEditorPageState extends State<WorkflowVisualEditorPage> {
     final t = AppLocalizations.of(context);
     final commentController = TextEditingController(text: node.comment ?? '');
     
-    showDialog(
+    showGlassDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: Text(t.workflowNoteComment),
@@ -1211,7 +1212,7 @@ class _WorkflowVisualEditorPageState extends State<WorkflowVisualEditorPage> {
     final t = AppLocalizations.of(context);
     final nameController = TextEditingController();
     
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showGlassDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: Text(t.workflowSaveAsTemplate),
@@ -1241,7 +1242,7 @@ class _WorkflowVisualEditorPageState extends State<WorkflowVisualEditorPage> {
     
     // نمایش loading indicator (روی root navigator تا با ShellRoute تداخل نگیرد)
     if (!mounted) return;
-    showDialog<void>(
+    showGlassDialog<void>(
       context: context,
       useRootNavigator: true,
       barrierDismissible: false,
@@ -1290,7 +1291,7 @@ class _WorkflowVisualEditorPageState extends State<WorkflowVisualEditorPage> {
     if (!mounted) return;
     final rootNav = Navigator.of(context, rootNavigator: true);
     var loadingOpen = true;
-    showDialog<void>(
+    showGlassDialog<void>(
       context: context,
       useRootNavigator: true,
       barrierDismissible: false,
@@ -1313,7 +1314,7 @@ class _WorkflowVisualEditorPageState extends State<WorkflowVisualEditorPage> {
       loadingOpen = false;
       
       // نمایش لیست قالب‌ها
-      final selectedTemplate = await showDialog<Map<String, dynamic>>(
+      final selectedTemplate = await showGlassDialog<Map<String, dynamic>>(
         context: context,
         useRootNavigator: true,
         builder: (context) => _TemplateSelectorDialog(

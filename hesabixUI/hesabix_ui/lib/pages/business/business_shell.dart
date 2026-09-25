@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/auth_store.dart';
@@ -232,7 +233,7 @@ class _BusinessShellState extends State<BusinessShell> {
     final bid = widget.businessId;
     void go(String loc) => context.go(loc);
 
-    await showDialog<void>(
+    await showGlassDialog<void>(
       context: context,
       builder: (ctx) {
         final t = AppLocalizations.of(ctx)!;
@@ -287,7 +288,7 @@ class _BusinessShellState extends State<BusinessShell> {
     final session = store.tabsForBusiness(bid);
     if (session == null || session.paths.isEmpty) return;
 
-    await showDialog<void>(
+    await showGlassDialog<void>(
       context: context,
       builder: (ctx) {
         final t = AppLocalizations.of(ctx)!;
@@ -686,7 +687,7 @@ class _BusinessShellState extends State<BusinessShell> {
       final ctx = context;
       final calendarController = widget.calendarController ?? await CalendarController.load();
       if (!ctx.mounted) return;
-      final result = await showDialog<bool>(
+      final result = await showGlassDialog<bool>(
         context: ctx,
         builder: (context) => BulkSettlementDialog(
           businessId: widget.businessId,
@@ -707,7 +708,7 @@ class _BusinessShellState extends State<BusinessShell> {
       final ctx = context;
       final calendarController = widget.calendarController ?? await CalendarController.load();
       if (!ctx.mounted) return;
-      final result = await showDialog<bool>(
+      final result = await showGlassDialog<bool>(
         context: ctx,
         builder: (context) => TransferFormDialog(
           businessId: widget.businessId,
@@ -726,7 +727,7 @@ class _BusinessShellState extends State<BusinessShell> {
       final ctx = context;
       final calendarController = widget.calendarController ?? await CalendarController.load();
       if (!ctx.mounted) return;
-      final result = await showDialog<bool>(
+      final result = await showGlassDialog<bool>(
         context: ctx,
         builder: (context) => ExpenseIncomeFormDialog(
           businessId: widget.businessId,
@@ -746,7 +747,7 @@ class _BusinessShellState extends State<BusinessShell> {
       final ctx = context;
       final calendarController = widget.calendarController ?? await CalendarController.load();
       if (!ctx.mounted) return;
-      final result = await showDialog<bool>(
+      final result = await showGlassDialog<bool>(
         context: ctx,
         builder: (context) => CheckFormDialog(
           businessId: widget.businessId,
@@ -1801,7 +1802,7 @@ class _BusinessShellState extends State<BusinessShell> {
               // باز کردن دیالوگ دسته‌بندی‌ها به جای ناوبری
               if (widget.authStore.canReadSection('categories')) {
                 if (!ctx.mounted) return;
-                await showDialog<bool>(
+                await showGlassDialog<bool>(
                   context: ctx,
                   builder: (dialogCtx) => CategoryTreeDialog(
                     businessId: widget.businessId,
@@ -1820,7 +1821,7 @@ class _BusinessShellState extends State<BusinessShell> {
             if (item.label == t.categories) {
               if (widget.authStore.canReadSection('categories')) {
                 if (!ctx.mounted) return;
-                await showDialog<bool>(
+                await showGlassDialog<bool>(
                   context: ctx,
                   builder: (dialogCtx) => CategoryTreeDialog(
                     businessId: widget.businessId,
@@ -1851,7 +1852,7 @@ class _BusinessShellState extends State<BusinessShell> {
         final child = parent.children![childIndex];
         if (child.label == t.categories) {
           if (widget.authStore.canReadSection('categories')) {
-            await showDialog<bool>(
+            await showGlassDialog<bool>(
               context: context,
               builder: (ctx) => CategoryTreeDialog(
                 businessId: widget.businessId,
@@ -1888,7 +1889,7 @@ class _BusinessShellState extends State<BusinessShell> {
     }
 
     Future<void> showAddPersonDialog() async {
-      final result = await showDialog<Person?>(
+      final result = await showGlassDialog<Person?>(
         context: context,
         builder: (context) => PersonFormDialog(
           businessId: widget.businessId,
@@ -1917,7 +1918,7 @@ class _BusinessShellState extends State<BusinessShell> {
     }
 
     Future<void> showAddProductDialog() async {
-      final result = await showDialog<Object?>(
+      final result = await showGlassDialog<Object?>(
         context: context,
         builder: (context) => ProductFormDialog(
           businessId: widget.businessId,
@@ -1935,7 +1936,7 @@ class _BusinessShellState extends State<BusinessShell> {
     }
 
     Future<void> showAddCashBoxDialog() async {
-      final result = await showDialog<bool>(
+      final result = await showGlassDialog<bool>(
         context: context,
         builder: (context) => CashRegisterFormDialog(
           businessId: widget.businessId,
@@ -1952,7 +1953,7 @@ class _BusinessShellState extends State<BusinessShell> {
     }
 
     Future<void> showAddPettyCashDialog() async {
-      final result = await showDialog<bool>(
+      final result = await showGlassDialog<bool>(
         context: context,
         builder: (context) => PettyCashFormDialog(
           businessId: widget.businessId,
@@ -1969,7 +1970,7 @@ class _BusinessShellState extends State<BusinessShell> {
     }
 
     Future<void> showAddBankAccountDialog() async {
-      final result = await showDialog<bool>(
+      final result = await showGlassDialog<bool>(
         context: context,
         builder: (context) => BankAccountFormDialog(
           businessId: widget.businessId,
@@ -1990,7 +1991,7 @@ class _BusinessShellState extends State<BusinessShell> {
       final ctx = context;
       final calendarController = widget.calendarController ?? await CalendarController.load();
       if (!ctx.mounted) return;
-      final result = await showDialog<bool>(
+      final result = await showGlassDialog<bool>(
         context: ctx,
         barrierDismissible: false,
         builder: (context) => DocumentFormDialog(
@@ -2056,7 +2057,7 @@ class _BusinessShellState extends State<BusinessShell> {
   Future<void> showAddWarehouseDocumentDialog() async {
     if (!context.mounted) return;
     final calendarController = widget.calendarController ?? await CalendarController.load();
-    final result = await showDialog<WarehouseDocWizardResult>(
+    final result = await showGlassDialog<WarehouseDocWizardResult>(
       context: context,
       builder: (context) => WarehouseDocWizardDialog(
         businessId: widget.businessId,
@@ -2069,7 +2070,7 @@ class _BusinessShellState extends State<BusinessShell> {
     if (result.isManual) {
       // Manual document creation
       final calendarController = widget.calendarController ?? await CalendarController.load();
-      await showDialog(
+      await showGlassDialog(
         context: context,
         builder: (_) => WarehouseDocumentFormDialog(
           businessId: widget.businessId,
@@ -3015,7 +3016,7 @@ class _BusinessShellState extends State<BusinessShell> {
       }
     }
 
-    showDialog(
+    showGlassDialog(
       context: context,
       barrierDismissible: false,
       builder: (_) => const Center(child: CircularProgressIndicator()),
@@ -3058,7 +3059,7 @@ class _BusinessShellState extends State<BusinessShell> {
       }
       
         final calendarController = widget.calendarController ?? await CalendarController.load();
-        await showDialog(
+        await showGlassDialog(
           context: context,
           builder: (_) => WarehouseDocumentFormDialog(
             businessId: widget.businessId,
