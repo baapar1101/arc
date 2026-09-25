@@ -1260,54 +1260,101 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
   @override
   Widget build(BuildContext context) {
     final t = AppLocalizations.of(context);
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final baseTheme = Theme.of(context);
+    final isDark = baseTheme.brightness == Brightness.dark;
+    final mobile = ResponsiveHelper.isMobile(context);
+    final compactTheme = baseTheme.copyWith(
+      visualDensity: const VisualDensity(horizontal: -2, vertical: -3),
+      inputDecorationTheme: baseTheme.inputDecorationTheme.copyWith(
+        isDense: true,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        prefixIconConstraints: const BoxConstraints(minWidth: 34, minHeight: 34),
+        suffixIconConstraints: const BoxConstraints(minWidth: 34, minHeight: 34),
+      ),
+      filledButtonTheme: FilledButtonThemeData(
+        style: baseTheme.filledButtonTheme.style?.copyWith(
+          minimumSize: const WidgetStatePropertyAll(Size(0, 36)),
+          padding: const WidgetStatePropertyAll(
+            EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+          ),
+        ),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: baseTheme.outlinedButtonTheme.style?.copyWith(
+          minimumSize: const WidgetStatePropertyAll(Size(0, 34)),
+          padding: const WidgetStatePropertyAll(
+            EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          ),
+        ),
+      ),
+      textButtonTheme: TextButtonThemeData(
+        style: baseTheme.textButtonTheme.style?.copyWith(
+          minimumSize: const WidgetStatePropertyAll(Size(0, 32)),
+          padding: const WidgetStatePropertyAll(
+            EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+          ),
+        ),
+      ),
+      iconButtonTheme: IconButtonThemeData(
+        style: IconButton.styleFrom(
+          minimumSize: const Size(32, 32),
+          padding: const EdgeInsets.all(5),
+          visualDensity: const VisualDensity(horizontal: -2, vertical: -2),
+          foregroundColor: baseTheme.colorScheme.onSurfaceVariant,
+        ),
+      ),
+    );
     final String logoAsset = isDark
         ? 'assets/images/logo-light.png'
         : 'assets/images/logo-blue.png';
-    return Scaffold(
+    return Theme(
+      data: compactTheme,
+      child: Scaffold(
         resizeToAvoidBottomInset: true,
         body: SafeArea(
           child: LayoutBuilder(
             builder: (context, constraints) {
               final bottomInset = MediaQuery.of(context).viewInsets.bottom;
               return SingleChildScrollView(
-                padding: EdgeInsets.only(bottom: bottomInset + 16),
+                padding: EdgeInsets.fromLTRB(8, 10, 8, bottomInset + 10),
                 child: Center(
                   child: ConstrainedBox(
                     constraints: BoxConstraints(
-                      maxWidth: ResponsiveHelper.getCardMaxWidth(context),
-                      minHeight: constraints.maxHeight - 32, // to keep card vertically centered when possible
+                      maxWidth: mobile ? 420 : 430,
                     ),
                     child: Card(
-                      elevation: 2,
-                      margin: EdgeInsets.all(ResponsiveHelper.isMobile(context) ? 8 : 16),
+                      elevation: 0,
+                      color: Colors.transparent,
+                      surfaceTintColor: Colors.transparent,
+                      shadowColor: Colors.transparent,
+                      margin: EdgeInsets.zero,
                       child: Padding(
-                        padding: EdgeInsets.all(context.appSpacing.lg),
+                        padding: EdgeInsets.all(mobile ? 12 : 14),
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
                             Row(
                               children: [
-                                Image.asset(logoAsset, height: 28),
-                                const SizedBox(width: 8),
-                                Text(t.welcomeTitle, style: Theme.of(context).textTheme.titleMedium),
+                                Image.asset(logoAsset, height: 24),
+                                const SizedBox(width: 6),
+                                Text(t.welcomeTitle, style: Theme.of(context).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700)),
                               ],
                             ),
-                            const SizedBox(height: 8),
-                            Text(t.welcomeSubtitle, style: Theme.of(context).textTheme.bodySmall),
-                            const SizedBox(height: 12),
+                            const SizedBox(height: 6),
+                            Text(t.welcomeSubtitle, style: Theme.of(context).textTheme.bodySmall?.copyWith(fontSize: 11)),
+                            const SizedBox(height: 6),
                             TabBar(
                               controller: _tabController,
                               isScrollable: true,
                               tabs: [
-                                Tab(text: t.login),
-                                if (_registrationEnabled) Tab(text: t.register),
-                                Tab(text: t.forgotPassword),
-                                Tab(text: t.otpLogin),
+                                Tab(height: 32, text: t.login),
+                                if (_registrationEnabled) Tab(height: 32, text: t.register),
+                                Tab(height: 32, text: t.forgotPassword),
+                                Tab(height: 32, text: t.otpLogin),
                               ],
                             ),
-                            const SizedBox(height: 16),
+                            const SizedBox(height: 10),
                             AnimatedBuilder(
                               animation: _tabController,
                               builder: (context, _) {
@@ -1316,7 +1363,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                                 switch (_tabKindAt(idx)) {
                                   case _LoginTabKind.login:
                                     body = Padding(
-                                    padding: const EdgeInsets.symmetric(vertical: 16),
+                                    padding: const EdgeInsets.symmetric(vertical: 8),
                                     child: Stack(
                                       children: [
                                         AbsorbPointer(
@@ -1334,7 +1381,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                                                   onFieldSubmitted: (_) =>
                                                       FocusScope.of(context).nextFocus(),
                                                 ),
-                                                const SizedBox(height: 12),
+                                                const SizedBox(height: 6),
                                                 TextFormField(
                                                   controller: _passwordCtrl,
                                                   decoration: InputDecoration(labelText: t.password),
@@ -1348,7 +1395,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                                                   onFieldSubmitted: (_) =>
                                                       FocusScope.of(context).nextFocus(),
                                                 ),
-                                                const SizedBox(height: 12),
+                                                const SizedBox(height: 6),
                                                 Row(
                                                   children: [
                                                     Expanded(
@@ -1365,20 +1412,20 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                                                         },
                                                       ),
                                                     ),
-                                                    const SizedBox(width: 8),
+                                                    const SizedBox(width: 6),
                                                     if (_loginCaptchaImage != null)
                                                       ClipRRect(
                                                         borderRadius: BorderRadius.circular(4),
                                                         child: Image.memory(
                                                           _loginCaptchaImage!,
-                                                          height: 40,
-                                                          width: 120,
+                                                          height: 34,
+                                                          width: 96,
                                                           fit: BoxFit.contain,
                                                         ),
                                                       )
                                                     else
-                                                      const SizedBox(height: 40, width: 120),
-                                                    const SizedBox(width: 8),
+                                                      const SizedBox(height: 34, width: 96),
+                                                    const SizedBox(width: 6),
                                                     IconButton(
                                                       onPressed: _loadingLogin ? null : () => _refreshCaptcha('login'),
                                                       icon: const Icon(Icons.refresh),
@@ -1386,13 +1433,13 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                                                     ),
                                                   ],
                                                 ),
-                                                const SizedBox(height: 16),
+                                                const SizedBox(height: 10),
                                                 // در تب ورود، فقط Snackbar نمایش داده می‌شود (بدون ویجت خطا)
-                                                const SizedBox(height: 12),
+                                                const SizedBox(height: 6),
                                                 FilledButton(
                                                   onPressed: _loadingLogin ? null : _onSubmit,
                                                   child: _loadingLogin
-                                                      ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                                                      ? const SizedBox(height: 16, width: 16, child: CircularProgressIndicator(strokeWidth: 2))
                                                       : Text(t.login),
                                                 ),
                                               ],
@@ -1413,7 +1460,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                                     break;
                                   case _LoginTabKind.register:
                                     body = Padding(
-                                    padding: const EdgeInsets.symmetric(vertical: 16),
+                                    padding: const EdgeInsets.symmetric(vertical: 8),
                                     child: Stack(
                                       children: [
                                         AbsorbPointer(
@@ -1431,7 +1478,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                                                   onFieldSubmitted: (_) =>
                                                       FocusScope.of(context).nextFocus(),
                                                 ),
-                                                const SizedBox(height: 12),
+                                                const SizedBox(height: 6),
                                                 TextFormField(
                                                   controller: _lastNameCtrl,
                                                   decoration: InputDecoration(labelText: t.lastName),
@@ -1440,7 +1487,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                                                   onFieldSubmitted: (_) =>
                                                       FocusScope.of(context).nextFocus(),
                                                 ),
-                                                const SizedBox(height: 12),
+                                                const SizedBox(height: 6),
                                                 TextFormField(
                                                   controller: _emailCtrl,
                                                   decoration: InputDecoration(labelText: t.email),
@@ -1450,7 +1497,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                                                   onFieldSubmitted: (_) =>
                                                       FocusScope.of(context).nextFocus(),
                                                 ),
-                                                const SizedBox(height: 12),
+                                                const SizedBox(height: 6),
                                                 TextFormField(
                                                   controller: _mobileCtrl,
                                                   decoration: InputDecoration(labelText: t.mobile),
@@ -1460,7 +1507,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                                                   onFieldSubmitted: (_) =>
                                                       FocusScope.of(context).nextFocus(),
                                                 ),
-                                                const SizedBox(height: 12),
+                                                const SizedBox(height: 6),
                                                 TextFormField(
                                                   controller: _registerPasswordCtrl,
                                                   decoration: InputDecoration(labelText: t.password),
@@ -1476,7 +1523,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                                                   onFieldSubmitted: (_) =>
                                                       FocusScope.of(context).nextFocus(),
                                                 ),
-                                                const SizedBox(height: 12),
+                                                const SizedBox(height: 6),
                                                 Row(
                                                   children: [
                                                     Expanded(
@@ -1493,20 +1540,20 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                                                         },
                                                       ),
                                                     ),
-                                                    const SizedBox(width: 8),
+                                                    const SizedBox(width: 6),
                                                     if (_registerCaptchaImage != null)
                                                       ClipRRect(
                                                         borderRadius: BorderRadius.circular(4),
                                                         child: Image.memory(
                                                           _registerCaptchaImage!,
-                                                          height: 40,
-                                                          width: 120,
+                                                          height: 34,
+                                                          width: 96,
                                                           fit: BoxFit.contain,
                                                         ),
                                                       )
                                                     else
-                                                      const SizedBox(height: 40, width: 120),
-                                                    const SizedBox(width: 8),
+                                                      const SizedBox(height: 34, width: 96),
+                                                    const SizedBox(width: 6),
                                                     IconButton(
                                                       onPressed: _loadingRegister ? null : () => _refreshCaptcha('register'),
                                                       icon: const Icon(Icons.refresh),
@@ -1514,7 +1561,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                                                     ),
                                                   ],
                                                 ),
-                                                const SizedBox(height: 12),
+                                                const SizedBox(height: 6),
                                                 CheckboxListTile(
                                                   value: _acceptedTerms,
                                                   onChanged: (v) => setState(() => _acceptedTerms = v ?? false),
@@ -1524,8 +1571,9 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                                                   visualDensity: const VisualDensity(vertical: -2),
                                                   title: RichText(
                                                     text: TextSpan(
-                                                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                                        color: Theme.of(context).textTheme.bodyMedium?.color,
+                                                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                                        color: Theme.of(context).textTheme.bodySmall?.color,
+                                                        height: 1.25,
                                                       ),
                                                       children: [
                                                         TextSpan(text: t.acceptTermsPrefix),
@@ -1545,11 +1593,11 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                                                     ),
                                                   ),
                                                 ),
-                                                const SizedBox(height: 12),
+                                                const SizedBox(height: 6),
                                                 FilledButton(
                                                   onPressed: _loadingRegister ? null : _onRegister,
                                                   child: _loadingRegister
-                                                      ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                                                      ? const SizedBox(height: 16, width: 16, child: CircularProgressIndicator(strokeWidth: 2))
                                                       : Text(t.register),
                                                 ),
                                               ],
@@ -1570,7 +1618,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                                     break;
                                   case _LoginTabKind.forgot:
                                     body = Padding(
-                                    padding: const EdgeInsets.symmetric(vertical: 16),
+                                    padding: const EdgeInsets.symmetric(vertical: 8),
                                     child: Stack(
                                       children: [
                                         AbsorbPointer(
@@ -1588,7 +1636,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                                                   onFieldSubmitted: (_) =>
                                                       FocusScope.of(context).nextFocus(),
                                                 ),
-                                                const SizedBox(height: 12),
+                                                const SizedBox(height: 6),
                                                 Row(
                                                   children: [
                                                     Expanded(
@@ -1605,20 +1653,20 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                                                         },
                                                       ),
                                                     ),
-                                                    const SizedBox(width: 8),
+                                                    const SizedBox(width: 6),
                                                     if (_forgotCaptchaImage != null)
                                                       ClipRRect(
                                                         borderRadius: BorderRadius.circular(4),
                                                         child: Image.memory(
                                                           _forgotCaptchaImage!,
-                                                          height: 40,
-                                                          width: 120,
+                                                          height: 34,
+                                                          width: 96,
                                                           fit: BoxFit.contain,
                                                         ),
                                                       )
                                                     else
-                                                      const SizedBox(height: 40, width: 120),
-                                                    const SizedBox(width: 8),
+                                                      const SizedBox(height: 34, width: 96),
+                                                    const SizedBox(width: 6),
                                                     IconButton(
                                                       onPressed: _loadingForgot ? null : () => _refreshCaptcha('forgot'),
                                                       icon: const Icon(Icons.refresh),
@@ -1626,11 +1674,11 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                                                     ),
                                                   ],
                                                 ),
-                                                const SizedBox(height: 12),
+                                                const SizedBox(height: 6),
                                                 FilledButton(
                                                   onPressed: _loadingForgot ? null : _onForgot,
                                                   child: _loadingForgot
-                                                      ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                                                      ? const SizedBox(height: 16, width: 16, child: CircularProgressIndicator(strokeWidth: 2))
                                                       : Text(t.sendReset),
                                                 ),
                                               ],
@@ -1652,7 +1700,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                                   case _LoginTabKind.otp:
                                   // OTP Login Tab
                                   body = Padding(
-                                    padding: const EdgeInsets.symmetric(vertical: 16),
+                                    padding: const EdgeInsets.symmetric(vertical: 8),
                                     child: Stack(
                                       children: [
                                         AbsorbPointer(
@@ -1664,11 +1712,11 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                                               children: [
                                                 Text(
                                                   AppLocalizations.of(context).otpLoginTitle,
-                                                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                                    fontWeight: FontWeight.bold,
+                                                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                                                    fontWeight: FontWeight.w700,
                                                   ),
                                                 ),
-                                                const SizedBox(height: 8),
+                                                const SizedBox(height: 6),
                                                 Text(
                                                   AppLocalizations.of(context).otpLoginSubtitle,
                                                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
@@ -1676,10 +1724,10 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                                                   ),
                                                 ),
                                                 if (_loadingOtpChannelStatus) ...[
-                                                  const SizedBox(height: 12),
+                                                  const SizedBox(height: 6),
                                                   const LinearProgressIndicator(),
                                                 ],
-                                                const SizedBox(height: 16),
+                                                const SizedBox(height: 10),
                                                 TextFormField(
                                                   controller: _otpLoginIdentifierCtrl,
                                                   enabled: _otpLoginSessionId == null,
@@ -1707,7 +1755,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                                                   },
                                                 ),
                                                 if (_otpLoginSessionId == null) ...[
-                                                  const SizedBox(height: 16),
+                                                  const SizedBox(height: 10),
                                                   Text(
                                                     AppLocalizations.of(context).otpChannelSelectionTitle,
                                                     style: const TextStyle(fontWeight: FontWeight.bold),
@@ -1719,7 +1767,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                                                           color: Theme.of(context).colorScheme.onSurfaceVariant,
                                                         ),
                                                   ),
-                                                  const SizedBox(height: 8),
+                                                  const SizedBox(height: 6),
                                                   ..._otpAllChannels.map((channel) {
                                                     final t = AppLocalizations.of(context);
                                                     final channelNames = {
@@ -1754,9 +1802,11 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                                                             },
                                                       secondary: Icon(channelIcons[channel] ?? Icons.send),
                                                       dense: true,
+                                                      contentPadding: EdgeInsets.zero,
+                                                      visualDensity: const VisualDensity(vertical: -4),
                                                     );
                                                   }),
-                                                  const SizedBox(height: 16),
+                                                  const SizedBox(height: 10),
                                                   Row(
                                                     crossAxisAlignment: CrossAxisAlignment.start,
                                                     children: [
@@ -1790,20 +1840,20 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                                                           },
                                                         ),
                                                       ),
-                                                      const SizedBox(width: 8),
+                                                      const SizedBox(width: 6),
                                                       if (_otpLoginCaptchaImage != null)
                                                         ClipRRect(
                                                           borderRadius: BorderRadius.circular(4),
                                                           child: Image.memory(
                                                             _otpLoginCaptchaImage!,
-                                                            height: 40,
-                                                            width: 120,
+                                                            height: 34,
+                                                          width: 96,
                                                             fit: BoxFit.contain,
                                                           ),
                                                         )
                                                       else
-                                                        const SizedBox(height: 40, width: 120),
-                                                      const SizedBox(width: 8),
+                                                        const SizedBox(height: 34, width: 96),
+                                                      const SizedBox(width: 6),
                                                       IconButton(
                                                         onPressed: _loadingOtpLogin ? null : () => _refreshCaptcha('otpLogin'),
                                                         icon: const Icon(Icons.refresh),
@@ -1811,7 +1861,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                                                       ),
                                                     ],
                                                   ),
-                                                  const SizedBox(height: 16),
+                                                  const SizedBox(height: 10),
                                                   FilledButton.icon(
                                                     onPressed: (_loadingOtpLogin ||
                                                             _selectedChannel == null ||
@@ -1820,8 +1870,8 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                                                         : _sendOtpLogin,
                                                     icon: _loadingOtpLogin
                                                         ? const SizedBox(
-                                                            width: 20,
-                                                            height: 20,
+                                                            width: 16,
+                                                            height: 16,
                                                             child: CircularProgressIndicator(strokeWidth: 2),
                                                           )
                                                         : const Icon(Icons.send),
@@ -1829,12 +1879,12 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                                                   ),
                                                 ] else ...[
                                                   if (_availableChannels.length > 1) ...[
-                                                    const SizedBox(height: 8),
+                                                    const SizedBox(height: 6),
                                                     Text(
                                                       AppLocalizations.of(context).otpChangeChannelTitle,
                                                       style: const TextStyle(fontSize: 12),
                                                     ),
-                                                    const SizedBox(height: 8),
+                                                    const SizedBox(height: 6),
                                                     Wrap(
                                                       spacing: 8,
                                                       runSpacing: 8,
@@ -1858,7 +1908,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                                                       }).toList(),
                                                     ),
                                                   ],
-                                                  const SizedBox(height: 8),
+                                                  const SizedBox(height: 6),
                                                   OutlinedButton.icon(
                                                     onPressed: () {
                                                       setState(() {
@@ -1897,9 +1947,9 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                                 );
                               },
                             ),
-                            const SizedBox(height: 8),
-                            Text(t.brandTagline, textAlign: TextAlign.center, style: Theme.of(context).textTheme.bodySmall),
-                            const SizedBox(height: 12),
+                            const SizedBox(height: 6),
+                            Text(t.brandTagline, textAlign: TextAlign.center, style: Theme.of(context).textTheme.bodySmall?.copyWith(fontSize: 10.5)),
+                            const SizedBox(height: 6),
                             AuthFooter(
                               localeController: widget.localeController,
                               calendarController: widget.calendarController,
@@ -1915,6 +1965,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
             },
           ),
         ),
+      ),
     );
   }
 }
