@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/auth_store.dart';
@@ -250,7 +251,7 @@ class _WorkflowMarketplacePageState extends State<WorkflowMarketplacePage> with 
                             if (isPublished) ...[
                               OutlinedButton.icon(
                                 onPressed: () async {
-                                  final ok = await showDialog<bool>(
+                                  final ok = await showGlassDialog<bool>(
                                     context: ctx,
                                     builder: (dCtx) {
                                       return AlertDialog(

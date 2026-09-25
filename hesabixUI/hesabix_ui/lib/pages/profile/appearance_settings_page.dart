@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 
 import '../../core/business_panel_ui_store.dart';
@@ -616,7 +617,7 @@ class _AppearanceSettingsPageState extends State<AppearanceSettingsPage> {
                   onPressed: _saving
                       ? null
                       : () async {
-                          final confirm = await showDialog<bool>(
+                          final confirm = await showGlassDialog<bool>(
                             context: context,
                             builder: (ctx) => AlertDialog(
                               title: const Text('بازگشت به چیدمان پیش‌فرض'),

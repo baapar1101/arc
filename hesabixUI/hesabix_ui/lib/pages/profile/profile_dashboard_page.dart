@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:reorderables/reorderables.dart';
 import '../../core/api_client.dart';
 import '../../models/business_dashboard_models.dart';
@@ -225,7 +226,7 @@ class _ProfileDashboardPageState extends State<ProfileDashboardPage> with Widget
     try {
       final ticket = await SupportService(ApiClient()).getTicket(ticketId);
       if (!mounted) return;
-      await showDialog<void>(
+      await showGlassDialog<void>(
         context: context,
         builder: (ctx) => TicketDetailsDialog(
           ticket: ticket,

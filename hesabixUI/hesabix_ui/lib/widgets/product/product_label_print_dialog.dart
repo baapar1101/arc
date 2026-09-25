@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:barcode/barcode.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/services.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
@@ -90,7 +91,7 @@ class ProductLabelPrintDialog extends StatefulWidget {
     String? dialogSubtitle,
   }) {
     if (items.isEmpty) return Future.value();
-    return showDialog<void>(
+    return showGlassDialog<void>(
       context: context,
       barrierDismissible: false,
       builder: (ctx) => ProductLabelPrintDialog(

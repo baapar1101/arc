@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:flutter/services.dart';
 
@@ -643,7 +644,7 @@ class _ProductPricingInventorySectionState extends State<ProductPricingInventory
 
   void _showNoPriceListsWarning(BuildContext context) {
     final t = AppLocalizations.of(context);
-    showDialog(
+    showGlassDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         title: Row(
@@ -733,7 +734,7 @@ class _ProductPricingInventorySectionState extends State<ProductPricingInventory
 
     final t = AppLocalizations.of(context);
     final isMobile = ResponsiveHelper.isMobile(context);
-    await showDialog<bool>(
+    await showGlassDialog<bool>(
       context: context,
       builder: (ctx) => Dialog(
         insetPadding: ResponsiveHelper.getDialogPadding(ctx),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 
 import '../person/file_picker_bridge.dart';
@@ -100,7 +101,7 @@ class _InvoiceImportDialogState extends State<InvoiceImportDialog> {
   }
 
   void _showHelp() {
-    showDialog(
+    showGlassDialog(
       context: context,
       builder: (context) => const _ImportHelpDialog(),
     );
