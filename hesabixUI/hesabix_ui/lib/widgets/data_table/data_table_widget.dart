@@ -1,4 +1,5 @@
 import 'dart:async';
+import '../../theme/glass.dart';
 import 'dart:convert';
 import 'dart:math' as math;
 import 'dart:ui' show FontFeature;
@@ -1170,7 +1171,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
     // Initialize search type if not exists
     _columnSearchTypes[columnName] ??= '*';
 
-    showDialog(
+    showGlassDialog(
       context: context,
       builder: (context) => DataTableSearchDialog(
         columnName: columnName,
@@ -1398,7 +1399,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
   Future<void> _openColumnSettingsDialog() async {
     if (!widget.config.enableColumnSettings || _columnSettings == null) return;
 
-    final result = await showDialog<ColumnSettings>(
+    final result = await showGlassDialog<ColumnSettings>(
       context: context,
       builder: (context) => ColumnSettingsDialog(
         columns: widget.config.columns,
@@ -2479,7 +2480,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
   }
 
   void _showDataTableUserGuideDialog(AppLocalizations t, ThemeData theme) {
-    showDialog<void>(
+    showGlassDialog<void>(
       context: context,
       builder: (dialogContext) {
         final screenH = MediaQuery.sizeOf(dialogContext).height;
@@ -2587,7 +2588,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
 
     if (!hasClearFilters && !hasExportButtons && customActions.isEmpty) return;
 
-    showModalBottomSheet(
+    showGlassModalBottomSheet(
       context: context,
       showDragHandle: true,
       builder: (sheetContext) {
@@ -2765,7 +2766,7 @@ class _DataTableWidgetState<T> extends State<DataTableWidget<T>> {
     // Reset callback flag when opening bottom sheet
     _templateLoadCallbackAdded = false;
 
-    showModalBottomSheet(
+    showGlassModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
       builder: (context) => StatefulBuilder(
