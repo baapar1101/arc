@@ -57,7 +57,7 @@
     mode = 'webm';
   }
 
-  globalThis.MarkStreetVoiceCapture = {
+  globalThis.HesabixVoiceCapture = {
     supportsWebmOpus,
     async start(ctx, targetRate, onPcmFrame, onWebmChunk) {
       await this.stop();

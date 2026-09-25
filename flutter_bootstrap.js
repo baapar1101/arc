@@ -63,7 +63,7 @@ _flutter.buildConfig = {"engineRevision":"af7e796e161ae0bb1ff0758c71a7105418bd9d
       try {
         await window.__hesabixFlutterWebPreload();
       } catch (e) {
-        console.warn('[MarkStreet] flutter_web_preload failed, falling back to direct load:', e);
+        console.warn('[Hesabix] flutter_web_preload failed, falling back to direct load:', e);
       }
     }
     // Do not register Flutter's deprecated service worker — it unregisters itself and
@@ -72,6 +72,6 @@ _flutter.buildConfig = {"engineRevision":"af7e796e161ae0bb1ff0758c71a7105418bd9d
   }
 
   hesabixStartFlutter().catch(function (e) {
-    console.error('[MarkStreet] Flutter bootstrap failed:', e);
+    console.error('[Hesabix] Flutter bootstrap failed:', e);
   });
 })();
