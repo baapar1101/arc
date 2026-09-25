@@ -82,7 +82,9 @@ class AppColorTokens {
     );
 
     if (def.seedOnly) {
-      return base;
+      // Preserve the fork's smoky blue glass scheme for the default theme
+      // while still using the upstream theme catalog API.
+      return schemeFromSeed(def.primary, dark: dark);
     }
 
     final primary = _adaptForDark(def.primary, dark: dark, amount: 0.08);
