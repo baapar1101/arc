@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:intl/intl.dart';
 
 import '../../l10n/app_localizations.dart';
@@ -217,7 +218,7 @@ class _TaxProductCodesPageState extends State<TaxProductCodesPage> {
               tooltip: 'جزئیات خطا',
               onPressed: () {
                 final err = _jobStatus?['error'] ?? 'نامشخص';
-                showDialog(
+                showGlassDialog(
                   context: context,
                   builder: (ctx) => AlertDialog(
                     title: const Text('جزئیات خطا'),

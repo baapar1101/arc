@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import '../../services/business_dashboard_service.dart';
@@ -1065,7 +1066,7 @@ class _BusinessCardState extends State<_BusinessCard> {
     final t = AppLocalizations.of(pageContext);
 
     // Show confirmation dialog
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showGlassDialog<bool>(
       context: pageContext,
       builder: (context) => AlertDialog(
         title: const Text('بازیابی کسب و کار'),
@@ -1127,7 +1128,7 @@ class _BusinessCardState extends State<_BusinessCard> {
     final t = AppLocalizations.of(pageContext);
 
     // Show confirmation dialog
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showGlassDialog<bool>(
       context: pageContext,
       builder: (context) => AlertDialog(
         title: const Text('خروج از کسب و کار'),

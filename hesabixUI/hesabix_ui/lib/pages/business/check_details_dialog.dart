@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:hesabix_ui/core/auth_store.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
 import 'package:hesabix_ui/core/date_utils.dart';
@@ -193,7 +194,7 @@ class _CheckDetailsDialogState extends State<CheckDetailsDialog> with SingleTick
 
     final theme = Theme.of(context);
 
-    await showDialog(
+    await showGlassDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: Row(
@@ -725,7 +726,7 @@ class _CheckDetailsDialogState extends State<CheckDetailsDialog> with SingleTick
                 onPressed: () {
                   final docId = item['document_id'] as int?;
                   if (docId != null) {
-                    showDialog(
+                    showGlassDialog(
                       context: context,
                       builder: (ctx) =>
                           DocumentDetailsDialog(documentId: docId, calendarController: widget.calendarController),
@@ -765,7 +766,7 @@ class _CheckDetailsDialogState extends State<CheckDetailsDialog> with SingleTick
           onPressed: () {
             final docId = doc['id'] as int?;
             if (docId != null) {
-              showDialog(
+              showGlassDialog(
                 context: context,
                 builder: (ctx) =>
                     DocumentDetailsDialog(documentId: docId, calendarController: widget.calendarController),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
@@ -137,7 +138,7 @@ class _OperatorTicketsPageState extends State<OperatorTicketsPage> {
     if (!mounted) return;
     
     final controller = TextEditingController();
-    final result = await showDialog<String>(
+    final result = await showGlassDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('ذخیره فیلتر'),
@@ -194,7 +195,7 @@ class _OperatorTicketsPageState extends State<OperatorTicketsPage> {
   }
 
   Future<void> _deleteSavedFilter(String filterName) async {
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showGlassDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('حذف فیلتر'),
@@ -326,7 +327,7 @@ class _OperatorTicketsPageState extends State<OperatorTicketsPage> {
 
   void _navigateToTicketDetail(Map<String, dynamic> ticketData) {
     final ticket = SupportTicket.fromJson(ticketData);
-    showDialog(
+    showGlassDialog(
       context: context,
       builder: (context) => TicketDetailsDialog(
         ticket: ticket,
@@ -348,7 +349,7 @@ class _OperatorTicketsPageState extends State<OperatorTicketsPage> {
     final t = AppLocalizations.of(context);
     
     // نمایش دیالوگ تأیید
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showGlassDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('تأیید حذف'),
@@ -419,7 +420,7 @@ class _OperatorTicketsPageState extends State<OperatorTicketsPage> {
     final ticketCount = _selectedRows.length;
     
     // نمایش دیالوگ تأیید
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showGlassDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('تأیید حذف گروهی'),
@@ -444,7 +445,7 @@ class _OperatorTicketsPageState extends State<OperatorTicketsPage> {
     if (confirmed != true || !mounted) return;
     
     // نمایش loading
-    showDialog(
+    showGlassDialog(
       context: context,
       barrierDismissible: false,
       builder: (loadingContext) => const Center(

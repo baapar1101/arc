@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 import 'package:hesabix_ui/utils/number_normalizer.dart';
 
@@ -68,7 +69,7 @@ class _InvoiceFxRateFieldState extends State<InvoiceFxRateField> {
     final t = AppLocalizations.of(context);
     final searchCtrl = TextEditingController();
     final rows = _rowsWithOrphan(t);
-    final selected = await showDialog<int?>(
+    final selected = await showGlassDialog<int?>(
       context: context,
       builder: (ctx) {
         return StatefulBuilder(

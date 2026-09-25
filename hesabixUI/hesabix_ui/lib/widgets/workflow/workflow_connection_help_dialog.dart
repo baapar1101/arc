@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hesabix_ui/theme/glass.dart';
 import '../../l10n/app_localizations.dart';
 
 /// Dialog راهنمای اتصال بین نودها
@@ -6,7 +7,7 @@ class WorkflowConnectionHelpDialog extends StatelessWidget {
   const WorkflowConnectionHelpDialog({super.key});
 
   static void show(BuildContext context) {
-    showDialog(
+    showGlassDialog(
       context: context,
       builder: (context) => const WorkflowConnectionHelpDialog(),
     );

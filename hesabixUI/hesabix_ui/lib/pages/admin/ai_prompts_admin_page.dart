@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/services/ai_service.dart';
@@ -64,7 +65,7 @@ class _AIPromptsAdminPageState extends State<AIPromptsAdminPage> {
     final promptKey = prompt.promptKey;
     if (promptKey == null) return;
 
-    await showDialog(
+    await showGlassDialog(
       context: context,
       builder: (context) => Dialog(
         child: Container(

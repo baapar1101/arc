@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
@@ -74,7 +75,7 @@ class _StorageFileManagerPageState extends State<StorageFileManagerPage> {
     final theme = Theme.of(context);
     bool dontShowAgain = false;
 
-    await showDialog(
+    await showGlassDialog(
       context: context,
       barrierDismissible: true,
       builder: (context) => StatefulBuilder(
@@ -336,7 +337,7 @@ class _StorageFileManagerPageState extends State<StorageFileManagerPage> {
 
     final theme = Theme.of(context);
 
-    return showDialog<bool>(
+    return showGlassDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('حذف فایل'),
@@ -419,7 +420,7 @@ class _StorageFileManagerPageState extends State<StorageFileManagerPage> {
 
     final newNameController = TextEditingController(text: nameWithoutExtension);
     
-    final result = await showDialog<String>(
+    final result = await showGlassDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('تغییر نام فایل'),
@@ -655,7 +656,7 @@ class _StorageFileManagerPageState extends State<StorageFileManagerPage> {
   }
 
   void _showImagePreview(String fileId, String fileName) {
-    showDialog(
+    showGlassDialog(
       context: context,
       builder: (context) => Dialog(
         backgroundColor: Colors.transparent,
@@ -1054,7 +1055,7 @@ class _StorageFileManagerPageState extends State<StorageFileManagerPage> {
     final pwdController = TextEditingController();
     var expiryDays = 30;
 
-    final created = await showDialog<Map<String, dynamic>?>(
+    final created = await showGlassDialog<Map<String, dynamic>?>(
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
@@ -1134,7 +1135,7 @@ class _StorageFileManagerPageState extends State<StorageFileManagerPage> {
     final publicUrl = (created['public_url'] as String?)?.trim();
     final pageUrl = token != null ? _publicFileSharePageUrl(token) : '';
 
-    await showDialog<void>(
+    await showGlassDialog<void>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('لینک آماده است'),
@@ -1306,7 +1307,7 @@ class _BusinessSharesSheetState extends State<_BusinessSharesSheet> {
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
             child: FilledButton.tonal(
               onPressed: () async {
-                final ok = await showDialog<bool>(
+                final ok = await showGlassDialog<bool>(
                   context: context,
                   builder: (c) => AlertDialog(
                     title: const Text('لغو همه لینک‌ها'),
