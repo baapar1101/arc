@@ -43,7 +43,7 @@ class AppRadii extends ThemeExtension<AppRadii> {
   final double md;
   final double lg;
 
-  const AppRadii({this.sm = 6, this.md = 10, this.lg = 14});
+  const AppRadii({this.sm = 8, this.md = 12, this.lg = 18});
 
   BorderRadius get smBorder => BorderRadius.circular(sm);
   BorderRadius get mdBorder => BorderRadius.circular(md);
@@ -82,21 +82,12 @@ class AppShellColors extends ThemeExtension<AppShellColors> {
   });
 
   static AppShellColors fromScheme(ColorScheme scheme, {required bool isDark}) {
-    final topBarBg = isDark
-        ? Color.lerp(scheme.primary, scheme.surface, 0.25)!
-        : scheme.primary;
-    final topBarFg = ThemeData.estimateBrightnessForColor(topBarBg) == Brightness.dark
-        ? Colors.white
-        : scheme.onPrimary;
     return AppShellColors(
-      topBarBackground: topBarBg,
-      topBarForeground: topBarFg,
-      dashboardBackground: isDark
-          ? scheme.surface
-          : Color.alphaBlend(
-              scheme.primary.withValues(alpha: 0.035),
-              scheme.surfaceContainerLowest,
-            ),
+      topBarBackground: isDark
+          ? const Color(0xB30F172A)
+          : const Color(0xCCFFFFFF),
+      topBarForeground: scheme.onSurface,
+      dashboardBackground: Colors.transparent,
     );
   }
 
