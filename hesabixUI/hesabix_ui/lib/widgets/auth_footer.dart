@@ -16,15 +16,15 @@ class AuthFooter extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(top: 12),
+      padding: const EdgeInsets.only(top: 4),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.end,
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
           CalendarSwitcher(controller: calendarController),
-          const SizedBox(width: 8),
+          const SizedBox(width: 4),
           if (themeController != null) ...[
             ThemeModeSwitcher(controller: themeController!),
-            const SizedBox(width: 8),
+            const SizedBox(width: 4),
           ],
           LanguageSwitcher(controller: localeController),
         ],
