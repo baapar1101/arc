@@ -8,8 +8,8 @@ class ThemeController extends ChangeNotifier {
   static const String _seedKey = 'theme_seed';
 
   ThemeMode _mode = ThemeMode.system;
-  // Neutral gray theme: #6B7280
-  Color _seed = const Color(0xFF6B7280);
+  // 21st.dev-inspired electric blue accent.
+  Color _seed = const Color(0xFF2563EB);
 
   ThemeMode get mode => _mode;
   Color get seedColor => _seed;
@@ -50,13 +50,13 @@ class ThemeController extends ChangeNotifier {
       }
     }
     
-    const legacyBlueSeed = Color(0xFF6B7280);
-    const defaultSeed = Color(0xFF6B7280);
+    const legacyNeutralSeed = Color(0xFF6B7280);
+    const defaultSeed = Color(0xFF2563EB);
 
     final seed = p.getInt(_seedKey);
     if (seed != null) {
       final loadedSeed = Color(seed);
-      _seed = loadedSeed == legacyBlueSeed ? defaultSeed : loadedSeed;
+      _seed = loadedSeed == legacyNeutralSeed ? defaultSeed : loadedSeed;
     } else {
       _seed = defaultSeed;
     }
