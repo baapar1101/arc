@@ -9,12 +9,12 @@ class BrandConfig {
 
   static const String appNameEn = String.fromEnvironment(
     'APP_NAME_EN',
-    defaultValue: '',
+    defaultValue: 'MarkStreet',
   );
 
   static const String appNameFa = String.fromEnvironment(
     'APP_NAME_FA',
-    defaultValue: '',
+    defaultValue: 'مارک‌استریت',
   );
 
   /// وقتی `0`/`false` باشد، [BrandLogo] لوگو را بدون ColorFilter نشان می‌دهد
@@ -38,7 +38,7 @@ class BrandConfig {
     if (en.isNotEmpty) return en;
     final fa = appNameFa.trim();
     if (fa.isNotEmpty) return fa;
-    return 'Hesabix';
+    return 'MarkStreet';
   }
 
   static String resolve({
@@ -80,7 +80,7 @@ class BrandConfig {
   static String displayName({String languageCode = 'fa'}) {
     return resolve(
       languageCode: languageCode,
-      fallback: languageCode.toLowerCase().startsWith('fa') ? 'حسابیکس' : 'Hesabix',
+      fallback: languageCode.toLowerCase().startsWith('fa') ? 'مارک‌استریت' : 'MarkStreet',
     );
   }
 
