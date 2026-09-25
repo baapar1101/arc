@@ -214,6 +214,7 @@ import 'core/calendar_controller.dart';
 import 'core/api_client.dart';
 import 'theme/theme_controller.dart';
 import 'theme/app_theme.dart';
+import 'theme/smokey_background.dart';
 import 'core/auth_store.dart';
 import 'core/mobile_launcher_prefs.dart';
 import 'core/mobile_launcher_nav.dart';
@@ -872,7 +873,7 @@ class _MyAppState extends State<MyApp> {
       );
 
       return MaterialApp.router(
-        title: BrandConfig.materialTitle,
+        title: 'MarkStreet',
         routerConfig: loadingRouter,
         theme: _themeController == null
             ? null
@@ -5831,23 +5832,26 @@ class _MyAppState extends State<MyApp> {
                 final theme = Theme.of(context);
                 final baseStyle =
                     theme.textTheme.bodyMedium ?? const TextStyle();
-                return InAppNotificationsBootstrap(
-                  authStore: _authStore!,
-                  calendarController: _calendarController,
-                  child: SmsBankBootstrap(
+                return SmokeyBackground(
+                  dark: theme.brightness == Brightness.dark,
+                  child: InAppNotificationsBootstrap(
                     authStore: _authStore!,
                     calendarController: _calendarController,
-                    biometricLockController: _biometricLockController,
-                    child: AndroidUpdateGate(
-                      child: WindowsCloseConfirmGate(
-                        child: WindowsUpdateGate(
-                          child: BiometricLockGate(
-                            authStore: _authStore!,
-                            lockController: _biometricLockController,
-                            child: DefaultTextStyle(
-                              style: baseStyle,
-                              child: KeyboardShortcutListener(
-                                child: child ?? const SizedBox(),
+                    child: SmsBankBootstrap(
+                      authStore: _authStore!,
+                      calendarController: _calendarController,
+                      biometricLockController: _biometricLockController,
+                      child: AndroidUpdateGate(
+                        child: WindowsCloseConfirmGate(
+                          child: WindowsUpdateGate(
+                            child: BiometricLockGate(
+                              authStore: _authStore!,
+                              lockController: _biometricLockController,
+                              child: DefaultTextStyle(
+                                style: baseStyle,
+                                child: KeyboardShortcutListener(
+                                  child: child ?? const SizedBox(),
+                                ),
                               ),
                             ),
                           ),
