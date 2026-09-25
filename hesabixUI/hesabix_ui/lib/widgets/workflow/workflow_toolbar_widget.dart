@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hesabix_ui/theme/glass.dart';
 import '../../l10n/app_localizations.dart';
 import '../../models/workflow_editor_state.dart';
 import '../../utils/workflow_auto_layout.dart';
@@ -43,7 +44,7 @@ class WorkflowToolbarWidget extends StatelessWidget {
     final t = AppLocalizations.of(context);
     
     if (errors.isEmpty) {
-      showDialog(
+      showGlassDialog(
         context: context,
         builder: (context) => AlertDialog(
           title: Row(
@@ -65,7 +66,7 @@ class WorkflowToolbarWidget extends StatelessWidget {
       return;
     }
     
-    showDialog(
+    showGlassDialog(
       context: context,
       builder: (context) => AlertDialog(
         title: Row(

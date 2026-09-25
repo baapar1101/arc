@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:file_saver/file_saver.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 
@@ -202,7 +203,7 @@ class _TaxSettingsPageState extends State<TaxSettingsPage> {
       final isOk = status == 'connected';
       final isIdentityIssue = status == 'identity_mismatch';
 
-      await showDialog<void>(
+      await showGlassDialog<void>(
         context: context,
         builder: (context) => AlertDialog(
           title: Row(
@@ -470,7 +471,7 @@ class _TaxSettingsPageState extends State<TaxSettingsPage> {
 
   Future<void> _generateKeys() async {
     final t = AppLocalizations.of(context);
-    final result = await showDialog<_GenerateKeysRequest>(
+    final result = await showGlassDialog<_GenerateKeysRequest>(
       context: context,
       builder: (context) => _GenerateKeysDialog(
         t: t,

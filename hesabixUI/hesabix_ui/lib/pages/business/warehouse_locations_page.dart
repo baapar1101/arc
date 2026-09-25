@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../models/warehouse_model.dart';
@@ -236,7 +237,7 @@ class _WarehouseLocationsPageState extends State<WarehouseLocationsPage> {
     }
 
     try {
-      final ok = await showDialog<bool>(
+      final ok = await showGlassDialog<bool>(
         context: context,
         builder: (ctx) {
           return StatefulBuilder(
@@ -532,7 +533,7 @@ class _WarehouseLocationsPageState extends State<WarehouseLocationsPage> {
   }
 
   Future<void> _deleteLocation(Map<String, dynamic> loc) async {
-    final confirm = await showDialog<bool>(
+    final confirm = await showGlassDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('حذف محل'),
@@ -578,7 +579,7 @@ class _WarehouseLocationsPageState extends State<WarehouseLocationsPage> {
         ? null
         : '${existing['product_code']} — ${existing['product_name']}';
 
-    await showDialog<void>(
+    await showGlassDialog<void>(
       context: context,
       builder: (ctx) {
         return StatefulBuilder(
@@ -739,7 +740,7 @@ class _WarehouseLocationsPageState extends State<WarehouseLocationsPage> {
           .map((e) => Map<String, dynamic>.from(e as Map))
           .toList();
       final mismatch = data['mismatch_count'];
-      await showDialog<void>(
+      await showGlassDialog<void>(
         context: context,
         builder: (ctx) => AlertDialog(
           title: const Text('تطبیق قرارگیری با موجودی حسابداری'),
@@ -790,7 +791,7 @@ class _WarehouseLocationsPageState extends State<WarehouseLocationsPage> {
   }
 
   Future<void> _deletePlacement(Map<String, dynamic> row) async {
-    final ok = await showDialog<bool>(
+    final ok = await showGlassDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('حذف قرارگیری'),

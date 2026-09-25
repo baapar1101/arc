@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
 
@@ -246,7 +247,7 @@ class _PluginMarketplacePageState extends State<PluginMarketplacePage> with Sing
     final shortfall = (res['shortfall'] ?? 0).toDouble();
     final sym = _walletCurrency;
 
-    final goWallet = await showDialog<bool>(
+    final goWallet = await showGlassDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(t.pluginMarketplaceInsufficientFundsTitle),
@@ -290,7 +291,7 @@ class _PluginMarketplacePageState extends State<PluginMarketplacePage> with Sing
     final hasReturn = widget.returnToPath != null && widget.returnToPath!.trim().isNotEmpty;
 
     if (!mounted) return;
-    await showDialog<void>(
+    await showGlassDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
         icon: Icon(Icons.check_circle_outline, color: Theme.of(ctx).colorScheme.primary, size: 40),

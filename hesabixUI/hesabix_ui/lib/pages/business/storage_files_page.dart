@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/foundation.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/core/api_client.dart';
@@ -474,7 +475,7 @@ class _StorageFilesPageState extends State<StorageFilesPage> with SingleTickerPr
     
     final theme = Theme.of(context);
     
-    await showDialog(
+    await showGlassDialog(
       context: context,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
@@ -2486,7 +2487,7 @@ class _StorageFilesPageState extends State<StorageFilesPage> with SingleTickerPr
 
     final theme = Theme.of(context);
 
-    return showDialog<bool>(
+    return showGlassDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('حذف فایل'),
@@ -2612,7 +2613,7 @@ class _StorageFilesPageState extends State<StorageFilesPage> with SingleTickerPr
 
     if (!mounted) return;
 
-    showDialog(
+    showGlassDialog(
       context: context,
       builder: (context) => Dialog(
         backgroundColor: Colors.transparent,
@@ -2708,7 +2709,7 @@ class _StorageFilesPageState extends State<StorageFilesPage> with SingleTickerPr
   Future<void> _deleteSelectedFiles() async {
     if (_selectedFileIds.isEmpty) return;
 
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showGlassDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('حذف فایل‌های انتخاب شده'),

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart';
 import 'package:share_plus/share_plus.dart';
@@ -747,7 +748,7 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
       if (multipleResults && items != null && items.isNotEmpty) {
         // اگر چند نتیجه پیدا شد، دیالوگ انتخاب نمایش بده
         if (!mounted) return;
-        final selected = await showDialog<Map<String, dynamic>>(
+        final selected = await showGlassDialog<Map<String, dynamic>>(
           context: context,
           builder: (context) => _InstanceSelectionDialog(
             instances: items,
@@ -856,7 +857,7 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
       // اگر چند نتیجه پیدا شد، دیالوگ انتخاب نمایش بده
       if (products.length > 1) {
         if (!mounted) return;
-        final selected = await showDialog<Map<String, dynamic>>(
+        final selected = await showGlassDialog<Map<String, dynamic>>(
           context: context,
           builder: (context) => _ProductSelectionDialog(
             products: products,
@@ -938,7 +939,7 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
     _removeBarcodeOverlay();
     final name = (presetName ?? _barcodeController.text).trim();
     try {
-      final result = await showDialog<dynamic>(
+      final result = await showGlassDialog<dynamic>(
         context: context,
         builder: (context) => ProductFormDialog(
           businessId: widget.businessId,
@@ -1413,7 +1414,7 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
     if (_cartItems.isEmpty) return;
     
     // نمایش دیالوگ تأیید
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showGlassDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('پاک کردن سبد'),
@@ -1807,7 +1808,7 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
 
   Future<void> _editCartItem(int index) async {
     final item = _cartItems[index];
-    final result = await showDialog<InvoiceLineItem>(
+    final result = await showGlassDialog<InvoiceLineItem>(
       context: context,
       builder: (context) => _CartItemEditDialog(
         item: item,
@@ -3637,7 +3638,7 @@ class _QuickSalesPageState extends State<QuickSalesPage> with SingleTickerProvid
       );
     } else {
       // دسکتاپ: Dialog
-      showDialog(
+      showGlassDialog(
         context: context,
         builder: (ctx) {
           return Dialog(

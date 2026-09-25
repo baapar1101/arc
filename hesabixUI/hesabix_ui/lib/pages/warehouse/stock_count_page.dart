@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -181,7 +182,7 @@ class _StockCountPageState extends State<StockCountPage> {
           ? 'می‌توانید همان شمارش را ادامه دهید یا از نو شروع کنید.'
           : 'آخرین ذخیرهٔ خودکار: $savedAt\nمی‌توانید همان شمارش را ادامه دهید یا از نو شروع کنید.';
 
-      final choice = await showDialog<String>(
+      final choice = await showGlassDialog<String>(
         context: context,
         barrierDismissible: false,
         builder: (ctx) => AlertDialog(
@@ -469,7 +470,7 @@ class _StockCountPageState extends State<StockCountPage> {
       return;
     }
 
-    final confirmed = await showDialog<bool>(
+    final confirmed = await showGlassDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('تایید ایجاد حواله تعدیل'),
