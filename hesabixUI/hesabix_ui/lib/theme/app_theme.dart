@@ -29,7 +29,11 @@ class AppTheme {
       textTheme: textTheme,
       primaryTextTheme: textTheme,
       visualDensity: VisualDensity.compact,
-      scaffoldBackgroundColor: isDark ? scheme.surface : scheme.surfaceContainerLowest,
+      scaffoldBackgroundColor: Colors.transparent,
+      canvasColor: Colors.transparent,
+      splashColor: scheme.primary.withValues(alpha: 0.10),
+      highlightColor: scheme.primary.withValues(alpha: 0.06),
+      hoverColor: scheme.primary.withValues(alpha: 0.07),
       inputDecorationTheme: appInputDecorationTheme(scheme, radii, textTheme),
       elevatedButtonTheme: appElevatedButtonTheme(scheme, radii, textTheme),
       filledButtonTheme: appFilledButtonTheme(scheme, radii, textTheme),
@@ -46,6 +50,40 @@ class AppTheme {
       chipTheme: appChipTheme(scheme, radii, textTheme),
       snackBarTheme: appSnackBarTheme(scheme, radii, textTheme),
       dataTableTheme: appDataTableTheme(scheme, textTheme),
+      progressIndicatorTheme: ProgressIndicatorThemeData(
+        color: scheme.primary,
+        linearTrackColor: scheme.onSurface.withValues(alpha: 0.10),
+        circularTrackColor: scheme.onSurface.withValues(alpha: 0.10),
+      ),
+      tooltipTheme: TooltipThemeData(
+        decoration: BoxDecoration(
+          color: scheme.inverseSurface.withValues(alpha: 0.96),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        textStyle: textTheme.bodySmall?.copyWith(color: scheme.onInverseSurface),
+      ),
+      popupMenuTheme: PopupMenuThemeData(
+        color: isDark ? const Color(0xF2111827) : const Color(0xF7FFFFFF),
+        surfaceTintColor: Colors.transparent,
+        elevation: 12,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: BorderSide(color: scheme.onSurface.withValues(alpha: 0.10)),
+        ),
+      ),
+      bottomSheetTheme: BottomSheetThemeData(
+        backgroundColor: isDark ? const Color(0xF2111827) : const Color(0xF7FFFFFF),
+        surfaceTintColor: Colors.transparent,
+        modalBackgroundColor: isDark ? const Color(0xF2111827) : const Color(0xF7FFFFFF),
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+      ),
+      navigationBarTheme: NavigationBarThemeData(
+        backgroundColor: isDark ? const Color(0xE6111827) : const Color(0xE6FFFFFF),
+        indicatorColor: scheme.primary.withValues(alpha: 0.18),
+        surfaceTintColor: Colors.transparent,
+      ),
       extensions: <ThemeExtension<dynamic>>[
         spacing,
         radii,
