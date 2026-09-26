@@ -598,3 +598,41 @@ Implemented on 2026-09-26 using the Phase 0 milestone entity and Leantime-style 
 - [x] Project-scope validation.
 - [x] Derived task completion progress.
 - [x] Gantt target markers.
+
+
+## Phase 12 — Cycles / Sprints
+
+Implemented on 2026-09-26 using Plane-style cycle planning over the Phase 0 cycle tables.
+
+### Domain
+
+- `project_cycles` is the canonical sprint/cycle entity.
+- Task membership uses `project_cycle_tasks`.
+- Cycle status supports planned, active, completed and cancelled.
+- Start/end dates are optional and validated when both exist.
+- Task membership is many-to-many as represented by the Phase 0 schema.
+- A task can only join cycles belonging to its own project.
+- Cycle progress is derived from linked task completion; no progress value is duplicated.
+
+### UX
+
+- Project workspace now includes a Cycles tab.
+- Cycles support create/edit/delete, goal, status and dates.
+- Cycle cards show linked/completed task counts and derived progress.
+- Task drawer exposes multi-select Cycle/Sprint membership.
+- Task cycle changes append an immutable `cycles_changed` activity event.
+
+### Phase 12 endpoints
+
+- `GET/POST /api/v1/businesses/{business_id}/projects/{project_id}/cycles`
+- `PATCH/DELETE /api/v1/businesses/{business_id}/projects/{project_id}/cycles/{cycle_id}`
+- `GET/PUT /api/v1/businesses/{business_id}/tasks/{task_id}/cycles`
+
+### Phase 12 acceptance gate
+
+- [x] Cycle CRUD.
+- [x] Project-scoped cycle validation.
+- [x] Many-to-many task membership.
+- [x] Derived progress.
+- [x] Cycle membership in the task drawer.
+- [x] Cycle workspace tab.
