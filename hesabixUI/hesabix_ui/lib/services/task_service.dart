@@ -79,6 +79,57 @@ class TaskService {
     );
   }
 
+  Future<TaskStructureModel> getTaskStructure({
+    required int businessId,
+    required int taskId,
+  }) async {
+    final response = await apiClient.get(
+      '/api/v1/businesses/$businessId/tasks/$taskId/structure',
+    );
+    return TaskStructureModel.fromJson(
+      Map<String, dynamic>.from(response.data['data'] as Map),
+    );
+  }
+
+  Future<TaskModel> createSubtask({
+    required int businessId,
+    required int parentTaskId,
+    required String title,
+  }) async {
+    final response = await apiClient.post(
+      '/api/v1/businesses/$businessId/tasks/$parentTaskId/subtasks',
+      data: {'title': title},
+    );
+    return TaskModel.fromJson(
+      Map<String, dynamic>.from(response.data['data']['task'] as Map),
+    );
+  }
+
+  Future<void> addTaskRelation({
+    required int businessId,
+    required int taskId,
+    required int relatedTaskId,
+    required String relationType,
+  }) async {
+    await apiClient.post(
+      '/api/v1/businesses/$businessId/tasks/$taskId/relations',
+      data: {
+        'related_task_id': relatedTaskId,
+        'relation_type': relationType,
+      },
+    );
+  }
+
+  Future<void> deleteTaskRelation({
+    required int businessId,
+    required int taskId,
+    required int relationId,
+  }) async {
+    await apiClient.delete(
+      '/api/v1/businesses/$businessId/tasks/$taskId/relations/$relationId',
+    );
+  }
+
   Future<TaskModel> createTask({
     required int businessId,
     required Map<String, dynamic> data,

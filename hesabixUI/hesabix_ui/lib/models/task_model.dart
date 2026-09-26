@@ -85,6 +85,7 @@ class TaskModel {
   final int businessId;
   final int? projectId;
   final String? projectName;
+  final int? parentTaskId;
   final int? statusId;
   final TaskStatusModel? status;
   final String title;
@@ -105,6 +106,7 @@ class TaskModel {
     required this.businessId,
     this.projectId,
     this.projectName,
+    this.parentTaskId,
     this.statusId,
     this.status,
     required this.title,
@@ -131,6 +133,7 @@ class TaskModel {
       businessId: (json['business_id'] as num).toInt(),
       projectId: (json['project_id'] as num?)?.toInt(),
       projectName: json['project_name']?.toString(),
+      parentTaskId: (json['parent_task_id'] as num?)?.toInt(),
       statusId: (json['status_id'] as num?)?.toInt(),
       status: statusJson is Map
           ? TaskStatusModel.fromJson(Map<String, dynamic>.from(statusJson))
@@ -151,6 +154,108 @@ class TaskModel {
       createdByUserId: (json['created_by_user_id'] as num?)?.toInt(),
       createdAt: _parseTaskDate(json['created_at_raw'] ?? json['created_at']),
       updatedAt: _parseTaskDate(json['updated_at_raw'] ?? json['updated_at']),
+    );
+  }
+}
+
+
+
+class TaskBriefModel {
+  final int id;
+  final int businessId;
+  final int? projectId;
+  final int? parentTaskId;
+  final int? statusId;
+  final String? statusName;
+  final String title;
+  final String priority;
+  final DateTime? completedAt;
+
+  const TaskBriefModel({
+    required this.id,
+    required this.businessId,
+    this.projectId,
+    this.parentTaskId,
+    this.statusId,
+    this.statusName,
+    required this.title,
+    required this.priority,
+    this.completedAt,
+  });
+
+  bool get isCompleted => completedAt != null;
+
+  factory TaskBriefModel.fromJson(Map<String, dynamic> json) {
+    return TaskBriefModel(
+      id: (json['id'] as num).toInt(),
+      businessId: (json['business_id'] as num).toInt(),
+      projectId: (json['project_id'] as num?)?.toInt(),
+      parentTaskId: (json['parent_task_id'] as num?)?.toInt(),
+      statusId: (json['status_id'] as num?)?.toInt(),
+      statusName: json['status_name']?.toString(),
+      title: json['title']?.toString() ?? '',
+      priority: json['priority']?.toString() ?? 'normal',
+      completedAt:
+          _parseTaskDate(json['completed_at_raw'] ?? json['completed_at']),
+    );
+  }
+}
+
+class TaskRelationModel {
+  final int id;
+  final String relationType;
+  final String direction;
+  final TaskBriefModel task;
+  final DateTime? createdAt;
+
+  const TaskRelationModel({
+    required this.id,
+    required this.relationType,
+    required this.direction,
+    required this.task,
+    this.createdAt,
+  });
+
+  factory TaskRelationModel.fromJson(Map<String, dynamic> json) {
+    return TaskRelationModel(
+      id: (json['id'] as num).toInt(),
+      relationType: json['relation_type']?.toString() ?? 'related',
+      direction: json['direction']?.toString() ?? 'outgoing',
+      task: TaskBriefModel.fromJson(
+        Map<String, dynamic>.from(json['task'] as Map),
+      ),
+      createdAt: _parseTaskDate(
+        json['created_at_raw'] ?? json['created_at'],
+      ),
+    );
+  }
+}
+
+class TaskStructureModel {
+  final TaskBriefModel? parent;
+  final List<TaskBriefModel> subtasks;
+  final List<TaskRelationModel> relations;
+
+  const TaskStructureModel({
+    this.parent,
+    required this.subtasks,
+    required this.relations,
+  });
+
+  factory TaskStructureModel.fromJson(Map<String, dynamic> json) {
+    final parentJson = json['parent'];
+    return TaskStructureModel(
+      parent: parentJson is Map
+          ? TaskBriefModel.fromJson(Map<String, dynamic>.from(parentJson))
+          : null,
+      subtasks: ((json['subtasks'] as List?) ?? const [])
+          .whereType<Map>()
+          .map((e) => TaskBriefModel.fromJson(Map<String, dynamic>.from(e)))
+          .toList(),
+      relations: ((json['relations'] as List?) ?? const [])
+          .whereType<Map>()
+          .map((e) => TaskRelationModel.fromJson(Map<String, dynamic>.from(e)))
+          .toList(),
     );
   }
 }
