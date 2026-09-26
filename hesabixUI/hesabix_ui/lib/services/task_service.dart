@@ -79,6 +79,75 @@ class TaskService {
     );
   }
 
+  Future<List<TaskCommentModel>> listComments({
+    required int businessId,
+    required int taskId,
+  }) async {
+    final response = await apiClient.get(
+      '/api/v1/businesses/$businessId/tasks/$taskId/comments',
+    );
+    final items = (response.data['data']?['items'] as List?) ?? const [];
+    return items
+        .whereType<Map>()
+        .map((e) => TaskCommentModel.fromJson(Map<String, dynamic>.from(e)))
+        .toList();
+  }
+
+  Future<TaskCommentModel> addComment({
+    required int businessId,
+    required int taskId,
+    required String body,
+  }) async {
+    final response = await apiClient.post(
+      '/api/v1/businesses/$businessId/tasks/$taskId/comments',
+      data: {'body': body},
+    );
+    return TaskCommentModel.fromJson(
+      Map<String, dynamic>.from(response.data['data']['comment'] as Map),
+    );
+  }
+
+  Future<TaskCommentModel> updateComment({
+    required int businessId,
+    required int taskId,
+    required int commentId,
+    required String body,
+  }) async {
+    final response = await apiClient.patch(
+      '/api/v1/businesses/$businessId/tasks/$taskId/comments/$commentId',
+      data: {'body': body},
+    );
+    return TaskCommentModel.fromJson(
+      Map<String, dynamic>.from(response.data['data']['comment'] as Map),
+    );
+  }
+
+  Future<void> deleteComment({
+    required int businessId,
+    required int taskId,
+    required int commentId,
+  }) async {
+    await apiClient.delete(
+      '/api/v1/businesses/$businessId/tasks/$taskId/comments/$commentId',
+    );
+  }
+
+  Future<List<TaskActivityModel>> listActivity({
+    required int businessId,
+    required int taskId,
+    int limit = 100,
+  }) async {
+    final response = await apiClient.get(
+      '/api/v1/businesses/$businessId/tasks/$taskId/activity',
+      query: {'limit': limit},
+    );
+    final items = (response.data['data']?['items'] as List?) ?? const [];
+    return items
+        .whereType<Map>()
+        .map((e) => TaskActivityModel.fromJson(Map<String, dynamic>.from(e)))
+        .toList();
+  }
+
   Future<TaskStructureModel> getTaskStructure({
     required int businessId,
     required int taskId,

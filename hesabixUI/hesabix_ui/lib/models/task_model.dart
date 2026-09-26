@@ -259,3 +259,77 @@ class TaskStructureModel {
     );
   }
 }
+
+
+
+class TaskCommentModel {
+  final int id;
+  final int taskId;
+  final int? authorUserId;
+  final String? authorName;
+  final String body;
+  final DateTime? createdAt;
+  final DateTime? updatedAt;
+
+  const TaskCommentModel({
+    required this.id,
+    required this.taskId,
+    this.authorUserId,
+    this.authorName,
+    required this.body,
+    this.createdAt,
+    this.updatedAt,
+  });
+
+  factory TaskCommentModel.fromJson(Map<String, dynamic> json) {
+    return TaskCommentModel(
+      id: (json['id'] as num).toInt(),
+      taskId: (json['task_id'] as num).toInt(),
+      authorUserId: (json['author_user_id'] as num?)?.toInt(),
+      authorName: json['author_name']?.toString(),
+      body: json['body']?.toString() ?? '',
+      createdAt: _parseTaskDate(
+        json['created_at_raw'] ?? json['created_at'],
+      ),
+      updatedAt: _parseTaskDate(
+        json['updated_at_raw'] ?? json['updated_at'],
+      ),
+    );
+  }
+}
+
+class TaskActivityModel {
+  final int id;
+  final int taskId;
+  final int? actorUserId;
+  final String? actorName;
+  final String eventType;
+  final Map<String, dynamic> eventData;
+  final DateTime? createdAt;
+
+  const TaskActivityModel({
+    required this.id,
+    required this.taskId,
+    this.actorUserId,
+    this.actorName,
+    required this.eventType,
+    required this.eventData,
+    this.createdAt,
+  });
+
+  factory TaskActivityModel.fromJson(Map<String, dynamic> json) {
+    return TaskActivityModel(
+      id: (json['id'] as num).toInt(),
+      taskId: (json['task_id'] as num).toInt(),
+      actorUserId: (json['actor_user_id'] as num?)?.toInt(),
+      actorName: json['actor_name']?.toString(),
+      eventType: json['event_type']?.toString() ?? '',
+      eventData: json['event_data'] is Map
+          ? Map<String, dynamic>.from(json['event_data'] as Map)
+          : const {},
+      createdAt: _parseTaskDate(
+        json['created_at_raw'] ?? json['created_at'],
+      ),
+    );
+  }
+}
