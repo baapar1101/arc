@@ -169,6 +169,19 @@ from .warranty import (  # noqa: F401
 )
 # Project models
 from .project import Project  # noqa: F401
+from .task_management import (  # noqa: F401
+    ProjectMember,
+    TaskStatus,
+    Task,
+    TaskAssignee,
+    TaskLabel,
+    TaskLabelLink,
+    TaskRelation,
+    TaskComment,
+    TaskAttachment,
+    TaskReminder,
+    TaskActivity,
+)
 # Bale messenger linking
 from .bale import BaleLinkToken  # noqa: F401
 from .messenger_operator_session import MessengerOperatorSession  # noqa: F401

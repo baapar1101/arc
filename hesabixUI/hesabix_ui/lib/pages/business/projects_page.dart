@@ -1,5 +1,6 @@
 import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/core/auth_store.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
@@ -73,6 +74,11 @@ class _ProjectsPageState extends State<ProjectsPage> {
         title: const Text('مدیریت پروژه‌ها'),
         leading: businessSubpageBackLeading(context, widget.businessId),
         actions: [
+          IconButton(
+            tooltip: 'مدیریت کارها',
+            icon: const Icon(Icons.task_alt_outlined),
+            onPressed: () => context.go('/business/${widget.businessId}/tasks'),
+          ),
           if (!isMobile)
             Padding(
               padding: const EdgeInsets.only(left: 8.0),

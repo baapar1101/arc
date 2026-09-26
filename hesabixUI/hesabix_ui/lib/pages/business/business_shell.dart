@@ -213,6 +213,8 @@ class _BusinessShellState extends State<BusinessShell> {
         return t.priceLists;
       case 'projects':
         return t.businessPanelTabRouteProjects;
+      case 'tasks':
+        return 'مدیریت کارها';
       case 'installments-report':
         return t.installmentsReportTitle;
       case 'document-monetization':
