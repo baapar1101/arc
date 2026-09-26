@@ -11,6 +11,7 @@ import 'package:hesabix_ui/utils/responsive_helper.dart';
 import 'package:hesabix_ui/utils/snackbar_helper.dart';
 import 'package:hesabix_ui/widgets/task/task_detail_drawer.dart';
 import 'package:hesabix_ui/widgets/task/task_kanban_board.dart';
+import 'package:hesabix_ui/widgets/task/task_calendar_view.dart';
 import 'package:hesabix_ui/widgets/task/task_quick_create.dart';
 import 'package:intl/intl.dart';
 
@@ -44,7 +45,7 @@ class _ProjectWorkspacePageState extends State<ProjectWorkspacePage>
     super.initState();
     _projectsService = ProjectService(ApiClient());
     _tasksService = TaskService(ApiClient());
-    _tabs = TabController(length: 3, vsync: this);
+    _tabs = TabController(length: 4, vsync: this);
     _load();
   }
 
@@ -147,6 +148,43 @@ class _ProjectWorkspacePageState extends State<ProjectWorkspacePage>
       }
       return false;
     }
+  }
+
+  Future<TaskModel?> _rescheduleTask(
+    TaskModel source,
+    DateTime targetDate,
+  ) async {
+    final reference = (source.dueAt ?? source.startAt)?.toLocal();
+    final target = DateUtils.dateOnly(targetDate);
+    final base = reference == null
+        ? DateUtils.dateOnly(DateTime.now())
+        : DateUtils.dateOnly(reference);
+    final delta = target.difference(base).inDays;
+
+    final data = <String, dynamic>{};
+    if (source.startAt != null) {
+      data['start_at'] = source.startAt!
+          .toLocal()
+          .add(Duration(days: delta))
+          .toUtc()
+          .toIso8601String();
+    }
+    if (source.dueAt != null) {
+      data['due_at'] = source.dueAt!
+          .toLocal()
+          .add(Duration(days: delta))
+          .toUtc()
+          .toIso8601String();
+    }
+    if (source.startAt == null && source.dueAt == null) {
+      data['due_at'] = DateTime(
+        target.year,
+        target.month,
+        target.day,
+        17,
+      ).toUtc().toIso8601String();
+    }
+    return _update(source, data);
   }
 
   Future<TaskModel?> _moveTask(
@@ -289,6 +327,7 @@ class _ProjectWorkspacePageState extends State<ProjectWorkspacePage>
           Tab(icon: Icon(Icons.dashboard_outlined), text: 'نمای کلی'),
           Tab(icon: Icon(Icons.task_alt_outlined), text: 'کارها'),
           Tab(icon: Icon(Icons.view_kanban_outlined), text: 'برد'),
+          Tab(icon: Icon(Icons.calendar_month_outlined), text: 'تقویم'),
         ]),
       ),
       body: SafeArea(
@@ -306,13 +345,13 @@ class _ProjectWorkspacePageState extends State<ProjectWorkspacePage>
                 : mobile
                     ? TabBarView(
                         controller: _tabs,
-                        children: [_overview(), _taskList(), _board()],
+                        children: [_overview(), _taskList(), _board(), _calendar()],
                       )
                     : Row(children: [
                         Expanded(
                           child: TabBarView(
                             controller: _tabs,
-                            children: [_overview(), _taskList(), _board()],
+                            children: [_overview(), _taskList(), _board(), _calendar()],
                           ),
                         ),
                         AnimatedContainer(
@@ -414,6 +453,12 @@ class _ProjectWorkspacePageState extends State<ProjectWorkspacePage>
       SizedBox(width: 135, child: Text(label, style: Theme.of(context).textTheme.bodySmall)),
       Expanded(child: Text(value, style: const TextStyle(fontWeight: FontWeight.w600))),
     ]),
+  );
+
+  Widget _calendar() => TaskCalendarView(
+    tasks: _tasks,
+    onOpen: _openTask,
+    onReschedule: _rescheduleTask,
   );
 
   Widget _board() => TaskKanbanBoard(

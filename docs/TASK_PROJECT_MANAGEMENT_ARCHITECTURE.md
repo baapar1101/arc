@@ -492,3 +492,35 @@ Implemented on 2026-09-26 using Vikunja's recurrence/reminder semantics as the b
 - [x] Start and due dates are editable.
 - [x] Relative reminders can be created and removed.
 - [x] Reminder times follow date changes.
+
+
+## Phase 9 — Calendar
+
+Implemented on 2026-09-26 as a native task view with no new persistence entity.
+
+### Calendar semantics
+
+- Calendar renders existing `start_at` / `due_at` task dates.
+- Tasks with a start and due range appear on each covered day.
+- Undated tasks stay out of the calendar until scheduled.
+- Month, Week, Day and Agenda modes share the same task data.
+- Project workspace Calendar is the fourth project view after Overview, Tasks and Board.
+
+### Rescheduling
+
+- Task cards are draggable.
+- Month/week/day cells are drop targets.
+- Dropping a task onto another day shifts both start and due by the same day delta, preserving duration.
+- A previously undated task receives a 17:00 due time on the target day.
+- Server remains authoritative because every drop persists through the existing task update endpoint.
+- Relative reminders from Phase 8 automatically follow moved task dates.
+
+### Phase 9 acceptance gate
+
+- [x] Month view.
+- [x] Week view.
+- [x] Day view.
+- [x] Agenda view.
+- [x] Drag-to-reschedule.
+- [x] Multi-day task rendering.
+- [x] No separate calendar-event entity.
