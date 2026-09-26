@@ -20,6 +20,10 @@ from app.services.project_service import (
 	get_project_workspace,
 	get_project_timeline,
 	list_project_milestones,
+	list_project_cycles,
+	create_project_cycle,
+	update_project_cycle,
+	delete_project_cycle,
 	create_project_milestone,
 	update_project_milestone,
 	delete_project_milestone,
@@ -34,6 +38,8 @@ from adapters.api.v1.schema_models.project_workspace import (
     ProjectMemberUpsertRequest,
     ProjectMilestoneCreateRequest,
     ProjectMilestoneUpdateRequest,
+    ProjectCycleCreateRequest,
+    ProjectCycleUpdateRequest,
 )
 from adapters.api.v1.schema_models.project import (
 	ProjectCreateRequest,
@@ -463,6 +469,26 @@ async def list_active_projects_simple_endpoint(
 
 
 
+def _format_project_cycle(row: Dict[str, Any]) -> Dict[str, Any]:
+    cycle = row["cycle"]
+    return {
+        "id": cycle.id,
+        "business_id": cycle.business_id,
+        "project_id": cycle.project_id,
+        "name": cycle.name,
+        "goal": cycle.goal,
+        "start_at": cycle.start_at,
+        "end_at": cycle.end_at,
+        "status": cycle.status,
+        "created_by_user_id": cycle.created_by_user_id,
+        "created_at": cycle.created_at,
+        "updated_at": cycle.updated_at,
+        "task_total": row.get("task_total", 0),
+        "task_completed": row.get("task_completed", 0),
+        "progress_percent": row.get("progress_percent", 0.0),
+    }
+
+
 def _format_project_milestone(row: Dict[str, Any]) -> Dict[str, Any]:
     milestone = row["milestone"]
     return {
@@ -523,6 +549,133 @@ async def get_project_workspace_endpoint(
         },
         request=request,
         message="PROJECT_WORKSPACE_FETCHED",
+    )
+
+
+@router.get(
+    "/businesses/{business_id}/projects/{project_id}/cycles",
+    summary="چرخه‌ها / اسپرینت‌های پروژه",
+)
+@require_business_access("business_id")
+async def list_project_cycles_endpoint(
+    request: Request,
+    business_id: int = Path(..., gt=0),
+    project_id: int = Path(..., gt=0),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+):
+    del ctx
+    rows = list_project_cycles(db, business_id, project_id)
+    return success_response(
+        data=format_datetime_fields(
+            {"items": [_format_project_cycle(row) for row in rows]},
+            request,
+            business_id,
+        ),
+        request=request,
+        message="PROJECT_CYCLES_FETCHED",
+    )
+
+
+@router.post(
+    "/businesses/{business_id}/projects/{project_id}/cycles",
+    summary="ایجاد چرخه / اسپرینت",
+)
+@require_business_access("business_id")
+async def create_project_cycle_endpoint(
+    request: Request,
+    data: ProjectCycleCreateRequest,
+    business_id: int = Path(..., gt=0),
+    project_id: int = Path(..., gt=0),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+):
+    cycle = create_project_cycle(
+        db,
+        business_id,
+        project_id,
+        ctx.get_user_id(),
+        data.dict(),
+    )
+    row = {
+        "cycle": cycle,
+        "task_total": 0,
+        "task_completed": 0,
+        "progress_percent": 0.0,
+    }
+    return success_response(
+        data=format_datetime_fields(
+            {"cycle": _format_project_cycle(row)},
+            request,
+            business_id,
+        ),
+        request=request,
+        message="PROJECT_CYCLE_CREATED",
+    )
+
+
+@router.patch(
+    "/businesses/{business_id}/projects/{project_id}/cycles/{cycle_id}",
+    summary="ویرایش چرخه / اسپرینت",
+)
+@require_business_access("business_id")
+async def update_project_cycle_endpoint(
+    request: Request,
+    data: ProjectCycleUpdateRequest,
+    business_id: int = Path(..., gt=0),
+    project_id: int = Path(..., gt=0),
+    cycle_id: int = Path(..., gt=0),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+):
+    del ctx
+    cycle = update_project_cycle(
+        db,
+        business_id,
+        project_id,
+        cycle_id,
+        data.dict(exclude_unset=True),
+    )
+    rows = list_project_cycles(db, business_id, project_id)
+    row = next(
+        (item for item in rows if item["cycle"].id == cycle.id),
+        {
+            "cycle": cycle,
+            "task_total": 0,
+            "task_completed": 0,
+            "progress_percent": 0.0,
+        },
+    )
+    return success_response(
+        data=format_datetime_fields(
+            {"cycle": _format_project_cycle(row)},
+            request,
+            business_id,
+        ),
+        request=request,
+        message="PROJECT_CYCLE_UPDATED",
+    )
+
+
+@router.delete(
+    "/businesses/{business_id}/projects/{project_id}/cycles/{cycle_id}",
+    summary="حذف چرخه / اسپرینت",
+)
+@require_business_access("business_id")
+async def delete_project_cycle_endpoint(
+    request: Request,
+    business_id: int = Path(..., gt=0),
+    project_id: int = Path(..., gt=0),
+    cycle_id: int = Path(..., gt=0),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+):
+    del ctx
+    delete_project_cycle(db, business_id, project_id, cycle_id)
+    return success_response(
+        data={"id": cycle_id},
+        request=request,
+        message="PROJECT_CYCLE_DELETED",
     )
 
 

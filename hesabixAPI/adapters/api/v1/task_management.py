@@ -11,6 +11,7 @@ from adapters.api.v1.schema_models.task_management import (
     TaskCommentCreateRequest,
     TaskCommentUpdateRequest,
     TaskCreateRequest,
+    TaskCyclesAssignRequest,
     TaskLabelCreateRequest,
     TaskLabelUpdateRequest,
     TaskLabelsAssignRequest,
@@ -47,12 +48,14 @@ from app.services.task_management_service import (
     list_saved_task_views,
     list_task_activity,
     list_task_comments,
+    list_task_cycles,
     list_task_reminders,
     list_task_labels,
     move_task,
     delete_task_relation,
     reopen_task,
     replace_task_assignees,
+    replace_task_cycles,
     replace_task_labels,
     soft_delete_task,
     update_saved_task_view,
@@ -483,6 +486,82 @@ async def get_task_endpoint(
         data={"task": _format_task(task, db, request)},
         request=request,
         message="TASK_FETCHED",
+    )
+
+
+@router.get("/businesses/{business_id}/tasks/{task_id}/cycles")
+@require_business_access("business_id")
+async def list_task_cycles_endpoint(
+    request: Request,
+    business_id: int = Path(..., gt=0),
+    task_id: int = Path(..., gt=0),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+):
+    del ctx
+    items = list_task_cycles(db, business_id, task_id)
+    return success_response(
+        data=format_datetime_fields(
+            {
+                "items": [
+                    {
+                        "id": item.id,
+                        "project_id": item.project_id,
+                        "name": item.name,
+                        "goal": item.goal,
+                        "start_at": item.start_at,
+                        "end_at": item.end_at,
+                        "status": item.status,
+                    }
+                    for item in items
+                ]
+            },
+            request,
+            business_id=business_id,
+        ),
+        request=request,
+        message="TASK_CYCLES_FETCHED",
+    )
+
+
+@router.put("/businesses/{business_id}/tasks/{task_id}/cycles")
+@require_business_access("business_id")
+async def replace_task_cycles_endpoint(
+    request: Request,
+    data: TaskCyclesAssignRequest,
+    business_id: int = Path(..., gt=0),
+    task_id: int = Path(..., gt=0),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+):
+    items = replace_task_cycles(
+        db,
+        business_id,
+        task_id,
+        ctx.get_user_id(),
+        data.cycle_ids,
+    )
+    return success_response(
+        data=format_datetime_fields(
+            {
+                "items": [
+                    {
+                        "id": item.id,
+                        "project_id": item.project_id,
+                        "name": item.name,
+                        "goal": item.goal,
+                        "start_at": item.start_at,
+                        "end_at": item.end_at,
+                        "status": item.status,
+                    }
+                    for item in items
+                ]
+            },
+            request,
+            business_id=business_id,
+        ),
+        request=request,
+        message="TASK_CYCLES_UPDATED",
     )
 
 

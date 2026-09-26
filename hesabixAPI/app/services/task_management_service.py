@@ -21,6 +21,8 @@ from adapters.db.models.business_permission import BusinessPermission
 from adapters.db.models.project import Project
 from adapters.db.models.task_management import (
     Milestone,
+    ProjectCycle,
+    ProjectCycleTask,
     Task,
     TaskActivity,
     TaskAssignee,
@@ -1785,3 +1787,102 @@ def delete_task_reminder(
         event_data={"reminder_id": reminder_id},
     )
     db.commit()
+
+
+
+def list_task_cycles(
+    db: Session,
+    business_id: int,
+    task_id: int,
+) -> list[ProjectCycle]:
+    task = _get_task_or_404(db, business_id, task_id)
+    if task.project_id is None:
+        return []
+    return (
+        db.query(ProjectCycle)
+        .join(
+            ProjectCycleTask,
+            ProjectCycleTask.cycle_id == ProjectCycle.id,
+        )
+        .filter(
+            ProjectCycleTask.business_id == business_id,
+            ProjectCycleTask.task_id == task.id,
+            ProjectCycle.business_id == business_id,
+            ProjectCycle.project_id == task.project_id,
+        )
+        .order_by(ProjectCycle.start_at.desc().nullslast(), ProjectCycle.id.desc())
+        .all()
+    )
+
+
+def replace_task_cycles(
+    db: Session,
+    business_id: int,
+    task_id: int,
+    actor_user_id: int,
+    cycle_ids: Iterable[int],
+) -> list[ProjectCycle]:
+    task = _get_task_or_404(db, business_id, task_id)
+    ids: list[int] = []
+    seen: set[int] = set()
+    for raw in cycle_ids:
+        value = int(raw)
+        if value <= 0 or value in seen:
+            continue
+        seen.add(value)
+        ids.append(value)
+
+    if ids and task.project_id is None:
+        raise ApiError(
+            "TASK_CYCLE_PROJECT_REQUIRED",
+            "A task must belong to a project before assigning a cycle",
+            http_status=400,
+        )
+
+    cycles = []
+    if ids:
+        cycles = (
+            db.query(ProjectCycle)
+            .filter(
+                ProjectCycle.business_id == business_id,
+                ProjectCycle.project_id == task.project_id,
+                ProjectCycle.id.in_(ids),
+            )
+            .all()
+        )
+        if len({cycle.id for cycle in cycles}) != len(ids):
+            raise ApiError(
+                "TASK_CYCLE_NOT_FOUND",
+                "One or more cycles do not belong to the task project",
+                http_status=400,
+            )
+
+    current_rows = db.query(ProjectCycleTask).filter(
+        ProjectCycleTask.business_id == business_id,
+        ProjectCycleTask.task_id == task.id,
+    ).all()
+    current_ids = [row.cycle_id for row in current_rows]
+    if set(current_ids) == set(ids):
+        return list_task_cycles(db, business_id, task_id)
+
+    db.query(ProjectCycleTask).filter(
+        ProjectCycleTask.business_id == business_id,
+        ProjectCycleTask.task_id == task.id,
+    ).delete(synchronize_session=False)
+    for cycle_id in ids:
+        db.add(
+            ProjectCycleTask(
+                business_id=business_id,
+                cycle_id=cycle_id,
+                task_id=task.id,
+            )
+        )
+    _record_activity(
+        db,
+        task=task,
+        actor_user_id=actor_user_id,
+        event_type="cycles_changed",
+        event_data={"from": current_ids, "to": ids},
+    )
+    db.commit()
+    return list_task_cycles(db, business_id, task_id)

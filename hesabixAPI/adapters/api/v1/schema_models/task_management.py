@@ -116,3 +116,8 @@ class TaskReminderCreateRequest(BaseModel):
     remind_at: Optional[datetime] = None
     relative_to: Optional[str] = Field(None, max_length=20)
     offset_minutes: Optional[int] = Field(None, ge=0)
+
+
+
+class TaskCyclesAssignRequest(BaseModel):
+    cycle_ids: list[int] = Field(default_factory=list)

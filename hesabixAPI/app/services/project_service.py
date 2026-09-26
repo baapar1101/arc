@@ -20,7 +20,7 @@ from adapters.db.models.currency import Currency
 from adapters.db.models.user import User
 from adapters.db.models.person import Person
 from adapters.db.models.business_permission import BusinessPermission
-from adapters.db.models.task_management import Milestone, ProjectMember, Task, TaskRelation, TaskStatus
+from adapters.db.models.task_management import Milestone, ProjectCycle, ProjectCycleTask, ProjectMember, Task, TaskRelation, TaskStatus
 from app.core.business_membership import membership_is_active
 from adapters.db.repositories.project_repository import ProjectRepository
 from app.core.responses import ApiError
@@ -878,4 +878,213 @@ def delete_project_milestone(
             http_status=404,
         )
     db.delete(milestone)
+    db.commit()
+
+
+
+_CYCLE_STATUSES = {"planned", "active", "completed", "cancelled"}
+
+
+def _parse_cycle_datetime(value: Any) -> Optional[datetime]:
+    if value is None or value == "":
+        return None
+    if isinstance(value, datetime):
+        dt = value
+    elif isinstance(value, str):
+        try:
+            dt = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError as exc:
+            raise ApiError(
+                "PROJECT_CYCLE_INVALID_DATETIME",
+                "Invalid cycle date/time",
+                http_status=400,
+            ) from exc
+    else:
+        raise ApiError(
+            "PROJECT_CYCLE_INVALID_DATETIME",
+            "Invalid cycle date/time",
+            http_status=400,
+        )
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
+
+
+def _validate_cycle_dates(
+    start_at: Optional[datetime],
+    end_at: Optional[datetime],
+) -> None:
+    if start_at is not None and end_at is not None and end_at < start_at:
+        raise ApiError(
+            "PROJECT_CYCLE_INVALID_DATE_RANGE",
+            "Cycle end cannot be before its start",
+            http_status=400,
+        )
+
+
+def list_project_cycles(
+    db: Session,
+    business_id: int,
+    project_id: int,
+) -> list[Dict[str, Any]]:
+    _require_project_in_business(db, business_id, project_id)
+    cycles = (
+        db.query(ProjectCycle)
+        .filter(
+            ProjectCycle.business_id == business_id,
+            ProjectCycle.project_id == project_id,
+        )
+        .order_by(
+            ProjectCycle.start_at.desc().nullslast(),
+            ProjectCycle.id.desc(),
+        )
+        .all()
+    )
+    result: list[Dict[str, Any]] = []
+    for cycle in cycles:
+        task_query = (
+            db.query(Task)
+            .join(
+                ProjectCycleTask,
+                ProjectCycleTask.task_id == Task.id,
+            )
+            .filter(
+                ProjectCycleTask.business_id == business_id,
+                ProjectCycleTask.cycle_id == cycle.id,
+                Task.business_id == business_id,
+                Task.project_id == project_id,
+                Task.deleted_at.is_(None),
+            )
+        )
+        total = task_query.count()
+        completed = task_query.filter(Task.completed_at.is_not(None)).count()
+        result.append(
+            {
+                "cycle": cycle,
+                "task_total": int(total),
+                "task_completed": int(completed),
+                "progress_percent": round((completed / total) * 100, 1) if total else 0.0,
+            }
+        )
+    return result
+
+
+def create_project_cycle(
+    db: Session,
+    business_id: int,
+    project_id: int,
+    actor_user_id: int,
+    data: Dict[str, Any],
+) -> ProjectCycle:
+    _require_project_in_business(db, business_id, project_id)
+    name = str(data.get("name") or "").strip()
+    if not name:
+        raise ApiError(
+            "PROJECT_CYCLE_NAME_REQUIRED",
+            "Cycle name is required",
+            http_status=400,
+        )
+    status = str(data.get("status") or "planned").strip().lower()
+    if status not in _CYCLE_STATUSES:
+        raise ApiError(
+            "PROJECT_CYCLE_INVALID_STATUS",
+            "Invalid cycle status",
+            http_status=400,
+        )
+    start_at = _parse_cycle_datetime(data.get("start_at"))
+    end_at = _parse_cycle_datetime(data.get("end_at"))
+    _validate_cycle_dates(start_at, end_at)
+    cycle = ProjectCycle(
+        business_id=business_id,
+        project_id=project_id,
+        name=name,
+        goal=data.get("goal"),
+        start_at=start_at,
+        end_at=end_at,
+        status=status,
+        created_by_user_id=actor_user_id,
+    )
+    db.add(cycle)
+    db.commit()
+    db.refresh(cycle)
+    return cycle
+
+
+def update_project_cycle(
+    db: Session,
+    business_id: int,
+    project_id: int,
+    cycle_id: int,
+    data: Dict[str, Any],
+) -> ProjectCycle:
+    _require_project_in_business(db, business_id, project_id)
+    cycle = (
+        db.query(ProjectCycle)
+        .filter(
+            ProjectCycle.id == cycle_id,
+            ProjectCycle.business_id == business_id,
+            ProjectCycle.project_id == project_id,
+        )
+        .first()
+    )
+    if not cycle:
+        raise ApiError("PROJECT_CYCLE_NOT_FOUND", "Cycle not found", http_status=404)
+    if "name" in data:
+        name = str(data.get("name") or "").strip()
+        if not name:
+            raise ApiError(
+                "PROJECT_CYCLE_NAME_REQUIRED",
+                "Cycle name is required",
+                http_status=400,
+            )
+        cycle.name = name
+    if "goal" in data:
+        cycle.goal = data.get("goal")
+    if "status" in data:
+        status = str(data.get("status") or "planned").strip().lower()
+        if status not in _CYCLE_STATUSES:
+            raise ApiError(
+                "PROJECT_CYCLE_INVALID_STATUS",
+                "Invalid cycle status",
+                http_status=400,
+            )
+        cycle.status = status
+    start_at = (
+        _parse_cycle_datetime(data.get("start_at"))
+        if "start_at" in data
+        else cycle.start_at
+    )
+    end_at = (
+        _parse_cycle_datetime(data.get("end_at"))
+        if "end_at" in data
+        else cycle.end_at
+    )
+    _validate_cycle_dates(start_at, end_at)
+    cycle.start_at = start_at
+    cycle.end_at = end_at
+    cycle.updated_at = datetime.now(timezone.utc)
+    db.commit()
+    db.refresh(cycle)
+    return cycle
+
+
+def delete_project_cycle(
+    db: Session,
+    business_id: int,
+    project_id: int,
+    cycle_id: int,
+) -> None:
+    _require_project_in_business(db, business_id, project_id)
+    cycle = (
+        db.query(ProjectCycle)
+        .filter(
+            ProjectCycle.id == cycle_id,
+            ProjectCycle.business_id == business_id,
+            ProjectCycle.project_id == project_id,
+        )
+        .first()
+    )
+    if not cycle:
+        raise ApiError("PROJECT_CYCLE_NOT_FOUND", "Cycle not found", http_status=404)
+    db.delete(cycle)
     db.commit()

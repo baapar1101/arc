@@ -34,3 +34,20 @@ class ProjectMilestoneUpdateRequest(BaseModel):
     target_at: datetime | None = None
     status: str | None = None
     sort_order: float | None = None
+
+
+
+class ProjectCycleCreateRequest(BaseModel):
+    name: str = Field(..., min_length=1, max_length=255)
+    goal: str | None = None
+    start_at: datetime | None = None
+    end_at: datetime | None = None
+    status: str = Field(default="planned")
+
+
+class ProjectCycleUpdateRequest(BaseModel):
+    name: str | None = Field(None, min_length=1, max_length=255)
+    goal: str | None = None
+    start_at: datetime | None = None
+    end_at: datetime | None = None
+    status: str | None = None
