@@ -234,7 +234,11 @@ class _ProjectWorkspacePageState extends State<ProjectWorkspacePage>
           heightFactor: .94,
           child: StatefulBuilder(
             builder: (_, setSheet) => TaskDetailDrawer(
-              task: live, statuses: _statuses, projects: _projects, assignees: _assignees,
+              businessId: widget.businessId,
+              task: live,
+              relationCandidates: _tasks,
+              onTaskCreated: _upsert,
+              statuses: _statuses, projects: _projects, assignees: _assignees,
               onUpdate: (data) async {
                 final u = await _update(live, data);
                 if (u != null) { live = u; setSheet(() {}); }
@@ -316,7 +320,11 @@ class _ProjectWorkspacePageState extends State<ProjectWorkspacePage>
                           width: _selectedTask == null ? 0 : 440,
                           child: _selectedTask == null ? const SizedBox.shrink() : TaskDetailDrawer(
                             key: ValueKey(_selectedTask!.id),
-                            task: _selectedTask!, statuses: _statuses, projects: _projects, assignees: _assignees,
+                            businessId: widget.businessId,
+                            task: _selectedTask!,
+                            relationCandidates: _tasks,
+                            onTaskCreated: _upsert,
+                            statuses: _statuses, projects: _projects, assignees: _assignees,
                             onUpdate: (d) => _update(_selectedTask!, d),
                             onToggleComplete: () => _toggle(_selectedTask!),
                             onDelete: () => _delete(_selectedTask!),

@@ -273,7 +273,10 @@ class _TaskManagementPageState extends State<TaskManagementPage> {
             heightFactor: 0.94,
             child: StatefulBuilder(
               builder: (sheetContext, setSheetState) => TaskDetailDrawer(
+                businessId: widget.businessId,
                 task: liveTask,
+                relationCandidates: _tasks,
+                onTaskCreated: _upsertTask,
                 statuses: _statuses,
                 projects: _projects,
                 assignees: _assignees,
@@ -369,7 +372,10 @@ class _TaskManagementPageState extends State<TaskManagementPage> {
                         ? const SizedBox.shrink()
                         : TaskDetailDrawer(
                             key: ValueKey(_selectedTask!.id),
+                            businessId: widget.businessId,
                             task: _selectedTask!,
+                            relationCandidates: _tasks,
+                            onTaskCreated: _upsertTask,
                             statuses: _statuses,
                             projects: _projects,
                             assignees: _assignees,

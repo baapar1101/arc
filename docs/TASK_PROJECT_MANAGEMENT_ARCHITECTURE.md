@@ -305,3 +305,47 @@ Focalboard only as an interaction reference.
 - [x] Completion semantics follow destination status.
 - [x] Board uses existing task editor.
 - [x] Quick add works per column.
+
+
+## Phase 5 — Subtasks & Dependencies
+
+Implemented on 2026-09-26 using Vikunja task-relation semantics as the primary benchmark.
+
+### Hierarchy
+
+- `parent_task_id` is the only hierarchical parent/subtask relation.
+- Creating a subtask inherits the parent project.
+- Parent and child must remain in the same project.
+- Self-parenting and ancestor cycles are rejected server-side.
+- Changing a task's project is blocked when it would break existing child hierarchy.
+
+### Semantic relations
+
+- `task_relations` remains separate from hierarchy.
+- Supported relation types: `blocks`, `related`, `duplicates`.
+- Symmetric duplicate entries are rejected for related/duplicate relations.
+- Blocking relations are graph-checked before insertion so dependency cycles cannot be created.
+- Incoming `blocks` is rendered as “blocked by”; inverse meaning is derived rather than stored twice.
+
+### UX
+
+- Task detail drawer now shows parent, direct subtasks, and semantic relations.
+- Subtasks can be created inline from the existing glass drawer.
+- New subtasks immediately appear in the parent task list / project board state.
+- Dependency/relation creation uses the currently loaded task set as candidates.
+- Relation removal and structure refresh do not navigate away from the task context.
+
+### Phase 5 endpoints
+
+- `GET /api/v1/businesses/{business_id}/tasks/{task_id}/structure`
+- `POST /api/v1/businesses/{business_id}/tasks/{task_id}/subtasks`
+- `POST /api/v1/businesses/{business_id}/tasks/{task_id}/relations`
+- `DELETE /api/v1/businesses/{business_id}/tasks/{task_id}/relations/{relation_id}`
+
+### Phase 5 acceptance gate
+
+- [x] Parent/subtask hierarchy is native.
+- [x] Parent cycles are prevented.
+- [x] Dependency cycles are prevented.
+- [x] Hierarchy and dependencies remain separate concepts.
+- [x] Drawer exposes subtasks and dependencies without page navigation.
