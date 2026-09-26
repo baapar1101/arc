@@ -20,6 +20,7 @@ from adapters.db.models.task_management import (
     Task,
     TaskActivity,
     TaskAssignee,
+    TaskRelation,
     TaskStatus,
 )
 from adapters.db.models.user import User
@@ -37,6 +38,7 @@ _DEFAULT_STATUSES = (
 )
 
 _ALLOWED_PRIORITIES = {"low", "normal", "high", "urgent"}
+_ALLOWED_RELATION_TYPES = {"blocks", "related", "duplicates"}
 
 
 def _now() -> datetime:
@@ -67,6 +69,64 @@ def _validate_dates(start_at: Optional[datetime], due_at: Optional[datetime]) ->
             "Task due date cannot be before its start date",
             http_status=400,
         )
+
+
+def _get_task_or_404(db: Session, business_id: int, task_id: int) -> Task:
+    task = TaskRepository(db).get_by_id(task_id, business_id)
+    if not task:
+        raise ApiError("TASK_NOT_FOUND", "Task not found", http_status=404)
+    return task
+
+
+def _validate_parent_task(
+    db: Session,
+    business_id: int,
+    *,
+    task_id: Optional[int],
+    parent_task_id: Optional[int],
+    project_id: Optional[int],
+) -> Optional[Task]:
+    if parent_task_id is None:
+        return None
+
+    parent = _get_task_or_404(db, business_id, int(parent_task_id))
+    if task_id is not None and int(parent.id) == int(task_id):
+        raise ApiError(
+            "TASK_PARENT_SELF",
+            "A task cannot be its own parent",
+            http_status=400,
+        )
+    if parent.project_id != project_id:
+        raise ApiError(
+            "TASK_PARENT_PROJECT_MISMATCH",
+            "Parent and subtask must belong to the same project",
+            http_status=400,
+        )
+
+    if task_id is not None:
+        cursor = parent
+        seen: set[int] = set()
+        while cursor is not None:
+            if cursor.id in seen:
+                raise ApiError(
+                    "TASK_PARENT_CYCLE",
+                    "Existing task hierarchy contains a cycle",
+                    http_status=409,
+                )
+            seen.add(cursor.id)
+            if int(cursor.id) == int(task_id):
+                raise ApiError(
+                    "TASK_PARENT_CYCLE",
+                    "Task hierarchy cannot contain a cycle",
+                    http_status=400,
+                )
+            if cursor.parent_task_id is None:
+                break
+            cursor = TaskRepository(db).get_by_id(
+                cursor.parent_task_id,
+                business_id,
+            )
+    return parent
 
 
 def _require_business(db: Session, business_id: int) -> Business:
@@ -275,7 +335,22 @@ def create_task(
     if not title:
         raise ApiError("TASK_TITLE_REQUIRED", "Task title is required", http_status=400)
 
+    requested_parent_id = data.get("parent_task_id")
+    parent_task = None
+    if requested_parent_id is not None:
+        parent_task = _get_task_or_404(db, business_id, int(requested_parent_id))
+        if data.get("project_id") is None:
+            data["project_id"] = parent_task.project_id
+
     project = _require_project(db, business_id, data.get("project_id"))
+    project_id = project.id if project else None
+    parent_task = _validate_parent_task(
+        db,
+        business_id,
+        task_id=None,
+        parent_task_id=requested_parent_id,
+        project_id=project_id,
+    )
     status = _require_status(db, business_id, data.get("status_id")) or _default_status(db, business_id)
 
     priority = str(data.get("priority") or "normal")
@@ -289,7 +364,8 @@ def create_task(
     repo = TaskRepository(db)
     task = Task(
         business_id=business_id,
-        project_id=project.id if project else None,
+        project_id=project_id,
+        parent_task_id=parent_task.id if parent_task else None,
         status_id=status.id,
         title=title,
         description=data.get("description"),
@@ -352,12 +428,50 @@ def update_task(
     if "description" in data:
         task.description = data.get("description")
 
+    proposed_project_id = task.project_id
     if "project_id" in data:
         project = _require_project(db, business_id, data.get("project_id"))
-        new_project_id = project.id if project else None
-        if new_project_id != task.project_id:
-            changes["project_id"] = {"from": task.project_id, "to": new_project_id}
-            task.project_id = new_project_id
+        proposed_project_id = project.id if project else None
+
+    proposed_parent_id = (
+        data.get("parent_task_id")
+        if "parent_task_id" in data
+        else task.parent_task_id
+    )
+    _validate_parent_task(
+        db,
+        business_id,
+        task_id=task.id,
+        parent_task_id=proposed_parent_id,
+        project_id=proposed_project_id,
+    )
+
+    if proposed_project_id != task.project_id:
+        child_mismatch = (
+            db.query(Task.id)
+            .filter(
+                Task.business_id == business_id,
+                Task.parent_task_id == task.id,
+                Task.deleted_at.is_(None),
+                Task.project_id != proposed_project_id,
+            )
+            .first()
+        )
+        if child_mismatch:
+            raise ApiError(
+                "TASK_SUBTASK_PROJECT_MISMATCH",
+                "Move subtasks before changing the parent project",
+                http_status=400,
+            )
+        changes["project_id"] = {"from": task.project_id, "to": proposed_project_id}
+        task.project_id = proposed_project_id
+
+    if proposed_parent_id != task.parent_task_id:
+        changes["parent_task_id"] = {
+            "from": task.parent_task_id,
+            "to": proposed_parent_id,
+        }
+        task.parent_task_id = proposed_parent_id
 
     if "status_id" in data:
         status = _require_status(db, business_id, data.get("status_id")) or _default_status(db, business_id)
@@ -592,3 +706,231 @@ def move_task(
     )
     db.commit()
     return repo.get_by_id(task.id, business_id) or task
+
+
+
+def create_subtask(
+    db: Session,
+    business_id: int,
+    parent_task_id: int,
+    actor_user_id: int,
+    data: dict[str, Any],
+) -> Task:
+    parent = _get_task_or_404(db, business_id, parent_task_id)
+    payload = dict(data)
+    payload["parent_task_id"] = parent.id
+    payload["project_id"] = parent.project_id
+    task = create_task(db, business_id, actor_user_id, payload)
+    _record_activity(
+        db,
+        task=parent,
+        actor_user_id=actor_user_id,
+        event_type="subtask_created",
+        event_data={"subtask_id": task.id},
+    )
+    db.commit()
+    return TaskRepository(db).get_by_id(task.id, business_id) or task
+
+
+def get_task_structure(
+    db: Session,
+    business_id: int,
+    task_id: int,
+) -> dict[str, Any]:
+    task = _get_task_or_404(db, business_id, task_id)
+    parent = (
+        TaskRepository(db).get_by_id(task.parent_task_id, business_id)
+        if task.parent_task_id
+        else None
+    )
+    subtasks = (
+        db.query(Task)
+        .filter(
+            Task.business_id == business_id,
+            Task.parent_task_id == task.id,
+            Task.deleted_at.is_(None),
+        )
+        .order_by(Task.sort_order.asc(), Task.id.asc())
+        .all()
+    )
+    relations = (
+        db.query(TaskRelation)
+        .filter(
+            TaskRelation.business_id == business_id,
+            (
+                (TaskRelation.task_id == task.id)
+                | (TaskRelation.related_task_id == task.id)
+            ),
+        )
+        .order_by(TaskRelation.created_at.asc(), TaskRelation.id.asc())
+        .all()
+    )
+    return {
+        "task": task,
+        "parent": parent,
+        "subtasks": subtasks,
+        "relations": relations,
+    }
+
+
+def _has_block_path(
+    db: Session,
+    business_id: int,
+    start_task_id: int,
+    target_task_id: int,
+) -> bool:
+    frontier = [int(start_task_id)]
+    visited: set[int] = set()
+    while frontier:
+        current = frontier.pop()
+        if current == int(target_task_id):
+            return True
+        if current in visited:
+            continue
+        visited.add(current)
+        next_ids = [
+            row[0]
+            for row in (
+                db.query(TaskRelation.related_task_id)
+                .filter(
+                    TaskRelation.business_id == business_id,
+                    TaskRelation.task_id == current,
+                    TaskRelation.relation_type == "blocks",
+                )
+                .all()
+            )
+        ]
+        frontier.extend(int(value) for value in next_ids if value not in visited)
+    return False
+
+
+def add_task_relation(
+    db: Session,
+    business_id: int,
+    task_id: int,
+    actor_user_id: int,
+    related_task_id: int,
+    relation_type: str,
+) -> TaskRelation:
+    task = _get_task_or_404(db, business_id, task_id)
+    related = _get_task_or_404(db, business_id, related_task_id)
+
+    relation_type = str(relation_type or "").strip().lower()
+    if relation_type not in _ALLOWED_RELATION_TYPES:
+        raise ApiError(
+            "TASK_RELATION_INVALID_TYPE",
+            "Invalid task relation type",
+            http_status=400,
+        )
+    if task.id == related.id:
+        raise ApiError(
+            "TASK_RELATION_SELF",
+            "A task cannot be related to itself",
+            http_status=400,
+        )
+
+    existing_query = db.query(TaskRelation).filter(
+        TaskRelation.business_id == business_id,
+        TaskRelation.relation_type == relation_type,
+    )
+    if relation_type in {"related", "duplicates"}:
+        existing_query = existing_query.filter(
+            (
+                (TaskRelation.task_id == task.id)
+                & (TaskRelation.related_task_id == related.id)
+            )
+            | (
+                (TaskRelation.task_id == related.id)
+                & (TaskRelation.related_task_id == task.id)
+            )
+        )
+    else:
+        existing_query = existing_query.filter(
+            TaskRelation.task_id == task.id,
+            TaskRelation.related_task_id == related.id,
+        )
+    if existing_query.first():
+        raise ApiError(
+            "TASK_RELATION_EXISTS",
+            "Task relation already exists",
+            http_status=409,
+        )
+
+    if relation_type == "blocks" and _has_block_path(
+        db,
+        business_id,
+        related.id,
+        task.id,
+    ):
+        raise ApiError(
+            "TASK_RELATION_CYCLE",
+            "Blocking relation would create a dependency cycle",
+            http_status=400,
+        )
+
+    relation = TaskRelation(
+        business_id=business_id,
+        task_id=task.id,
+        related_task_id=related.id,
+        relation_type=relation_type,
+        created_by_user_id=actor_user_id,
+    )
+    db.add(relation)
+    db.flush()
+    _record_activity(
+        db,
+        task=task,
+        actor_user_id=actor_user_id,
+        event_type="task_relation_added",
+        event_data={
+            "relation_id": relation.id,
+            "relation_type": relation_type,
+            "related_task_id": related.id,
+        },
+    )
+    db.commit()
+    db.refresh(relation)
+    return relation
+
+
+def delete_task_relation(
+    db: Session,
+    business_id: int,
+    task_id: int,
+    relation_id: int,
+    actor_user_id: int,
+) -> None:
+    task = _get_task_or_404(db, business_id, task_id)
+    relation = (
+        db.query(TaskRelation)
+        .filter(
+            TaskRelation.id == relation_id,
+            TaskRelation.business_id == business_id,
+            (
+                (TaskRelation.task_id == task.id)
+                | (TaskRelation.related_task_id == task.id)
+            ),
+        )
+        .first()
+    )
+    if not relation:
+        raise ApiError(
+            "TASK_RELATION_NOT_FOUND",
+            "Task relation not found",
+            http_status=404,
+        )
+    event_data = {
+        "relation_id": relation.id,
+        "relation_type": relation.relation_type,
+        "task_id": relation.task_id,
+        "related_task_id": relation.related_task_id,
+    }
+    db.delete(relation)
+    _record_activity(
+        db,
+        task=task,
+        actor_user_id=actor_user_id,
+        event_type="task_relation_removed",
+        event_data=event_data,
+    )
+    db.commit()

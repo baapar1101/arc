@@ -9,6 +9,8 @@ from adapters.api.v1.schema_models.task_management import (
     TaskAssigneesRequest,
     TaskCreateRequest,
     TaskMoveRequest,
+    TaskRelationCreateRequest,
+    TaskSubtaskCreateRequest,
     TaskUpdateRequest,
 )
 from adapters.db.models.task_management import Task, TaskStatus
@@ -18,11 +20,15 @@ from app.core.auth_dependency import AuthContext, get_current_user
 from app.core.permissions import require_business_access
 from app.core.responses import ApiError, format_datetime_fields, success_response
 from app.services.task_management_service import (
+    add_task_relation,
     complete_task,
+    create_subtask,
     create_task,
     ensure_default_task_statuses,
+    get_task_structure,
     list_available_assignees,
     move_task,
+    delete_task_relation,
     reopen_task,
     replace_task_assignees,
     soft_delete_task,
@@ -43,6 +49,22 @@ def _format_status(status: TaskStatus) -> dict[str, Any]:
         "sort_order": status.sort_order,
         "is_default": status.is_default,
         "is_closed": status.is_closed,
+    }
+
+
+def _format_task_brief(task: Task | None) -> dict[str, Any] | None:
+    if task is None:
+        return None
+    return {
+        "id": task.id,
+        "business_id": task.business_id,
+        "project_id": task.project_id,
+        "parent_task_id": task.parent_task_id,
+        "status_id": task.status_id,
+        "status_name": task.status.name if task.status else None,
+        "title": task.title,
+        "priority": task.priority,
+        "completed_at": task.completed_at,
     }
 
 
@@ -203,6 +225,121 @@ async def get_task_endpoint(
         data={"task": _format_task(task, db, request)},
         request=request,
         message="TASK_FETCHED",
+    )
+
+
+@router.get("/businesses/{business_id}/tasks/{task_id}/structure")
+@require_business_access("business_id")
+async def get_task_structure_endpoint(
+    request: Request,
+    business_id: int = Path(..., gt=0),
+    task_id: int = Path(..., gt=0),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+):
+    del ctx
+    structure = get_task_structure(db, business_id, task_id)
+    task = structure["task"]
+    relations = []
+    for relation in structure["relations"]:
+        outgoing = relation.task_id == task.id
+        other_id = (
+            relation.related_task_id if outgoing else relation.task_id
+        )
+        other = TaskRepository(db).get_by_id(other_id, business_id)
+        relations.append(
+            {
+                "id": relation.id,
+                "relation_type": relation.relation_type,
+                "direction": "outgoing" if outgoing else "incoming",
+                "task": _format_task_brief(other),
+                "created_at": relation.created_at,
+            }
+        )
+    data = {
+        "parent": _format_task_brief(structure["parent"]),
+        "subtasks": [
+            _format_task_brief(item) for item in structure["subtasks"]
+        ],
+        "relations": relations,
+    }
+    return success_response(
+        data=format_datetime_fields(data, request, business_id=business_id),
+        request=request,
+        message="TASK_STRUCTURE_FETCHED",
+    )
+
+
+@router.post("/businesses/{business_id}/tasks/{task_id}/subtasks")
+@require_business_access("business_id")
+async def create_subtask_endpoint(
+    request: Request,
+    data: TaskSubtaskCreateRequest,
+    business_id: int = Path(..., gt=0),
+    task_id: int = Path(..., gt=0),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+):
+    task = create_subtask(
+        db,
+        business_id,
+        task_id,
+        ctx.get_user_id(),
+        data.dict(),
+    )
+    return success_response(
+        data={"task": _format_task(task, db, request)},
+        request=request,
+        message="SUBTASK_CREATED",
+    )
+
+
+@router.post("/businesses/{business_id}/tasks/{task_id}/relations")
+@require_business_access("business_id")
+async def add_task_relation_endpoint(
+    request: Request,
+    data: TaskRelationCreateRequest,
+    business_id: int = Path(..., gt=0),
+    task_id: int = Path(..., gt=0),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+):
+    relation = add_task_relation(
+        db,
+        business_id,
+        task_id,
+        ctx.get_user_id(),
+        data.related_task_id,
+        data.relation_type,
+    )
+    return success_response(
+        data={"relation_id": relation.id},
+        request=request,
+        message="TASK_RELATION_CREATED",
+    )
+
+
+@router.delete("/businesses/{business_id}/tasks/{task_id}/relations/{relation_id}")
+@require_business_access("business_id")
+async def delete_task_relation_endpoint(
+    request: Request,
+    business_id: int = Path(..., gt=0),
+    task_id: int = Path(..., gt=0),
+    relation_id: int = Path(..., gt=0),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+):
+    delete_task_relation(
+        db,
+        business_id,
+        task_id,
+        relation_id,
+        ctx.get_user_id(),
+    )
+    return success_response(
+        data={"id": relation_id},
+        request=request,
+        message="TASK_RELATION_DELETED",
     )
 
 
