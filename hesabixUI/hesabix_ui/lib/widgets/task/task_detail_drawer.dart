@@ -5,6 +5,7 @@ import 'package:hesabix_ui/theme/glass.dart';
 import 'package:hesabix_ui/widgets/task/task_structure_section.dart';
 import 'package:hesabix_ui/widgets/task/task_conversation_section.dart';
 import 'package:hesabix_ui/widgets/task/task_labels_section.dart';
+import 'package:hesabix_ui/widgets/task/task_recurrence_reminder_section.dart';
 import 'package:intl/intl.dart';
 
 typedef TaskUpdateCallback = Future<TaskModel?> Function(Map<String, dynamic> data);
@@ -156,6 +157,52 @@ class _TaskDetailDrawerState extends State<TaskDetailDrawer> {
     } finally {
       if (mounted) setState(() => _propertyBusy = false);
     }
+  }
+
+  Future<void> _pickStartDate() async {
+    var selected = _task.startAt?.toLocal() ?? DateTime.now();
+    final result = await showGlassDialog<DateTime>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setInnerState) => AlertDialog(
+          title: const Text('تاریخ شروع'),
+          content: SizedBox(
+            width: 360,
+            height: 330,
+            child: CalendarDatePicker(
+              initialDate: selected,
+              firstDate: DateTime(2020),
+              lastDate: DateTime.now().add(const Duration(days: 3650)),
+              onDateChanged: (value) =>
+                  setInnerState(() => selected = value),
+            ),
+          ),
+          actions: [
+            if (_task.startAt != null)
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, DateTime(1970)),
+                child: const Text('حذف تاریخ شروع'),
+              ),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('انصراف'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, selected),
+              child: const Text('انتخاب'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (result == null) return;
+    if (result.year == 1970) {
+      await _updateProperty({'start_at': null});
+      return;
+    }
+    final start =
+        DateTime(result.year, result.month, result.day, 9).toUtc();
+    await _updateProperty({'start_at': start.toIso8601String()});
   }
 
   Future<void> _pickDueDate() async {
@@ -367,6 +414,23 @@ class _TaskDetailDrawerState extends State<TaskDetailDrawer> {
                   ),
                   InkWell(
                     borderRadius: BorderRadius.circular(12),
+                    onTap: _propertyBusy ? null : _pickStartDate,
+                    child: _propertyRow(
+                      icon: Icons.play_circle_outline_rounded,
+                      label: 'شروع',
+                      child: Align(
+                        alignment: AlignmentDirectional.centerStart,
+                        child: Text(
+                          _task.startAt == null
+                              ? 'بدون تاریخ شروع'
+                              : DateFormat('yyyy/MM/dd')
+                                  .format(_task.startAt!.toLocal()),
+                        ),
+                      ),
+                    ),
+                  ),
+                  InkWell(
+                    borderRadius: BorderRadius.circular(12),
                     onTap: _propertyBusy ? null : _pickDueDate,
                     child: _propertyRow(
                       icon: isOverdue
@@ -431,6 +495,12 @@ class _TaskDetailDrawerState extends State<TaskDetailDrawer> {
                     ),
                   const SizedBox(height: 22),
                   TaskLabelsSection(
+                    businessId: widget.businessId,
+                    task: _task,
+                    onUpdate: _updateProperty,
+                  ),
+                  const SizedBox(height: 22),
+                  TaskRecurrenceReminderSection(
                     businessId: widget.businessId,
                     task: _task,
                     onUpdate: _updateProperty,

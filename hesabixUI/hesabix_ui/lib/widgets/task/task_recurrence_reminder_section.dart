@@ -31,13 +31,22 @@ class _TaskRecurrenceReminderSectionState
   bool _busy = false;
   String? _error;
 
-  static const Map<String, String?> _rules = {
-    'بدون تکرار': null,
-    'روزانه': 'FREQ=DAILY;INTERVAL=1',
-    'روزهای کاری': 'FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR',
-    'هفتگی': 'FREQ=WEEKLY;INTERVAL=1',
-    'ماهانه': 'FREQ=MONTHLY;INTERVAL=1',
-    'سالانه': 'FREQ=YEARLY;INTERVAL=1',
+  static const Map<String, String> _presetRules = {
+    'daily': 'FREQ=DAILY;INTERVAL=1',
+    'weekdays': 'FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR',
+    'weekly': 'FREQ=WEEKLY;INTERVAL=1',
+    'monthly': 'FREQ=MONTHLY;INTERVAL=1',
+    'yearly': 'FREQ=YEARLY;INTERVAL=1',
+  };
+
+  static const Map<String, String> _presetLabels = {
+    'none': 'بدون تکرار',
+    'daily': 'روزانه',
+    'weekdays': 'روزهای کاری',
+    'weekly': 'هفتگی',
+    'monthly': 'ماهانه',
+    'yearly': 'سالانه',
+    'custom': 'سفارشی',
   };
 
   @override
@@ -80,11 +89,13 @@ class _TaskRecurrenceReminderSectionState
     }
   }
 
-  String _ruleLabel(String? rule) {
-    for (final entry in _rules.entries) {
+  String _selectedPreset() {
+    final rule = widget.task.recurrenceRule;
+    if (rule == null || rule.isEmpty) return 'none';
+    for (final entry in _presetRules.entries) {
       if (entry.value == rule) return entry.key;
     }
-    return rule == null || rule.isEmpty ? 'بدون تکرار' : 'سفارشی';
+    return 'custom';
   }
 
   Future<void> _setRecurrence(String? rule) async {
@@ -218,9 +229,7 @@ class _TaskRecurrenceReminderSectionState
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final selectedRule = _rules.values.contains(widget.task.recurrenceRule)
-        ? widget.task.recurrenceRule
-        : '__custom__';
+    final selectedPreset = _selectedPreset();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -230,29 +239,36 @@ class _TaskRecurrenceReminderSectionState
           style: TextStyle(fontWeight: FontWeight.w700),
         ),
         const SizedBox(height: 9),
-        DropdownButtonFormField<String?>(
-          value: selectedRule,
+        DropdownButtonFormField<String>(
+          value: selectedPreset,
           decoration: const InputDecoration(
             labelText: 'تکرار',
             isDense: true,
           ),
           items: [
-            ..._rules.entries.map(
-              (entry) => DropdownMenuItem<String?>(
-                value: entry.value,
-                child: Text(entry.key),
+            const DropdownMenuItem(
+              value: 'none',
+              child: Text('بدون تکرار'),
+            ),
+            ..._presetRules.keys.map(
+              (key) => DropdownMenuItem<String>(
+                value: key,
+                child: Text(_presetLabels[key] ?? key),
               ),
             ),
-            if (selectedRule == '__custom__')
-              DropdownMenuItem<String?>(
-                value: '__custom__',
-                child: Text(_ruleLabel(widget.task.recurrenceRule)),
+            if (selectedPreset == 'custom')
+              const DropdownMenuItem(
+                value: 'custom',
+                child: Text('سفارشی'),
               ),
           ],
           onChanged: _busy
               ? null
               : (value) {
-                  if (value != '__custom__') _setRecurrence(value);
+                  if (value == null || value == 'custom') return;
+                  _setRecurrence(
+                    value == 'none' ? null : _presetRules[value],
+                  );
                 },
         ),
         if (widget.task.recurrenceRule != null) ...[

@@ -452,3 +452,43 @@ completion and sorting controls.
 - [x] User-owned saved views.
 - [x] Optional shared views.
 - [x] Saved views contain structured JSON only.
+
+
+## Phase 8 — Recurrence & Reminders
+
+Implemented on 2026-09-26 using Vikunja's recurrence/reminder semantics as the benchmark.
+
+### Recurrence
+
+- Recurrence uses the Phase 0 `recurrence_rule`, `recurrence_timezone`, and `recurrence_end_at` fields.
+- Rules are validated with RFC 5545-compatible RRULE parsing.
+- UI provides safe presets: daily, weekdays, weekly, monthly, yearly; custom rules remain API-compatible.
+- COUNT/UNTIL inside RRULE are rejected so recurrence termination has one canonical field: `recurrence_end_at`.
+- Business display timezone is used by default and stored with the recurring task.
+- Completing a recurring task creates exactly one next occurrence.
+- Next occurrence generation is idempotent via the immutable activity stream.
+- Project, parent hierarchy, milestone, priority, description, estimate, assignees and labels are copied.
+- Moving a recurring task into a completed Kanban column triggers the same recurrence behavior.
+
+### Reminders
+
+- Reminders use native `task_reminders`.
+- Supported relative anchors are start and due dates with minute offsets.
+- Date edits automatically recalculate pending relative reminders.
+- Removing an anchor date removes pending reminders that depend on it.
+- Reminder delivery is intentionally deferred to Phase 15 notifications; Phase 8 owns schedule semantics only.
+
+### Phase 8 endpoints
+
+- `GET /api/v1/businesses/{business_id}/tasks/{task_id}/reminders`
+- `POST /api/v1/businesses/{business_id}/tasks/{task_id}/reminders`
+- `DELETE /api/v1/businesses/{business_id}/tasks/{task_id}/reminders/{reminder_id}`
+
+### Phase 8 acceptance gate
+
+- [x] RRULE recurrence is validated.
+- [x] Timezone is explicit and business-aware.
+- [x] Completion creates one next occurrence only.
+- [x] Start and due dates are editable.
+- [x] Relative reminders can be created and removed.
+- [x] Reminder times follow date changes.
