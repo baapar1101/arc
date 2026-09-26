@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:hesabix_ui/models/project_model.dart';
 import 'package:hesabix_ui/models/task_model.dart';
 import 'package:hesabix_ui/theme/glass.dart';
+import 'package:hesabix_ui/widgets/task/task_structure_section.dart';
 import 'package:intl/intl.dart';
 
 typedef TaskUpdateCallback = Future<TaskModel?> Function(Map<String, dynamic> data);
@@ -13,7 +14,10 @@ typedef TaskDeleteCallback = Future<bool> Function();
 /// On desktop this is rendered as a persistent side drawer next to the list.
 /// On mobile the same surface is hosted by a glass modal bottom sheet.
 class TaskDetailDrawer extends StatefulWidget {
+  final int businessId;
   final TaskModel task;
+  final List<TaskModel> relationCandidates;
+  final ValueChanged<TaskModel> onTaskCreated;
   final List<TaskStatusModel> statuses;
   final List<ProjectModel> projects;
   final List<TaskAssigneeOption> assignees;
@@ -24,7 +28,10 @@ class TaskDetailDrawer extends StatefulWidget {
 
   const TaskDetailDrawer({
     super.key,
+    required this.businessId,
     required this.task,
+    required this.relationCandidates,
+    required this.onTaskCreated,
     required this.statuses,
     required this.projects,
     required this.assignees,
@@ -418,6 +425,13 @@ class _TaskDetailDrawerState extends State<TaskDetailDrawer> {
                         );
                       }).toList(),
                     ),
+                  const SizedBox(height: 22),
+                  TaskStructureSection(
+                    businessId: widget.businessId,
+                    task: _task,
+                    relationCandidates: widget.relationCandidates,
+                    onTaskCreated: widget.onTaskCreated,
+                  ),
                   if (_error != null) ...[
                     const SizedBox(height: 18),
                     Container(
