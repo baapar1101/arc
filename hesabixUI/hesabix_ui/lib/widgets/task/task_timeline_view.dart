@@ -398,8 +398,7 @@ class _TaskTimelineViewState extends State<TaskTimelineView> {
       height: 35,
       child: Tooltip(
         message:
-            '${task.title}
-${DateFormat('yyyy/MM/dd').format(range.start)} → ${DateFormat('yyyy/MM/dd').format(range.end)}',
+            '${task.title}\\n${DateFormat('yyyy/MM/dd').format(range.start)} → ${DateFormat('yyyy/MM/dd').format(range.end)}',
         child: InkWell(
           borderRadius: BorderRadius.circular(9),
           onTap: () => widget.onOpen(task),
