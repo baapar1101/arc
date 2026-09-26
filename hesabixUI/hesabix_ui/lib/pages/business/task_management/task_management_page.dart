@@ -1,3 +1,6 @@
+import 'dart:math' as math;
+import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/core/api_client.dart';
@@ -6,7 +9,6 @@ import 'package:hesabix_ui/models/task_model.dart';
 import 'package:hesabix_ui/services/project_service.dart';
 import 'package:hesabix_ui/services/task_service.dart';
 import 'package:hesabix_ui/theme/glass.dart';
-import 'package:hesabix_ui/widgets/task/task_detail_drawer.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
 import 'package:hesabix_ui/utils/responsive_helper.dart';
 import 'package:hesabix_ui/utils/snackbar_helper.dart';
@@ -28,6 +30,7 @@ class _TaskManagementPageState extends State<TaskManagementPage> {
   late final TaskService _taskService;
   late final ProjectService _projectService;
   final TextEditingController _searchController = TextEditingController();
+  final TextEditingController _quickCreateController = TextEditingController();
 
   List<TaskModel> _tasks = const [];
   List<TaskStatusModel> _statuses = const [];
@@ -35,6 +38,7 @@ class _TaskManagementPageState extends State<TaskManagementPage> {
   List<TaskAssigneeOption> _assignees = const [];
 
   bool _loading = true;
+  bool _quickCreating = false;
   String? _error;
   bool? _completedFilter = false;
   int? _statusFilterId;
@@ -50,6 +54,7 @@ class _TaskManagementPageState extends State<TaskManagementPage> {
   @override
   void dispose() {
     _searchController.dispose();
+    _quickCreateController.dispose();
     super.dispose();
   }
 
@@ -62,12 +67,8 @@ class _TaskManagementPageState extends State<TaskManagementPage> {
     try {
       final statuses = await _taskService.listStatuses(widget.businessId);
       final assignees = await _taskService.listAssignees(widget.businessId);
-      final projectsResult = await _projectService.listProjects(
-        businessId: widget.businessId,
-        limit: 500,
-      );
       final projects =
-          (projectsResult['items'] as List<ProjectModel>?) ?? const <ProjectModel>[];
+          await _projectService.listActiveProjects(widget.businessId);
       final tasksResult = await _taskService.listTasks(
         businessId: widget.businessId,
         search: _searchController.text,
@@ -118,7 +119,67 @@ class _TaskManagementPageState extends State<TaskManagementPage> {
     }
   }
 
-  Future<void> _openForm([TaskModel? task]) async {
+  bool _matchesCurrentFilters(TaskModel task) {
+    if (_completedFilter != null && task.isCompleted != _completedFilter) {
+      return false;
+    }
+    if (_statusFilterId != null && task.statusId != _statusFilterId) {
+      return false;
+    }
+    final query = _searchController.text.trim().toLowerCase();
+    if (query.isNotEmpty) {
+      final haystack =
+          '${task.title} ${task.description ?? ''}'.toLowerCase();
+      if (!haystack.contains(query)) return false;
+    }
+    return true;
+  }
+
+  void _applyTaskChange(TaskModel task) {
+    if (!mounted) return;
+    setState(() {
+      final next = List<TaskModel>.from(_tasks)
+        ..removeWhere((item) => item.id == task.id);
+      if (_matchesCurrentFilters(task)) {
+        next.insert(0, task);
+      }
+      _tasks = next;
+    });
+  }
+
+  void _removeTask(int taskId) {
+    if (!mounted) return;
+    setState(() {
+      _tasks = _tasks.where((task) => task.id != taskId).toList();
+    });
+  }
+
+  Future<void> _quickCreate() async {
+    final title = _quickCreateController.text.trim();
+    if (title.isEmpty || _quickCreating) return;
+
+    setState(() => _quickCreating = true);
+    try {
+      final created = await _taskService.createTask(
+        businessId: widget.businessId,
+        data: {'title': title},
+      );
+      if (!mounted) return;
+      _quickCreateController.clear();
+      _applyTaskChange(created);
+      SnackBarHelper.showSuccess(context, message: 'کار ایجاد شد');
+    } catch (e) {
+      if (!mounted) return;
+      SnackBarHelper.showError(
+        context,
+        message: ErrorExtractor.forContext(e, context),
+      );
+    } finally {
+      if (mounted) setState(() => _quickCreating = false);
+    }
+  }
+
+  Future<void> _openTaskPanel([TaskModel? task]) async {
     if (_statuses.isEmpty) {
       SnackBarHelper.showError(
         context,
@@ -126,70 +187,54 @@ class _TaskManagementPageState extends State<TaskManagementPage> {
       );
       return;
     }
-    final changed = await showGlassDialog<bool>(
-      context: context,
-      builder: (dialogContext) => _TaskFormDialog(
-        businessId: widget.businessId,
-        taskService: _taskService,
-        task: task,
-        statuses: _statuses,
-        projects: _projects,
-        assignees: _assignees,
-      ),
-    );
-    if (changed == true) {
-      await _reloadTasks();
-    }
-  }
 
-  Future<void> _openTaskDetail(TaskModel task) async {
-    try {
-      final latest = await _taskService.getTask(
-        businessId: widget.businessId,
-        taskId: task.id,
-      );
-      if (!mounted) return;
-      final changed = await showTaskDetailDrawer(
+    final panel = _TaskDetailPanel(
+      businessId: widget.businessId,
+      taskService: _taskService,
+      initialTask: task,
+      statuses: _statuses,
+      projects: _projects,
+      assignees: _assignees,
+      onTaskChanged: _applyTaskChange,
+      onTaskDeleted: _removeTask,
+    );
+
+    if (ResponsiveHelper.isMobile(context)) {
+      await showGlassModalBottomSheet<void>(
         context: context,
-        businessId: widget.businessId,
-        taskService: _taskService,
-        task: latest,
-        statuses: _statuses,
-        projects: _projects,
-        assignees: _assignees,
+        isScrollControlled: true,
+        useSafeArea: true,
+        builder: (_) => FractionallySizedBox(
+          heightFactor: 0.96,
+          child: panel,
+        ),
       );
-      if (changed == true) {
-        await _reloadTasks();
-      }
-    } catch (e) {
-      if (!mounted) return;
-      SnackBarHelper.showError(
-        context,
-        message: ErrorExtractor.forContext(e, context),
-      );
+      return;
     }
+
+    await _showGlassSidePanel<void>(
+      context: context,
+      builder: (_) => panel,
+    );
   }
 
   Future<void> _toggleComplete(TaskModel task) async {
     try {
-      if (task.isCompleted) {
-        await _taskService.reopenTask(
-          businessId: widget.businessId,
-          taskId: task.id,
-        );
-        if (mounted) {
-          SnackBarHelper.showSuccess(context, message: 'کار دوباره باز شد');
-        }
-      } else {
-        await _taskService.completeTask(
-          businessId: widget.businessId,
-          taskId: task.id,
-        );
-        if (mounted) {
-          SnackBarHelper.showSuccess(context, message: 'کار تکمیل شد');
-        }
-      }
-      await _reloadTasks();
+      final updated = task.isCompleted
+          ? await _taskService.reopenTask(
+              businessId: widget.businessId,
+              taskId: task.id,
+            )
+          : await _taskService.completeTask(
+              businessId: widget.businessId,
+              taskId: task.id,
+            );
+      if (!mounted) return;
+      _applyTaskChange(updated);
+      SnackBarHelper.showSuccess(
+        context,
+        message: task.isCompleted ? 'کار دوباره باز شد' : 'کار تکمیل شد',
+      );
     } catch (e) {
       if (!mounted) return;
       SnackBarHelper.showError(
@@ -199,35 +244,16 @@ class _TaskManagementPageState extends State<TaskManagementPage> {
     }
   }
 
-  Future<void> _deleteTask(TaskModel task) async {
-    final confirmed = await showGlassDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('حذف کار'),
-        content: Text('«${task.title}» حذف شود؟'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('انصراف'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('حذف'),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true) return;
-
+  Future<void> _changeStatus(TaskModel task, int statusId) async {
+    if (task.statusId == statusId) return;
     try {
-      await _taskService.deleteTask(
+      final updated = await _taskService.updateTask(
         businessId: widget.businessId,
         taskId: task.id,
+        data: {'status_id': statusId},
       );
-      if (mounted) {
-        SnackBarHelper.showSuccess(context, message: 'کار حذف شد');
-      }
-      await _reloadTasks();
+      if (!mounted) return;
+      _applyTaskChange(updated);
     } catch (e) {
       if (!mounted) return;
       SnackBarHelper.showError(
@@ -290,7 +316,7 @@ class _TaskManagementPageState extends State<TaskManagementPage> {
             Padding(
               padding: const EdgeInsetsDirectional.only(end: 8),
               child: FilledButton.icon(
-                onPressed: _loading ? null : () => _openForm(),
+                onPressed: _loading ? null : () => _openTaskPanel(),
                 icon: const Icon(Icons.add_task),
                 label: const Text('کار جدید'),
               ),
@@ -299,7 +325,7 @@ class _TaskManagementPageState extends State<TaskManagementPage> {
       ),
       floatingActionButton: isMobile
           ? FloatingActionButton.extended(
-              onPressed: _loading ? null : () => _openForm(),
+              onPressed: _loading ? null : () => _openTaskPanel(),
               icon: const Icon(Icons.add_task),
               label: const Text('کار جدید'),
             )
@@ -334,11 +360,11 @@ class _TaskManagementPageState extends State<TaskManagementPage> {
                     ),
                     Chip(
                       avatar: Icon(
-                        Icons.check_circle_outline,
+                        Icons.view_sidebar_outlined,
                         size: 18,
                         color: scheme.primary,
                       ),
-                      label: const Text('Phase 2 · Task Detail UX'),
+                      label: const Text('Phase 2 · Task UX'),
                       backgroundColor: scheme.primary.withValues(alpha: 0.08),
                       side: BorderSide(
                         color: scheme.primary.withValues(alpha: 0.24),
@@ -352,6 +378,37 @@ class _TaskManagementPageState extends State<TaskManagementPage> {
                 padding: const EdgeInsets.all(14),
                 child: Column(
                   children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextField(
+                            controller: _quickCreateController,
+                            textInputAction: TextInputAction.done,
+                            onSubmitted: (_) => _quickCreate(),
+                            decoration: const InputDecoration(
+                              hintText: 'عنوان کار جدید را بنویسید و Enter بزنید…',
+                              prefixIcon: Icon(Icons.add_task_outlined),
+                              isDense: true,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        IconButton.filled(
+                          tooltip: 'ایجاد سریع',
+                          onPressed: _quickCreating ? null : _quickCreate,
+                          icon: _quickCreating
+                              ? const SizedBox(
+                                  width: 18,
+                                  height: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Icon(Icons.arrow_forward),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
                     TextField(
                       controller: _searchController,
                       textInputAction: TextInputAction.search,
@@ -361,7 +418,7 @@ class _TaskManagementPageState extends State<TaskManagementPage> {
                         prefixIcon: const Icon(Icons.search),
                         suffixIcon: IconButton(
                           tooltip: 'جستجو',
-                          icon: const Icon(Icons.arrow_forward),
+                          icon: const Icon(Icons.search_rounded),
                           onPressed: _reloadTasks,
                         ),
                       ),
@@ -448,10 +505,7 @@ class _TaskManagementPageState extends State<TaskManagementPage> {
                         color: scheme.error,
                       ),
                       const SizedBox(height: 12),
-                      Text(
-                        _error!,
-                        textAlign: TextAlign.center,
-                      ),
+                      Text(_error!, textAlign: TextAlign.center),
                       const SizedBox(height: 12),
                       FilledButton.icon(
                         onPressed: _loadAll,
@@ -481,7 +535,7 @@ class _TaskManagementPageState extends State<TaskManagementPage> {
                       ),
                       const SizedBox(height: 12),
                       OutlinedButton.icon(
-                        onPressed: () => _openForm(),
+                        onPressed: () => _openTaskPanel(),
                         icon: const Icon(Icons.add),
                         label: const Text('ایجاد اولین کار'),
                       ),
@@ -494,11 +548,12 @@ class _TaskManagementPageState extends State<TaskManagementPage> {
                     padding: const EdgeInsets.only(bottom: 10),
                     child: _TaskCard(
                       task: task,
+                      statuses: _statuses,
                       priorityLabel: _priorityLabel(task.priority),
                       priorityColor: _priorityColor(context, task.priority),
                       onToggle: () => _toggleComplete(task),
-                      onEdit: () => _openTaskDetail(task),
-                      onDelete: () => _deleteTask(task),
+                      onOpen: () => _openTaskPanel(task),
+                      onStatusChanged: (id) => _changeStatus(task, id),
                     ),
                   ),
                 ),
@@ -547,28 +602,29 @@ class _SummaryPill extends StatelessWidget {
 
 class _TaskCard extends StatelessWidget {
   final TaskModel task;
+  final List<TaskStatusModel> statuses;
   final String priorityLabel;
   final Color priorityColor;
   final VoidCallback onToggle;
-  final VoidCallback onEdit;
-  final VoidCallback onDelete;
+  final VoidCallback onOpen;
+  final ValueChanged<int> onStatusChanged;
 
   const _TaskCard({
     required this.task,
+    required this.statuses,
     required this.priorityLabel,
     required this.priorityColor,
     required this.onToggle,
-    required this.onEdit,
-    required this.onDelete,
+    required this.onOpen,
+    required this.onStatusChanged,
   });
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final due = task.dueAt?.toLocal();
-    final overdue = due != null &&
-        !task.isCompleted &&
-        due.isBefore(DateTime.now());
+    final overdue =
+        due != null && !task.isCompleted && due.isBefore(DateTime.now());
 
     final meta = <String>[
       if (task.projectName != null && task.projectName!.isNotEmpty)
@@ -591,7 +647,7 @@ class _TaskCard extends StatelessWidget {
           Expanded(
             child: InkWell(
               borderRadius: BorderRadius.circular(12),
-              onTap: onEdit,
+              onTap: onOpen,
               child: Padding(
                 padding: const EdgeInsets.symmetric(vertical: 3),
                 child: Column(
@@ -629,12 +685,36 @@ class _TaskCard extends StatelessWidget {
                     Wrap(
                       spacing: 6,
                       runSpacing: 6,
+                      crossAxisAlignment: WrapCrossAlignment.center,
                       children: [
-                        if (task.status != null)
-                          Chip(
-                            label: Text(task.status!.name),
+                        PopupMenuButton<int>(
+                          tooltip: 'تغییر وضعیت',
+                          onSelected: onStatusChanged,
+                          itemBuilder: (_) => statuses
+                              .map(
+                                (status) => PopupMenuItem<int>(
+                                  value: status.id,
+                                  child: Row(
+                                    children: [
+                                      if (status.id == task.statusId)
+                                        const Padding(
+                                          padding:
+                                              EdgeInsetsDirectional.only(end: 8),
+                                          child: Icon(Icons.check, size: 18),
+                                        ),
+                                      Text(status.name),
+                                    ],
+                                  ),
+                                ),
+                              )
+                              .toList(),
+                          child: Chip(
+                            avatar:
+                                const Icon(Icons.swap_horiz_rounded, size: 16),
+                            label: Text(task.status?.name ?? 'وضعیت'),
                             visualDensity: VisualDensity.compact,
                           ),
+                        ),
                         Chip(
                           label: Text(priorityLabel),
                           visualDensity: VisualDensity.compact,
@@ -662,19 +742,10 @@ class _TaskCard extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 4),
-          Column(
-            children: [
-              IconButton(
-                tooltip: 'باز کردن جزئیات',
-                icon: const Icon(Icons.open_in_new_outlined),
-                onPressed: onEdit,
-              ),
-              IconButton(
-                tooltip: 'حذف',
-                icon: Icon(Icons.delete_outline, color: scheme.error),
-                onPressed: onDelete,
-              ),
-            ],
+          IconButton(
+            tooltip: 'باز کردن جزئیات',
+            icon: const Icon(Icons.chevron_right),
+            onPressed: onOpen,
           ),
         ],
       ),
@@ -682,50 +753,59 @@ class _TaskCard extends StatelessWidget {
   }
 }
 
-class _TaskFormDialog extends StatefulWidget {
+class _TaskDetailPanel extends StatefulWidget {
   final int businessId;
   final TaskService taskService;
-  final TaskModel? task;
+  final TaskModel? initialTask;
   final List<TaskStatusModel> statuses;
   final List<ProjectModel> projects;
   final List<TaskAssigneeOption> assignees;
+  final ValueChanged<TaskModel> onTaskChanged;
+  final ValueChanged<int> onTaskDeleted;
 
-  const _TaskFormDialog({
+  const _TaskDetailPanel({
     required this.businessId,
     required this.taskService,
-    required this.task,
+    required this.initialTask,
     required this.statuses,
     required this.projects,
     required this.assignees,
+    required this.onTaskChanged,
+    required this.onTaskDeleted,
   });
 
   @override
-  State<_TaskFormDialog> createState() => _TaskFormDialogState();
+  State<_TaskDetailPanel> createState() => _TaskDetailPanelState();
 }
 
-class _TaskFormDialogState extends State<_TaskFormDialog> {
+class _TaskDetailPanelState extends State<_TaskDetailPanel> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _titleController;
   late final TextEditingController _descriptionController;
+  TaskModel? _task;
   late int _projectId;
   late int _statusId;
-  late int _assigneeUserId;
   late String _priority;
+  late Set<int> _assigneeIds;
   DateTime? _dueDate;
   bool _saving = false;
+  bool _togglingComplete = false;
+  bool _deleting = false;
   String? _error;
+
+  bool get _editing => _task != null;
 
   @override
   void initState() {
     super.initState();
-    final task = widget.task;
-    _titleController = TextEditingController(text: task?.title ?? '');
-    _descriptionController = TextEditingController(text: task?.description ?? '');
-    _projectId = task?.projectId ?? 0;
-    _assigneeUserId =
-        task != null && task.assignees.isNotEmpty ? task.assignees.first.userId : 0;
-    _priority = task?.priority ?? 'normal';
-    _dueDate = task?.dueAt?.toLocal();
+    _task = widget.initialTask;
+    _titleController = TextEditingController(text: _task?.title ?? '');
+    _descriptionController =
+        TextEditingController(text: _task?.description ?? '');
+    _projectId = _task?.projectId ?? 0;
+    _priority = _task?.priority ?? 'normal';
+    _dueDate = _task?.dueAt?.toLocal();
+    _assigneeIds = _task?.assignees.map((e) => e.userId).toSet() ?? <int>{};
 
     TaskStatusModel? defaultStatus;
     for (final status in widget.statuses) {
@@ -734,7 +814,7 @@ class _TaskFormDialogState extends State<_TaskFormDialog> {
         break;
       }
     }
-    _statusId = task?.statusId ??
+    _statusId = _task?.statusId ??
         defaultStatus?.id ??
         (widget.statuses.isNotEmpty ? widget.statuses.first.id : 0);
   }
@@ -783,13 +863,7 @@ class _TaskFormDialogState extends State<_TaskFormDialog> {
     }
   }
 
-  Future<void> _save() async {
-    if (!(_formKey.currentState?.validate() ?? false)) return;
-    setState(() {
-      _saving = true;
-      _error = null;
-    });
-
+  Map<String, dynamic> _payload() {
     final due = _dueDate == null
         ? null
         : DateTime(
@@ -799,7 +873,7 @@ class _TaskFormDialogState extends State<_TaskFormDialog> {
             17,
           ).toUtc();
 
-    final data = <String, dynamic>{
+    return {
       'title': _titleController.text.trim(),
       'description': _descriptionController.text.trim().isEmpty
           ? null
@@ -808,25 +882,43 @@ class _TaskFormDialogState extends State<_TaskFormDialog> {
       'status_id': _statusId == 0 ? null : _statusId,
       'priority': _priority,
       'due_at': due?.toIso8601String(),
-      'assignee_user_ids':
-          _assigneeUserId == 0 ? <int>[] : <int>[_assigneeUserId],
+      'assignee_user_ids': _assigneeIds.toList(),
     };
+  }
+
+  Future<void> _save() async {
+    if (!(_formKey.currentState?.validate() ?? false)) return;
+    setState(() {
+      _saving = true;
+      _error = null;
+    });
 
     try {
-      if (widget.task == null) {
-        await widget.taskService.createTask(
-          businessId: widget.businessId,
-          data: data,
-        );
-      } else {
-        await widget.taskService.updateTask(
-          businessId: widget.businessId,
-          taskId: widget.task!.id,
-          data: data,
-        );
-      }
+      final updated = _task == null
+          ? await widget.taskService.createTask(
+              businessId: widget.businessId,
+              data: _payload(),
+            )
+          : await widget.taskService.updateTask(
+              businessId: widget.businessId,
+              taskId: _task!.id,
+              data: _payload(),
+            );
       if (!mounted) return;
-      Navigator.pop(context, true);
+      setState(() {
+        _task = updated;
+        _projectId = updated.projectId ?? 0;
+        _statusId = updated.statusId ?? _statusId;
+        _priority = updated.priority;
+        _dueDate = updated.dueAt?.toLocal();
+        _assigneeIds = updated.assignees.map((e) => e.userId).toSet();
+        _saving = false;
+      });
+      widget.onTaskChanged(updated);
+      SnackBarHelper.showSuccess(
+        context,
+        message: widget.initialTask == null ? 'کار ایجاد شد' : 'تغییرات ذخیره شد',
+      );
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -836,180 +928,494 @@ class _TaskFormDialogState extends State<_TaskFormDialog> {
     }
   }
 
+  Future<void> _toggleComplete() async {
+    final current = _task;
+    if (current == null || _togglingComplete) return;
+
+    setState(() => _togglingComplete = true);
+    try {
+      final updated = current.isCompleted
+          ? await widget.taskService.reopenTask(
+              businessId: widget.businessId,
+              taskId: current.id,
+            )
+          : await widget.taskService.completeTask(
+              businessId: widget.businessId,
+              taskId: current.id,
+            );
+      if (!mounted) return;
+      setState(() {
+        _task = updated;
+        _statusId = updated.statusId ?? _statusId;
+        _togglingComplete = false;
+      });
+      widget.onTaskChanged(updated);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _togglingComplete = false;
+        _error = ErrorExtractor.forContext(e, context);
+      });
+    }
+  }
+
+  Future<void> _delete() async {
+    final current = _task;
+    if (current == null || _deleting) return;
+
+    final confirmed = await showGlassDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('حذف کار'),
+        content: Text('«${current.title}» حذف شود؟'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('انصراف'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('حذف'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _deleting = true);
+    try {
+      await widget.taskService.deleteTask(
+        businessId: widget.businessId,
+        taskId: current.id,
+      );
+      if (!mounted) return;
+      widget.onTaskDeleted(current.id);
+      Navigator.of(context).pop();
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _deleting = false;
+        _error = ErrorExtractor.forContext(e, context);
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final editing = widget.task != null;
+    final scheme = Theme.of(context).colorScheme;
+    final current = _task;
 
-    return AlertDialog(
-      title: Text(editing ? 'ویرایش کار' : 'کار جدید'),
-      content: SizedBox(
-        width: 620,
-        child: SingleChildScrollView(
-          child: Form(
-            key: _formKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
+    return Material(
+      color: Colors.transparent,
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(18, 12, 12, 8),
+            child: Row(
               children: [
-                TextFormField(
-                  controller: _titleController,
-                  autofocus: !editing,
-                  decoration: const InputDecoration(
-                    labelText: 'عنوان',
-                    prefixIcon: Icon(Icons.task_alt_outlined),
-                  ),
-                  validator: (value) {
-                    if (value == null || value.trim().isEmpty) {
-                      return 'عنوان الزامی است';
-                    }
-                    return null;
-                  },
+                Icon(
+                  _editing ? Icons.task_alt_outlined : Icons.add_task,
+                  color: scheme.primary,
                 ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: _descriptionController,
-                  minLines: 2,
-                  maxLines: 4,
-                  decoration: const InputDecoration(
-                    labelText: 'توضیحات',
-                    alignLabelWithHint: true,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                DropdownButtonFormField<int>(
-                  value: _projectId,
-                  isExpanded: true,
-                  decoration: const InputDecoration(labelText: 'پروژه'),
-                  items: [
-                    const DropdownMenuItem(
-                      value: 0,
-                      child: Text('بدون پروژه'),
-                    ),
-                    ...widget.projects.map(
-                      (project) => DropdownMenuItem(
-                        value: project.id,
-                        child: Text('${project.code} · ${project.name}'),
-                      ),
-                    ),
-                  ],
-                  onChanged: _saving
-                      ? null
-                      : (value) => setState(() => _projectId = value ?? 0),
-                ),
-                const SizedBox(height: 12),
-                DropdownButtonFormField<int>(
-                  value: _statusId,
-                  isExpanded: true,
-                  decoration: const InputDecoration(labelText: 'وضعیت'),
-                  items: widget.statuses
-                      .map(
-                        (status) => DropdownMenuItem(
-                          value: status.id,
-                          child: Text(status.name),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    _editing ? 'TASK-${current!.id}' : 'کار جدید',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
                         ),
-                      )
-                      .toList(),
-                  onChanged: _saving
-                      ? null
-                      : (value) => setState(() => _statusId = value ?? 0),
-                ),
-                const SizedBox(height: 12),
-                DropdownButtonFormField<String>(
-                  value: _priority,
-                  decoration: const InputDecoration(labelText: 'اولویت'),
-                  items: const [
-                    DropdownMenuItem(value: 'low', child: Text('کم')),
-                    DropdownMenuItem(value: 'normal', child: Text('معمولی')),
-                    DropdownMenuItem(value: 'high', child: Text('زیاد')),
-                    DropdownMenuItem(value: 'urgent', child: Text('فوری')),
-                  ],
-                  onChanged: _saving
-                      ? null
-                      : (value) =>
-                          setState(() => _priority = value ?? 'normal'),
-                ),
-                const SizedBox(height: 12),
-                DropdownButtonFormField<int>(
-                  value: _assigneeUserId,
-                  isExpanded: true,
-                  decoration: const InputDecoration(labelText: 'مسئول'),
-                  items: [
-                    const DropdownMenuItem(
-                      value: 0,
-                      child: Text('بدون مسئول'),
-                    ),
-                    ...widget.assignees.map(
-                      (user) => DropdownMenuItem(
-                        value: user.userId,
-                        child: Text(user.name),
-                      ),
-                    ),
-                  ],
-                  onChanged: _saving
-                      ? null
-                      : (value) =>
-                          setState(() => _assigneeUserId = value ?? 0),
-                ),
-                const SizedBox(height: 12),
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: const Icon(Icons.event_outlined),
-                  title: const Text('سررسید'),
-                  subtitle: Text(
-                    _dueDate == null
-                        ? 'بدون سررسید'
-                        : DateFormat('yyyy/MM/dd').format(_dueDate!),
-                  ),
-                  trailing: Wrap(
-                    spacing: 4,
-                    children: [
-                      if (_dueDate != null)
-                        IconButton(
-                          tooltip: 'پاک کردن',
-                          onPressed: _saving
-                              ? null
-                              : () => setState(() => _dueDate = null),
-                          icon: const Icon(Icons.clear),
-                        ),
-                      IconButton(
-                        tooltip: 'انتخاب تاریخ',
-                        onPressed: _saving ? null : _pickDueDate,
-                        icon: const Icon(Icons.calendar_month_outlined),
-                      ),
-                    ],
                   ),
                 ),
-                if (_error != null) ...[
-                  const SizedBox(height: 8),
-                  Text(
-                    _error!,
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.error,
+                if (_editing)
+                  Tooltip(
+                    message: current!.isCompleted ? 'بازگشایی' : 'تکمیل',
+                    child: IconButton(
+                      onPressed: _togglingComplete ? null : _toggleComplete,
+                      icon: _togglingComplete
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : Icon(
+                              current.isCompleted
+                                  ? Icons.undo_rounded
+                                  : Icons.check_circle_outline,
+                            ),
                     ),
-                    textAlign: TextAlign.center,
                   ),
-                ],
+                if (_editing)
+                  IconButton(
+                    tooltip: 'حذف',
+                    onPressed: _deleting ? null : _delete,
+                    icon: Icon(Icons.delete_outline, color: scheme.error),
+                  ),
+                IconButton(
+                  tooltip: 'بستن',
+                  onPressed: () => Navigator.of(context).pop(),
+                  icon: const Icon(Icons.close),
+                ),
               ],
             ),
           ),
-        ),
+          const Divider(height: 1),
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(20, 18, 20, 28),
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    TextFormField(
+                      controller: _titleController,
+                      autofocus: !_editing,
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.w700,
+                          ),
+                      decoration: const InputDecoration(
+                        labelText: 'عنوان',
+                        prefixIcon: Icon(Icons.title),
+                      ),
+                      validator: (value) {
+                        if (value == null || value.trim().isEmpty) {
+                          return 'عنوان الزامی است';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 14),
+                    TextFormField(
+                      controller: _descriptionController,
+                      minLines: 4,
+                      maxLines: 10,
+                      decoration: const InputDecoration(
+                        labelText: 'توضیحات',
+                        alignLabelWithHint: true,
+                        prefixIcon: Padding(
+                          padding: EdgeInsets.only(bottom: 72),
+                          child: Icon(Icons.notes),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    Text(
+                      'ویژگی‌ها',
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.w700,
+                          ),
+                    ),
+                    const SizedBox(height: 10),
+                    _PropertyRow(
+                      icon: Icons.radio_button_checked_outlined,
+                      label: 'وضعیت',
+                      child: DropdownButtonFormField<int>(
+                        value: _statusId,
+                        isExpanded: true,
+                        decoration: const InputDecoration(
+                          isDense: true,
+                          border: InputBorder.none,
+                        ),
+                        items: widget.statuses
+                            .map(
+                              (status) => DropdownMenuItem(
+                                value: status.id,
+                                child: Text(status.name),
+                              ),
+                            )
+                            .toList(),
+                        onChanged: _saving
+                            ? null
+                            : (value) =>
+                                setState(() => _statusId = value ?? _statusId),
+                      ),
+                    ),
+                    _PropertyRow(
+                      icon: Icons.flag_outlined,
+                      label: 'اولویت',
+                      child: DropdownButtonFormField<String>(
+                        value: _priority,
+                        decoration: const InputDecoration(
+                          isDense: true,
+                          border: InputBorder.none,
+                        ),
+                        items: const [
+                          DropdownMenuItem(value: 'low', child: Text('کم')),
+                          DropdownMenuItem(
+                            value: 'normal',
+                            child: Text('معمولی'),
+                          ),
+                          DropdownMenuItem(value: 'high', child: Text('زیاد')),
+                          DropdownMenuItem(
+                            value: 'urgent',
+                            child: Text('فوری'),
+                          ),
+                        ],
+                        onChanged: _saving
+                            ? null
+                            : (value) => setState(
+                                  () => _priority = value ?? 'normal',
+                                ),
+                      ),
+                    ),
+                    _PropertyRow(
+                      icon: Icons.folder_open_outlined,
+                      label: 'پروژه',
+                      child: DropdownButtonFormField<int>(
+                        value: _projectId,
+                        isExpanded: true,
+                        decoration: const InputDecoration(
+                          isDense: true,
+                          border: InputBorder.none,
+                        ),
+                        items: [
+                          const DropdownMenuItem(
+                            value: 0,
+                            child: Text('بدون پروژه'),
+                          ),
+                          ...widget.projects.map(
+                            (project) => DropdownMenuItem(
+                              value: project.id,
+                              child: Text(
+                                '${project.code} · ${project.name}',
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ),
+                        ],
+                        onChanged: _saving
+                            ? null
+                            : (value) =>
+                                setState(() => _projectId = value ?? 0),
+                      ),
+                    ),
+                    _PropertyRow(
+                      icon: Icons.event_outlined,
+                      label: 'سررسید',
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              _dueDate == null
+                                  ? 'بدون سررسید'
+                                  : DateFormat('yyyy/MM/dd').format(_dueDate!),
+                            ),
+                          ),
+                          if (_dueDate != null)
+                            IconButton(
+                              tooltip: 'پاک کردن',
+                              onPressed: _saving
+                                  ? null
+                                  : () => setState(() => _dueDate = null),
+                              icon: const Icon(Icons.clear, size: 19),
+                            ),
+                          IconButton(
+                            tooltip: 'انتخاب تاریخ',
+                            onPressed: _saving ? null : _pickDueDate,
+                            icon: const Icon(
+                              Icons.calendar_month_outlined,
+                              size: 20,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                    Text(
+                      'مسئولان',
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.w700,
+                          ),
+                    ),
+                    const SizedBox(height: 10),
+                    if (widget.assignees.isEmpty)
+                      Text(
+                        'عضوی برای تخصیص وجود ندارد.',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      )
+                    else
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: widget.assignees.map((user) {
+                          final selected = _assigneeIds.contains(user.userId);
+                          return FilterChip(
+                            selected: selected,
+                            avatar: CircleAvatar(
+                              radius: 11,
+                              child: Text(
+                                user.name.trim().isEmpty
+                                    ? '?'
+                                    : user.name.trim().characters.first,
+                                style: const TextStyle(fontSize: 11),
+                              ),
+                            ),
+                            label: Text(user.name),
+                            onSelected: _saving
+                                ? null
+                                : (value) {
+                                    setState(() {
+                                      if (value) {
+                                        _assigneeIds.add(user.userId);
+                                      } else {
+                                        _assigneeIds.remove(user.userId);
+                                      }
+                                    });
+                                  },
+                          );
+                        }).toList(),
+                      ),
+                    if (_error != null) ...[
+                      const SizedBox(height: 18),
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: scheme.errorContainer.withValues(alpha: 0.58),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          _error!,
+                          style: TextStyle(color: scheme.onErrorContainer),
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 24),
+                    FilledButton.icon(
+                      onPressed: _saving ? null : _save,
+                      icon: _saving
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.save_outlined),
+                      label: Text(_editing ? 'ذخیره تغییرات' : 'ایجاد کار'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
-      actions: [
-        TextButton(
-          onPressed: _saving ? null : () => Navigator.pop(context, false),
-          child: const Text('انصراف'),
-        ),
-        FilledButton.icon(
-          onPressed: _saving ? null : _save,
-          icon: _saving
-              ? const SizedBox(
-                  width: 18,
-                  height: 18,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : const Icon(Icons.save_outlined),
-          label: Text(editing ? 'ذخیره' : 'ایجاد'),
-        ),
-      ],
     );
   }
+}
+
+class _PropertyRow extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Widget child;
+
+  const _PropertyRow({
+    required this.icon,
+    required this.label,
+    required this.child,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsetsDirectional.fromSTEB(12, 6, 8, 6),
+      decoration: BoxDecoration(
+        color: scheme.surface.withValues(alpha: 0.28),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: scheme.outlineVariant.withValues(alpha: 0.45),
+        ),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, size: 19, color: scheme.outline),
+          const SizedBox(width: 9),
+          SizedBox(
+            width: 72,
+            child: Text(
+              label,
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ),
+          Expanded(child: child),
+        ],
+      ),
+    );
+  }
+}
+
+Future<T?> _showGlassSidePanel<T>({
+  required BuildContext context,
+  required WidgetBuilder builder,
+}) {
+  final label = MaterialLocalizations.of(context).modalBarrierDismissLabel;
+
+  return showGeneralDialog<T>(
+    context: context,
+    barrierDismissible: false,
+    barrierLabel: label,
+    barrierColor: Colors.transparent,
+    transitionDuration: const Duration(milliseconds: 190),
+    pageBuilder: (routeContext, animation, secondaryAnimation) {
+      final size = MediaQuery.sizeOf(routeContext);
+      final width = math.min(680.0, size.width * 0.82);
+      final slide = Tween<Offset>(
+        begin: const Offset(0.08, 0),
+        end: Offset.zero,
+      ).animate(
+        CurvedAnimation(
+          parent: animation,
+          curve: Curves.easeOutCubic,
+          reverseCurve: Curves.easeInCubic,
+        ),
+      );
+
+      return Material(
+        type: MaterialType.transparency,
+        child: Stack(
+          children: [
+            Positioned.fill(
+              child: BackdropFilter(
+                filter: ui.ImageFilter.blur(
+                  sigmaX: GlassStyle.strongModalBlur,
+                  sigmaY: GlassStyle.strongModalBlur,
+                ),
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () => Navigator.of(routeContext).pop(),
+                  child: ColoredBox(
+                    color: GlassStyle.modalBarrier(routeContext),
+                  ),
+                ),
+              ),
+            ),
+            Align(
+              alignment: Alignment.centerRight,
+              child: SlideTransition(
+                position: slide,
+                child: SafeArea(
+                  left: false,
+                  child: SizedBox(
+                    width: width,
+                    height: size.height,
+                    child: GlassSurface(
+                      borderRadius: const BorderRadius.horizontal(
+                        left: Radius.circular(24),
+                      ),
+                      blur: GlassStyle.strongModalBlur,
+                      opacity:
+                          Theme.of(routeContext).brightness == Brightness.dark
+                              ? 0.22
+                              : 0.62,
+                      child: builder(routeContext),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    },
+  );
 }

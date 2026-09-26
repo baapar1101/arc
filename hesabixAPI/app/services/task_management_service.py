@@ -365,7 +365,7 @@ def update_task(
             task.status_id = status.id
         if status.category == "completed":
             task.completed_at = task.completed_at or _now()
-        elif status.category != "cancelled":
+        else:
             task.completed_at = None
 
     if "priority" in data:

@@ -193,3 +193,30 @@ Implemented on 2026-09-26 using Plane as the primary interaction benchmark.
 - Project pickers load all projects, not only active ones, so older task/project links remain editable.
 
 Comments, attachments, and activity history remain intentionally outside this phase and are implemented in their later pipeline phases.
+
+
+## Phase 2 — Task UX / Plane-style interaction
+
+Implemented on 2026-09-26.
+
+### Interaction model
+
+- Desktop task detail opens in a persistent frosted-glass right drawer.
+- Mobile task detail opens in a nearly full-height frosted-glass bottom sheet.
+- Clicking a task never navigates away from the current list.
+- Quick create accepts a task title directly from the list.
+- Status can be changed inline from each task card.
+- The detail panel edits title, description, project, status, priority, due date and multiple assignees.
+- Complete/reopen and soft-delete are available directly in the detail panel.
+- Parent list state is updated from API results without a full page navigation/reload.
+
+### Acceptance gate
+
+- [x] Quick task creation from list
+- [x] Detail editing without page navigation
+- [x] Inline status change
+- [x] Multi-assignee UI
+- [x] Complete/reopen
+- [x] Desktop drawer
+- [x] Mobile glass sheet
+- [x] Existing glass design system remains authoritative
