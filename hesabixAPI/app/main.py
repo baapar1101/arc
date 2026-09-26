@@ -1033,6 +1033,8 @@ def create_app() -> FastAPI:
     application.include_router(customers_router, prefix=settings.api_v1_prefix)
     from adapters.api.v1.projects import router as projects_router
     application.include_router(projects_router, prefix=settings.api_v1_prefix)
+    from adapters.api.v1.task_management import router as task_management_router
+    application.include_router(task_management_router, prefix=settings.api_v1_prefix)
     from adapters.api.v1.crm import router as crm_router
     application.include_router(crm_router, prefix=settings.api_v1_prefix)
     application.include_router(bank_accounts_router, prefix=settings.api_v1_prefix)

@@ -129,3 +129,47 @@ alembic upgrade head
 The completion revision is `20260926_000002_task_management_phase0_completion`.
 It backfills `business_id` from the owning project/task before enforcing NOT NULL
 tenant scope, so an already-applied initial Phase 0 migration can be upgraded in place.
+
+
+## Phase 1 — Core Task Engine
+
+Implemented on 2026-09-26.
+
+### Backend operations
+
+- Create/list/read/update/soft-delete task
+- Complete and reopen task
+- Business-scoped status bootstrap
+- Priority and due date updates
+- Existing-project validation
+- Active business-member validation for assignees
+- Multi-assignee persistence
+- Search and basic filtering
+- Domain activity events for create/update/assignment/complete/reopen/delete
+
+### Phase 1 endpoints
+
+- `GET /api/v1/businesses/{business_id}/task-statuses`
+- `GET /api/v1/businesses/{business_id}/task-assignees`
+- `GET /api/v1/businesses/{business_id}/tasks`
+- `POST /api/v1/businesses/{business_id}/tasks`
+- `GET /api/v1/businesses/{business_id}/tasks/{task_id}`
+- `PATCH /api/v1/businesses/{business_id}/tasks/{task_id}`
+- `DELETE /api/v1/businesses/{business_id}/tasks/{task_id}`
+- `POST /api/v1/businesses/{business_id}/tasks/{task_id}/complete`
+- `POST /api/v1/businesses/{business_id}/tasks/{task_id}/reopen`
+- `PUT /api/v1/businesses/{business_id}/tasks/{task_id}/assignees`
+
+### Flutter
+
+The Task Management screen now supports:
+
+- task list and search
+- open/completed/status filtering
+- create/edit glass dialog
+- project, status, priority and assignee selection
+- due date selection in a glass modal
+- complete/reopen
+- soft delete
+
+Phase 2 will replace the edit-oriented interaction with the richer Plane-style task drawer/detail experience.
