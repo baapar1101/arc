@@ -7,6 +7,8 @@ from sqlalchemy.orm import Session
 
 from adapters.api.v1.schema_models.task_management import (
     TaskAssigneesRequest,
+    TaskCommentCreateRequest,
+    TaskCommentUpdateRequest,
     TaskCreateRequest,
     TaskMoveRequest,
     TaskRelationCreateRequest,
@@ -20,19 +22,24 @@ from app.core.auth_dependency import AuthContext, get_current_user
 from app.core.permissions import require_business_access
 from app.core.responses import ApiError, format_datetime_fields, success_response
 from app.services.task_management_service import (
+    add_task_comment,
     add_task_relation,
     complete_task,
     create_subtask,
     create_task,
+    delete_task_comment,
     ensure_default_task_statuses,
     get_task_structure,
     list_available_assignees,
+    list_task_activity,
+    list_task_comments,
     move_task,
     delete_task_relation,
     reopen_task,
     replace_task_assignees,
     soft_delete_task,
     update_task,
+    update_task_comment,
 )
 
 router = APIRouter(tags=["وظایف"])
@@ -49,6 +56,37 @@ def _format_status(status: TaskStatus) -> dict[str, Any]:
         "sort_order": status.sort_order,
         "is_default": status.is_default,
         "is_closed": status.is_closed,
+    }
+
+
+def _display_user_name(user: Any) -> str | None:
+    if user is None:
+        return None
+    name = f"{user.first_name or ''} {user.last_name or ''}".strip()
+    return name or user.email or user.mobile or f"User {user.id}"
+
+
+def _format_comment(comment: Any) -> dict[str, Any]:
+    return {
+        "id": comment.id,
+        "task_id": comment.task_id,
+        "author_user_id": comment.author_user_id,
+        "author_name": _display_user_name(comment.author),
+        "body": comment.body,
+        "created_at": comment.created_at,
+        "updated_at": comment.updated_at,
+    }
+
+
+def _format_activity(event: Any) -> dict[str, Any]:
+    return {
+        "id": event.id,
+        "task_id": event.task_id,
+        "actor_user_id": event.actor_user_id,
+        "actor_name": _display_user_name(event.actor),
+        "event_type": event.event_type,
+        "event_data": event.event_data or {},
+        "created_at": event.created_at,
     }
 
 
@@ -225,6 +263,138 @@ async def get_task_endpoint(
         data={"task": _format_task(task, db, request)},
         request=request,
         message="TASK_FETCHED",
+    )
+
+
+@router.get("/businesses/{business_id}/tasks/{task_id}/comments")
+@require_business_access("business_id")
+async def list_task_comments_endpoint(
+    request: Request,
+    business_id: int = Path(..., gt=0),
+    task_id: int = Path(..., gt=0),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+):
+    del ctx
+    comments = list_task_comments(db, business_id, task_id)
+    return success_response(
+        data=format_datetime_fields(
+            {"items": [_format_comment(item) for item in comments]},
+            request,
+            business_id=business_id,
+        ),
+        request=request,
+        message="TASK_COMMENTS_FETCHED",
+    )
+
+
+@router.post("/businesses/{business_id}/tasks/{task_id}/comments")
+@require_business_access("business_id")
+async def add_task_comment_endpoint(
+    request: Request,
+    data: TaskCommentCreateRequest,
+    business_id: int = Path(..., gt=0),
+    task_id: int = Path(..., gt=0),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+):
+    comment = add_task_comment(
+        db,
+        business_id,
+        task_id,
+        ctx.get_user_id(),
+        data.body,
+    )
+    return success_response(
+        data=format_datetime_fields(
+            {"comment": _format_comment(comment)},
+            request,
+            business_id=business_id,
+        ),
+        request=request,
+        message="TASK_COMMENT_CREATED",
+    )
+
+
+@router.patch("/businesses/{business_id}/tasks/{task_id}/comments/{comment_id}")
+@require_business_access("business_id")
+async def update_task_comment_endpoint(
+    request: Request,
+    data: TaskCommentUpdateRequest,
+    business_id: int = Path(..., gt=0),
+    task_id: int = Path(..., gt=0),
+    comment_id: int = Path(..., gt=0),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+):
+    comment = update_task_comment(
+        db,
+        business_id,
+        task_id,
+        comment_id,
+        ctx.get_user_id(),
+        data.body,
+    )
+    return success_response(
+        data=format_datetime_fields(
+            {"comment": _format_comment(comment)},
+            request,
+            business_id=business_id,
+        ),
+        request=request,
+        message="TASK_COMMENT_UPDATED",
+    )
+
+
+@router.delete("/businesses/{business_id}/tasks/{task_id}/comments/{comment_id}")
+@require_business_access("business_id")
+async def delete_task_comment_endpoint(
+    request: Request,
+    business_id: int = Path(..., gt=0),
+    task_id: int = Path(..., gt=0),
+    comment_id: int = Path(..., gt=0),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+):
+    delete_task_comment(
+        db,
+        business_id,
+        task_id,
+        comment_id,
+        ctx.get_user_id(),
+    )
+    return success_response(
+        data={"id": comment_id},
+        request=request,
+        message="TASK_COMMENT_DELETED",
+    )
+
+
+@router.get("/businesses/{business_id}/tasks/{task_id}/activity")
+@require_business_access("business_id")
+async def list_task_activity_endpoint(
+    request: Request,
+    business_id: int = Path(..., gt=0),
+    task_id: int = Path(..., gt=0),
+    limit: int = Query(100, ge=1, le=200),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+):
+    del ctx
+    events = list_task_activity(
+        db,
+        business_id,
+        task_id,
+        limit=limit,
+    )
+    return success_response(
+        data=format_datetime_fields(
+            {"items": [_format_activity(item) for item in events]},
+            request,
+            business_id=business_id,
+        ),
+        request=request,
+        message="TASK_ACTIVITY_FETCHED",
     )
 
 

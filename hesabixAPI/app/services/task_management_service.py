@@ -20,6 +20,7 @@ from adapters.db.models.task_management import (
     Task,
     TaskActivity,
     TaskAssignee,
+    TaskComment,
     TaskRelation,
     TaskStatus,
 )
@@ -934,3 +935,185 @@ def delete_task_relation(
         event_data=event_data,
     )
     db.commit()
+
+
+
+def list_task_comments(
+    db: Session,
+    business_id: int,
+    task_id: int,
+) -> list[TaskComment]:
+    _get_task_or_404(db, business_id, task_id)
+    return (
+        db.query(TaskComment)
+        .filter(
+            TaskComment.business_id == business_id,
+            TaskComment.task_id == task_id,
+            TaskComment.deleted_at.is_(None),
+        )
+        .order_by(TaskComment.created_at.asc(), TaskComment.id.asc())
+        .all()
+    )
+
+
+def add_task_comment(
+    db: Session,
+    business_id: int,
+    task_id: int,
+    actor_user_id: int,
+    body: str,
+) -> TaskComment:
+    task = _get_task_or_404(db, business_id, task_id)
+    clean_body = str(body or "").strip()
+    if not clean_body:
+        raise ApiError(
+            "TASK_COMMENT_REQUIRED",
+            "Comment body is required",
+            http_status=400,
+        )
+    comment = TaskComment(
+        business_id=business_id,
+        task_id=task.id,
+        author_user_id=actor_user_id,
+        body=clean_body,
+    )
+    db.add(comment)
+    db.flush()
+    _record_activity(
+        db,
+        task=task,
+        actor_user_id=actor_user_id,
+        event_type="comment_added",
+        event_data={"comment_id": comment.id},
+    )
+    db.commit()
+    db.refresh(comment)
+    return comment
+
+
+def _require_comment_manager(
+    db: Session,
+    business_id: int,
+    comment_id: int,
+    actor_user_id: int,
+) -> TaskComment:
+    comment = (
+        db.query(TaskComment)
+        .filter(
+            TaskComment.id == comment_id,
+            TaskComment.business_id == business_id,
+            TaskComment.deleted_at.is_(None),
+        )
+        .first()
+    )
+    if not comment:
+        raise ApiError(
+            "TASK_COMMENT_NOT_FOUND",
+            "Comment not found",
+            http_status=404,
+        )
+    business = _require_business(db, business_id)
+    if (
+        comment.author_user_id != actor_user_id
+        and int(business.owner_id) != int(actor_user_id)
+    ):
+        raise ApiError(
+            "TASK_COMMENT_FORBIDDEN",
+            "Only the author or business owner can change this comment",
+            http_status=403,
+        )
+    return comment
+
+
+def update_task_comment(
+    db: Session,
+    business_id: int,
+    task_id: int,
+    comment_id: int,
+    actor_user_id: int,
+    body: str,
+) -> TaskComment:
+    task = _get_task_or_404(db, business_id, task_id)
+    comment = _require_comment_manager(
+        db,
+        business_id,
+        comment_id,
+        actor_user_id,
+    )
+    if comment.task_id != task.id:
+        raise ApiError(
+            "TASK_COMMENT_NOT_FOUND",
+            "Comment does not belong to this task",
+            http_status=404,
+        )
+    clean_body = str(body or "").strip()
+    if not clean_body:
+        raise ApiError(
+            "TASK_COMMENT_REQUIRED",
+            "Comment body is required",
+            http_status=400,
+        )
+    comment.body = clean_body
+    comment.updated_at = _now()
+    _record_activity(
+        db,
+        task=task,
+        actor_user_id=actor_user_id,
+        event_type="comment_edited",
+        event_data={"comment_id": comment.id},
+    )
+    db.commit()
+    db.refresh(comment)
+    return comment
+
+
+def delete_task_comment(
+    db: Session,
+    business_id: int,
+    task_id: int,
+    comment_id: int,
+    actor_user_id: int,
+) -> None:
+    task = _get_task_or_404(db, business_id, task_id)
+    comment = _require_comment_manager(
+        db,
+        business_id,
+        comment_id,
+        actor_user_id,
+    )
+    if comment.task_id != task.id:
+        raise ApiError(
+            "TASK_COMMENT_NOT_FOUND",
+            "Comment does not belong to this task",
+            http_status=404,
+        )
+    comment.deleted_at = _now()
+    comment.updated_at = _now()
+    _record_activity(
+        db,
+        task=task,
+        actor_user_id=actor_user_id,
+        event_type="comment_deleted",
+        event_data={"comment_id": comment.id},
+    )
+    db.commit()
+
+
+def list_task_activity(
+    db: Session,
+    business_id: int,
+    task_id: int,
+    *,
+    limit: int = 100,
+) -> list[TaskActivity]:
+    _get_task_or_404(db, business_id, task_id)
+    return (
+        db.query(TaskActivity)
+        .filter(
+            TaskActivity.business_id == business_id,
+            TaskActivity.task_id == task_id,
+        )
+        .order_by(TaskActivity.created_at.desc(), TaskActivity.id.desc())
+        .limit(max(1, min(int(limit), 200)))
+        .all()
+    )

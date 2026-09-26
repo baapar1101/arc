@@ -54,3 +54,12 @@ class TaskSubtaskCreateRequest(BaseModel):
 class TaskRelationCreateRequest(BaseModel):
     related_task_id: int = Field(..., gt=0)
     relation_type: str = Field(..., min_length=1, max_length=20)
+
+
+
+class TaskCommentCreateRequest(BaseModel):
+    body: str = Field(..., min_length=1, max_length=10000)
+
+
+class TaskCommentUpdateRequest(BaseModel):
+    body: str = Field(..., min_length=1, max_length=10000)
