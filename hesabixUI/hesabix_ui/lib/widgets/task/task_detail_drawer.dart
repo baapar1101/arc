@@ -100,14 +100,14 @@ class _TaskDetailDrawerState extends State<TaskDetailDrawer> {
   }
 
   Future<TaskModel?> _updateProperty(Map<String, dynamic> data) async {
-    if (_propertyBusy) return;
+    if (_propertyBusy) return null;
     setState(() {
       _propertyBusy = true;
       _error = null;
     });
     try {
       final updated = await widget.onUpdate(data);
-      if (!mounted) return;
+      if (!mounted) return updated;
       if (updated != null) {
         setState(() {
           _task = updated;
