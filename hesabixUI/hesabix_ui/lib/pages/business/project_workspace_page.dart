@@ -15,6 +15,7 @@ import 'package:hesabix_ui/widgets/task/task_calendar_view.dart';
 import 'package:hesabix_ui/widgets/task/task_timeline_view.dart';
 import 'package:hesabix_ui/widgets/project/project_milestones_view.dart';
 import 'package:hesabix_ui/widgets/project/project_cycles_view.dart';
+import 'package:hesabix_ui/widgets/project/project_time_tracking_view.dart';
 import 'package:hesabix_ui/widgets/task/task_quick_create.dart';
 import 'package:intl/intl.dart';
 
@@ -51,7 +52,7 @@ class _ProjectWorkspacePageState extends State<ProjectWorkspacePage>
     super.initState();
     _projectsService = ProjectService(ApiClient());
     _tasksService = TaskService(ApiClient());
-    _tabs = TabController(length: 7, vsync: this);
+    _tabs = TabController(length: 8, vsync: this);
     _load();
   }
 
@@ -357,6 +358,7 @@ class _ProjectWorkspacePageState extends State<ProjectWorkspacePage>
           Tab(icon: Icon(Icons.timeline_outlined), text: 'Timeline'),
           Tab(icon: Icon(Icons.flag_outlined), text: 'Milestones'),
           Tab(icon: Icon(Icons.autorenew_rounded), text: 'Cycles'),
+          Tab(icon: Icon(Icons.timer_outlined), text: 'Timesheet'),
         ]),
       ),
       body: SafeArea(
@@ -374,13 +376,13 @@ class _ProjectWorkspacePageState extends State<ProjectWorkspacePage>
                 : mobile
                     ? TabBarView(
                         controller: _tabs,
-                        children: [_overview(), _taskList(), _board(), _calendar(), _timeline(), _milestonesView(), _cyclesView()],
+                        children: [_overview(), _taskList(), _board(), _calendar(), _timeline(), _milestonesView(), _cyclesView(), _timesheetView()],
                       )
                     : Row(children: [
                         Expanded(
                           child: TabBarView(
                             controller: _tabs,
-                            children: [_overview(), _taskList(), _board(), _calendar(), _timeline(), _milestonesView(), _cyclesView()],
+                            children: [_overview(), _taskList(), _board(), _calendar(), _timeline(), _milestonesView(), _cyclesView(), _timesheetView()],
                           ),
                         ),
                         AnimatedContainer(
@@ -482,6 +484,11 @@ class _ProjectWorkspacePageState extends State<ProjectWorkspacePage>
       SizedBox(width: 135, child: Text(label, style: Theme.of(context).textTheme.bodySmall)),
       Expanded(child: Text(value, style: const TextStyle(fontWeight: FontWeight.w600))),
     ]),
+  );
+
+  Widget _timesheetView() => ProjectTimeTrackingView(
+    businessId: widget.businessId,
+    projectId: widget.projectId,
   );
 
   Widget _cyclesView() => ProjectCyclesView(

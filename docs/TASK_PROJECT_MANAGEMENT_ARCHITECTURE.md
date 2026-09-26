@@ -636,3 +636,47 @@ Implemented on 2026-09-26 using Plane-style cycle planning over the Phase 0 cycl
 - [x] Derived progress.
 - [x] Cycle membership in the task drawer.
 - [x] Cycle workspace tab.
+
+
+## Phase 13 — Time Tracking
+
+Implemented on 2026-09-26 using Leantime-style task time tracking over the Phase 0 `task_time_entries` table.
+
+### Domain
+
+- The existing partial unique index remains authoritative: one active timer per business/user.
+- Timers and manual entries are business- and task-scoped.
+- Timer stop calculates immutable elapsed seconds for the entry.
+- Manual entries accept start/end or start + duration.
+- Completed entries can be edited or deleted by the entry owner or business owner.
+- Active entries must be stopped before editing/deleting.
+- Start/stop/manual/edit/delete operations append task activity events.
+- Billable is stored per time entry; no financial posting is performed in this phase.
+
+### UX
+
+- Task drawer now includes Time Tracking.
+- Users can start/stop a live timer with second-by-second elapsed display.
+- Starting another timer is blocked while any timer in the same business is active for that user.
+- Manual time registration supports date, end time, duration, note and billable flag.
+- Task drawer shows recent time entries and total logged time.
+- Project workspace includes a Timesheet tab with project totals, billable totals, user rollups, task rollups and entry history.
+
+### Phase 13 endpoints
+
+- `GET /api/v1/businesses/{business_id}/time-entries`
+- `GET /api/v1/businesses/{business_id}/timer/active`
+- `POST /api/v1/businesses/{business_id}/tasks/{task_id}/timer/start`
+- `POST /api/v1/businesses/{business_id}/timer/stop`
+- `POST /api/v1/businesses/{business_id}/tasks/{task_id}/time-entries`
+- `PATCH/DELETE /api/v1/businesses/{business_id}/time-entries/{entry_id}`
+
+### Phase 13 acceptance gate
+
+- [x] One active timer per business/user.
+- [x] Start/stop live timer.
+- [x] Manual time entry.
+- [x] Billable flag.
+- [x] Owner/author edit-delete authorization.
+- [x] Task drawer time UI.
+- [x] Project Timesheet rollups.
