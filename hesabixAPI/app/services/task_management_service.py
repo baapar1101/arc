@@ -8,6 +8,7 @@ priority, due date and project linkage on the Phase 0 domain model.
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from decimal import Decimal
 from typing import Any, Iterable, Optional
 
 from sqlalchemy.orm import Session
@@ -507,3 +508,87 @@ def list_available_assignees(db: Session, business_id: int) -> list[dict[str, An
             }
         )
     return result
+
+
+
+def move_task(
+    db: Session,
+    business_id: int,
+    task_id: int,
+    actor_user_id: int,
+    target_status_id: int,
+    target_index: int,
+) -> Task:
+    """Move/reorder a task inside a status column using stable fractional ordering."""
+    repo = TaskRepository(db)
+    task = repo.get_by_id(task_id, business_id)
+    if not task:
+        raise ApiError("TASK_NOT_FOUND", "Task not found", http_status=404)
+
+    target_status = _require_status(db, business_id, target_status_id)
+    if target_status is None:
+        raise ApiError("TASK_STATUS_NOT_FOUND", "Task status not found", http_status=404)
+
+    peer_query = db.query(Task).filter(
+        Task.business_id == business_id,
+        Task.deleted_at.is_(None),
+        Task.status_id == target_status.id,
+        Task.id != task.id,
+    )
+    if task.project_id is None:
+        peer_query = peer_query.filter(Task.project_id.is_(None))
+    else:
+        peer_query = peer_query.filter(Task.project_id == task.project_id)
+
+    peers = peer_query.order_by(Task.sort_order.asc(), Task.id.asc()).all()
+    insert_at = max(0, min(int(target_index), len(peers)))
+
+    def _renormalize() -> None:
+        for index, peer in enumerate(peers, start=1):
+            peer.sort_order = Decimal(index * 1000)
+        db.flush()
+
+    if not peers:
+        next_order = Decimal(1000)
+    elif insert_at == 0:
+        first_order = Decimal(str(peers[0].sort_order or 0))
+        next_order = first_order - Decimal(1000)
+    elif insert_at >= len(peers):
+        last_order = Decimal(str(peers[-1].sort_order or 0))
+        next_order = last_order + Decimal(1000)
+    else:
+        before_order = Decimal(str(peers[insert_at - 1].sort_order or 0))
+        after_order = Decimal(str(peers[insert_at].sort_order or 0))
+        if after_order - before_order <= Decimal("0.000002"):
+            _renormalize()
+            before_order = Decimal(str(peers[insert_at - 1].sort_order or 0))
+            after_order = Decimal(str(peers[insert_at].sort_order or 0))
+        next_order = (before_order + after_order) / Decimal(2)
+
+    previous_status_id = task.status_id
+    previous_order = float(task.sort_order or 0)
+
+    task.status_id = target_status.id
+    task.sort_order = next_order
+    task.completed_at = (
+        task.completed_at or _now()
+        if target_status.category == "completed"
+        else None
+    )
+    task.updated_at = _now()
+
+    _record_activity(
+        db,
+        task=task,
+        actor_user_id=actor_user_id,
+        event_type="task_moved",
+        event_data={
+            "from_status_id": previous_status_id,
+            "to_status_id": target_status.id,
+            "from_sort_order": previous_order,
+            "to_sort_order": float(next_order),
+            "target_index": insert_at,
+        },
+    )
+    db.commit()
+    return repo.get_by_id(task.id, business_id) or task

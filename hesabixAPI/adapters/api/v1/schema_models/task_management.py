@@ -32,3 +32,9 @@ class TaskUpdateRequest(BaseModel):
 
 class TaskAssigneesRequest(BaseModel):
     user_ids: list[int] = Field(default_factory=list)
+
+
+
+class TaskMoveRequest(BaseModel):
+    target_status_id: int = Field(..., gt=0)
+    target_index: int = Field(..., ge=0)

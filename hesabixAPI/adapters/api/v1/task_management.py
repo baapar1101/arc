@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from adapters.api.v1.schema_models.task_management import (
     TaskAssigneesRequest,
     TaskCreateRequest,
+    TaskMoveRequest,
     TaskUpdateRequest,
 )
 from adapters.db.models.task_management import Task, TaskStatus
@@ -21,6 +22,7 @@ from app.services.task_management_service import (
     create_task,
     ensure_default_task_statuses,
     list_available_assignees,
+    move_task,
     reopen_task,
     replace_task_assignees,
     soft_delete_task,
@@ -242,6 +244,31 @@ async def delete_task_endpoint(
         data={"id": task_id},
         request=request,
         message="TASK_DELETED",
+    )
+
+
+@router.post("/businesses/{business_id}/tasks/{task_id}/move")
+@require_business_access("business_id")
+async def move_task_endpoint(
+    request: Request,
+    data: TaskMoveRequest,
+    business_id: int = Path(..., gt=0),
+    task_id: int = Path(..., gt=0),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+):
+    task = move_task(
+        db,
+        business_id,
+        task_id,
+        ctx.get_user_id(),
+        data.target_status_id,
+        data.target_index,
+    )
+    return success_response(
+        data={"task": _format_task(task, db, request)},
+        request=request,
+        message="TASK_MOVED",
     )
 
 
