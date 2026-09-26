@@ -275,3 +275,35 @@ class ProjectMilestoneModel {
     );
   }
 }
+
+
+
+class ProjectCycleModel {
+  final int id, businessId, projectId, taskTotal, taskCompleted;
+  final String name, status;
+  final String? goal;
+  final DateTime? startAt, endAt;
+  final double progressPercent;
+
+  const ProjectCycleModel({
+    required this.id, required this.businessId, required this.projectId,
+    required this.name, this.goal, this.startAt, this.endAt,
+    required this.status, required this.taskTotal, required this.taskCompleted,
+    required this.progressPercent,
+  });
+
+  factory ProjectCycleModel.fromJson(Map<String, dynamic> json) =>
+      ProjectCycleModel(
+        id: (json['id'] as num).toInt(),
+        businessId: (json['business_id'] as num?)?.toInt() ?? 0,
+        projectId: (json['project_id'] as num).toInt(),
+        name: json['name']?.toString() ?? '',
+        goal: json['goal']?.toString(),
+        startAt: _parseProjectDateTimeNullable(json['start_at_raw'] ?? json['start_at']),
+        endAt: _parseProjectDateTimeNullable(json['end_at_raw'] ?? json['end_at']),
+        status: json['status']?.toString() ?? 'planned',
+        taskTotal: (json['task_total'] as num?)?.toInt() ?? 0,
+        taskCompleted: (json['task_completed'] as num?)?.toInt() ?? 0,
+        progressPercent: (json['progress_percent'] as num?)?.toDouble() ?? 0,
+      );
+}

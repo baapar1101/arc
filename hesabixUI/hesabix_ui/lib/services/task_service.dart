@@ -175,6 +175,22 @@ class TaskService {
     );
   }
 
+  Future<List<TaskCycleModel>> listTaskCycles({
+    required int businessId, required int taskId,
+  }) async {
+    final r=await apiClient.get('/api/v1/businesses/$businessId/tasks/$taskId/cycles');
+    final items=(r.data['data']?['items'] as List?)??const [];
+    return items.whereType<Map>().map((e)=>TaskCycleModel.fromJson(Map<String,dynamic>.from(e))).toList();
+  }
+
+  Future<List<TaskCycleModel>> replaceTaskCycles({
+    required int businessId, required int taskId, required List<int> cycleIds,
+  }) async {
+    final r=await apiClient.put('/api/v1/businesses/$businessId/tasks/$taskId/cycles', data:{'cycle_ids':cycleIds});
+    final items=(r.data['data']?['items'] as List?)??const [];
+    return items.whereType<Map>().map((e)=>TaskCycleModel.fromJson(Map<String,dynamic>.from(e))).toList();
+  }
+
   Future<List<TaskReminderModel>> listReminders({
     required int businessId,
     required int taskId,

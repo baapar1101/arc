@@ -461,3 +461,25 @@ class TaskReminderModel {
     );
   }
 }
+
+
+
+class TaskCycleModel {
+  final int id, projectId;
+  final String name, status;
+  final String? goal;
+  final DateTime? startAt, endAt;
+  const TaskCycleModel({
+    required this.id, required this.projectId, required this.name, this.goal,
+    this.startAt, this.endAt, required this.status,
+  });
+  factory TaskCycleModel.fromJson(Map<String,dynamic> json)=>TaskCycleModel(
+    id:(json['id'] as num).toInt(),
+    projectId:(json['project_id'] as num).toInt(),
+    name:json['name']?.toString()??'',
+    goal:json['goal']?.toString(),
+    startAt:_parseTaskDate(json['start_at_raw']??json['start_at']),
+    endAt:_parseTaskDate(json['end_at_raw']??json['end_at']),
+    status:json['status']?.toString()??'planned',
+  );
+}
