@@ -190,6 +190,67 @@ class ProjectService {
     }
   }
 
+  Future<List<ProjectMilestoneModel>> listMilestones({
+    required int businessId,
+    required int projectId,
+  }) async {
+    final response = await apiClient.get(
+      '/api/v1/businesses/$businessId/projects/$projectId/milestones',
+    );
+    final items = (response.data['data']?['items'] as List?) ?? const [];
+    return items
+        .whereType<Map>()
+        .map(
+          (e) => ProjectMilestoneModel.fromJson(
+            Map<String, dynamic>.from(e),
+          ),
+        )
+        .toList();
+  }
+
+  Future<ProjectMilestoneModel> createMilestone({
+    required int businessId,
+    required int projectId,
+    required Map<String, dynamic> data,
+  }) async {
+    final response = await apiClient.post(
+      '/api/v1/businesses/$businessId/projects/$projectId/milestones',
+      data: data,
+    );
+    return ProjectMilestoneModel.fromJson(
+      Map<String, dynamic>.from(
+        response.data['data']['milestone'] as Map,
+      ),
+    );
+  }
+
+  Future<ProjectMilestoneModel> updateMilestone({
+    required int businessId,
+    required int projectId,
+    required int milestoneId,
+    required Map<String, dynamic> data,
+  }) async {
+    final response = await apiClient.patch(
+      '/api/v1/businesses/$businessId/projects/$projectId/milestones/$milestoneId',
+      data: data,
+    );
+    return ProjectMilestoneModel.fromJson(
+      Map<String, dynamic>.from(
+        response.data['data']['milestone'] as Map,
+      ),
+    );
+  }
+
+  Future<void> deleteMilestone({
+    required int businessId,
+    required int projectId,
+    required int milestoneId,
+  }) async {
+    await apiClient.delete(
+      '/api/v1/businesses/$businessId/projects/$projectId/milestones/$milestoneId',
+    );
+  }
+
   Future<Map<String, dynamic>> getTimeline({
     required int businessId,
     required int projectId,

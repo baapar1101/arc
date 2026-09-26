@@ -5,6 +5,7 @@ import 'package:hesabix_ui/theme/glass.dart';
 import 'package:hesabix_ui/widgets/task/task_structure_section.dart';
 import 'package:hesabix_ui/widgets/task/task_conversation_section.dart';
 import 'package:hesabix_ui/widgets/task/task_labels_section.dart';
+import 'package:hesabix_ui/widgets/task/task_milestone_section.dart';
 import 'package:hesabix_ui/widgets/task/task_recurrence_reminder_section.dart';
 import 'package:intl/intl.dart';
 
@@ -493,6 +494,12 @@ class _TaskDetailDrawerState extends State<TaskDetailDrawer> {
                         );
                       }).toList(),
                     ),
+                  const SizedBox(height: 22),
+                  TaskMilestoneSection(
+                    businessId: widget.businessId,
+                    task: _task,
+                    onUpdate: _updateProperty,
+                  ),
                   const SizedBox(height: 22),
                   TaskLabelsSection(
                     businessId: widget.businessId,

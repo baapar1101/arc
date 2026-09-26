@@ -111,6 +111,8 @@ class TaskModel {
   final int? parentTaskId;
   final int? statusId;
   final TaskStatusModel? status;
+  final int? milestoneId;
+  final String? milestoneName;
   final String title;
   final String? description;
   final String priority;
@@ -136,6 +138,8 @@ class TaskModel {
     this.parentTaskId,
     this.statusId,
     this.status,
+    this.milestoneId,
+    this.milestoneName,
     required this.title,
     this.description,
     required this.priority,
@@ -170,6 +174,8 @@ class TaskModel {
       status: statusJson is Map
           ? TaskStatusModel.fromJson(Map<String, dynamic>.from(statusJson))
           : null,
+      milestoneId: (json['milestone_id'] as num?)?.toInt(),
+      milestoneName: json['milestone_name']?.toString(),
       title: json['title']?.toString() ?? '',
       description: json['description']?.toString(),
       priority: json['priority']?.toString() ?? 'normal',
