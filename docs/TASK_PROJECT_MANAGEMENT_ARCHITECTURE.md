@@ -13,6 +13,10 @@ Date: 2026-09-26
 | Multi-assignee work | Plane/Vikunja | `task_assignees` |
 | Labels | Plane/Vikunja | `task_labels` + `task_label_links` |
 | Activity/audit feed | Plane | immutable `task_activity_events` |
+| Milestones / planning dates | Leantime | `project_milestones` + optional task milestone |
+| Cycles / sprints | Plane + Leantime | `project_cycles` + `project_cycle_tasks` |
+| Time tracking | Leantime | `task_time_entries` with one-active-timer invariant |
+| CRM/accounting/support linkage | Native CRM | generic `task_entity_links` |
 
 The benchmark projects are references only. The implementation is native to this repository and its existing Python/FastAPI/SQLAlchemy + Flutter architecture.
 
@@ -38,6 +42,11 @@ A later CRM integration phase will link first-class tasks to CRM entities withou
 - `task_attachments`
 - `task_reminders`
 - `task_activity_events`
+- `project_milestones`
+- `project_cycles`
+- `project_cycle_tasks`
+- `task_time_entries`
+- `task_entity_links`
 
 ## Key invariants
 
@@ -51,6 +60,11 @@ A later CRM integration phase will link first-class tasks to CRM entities withou
 8. Task activity events are append-only domain events. They are not reconstructed from timestamps.
 9. Recurrence fields use RRULE-compatible text so Phase 8 can implement calendar-safe recurrence instead of a limited “every N days” model.
 10. Dates use timezone-aware database columns.
+11. Association/detail rows carry explicit `business_id` tenant scope even when it can be derived from a task/project.
+12. At most one active time timer is allowed per business/user.
+13. Task attachments can reference the existing shared `file_storage` subsystem.
+14. Milestones and cycles remain planning entities; they are not overloaded as task statuses.
+15. Generic entity links use text `entity_type` + `entity_id` so CRM/accounting/support modules can attach tasks without schema churn.
 
 ## Deletion policy
 
@@ -92,5 +106,26 @@ The foundation includes indexes for the expected hot paths:
 - [x] Board ordering and future recurrence are represented without schema rework.
 - [x] CRM work queue remains operational and separate.
 - [x] Flutter has a visible Task Management foundation page.
+- [x] Milestones and cycles are represented.
+- [x] Time-entry schema and one-active-timer guard exist.
+- [x] Generic CRM/accounting/support entity links exist.
+- [x] Task association/detail tables carry explicit tenant scope.
+- [x] Task attachments can link to the existing shared file-storage record.
 - [ ] CRUD/service/API implementation — Phase 1.
 - [ ] Task drawer/editor UX — Phase 2.
+
+
+## Deployment after Phase 0 completion
+
+The Phase 0 completion is an additive Alembic revision and is safe to apply after
+the initial Phase 0 migration:
+
+```bash
+git pull origin master
+cd hesabixAPI
+alembic upgrade head
+```
+
+The completion revision is `20260926_000002_task_management_phase0_completion`.
+It backfills `business_id` from the owning project/task before enforcing NOT NULL
+tenant scope, so an already-applied initial Phase 0 migration can be upgraded in place.

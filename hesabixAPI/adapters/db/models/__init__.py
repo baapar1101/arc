@@ -181,6 +181,11 @@ from .task_management import (  # noqa: F401
     TaskAttachment,
     TaskReminder,
     TaskActivity,
+    Milestone,
+    ProjectCycle,
+    ProjectCycleTask,
+    TaskTimeEntry,
+    TaskEntityLink,
 )
 # Bale messenger linking
 from .bale import BaleLinkToken  # noqa: F401

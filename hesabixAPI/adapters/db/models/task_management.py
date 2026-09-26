@@ -16,6 +16,7 @@ from sqlalchemy import (
     String,
     Text,
     UniqueConstraint,
+    text,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -38,9 +39,16 @@ class ProjectMember(Base):
             name="ck_project_members_role",
         ),
         Index("ix_project_members_user_project", "user_id", "project_id"),
+        Index("ix_project_members_business_project", "business_id", "project_id"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    business_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("businesses.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
     project_id: Mapped[int] = mapped_column(
         Integer,
         ForeignKey("projects.id", ondelete="CASCADE"),
@@ -161,6 +169,14 @@ class Task(Base):
             "estimated_minutes IS NULL OR estimated_minutes >= 0",
             name="ck_tasks_estimated_minutes",
         ),
+        CheckConstraint(
+            "parent_task_id IS NULL OR parent_task_id <> id",
+            name="ck_tasks_not_own_parent",
+        ),
+        CheckConstraint(
+            "due_at IS NULL OR start_at IS NULL OR due_at >= start_at",
+            name="ck_tasks_dates",
+        ),
         Index("ix_tasks_biz_deleted_due", "business_id", "deleted_at", "due_at"),
         Index("ix_tasks_biz_project_pos", "business_id", "project_id", "sort_order"),
         Index("ix_tasks_biz_status_pos", "business_id", "status_id", "sort_order"),
@@ -188,6 +204,12 @@ class Task(Base):
     status_id: Mapped[int | None] = mapped_column(
         Integer,
         ForeignKey("task_statuses.id", ondelete="RESTRICT"),
+        nullable=True,
+        index=True,
+    )
+    milestone_id: Mapped[int | None] = mapped_column(
+        Integer,
+        ForeignKey("project_milestones.id", ondelete="SET NULL"),
         nullable=True,
         index=True,
     )
@@ -237,6 +259,7 @@ class Task(Base):
     business = relationship("Business")
     project = relationship("Project")
     status = relationship("TaskStatus")
+    milestone = relationship("Milestone", foreign_keys=[milestone_id])
     parent = relationship("Task", remote_side="Task.id", foreign_keys=[parent_task_id])
     created_by = relationship("User", foreign_keys=[created_by_user_id])
 
@@ -246,9 +269,16 @@ class TaskAssignee(Base):
     __table_args__ = (
         UniqueConstraint("task_id", "user_id", name="uq_task_assignees_task_user"),
         Index("ix_task_assignees_user_task", "user_id", "task_id"),
+        Index("ix_task_assignees_business_user", "business_id", "user_id"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    business_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("businesses.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
     task_id: Mapped[int] = mapped_column(
         Integer,
         ForeignKey("tasks.id", ondelete="CASCADE"),
@@ -280,6 +310,12 @@ class TaskLabelLink(Base):
     )
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    business_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("businesses.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
     task_id: Mapped[int] = mapped_column(
         Integer,
         ForeignKey("tasks.id", ondelete="CASCADE"),
@@ -314,9 +350,16 @@ class TaskRelation(Base):
             name="ck_task_relations_type",
         ),
         Index("ix_task_relations_related", "related_task_id", "relation_type"),
+        Index("ix_task_relations_business_task", "business_id", "task_id"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    business_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("businesses.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
     task_id: Mapped[int] = mapped_column(
         Integer,
         ForeignKey("tasks.id", ondelete="CASCADE"),
@@ -346,9 +389,16 @@ class TaskComment(Base):
     __tablename__ = "task_comments"
     __table_args__ = (
         Index("ix_task_comments_task_created", "task_id", "created_at"),
+        Index("ix_task_comments_business_task", "business_id", "task_id"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    business_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("businesses.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
     task_id: Mapped[int] = mapped_column(
         Integer,
         ForeignKey("tasks.id", ondelete="CASCADE"),
@@ -379,13 +429,27 @@ class TaskAttachment(Base):
     __tablename__ = "task_attachments"
     __table_args__ = (
         Index("ix_task_attachments_task_created", "task_id", "created_at"),
+        Index("ix_task_attachments_business_task", "business_id", "task_id"),
+        UniqueConstraint("task_id", "file_storage_id", name="uq_task_attachments_task_file"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    business_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("businesses.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
     task_id: Mapped[int] = mapped_column(
         Integer,
         ForeignKey("tasks.id", ondelete="CASCADE"),
         nullable=False,
+        index=True,
+    )
+    file_storage_id: Mapped[str | None] = mapped_column(
+        String(36),
+        ForeignKey("file_storage.id", ondelete="CASCADE"),
+        nullable=True,
         index=True,
     )
     storage_key: Mapped[str] = mapped_column(String(1024), nullable=False)
@@ -400,6 +464,7 @@ class TaskAttachment(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utc_now, nullable=False)
 
     task = relationship("Task")
+    file = relationship("FileStorage", foreign_keys=[file_storage_id])
     uploaded_by = relationship("User", foreign_keys=[uploaded_by_user_id])
 
 
@@ -412,9 +477,16 @@ class TaskReminder(Base):
         ),
         Index("ix_task_reminders_user_due", "user_id", "remind_at", "sent_at"),
         Index("ix_task_reminders_task_due", "task_id", "remind_at"),
+        Index("ix_task_reminders_business_due", "business_id", "remind_at"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    business_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("businesses.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
     task_id: Mapped[int] = mapped_column(
         Integer,
         ForeignKey("tasks.id", ondelete="CASCADE"),
@@ -472,3 +544,183 @@ class TaskActivity(Base):
     business = relationship("Business")
     task = relationship("Task")
     actor = relationship("User", foreign_keys=[actor_user_id])
+
+class Milestone(Base):
+    """Project milestone used by timeline/Gantt and milestone planning."""
+
+    __tablename__ = "project_milestones"
+    __table_args__ = (
+        CheckConstraint(
+            "target_at IS NULL OR start_at IS NULL OR target_at >= start_at",
+            name="ck_project_milestones_dates",
+        ),
+        Index("ix_project_milestones_project_target", "project_id", "target_at"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    business_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("businesses.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    project_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    start_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    target_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="open", server_default="open")
+    sort_order: Mapped[Decimal] = mapped_column(
+        Numeric(20, 6), nullable=False, default=0, server_default="0"
+    )
+    created_by_user_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utc_now, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utc_now, onupdate=_utc_now, nullable=False
+    )
+
+    project = relationship("Project")
+    created_by = relationship("User", foreign_keys=[created_by_user_id])
+
+
+class ProjectCycle(Base):
+    """Plane-style cycle / sprint planning container."""
+
+    __tablename__ = "project_cycles"
+    __table_args__ = (
+        CheckConstraint(
+            "end_at IS NULL OR start_at IS NULL OR end_at >= start_at",
+            name="ck_project_cycles_dates",
+        ),
+        Index("ix_project_cycles_project_dates", "project_id", "start_at", "end_at"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    business_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("businesses.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    project_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("projects.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    name: Mapped[str] = mapped_column(String(255), nullable=False)
+    goal: Mapped[str | None] = mapped_column(Text, nullable=True)
+    start_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    end_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    status: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="planned", server_default="planned"
+    )
+    created_by_user_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utc_now, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utc_now, onupdate=_utc_now, nullable=False
+    )
+
+    project = relationship("Project")
+    created_by = relationship("User", foreign_keys=[created_by_user_id])
+
+
+class ProjectCycleTask(Base):
+    __tablename__ = "project_cycle_tasks"
+    __table_args__ = (
+        UniqueConstraint("cycle_id", "task_id", name="uq_project_cycle_tasks_cycle_task"),
+        Index("ix_project_cycle_tasks_business_cycle", "business_id", "cycle_id"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    business_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("businesses.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    cycle_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("project_cycles.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    task_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("tasks.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    added_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utc_now, nullable=False)
+
+    cycle = relationship("ProjectCycle")
+    task = relationship("Task")
+
+
+class TaskTimeEntry(Base):
+    """Leantime-inspired time entry with one active timer per business/user."""
+
+    __tablename__ = "task_time_entries"
+    __table_args__ = (
+        CheckConstraint("ended_at IS NULL OR ended_at >= started_at", name="ck_task_time_entries_dates"),
+        CheckConstraint(
+            "duration_seconds IS NULL OR duration_seconds >= 0",
+            name="ck_task_time_entries_duration",
+        ),
+        Index("ix_task_time_entries_task_started", "task_id", "started_at"),
+        Index(
+            "uq_task_time_entries_active_user",
+            "business_id",
+            "user_id",
+            unique=True,
+            postgresql_where=text("ended_at IS NULL"),
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    business_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("businesses.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    task_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("tasks.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    duration_seconds: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    billable: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utc_now, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=_utc_now, onupdate=_utc_now, nullable=False
+    )
+
+    task = relationship("Task")
+    user = relationship("User")
+
+
+class TaskEntityLink(Base):
+    """Generic native link from a task to CRM/accounting/support/domain entities."""
+
+    __tablename__ = "task_entity_links"
+    __table_args__ = (
+        UniqueConstraint(
+            "task_id",
+            "entity_type",
+            "entity_id",
+            "relationship_type",
+            name="uq_task_entity_links_task_entity_relation",
+        ),
+        Index("ix_task_entity_links_entity", "business_id", "entity_type", "entity_id"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    business_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("businesses.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    task_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("tasks.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    entity_type: Mapped[str] = mapped_column(String(50), nullable=False)
+    entity_id: Mapped[str] = mapped_column(String(64), nullable=False)
+    relationship_type: Mapped[str] = mapped_column(
+        String(50), nullable=False, default="related", server_default="related"
+    )
+    created_by_user_id: Mapped[int | None] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utc_now, nullable=False)
+
+    task = relationship("Task")
+    created_by = relationship("User", foreign_keys=[created_by_user_id])
+
