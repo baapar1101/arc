@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import datetime
+
 from pydantic import BaseModel, Field, validator
 
 
@@ -13,3 +15,22 @@ class ProjectMemberUpsertRequest(BaseModel):
         if value not in allowed:
             raise ValueError(f"role must be one of {sorted(allowed)}")
         return value
+
+
+
+class ProjectMilestoneCreateRequest(BaseModel):
+    title: str = Field(..., min_length=1, max_length=255)
+    description: str | None = None
+    start_at: datetime | None = None
+    target_at: datetime | None = None
+    status: str = Field(default="open")
+    sort_order: float = 0
+
+
+class ProjectMilestoneUpdateRequest(BaseModel):
+    title: str | None = Field(None, min_length=1, max_length=255)
+    description: str | None = None
+    start_at: datetime | None = None
+    target_at: datetime | None = None
+    status: str | None = None
+    sort_order: float | None = None

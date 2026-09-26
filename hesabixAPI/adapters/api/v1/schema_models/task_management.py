@@ -11,6 +11,7 @@ class TaskCreateRequest(BaseModel):
     description: Optional[str] = None
     project_id: Optional[int] = Field(None, gt=0)
     parent_task_id: Optional[int] = Field(None, gt=0)
+    milestone_id: Optional[int] = Field(None, gt=0)
     status_id: Optional[int] = Field(None, gt=0)
     priority: str = Field(default="normal")
     start_at: Optional[datetime] = None
@@ -28,6 +29,7 @@ class TaskUpdateRequest(BaseModel):
     description: Optional[str] = None
     project_id: Optional[int] = Field(None, gt=0)
     parent_task_id: Optional[int] = Field(None, gt=0)
+    milestone_id: Optional[int] = Field(None, gt=0)
     status_id: Optional[int] = Field(None, gt=0)
     priority: Optional[str] = None
     start_at: Optional[datetime] = None

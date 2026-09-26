@@ -19,6 +19,10 @@ from app.services.project_service import (
 	list_project_documents,
 	get_project_workspace,
 	get_project_timeline,
+	list_project_milestones,
+	create_project_milestone,
+	update_project_milestone,
+	delete_project_milestone,
 	list_project_members,
 	upsert_project_member,
 	remove_project_member
@@ -26,7 +30,11 @@ from app.services.project_service import (
 from adapters.db.repositories.project_repository import ProjectRepository
 from adapters.db.models.project import Project
 from adapters.db.models.task_management import ProjectMember
-from adapters.api.v1.schema_models.project_workspace import ProjectMemberUpsertRequest
+from adapters.api.v1.schema_models.project_workspace import (
+    ProjectMemberUpsertRequest,
+    ProjectMilestoneCreateRequest,
+    ProjectMilestoneUpdateRequest,
+)
 from adapters.api.v1.schema_models.project import (
 	ProjectCreateRequest,
 	ProjectUpdateRequest,
@@ -455,6 +463,27 @@ async def list_active_projects_simple_endpoint(
 
 
 
+def _format_project_milestone(row: Dict[str, Any]) -> Dict[str, Any]:
+    milestone = row["milestone"]
+    return {
+        "id": milestone.id,
+        "business_id": milestone.business_id,
+        "project_id": milestone.project_id,
+        "title": milestone.title,
+        "description": milestone.description,
+        "start_at": milestone.start_at,
+        "target_at": milestone.target_at,
+        "status": milestone.status,
+        "sort_order": float(milestone.sort_order or 0),
+        "created_by_user_id": milestone.created_by_user_id,
+        "created_at": milestone.created_at,
+        "updated_at": milestone.updated_at,
+        "task_total": row.get("task_total", 0),
+        "task_completed": row.get("task_completed", 0),
+        "progress_percent": row.get("progress_percent", 0.0),
+    }
+
+
 def _format_project_member(member: ProjectMember) -> Dict[str, Any]:
     user = member.user
     name = f"{user.first_name or ''} {user.last_name or ''}".strip() if user else ""
@@ -494,6 +523,133 @@ async def get_project_workspace_endpoint(
         },
         request=request,
         message="PROJECT_WORKSPACE_FETCHED",
+    )
+
+
+@router.get(
+    "/businesses/{business_id}/projects/{project_id}/milestones",
+    summary="مایلستون‌های پروژه",
+)
+@require_business_access("business_id")
+async def list_project_milestones_endpoint(
+    request: Request,
+    business_id: int = Path(..., gt=0),
+    project_id: int = Path(..., gt=0),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+):
+    del ctx
+    rows = list_project_milestones(db, business_id, project_id)
+    return success_response(
+        data=format_datetime_fields(
+            {"items": [_format_project_milestone(row) for row in rows]},
+            request,
+            business_id,
+        ),
+        request=request,
+        message="PROJECT_MILESTONES_FETCHED",
+    )
+
+
+@router.post(
+    "/businesses/{business_id}/projects/{project_id}/milestones",
+    summary="ایجاد مایلستون پروژه",
+)
+@require_business_access("business_id")
+async def create_project_milestone_endpoint(
+    request: Request,
+    data: ProjectMilestoneCreateRequest,
+    business_id: int = Path(..., gt=0),
+    project_id: int = Path(..., gt=0),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+):
+    milestone = create_project_milestone(
+        db,
+        business_id,
+        project_id,
+        ctx.get_user_id(),
+        data.dict(),
+    )
+    row = {
+        "milestone": milestone,
+        "task_total": 0,
+        "task_completed": 0,
+        "progress_percent": 0.0,
+    }
+    return success_response(
+        data=format_datetime_fields(
+            {"milestone": _format_project_milestone(row)},
+            request,
+            business_id,
+        ),
+        request=request,
+        message="PROJECT_MILESTONE_CREATED",
+    )
+
+
+@router.patch(
+    "/businesses/{business_id}/projects/{project_id}/milestones/{milestone_id}",
+    summary="ویرایش مایلستون پروژه",
+)
+@require_business_access("business_id")
+async def update_project_milestone_endpoint(
+    request: Request,
+    data: ProjectMilestoneUpdateRequest,
+    business_id: int = Path(..., gt=0),
+    project_id: int = Path(..., gt=0),
+    milestone_id: int = Path(..., gt=0),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+):
+    del ctx
+    milestone = update_project_milestone(
+        db,
+        business_id,
+        project_id,
+        milestone_id,
+        data.dict(exclude_unset=True),
+    )
+    rows = list_project_milestones(db, business_id, project_id)
+    row = next(
+        (item for item in rows if item["milestone"].id == milestone.id),
+        {
+            "milestone": milestone,
+            "task_total": 0,
+            "task_completed": 0,
+            "progress_percent": 0.0,
+        },
+    )
+    return success_response(
+        data=format_datetime_fields(
+            {"milestone": _format_project_milestone(row)},
+            request,
+            business_id,
+        ),
+        request=request,
+        message="PROJECT_MILESTONE_UPDATED",
+    )
+
+
+@router.delete(
+    "/businesses/{business_id}/projects/{project_id}/milestones/{milestone_id}",
+    summary="حذف مایلستون پروژه",
+)
+@require_business_access("business_id")
+async def delete_project_milestone_endpoint(
+    request: Request,
+    business_id: int = Path(..., gt=0),
+    project_id: int = Path(..., gt=0),
+    milestone_id: int = Path(..., gt=0),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+):
+    del ctx
+    delete_project_milestone(db, business_id, project_id, milestone_id)
+    return success_response(
+        data={"id": milestone_id},
+        request=request,
+        message="PROJECT_MILESTONE_DELETED",
     )
 
 

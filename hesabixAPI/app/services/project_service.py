@@ -20,7 +20,7 @@ from adapters.db.models.currency import Currency
 from adapters.db.models.user import User
 from adapters.db.models.person import Person
 from adapters.db.models.business_permission import BusinessPermission
-from adapters.db.models.task_management import ProjectMember, Task, TaskRelation, TaskStatus
+from adapters.db.models.task_management import Milestone, ProjectMember, Task, TaskRelation, TaskStatus
 from app.core.business_membership import membership_is_active
 from adapters.db.repositories.project_repository import ProjectRepository
 from app.core.responses import ApiError
@@ -664,3 +664,218 @@ def get_project_timeline(
             "end_at": max(ends) if ends else None,
         },
     }
+
+
+
+_MILESTONE_STATUSES = {"open", "completed", "cancelled"}
+
+
+def _parse_milestone_datetime(value: Any) -> Optional[datetime]:
+    if value is None or value == "":
+        return None
+    if isinstance(value, datetime):
+        dt = value
+    elif isinstance(value, str):
+        try:
+            dt = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError as exc:
+            raise ApiError(
+                "PROJECT_MILESTONE_INVALID_DATETIME",
+                "Invalid milestone date/time",
+                http_status=400,
+            ) from exc
+    else:
+        raise ApiError(
+            "PROJECT_MILESTONE_INVALID_DATETIME",
+            "Invalid milestone date/time",
+            http_status=400,
+        )
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(timezone.utc)
+
+
+def _validate_milestone_dates(
+    start_at: Optional[datetime],
+    target_at: Optional[datetime],
+) -> None:
+    if start_at is not None and target_at is not None and target_at < start_at:
+        raise ApiError(
+            "PROJECT_MILESTONE_INVALID_DATE_RANGE",
+            "Milestone target cannot be before its start",
+            http_status=400,
+        )
+
+
+def list_project_milestones(
+    db: Session,
+    business_id: int,
+    project_id: int,
+) -> list[Dict[str, Any]]:
+    _require_project_in_business(db, business_id, project_id)
+    milestones = (
+        db.query(Milestone)
+        .filter(
+            Milestone.business_id == business_id,
+            Milestone.project_id == project_id,
+        )
+        .order_by(
+            Milestone.sort_order.asc(),
+            Milestone.target_at.asc().nullslast(),
+            Milestone.id.asc(),
+        )
+        .all()
+    )
+    result: list[Dict[str, Any]] = []
+    for milestone in milestones:
+        task_query = db.query(Task).filter(
+            Task.business_id == business_id,
+            Task.project_id == project_id,
+            Task.milestone_id == milestone.id,
+            Task.deleted_at.is_(None),
+        )
+        total = task_query.count()
+        completed = task_query.filter(Task.completed_at.is_not(None)).count()
+        result.append(
+            {
+                "milestone": milestone,
+                "task_total": int(total),
+                "task_completed": int(completed),
+                "progress_percent": round((completed / total) * 100, 1) if total else 0.0,
+            }
+        )
+    return result
+
+
+def create_project_milestone(
+    db: Session,
+    business_id: int,
+    project_id: int,
+    actor_user_id: int,
+    data: Dict[str, Any],
+) -> Milestone:
+    _require_project_in_business(db, business_id, project_id)
+    title = str(data.get("title") or "").strip()
+    if not title:
+        raise ApiError(
+            "PROJECT_MILESTONE_TITLE_REQUIRED",
+            "Milestone title is required",
+            http_status=400,
+        )
+    status = str(data.get("status") or "open").strip().lower()
+    if status not in _MILESTONE_STATUSES:
+        raise ApiError(
+            "PROJECT_MILESTONE_INVALID_STATUS",
+            "Invalid milestone status",
+            http_status=400,
+        )
+    start_at = _parse_milestone_datetime(data.get("start_at"))
+    target_at = _parse_milestone_datetime(data.get("target_at"))
+    _validate_milestone_dates(start_at, target_at)
+    milestone = Milestone(
+        business_id=business_id,
+        project_id=project_id,
+        title=title,
+        description=data.get("description"),
+        start_at=start_at,
+        target_at=target_at,
+        status=status,
+        sort_order=Decimal(str(data.get("sort_order") or 0)),
+        created_by_user_id=actor_user_id,
+    )
+    db.add(milestone)
+    db.commit()
+    db.refresh(milestone)
+    return milestone
+
+
+def update_project_milestone(
+    db: Session,
+    business_id: int,
+    project_id: int,
+    milestone_id: int,
+    data: Dict[str, Any],
+) -> Milestone:
+    _require_project_in_business(db, business_id, project_id)
+    milestone = (
+        db.query(Milestone)
+        .filter(
+            Milestone.id == milestone_id,
+            Milestone.business_id == business_id,
+            Milestone.project_id == project_id,
+        )
+        .first()
+    )
+    if not milestone:
+        raise ApiError(
+            "PROJECT_MILESTONE_NOT_FOUND",
+            "Milestone not found",
+            http_status=404,
+        )
+
+    if "title" in data:
+        title = str(data.get("title") or "").strip()
+        if not title:
+            raise ApiError(
+                "PROJECT_MILESTONE_TITLE_REQUIRED",
+                "Milestone title is required",
+                http_status=400,
+            )
+        milestone.title = title
+    if "description" in data:
+        milestone.description = data.get("description")
+    if "status" in data:
+        status = str(data.get("status") or "open").strip().lower()
+        if status not in _MILESTONE_STATUSES:
+            raise ApiError(
+                "PROJECT_MILESTONE_INVALID_STATUS",
+                "Invalid milestone status",
+                http_status=400,
+            )
+        milestone.status = status
+    if "sort_order" in data:
+        milestone.sort_order = Decimal(str(data.get("sort_order") or 0))
+
+    start_at = (
+        _parse_milestone_datetime(data.get("start_at"))
+        if "start_at" in data
+        else milestone.start_at
+    )
+    target_at = (
+        _parse_milestone_datetime(data.get("target_at"))
+        if "target_at" in data
+        else milestone.target_at
+    )
+    _validate_milestone_dates(start_at, target_at)
+    milestone.start_at = start_at
+    milestone.target_at = target_at
+    milestone.updated_at = datetime.now(timezone.utc)
+    db.commit()
+    db.refresh(milestone)
+    return milestone
+
+
+def delete_project_milestone(
+    db: Session,
+    business_id: int,
+    project_id: int,
+    milestone_id: int,
+) -> None:
+    _require_project_in_business(db, business_id, project_id)
+    milestone = (
+        db.query(Milestone)
+        .filter(
+            Milestone.id == milestone_id,
+            Milestone.business_id == business_id,
+            Milestone.project_id == project_id,
+        )
+        .first()
+    )
+    if not milestone:
+        raise ApiError(
+            "PROJECT_MILESTONE_NOT_FOUND",
+            "Milestone not found",
+            http_status=404,
+        )
+    db.delete(milestone)
+    db.commit()

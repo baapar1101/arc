@@ -200,6 +200,8 @@ def _format_task(task: Task, db: Session, request: Request) -> dict[str, Any]:
         "parent_task_id": task.parent_task_id,
         "status_id": task.status_id,
         "status": _format_status(task.status) if task.status else None,
+        "milestone_id": task.milestone_id,
+        "milestone_name": task.milestone.title if task.milestone else None,
         "title": task.title,
         "description": task.description,
         "priority": task.priority,

@@ -20,6 +20,7 @@ from adapters.db.models.business import Business
 from adapters.db.models.business_permission import BusinessPermission
 from adapters.db.models.project import Project
 from adapters.db.models.task_management import (
+    Milestone,
     Task,
     TaskActivity,
     TaskAssignee,
@@ -325,6 +326,38 @@ def _validate_parent_task(
     return parent
 
 
+def _require_milestone(
+    db: Session,
+    business_id: int,
+    milestone_id: Optional[int],
+    project_id: Optional[int],
+) -> Optional[Milestone]:
+    if milestone_id is None:
+        return None
+    if project_id is None:
+        raise ApiError(
+            "TASK_MILESTONE_PROJECT_REQUIRED",
+            "A milestone requires the task to belong to a project",
+            http_status=400,
+        )
+    milestone = (
+        db.query(Milestone)
+        .filter(
+            Milestone.id == int(milestone_id),
+            Milestone.business_id == business_id,
+            Milestone.project_id == project_id,
+        )
+        .first()
+    )
+    if not milestone:
+        raise ApiError(
+            "TASK_MILESTONE_NOT_FOUND",
+            "Milestone does not belong to this project",
+            http_status=400,
+        )
+    return milestone
+
+
 def _require_business(db: Session, business_id: int) -> Business:
     business = db.get(Business, business_id)
     if not business or getattr(business, "deleted_at", None) is not None:
@@ -540,6 +573,12 @@ def create_task(
 
     project = _require_project(db, business_id, data.get("project_id"))
     project_id = project.id if project else None
+    milestone = _require_milestone(
+        db,
+        business_id,
+        data.get("milestone_id"),
+        project_id,
+    )
     parent_task = _validate_parent_task(
         db,
         business_id,
@@ -569,6 +608,7 @@ def create_task(
         project_id=project_id,
         parent_task_id=parent_task.id if parent_task else None,
         status_id=status.id,
+        milestone_id=milestone.id if milestone else None,
         title=title,
         description=data.get("description"),
         priority=priority,
@@ -653,6 +693,23 @@ def update_task(
         if "parent_task_id" in data
         else task.parent_task_id
     )
+    proposed_milestone_id = (
+        data.get("milestone_id")
+        if "milestone_id" in data
+        else task.milestone_id
+    )
+    if (
+        "project_id" in data
+        and "milestone_id" not in data
+        and proposed_project_id != task.project_id
+    ):
+        proposed_milestone_id = None
+    milestone = _require_milestone(
+        db,
+        business_id,
+        proposed_milestone_id,
+        proposed_project_id,
+    )
     _validate_parent_task(
         db,
         business_id,
@@ -687,6 +744,14 @@ def update_task(
             "to": proposed_parent_id,
         }
         task.parent_task_id = proposed_parent_id
+
+    next_milestone_id = milestone.id if milestone else None
+    if next_milestone_id != task.milestone_id:
+        changes["milestone_id"] = {
+            "from": task.milestone_id,
+            "to": next_milestone_id,
+        }
+        task.milestone_id = next_milestone_id
 
     if "status_id" in data:
         status = _require_status(db, business_id, data.get("status_id")) or _default_status(db, business_id)
