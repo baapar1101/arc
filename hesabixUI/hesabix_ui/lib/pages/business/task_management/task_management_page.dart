@@ -6,6 +6,7 @@ import 'package:hesabix_ui/models/task_model.dart';
 import 'package:hesabix_ui/services/project_service.dart';
 import 'package:hesabix_ui/services/task_service.dart';
 import 'package:hesabix_ui/theme/glass.dart';
+import 'package:hesabix_ui/widgets/task/task_detail_drawer.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
 import 'package:hesabix_ui/utils/responsive_helper.dart';
 import 'package:hesabix_ui/utils/snackbar_helper.dart';
@@ -61,7 +62,12 @@ class _TaskManagementPageState extends State<TaskManagementPage> {
     try {
       final statuses = await _taskService.listStatuses(widget.businessId);
       final assignees = await _taskService.listAssignees(widget.businessId);
-      final projects = await _projectService.listActiveProjects(widget.businessId);
+      final projectsResult = await _projectService.listProjects(
+        businessId: widget.businessId,
+        limit: 500,
+      );
+      final projects =
+          (projectsResult['items'] as List<ProjectModel>?) ?? const <ProjectModel>[];
       final tasksResult = await _taskService.listTasks(
         businessId: widget.businessId,
         search: _searchController.text,
@@ -133,6 +139,34 @@ class _TaskManagementPageState extends State<TaskManagementPage> {
     );
     if (changed == true) {
       await _reloadTasks();
+    }
+  }
+
+  Future<void> _openTaskDetail(TaskModel task) async {
+    try {
+      final latest = await _taskService.getTask(
+        businessId: widget.businessId,
+        taskId: task.id,
+      );
+      if (!mounted) return;
+      final changed = await showTaskDetailDrawer(
+        context: context,
+        businessId: widget.businessId,
+        taskService: _taskService,
+        task: latest,
+        statuses: _statuses,
+        projects: _projects,
+        assignees: _assignees,
+      );
+      if (changed == true) {
+        await _reloadTasks();
+      }
+    } catch (e) {
+      if (!mounted) return;
+      SnackBarHelper.showError(
+        context,
+        message: ErrorExtractor.forContext(e, context),
+      );
     }
   }
 
@@ -304,7 +338,7 @@ class _TaskManagementPageState extends State<TaskManagementPage> {
                         size: 18,
                         color: scheme.primary,
                       ),
-                      label: const Text('Phase 1 · Core Task Engine'),
+                      label: const Text('Phase 2 · Task Detail UX'),
                       backgroundColor: scheme.primary.withValues(alpha: 0.08),
                       side: BorderSide(
                         color: scheme.primary.withValues(alpha: 0.24),
@@ -463,7 +497,7 @@ class _TaskManagementPageState extends State<TaskManagementPage> {
                       priorityLabel: _priorityLabel(task.priority),
                       priorityColor: _priorityColor(context, task.priority),
                       onToggle: () => _toggleComplete(task),
-                      onEdit: () => _openForm(task),
+                      onEdit: () => _openTaskDetail(task),
                       onDelete: () => _deleteTask(task),
                     ),
                   ),
@@ -631,8 +665,8 @@ class _TaskCard extends StatelessWidget {
           Column(
             children: [
               IconButton(
-                tooltip: 'ویرایش',
-                icon: const Icon(Icons.edit_outlined),
+                tooltip: 'باز کردن جزئیات',
+                icon: const Icon(Icons.open_in_new_outlined),
                 onPressed: onEdit,
               ),
               IconButton(

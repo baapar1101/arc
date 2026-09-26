@@ -173,3 +173,23 @@ The Task Management screen now supports:
 - soft delete
 
 Phase 2 will replace the edit-oriented interaction with the richer Plane-style task drawer/detail experience.
+
+
+## Phase 2 — Task UX / Detail Drawer
+
+Implemented on 2026-09-26 using Plane as the primary interaction benchmark.
+
+### UX delivered
+
+- Clicking a task now opens a dedicated task-detail surface instead of the compact create/edit form.
+- Desktop: persistent-feeling frosted side drawer with full-height context.
+- Mobile: the same editor is presented as a 92% height glass bottom sheet.
+- Inline editable title and description.
+- Inline status, priority, project, and due-date properties.
+- Native multi-assignee editing with filter chips.
+- Complete/reopen action directly from the detail surface.
+- The list stays compact and context-preserving; creating a task still uses the quick-create dialog.
+- The drawer loads a fresh task record before opening to reduce stale edits.
+- Project pickers load all projects, not only active ones, so older task/project links remain editable.
+
+Comments, attachments, and activity history remain intentionally outside this phase and are implemented in their later pipeline phases.

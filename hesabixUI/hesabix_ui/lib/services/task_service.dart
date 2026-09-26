@@ -67,6 +67,18 @@ class TaskService {
     };
   }
 
+  Future<TaskModel> getTask({
+    required int businessId,
+    required int taskId,
+  }) async {
+    final response = await apiClient.get(
+      '/api/v1/businesses/$businessId/tasks/$taskId',
+    );
+    return TaskModel.fromJson(
+      Map<String, dynamic>.from(response.data['data']['task'] as Map),
+    );
+  }
+
   Future<TaskModel> createTask({
     required int businessId,
     required Map<String, dynamic> data,
