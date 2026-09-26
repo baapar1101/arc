@@ -5,7 +5,7 @@
 from __future__ import annotations
 
 from typing import Dict, Any, List, Optional, Tuple
-from datetime import datetime, date
+from datetime import datetime, date, timezone
 from decimal import Decimal
 import logging
 
@@ -92,9 +92,7 @@ def create_project(
 	# اعتبارسنجی مدیر پروژه
 	manager_user_id = data.get('manager_user_id')
 	if manager_user_id:
-		manager = db.query(User).filter(User.id == manager_user_id).first()
-		if not manager:
-			raise ApiError("MANAGER_NOT_FOUND", "مدیر پروژه یافت نشد", http_status=404)
+		_business_member_user(db, business, manager_user_id)
 	
 	# اعتبارسنجی شخص
 	person_id = data.get('person_id')
@@ -124,6 +122,15 @@ def create_project(
 	)
 	
 	db.add(project)
+	db.flush()
+	if manager_user_id:
+		db.add(ProjectMember(
+			business_id=business_id,
+			project_id=project.id,
+			user_id=manager_user_id,
+			role="manager",
+			added_by_user_id=user_id,
+		))
 	db.commit()
 	db.refresh(project)
 	
@@ -196,11 +203,39 @@ def update_project(
 		project.currency_id = data['currency_id']
 	
 	if 'manager_user_id' in data:
-		if data['manager_user_id']:
-			manager = db.query(User).filter(User.id == data['manager_user_id']).first()
-			if not manager:
-				raise ApiError("MANAGER_NOT_FOUND", "مدیر پروژه یافت نشد", http_status=404)
-		project.manager_user_id = data['manager_user_id']
+		new_manager_id = data['manager_user_id']
+		business = db.get(Business, business_id)
+		if not business:
+			raise ApiError("BUSINESS_NOT_FOUND", "کسب‌وکار یافت نشد", http_status=404)
+		if new_manager_id:
+			_business_member_user(db, business, new_manager_id)
+		old_manager_id = project.manager_user_id
+		project.manager_user_id = new_manager_id
+		if old_manager_id and old_manager_id != new_manager_id:
+			old_member = db.query(ProjectMember).filter(
+				ProjectMember.business_id == business_id,
+				ProjectMember.project_id == project_id,
+				ProjectMember.user_id == old_manager_id,
+				ProjectMember.role == "manager",
+			).first()
+			if old_member:
+				old_member.role = "member"
+		if new_manager_id:
+			manager_member = db.query(ProjectMember).filter(
+				ProjectMember.business_id == business_id,
+				ProjectMember.project_id == project_id,
+				ProjectMember.user_id == new_manager_id,
+			).first()
+			if manager_member:
+				manager_member.role = "manager"
+			else:
+				db.add(ProjectMember(
+					business_id=business_id,
+					project_id=project_id,
+					user_id=new_manager_id,
+					role="manager",
+					added_by_user_id=new_manager_id,
+				))
 	
 	if 'person_id' in data:
 		if data['person_id']:
@@ -388,6 +423,26 @@ def list_project_members(db: Session, business_id: int, project_id: int) -> list
     )
 
 
+
+def _can_manage_project_members(
+    db: Session,
+    business: Business,
+    project: Project,
+    actor_user_id: int,
+) -> bool:
+    if int(business.owner_id) == int(actor_user_id):
+        return True
+    if project.manager_user_id and int(project.manager_user_id) == int(actor_user_id):
+        return True
+    member = db.query(ProjectMember).filter(
+        ProjectMember.business_id == business.id,
+        ProjectMember.project_id == project.id,
+        ProjectMember.user_id == actor_user_id,
+        ProjectMember.role.in_(["owner", "manager"]),
+    ).first()
+    return member is not None
+
+
 def upsert_project_member(
     db: Session,
     business_id: int,
@@ -400,6 +455,12 @@ def upsert_project_member(
     business = db.get(Business, business_id)
     if not business:
         raise ApiError("BUSINESS_NOT_FOUND", "کسب‌وکار یافت نشد", http_status=404)
+    if not _can_manage_project_members(db, business, project, actor_user_id):
+        raise ApiError(
+            "PROJECT_MEMBER_MANAGE_FORBIDDEN",
+            "فقط مالک کسب‌وکار یا مدیر پروژه می‌تواند اعضا را تغییر دهد",
+            http_status=403,
+        )
     user = _business_member_user(db, business, user_id)
     member = db.query(ProjectMember).filter(
         ProjectMember.business_id == business_id,
@@ -424,8 +485,23 @@ def upsert_project_member(
     return member
 
 
-def remove_project_member(db: Session, business_id: int, project_id: int, user_id: int) -> None:
+def remove_project_member(
+    db: Session,
+    business_id: int,
+    project_id: int,
+    actor_user_id: int,
+    user_id: int,
+) -> None:
     project = _require_project_in_business(db, business_id, project_id)
+    business = db.get(Business, business_id)
+    if not business:
+        raise ApiError("BUSINESS_NOT_FOUND", "کسب‌وکار یافت نشد", http_status=404)
+    if not _can_manage_project_members(db, business, project, actor_user_id):
+        raise ApiError(
+            "PROJECT_MEMBER_MANAGE_FORBIDDEN",
+            "فقط مالک کسب‌وکار یا مدیر پروژه می‌تواند اعضا را تغییر دهد",
+            http_status=403,
+        )
     if project.manager_user_id == user_id:
         raise ApiError(
             "PROJECT_MEMBER_IS_MANAGER",
@@ -453,7 +529,7 @@ def get_project_workspace(db: Session, business_id: int, project_id: int) -> Dic
     total_tasks = task_base.count()
     completed_tasks = task_base.filter(Task.completed_at.is_not(None)).count()
     open_tasks = max(total_tasks - completed_tasks, 0)
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     overdue_tasks = task_base.filter(
         Task.completed_at.is_(None),
         Task.due_at.is_not(None),

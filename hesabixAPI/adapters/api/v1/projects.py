@@ -184,8 +184,8 @@ async def get_project_endpoint(
 	if not project:
 		raise ApiError("PROJECT_NOT_FOUND", "پروژه یافت نشد", http_status=404)
 	
-	# بررسی دسترسی
-	# TODO: اضافه کردن بررسی دسترسی business
+	if not ctx.can_access_business(project.business_id):
+		raise ApiError("FORBIDDEN", "No access to this project", http_status=403)
 	
 	# دریافت آمار
 	stats = get_project_statistics(db, project_id)
@@ -220,7 +220,8 @@ async def update_project_endpoint(
 	if not project:
 		raise ApiError("PROJECT_NOT_FOUND", "پروژه یافت نشد", http_status=404)
 	
-	# TODO: بررسی دسترسی کاربر به business
+	if not ctx.can_access_business(project.business_id):
+		raise ApiError("FORBIDDEN", "No access to this project", http_status=403)
 	
 	updated_project = update_project(
 		db,
@@ -260,7 +261,8 @@ async def delete_project_endpoint(
 	if not project:
 		raise ApiError("PROJECT_NOT_FOUND", "پروژه یافت نشد", http_status=404)
 	
-	# TODO: بررسی دسترسی کاربر به business
+	if not ctx.can_access_business(project.business_id):
+		raise ApiError("FORBIDDEN", "No access to this project", http_status=403)
 	
 	delete_project(db, project_id, project.business_id, hard_delete=hard_delete)
 	
@@ -284,6 +286,11 @@ async def list_project_documents_endpoint(
 	ctx: AuthContext = Depends(get_current_user)
 ):
 	"""لیست اسناد پروژه"""
+	project = ProjectRepository(db).get_by_id(project_id)
+	if not project:
+		raise ApiError("PROJECT_NOT_FOUND", "پروژه یافت نشد", http_status=404)
+	if not ctx.can_access_business(project.business_id):
+		raise ApiError("FORBIDDEN", "No access to this project", http_status=403)
 	skip = (page - 1) * limit
 	documents, total = list_project_documents(db, project_id, skip=skip, limit=limit)
 	
@@ -542,8 +549,9 @@ async def remove_project_member_endpoint(
     db: Session = Depends(get_db),
     ctx: AuthContext = Depends(get_current_user),
 ):
-    del ctx
-    remove_project_member(db, business_id, project_id, user_id)
+    remove_project_member(
+        db, business_id, project_id, ctx.get_user_id(), user_id
+    )
     return success_response(
         data={"user_id": user_id},
         request=request,
