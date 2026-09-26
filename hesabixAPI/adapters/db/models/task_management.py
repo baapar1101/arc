@@ -156,6 +156,80 @@ class TaskLabel(Base):
     business = relationship("Business")
 
 
+class TaskSavedView(Base):
+    """User-owned structured task filter/view configuration."""
+
+    __tablename__ = "task_saved_views"
+    __table_args__ = (
+        UniqueConstraint(
+            "business_id",
+            "user_id",
+            "name",
+            name="uq_task_saved_views_business_user_name",
+        ),
+        Index(
+            "ix_task_saved_views_business_user",
+            "business_id",
+            "user_id",
+        ),
+        Index(
+            "ix_task_saved_views_business_project",
+            "business_id",
+            "project_id",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    business_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("businesses.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    user_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    project_id: Mapped[int | None] = mapped_column(
+        Integer,
+        ForeignKey("projects.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    name: Mapped[str] = mapped_column(String(120), nullable=False)
+    view_type: Mapped[str] = mapped_column(
+        String(30),
+        nullable=False,
+        default="list",
+        server_default="list",
+    )
+    filters_json: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    sort_json: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    is_shared: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False,
+        server_default="false",
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=_utc_now,
+        nullable=False,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=_utc_now,
+        onupdate=_utc_now,
+        nullable=False,
+    )
+
+    business = relationship("Business")
+    user = relationship("User")
+    project = relationship("Project")
+
+
 class Task(Base):
     """First-class task/work-item independent from CRM activity logs."""
 
