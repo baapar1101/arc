@@ -190,6 +190,16 @@ class ProjectService {
     }
   }
 
+  Future<Map<String, dynamic>> getTimeline({
+    required int businessId,
+    required int projectId,
+  }) async {
+    final response = await apiClient.get(
+      '/api/v1/businesses/$businessId/projects/$projectId/timeline',
+    );
+    return Map<String, dynamic>.from(response.data['data'] as Map);
+  }
+
   Future<Map<String, dynamic>> getWorkspace({
     required int businessId,
     required int projectId,
