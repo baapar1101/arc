@@ -175,6 +175,111 @@ class TaskService {
     );
   }
 
+  Future<Map<String, dynamic>> listTimeEntries({
+    required int businessId,
+    int? taskId,
+    int? projectId,
+    int? userId,
+    int limit = 200,
+  }) async {
+    final query = <String, dynamic>{'limit': limit};
+    if (taskId != null) query['task_id'] = taskId;
+    if (projectId != null) query['project_id'] = projectId;
+    if (userId != null) query['user_id'] = userId;
+    final response = await apiClient.get(
+      '/api/v1/businesses/$businessId/time-entries',
+      query: query,
+    );
+    final data = Map<String, dynamic>.from(response.data['data'] as Map);
+    final raw = (data['items'] as List?) ?? const [];
+    return {
+      'items': raw
+          .whereType<Map>()
+          .map(
+            (e) => TaskTimeEntryModel.fromJson(
+              Map<String, dynamic>.from(e),
+            ),
+          )
+          .toList(),
+      'total_seconds': (data['total_seconds'] as num?)?.toInt() ?? 0,
+    };
+  }
+
+  Future<TaskTimeEntryModel?> getActiveTimer({
+    required int businessId,
+  }) async {
+    final response = await apiClient.get(
+      '/api/v1/businesses/$businessId/timer/active',
+    );
+    final entry = response.data['data']?['entry'];
+    return entry is Map
+        ? TaskTimeEntryModel.fromJson(Map<String, dynamic>.from(entry))
+        : null;
+  }
+
+  Future<TaskTimeEntryModel> startTimer({
+    required int businessId,
+    required int taskId,
+    String? description,
+    bool billable = false,
+  }) async {
+    final response = await apiClient.post(
+      '/api/v1/businesses/$businessId/tasks/$taskId/timer/start',
+      data: {
+        'description': description,
+        'billable': billable,
+      },
+    );
+    return TaskTimeEntryModel.fromJson(
+      Map<String, dynamic>.from(response.data['data']['entry'] as Map),
+    );
+  }
+
+  Future<TaskTimeEntryModel> stopTimer({
+    required int businessId,
+  }) async {
+    final response = await apiClient.post(
+      '/api/v1/businesses/$businessId/timer/stop',
+    );
+    return TaskTimeEntryModel.fromJson(
+      Map<String, dynamic>.from(response.data['data']['entry'] as Map),
+    );
+  }
+
+  Future<TaskTimeEntryModel> createTimeEntry({
+    required int businessId,
+    required int taskId,
+    required DateTime startedAt,
+    DateTime? endedAt,
+    int? durationMinutes,
+    String? description,
+    bool billable = false,
+  }) async {
+    final response = await apiClient.post(
+      '/api/v1/businesses/$businessId/tasks/$taskId/time-entries',
+      data: {
+        'started_at': startedAt.toUtc().toIso8601String(),
+        if (endedAt != null)
+          'ended_at': endedAt.toUtc().toIso8601String(),
+        if (durationMinutes != null) 'duration_minutes': durationMinutes,
+        'description': description,
+        'billable': billable,
+      },
+    );
+    return TaskTimeEntryModel.fromJson(
+      Map<String, dynamic>.from(response.data['data']['entry'] as Map),
+    );
+  }
+
+  Future<void> deleteTimeEntry({
+    required int businessId,
+    required int entryId,
+  }) async {
+    await apiClient.delete(
+      '/api/v1/businesses/$businessId/time-entries/$entryId',
+    );
+  }
+
   Future<List<TaskCycleModel>> listTaskCycles({
     required int businessId, required int taskId,
   }) async {

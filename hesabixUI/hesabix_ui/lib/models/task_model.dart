@@ -483,3 +483,64 @@ class TaskCycleModel {
     status:json['status']?.toString()??'planned',
   );
 }
+
+
+
+class TaskTimeEntryModel {
+  final int id;
+  final int businessId;
+  final int taskId;
+  final String? taskTitle;
+  final int? projectId;
+  final int userId;
+  final String? userName;
+  final DateTime startedAt;
+  final DateTime? endedAt;
+  final int? durationSeconds;
+  final String? description;
+  final bool billable;
+  final bool isActive;
+
+  const TaskTimeEntryModel({
+    required this.id,
+    required this.businessId,
+    required this.taskId,
+    this.taskTitle,
+    this.projectId,
+    required this.userId,
+    this.userName,
+    required this.startedAt,
+    this.endedAt,
+    this.durationSeconds,
+    this.description,
+    required this.billable,
+    required this.isActive,
+  });
+
+  int get effectiveDurationSeconds {
+    if (durationSeconds != null) return durationSeconds!;
+    if (!isActive) return 0;
+    return DateTime.now().toUtc().difference(startedAt.toUtc()).inSeconds;
+  }
+
+  factory TaskTimeEntryModel.fromJson(Map<String, dynamic> json) {
+    return TaskTimeEntryModel(
+      id: (json['id'] as num).toInt(),
+      businessId: (json['business_id'] as num).toInt(),
+      taskId: (json['task_id'] as num).toInt(),
+      taskTitle: json['task_title']?.toString(),
+      projectId: (json['project_id'] as num?)?.toInt(),
+      userId: (json['user_id'] as num).toInt(),
+      userName: json['user_name']?.toString(),
+      startedAt: _parseTaskDate(
+            json['started_at_raw'] ?? json['started_at'],
+          ) ??
+          DateTime.fromMillisecondsSinceEpoch(0, isUtc: true),
+      endedAt: _parseTaskDate(json['ended_at_raw'] ?? json['ended_at']),
+      durationSeconds: (json['duration_seconds'] as num?)?.toInt(),
+      description: json['description']?.toString(),
+      billable: json['billable'] == true,
+      isActive: json['is_active'] == true || json['ended_at'] == null,
+    );
+  }
+}
