@@ -220,3 +220,29 @@ Implemented on 2026-09-26.
 - [x] Desktop drawer
 - [x] Mobile glass sheet
 - [x] Existing glass design system remains authoritative
+
+
+## Phase 2 — Task UX
+
+Implemented with Plane as the primary interaction benchmark.
+
+### Interaction changes
+
+- One-line quick create: type a title and press Enter.
+- Desktop task details open in a persistent glass side drawer; the list remains visible.
+- Mobile task details use the same component in a near-full-height glass bottom sheet.
+- Status can be changed directly from the task card.
+- Status, priority, project, due date and assignees update inline inside the detail surface.
+- Assignees are multi-select in the detail surface, matching the underlying multi-assignee domain.
+- Title and description edit without navigation or a page reload.
+- Complete/reopen and delete update local list state from API responses rather than re-fetching the whole page.
+
+### Phase 2 acceptance gate
+
+- [x] Quick task creation without a separate form.
+- [x] Open/edit task while preserving list context.
+- [x] Inline status changes.
+- [x] Inline project/priority/due-date changes.
+- [x] Multi-assignee editing.
+- [x] Complete/reopen without page reload.
+- [x] Responsive desktop drawer / mobile glass sheet.
