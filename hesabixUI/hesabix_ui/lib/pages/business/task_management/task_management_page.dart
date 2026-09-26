@@ -263,7 +263,7 @@ class _TaskManagementPageState extends State<TaskManagementPage> {
 
   Future<void> _openDetails(TaskModel task) async {
     if (ResponsiveHelper.isMobile(context)) {
-      final result = await showGlassModalBottomSheet<TaskModel>(
+      await showGlassModalBottomSheet<void>(
         context: context,
         isScrollControlled: true,
         useSafeArea: true,
@@ -294,13 +294,12 @@ class _TaskManagementPageState extends State<TaskManagementPage> {
                   return updated;
                 },
                 onDelete: () => _deleteTask(liveTask),
-                onClose: () => Navigator.pop(sheetContext, liveTask),
+                onClose: () => Navigator.pop(sheetContext),
               ),
             ),
           );
         },
       );
-      if (result != null) _upsertTask(result);
       return;
     }
 
