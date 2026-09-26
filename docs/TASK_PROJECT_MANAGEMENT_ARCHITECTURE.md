@@ -524,3 +524,39 @@ Implemented on 2026-09-26 as a native task view with no new persistence entity.
 - [x] Drag-to-reschedule.
 - [x] Multi-day task rendering.
 - [x] No separate calendar-event entity.
+
+
+## Phase 10 — Timeline / Gantt
+
+Implemented on 2026-09-26 using Leantime planning concepts and Vikunja dependency semantics.
+
+### Data model
+
+- Timeline uses existing task `start_at` and `due_at`; no Gantt-specific task table.
+- Blocking edges come directly from existing `task_relations` where `relation_type = blocks`.
+- Project timeline endpoint returns only scheduled task IDs/date bounds plus dependency edges.
+- Full task metadata continues to come from the normal project task list, avoiding duplicate payloads.
+- Milestone management remains Phase 11 and is intentionally not implemented here.
+
+### UX
+
+- Project workspace now includes a fifth Timeline tab.
+- Day, Week and Month zoom levels change pixels-per-day while preserving date accuracy.
+- Fixed task-name column stays visible beside a horizontally scrollable time scale.
+- Task bars render start/due duration and open the existing task drawer on click.
+- Dependency edges are drawn as connector paths from blocking task end to blocked task start.
+- A today marker is drawn on the time scale.
+- Unscheduled task count is surfaced without inventing dates.
+
+### Phase 10 endpoint
+
+- `GET /api/v1/businesses/{business_id}/projects/{project_id}/timeline`
+
+### Phase 10 acceptance gate
+
+- [x] Task bars.
+- [x] Day/week/month zoom.
+- [x] Today marker.
+- [x] Blocking dependency connectors.
+- [x] Unscheduled task visibility.
+- [x] No duplicate Gantt persistence model.
