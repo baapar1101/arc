@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Optional
+from typing import Any, Optional
 
 from pydantic import BaseModel, Field
 
@@ -17,6 +17,7 @@ class TaskCreateRequest(BaseModel):
     due_at: Optional[datetime] = None
     estimated_minutes: Optional[int] = Field(None, ge=0)
     assignee_user_ids: list[int] = Field(default_factory=list)
+    label_ids: list[int] = Field(default_factory=list)
 
 
 class TaskUpdateRequest(BaseModel):
@@ -30,6 +31,7 @@ class TaskUpdateRequest(BaseModel):
     due_at: Optional[datetime] = None
     estimated_minutes: Optional[int] = Field(None, ge=0)
     assignee_user_ids: Optional[list[int]] = None
+    label_ids: Optional[list[int]] = None
 
 
 class TaskAssigneesRequest(BaseModel):
@@ -63,3 +65,38 @@ class TaskCommentCreateRequest(BaseModel):
 
 class TaskCommentUpdateRequest(BaseModel):
     body: str = Field(..., min_length=1, max_length=10000)
+
+
+
+class TaskLabelCreateRequest(BaseModel):
+    name: str = Field(..., min_length=1, max_length=100)
+    color: Optional[str] = Field(None, max_length=20)
+    description: Optional[str] = None
+
+
+class TaskLabelUpdateRequest(BaseModel):
+    name: Optional[str] = Field(None, min_length=1, max_length=100)
+    color: Optional[str] = Field(None, max_length=20)
+    description: Optional[str] = None
+
+
+class TaskLabelsAssignRequest(BaseModel):
+    label_ids: list[int] = Field(default_factory=list)
+
+
+class TaskSavedViewCreateRequest(BaseModel):
+    name: str = Field(..., min_length=1, max_length=120)
+    project_id: Optional[int] = Field(None, gt=0)
+    view_type: str = Field(default="list", min_length=1, max_length=30)
+    filters: dict[str, Any] = Field(default_factory=dict)
+    sort: dict[str, Any] = Field(default_factory=dict)
+    is_shared: bool = False
+
+
+class TaskSavedViewUpdateRequest(BaseModel):
+    name: Optional[str] = Field(None, min_length=1, max_length=120)
+    project_id: Optional[int] = Field(None, gt=0)
+    view_type: Optional[str] = Field(None, min_length=1, max_length=30)
+    filters: Optional[dict[str, Any]] = None
+    sort: Optional[dict[str, Any]] = None
+    is_shared: Optional[bool] = None

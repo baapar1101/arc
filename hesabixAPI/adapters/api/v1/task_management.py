@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, Path, Query, Request
@@ -10,8 +11,13 @@ from adapters.api.v1.schema_models.task_management import (
     TaskCommentCreateRequest,
     TaskCommentUpdateRequest,
     TaskCreateRequest,
+    TaskLabelCreateRequest,
+    TaskLabelUpdateRequest,
+    TaskLabelsAssignRequest,
     TaskMoveRequest,
     TaskRelationCreateRequest,
+    TaskSavedViewCreateRequest,
+    TaskSavedViewUpdateRequest,
     TaskSubtaskCreateRequest,
     TaskUpdateRequest,
 )
@@ -24,25 +30,62 @@ from app.core.responses import ApiError, format_datetime_fields, success_respons
 from app.services.task_management_service import (
     add_task_comment,
     add_task_relation,
+    create_saved_task_view,
+    create_task_label,
     complete_task,
     create_subtask,
     create_task,
+    delete_saved_task_view,
     delete_task_comment,
+    delete_task_label,
     ensure_default_task_statuses,
     get_task_structure,
     list_available_assignees,
+    list_saved_task_views,
     list_task_activity,
     list_task_comments,
+    list_task_labels,
     move_task,
     delete_task_relation,
     reopen_task,
     replace_task_assignees,
+    replace_task_labels,
     soft_delete_task,
+    update_saved_task_view,
     update_task,
     update_task_comment,
+    update_task_label,
 )
 
 router = APIRouter(tags=["وظایف"])
+
+
+def _format_label(label: Any) -> dict[str, Any]:
+    return {
+        "id": label.id,
+        "business_id": label.business_id,
+        "name": label.name,
+        "color": label.color,
+        "description": label.description,
+        "created_at": label.created_at,
+        "updated_at": label.updated_at,
+    }
+
+
+def _format_saved_view(view: Any) -> dict[str, Any]:
+    return {
+        "id": view.id,
+        "business_id": view.business_id,
+        "user_id": view.user_id,
+        "project_id": view.project_id,
+        "name": view.name,
+        "view_type": view.view_type,
+        "filters": view.filters_json or {},
+        "sort": view.sort_json or {},
+        "is_shared": view.is_shared,
+        "created_at": view.created_at,
+        "updated_at": view.updated_at,
+    }
 
 
 def _format_status(status: TaskStatus) -> dict[str, Any]:
@@ -108,6 +151,16 @@ def _format_task_brief(task: Task | None) -> dict[str, Any] | None:
 
 def _format_task(task: Task, db: Session, request: Request) -> dict[str, Any]:
     repo = TaskRepository(db)
+    labels = [
+        {
+            "id": row.label.id,
+            "name": row.label.name,
+            "color": row.label.color,
+            "description": row.label.description,
+        }
+        for row in repo.label_rows(task.id)
+        if row.label is not None
+    ]
     assignees = []
     for row in repo.assignee_rows(task.id):
         user = row.user
@@ -139,6 +192,7 @@ def _format_task(task: Task, db: Session, request: Request) -> dict[str, Any]:
         "completed_at": task.completed_at,
         "estimated_minutes": task.estimated_minutes,
         "assignees": assignees,
+        "labels": labels,
         "created_by_user_id": task.created_by_user_id,
         "created_at": task.created_at,
         "updated_at": task.updated_at,
@@ -146,6 +200,138 @@ def _format_task(task: Task, db: Session, request: Request) -> dict[str, Any]:
         "is_completed": task.completed_at is not None,
     }
     return format_datetime_fields(data, request, business_id=task.business_id)
+
+
+@router.get("/businesses/{business_id}/task-labels")
+@require_business_access("business_id")
+async def list_task_labels_endpoint(
+    request: Request,
+    business_id: int = Path(..., gt=0),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+):
+    del ctx
+    items = list_task_labels(db, business_id)
+    return success_response(
+        data=format_datetime_fields({"items": [_format_label(item) for item in items]}, request, business_id=business_id),
+        request=request,
+        message="TASK_LABELS_FETCHED",
+    )
+
+
+@router.post("/businesses/{business_id}/task-labels")
+@require_business_access("business_id")
+async def create_task_label_endpoint(
+    request: Request,
+    data: TaskLabelCreateRequest,
+    business_id: int = Path(..., gt=0),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+):
+    del ctx
+    label = create_task_label(db, business_id, data.name, data.color, data.description)
+    return success_response(
+        data=format_datetime_fields({"label": _format_label(label)}, request, business_id=business_id),
+        request=request,
+        message="TASK_LABEL_CREATED",
+    )
+
+
+@router.patch("/businesses/{business_id}/task-labels/{label_id}")
+@require_business_access("business_id")
+async def update_task_label_endpoint(
+    request: Request,
+    data: TaskLabelUpdateRequest,
+    business_id: int = Path(..., gt=0),
+    label_id: int = Path(..., gt=0),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+):
+    del ctx
+    label = update_task_label(db, business_id, label_id, data.dict(exclude_unset=True))
+    return success_response(
+        data=format_datetime_fields({"label": _format_label(label)}, request, business_id=business_id),
+        request=request,
+        message="TASK_LABEL_UPDATED",
+    )
+
+
+@router.delete("/businesses/{business_id}/task-labels/{label_id}")
+@require_business_access("business_id")
+async def delete_task_label_endpoint(
+    request: Request,
+    business_id: int = Path(..., gt=0),
+    label_id: int = Path(..., gt=0),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+):
+    del ctx
+    delete_task_label(db, business_id, label_id)
+    return success_response(data={"id": label_id}, request=request, message="TASK_LABEL_DELETED")
+
+
+@router.get("/businesses/{business_id}/task-views")
+@require_business_access("business_id")
+async def list_task_views_endpoint(
+    request: Request,
+    business_id: int = Path(..., gt=0),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+):
+    items = list_saved_task_views(db, business_id, ctx.get_user_id())
+    return success_response(
+        data=format_datetime_fields({"items": [_format_saved_view(item) for item in items]}, request, business_id=business_id),
+        request=request,
+        message="TASK_VIEWS_FETCHED",
+    )
+
+
+@router.post("/businesses/{business_id}/task-views")
+@require_business_access("business_id")
+async def create_task_view_endpoint(
+    request: Request,
+    data: TaskSavedViewCreateRequest,
+    business_id: int = Path(..., gt=0),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+):
+    view = create_saved_task_view(db, business_id, ctx.get_user_id(), data.dict())
+    return success_response(
+        data=format_datetime_fields({"view": _format_saved_view(view)}, request, business_id=business_id),
+        request=request,
+        message="TASK_VIEW_CREATED",
+    )
+
+
+@router.patch("/businesses/{business_id}/task-views/{view_id}")
+@require_business_access("business_id")
+async def update_task_view_endpoint(
+    request: Request,
+    data: TaskSavedViewUpdateRequest,
+    business_id: int = Path(..., gt=0),
+    view_id: int = Path(..., gt=0),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+):
+    view = update_saved_task_view(db, business_id, ctx.get_user_id(), view_id, data.dict(exclude_unset=True))
+    return success_response(
+        data=format_datetime_fields({"view": _format_saved_view(view)}, request, business_id=business_id),
+        request=request,
+        message="TASK_VIEW_UPDATED",
+    )
+
+
+@router.delete("/businesses/{business_id}/task-views/{view_id}")
+@require_business_access("business_id")
+async def delete_task_view_endpoint(
+    request: Request,
+    business_id: int = Path(..., gt=0),
+    view_id: int = Path(..., gt=0),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+):
+    delete_saved_task_view(db, business_id, ctx.get_user_id(), view_id)
+    return success_response(data={"id": view_id}, request=request, message="TASK_VIEW_DELETED")
 
 
 @router.get("/businesses/{business_id}/task-statuses")
@@ -191,7 +377,13 @@ async def list_tasks(
     status_id: Optional[int] = Query(None, gt=0),
     assignee_user_id: Optional[int] = Query(None, gt=0),
     priority: Optional[str] = Query(None),
+    label_id: Optional[int] = Query(None, gt=0),
+    created_by_user_id: Optional[int] = Query(None, gt=0),
+    due_from: Optional[datetime] = Query(None),
+    due_to: Optional[datetime] = Query(None),
     completed: Optional[bool] = Query(None),
+    sort_by: Optional[str] = Query(None),
+    sort_dir: str = Query("asc", pattern="^(asc|desc)$"),
     page: int = Query(1, ge=1),
     limit: int = Query(50, ge=1, le=200),
     db: Session = Depends(get_db),
@@ -207,7 +399,13 @@ async def list_tasks(
         status_id=status_id,
         assignee_user_id=assignee_user_id,
         priority=priority,
+        label_id=label_id,
+        created_by_user_id=created_by_user_id,
+        due_from=due_from,
+        due_to=due_to,
         completed=completed,
+        sort_by=sort_by,
+        sort_dir=sort_dir,
         skip=(page - 1) * limit,
         limit=limit,
     )
@@ -551,6 +749,34 @@ async def delete_task_endpoint(
         data={"id": task_id},
         request=request,
         message="TASK_DELETED",
+    )
+
+
+@router.put("/businesses/{business_id}/tasks/{task_id}/labels")
+@require_business_access("business_id")
+async def replace_task_labels_endpoint(
+    request: Request,
+    data: TaskLabelsAssignRequest,
+    business_id: int = Path(..., gt=0),
+    task_id: int = Path(..., gt=0),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+):
+    task = TaskRepository(db).get_by_id(task_id, business_id)
+    if not task:
+        raise ApiError("TASK_NOT_FOUND", "Task not found", http_status=404)
+    replace_task_labels(
+        db,
+        task=task,
+        label_ids=data.label_ids,
+        actor_user_id=ctx.get_user_id(),
+        commit=True,
+    )
+    task = TaskRepository(db).get_by_id(task_id, business_id) or task
+    return success_response(
+        data={"task": _format_task(task, db, request)},
+        request=request,
+        message="TASK_LABELS_UPDATED",
     )
 
 
