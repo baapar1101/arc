@@ -115,6 +115,24 @@ class TaskService {
     );
   }
 
+  Future<TaskModel> moveTask({
+    required int businessId,
+    required int taskId,
+    required int targetStatusId,
+    required int targetIndex,
+  }) async {
+    final response = await apiClient.post(
+      '/api/v1/businesses/$businessId/tasks/$taskId/move',
+      data: {
+        'target_status_id': targetStatusId,
+        'target_index': targetIndex,
+      },
+    );
+    return TaskModel.fromJson(
+      Map<String, dynamic>.from(response.data['data']['task'] as Map),
+    );
+  }
+
   Future<TaskModel> completeTask({
     required int businessId,
     required int taskId,

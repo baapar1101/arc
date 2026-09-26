@@ -90,6 +90,7 @@ class TaskModel {
   final String title;
   final String? description;
   final String priority;
+  final double sortOrder;
   final DateTime? startAt;
   final DateTime? dueAt;
   final DateTime? completedAt;
@@ -109,6 +110,7 @@ class TaskModel {
     required this.title,
     this.description,
     required this.priority,
+    this.sortOrder = 0,
     this.startAt,
     this.dueAt,
     this.completedAt,
@@ -136,6 +138,7 @@ class TaskModel {
       title: json['title']?.toString() ?? '',
       description: json['description']?.toString(),
       priority: json['priority']?.toString() ?? 'normal',
+      sortOrder: (json['sort_order'] as num?)?.toDouble() ?? 0,
       startAt: _parseTaskDate(json['start_at_raw'] ?? json['start_at']),
       dueAt: _parseTaskDate(json['due_at_raw'] ?? json['due_at']),
       completedAt:
