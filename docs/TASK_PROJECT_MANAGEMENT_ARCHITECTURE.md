@@ -560,3 +560,41 @@ Implemented on 2026-09-26 using Leantime planning concepts and Vikunja dependenc
 - [x] Blocking dependency connectors.
 - [x] Unscheduled task visibility.
 - [x] No duplicate Gantt persistence model.
+
+
+## Phase 11 — Milestones
+
+Implemented on 2026-09-26 using the Phase 0 milestone entity and Leantime-style milestone planning.
+
+### Domain
+
+- `project_milestones` is the canonical project milestone table.
+- Tasks link through existing `tasks.milestone_id`.
+- Milestones are business- and project-scoped.
+- Task assignment rejects milestones from another project.
+- Moving a task to another project clears an incompatible milestone unless a valid replacement is supplied.
+- Deleting a milestone uses the existing `ON DELETE SET NULL` task link behavior.
+- Milestone progress is derived from assigned task completion; no duplicated progress field is stored.
+
+### UX
+
+- Project workspace now has a Milestones tab.
+- Milestones support create, edit, status changes, dates and delete.
+- Each milestone card shows assigned/completed task counts and derived progress.
+- Task drawer can assign or clear a milestone dynamically based on its selected project.
+- Timeline shows milestone target dates as vertical markers/diamonds.
+
+### Phase 11 endpoints
+
+- `GET /api/v1/businesses/{business_id}/projects/{project_id}/milestones`
+- `POST /api/v1/businesses/{business_id}/projects/{project_id}/milestones`
+- `PATCH /api/v1/businesses/{business_id}/projects/{project_id}/milestones/{milestone_id}`
+- `DELETE /api/v1/businesses/{business_id}/projects/{project_id}/milestones/{milestone_id}`
+
+### Phase 11 acceptance gate
+
+- [x] Milestone CRUD.
+- [x] Task-to-milestone assignment.
+- [x] Project-scope validation.
+- [x] Derived task completion progress.
+- [x] Gantt target markers.

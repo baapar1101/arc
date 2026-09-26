@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:hesabix_ui/models/project_model.dart';
 import 'package:hesabix_ui/models/task_model.dart';
 import 'package:hesabix_ui/theme/glass.dart';
 import 'package:intl/intl.dart';
@@ -10,12 +11,14 @@ enum TaskTimelineZoom { day, week, month }
 class TaskTimelineView extends StatefulWidget {
   final List<TaskModel> tasks;
   final List<Map<String, dynamic>> dependencies;
+  final List<ProjectMilestoneModel> milestones;
   final ValueChanged<TaskModel> onOpen;
 
   const TaskTimelineView({
     super.key,
     required this.tasks,
     required this.dependencies,
+    this.milestones = const [],
     required this.onOpen,
   });
 
@@ -286,6 +289,16 @@ class _TaskTimelineViewState extends State<TaskTimelineView> {
                                             ),
                                           ),
                                         ),
+                                        ...widget.milestones
+                                            .where((m) => m.targetAt != null)
+                                            .map(
+                                              (milestone) => _milestoneMarker(
+                                                context,
+                                                milestone,
+                                                range.start,
+                                                contentHeight,
+                                              ),
+                                            ),
                                         ...tasks.asMap().entries.map(
                                               (entry) => _taskBar(
                                                 context,
@@ -376,6 +389,55 @@ class _TaskTimelineViewState extends State<TaskTimelineView> {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _milestoneMarker(
+    BuildContext context,
+    ProjectMilestoneModel milestone,
+    DateTime rangeStart,
+    double contentHeight,
+  ) {
+    final target = milestone.targetAt!.toLocal();
+    final left = _x(target, rangeStart);
+    final scheme = Theme.of(context).colorScheme;
+    return Positioned(
+      left: left - 6,
+      top: _headerHeight - 2,
+      width: 160,
+      height: contentHeight - _headerHeight + 2,
+      child: IgnorePointer(
+        child: Stack(
+          clipBehavior: Clip.none,
+          children: [
+            Positioned(
+              left: 6,
+              top: 0,
+              bottom: 0,
+              child: Container(
+                width: 1,
+                color: scheme.tertiary.withValues(alpha: .55),
+              ),
+            ),
+            Positioned(
+              left: 0,
+              top: -7,
+              child: Tooltip(
+                message:
+                    '${milestone.title} · ${DateFormat('yyyy/MM/dd').format(target)}',
+                child: Transform.rotate(
+                  angle: math.pi / 4,
+                  child: Container(
+                    width: 13,
+                    height: 13,
+                    color: scheme.tertiary,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
