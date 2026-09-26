@@ -349,3 +349,46 @@ Implemented on 2026-09-26 using Vikunja task-relation semantics as the primary b
 - [x] Dependency cycles are prevented.
 - [x] Hierarchy and dependencies remain separate concepts.
 - [x] Drawer exposes subtasks and dependencies without page navigation.
+
+
+## Phase 6 — Comments & Activity
+
+Implemented on 2026-09-26 using Plane's work-item conversation/activity pattern.
+
+### Comments
+
+- Comments are native `task_comments`, scoped by business and task.
+- Comments support create, edit and soft-delete.
+- Only the comment author or business owner can edit/delete a comment.
+- Comment mutations append activity events; comments themselves are not used as the audit trail.
+
+### Activity
+
+- `task_activity_events` remains append-only and immutable.
+- The feed exposes actor, event type, structured event metadata and timestamp.
+- Existing task operations already feed this stream: create/update, assignment, completion/reopen,
+  Kanban movement, subtask creation, relation mutations, and comment actions.
+- Activity is rendered read-only in the task drawer.
+
+### UX
+
+- Existing task drawer now includes a Comments & Activity section.
+- Comment creation, editing and deletion stay inside task context.
+- Activity presents actor/action/time without navigating away.
+- Refresh is section-local; task list and board are not reloaded.
+
+### Phase 6 endpoints
+
+- `GET /api/v1/businesses/{business_id}/tasks/{task_id}/comments`
+- `POST /api/v1/businesses/{business_id}/tasks/{task_id}/comments`
+- `PATCH /api/v1/businesses/{business_id}/tasks/{task_id}/comments/{comment_id}`
+- `DELETE /api/v1/businesses/{business_id}/tasks/{task_id}/comments/{comment_id}`
+- `GET /api/v1/businesses/{business_id}/tasks/{task_id}/activity`
+
+### Phase 6 acceptance gate
+
+- [x] Comments are tenant-scoped.
+- [x] Comment edit/delete is authorization-checked server-side.
+- [x] Activity events are immutable.
+- [x] Existing task operations are visible in the feed.
+- [x] Comments and activity share the existing glass task drawer.
