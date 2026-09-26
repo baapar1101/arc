@@ -392,3 +392,63 @@ Implemented on 2026-09-26 using Plane's work-item conversation/activity pattern.
 - [x] Activity events are immutable.
 - [x] Existing task operations are visible in the feed.
 - [x] Comments and activity share the existing glass task drawer.
+
+
+## Phase 7 — Labels, Filters & Saved Views
+
+Implemented on 2026-09-26 using Plane's filtering/custom-view model as the benchmark.
+
+### Labels
+
+- Reuses Phase 0 business-scoped `task_labels` and `task_label_links`.
+- Tasks support multiple labels.
+- Labels can be created and assigned inline in the existing task drawer.
+- Task cards expose assigned labels.
+- Label assignment appends a structured activity event.
+
+### Filtering
+
+The native task query now supports:
+- search
+- status
+- project
+- assignee
+- priority
+- label
+- creator
+- due-date range
+- completion state
+- structured sort field/direction
+
+The main task screen exposes project, assignee, label, priority, due preset,
+completion and sorting controls.
+
+### Saved views
+
+- New `task_saved_views` storage is business-scoped and user-owned.
+- Shared views can be read by other business members.
+- Only the owner can edit or delete a saved view.
+- Saved views persist structured filter/sort JSON only; no SQL or executable expression is stored.
+- The main task screen can snapshot, apply and delete saved views.
+
+### Phase 7 endpoints
+
+- `GET/POST /api/v1/businesses/{business_id}/task-labels`
+- `PATCH/DELETE /api/v1/businesses/{business_id}/task-labels/{label_id}`
+- `PUT /api/v1/businesses/{business_id}/tasks/{task_id}/labels`
+- `GET/POST /api/v1/businesses/{business_id}/task-views`
+- `PATCH/DELETE /api/v1/businesses/{business_id}/task-views/{view_id}`
+
+### Phase 7 migration
+
+- `20260926_000003_task_saved_views`
+
+### Phase 7 acceptance gate
+
+- [x] Multiple labels per task.
+- [x] Label filtering.
+- [x] Multi-dimensional task filtering.
+- [x] Structured sorting.
+- [x] User-owned saved views.
+- [x] Optional shared views.
+- [x] Saved views contain structured JSON only.

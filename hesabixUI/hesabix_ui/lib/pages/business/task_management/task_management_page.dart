@@ -34,11 +34,21 @@ class _TaskManagementPageState extends State<TaskManagementPage> {
   List<TaskStatusModel> _statuses = const [];
   List<ProjectModel> _projects = const [];
   List<TaskAssigneeOption> _assignees = const [];
+  List<TaskLabelModel> _labels = const [];
+  List<TaskSavedViewModel> _savedViews = const [];
 
   bool _loading = true;
   String? _error;
   bool? _completedFilter = false;
   int? _statusFilterId;
+  int? _projectFilterId;
+  int? _assigneeFilterId;
+  int? _labelFilterId;
+  String? _priorityFilter;
+  String _duePreset = 'any';
+  String? _sortBy;
+  String _sortDir = 'asc';
+  int? _selectedViewId;
   TaskModel? _selectedTask;
 
   @override
@@ -64,6 +74,8 @@ class _TaskManagementPageState extends State<TaskManagementPage> {
     try {
       final statusesFuture = _taskService.listStatuses(widget.businessId);
       final assigneesFuture = _taskService.listAssignees(widget.businessId);
+      final labelsFuture = _taskService.listLabels(widget.businessId);
+      final viewsFuture = _taskService.listSavedViews(widget.businessId);
       final projectsFuture =
           _projectService.listActiveProjects(widget.businessId);
       final tasksFuture = _loadTasksRequest();
@@ -71,18 +83,22 @@ class _TaskManagementPageState extends State<TaskManagementPage> {
       final results = await Future.wait<dynamic>([
         statusesFuture,
         assigneesFuture,
+        labelsFuture,
+        viewsFuture,
         projectsFuture,
         tasksFuture,
       ]);
 
       if (!mounted) return;
       final nextTasks =
-          (results[3] as Map<String, dynamic>)['items'] as List<TaskModel>? ??
+          (results[5] as Map<String, dynamic>)['items'] as List<TaskModel>? ??
               const <TaskModel>[];
       setState(() {
         _statuses = results[0] as List<TaskStatusModel>;
         _assignees = results[1] as List<TaskAssigneeOption>;
-        _projects = results[2] as List<ProjectModel>;
+        _labels = results[2] as List<TaskLabelModel>;
+        _savedViews = results[3] as List<TaskSavedViewModel>;
+        _projects = results[4] as List<ProjectModel>;
         _tasks = nextTasks;
         _selectedTask = _selectedTask == null
             ? null
@@ -99,12 +115,190 @@ class _TaskManagementPageState extends State<TaskManagementPage> {
   }
 
   Future<Map<String, dynamic>> _loadTasksRequest() {
+    final now = DateTime.now();
+    DateTime? dueFrom;
+    DateTime? dueTo;
+    if (_duePreset == 'overdue') {
+      dueTo = now;
+    } else if (_duePreset == 'today') {
+      dueFrom = DateTime(now.year, now.month, now.day);
+      dueTo = dueFrom.add(const Duration(days: 1))
+          .subtract(const Duration(milliseconds: 1));
+    } else if (_duePreset == 'next7') {
+      dueFrom = now;
+      dueTo = now.add(const Duration(days: 7));
+    }
+
     return _taskService.listTasks(
       businessId: widget.businessId,
       search: _searchController.text,
+      projectId: _projectFilterId,
       statusId: _statusFilterId,
+      assigneeUserId: _assigneeFilterId,
+      priority: _priorityFilter,
+      labelId: _labelFilterId,
+      dueFrom: dueFrom,
+      dueTo: dueTo,
       completed: _completedFilter,
+      sortBy: _sortBy,
+      sortDir: _sortDir,
     );
+  }
+
+  Map<String, dynamic> _currentFilterSnapshot() => {
+        if (_searchController.text.trim().isNotEmpty)
+          'search': _searchController.text.trim(),
+        if (_statusFilterId != null) 'status_id': _statusFilterId,
+        if (_projectFilterId != null) 'project_id': _projectFilterId,
+        if (_assigneeFilterId != null)
+          'assignee_user_id': _assigneeFilterId,
+        if (_labelFilterId != null) 'label_id': _labelFilterId,
+        if (_priorityFilter != null) 'priority': _priorityFilter,
+        if (_completedFilter != null) 'completed': _completedFilter,
+        if (_duePreset != 'any') 'due_preset': _duePreset,
+      };
+
+  Map<String, dynamic> _currentSortSnapshot() => {
+        if (_sortBy != null) 'sort_by': _sortBy,
+        'sort_dir': _sortDir,
+      };
+
+  void _applySavedView(TaskSavedViewModel? view) {
+    if (view == null) return;
+    final filters = view.filters;
+    final sort = view.sort;
+    setState(() {
+      _selectedViewId = view.id;
+      _searchController.text = filters['search']?.toString() ?? '';
+      _statusFilterId = (filters['status_id'] as num?)?.toInt();
+      _projectFilterId = (filters['project_id'] as num?)?.toInt();
+      _assigneeFilterId =
+          (filters['assignee_user_id'] as num?)?.toInt();
+      _labelFilterId = (filters['label_id'] as num?)?.toInt();
+      _priorityFilter = filters['priority']?.toString();
+      _completedFilter = filters.containsKey('completed')
+          ? filters['completed'] == true
+          : null;
+      _duePreset = filters['due_preset']?.toString() ?? 'any';
+      _sortBy = sort['sort_by']?.toString();
+      _sortDir = sort['sort_dir']?.toString() == 'desc' ? 'desc' : 'asc';
+      _selectedTask = null;
+    });
+    _reloadTasks();
+  }
+
+  void _resetFilters() {
+    setState(() {
+      _selectedViewId = null;
+      _searchController.clear();
+      _completedFilter = false;
+      _statusFilterId = null;
+      _projectFilterId = null;
+      _assigneeFilterId = null;
+      _labelFilterId = null;
+      _priorityFilter = null;
+      _duePreset = 'any';
+      _sortBy = null;
+      _sortDir = 'asc';
+      _selectedTask = null;
+    });
+    _reloadTasks();
+  }
+
+  Future<void> _saveCurrentView() async {
+    final nameController = TextEditingController();
+    var shared = false;
+    final result = await showGlassDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setInner) => AlertDialog(
+          title: const Text('ذخیره نما'),
+          content: SizedBox(
+            width: 460,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: nameController,
+                  autofocus: true,
+                  decoration: const InputDecoration(labelText: 'نام نما'),
+                ),
+                const SizedBox(height: 10),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('اشتراک با اعضای کسب‌وکار'),
+                  value: shared,
+                  onChanged: (value) => setInner(() => shared = value),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('انصراف'),
+            ),
+            FilledButton(
+              onPressed: () {
+                final name = nameController.text.trim();
+                if (name.isEmpty) return;
+                Navigator.pop(ctx, {'name': name, 'shared': shared});
+              },
+              child: const Text('ذخیره'),
+            ),
+          ],
+        ),
+      ),
+    );
+    nameController.dispose();
+    if (result == null) return;
+
+    try {
+      final view = await _taskService.createSavedView(
+        businessId: widget.businessId,
+        name: result['name'].toString(),
+        projectId: _projectFilterId,
+        filters: _currentFilterSnapshot(),
+        sort: _currentSortSnapshot(),
+        isShared: result['shared'] == true,
+      );
+      if (!mounted) return;
+      setState(() {
+        _savedViews = [..._savedViews, view]
+          ..sort((a, b) => a.name.compareTo(b.name));
+        _selectedViewId = view.id;
+      });
+      SnackBarHelper.showSuccess(context, message: 'نما ذخیره شد');
+    } catch (e) {
+      if (!mounted) return;
+      SnackBarHelper.showError(
+        context,
+        message: ErrorExtractor.forContext(e, context),
+      );
+    }
+  }
+
+  Future<void> _deleteSelectedView() async {
+    final id = _selectedViewId;
+    if (id == null) return;
+    try {
+      await _taskService.deleteSavedView(
+        businessId: widget.businessId,
+        viewId: id,
+      );
+      if (!mounted) return;
+      setState(() {
+        _savedViews = _savedViews.where((view) => view.id != id).toList();
+        _selectedViewId = null;
+      });
+      SnackBarHelper.showSuccess(context, message: 'نمای ذخیره‌شده حذف شد');
+    } catch (e) {
+      if (!mounted) return;
+      SnackBarHelper.showError(
+        context,
+        message: ErrorExtractor.forContext(e, context),
+      );
+    }
   }
 
   Future<void> _reloadTasks() async {
@@ -156,7 +350,20 @@ class _TaskManagementPageState extends State<TaskManagementPage> {
         (_completedFilter == false && !task.isCompleted);
     final visibleByStatus =
         _statusFilterId == null || task.statusId == _statusFilterId;
-    if (!visibleByCompletion || !visibleByStatus) {
+    final visibleByProject =
+        _projectFilterId == null || task.projectId == _projectFilterId;
+    final visibleByAssignee = _assigneeFilterId == null ||
+        task.assignees.any((a) => a.userId == _assigneeFilterId);
+    final visibleByLabel = _labelFilterId == null ||
+        task.labels.any((label) => label.id == _labelFilterId);
+    final visibleByPriority =
+        _priorityFilter == null || task.priority == _priorityFilter;
+    if (!visibleByCompletion ||
+        !visibleByStatus ||
+        !visibleByProject ||
+        !visibleByAssignee ||
+        !visibleByLabel ||
+        !visibleByPriority) {
       next.removeWhere((item) => item.id == task.id);
     }
 
@@ -170,7 +377,15 @@ class _TaskManagementPageState extends State<TaskManagementPage> {
     try {
       final task = await _taskService.createTask(
         businessId: widget.businessId,
-        data: {'title': title},
+        data: {
+          'title': title,
+          if (_projectFilterId != null) 'project_id': _projectFilterId,
+          if (_statusFilterId != null) 'status_id': _statusFilterId,
+          if (_priorityFilter != null) 'priority': _priorityFilter,
+          if (_assigneeFilterId != null)
+            'assignee_user_ids': [_assigneeFilterId],
+          if (_labelFilterId != null) 'label_ids': [_labelFilterId],
+        },
       );
       _upsertTask(task);
       if (mounted) {
@@ -489,6 +704,74 @@ class _TaskManagementPageState extends State<TaskManagementPage> {
       padding: const EdgeInsets.all(13),
       child: Column(
         children: [
+          Row(
+            children: [
+              Expanded(
+                child: DropdownButtonFormField<int>(
+                  value: _selectedViewId ?? 0,
+                  isExpanded: true,
+                  decoration: const InputDecoration(
+                    labelText: 'نماهای ذخیره‌شده',
+                    prefixIcon: Icon(Icons.bookmarks_outlined),
+                    isDense: true,
+                  ),
+                  items: [
+                    const DropdownMenuItem(
+                      value: 0,
+                      child: Text('نمای فعلی / بدون نما'),
+                    ),
+                    ..._savedViews.map(
+                      (view) => DropdownMenuItem(
+                        value: view.id,
+                        child: Row(
+                          children: [
+                            if (view.isShared)
+                              const Padding(
+                                padding: EdgeInsetsDirectional.only(end: 6),
+                                child: Icon(Icons.groups_outlined, size: 17),
+                              ),
+                            Expanded(
+                              child: Text(
+                                view.name,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                  onChanged: (value) {
+                    if (value == null || value == 0) {
+                      setState(() => _selectedViewId = null);
+                      return;
+                    }
+                    for (final view in _savedViews) {
+                      if (view.id == value) {
+                        _applySavedView(view);
+                        break;
+                      }
+                    }
+                  },
+                ),
+              ),
+              const SizedBox(width: 7),
+              IconButton.filledTonal(
+                tooltip: 'ذخیره فیلترهای فعلی',
+                onPressed: _saveCurrentView,
+                icon: const Icon(Icons.bookmark_add_outlined),
+              ),
+              if (_selectedViewId != null) ...[
+                const SizedBox(width: 4),
+                IconButton(
+                  tooltip: 'حذف نمای انتخاب‌شده',
+                  onPressed: _deleteSelectedView,
+                  icon: const Icon(Icons.delete_outline),
+                ),
+              ],
+            ],
+          ),
+          const SizedBox(height: 11),
           TextField(
             controller: _searchController,
             textInputAction: TextInputAction.search,
@@ -513,7 +796,10 @@ class _TaskManagementPageState extends State<TaskManagementPage> {
                 label: const Text('باز'),
                 selected: _completedFilter == false,
                 onSelected: (_) {
-                  setState(() => _completedFilter = false);
+                  setState(() {
+                    _completedFilter = false;
+                    _selectedViewId = null;
+                  });
                   _reloadTasks();
                 },
               ),
@@ -521,7 +807,10 @@ class _TaskManagementPageState extends State<TaskManagementPage> {
                 label: const Text('تکمیل‌شده'),
                 selected: _completedFilter == true,
                 onSelected: (_) {
-                  setState(() => _completedFilter = true);
+                  setState(() {
+                    _completedFilter = true;
+                    _selectedViewId = null;
+                  });
                   _reloadTasks();
                 },
               ),
@@ -529,12 +818,15 @@ class _TaskManagementPageState extends State<TaskManagementPage> {
                 label: const Text('همه'),
                 selected: _completedFilter == null,
                 onSelected: (_) {
-                  setState(() => _completedFilter = null);
+                  setState(() {
+                    _completedFilter = null;
+                    _selectedViewId = null;
+                  });
                   _reloadTasks();
                 },
               ),
               SizedBox(
-                width: 220,
+                width: 205,
                 child: DropdownButtonFormField<int>(
                   value: _statusFilterId ?? 0,
                   isExpanded: true,
@@ -558,10 +850,223 @@ class _TaskManagementPageState extends State<TaskManagementPage> {
                     setState(() {
                       _statusFilterId =
                           value == null || value == 0 ? null : value;
+                      _selectedViewId = null;
                     });
                     _reloadTasks();
                   },
                 ),
+              ),
+              SizedBox(
+                width: 235,
+                child: DropdownButtonFormField<int>(
+                  value: _projectFilterId ?? 0,
+                  isExpanded: true,
+                  decoration: const InputDecoration(
+                    labelText: 'پروژه',
+                    isDense: true,
+                  ),
+                  items: [
+                    const DropdownMenuItem(
+                      value: 0,
+                      child: Text('همه پروژه‌ها'),
+                    ),
+                    ..._projects.map(
+                      (project) => DropdownMenuItem(
+                        value: project.id,
+                        child: Text(
+                          '${project.code} · ${project.name}',
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ),
+                  ],
+                  onChanged: (value) {
+                    setState(() {
+                      _projectFilterId =
+                          value == null || value == 0 ? null : value;
+                      _selectedViewId = null;
+                    });
+                    _reloadTasks();
+                  },
+                ),
+              ),
+              SizedBox(
+                width: 220,
+                child: DropdownButtonFormField<int>(
+                  value: _assigneeFilterId ?? 0,
+                  isExpanded: true,
+                  decoration: const InputDecoration(
+                    labelText: 'مسئول',
+                    isDense: true,
+                  ),
+                  items: [
+                    const DropdownMenuItem(
+                      value: 0,
+                      child: Text('همه مسئولان'),
+                    ),
+                    ..._assignees.map(
+                      (user) => DropdownMenuItem(
+                        value: user.userId,
+                        child: Text(
+                          user.name,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ),
+                  ],
+                  onChanged: (value) {
+                    setState(() {
+                      _assigneeFilterId =
+                          value == null || value == 0 ? null : value;
+                      _selectedViewId = null;
+                    });
+                    _reloadTasks();
+                  },
+                ),
+              ),
+              SizedBox(
+                width: 190,
+                child: DropdownButtonFormField<int>(
+                  value: _labelFilterId ?? 0,
+                  isExpanded: true,
+                  decoration: const InputDecoration(
+                    labelText: 'برچسب',
+                    isDense: true,
+                  ),
+                  items: [
+                    const DropdownMenuItem(
+                      value: 0,
+                      child: Text('همه برچسب‌ها'),
+                    ),
+                    ..._labels.map(
+                      (label) => DropdownMenuItem(
+                        value: label.id,
+                        child: Text(label.name),
+                      ),
+                    ),
+                  ],
+                  onChanged: (value) {
+                    setState(() {
+                      _labelFilterId =
+                          value == null || value == 0 ? null : value;
+                      _selectedViewId = null;
+                    });
+                    _reloadTasks();
+                  },
+                ),
+              ),
+              SizedBox(
+                width: 165,
+                child: DropdownButtonFormField<String>(
+                  value: _priorityFilter ?? 'all',
+                  decoration: const InputDecoration(
+                    labelText: 'اولویت',
+                    isDense: true,
+                  ),
+                  items: const [
+                    DropdownMenuItem(value: 'all', child: Text('همه')),
+                    DropdownMenuItem(value: 'low', child: Text('کم')),
+                    DropdownMenuItem(
+                      value: 'normal',
+                      child: Text('معمولی'),
+                    ),
+                    DropdownMenuItem(value: 'high', child: Text('زیاد')),
+                    DropdownMenuItem(value: 'urgent', child: Text('فوری')),
+                  ],
+                  onChanged: (value) {
+                    setState(() {
+                      _priorityFilter =
+                          value == null || value == 'all' ? null : value;
+                      _selectedViewId = null;
+                    });
+                    _reloadTasks();
+                  },
+                ),
+              ),
+              SizedBox(
+                width: 180,
+                child: DropdownButtonFormField<String>(
+                  value: _duePreset,
+                  decoration: const InputDecoration(
+                    labelText: 'سررسید',
+                    isDense: true,
+                  ),
+                  items: const [
+                    DropdownMenuItem(value: 'any', child: Text('همه')),
+                    DropdownMenuItem(
+                      value: 'overdue',
+                      child: Text('گذشته'),
+                    ),
+                    DropdownMenuItem(value: 'today', child: Text('امروز')),
+                    DropdownMenuItem(
+                      value: 'next7',
+                      child: Text('۷ روز آینده'),
+                    ),
+                  ],
+                  onChanged: (value) {
+                    setState(() {
+                      _duePreset = value ?? 'any';
+                      _selectedViewId = null;
+                    });
+                    _reloadTasks();
+                  },
+                ),
+              ),
+              SizedBox(
+                width: 195,
+                child: DropdownButtonFormField<String>(
+                  value: _sortBy ?? 'default',
+                  decoration: const InputDecoration(
+                    labelText: 'مرتب‌سازی',
+                    isDense: true,
+                  ),
+                  items: const [
+                    DropdownMenuItem(
+                      value: 'default',
+                      child: Text('پیش‌فرض'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'due_at',
+                      child: Text('سررسید'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'created_at',
+                      child: Text('تاریخ ایجاد'),
+                    ),
+                    DropdownMenuItem(
+                      value: 'updated_at',
+                      child: Text('آخرین تغییر'),
+                    ),
+                    DropdownMenuItem(value: 'title', child: Text('عنوان')),
+                  ],
+                  onChanged: (value) {
+                    setState(() {
+                      _sortBy =
+                          value == null || value == 'default' ? null : value;
+                      _selectedViewId = null;
+                    });
+                    _reloadTasks();
+                  },
+                ),
+              ),
+              SegmentedButton<String>(
+                segments: const [
+                  ButtonSegment(value: 'asc', label: Text('صعودی')),
+                  ButtonSegment(value: 'desc', label: Text('نزولی')),
+                ],
+                selected: {_sortDir},
+                onSelectionChanged: (values) {
+                  setState(() {
+                    _sortDir = values.first;
+                    _selectedViewId = null;
+                  });
+                  _reloadTasks();
+                },
+              ),
+              OutlinedButton.icon(
+                onPressed: _resetFilters,
+                icon: const Icon(Icons.filter_alt_off_outlined),
+                label: const Text('پاک کردن'),
               ),
             ],
           ),
@@ -767,6 +1272,16 @@ class _TaskCard extends StatelessWidget {
                               priorityColor.withValues(alpha: 0.12),
                           side: BorderSide(
                             color: priorityColor.withValues(alpha: 0.32),
+                          ),
+                        ),
+                        ...task.labels.map(
+                          (label) => Chip(
+                            label: Text(label.name),
+                            visualDensity: VisualDensity.compact,
+                            avatar: const Icon(
+                              Icons.label_outline,
+                              size: 15,
+                            ),
                           ),
                         ),
                         if (overdue)
