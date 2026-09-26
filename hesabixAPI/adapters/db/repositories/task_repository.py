@@ -9,7 +9,7 @@ from typing import Optional
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session, joinedload
 
-from adapters.db.models.task_management import Task, TaskAssignee, TaskStatus
+from adapters.db.models.task_management import Task, TaskAssignee, TaskLabelLink, TaskStatus
 
 
 class TaskRepository:
@@ -57,7 +57,13 @@ class TaskRepository:
         status_id: Optional[int] = None,
         assignee_user_id: Optional[int] = None,
         priority: Optional[str] = None,
+        label_id: Optional[int] = None,
+        created_by_user_id: Optional[int] = None,
+        due_from=None,
+        due_to=None,
         completed: Optional[bool] = None,
+        sort_by: Optional[str] = None,
+        sort_dir: str = "asc",
         skip: int = 0,
         limit: int = 100,
     ) -> tuple[list[Task], int]:
@@ -88,6 +94,18 @@ class TaskRepository:
             query = query.filter(Task.status_id == status_id)
         if priority:
             query = query.filter(Task.priority == priority)
+        if created_by_user_id is not None:
+            query = query.filter(Task.created_by_user_id == created_by_user_id)
+        if due_from is not None:
+            query = query.filter(Task.due_at >= due_from)
+        if due_to is not None:
+            query = query.filter(Task.due_at <= due_to)
+        if label_id is not None:
+            labeled_task_ids = select(TaskLabelLink.task_id).where(
+                TaskLabelLink.business_id == business_id,
+                TaskLabelLink.label_id == label_id,
+            )
+            query = query.filter(Task.id.in_(labeled_task_ids))
         if completed is True:
             query = query.filter(Task.completed_at.is_not(None))
         elif completed is False:
@@ -101,16 +119,25 @@ class TaskRepository:
             query = query.filter(Task.id.in_(assigned_task_ids))
 
         total = query.count()
-        items = (
-            query.order_by(
+        sort_columns = {
+            "due_at": Task.due_at,
+            "created_at": Task.created_at,
+            "updated_at": Task.updated_at,
+            "title": Task.title,
+            "sort_order": Task.sort_order,
+        }
+        sort_column = sort_columns.get(sort_by or "")
+        if sort_column is not None:
+            order_expr = sort_column.desc() if sort_dir == "desc" else sort_column.asc()
+            query = query.order_by(order_expr, Task.id.asc())
+        else:
+            query = query.order_by(
                 Task.due_at.asc().nullslast(),
                 Task.sort_order.asc(),
                 Task.created_at.desc(),
             )
-            .offset(skip)
-            .limit(limit)
-            .all()
-        )
+
+        items = query.offset(skip).limit(limit).all()
         return items, total
 
     def next_sort_order(self, business_id: int, project_id: Optional[int]) -> int:
@@ -137,5 +164,15 @@ class TaskRepository:
             .options(joinedload(TaskAssignee.user))
             .filter(TaskAssignee.task_id == task_id)
             .order_by(TaskAssignee.assigned_at.asc(), TaskAssignee.id.asc())
+            .all()
+        )
+
+
+    def label_rows(self, task_id: int):
+        return (
+            self.db.query(TaskLabelLink)
+            .options(joinedload(TaskLabelLink.label))
+            .filter(TaskLabelLink.task_id == task_id)
+            .order_by(TaskLabelLink.id.asc())
             .all()
         )

@@ -21,7 +21,10 @@ from adapters.db.models.task_management import (
     TaskActivity,
     TaskAssignee,
     TaskComment,
+    TaskLabel,
+    TaskLabelLink,
     TaskRelation,
+    TaskSavedView,
     TaskStatus,
 )
 from adapters.db.models.user import User
@@ -388,6 +391,15 @@ def create_task(
         event_data={"status_id": status.id, "project_id": task.project_id},
     )
 
+    label_ids = _normalize_label_ids(data.get("label_ids"))
+    replace_task_labels(
+        db,
+        task=task,
+        label_ids=label_ids,
+        actor_user_id=actor_user_id,
+        commit=False,
+    )
+
     assignee_ids = _normalize_assignee_ids(data.get("assignee_user_ids"))
     for user_id in assignee_ids:
         _require_business_member(db, business, user_id)
@@ -514,6 +526,15 @@ def update_task(
             actor_user_id=actor_user_id,
             event_type="task_updated",
             event_data=changes,
+        )
+
+    if "label_ids" in data:
+        replace_task_labels(
+            db,
+            task=task,
+            label_ids=data.get("label_ids") or [],
+            actor_user_id=actor_user_id,
+            commit=False,
         )
 
     if "assignee_user_ids" in data:
@@ -1117,3 +1138,254 @@ def list_task_activity(
         .limit(max(1, min(int(limit), 200)))
         .all()
     )
+
+
+
+def _normalize_label_ids(values: Optional[Iterable[int]]) -> list[int]:
+    if values is None:
+        return []
+    result: list[int] = []
+    seen: set[int] = set()
+    for raw in values:
+        value = int(raw)
+        if value <= 0 or value in seen:
+            continue
+        seen.add(value)
+        result.append(value)
+    return result
+
+
+def replace_task_labels(
+    db: Session,
+    *,
+    task: Task,
+    label_ids: Iterable[int],
+    actor_user_id: Optional[int],
+    commit: bool = True,
+) -> list[int]:
+    new_ids = _normalize_label_ids(label_ids)
+    if new_ids:
+        labels = db.query(TaskLabel).filter(
+            TaskLabel.business_id == task.business_id,
+            TaskLabel.id.in_(new_ids),
+        ).all()
+        if len({item.id for item in labels}) != len(new_ids):
+            raise ApiError(
+                "TASK_LABEL_NOT_FOUND",
+                "One or more task labels do not belong to this business",
+                http_status=400,
+            )
+    current_rows = db.query(TaskLabelLink).filter(
+        TaskLabelLink.business_id == task.business_id,
+        TaskLabelLink.task_id == task.id,
+    ).all()
+    current_ids = [row.label_id for row in current_rows]
+    if set(current_ids) == set(new_ids):
+        return current_ids
+    db.query(TaskLabelLink).filter(
+        TaskLabelLink.business_id == task.business_id,
+        TaskLabelLink.task_id == task.id,
+    ).delete(synchronize_session=False)
+    for label_id in new_ids:
+        db.add(TaskLabelLink(
+            business_id=task.business_id,
+            task_id=task.id,
+            label_id=label_id,
+        ))
+    _record_activity(
+        db,
+        task=task,
+        actor_user_id=actor_user_id,
+        event_type="labels_changed",
+        event_data={"from": current_ids, "to": new_ids},
+    )
+    if commit:
+        db.commit()
+    return new_ids
+
+
+def list_task_labels(db: Session, business_id: int) -> list[TaskLabel]:
+    _require_business(db, business_id)
+    return db.query(TaskLabel).filter(
+        TaskLabel.business_id == business_id
+    ).order_by(TaskLabel.name.asc(), TaskLabel.id.asc()).all()
+
+
+def create_task_label(
+    db: Session,
+    business_id: int,
+    name: str,
+    color: Optional[str],
+    description: Optional[str],
+) -> TaskLabel:
+    _require_business(db, business_id)
+    clean_name = str(name or "").strip()
+    if not clean_name:
+        raise ApiError("TASK_LABEL_NAME_REQUIRED", "Label name is required", http_status=400)
+    if db.query(TaskLabel.id).filter(
+        TaskLabel.business_id == business_id,
+        TaskLabel.name == clean_name,
+    ).first():
+        raise ApiError("TASK_LABEL_EXISTS", "A label with this name already exists", http_status=409)
+    label = TaskLabel(
+        business_id=business_id,
+        name=clean_name,
+        color=color,
+        description=description,
+    )
+    db.add(label)
+    db.commit()
+    db.refresh(label)
+    return label
+
+
+def update_task_label(
+    db: Session,
+    business_id: int,
+    label_id: int,
+    data: dict[str, Any],
+) -> TaskLabel:
+    label = db.query(TaskLabel).filter(
+        TaskLabel.business_id == business_id,
+        TaskLabel.id == label_id,
+    ).first()
+    if not label:
+        raise ApiError("TASK_LABEL_NOT_FOUND", "Task label not found", http_status=404)
+    if "name" in data:
+        clean_name = str(data.get("name") or "").strip()
+        if db.query(TaskLabel.id).filter(
+            TaskLabel.business_id == business_id,
+            TaskLabel.name == clean_name,
+            TaskLabel.id != label.id,
+        ).first():
+            raise ApiError("TASK_LABEL_EXISTS", "A label with this name already exists", http_status=409)
+        label.name = clean_name
+    if "color" in data:
+        label.color = data.get("color")
+    if "description" in data:
+        label.description = data.get("description")
+    label.updated_at = _now()
+    db.commit()
+    db.refresh(label)
+    return label
+
+
+def delete_task_label(db: Session, business_id: int, label_id: int) -> None:
+    label = db.query(TaskLabel).filter(
+        TaskLabel.business_id == business_id,
+        TaskLabel.id == label_id,
+    ).first()
+    if not label:
+        raise ApiError("TASK_LABEL_NOT_FOUND", "Task label not found", http_status=404)
+    db.delete(label)
+    db.commit()
+
+
+def list_saved_task_views(
+    db: Session,
+    business_id: int,
+    user_id: int,
+) -> list[TaskSavedView]:
+    _require_business(db, business_id)
+    return db.query(TaskSavedView).filter(
+        TaskSavedView.business_id == business_id,
+        (
+            (TaskSavedView.user_id == user_id)
+            | (TaskSavedView.is_shared.is_(True))
+        ),
+    ).order_by(TaskSavedView.name.asc(), TaskSavedView.id.asc()).all()
+
+
+def create_saved_task_view(
+    db: Session,
+    business_id: int,
+    user_id: int,
+    data: dict[str, Any],
+) -> TaskSavedView:
+    _require_business(db, business_id)
+    project_id = data.get("project_id")
+    if project_id is not None:
+        _require_project(db, business_id, project_id)
+    name = str(data.get("name") or "").strip()
+    if db.query(TaskSavedView.id).filter(
+        TaskSavedView.business_id == business_id,
+        TaskSavedView.user_id == user_id,
+        TaskSavedView.name == name,
+    ).first():
+        raise ApiError("TASK_VIEW_EXISTS", "A saved view with this name already exists", http_status=409)
+    view = TaskSavedView(
+        business_id=business_id,
+        user_id=user_id,
+        project_id=project_id,
+        name=name,
+        view_type=str(data.get("view_type") or "list"),
+        filters_json=dict(data.get("filters") or {}),
+        sort_json=dict(data.get("sort") or {}),
+        is_shared=bool(data.get("is_shared", False)),
+    )
+    db.add(view)
+    db.commit()
+    db.refresh(view)
+    return view
+
+
+def update_saved_task_view(
+    db: Session,
+    business_id: int,
+    user_id: int,
+    view_id: int,
+    data: dict[str, Any],
+) -> TaskSavedView:
+    view = db.query(TaskSavedView).filter(
+        TaskSavedView.id == view_id,
+        TaskSavedView.business_id == business_id,
+    ).first()
+    if not view:
+        raise ApiError("TASK_VIEW_NOT_FOUND", "Saved view not found", http_status=404)
+    if view.user_id != user_id:
+        raise ApiError("TASK_VIEW_FORBIDDEN", "Only the view owner can edit this view", http_status=403)
+    if "name" in data:
+        name = str(data.get("name") or "").strip()
+        if db.query(TaskSavedView.id).filter(
+            TaskSavedView.business_id == business_id,
+            TaskSavedView.user_id == user_id,
+            TaskSavedView.name == name,
+            TaskSavedView.id != view.id,
+        ).first():
+            raise ApiError("TASK_VIEW_EXISTS", "A saved view with this name already exists", http_status=409)
+        view.name = name
+    if "project_id" in data:
+        project_id = data.get("project_id")
+        if project_id is not None:
+            _require_project(db, business_id, project_id)
+        view.project_id = project_id
+    if "view_type" in data:
+        view.view_type = str(data.get("view_type") or "list")
+    if "filters" in data:
+        view.filters_json = dict(data.get("filters") or {})
+    if "sort" in data:
+        view.sort_json = dict(data.get("sort") or {})
+    if "is_shared" in data:
+        view.is_shared = bool(data.get("is_shared"))
+    view.updated_at = _now()
+    db.commit()
+    db.refresh(view)
+    return view
+
+
+def delete_saved_task_view(
+    db: Session,
+    business_id: int,
+    user_id: int,
+    view_id: int,
+) -> None:
+    view = db.query(TaskSavedView).filter(
+        TaskSavedView.id == view_id,
+        TaskSavedView.business_id == business_id,
+    ).first()
+    if not view:
+        raise ApiError("TASK_VIEW_NOT_FOUND", "Saved view not found", http_status=404)
+    if view.user_id != user_id:
+        raise ApiError("TASK_VIEW_FORBIDDEN", "Only the view owner can delete this view", http_status=403)
+    db.delete(view)
+    db.commit()
