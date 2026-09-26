@@ -59,6 +59,15 @@ def _parse_datetime(value: Any) -> Optional[datetime]:
     return dt.astimezone(timezone.utc)
 
 
+def _validate_dates(start_at: Optional[datetime], due_at: Optional[datetime]) -> None:
+    if start_at is not None and due_at is not None and due_at < start_at:
+        raise ApiError(
+            "TASK_INVALID_DATE_RANGE",
+            "Task due date cannot be before its start date",
+            http_status=400,
+        )
+
+
 def _require_business(db: Session, business_id: int) -> Business:
     business = db.get(Business, business_id)
     if not business or getattr(business, "deleted_at", None) is not None:
@@ -219,19 +228,24 @@ def replace_task_assignees(
 
     current_rows = (
         db.query(TaskAssignee)
-        .filter(TaskAssignee.task_id == task.id)
+        .filter(
+            TaskAssignee.business_id == task.business_id,
+            TaskAssignee.task_id == task.id,
+        )
         .all()
     )
     current_ids = [row.user_id for row in current_rows]
     if current_ids == new_ids:
         return current_ids
 
-    db.query(TaskAssignee).filter(TaskAssignee.task_id == task.id).delete(
-        synchronize_session=False
-    )
+    db.query(TaskAssignee).filter(
+        TaskAssignee.business_id == task.business_id,
+        TaskAssignee.task_id == task.id,
+    ).delete(synchronize_session=False)
     for user_id in new_ids:
         db.add(
             TaskAssignee(
+                business_id=task.business_id,
                 task_id=task.id,
                 user_id=user_id,
                 assigned_by_user_id=actor_user_id,
@@ -267,6 +281,10 @@ def create_task(
     if priority not in _ALLOWED_PRIORITIES:
         raise ApiError("TASK_INVALID_PRIORITY", "Invalid task priority", http_status=400)
 
+    start_at = _parse_datetime(data.get("start_at"))
+    due_at = _parse_datetime(data.get("due_at"))
+    _validate_dates(start_at, due_at)
+
     repo = TaskRepository(db)
     task = Task(
         business_id=business_id,
@@ -276,8 +294,8 @@ def create_task(
         description=data.get("description"),
         priority=priority,
         sort_order=repo.next_sort_order(business_id, project.id if project else None),
-        start_at=_parse_datetime(data.get("start_at")),
-        due_at=_parse_datetime(data.get("due_at")),
+        start_at=start_at,
+        due_at=due_at,
         estimated_minutes=data.get("estimated_minutes"),
         created_by_user_id=actor_user_id,
     )
@@ -297,6 +315,7 @@ def create_task(
         _require_business_member(db, business, user_id)
         db.add(
             TaskAssignee(
+                business_id=task.business_id,
                 task_id=task.id,
                 user_id=user_id,
                 assigned_by_user_id=actor_user_id,
@@ -357,10 +376,13 @@ def update_task(
             changes["priority"] = {"from": task.priority, "to": priority}
             task.priority = priority
 
+    next_start_at = _parse_datetime(data.get("start_at")) if "start_at" in data else task.start_at
+    next_due_at = _parse_datetime(data.get("due_at")) if "due_at" in data else task.due_at
+    _validate_dates(next_start_at, next_due_at)
     if "start_at" in data:
-        task.start_at = _parse_datetime(data.get("start_at"))
+        task.start_at = next_start_at
     if "due_at" in data:
-        task.due_at = _parse_datetime(data.get("due_at"))
+        task.due_at = next_due_at
     if "estimated_minutes" in data:
         value = data.get("estimated_minutes")
         if value is not None and int(value) < 0:

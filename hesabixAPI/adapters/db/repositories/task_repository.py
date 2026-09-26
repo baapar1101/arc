@@ -95,7 +95,8 @@ class TaskRepository:
 
         if assignee_user_id is not None:
             assigned_task_ids = select(TaskAssignee.task_id).where(
-                TaskAssignee.user_id == assignee_user_id
+                TaskAssignee.business_id == business_id,
+                TaskAssignee.user_id == assignee_user_id,
             )
             query = query.filter(Task.id.in_(assigned_task_ids))
 
