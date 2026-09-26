@@ -20,7 +20,6 @@ from app.services.task_management_service import (
     complete_task,
     create_task,
     ensure_default_task_statuses,
-    get_project_workspace_summary,
     list_available_assignees,
     reopen_task,
     replace_task_assignees,
@@ -117,24 +116,6 @@ async def list_task_assignees(
         data={"users": list_available_assignees(db, business_id)},
         request=request,
         message="TASK_ASSIGNEES_FETCHED",
-    )
-
-
-@router.get("/businesses/{business_id}/projects/{project_id}/workspace")
-@require_business_access("business_id")
-async def get_project_workspace(
-    request: Request,
-    business_id: int = Path(..., gt=0),
-    project_id: int = Path(..., gt=0),
-    db: Session = Depends(get_db),
-    ctx: AuthContext = Depends(get_current_user),
-):
-    del ctx
-    data = get_project_workspace_summary(db, business_id, project_id)
-    return success_response(
-        data=format_datetime_fields(data, request, business_id=business_id),
-        request=request,
-        message="PROJECT_WORKSPACE_FETCHED",
     )
 
 

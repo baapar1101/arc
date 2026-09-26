@@ -10,7 +10,6 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any, Iterable, Optional
 
-from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from adapters.db.models.business import Business
@@ -18,7 +17,6 @@ from adapters.db.models.business_permission import BusinessPermission
 from adapters.db.models.project import Project
 from adapters.db.models.task_management import (
     Task,
-    ProjectMember,
     TaskActivity,
     TaskAssignee,
     TaskStatus,
@@ -509,125 +507,3 @@ def list_available_assignees(db: Session, business_id: int) -> list[dict[str, An
             }
         )
     return result
-
-
-
-def get_project_workspace_summary(
-    db: Session,
-    business_id: int,
-    project_id: int,
-) -> dict[str, Any]:
-    """Plane-inspired project workspace summary over the native Project entity."""
-    project = _require_project(db, business_id, project_id)
-    if project is None:
-        raise ApiError("TASK_PROJECT_NOT_FOUND", "Project not found", http_status=404)
-
-    ensure_default_task_statuses(db, business_id)
-
-    base_filters = (
-        Task.business_id == business_id,
-        Task.project_id == project_id,
-        Task.deleted_at.is_(None),
-    )
-
-    total = db.query(func.count(Task.id)).filter(*base_filters).scalar() or 0
-    completed = (
-        db.query(func.count(Task.id))
-        .filter(*base_filters, Task.completed_at.is_not(None))
-        .scalar()
-        or 0
-    )
-    cancelled = (
-        db.query(func.count(Task.id))
-        .join(TaskStatus, Task.status_id == TaskStatus.id)
-        .filter(*base_filters, TaskStatus.category == "cancelled")
-        .scalar()
-        or 0
-    )
-    overdue = (
-        db.query(func.count(Task.id))
-        .outerjoin(TaskStatus, Task.status_id == TaskStatus.id)
-        .filter(
-            *base_filters,
-            Task.completed_at.is_(None),
-            Task.due_at.is_not(None),
-            Task.due_at < _now(),
-            or_(TaskStatus.category.is_(None), TaskStatus.category != "cancelled"),
-        )
-        .scalar()
-        or 0
-    )
-    open_count = max(int(total) - int(completed) - int(cancelled), 0)
-
-    project_members = (
-        db.query(func.count(ProjectMember.id))
-        .filter(
-            ProjectMember.business_id == business_id,
-            ProjectMember.project_id == project_id,
-        )
-        .scalar()
-        or 0
-    )
-    active_assignees = (
-        db.query(func.count(func.distinct(TaskAssignee.user_id)))
-        .join(Task, TaskAssignee.task_id == Task.id)
-        .filter(
-            TaskAssignee.business_id == business_id,
-            Task.project_id == project_id,
-            Task.deleted_at.is_(None),
-        )
-        .scalar()
-        or 0
-    )
-
-    progress_percent = (
-        round((int(completed) / int(total)) * 100, 1) if int(total) > 0 else 0.0
-    )
-    status_names = {
-        "active": "فعال",
-        "completed": "تکمیل شده",
-        "on_hold": "معلق",
-        "cancelled": "لغو شده",
-    }
-
-    manager_name = None
-    if project.manager:
-        manager_name = (
-            f"{project.manager.first_name or ''} {project.manager.last_name or ''}".strip()
-            or project.manager.email
-        )
-
-    return {
-        "project": {
-            "id": project.id,
-            "business_id": project.business_id,
-            "code": project.code,
-            "name": project.name,
-            "description": project.description,
-            "status": project.status,
-            "status_name": status_names.get(project.status, project.status),
-            "start_date": project.start_date,
-            "end_date": project.end_date,
-            "budget": float(project.budget) if project.budget is not None else None,
-            "currency_id": project.currency_id,
-            "manager_user_id": project.manager_user_id,
-            "manager_name": manager_name,
-            "person_id": project.person_id,
-            "person_name": project.person.alias_name if project.person else None,
-            "is_active": project.is_active,
-            "created_at": project.created_at,
-            "updated_at": project.updated_at,
-        },
-        "tasks": {
-            "total": int(total),
-            "open": int(open_count),
-            "completed": int(completed),
-            "cancelled": int(cancelled),
-            "overdue": int(overdue),
-            "progress_percent": progress_percent,
-        },
-        "team": {
-            "project_members": int(project_members),
-            "active_task_assignees": int(active_assignees),
-        },
-    }
