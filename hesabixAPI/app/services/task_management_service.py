@@ -7,9 +7,12 @@ priority, due date and project linkage on the Phase 0 domain model.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Any, Iterable, Optional
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+
+from dateutil.rrule import rrulestr
 
 from sqlalchemy.orm import Session
 
@@ -24,12 +27,14 @@ from adapters.db.models.task_management import (
     TaskLabel,
     TaskLabelLink,
     TaskRelation,
+    TaskReminder,
     TaskSavedView,
     TaskStatus,
 )
 from adapters.db.models.user import User
 from adapters.db.repositories.task_repository import TaskRepository
 from app.core.business_membership import membership_is_active
+from app.core.datetime_utils import resolve_display_timezone_name
 from app.core.responses import ApiError
 
 
@@ -73,6 +78,193 @@ def _validate_dates(start_at: Optional[datetime], due_at: Optional[datetime]) ->
             "Task due date cannot be before its start date",
             http_status=400,
         )
+
+
+def _normalize_recurrence(
+    business_id: int,
+    rule: Any,
+    timezone_name: Any,
+    end_at: Any,
+) -> tuple[Optional[str], Optional[str], Optional[datetime]]:
+    clean_rule = str(rule or "").strip()
+    if not clean_rule:
+        return None, None, None
+
+    upper = clean_rule.upper()
+    if upper.startswith("RRULE:"):
+        clean_rule = clean_rule[6:].strip()
+        upper = clean_rule.upper()
+    if "COUNT=" in upper or "UNTIL=" in upper:
+        raise ApiError(
+            "TASK_RECURRENCE_LIMIT_UNSUPPORTED",
+            "Use recurrence_end_at instead of COUNT or UNTIL in the recurrence rule",
+            http_status=400,
+        )
+    if "FREQ=" not in upper:
+        raise ApiError(
+            "TASK_RECURRENCE_INVALID",
+            "Recurrence rule must include FREQ",
+            http_status=400,
+        )
+
+    tz_name = str(timezone_name or resolve_display_timezone_name(business_id) or "UTC").strip()
+    try:
+        tz = ZoneInfo(tz_name)
+    except ZoneInfoNotFoundError as exc:
+        raise ApiError(
+            "TASK_RECURRENCE_TIMEZONE_INVALID",
+            "Invalid recurrence timezone",
+            http_status=400,
+        ) from exc
+
+    end = _parse_datetime(end_at)
+    validation_start = _now().astimezone(tz)
+    try:
+        parsed = rrulestr(f"RRULE:{clean_rule}", dtstart=validation_start)
+        parsed.after(validation_start, inc=False)
+    except Exception as exc:
+        raise ApiError(
+            "TASK_RECURRENCE_INVALID",
+            "Invalid recurrence rule",
+            http_status=400,
+        ) from exc
+    return clean_rule, tz_name, end
+
+
+def _sync_relative_reminders(db: Session, task: Task) -> None:
+    reminders = db.query(TaskReminder).filter(
+        TaskReminder.business_id == task.business_id,
+        TaskReminder.task_id == task.id,
+        TaskReminder.relative_to.is_not(None),
+        TaskReminder.sent_at.is_(None),
+    ).all()
+    for reminder in reminders:
+        base = task.due_at if reminder.relative_to == "due" else task.start_at
+        if base is None:
+            db.delete(reminder)
+            continue
+        reminder.remind_at = base - timedelta(minutes=int(reminder.offset_minutes or 0))
+
+
+def _next_recurrence_dates(task: Task) -> tuple[Optional[datetime], Optional[datetime]]:
+    if not task.recurrence_rule:
+        return None, None
+    tz_name = task.recurrence_timezone or resolve_display_timezone_name(task.business_id) or "UTC"
+    try:
+        tz = ZoneInfo(tz_name)
+    except ZoneInfoNotFoundError:
+        tz = ZoneInfo("UTC")
+
+    anchor_utc = task.due_at or task.start_at or task.completed_at or _now()
+    if anchor_utc.tzinfo is None:
+        anchor_utc = anchor_utc.replace(tzinfo=timezone.utc)
+    anchor_local = anchor_utc.astimezone(tz)
+    try:
+        parsed = rrulestr(f"RRULE:{task.recurrence_rule}", dtstart=anchor_local)
+        next_local = parsed.after(anchor_local, inc=False)
+    except Exception:
+        return None, None
+    if next_local is None:
+        return None, None
+    next_utc = next_local.astimezone(timezone.utc)
+    if task.recurrence_end_at is not None:
+        end = task.recurrence_end_at
+        if end.tzinfo is None:
+            end = end.replace(tzinfo=timezone.utc)
+        if next_utc > end.astimezone(timezone.utc):
+            return None, None
+
+    if task.due_at is not None:
+        next_due = next_utc
+        next_start = None
+        if task.start_at is not None:
+            next_start = next_due - (task.due_at - task.start_at)
+        return next_start, next_due
+    if task.start_at is not None:
+        return next_utc, None
+    return None, next_utc
+
+
+def _ensure_next_recurring_task(
+    db: Session,
+    task: Task,
+    actor_user_id: int,
+) -> Optional[Task]:
+    if not task.recurrence_rule or task.completed_at is None:
+        return None
+
+    existing_event = db.query(TaskActivity).filter(
+        TaskActivity.business_id == task.business_id,
+        TaskActivity.task_id == task.id,
+        TaskActivity.event_type == "recurrence_next_created",
+    ).order_by(TaskActivity.id.desc()).first()
+    if existing_event and isinstance(existing_event.event_data, dict):
+        next_id = existing_event.event_data.get("next_task_id")
+        if next_id:
+            return TaskRepository(db).get_by_id(int(next_id), task.business_id)
+
+    next_start, next_due = _next_recurrence_dates(task)
+    if next_start is None and next_due is None:
+        return None
+
+    default_status = _default_status(db, task.business_id)
+    repo = TaskRepository(db)
+    next_task = Task(
+        business_id=task.business_id,
+        project_id=task.project_id,
+        parent_task_id=task.parent_task_id,
+        status_id=default_status.id,
+        milestone_id=getattr(task, "milestone_id", None),
+        title=task.title,
+        description=task.description,
+        priority=task.priority,
+        sort_order=repo.next_sort_order(task.business_id, task.project_id),
+        start_at=next_start,
+        due_at=next_due,
+        estimated_minutes=task.estimated_minutes,
+        recurrence_rule=task.recurrence_rule,
+        recurrence_timezone=task.recurrence_timezone,
+        recurrence_end_at=task.recurrence_end_at,
+        created_by_user_id=actor_user_id,
+    )
+    db.add(next_task)
+    db.flush()
+
+    for row in db.query(TaskAssignee).filter(
+        TaskAssignee.business_id == task.business_id,
+        TaskAssignee.task_id == task.id,
+    ).all():
+        db.add(TaskAssignee(
+            business_id=task.business_id,
+            task_id=next_task.id,
+            user_id=row.user_id,
+            assigned_by_user_id=actor_user_id,
+        ))
+    for row in db.query(TaskLabelLink).filter(
+        TaskLabelLink.business_id == task.business_id,
+        TaskLabelLink.task_id == task.id,
+    ).all():
+        db.add(TaskLabelLink(
+            business_id=task.business_id,
+            task_id=next_task.id,
+            label_id=row.label_id,
+        ))
+
+    _record_activity(
+        db,
+        task=next_task,
+        actor_user_id=actor_user_id,
+        event_type="recurrence_task_created",
+        event_data={"source_task_id": task.id},
+    )
+    _record_activity(
+        db,
+        task=task,
+        actor_user_id=actor_user_id,
+        event_type="recurrence_next_created",
+        event_data={"next_task_id": next_task.id},
+    )
+    return next_task
 
 
 def _get_task_or_404(db: Session, business_id: int, task_id: int) -> Task:
@@ -364,6 +556,12 @@ def create_task(
     start_at = _parse_datetime(data.get("start_at"))
     due_at = _parse_datetime(data.get("due_at"))
     _validate_dates(start_at, due_at)
+    recurrence_rule, recurrence_timezone, recurrence_end_at = _normalize_recurrence(
+        business_id,
+        data.get("recurrence_rule"),
+        data.get("recurrence_timezone"),
+        data.get("recurrence_end_at"),
+    )
 
     repo = TaskRepository(db)
     task = Task(
@@ -378,6 +576,9 @@ def create_task(
         start_at=start_at,
         due_at=due_at,
         estimated_minutes=data.get("estimated_minutes"),
+        recurrence_rule=recurrence_rule,
+        recurrence_timezone=recurrence_timezone,
+        recurrence_end_at=recurrence_end_at,
         created_by_user_id=actor_user_id,
     )
     db.add(task)
@@ -429,6 +630,7 @@ def update_task(
         raise ApiError("TASK_NOT_FOUND", "Task not found", http_status=404)
 
     changes: dict[str, Any] = {}
+    was_completed = task.completed_at is not None
 
     if "title" in data:
         title = str(data.get("title") or "").strip()
@@ -517,6 +719,20 @@ def update_task(
             raise ApiError("TASK_INVALID_ESTIMATE", "Estimated minutes cannot be negative", http_status=400)
         task.estimated_minutes = int(value) if value is not None else None
 
+    if "recurrence_rule" in data or "recurrence_timezone" in data or "recurrence_end_at" in data:
+        recurrence_rule, recurrence_timezone, recurrence_end_at = _normalize_recurrence(
+            business_id,
+            data.get("recurrence_rule", task.recurrence_rule),
+            data.get("recurrence_timezone", task.recurrence_timezone),
+            data.get("recurrence_end_at", task.recurrence_end_at),
+        )
+        task.recurrence_rule = recurrence_rule
+        task.recurrence_timezone = recurrence_timezone
+        task.recurrence_end_at = recurrence_end_at
+
+    if "start_at" in data or "due_at" in data:
+        _sync_relative_reminders(db, task)
+
     task.updated_at = _now()
 
     if changes:
@@ -546,6 +762,9 @@ def update_task(
             commit=False,
         )
 
+    if task.completed_at is not None and not was_completed:
+        _ensure_next_recurring_task(db, task, actor_user_id)
+
     db.commit()
     return repo.get_by_id(task.id, business_id) or task
 
@@ -568,6 +787,7 @@ def complete_task(db: Session, business_id: int, task_id: int, actor_user_id: in
         event_type="task_completed",
         event_data={"from_status_id": previous_status_id, "to_status_id": done.id},
     )
+    _ensure_next_recurring_task(db, task, actor_user_id)
     db.commit()
     return repo.get_by_id(task.id, business_id) or task
 
@@ -703,6 +923,7 @@ def move_task(
 
     previous_status_id = task.status_id
     previous_order = float(task.sort_order or 0)
+    was_completed = task.completed_at is not None
 
     task.status_id = target_status.id
     task.sort_order = next_order
@@ -726,6 +947,8 @@ def move_task(
             "target_index": insert_at,
         },
     )
+    if task.completed_at is not None and not was_completed:
+        _ensure_next_recurring_task(db, task, actor_user_id)
     db.commit()
     return repo.get_by_id(task.id, business_id) or task
 
@@ -1388,4 +1611,112 @@ def delete_saved_task_view(
     if view.user_id != user_id:
         raise ApiError("TASK_VIEW_FORBIDDEN", "Only the view owner can delete this view", http_status=403)
     db.delete(view)
+    db.commit()
+
+
+
+def list_task_reminders(
+    db: Session,
+    business_id: int,
+    task_id: int,
+) -> list[TaskReminder]:
+    _get_task_or_404(db, business_id, task_id)
+    return db.query(TaskReminder).filter(
+        TaskReminder.business_id == business_id,
+        TaskReminder.task_id == task_id,
+    ).order_by(TaskReminder.remind_at.asc(), TaskReminder.id.asc()).all()
+
+
+def create_task_reminder(
+    db: Session,
+    business_id: int,
+    task_id: int,
+    actor_user_id: int,
+    data: dict[str, Any],
+) -> TaskReminder:
+    task = _get_task_or_404(db, business_id, task_id)
+    business = _require_business(db, business_id)
+    user_id = int(data.get("user_id") or actor_user_id)
+    _require_business_member(db, business, user_id)
+
+    relative_to = str(data.get("relative_to") or "").strip().lower() or None
+    offset_minutes = data.get("offset_minutes")
+    remind_at = _parse_datetime(data.get("remind_at"))
+
+    if relative_to is not None:
+        if relative_to not in {"due", "start"}:
+            raise ApiError(
+                "TASK_REMINDER_RELATIVE_INVALID",
+                "Reminder relative_to must be due or start",
+                http_status=400,
+            )
+        offset = int(offset_minutes or 0)
+        base = task.due_at if relative_to == "due" else task.start_at
+        if base is None:
+            raise ApiError(
+                "TASK_REMINDER_DATE_REQUIRED",
+                "Task date is required for a relative reminder",
+                http_status=400,
+            )
+        remind_at = base - timedelta(minutes=offset)
+        offset_minutes = offset
+    elif remind_at is None:
+        raise ApiError(
+            "TASK_REMINDER_TIME_REQUIRED",
+            "Reminder time is required",
+            http_status=400,
+        )
+
+    reminder = TaskReminder(
+        business_id=business_id,
+        task_id=task.id,
+        user_id=user_id,
+        remind_at=remind_at,
+        relative_to=relative_to,
+        offset_minutes=int(offset_minutes) if offset_minutes is not None else None,
+    )
+    db.add(reminder)
+    db.flush()
+    _record_activity(
+        db,
+        task=task,
+        actor_user_id=actor_user_id,
+        event_type="reminder_added",
+        event_data={"reminder_id": reminder.id, "user_id": user_id},
+    )
+    db.commit()
+    db.refresh(reminder)
+    return reminder
+
+
+def delete_task_reminder(
+    db: Session,
+    business_id: int,
+    task_id: int,
+    reminder_id: int,
+    actor_user_id: int,
+) -> None:
+    task = _get_task_or_404(db, business_id, task_id)
+    reminder = db.query(TaskReminder).filter(
+        TaskReminder.id == reminder_id,
+        TaskReminder.business_id == business_id,
+        TaskReminder.task_id == task.id,
+    ).first()
+    if not reminder:
+        raise ApiError("TASK_REMINDER_NOT_FOUND", "Task reminder not found", http_status=404)
+    business = _require_business(db, business_id)
+    if reminder.user_id != actor_user_id and int(business.owner_id) != int(actor_user_id):
+        raise ApiError(
+            "TASK_REMINDER_FORBIDDEN",
+            "Only the reminder owner or business owner can delete it",
+            http_status=403,
+        )
+    db.delete(reminder)
+    _record_activity(
+        db,
+        task=task,
+        actor_user_id=actor_user_id,
+        event_type="reminder_removed",
+        event_data={"reminder_id": reminder_id},
+    )
     db.commit()

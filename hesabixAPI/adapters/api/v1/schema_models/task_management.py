@@ -16,6 +16,9 @@ class TaskCreateRequest(BaseModel):
     start_at: Optional[datetime] = None
     due_at: Optional[datetime] = None
     estimated_minutes: Optional[int] = Field(None, ge=0)
+    recurrence_rule: Optional[str] = Field(None, max_length=512)
+    recurrence_timezone: Optional[str] = Field(None, max_length=80)
+    recurrence_end_at: Optional[datetime] = None
     assignee_user_ids: list[int] = Field(default_factory=list)
     label_ids: list[int] = Field(default_factory=list)
 
@@ -30,6 +33,9 @@ class TaskUpdateRequest(BaseModel):
     start_at: Optional[datetime] = None
     due_at: Optional[datetime] = None
     estimated_minutes: Optional[int] = Field(None, ge=0)
+    recurrence_rule: Optional[str] = Field(None, max_length=512)
+    recurrence_timezone: Optional[str] = Field(None, max_length=80)
+    recurrence_end_at: Optional[datetime] = None
     assignee_user_ids: Optional[list[int]] = None
     label_ids: Optional[list[int]] = None
 
@@ -100,3 +106,11 @@ class TaskSavedViewUpdateRequest(BaseModel):
     filters: Optional[dict[str, Any]] = None
     sort: Optional[dict[str, Any]] = None
     is_shared: Optional[bool] = None
+
+
+
+class TaskReminderCreateRequest(BaseModel):
+    user_id: Optional[int] = Field(None, gt=0)
+    remind_at: Optional[datetime] = None
+    relative_to: Optional[str] = Field(None, max_length=20)
+    offset_minutes: Optional[int] = Field(None, ge=0)
