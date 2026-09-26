@@ -33,6 +33,7 @@ from adapters.db.models.task_management import (
     TaskReminder,
     TaskSavedView,
     TaskStatus,
+    TaskTimeEntry,
 )
 from adapters.db.models.user import User
 from adapters.db.repositories.task_repository import TaskRepository
@@ -1886,3 +1887,351 @@ def replace_task_cycles(
     )
     db.commit()
     return list_task_cycles(db, business_id, task_id)
+
+
+
+def _time_entry_can_manage(
+    db: Session,
+    business_id: int,
+    actor_user_id: int,
+    entry: TaskTimeEntry,
+) -> bool:
+    if int(entry.user_id) == int(actor_user_id):
+        return True
+    business = _require_business(db, business_id)
+    return int(business.owner_id) == int(actor_user_id)
+
+
+def get_active_time_entry(
+    db: Session,
+    business_id: int,
+    user_id: int,
+) -> Optional[TaskTimeEntry]:
+    return (
+        db.query(TaskTimeEntry)
+        .filter(
+            TaskTimeEntry.business_id == business_id,
+            TaskTimeEntry.user_id == user_id,
+            TaskTimeEntry.ended_at.is_(None),
+        )
+        .order_by(TaskTimeEntry.started_at.desc(), TaskTimeEntry.id.desc())
+        .first()
+    )
+
+
+def list_time_entries(
+    db: Session,
+    business_id: int,
+    *,
+    task_id: Optional[int] = None,
+    project_id: Optional[int] = None,
+    user_id: Optional[int] = None,
+    limit: int = 200,
+) -> list[TaskTimeEntry]:
+    _require_business(db, business_id)
+    query = db.query(TaskTimeEntry).filter(
+        TaskTimeEntry.business_id == business_id
+    )
+    if task_id is not None:
+        _get_task_or_404(db, business_id, task_id)
+        query = query.filter(TaskTimeEntry.task_id == task_id)
+    if project_id is not None:
+        _require_project(db, business_id, project_id)
+        query = query.join(Task, TaskTimeEntry.task_id == Task.id).filter(
+            Task.business_id == business_id,
+            Task.project_id == project_id,
+            Task.deleted_at.is_(None),
+        )
+    if user_id is not None:
+        query = query.filter(TaskTimeEntry.user_id == user_id)
+    return (
+        query.order_by(
+            TaskTimeEntry.started_at.desc(),
+            TaskTimeEntry.id.desc(),
+        )
+        .limit(max(1, min(int(limit), 500)))
+        .all()
+    )
+
+
+def start_task_timer(
+    db: Session,
+    business_id: int,
+    task_id: int,
+    actor_user_id: int,
+    *,
+    description: Optional[str] = None,
+    billable: bool = False,
+) -> TaskTimeEntry:
+    task = _get_task_or_404(db, business_id, task_id)
+    business = _require_business(db, business_id)
+    _require_business_member(db, business, actor_user_id)
+
+    active = get_active_time_entry(db, business_id, actor_user_id)
+    if active is not None:
+        raise ApiError(
+            "TASK_TIMER_ALREADY_ACTIVE",
+            f"An active timer already exists for task {active.task_id}",
+            http_status=409,
+        )
+
+    entry = TaskTimeEntry(
+        business_id=business_id,
+        task_id=task.id,
+        user_id=actor_user_id,
+        started_at=_now(),
+        ended_at=None,
+        duration_seconds=None,
+        description=(description or "").strip() or None,
+        billable=bool(billable),
+    )
+    db.add(entry)
+    db.flush()
+    _record_activity(
+        db,
+        task=task,
+        actor_user_id=actor_user_id,
+        event_type="timer_started",
+        event_data={"time_entry_id": entry.id},
+    )
+    db.commit()
+    db.refresh(entry)
+    return entry
+
+
+def stop_active_timer(
+    db: Session,
+    business_id: int,
+    actor_user_id: int,
+) -> TaskTimeEntry:
+    entry = get_active_time_entry(db, business_id, actor_user_id)
+    if entry is None:
+        raise ApiError(
+            "TASK_TIMER_NOT_ACTIVE",
+            "No active timer was found",
+            http_status=404,
+        )
+    task = _get_task_or_404(db, business_id, entry.task_id)
+    ended_at = _now()
+    started_at = entry.started_at
+    if started_at.tzinfo is None:
+        started_at = started_at.replace(tzinfo=timezone.utc)
+    entry.ended_at = ended_at
+    entry.duration_seconds = max(
+        0,
+        int((ended_at - started_at.astimezone(timezone.utc)).total_seconds()),
+    )
+    entry.updated_at = ended_at
+    _record_activity(
+        db,
+        task=task,
+        actor_user_id=actor_user_id,
+        event_type="timer_stopped",
+        event_data={
+            "time_entry_id": entry.id,
+            "duration_seconds": entry.duration_seconds,
+        },
+    )
+    db.commit()
+    db.refresh(entry)
+    return entry
+
+
+def create_manual_time_entry(
+    db: Session,
+    business_id: int,
+    task_id: int,
+    actor_user_id: int,
+    data: dict[str, Any],
+) -> TaskTimeEntry:
+    task = _get_task_or_404(db, business_id, task_id)
+    business = _require_business(db, business_id)
+    _require_business_member(db, business, actor_user_id)
+
+    started_at = _parse_datetime(data.get("started_at"))
+    if started_at is None:
+        raise ApiError(
+            "TASK_TIME_START_REQUIRED",
+            "Time entry start is required",
+            http_status=400,
+        )
+    ended_at = _parse_datetime(data.get("ended_at"))
+    duration_minutes = data.get("duration_minutes")
+    if ended_at is None and duration_minutes is not None:
+        ended_at = started_at + timedelta(minutes=int(duration_minutes))
+    if ended_at is None:
+        raise ApiError(
+            "TASK_TIME_END_REQUIRED",
+            "Manual time entry requires an end time or duration",
+            http_status=400,
+        )
+    if ended_at < started_at:
+        raise ApiError(
+            "TASK_TIME_INVALID_RANGE",
+            "Time entry end cannot be before start",
+            http_status=400,
+        )
+
+    entry = TaskTimeEntry(
+        business_id=business_id,
+        task_id=task.id,
+        user_id=actor_user_id,
+        started_at=started_at,
+        ended_at=ended_at,
+        duration_seconds=max(
+            0,
+            int((ended_at - started_at).total_seconds()),
+        ),
+        description=(data.get("description") or "").strip() or None,
+        billable=bool(data.get("billable", False)),
+    )
+    db.add(entry)
+    db.flush()
+    _record_activity(
+        db,
+        task=task,
+        actor_user_id=actor_user_id,
+        event_type="time_entry_added",
+        event_data={
+            "time_entry_id": entry.id,
+            "duration_seconds": entry.duration_seconds,
+        },
+    )
+    db.commit()
+    db.refresh(entry)
+    return entry
+
+
+def update_time_entry(
+    db: Session,
+    business_id: int,
+    entry_id: int,
+    actor_user_id: int,
+    data: dict[str, Any],
+) -> TaskTimeEntry:
+    entry = (
+        db.query(TaskTimeEntry)
+        .filter(
+            TaskTimeEntry.id == entry_id,
+            TaskTimeEntry.business_id == business_id,
+        )
+        .first()
+    )
+    if not entry:
+        raise ApiError(
+            "TASK_TIME_ENTRY_NOT_FOUND",
+            "Time entry not found",
+            http_status=404,
+        )
+    if entry.ended_at is None:
+        raise ApiError(
+            "TASK_TIME_ENTRY_ACTIVE",
+            "Stop the active timer before editing it",
+            http_status=409,
+        )
+    if not _time_entry_can_manage(
+        db,
+        business_id,
+        actor_user_id,
+        entry,
+    ):
+        raise ApiError(
+            "TASK_TIME_ENTRY_FORBIDDEN",
+            "Only the entry owner or business owner can edit it",
+            http_status=403,
+        )
+
+    started_at = (
+        _parse_datetime(data.get("started_at"))
+        if "started_at" in data
+        else entry.started_at
+    )
+    ended_at = (
+        _parse_datetime(data.get("ended_at"))
+        if "ended_at" in data
+        else entry.ended_at
+    )
+    if started_at is None or ended_at is None or ended_at < started_at:
+        raise ApiError(
+            "TASK_TIME_INVALID_RANGE",
+            "Time entry start/end range is invalid",
+            http_status=400,
+        )
+    entry.started_at = started_at
+    entry.ended_at = ended_at
+    entry.duration_seconds = max(
+        0,
+        int((ended_at - started_at).total_seconds()),
+    )
+    if "description" in data:
+        entry.description = (data.get("description") or "").strip() or None
+    if "billable" in data:
+        entry.billable = bool(data.get("billable"))
+    entry.updated_at = _now()
+    task = _get_task_or_404(db, business_id, entry.task_id)
+    _record_activity(
+        db,
+        task=task,
+        actor_user_id=actor_user_id,
+        event_type="time_entry_updated",
+        event_data={
+            "time_entry_id": entry.id,
+            "duration_seconds": entry.duration_seconds,
+        },
+    )
+    db.commit()
+    db.refresh(entry)
+    return entry
+
+
+def delete_time_entry(
+    db: Session,
+    business_id: int,
+    entry_id: int,
+    actor_user_id: int,
+) -> None:
+    entry = (
+        db.query(TaskTimeEntry)
+        .filter(
+            TaskTimeEntry.id == entry_id,
+            TaskTimeEntry.business_id == business_id,
+        )
+        .first()
+    )
+    if not entry:
+        raise ApiError(
+            "TASK_TIME_ENTRY_NOT_FOUND",
+            "Time entry not found",
+            http_status=404,
+        )
+    if entry.ended_at is None:
+        raise ApiError(
+            "TASK_TIME_ENTRY_ACTIVE",
+            "Stop the active timer before deleting it",
+            http_status=409,
+        )
+    if not _time_entry_can_manage(
+        db,
+        business_id,
+        actor_user_id,
+        entry,
+    ):
+        raise ApiError(
+            "TASK_TIME_ENTRY_FORBIDDEN",
+            "Only the entry owner or business owner can delete it",
+            http_status=403,
+        )
+    task = _get_task_or_404(db, business_id, entry.task_id)
+    event_data = {
+        "time_entry_id": entry.id,
+        "duration_seconds": entry.duration_seconds,
+    }
+    db.delete(entry)
+    _record_activity(
+        db,
+        task=task,
+        actor_user_id=actor_user_id,
+        event_type="time_entry_deleted",
+        event_data=event_data,
+    )
+    db.commit()

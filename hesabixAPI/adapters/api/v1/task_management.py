@@ -21,6 +21,9 @@ from adapters.api.v1.schema_models.task_management import (
     TaskSavedViewCreateRequest,
     TaskSavedViewUpdateRequest,
     TaskSubtaskCreateRequest,
+    TaskTimeEntryCreateRequest,
+    TaskTimeEntryUpdateRequest,
+    TaskTimerStartRequest,
     TaskUpdateRequest,
 )
 from adapters.db.models.task_management import Task, TaskStatus
@@ -43,6 +46,7 @@ from app.services.task_management_service import (
     delete_task_reminder,
     delete_task_label,
     ensure_default_task_statuses,
+    get_active_time_entry,
     get_task_structure,
     list_available_assignees,
     list_saved_task_views,
@@ -51,6 +55,7 @@ from app.services.task_management_service import (
     list_task_cycles,
     list_task_reminders,
     list_task_labels,
+    list_time_entries,
     move_task,
     delete_task_relation,
     reopen_task,
@@ -58,6 +63,11 @@ from app.services.task_management_service import (
     replace_task_cycles,
     replace_task_labels,
     soft_delete_task,
+    start_task_timer,
+    stop_active_timer,
+    create_manual_time_entry,
+    update_time_entry,
+    delete_time_entry,
     update_saved_task_view,
     update_task,
     update_task_comment,
@@ -114,6 +124,28 @@ def _display_user_name(user: Any) -> str | None:
         return None
     name = f"{user.first_name or ''} {user.last_name or ''}".strip()
     return name or user.email or user.mobile or f"User {user.id}"
+
+
+def _format_time_entry(entry: Any) -> dict[str, Any]:
+    user = entry.user
+    task = entry.task
+    return {
+        "id": entry.id,
+        "business_id": entry.business_id,
+        "task_id": entry.task_id,
+        "task_title": task.title if task else None,
+        "project_id": task.project_id if task else None,
+        "user_id": entry.user_id,
+        "user_name": _display_user_name(user),
+        "started_at": entry.started_at,
+        "ended_at": entry.ended_at,
+        "duration_seconds": entry.duration_seconds,
+        "description": entry.description,
+        "billable": entry.billable,
+        "created_at": entry.created_at,
+        "updated_at": entry.updated_at,
+        "is_active": entry.ended_at is None,
+    }
 
 
 def _format_reminder(reminder: Any) -> dict[str, Any]:
@@ -486,6 +518,188 @@ async def get_task_endpoint(
         data={"task": _format_task(task, db, request)},
         request=request,
         message="TASK_FETCHED",
+    )
+
+
+@router.get("/businesses/{business_id}/time-entries")
+@require_business_access("business_id")
+async def list_time_entries_endpoint(
+    request: Request,
+    business_id: int = Path(..., gt=0),
+    task_id: Optional[int] = Query(None, gt=0),
+    project_id: Optional[int] = Query(None, gt=0),
+    user_id: Optional[int] = Query(None, gt=0),
+    limit: int = Query(200, ge=1, le=500),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+):
+    del ctx
+    items = list_time_entries(
+        db,
+        business_id,
+        task_id=task_id,
+        project_id=project_id,
+        user_id=user_id,
+        limit=limit,
+    )
+    total_seconds = sum(
+        int(item.duration_seconds or 0)
+        for item in items
+        if item.ended_at is not None
+    )
+    return success_response(
+        data=format_datetime_fields(
+            {
+                "items": [_format_time_entry(item) for item in items],
+                "total_seconds": total_seconds,
+            },
+            request,
+            business_id=business_id,
+        ),
+        request=request,
+        message="TASK_TIME_ENTRIES_FETCHED",
+    )
+
+
+@router.get("/businesses/{business_id}/timer/active")
+@require_business_access("business_id")
+async def get_active_timer_endpoint(
+    request: Request,
+    business_id: int = Path(..., gt=0),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+):
+    entry = get_active_time_entry(db, business_id, ctx.get_user_id())
+    return success_response(
+        data=format_datetime_fields(
+            {"entry": _format_time_entry(entry) if entry else None},
+            request,
+            business_id=business_id,
+        ),
+        request=request,
+        message="TASK_ACTIVE_TIMER_FETCHED",
+    )
+
+
+@router.post("/businesses/{business_id}/tasks/{task_id}/timer/start")
+@require_business_access("business_id")
+async def start_task_timer_endpoint(
+    request: Request,
+    data: TaskTimerStartRequest,
+    business_id: int = Path(..., gt=0),
+    task_id: int = Path(..., gt=0),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+):
+    entry = start_task_timer(
+        db,
+        business_id,
+        task_id,
+        ctx.get_user_id(),
+        description=data.description,
+        billable=data.billable,
+    )
+    return success_response(
+        data=format_datetime_fields(
+            {"entry": _format_time_entry(entry)},
+            request,
+            business_id=business_id,
+        ),
+        request=request,
+        message="TASK_TIMER_STARTED",
+    )
+
+
+@router.post("/businesses/{business_id}/timer/stop")
+@require_business_access("business_id")
+async def stop_task_timer_endpoint(
+    request: Request,
+    business_id: int = Path(..., gt=0),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+):
+    entry = stop_active_timer(db, business_id, ctx.get_user_id())
+    return success_response(
+        data=format_datetime_fields(
+            {"entry": _format_time_entry(entry)},
+            request,
+            business_id=business_id,
+        ),
+        request=request,
+        message="TASK_TIMER_STOPPED",
+    )
+
+
+@router.post("/businesses/{business_id}/tasks/{task_id}/time-entries")
+@require_business_access("business_id")
+async def create_time_entry_endpoint(
+    request: Request,
+    data: TaskTimeEntryCreateRequest,
+    business_id: int = Path(..., gt=0),
+    task_id: int = Path(..., gt=0),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+):
+    entry = create_manual_time_entry(
+        db,
+        business_id,
+        task_id,
+        ctx.get_user_id(),
+        data.dict(),
+    )
+    return success_response(
+        data=format_datetime_fields(
+            {"entry": _format_time_entry(entry)},
+            request,
+            business_id=business_id,
+        ),
+        request=request,
+        message="TASK_TIME_ENTRY_CREATED",
+    )
+
+
+@router.patch("/businesses/{business_id}/time-entries/{entry_id}")
+@require_business_access("business_id")
+async def update_time_entry_endpoint(
+    request: Request,
+    data: TaskTimeEntryUpdateRequest,
+    business_id: int = Path(..., gt=0),
+    entry_id: int = Path(..., gt=0),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+):
+    entry = update_time_entry(
+        db,
+        business_id,
+        entry_id,
+        ctx.get_user_id(),
+        data.dict(exclude_unset=True),
+    )
+    return success_response(
+        data=format_datetime_fields(
+            {"entry": _format_time_entry(entry)},
+            request,
+            business_id=business_id,
+        ),
+        request=request,
+        message="TASK_TIME_ENTRY_UPDATED",
+    )
+
+
+@router.delete("/businesses/{business_id}/time-entries/{entry_id}")
+@require_business_access("business_id")
+async def delete_time_entry_endpoint(
+    request: Request,
+    business_id: int = Path(..., gt=0),
+    entry_id: int = Path(..., gt=0),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+):
+    delete_time_entry(db, business_id, entry_id, ctx.get_user_id())
+    return success_response(
+        data={"id": entry_id},
+        request=request,
+        message="TASK_TIME_ENTRY_DELETED",
     )
 
 

@@ -121,3 +121,24 @@ class TaskReminderCreateRequest(BaseModel):
 
 class TaskCyclesAssignRequest(BaseModel):
     cycle_ids: list[int] = Field(default_factory=list)
+
+
+
+class TaskTimerStartRequest(BaseModel):
+    description: Optional[str] = None
+    billable: bool = False
+
+
+class TaskTimeEntryCreateRequest(BaseModel):
+    started_at: datetime
+    ended_at: Optional[datetime] = None
+    duration_minutes: Optional[int] = Field(None, ge=0)
+    description: Optional[str] = None
+    billable: bool = False
+
+
+class TaskTimeEntryUpdateRequest(BaseModel):
+    started_at: Optional[datetime] = None
+    ended_at: Optional[datetime] = None
+    description: Optional[str] = None
+    billable: Optional[bool] = None
