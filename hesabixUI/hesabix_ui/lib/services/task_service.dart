@@ -175,6 +175,52 @@ class TaskService {
     );
   }
 
+  Future<List<TaskReminderModel>> listReminders({
+    required int businessId,
+    required int taskId,
+  }) async {
+    final response = await apiClient.get(
+      '/api/v1/businesses/$businessId/tasks/$taskId/reminders',
+    );
+    final items = (response.data['data']?['items'] as List?) ?? const [];
+    return items
+        .whereType<Map>()
+        .map((e) => TaskReminderModel.fromJson(Map<String, dynamic>.from(e)))
+        .toList();
+  }
+
+  Future<TaskReminderModel> createReminder({
+    required int businessId,
+    required int taskId,
+    int? userId,
+    DateTime? remindAt,
+    String? relativeTo,
+    int? offsetMinutes,
+  }) async {
+    final response = await apiClient.post(
+      '/api/v1/businesses/$businessId/tasks/$taskId/reminders',
+      data: {
+        if (userId != null) 'user_id': userId,
+        if (remindAt != null) 'remind_at': remindAt.toUtc().toIso8601String(),
+        if (relativeTo != null) 'relative_to': relativeTo,
+        if (offsetMinutes != null) 'offset_minutes': offsetMinutes,
+      },
+    );
+    return TaskReminderModel.fromJson(
+      Map<String, dynamic>.from(response.data['data']['reminder'] as Map),
+    );
+  }
+
+  Future<void> deleteReminder({
+    required int businessId,
+    required int taskId,
+    required int reminderId,
+  }) async {
+    await apiClient.delete(
+      '/api/v1/businesses/$businessId/tasks/$taskId/reminders/$reminderId',
+    );
+  }
+
   Future<List<TaskCommentModel>> listComments({
     required int businessId,
     required int taskId,

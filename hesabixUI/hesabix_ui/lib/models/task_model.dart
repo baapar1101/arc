@@ -119,6 +119,9 @@ class TaskModel {
   final DateTime? dueAt;
   final DateTime? completedAt;
   final int? estimatedMinutes;
+  final String? recurrenceRule;
+  final String? recurrenceTimezone;
+  final DateTime? recurrenceEndAt;
   final List<TaskAssigneeModel> assignees;
   final List<TaskLabelModel> labels;
   final int? createdByUserId;
@@ -141,6 +144,9 @@ class TaskModel {
     this.dueAt,
     this.completedAt,
     this.estimatedMinutes,
+    this.recurrenceRule,
+    this.recurrenceTimezone,
+    this.recurrenceEndAt,
     required this.assignees,
     this.labels = const [],
     this.createdByUserId,
@@ -173,6 +179,11 @@ class TaskModel {
       completedAt:
           _parseTaskDate(json['completed_at_raw'] ?? json['completed_at']),
       estimatedMinutes: (json['estimated_minutes'] as num?)?.toInt(),
+      recurrenceRule: json['recurrence_rule']?.toString(),
+      recurrenceTimezone: json['recurrence_timezone']?.toString(),
+      recurrenceEndAt: _parseTaskDate(
+        json['recurrence_end_at_raw'] ?? json['recurrence_end_at'],
+      ),
       assignees: assigneeJson
           .whereType<Map>()
           .map((e) => TaskAssigneeModel.fromJson(Map<String, dynamic>.from(e)))
@@ -404,6 +415,43 @@ class TaskSavedViewModel {
           ? Map<String, dynamic>.from(json['sort'] as Map)
           : const {},
       isShared: json['is_shared'] == true,
+    );
+  }
+}
+
+
+
+class TaskReminderModel {
+  final int id;
+  final int taskId;
+  final int? userId;
+  final DateTime remindAt;
+  final String? relativeTo;
+  final int? offsetMinutes;
+  final DateTime? sentAt;
+
+  const TaskReminderModel({
+    required this.id,
+    required this.taskId,
+    this.userId,
+    required this.remindAt,
+    this.relativeTo,
+    this.offsetMinutes,
+    this.sentAt,
+  });
+
+  factory TaskReminderModel.fromJson(Map<String, dynamic> json) {
+    return TaskReminderModel(
+      id: (json['id'] as num).toInt(),
+      taskId: (json['task_id'] as num).toInt(),
+      userId: (json['user_id'] as num?)?.toInt(),
+      remindAt: _parseTaskDate(
+            json['remind_at_raw'] ?? json['remind_at'],
+          ) ??
+          DateTime.fromMillisecondsSinceEpoch(0, isUtc: true),
+      relativeTo: json['relative_to']?.toString(),
+      offsetMinutes: (json['offset_minutes'] as num?)?.toInt(),
+      sentAt: _parseTaskDate(json['sent_at_raw'] ?? json['sent_at']),
     );
   }
 }
