@@ -99,7 +99,7 @@ class _TaskDetailDrawerState extends State<TaskDetailDrawer> {
     super.dispose();
   }
 
-  Future<void> _updateProperty(Map<String, dynamic> data) async {
+  Future<TaskModel?> _updateProperty(Map<String, dynamic> data) async {
     if (_propertyBusy) return;
     setState(() {
       _propertyBusy = true;
@@ -114,8 +114,10 @@ class _TaskDetailDrawerState extends State<TaskDetailDrawer> {
           _assigneeIds = updated.assignees.map((e) => e.userId).toSet();
         });
       }
+      return updated;
     } catch (e) {
       if (mounted) setState(() => _error = e.toString());
+      return null;
     } finally {
       if (mounted) setState(() => _propertyBusy = false);
     }
