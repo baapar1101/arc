@@ -120,10 +120,23 @@ jobs:
               hesabixUI/hesabix_ui/lib/theme/*|\
               hesabixUI/hesabix_ui/lib/pages/login_page.dart|\
               hesabixUI/hesabix_ui/web/index.html|\
+              hesabixUI/hesabix_ui/web/favicon.ico|\
+              hesabixUI/hesabix_ui/web/favicon.png|\
+              hesabixUI/hesabix_ui/web/icons/*|\
+              hesabixUI/hesabix_ui/web/images/*|\
+              hesabixUI/hesabix_ui/web/assets/images/*|\
               hesabixUI/hesabix_ui/lib/widgets/auth_footer.dart|\
+              hesabixUI/hesabix_ui/lib/config/brand_config.dart|\
               hesabixUI/hesabix_ui/pubspec.yaml|\
               hesabixUI/hesabix_ui/lib/utils/error_extractor.dart|\
               hesabixUI/hesabix_ui/assets/images/*|\
+              hesabixUI/hesabix_ui/android/app/src/main/res/drawable*/ic_*|\
+              hesabixUI/hesabix_ui/android/app/src/main/res/mipmap*/ic_*|\
+              hesabixUI/hesabix_ui/android/app/src/main/res/values*/strings.xml|\
+              hesabixUI/hesabix_ui/ios/Runner/Assets.xcassets/AppIcon.appiconset/*|\
+              hesabixUI/hesabix_ui/ios/Runner/Info.plist|\
+              hesabixUI/hesabix_ui/macos/Runner/Assets.xcassets/AppIcon.appiconset/*|\
+              hesabixUI/hesabix_ui/windows/runner/resources/app_icon.ico|\
               build_web.sh)
                 echo "KEEP PRESENTATION: $file"
                 git checkout --ours -- "$file"
@@ -143,20 +156,42 @@ jobs:
             hesabixUI/hesabix_ui/lib/theme \
             hesabixUI/hesabix_ui/lib/pages/login_page.dart \
             hesabixUI/hesabix_ui/web/index.html \
+            hesabixUI/hesabix_ui/web/favicon.ico \
+            hesabixUI/hesabix_ui/web/favicon.png \
+            hesabixUI/hesabix_ui/web/icons \
+            hesabixUI/hesabix_ui/web/images \
+            hesabixUI/hesabix_ui/web/assets/images \
             hesabixUI/hesabix_ui/lib/widgets/auth_footer.dart \
+            hesabixUI/hesabix_ui/lib/config/brand_config.dart \
             hesabixUI/hesabix_ui/pubspec.yaml \
             hesabixUI/hesabix_ui/lib/utils/error_extractor.dart \
             hesabixUI/hesabix_ui/assets/images \
+            hesabixUI/hesabix_ui/android/app/src/main/res \
+            hesabixUI/hesabix_ui/ios/Runner/Assets.xcassets/AppIcon.appiconset \
+            hesabixUI/hesabix_ui/ios/Runner/Info.plist \
+            hesabixUI/hesabix_ui/macos/Runner/Assets.xcassets/AppIcon.appiconset \
+            hesabixUI/hesabix_ui/windows/runner/resources/app_icon.ico \
             build_web.sh
           git add \
             .github \
             hesabixUI/hesabix_ui/lib/theme \
             hesabixUI/hesabix_ui/lib/pages/login_page.dart \
             hesabixUI/hesabix_ui/web/index.html \
+            hesabixUI/hesabix_ui/web/favicon.ico \
+            hesabixUI/hesabix_ui/web/favicon.png \
+            hesabixUI/hesabix_ui/web/icons \
+            hesabixUI/hesabix_ui/web/images \
+            hesabixUI/hesabix_ui/web/assets/images \
             hesabixUI/hesabix_ui/lib/widgets/auth_footer.dart \
+            hesabixUI/hesabix_ui/lib/config/brand_config.dart \
             hesabixUI/hesabix_ui/pubspec.yaml \
             hesabixUI/hesabix_ui/lib/utils/error_extractor.dart \
             hesabixUI/hesabix_ui/assets/images \
+            hesabixUI/hesabix_ui/android/app/src/main/res \
+            hesabixUI/hesabix_ui/ios/Runner/Assets.xcassets/AppIcon.appiconset \
+            hesabixUI/hesabix_ui/ios/Runner/Info.plist \
+            hesabixUI/hesabix_ui/macos/Runner/Assets.xcassets/AppIcon.appiconset \
+            hesabixUI/hesabix_ui/windows/runner/resources/app_icon.ico \
             build_web.sh
 
           if git diff --name-only --diff-filter=U | grep -q .; then
