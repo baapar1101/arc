@@ -16,6 +16,7 @@ from adapters.api.v1.schema_models.task_management import (
     TaskLabelsAssignRequest,
     TaskMoveRequest,
     TaskRelationCreateRequest,
+    TaskReminderCreateRequest,
     TaskSavedViewCreateRequest,
     TaskSavedViewUpdateRequest,
     TaskSubtaskCreateRequest,
@@ -33,10 +34,12 @@ from app.services.task_management_service import (
     create_saved_task_view,
     create_task_label,
     complete_task,
+    create_task_reminder,
     create_subtask,
     create_task,
     delete_saved_task_view,
     delete_task_comment,
+    delete_task_reminder,
     delete_task_label,
     ensure_default_task_statuses,
     get_task_structure,
@@ -44,6 +47,7 @@ from app.services.task_management_service import (
     list_saved_task_views,
     list_task_activity,
     list_task_comments,
+    list_task_reminders,
     list_task_labels,
     move_task,
     delete_task_relation,
@@ -107,6 +111,19 @@ def _display_user_name(user: Any) -> str | None:
         return None
     name = f"{user.first_name or ''} {user.last_name or ''}".strip()
     return name or user.email or user.mobile or f"User {user.id}"
+
+
+def _format_reminder(reminder: Any) -> dict[str, Any]:
+    return {
+        "id": reminder.id,
+        "task_id": reminder.task_id,
+        "user_id": reminder.user_id,
+        "remind_at": reminder.remind_at,
+        "relative_to": reminder.relative_to,
+        "offset_minutes": reminder.offset_minutes,
+        "sent_at": reminder.sent_at,
+        "created_at": reminder.created_at,
+    }
 
 
 def _format_comment(comment: Any) -> dict[str, Any]:
@@ -191,6 +208,9 @@ def _format_task(task: Task, db: Session, request: Request) -> dict[str, Any]:
         "due_at": task.due_at,
         "completed_at": task.completed_at,
         "estimated_minutes": task.estimated_minutes,
+        "recurrence_rule": task.recurrence_rule,
+        "recurrence_timezone": task.recurrence_timezone,
+        "recurrence_end_at": task.recurrence_end_at,
         "assignees": assignees,
         "labels": labels,
         "created_by_user_id": task.created_by_user_id,
@@ -461,6 +481,80 @@ async def get_task_endpoint(
         data={"task": _format_task(task, db, request)},
         request=request,
         message="TASK_FETCHED",
+    )
+
+
+@router.get("/businesses/{business_id}/tasks/{task_id}/reminders")
+@require_business_access("business_id")
+async def list_task_reminders_endpoint(
+    request: Request,
+    business_id: int = Path(..., gt=0),
+    task_id: int = Path(..., gt=0),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+):
+    del ctx
+    items = list_task_reminders(db, business_id, task_id)
+    return success_response(
+        data=format_datetime_fields(
+            {"items": [_format_reminder(item) for item in items]},
+            request,
+            business_id=business_id,
+        ),
+        request=request,
+        message="TASK_REMINDERS_FETCHED",
+    )
+
+
+@router.post("/businesses/{business_id}/tasks/{task_id}/reminders")
+@require_business_access("business_id")
+async def create_task_reminder_endpoint(
+    request: Request,
+    data: TaskReminderCreateRequest,
+    business_id: int = Path(..., gt=0),
+    task_id: int = Path(..., gt=0),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+):
+    reminder = create_task_reminder(
+        db,
+        business_id,
+        task_id,
+        ctx.get_user_id(),
+        data.dict(),
+    )
+    return success_response(
+        data=format_datetime_fields(
+            {"reminder": _format_reminder(reminder)},
+            request,
+            business_id=business_id,
+        ),
+        request=request,
+        message="TASK_REMINDER_CREATED",
+    )
+
+
+@router.delete("/businesses/{business_id}/tasks/{task_id}/reminders/{reminder_id}")
+@require_business_access("business_id")
+async def delete_task_reminder_endpoint(
+    request: Request,
+    business_id: int = Path(..., gt=0),
+    task_id: int = Path(..., gt=0),
+    reminder_id: int = Path(..., gt=0),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+):
+    delete_task_reminder(
+        db,
+        business_id,
+        task_id,
+        reminder_id,
+        ctx.get_user_id(),
+    )
+    return success_response(
+        data={"id": reminder_id},
+        request=request,
+        message="TASK_REMINDER_DELETED",
     )
 
 
