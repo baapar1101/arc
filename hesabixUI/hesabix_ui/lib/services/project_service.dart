@@ -189,5 +189,38 @@ class ProjectService {
       rethrow;
     }
   }
-}
 
+  Future<Map<String, dynamic>> getWorkspace({
+    required int businessId,
+    required int projectId,
+  }) async {
+    final response = await apiClient.get(
+      '/api/v1/businesses/$businessId/projects/$projectId/workspace',
+    );
+    return Map<String, dynamic>.from(response.data['data'] as Map);
+  }
+
+  Future<Map<String, dynamic>> saveMember({
+    required int businessId,
+    required int projectId,
+    required int userId,
+    String role = 'member',
+  }) async {
+    final response = await apiClient.post(
+      '/api/v1/businesses/$businessId/projects/$projectId/members',
+      data: {'user_id': userId, 'role': role},
+    );
+    return Map<String, dynamic>.from(response.data['data']['member'] as Map);
+  }
+
+  Future<void> removeMember({
+    required int businessId,
+    required int projectId,
+    required int userId,
+  }) async {
+    await apiClient.delete(
+      '/api/v1/businesses/$businessId/projects/$projectId/members/$userId',
+    );
+  }
+
+}

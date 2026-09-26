@@ -19,6 +19,9 @@ from adapters.db.models.business import Business
 from adapters.db.models.currency import Currency
 from adapters.db.models.user import User
 from adapters.db.models.person import Person
+from adapters.db.models.business_permission import BusinessPermission
+from adapters.db.models.task_management import ProjectMember, Task, TaskStatus
+from app.core.business_membership import membership_is_active
 from adapters.db.repositories.project_repository import ProjectRepository
 from app.core.responses import ApiError
 
@@ -340,3 +343,169 @@ def list_project_documents(
 	
 	return documents, total
 
+
+
+
+def _require_project_in_business(db: Session, business_id: int, project_id: int) -> Project:
+    project = db.query(Project).filter(
+        Project.id == project_id,
+        Project.business_id == business_id,
+    ).first()
+    if not project:
+        raise ApiError("PROJECT_NOT_FOUND", "پروژه یافت نشد", http_status=404)
+    return project
+
+
+def _business_member_user(db: Session, business: Business, user_id: int) -> User:
+    user = db.get(User, int(user_id))
+    if not user:
+        raise ApiError("PROJECT_MEMBER_USER_NOT_FOUND", "کاربر یافت نشد", http_status=404)
+    if int(user.id) == int(business.owner_id):
+        return user
+    permission = db.query(BusinessPermission).filter(
+        BusinessPermission.business_id == business.id,
+        BusinessPermission.user_id == user.id,
+    ).first()
+    if not permission or not membership_is_active(permission):
+        raise ApiError(
+            "PROJECT_MEMBER_NOT_BUSINESS_MEMBER",
+            "کاربر عضو فعال این کسب‌وکار نیست",
+            http_status=400,
+        )
+    return user
+
+
+def list_project_members(db: Session, business_id: int, project_id: int) -> list[ProjectMember]:
+    _require_project_in_business(db, business_id, project_id)
+    return (
+        db.query(ProjectMember)
+        .filter(
+            ProjectMember.business_id == business_id,
+            ProjectMember.project_id == project_id,
+        )
+        .order_by(ProjectMember.created_at.asc(), ProjectMember.id.asc())
+        .all()
+    )
+
+
+def upsert_project_member(
+    db: Session,
+    business_id: int,
+    project_id: int,
+    actor_user_id: int,
+    user_id: int,
+    role: str = "member",
+) -> ProjectMember:
+    project = _require_project_in_business(db, business_id, project_id)
+    business = db.get(Business, business_id)
+    if not business:
+        raise ApiError("BUSINESS_NOT_FOUND", "کسب‌وکار یافت نشد", http_status=404)
+    user = _business_member_user(db, business, user_id)
+    member = db.query(ProjectMember).filter(
+        ProjectMember.business_id == business_id,
+        ProjectMember.project_id == project_id,
+        ProjectMember.user_id == user.id,
+    ).first()
+    if member:
+        member.role = role
+        db.commit()
+        db.refresh(member)
+        return member
+    member = ProjectMember(
+        business_id=business_id,
+        project_id=project.id,
+        user_id=user.id,
+        role=role,
+        added_by_user_id=actor_user_id,
+    )
+    db.add(member)
+    db.commit()
+    db.refresh(member)
+    return member
+
+
+def remove_project_member(db: Session, business_id: int, project_id: int, user_id: int) -> None:
+    project = _require_project_in_business(db, business_id, project_id)
+    if project.manager_user_id == user_id:
+        raise ApiError(
+            "PROJECT_MEMBER_IS_MANAGER",
+            "ابتدا مدیر پروژه را تغییر دهید",
+            http_status=400,
+        )
+    member = db.query(ProjectMember).filter(
+        ProjectMember.business_id == business_id,
+        ProjectMember.project_id == project_id,
+        ProjectMember.user_id == user_id,
+    ).first()
+    if not member:
+        raise ApiError("PROJECT_MEMBER_NOT_FOUND", "عضو پروژه یافت نشد", http_status=404)
+    db.delete(member)
+    db.commit()
+
+
+def get_project_workspace(db: Session, business_id: int, project_id: int) -> Dict[str, Any]:
+    project = _require_project_in_business(db, business_id, project_id)
+    task_base = db.query(Task).filter(
+        Task.business_id == business_id,
+        Task.project_id == project_id,
+        Task.deleted_at.is_(None),
+    )
+    total_tasks = task_base.count()
+    completed_tasks = task_base.filter(Task.completed_at.is_not(None)).count()
+    open_tasks = max(total_tasks - completed_tasks, 0)
+    now = datetime.utcnow()
+    overdue_tasks = task_base.filter(
+        Task.completed_at.is_(None),
+        Task.due_at.is_not(None),
+        Task.due_at < now,
+    ).count()
+    status_rows = (
+        db.query(
+            TaskStatus.id,
+            TaskStatus.key,
+            TaskStatus.name,
+            TaskStatus.category,
+            TaskStatus.color,
+            func.count(Task.id),
+        )
+        .outerjoin(
+            Task,
+            and_(
+                Task.status_id == TaskStatus.id,
+                Task.business_id == business_id,
+                Task.project_id == project_id,
+                Task.deleted_at.is_(None),
+            ),
+        )
+        .filter(TaskStatus.business_id == business_id)
+        .group_by(
+            TaskStatus.id,
+            TaskStatus.key,
+            TaskStatus.name,
+            TaskStatus.category,
+            TaskStatus.color,
+            TaskStatus.sort_order,
+        )
+        .order_by(TaskStatus.sort_order.asc())
+        .all()
+    )
+    return {
+        "project": project,
+        "task_statistics": {
+            "total": total_tasks,
+            "open": open_tasks,
+            "completed": completed_tasks,
+            "overdue": overdue_tasks,
+            "progress_percent": round((completed_tasks / total_tasks) * 100, 1)
+            if total_tasks else 0.0,
+            "by_status": [
+                {
+                    "id": row[0], "key": row[1], "name": row[2],
+                    "category": row[3], "color": row[4], "count": int(row[5] or 0),
+                }
+                for row in status_rows
+            ],
+        },
+        "financial_statistics": get_project_statistics(db, project_id),
+        "members": list_project_members(db, business_id, project_id),
+    }

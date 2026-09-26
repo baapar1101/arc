@@ -246,3 +246,24 @@ Implemented with Plane as the primary interaction benchmark.
 - [x] Multi-assignee editing.
 - [x] Complete/reopen without page reload.
 - [x] Responsive desktop drawer / mobile glass sheet.
+
+
+## Phase 3 — Project Workspace
+
+Implemented with Plane as the workspace benchmark while retaining the existing accounting Project entity.
+
+- Dedicated project workspace route with Overview and Tasks.
+- Native task progress, open/completed/overdue metrics, and financial summary.
+- Project-scoped quick task creation and Phase 2 detail drawer.
+- First-class project member management on `project_members`.
+- Only active users of the same business can join a project.
+- Existing Projects list opens the workspace instead of a read-only dialog.
+
+### Phase 3 acceptance gate
+
+- [x] Existing Project remains canonical.
+- [x] Project workspace exists.
+- [x] Task progress is derived from native tasks.
+- [x] Project-scoped task creation/editing works.
+- [x] Team membership can be managed.
+- [x] Financial and operational project context are visible together.

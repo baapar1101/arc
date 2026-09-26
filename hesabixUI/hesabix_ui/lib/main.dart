@@ -142,6 +142,7 @@ import 'pages/business/catalog_spec_fields_page.dart';
 import 'pages/business/products_page.dart';
 import 'pages/business/product_bulk_prices_sheet_page.dart';
 import 'pages/business/projects_page.dart';
+import 'pages/business/project_workspace_page.dart';
 import 'pages/business/task_management/task_management_page.dart';
 import 'pages/business/warranty_management_page.dart';
 import 'pages/business/warranty_settings_page.dart';
@@ -5282,6 +5283,17 @@ class _MyAppState extends State<MyApp> {
                                 TaskManagementPage(
                                   businessId: businessId,
                                 ),
+                              );
+                            },
+                          ),
+                          GoRoute(
+                            path: 'projects/:project_id/workspace',
+                            pageBuilder: (context, state) {
+                              final businessId = int.parse(state.pathParameters['business_id']!);
+                              final projectId = int.parse(state.pathParameters['project_id']!);
+                              return hesabixNoTransitionPage(
+                                state,
+                                ProjectWorkspacePage(businessId: businessId, projectId: projectId),
                               );
                             },
                           ),

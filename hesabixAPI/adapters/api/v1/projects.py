@@ -16,10 +16,16 @@ from app.services.project_service import (
 	update_project,
 	delete_project,
 	get_project_statistics,
-	list_project_documents
+	list_project_documents,
+	get_project_workspace,
+	list_project_members,
+	upsert_project_member,
+	remove_project_member
 )
 from adapters.db.repositories.project_repository import ProjectRepository
 from adapters.db.models.project import Project
+from adapters.db.models.task_management import ProjectMember
+from adapters.api.v1.schema_models.project_workspace import ProjectMemberUpsertRequest
 from adapters.api.v1.schema_models.project import (
 	ProjectCreateRequest,
 	ProjectUpdateRequest,
@@ -438,3 +444,108 @@ async def list_active_projects_simple_endpoint(
 		message="ACTIVE_PROJECTS_FETCHED"
 	)
 
+
+
+
+def _format_project_member(member: ProjectMember) -> Dict[str, Any]:
+    user = member.user
+    name = f"{user.first_name or ''} {user.last_name or ''}".strip() if user else ""
+    return {
+        "id": member.id,
+        "business_id": member.business_id,
+        "project_id": member.project_id,
+        "user_id": member.user_id,
+        "name": name or (user.email if user else None) or f"User {member.user_id}",
+        "email": user.email if user else None,
+        "role": member.role,
+        "created_at": member.created_at,
+    }
+
+
+@router.get("/businesses/{business_id}/projects/{project_id}/workspace", summary="فضای کاری پروژه")
+@require_business_access("business_id")
+async def get_project_workspace_endpoint(
+    request: Request,
+    business_id: int = Path(..., gt=0),
+    project_id: int = Path(..., gt=0),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+):
+    del ctx
+    data = get_project_workspace(db, business_id, project_id)
+    project = data.pop("project")
+    members = data.pop("members")
+    return success_response(
+        data={
+            "project": _format_project(project, request),
+            **data,
+            "members": [
+                format_datetime_fields(_format_project_member(m), request, business_id)
+                for m in members
+            ],
+        },
+        request=request,
+        message="PROJECT_WORKSPACE_FETCHED",
+    )
+
+
+@router.get("/businesses/{business_id}/projects/{project_id}/members", summary="اعضای پروژه")
+@require_business_access("business_id")
+async def list_project_members_endpoint(
+    request: Request,
+    business_id: int = Path(..., gt=0),
+    project_id: int = Path(..., gt=0),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+):
+    del ctx
+    members = list_project_members(db, business_id, project_id)
+    return success_response(
+        data={"items": [
+            format_datetime_fields(_format_project_member(m), request, business_id)
+            for m in members
+        ]},
+        request=request,
+        message="PROJECT_MEMBERS_FETCHED",
+    )
+
+
+@router.post("/businesses/{business_id}/projects/{project_id}/members", summary="افزودن یا تغییر نقش عضو پروژه")
+@require_business_access("business_id")
+async def upsert_project_member_endpoint(
+    request: Request,
+    data: ProjectMemberUpsertRequest,
+    business_id: int = Path(..., gt=0),
+    project_id: int = Path(..., gt=0),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+):
+    member = upsert_project_member(
+        db, business_id, project_id, ctx.get_user_id(), data.user_id, data.role
+    )
+    return success_response(
+        data={"member": format_datetime_fields(
+            _format_project_member(member), request, business_id
+        )},
+        request=request,
+        message="PROJECT_MEMBER_SAVED",
+    )
+
+
+@router.delete("/businesses/{business_id}/projects/{project_id}/members/{user_id}", summary="حذف عضو از پروژه")
+@require_business_access("business_id")
+async def remove_project_member_endpoint(
+    request: Request,
+    business_id: int = Path(..., gt=0),
+    project_id: int = Path(..., gt=0),
+    user_id: int = Path(..., gt=0),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+):
+    del ctx
+    remove_project_member(db, business_id, project_id, user_id)
+    return success_response(
+        data={"user_id": user_id},
+        request=request,
+        message="PROJECT_MEMBER_REMOVED",
+    )

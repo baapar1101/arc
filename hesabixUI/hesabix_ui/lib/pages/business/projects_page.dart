@@ -385,67 +385,9 @@ class _ProjectsPageState extends State<ProjectsPage> {
     }
   }
 
-  void _onViewProject(dynamic item) async {
+  void _onViewProject(dynamic item) {
     if (item is! ProjectModel) return;
-    final projectId = item.id;
-    
-    try {
-      final result = await _projectService.getProject(projectId);
-      
-      if (!mounted) return;
-      
-      showGlassDialog(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: Text('جزئیات پروژه: ${result['project']['name']}'),
-          content: SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _buildInfoRow('کد', result['project']['code']),
-                _buildInfoRow('وضعیت', result['project']['status_name']),
-                _buildInfoRow('تعداد اسناد', result['statistics']['total_documents'].toString()),
-                _buildInfoRow('مجموع بدهکار', result['statistics']['total_debit'].toString()),
-                _buildInfoRow('مجموع بستانکار', result['statistics']['total_credit'].toString()),
-                _buildInfoRow('مانده', result['statistics']['balance'].toString()),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('بستن'),
-            ),
-          ],
-        ),
-      );
-    } catch (e) {
-      if (!mounted) return;
-      SnackBarHelper.showError(
-        context,
-        message:
-            'خطا در دریافت اطلاعات پروژه: ${ErrorExtractor.forContext(e, context)}',
-      );
-    }
-  }
-
-  Widget _buildInfoRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        children: [
-          SizedBox(
-            width: 120,
-            child: Text(
-              '$label:',
-              style: const TextStyle(fontWeight: FontWeight.bold),
-            ),
-          ),
-          Expanded(child: Text(value)),
-        ],
-      ),
-    );
+    context.go('/business/${widget.businessId}/projects/${item.id}/workspace');
   }
 
   void _onEditProject(dynamic item) async {
