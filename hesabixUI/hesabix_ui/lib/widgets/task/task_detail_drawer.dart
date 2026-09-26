@@ -4,6 +4,7 @@ import 'package:hesabix_ui/models/task_model.dart';
 import 'package:hesabix_ui/theme/glass.dart';
 import 'package:hesabix_ui/widgets/task/task_structure_section.dart';
 import 'package:hesabix_ui/widgets/task/task_conversation_section.dart';
+import 'package:hesabix_ui/widgets/task/task_labels_section.dart';
 import 'package:intl/intl.dart';
 
 typedef TaskUpdateCallback = Future<TaskModel?> Function(Map<String, dynamic> data);
@@ -426,6 +427,12 @@ class _TaskDetailDrawerState extends State<TaskDetailDrawer> {
                         );
                       }).toList(),
                     ),
+                  const SizedBox(height: 22),
+                  TaskLabelsSection(
+                    businessId: widget.businessId,
+                    task: _task,
+                    onUpdate: _updateProperty,
+                  ),
                   const SizedBox(height: 22),
                   TaskStructureSection(
                     businessId: widget.businessId,

@@ -30,6 +30,29 @@ class TaskStatusModel {
   }
 }
 
+class TaskLabelModel {
+  final int id;
+  final String name;
+  final String? color;
+  final String? description;
+
+  const TaskLabelModel({
+    required this.id,
+    required this.name,
+    this.color,
+    this.description,
+  });
+
+  factory TaskLabelModel.fromJson(Map<String, dynamic> json) {
+    return TaskLabelModel(
+      id: (json['id'] as num).toInt(),
+      name: json['name']?.toString() ?? '',
+      color: json['color']?.toString(),
+      description: json['description']?.toString(),
+    );
+  }
+}
+
 class TaskAssigneeModel {
   final int userId;
   final String name;
@@ -97,6 +120,7 @@ class TaskModel {
   final DateTime? completedAt;
   final int? estimatedMinutes;
   final List<TaskAssigneeModel> assignees;
+  final List<TaskLabelModel> labels;
   final int? createdByUserId;
   final DateTime? createdAt;
   final DateTime? updatedAt;
@@ -118,6 +142,7 @@ class TaskModel {
     this.completedAt,
     this.estimatedMinutes,
     required this.assignees,
+    this.labels = const [],
     this.createdByUserId,
     this.createdAt,
     this.updatedAt,
@@ -128,6 +153,7 @@ class TaskModel {
   factory TaskModel.fromJson(Map<String, dynamic> json) {
     final statusJson = json['status'];
     final assigneeJson = (json['assignees'] as List?) ?? const [];
+    final labelJson = (json['labels'] as List?) ?? const [];
     return TaskModel(
       id: (json['id'] as num).toInt(),
       businessId: (json['business_id'] as num).toInt(),
@@ -150,6 +176,10 @@ class TaskModel {
       assignees: assigneeJson
           .whereType<Map>()
           .map((e) => TaskAssigneeModel.fromJson(Map<String, dynamic>.from(e)))
+          .toList(),
+      labels: labelJson
+          .whereType<Map>()
+          .map((e) => TaskLabelModel.fromJson(Map<String, dynamic>.from(e)))
           .toList(),
       createdByUserId: (json['created_by_user_id'] as num?)?.toInt(),
       createdAt: _parseTaskDate(json['created_at_raw'] ?? json['created_at']),
@@ -330,6 +360,50 @@ class TaskActivityModel {
       createdAt: _parseTaskDate(
         json['created_at_raw'] ?? json['created_at'],
       ),
+    );
+  }
+}
+
+
+
+class TaskSavedViewModel {
+  final int id;
+  final int businessId;
+  final int userId;
+  final int? projectId;
+  final String name;
+  final String viewType;
+  final Map<String, dynamic> filters;
+  final Map<String, dynamic> sort;
+  final bool isShared;
+
+  const TaskSavedViewModel({
+    required this.id,
+    required this.businessId,
+    required this.userId,
+    this.projectId,
+    required this.name,
+    required this.viewType,
+    required this.filters,
+    required this.sort,
+    required this.isShared,
+  });
+
+  factory TaskSavedViewModel.fromJson(Map<String, dynamic> json) {
+    return TaskSavedViewModel(
+      id: (json['id'] as num).toInt(),
+      businessId: (json['business_id'] as num).toInt(),
+      userId: (json['user_id'] as num).toInt(),
+      projectId: (json['project_id'] as num?)?.toInt(),
+      name: json['name']?.toString() ?? '',
+      viewType: json['view_type']?.toString() ?? 'list',
+      filters: json['filters'] is Map
+          ? Map<String, dynamic>.from(json['filters'] as Map)
+          : const {},
+      sort: json['sort'] is Map
+          ? Map<String, dynamic>.from(json['sort'] as Map)
+          : const {},
+      isShared: json['is_shared'] == true,
     );
   }
 }

@@ -6,6 +6,90 @@ class TaskService {
 
   TaskService(this.apiClient);
 
+  Future<List<TaskLabelModel>> listLabels(int businessId) async {
+    final response = await apiClient.get(
+      '/api/v1/businesses/$businessId/task-labels',
+    );
+    final items = (response.data['data']?['items'] as List?) ?? const [];
+    return items
+        .whereType<Map>()
+        .map((e) => TaskLabelModel.fromJson(Map<String, dynamic>.from(e)))
+        .toList();
+  }
+
+  Future<TaskLabelModel> createLabel({
+    required int businessId,
+    required String name,
+    String? color,
+    String? description,
+  }) async {
+    final response = await apiClient.post(
+      '/api/v1/businesses/$businessId/task-labels',
+      data: {
+        'name': name,
+        if (color != null) 'color': color,
+        if (description != null) 'description': description,
+      },
+    );
+    return TaskLabelModel.fromJson(
+      Map<String, dynamic>.from(response.data['data']['label'] as Map),
+    );
+  }
+
+  Future<void> deleteLabel({
+    required int businessId,
+    required int labelId,
+  }) async {
+    await apiClient.delete(
+      '/api/v1/businesses/$businessId/task-labels/$labelId',
+    );
+  }
+
+  Future<List<TaskSavedViewModel>> listSavedViews(int businessId) async {
+    final response = await apiClient.get(
+      '/api/v1/businesses/$businessId/task-views',
+    );
+    final items = (response.data['data']?['items'] as List?) ?? const [];
+    return items
+        .whereType<Map>()
+        .map((e) => TaskSavedViewModel.fromJson(Map<String, dynamic>.from(e)))
+        .toList();
+  }
+
+  Future<TaskSavedViewModel> createSavedView({
+    required int businessId,
+    required String name,
+    int? projectId,
+    String viewType = 'list',
+    required Map<String, dynamic> filters,
+    required Map<String, dynamic> sort,
+    bool isShared = false,
+  }) async {
+    final response = await apiClient.post(
+      '/api/v1/businesses/$businessId/task-views',
+      data: {
+        'name': name,
+        'project_id': projectId,
+        'view_type': viewType,
+        'filters': filters,
+        'sort': sort,
+        'is_shared': isShared,
+      },
+    );
+    return TaskSavedViewModel.fromJson(
+      Map<String, dynamic>.from(response.data['data']['view'] as Map),
+    );
+  }
+
+  Future<void> deleteSavedView({
+    required int businessId,
+    required int viewId,
+  }) async {
+    await apiClient.delete(
+      '/api/v1/businesses/$businessId/task-views/$viewId',
+    );
+  }
+
   Future<List<TaskStatusModel>> listStatuses(int businessId) async {
     final response = await apiClient.get(
       '/api/v1/businesses/$businessId/task-statuses',
@@ -35,7 +119,13 @@ class TaskService {
     int? statusId,
     int? assigneeUserId,
     String? priority,
+    int? labelId,
+    int? createdByUserId,
+    DateTime? dueFrom,
+    DateTime? dueTo,
     bool? completed,
+    String? sortBy,
+    String sortDir = 'asc',
     int page = 1,
     int limit = 100,
   }) async {
@@ -48,7 +138,13 @@ class TaskService {
     if (statusId != null) query['status_id'] = statusId;
     if (assigneeUserId != null) query['assignee_user_id'] = assigneeUserId;
     if (priority != null && priority.isNotEmpty) query['priority'] = priority;
+    if (labelId != null) query['label_id'] = labelId;
+    if (createdByUserId != null) query['created_by_user_id'] = createdByUserId;
+    if (dueFrom != null) query['due_from'] = dueFrom.toUtc().toIso8601String();
+    if (dueTo != null) query['due_to'] = dueTo.toUtc().toIso8601String();
     if (completed != null) query['completed'] = completed;
+    if (sortBy != null && sortBy.isNotEmpty) query['sort_by'] = sortBy;
+    query['sort_dir'] = sortDir;
 
     final response = await apiClient.get(
       '/api/v1/businesses/$businessId/tasks',
