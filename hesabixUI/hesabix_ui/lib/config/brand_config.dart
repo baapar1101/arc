@@ -21,7 +21,7 @@ class BrandConfig {
   /// (مناسب برند کاستوم رنگی مثل سیان روی شفاف).
   static const String _logoTintRaw = String.fromEnvironment(
     'BRAND_LOGO_TINT',
-    defaultValue: '1',
+    defaultValue: '0',
   );
 
   static bool get hasCustomName =>
