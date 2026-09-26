@@ -267,3 +267,41 @@ Implemented with Plane as the workspace benchmark while retaining the existing a
 - [x] Project-scoped task creation/editing works.
 - [x] Team membership can be managed.
 - [x] Financial and operational project context are visible together.
+
+
+## Phase 4 — Kanban
+
+Implemented on 2026-09-26 using Plane as the primary workflow benchmark and
+Focalboard only as an interaction reference.
+
+### Native board model
+
+- Columns are existing business-scoped `task_statuses`; there is no board-column table.
+- Cards are existing `tasks`.
+- Persistent card order uses `tasks.sort_order`.
+- Move API accepts a target status and insertion index; the server computes a fractional sort value.
+- Dense ordering is renormalized only when adjacent fractional positions become too close.
+- Moving into a completed status sets completion time; moving out clears it.
+
+### UX delivered
+
+- Project workspace now has Overview, Tasks, and Board tabs.
+- Horizontal status columns use the existing glass visual system.
+- Drag/drop works across columns and within the same column.
+- Drop zones expose exact insertion positions.
+- Each column supports quick task creation directly into that status.
+- Clicking a board card opens the same Phase 2 task detail drawer/sheet.
+- Board cards show assignees and due-date/overdue context.
+
+### Phase 4 endpoint
+
+- `POST /api/v1/businesses/{business_id}/tasks/{task_id}/move`
+
+### Phase 4 acceptance gate
+
+- [x] Status columns are native task statuses.
+- [x] Same-column reorder persists.
+- [x] Cross-column movement persists.
+- [x] Completion semantics follow destination status.
+- [x] Board uses existing task editor.
+- [x] Quick add works per column.

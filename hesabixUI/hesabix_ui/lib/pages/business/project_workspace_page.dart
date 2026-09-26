@@ -10,6 +10,7 @@ import 'package:hesabix_ui/utils/error_extractor.dart';
 import 'package:hesabix_ui/utils/responsive_helper.dart';
 import 'package:hesabix_ui/utils/snackbar_helper.dart';
 import 'package:hesabix_ui/widgets/task/task_detail_drawer.dart';
+import 'package:hesabix_ui/widgets/task/task_kanban_board.dart';
 import 'package:hesabix_ui/widgets/task/task_quick_create.dart';
 import 'package:intl/intl.dart';
 
@@ -43,7 +44,7 @@ class _ProjectWorkspacePageState extends State<ProjectWorkspacePage>
     super.initState();
     _projectsService = ProjectService(ApiClient());
     _tasksService = TaskService(ApiClient());
-    _tabs = TabController(length: 2, vsync: this);
+    _tabs = TabController(length: 3, vsync: this);
     _load();
   }
 
@@ -120,6 +121,57 @@ class _ProjectWorkspacePageState extends State<ProjectWorkspacePage>
         'progress_percent': total == 0 ? 0.0 : completed * 100 / total,
       };
     });
+  }
+
+  Future<bool> _quickCreateInStatus(
+    TaskStatusModel status,
+    String title,
+  ) async {
+    try {
+      final task = await _tasksService.createTask(
+        businessId: widget.businessId,
+        data: {
+          'title': title,
+          'project_id': widget.projectId,
+          'status_id': status.id,
+        },
+      );
+      _upsert(task);
+      return true;
+    } catch (e) {
+      if (mounted) {
+        SnackBarHelper.showError(
+          context,
+          message: ErrorExtractor.forContext(e, context),
+        );
+      }
+      return false;
+    }
+  }
+
+  Future<TaskModel?> _moveTask(
+    TaskModel source,
+    int targetStatusId,
+    int targetIndex,
+  ) async {
+    try {
+      final task = await _tasksService.moveTask(
+        businessId: widget.businessId,
+        taskId: source.id,
+        targetStatusId: targetStatusId,
+        targetIndex: targetIndex,
+      );
+      _upsert(task);
+      return task;
+    } catch (e) {
+      if (mounted) {
+        SnackBarHelper.showError(
+          context,
+          message: ErrorExtractor.forContext(e, context),
+        );
+      }
+      return null;
+    }
   }
 
   Future<bool> _quickCreate(String title) async {
@@ -232,6 +284,7 @@ class _ProjectWorkspacePageState extends State<ProjectWorkspacePage>
         bottom: TabBar(controller: _tabs, tabs: const [
           Tab(icon: Icon(Icons.dashboard_outlined), text: 'نمای کلی'),
           Tab(icon: Icon(Icons.task_alt_outlined), text: 'کارها'),
+          Tab(icon: Icon(Icons.view_kanban_outlined), text: 'برد'),
         ]),
       ),
       body: SafeArea(
@@ -247,9 +300,17 @@ class _ProjectWorkspacePageState extends State<ProjectWorkspacePage>
                     ],
                   )))
                 : mobile
-                    ? TabBarView(controller: _tabs, children: [_overview(), _taskList()])
+                    ? TabBarView(
+                        controller: _tabs,
+                        children: [_overview(), _taskList(), _board()],
+                      )
                     : Row(children: [
-                        Expanded(child: TabBarView(controller: _tabs, children: [_overview(), _taskList()])),
+                        Expanded(
+                          child: TabBarView(
+                            controller: _tabs,
+                            children: [_overview(), _taskList(), _board()],
+                          ),
+                        ),
                         AnimatedContainer(
                           duration: const Duration(milliseconds: 220),
                           width: _selectedTask == null ? 0 : 440,
@@ -345,6 +406,14 @@ class _ProjectWorkspacePageState extends State<ProjectWorkspacePage>
       SizedBox(width: 135, child: Text(label, style: Theme.of(context).textTheme.bodySmall)),
       Expanded(child: Text(value, style: const TextStyle(fontWeight: FontWeight.w600))),
     ]),
+  );
+
+  Widget _board() => TaskKanbanBoard(
+    tasks: _tasks,
+    statuses: _statuses,
+    onMove: _moveTask,
+    onCreate: _quickCreateInStatus,
+    onOpen: _openTask,
   );
 
   Widget _taskList() {
