@@ -20,7 +20,7 @@ from adapters.db.models.currency import Currency
 from adapters.db.models.user import User
 from adapters.db.models.person import Person
 from adapters.db.models.business_permission import BusinessPermission
-from adapters.db.models.task_management import ProjectMember, Task, TaskStatus
+from adapters.db.models.task_management import ProjectMember, Task, TaskRelation, TaskStatus
 from app.core.business_membership import membership_is_active
 from adapters.db.repositories.project_repository import ProjectRepository
 from app.core.responses import ApiError
@@ -584,4 +584,83 @@ def get_project_workspace(db: Session, business_id: int, project_id: int) -> Dic
         },
         "financial_statistics": get_project_statistics(db, project_id),
         "members": list_project_members(db, business_id, project_id),
+    }
+
+
+
+def get_project_timeline(
+    db: Session,
+    business_id: int,
+    project_id: int,
+) -> Dict[str, Any]:
+    """Timeline/Gantt support payload for a project.
+
+    Full task details stay on the normal task list endpoint; this endpoint
+    supplies scheduled IDs/date bounds and dependency edges only.
+    """
+    _require_project_in_business(db, business_id, project_id)
+
+    scheduled = (
+        db.query(Task.id, Task.start_at, Task.due_at)
+        .filter(
+            Task.business_id == business_id,
+            Task.project_id == project_id,
+            Task.deleted_at.is_(None),
+            ((Task.start_at.is_not(None)) | (Task.due_at.is_not(None))),
+        )
+        .order_by(Task.sort_order.asc(), Task.id.asc())
+        .all()
+    )
+    task_ids = [int(row[0]) for row in scheduled]
+    task_id_set = set(task_ids)
+
+    dependencies = []
+    if task_ids:
+        relation_rows = (
+            db.query(TaskRelation)
+            .filter(
+                TaskRelation.business_id == business_id,
+                TaskRelation.relation_type == "blocks",
+                TaskRelation.task_id.in_(task_ids),
+                TaskRelation.related_task_id.in_(task_ids),
+            )
+            .order_by(TaskRelation.id.asc())
+            .all()
+        )
+        dependencies = [
+            {
+                "id": relation.id,
+                "from_task_id": relation.task_id,
+                "to_task_id": relation.related_task_id,
+            }
+            for relation in relation_rows
+            if relation.task_id in task_id_set
+            and relation.related_task_id in task_id_set
+        ]
+
+    starts = []
+    ends = []
+    items = []
+    for task_id, start_at, due_at in scheduled:
+        start = start_at or due_at
+        end = due_at or start_at
+        if start is None or end is None:
+            continue
+        starts.append(start)
+        ends.append(end)
+        items.append(
+            {
+                "task_id": int(task_id),
+                "start_at": start_at,
+                "due_at": due_at,
+            }
+        )
+
+    return {
+        "items": items,
+        "dependencies": dependencies,
+        "range": {
+            "start_at": min(starts) if starts else None,
+            "end_at": max(ends) if ends else None,
+        },
     }

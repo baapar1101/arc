@@ -18,6 +18,7 @@ from app.services.project_service import (
 	get_project_statistics,
 	list_project_documents,
 	get_project_workspace,
+	get_project_timeline,
 	list_project_members,
 	upsert_project_member,
 	remove_project_member
@@ -493,6 +494,27 @@ async def get_project_workspace_endpoint(
         },
         request=request,
         message="PROJECT_WORKSPACE_FETCHED",
+    )
+
+
+@router.get(
+    "/businesses/{business_id}/projects/{project_id}/timeline",
+    summary="داده زمان‌بندی پروژه",
+)
+@require_business_access("business_id")
+async def get_project_timeline_endpoint(
+    request: Request,
+    business_id: int = Path(..., gt=0),
+    project_id: int = Path(..., gt=0),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+):
+    del ctx
+    data = get_project_timeline(db, business_id, project_id)
+    return success_response(
+        data=format_datetime_fields(data, request, business_id),
+        request=request,
+        message="PROJECT_TIMELINE_FETCHED",
     )
 
 
