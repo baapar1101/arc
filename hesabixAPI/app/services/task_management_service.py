@@ -552,6 +552,7 @@ def replace_task_assignees(
         .all()
     )
     current_ids = [row.user_id for row in current_rows]
+    newly_assigned_ids = sorted(set(new_ids) - set(current_ids))
     if current_ids == new_ids:
         return current_ids
 
@@ -577,6 +578,9 @@ def replace_task_assignees(
     )
     if commit:
         db.commit()
+        if newly_assigned_ids:
+            from app.services.task_notification_service import notify_task_assigned
+            notify_task_assigned(db, task, newly_assigned_ids, actor_user_id)
     return new_ids
 
 
@@ -681,7 +685,11 @@ def create_task(
         )
 
     db.commit()
-    return repo.get_by_id(task.id, business_id) or task
+    created_task = repo.get_by_id(task.id, business_id) or task
+    if assignee_ids:
+        from app.services.task_notification_service import notify_task_assigned
+        notify_task_assigned(db, created_task, assignee_ids, actor_user_id)
+    return created_task
 
 
 def update_task(
@@ -698,6 +706,7 @@ def update_task(
 
     changes: dict[str, Any] = {}
     was_completed = task.completed_at is not None
+    newly_assigned_ids: list[int] = []
 
     if "title" in data:
         title = str(data.get("title") or "").strip()
@@ -846,19 +855,23 @@ def update_task(
         )
 
     if "assignee_user_ids" in data:
-        replace_task_assignees(
-            db,
-            task=task,
-            assignee_user_ids=data.get("assignee_user_ids") or [],
-            actor_user_id=actor_user_id,
-            commit=False,
-        )
+        existing_assignee_ids = {int(row[0]) for row in db.query(TaskAssignee.user_id).filter(TaskAssignee.business_id == task.business_id, TaskAssignee.task_id == task.id).all()}
+        requested_assignee_ids = _normalize_assignee_ids(data.get("assignee_user_ids") or [])
+        newly_assigned_ids = sorted(set(requested_assignee_ids) - existing_assignee_ids)
+        replace_task_assignees(db, task=task, assignee_user_ids=requested_assignee_ids, actor_user_id=actor_user_id, commit=False)
 
     if task.completed_at is not None and not was_completed:
         _ensure_next_recurring_task(db, task, actor_user_id)
 
     db.commit()
-    return repo.get_by_id(task.id, business_id) or task
+    updated_task = repo.get_by_id(task.id, business_id) or task
+    if newly_assigned_ids:
+        from app.services.task_notification_service import notify_task_assigned
+        notify_task_assigned(db, updated_task, newly_assigned_ids, actor_user_id)
+    if updated_task.completed_at is not None and not was_completed:
+        from app.services.task_notification_service import notify_dependency_resolved
+        notify_dependency_resolved(db, updated_task, actor_user_id)
+    return updated_task
 
 
 def complete_task(db: Session, business_id: int, task_id: int, actor_user_id: int) -> Task:
@@ -869,6 +882,7 @@ def complete_task(db: Session, business_id: int, task_id: int, actor_user_id: in
 
     done = _status_for_category(db, business_id, "completed")
     previous_status_id = task.status_id
+    was_completed = task.completed_at is not None
     task.status_id = done.id
     task.completed_at = _now()
     task.updated_at = _now()
@@ -881,7 +895,11 @@ def complete_task(db: Session, business_id: int, task_id: int, actor_user_id: in
     )
     _ensure_next_recurring_task(db, task, actor_user_id)
     db.commit()
-    return repo.get_by_id(task.id, business_id) or task
+    completed_task = repo.get_by_id(task.id, business_id) or task
+    if not was_completed:
+        from app.services.task_notification_service import notify_dependency_resolved
+        notify_dependency_resolved(db, completed_task, actor_user_id)
+    return completed_task
 
 
 def reopen_task(db: Session, business_id: int, task_id: int, actor_user_id: int) -> Task:
@@ -1042,7 +1060,11 @@ def move_task(
     if task.completed_at is not None and not was_completed:
         _ensure_next_recurring_task(db, task, actor_user_id)
     db.commit()
-    return repo.get_by_id(task.id, business_id) or task
+    moved_task = repo.get_by_id(task.id, business_id) or task
+    if moved_task.completed_at is not None and not was_completed:
+        from app.services.task_notification_service import notify_dependency_resolved
+        notify_dependency_resolved(db, moved_task, actor_user_id)
+    return moved_task
 
 
 
@@ -1324,6 +1346,8 @@ def add_task_comment(
     )
     db.commit()
     db.refresh(comment)
+    from app.services.task_notification_service import notify_task_comment
+    notify_task_comment(db, task, actor_user_id)
     return comment
 
 
