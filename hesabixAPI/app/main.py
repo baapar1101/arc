@@ -123,6 +123,7 @@ from adapters.api.v1.activity_logs import router as activity_logs_router
 from adapters.api.v1.admin.activity_logs_admin import router as admin_activity_logs_router
 from adapters.api.v1.admin.hscript_admin import router as admin_hscript_router
 from app.services.notification_processor import background_loop as notifications_background_loop
+from app.services.task_notification_service import task_notification_background_loop
 from app.services.storage_background_jobs import storage_cleanup_loop, storage_subscription_check_loop
 from app.services.document_monetization_background_jobs import document_monetization_finalize_periods_loop
 from app.services.document_monetization_jobs import document_monetization_loop
@@ -1240,6 +1241,8 @@ def create_app() -> FastAPI:
             return
 
         asyncio.create_task(notifications_background_loop(30))
+        # Task reminders / due-soon / overdue: every 5 minutes
+        asyncio.create_task(task_notification_background_loop(300))
         # Storage cleanup: هر 24 ساعت یکبار
         asyncio.create_task(storage_cleanup_loop(24))
         # Subscription check: هر 6 ساعت یکبار

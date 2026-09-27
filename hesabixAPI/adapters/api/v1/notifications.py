@@ -208,6 +208,13 @@ EVENT_KEY_TITLES = {
 	"system.test": "تست سیستم",
 	"email.verification": "تایید ایمیل",
 	"business.deleted": "حذف کسب‌وکار",
+	"task.assigned": "واگذاری کار",
+	"task.comment_added": "نظر جدید روی کار",
+	"task.dependency_resolved": "رفع وابستگی کار",
+	"task.reminder": "یادآور کار",
+	"task.due_soon": "نزدیک شدن سررسید کار",
+	"task.overdue": "گذشتن سررسید کار",
+	"task.project_member_added": "عضویت در پروژه",
 }
 
 

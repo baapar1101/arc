@@ -727,3 +727,52 @@ Implemented on 2026-09-27 as a Hesabix-native integration phase.
 - [x] Reverse entity-to-task lookup.
 - [x] Customer/Lead/Deal record surfaces expose first-class linked tasks.
 - [x] Legacy CRM tasks remain operational and semantically separate.
+
+
+## Phase 15 — Notifications
+
+Implemented on 2026-09-27 by reusing Hesabix's existing multi-channel notification stack.
+
+### Delivery architecture
+
+- No task-specific notification inbox or provider stack was introduced.
+- Task domain events feed the existing `NotificationService`, notification outbox, in-app announcements and user channel settings.
+- When Redis/RQ is available, task mutations enqueue delivery jobs so email/in-app delivery is outside task CRUD.
+- When Redis is disabled or unavailable, mutation paths fall back to **in-app only**; external provider I/O never blocks task writes.
+- In-app notifications include task/project deep links through the existing announcement navigation resolver.
+- Existing user channel preferences continue to govern delivery.
+
+### Immediate domain events
+
+- `task.assigned` — newly assigned users; actor excluded.
+- `task.comment_added` — task assignees + creator; commenting actor excluded.
+- `task.dependency_resolved` — when a blocking task transitions to completed, recipients of dependent tasks are notified.
+- `task.project_member_added` — newly added project member; actor excluded.
+
+### Scheduled conditions
+
+A leader-only five-minute scanner is registered in `app/main.py` using the existing background-job lock.
+
+- `task.reminder` — unsent Phase 8 reminders whose trigger time has arrived.
+- `task.due_soon` — first notification when an active task enters the next 24-hour due window.
+- `task.overdue` — first notification after an active task passes its due time.
+- Reminder delivery uses `task_reminders.sent_at` for idempotency.
+- Due-soon/overdue use immutable task-activity marker events, so multi-worker restarts do not repeatedly notify.
+- Completed/cancelled/deleted tasks are excluded from scheduled alerts.
+
+### Scope decisions
+
+- Structured mentions are not fabricated from comment text in this phase. A future mention feature should persist explicit mentioned user IDs instead of guessing names with regex.
+- Notification templates remain optional: event contexts always include a fallback subject/message, so the events work before admin templates are created.
+
+### Phase 15 acceptance gate
+
+- [x] Assignment notifications.
+- [x] Comment notifications.
+- [x] Dependency-resolved notifications.
+- [x] Project-member notifications.
+- [x] Reminder delivery.
+- [x] Due-soon alerts.
+- [x] Overdue alerts.
+- [x] Existing notification preferences/channels reused.
+- [x] Background scanner is leader-only and idempotent.
