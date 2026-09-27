@@ -680,3 +680,50 @@ Implemented on 2026-09-26 using Leantime-style task time tracking over the Phase
 - [x] Owner/author edit-delete authorization.
 - [x] Task drawer time UI.
 - [x] Project Timesheet rollups.
+
+
+## Phase 14 — CRM Entity Linking
+
+Implemented on 2026-09-27 as a Hesabix-native integration phase.
+
+### Native link domain
+
+- Reuses Phase 0 `task_entity_links`; no new migration.
+- Supported tenant-verifiable entity types:
+  - `person` — customer/contact/person
+  - `lead` — CRM lead
+  - `deal` — CRM sales opportunity
+  - `crm_activity` — legacy CRM activity/follow-up
+  - `document` — accounting document/invoice/proforma/document
+  - `product` — product/service
+- Support tickets are intentionally excluded because the current support ticket model has no `business_id`; linking them generically would weaken tenant isolation.
+- Every new link validates the target entity against the task's business.
+- Relationship types are constrained to structured values such as related, customer, contact, regarding, billing, product and follow-up.
+- Link add/remove operations append immutable task activity events.
+- Generic links can survive later deletion of the target; the task UI marks such references as deleted instead of corrupting task history.
+
+### Bidirectional access
+
+- Task drawer can search real business entities and add/remove links.
+- Reverse lookup returns first-class tasks linked to any supported entity.
+- CRM Lead record exposes linked first-class tasks with quick create + complete/reopen.
+- CRM Deal record exposes linked first-class tasks with quick create + complete/reopen.
+- Customer 360 exposes first-class tasks linked to the Person/customer.
+- Legacy CRM Activity tasks remain separate and are explicitly labeled as such in the UI.
+
+### Phase 14 endpoints
+
+- `GET /api/v1/businesses/{business_id}/task-link-entity-types`
+- `GET /api/v1/businesses/{business_id}/task-link-targets`
+- `GET/POST /api/v1/businesses/{business_id}/tasks/{task_id}/entity-links`
+- `DELETE /api/v1/businesses/{business_id}/tasks/{task_id}/entity-links/{link_id}`
+- `GET /api/v1/businesses/{business_id}/entities/{entity_type}/{entity_id}/tasks`
+
+### Phase 14 acceptance gate
+
+- [x] No duplicate CRM ownership model.
+- [x] Cross-business entity links are rejected server-side.
+- [x] Task drawer supports searchable entity linking.
+- [x] Reverse entity-to-task lookup.
+- [x] Customer/Lead/Deal record surfaces expose first-class linked tasks.
+- [x] Legacy CRM tasks remain operational and semantically separate.

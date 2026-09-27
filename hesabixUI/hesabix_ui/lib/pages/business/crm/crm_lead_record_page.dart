@@ -16,6 +16,7 @@ import 'package:hesabix_ui/widgets/crm/crm_delete_confirm_dialog.dart';
 import 'package:hesabix_ui/widgets/crm/crm_follow_up_field.dart';
 import 'package:hesabix_ui/widgets/crm/crm_lead_form_dialog.dart';
 import 'package:hesabix_ui/widgets/crm/crm_section_card.dart';
+import 'package:hesabix_ui/widgets/task/entity_linked_tasks_card.dart';
 import 'package:hesabix_ui/widgets/permission/permission_widgets.dart';
 import 'package:hesabix_ui/core/hesabix_back.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
@@ -418,6 +419,15 @@ class _CrmLeadRecordPageState extends State<CrmLeadRecordPage> {
                         ),
                         const SizedBox(height: 12),
                       ],
+                      EntityLinkedTasksCard(
+                        businessId: widget.businessId,
+                        entityType: 'lead',
+                        entityId: widget.leadId.toString(),
+                        canWrite: _canWrite,
+                        title: 'کارهای مرتبط با سرنخ',
+                        relationshipType: 'follow_up',
+                      ),
+                      const SizedBox(height: 12),
                       if (_lead != null)
                         CrmAIAssistantWidget(
                           businessId: widget.businessId,

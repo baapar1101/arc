@@ -17,6 +17,7 @@ import 'package:hesabix_ui/widgets/crm/crm_deal_form_dialog.dart';
 import 'package:hesabix_ui/widgets/crm/crm_delete_confirm_dialog.dart';
 import 'package:hesabix_ui/widgets/crm/crm_follow_up_field.dart';
 import 'package:hesabix_ui/widgets/crm/crm_section_card.dart';
+import 'package:hesabix_ui/widgets/task/entity_linked_tasks_card.dart';
 import 'package:hesabix_ui/widgets/permission/permission_widgets.dart';
 import 'package:hesabix_ui/core/hesabix_back.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
@@ -396,6 +397,15 @@ class _CrmDealRecordPageState extends State<CrmDealRecordPage> {
                         ),
                         const SizedBox(height: 12),
                       ],
+                      EntityLinkedTasksCard(
+                        businessId: widget.businessId,
+                        entityType: 'deal',
+                        entityId: widget.dealId.toString(),
+                        canWrite: _canWrite,
+                        title: 'کارهای مرتبط با فرصت',
+                        relationshipType: 'follow_up',
+                      ),
+                      const SizedBox(height: 12),
                       if (_deal != null)
                         CrmAIAssistantWidget(
                           businessId: widget.businessId,

@@ -6,6 +6,7 @@ import 'package:hesabix_ui/models/person_model.dart';
 import 'package:hesabix_ui/services/crm_service.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
 import 'package:hesabix_ui/widgets/crm/crm_section_card.dart';
+import 'package:hesabix_ui/widgets/task/entity_linked_tasks_card.dart';
 import 'package:hesabix_ui/widgets/invoice/person_combobox_widget.dart';
 import 'package:hesabix_ui/widgets/permission/permission_widgets.dart';
 import 'package:hesabix_ui/services/telephony/telephony_session_controller.dart';
@@ -261,6 +262,15 @@ class _CrmCustomer360PageState extends State<CrmCustomer360Page> {
               ),
             ),
           ],
+          const SizedBox(height: 16),
+          EntityLinkedTasksCard(
+            businessId: widget.businessId,
+            entityType: 'person',
+            entityId: _personId.toString(),
+            canWrite: widget.authStore.hasBusinessPermission('crm', 'write'),
+            title: 'کارهای مرتبط با مشتری',
+            relationshipType: 'customer',
+          ),
           const SizedBox(height: 16),
           CrmSectionCard(
             title: 'تایم‌لاین',
