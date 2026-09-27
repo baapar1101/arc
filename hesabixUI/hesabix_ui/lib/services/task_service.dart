@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart' as dio;
 import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/models/task_model.dart';
 
@@ -630,6 +631,65 @@ class TaskService {
         .whereType<Map>()
         .map((e) => TaskModel.fromJson(Map<String, dynamic>.from(e)))
         .toList();
+  }
+
+
+  Future<List<TaskAttachmentModel>> listAttachments({
+    required int businessId,
+    required int taskId,
+  }) async {
+    final response = await apiClient.get(
+      '/api/v1/businesses/$businessId/tasks/$taskId/attachments',
+    );
+    final items = (response.data['data']?['items'] as List?) ?? const [];
+    return items
+        .whereType<Map>()
+        .map((e) => TaskAttachmentModel.fromJson(Map<String, dynamic>.from(e)))
+        .toList();
+  }
+
+  Future<TaskAttachmentModel> uploadAttachment({
+    required int businessId,
+    required int taskId,
+    required List<int> bytes,
+    required String filename,
+  }) async {
+    final form = dio.FormData.fromMap({
+      'file': dio.MultipartFile.fromBytes(bytes, filename: filename),
+    });
+    final response = await apiClient.post(
+      '/api/v1/businesses/$businessId/tasks/$taskId/attachments',
+      data: form,
+      options: dio.Options(contentType: 'multipart/form-data'),
+    );
+    return TaskAttachmentModel.fromJson(
+      Map<String, dynamic>.from(response.data['data']['attachment'] as Map),
+    );
+  }
+
+  Future<List<int>> downloadAttachment({
+    required int businessId,
+    required int taskId,
+    required int attachmentId,
+  }) async {
+    final response = await apiClient.get<List<int>>(
+      '/api/v1/businesses/$businessId/tasks/$taskId/attachments/$attachmentId/download',
+      options: dio.Options(
+        responseType: dio.ResponseType.bytes,
+        receiveTimeout: const Duration(minutes: 5),
+      ),
+    );
+    return response.data ?? <int>[];
+  }
+
+  Future<void> deleteAttachment({
+    required int businessId,
+    required int taskId,
+    required int attachmentId,
+  }) async {
+    await apiClient.delete(
+      '/api/v1/businesses/$businessId/tasks/$taskId/attachments/$attachmentId',
+    );
   }
 
 

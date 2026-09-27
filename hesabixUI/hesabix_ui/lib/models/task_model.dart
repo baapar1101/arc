@@ -625,3 +625,45 @@ class TaskEntityLinkModel {
     );
   }
 }
+
+
+
+class TaskAttachmentModel {
+  final int id;
+  final int taskId;
+  final String? fileStorageId;
+  final String originalName;
+  final String? mimeType;
+  final int sizeBytes;
+  final int? uploadedByUserId;
+  final String? uploadedByName;
+  final DateTime? createdAt;
+
+  const TaskAttachmentModel({
+    required this.id,
+    required this.taskId,
+    this.fileStorageId,
+    required this.originalName,
+    this.mimeType,
+    required this.sizeBytes,
+    this.uploadedByUserId,
+    this.uploadedByName,
+    this.createdAt,
+  });
+
+  factory TaskAttachmentModel.fromJson(Map<String, dynamic> json) {
+    return TaskAttachmentModel(
+      id: (json['id'] as num).toInt(),
+      taskId: (json['task_id'] as num).toInt(),
+      fileStorageId: json['file_storage_id']?.toString(),
+      originalName: json['original_name']?.toString() ?? 'attachment',
+      mimeType: json['mime_type']?.toString(),
+      sizeBytes: (json['size_bytes'] as num?)?.toInt() ?? 0,
+      uploadedByUserId: (json['uploaded_by_user_id'] as num?)?.toInt(),
+      uploadedByName: json['uploaded_by_name']?.toString(),
+      createdAt: _parseTaskDate(
+        json['created_at_raw'] ?? json['created_at'],
+      ),
+    );
+  }
+}

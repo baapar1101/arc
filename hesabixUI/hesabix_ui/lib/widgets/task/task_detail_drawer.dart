@@ -3,6 +3,7 @@ import 'package:hesabix_ui/models/project_model.dart';
 import 'package:hesabix_ui/models/task_model.dart';
 import 'package:hesabix_ui/theme/glass.dart';
 import 'package:hesabix_ui/widgets/task/task_structure_section.dart';
+import 'package:hesabix_ui/widgets/task/task_attachments_section.dart';
 import 'package:hesabix_ui/widgets/task/task_time_tracking_section.dart';
 import 'package:hesabix_ui/widgets/task/task_conversation_section.dart';
 import 'package:hesabix_ui/widgets/task/task_cycle_section.dart';
@@ -536,6 +537,11 @@ class _TaskDetailDrawerState extends State<TaskDetailDrawer> {
                     task: _task,
                     relationCandidates: widget.relationCandidates,
                     onTaskCreated: widget.onTaskCreated,
+                  ),
+                  const SizedBox(height: 22),
+                  TaskAttachmentsSection(
+                    businessId: widget.businessId,
+                    task: _task,
                   ),
                   const SizedBox(height: 22),
                   TaskConversationSection(

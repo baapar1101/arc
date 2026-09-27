@@ -776,3 +776,44 @@ A leader-only five-minute scanner is registered in `app/main.py` using the exist
 - [x] Overdue alerts.
 - [x] Existing notification preferences/channels reused.
 - [x] Background scanner is leader-only and idempotent.
+
+
+## Phase 16 — Attachments
+
+Implemented on 2026-09-27 using the existing Hesabix FileStorage subsystem.
+
+### Storage architecture
+
+- No binary content is stored in SQL task rows.
+- Each task upload is a normal FileStorage record with:
+  - `module_context = tasks`
+  - `context_id = task_id`
+  - the owning `business_id`
+- `task_attachments.file_storage_id` links task metadata to FileStorage.
+- Existing storage configuration, local/FTP backend handling, maximum-file-size checks, business storage plans and storage-usage accounting are reused.
+- A maximum of 50 attachments per task is enforced.
+- Removing an attachment soft-deletes the FileStorage item and releases its storage usage.
+- Attachment add/remove actions append immutable task activity events.
+
+### UX
+
+- The existing glass task drawer contains an Attachments section.
+- Cross-platform file selection uses the project's existing `file_picker`.
+- Download uses the existing `BytesExportService`, preserving browser/native save behavior.
+- File name, size, uploader and upload time are shown in the task context.
+
+### Phase 16 endpoints
+
+- `GET /api/v1/businesses/{business_id}/tasks/{task_id}/attachments`
+- `POST /api/v1/businesses/{business_id}/tasks/{task_id}/attachments`
+- `GET /api/v1/businesses/{business_id}/tasks/{task_id}/attachments/{attachment_id}/download`
+- `DELETE /api/v1/businesses/{business_id}/tasks/{task_id}/attachments/{attachment_id}`
+
+### Phase 16 acceptance gate
+
+- [x] Native upload.
+- [x] Tenant-scoped listing/download/delete.
+- [x] Central FileStorage integration.
+- [x] Storage plan/quota accounting reused.
+- [x] Cross-platform download UX.
+- [x] Activity feed events for attachment add/remove.
