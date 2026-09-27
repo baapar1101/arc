@@ -14,10 +14,15 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from dateutil.rrule import rrulestr
 
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from adapters.db.models.business import Business
 from adapters.db.models.business_permission import BusinessPermission
+from adapters.db.models.crm import CrmActivity, Deal, Lead
+from adapters.db.models.document import Document
+from adapters.db.models.person import Person
+from adapters.db.models.product import Product
 from adapters.db.models.project import Project
 from adapters.db.models.task_management import (
     Milestone,
@@ -27,6 +32,7 @@ from adapters.db.models.task_management import (
     TaskActivity,
     TaskAssignee,
     TaskComment,
+    TaskEntityLink,
     TaskLabel,
     TaskLabelLink,
     TaskRelation,
@@ -52,6 +58,24 @@ _DEFAULT_STATUSES = (
 
 _ALLOWED_PRIORITIES = {"low", "normal", "high", "urgent"}
 _ALLOWED_RELATION_TYPES = {"blocks", "related", "duplicates"}
+_TASK_ENTITY_TYPES = {
+    "person": "Person / Customer",
+    "lead": "CRM Lead",
+    "deal": "CRM Deal",
+    "crm_activity": "CRM Activity",
+    "document": "Accounting Document",
+    "product": "Product / Service",
+}
+_TASK_ENTITY_RELATION_TYPES = {
+    "related",
+    "customer",
+    "contact",
+    "source",
+    "regarding",
+    "billing",
+    "product",
+    "follow_up",
+}
 
 
 def _now() -> datetime:
@@ -2235,3 +2259,332 @@ def delete_time_entry(
         event_data=event_data,
     )
     db.commit()
+
+
+
+def list_task_entity_types() -> list[dict[str, str]]:
+    return [
+        {"key": key, "name": name}
+        for key, name in _TASK_ENTITY_TYPES.items()
+    ]
+
+
+def _entity_model(entity_type: str):
+    registry = {
+        "person": Person,
+        "lead": Lead,
+        "deal": Deal,
+        "crm_activity": CrmActivity,
+        "document": Document,
+        "product": Product,
+    }
+    model = registry.get(str(entity_type or "").strip())
+    if model is None:
+        raise ApiError(
+            "TASK_ENTITY_TYPE_INVALID",
+            "Unsupported task link entity type",
+            http_status=400,
+        )
+    return model
+
+
+def _entity_id_int(entity_id: Any) -> int:
+    try:
+        value = int(str(entity_id).strip())
+    except (TypeError, ValueError) as exc:
+        raise ApiError(
+            "TASK_ENTITY_ID_INVALID",
+            "Entity id must be a positive integer",
+            http_status=400,
+        ) from exc
+    if value <= 0:
+        raise ApiError(
+            "TASK_ENTITY_ID_INVALID",
+            "Entity id must be a positive integer",
+            http_status=400,
+        )
+    return value
+
+
+def _entity_target_dict(entity_type: str, entity: Any) -> dict[str, Any]:
+    title = f"{entity_type} #{getattr(entity, 'id', '')}"
+    subtitle = None
+
+    if entity_type == "person":
+        title = entity.alias_name or f"Person #{entity.id}"
+        subtitle = entity.company_name or entity.mobile or entity.email
+    elif entity_type == "lead":
+        title = entity.name or f"Lead #{entity.id}"
+        subtitle = " · ".join(
+            part for part in [entity.code, entity.company_name] if part
+        ) or entity.mobile or entity.email
+    elif entity_type == "deal":
+        title = entity.title or f"Deal #{entity.id}"
+        subtitle = entity.code
+    elif entity_type == "crm_activity":
+        title = entity.subject or f"CRM Activity {entity.code}"
+        subtitle = entity.activity_type
+    elif entity_type == "document":
+        title = f"{entity.document_type} · {entity.code}"
+        subtitle = entity.description
+    elif entity_type == "product":
+        title = entity.name or f"Product #{entity.id}"
+        subtitle = entity.code
+
+    return {
+        "entity_type": entity_type,
+        "entity_id": str(entity.id),
+        "title": title,
+        "subtitle": subtitle,
+    }
+
+
+def _require_task_entity_target(
+    db: Session,
+    business_id: int,
+    entity_type: str,
+    entity_id: Any,
+):
+    clean_type = str(entity_type or "").strip()
+    model = _entity_model(clean_type)
+    target_id = _entity_id_int(entity_id)
+    entity = db.query(model).filter(
+        model.id == target_id,
+        model.business_id == business_id,
+    ).first()
+    if entity is None:
+        raise ApiError(
+            "TASK_ENTITY_NOT_FOUND",
+            "Linked entity was not found in this business",
+            http_status=404,
+        )
+    return clean_type, entity
+
+
+def search_task_entity_targets(
+    db: Session,
+    business_id: int,
+    entity_type: str,
+    *,
+    search: Optional[str] = None,
+    limit: int = 25,
+) -> list[dict[str, Any]]:
+    _require_business(db, business_id)
+    clean_type = str(entity_type or "").strip()
+    model = _entity_model(clean_type)
+    query = db.query(model).filter(model.business_id == business_id)
+    term = str(search or "").strip()
+    if term:
+        pattern = f"%{term}%"
+        if clean_type == "person":
+            query = query.filter(or_(
+                Person.alias_name.ilike(pattern),
+                Person.company_name.ilike(pattern),
+                Person.first_name.ilike(pattern),
+                Person.last_name.ilike(pattern),
+                Person.mobile.ilike(pattern),
+                Person.email.ilike(pattern),
+            ))
+        elif clean_type == "lead":
+            query = query.filter(or_(
+                Lead.name.ilike(pattern),
+                Lead.company_name.ilike(pattern),
+                Lead.code.ilike(pattern),
+                Lead.mobile.ilike(pattern),
+                Lead.email.ilike(pattern),
+            ))
+        elif clean_type == "deal":
+            query = query.filter(or_(
+                Deal.title.ilike(pattern),
+                Deal.code.ilike(pattern),
+                Deal.description.ilike(pattern),
+            ))
+        elif clean_type == "crm_activity":
+            query = query.filter(or_(
+                CrmActivity.subject.ilike(pattern),
+                CrmActivity.code.ilike(pattern),
+                CrmActivity.description.ilike(pattern),
+            ))
+        elif clean_type == "document":
+            query = query.filter(or_(
+                Document.code.ilike(pattern),
+                Document.document_type.ilike(pattern),
+                Document.description.ilike(pattern),
+            ))
+        elif clean_type == "product":
+            query = query.filter(or_(
+                Product.name.ilike(pattern),
+                Product.code.ilike(pattern),
+                Product.description.ilike(pattern),
+            ))
+    rows = query.order_by(model.id.desc()).limit(max(1, min(int(limit), 50))).all()
+    return [_entity_target_dict(clean_type, row) for row in rows]
+
+
+def list_task_entity_links(
+    db: Session,
+    business_id: int,
+    task_id: int,
+) -> list[dict[str, Any]]:
+    _get_task_or_404(db, business_id, task_id)
+    rows = db.query(TaskEntityLink).filter(
+        TaskEntityLink.business_id == business_id,
+        TaskEntityLink.task_id == task_id,
+    ).order_by(TaskEntityLink.created_at.asc(), TaskEntityLink.id.asc()).all()
+
+    items: list[dict[str, Any]] = []
+    for row in rows:
+        target = None
+        try:
+            _, entity = _require_task_entity_target(
+                db,
+                business_id,
+                row.entity_type,
+                row.entity_id,
+            )
+            target = _entity_target_dict(row.entity_type, entity)
+        except ApiError:
+            target = {
+                "entity_type": row.entity_type,
+                "entity_id": row.entity_id,
+                "title": f"Deleted {row.entity_type} #{row.entity_id}",
+                "subtitle": None,
+            }
+        items.append({
+            "id": row.id,
+            "task_id": row.task_id,
+            "entity_type": row.entity_type,
+            "entity_id": row.entity_id,
+            "relationship_type": row.relationship_type,
+            "target": target,
+            "created_by_user_id": row.created_by_user_id,
+            "created_at": row.created_at,
+        })
+    return items
+
+
+def add_task_entity_link(
+    db: Session,
+    business_id: int,
+    task_id: int,
+    actor_user_id: int,
+    *,
+    entity_type: str,
+    entity_id: Any,
+    relationship_type: str = "related",
+) -> TaskEntityLink:
+    task = _get_task_or_404(db, business_id, task_id)
+    clean_type, entity = _require_task_entity_target(
+        db,
+        business_id,
+        entity_type,
+        entity_id,
+    )
+    clean_relation = str(relationship_type or "related").strip().lower()
+    if clean_relation not in _TASK_ENTITY_RELATION_TYPES:
+        raise ApiError(
+            "TASK_ENTITY_RELATION_INVALID",
+            "Unsupported task/entity relationship type",
+            http_status=400,
+        )
+    entity_id_text = str(entity.id)
+    existing = db.query(TaskEntityLink).filter(
+        TaskEntityLink.business_id == business_id,
+        TaskEntityLink.task_id == task.id,
+        TaskEntityLink.entity_type == clean_type,
+        TaskEntityLink.entity_id == entity_id_text,
+        TaskEntityLink.relationship_type == clean_relation,
+    ).first()
+    if existing:
+        return existing
+
+    row = TaskEntityLink(
+        business_id=business_id,
+        task_id=task.id,
+        entity_type=clean_type,
+        entity_id=entity_id_text,
+        relationship_type=clean_relation,
+        created_by_user_id=actor_user_id,
+    )
+    db.add(row)
+    db.flush()
+    _record_activity(
+        db,
+        task=task,
+        actor_user_id=actor_user_id,
+        event_type="entity_link_added",
+        event_data={
+            "link_id": row.id,
+            "entity_type": clean_type,
+            "entity_id": entity_id_text,
+            "relationship_type": clean_relation,
+        },
+    )
+    db.commit()
+    db.refresh(row)
+    return row
+
+
+def delete_task_entity_link(
+    db: Session,
+    business_id: int,
+    task_id: int,
+    link_id: int,
+    actor_user_id: int,
+) -> None:
+    task = _get_task_or_404(db, business_id, task_id)
+    row = db.query(TaskEntityLink).filter(
+        TaskEntityLink.id == link_id,
+        TaskEntityLink.business_id == business_id,
+        TaskEntityLink.task_id == task.id,
+    ).first()
+    if not row:
+        raise ApiError(
+            "TASK_ENTITY_LINK_NOT_FOUND",
+            "Task entity link not found",
+            http_status=404,
+        )
+    event_data = {
+        "link_id": row.id,
+        "entity_type": row.entity_type,
+        "entity_id": row.entity_id,
+        "relationship_type": row.relationship_type,
+    }
+    db.delete(row)
+    _record_activity(
+        db,
+        task=task,
+        actor_user_id=actor_user_id,
+        event_type="entity_link_removed",
+        event_data=event_data,
+    )
+    db.commit()
+
+
+def list_entity_linked_tasks(
+    db: Session,
+    business_id: int,
+    entity_type: str,
+    entity_id: Any,
+) -> list[Task]:
+    clean_type, entity = _require_task_entity_target(
+        db,
+        business_id,
+        entity_type,
+        entity_id,
+    )
+    task_ids = [
+        row[0]
+        for row in db.query(TaskEntityLink.task_id).filter(
+            TaskEntityLink.business_id == business_id,
+            TaskEntityLink.entity_type == clean_type,
+            TaskEntityLink.entity_id == str(entity.id),
+        ).distinct().all()
+    ]
+    if not task_ids:
+        return []
+    return db.query(Task).filter(
+        Task.business_id == business_id,
+        Task.id.in_(task_ids),
+        Task.deleted_at.is_(None),
+    ).order_by(Task.due_at.asc().nullslast(), Task.created_at.desc()).all()

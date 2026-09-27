@@ -142,3 +142,10 @@ class TaskTimeEntryUpdateRequest(BaseModel):
     ended_at: Optional[datetime] = None
     description: Optional[str] = None
     billable: Optional[bool] = None
+
+
+
+class TaskEntityLinkCreateRequest(BaseModel):
+    entity_type: str = Field(..., min_length=1, max_length=50)
+    entity_id: str = Field(..., min_length=1, max_length=64)
+    relationship_type: str = Field(default="related", min_length=1, max_length=50)

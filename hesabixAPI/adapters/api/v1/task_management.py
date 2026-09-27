@@ -12,6 +12,7 @@ from adapters.api.v1.schema_models.task_management import (
     TaskCommentUpdateRequest,
     TaskCreateRequest,
     TaskCyclesAssignRequest,
+    TaskEntityLinkCreateRequest,
     TaskLabelCreateRequest,
     TaskLabelUpdateRequest,
     TaskLabelsAssignRequest,
@@ -35,6 +36,7 @@ from app.core.responses import ApiError, format_datetime_fields, success_respons
 from app.services.task_management_service import (
     add_task_comment,
     add_task_relation,
+    add_task_entity_link,
     create_saved_task_view,
     create_task_label,
     complete_task,
@@ -43,6 +45,7 @@ from app.services.task_management_service import (
     create_task,
     delete_saved_task_view,
     delete_task_comment,
+    delete_task_entity_link,
     delete_task_reminder,
     delete_task_label,
     ensure_default_task_statuses,
@@ -51,12 +54,16 @@ from app.services.task_management_service import (
     list_available_assignees,
     list_saved_task_views,
     list_task_activity,
+    list_task_entity_links,
+    list_task_entity_types,
     list_task_comments,
     list_task_cycles,
     list_task_reminders,
     list_task_labels,
     list_time_entries,
+    list_entity_linked_tasks,
     move_task,
+    search_task_entity_targets,
     delete_task_relation,
     reopen_task,
     replace_task_assignees,
@@ -776,6 +783,149 @@ async def replace_task_cycles_endpoint(
         ),
         request=request,
         message="TASK_CYCLES_UPDATED",
+    )
+
+
+@router.get("/businesses/{business_id}/task-link-entity-types")
+@require_business_access("business_id")
+async def list_task_link_entity_types_endpoint(
+    request: Request,
+    business_id: int = Path(..., gt=0),
+    ctx: AuthContext = Depends(get_current_user),
+):
+    del business_id, ctx
+    return success_response(
+        data={"items": list_task_entity_types()},
+        request=request,
+        message="TASK_ENTITY_TYPES_FETCHED",
+    )
+
+
+@router.get("/businesses/{business_id}/task-link-targets")
+@require_business_access("business_id")
+async def search_task_link_targets_endpoint(
+    request: Request,
+    business_id: int = Path(..., gt=0),
+    entity_type: str = Query(..., min_length=1, max_length=50),
+    search: Optional[str] = Query(None),
+    limit: int = Query(25, ge=1, le=50),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+):
+    del ctx
+    items = search_task_entity_targets(
+        db,
+        business_id,
+        entity_type,
+        search=search,
+        limit=limit,
+    )
+    return success_response(
+        data={"items": items},
+        request=request,
+        message="TASK_LINK_TARGETS_FETCHED",
+    )
+
+
+@router.get("/businesses/{business_id}/tasks/{task_id}/entity-links")
+@require_business_access("business_id")
+async def list_task_entity_links_endpoint(
+    request: Request,
+    business_id: int = Path(..., gt=0),
+    task_id: int = Path(..., gt=0),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+):
+    del ctx
+    items = list_task_entity_links(db, business_id, task_id)
+    return success_response(
+        data=format_datetime_fields(
+            {"items": items},
+            request,
+            business_id=business_id,
+        ),
+        request=request,
+        message="TASK_ENTITY_LINKS_FETCHED",
+    )
+
+
+@router.post("/businesses/{business_id}/tasks/{task_id}/entity-links")
+@require_business_access("business_id")
+async def add_task_entity_link_endpoint(
+    request: Request,
+    data: TaskEntityLinkCreateRequest,
+    business_id: int = Path(..., gt=0),
+    task_id: int = Path(..., gt=0),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+):
+    row = add_task_entity_link(
+        db,
+        business_id,
+        task_id,
+        ctx.get_user_id(),
+        entity_type=data.entity_type,
+        entity_id=data.entity_id,
+        relationship_type=data.relationship_type,
+    )
+    items = list_task_entity_links(db, business_id, task_id)
+    item = next((value for value in items if value["id"] == row.id), None)
+    return success_response(
+        data=format_datetime_fields(
+            {"link": item},
+            request,
+            business_id=business_id,
+        ),
+        request=request,
+        message="TASK_ENTITY_LINK_CREATED",
+    )
+
+
+@router.delete("/businesses/{business_id}/tasks/{task_id}/entity-links/{link_id}")
+@require_business_access("business_id")
+async def delete_task_entity_link_endpoint(
+    request: Request,
+    business_id: int = Path(..., gt=0),
+    task_id: int = Path(..., gt=0),
+    link_id: int = Path(..., gt=0),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+):
+    delete_task_entity_link(
+        db,
+        business_id,
+        task_id,
+        link_id,
+        ctx.get_user_id(),
+    )
+    return success_response(
+        data={"id": link_id},
+        request=request,
+        message="TASK_ENTITY_LINK_DELETED",
+    )
+
+
+@router.get("/businesses/{business_id}/entities/{entity_type}/{entity_id}/tasks")
+@require_business_access("business_id")
+async def list_entity_linked_tasks_endpoint(
+    request: Request,
+    business_id: int = Path(..., gt=0),
+    entity_type: str = Path(..., min_length=1, max_length=50),
+    entity_id: str = Path(..., min_length=1, max_length=64),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+):
+    del ctx
+    tasks = list_entity_linked_tasks(
+        db,
+        business_id,
+        entity_type,
+        entity_id,
+    )
+    return success_response(
+        data={"items": [_format_task(task, db, request) for task in tasks]},
+        request=request,
+        message="ENTITY_TASKS_FETCHED",
     )
 
 
