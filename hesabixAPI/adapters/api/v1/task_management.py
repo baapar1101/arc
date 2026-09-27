@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any, Optional
 
-from fastapi import APIRouter, Depends, Path, Query, Request
+from fastapi import APIRouter, Depends, File, Path, Query, Request, Response, UploadFile
 from sqlalchemy.orm import Session
 
 from adapters.api.v1.schema_models.task_management import (
@@ -33,6 +33,7 @@ from adapters.db.session import get_db
 from app.core.auth_dependency import AuthContext, get_current_user
 from app.core.permissions import require_business_access
 from app.core.responses import ApiError, format_datetime_fields, success_response
+from app.services.task_attachment_service import TaskAttachmentService
 from app.services.task_management_service import (
     add_task_comment,
     add_task_relation,
@@ -926,6 +927,102 @@ async def list_entity_linked_tasks_endpoint(
         data={"items": [_format_task(task, db, request) for task in tasks]},
         request=request,
         message="ENTITY_TASKS_FETCHED",
+    )
+
+
+@router.get("/businesses/{business_id}/tasks/{task_id}/attachments")
+@require_business_access("business_id")
+async def list_task_attachments_endpoint(
+    request: Request,
+    business_id: int = Path(..., gt=0),
+    task_id: int = Path(..., gt=0),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+):
+    del ctx
+    service = TaskAttachmentService(db)
+    items = service.list(business_id, task_id)
+    return success_response(
+        data=format_datetime_fields(
+            {"items": [service.to_dict(item) for item in items]},
+            request,
+            business_id=business_id,
+        ),
+        request=request,
+        message="TASK_ATTACHMENTS_FETCHED",
+    )
+
+
+@router.post("/businesses/{business_id}/tasks/{task_id}/attachments")
+@require_business_access("business_id")
+async def upload_task_attachment_endpoint(
+    request: Request,
+    business_id: int = Path(..., gt=0),
+    task_id: int = Path(..., gt=0),
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+):
+    service = TaskAttachmentService(db)
+    item = await service.upload(
+        business_id=business_id,
+        task_id=task_id,
+        user_id=ctx.get_user_id(),
+        file=file,
+    )
+    return success_response(
+        data=format_datetime_fields(
+            {"attachment": service.to_dict(item)},
+            request,
+            business_id=business_id,
+        ),
+        request=request,
+        message="TASK_ATTACHMENT_CREATED",
+    )
+
+
+@router.get("/businesses/{business_id}/tasks/{task_id}/attachments/{attachment_id}/download")
+@require_business_access("business_id")
+async def download_task_attachment_endpoint(
+    business_id: int = Path(..., gt=0),
+    task_id: int = Path(..., gt=0),
+    attachment_id: int = Path(..., gt=0),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+):
+    del ctx
+    service = TaskAttachmentService(db)
+    data = await service.download(business_id, task_id, attachment_id)
+    return Response(
+        content=data["content"],
+        media_type=data["mime_type"],
+        headers={
+            "Content-Disposition": f'attachment; filename="{data["filename"]}"'
+        },
+    )
+
+
+@router.delete("/businesses/{business_id}/tasks/{task_id}/attachments/{attachment_id}")
+@require_business_access("business_id")
+async def delete_task_attachment_endpoint(
+    request: Request,
+    business_id: int = Path(..., gt=0),
+    task_id: int = Path(..., gt=0),
+    attachment_id: int = Path(..., gt=0),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+):
+    service = TaskAttachmentService(db)
+    await service.delete(
+        business_id=business_id,
+        task_id=task_id,
+        attachment_id=attachment_id,
+        actor_user_id=ctx.get_user_id(),
+    )
+    return success_response(
+        data={"id": attachment_id},
+        request=request,
+        message="TASK_ATTACHMENT_DELETED",
     )
 
 
