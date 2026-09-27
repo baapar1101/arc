@@ -544,3 +544,84 @@ class TaskTimeEntryModel {
     );
   }
 }
+
+
+
+class TaskEntityTypeModel {
+  final String key;
+  final String name;
+
+  const TaskEntityTypeModel({
+    required this.key,
+    required this.name,
+  });
+
+  factory TaskEntityTypeModel.fromJson(Map<String, dynamic> json) {
+    return TaskEntityTypeModel(
+      key: json['key']?.toString() ?? '',
+      name: json['name']?.toString() ?? '',
+    );
+  }
+}
+
+class TaskLinkTargetModel {
+  final String entityType;
+  final String entityId;
+  final String title;
+  final String? subtitle;
+
+  const TaskLinkTargetModel({
+    required this.entityType,
+    required this.entityId,
+    required this.title,
+    this.subtitle,
+  });
+
+  factory TaskLinkTargetModel.fromJson(Map<String, dynamic> json) {
+    return TaskLinkTargetModel(
+      entityType: json['entity_type']?.toString() ?? '',
+      entityId: json['entity_id']?.toString() ?? '',
+      title: json['title']?.toString() ?? '',
+      subtitle: json['subtitle']?.toString(),
+    );
+  }
+}
+
+class TaskEntityLinkModel {
+  final int id;
+  final int taskId;
+  final String entityType;
+  final String entityId;
+  final String relationshipType;
+  final TaskLinkTargetModel target;
+  final int? createdByUserId;
+  final DateTime? createdAt;
+
+  const TaskEntityLinkModel({
+    required this.id,
+    required this.taskId,
+    required this.entityType,
+    required this.entityId,
+    required this.relationshipType,
+    required this.target,
+    this.createdByUserId,
+    this.createdAt,
+  });
+
+  factory TaskEntityLinkModel.fromJson(Map<String, dynamic> json) {
+    return TaskEntityLinkModel(
+      id: (json['id'] as num).toInt(),
+      taskId: (json['task_id'] as num).toInt(),
+      entityType: json['entity_type']?.toString() ?? '',
+      entityId: json['entity_id']?.toString() ?? '',
+      relationshipType: json['relationship_type']?.toString() ?? 'related',
+      target: TaskLinkTargetModel.fromJson(
+        Map<String, dynamic>.from((json['target'] as Map?) ?? const {}),
+      ),
+      createdByUserId: (json['created_by_user_id'] as num?)?.toInt(),
+      createdAt: _parseTaskDate(
+        json['created_at_raw'] ?? json['created_at'],
+      ),
+    );
+  }
+}

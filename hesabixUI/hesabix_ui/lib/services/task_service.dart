@@ -539,4 +539,98 @@ class TaskService {
       Map<String, dynamic>.from(response.data['data']['task'] as Map),
     );
   }
+  Future<List<TaskEntityTypeModel>> listEntityTypes({
+    required int businessId,
+  }) async {
+    final response = await apiClient.get(
+      '/api/v1/businesses/$businessId/task-link-entity-types',
+    );
+    final items = (response.data['data']?['items'] as List?) ?? const [];
+    return items
+        .whereType<Map>()
+        .map((e) => TaskEntityTypeModel.fromJson(Map<String, dynamic>.from(e)))
+        .toList();
+  }
+
+  Future<List<TaskLinkTargetModel>> searchEntityTargets({
+    required int businessId,
+    required String entityType,
+    String? search,
+    int limit = 25,
+  }) async {
+    final response = await apiClient.get(
+      '/api/v1/businesses/$businessId/task-link-targets',
+      query: {
+        'entity_type': entityType,
+        if (search != null && search.trim().isNotEmpty) 'search': search.trim(),
+        'limit': limit,
+      },
+    );
+    final items = (response.data['data']?['items'] as List?) ?? const [];
+    return items
+        .whereType<Map>()
+        .map((e) => TaskLinkTargetModel.fromJson(Map<String, dynamic>.from(e)))
+        .toList();
+  }
+
+  Future<List<TaskEntityLinkModel>> listEntityLinks({
+    required int businessId,
+    required int taskId,
+  }) async {
+    final response = await apiClient.get(
+      '/api/v1/businesses/$businessId/tasks/$taskId/entity-links',
+    );
+    final items = (response.data['data']?['items'] as List?) ?? const [];
+    return items
+        .whereType<Map>()
+        .map((e) => TaskEntityLinkModel.fromJson(Map<String, dynamic>.from(e)))
+        .toList();
+  }
+
+  Future<TaskEntityLinkModel> addEntityLink({
+    required int businessId,
+    required int taskId,
+    required String entityType,
+    required String entityId,
+    String relationshipType = 'related',
+  }) async {
+    final response = await apiClient.post(
+      '/api/v1/businesses/$businessId/tasks/$taskId/entity-links',
+      data: {
+        'entity_type': entityType,
+        'entity_id': entityId,
+        'relationship_type': relationshipType,
+      },
+    );
+    return TaskEntityLinkModel.fromJson(
+      Map<String, dynamic>.from(response.data['data']['link'] as Map),
+    );
+  }
+
+  Future<void> deleteEntityLink({
+    required int businessId,
+    required int taskId,
+    required int linkId,
+  }) async {
+    await apiClient.delete(
+      '/api/v1/businesses/$businessId/tasks/$taskId/entity-links/$linkId',
+    );
+  }
+
+  Future<List<TaskModel>> listTasksForEntity({
+    required int businessId,
+    required String entityType,
+    required String entityId,
+  }) async {
+    final response = await apiClient.get(
+      '/api/v1/businesses/$businessId/entities/$entityType/$entityId/tasks',
+    );
+    final items = (response.data['data']?['items'] as List?) ?? const [];
+    return items
+        .whereType<Map>()
+        .map((e) => TaskModel.fromJson(Map<String, dynamic>.from(e)))
+        .toList();
+  }
+
+
 }

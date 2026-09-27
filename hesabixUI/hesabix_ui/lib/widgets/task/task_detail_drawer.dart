@@ -6,6 +6,7 @@ import 'package:hesabix_ui/widgets/task/task_structure_section.dart';
 import 'package:hesabix_ui/widgets/task/task_time_tracking_section.dart';
 import 'package:hesabix_ui/widgets/task/task_conversation_section.dart';
 import 'package:hesabix_ui/widgets/task/task_cycle_section.dart';
+import 'package:hesabix_ui/widgets/task/task_entity_links_section.dart';
 import 'package:hesabix_ui/widgets/task/task_labels_section.dart';
 import 'package:hesabix_ui/widgets/task/task_milestone_section.dart';
 import 'package:hesabix_ui/widgets/task/task_recurrence_reminder_section.dart';
@@ -511,6 +512,11 @@ class _TaskDetailDrawerState extends State<TaskDetailDrawer> {
                     businessId: widget.businessId,
                     task: _task,
                     onUpdate: _updateProperty,
+                  ),
+                  const SizedBox(height: 22),
+                  TaskEntityLinksSection(
+                    businessId: widget.businessId,
+                    task: _task,
                   ),
                   const SizedBox(height: 22),
                   TaskLabelsSection(
