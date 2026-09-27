@@ -482,6 +482,15 @@ def upsert_project_member(
     db.add(member)
     db.commit()
     db.refresh(member)
+    from app.services.task_notification_service import notify_project_member_added
+    notify_project_member_added(
+        db,
+        business_id=business_id,
+        project_id=project.id,
+        project_name=project.name,
+        user_id=user.id,
+        actor_user_id=actor_user_id,
+    )
     return member
 
 
