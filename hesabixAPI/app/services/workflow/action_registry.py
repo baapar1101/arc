@@ -125,6 +125,9 @@ class ActionRegistry:
             MergeDataAction,
             SplitInBatchesAction,
         )
+        from app.services.workflow.actions.task_actions import (
+            InstantiateTaskTemplateAction,
+        )
         
         # Communication actions
         self.register("send_email", SendEmailAction())
@@ -181,6 +184,12 @@ class ActionRegistry:
         self.register("query_invoices", QueryInvoicesAction())
         self.register("query_receipts_payments", QueryReceiptsPaymentsAction())
         self.register("query_warehouse_documents", QueryWarehouseDocumentsAction())
+
+        # Native task/project automation
+        self.register(
+            "task_template_instantiate",
+            InstantiateTaskTemplateAction(),
+        )
 
         # Flow control
         self.register("wait", WaitAction())
