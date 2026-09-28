@@ -177,6 +177,7 @@ from .task_management import (  # noqa: F401
     TaskLabel,
     TaskLabelLink,
     TaskSavedView,
+    TaskProjectTemplate,
     TaskRelation,
     TaskComment,
     TaskAttachment,

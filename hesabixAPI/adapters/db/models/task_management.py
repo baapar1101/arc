@@ -230,6 +230,69 @@ class TaskSavedView(Base):
     project = relationship("Project")
 
 
+class TaskProjectTemplate(Base):
+    """Reusable native project/task blueprint."""
+
+    __tablename__ = "task_project_templates"
+    __table_args__ = (
+        UniqueConstraint(
+            "business_id",
+            "name",
+            name="uq_task_project_templates_business_name",
+        ),
+        Index(
+            "ix_task_project_templates_business_active",
+            "business_id",
+            "is_active",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    business_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("businesses.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    name: Mapped[str] = mapped_column(String(160), nullable=False)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    project_defaults_json: Mapped[dict] = mapped_column(
+        JSON,
+        nullable=False,
+        default=dict,
+    )
+    tasks_json: Mapped[list] = mapped_column(
+        JSON,
+        nullable=False,
+        default=list,
+    )
+    is_active: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=True,
+        server_default="true",
+    )
+    created_by_user_id: Mapped[int | None] = mapped_column(
+        Integer,
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=_utc_now,
+        nullable=False,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=_utc_now,
+        onupdate=_utc_now,
+        nullable=False,
+    )
+
+    business = relationship("Business")
+    created_by = relationship("User", foreign_keys=[created_by_user_id])
+
+
 class Task(Base):
     """First-class task/work-item independent from CRM activity logs."""
 
