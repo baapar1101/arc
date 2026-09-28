@@ -4,6 +4,7 @@ import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/models/project_model.dart';
 import 'package:hesabix_ui/models/task_model.dart';
 import 'package:hesabix_ui/services/project_service.dart';
+import 'package:hesabix_ui/services/bytes_export/bytes_export_service.dart';
 import 'package:hesabix_ui/services/task_service.dart';
 import 'package:hesabix_ui/theme/glass.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
@@ -43,6 +44,9 @@ class _ProjectWorkspacePageState extends State<ProjectWorkspacePage>
   List<ProjectModel> _projects = const [];
   List<ProjectMilestoneModel> _milestones = const [];
   List<ProjectCycleModel> _cycles = const [];
+  List<Map<String, dynamic>> _projectActivity = const [];
+  List<Map<String, dynamic>> _projectFiles = const [];
+  final Set<int> _busyFileIds = <int>{};
   TaskModel? _selectedTask;
   bool _loading = true;
   String? _error;
@@ -52,7 +56,7 @@ class _ProjectWorkspacePageState extends State<ProjectWorkspacePage>
     super.initState();
     _projectsService = ProjectService(ApiClient());
     _tasksService = TaskService(ApiClient());
-    _tabs = TabController(length: 8, vsync: this);
+    _tabs = TabController(length: 11, vsync: this);
     _load();
   }
 
@@ -84,6 +88,14 @@ class _ProjectWorkspacePageState extends State<ProjectWorkspacePage>
           businessId: widget.businessId,
           projectId: widget.projectId,
         ),
+        _projectsService.listProjectActivity(
+          businessId: widget.businessId,
+          projectId: widget.projectId,
+        ),
+        _projectsService.listProjectFiles(
+          businessId: widget.businessId,
+          projectId: widget.projectId,
+        ),
       ]);
       final ws = Map<String, dynamic>.from(r[0] as Map);
       final taskResult = Map<String, dynamic>.from(r[1] as Map);
@@ -106,6 +118,8 @@ class _ProjectWorkspacePageState extends State<ProjectWorkspacePage>
                 .toList();
         _milestones = r[6] as List<ProjectMilestoneModel>;
         _cycles = r[7] as List<ProjectCycleModel>;
+        _projectActivity = r[8] as List<Map<String, dynamic>>;
+        _projectFiles = r[9] as List<Map<String, dynamic>>;
         _loading = false;
       });
     } catch (e) {
@@ -440,6 +454,9 @@ class _ProjectWorkspacePageState extends State<ProjectWorkspacePage>
           Tab(icon: Icon(Icons.flag_outlined), text: 'Milestones'),
           Tab(icon: Icon(Icons.autorenew_rounded), text: 'Cycles'),
           Tab(icon: Icon(Icons.timer_outlined), text: 'Timesheet'),
+          Tab(icon: Icon(Icons.history_rounded), text: 'Activity'),
+          Tab(icon: Icon(Icons.folder_outlined), text: 'Files'),
+          Tab(icon: Icon(Icons.settings_outlined), text: 'Settings'),
         ]),
       ),
       body: SafeArea(
@@ -457,13 +474,13 @@ class _ProjectWorkspacePageState extends State<ProjectWorkspacePage>
                 : mobile
                     ? TabBarView(
                         controller: _tabs,
-                        children: [_overview(), _taskList(), _board(), _calendar(), _timeline(), _milestonesView(), _cyclesView(), _timesheetView()],
+                        children: [_overview(), _taskList(), _board(), _calendar(), _timeline(), _milestonesView(), _cyclesView(), _timesheetView(), _activityView(), _filesView(), _settingsView()],
                       )
                     : Row(children: [
                         Expanded(
                           child: TabBarView(
                             controller: _tabs,
-                            children: [_overview(), _taskList(), _board(), _calendar(), _timeline(), _milestonesView(), _cyclesView(), _timesheetView()],
+                            children: [_overview(), _taskList(), _board(), _calendar(), _timeline(), _milestonesView(), _cyclesView(), _timesheetView(), _activityView(), _filesView(), _settingsView()],
                           ),
                         ),
                         AnimatedContainer(
@@ -566,6 +583,297 @@ class _ProjectWorkspacePageState extends State<ProjectWorkspacePage>
       Expanded(child: Text(value, style: const TextStyle(fontWeight: FontWeight.w600))),
     ]),
   );
+
+  TaskModel? _taskById(int taskId) {
+    for (final task in _tasks) {
+      if (task.id == taskId) return task;
+    }
+    return null;
+  }
+
+  String _activityLabel(String type) {
+    const labels = <String, String>{
+      'task_created': 'کار ایجاد شد',
+      'task_updated': 'کار ویرایش شد',
+      'task_completed': 'کار تکمیل شد',
+      'task_reopened': 'کار دوباره باز شد',
+      'task_moved': 'کار جابه‌جا شد',
+      'task_deleted': 'کار حذف شد',
+      'task_restored': 'کار بازیابی شد',
+      'comment_added': 'نظر جدید ثبت شد',
+      'comment_edited': 'نظر ویرایش شد',
+      'comment_deleted': 'نظر حذف شد',
+      'attachment_added': 'فایل اضافه شد',
+      'attachment_removed': 'فایل حذف شد',
+      'task_relation_added': 'وابستگی اضافه شد',
+      'task_relation_removed': 'وابستگی حذف شد',
+      'timer_started': 'تایمر شروع شد',
+      'timer_stopped': 'تایمر متوقف شد',
+    };
+    return labels[type] ?? type.replaceAll('_', ' ');
+  }
+
+  String _workspaceDate(dynamic raw) {
+    final parsed = DateTime.tryParse(raw?.toString() ?? '');
+    if (parsed == null) return '-';
+    return DateFormat('yyyy/MM/dd HH:mm').format(parsed.toLocal());
+  }
+
+  String _fileSize(dynamic raw) {
+    final bytes = (raw as num?)?.toInt() ?? 0;
+    if (bytes < 1024) return '$bytes B';
+    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
+    return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+  }
+
+  Future<void> _downloadProjectFile(Map<String, dynamic> item) async {
+    final attachmentId = (item['id'] as num?)?.toInt();
+    final taskId = (item['task_id'] as num?)?.toInt();
+    if (attachmentId == null || taskId == null || _busyFileIds.contains(attachmentId)) return;
+    setState(() => _busyFileIds.add(attachmentId));
+    try {
+      final bytes = await _tasksService.downloadAttachment(
+        businessId: widget.businessId,
+        taskId: taskId,
+        attachmentId: attachmentId,
+      );
+      final result = await BytesExportService.export(
+        bytes: bytes,
+        filename: item['original_name']?.toString() ?? 'attachment',
+        mimeType: item['mime_type']?.toString(),
+      );
+      if (mounted) BytesExportService.showFeedback(context, result);
+    } catch (e) {
+      if (mounted) SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
+    } finally {
+      if (mounted) setState(() => _busyFileIds.remove(attachmentId));
+    }
+  }
+
+  Future<void> _editProjectSettings() async {
+    final project = _project;
+    if (project == null) return;
+    final name = TextEditingController(text: project.name);
+    final description = TextEditingController(text: project.description ?? '');
+    var status = project.status;
+    var active = project.isActive;
+    final payload = await showGlassDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          title: const Text('تنظیمات پروژه'),
+          content: SizedBox(
+            width: 560,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  TextField(controller: name, decoration: const InputDecoration(labelText: 'نام پروژه')),
+                  const SizedBox(height: 10),
+                  TextField(
+                    controller: description,
+                    minLines: 3,
+                    maxLines: 6,
+                    decoration: const InputDecoration(labelText: 'توضیحات', alignLabelWithHint: true),
+                  ),
+                  const SizedBox(height: 10),
+                  DropdownButtonFormField<String>(
+                    value: status,
+                    decoration: const InputDecoration(labelText: 'وضعیت'),
+                    items: const [
+                      DropdownMenuItem(value: 'active', child: Text('فعال')),
+                      DropdownMenuItem(value: 'completed', child: Text('تکمیل‌شده')),
+                      DropdownMenuItem(value: 'on_hold', child: Text('متوقف')),
+                      DropdownMenuItem(value: 'cancelled', child: Text('لغوشده')),
+                    ],
+                    onChanged: (value) {
+                      if (value != null) setDialogState(() => status = value);
+                    },
+                  ),
+                  SwitchListTile.adaptive(
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('پروژه فعال باشد'),
+                    value: active,
+                    onChanged: (value) => setDialogState(() => active = value),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('انصراف')),
+            FilledButton(
+              onPressed: () {
+                if (name.text.trim().isEmpty) return;
+                Navigator.pop(ctx, {
+                  'name': name.text.trim(),
+                  'description': description.text.trim(),
+                  'status': status,
+                  'is_active': active,
+                });
+              },
+              child: const Text('ذخیره'),
+            ),
+          ],
+        ),
+      ),
+    );
+    name.dispose();
+    description.dispose();
+    if (payload == null) return;
+    try {
+      await _projectsService.updateProject(projectId: widget.projectId, data: payload);
+      await _load();
+      if (mounted) SnackBarHelper.showSuccess(context, message: 'تنظیمات پروژه ذخیره شد');
+    } catch (e) {
+      if (mounted) SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
+    }
+  }
+
+  Widget _activityView() {
+    final pad = ResponsiveHelper.getPadding(context);
+    return RefreshIndicator(
+      onRefresh: _load,
+      child: ListView(
+        padding: EdgeInsets.fromLTRB(pad, 16, pad, 30),
+        children: [
+          GlassSurface(
+            padding: const EdgeInsets.all(18),
+            child: Row(children: [
+              const Icon(Icons.history_rounded),
+              const SizedBox(width: 10),
+              Expanded(child: Text('فعالیت پروژه', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800))),
+              Text('${_projectActivity.length} رویداد'),
+            ]),
+          ),
+          const SizedBox(height: 10),
+          if (_projectActivity.isEmpty)
+            const GlassSurface(padding: EdgeInsets.all(36), child: Center(child: Text('هنوز فعالیتی برای کارهای این پروژه ثبت نشده است.')))
+          else
+            ..._projectActivity.map((item) {
+              final taskId = (item['task_id'] as num?)?.toInt();
+              final task = taskId == null ? null : _taskById(taskId);
+              final actor = item['actor_name']?.toString();
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: GlassSurface(
+                  padding: const EdgeInsets.all(6),
+                  child: ListTile(
+                    leading: const CircleAvatar(child: Icon(Icons.bolt_outlined)),
+                    title: Text(_activityLabel(item['event_type']?.toString() ?? 'activity'), style: const TextStyle(fontWeight: FontWeight.w700)),
+                    subtitle: Text([
+                      item['task_title']?.toString() ?? 'Task',
+                      if (actor?.isNotEmpty == true) actor!,
+                      _workspaceDate(item['created_at']),
+                    ].join(' · ')),
+                    trailing: task == null ? null : const Icon(Icons.chevron_left_rounded),
+                    onTap: task == null ? null : () => _openTask(task),
+                  ),
+                ),
+              );
+            }),
+        ],
+      ),
+    );
+  }
+
+  Widget _filesView() {
+    final pad = ResponsiveHelper.getPadding(context);
+    return RefreshIndicator(
+      onRefresh: _load,
+      child: ListView(
+        padding: EdgeInsets.fromLTRB(pad, 16, pad, 30),
+        children: [
+          GlassSurface(
+            padding: const EdgeInsets.all(18),
+            child: Row(children: [
+              const Icon(Icons.folder_outlined),
+              const SizedBox(width: 10),
+              Expanded(child: Text('فایل‌های پروژه', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800))),
+              Text('${_projectFiles.length} فایل'),
+            ]),
+          ),
+          const SizedBox(height: 10),
+          if (_projectFiles.isEmpty)
+            const GlassSurface(padding: EdgeInsets.all(36), child: Center(child: Text('پیوستی در کارهای این پروژه ثبت نشده است.')))
+          else
+            ..._projectFiles.map((item) {
+              final attachmentId = (item['id'] as num?)?.toInt();
+              final taskId = (item['task_id'] as num?)?.toInt();
+              final task = taskId == null ? null : _taskById(taskId);
+              final busy = attachmentId != null && _busyFileIds.contains(attachmentId);
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: GlassSurface(
+                  padding: const EdgeInsets.all(6),
+                  child: ListTile(
+                    leading: const CircleAvatar(child: Icon(Icons.insert_drive_file_outlined)),
+                    title: Text(item['original_name']?.toString() ?? 'Attachment', style: const TextStyle(fontWeight: FontWeight.w700)),
+                    subtitle: Text([
+                      item['task_title']?.toString() ?? 'Task',
+                      _fileSize(item['size_bytes']),
+                      if (item['uploader_name']?.toString().isNotEmpty == true) item['uploader_name'].toString(),
+                      _workspaceDate(item['created_at']),
+                    ].join(' · ')),
+                    onTap: task == null ? null : () => _openTask(task),
+                    trailing: IconButton(
+                      tooltip: 'دانلود',
+                      onPressed: busy ? null : () => _downloadProjectFile(item),
+                      icon: busy
+                          ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                          : const Icon(Icons.download_outlined),
+                    ),
+                  ),
+                ),
+              );
+            }),
+        ],
+      ),
+    );
+  }
+
+  Widget _settingsView() {
+    final project = _project!;
+    final pad = ResponsiveHelper.getPadding(context);
+    return ListView(
+      padding: EdgeInsets.fromLTRB(pad, 16, pad, 30),
+      children: [
+        GlassSurface(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(children: [
+                const Icon(Icons.settings_outlined),
+                const SizedBox(width: 10),
+                Expanded(child: Text('تنظیمات پروژه', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800))),
+                FilledButton.icon(onPressed: _editProjectSettings, icon: const Icon(Icons.edit_outlined), label: const Text('ویرایش')),
+              ]),
+              const SizedBox(height: 16),
+              _info('کد پروژه', project.code),
+              _info('نام', project.name),
+              _info('وضعیت', project.statusName),
+              _info('فعال', project.isActive ? 'بله' : 'خیر'),
+              _info('مدیر', project.managerName ?? '-'),
+              _info('مشتری/تامین‌کننده', project.personName ?? '-'),
+            ],
+          ),
+        ),
+        const SizedBox(height: 12),
+        GlassSurface(
+          padding: const EdgeInsets.all(18),
+          child: Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              OutlinedButton.icon(onPressed: _manageMembers, icon: const Icon(Icons.manage_accounts_outlined), label: const Text('مدیریت اعضا')),
+              OutlinedButton.icon(onPressed: _saveAsTemplate, icon: const Icon(Icons.bookmark_add_outlined), label: const Text('ذخیره به‌عنوان قالب')),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
 
   Widget _timesheetView() => ProjectTimeTrackingView(
     businessId: widget.businessId,

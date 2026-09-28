@@ -20,7 +20,7 @@ from adapters.db.models.currency import Currency
 from adapters.db.models.user import User
 from adapters.db.models.person import Person
 from adapters.db.models.business_permission import BusinessPermission
-from adapters.db.models.task_management import Milestone, ProjectCycle, ProjectCycleTask, ProjectMember, Task, TaskRelation, TaskStatus
+from adapters.db.models.task_management import Milestone, ProjectCycle, ProjectCycleTask, ProjectMember, Task, TaskActivity, TaskAttachment, TaskRelation, TaskStatus
 from app.core.business_membership import membership_is_active
 from adapters.db.repositories.project_repository import ProjectRepository
 from app.core.responses import ApiError
@@ -595,6 +595,60 @@ def get_project_workspace(db: Session, business_id: int, project_id: int) -> Dic
         "members": list_project_members(db, business_id, project_id),
     }
 
+
+
+def list_project_activity(
+    db: Session,
+    business_id: int,
+    project_id: int,
+    limit: int = 200,
+) -> list[dict[str, Any]]:
+    """Recent immutable task-domain activity for a project workspace."""
+    _require_project_in_business(db, business_id, project_id)
+    rows = (
+        db.query(TaskActivity, Task.title)
+        .join(Task, TaskActivity.task_id == Task.id)
+        .filter(
+            TaskActivity.business_id == business_id,
+            Task.business_id == business_id,
+            Task.project_id == project_id,
+            Task.deleted_at.is_(None),
+        )
+        .order_by(TaskActivity.created_at.desc(), TaskActivity.id.desc())
+        .limit(max(1, min(int(limit), 500)))
+        .all()
+    )
+    return [
+        {"activity": activity, "task_title": task_title}
+        for activity, task_title in rows
+    ]
+
+
+def list_project_files(
+    db: Session,
+    business_id: int,
+    project_id: int,
+    limit: int = 200,
+) -> list[dict[str, Any]]:
+    """Task attachments surfaced together in the project workspace."""
+    _require_project_in_business(db, business_id, project_id)
+    rows = (
+        db.query(TaskAttachment, Task.title)
+        .join(Task, TaskAttachment.task_id == Task.id)
+        .filter(
+            TaskAttachment.business_id == business_id,
+            Task.business_id == business_id,
+            Task.project_id == project_id,
+            Task.deleted_at.is_(None),
+        )
+        .order_by(TaskAttachment.created_at.desc(), TaskAttachment.id.desc())
+        .limit(max(1, min(int(limit), 500)))
+        .all()
+    )
+    return [
+        {"attachment": attachment, "task_title": task_title}
+        for attachment, task_title in rows
+    ]
 
 
 def get_project_timeline(

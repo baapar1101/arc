@@ -23,6 +23,8 @@ from app.services.project_service import (
 	get_project_statistics,
 	list_project_documents,
 	get_project_workspace,
+	list_project_activity,
+	list_project_files,
 	get_project_timeline,
 	list_project_milestones,
 	list_project_cycles,
@@ -486,6 +488,43 @@ async def list_active_projects_simple_endpoint(
 
 
 
+def _display_user_name(user: Any) -> Optional[str]:
+    if user is None:
+        return None
+    name = f"{getattr(user, 'first_name', '') or ''} {getattr(user, 'last_name', '') or ''}".strip()
+    return name or getattr(user, "email", None) or getattr(user, "mobile", None)
+
+
+def _format_project_activity(row: Dict[str, Any]) -> Dict[str, Any]:
+    activity = row["activity"]
+    return {
+        "id": activity.id,
+        "task_id": activity.task_id,
+        "task_title": row.get("task_title"),
+        "actor_user_id": activity.actor_user_id,
+        "actor_name": _display_user_name(activity.actor),
+        "event_type": activity.event_type,
+        "metadata": activity.event_data or {},
+        "created_at": activity.created_at,
+    }
+
+
+def _format_project_file(row: Dict[str, Any]) -> Dict[str, Any]:
+    attachment = row["attachment"]
+    return {
+        "id": attachment.id,
+        "task_id": attachment.task_id,
+        "task_title": row.get("task_title"),
+        "file_storage_id": attachment.file_storage_id,
+        "original_name": attachment.original_name,
+        "mime_type": attachment.mime_type,
+        "size_bytes": attachment.size_bytes,
+        "uploaded_by_user_id": attachment.uploaded_by_user_id,
+        "uploader_name": _display_user_name(attachment.uploaded_by),
+        "created_at": attachment.created_at,
+    }
+
+
 def _format_project_cycle(row: Dict[str, Any]) -> Dict[str, Any]:
     cycle = row["cycle"]
     return {
@@ -820,6 +859,58 @@ async def delete_project_milestone_endpoint(
         data={"id": milestone_id},
         request=request,
         message="PROJECT_MILESTONE_DELETED",
+    )
+
+
+@router.get(
+    "/businesses/{business_id}/projects/{project_id}/activity",
+    summary="فعالیت پروژه",
+)
+@require_business_access("business_id")
+async def list_project_activity_endpoint(
+    request: Request,
+    business_id: int = Path(..., gt=0),
+    project_id: int = Path(..., gt=0),
+    limit: int = Query(200, ge=1, le=500),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+):
+    del ctx
+    rows = list_project_activity(db, business_id, project_id, limit=limit)
+    return success_response(
+        data=format_datetime_fields(
+            {"items": [_format_project_activity(row) for row in rows]},
+            request,
+            business_id,
+        ),
+        request=request,
+        message="PROJECT_ACTIVITY_FETCHED",
+    )
+
+
+@router.get(
+    "/businesses/{business_id}/projects/{project_id}/files",
+    summary="فایل‌های پروژه",
+)
+@require_business_access("business_id")
+async def list_project_files_endpoint(
+    request: Request,
+    business_id: int = Path(..., gt=0),
+    project_id: int = Path(..., gt=0),
+    limit: int = Query(200, ge=1, le=500),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+):
+    del ctx
+    rows = list_project_files(db, business_id, project_id, limit=limit)
+    return success_response(
+        data=format_datetime_fields(
+            {"items": [_format_project_file(row) for row in rows]},
+            request,
+            business_id,
+        ),
+        request=request,
+        message="PROJECT_FILES_FETCHED",
     )
 
 

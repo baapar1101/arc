@@ -190,6 +190,38 @@ class ProjectService {
     }
   }
 
+  Future<List<Map<String, dynamic>>> listProjectActivity({
+    required int businessId,
+    required int projectId,
+    int limit = 200,
+  }) async {
+    final response = await apiClient.get(
+      '/api/v1/businesses/$businessId/projects/$projectId/activity',
+      query: {'limit': limit},
+    );
+    final items = (response.data['data']?['items'] as List?) ?? const [];
+    return items
+        .whereType<Map>()
+        .map((e) => Map<String, dynamic>.from(e))
+        .toList();
+  }
+
+  Future<List<Map<String, dynamic>>> listProjectFiles({
+    required int businessId,
+    required int projectId,
+    int limit = 200,
+  }) async {
+    final response = await apiClient.get(
+      '/api/v1/businesses/$businessId/projects/$projectId/files',
+      query: {'limit': limit},
+    );
+    final items = (response.data['data']?['items'] as List?) ?? const [];
+    return items
+        .whereType<Map>()
+        .map((e) => Map<String, dynamic>.from(e))
+        .toList();
+  }
+
   Future<List<ProjectCycleModel>> listCycles({
     required int businessId,
     required int projectId,
