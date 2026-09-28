@@ -3800,6 +3800,13 @@ class _BusinessShellState extends State<BusinessShell> {
       return hasRead;
     }
 
+    // Project menu stays reachable for scoped project-role access. The server
+    // filters the actual projects/tasks the member can see.
+    if (section == 'projects') {
+      return widget.authStore.hasProjectPermission('view') ||
+          widget.authStore.projectPermissionsConfigured;
+    }
+
     // سایر سکشن‌ها: بررسی دسترسی view
     final hasAccess = widget.authStore.canReadSection(section);
     
@@ -3826,6 +3833,9 @@ class _BusinessShellState extends State<BusinessShell> {
     if (section == null) return false;
     if (section == 'crm') {
       return widget.authStore.hasBusinessPermission(section, 'write');
+    }
+    if (section == 'projects') {
+      return widget.authStore.hasProjectPermission('project_create');
     }
     return widget.authStore.hasBusinessPermission(section, 'add');
   }
@@ -3856,6 +3866,7 @@ class _BusinessShellState extends State<BusinessShell> {
     }
     final path = item.path;
     if (path != null) {
+      if (path.contains('/projects') || path.contains('/tasks')) return 'projects';
       if (path.contains('/hscript')) return 'reports';
       if (path.contains('/payroll')) return 'payroll';
       if (path.contains('/barcode-labels')) return 'barcode_labels';

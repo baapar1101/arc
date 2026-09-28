@@ -612,6 +612,38 @@ class AuthStore with ChangeNotifier {
   }
 
   // بررسی دسترسی‌های کسب و کار
+  bool get projectPermissionsConfigured =>
+      _businessPermissions?.containsKey('projects') == true;
+
+  bool hasProjectPermission(String action) {
+    if (_currentBusiness?.isOwner == true) return true;
+    final permissions = _businessPermissions;
+    if (permissions == null) return false;
+
+    // Backward compatibility: before Phase 17 no projects section existed.
+    if (!permissions.containsKey('projects')) return true;
+
+    final section = permissions['projects'];
+    if (section is! Map) return false;
+    final aliases = <String, List<String>>{
+      'view': ['view', 'read'],
+      'project_create': ['project_create', 'add'],
+      'project_edit': ['project_edit', 'edit', 'write'],
+      'project_delete': ['project_delete', 'delete'],
+      'manage_members': ['manage_members'],
+      'task_create': ['task_create', 'add'],
+      'task_edit': ['task_edit', 'edit', 'write'],
+      'task_delete': ['task_delete', 'delete'],
+      'task_assign': ['task_assign', 'edit', 'write'],
+      'time_log': ['time_log', 'edit', 'write'],
+      'time_view_team': ['time_view_team'],
+    };
+    for (final key in aliases[action] ?? <String>[action]) {
+      if (section[key] == true) return true;
+    }
+    return false;
+  }
+
   bool hasBusinessPermission(String section, String action) {
     
     if (_currentBusiness?.isOwner == true) {

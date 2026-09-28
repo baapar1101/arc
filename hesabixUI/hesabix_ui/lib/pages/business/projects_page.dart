@@ -83,7 +83,7 @@ class _ProjectsPageState extends State<ProjectsPage> {
             Padding(
               padding: const EdgeInsets.only(left: 8.0),
               child: ElevatedButton.icon(
-                onPressed: _onAddProject,
+                onPressed: widget.authStore.hasProjectPermission('project_create') ? _onAddProject : null,
                 icon: const Icon(Icons.add),
                 label: const Text('پروژه جدید'),
               ),
@@ -114,7 +114,7 @@ class _ProjectsPageState extends State<ProjectsPage> {
           ),
         ),
       ),
-      floatingActionButton: isMobile
+      floatingActionButton: isMobile && widget.authStore.hasProjectPermission('project_create')
           ? FloatingActionButton.extended(
               onPressed: _onAddProject,
               icon: const Icon(Icons.add),
@@ -347,17 +347,19 @@ class _ProjectsPageState extends State<ProjectsPage> {
               label: 'مشاهده',
               onTap: _onViewProject,
             ),
-            DataTableAction(
-              icon: Icons.edit,
-              label: 'ویرایش',
-              onTap: _onEditProject,
-            ),
-            DataTableAction(
-              icon: Icons.delete,
-              label: 'حذف',
-              onTap: _onDeleteProject,
-              isDestructive: true,
-            ),
+            if (widget.authStore.hasProjectPermission('project_edit'))
+              DataTableAction(
+                icon: Icons.edit,
+                label: 'ویرایش',
+                onTap: _onEditProject,
+              ),
+            if (widget.authStore.hasProjectPermission('project_delete'))
+              DataTableAction(
+                icon: Icons.delete,
+                label: 'حذف',
+                onTap: _onDeleteProject,
+                isDestructive: true,
+              ),
           ],
         ),
       ],

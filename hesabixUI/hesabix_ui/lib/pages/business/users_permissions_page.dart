@@ -1272,6 +1272,19 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
         'adjust': t.customerClubPermissionAdjustManual(t.customerClubTitle),
         'redeem': t.customerClubPermissionRedeemInvoice(t.customerClubTitle),
       },
+      'projects': {
+        'view': t.localeName.startsWith('fa') ? 'مشاهده پروژه‌ها و کارها' : 'View projects & tasks',
+        'project_create': t.localeName.startsWith('fa') ? 'ایجاد پروژه' : 'Create projects',
+        'project_edit': t.localeName.startsWith('fa') ? 'ویرایش پروژه' : 'Edit projects',
+        'project_delete': t.localeName.startsWith('fa') ? 'حذف پروژه' : 'Delete projects',
+        'manage_members': t.localeName.startsWith('fa') ? 'مدیریت اعضای پروژه' : 'Manage project members',
+        'task_create': t.localeName.startsWith('fa') ? 'ایجاد کار' : 'Create tasks',
+        'task_edit': t.localeName.startsWith('fa') ? 'ویرایش و تکمیل کار' : 'Edit & complete tasks',
+        'task_delete': t.localeName.startsWith('fa') ? 'حذف کار' : 'Delete tasks',
+        'task_assign': t.localeName.startsWith('fa') ? 'تخصیص کار' : 'Assign tasks',
+        'time_log': t.localeName.startsWith('fa') ? 'ثبت زمان شخصی' : 'Log own time',
+        'time_view_team': t.localeName.startsWith('fa') ? 'مشاهده زمان تیم' : 'View team time',
+      },
       'crm': {
         'view': '${t.view} ${t.workflowCategoryCrm}',
         'write': t.permissionCrmEditAndAdd,
@@ -1342,7 +1355,10 @@ class _PermissionsDialogState extends State<_PermissionsDialog> {
       for (final action in allPermissions[section]!.keys) {
         // فقط از سکشن جدید استفاده می‌کنیم؛ بدون OR با کلیدهای قدیمی
         late bool sectionPermissionsValue;
-        if (section == 'invoices' && action == 'change_unit_price') {
+        if (section == 'projects' && !dbPermissions.containsKey(section)) {
+          // Phase 17 migration compatibility: existing members had full project access.
+          sectionPermissionsValue = true;
+        } else if (section == 'invoices' && action == 'change_unit_price') {
           if (dbPermissions.containsKey(section) &&
               dbPermissions[section] is Map<String, dynamic> &&
               (dbPermissions[section] as Map<String, dynamic>).containsKey(action)) {

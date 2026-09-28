@@ -5282,6 +5282,7 @@ class _MyAppState extends State<MyApp> {
                                 state,
                                 TaskManagementPage(
                                   businessId: businessId,
+                                  authStore: _authStore!,
                                 ),
                               );
                             },

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/core/api_client.dart';
+import 'package:hesabix_ui/core/auth_store.dart';
 import 'package:hesabix_ui/models/project_model.dart';
 import 'package:hesabix_ui/models/task_model.dart';
 import 'package:hesabix_ui/services/project_service.dart';
@@ -15,10 +16,12 @@ import 'package:intl/intl.dart';
 
 class TaskManagementPage extends StatefulWidget {
   final int businessId;
+  final AuthStore authStore;
 
   const TaskManagementPage({
     super.key,
     required this.businessId,
+    required this.authStore,
   });
 
   @override
@@ -661,11 +664,13 @@ class _TaskManagementPageState extends State<TaskManagementPage> {
             ),
           ),
           const SizedBox(height: 12),
-          TaskQuickCreate(
-            enabled: !_loading,
-            onCreate: _quickCreate,
-          ),
-          const SizedBox(height: 12),
+          if (widget.authStore.hasProjectPermission('task_create')) ...[
+            TaskQuickCreate(
+              enabled: !_loading,
+              onCreate: _quickCreate,
+            ),
+            const SizedBox(height: 12),
+          ],
           _filters(context),
           const SizedBox(height: 12),
           if (_loading)
