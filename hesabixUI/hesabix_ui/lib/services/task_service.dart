@@ -7,6 +7,13 @@ class TaskService {
 
   TaskService(this.apiClient);
 
+  Future<Map<String, dynamic>> getDashboard(int businessId) async {
+    final response = await apiClient.get(
+      '/api/v1/businesses/$businessId/task-dashboard',
+    );
+    return Map<String, dynamic>.from(response.data['data'] as Map);
+  }
+
   Future<List<TaskLabelModel>> listLabels(int businessId) async {
     final response = await apiClient.get(
       '/api/v1/businesses/$businessId/task-labels',

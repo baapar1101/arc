@@ -11,6 +11,7 @@ import 'package:hesabix_ui/utils/error_extractor.dart';
 import 'package:hesabix_ui/utils/responsive_helper.dart';
 import 'package:hesabix_ui/utils/snackbar_helper.dart';
 import 'package:hesabix_ui/widgets/task/task_detail_drawer.dart';
+import 'package:hesabix_ui/widgets/task/task_dashboard_view.dart';
 import 'package:hesabix_ui/widgets/task/task_quick_create.dart';
 import 'package:intl/intl.dart';
 
@@ -41,6 +42,8 @@ class _TaskManagementPageState extends State<TaskManagementPage> {
   List<TaskSavedViewModel> _savedViews = const [];
 
   bool _loading = true;
+  bool _showDashboard = false;
+  int _dashboardRevision = 0;
   String? _error;
   bool? _completedFilter = false;
   int? _statusFilterId;
@@ -479,6 +482,25 @@ class _TaskManagementPageState extends State<TaskManagementPage> {
     }
   }
 
+  Future<void> _openDashboardTask(int taskId) async {
+    try {
+      final task = _findTask(_tasks, taskId) ??
+          await _taskService.getTask(
+            businessId: widget.businessId,
+            taskId: taskId,
+          );
+      if (!mounted) return;
+      setState(() => _showDashboard = false);
+      await _openDetails(task);
+    } catch (e) {
+      if (!mounted) return;
+      SnackBarHelper.showError(
+        context,
+        message: ErrorExtractor.forContext(e, context),
+      );
+    }
+  }
+
   Future<void> _openDetails(TaskModel task) async {
     if (ResponsiveHelper.isMobile(context)) {
       await showGlassModalBottomSheet<void>(
@@ -558,7 +580,17 @@ class _TaskManagementPageState extends State<TaskManagementPage> {
   Widget build(BuildContext context) {
     final padding = ResponsiveHelper.getPadding(context);
     final isMobile = ResponsiveHelper.isMobile(context);
-    final body = _buildMainContent(context, padding, isMobile);
+    final taskBody = _buildMainContent(context, padding, isMobile);
+    final body = _showDashboard
+        ? TaskDashboardView(
+            key: ValueKey(_dashboardRevision),
+            businessId: widget.businessId,
+            onOpenTask: (id) => _openDashboardTask(id),
+            onOpenProject: (id) => context.go(
+              '/business/${widget.businessId}/projects/$id/workspace',
+            ),
+          )
+        : taskBody;
 
     return Scaffold(
       appBar: AppBar(
@@ -570,14 +602,35 @@ class _TaskManagementPageState extends State<TaskManagementPage> {
         ),
         actions: [
           IconButton(
+            tooltip: _showDashboard ? 'لیست کارها' : 'داشبورد',
+            onPressed: () {
+              setState(() {
+                _showDashboard = !_showDashboard;
+                _selectedTask = null;
+                if (_showDashboard) _dashboardRevision++;
+              });
+            },
+            icon: Icon(
+              _showDashboard
+                  ? Icons.list_alt_outlined
+                  : Icons.analytics_outlined,
+            ),
+          ),
+          IconButton(
             tooltip: 'بروزرسانی',
-            onPressed: _loading ? null : _loadAll,
+            onPressed: () {
+              if (_showDashboard) {
+                setState(() => _dashboardRevision++);
+              } else if (!_loading) {
+                _loadAll();
+              }
+            },
             icon: const Icon(Icons.refresh),
           ),
         ],
       ),
       body: SafeArea(
-        child: isMobile
+        child: isMobile || _showDashboard
             ? body
             : Row(
                 children: [

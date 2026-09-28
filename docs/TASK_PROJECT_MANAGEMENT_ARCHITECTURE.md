@@ -817,3 +817,111 @@ Implemented on 2026-09-27 using the existing Hesabix FileStorage subsystem.
 - [x] Storage plan/quota accounting reused.
 - [x] Cross-platform download UX.
 - [x] Activity feed events for attachment add/remove.
+
+
+## Phase 17 — Permissions
+
+Implemented on 2026-09-28 using the existing business-permission JSON plus project-member roles.
+
+### Business permission section
+
+The new `projects` section supports:
+- `view`
+- `project_create`
+- `project_edit`
+- `project_delete`
+- `manage_members`
+- `task_create`
+- `task_edit`
+- `task_delete`
+- `task_assign`
+- `time_log`
+- `time_view_team`
+
+Existing businesses remain backward compatible: if a member has no `projects`
+section at all, legacy project/task access remains enabled. Once the owner saves
+an explicit `projects` block, those permissions become authoritative.
+
+### Project roles
+
+- Viewer: project/task read access.
+- Member: task create/edit and own time logging.
+- Manager: project edit, member management, assignment, task deletion and team time.
+- Owner: manager capabilities plus project deletion.
+
+Business-wide permissions may grant broader access; project roles can grant
+scoped access to individual projects.
+
+### Server enforcement
+
+- Project and task routers use automatic authorization dependencies.
+- Project lists/search/active pickers are filtered to accessible project IDs.
+- Task lists are filtered to accessible projects plus personal unprojected tasks.
+- Task collection creation checks `task_create`.
+- Team time degrades to self-only when `time_view_team` is absent.
+- Reverse CRM entity task lookups are filtered by task visibility.
+- The Flutter permission editor exposes the granular project section.
+- UI buttons reflect business permissions, but server authorization remains authoritative.
+
+### Phase 17 acceptance gate
+
+- [x] Business project/task permission section.
+- [x] Backward-compatible rollout.
+- [x] Project role matrix.
+- [x] Server-side route guards.
+- [x] Project/task list visibility filtering.
+- [x] Own-vs-team time enforcement.
+- [x] Permission editor and action visibility.
+
+
+## Phase 18 — Dashboard / Analytics
+
+Implemented on 2026-09-28 using Plane/Leantime dashboard concepts with transparent native metrics.
+
+### Dashboard scope
+
+The business Task module can toggle between the existing task list and a
+permission-aware analytics dashboard.
+
+The dashboard exposes:
+- open tasks
+- due today
+- overdue
+- completed in the last 7 days
+- unassigned work
+- logged time in the last 7 days
+- current user's open work
+- status distribution
+- project completion / overdue progress
+- assignee workload
+- active milestones
+- active cycles
+- recent completions
+- billable vs total logged time
+
+### Permission behavior
+
+- Task/project metrics use the Phase 17 visibility scope.
+- Restricted members see project metrics only for projects they can access.
+- Team time is shown only with `time_view_team`; otherwise time totals are self-only.
+- The API returns an explicit scope descriptor so the UI does not imply broader coverage.
+
+### Metric design
+
+There is deliberately no opaque “project health score.” Progress, overdue work,
+workload and time are displayed as independent inspectable metrics.
+
+### Phase 18 endpoint
+
+- `GET /api/v1/businesses/{business_id}/task-dashboard`
+
+### Phase 18 acceptance gate
+
+- [x] Permission-aware aggregate API.
+- [x] Summary KPIs.
+- [x] My-work queue.
+- [x] Project progress.
+- [x] Workload view.
+- [x] Milestone/cycle progress.
+- [x] 7-day time metrics.
+- [x] No unexplained synthetic score.
