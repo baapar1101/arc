@@ -282,6 +282,7 @@ Focalboard only as an interaction reference.
 - Move API accepts a target status and insertion index; the server computes a fractional sort value.
 - Dense ordering is renormalized only when adjacent fractional positions become too close.
 - Moving into a completed status sets completion time; moving out clears it.
+- Baseline workflow statuses include Backlog, To Do, In Progress, Blocked, Review, Done and Cancelled; custom business statuses can coexist without being replaced.
 
 ### UX delivered
 
@@ -292,6 +293,8 @@ Focalboard only as an interaction reference.
 - Each column supports quick task creation directly into that status.
 - Clicking a board card opens the same Phase 2 task detail drawer/sheet.
 - Board cards show assignees and due-date/overdue context.
+- Board filters cover text search, priority, assignee, label and due state.
+- Filtered drag/drop translates the visible drop zone back to the absolute unfiltered column index before calling the move API, so hidden cards keep stable ordering.
 
 ### Phase 4 endpoint
 
@@ -305,6 +308,9 @@ Focalboard only as an interaction reference.
 - [x] Completion semantics follow destination status.
 - [x] Board uses existing task editor.
 - [x] Quick add works per column.
+- [x] Blocked and Review baseline workflow states are available.
+- [x] Board filtering works without changing the canonical task/status model.
+- [x] Filtered drag/drop preserves absolute server ordering.
 
 
 ## Phase 5 — Subtasks & Dependencies

@@ -52,6 +52,8 @@ _DEFAULT_STATUSES = (
     ("backlog", "Backlog", "backlog", "#64748B", 1000, False, False),
     ("todo", "To Do", "unstarted", "#3B82F6", 2000, True, False),
     ("in_progress", "In Progress", "started", "#F59E0B", 3000, False, False),
+    ("blocked", "Blocked", "started", "#F97316", 3500, False, False),
+    ("review", "Review", "started", "#8B5CF6", 3750, False, False),
     ("done", "Done", "completed", "#22C55E", 4000, False, True),
     ("cancelled", "Cancelled", "cancelled", "#EF4444", 5000, False, True),
 )

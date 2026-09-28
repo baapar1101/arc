@@ -29,12 +29,18 @@ class TaskKanbanBoard extends StatefulWidget {
 
 class _TaskKanbanBoardState extends State<TaskKanbanBoard> {
   final ScrollController _horizontal = ScrollController();
+  final TextEditingController _searchController = TextEditingController();
   final Map<int, TextEditingController> _quickControllers = {};
   final Set<int> _creatingStatusIds = {};
+  String _priorityFilter = 'all';
+  int? _assigneeFilterId;
+  int? _labelFilterId;
+  String _dueFilter = 'any';
 
   @override
   void dispose() {
     _horizontal.dispose();
+    _searchController.dispose();
     for (final controller in _quickControllers.values) {
       controller.dispose();
     }
@@ -48,7 +54,7 @@ class _TaskKanbanBoardState extends State<TaskKanbanBoard> {
     );
   }
 
-  List<TaskModel> _tasksFor(TaskStatusModel status) {
+  List<TaskModel> _allTasksFor(TaskStatusModel status) {
     final items = widget.tasks
         .where((task) => task.statusId == status.id)
         .toList();
@@ -57,6 +63,93 @@ class _TaskKanbanBoardState extends State<TaskKanbanBoard> {
       return byOrder != 0 ? byOrder : a.id.compareTo(b.id);
     });
     return items;
+  }
+
+  bool _matchesFilters(TaskModel task) {
+    final query = _searchController.text.trim().toLowerCase();
+    if (query.isNotEmpty) {
+      final haystack = [
+        task.title,
+        task.description ?? '',
+        task.assignees.map((e) => e.name).join(' '),
+        task.labels.map((e) => e.name).join(' '),
+      ].join(' ').toLowerCase();
+      if (!haystack.contains(query)) return false;
+    }
+
+    if (_priorityFilter != 'all' && task.priority != _priorityFilter) {
+      return false;
+    }
+    if (_assigneeFilterId != null &&
+        !task.assignees.any((e) => e.userId == _assigneeFilterId)) {
+      return false;
+    }
+    if (_labelFilterId != null &&
+        !task.labels.any((e) => e.id == _labelFilterId)) {
+      return false;
+    }
+
+    final due = task.dueAt?.toLocal();
+    final now = DateTime.now();
+    final today = DateUtils.dateOnly(now);
+    if (_dueFilter == 'overdue') {
+      if (task.isCompleted || due == null || !due.isBefore(now)) return false;
+    } else if (_dueFilter == 'today') {
+      if (due == null || DateUtils.dateOnly(due) != today) return false;
+    } else if (_dueFilter == 'upcoming') {
+      if (due == null || !due.isAfter(now)) return false;
+    } else if (_dueFilter == 'none') {
+      if (due != null) return false;
+    }
+    return true;
+  }
+
+  List<TaskModel> _tasksFor(TaskStatusModel status) {
+    return _allTasksFor(status).where(_matchesFilters).toList();
+  }
+
+  List<TaskAssigneeModel> get _assigneeOptions {
+    final byId = <int, TaskAssigneeModel>{};
+    for (final task in widget.tasks) {
+      for (final assignee in task.assignees) {
+        byId[assignee.userId] = assignee;
+      }
+    }
+    final items = byId.values.toList()
+      ..sort((a, b) => a.name.compareTo(b.name));
+    return items;
+  }
+
+  List<TaskLabelModel> get _labelOptions {
+    final byId = <int, TaskLabelModel>{};
+    for (final task in widget.tasks) {
+      for (final label in task.labels) {
+        byId[label.id] = label;
+      }
+    }
+    final items = byId.values.toList()
+      ..sort((a, b) => a.name.compareTo(b.name));
+    return items;
+  }
+
+  int get _activeFilterCount {
+    var count = 0;
+    if (_searchController.text.trim().isNotEmpty) count++;
+    if (_priorityFilter != 'all') count++;
+    if (_assigneeFilterId != null) count++;
+    if (_labelFilterId != null) count++;
+    if (_dueFilter != 'any') count++;
+    return count;
+  }
+
+  void _clearFilters() {
+    setState(() {
+      _searchController.clear();
+      _priorityFilter = 'all';
+      _assigneeFilterId = null;
+      _labelFilterId = null;
+      _dueFilter = 'any';
+    });
   }
 
   Future<void> _quickCreate(TaskStatusModel status) async {
@@ -85,19 +178,38 @@ class _TaskKanbanBoardState extends State<TaskKanbanBoard> {
     return value == null ? fallback : Color(value);
   }
 
-  int _normalizedTargetIndex(
+  int _absoluteTargetIndex(
     TaskModel dragged,
     TaskStatusModel targetStatus,
-    List<TaskModel> currentColumn,
+    List<TaskModel> currentVisibleColumn,
     int zoneIndex,
   ) {
-    if (dragged.statusId != targetStatus.id) return zoneIndex;
-    final originalIndex =
-        currentColumn.indexWhere((task) => task.id == dragged.id);
-    if (originalIndex >= 0 && originalIndex < zoneIndex) {
-      return zoneIndex - 1;
+    var visibleIndex = zoneIndex;
+    if (dragged.statusId == targetStatus.id) {
+      final originalIndex =
+          currentVisibleColumn.indexWhere((task) => task.id == dragged.id);
+      if (originalIndex >= 0 && originalIndex < visibleIndex) {
+        visibleIndex -= 1;
+      }
     }
-    return zoneIndex;
+
+    final fullPeers = _allTasksFor(targetStatus)
+        .where((task) => task.id != dragged.id)
+        .toList();
+    final visiblePeers = fullPeers.where(_matchesFilters).toList();
+
+    if (visiblePeers.isEmpty) return fullPeers.length;
+    if (visibleIndex <= 0) {
+      return fullPeers.indexWhere((task) => task.id == visiblePeers.first.id);
+    }
+    if (visibleIndex >= visiblePeers.length) {
+      final lastIndex =
+          fullPeers.indexWhere((task) => task.id == visiblePeers.last.id);
+      return lastIndex + 1;
+    }
+    return fullPeers.indexWhere(
+      (task) => task.id == visiblePeers[visibleIndex].id,
+    );
   }
 
   @override
@@ -106,34 +218,165 @@ class _TaskKanbanBoardState extends State<TaskKanbanBoard> {
       return const Center(child: Text('وضعیتی برای برد تعریف نشده است.'));
     }
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final height = constraints.maxHeight.isFinite
-            ? constraints.maxHeight
-            : MediaQuery.sizeOf(context).height * .72;
-        return Scrollbar(
-          controller: _horizontal,
-          thumbVisibility: true,
-          child: SingleChildScrollView(
-            controller: _horizontal,
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.fromLTRB(14, 14, 14, 22),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: widget.statuses.map((status) {
-                return Padding(
-                  padding: const EdgeInsetsDirectional.only(end: 12),
-                  child: SizedBox(
-                    width: 310,
-                    height: height > 360 ? height - 28 : 360,
-                    child: _column(context, status),
+    return Column(
+      children: [
+        _filterBar(context),
+        Expanded(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final height = constraints.maxHeight.isFinite
+                  ? constraints.maxHeight
+                  : MediaQuery.sizeOf(context).height * .72;
+              return Scrollbar(
+                controller: _horizontal,
+                thumbVisibility: true,
+                child: SingleChildScrollView(
+                  controller: _horizontal,
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.fromLTRB(14, 8, 14, 22),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: widget.statuses.map((status) {
+                      return Padding(
+                        padding: const EdgeInsetsDirectional.only(end: 12),
+                        child: SizedBox(
+                          width: 310,
+                          height: height > 360 ? height - 20 : 360,
+                          child: _column(context, status),
+                        ),
+                      );
+                    }).toList(),
                   ),
-                );
-              }).toList(),
-            ),
+                ),
+              );
+            },
           ),
-        );
-      },
+        ),
+      ],
+    );
+  }
+
+  Widget _filterBar(BuildContext context) {
+    final assignees = _assigneeOptions;
+    final labels = _labelOptions;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 0),
+      child: GlassSurface(
+        padding: const EdgeInsets.all(10),
+        child: Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            SizedBox(
+              width: 230,
+              child: TextField(
+                controller: _searchController,
+                onChanged: (_) => setState(() {}),
+                decoration: const InputDecoration(
+                  isDense: true,
+                  prefixIcon: Icon(Icons.search_rounded),
+                  hintText: 'جستجو در برد',
+                ),
+              ),
+            ),
+            SizedBox(
+              width: 150,
+              child: DropdownButtonFormField<String>(
+                value: _priorityFilter,
+                isDense: true,
+                decoration: const InputDecoration(labelText: 'اولویت'),
+                items: const [
+                  DropdownMenuItem(value: 'all', child: Text('همه')),
+                  DropdownMenuItem(value: 'urgent', child: Text('Urgent')),
+                  DropdownMenuItem(value: 'high', child: Text('High')),
+                  DropdownMenuItem(value: 'normal', child: Text('Normal')),
+                  DropdownMenuItem(value: 'low', child: Text('Low')),
+                ],
+                onChanged: (value) =>
+                    setState(() => _priorityFilter = value ?? 'all'),
+              ),
+            ),
+            SizedBox(
+              width: 180,
+              child: DropdownButtonFormField<int>(
+                value: _assigneeFilterId ?? 0,
+                isDense: true,
+                decoration: const InputDecoration(labelText: 'مسئول'),
+                items: [
+                  const DropdownMenuItem<int>(
+                    value: 0,
+                    child: Text('همه'),
+                  ),
+                  ...assignees.map(
+                    (e) => DropdownMenuItem<int>(
+                      value: e.userId,
+                      child: Text(
+                        e.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ),
+                ],
+                onChanged: (value) => setState(
+                  () => _assigneeFilterId = value == 0 ? null : value,
+                ),
+              ),
+            ),
+            SizedBox(
+              width: 170,
+              child: DropdownButtonFormField<int>(
+                value: _labelFilterId ?? 0,
+                isDense: true,
+                decoration: const InputDecoration(labelText: 'برچسب'),
+                items: [
+                  const DropdownMenuItem<int>(
+                    value: 0,
+                    child: Text('همه'),
+                  ),
+                  ...labels.map(
+                    (e) => DropdownMenuItem<int>(
+                      value: e.id,
+                      child: Text(
+                        e.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ),
+                ],
+                onChanged: (value) => setState(
+                  () => _labelFilterId = value == 0 ? null : value,
+                ),
+              ),
+            ),
+            SizedBox(
+              width: 160,
+              child: DropdownButtonFormField<String>(
+                value: _dueFilter,
+                isDense: true,
+                decoration: const InputDecoration(labelText: 'سررسید'),
+                items: const [
+                  DropdownMenuItem(value: 'any', child: Text('همه')),
+                  DropdownMenuItem(value: 'overdue', child: Text('گذشته')),
+                  DropdownMenuItem(value: 'today', child: Text('امروز')),
+                  DropdownMenuItem(value: 'upcoming', child: Text('آینده')),
+                  DropdownMenuItem(value: 'none', child: Text('بدون تاریخ')),
+                ],
+                onChanged: (value) =>
+                    setState(() => _dueFilter = value ?? 'any'),
+              ),
+            ),
+            if (_activeFilterCount > 0)
+              TextButton.icon(
+                onPressed: _clearFilters,
+                icon: const Icon(Icons.filter_alt_off_outlined),
+                label: Text('پاک‌کردن ($_activeFilterCount)'),
+              ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -251,7 +494,7 @@ class _TaskKanbanBoardState extends State<TaskKanbanBoard> {
       onWillAccept: (task) => task != null,
       onAccept: (task) {
         final targetIndex =
-            _normalizedTargetIndex(task, status, items, zoneIndex);
+            _absoluteTargetIndex(task, status, items, zoneIndex);
         widget.onMove(task, status.id, targetIndex);
       },
       builder: (context, candidates, rejected) {
