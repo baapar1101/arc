@@ -17,6 +17,10 @@ from adapters.api.v1.schema_models.task_management import (
     TaskLabelUpdateRequest,
     TaskLabelsAssignRequest,
     TaskMoveRequest,
+    TaskProjectTemplateCreateRequest,
+    TaskProjectTemplateInstantiateRequest,
+    TaskProjectTemplateSnapshotRequest,
+    TaskProjectTemplateUpdateRequest,
     TaskRelationCreateRequest,
     TaskReminderCreateRequest,
     TaskSavedViewCreateRequest,
@@ -42,6 +46,14 @@ from app.core.task_project_permissions import (
 from app.core.responses import ApiError, format_datetime_fields, success_response
 from app.services.task_attachment_service import TaskAttachmentService
 from app.services.task_dashboard_service import get_task_dashboard
+from app.services.task_template_service import (
+    create_project_task_template,
+    delete_project_task_template,
+    instantiate_project_task_template,
+    list_project_task_templates,
+    snapshot_project_as_template,
+    update_project_task_template,
+)
 from app.services.task_management_service import (
     add_task_comment,
     add_task_relation,
@@ -91,6 +103,22 @@ from app.services.task_management_service import (
 )
 
 router = APIRouter(tags=["وظایف"], dependencies=[Depends(task_route_guard_dep)])
+
+
+def _format_task_template(row: Any) -> dict[str, Any]:
+    return {
+        "id": row.id,
+        "business_id": row.business_id,
+        "name": row.name,
+        "description": row.description,
+        "project_defaults": row.project_defaults_json or {},
+        "tasks": row.tasks_json or [],
+        "task_count": len(row.tasks_json or []),
+        "is_active": row.is_active,
+        "created_by_user_id": row.created_by_user_id,
+        "created_at": row.created_at,
+        "updated_at": row.updated_at,
+    }
 
 
 def _format_label(label: Any) -> dict[str, Any]:
@@ -273,6 +301,196 @@ def _format_task(task: Task, db: Session, request: Request) -> dict[str, Any]:
         "is_completed": task.completed_at is not None,
     }
     return format_datetime_fields(data, request, business_id=task.business_id)
+
+
+@router.get("/businesses/{business_id}/task-templates")
+@require_business_access("business_id")
+async def list_task_templates_endpoint(
+    request: Request,
+    business_id: int = Path(..., gt=0),
+    include_inactive: bool = Query(False),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+):
+    if not business_project_action(ctx, db, business_id, "view"):
+        raise ApiError(
+            "PROJECT_PERMISSION_DENIED",
+            "Missing project capability: view",
+            http_status=403,
+        )
+    items = list_project_task_templates(
+        db,
+        business_id,
+        include_inactive=include_inactive,
+    )
+    return success_response(
+        data=format_datetime_fields(
+            {"items": [_format_task_template(item) for item in items]},
+            request,
+            business_id=business_id,
+        ),
+        request=request,
+        message="TASK_TEMPLATES_FETCHED",
+    )
+
+
+@router.post("/businesses/{business_id}/task-templates")
+@require_business_access("business_id")
+async def create_task_template_endpoint(
+    request: Request,
+    data: TaskProjectTemplateCreateRequest,
+    business_id: int = Path(..., gt=0),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+):
+    if not business_project_action(ctx, db, business_id, "project_create"):
+        raise ApiError(
+            "PROJECT_PERMISSION_DENIED",
+            "Missing project capability: project_create",
+            http_status=403,
+        )
+    row = create_project_task_template(
+        db,
+        business_id,
+        ctx.get_user_id(),
+        data.dict(),
+    )
+    return success_response(
+        data={"template": _format_task_template(row)},
+        request=request,
+        message="TASK_TEMPLATE_CREATED",
+    )
+
+
+@router.patch("/businesses/{business_id}/task-templates/{template_id}")
+@require_business_access("business_id")
+async def update_task_template_endpoint(
+    request: Request,
+    data: TaskProjectTemplateUpdateRequest,
+    business_id: int = Path(..., gt=0),
+    template_id: int = Path(..., gt=0),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+):
+    if not business_project_action(ctx, db, business_id, "project_edit"):
+        raise ApiError(
+            "PROJECT_PERMISSION_DENIED",
+            "Missing project capability: project_edit",
+            http_status=403,
+        )
+    row = update_project_task_template(
+        db,
+        business_id,
+        template_id,
+        data.dict(exclude_unset=True),
+    )
+    return success_response(
+        data={"template": _format_task_template(row)},
+        request=request,
+        message="TASK_TEMPLATE_UPDATED",
+    )
+
+
+@router.delete("/businesses/{business_id}/task-templates/{template_id}")
+@require_business_access("business_id")
+async def delete_task_template_endpoint(
+    request: Request,
+    business_id: int = Path(..., gt=0),
+    template_id: int = Path(..., gt=0),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+):
+    if not business_project_action(ctx, db, business_id, "project_delete"):
+        raise ApiError(
+            "PROJECT_PERMISSION_DENIED",
+            "Missing project capability: project_delete",
+            http_status=403,
+        )
+    delete_project_task_template(db, business_id, template_id)
+    return success_response(
+        data={"id": template_id},
+        request=request,
+        message="TASK_TEMPLATE_DELETED",
+    )
+
+
+@router.post(
+    "/businesses/{business_id}/projects/{project_id}/task-template-snapshot"
+)
+@require_business_access("business_id")
+async def snapshot_task_template_endpoint(
+    request: Request,
+    data: TaskProjectTemplateSnapshotRequest,
+    business_id: int = Path(..., gt=0),
+    project_id: int = Path(..., gt=0),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+):
+    require_project_capability(
+        ctx,
+        db,
+        business_id,
+        project_id,
+        "project_edit",
+    )
+    row = snapshot_project_as_template(
+        db,
+        business_id,
+        project_id,
+        ctx.get_user_id(),
+        name=data.name,
+        description=data.description,
+    )
+    return success_response(
+        data={"template": _format_task_template(row)},
+        request=request,
+        message="TASK_TEMPLATE_SNAPSHOT_CREATED",
+    )
+
+
+@router.post(
+    "/businesses/{business_id}/task-templates/{template_id}/instantiate"
+)
+@require_business_access("business_id")
+async def instantiate_task_template_endpoint(
+    request: Request,
+    data: TaskProjectTemplateInstantiateRequest,
+    business_id: int = Path(..., gt=0),
+    template_id: int = Path(..., gt=0),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+):
+    if data.project_id is not None:
+        require_project_capability(
+            ctx,
+            db,
+            business_id,
+            data.project_id,
+            "task_create",
+        )
+    elif not business_project_action(
+        ctx,
+        db,
+        business_id,
+        "project_create",
+    ):
+        raise ApiError(
+            "PROJECT_PERMISSION_DENIED",
+            "Missing project capability: project_create",
+            http_status=403,
+        )
+    result = instantiate_project_task_template(
+        db,
+        business_id,
+        template_id,
+        ctx.get_user_id(),
+        data.dict(exclude_none=True),
+    )
+    return success_response(
+        data=result,
+        request=request,
+        message="TASK_TEMPLATE_INSTANTIATED",
+    )
 
 
 @router.get("/businesses/{business_id}/task-dashboard")

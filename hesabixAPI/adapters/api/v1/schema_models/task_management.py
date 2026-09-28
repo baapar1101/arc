@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any, Optional
 
 from pydantic import BaseModel, Field
@@ -149,3 +149,37 @@ class TaskEntityLinkCreateRequest(BaseModel):
     entity_type: str = Field(..., min_length=1, max_length=50)
     entity_id: str = Field(..., min_length=1, max_length=64)
     relationship_type: str = Field(default="related", min_length=1, max_length=50)
+
+
+
+class TaskProjectTemplateCreateRequest(BaseModel):
+    name: str = Field(..., min_length=1, max_length=160)
+    description: Optional[str] = None
+    project_defaults: dict[str, Any] = Field(default_factory=dict)
+    tasks: list[dict[str, Any]] = Field(default_factory=list)
+    is_active: bool = True
+
+
+class TaskProjectTemplateUpdateRequest(BaseModel):
+    name: Optional[str] = Field(None, min_length=1, max_length=160)
+    description: Optional[str] = None
+    project_defaults: Optional[dict[str, Any]] = None
+    tasks: Optional[list[dict[str, Any]]] = None
+    is_active: Optional[bool] = None
+
+
+class TaskProjectTemplateSnapshotRequest(BaseModel):
+    name: str = Field(..., min_length=1, max_length=160)
+    description: Optional[str] = None
+
+
+class TaskProjectTemplateInstantiateRequest(BaseModel):
+    project_id: Optional[int] = Field(None, gt=0)
+    project_code: Optional[str] = Field(None, max_length=50)
+    project_name: Optional[str] = Field(None, max_length=255)
+    start_date: Optional[date] = None
+    person_id: Optional[int] = Field(None, gt=0)
+    manager_user_id: Optional[int] = Field(None, gt=0)
+    link_entity_type: Optional[str] = Field(None, max_length=50)
+    link_entity_id: Optional[str] = Field(None, max_length=64)
+    relationship_type: str = Field(default="related", max_length=50)
