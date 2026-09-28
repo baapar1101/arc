@@ -1,11 +1,83 @@
 import 'package:dio/dio.dart' as dio;
 import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/models/task_model.dart';
+import 'package:intl/intl.dart';
 
 class TaskService {
   final ApiClient apiClient;
 
   TaskService(this.apiClient);
+
+  Future<List<TaskProjectTemplateModel>> listTemplates(
+    int businessId, {
+    bool includeInactive = false,
+  }) async {
+    final response = await apiClient.get(
+      '/api/v1/businesses/$businessId/task-templates',
+      query: {'include_inactive': includeInactive},
+    );
+    final items = (response.data['data']?['items'] as List?) ?? const [];
+    return items
+        .whereType<Map>()
+        .map(
+          (e) => TaskProjectTemplateModel.fromJson(
+            Map<String, dynamic>.from(e),
+          ),
+        )
+        .toList();
+  }
+
+  Future<TaskProjectTemplateModel> snapshotProjectTemplate({
+    required int businessId,
+    required int projectId,
+    required String name,
+    String? description,
+  }) async {
+    final response = await apiClient.post(
+      '/api/v1/businesses/$businessId/projects/$projectId/task-template-snapshot',
+      data: {
+        'name': name,
+        if (description != null) 'description': description,
+      },
+    );
+    return TaskProjectTemplateModel.fromJson(
+      Map<String, dynamic>.from(response.data['data']['template'] as Map),
+    );
+  }
+
+  Future<Map<String, dynamic>> instantiateTemplate({
+    required int businessId,
+    required int templateId,
+    int? projectId,
+    String? projectCode,
+    String? projectName,
+    DateTime? startDate,
+    int? personId,
+    int? managerUserId,
+  }) async {
+    final response = await apiClient.post(
+      '/api/v1/businesses/$businessId/task-templates/$templateId/instantiate',
+      data: {
+        if (projectId != null) 'project_id': projectId,
+        if (projectCode != null) 'project_code': projectCode,
+        if (projectName != null) 'project_name': projectName,
+        if (startDate != null)
+          'start_date': DateFormat('yyyy-MM-dd').format(startDate),
+        if (personId != null) 'person_id': personId,
+        if (managerUserId != null) 'manager_user_id': managerUserId,
+      },
+    );
+    return Map<String, dynamic>.from(response.data['data'] as Map);
+  }
+
+  Future<void> deleteTemplate({
+    required int businessId,
+    required int templateId,
+  }) async {
+    await apiClient.delete(
+      '/api/v1/businesses/$businessId/task-templates/$templateId',
+    );
+  }
 
   Future<Map<String, dynamic>> getDashboard(int businessId) async {
     final response = await apiClient.get(

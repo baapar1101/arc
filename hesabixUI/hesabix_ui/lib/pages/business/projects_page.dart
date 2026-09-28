@@ -1,3 +1,4 @@
+import 'package:hesabix_ui/widgets/task/task_templates_dialog.dart';
 import 'package:hesabix_ui/theme/glass.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -6,6 +7,7 @@ import 'package:hesabix_ui/core/auth_store.dart';
 import 'package:hesabix_ui/core/calendar_controller.dart';
 import 'package:hesabix_ui/models/project_model.dart';
 import 'package:hesabix_ui/services/project_service.dart';
+import 'package:hesabix_ui/services/task_service.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table_widget.dart';
 import 'package:hesabix_ui/widgets/data_table/data_table_config.dart';
 import 'package:hesabix_ui/l10n/app_localizations.dart';
@@ -49,6 +51,22 @@ class _ProjectsPageState extends State<ProjectsPage> {
     _projectService = ProjectService(widget.apiClient);
   }
 
+  Future<void> _openTemplates() async {
+    final changed = await showGlassDialog<bool>(
+      context: context,
+      builder: (_) => TaskTemplatesDialog(
+        businessId: widget.businessId,
+        service: TaskService(widget.apiClient),
+        canCreateProject:
+            widget.authStore.hasProjectPermission('project_create'),
+        canDeleteTemplate:
+            widget.authStore.hasProjectPermission('project_delete'),
+        onInstantiated: _refreshData,
+      ),
+    );
+    if (changed == true) _refreshData();
+  }
+
   void _refreshData() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
@@ -74,6 +92,11 @@ class _ProjectsPageState extends State<ProjectsPage> {
         title: const Text('مدیریت پروژه‌ها'),
         leading: businessSubpageBackLeading(context, widget.businessId),
         actions: [
+          IconButton(
+            tooltip: 'قالب‌های پروژه',
+            icon: const Icon(Icons.auto_awesome_motion_outlined),
+            onPressed: _openTemplates,
+          ),
           IconButton(
             tooltip: 'مدیریت کارها',
             icon: const Icon(Icons.task_alt_outlined),

@@ -325,6 +325,82 @@ class _ProjectWorkspacePageState extends State<ProjectWorkspacePage>
     }
   }
 
+  Future<void> _saveAsTemplate() async {
+    final name = TextEditingController(
+      text: _project == null ? '' : '${_project!.name} Template',
+    );
+    final description = TextEditingController(
+      text: _project?.description ?? '',
+    );
+    final payload = await showGlassDialog<Map<String, String>>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('ذخیره پروژه به‌عنوان قالب'),
+        content: SizedBox(
+          width: 520,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextField(
+                controller: name,
+                autofocus: true,
+                decoration: const InputDecoration(labelText: 'نام قالب'),
+              ),
+              const SizedBox(height: 10),
+              TextField(
+                controller: description,
+                minLines: 2,
+                maxLines: 5,
+                decoration: const InputDecoration(
+                  labelText: 'توضیحات',
+                  alignLabelWithHint: true,
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('انصراف'),
+          ),
+          FilledButton(
+            onPressed: () {
+              if (name.text.trim().isEmpty) return;
+              Navigator.pop(ctx, {
+                'name': name.text.trim(),
+                'description': description.text.trim(),
+              });
+            },
+            child: const Text('ذخیره'),
+          ),
+        ],
+      ),
+    );
+    name.dispose();
+    description.dispose();
+    if (payload == null) return;
+    try {
+      await _tasksService.snapshotProjectTemplate(
+        businessId: widget.businessId,
+        projectId: widget.projectId,
+        name: payload['name']!,
+        description: payload['description'],
+      );
+      if (!mounted) return;
+      SnackBarHelper.showSuccess(
+        context,
+        message: 'قالب پروژه ذخیره شد',
+      );
+    } catch (e) {
+      if (!mounted) return;
+      SnackBarHelper.showError(
+        context,
+        message: ErrorExtractor.forContext(e, context),
+      );
+    }
+  }
+
   Future<void> _manageMembers() async {
     final changed = await showGlassDialog<bool>(
       context: context,
@@ -347,6 +423,11 @@ class _ProjectWorkspacePageState extends State<ProjectWorkspacePage>
           onPressed: () => context.go('/business/${widget.businessId}/projects'),
         ),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.bookmark_add_outlined),
+            tooltip: 'ذخیره به‌عنوان قالب',
+            onPressed: _loading ? null : _saveAsTemplate,
+          ),
           IconButton(icon: const Icon(Icons.group_outlined), tooltip: 'اعضای پروژه', onPressed: _loading ? null : _manageMembers),
           IconButton(icon: const Icon(Icons.refresh), tooltip: 'بروزرسانی', onPressed: _loading ? null : _load),
         ],

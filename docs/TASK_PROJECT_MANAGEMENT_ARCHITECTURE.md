@@ -925,3 +925,60 @@ workload and time are displayed as independent inspectable metrics.
 - [x] Milestone/cycle progress.
 - [x] 7-day time metrics.
 - [x] No unexplained synthetic score.
+
+
+## Phase 19 — Templates & Automation
+
+Implemented on 2026-09-28 using native task/project data plus the existing Hesabix Workflow engine.
+
+### Template model
+
+- New `task_project_templates` stores a business-scoped project blueprint.
+- Project defaults and task specifications are structured JSON; instantiated tasks are normal native tasks.
+- Template task keys are local identifiers used only to rebuild parent/subtask hierarchy.
+- Task specifications can carry status key, priority, relative start/due offsets, estimate, assignees, labels and recurrence settings.
+- A template can contain up to 500 tasks.
+- Project dates are relative to a chosen base date, so the same template can be reused later.
+
+### Native workflows
+
+- Any project workspace can be saved as a template.
+- The Projects page has a template manager and can instantiate a template as a new project.
+- Instantiation can target an existing project through the API.
+- New projects inherit template defaults while receiving a new code/name/start date.
+- Parent/subtask hierarchy is reconstructed in dependency order.
+- Optional CRM entity parameters can link all generated tasks to a Person, Lead, Deal, CRM Activity, Document or Product.
+
+### Workflow automation
+
+The existing Workflow ActionRegistry now exposes:
+- `task_template_instantiate` — “ایجاد پروژه/کارها از قالب”
+
+Because Workflow editor actions are metadata-driven, this action appears in the
+existing workflow palette/config UI automatically. It can consume trigger/node
+references for project name/code, person ID, CRM entity link and other inputs.
+
+This allows existing workflow triggers (CRM, person, documents, schedules, etc.)
+to generate a native project and task plan without a second automation engine.
+
+### Phase 19 endpoints
+
+- `GET/POST /api/v1/businesses/{business_id}/task-templates`
+- `PATCH/DELETE /api/v1/businesses/{business_id}/task-templates/{template_id}`
+- `POST /api/v1/businesses/{business_id}/projects/{project_id}/task-template-snapshot`
+- `POST /api/v1/businesses/{business_id}/task-templates/{template_id}/instantiate`
+
+### Phase 19 migration
+
+- `20260928_000004_task_project_templates`
+
+### Phase 19 acceptance gate
+
+- [x] Save project as template.
+- [x] Relative date offsets.
+- [x] Subtask hierarchy reconstruction.
+- [x] Assignee/label/status reuse.
+- [x] Instantiate into new or existing project.
+- [x] Optional CRM entity linkage.
+- [x] Existing Workflow engine action integration.
+- [x] No parallel automation engine.

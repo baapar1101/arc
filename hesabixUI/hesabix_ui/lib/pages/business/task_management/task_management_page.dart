@@ -587,7 +587,7 @@ class _TaskManagementPageState extends State<TaskManagementPage> {
             businessId: widget.businessId,
             onOpenTask: (id) => _openDashboardTask(id),
             onOpenProject: (id) => context.go(
-              '/business/${widget.businessId}/projects/$id/workspace',
+              '/business/${widget.businessId}/projects/$id',
             ),
           )
         : taskBody;

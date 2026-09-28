@@ -667,3 +667,46 @@ class TaskAttachmentModel {
     );
   }
 }
+
+
+
+class TaskProjectTemplateModel {
+  final int id;
+  final int businessId;
+  final String name;
+  final String? description;
+  final Map<String, dynamic> projectDefaults;
+  final List<Map<String, dynamic>> tasks;
+  final int taskCount;
+  final bool isActive;
+
+  const TaskProjectTemplateModel({
+    required this.id,
+    required this.businessId,
+    required this.name,
+    this.description,
+    required this.projectDefaults,
+    required this.tasks,
+    required this.taskCount,
+    required this.isActive,
+  });
+
+  factory TaskProjectTemplateModel.fromJson(Map<String, dynamic> json) {
+    return TaskProjectTemplateModel(
+      id: (json['id'] as num).toInt(),
+      businessId: (json['business_id'] as num).toInt(),
+      name: json['name']?.toString() ?? '',
+      description: json['description']?.toString(),
+      projectDefaults: json['project_defaults'] is Map
+          ? Map<String, dynamic>.from(json['project_defaults'] as Map)
+          : const {},
+      tasks: ((json['tasks'] as List?) ?? const [])
+          .whereType<Map>()
+          .map((e) => Map<String, dynamic>.from(e))
+          .toList(),
+      taskCount: (json['task_count'] as num?)?.toInt() ??
+          ((json['tasks'] as List?)?.length ?? 0),
+      isActive: json['is_active'] != false,
+    );
+  }
+}
