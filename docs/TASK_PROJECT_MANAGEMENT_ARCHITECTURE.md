@@ -426,8 +426,13 @@ The native task query now supports:
 - completion state
 - structured sort field/direction
 
-The main task screen exposes project, assignee, label, priority, due preset,
+The main task screen exposes project, assignee, label, creator, priority, due preset,
 completion and sorting controls.
+
+Filter state is URL-backed. Search/status/project/assignee/label/creator/priority,
+due preset/completion/sort and selected saved-view ID are serialized into the
+`/business/{business_id}/tasks` query string. Opening a copied URL hydrates the
+same normalized filter state before the first task request.
 
 ### Saved views
 
@@ -436,6 +441,7 @@ completion and sorting controls.
 - Only the owner can edit or delete a saved view.
 - Saved views persist structured filter/sort JSON only; no SQL or executable expression is stored.
 - The main task screen can snapshot, apply and delete saved views.
+- Applying a saved view writes its normalized filters/sort into the URL; URL state remains independently reproducible even if the saved-view record later changes.
 
 ### Phase 7 endpoints
 
@@ -458,6 +464,9 @@ completion and sorting controls.
 - [x] User-owned saved views.
 - [x] Optional shared views.
 - [x] Saved views contain structured JSON only.
+- [x] Creator filtering is exposed in the task UI.
+- [x] URL state and saved-view state use the same normalized filter/sort fields.
+- [x] Copied task URLs restore filter/sort state before loading results.
 
 
 ## Phase 8 — Recurrence & Reminders

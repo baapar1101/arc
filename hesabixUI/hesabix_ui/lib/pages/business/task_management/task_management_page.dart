@@ -19,11 +19,13 @@ import 'package:intl/intl.dart';
 class TaskManagementPage extends StatefulWidget {
   final int businessId;
   final AuthStore authStore;
+  final Uri initialUri;
 
   const TaskManagementPage({
     super.key,
     required this.businessId,
     required this.authStore,
+    required this.initialUri,
   });
 
   @override
@@ -52,6 +54,7 @@ class _TaskManagementPageState extends State<TaskManagementPage> {
   int? _projectFilterId;
   int? _assigneeFilterId;
   int? _labelFilterId;
+  int? _creatorFilterId;
   String? _priorityFilter;
   String _duePreset = 'any';
   String? _sortBy;
@@ -63,13 +66,36 @@ class _TaskManagementPageState extends State<TaskManagementPage> {
   int _taskPage = 1;
   int _taskPages = 1;
   bool _loadingMore = false;
+  late String _lastAppliedUriText;
 
   @override
   void initState() {
     super.initState();
     _taskService = TaskService(ApiClient());
     _projectService = ProjectService(ApiClient());
+    _hydrateFiltersFromUri(widget.initialUri);
+    _lastAppliedUriText = widget.initialUri.toString();
     _loadAll();
+  }
+
+  @override
+  void didUpdateWidget(covariant TaskManagementPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final nextUri = widget.initialUri.toString();
+    if (nextUri == oldWidget.initialUri.toString() ||
+        nextUri == _lastAppliedUriText) {
+      return;
+    }
+    setState(() {
+      _hydrateFiltersFromUri(widget.initialUri);
+      _selectedTask = null;
+      _selectionMode = false;
+      _selectedTaskIds.clear();
+    });
+    _lastAppliedUriText = nextUri;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _reloadTasks();
+    });
   }
 
   @override
@@ -77,6 +103,90 @@ class _TaskManagementPageState extends State<TaskManagementPage> {
     _searchController.dispose();
     _searchFocus.dispose();
     super.dispose();
+  }
+
+  int? _queryInt(Uri uri, String key) {
+    final raw = uri.queryParameters[key];
+    final value = raw == null ? null : int.tryParse(raw);
+    return value != null && value > 0 ? value : null;
+  }
+
+  void _hydrateFiltersFromUri(Uri uri) {
+    final query = uri.queryParameters;
+    _searchController.text = query['q']?.trim() ?? '';
+    _statusFilterId = _queryInt(uri, 'status');
+    _projectFilterId = _queryInt(uri, 'project');
+    _assigneeFilterId = _queryInt(uri, 'assignee');
+    _labelFilterId = _queryInt(uri, 'label');
+    _creatorFilterId = _queryInt(uri, 'creator');
+
+    final priority = query['priority'];
+    _priorityFilter = const {'low', 'normal', 'high', 'urgent'}.contains(priority)
+        ? priority
+        : null;
+
+    final due = query['due'];
+    _duePreset = const {'overdue', 'today', 'next7'}.contains(due)
+        ? due!
+        : 'any';
+
+    switch (query['completed']) {
+      case 'done':
+      case 'true':
+        _completedFilter = true;
+        break;
+      case 'all':
+        _completedFilter = null;
+        break;
+      default:
+        _completedFilter = false;
+        break;
+    }
+
+    final sortBy = query['sort'];
+    _sortBy = const {'due_at', 'created_at', 'updated_at', 'title'}
+            .contains(sortBy)
+        ? sortBy
+        : null;
+    _sortDir = query['dir'] == 'desc' ? 'desc' : 'asc';
+    _selectedViewId = _queryInt(uri, 'view');
+  }
+
+  Map<String, String> _currentUrlQuery() {
+    final query = <String, String>{};
+    final search = _searchController.text.trim();
+    if (search.isNotEmpty) query['q'] = search;
+    if (_statusFilterId != null) query['status'] = '$_statusFilterId';
+    if (_projectFilterId != null) query['project'] = '$_projectFilterId';
+    if (_assigneeFilterId != null) query['assignee'] = '$_assigneeFilterId';
+    if (_labelFilterId != null) query['label'] = '$_labelFilterId';
+    if (_creatorFilterId != null) query['creator'] = '$_creatorFilterId';
+    if (_priorityFilter != null) query['priority'] = _priorityFilter!;
+    if (_duePreset != 'any') query['due'] = _duePreset;
+    if (_completedFilter == true) {
+      query['completed'] = 'done';
+    } else if (_completedFilter == null) {
+      query['completed'] = 'all';
+    }
+    if (_sortBy != null) {
+      query['sort'] = _sortBy!;
+      if (_sortDir == 'desc') query['dir'] = 'desc';
+    }
+    if (_selectedViewId != null) query['view'] = '$_selectedViewId';
+    return query;
+  }
+
+  void _syncUrl() {
+    if (!mounted) return;
+    final query = _currentUrlQuery();
+    final uri = Uri(
+      path: '/business/${widget.businessId}/tasks',
+      queryParameters: query.isEmpty ? null : query,
+    );
+    final next = uri.toString();
+    if (next == _lastAppliedUriText) return;
+    _lastAppliedUriText = next;
+    Router.neglect(context, () => context.go(next));
   }
 
   Future<void> _loadAll() async {
@@ -112,6 +222,10 @@ class _TaskManagementPageState extends State<TaskManagementPage> {
         _assignees = results[1] as List<TaskAssigneeOption>;
         _labels = results[2] as List<TaskLabelModel>;
         _savedViews = results[3] as List<TaskSavedViewModel>;
+        if (_selectedViewId != null &&
+            !_savedViews.any((view) => view.id == _selectedViewId)) {
+          _selectedViewId = null;
+        }
         _projects = results[4] as List<ProjectModel>;
         _tasks = nextTasks;
         _taskPage = (taskResult['page'] as num?)?.toInt() ?? 1;
@@ -156,6 +270,7 @@ class _TaskManagementPageState extends State<TaskManagementPage> {
       assigneeUserId: _assigneeFilterId,
       priority: _priorityFilter,
       labelId: _labelFilterId,
+      createdByUserId: _creatorFilterId,
       dueFrom: dueFrom,
       dueTo: dueTo,
       completed: _completedFilter,
@@ -174,6 +289,8 @@ class _TaskManagementPageState extends State<TaskManagementPage> {
         if (_assigneeFilterId != null)
           'assignee_user_id': _assigneeFilterId,
         if (_labelFilterId != null) 'label_id': _labelFilterId,
+        if (_creatorFilterId != null)
+          'created_by_user_id': _creatorFilterId,
         if (_priorityFilter != null) 'priority': _priorityFilter,
         if (_completedFilter != null) 'completed': _completedFilter,
         if (_duePreset != 'any') 'due_preset': _duePreset,
@@ -196,6 +313,8 @@ class _TaskManagementPageState extends State<TaskManagementPage> {
       _assigneeFilterId =
           (filters['assignee_user_id'] as num?)?.toInt();
       _labelFilterId = (filters['label_id'] as num?)?.toInt();
+      _creatorFilterId =
+          (filters['created_by_user_id'] as num?)?.toInt();
       _priorityFilter = filters['priority']?.toString();
       _completedFilter = filters.containsKey('completed')
           ? filters['completed'] == true
@@ -217,6 +336,7 @@ class _TaskManagementPageState extends State<TaskManagementPage> {
       _projectFilterId = null;
       _assigneeFilterId = null;
       _labelFilterId = null;
+      _creatorFilterId = null;
       _priorityFilter = null;
       _duePreset = 'any';
       _sortBy = null;
@@ -324,6 +444,7 @@ class _TaskManagementPageState extends State<TaskManagementPage> {
 
   Future<void> _reloadTasks() async {
     if (!mounted) return;
+    _syncUrl();
     setState(() {
       _loading = true;
       _error = null;
@@ -1257,6 +1378,7 @@ class _TaskManagementPageState extends State<TaskManagementPage> {
                   onChanged: (value) {
                     if (value == null || value == 0) {
                       setState(() => _selectedViewId = null);
+                      _syncUrl();
                       return;
                     }
                     for (final view in _savedViews) {
@@ -1462,6 +1584,40 @@ class _TaskManagementPageState extends State<TaskManagementPage> {
                   onChanged: (value) {
                     setState(() {
                       _labelFilterId =
+                          value == null || value == 0 ? null : value;
+                      _selectedViewId = null;
+                    });
+                    _reloadTasks();
+                  },
+                ),
+              ),
+              SizedBox(
+                width: 220,
+                child: DropdownButtonFormField<int>(
+                  value: _creatorFilterId ?? 0,
+                  isExpanded: true,
+                  decoration: const InputDecoration(
+                    labelText: 'ایجادکننده',
+                    isDense: true,
+                  ),
+                  items: [
+                    const DropdownMenuItem(
+                      value: 0,
+                      child: Text('همه ایجادکنندگان'),
+                    ),
+                    ..._assignees.map(
+                      (user) => DropdownMenuItem(
+                        value: user.userId,
+                        child: Text(
+                          user.name,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ),
+                  ],
+                  onChanged: (value) {
+                    setState(() {
+                      _creatorFilterId =
                           value == null || value == 0 ? null : value;
                       _selectedViewId = null;
                     });

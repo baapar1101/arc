@@ -5283,6 +5283,7 @@ class _MyAppState extends State<MyApp> {
                                 TaskManagementPage(
                                   businessId: businessId,
                                   authStore: _authStore!,
+                                  initialUri: state.uri,
                                 ),
                               );
                             },
