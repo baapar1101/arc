@@ -8,6 +8,8 @@ from sqlalchemy.orm import Session
 
 from adapters.api.v1.schema_models.task_management import (
     TaskAssigneesRequest,
+    TaskBulkDeleteRequest,
+    TaskBulkUpdateRequest,
     TaskCommentCreateRequest,
     TaskCommentUpdateRequest,
     TaskCreateRequest,
@@ -30,6 +32,7 @@ from adapters.api.v1.schema_models.task_management import (
     TaskTimeEntryUpdateRequest,
     TaskTimerStartRequest,
     TaskUpdateRequest,
+    TaskRestoreRequest,
 )
 from adapters.db.models.task_management import Task, TaskStatus
 from adapters.db.repositories.task_repository import TaskRepository
@@ -90,6 +93,7 @@ from app.services.task_management_service import (
     replace_task_assignees,
     replace_task_cycles,
     replace_task_labels,
+    restore_task,
     soft_delete_task,
     start_task_timer,
     stop_active_timer,
@@ -675,6 +679,131 @@ async def list_task_assignees(
         data={"users": list_available_assignees(db, business_id)},
         request=request,
         message="TASK_ASSIGNEES_FETCHED",
+    )
+
+
+@router.post("/businesses/{business_id}/tasks/bulk-update")
+@require_business_access("business_id")
+async def bulk_update_tasks_endpoint(
+    request: Request,
+    data: TaskBulkUpdateRequest,
+    business_id: int = Path(..., gt=0),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+):
+    payload = data.dict(exclude={"task_ids"}, exclude_none=True)
+    if not payload:
+        raise ApiError(
+            "TASK_BULK_EMPTY",
+            "At least one bulk update field is required",
+            http_status=400,
+        )
+    capability = (
+        "task_assign"
+        if "assignee_user_ids" in payload
+        else "task_edit"
+    )
+    updated = []
+    for task_id in dict.fromkeys(data.task_ids):
+        require_task_capability(
+            ctx,
+            db,
+            business_id,
+            int(task_id),
+            capability,
+        )
+        task = update_task(
+            db,
+            business_id,
+            int(task_id),
+            ctx.get_user_id(),
+            payload,
+        )
+        updated.append(_format_task(task, db, request))
+    return success_response(
+        data={"items": updated, "count": len(updated)},
+        request=request,
+        message="TASKS_BULK_UPDATED",
+    )
+
+
+@router.post("/businesses/{business_id}/tasks/bulk-delete")
+@require_business_access("business_id")
+async def bulk_delete_tasks_endpoint(
+    request: Request,
+    data: TaskBulkDeleteRequest,
+    business_id: int = Path(..., gt=0),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+):
+    deleted_ids = []
+    for task_id in dict.fromkeys(data.task_ids):
+        require_task_capability(
+            ctx,
+            db,
+            business_id,
+            int(task_id),
+            "task_delete",
+        )
+        soft_delete_task(
+            db,
+            business_id,
+            int(task_id),
+            ctx.get_user_id(),
+        )
+        deleted_ids.append(int(task_id))
+    return success_response(
+        data={"task_ids": deleted_ids, "count": len(deleted_ids)},
+        request=request,
+        message="TASKS_BULK_DELETED",
+    )
+
+
+@router.post("/businesses/{business_id}/tasks/restore")
+@require_business_access("business_id")
+async def restore_task_endpoint(
+    request: Request,
+    data: TaskRestoreRequest,
+    business_id: int = Path(..., gt=0),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+):
+    deleted = TaskRepository(db).get_by_id(
+        data.task_id,
+        business_id,
+        include_deleted=True,
+    )
+    if not deleted:
+        raise ApiError("TASK_NOT_FOUND", "Task not found", http_status=404)
+    if deleted.project_id is not None:
+        require_project_capability(
+            ctx,
+            db,
+            business_id,
+            deleted.project_id,
+            "task_delete",
+        )
+    elif not business_project_action(
+        ctx,
+        db,
+        business_id,
+        "task_delete",
+    ) and deleted.created_by_user_id != ctx.get_user_id():
+        raise ApiError(
+            "TASK_PERMISSION_DENIED",
+            "Missing task capability: task_delete",
+            http_status=403,
+        )
+    task = restore_task(
+        db,
+        business_id,
+        data.task_id,
+        ctx.get_user_id(),
+    )
+    return success_response(
+        data={"task": _format_task(task, db, request)},
+        request=request,
+        message="TASK_RESTORED",
     )
 
 

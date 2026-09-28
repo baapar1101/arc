@@ -2612,3 +2612,33 @@ def list_entity_linked_tasks(
         Task.id.in_(task_ids),
         Task.deleted_at.is_(None),
     ).order_by(Task.due_at.asc().nullslast(), Task.created_at.desc()).all()
+
+
+
+def restore_task(
+    db: Session,
+    business_id: int,
+    task_id: int,
+    actor_user_id: int,
+) -> Task:
+    repo = TaskRepository(db)
+    task = repo.get_by_id(
+        task_id,
+        business_id,
+        include_deleted=True,
+    )
+    if not task:
+        raise ApiError("TASK_NOT_FOUND", "Task not found", http_status=404)
+    if task.deleted_at is None:
+        return task
+    task.deleted_at = None
+    task.updated_at = _now()
+    _record_activity(
+        db,
+        task=task,
+        actor_user_id=actor_user_id,
+        event_type="task_restored",
+        event_data={},
+    )
+    db.commit()
+    return repo.get_by_id(task.id, business_id) or task

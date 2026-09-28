@@ -183,3 +183,20 @@ class TaskProjectTemplateInstantiateRequest(BaseModel):
     link_entity_type: Optional[str] = Field(None, max_length=50)
     link_entity_id: Optional[str] = Field(None, max_length=64)
     relationship_type: str = Field(default="related", max_length=50)
+
+
+
+class TaskBulkUpdateRequest(BaseModel):
+    task_ids: list[int] = Field(..., min_length=1, max_length=200)
+    status_id: Optional[int] = Field(None, gt=0)
+    priority: Optional[str] = None
+    assignee_user_ids: Optional[list[int]] = None
+    label_ids: Optional[list[int]] = None
+
+
+class TaskBulkDeleteRequest(BaseModel):
+    task_ids: list[int] = Field(..., min_length=1, max_length=200)
+
+
+class TaskRestoreRequest(BaseModel):
+    task_id: int = Field(..., gt=0)
