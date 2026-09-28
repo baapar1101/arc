@@ -1005,7 +1005,7 @@ async def list_entity_linked_tasks_endpoint(
             )
             visible_tasks.append(task)
         except ApiError as exc:
-            if exc.http_status != 403:
+            if exc.status_code != 403:
                 raise
     return success_response(
         data={"items": [_format_task(task, db, request) for task in visible_tasks]},

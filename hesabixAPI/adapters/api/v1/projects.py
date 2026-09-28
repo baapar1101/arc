@@ -8,6 +8,11 @@ from typing import Dict, Any, Optional
 
 from app.core.auth_dependency import get_current_user, AuthContext, get_db
 from app.core.permissions import require_business_access, require_business_permission_dep
+from app.core.task_project_permissions import (
+    accessible_project_ids,
+    business_project_action,
+    project_route_guard_dep,
+)
 from app.core.responses import success_response, ApiError
 from app.core.pagination import paginate_query
 from app.core.cache import get_cache
@@ -51,7 +56,7 @@ from adapters.api.v1.schema_models.project import (
 )
 from app.core.responses import format_datetime_fields
 
-router = APIRouter(tags=["پروژه‌ها"])
+router = APIRouter(tags=["پروژه‌ها"], dependencies=[Depends(project_route_guard_dep)])
 
 
 def _format_project(project: Project, request: Request = None) -> Dict[str, Any]:
@@ -109,6 +114,12 @@ async def create_project_endpoint(
 	ctx: AuthContext = Depends(get_current_user)
 ):
 	"""ایجاد پروژه جدید"""
+	if not business_project_action(ctx, db, business_id, "project_create"):
+		raise ApiError(
+			"PROJECT_PERMISSION_DENIED",
+			"Missing project capability: project_create",
+			http_status=403,
+		)
 	project = create_project(db, business_id, ctx.get_user_id(), data.dict())
 	
 	return success_response(
@@ -156,11 +167,13 @@ async def list_projects_endpoint(
 		filters['manager_user_id'] = manager_user_id
 	
 	# جستجو
+	allowed_project_ids = accessible_project_ids(ctx, db, business_id)
 	skip = (page - 1) * limit
 	projects, total = repo.search(
 		business_id=business_id,
 		search_term=search,
 		filters=filters,
+		allowed_project_ids=allowed_project_ids,
 		skip=skip,
 		limit=limit
 	)
@@ -387,10 +400,12 @@ async def search_projects_endpoint(
 			return success_response(cached, request)
 
 	# جستجو
+	allowed_project_ids = accessible_project_ids(ctx, db, business_id)
 	projects, total = repo.search(
 		business_id=business_id,
 		search_term=search,
 		filters=filters if filters else None,
+		allowed_project_ids=allowed_project_ids,
 		skip=skip,
 		limit=take
 	)
@@ -430,9 +445,11 @@ async def list_active_projects_simple_endpoint(
 ):
 	"""لیست ساده پروژه‌های فعال"""
 	repo = ProjectRepository(db)
+	allowed_project_ids = accessible_project_ids(ctx, db, business_id)
 	projects = repo.list_by_business(
 		business_id=business_id,
 		is_active=True,
+		allowed_project_ids=allowed_project_ids,
 		skip=0,
 		limit=1000  # حداکثر برای کمبوباکس
 	)
