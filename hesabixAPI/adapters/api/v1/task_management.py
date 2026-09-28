@@ -41,6 +41,7 @@ from app.core.task_project_permissions import (
 )
 from app.core.responses import ApiError, format_datetime_fields, success_response
 from app.services.task_attachment_service import TaskAttachmentService
+from app.services.task_dashboard_service import get_task_dashboard
 from app.services.task_management_service import (
     add_task_comment,
     add_task_relation,
@@ -272,6 +273,26 @@ def _format_task(task: Task, db: Session, request: Request) -> dict[str, Any]:
         "is_completed": task.completed_at is not None,
     }
     return format_datetime_fields(data, request, business_id=task.business_id)
+
+
+@router.get("/businesses/{business_id}/task-dashboard")
+@require_business_access("business_id")
+async def get_task_dashboard_endpoint(
+    request: Request,
+    business_id: int = Path(..., gt=0),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+):
+    data = get_task_dashboard(db, business_id, ctx)
+    return success_response(
+        data=format_datetime_fields(
+            data,
+            request,
+            business_id=business_id,
+        ),
+        request=request,
+        message="TASK_DASHBOARD_FETCHED",
+    )
 
 
 @router.get("/businesses/{business_id}/task-labels")
