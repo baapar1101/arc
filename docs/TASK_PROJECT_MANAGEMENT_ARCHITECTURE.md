@@ -982,3 +982,73 @@ to generate a native project and task plan without a second automation engine.
 - [x] Optional CRM entity linkage.
 - [x] Existing Workflow engine action integration.
 - [x] No parallel automation engine.
+
+
+## Phase 20 — UX / Performance / Polish
+
+Implemented on 2026-09-28 as the final benchmark/polish pass.
+
+### Command workflow
+
+- Task module includes a command palette available from the AppBar or Ctrl/Cmd+K.
+- Palette actions cover new task, Dashboard/List switching, Due Today, Overdue, clear filters and multi-select mode.
+- Alt+D toggles Dashboard/List.
+- Alt+S toggles selection mode.
+- Escape exits selection mode.
+
+### Bulk operations
+
+- Multi-select mode reuses the leading checkbox position to avoid competing controls.
+- Long-press enters selection mode on touch devices.
+- Loaded tasks can be select-all.
+- Bulk status and priority updates use dedicated bounded backend endpoints.
+- Bulk delete permission-checks every task and remains soft-delete.
+- Bulk requests are capped at 200 task IDs.
+
+### Undo
+
+- Single and bulk deletes expose Undo through the existing root Snackbar/overlay system.
+- Undo restores the same task record; IDs, comments, files, links, activity and task relationships remain intact.
+- Restore itself is permission checked.
+
+### Large lists
+
+- Task loading uses server-side pages of 100 records.
+- “Load more” appends subsequent pages without re-fetching previously loaded rows.
+- Filter changes reset pagination to page 1.
+- This bounds initial Flutter widget creation even for large task sets.
+
+### Existing polished behavior retained
+
+- Quick create.
+- Inline status changes.
+- Native glass task drawer.
+- Responsive desktop/mobile detail surfaces.
+- Kanban drag/drop.
+- Calendar drag rescheduling.
+- Gantt/Timeline.
+- Saved views.
+- Analytics dashboard.
+
+### Realtime note
+
+The current repository does not expose a task realtime/WebSocket transport.
+Phase 20 does not mislabel polling as realtime; live task sync can be added later
+when a supported task event channel exists.
+
+### Phase 20 endpoints
+
+- `POST /api/v1/businesses/{business_id}/tasks/bulk-update`
+- `POST /api/v1/businesses/{business_id}/tasks/bulk-delete`
+- `POST /api/v1/businesses/{business_id}/tasks/restore`
+
+### Phase 20 acceptance gate
+
+- [x] Command palette.
+- [x] Keyboard shortcuts.
+- [x] Multi-select.
+- [x] Bulk status/priority/delete.
+- [x] Soft-delete Undo.
+- [x] Bounded server pagination/load-more.
+- [x] Responsive glass interaction model retained.
+- [x] No fake realtime claim.

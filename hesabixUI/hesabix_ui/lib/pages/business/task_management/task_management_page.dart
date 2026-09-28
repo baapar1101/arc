@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/core/auth_store.dart';
@@ -33,6 +34,7 @@ class _TaskManagementPageState extends State<TaskManagementPage> {
   late final TaskService _taskService;
   late final ProjectService _projectService;
   final TextEditingController _searchController = TextEditingController();
+  final FocusNode _searchFocus = FocusNode();
 
   List<TaskModel> _tasks = const [];
   List<TaskStatusModel> _statuses = const [];
@@ -56,6 +58,11 @@ class _TaskManagementPageState extends State<TaskManagementPage> {
   String _sortDir = 'asc';
   int? _selectedViewId;
   TaskModel? _selectedTask;
+  bool _selectionMode = false;
+  final Set<int> _selectedTaskIds = <int>{};
+  int _taskPage = 1;
+  int _taskPages = 1;
+  bool _loadingMore = false;
 
   @override
   void initState() {
@@ -68,6 +75,7 @@ class _TaskManagementPageState extends State<TaskManagementPage> {
   @override
   void dispose() {
     _searchController.dispose();
+    _searchFocus.dispose();
     super.dispose();
   }
 
@@ -96,9 +104,9 @@ class _TaskManagementPageState extends State<TaskManagementPage> {
       ]);
 
       if (!mounted) return;
+      final taskResult = results[5] as Map<String, dynamic>;
       final nextTasks =
-          (results[5] as Map<String, dynamic>)['items'] as List<TaskModel>? ??
-              const <TaskModel>[];
+          taskResult['items'] as List<TaskModel>? ?? const <TaskModel>[];
       setState(() {
         _statuses = results[0] as List<TaskStatusModel>;
         _assignees = results[1] as List<TaskAssigneeOption>;
@@ -106,6 +114,11 @@ class _TaskManagementPageState extends State<TaskManagementPage> {
         _savedViews = results[3] as List<TaskSavedViewModel>;
         _projects = results[4] as List<ProjectModel>;
         _tasks = nextTasks;
+        _taskPage = (taskResult['page'] as num?)?.toInt() ?? 1;
+        _taskPages = (taskResult['pages'] as num?)?.toInt() ?? 1;
+        _selectedTaskIds.removeWhere(
+          (id) => !nextTasks.any((task) => task.id == id),
+        );
         _selectedTask = _selectedTask == null
             ? null
             : _findTask(nextTasks, _selectedTask!.id);
@@ -120,7 +133,7 @@ class _TaskManagementPageState extends State<TaskManagementPage> {
     }
   }
 
-  Future<Map<String, dynamic>> _loadTasksRequest() {
+  Future<Map<String, dynamic>> _loadTasksRequest({int page = 1}) {
     final now = DateTime.now();
     DateTime? dueFrom;
     DateTime? dueTo;
@@ -148,6 +161,8 @@ class _TaskManagementPageState extends State<TaskManagementPage> {
       completed: _completedFilter,
       sortBy: _sortBy,
       sortDir: _sortDir,
+      page: page,
+      limit: 100,
     );
   }
 
@@ -314,12 +329,15 @@ class _TaskManagementPageState extends State<TaskManagementPage> {
       _error = null;
     });
     try {
-      final result = await _loadTasksRequest();
+      final result = await _loadTasksRequest(page: 1);
       final nextTasks =
           (result['items'] as List<TaskModel>?) ?? const <TaskModel>[];
       if (!mounted) return;
       setState(() {
         _tasks = nextTasks;
+        _taskPage = (result['page'] as num?)?.toInt() ?? 1;
+        _taskPages = (result['pages'] as num?)?.toInt() ?? 1;
+        _selectedTaskIds.clear();
         _selectedTask = _selectedTask == null
             ? null
             : _findTask(nextTasks, _selectedTask!.id);
@@ -332,6 +350,277 @@ class _TaskManagementPageState extends State<TaskManagementPage> {
         _loading = false;
       });
     }
+  }
+
+  Future<void> _loadMoreTasks() async {
+    if (_loadingMore || _taskPage >= _taskPages) return;
+    setState(() => _loadingMore = true);
+    try {
+      final result = await _loadTasksRequest(page: _taskPage + 1);
+      final items =
+          (result['items'] as List<TaskModel>?) ?? const <TaskModel>[];
+      if (!mounted) return;
+      final existing = {for (final task in _tasks) task.id: task};
+      for (final task in items) {
+        existing[task.id] = task;
+      }
+      setState(() {
+        _tasks = existing.values.toList();
+        _taskPage = (result['page'] as num?)?.toInt() ?? (_taskPage + 1);
+        _taskPages = (result['pages'] as num?)?.toInt() ?? _taskPages;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      SnackBarHelper.showError(
+        context,
+        message: ErrorExtractor.forContext(e, context),
+      );
+    } finally {
+      if (mounted) setState(() => _loadingMore = false);
+    }
+  }
+
+  void _setSelectionMode(bool enabled) {
+    setState(() {
+      _selectionMode = enabled;
+      if (!enabled) _selectedTaskIds.clear();
+      _selectedTask = null;
+    });
+  }
+
+  void _toggleSelection(int taskId, bool selected) {
+    setState(() {
+      _selectionMode = true;
+      if (selected) {
+        _selectedTaskIds.add(taskId);
+      } else {
+        _selectedTaskIds.remove(taskId);
+        if (_selectedTaskIds.isEmpty) _selectionMode = false;
+      }
+    });
+  }
+
+  void _selectAllLoaded() {
+    setState(() {
+      _selectionMode = true;
+      _selectedTaskIds
+        ..clear()
+        ..addAll(_tasks.map((task) => task.id));
+    });
+  }
+
+  Future<void> _bulkUpdate({
+    int? statusId,
+    String? priority,
+  }) async {
+    if (_selectedTaskIds.isEmpty) return;
+    try {
+      final updated = await _taskService.bulkUpdateTasks(
+        businessId: widget.businessId,
+        taskIds: _selectedTaskIds.toList(),
+        statusId: statusId,
+        priority: priority,
+      );
+      for (final task in updated) {
+        _upsertTask(task);
+      }
+      if (!mounted) return;
+      _setSelectionMode(false);
+      SnackBarHelper.showSuccess(
+        context,
+        message: '${updated.length} کار بروزرسانی شد',
+      );
+    } catch (e) {
+      if (!mounted) return;
+      SnackBarHelper.showError(
+        context,
+        message: ErrorExtractor.forContext(e, context),
+      );
+    }
+  }
+
+  Future<void> _restoreDeletedTasks(List<int> ids) async {
+    try {
+      for (final id in ids) {
+        await _taskService.restoreTask(
+          businessId: widget.businessId,
+          taskId: id,
+        );
+      }
+      await _reloadTasks();
+      if (mounted) {
+        SnackBarHelper.showSuccess(
+          context,
+          message: 'حذف برگردانده شد',
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+      SnackBarHelper.showError(
+        context,
+        message: ErrorExtractor.forContext(e, context),
+      );
+    }
+  }
+
+  Future<void> _bulkDelete() async {
+    if (_selectedTaskIds.isEmpty) return;
+    final ids = _selectedTaskIds.toList();
+    try {
+      final deleted = await _taskService.bulkDeleteTasks(
+        businessId: widget.businessId,
+        taskIds: ids,
+      );
+      if (!mounted) return;
+      setState(() {
+        _tasks = _tasks
+            .where((task) => !deleted.contains(task.id))
+            .toList();
+        _selectionMode = false;
+        _selectedTaskIds.clear();
+        _selectedTask = null;
+      });
+      SnackBarHelper.show(
+        context,
+        message: '${deleted.length} کار حذف شد',
+        action: SnackBarAction(
+          label: 'Undo',
+          onPressed: () => _restoreDeletedTasks(deleted),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      SnackBarHelper.showError(
+        context,
+        message: ErrorExtractor.forContext(e, context),
+      );
+    }
+  }
+
+  Future<void> _commandCreateTask() async {
+    final controller = TextEditingController();
+    final title = await showGlassDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('کار جدید'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: const InputDecoration(labelText: 'عنوان'),
+          onSubmitted: (value) =>
+              Navigator.pop(ctx, value.trim()),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('انصراف'),
+          ),
+          FilledButton(
+            onPressed: () =>
+                Navigator.pop(ctx, controller.text.trim()),
+            child: const Text('ایجاد'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (title != null && title.isNotEmpty) {
+      await _quickCreate(title);
+    }
+  }
+
+  Future<void> _showCommandPalette() async {
+    await showGlassDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.keyboard_command_key_rounded),
+            SizedBox(width: 8),
+            Text('Command Palette'),
+          ],
+        ),
+        content: SizedBox(
+          width: 520,
+          child: ListView(
+            shrinkWrap: true,
+            children: [
+              if (widget.authStore.hasProjectPermission('task_create'))
+                ListTile(
+                  leading: const Icon(Icons.add_task_outlined),
+                  title: const Text('New task'),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _commandCreateTask();
+                  },
+                ),
+              ListTile(
+                leading: const Icon(Icons.analytics_outlined),
+                title: Text(
+                  _showDashboard ? 'Show task list' : 'Show dashboard',
+                ),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  setState(() {
+                    _showDashboard = !_showDashboard;
+                    _selectedTask = null;
+                    if (_showDashboard) _dashboardRevision++;
+                  });
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.today_outlined),
+                title: const Text('Due today'),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  setState(() {
+                    _showDashboard = false;
+                    _duePreset = 'today';
+                    _completedFilter = false;
+                  });
+                  _reloadTasks();
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.warning_amber_rounded),
+                title: const Text('Overdue'),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  setState(() {
+                    _showDashboard = false;
+                    _duePreset = 'overdue';
+                    _completedFilter = false;
+                  });
+                  _reloadTasks();
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.filter_alt_off_outlined),
+                title: const Text('Clear filters'),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _resetFilters();
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.checklist_rounded),
+                title: const Text('Selection mode'),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _setSelectionMode(true);
+                },
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('بستن'),
+          ),
+        ],
+      ),
+    );
   }
 
   TaskModel? _findTask(List<TaskModel> tasks, int id) {
@@ -470,7 +759,14 @@ class _TaskManagementPageState extends State<TaskManagementPage> {
         _tasks = _tasks.where((item) => item.id != source.id).toList();
         if (_selectedTask?.id == source.id) _selectedTask = null;
       });
-      SnackBarHelper.showSuccess(context, message: 'کار حذف شد');
+      SnackBarHelper.show(
+        context,
+        message: 'کار حذف شد',
+        action: SnackBarAction(
+          label: 'Undo',
+          onPressed: () => _restoreDeletedTasks([source.id]),
+        ),
+      );
       return true;
     } catch (e) {
       if (!mounted) return false;
@@ -592,7 +888,39 @@ class _TaskManagementPageState extends State<TaskManagementPage> {
           )
         : taskBody;
 
-    return Scaffold(
+    return CallbackShortcuts(
+      bindings: <ShortcutActivator, VoidCallback>{
+        const SingleActivator(
+          LogicalKeyboardKey.keyK,
+          control: true,
+        ): _showCommandPalette,
+        const SingleActivator(
+          LogicalKeyboardKey.keyK,
+          meta: true,
+        ): _showCommandPalette,
+        const SingleActivator(
+          LogicalKeyboardKey.keyD,
+          alt: true,
+        ): () {
+          setState(() {
+            _showDashboard = !_showDashboard;
+            _selectedTask = null;
+            if (_showDashboard) _dashboardRevision++;
+          });
+        },
+        const SingleActivator(
+          LogicalKeyboardKey.keyS,
+          alt: true,
+        ): () => _setSelectionMode(!_selectionMode),
+        const SingleActivator(
+          LogicalKeyboardKey.escape,
+        ): () {
+          if (_selectionMode) _setSelectionMode(false);
+        },
+      },
+      child: Focus(
+        autofocus: true,
+        child: Scaffold(
       appBar: AppBar(
         title: const Text('مدیریت کارها'),
         leading: IconButton(
@@ -601,6 +929,21 @@ class _TaskManagementPageState extends State<TaskManagementPage> {
           onPressed: () => context.go('/business/${widget.businessId}/projects'),
         ),
         actions: [
+          if (!_showDashboard)
+            IconButton(
+              tooltip: _selectionMode ? 'خروج از انتخاب' : 'انتخاب چندتایی',
+              onPressed: () => _setSelectionMode(!_selectionMode),
+              icon: Icon(
+                _selectionMode
+                    ? Icons.close_rounded
+                    : Icons.checklist_rounded,
+              ),
+            ),
+          IconButton(
+            tooltip: 'Command Palette · Ctrl/Cmd+K',
+            onPressed: _showCommandPalette,
+            icon: const Icon(Icons.keyboard_command_key_rounded),
+          ),
           IconButton(
             tooltip: _showDashboard ? 'لیست کارها' : 'داشبورد',
             onPressed: () {
@@ -661,6 +1004,8 @@ class _TaskManagementPageState extends State<TaskManagementPage> {
                   ),
                 ],
               ),
+      ),
+        ),
       ),
     );
   }
@@ -726,6 +1071,10 @@ class _TaskManagementPageState extends State<TaskManagementPage> {
           ],
           _filters(context),
           const SizedBox(height: 12),
+          if (_selectionMode) ...[
+            _bulkToolbar(context),
+            const SizedBox(height: 12),
+          ],
           if (_loading)
             const Padding(
               padding: EdgeInsets.symmetric(vertical: 64),
@@ -743,15 +1092,121 @@ class _TaskManagementPageState extends State<TaskManagementPage> {
                   task: task,
                   priorityLabel: _priorityLabel(task.priority),
                   priorityColor: _priorityColor(context, task.priority),
-                  selected: _selectedTask?.id == task.id,
+                  selected: _selectedTask?.id == task.id ||
+                      _selectedTaskIds.contains(task.id),
+                  selectionMode: _selectionMode,
+                  batchSelected: _selectedTaskIds.contains(task.id),
                   statuses: _statuses,
-                  onOpen: () => _openDetails(task),
+                  onOpen: () {
+                    if (_selectionMode) {
+                      _toggleSelection(
+                        task.id,
+                        !_selectedTaskIds.contains(task.id),
+                      );
+                    } else {
+                      _openDetails(task);
+                    }
+                  },
+                  onLongPress: () => _toggleSelection(task.id, true),
+                  onSelectionChanged: (value) =>
+                      _toggleSelection(task.id, value),
                   onToggle: () => _toggleComplete(task),
                   onStatusChanged: (statusId) =>
                       _updateTask(task, {'status_id': statusId}),
                 ),
               ),
             ),
+          if (!_loading && _taskPage < _taskPages) ...[
+            const SizedBox(height: 6),
+            Center(
+              child: OutlinedButton.icon(
+                onPressed: _loadingMore ? null : _loadMoreTasks,
+                icon: _loadingMore
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.expand_more_rounded),
+                label: Text(
+                  _loadingMore
+                      ? 'در حال بارگذاری…'
+                      : 'بارگذاری بیشتر ($_taskPage/$_taskPages)',
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _bulkToolbar(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return GlassSurface(
+      padding: const EdgeInsets.all(12),
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        children: [
+          Chip(
+            avatar: const Icon(Icons.checklist_rounded, size: 17),
+            label: Text('${_selectedTaskIds.length} انتخاب‌شده'),
+          ),
+          TextButton.icon(
+            onPressed: _selectAllLoaded,
+            icon: const Icon(Icons.select_all_rounded),
+            label: const Text('انتخاب همه بارگذاری‌شده'),
+          ),
+          PopupMenuButton<int>(
+            enabled: _selectedTaskIds.isNotEmpty &&
+                widget.authStore.hasProjectPermission('task_edit'),
+            tooltip: 'تغییر گروهی وضعیت',
+            onSelected: (value) => _bulkUpdate(statusId: value),
+            itemBuilder: (_) => _statuses
+                .map(
+                  (status) => PopupMenuItem(
+                    value: status.id,
+                    child: Text(status.name),
+                  ),
+                )
+                .toList(),
+            child: const Chip(
+              avatar: Icon(Icons.swap_horiz_rounded, size: 17),
+              label: Text('وضعیت'),
+            ),
+          ),
+          PopupMenuButton<String>(
+            enabled: _selectedTaskIds.isNotEmpty &&
+                widget.authStore.hasProjectPermission('task_edit'),
+            tooltip: 'تغییر گروهی اولویت',
+            onSelected: (value) => _bulkUpdate(priority: value),
+            itemBuilder: (_) => const [
+              PopupMenuItem(value: 'low', child: Text('کم')),
+              PopupMenuItem(value: 'normal', child: Text('معمولی')),
+              PopupMenuItem(value: 'high', child: Text('زیاد')),
+              PopupMenuItem(value: 'urgent', child: Text('فوری')),
+            ],
+            child: const Chip(
+              avatar: Icon(Icons.priority_high_rounded, size: 17),
+              label: Text('اولویت'),
+            ),
+          ),
+          if (widget.authStore.hasProjectPermission('task_delete'))
+            FilledButton.tonalIcon(
+              onPressed:
+                  _selectedTaskIds.isEmpty ? null : _bulkDelete,
+              icon: Icon(Icons.delete_outline, color: scheme.error),
+              label: Text(
+                'حذف',
+                style: TextStyle(color: scheme.error),
+              ),
+            ),
+          TextButton(
+            onPressed: () => _setSelectionMode(false),
+            child: const Text('خروج'),
+          ),
         ],
       ),
     );
@@ -832,6 +1287,7 @@ class _TaskManagementPageState extends State<TaskManagementPage> {
           const SizedBox(height: 11),
           TextField(
             controller: _searchController,
+            focusNode: _searchFocus,
             textInputAction: TextInputAction.search,
             onSubmitted: (_) => _reloadTasks(),
             decoration: InputDecoration(
@@ -1211,8 +1667,12 @@ class _TaskCard extends StatelessWidget {
   final String priorityLabel;
   final Color priorityColor;
   final bool selected;
+  final bool selectionMode;
+  final bool batchSelected;
   final List<TaskStatusModel> statuses;
   final VoidCallback onOpen;
+  final VoidCallback onLongPress;
+  final ValueChanged<bool> onSelectionChanged;
   final VoidCallback onToggle;
   final Future<TaskModel?> Function(int statusId) onStatusChanged;
 
@@ -1221,8 +1681,12 @@ class _TaskCard extends StatelessWidget {
     required this.priorityLabel,
     required this.priorityColor,
     required this.selected,
+    required this.selectionMode,
+    required this.batchSelected,
     required this.statuses,
     required this.onOpen,
+    required this.onLongPress,
+    required this.onSelectionChanged,
     required this.onToggle,
     required this.onStatusChanged,
   });
@@ -1255,14 +1719,22 @@ class _TaskCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Checkbox(
-            value: task.isCompleted,
-            onChanged: (_) => onToggle(),
+            value: selectionMode ? batchSelected : task.isCompleted,
+            shape: selectionMode ? const CircleBorder() : null,
+            onChanged: (value) {
+              if (selectionMode) {
+                onSelectionChanged(value == true);
+              } else {
+                onToggle();
+              }
+            },
           ),
           const SizedBox(width: 5),
           Expanded(
             child: InkWell(
               borderRadius: BorderRadius.circular(10),
               onTap: onOpen,
+              onLongPress: onLongPress,
               child: Padding(
                 padding: const EdgeInsets.symmetric(vertical: 4),
                 child: Column(
