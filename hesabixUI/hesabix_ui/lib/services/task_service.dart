@@ -243,6 +243,59 @@ class TaskService {
     };
   }
 
+  Future<List<TaskModel>> bulkUpdateTasks({
+    required int businessId,
+    required List<int> taskIds,
+    int? statusId,
+    String? priority,
+    List<int>? assigneeUserIds,
+    List<int>? labelIds,
+  }) async {
+    final response = await apiClient.post(
+      '/api/v1/businesses/$businessId/tasks/bulk-update',
+      data: {
+        'task_ids': taskIds,
+        if (statusId != null) 'status_id': statusId,
+        if (priority != null) 'priority': priority,
+        if (assigneeUserIds != null)
+          'assignee_user_ids': assigneeUserIds,
+        if (labelIds != null) 'label_ids': labelIds,
+      },
+    );
+    final items = (response.data['data']?['items'] as List?) ?? const [];
+    return items
+        .whereType<Map>()
+        .map((e) => TaskModel.fromJson(Map<String, dynamic>.from(e)))
+        .toList();
+  }
+
+  Future<List<int>> bulkDeleteTasks({
+    required int businessId,
+    required List<int> taskIds,
+  }) async {
+    final response = await apiClient.post(
+      '/api/v1/businesses/$businessId/tasks/bulk-delete',
+      data: {'task_ids': taskIds},
+    );
+    return ((response.data['data']?['task_ids'] as List?) ?? const [])
+        .whereType<num>()
+        .map((e) => e.toInt())
+        .toList();
+  }
+
+  Future<TaskModel> restoreTask({
+    required int businessId,
+    required int taskId,
+  }) async {
+    final response = await apiClient.post(
+      '/api/v1/businesses/$businessId/tasks/restore',
+      data: {'task_id': taskId},
+    );
+    return TaskModel.fromJson(
+      Map<String, dynamic>.from(response.data['data']['task'] as Map),
+    );
+  }
+
   Future<TaskModel> getTask({
     required int businessId,
     required int taskId,
