@@ -4,11 +4,13 @@ from __future__ import annotations
 
 from typing import Optional
 
+from fastapi import Depends, Request
 from sqlalchemy.orm import Session
 
 from adapters.db.models.project import Project
 from adapters.db.models.task_management import ProjectMember, Task, TaskAssignee
-from app.core.auth_dependency import AuthContext
+from app.core.auth_dependency import AuthContext, get_current_user
+from adapters.db.session import get_db
 from app.core.permissions import get_business_permissions_for_user
 from app.core.responses import ApiError
 
@@ -236,3 +238,98 @@ def task_visibility_scope(
     if project_ids is None:
         return None, None
     return project_ids, ctx.get_user_id()
+
+
+
+def _ensure_business_access(ctx: AuthContext, business_id: int) -> None:
+    if not ctx.can_access_business(int(business_id)):
+        raise ApiError(
+            "FORBIDDEN",
+            f"No access to business {business_id}",
+            http_status=403,
+        )
+
+
+def task_route_guard_dep(
+    request: Request,
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> None:
+    """Automatic guard for every task-scoped route.
+
+    Collection/create routes without task_id are handled explicitly because
+    creation needs request-body project context and listing needs visibility
+    filtering rather than a blanket denial.
+    """
+    raw_business_id = request.path_params.get("business_id")
+    raw_task_id = request.path_params.get("task_id")
+    if raw_business_id is None or raw_task_id is None:
+        return
+
+    business_id = int(raw_business_id)
+    task_id = int(raw_task_id)
+    _ensure_business_access(ctx, business_id)
+
+    method = request.method.upper()
+    path = request.url.path
+
+    if method in {"GET", "HEAD"}:
+        capability = "view"
+    elif "/assignees" in path:
+        capability = "task_assign"
+    elif "/timer/" in path or "/time-entries" in path:
+        capability = "time_log"
+    elif method == "DELETE" and path.rstrip("/").endswith(f"/tasks/{task_id}"):
+        capability = "task_delete"
+    else:
+        capability = "task_edit"
+
+    require_task_capability(
+        ctx,
+        db,
+        business_id,
+        task_id,
+        capability,
+    )
+
+
+def project_route_guard_dep(
+    request: Request,
+    ctx: AuthContext = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> None:
+    """Automatic guard for routes containing project_id."""
+    raw_project_id = request.path_params.get("project_id")
+    if raw_project_id is None:
+        return
+    project_id = int(raw_project_id)
+
+    raw_business_id = request.path_params.get("business_id")
+    if raw_business_id is None:
+        project = db.query(Project).filter(Project.id == project_id).first()
+        if project is None:
+            raise ApiError("PROJECT_NOT_FOUND", "Project not found", http_status=404)
+        business_id = int(project.business_id)
+    else:
+        business_id = int(raw_business_id)
+
+    _ensure_business_access(ctx, business_id)
+
+    method = request.method.upper()
+    path = request.url.path
+    if method in {"GET", "HEAD"}:
+        capability = "view"
+    elif "/members" in path:
+        capability = "manage_members"
+    elif method == "DELETE" and path.rstrip("/").endswith(f"/projects/{project_id}"):
+        capability = "project_delete"
+    else:
+        capability = "project_edit"
+
+    require_project_capability(
+        ctx,
+        db,
+        business_id,
+        project_id,
+        capability,
+    )
