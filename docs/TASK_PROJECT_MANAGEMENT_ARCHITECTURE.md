@@ -492,6 +492,8 @@ Implemented on 2026-09-26 using Vikunja's recurrence/reminder semantics as the b
 - Date edits automatically recalculate pending relative reminders.
 - Removing an anchor date removes pending reminders that depend on it.
 - Reminder delivery is intentionally deferred to Phase 15 notifications; Phase 8 owns schedule semantics only.
+- Regression coverage validates Europe/London and America/New_York DST transitions, local-clock preservation, duration preservation, recurrence end bounds, invalid/noncanonical RRULE rejection, reminder rescheduling/removal, and idempotent next-occurrence generation.
+- A focused GitHub Actions workflow runs the recurrence regression suite whenever the recurrence service or its tests change.
 
 ### Phase 8 endpoints
 
@@ -507,6 +509,10 @@ Implemented on 2026-09-26 using Vikunja's recurrence/reminder semantics as the b
 - [x] Start and due dates are editable.
 - [x] Relative reminders can be created and removed.
 - [x] Reminder times follow date changes.
+- [x] DST/timezone recurrence regression coverage.
+- [x] Recurrence end-bound and invalid RRULE coverage.
+- [x] Next-occurrence idempotency is regression-tested.
+- [x] Relative reminder rescheduling/removal is regression-tested.
 
 
 ## Phase 9 — Calendar
