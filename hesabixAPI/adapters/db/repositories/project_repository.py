@@ -43,10 +43,15 @@ class ProjectRepository:
 		is_active: Optional[bool] = None,
 		status: Optional[str] = None,
 		skip: int = 0,
-		limit: int = 100
+		limit: int = 100,
+		allowed_project_ids: Optional[set[int]] = None,
 	) -> List[Project]:
 		"""لیست پروژه‌های یک کسب‌وکار"""
 		query = self.db.query(Project).filter(Project.business_id == business_id)
+		if allowed_project_ids is not None:
+			if not allowed_project_ids:
+				return []
+			query = query.filter(Project.id.in_(allowed_project_ids))
 		
 		if is_active is not None:
 			query = query.filter(Project.is_active == is_active)
@@ -62,10 +67,15 @@ class ProjectRepository:
 		search_term: Optional[str] = None,
 		filters: Optional[Dict[str, Any]] = None,
 		skip: int = 0,
-		limit: int = 100
+		limit: int = 100,
+		allowed_project_ids: Optional[set[int]] = None,
 	) -> Tuple[List[Project], int]:
 		"""جستجوی پروژه‌ها با فیلترها"""
 		query = self.db.query(Project).filter(Project.business_id == business_id)
+		if allowed_project_ids is not None:
+			if not allowed_project_ids:
+				return [], 0
+			query = query.filter(Project.id.in_(allowed_project_ids))
 		
 		# جستجوی متنی
 		if search_term:

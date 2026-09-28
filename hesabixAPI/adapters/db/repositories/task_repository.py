@@ -64,6 +64,8 @@ class TaskRepository:
         completed: Optional[bool] = None,
         sort_by: Optional[str] = None,
         sort_dir: str = "asc",
+        visible_project_ids: Optional[set[int]] = None,
+        visible_user_id: Optional[int] = None,
         skip: int = 0,
         limit: int = 100,
     ) -> tuple[list[Task], int]:
@@ -79,6 +81,29 @@ class TaskRepository:
                 Task.deleted_at.is_(None),
             )
         )
+
+        if visible_project_ids is not None:
+            assignee_visible_ids = select(TaskAssignee.task_id).where(
+                TaskAssignee.business_id == business_id,
+                TaskAssignee.user_id == visible_user_id,
+            )
+            project_clause = (
+                Task.project_id.in_(visible_project_ids)
+                if visible_project_ids
+                else Task.id == -1
+            )
+            query = query.filter(
+                or_(
+                    project_clause,
+                    (
+                        Task.project_id.is_(None)
+                        & (
+                            (Task.created_by_user_id == visible_user_id)
+                            | Task.id.in_(assignee_visible_ids)
+                        )
+                    ),
+                )
+            )
 
         if search:
             pattern = f"%{search.strip()}%"
