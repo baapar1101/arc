@@ -66,14 +66,10 @@ class _TaskTimelineViewState extends State<TaskTimelineView> {
     }
   }
 
-  ({DateTime start, DateTime end}) _range(List<TaskModel> tasks) {
-    if (tasks.isEmpty) {
-      final today = DateUtils.dateOnly(DateTime.now());
-      return (
-        start: today.subtract(const Duration(days: 7)),
-        end: today.add(const Duration(days: 35)),
-      );
-    }
+  ({DateTime start, DateTime end}) _range(
+    List<TaskModel> tasks,
+    List<ProjectMilestoneModel> milestones,
+  ) {
     DateTime? minDate;
     DateTime? maxDate;
     for (final task in tasks) {
@@ -82,14 +78,38 @@ class _TaskTimelineViewState extends State<TaskTimelineView> {
       if (minDate == null || start.isBefore(minDate)) minDate = start;
       if (maxDate == null || end.isAfter(maxDate)) maxDate = end;
     }
+    for (final milestone in milestones) {
+      final start = milestone.startAt == null ? null : _day(milestone.startAt!);
+      final target =
+          milestone.targetAt == null ? null : _day(milestone.targetAt!);
+      if (start != null && (minDate == null || start.isBefore(minDate))) {
+        minDate = start;
+      }
+      if (start != null && (maxDate == null || start.isAfter(maxDate))) {
+        maxDate = start;
+      }
+      if (target != null && (minDate == null || target.isBefore(minDate))) {
+        minDate = target;
+      }
+      if (target != null && (maxDate == null || target.isAfter(maxDate))) {
+        maxDate = target;
+      }
+    }
+    if (minDate == null || maxDate == null) {
+      final today = DateUtils.dateOnly(DateTime.now());
+      return (
+        start: today.subtract(const Duration(days: 7)),
+        end: today.add(const Duration(days: 35)),
+      );
+    }
     final pad = _zoom == TaskTimelineZoom.day
         ? 3
         : _zoom == TaskTimelineZoom.week
             ? 14
             : 35;
     return (
-      start: minDate!.subtract(Duration(days: pad)),
-      end: maxDate!.add(Duration(days: pad)),
+      start: minDate.subtract(Duration(days: pad)),
+      end: maxDate.add(Duration(days: pad)),
     );
   }
 
@@ -151,8 +171,10 @@ class _TaskTimelineViewState extends State<TaskTimelineView> {
   @override
   Widget build(BuildContext context) {
     final tasks = _scheduled;
+    final milestones =
+        widget.milestones.where((m) => m.targetAt != null).toList();
     final unscheduled = widget.tasks.length - tasks.length;
-    final range = _range(tasks);
+    final range = _range(tasks, widget.milestones);
     final totalDays = range.end.difference(range.start).inDays + 1;
     final timelineWidth = math.max(820.0, totalDays * _pixelsPerDay + 80);
     final contentHeight =
@@ -183,6 +205,11 @@ class _TaskTimelineViewState extends State<TaskTimelineView> {
                 Chip(
                   avatar: const Icon(Icons.event_busy_outlined, size: 17),
                   label: Text('$unscheduled بدون تاریخ'),
+                ),
+              if (milestones.isNotEmpty)
+                Chip(
+                  avatar: const Icon(Icons.flag_outlined, size: 17),
+                  label: Text('${milestones.length} milestone'),
                 ),
               SizedBox(
                 width: 165,
@@ -215,10 +242,10 @@ class _TaskTimelineViewState extends State<TaskTimelineView> {
           ),
         ),
         Expanded(
-          child: tasks.isEmpty
+          child: tasks.isEmpty && milestones.isEmpty
               ? const Center(
                   child: Text(
-                    'برای نمایش Timeline حداقل یک کار با تاریخ شروع یا سررسید لازم است.',
+                    'برای نمایش Timeline حداقل یک کار زمان‌بندی‌شده یا milestone تاریخ‌دار لازم است.',
                     textAlign: TextAlign.center,
                   ),
                 )
@@ -289,9 +316,7 @@ class _TaskTimelineViewState extends State<TaskTimelineView> {
                                             ),
                                           ),
                                         ),
-                                        ...widget.milestones
-                                            .where((m) => m.targetAt != null)
-                                            .map(
+                                        ...milestones.map(
                                               (milestone) => _milestoneMarker(
                                                 context,
                                                 milestone,

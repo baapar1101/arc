@@ -557,7 +557,7 @@ Implemented on 2026-09-26 using Leantime planning concepts and Vikunja dependenc
 - Blocking edges come directly from existing `task_relations` where `relation_type = blocks`.
 - Project timeline endpoint returns only scheduled task IDs/date bounds plus dependency edges.
 - Full task metadata continues to come from the normal project task list, avoiding duplicate payloads.
-- Milestone management remains Phase 11 and is intentionally not implemented here.
+- Milestone management remains owned by Phase 11; when Phase 11 milestone data is present, the Timeline consumes that canonical data directly rather than duplicating it.
 
 ### UX
 
@@ -568,6 +568,9 @@ Implemented on 2026-09-26 using Leantime planning concepts and Vikunja dependenc
 - Dependency edges are drawn as connector paths from blocking task end to blocked task start.
 - A today marker is drawn on the time scale.
 - Unscheduled task count is surfaced without inventing dates.
+- Project milestones are passed into the Timeline and render as target-date markers on the same time scale.
+- Timeline bounds include milestone start/target dates, so milestones outside task date ranges are not clipped.
+- A dated milestone can keep the Timeline useful even when the project has no scheduled task bars yet.
 
 ### Phase 10 endpoint
 
@@ -580,6 +583,8 @@ Implemented on 2026-09-26 using Leantime planning concepts and Vikunja dependenc
 - [x] Today marker.
 - [x] Blocking dependency connectors.
 - [x] Unscheduled task visibility.
+- [x] Canonical project milestone markers are integrated.
+- [x] Milestone dates participate in Timeline bounds.
 - [x] No duplicate Gantt persistence model.
 
 
@@ -600,6 +605,7 @@ Implemented on 2026-09-26 using the Phase 0 milestone entity and Leantime-style 
 ### UX
 
 - Project workspace now has a Milestones tab.
+- Milestone target dates are also visible in the Timeline/Gantt view using the same canonical milestone records.
 - Milestones support create, edit, status changes, dates and delete.
 - Each milestone card shows assigned/completed task counts and derived progress.
 - Task drawer can assign or clear a milestone dynamically based on its selected project.

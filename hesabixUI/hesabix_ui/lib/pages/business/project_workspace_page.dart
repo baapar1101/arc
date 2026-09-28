@@ -899,6 +899,7 @@ class _ProjectWorkspacePageState extends State<ProjectWorkspacePage>
   Widget _timeline() => TaskTimelineView(
     tasks: _tasks,
     dependencies: _timelineDependencies,
+    milestones: _milestones,
     onOpen: _openTask,
   );
 
