@@ -32,6 +32,13 @@ from adapters.db.repositories.task_repository import TaskRepository
 from adapters.db.session import get_db
 from app.core.auth_dependency import AuthContext, get_current_user
 from app.core.permissions import require_business_access
+from app.core.task_project_permissions import (
+    business_project_action,
+    require_project_capability,
+    require_task_capability,
+    task_route_guard_dep,
+    task_visibility_scope,
+)
 from app.core.responses import ApiError, format_datetime_fields, success_response
 from app.services.task_attachment_service import TaskAttachmentService
 from app.services.task_management_service import (
@@ -82,7 +89,7 @@ from app.services.task_management_service import (
     update_task_label,
 )
 
-router = APIRouter(tags=["وظایف"])
+router = APIRouter(tags=["وظایف"], dependencies=[Depends(task_route_guard_dep)])
 
 
 def _format_label(label: Any) -> dict[str, Any]:
@@ -454,7 +461,19 @@ async def list_tasks(
     db: Session = Depends(get_db),
     ctx: AuthContext = Depends(get_current_user),
 ):
-    del ctx
+    if project_id is not None:
+        require_project_capability(
+            ctx,
+            db,
+            business_id,
+            project_id,
+            "view",
+        )
+    visible_project_ids, visible_user_id = task_visibility_scope(
+        ctx,
+        db,
+        business_id,
+    )
     ensure_default_task_statuses(db, business_id)
     repo = TaskRepository(db)
     items, total = repo.list_tasks(
@@ -471,6 +490,8 @@ async def list_tasks(
         completed=completed,
         sort_by=sort_by,
         sort_dir=sort_dir,
+        visible_project_ids=visible_project_ids,
+        visible_user_id=visible_user_id,
         skip=(page - 1) * limit,
         limit=limit,
     )
@@ -496,6 +517,25 @@ async def create_task_endpoint(
     db: Session = Depends(get_db),
     ctx: AuthContext = Depends(get_current_user),
 ):
+    if data.project_id is not None:
+        require_project_capability(
+            ctx,
+            db,
+            business_id,
+            data.project_id,
+            "task_create",
+        )
+    elif not business_project_action(
+        ctx,
+        db,
+        business_id,
+        "task_create",
+    ):
+        raise ApiError(
+            "TASK_PERMISSION_DENIED",
+            "Missing task capability: task_create",
+            http_status=403,
+        )
     task = create_task(
         db,
         business_id,
@@ -541,13 +581,43 @@ async def list_time_entries_endpoint(
     db: Session = Depends(get_db),
     ctx: AuthContext = Depends(get_current_user),
 ):
-    del ctx
+    requested_user_id = user_id
+    effective_user_id = user_id
+    if project_id is not None:
+        can_team = True
+        try:
+            require_project_capability(
+                ctx,
+                db,
+                business_id,
+                project_id,
+                "time_view_team",
+            )
+        except ApiError:
+            can_team = False
+        if not can_team:
+            if requested_user_id is not None and requested_user_id != ctx.get_user_id():
+                raise ApiError(
+                    "TASK_TIME_PERMISSION_DENIED",
+                    "You can only view your own time entries",
+                    http_status=403,
+                )
+            effective_user_id = ctx.get_user_id()
+    elif not business_project_action(ctx, db, business_id, "time_view_team"):
+        if requested_user_id is not None and requested_user_id != ctx.get_user_id():
+            raise ApiError(
+                "TASK_TIME_PERMISSION_DENIED",
+                "You can only view your own time entries",
+                http_status=403,
+            )
+        effective_user_id = ctx.get_user_id()
+
     items = list_time_entries(
         db,
         business_id,
         task_id=task_id,
         project_id=project_id,
-        user_id=user_id,
+        user_id=effective_user_id,
         limit=limit,
     )
     total_seconds = sum(
@@ -923,8 +993,22 @@ async def list_entity_linked_tasks_endpoint(
         entity_type,
         entity_id,
     )
+    visible_tasks = []
+    for task in tasks:
+        try:
+            require_task_capability(
+                ctx,
+                db,
+                business_id,
+                task.id,
+                "view",
+            )
+            visible_tasks.append(task)
+        except ApiError as exc:
+            if exc.http_status != 403:
+                raise
     return success_response(
-        data={"items": [_format_task(task, db, request) for task in tasks]},
+        data={"items": [_format_task(task, db, request) for task in visible_tasks]},
         request=request,
         message="ENTITY_TASKS_FETCHED",
     )
