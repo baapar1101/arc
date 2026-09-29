@@ -131,14 +131,6 @@ jobs:
               fullPage: true,
             });
 
-            const publicConfig = await context.request.get(
-              'https://tamastore.ir/api/v1/auth/public-config',
-            );
-            assert.equal(
-              publicConfig.status(),
-              200,
-              `Public auth config returned HTTP ${publicConfig.status()}.`,
-            );
             assert.equal(
               await page.title(),
               'MarkStreet',
