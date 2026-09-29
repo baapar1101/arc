@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:hesabix_ui/models/project_model.dart';
+import 'package:hesabix_ui/models/task_model.dart';
 import 'package:hesabix_ui/services/project_service.dart';
 import 'package:hesabix_ui/theme/glass.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
@@ -9,6 +10,7 @@ class ProjectMilestonesView extends StatefulWidget {
   final int businessId;
   final int projectId;
   final List<ProjectMilestoneModel> milestones;
+  final List<TaskAssigneeOption> ownerOptions;
   final ProjectService service;
   final ValueChanged<List<ProjectMilestoneModel>> onChanged;
 
@@ -17,6 +19,7 @@ class ProjectMilestonesView extends StatefulWidget {
     required this.businessId,
     required this.projectId,
     required this.milestones,
+    required this.ownerOptions,
     required this.service,
     required this.onChanged,
   });
@@ -53,7 +56,10 @@ class _ProjectMilestonesViewState extends State<ProjectMilestonesView> {
     if (_busy) return;
     final data = await showGlassDialog<Map<String, dynamic>>(
       context: context,
-      builder: (_) => _MilestoneEditorDialog(milestone: milestone),
+      builder: (_) => _MilestoneEditorDialog(
+        milestone: milestone,
+        ownerOptions: widget.ownerOptions,
+      ),
     );
     if (data == null) return;
     setState(() {
@@ -268,6 +274,16 @@ class _ProjectMilestonesViewState extends State<ProjectMilestonesView> {
                                     .format(item.startAt!.toLocal()),
                               ),
                             ),
+                          if (item.ownerId != null)
+                            Chip(
+                              avatar: const Icon(
+                                Icons.person_outline,
+                                size: 17,
+                              ),
+                              label: Text(
+                                item.ownerName ?? 'User ${item.ownerId}',
+                              ),
+                            ),
                           if (item.targetAt != null)
                             Chip(
                               avatar: const Icon(
@@ -311,7 +327,11 @@ class _ProjectMilestonesViewState extends State<ProjectMilestonesView> {
 
 class _MilestoneEditorDialog extends StatefulWidget {
   final ProjectMilestoneModel? milestone;
-  const _MilestoneEditorDialog({this.milestone});
+  final List<TaskAssigneeOption> ownerOptions;
+  const _MilestoneEditorDialog({
+    this.milestone,
+    required this.ownerOptions,
+  });
 
   @override
   State<_MilestoneEditorDialog> createState() =>
@@ -322,6 +342,7 @@ class _MilestoneEditorDialogState extends State<_MilestoneEditorDialog> {
   late final TextEditingController _title;
   late final TextEditingController _description;
   late String _status;
+  int? _ownerId;
   DateTime? _start;
   DateTime? _target;
 
@@ -332,6 +353,7 @@ class _MilestoneEditorDialogState extends State<_MilestoneEditorDialog> {
     _description =
         TextEditingController(text: widget.milestone?.description ?? '');
     _status = widget.milestone?.status ?? 'open';
+    _ownerId = widget.milestone?.ownerId;
     _start = widget.milestone?.startAt?.toLocal();
     _target = widget.milestone?.targetAt?.toLocal();
   }
@@ -360,6 +382,7 @@ class _MilestoneEditorDialogState extends State<_MilestoneEditorDialog> {
       'description':
           _description.text.trim().isEmpty ? null : _description.text.trim(),
       'status': _status,
+      'owner_id': _ownerId,
       'start_at': _start == null
           ? null
           : DateTime(
@@ -402,6 +425,42 @@ class _MilestoneEditorDialogState extends State<_MilestoneEditorDialog> {
                   decoration: const InputDecoration(
                     labelText: 'توضیحات',
                     alignLabelWithHint: true,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                DropdownButtonFormField<int>(
+                  value: _ownerId ?? 0,
+                  isExpanded: true,
+                  decoration: const InputDecoration(labelText: 'مالک'),
+                  items: [
+                    const DropdownMenuItem<int>(
+                      value: 0,
+                      child: Text('بدون مالک'),
+                    ),
+                    ...widget.ownerOptions.map(
+                      (user) => DropdownMenuItem<int>(
+                        value: user.userId,
+                        child: Text(
+                          user.name,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ),
+                    if (_ownerId != null &&
+                        !widget.ownerOptions.any(
+                          (user) => user.userId == _ownerId,
+                        ))
+                      DropdownMenuItem<int>(
+                        value: _ownerId!,
+                        child: Text(
+                          widget.milestone?.ownerName ??
+                              'مالک فعلی (غیرفعال)',
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                  ],
+                  onChanged: (value) => setState(
+                    () => _ownerId = value == null || value == 0 ? null : value,
                   ),
                 ),
                 const SizedBox(height: 10),

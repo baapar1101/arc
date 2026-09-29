@@ -23,6 +23,7 @@ class ProjectMilestoneCreateRequest(BaseModel):
     description: str | None = None
     start_at: datetime | None = None
     target_at: datetime | None = None
+    owner_id: int | None = Field(None, gt=0)
     status: str = Field(default="open")
     sort_order: float = 0
 
@@ -32,6 +33,7 @@ class ProjectMilestoneUpdateRequest(BaseModel):
     description: str | None = None
     start_at: datetime | None = None
     target_at: datetime | None = None
+    owner_id: int | None = Field(None, gt=0)
     status: str | None = None
     sort_order: float | None = None
 

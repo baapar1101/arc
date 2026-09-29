@@ -818,6 +818,12 @@ def create_project_milestone(
     data: Dict[str, Any],
 ) -> Milestone:
     _require_project_in_business(db, business_id, project_id)
+    business = db.get(Business, business_id)
+    if not business:
+        raise ApiError("BUSINESS_NOT_FOUND", "کسب‌وکار یافت نشد", http_status=404)
+    owner_id = data.get("owner_id")
+    if owner_id is not None:
+        _business_member_user(db, business, int(owner_id))
     title = str(data.get("title") or "").strip()
     if not title:
         raise ApiError(
@@ -842,6 +848,7 @@ def create_project_milestone(
         description=data.get("description"),
         start_at=start_at,
         target_at=target_at,
+        owner_id=int(owner_id) if owner_id is not None else None,
         status=status,
         sort_order=Decimal(str(data.get("sort_order") or 0)),
         created_by_user_id=actor_user_id,
@@ -860,6 +867,9 @@ def update_project_milestone(
     data: Dict[str, Any],
 ) -> Milestone:
     _require_project_in_business(db, business_id, project_id)
+    business = db.get(Business, business_id)
+    if not business:
+        raise ApiError("BUSINESS_NOT_FOUND", "کسب‌وکار یافت نشد", http_status=404)
     milestone = (
         db.query(Milestone)
         .filter(
@@ -887,6 +897,13 @@ def update_project_milestone(
         milestone.title = title
     if "description" in data:
         milestone.description = data.get("description")
+    if "owner_id" in data:
+        owner_id = data.get("owner_id")
+        if owner_id is not None:
+            _business_member_user(db, business, int(owner_id))
+            milestone.owner_id = int(owner_id)
+        else:
+            milestone.owner_id = None
     if "status" in data:
         status = str(data.get("status") or "open").strip().lower()
         if status not in _MILESTONE_STATUSES:

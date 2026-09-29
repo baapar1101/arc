@@ -597,6 +597,8 @@ Implemented on 2026-09-26 using the Phase 0 milestone entity and Leantime-style 
 - `project_milestones` is the canonical project milestone table.
 - Tasks link through existing `tasks.milestone_id`.
 - Milestones are business- and project-scoped.
+- Optional `owner_id` is a foreign key to an active member of the same business and uses `ON DELETE SET NULL`.
+- Milestone create/update rejects owners who are not active business members.
 - Task assignment rejects milestones from another project.
 - Moving a task to another project clears an incompatible milestone unless a valid replacement is supplied.
 - Deleting a milestone uses the existing `ON DELETE SET NULL` task link behavior.
@@ -606,7 +608,8 @@ Implemented on 2026-09-26 using the Phase 0 milestone entity and Leantime-style 
 
 - Project workspace now has a Milestones tab.
 - Milestone target dates are also visible in the Timeline/Gantt view using the same canonical milestone records.
-- Milestones support create, edit, status changes, dates and delete.
+- Milestones support create, edit, owner assignment, status changes, dates and delete.
+- Milestone cards show the owner when assigned; the editor reuses the existing business-member/assignee options.
 - Each milestone card shows assigned/completed task counts and derived progress.
 - Task drawer can assign or clear a milestone dynamically based on its selected project.
 - Timeline shows milestone target dates as vertical markers/diamonds.
@@ -621,6 +624,7 @@ Implemented on 2026-09-26 using the Phase 0 milestone entity and Leantime-style 
 ### Phase 11 acceptance gate
 
 - [x] Milestone CRUD.
+- [x] Optional milestone ownership with server-side membership validation.
 - [x] Task-to-milestone assignment.
 - [x] Project-scope validation.
 - [x] Derived task completion progress.

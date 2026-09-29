@@ -232,6 +232,8 @@ class ProjectMilestoneModel {
   final String? description;
   final DateTime? startAt;
   final DateTime? targetAt;
+  final int? ownerId;
+  final String? ownerName;
   final String status;
   final double sortOrder;
   final int taskTotal;
@@ -246,6 +248,8 @@ class ProjectMilestoneModel {
     this.description,
     this.startAt,
     this.targetAt,
+    this.ownerId,
+    this.ownerName,
     required this.status,
     required this.sortOrder,
     required this.taskTotal,
@@ -266,6 +270,8 @@ class ProjectMilestoneModel {
       targetAt: _parseProjectDateTimeNullable(
         json['target_at_raw'] ?? json['target_at'],
       ),
+      ownerId: (json['owner_id'] as num?)?.toInt(),
+      ownerName: json['owner_name']?.toString(),
       status: json['status']?.toString() ?? 'open',
       sortOrder: (json['sort_order'] as num?)?.toDouble() ?? 0,
       taskTotal: (json['task_total'] as num?)?.toInt() ?? 0,

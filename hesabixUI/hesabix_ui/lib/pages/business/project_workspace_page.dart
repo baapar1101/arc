@@ -892,6 +892,7 @@ class _ProjectWorkspacePageState extends State<ProjectWorkspacePage>
     businessId: widget.businessId,
     projectId: widget.projectId,
     milestones: _milestones,
+    ownerOptions: _assignees,
     service: _projectsService,
     onChanged: (items) => setState(() => _milestones = items),
   );

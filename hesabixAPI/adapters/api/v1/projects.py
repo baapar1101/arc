@@ -555,6 +555,8 @@ def _format_project_milestone(row: Dict[str, Any]) -> Dict[str, Any]:
         "description": milestone.description,
         "start_at": milestone.start_at,
         "target_at": milestone.target_at,
+        "owner_id": milestone.owner_id,
+        "owner_name": _display_user_name(milestone.owner),
         "status": milestone.status,
         "sort_order": float(milestone.sort_order or 0),
         "created_by_user_id": milestone.created_by_user_id,

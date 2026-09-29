@@ -705,6 +705,12 @@ class Milestone(Base):
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     start_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     target_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    owner_id: Mapped[int | None] = mapped_column(
+        Integer,
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="open", server_default="open")
     sort_order: Mapped[Decimal] = mapped_column(
         Numeric(20, 6), nullable=False, default=0, server_default="0"
@@ -718,6 +724,7 @@ class Milestone(Base):
     )
 
     project = relationship("Project")
+    owner = relationship("User", foreign_keys=[owner_id])
     created_by = relationship("User", foreign_keys=[created_by_user_id])
 
 
