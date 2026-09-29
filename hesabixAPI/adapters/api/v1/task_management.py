@@ -34,7 +34,7 @@ from adapters.api.v1.schema_models.task_management import (
     TaskUpdateRequest,
     TaskRestoreRequest,
 )
-from adapters.db.models.task_management import Task, TaskStatus
+from adapters.db.models.task_management import Task, TaskCommentMention, TaskStatus
 from adapters.db.repositories.task_repository import TaskRepository
 from adapters.db.session import get_db
 from app.core.auth_dependency import AuthContext, get_current_user
@@ -209,13 +209,29 @@ def _format_reminder(reminder: Any) -> dict[str, Any]:
     }
 
 
-def _format_comment(comment: Any) -> dict[str, Any]:
+def _format_comment(comment: Any, db: Session) -> dict[str, Any]:
+    mentions = (
+        db.query(TaskCommentMention)
+        .filter(
+            TaskCommentMention.business_id == comment.business_id,
+            TaskCommentMention.comment_id == comment.id,
+        )
+        .order_by(TaskCommentMention.id.asc())
+        .all()
+    )
     return {
         "id": comment.id,
         "task_id": comment.task_id,
         "author_user_id": comment.author_user_id,
         "author_name": _display_user_name(comment.author),
         "body": comment.body,
+        "mentions": [
+            {
+                "user_id": mention.user_id,
+                "user_name": _display_user_name(mention.user),
+            }
+            for mention in mentions
+        ],
         "created_at": comment.created_at,
         "updated_at": comment.updated_at,
     }
@@ -1565,7 +1581,7 @@ async def list_task_comments_endpoint(
     comments = list_task_comments(db, business_id, task_id)
     return success_response(
         data=format_datetime_fields(
-            {"items": [_format_comment(item) for item in comments]},
+            {"items": [_format_comment(item, db) for item in comments]},
             request,
             business_id=business_id,
         ),
@@ -1590,10 +1606,11 @@ async def add_task_comment_endpoint(
         task_id,
         ctx.get_user_id(),
         data.body,
+        mention_user_ids=data.mention_user_ids,
     )
     return success_response(
         data=format_datetime_fields(
-            {"comment": _format_comment(comment)},
+            {"comment": _format_comment(comment, db)},
             request,
             business_id=business_id,
         ),
@@ -1620,10 +1637,11 @@ async def update_task_comment_endpoint(
         comment_id,
         ctx.get_user_id(),
         data.body,
+        mention_user_ids=data.mention_user_ids,
     )
     return success_response(
         data=format_datetime_fields(
-            {"comment": _format_comment(comment)},
+            {"comment": _format_comment(comment, db)},
             request,
             business_id=business_id,
         ),

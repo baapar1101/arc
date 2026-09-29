@@ -69,10 +69,12 @@ class TaskRelationCreateRequest(BaseModel):
 
 class TaskCommentCreateRequest(BaseModel):
     body: str = Field(..., min_length=1, max_length=10000)
+    mention_user_ids: list[int] = Field(default_factory=list)
 
 
 class TaskCommentUpdateRequest(BaseModel):
     body: str = Field(..., min_length=1, max_length=10000)
+    mention_user_ids: Optional[list[int]] = None
 
 
 

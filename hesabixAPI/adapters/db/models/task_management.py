@@ -560,6 +560,67 @@ class TaskComment(Base):
 
     task = relationship("Task")
     author = relationship("User", foreign_keys=[author_user_id])
+    mentions = relationship(
+        "TaskCommentMention",
+        back_populates="comment",
+        cascade="all, delete-orphan",
+        order_by="TaskCommentMention.id",
+    )
+
+
+class TaskCommentMention(Base):
+    """Structured user mentions attached to a task comment."""
+
+    __tablename__ = "task_comment_mentions"
+    __table_args__ = (
+        UniqueConstraint(
+            "comment_id",
+            "user_id",
+            name="uq_task_comment_mentions_comment_user",
+        ),
+        Index("ix_task_comment_mentions_task", "task_id", "comment_id"),
+        Index("ix_task_comment_mentions_business_user", "business_id", "user_id"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    business_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("businesses.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    task_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("tasks.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    comment_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("task_comments.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    user_id: Mapped[int] = mapped_column(
+        Integer,
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    created_by_user_id: Mapped[int | None] = mapped_column(
+        Integer,
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=_utc_now,
+        nullable=False,
+    )
+
+    comment = relationship("TaskComment", back_populates="mentions")
+    user = relationship("User", foreign_keys=[user_id])
+    created_by = relationship("User", foreign_keys=[created_by_user_id])
 
 
 class TaskAttachment(Base):

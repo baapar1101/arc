@@ -32,7 +32,7 @@ _TASK_CHANNELS = ("inapp", "email")
 
 def _task_deep_link(task: Task) -> str:
     if task.project_id:
-        return f"/business/{task.business_id}/tasks?project_id={task.project_id}"
+        return f"/business/{task.business_id}/tasks?project={task.project_id}"
     return f"/business/{task.business_id}/tasks"
 
 
@@ -164,15 +164,45 @@ def notify_task_comment(
     db: Session,
     task: Task,
     actor_user_id: int,
+    *,
+    exclude_user_ids: Iterable[int] = (),
 ) -> bool:
+    excluded = {int(value) for value in exclude_user_ids if value}
+    recipients = [
+        user_id
+        for user_id in _recipient_ids(db, task)
+        if user_id not in excluded
+    ]
     return enqueue_task_notifications(
         db,
-        _recipient_ids(db, task),
+        recipients,
         "task.comment_added",
         _task_context(
             task,
             subject="نظر جدید روی کار",
             message=f"یک نظر جدید روی «{task.title}» ثبت شد.",
+        ),
+        actor_user_id=actor_user_id,
+    )
+
+
+def notify_task_mentioned(
+    db: Session,
+    task: Task,
+    user_ids: Iterable[int],
+    actor_user_id: int,
+    *,
+    comment_id: int,
+) -> bool:
+    return enqueue_task_notifications(
+        db,
+        user_ids,
+        "task.mentioned",
+        _task_context(
+            task,
+            subject="در یک نظر از شما نام برده شد",
+            message=f"در یک نظر روی «{task.title}» از شما نام برده شد.",
+            comment_id=comment_id,
         ),
         actor_user_id=actor_user_id,
     )

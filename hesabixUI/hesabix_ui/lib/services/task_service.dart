@@ -493,10 +493,14 @@ class TaskService {
     required int businessId,
     required int taskId,
     required String body,
+    List<int> mentionUserIds = const [],
   }) async {
     final response = await apiClient.post(
       '/api/v1/businesses/$businessId/tasks/$taskId/comments',
-      data: {'body': body},
+      data: {
+        'body': body,
+        'mention_user_ids': mentionUserIds,
+      },
     );
     return TaskCommentModel.fromJson(
       Map<String, dynamic>.from(response.data['data']['comment'] as Map),
@@ -508,10 +512,14 @@ class TaskService {
     required int taskId,
     required int commentId,
     required String body,
+    List<int>? mentionUserIds,
   }) async {
     final response = await apiClient.patch(
       '/api/v1/businesses/$businessId/tasks/$taskId/comments/$commentId',
-      data: {'body': body},
+      data: {
+        'body': body,
+        if (mentionUserIds != null) 'mention_user_ids': mentionUserIds,
+      },
     );
     return TaskCommentModel.fromJson(
       Map<String, dynamic>.from(response.data['data']['comment'] as Map),

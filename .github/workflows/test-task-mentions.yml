@@ -1,0 +1,42 @@
+name: Task Mention Regression
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - 'hesabixAPI/adapters/db/models/task_management.py'
+      - 'hesabixAPI/adapters/api/v1/schema_models/task_management.py'
+      - 'hesabixAPI/app/services/task_management_service.py'
+      - 'hesabixAPI/app/services/task_notification_service.py'
+      - 'hesabixAPI/tests/test_task_mentions.py'
+      - 'hesabixAPI/migrations/versions/20260929_000006_task_comment_mentions.py'
+      - '.github/workflows/test-task-mentions.yml'
+  workflow_dispatch:
+
+jobs:
+  task-mention-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: hesabixAPI
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+          cache-dependency-path: hesabixAPI/pyproject.toml
+
+      - name: Install API test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev]"
+
+      - name: Run task mention regression suite
+        run: pytest -q tests/test_task_mentions.py

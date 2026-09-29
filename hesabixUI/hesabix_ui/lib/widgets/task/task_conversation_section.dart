@@ -26,6 +26,8 @@ class _TaskConversationSectionState extends State<TaskConversationSection> {
   final TextEditingController _commentController = TextEditingController();
   List<TaskCommentModel> _comments = const [];
   List<TaskActivityModel> _activity = const [];
+  List<TaskAssigneeOption> _mentionOptions = const [];
+  final Set<int> _selectedMentionIds = <int>{};
   bool _loading = true;
   bool _posting = false;
   bool _mutating = false;
@@ -43,6 +45,7 @@ class _TaskConversationSectionState extends State<TaskConversationSection> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.task.id != widget.task.id) {
       _commentController.clear();
+      _selectedMentionIds.clear();
       _load();
     }
   }
@@ -70,11 +73,13 @@ class _TaskConversationSectionState extends State<TaskConversationSection> {
           taskId: widget.task.id,
           limit: 50,
         ),
+        _service.listAssignees(widget.businessId),
       ]);
       if (!mounted) return;
       setState(() {
         _comments = results[0] as List<TaskCommentModel>;
         _activity = results[1] as List<TaskActivityModel>;
+        _mentionOptions = results[2] as List<TaskAssigneeOption>;
         _loading = false;
       });
     } catch (e) {
@@ -98,9 +103,11 @@ class _TaskConversationSectionState extends State<TaskConversationSection> {
         businessId: widget.businessId,
         taskId: widget.task.id,
         body: body,
+        mentionUserIds: _selectedMentionIds.toList(),
       );
       if (!mounted) return;
       _commentController.clear();
+      _selectedMentionIds.clear();
       await _load();
     } catch (e) {
       if (!mounted) return;
@@ -115,37 +122,96 @@ class _TaskConversationSectionState extends State<TaskConversationSection> {
   Future<void> _editComment(TaskCommentModel comment) async {
     if (_mutating) return;
     final controller = TextEditingController(text: comment.body);
-    final nextBody = await showGlassDialog<String>(
+    final mentionIds = comment.mentions.map((e) => e.userId).toSet();
+    final result = await showGlassDialog<Map<String, dynamic>>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('ویرایش نظر'),
-        content: SizedBox(
-          width: 520,
-          child: TextField(
-            controller: controller,
-            autofocus: true,
-            minLines: 3,
-            maxLines: 8,
-            decoration: const InputDecoration(
-              labelText: 'متن نظر',
-              alignLabelWithHint: true,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setInner) => AlertDialog(
+          title: const Text('ویرایش نظر'),
+          content: SizedBox(
+            width: 560,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  TextField(
+                    controller: controller,
+                    autofocus: true,
+                    minLines: 3,
+                    maxLines: 8,
+                    decoration: const InputDecoration(
+                      labelText: 'متن نظر',
+                      alignLabelWithHint: true,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Wrap(
+                    spacing: 7,
+                    runSpacing: 7,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      ...mentionIds.map(
+                        (userId) => InputChip(
+                          avatar: const Icon(Icons.alternate_email, size: 16),
+                          label: Text(_mentionName(userId)),
+                          onDeleted: () =>
+                              setInner(() => mentionIds.remove(userId)),
+                        ),
+                      ),
+                      PopupMenuButton<int>(
+                        tooltip: 'Mention user',
+                        enabled: mentionIds.length < 25,
+                        onSelected: (userId) =>
+                            setInner(() => mentionIds.add(userId)),
+                        itemBuilder: (_) => _mentionOptions
+                            .where((user) => !mentionIds.contains(user.userId))
+                            .map(
+                              (user) => PopupMenuItem<int>(
+                                value: user.userId,
+                                child: Text(user.name),
+                              ),
+                            )
+                            .toList(),
+                        child: const Chip(
+                          avatar: Icon(Icons.alternate_email, size: 16),
+                          label: Text('Mention'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
           ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('انصراف'),
+            ),
+            FilledButton(
+              onPressed: () {
+                final body = controller.text.trim();
+                if (body.isEmpty) return;
+                Navigator.pop(ctx, {
+                  'body': body,
+                  'mention_user_ids': mentionIds.toList(),
+                });
+              },
+              child: const Text('ذخیره'),
+            ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('انصراف'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, controller.text.trim()),
-            child: const Text('ذخیره'),
-          ),
-        ],
       ),
     );
     controller.dispose();
-    if (nextBody == null || nextBody.isEmpty) return;
+    if (result == null) return;
+    final nextBody = result['body']?.toString().trim() ?? '';
+    if (nextBody.isEmpty) return;
+    final nextMentionIds = ((result['mention_user_ids'] as List?) ?? const [])
+        .whereType<num>()
+        .map((e) => e.toInt())
+        .toList();
 
     setState(() {
       _mutating = true;
@@ -157,6 +223,7 @@ class _TaskConversationSectionState extends State<TaskConversationSection> {
         taskId: widget.task.id,
         commentId: comment.id,
         body: nextBody,
+        mentionUserIds: nextMentionIds,
       );
       await _load();
     } catch (e) {
@@ -240,9 +307,25 @@ class _TaskConversationSectionState extends State<TaskConversationSection> {
         return 'نظر را ویرایش کرد';
       case 'comment_deleted':
         return 'نظر را حذف کرد';
+      case 'task_mentioned':
+        return 'از کاربر در نظر نام برد';
       default:
         return event.eventType.replaceAll('_', ' ');
     }
+  }
+
+  String _mentionName(int userId) {
+    for (final user in _mentionOptions) {
+      if (user.userId == userId) return '@${user.name}';
+    }
+    for (final comment in _comments) {
+      for (final mention in comment.mentions) {
+        if (mention.userId == userId) {
+          return '@${mention.userName ?? 'User $userId'}';
+        }
+      }
+    }
+    return '@User $userId';
   }
 
   String _time(DateTime? value) {
@@ -307,6 +390,46 @@ class _TaskConversationSectionState extends State<TaskConversationSection> {
             ),
           ],
         ),
+        const SizedBox(height: 7),
+        Wrap(
+          spacing: 7,
+          runSpacing: 7,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            ..._selectedMentionIds.map(
+              (userId) => InputChip(
+                avatar: const Icon(Icons.alternate_email, size: 16),
+                label: Text(_mentionName(userId)),
+                onDeleted: _posting
+                    ? null
+                    : () => setState(
+                          () => _selectedMentionIds.remove(userId),
+                        ),
+              ),
+            ),
+            PopupMenuButton<int>(
+              tooltip: 'Mention user',
+              enabled: !_posting && _selectedMentionIds.length < 25,
+              onSelected: (userId) =>
+                  setState(() => _selectedMentionIds.add(userId)),
+              itemBuilder: (_) => _mentionOptions
+                  .where(
+                    (user) => !_selectedMentionIds.contains(user.userId),
+                  )
+                  .map(
+                    (user) => PopupMenuItem<int>(
+                      value: user.userId,
+                      child: Text(user.name),
+                    ),
+                  )
+                  .toList(),
+              child: const Chip(
+                avatar: Icon(Icons.alternate_email, size: 16),
+                label: Text('Mention'),
+              ),
+            ),
+          ],
+        ),
         const SizedBox(height: 10),
         if (_loading)
           const Padding(
@@ -362,6 +485,27 @@ class _TaskConversationSectionState extends State<TaskConversationSection> {
                             ),
                             const SizedBox(height: 4),
                             Text(comment.body),
+                            if (comment.mentions.isNotEmpty) ...[
+                              const SizedBox(height: 7),
+                              Wrap(
+                                spacing: 6,
+                                runSpacing: 6,
+                                children: comment.mentions
+                                    .map(
+                                      (mention) => Chip(
+                                        visualDensity: VisualDensity.compact,
+                                        avatar: const Icon(
+                                          Icons.alternate_email,
+                                          size: 14,
+                                        ),
+                                        label: Text(
+                                          '@${mention.userName ?? 'User ${mention.userId}'}',
+                                        ),
+                                      ),
+                                    )
+                                    .toList(),
+                              ),
+                            ],
                           ],
                         ),
                       ),

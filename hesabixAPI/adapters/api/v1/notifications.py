@@ -210,6 +210,7 @@ EVENT_KEY_TITLES = {
 	"business.deleted": "حذف کسب‌وکار",
 	"task.assigned": "واگذاری کار",
 	"task.comment_added": "نظر جدید روی کار",
+	"task.mentioned": "اشاره در نظر کار",
 	"task.dependency_resolved": "رفع وابستگی کار",
 	"task.reminder": "یادآور کار",
 	"task.due_soon": "نزدیک شدن سررسید کار",

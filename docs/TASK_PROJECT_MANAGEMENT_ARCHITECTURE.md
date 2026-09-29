@@ -799,7 +799,8 @@ Implemented on 2026-09-27 by reusing Hesabix's existing multi-channel notificati
 ### Immediate domain events
 
 - `task.assigned` — newly assigned users; actor excluded.
-- `task.comment_added` — task assignees + creator; commenting actor excluded.
+- `task.comment_added` — task assignees + creator; commenting actor excluded. Explicitly mentioned users are excluded from this recipient set to avoid duplicate delivery.
+- `task.mentioned` — explicitly selected comment mentions; actor excluded. The event includes `comment_id` and uses the same notification/channel stack.
 - `task.dependency_resolved` — when a blocking task transitions to completed, recipients of dependent tasks are notified.
 - `task.project_member_added` — newly added project member; actor excluded.
 
@@ -814,15 +815,24 @@ A leader-only five-minute scanner is registered in `app/main.py` using the exist
 - Due-soon/overdue use immutable task-activity marker events, so multi-worker restarts do not repeatedly notify.
 - Completed/cancelled/deleted tasks are excluded from scheduled alerts.
 
-### Scope decisions
+### Structured mentions
 
-- Structured mentions are not fabricated from comment text in this phase. A future mention feature should persist explicit mentioned user IDs instead of guessing names with regex.
+- Mentions are never inferred from comment text or usernames.
+- `task_comment_mentions` persists explicit `comment_id + user_id` relationships with tenant/task context.
+- Comment create/edit requests accept structured `mention_user_ids`.
+- Mentioned users must be active members of the same business.
+- Duplicate IDs and self-mentions are removed server-side; a comment supports at most 25 mentioned users.
+- Editing a comment notifies only newly added mentions. Removing/re-adding mention metadata does not resend unrelated comment notifications.
+- The Flutter comment composer/editor uses an explicit business-member picker and renders persisted mention chips.
 - Notification templates remain optional: event contexts always include a fallback subject/message, so the events work before admin templates are created.
 
 ### Phase 15 acceptance gate
 
 - [x] Assignment notifications.
 - [x] Comment notifications.
+- [x] Structured TaskMentioned notifications.
+- [x] Explicit mention persistence and comment mention picker.
+- [x] Mention/comment recipient de-duplication.
 - [x] Dependency-resolved notifications.
 - [x] Project-member notifications.
 - [x] Reminder delivery.

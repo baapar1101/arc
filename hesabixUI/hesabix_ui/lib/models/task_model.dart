@@ -309,12 +309,31 @@ class TaskStructureModel {
 
 
 
+class TaskCommentMentionModel {
+  final int userId;
+  final String? userName;
+
+  const TaskCommentMentionModel({
+    required this.userId,
+    this.userName,
+  });
+
+  factory TaskCommentMentionModel.fromJson(Map<String, dynamic> json) {
+    return TaskCommentMentionModel(
+      userId: (json['user_id'] as num).toInt(),
+      userName: json['user_name']?.toString(),
+    );
+  }
+}
+
+
 class TaskCommentModel {
   final int id;
   final int taskId;
   final int? authorUserId;
   final String? authorName;
   final String body;
+  final List<TaskCommentMentionModel> mentions;
   final DateTime? createdAt;
   final DateTime? updatedAt;
 
@@ -324,6 +343,7 @@ class TaskCommentModel {
     this.authorUserId,
     this.authorName,
     required this.body,
+    this.mentions = const [],
     this.createdAt,
     this.updatedAt,
   });
@@ -335,6 +355,14 @@ class TaskCommentModel {
       authorUserId: (json['author_user_id'] as num?)?.toInt(),
       authorName: json['author_name']?.toString(),
       body: json['body']?.toString() ?? '',
+      mentions: ((json['mentions'] as List?) ?? const [])
+          .whereType<Map>()
+          .map(
+            (e) => TaskCommentMentionModel.fromJson(
+              Map<String, dynamic>.from(e),
+            ),
+          )
+          .toList(),
       createdAt: _parseTaskDate(
         json['created_at_raw'] ?? json['created_at'],
       ),

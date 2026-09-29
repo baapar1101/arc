@@ -32,6 +32,7 @@ from adapters.db.models.task_management import (
     TaskActivity,
     TaskAssignee,
     TaskComment,
+    TaskCommentMention,
     TaskEntityLink,
     TaskLabel,
     TaskLabelLink,
@@ -1323,12 +1324,82 @@ def list_task_comments(
     )
 
 
+def _normalize_comment_mention_ids(
+    values: Optional[Iterable[int]],
+    actor_user_id: int,
+) -> list[int]:
+    result: list[int] = []
+    seen: set[int] = set()
+    for raw in values or []:
+        value = int(raw)
+        if value <= 0 or value == int(actor_user_id) or value in seen:
+            continue
+        seen.add(value)
+        result.append(value)
+    if len(result) > 25:
+        raise ApiError(
+            "TASK_COMMENT_MENTIONS_LIMIT",
+            "A comment can mention at most 25 users",
+            http_status=400,
+        )
+    return result
+
+
+def _replace_comment_mentions(
+    db: Session,
+    *,
+    task: Task,
+    comment: TaskComment,
+    actor_user_id: int,
+    mention_user_ids: Iterable[int],
+) -> tuple[list[int], list[int]]:
+    business = _require_business(db, task.business_id)
+    new_ids = _normalize_comment_mention_ids(
+        mention_user_ids,
+        actor_user_id,
+    )
+    for user_id in new_ids:
+        _require_business_member(db, business, user_id)
+
+    current_rows = (
+        db.query(TaskCommentMention)
+        .filter(
+            TaskCommentMention.business_id == task.business_id,
+            TaskCommentMention.comment_id == comment.id,
+        )
+        .all()
+    )
+    current_ids = {int(row.user_id) for row in current_rows}
+    desired_ids = set(new_ids)
+
+    for row in current_rows:
+        if int(row.user_id) not in desired_ids:
+            db.delete(row)
+
+    added_ids: list[int] = []
+    for user_id in new_ids:
+        if user_id in current_ids:
+            continue
+        db.add(
+            TaskCommentMention(
+                business_id=task.business_id,
+                task_id=task.id,
+                comment_id=comment.id,
+                user_id=user_id,
+                created_by_user_id=actor_user_id,
+            )
+        )
+        added_ids.append(user_id)
+    return new_ids, added_ids
+
+
 def add_task_comment(
     db: Session,
     business_id: int,
     task_id: int,
     actor_user_id: int,
     body: str,
+    mention_user_ids: Optional[Iterable[int]] = None,
 ) -> TaskComment:
     task = _get_task_or_404(db, business_id, task_id)
     clean_body = str(body or "").strip()
@@ -1346,17 +1417,54 @@ def add_task_comment(
     )
     db.add(comment)
     db.flush()
+    all_mention_ids, added_mention_ids = _replace_comment_mentions(
+        db,
+        task=task,
+        comment=comment,
+        actor_user_id=actor_user_id,
+        mention_user_ids=mention_user_ids or [],
+    )
     _record_activity(
         db,
         task=task,
         actor_user_id=actor_user_id,
         event_type="comment_added",
-        event_data={"comment_id": comment.id},
+        event_data={
+            "comment_id": comment.id,
+            "mention_user_ids": all_mention_ids,
+        },
     )
+    if added_mention_ids:
+        _record_activity(
+            db,
+            task=task,
+            actor_user_id=actor_user_id,
+            event_type="task_mentioned",
+            event_data={
+                "comment_id": comment.id,
+                "user_ids": added_mention_ids,
+            },
+        )
     db.commit()
     db.refresh(comment)
-    from app.services.task_notification_service import notify_task_comment
-    notify_task_comment(db, task, actor_user_id)
+    from app.services.task_notification_service import (
+        notify_task_comment,
+        notify_task_mentioned,
+    )
+    notify_task_comment(
+        db,
+        task,
+        actor_user_id,
+        exclude_user_ids=all_mention_ids,
+    )
+    if added_mention_ids:
+        notify_task_mentioned(
+            db,
+            task,
+            added_mention_ids,
+            actor_user_id,
+            comment_id=comment.id,
+        )
     return comment
 
 
@@ -1401,6 +1509,7 @@ def update_task_comment(
     comment_id: int,
     actor_user_id: int,
     body: str,
+    mention_user_ids: Optional[Iterable[int]] = None,
 ) -> TaskComment:
     task = _get_task_or_404(db, business_id, task_id)
     comment = _require_comment_manager(
@@ -1424,15 +1533,52 @@ def update_task_comment(
         )
     comment.body = clean_body
     comment.updated_at = _now()
+    added_mention_ids: list[int] = []
+    effective_mention_ids: Optional[list[int]] = None
+    if mention_user_ids is not None:
+        effective_mention_ids, added_mention_ids = _replace_comment_mentions(
+            db,
+            task=task,
+            comment=comment,
+            actor_user_id=actor_user_id,
+            mention_user_ids=mention_user_ids,
+        )
     _record_activity(
         db,
         task=task,
         actor_user_id=actor_user_id,
         event_type="comment_edited",
-        event_data={"comment_id": comment.id},
+        event_data={
+            "comment_id": comment.id,
+            **(
+                {"mention_user_ids": effective_mention_ids}
+                if effective_mention_ids is not None
+                else {}
+            ),
+        },
     )
+    if added_mention_ids:
+        _record_activity(
+            db,
+            task=task,
+            actor_user_id=actor_user_id,
+            event_type="task_mentioned",
+            event_data={
+                "comment_id": comment.id,
+                "user_ids": added_mention_ids,
+            },
+        )
     db.commit()
     db.refresh(comment)
+    if added_mention_ids:
+        from app.services.task_notification_service import notify_task_mentioned
+        notify_task_mentioned(
+            db,
+            task,
+            added_mention_ids,
+            actor_user_id,
+            comment_id=comment.id,
+        )
     return comment
 
 
