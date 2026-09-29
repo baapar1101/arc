@@ -1080,7 +1080,18 @@ Implemented on 2026-09-28 as the final benchmark/polish pass.
 - Task loading uses server-side pages of 100 records.
 - “Load more” appends subsequent pages without re-fetching previously loaded rows.
 - Filter changes reset pagination to page 1.
-- This bounds initial Flutter widget creation even for large task sets.
+- Main task rows are rendered through a shared bounded sliver builder; loaded
+  pages no longer materialize every card widget eagerly.
+- Project Tasks, Activity and Files use the same lazy sliver builder. Their
+  logical collections may contain hundreds of records while only viewport-near
+  rows are instantiated.
+- The shared sliver disables automatic keep-alives for stateless rows and keeps
+  repaint boundaries enabled, reducing retained element state and limiting
+  glass-card repaint cost.
+- Kanban columns already use `ListView.builder` and therefore keep their
+  existing lazy card construction.
+- Custom scroll views use a bounded cache extent so prefetch remains useful
+  without expanding widget creation to the full loaded dataset.
 
 ### Existing polished behavior retained
 
@@ -1191,3 +1202,6 @@ Rollback model:
 - [x] Optimistic single-task edits with guarded rollback.
 - [x] Optimistic complete/reopen, Kanban move, calendar reschedule and delete.
 - [x] Realtime/optimistic race handling through per-task mutation revisions.
+- [x] Lazy sliver virtualization for main/project task lists.
+- [x] Lazy project Activity/Files feeds with bounded cache extent.
+- [x] Large-list regression proving 1,000 logical rows do not eagerly build.

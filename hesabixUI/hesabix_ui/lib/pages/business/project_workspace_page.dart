@@ -22,6 +22,7 @@ import 'package:hesabix_ui/widgets/project/project_milestones_view.dart';
 import 'package:hesabix_ui/widgets/project/project_cycles_view.dart';
 import 'package:hesabix_ui/widgets/project/project_time_tracking_view.dart';
 import 'package:hesabix_ui/widgets/task/task_quick_create.dart';
+import 'package:hesabix_ui/widgets/common/bounded_sliver_list.dart';
 import 'package:intl/intl.dart';
 
 class ProjectWorkspacePage extends StatefulWidget {
@@ -943,44 +944,85 @@ class _ProjectWorkspacePageState extends State<ProjectWorkspacePage>
     final pad = ResponsiveHelper.getPadding(context);
     return RefreshIndicator(
       onRefresh: _load,
-      child: ListView(
-        padding: EdgeInsets.fromLTRB(pad, 16, pad, 30),
-        children: [
-          GlassSurface(
-            padding: const EdgeInsets.all(18),
-            child: Row(children: [
-              const Icon(Icons.history_rounded),
-              const SizedBox(width: 10),
-              Expanded(child: Text('فعالیت پروژه', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800))),
-              Text('${_projectActivity.length} رویداد'),
-            ]),
+      child: CustomScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        cacheExtent: 720,
+        slivers: [
+          SliverPadding(
+            padding: EdgeInsets.fromLTRB(pad, 16, pad, 10),
+            sliver: SliverToBoxAdapter(
+              child: GlassSurface(
+                padding: const EdgeInsets.all(18),
+                child: Row(children: [
+                  const Icon(Icons.history_rounded),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'فعالیت پروژه',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w800,
+                          ),
+                    ),
+                  ),
+                  Text('${_projectActivity.length} رویداد'),
+                ]),
+              ),
+            ),
           ),
-          const SizedBox(height: 10),
           if (_projectActivity.isEmpty)
-            const GlassSurface(padding: EdgeInsets.all(36), child: Center(child: Text('هنوز فعالیتی برای کارهای این پروژه ثبت نشده است.')))
-          else
-            ..._projectActivity.map((item) {
-              final taskId = (item['task_id'] as num?)?.toInt();
-              final task = taskId == null ? null : _taskById(taskId);
-              final actor = item['actor_name']?.toString();
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 8),
+            SliverPadding(
+              padding: EdgeInsets.fromLTRB(pad, 0, pad, 30),
+              sliver: const SliverToBoxAdapter(
                 child: GlassSurface(
-                  padding: const EdgeInsets.all(6),
-                  child: ListTile(
-                    leading: const CircleAvatar(child: Icon(Icons.bolt_outlined)),
-                    title: Text(_activityLabel(item['event_type']?.toString() ?? 'activity'), style: const TextStyle(fontWeight: FontWeight.w700)),
-                    subtitle: Text([
-                      item['task_title']?.toString() ?? 'Task',
-                      if (actor?.isNotEmpty == true) actor!,
-                      _workspaceDate(item['created_at']),
-                    ].join(' · ')),
-                    trailing: task == null ? null : const Icon(Icons.chevron_left_rounded),
-                    onTap: task == null ? null : () => _openTask(task),
+                  padding: EdgeInsets.all(36),
+                  child: Center(
+                    child: Text(
+                      'هنوز فعالیتی برای کارهای این پروژه ثبت نشده است.',
+                    ),
                   ),
                 ),
-              );
-            }),
+              ),
+            )
+          else
+            SliverPadding(
+              padding: EdgeInsets.fromLTRB(pad, 0, pad, 30),
+              sliver: BoundedSliverList(
+                itemCount: _projectActivity.length,
+                itemBuilder: (context, index) {
+                  final item = _projectActivity[index];
+                  final taskId = (item['task_id'] as num?)?.toInt();
+                  final task = taskId == null ? null : _taskById(taskId);
+                  final actor = item['actor_name']?.toString();
+                  return Padding(
+                    key: ValueKey('activity-${item['id'] ?? index}'),
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: GlassSurface(
+                      padding: const EdgeInsets.all(6),
+                      child: ListTile(
+                        leading: const CircleAvatar(
+                          child: Icon(Icons.bolt_outlined),
+                        ),
+                        title: Text(
+                          _activityLabel(
+                            item['event_type']?.toString() ?? 'activity',
+                          ),
+                          style: const TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                        subtitle: Text([
+                          item['task_title']?.toString() ?? 'Task',
+                          if (actor?.isNotEmpty == true) actor!,
+                          _workspaceDate(item['created_at']),
+                        ].join(' · ')),
+                        trailing: task == null
+                            ? null
+                            : const Icon(Icons.chevron_left_rounded),
+                        onTap: task == null ? null : () => _openTask(task),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
         ],
       ),
     );
@@ -990,52 +1032,100 @@ class _ProjectWorkspacePageState extends State<ProjectWorkspacePage>
     final pad = ResponsiveHelper.getPadding(context);
     return RefreshIndicator(
       onRefresh: _load,
-      child: ListView(
-        padding: EdgeInsets.fromLTRB(pad, 16, pad, 30),
-        children: [
-          GlassSurface(
-            padding: const EdgeInsets.all(18),
-            child: Row(children: [
-              const Icon(Icons.folder_outlined),
-              const SizedBox(width: 10),
-              Expanded(child: Text('فایل‌های پروژه', style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800))),
-              Text('${_projectFiles.length} فایل'),
-            ]),
+      child: CustomScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        cacheExtent: 720,
+        slivers: [
+          SliverPadding(
+            padding: EdgeInsets.fromLTRB(pad, 16, pad, 10),
+            sliver: SliverToBoxAdapter(
+              child: GlassSurface(
+                padding: const EdgeInsets.all(18),
+                child: Row(children: [
+                  const Icon(Icons.folder_outlined),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'فایل‌های پروژه',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w800,
+                          ),
+                    ),
+                  ),
+                  Text('${_projectFiles.length} فایل'),
+                ]),
+              ),
+            ),
           ),
-          const SizedBox(height: 10),
           if (_projectFiles.isEmpty)
-            const GlassSurface(padding: EdgeInsets.all(36), child: Center(child: Text('پیوستی در کارهای این پروژه ثبت نشده است.')))
-          else
-            ..._projectFiles.map((item) {
-              final attachmentId = (item['id'] as num?)?.toInt();
-              final taskId = (item['task_id'] as num?)?.toInt();
-              final task = taskId == null ? null : _taskById(taskId);
-              final busy = attachmentId != null && _busyFileIds.contains(attachmentId);
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 8),
+            SliverPadding(
+              padding: EdgeInsets.fromLTRB(pad, 0, pad, 30),
+              sliver: const SliverToBoxAdapter(
                 child: GlassSurface(
-                  padding: const EdgeInsets.all(6),
-                  child: ListTile(
-                    leading: const CircleAvatar(child: Icon(Icons.insert_drive_file_outlined)),
-                    title: Text(item['original_name']?.toString() ?? 'Attachment', style: const TextStyle(fontWeight: FontWeight.w700)),
-                    subtitle: Text([
-                      item['task_title']?.toString() ?? 'Task',
-                      _fileSize(item['size_bytes']),
-                      if (item['uploader_name']?.toString().isNotEmpty == true) item['uploader_name'].toString(),
-                      _workspaceDate(item['created_at']),
-                    ].join(' · ')),
-                    onTap: task == null ? null : () => _openTask(task),
-                    trailing: IconButton(
-                      tooltip: 'دانلود',
-                      onPressed: busy ? null : () => _downloadProjectFile(item),
-                      icon: busy
-                          ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                          : const Icon(Icons.download_outlined),
+                  padding: EdgeInsets.all(36),
+                  child: Center(
+                    child: Text(
+                      'پیوستی در کارهای این پروژه ثبت نشده است.',
                     ),
                   ),
                 ),
-              );
-            }),
+              ),
+            )
+          else
+            SliverPadding(
+              padding: EdgeInsets.fromLTRB(pad, 0, pad, 30),
+              sliver: BoundedSliverList(
+                itemCount: _projectFiles.length,
+                itemBuilder: (context, index) {
+                  final item = _projectFiles[index];
+                  final attachmentId = (item['id'] as num?)?.toInt();
+                  final taskId = (item['task_id'] as num?)?.toInt();
+                  final task = taskId == null ? null : _taskById(taskId);
+                  final busy = attachmentId != null &&
+                      _busyFileIds.contains(attachmentId);
+                  return Padding(
+                    key: ValueKey('file-${attachmentId ?? index}'),
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: GlassSurface(
+                      padding: const EdgeInsets.all(6),
+                      child: ListTile(
+                        leading: const CircleAvatar(
+                          child: Icon(Icons.insert_drive_file_outlined),
+                        ),
+                        title: Text(
+                          item['original_name']?.toString() ?? 'Attachment',
+                          style: const TextStyle(fontWeight: FontWeight.w700),
+                        ),
+                        subtitle: Text([
+                          item['task_title']?.toString() ?? 'Task',
+                          _fileSize(item['size_bytes']),
+                          if (item['uploader_name']?.toString().isNotEmpty ==
+                              true)
+                            item['uploader_name'].toString(),
+                          _workspaceDate(item['created_at']),
+                        ].join(' · ')),
+                        onTap: task == null ? null : () => _openTask(task),
+                        trailing: IconButton(
+                          tooltip: 'دانلود',
+                          onPressed: busy
+                              ? null
+                              : () => _downloadProjectFile(item),
+                          icon: busy
+                              ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Icon(Icons.download_outlined),
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
         ],
       ),
     );
@@ -1137,33 +1227,78 @@ class _ProjectWorkspacePageState extends State<ProjectWorkspacePage>
     final pad = ResponsiveHelper.getPadding(context);
     return RefreshIndicator(
       onRefresh: _load,
-      child: ListView(
-        padding: EdgeInsets.fromLTRB(pad, 16, pad, 30),
-        children: [
-          TaskQuickCreate(enabled: !_loading, onCreate: _quickCreate),
-          const SizedBox(height: 12),
+      child: CustomScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        cacheExtent: 720,
+        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+        slivers: [
+          SliverPadding(
+            padding: EdgeInsets.fromLTRB(pad, 16, pad, 12),
+            sliver: SliverToBoxAdapter(
+              child: TaskQuickCreate(
+                enabled: !_loading,
+                onCreate: _quickCreate,
+              ),
+            ),
+          ),
           if (_tasks.isEmpty)
-            const GlassSurface(padding: EdgeInsets.all(40), child: Center(child: Text('هنوز کاری برای این پروژه ثبت نشده است.')))
-          else ..._tasks.map((task) => Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: GlassSurface(padding: const EdgeInsets.all(8), child: ListTile(
-              leading: Checkbox(value: task.isCompleted, onChanged: (_) => _toggle(task)),
-              title: Text(task.title, style: TextStyle(
-                fontWeight: FontWeight.w700,
-                decoration: task.isCompleted ? TextDecoration.lineThrough : null,
-              )),
-              subtitle: Text([
-                task.status?.name ?? '',
-                if (task.assignees.isNotEmpty) task.assignees.map((e) => e.name).join('، '),
-              ].where((e) => e.isNotEmpty).join(' · ')),
-              trailing: const Icon(Icons.chevron_left_rounded),
-              onTap: () => _openTask(task),
-            )),
-          )),
+            SliverPadding(
+              padding: EdgeInsets.fromLTRB(pad, 0, pad, 30),
+              sliver: const SliverToBoxAdapter(
+                child: GlassSurface(
+                  padding: EdgeInsets.all(40),
+                  child: Center(
+                    child: Text(
+                      'هنوز کاری برای این پروژه ثبت نشده است.',
+                    ),
+                  ),
+                ),
+              ),
+            )
+          else
+            SliverPadding(
+              padding: EdgeInsets.fromLTRB(pad, 0, pad, 30),
+              sliver: BoundedSliverList(
+                itemCount: _tasks.length,
+                itemBuilder: (context, index) {
+                  final task = _tasks[index];
+                  return Padding(
+                    key: ValueKey(task.id),
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: GlassSurface(
+                      padding: const EdgeInsets.all(8),
+                      child: ListTile(
+                        leading: Checkbox(
+                          value: task.isCompleted,
+                          onChanged: (_) => _toggle(task),
+                        ),
+                        title: Text(
+                          task.title,
+                          style: TextStyle(
+                            fontWeight: FontWeight.w700,
+                            decoration: task.isCompleted
+                                ? TextDecoration.lineThrough
+                                : null,
+                          ),
+                        ),
+                        subtitle: Text([
+                          task.status?.name ?? '',
+                          if (task.assignees.isNotEmpty)
+                            task.assignees.map((e) => e.name).join('، '),
+                        ].where((e) => e.isNotEmpty).join(' · ')),
+                        trailing: const Icon(Icons.chevron_left_rounded),
+                        onTap: () => _openTask(task),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
         ],
       ),
     );
   }
+
 }
 
 class _MembersDialog extends StatefulWidget {

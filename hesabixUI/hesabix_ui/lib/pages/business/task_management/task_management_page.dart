@@ -18,6 +18,7 @@ import 'package:hesabix_ui/utils/snackbar_helper.dart';
 import 'package:hesabix_ui/widgets/task/task_detail_drawer.dart';
 import 'package:hesabix_ui/widgets/task/task_dashboard_view.dart';
 import 'package:hesabix_ui/widgets/task/task_quick_create.dart';
+import 'package:hesabix_ui/widgets/common/bounded_sliver_list.dart';
 import 'package:intl/intl.dart';
 
 class TaskManagementPage extends StatefulWidget {
@@ -1290,121 +1291,153 @@ class _TaskManagementPageState extends State<TaskManagementPage> {
 
     return RefreshIndicator(
       onRefresh: _loadAll,
-      child: ListView(
-        padding: EdgeInsets.fromLTRB(
-          padding,
-          16,
-          padding,
-          isMobile ? 32 : 32,
-        ),
-        children: [
-          GlassSurface(
-            padding: const EdgeInsets.all(15),
-            child: Wrap(
-              spacing: 12,
-              runSpacing: 10,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              children: [
-                _SummaryPill(
-                  icon: Icons.pending_actions_outlined,
-                  label: 'باز',
-                  value: '$openCount',
-                ),
-                _SummaryPill(
-                  icon: Icons.task_alt,
-                  label: 'تکمیل‌شده',
-                  value: '$doneCount',
-                ),
-                Chip(
-                  avatar: Icon(
-                    Icons.view_sidebar_outlined,
-                    size: 18,
-                    color: scheme.primary,
+      child: CustomScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        cacheExtent: 720,
+        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+        slivers: [
+          SliverPadding(
+            padding: EdgeInsets.fromLTRB(padding, 16, padding, 0),
+            sliver: SliverList(
+              delegate: SliverChildListDelegate.fixed([
+                GlassSurface(
+                  padding: const EdgeInsets.all(15),
+                  child: Wrap(
+                    spacing: 12,
+                    runSpacing: 10,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      _SummaryPill(
+                        icon: Icons.pending_actions_outlined,
+                        label: 'باز',
+                        value: '$openCount',
+                      ),
+                      _SummaryPill(
+                        icon: Icons.task_alt,
+                        label: 'تکمیل‌شده',
+                        value: '$doneCount',
+                      ),
+                      Chip(
+                        avatar: Icon(
+                          Icons.view_sidebar_outlined,
+                          size: 18,
+                          color: scheme.primary,
+                        ),
+                        label: const Text('Phase 2 · Task UX'),
+                        backgroundColor:
+                            scheme.primary.withValues(alpha: 0.08),
+                        side: BorderSide(
+                          color: scheme.primary.withValues(alpha: 0.24),
+                        ),
+                      ),
+                    ],
                   ),
-                  label: const Text('Phase 2 · Task UX'),
-                  backgroundColor: scheme.primary.withValues(alpha: 0.08),
-                  side: BorderSide(
-                    color: scheme.primary.withValues(alpha: 0.24),
-                  ),
                 ),
-              ],
+                const SizedBox(height: 12),
+                if (widget.authStore.hasProjectPermission('task_create')) ...[
+                  TaskQuickCreate(
+                    enabled: !_loading,
+                    onCreate: _quickCreate,
+                  ),
+                  const SizedBox(height: 12),
+                ],
+                _filters(context),
+                const SizedBox(height: 12),
+                if (_selectionMode) ...[
+                  _bulkToolbar(context),
+                  const SizedBox(height: 12),
+                ],
+              ]),
             ),
           ),
-          const SizedBox(height: 12),
-          if (widget.authStore.hasProjectPermission('task_create')) ...[
-            TaskQuickCreate(
-              enabled: !_loading,
-              onCreate: _quickCreate,
-            ),
-            const SizedBox(height: 12),
-          ],
-          _filters(context),
-          const SizedBox(height: 12),
-          if (_selectionMode) ...[
-            _bulkToolbar(context),
-            const SizedBox(height: 12),
-          ],
           if (_loading)
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 64),
-              child: Center(child: CircularProgressIndicator()),
+            const SliverToBoxAdapter(
+              child: Padding(
+                padding: EdgeInsets.symmetric(vertical: 64),
+                child: Center(child: CircularProgressIndicator()),
+              ),
             )
           else if (_error != null)
-            _errorCard(context)
+            SliverPadding(
+              padding: EdgeInsets.symmetric(horizontal: padding),
+              sliver: SliverToBoxAdapter(child: _errorCard(context)),
+            )
           else if (_tasks.isEmpty)
-            _emptyCard(context)
+            SliverPadding(
+              padding: EdgeInsets.symmetric(horizontal: padding),
+              sliver: SliverToBoxAdapter(child: _emptyCard(context)),
+            )
           else
-            ..._tasks.map(
-              (task) => Padding(
-                padding: const EdgeInsets.only(bottom: 9),
-                child: _TaskCard(
-                  task: task,
-                  priorityLabel: _priorityLabel(task.priority),
-                  priorityColor: _priorityColor(context, task.priority),
-                  selected: _selectedTask?.id == task.id ||
-                      _selectedTaskIds.contains(task.id),
-                  selectionMode: _selectionMode,
-                  batchSelected: _selectedTaskIds.contains(task.id),
-                  statuses: _statuses,
-                  onOpen: () {
-                    if (_selectionMode) {
-                      _toggleSelection(
-                        task.id,
-                        !_selectedTaskIds.contains(task.id),
-                      );
-                    } else {
-                      _openDetails(task);
-                    }
-                  },
-                  onLongPress: () => _toggleSelection(task.id, true),
-                  onSelectionChanged: (value) =>
-                      _toggleSelection(task.id, value),
-                  onToggle: () => _toggleComplete(task),
-                  onStatusChanged: (statusId) =>
-                      _updateTask(task, {'status_id': statusId}),
-                ),
+            SliverPadding(
+              padding: EdgeInsets.symmetric(horizontal: padding),
+              sliver: BoundedSliverList(
+                itemCount: _tasks.length,
+                itemBuilder: (context, index) {
+                  final task = _tasks[index];
+                  return Padding(
+                    key: ValueKey(task.id),
+                    padding: const EdgeInsets.only(bottom: 9),
+                    child: _TaskCard(
+                      task: task,
+                      priorityLabel: _priorityLabel(task.priority),
+                      priorityColor: _priorityColor(context, task.priority),
+                      selected: _selectedTask?.id == task.id ||
+                          _selectedTaskIds.contains(task.id),
+                      selectionMode: _selectionMode,
+                      batchSelected: _selectedTaskIds.contains(task.id),
+                      statuses: _statuses,
+                      onOpen: () {
+                        if (_selectionMode) {
+                          _toggleSelection(
+                            task.id,
+                            !_selectedTaskIds.contains(task.id),
+                          );
+                        } else {
+                          _openDetails(task);
+                        }
+                      },
+                      onLongPress: () => _toggleSelection(task.id, true),
+                      onSelectionChanged: (value) =>
+                          _toggleSelection(task.id, value),
+                      onToggle: () => _toggleComplete(task),
+                      onStatusChanged: (statusId) =>
+                          _updateTask(task, {'status_id': statusId}),
+                    ),
+                  );
+                },
               ),
             ),
-          if (!_loading && _taskPage < _taskPages) ...[
-            const SizedBox(height: 6),
-            Center(
-              child: OutlinedButton.icon(
-                onPressed: _loadingMore ? null : _loadMoreTasks,
-                icon: _loadingMore
-                    ? const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.expand_more_rounded),
-                label: Text(
-                  _loadingMore
-                      ? 'در حال بارگذاری…'
-                      : 'بارگذاری بیشتر ($_taskPage/$_taskPages)',
-                ),
-              ),
+          SliverPadding(
+            padding: EdgeInsets.fromLTRB(
+              padding,
+              6,
+              padding,
+              isMobile ? 32 : 32,
             ),
-          ],
+            sliver: SliverToBoxAdapter(
+              child: !_loading && _taskPage < _taskPages
+                  ? Center(
+                      child: OutlinedButton.icon(
+                        onPressed: _loadingMore ? null : _loadMoreTasks,
+                        icon: _loadingMore
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
+                            : const Icon(Icons.expand_more_rounded),
+                        label: Text(
+                          _loadingMore
+                              ? 'در حال بارگذاری…'
+                              : 'بارگذاری بیشتر ($_taskPage/$_taskPages)',
+                        ),
+                      ),
+                    )
+                  : const SizedBox(height: 1),
+            ),
+          ),
         ],
       ),
     );
