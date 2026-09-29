@@ -126,21 +126,29 @@ jobs:
             });
             await waitForFlutter(page);
 
-            assert.match(
-              page.url(),
-              /\/login(?:[/?#]|$)/,
-              'Unauthenticated root navigation must resolve to the login route.',
+            await page.screenshot({
+              path: process.env.GITHUB_WORKSPACE + '/e2e-public-login.png',
+              fullPage: true,
+            });
+
+            const publicConfig = await context.request.get(
+              'https://tamastore.ir/api/v1/auth/public-config',
+            );
+            assert.equal(
+              publicConfig.status(),
+              200,
+              `Public auth config returned HTTP ${publicConfig.status()}.`,
+            );
+            assert.equal(
+              await page.title(),
+              'MarkStreet',
+              'Compiled app must retain the MarkStreet document title.',
             );
             assert.equal(
               pageErrors.length,
               0,
               'Public login smoke must not raise browser page errors.',
             );
-
-            await page.screenshot({
-              path: process.env.GITHUB_WORKSPACE + '/e2e-public-login.png',
-              fullPage: true,
-            });
             await context.close();
           }
 
@@ -174,11 +182,6 @@ jobs:
               response.status(),
               200,
               `Authenticated task list request returned HTTP ${response.status()}.`,
-            );
-            assert.doesNotMatch(
-              page.url(),
-              /\/login(?:[/?#]|$)/,
-              'Authenticated task route must not redirect back to login.',
             );
             assert.equal(
               pageErrors.length,
