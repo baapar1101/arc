@@ -1,0 +1,138 @@
+name: Publish Android Release
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - '.github/workflows/publish-android-release.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: android-release
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Build and publish Android APKs
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    defaults:
+      run:
+        working-directory: hesabixUI/hesabix_ui
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+
+      - name: Install Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Install Android SDK requirements
+        shell: bash
+        run: |
+          set -euo pipefail
+          SDKMANAGER="${ANDROID_HOME:-/usr/local/lib/android/sdk}/cmdline-tools/latest/bin/sdkmanager"
+          if [ ! -x "$SDKMANAGER" ]; then
+            SDKMANAGER="${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}/cmdline-tools/latest/bin/sdkmanager"
+          fi
+          test -x "$SDKMANAGER"
+          yes | "$SDKMANAGER" --licenses >/dev/null || true
+          "$SDKMANAGER"             "platforms;android-36"             "build-tools;35.0.0"             "ndk;28.2.13676358"
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Read app version
+        id: app
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="$(awk '/^version:/ {print $2; exit}' pubspec.yaml)"
+          test -n "$VERSION"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=v$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Build universal release APK
+        run: |
+          flutter build apk             --release             --dart-define API_BASE_URL=https://tamastore.ir
+
+      - name: Preserve universal APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p release-apks
+          cp build/app/outputs/flutter-apk/app-release.apk             "release-apks/MarkStreet-${{ steps.app.outputs.version }}-universal.apk"
+
+      - name: Build ABI-specific release APKs
+        run: |
+          flutter build apk             --release             --split-per-abi             --dart-define API_BASE_URL=https://tamastore.ir
+
+      - name: Prepare ABI APKs and checksums
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="${{ steps.app.outputs.version }}"
+          cp build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk             "release-apks/MarkStreet-${VERSION}-armeabi-v7a.apk"
+          cp build/app/outputs/flutter-apk/app-arm64-v8a-release.apk             "release-apks/MarkStreet-${VERSION}-arm64-v8a.apk"
+          cp build/app/outputs/flutter-apk/app-x86_64-release.apk             "release-apks/MarkStreet-${VERSION}-x86_64.apk"
+          (
+            cd release-apks
+            sha256sum *.apk > SHA256SUMS.txt
+            ls -lh
+            cat SHA256SUMS.txt
+          )
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: markstreet-android-release-${{ steps.app.outputs.version }}
+          path: hesabixUI/hesabix_ui/release-apks/*
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Publish GitHub Release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.app.outputs.tag }}
+          VERSION: ${{ steps.app.outputs.version }}
+        run: |
+          set -euo pipefail
+          cd "$GITHUB_WORKSPACE"
+
+          NOTES="$(mktemp)"
+          cat > "$NOTES" <<EOF
+          ## MarkStreet Android $VERSION
+
+          Built from commit \`$GITHUB_SHA\`.
+
+          APKs:
+          - **arm64-v8a** — recommended for most current Android phones/tablets.
+          - **armeabi-v7a** — older 32-bit ARM devices.
+          - **x86_64** — x86_64 Android devices/emulators.
+          - **universal** — one APK containing all supported ABIs.
+
+          API endpoint: \`https://tamastore.ir\`
+
+          The current repository configuration uses the debug signing key when no production keystore is supplied to CI.
+          EOF
+
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$TAG"               hesabixUI/hesabix_ui/release-apks/*               --repo "$GITHUB_REPOSITORY"               --clobber
+          else
+            gh release create "$TAG"               hesabixUI/hesabix_ui/release-apks/*               --repo "$GITHUB_REPOSITORY"               --target "$GITHUB_SHA"               --title "MarkStreet $VERSION"               --notes-file "$NOTES"
+          fi
