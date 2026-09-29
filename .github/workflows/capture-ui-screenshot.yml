@@ -11,7 +11,7 @@ on:
 jobs:
   capture-ui:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     env:
       PUB_HOSTED_URL: https://pub.dev
       FLUTTER_STORAGE_BASE_URL: https://storage.googleapis.com
@@ -58,23 +58,57 @@ jobs:
             sleep 1
           done
 
-          BROWSER="$(command -v google-chrome || command -v chromium-browser || command -v chromium || true)"
-          if [ -z "$BROWSER" ]; then
-            echo "No Chromium/Chrome binary available on runner" >&2
-            exit 1
-          fi
+          cd "$RUNNER_TEMP"
+          npm init -y >/dev/null 2>&1
+          npm install --no-audit --no-fund playwright@1.55.0
+          npx playwright install chromium
 
-          "$BROWSER" \
-            --headless=new \
-            --no-sandbox \
-            --disable-dev-shm-usage \
-            --hide-scrollbars \
-            --window-size=1440,1000 \
-            --force-device-scale-factor=1 \
-            --virtual-time-budget=15000 \
-            --screenshot="$GITHUB_WORKSPACE/hesabix-ui.png" \
-            http://127.0.0.1:8080/
+          cat > capture-ui.mjs <<'NODE'
+          import { chromium } from 'playwright';
 
+          const browser = await chromium.launch({
+            headless: true,
+            args: [
+              '--no-sandbox',
+              '--disable-dev-shm-usage',
+              '--enable-webgl',
+              '--ignore-gpu-blocklist',
+              '--use-angle=swiftshader',
+            ],
+          });
+          const context = await browser.newContext({
+            viewport: { width: 1440, height: 1000 },
+            deviceScaleFactor: 1,
+          });
+          const page = await context.newPage();
+
+          page.on('console', (msg) => {
+            console.log(`[browser:${msg.type()}] ${msg.text()}`);
+          });
+          page.on('pageerror', (error) => {
+            console.error(`[pageerror] ${error.message}`);
+          });
+          page.on('requestfailed', (request) => {
+            console.error(
+              `[requestfailed] ${request.url()} :: ${request.failure()?.errorText ?? ''}`,
+            );
+          });
+
+          await page.goto('http://127.0.0.1:8080/', {
+            waitUntil: 'domcontentloaded',
+            timeout: 60000,
+          });
+          await page.waitForSelector('flt-glass-pane', { timeout: 60000 });
+          await page.waitForTimeout(18000);
+          console.log(`[capture] url=${page.url()} title=${await page.title()}`);
+          await page.screenshot({
+            path: process.env.GITHUB_WORKSPACE + '/hesabix-ui.png',
+            fullPage: true,
+          });
+          await browser.close();
+          NODE
+
+          node capture-ui.mjs
           test -s "$GITHUB_WORKSPACE/hesabix-ui.png"
 
       - name: Upload UI screenshot
