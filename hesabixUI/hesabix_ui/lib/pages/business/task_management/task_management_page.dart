@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
@@ -7,6 +9,7 @@ import 'package:hesabix_ui/models/project_model.dart';
 import 'package:hesabix_ui/models/task_model.dart';
 import 'package:hesabix_ui/services/project_service.dart';
 import 'package:hesabix_ui/services/task_service.dart';
+import 'package:hesabix_ui/services/in_app_notifications_hub.dart';
 import 'package:hesabix_ui/theme/glass.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
 import 'package:hesabix_ui/utils/responsive_helper.dart';
@@ -67,6 +70,9 @@ class _TaskManagementPageState extends State<TaskManagementPage> {
   int _taskPages = 1;
   bool _loadingMore = false;
   late String _lastAppliedUriText;
+  Timer? _realtimeRefreshTimer;
+  bool _realtimeReconciling = false;
+  final Set<String> _recentRealtimeEventIds = <String>{};
 
   @override
   void initState() {
@@ -75,6 +81,7 @@ class _TaskManagementPageState extends State<TaskManagementPage> {
     _projectService = ProjectService(ApiClient());
     _hydrateFiltersFromUri(widget.initialUri);
     _lastAppliedUriText = widget.initialUri.toString();
+    InAppNotificationsHub.instance.addRawMessageListener(_onRealtimeMessage);
     _loadAll();
   }
 
@@ -100,9 +107,58 @@ class _TaskManagementPageState extends State<TaskManagementPage> {
 
   @override
   void dispose() {
+    InAppNotificationsHub.instance.removeRawMessageListener(_onRealtimeMessage);
+    _realtimeRefreshTimer?.cancel();
     _searchController.dispose();
     _searchFocus.dispose();
     super.dispose();
+  }
+
+  void _onRealtimeMessage(Map<String, dynamic> message) {
+    if ('${message['type'] ?? ''}' != 'task.realtime') return;
+    final businessId = (message['business_id'] as num?)?.toInt();
+    if (businessId != widget.businessId) return;
+
+    final eventId = message['event_id']?.toString();
+    if (eventId != null && eventId.isNotEmpty) {
+      if (!_recentRealtimeEventIds.add(eventId)) return;
+      if (_recentRealtimeEventIds.length > 256) {
+        _recentRealtimeEventIds.clear();
+        _recentRealtimeEventIds.add(eventId);
+      }
+    }
+
+    _realtimeRefreshTimer?.cancel();
+    _realtimeRefreshTimer = Timer(
+      const Duration(milliseconds: 250),
+      () {
+        if (mounted) unawaited(_reconcileRealtime());
+      },
+    );
+  }
+
+  Future<void> _reconcileRealtime() async {
+    if (!mounted || _realtimeReconciling) return;
+    _realtimeReconciling = true;
+    try {
+      final result = await _loadTasksRequest(page: 1);
+      final nextTasks =
+          (result['items'] as List<TaskModel>?) ?? const <TaskModel>[];
+      if (!mounted) return;
+      setState(() {
+        _tasks = nextTasks;
+        _taskPage = (result['page'] as num?)?.toInt() ?? 1;
+        _taskPages = (result['pages'] as num?)?.toInt() ?? 1;
+        _selectedTask = _selectedTask == null
+            ? null
+            : _findTask(nextTasks, _selectedTask!.id);
+        _dashboardRevision++;
+      });
+    } catch (_) {
+      // Realtime is best-effort. Normal REST interactions remain authoritative.
+    } finally {
+      _realtimeReconciling = false;
+    }
   }
 
   int? _queryInt(Uri uri, String key) {

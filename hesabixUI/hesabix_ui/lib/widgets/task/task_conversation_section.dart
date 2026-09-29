@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:hesabix_ui/core/api_client.dart';
 import 'package:hesabix_ui/models/task_model.dart';
 import 'package:hesabix_ui/services/task_service.dart';
+import 'package:hesabix_ui/services/in_app_notifications_hub.dart';
 import 'package:hesabix_ui/theme/glass.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
 import 'package:intl/intl.dart';
@@ -32,11 +35,14 @@ class _TaskConversationSectionState extends State<TaskConversationSection> {
   bool _posting = false;
   bool _mutating = false;
   String? _error;
+  Timer? _realtimeRefreshTimer;
+  final Set<String> _recentRealtimeEventIds = <String>{};
 
   @override
   void initState() {
     super.initState();
     _service = TaskService(ApiClient());
+    InAppNotificationsHub.instance.addRawMessageListener(_onRealtimeMessage);
     _load();
   }
 
@@ -52,16 +58,44 @@ class _TaskConversationSectionState extends State<TaskConversationSection> {
 
   @override
   void dispose() {
+    InAppNotificationsHub.instance.removeRawMessageListener(_onRealtimeMessage);
+    _realtimeRefreshTimer?.cancel();
     _commentController.dispose();
     super.dispose();
   }
 
-  Future<void> _load() async {
+  void _onRealtimeMessage(Map<String, dynamic> message) {
+    if ('${message['type'] ?? ''}' != 'task.realtime') return;
+    final businessId = (message['business_id'] as num?)?.toInt();
+    final taskId = (message['task_id'] as num?)?.toInt();
+    if (businessId != widget.businessId || taskId != widget.task.id) return;
+
+    final eventId = message['event_id']?.toString();
+    if (eventId != null && eventId.isNotEmpty) {
+      if (!_recentRealtimeEventIds.add(eventId)) return;
+      if (_recentRealtimeEventIds.length > 128) {
+        _recentRealtimeEventIds.clear();
+        _recentRealtimeEventIds.add(eventId);
+      }
+    }
+
+    _realtimeRefreshTimer?.cancel();
+    _realtimeRefreshTimer = Timer(
+      const Duration(milliseconds: 180),
+      () {
+        if (mounted) unawaited(_load(silent: true));
+      },
+    );
+  }
+
+  Future<void> _load({bool silent = false}) async {
     if (!mounted) return;
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
+    if (!silent) {
+      setState(() {
+        _loading = true;
+        _error = null;
+      });
+    }
     try {
       final results = await Future.wait<dynamic>([
         _service.listComments(
@@ -80,10 +114,11 @@ class _TaskConversationSectionState extends State<TaskConversationSection> {
         _comments = results[0] as List<TaskCommentModel>;
         _activity = results[1] as List<TaskActivityModel>;
         _mentionOptions = results[2] as List<TaskAssigneeOption>;
+        _error = null;
         _loading = false;
       });
     } catch (e) {
-      if (!mounted) return;
+      if (!mounted || silent) return;
       setState(() {
         _loading = false;
         _error = ErrorExtractor.forContext(e, context);

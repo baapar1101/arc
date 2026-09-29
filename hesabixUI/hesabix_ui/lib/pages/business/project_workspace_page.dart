@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hesabix_ui/core/api_client.dart';
@@ -6,6 +8,7 @@ import 'package:hesabix_ui/models/task_model.dart';
 import 'package:hesabix_ui/services/project_service.dart';
 import 'package:hesabix_ui/services/bytes_export/bytes_export_service.dart';
 import 'package:hesabix_ui/services/task_service.dart';
+import 'package:hesabix_ui/services/in_app_notifications_hub.dart';
 import 'package:hesabix_ui/theme/glass.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
 import 'package:hesabix_ui/utils/responsive_helper.dart';
@@ -51,6 +54,9 @@ class _ProjectWorkspacePageState extends State<ProjectWorkspacePage>
   TaskModel? _selectedTask;
   bool _loading = true;
   String? _error;
+  Timer? _realtimeRefreshTimer;
+  bool _realtimeReconciling = false;
+  final Set<String> _recentRealtimeEventIds = <String>{};
 
   @override
   void initState() {
@@ -58,18 +64,59 @@ class _ProjectWorkspacePageState extends State<ProjectWorkspacePage>
     _projectsService = ProjectService(ApiClient());
     _tasksService = TaskService(ApiClient());
     _tabs = TabController(length: 11, vsync: this);
+    InAppNotificationsHub.instance.addRawMessageListener(_onRealtimeMessage);
     _load();
   }
 
   @override
   void dispose() {
+    InAppNotificationsHub.instance.removeRawMessageListener(_onRealtimeMessage);
+    _realtimeRefreshTimer?.cancel();
     _tabs.dispose();
     super.dispose();
   }
 
-  Future<void> _load() async {
+  void _onRealtimeMessage(Map<String, dynamic> message) {
+    if ('${message['type'] ?? ''}' != 'task.realtime') return;
+    final businessId = (message['business_id'] as num?)?.toInt();
+    if (businessId != widget.businessId) return;
+
+    final eventId = message['event_id']?.toString();
+    if (eventId != null && eventId.isNotEmpty) {
+      if (!_recentRealtimeEventIds.add(eventId)) return;
+      if (_recentRealtimeEventIds.length > 256) {
+        _recentRealtimeEventIds.clear();
+        _recentRealtimeEventIds.add(eventId);
+      }
+    }
+
+    _realtimeRefreshTimer?.cancel();
+    _realtimeRefreshTimer = Timer(
+      const Duration(milliseconds: 300),
+      () {
+        if (mounted) unawaited(_reconcileRealtime());
+      },
+    );
+  }
+
+  Future<void> _reconcileRealtime() async {
+    if (!mounted || _realtimeReconciling) return;
+    _realtimeReconciling = true;
+    try {
+      await _load(showLoading: false);
+    } finally {
+      _realtimeReconciling = false;
+    }
+  }
+
+  Future<void> _load({bool showLoading = true}) async {
     if (!mounted) return;
-    setState(() { _loading = true; _error = null; });
+    if (showLoading) {
+      setState(() {
+        _loading = true;
+        _error = null;
+      });
+    }
     try {
       final r = await Future.wait<dynamic>([
         _projectsService.getWorkspace(businessId: widget.businessId, projectId: widget.projectId),
@@ -108,6 +155,16 @@ class _ProjectWorkspacePageState extends State<ProjectWorkspacePage>
         _members = ((ws['members'] as List?) ?? const []).whereType<Map>()
             .map((e) => Map<String, dynamic>.from(e)).toList();
         _tasks = (taskResult['items'] as List<TaskModel>?) ?? const [];
+        if (_selectedTask != null) {
+          TaskModel? refreshed;
+          for (final task in _tasks) {
+            if (task.id == _selectedTask!.id) {
+              refreshed = task;
+              break;
+            }
+          }
+          _selectedTask = refreshed;
+        }
         _statuses = r[2] as List<TaskStatusModel>;
         _assignees = r[3] as List<TaskAssigneeOption>;
         _projects = r[4] as List<ProjectModel>;
@@ -126,11 +183,15 @@ class _ProjectWorkspacePageState extends State<ProjectWorkspacePage>
         _cycleBacklogTaskIds = cycleWorkflow.backlogTaskIds;
         _projectActivity = r[8] as List<Map<String, dynamic>>;
         _projectFiles = r[9] as List<Map<String, dynamic>>;
+        _error = null;
         _loading = false;
       });
     } catch (e) {
-      if (!mounted) return;
-      setState(() { _error = ErrorExtractor.forContext(e, context); _loading = false; });
+      if (!mounted || !showLoading) return;
+      setState(() {
+        _error = ErrorExtractor.forContext(e, context);
+        _loading = false;
+      });
     }
   }
 

@@ -1234,6 +1234,12 @@ def create_app() -> FastAPI:
 
         start_support_fanout_subscriber(loop)
 
+        from app.services.task_realtime_service import (
+            start_task_realtime_fanout_subscriber,
+        )
+
+        start_task_realtime_fanout_subscriber(loop)
+
         # سایر background jobs باید فقط در یک process اجرا شوند (leader-only)
         if not _try_acquire_background_jobs_lock():
             logger = logging.getLogger(__name__)

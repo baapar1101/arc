@@ -1094,11 +1094,49 @@ Implemented on 2026-09-28 as the final benchmark/polish pass.
 - Saved views.
 - Analytics dashboard.
 
-### Realtime note
+### Realtime task synchronization
 
-The current repository does not expose a task realtime/WebSocket transport.
-Phase 20 does not mislabel polling as realtime; live task sync can be added later
-when a supported task event channel exists.
+The task module now reuses the existing authenticated `/ws/notifications`
+transport instead of opening a second application WebSocket.
+
+Mutation flow:
+
+```
+Task mutation
+    ↓
+immutable task_activity event
+    ↓
+queue task realtime invalidation in SQLAlchemy Session.info
+    ↓
+database COMMIT
+    ↓
+after_commit hook
+    ↓
+task visibility recipient resolution
+    ↓
+same-worker WebSocket + Redis pub/sub fan-out
+    ↓
+Flutter InAppNotificationsHub raw message
+    ↓
+debounced REST reconciliation
+```
+
+Important invariants:
+
+- Rollbacks clear the queued invalidations; uncommitted state is never broadcast.
+- The public `task.realtime` payload contains only event/business/task/project
+  identifiers and timestamp. Comment bodies, titles, assignee lists, actor IDs
+  and activity metadata stay behind normal REST authorization.
+- Recipients are resolved with the same project/personal visibility rules used
+  by task list queries. Project moves also invalidate users who could see the
+  previous project, and removed personal-task assignees receive the transition
+  invalidation needed to remove stale rows.
+- Redis pub/sub mirrors the repository's existing CRM/support fan-out pattern
+  for multi-worker API deployments. With Redis disabled, realtime delivery
+  falls back to sockets connected to the same worker.
+- Flutter does not apply WebSocket payloads as canonical task data. The main
+  task list, project workspace and open Comments/Activity surface debounce the
+  invalidation and reload authorized REST state.
 
 ### Phase 20 endpoints
 
@@ -1115,4 +1153,7 @@ when a supported task event channel exists.
 - [x] Soft-delete Undo.
 - [x] Bounded server pagination/load-more.
 - [x] Responsive glass interaction model retained.
-- [x] No fake realtime claim.
+- [x] Realtime task invalidation over the existing authenticated WebSocket.
+- [x] After-commit / rollback-safe realtime semantics.
+- [x] Visibility-filtered recipients and Redis multi-worker fan-out.
+- [x] Server-authoritative Flutter reconciliation with event dedup/debounce.

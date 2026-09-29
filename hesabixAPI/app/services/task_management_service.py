@@ -515,14 +515,26 @@ def _record_activity(
     event_type: str,
     event_data: Optional[dict[str, Any]] = None,
 ) -> None:
+    payload = event_data or {}
     db.add(
         TaskActivity(
             business_id=task.business_id,
             task_id=task.id,
             actor_user_id=actor_user_id,
             event_type=event_type,
-            event_data=event_data or {},
+            event_data=payload,
         )
+    )
+    # Realtime invalidation is queued in the same SQLAlchemy transaction and
+    # emitted by an after_commit hook. Rolled-back mutations never broadcast.
+    from app.services.task_realtime_service import queue_task_realtime_event
+
+    queue_task_realtime_event(
+        db,
+        task=task,
+        actor_user_id=actor_user_id,
+        event_type=event_type,
+        event_data=payload,
     )
 
 
