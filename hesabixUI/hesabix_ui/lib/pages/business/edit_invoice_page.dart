@@ -37,6 +37,7 @@ import '../../models/account_model.dart';
 import '../../services/account_service.dart';
 import 'business_shell_side_nav_scope.dart';
 import '../../widgets/business_subpage_back_leading.dart';
+import '../../widgets/task/entity_linked_tasks_card.dart';
 
 
 class EditInvoicePage extends StatefulWidget {
@@ -83,6 +84,7 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
   String? _invoiceTitle;
   final TextEditingController _invoiceTitleController = TextEditingController();
   bool _isProforma = false; // وضعیت پیش‌فاکتور (قابل تغییر)
+  bool _persistedIsProforma = false;
   /// none | draft | posted
   String _invoiceWarehouseReleaseMode = 'draft';
 
@@ -449,6 +451,7 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
 
       _invoiceNumber = item['code']?.toString();
       _isProforma = item['is_proforma'] == true;
+      _persistedIsProforma = _isProforma;
       _invoiceDate = DateTime.tryParse(item['document_date']?.toString() ?? '') ?? DateTime.now();
       _selectedCurrencyId = (item['currency_id'] as num?)?.toInt();
       _selectedProjectId = (item['project_id'] as num?)?.toInt();
@@ -921,7 +924,10 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
       child: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 1600),
-          child: InvoiceInfoForm(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              InvoiceInfoForm(
             header: _buildTaxConstraintBanner(),
             businessId: widget.businessId,
             authStore: widget.authStore,
@@ -991,6 +997,21 @@ class _EditInvoicePageState extends State<EditInvoicePage> with SingleTickerProv
                 _invoiceTitle = value.trim().isEmpty ? null : value.trim();
               });
             },
+              ),
+              const SizedBox(height: 12),
+              EntityLinkedTasksCard(
+                businessId: widget.businessId,
+                entityType:
+                    _persistedIsProforma ? 'quote' : 'invoice',
+                entityId: widget.invoiceId.toString(),
+                canWrite:
+                    widget.authStore.hasProjectPermission('task_create'),
+                title: _persistedIsProforma
+                    ? 'کارهای مرتبط با پیش‌فاکتور'
+                    : 'کارهای مرتبط با فاکتور',
+                relationshipType: 'billing',
+              ),
+            ],
           ),
         ),
       ),

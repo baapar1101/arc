@@ -1,0 +1,38 @@
+name: Task Entity Adapter Regression
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - 'hesabixAPI/app/services/task_management_service.py'
+      - 'hesabixAPI/tests/test_task_entity_adapters.py'
+      - '.github/workflows/test-task-entity-adapters.yml'
+  workflow_dispatch:
+
+jobs:
+  task-entity-adapter-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: hesabixAPI
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+          cache-dependency-path: hesabixAPI/pyproject.toml
+
+      - name: Install API test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev]"
+
+      - name: Run task entity adapter regression suite
+        run: pytest -q tests/test_task_entity_adapters.py

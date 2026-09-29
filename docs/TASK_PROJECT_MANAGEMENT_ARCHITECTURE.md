@@ -731,13 +731,20 @@ Implemented on 2026-09-27 as a Hesabix-native integration phase.
 
 - Reuses Phase 0 `task_entity_links`; no new migration.
 - Supported tenant-verifiable entity types:
-  - `person` — customer/contact/person
+  - `person` — generic Person record
+  - `customer` — explicit customer alias over native Person records whose `person_types` includes Customer
+  - `contact` — explicit contact/person alias over the native Person table
   - `lead` — CRM lead
   - `deal` — CRM sales opportunity
   - `crm_activity` — legacy CRM activity/follow-up
-  - `document` — accounting document/invoice/proforma/document
+  - `document` — generic accounting Document
+  - `quote` — native Document scoped to `invoice_*` + `is_proforma = true`
+  - `invoice` — native Document scoped to `invoice_*` + `is_proforma = false`
+  - `payment` — native Document scoped to `receipt` / `payment`
   - `product` — product/service
-- Support tickets are intentionally excluded because the current support ticket model has no `business_id`; linking them generically would weaken tenant isolation.
+- Existing generic `person` and `document` links remain visible through the new explicit reverse aliases, so Phase 14 expansion does not fragment old task history.
+- Support tickets remain intentionally excluded because the current support ticket model has no `business_id`; linking them generically would weaken tenant isolation.
+- Contracts remain excluded because this repository does not currently have a first-class business-scoped Contract model; no synthetic task-only contract entity is introduced.
 - Every new link validates the target entity against the task's business.
 - Relationship types are constrained to structured values such as related, customer, contact, regarding, billing, product and follow-up.
 - Link add/remove operations append immutable task activity events.
@@ -749,7 +756,9 @@ Implemented on 2026-09-27 as a Hesabix-native integration phase.
 - Reverse lookup returns first-class tasks linked to any supported entity.
 - CRM Lead record exposes linked first-class tasks with quick create + complete/reopen.
 - CRM Deal record exposes linked first-class tasks with quick create + complete/reopen.
-- Customer 360 exposes first-class tasks linked to the Person/customer.
+- Customer 360 exposes first-class tasks linked to the Person/customer, including customer/contact/person aliases.
+- Invoice/pro-forma edit exposes linked first-class tasks using explicit `invoice` / `quote` aliases.
+- Receipt/payment edit exposes linked first-class tasks using the explicit `payment` alias.
 - Legacy CRM Activity tasks remain separate and are explicitly labeled as such in the UI.
 
 ### Phase 14 endpoints
@@ -767,6 +776,10 @@ Implemented on 2026-09-27 as a Hesabix-native integration phase.
 - [x] Task drawer supports searchable entity linking.
 - [x] Reverse entity-to-task lookup.
 - [x] Customer/Lead/Deal record surfaces expose first-class linked tasks.
+- [x] Explicit customer/contact/quote/invoice/payment aliases use native CRM/accounting tables.
+- [x] Generic person/document link history remains visible from explicit reverse aliases.
+- [x] Invoice/pro-forma and receipt/payment record surfaces expose first-class linked tasks.
+- [x] Unsupported Contract/global Support Ticket are not faked as business-scoped entities.
 - [x] Legacy CRM tasks remain operational and semantically separate.
 
 

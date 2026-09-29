@@ -44,6 +44,7 @@ import 'package:hesabix_ui/utils/invoice_payment_tx_from_receipt.dart';
 import '../../services/business_dashboard_service.dart';
 import 'package:hesabix_ui/services/bytes_export/bytes_export_service.dart';
 import 'package:hesabix_ui/theme/semantic_color_resolver.dart';
+import 'package:hesabix_ui/widgets/task/entity_linked_tasks_card.dart';
 
 /// صفحه لیست اسناد دریافت و پرداخت با ویجت جدول
 class ReceiptsPaymentsListPage extends StatefulWidget {
@@ -1847,6 +1848,19 @@ class _BulkSettlementDialogState extends State<BulkSettlementDialog>
                             ),
                             maxLines: 2,
                           ),
+                          if (widget.initialDocument != null) ...[
+                            const SizedBox(height: 12),
+                            EntityLinkedTasksCard(
+                              businessId: widget.businessId,
+                              entityType: 'payment',
+                              entityId: widget.initialDocument!.id.toString(),
+                              canWrite: widget.authStore
+                                      ?.hasProjectPermission('task_create') ??
+                                  false,
+                              title: 'کارهای مرتبط با دریافت/پرداخت',
+                              relationshipType: 'billing',
+                            ),
+                          ],
                         ],
                       ),
                     ),
@@ -2083,6 +2097,25 @@ class _BulkSettlementDialogState extends State<BulkSettlementDialog>
                   maxLines: 2,
                 ),
               ),
+              if (widget.initialDocument != null)
+                Padding(
+                  padding: EdgeInsets.fromLTRB(
+                    padding,
+                    0,
+                    padding,
+                    padding * 0.55,
+                  ),
+                  child: EntityLinkedTasksCard(
+                    businessId: widget.businessId,
+                    entityType: 'payment',
+                    entityId: widget.initialDocument!.id.toString(),
+                    canWrite: widget.authStore
+                            ?.hasProjectPermission('task_create') ??
+                        false,
+                    title: 'کارهای مرتبط با دریافت/پرداخت',
+                    relationshipType: 'billing',
+                  ),
+                ),
               const Divider(height: 1),
               // پنل‌ها دسکتاپ
               Expanded(

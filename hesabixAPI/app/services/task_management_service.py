@@ -21,7 +21,7 @@ from adapters.db.models.business import Business
 from adapters.db.models.business_permission import BusinessPermission
 from adapters.db.models.crm import CrmActivity, Deal, Lead
 from adapters.db.models.document import Document
-from adapters.db.models.person import Person
+from adapters.db.models.person import Person, PersonType
 from adapters.db.models.product import Product
 from adapters.db.models.project import Project
 from adapters.db.models.task_management import (
@@ -61,13 +61,20 @@ _DEFAULT_STATUSES = (
 _ALLOWED_PRIORITIES = {"low", "normal", "high", "urgent"}
 _ALLOWED_RELATION_TYPES = {"blocks", "related", "duplicates"}
 _TASK_ENTITY_TYPES = {
-    "person": "Person / Customer",
+    "person": "Person",
+    "customer": "Customer",
+    "contact": "Contact / Person",
     "lead": "CRM Lead",
     "deal": "CRM Deal",
     "crm_activity": "CRM Activity",
     "document": "Accounting Document",
+    "quote": "Quote / Pro-forma",
+    "invoice": "Invoice",
+    "payment": "Receipt / Payment",
     "product": "Product / Service",
 }
+_PERSON_ENTITY_TYPES = {"person", "customer", "contact"}
+_DOCUMENT_ENTITY_TYPES = {"document", "quote", "invoice", "payment"}
 _TASK_ENTITY_RELATION_TYPES = {
     "related",
     "customer",
@@ -2295,13 +2302,28 @@ def list_task_entity_types() -> list[dict[str, str]]:
     ]
 
 
+def _equivalent_entity_link_types(entity_type: str) -> set[str]:
+    if entity_type in _PERSON_ENTITY_TYPES:
+        return set(_PERSON_ENTITY_TYPES)
+    if entity_type == "document":
+        return set(_DOCUMENT_ENTITY_TYPES)
+    if entity_type in {"quote", "invoice", "payment"}:
+        return {"document", entity_type}
+    return {entity_type}
+
+
 def _entity_model(entity_type: str):
     registry = {
         "person": Person,
+        "customer": Person,
+        "contact": Person,
         "lead": Lead,
         "deal": Deal,
         "crm_activity": CrmActivity,
         "document": Document,
+        "quote": Document,
+        "invoice": Document,
+        "payment": Document,
         "product": Product,
     }
     model = registry.get(str(entity_type or "").strip())
@@ -2312,6 +2334,27 @@ def _entity_model(entity_type: str):
             http_status=400,
         )
     return model
+
+
+def _apply_entity_type_scope(query, entity_type: str):
+    """Apply native subtype boundaries for aliases sharing one table."""
+    if entity_type == "customer":
+        return query.filter(
+            Person.person_types.ilike(f"%{PersonType.CUSTOMER.value}%")
+        )
+    if entity_type == "quote":
+        return query.filter(
+            Document.document_type.like("invoice_%"),
+            Document.is_proforma.is_(True),
+        )
+    if entity_type == "invoice":
+        return query.filter(
+            Document.document_type.like("invoice_%"),
+            Document.is_proforma.is_(False),
+        )
+    if entity_type == "payment":
+        return query.filter(Document.document_type.in_(["receipt", "payment"]))
+    return query
 
 
 def _entity_id_int(entity_id: Any) -> int:
@@ -2336,8 +2379,12 @@ def _entity_target_dict(entity_type: str, entity: Any) -> dict[str, Any]:
     title = f"{entity_type} #{getattr(entity, 'id', '')}"
     subtitle = None
 
-    if entity_type == "person":
-        title = entity.alias_name or f"Person #{entity.id}"
+    if entity_type in _PERSON_ENTITY_TYPES:
+        prefix = {
+            "customer": "Customer",
+            "contact": "Contact",
+        }.get(entity_type, "Person")
+        title = entity.alias_name or f"{prefix} #{entity.id}"
         subtitle = entity.company_name or entity.mobile or entity.email
     elif entity_type == "lead":
         title = entity.name or f"Lead #{entity.id}"
@@ -2350,9 +2397,14 @@ def _entity_target_dict(entity_type: str, entity: Any) -> dict[str, Any]:
     elif entity_type == "crm_activity":
         title = entity.subject or f"CRM Activity {entity.code}"
         subtitle = entity.activity_type
-    elif entity_type == "document":
-        title = f"{entity.document_type} · {entity.code}"
-        subtitle = entity.description
+    elif entity_type in _DOCUMENT_ENTITY_TYPES:
+        prefix = {
+            "quote": "Quote",
+            "invoice": "Invoice",
+            "payment": "Payment",
+        }.get(entity_type, entity.document_type)
+        title = f"{prefix} · {entity.code}"
+        subtitle = entity.description or entity.document_type
     elif entity_type == "product":
         title = entity.name or f"Product #{entity.id}"
         subtitle = entity.code
@@ -2374,10 +2426,11 @@ def _require_task_entity_target(
     clean_type = str(entity_type or "").strip()
     model = _entity_model(clean_type)
     target_id = _entity_id_int(entity_id)
-    entity = db.query(model).filter(
+    query = db.query(model).filter(
         model.id == target_id,
         model.business_id == business_id,
-    ).first()
+    )
+    entity = _apply_entity_type_scope(query, clean_type).first()
     if entity is None:
         raise ApiError(
             "TASK_ENTITY_NOT_FOUND",
@@ -2399,10 +2452,11 @@ def search_task_entity_targets(
     clean_type = str(entity_type or "").strip()
     model = _entity_model(clean_type)
     query = db.query(model).filter(model.business_id == business_id)
+    query = _apply_entity_type_scope(query, clean_type)
     term = str(search or "").strip()
     if term:
         pattern = f"%{term}%"
-        if clean_type == "person":
+        if clean_type in _PERSON_ENTITY_TYPES:
             query = query.filter(or_(
                 Person.alias_name.ilike(pattern),
                 Person.company_name.ilike(pattern),
@@ -2431,7 +2485,7 @@ def search_task_entity_targets(
                 CrmActivity.code.ilike(pattern),
                 CrmActivity.description.ilike(pattern),
             ))
-        elif clean_type == "document":
+        elif clean_type in _DOCUMENT_ENTITY_TYPES:
             query = query.filter(or_(
                 Document.code.ilike(pattern),
                 Document.document_type.ilike(pattern),
@@ -2599,11 +2653,12 @@ def list_entity_linked_tasks(
         entity_type,
         entity_id,
     )
+    link_types = _equivalent_entity_link_types(clean_type)
     task_ids = [
         row[0]
         for row in db.query(TaskEntityLink.task_id).filter(
             TaskEntityLink.business_id == business_id,
-            TaskEntityLink.entity_type == clean_type,
+            TaskEntityLink.entity_type.in_(link_types),
             TaskEntityLink.entity_id == str(entity.id),
         ).distinct().all()
     ]
