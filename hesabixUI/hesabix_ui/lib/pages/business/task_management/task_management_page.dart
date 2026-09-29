@@ -9,6 +9,7 @@ import 'package:hesabix_ui/models/project_model.dart';
 import 'package:hesabix_ui/models/task_model.dart';
 import 'package:hesabix_ui/services/project_service.dart';
 import 'package:hesabix_ui/services/task_service.dart';
+import 'package:hesabix_ui/services/task_optimistic_patch.dart';
 import 'package:hesabix_ui/services/in_app_notifications_hub.dart';
 import 'package:hesabix_ui/theme/glass.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
@@ -73,6 +74,7 @@ class _TaskManagementPageState extends State<TaskManagementPage> {
   Timer? _realtimeRefreshTimer;
   bool _realtimeReconciling = false;
   final Set<String> _recentRealtimeEventIds = <String>{};
+  final Map<int, int> _optimisticTaskRevisions = <int, int>{};
 
   @override
   void initState() {
@@ -118,6 +120,12 @@ class _TaskManagementPageState extends State<TaskManagementPage> {
     if ('${message['type'] ?? ''}' != 'task.realtime') return;
     final businessId = (message['business_id'] as num?)?.toInt();
     if (businessId != widget.businessId) return;
+
+    final taskId = (message['task_id'] as num?)?.toInt();
+    if (taskId != null && _optimisticTaskRevisions.containsKey(taskId)) {
+      _optimisticTaskRevisions[taskId] =
+          (_optimisticTaskRevisions[taskId] ?? 0) + 1;
+    }
 
     final eventId = message['event_id']?.toString();
     if (eventId != null && eventId.isNotEmpty) {
@@ -800,6 +808,42 @@ class _TaskManagementPageState extends State<TaskManagementPage> {
     );
   }
 
+  int _beginOptimisticTask(int taskId) {
+    final revision = (_optimisticTaskRevisions[taskId] ?? 0) + 1;
+    _optimisticTaskRevisions[taskId] = revision;
+    return revision;
+  }
+
+  void _finishOptimisticTask(int taskId, int revision) {
+    if (_optimisticTaskRevisions[taskId] == revision) {
+      _optimisticTaskRevisions.remove(taskId);
+    }
+  }
+
+  void _rollbackOptimisticTask(
+    TaskModel source, {
+    required int originalIndex,
+    required int revision,
+    required TaskModel? previousSelectedTask,
+  }) {
+    if (!mounted || _optimisticTaskRevisions[source.id] != revision) return;
+    final next = List<TaskModel>.from(_tasks)
+      ..removeWhere((task) => task.id == source.id);
+    if (originalIndex >= 0) {
+      final insertAt =
+          originalIndex > next.length ? next.length : originalIndex;
+      next.insert(insertAt, source);
+    }
+    setState(() {
+      _tasks = next;
+      if (_selectedTask?.id == source.id ||
+          previousSelectedTask?.id == source.id) {
+        _selectedTask = previousSelectedTask;
+      }
+    });
+    _optimisticTaskRevisions.remove(source.id);
+  }
+
   TaskModel? _findTask(List<TaskModel> tasks, int id) {
     for (final task in tasks) {
       if (task.id == id) return task;
@@ -878,15 +922,35 @@ class _TaskManagementPageState extends State<TaskManagementPage> {
     TaskModel source,
     Map<String, dynamic> data,
   ) async {
+    final originalIndex = _tasks.indexWhere((task) => task.id == source.id);
+    final previousSelectedTask = _selectedTask;
+    final revision = _beginOptimisticTask(source.id);
+    final optimistic = applyTaskOptimisticPatch(
+      source,
+      data,
+      statuses: _statuses,
+      projects: _projects,
+      assignees: _assignees,
+      labels: _labels,
+    );
+    _upsertTask(optimistic);
+
     try {
       final updated = await _taskService.updateTask(
         businessId: widget.businessId,
         taskId: source.id,
         data: data,
       );
+      _finishOptimisticTask(source.id, revision);
       _upsertTask(updated);
       return updated;
     } catch (e) {
+      _rollbackOptimisticTask(
+        source,
+        originalIndex: originalIndex,
+        revision: revision,
+        previousSelectedTask: previousSelectedTask,
+      );
       if (!mounted) return null;
       SnackBarHelper.showError(
         context,
@@ -897,6 +961,14 @@ class _TaskManagementPageState extends State<TaskManagementPage> {
   }
 
   Future<TaskModel?> _toggleComplete(TaskModel source) async {
+    final originalIndex = _tasks.indexWhere((task) => task.id == source.id);
+    final previousSelectedTask = _selectedTask;
+    final revision = _beginOptimisticTask(source.id);
+    final optimistic = source.isCompleted
+        ? optimisticReopenTask(source, _statuses)
+        : optimisticCompleteTask(source, _statuses);
+    _upsertTask(optimistic);
+
     try {
       final updated = source.isCompleted
           ? await _taskService.reopenTask(
@@ -907,6 +979,7 @@ class _TaskManagementPageState extends State<TaskManagementPage> {
               businessId: widget.businessId,
               taskId: source.id,
             );
+      _finishOptimisticTask(source.id, revision);
       _upsertTask(updated);
       if (mounted) {
         SnackBarHelper.showSuccess(
@@ -916,6 +989,12 @@ class _TaskManagementPageState extends State<TaskManagementPage> {
       }
       return updated;
     } catch (e) {
+      _rollbackOptimisticTask(
+        source,
+        originalIndex: originalIndex,
+        revision: revision,
+        previousSelectedTask: previousSelectedTask,
+      );
       if (!mounted) return null;
       SnackBarHelper.showError(
         context,
@@ -926,16 +1005,23 @@ class _TaskManagementPageState extends State<TaskManagementPage> {
   }
 
   Future<bool> _deleteTask(TaskModel source) async {
+    final originalIndex = _tasks.indexWhere((task) => task.id == source.id);
+    final previousSelectedTask = _selectedTask;
+    final revision = _beginOptimisticTask(source.id);
+    if (mounted) {
+      setState(() {
+        _tasks = _tasks.where((item) => item.id != source.id).toList();
+        if (_selectedTask?.id == source.id) _selectedTask = null;
+      });
+    }
+
     try {
       await _taskService.deleteTask(
         businessId: widget.businessId,
         taskId: source.id,
       );
+      _finishOptimisticTask(source.id, revision);
       if (!mounted) return false;
-      setState(() {
-        _tasks = _tasks.where((item) => item.id != source.id).toList();
-        if (_selectedTask?.id == source.id) _selectedTask = null;
-      });
       SnackBarHelper.show(
         context,
         message: 'کار حذف شد',
@@ -946,6 +1032,12 @@ class _TaskManagementPageState extends State<TaskManagementPage> {
       );
       return true;
     } catch (e) {
+      _rollbackOptimisticTask(
+        source,
+        originalIndex: originalIndex,
+        revision: revision,
+        previousSelectedTask: previousSelectedTask,
+      );
       if (!mounted) return false;
       SnackBarHelper.showError(
         context,

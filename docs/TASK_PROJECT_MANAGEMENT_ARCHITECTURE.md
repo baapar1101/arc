@@ -1138,6 +1138,37 @@ Important invariants:
   task list, project workspace and open Comments/Activity surface debounce the
   invalidation and reload authorized REST state.
 
+### Optimistic task mutations
+
+The primary single-task interactions now update local Flutter state before the
+network round-trip and reconcile with the authoritative response afterward.
+
+Covered paths:
+
+- Task drawer/list edits for title, description, priority, status, project,
+  dates, assignees, labels, estimate and recurrence fields.
+- Complete / reopen.
+- Project Kanban status/reorder moves.
+- Calendar rescheduling through the shared update path.
+- Single-task soft delete.
+
+Rollback model:
+
+- Every optimistic mutation records the previous immutable `TaskModel`, its
+  loaded-list position and selected-task state.
+- A per-task mutation revision prevents an older response from rolling back a
+  newer local edit.
+- If a realtime event touches a task while an optimistic request is pending,
+  the rollback guard is invalidated and the normal realtime REST reconciliation
+  wins. This also handles the case where the server committed successfully but
+  the HTTP response was lost.
+- Validation/network failures with no committed realtime event restore the
+  exact prior task and list position.
+- Successful responses always replace the optimistic model with the canonical
+  server task.
+- Bulk mutations remain server-authoritative because partial-success rollback
+  has different semantics and is not treated as a single-task optimistic write.
+
 ### Phase 20 endpoints
 
 - `POST /api/v1/businesses/{business_id}/tasks/bulk-update`
@@ -1157,3 +1188,6 @@ Important invariants:
 - [x] After-commit / rollback-safe realtime semantics.
 - [x] Visibility-filtered recipients and Redis multi-worker fan-out.
 - [x] Server-authoritative Flutter reconciliation with event dedup/debounce.
+- [x] Optimistic single-task edits with guarded rollback.
+- [x] Optimistic complete/reopen, Kanban move, calendar reschedule and delete.
+- [x] Realtime/optimistic race handling through per-task mutation revisions.

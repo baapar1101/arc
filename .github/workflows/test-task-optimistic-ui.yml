@@ -1,0 +1,37 @@
+name: Task Optimistic UI Regression
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - 'hesabixUI/hesabix_ui/lib/services/task_optimistic_patch.dart'
+      - 'hesabixUI/hesabix_ui/lib/pages/business/task_management/task_management_page.dart'
+      - 'hesabixUI/hesabix_ui/lib/pages/business/project_workspace_page.dart'
+      - 'hesabixUI/hesabix_ui/test/task_optimistic_patch_test.dart'
+      - '.github/workflows/test-task-optimistic-ui.yml'
+  workflow_dispatch:
+
+jobs:
+  optimistic-ui-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: hesabixUI/hesabix_ui
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Install Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Run optimistic task regression suite
+        run: flutter test test/task_optimistic_patch_test.dart

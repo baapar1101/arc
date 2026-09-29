@@ -8,6 +8,7 @@ import 'package:hesabix_ui/models/task_model.dart';
 import 'package:hesabix_ui/services/project_service.dart';
 import 'package:hesabix_ui/services/bytes_export/bytes_export_service.dart';
 import 'package:hesabix_ui/services/task_service.dart';
+import 'package:hesabix_ui/services/task_optimistic_patch.dart';
 import 'package:hesabix_ui/services/in_app_notifications_hub.dart';
 import 'package:hesabix_ui/theme/glass.dart';
 import 'package:hesabix_ui/utils/error_extractor.dart';
@@ -57,6 +58,7 @@ class _ProjectWorkspacePageState extends State<ProjectWorkspacePage>
   Timer? _realtimeRefreshTimer;
   bool _realtimeReconciling = false;
   final Set<String> _recentRealtimeEventIds = <String>{};
+  final Map<int, int> _optimisticTaskRevisions = <int, int>{};
 
   @override
   void initState() {
@@ -80,6 +82,12 @@ class _ProjectWorkspacePageState extends State<ProjectWorkspacePage>
     if ('${message['type'] ?? ''}' != 'task.realtime') return;
     final businessId = (message['business_id'] as num?)?.toInt();
     if (businessId != widget.businessId) return;
+
+    final taskId = (message['task_id'] as num?)?.toInt();
+    if (taskId != null && _optimisticTaskRevisions.containsKey(taskId)) {
+      _optimisticTaskRevisions[taskId] =
+          (_optimisticTaskRevisions[taskId] ?? 0) + 1;
+    }
 
     final eventId = message['event_id']?.toString();
     if (eventId != null && eventId.isNotEmpty) {
@@ -195,6 +203,43 @@ class _ProjectWorkspacePageState extends State<ProjectWorkspacePage>
     }
   }
 
+  int _beginOptimisticTask(int taskId) {
+    final revision = (_optimisticTaskRevisions[taskId] ?? 0) + 1;
+    _optimisticTaskRevisions[taskId] = revision;
+    return revision;
+  }
+
+  void _finishOptimisticTask(int taskId, int revision) {
+    if (_optimisticTaskRevisions[taskId] == revision) {
+      _optimisticTaskRevisions.remove(taskId);
+    }
+  }
+
+  void _rollbackOptimisticTask(
+    TaskModel source, {
+    required int originalIndex,
+    required int revision,
+    required TaskModel? previousSelectedTask,
+  }) {
+    if (!mounted || _optimisticTaskRevisions[source.id] != revision) return;
+    final next = List<TaskModel>.from(_tasks)
+      ..removeWhere((task) => task.id == source.id);
+    if (originalIndex >= 0) {
+      final insertAt =
+          originalIndex > next.length ? next.length : originalIndex;
+      next.insert(insertAt, source);
+    }
+    setState(() {
+      _tasks = next;
+      if (_selectedTask?.id == source.id ||
+          previousSelectedTask?.id == source.id) {
+        _selectedTask = previousSelectedTask;
+      }
+    });
+    _optimisticTaskRevisions.remove(source.id);
+    _recalc();
+  }
+
   void _upsert(TaskModel task) {
     final next = List<TaskModel>.from(_tasks);
     final i = next.indexWhere((e) => e.id == task.id);
@@ -300,6 +345,18 @@ class _ProjectWorkspacePageState extends State<ProjectWorkspacePage>
     int targetStatusId,
     int targetIndex,
   ) async {
+    final originalIndex = _tasks.indexWhere((task) => task.id == source.id);
+    final previousSelectedTask = _selectedTask;
+    final revision = _beginOptimisticTask(source.id);
+    final optimistic = optimisticMoveTask(
+      source,
+      targetStatusId: targetStatusId,
+      targetIndex: targetIndex,
+      allTasks: _tasks,
+      statuses: _statuses,
+    );
+    _upsert(optimistic);
+
     try {
       final task = await _tasksService.moveTask(
         businessId: widget.businessId,
@@ -307,9 +364,16 @@ class _ProjectWorkspacePageState extends State<ProjectWorkspacePage>
         targetStatusId: targetStatusId,
         targetIndex: targetIndex,
       );
+      _finishOptimisticTask(source.id, revision);
       _upsert(task);
       return task;
     } catch (e) {
+      _rollbackOptimisticTask(
+        source,
+        originalIndex: originalIndex,
+        revision: revision,
+        previousSelectedTask: previousSelectedTask,
+      );
       if (mounted) {
         SnackBarHelper.showError(
           context,
@@ -335,38 +399,116 @@ class _ProjectWorkspacePageState extends State<ProjectWorkspacePage>
   }
 
   Future<TaskModel?> _update(TaskModel source, Map<String, dynamic> data) async {
+    final originalIndex = _tasks.indexWhere((task) => task.id == source.id);
+    final previousSelectedTask = _selectedTask;
+    final revision = _beginOptimisticTask(source.id);
+    final optimistic = applyTaskOptimisticPatch(
+      source,
+      data,
+      statuses: _statuses,
+      projects: _projects,
+      assignees: _assignees,
+      labels: source.labels,
+    );
+    _upsert(optimistic);
+
     try {
       final task = await _tasksService.updateTask(
-        businessId: widget.businessId, taskId: source.id, data: data,
+        businessId: widget.businessId,
+        taskId: source.id,
+        data: data,
       );
+      _finishOptimisticTask(source.id, revision);
       _upsert(task);
       return task;
     } catch (e) {
-      if (mounted) SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
+      _rollbackOptimisticTask(
+        source,
+        originalIndex: originalIndex,
+        revision: revision,
+        previousSelectedTask: previousSelectedTask,
+      );
+      if (mounted) {
+        SnackBarHelper.showError(
+          context,
+          message: ErrorExtractor.forContext(e, context),
+        );
+      }
       rethrow;
     }
   }
 
   Future<TaskModel?> _toggle(TaskModel source) async {
-    final task = source.isCompleted
-        ? await _tasksService.reopenTask(businessId: widget.businessId, taskId: source.id)
-        : await _tasksService.completeTask(businessId: widget.businessId, taskId: source.id);
-    _upsert(task);
-    return task;
+    final originalIndex = _tasks.indexWhere((task) => task.id == source.id);
+    final previousSelectedTask = _selectedTask;
+    final revision = _beginOptimisticTask(source.id);
+    final optimistic = source.isCompleted
+        ? optimisticReopenTask(source, _statuses)
+        : optimisticCompleteTask(source, _statuses);
+    _upsert(optimistic);
+
+    try {
+      final task = source.isCompleted
+          ? await _tasksService.reopenTask(
+              businessId: widget.businessId,
+              taskId: source.id,
+            )
+          : await _tasksService.completeTask(
+              businessId: widget.businessId,
+              taskId: source.id,
+            );
+      _finishOptimisticTask(source.id, revision);
+      _upsert(task);
+      return task;
+    } catch (e) {
+      _rollbackOptimisticTask(
+        source,
+        originalIndex: originalIndex,
+        revision: revision,
+        previousSelectedTask: previousSelectedTask,
+      );
+      if (mounted) {
+        SnackBarHelper.showError(
+          context,
+          message: ErrorExtractor.forContext(e, context),
+        );
+      }
+      rethrow;
+    }
   }
 
   Future<bool> _delete(TaskModel source) async {
-    try {
-      await _tasksService.deleteTask(businessId: widget.businessId, taskId: source.id);
-      if (!mounted) return false;
+    final originalIndex = _tasks.indexWhere((task) => task.id == source.id);
+    final previousSelectedTask = _selectedTask;
+    final revision = _beginOptimisticTask(source.id);
+    if (mounted) {
       setState(() {
         _tasks = _tasks.where((e) => e.id != source.id).toList();
         if (_selectedTask?.id == source.id) _selectedTask = null;
       });
       _recalc();
+    }
+
+    try {
+      await _tasksService.deleteTask(
+        businessId: widget.businessId,
+        taskId: source.id,
+      );
+      _finishOptimisticTask(source.id, revision);
       return true;
     } catch (e) {
-      if (mounted) SnackBarHelper.showError(context, message: ErrorExtractor.forContext(e, context));
+      _rollbackOptimisticTask(
+        source,
+        originalIndex: originalIndex,
+        revision: revision,
+        previousSelectedTask: previousSelectedTask,
+      );
+      if (mounted) {
+        SnackBarHelper.showError(
+          context,
+          message: ErrorExtractor.forContext(e, context),
+        );
+      }
       return false;
     }
   }
