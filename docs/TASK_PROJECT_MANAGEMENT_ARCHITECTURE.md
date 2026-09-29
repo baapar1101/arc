@@ -644,12 +644,16 @@ Implemented on 2026-09-26 using Plane-style cycle planning over the Phase 0 cycl
 - Task membership is many-to-many as represented by the Phase 0 schema.
 - A task can only join cycles belonging to its own project.
 - Cycle progress is derived from linked task completion; no progress value is duplicated.
+- Backlog is derived server-side as incomplete project tasks that are not assigned to a planned/active cycle.
+- Carry-over keeps historical source-cycle membership and adds only incomplete tasks to a planned/active target cycle; completed tasks never carry forward.
 
 ### UX
 
-- Project workspace now includes a Cycles tab.
+- Project workspace now includes a Cycles tab with explicit Backlog, Current cycle, Future cycles and Completed cycles sections.
 - Cycles support create/edit/delete, goal, status and dates.
-- Cycle cards show linked/completed task counts and derived progress.
+- Backlog tasks can be scheduled directly into a current/future cycle.
+- Cycle cards show linked/completed/incomplete task counts and derived progress.
+- Carry-over can move incomplete work forward while preserving source-cycle history. This was listed as a later enhancement in the original benchmark plan and is included in this completion pass.
 - Task drawer exposes multi-select Cycle/Sprint membership.
 - Task cycle changes append an immutable `cycles_changed` activity event.
 
@@ -657,6 +661,8 @@ Implemented on 2026-09-26 using Plane-style cycle planning over the Phase 0 cycl
 
 - `GET/POST /api/v1/businesses/{business_id}/projects/{project_id}/cycles`
 - `PATCH/DELETE /api/v1/businesses/{business_id}/projects/{project_id}/cycles/{cycle_id}`
+- `POST /api/v1/businesses/{business_id}/projects/{project_id}/cycles/{cycle_id}/tasks/{task_id}`
+- `POST /api/v1/businesses/{business_id}/projects/{project_id}/cycles/{cycle_id}/carry-over`
 - `GET/PUT /api/v1/businesses/{business_id}/tasks/{task_id}/cycles`
 
 ### Phase 12 acceptance gate
@@ -667,6 +673,10 @@ Implemented on 2026-09-26 using Plane-style cycle planning over the Phase 0 cycl
 - [x] Derived progress.
 - [x] Cycle membership in the task drawer.
 - [x] Cycle workspace tab.
+- [x] Explicit Backlog / Current / Future / Completed workflow.
+- [x] Server-authoritative backlog derivation.
+- [x] Backlog-to-cycle scheduling.
+- [x] Incomplete-only carry-over with historical source membership preserved.
 
 
 ## Phase 13 — Time Tracking

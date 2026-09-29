@@ -10,7 +10,7 @@ from decimal import Decimal
 import logging
 
 from sqlalchemy.orm import Session
-from sqlalchemy import and_, func
+from sqlalchemy import and_, func, select
 
 from adapters.db.models.project import Project
 from adapters.db.models.document import Document
@@ -1036,17 +1036,214 @@ def list_project_cycles(
                 Task.deleted_at.is_(None),
             )
         )
-        total = task_query.count()
-        completed = task_query.filter(Task.completed_at.is_not(None)).count()
+        task_rows = task_query.with_entities(Task.id, Task.completed_at).all()
+        task_ids = [int(task_id) for task_id, _completed_at in task_rows]
+        incomplete_task_ids = [
+            int(task_id)
+            for task_id, completed_at in task_rows
+            if completed_at is None
+        ]
+        total = len(task_ids)
+        completed = total - len(incomplete_task_ids)
         result.append(
             {
                 "cycle": cycle,
                 "task_total": int(total),
                 "task_completed": int(completed),
                 "progress_percent": round((completed / total) * 100, 1) if total else 0.0,
+                "task_ids": task_ids,
+                "incomplete_task_ids": incomplete_task_ids,
             }
         )
     return result
+
+
+def list_project_cycle_backlog_task_ids(
+    db: Session,
+    business_id: int,
+    project_id: int,
+) -> list[int]:
+    """Incomplete project tasks not scheduled into a planned/active cycle."""
+    _require_project_in_business(db, business_id, project_id)
+    scheduled_task_ids = (
+        select(ProjectCycleTask.task_id)
+        .join(ProjectCycle, ProjectCycle.id == ProjectCycleTask.cycle_id)
+        .where(
+            ProjectCycleTask.business_id == business_id,
+            ProjectCycle.business_id == business_id,
+            ProjectCycle.project_id == project_id,
+            ProjectCycle.status.in_(["planned", "active"]),
+        )
+    )
+    rows = (
+        db.query(Task.id)
+        .filter(
+            Task.business_id == business_id,
+            Task.project_id == project_id,
+            Task.deleted_at.is_(None),
+            Task.completed_at.is_(None),
+            ~Task.id.in_(scheduled_task_ids),
+        )
+        .order_by(
+            Task.due_at.asc().nullslast(),
+            Task.sort_order.asc(),
+            Task.id.asc(),
+        )
+        .all()
+    )
+    return [int(row[0]) for row in rows]
+
+
+def add_task_to_project_cycle(
+    db: Session,
+    business_id: int,
+    project_id: int,
+    cycle_id: int,
+    task_id: int,
+) -> bool:
+    _require_project_in_business(db, business_id, project_id)
+    cycle = (
+        db.query(ProjectCycle)
+        .filter(
+            ProjectCycle.id == cycle_id,
+            ProjectCycle.business_id == business_id,
+            ProjectCycle.project_id == project_id,
+        )
+        .first()
+    )
+    if not cycle:
+        raise ApiError("PROJECT_CYCLE_NOT_FOUND", "Cycle not found", http_status=404)
+    if cycle.status not in {"planned", "active"}:
+        raise ApiError(
+            "PROJECT_CYCLE_TASK_TARGET_INVALID",
+            "Tasks can only be scheduled into planned or active cycles",
+            http_status=400,
+        )
+    task = (
+        db.query(Task)
+        .filter(
+            Task.id == task_id,
+            Task.business_id == business_id,
+            Task.project_id == project_id,
+            Task.deleted_at.is_(None),
+        )
+        .first()
+    )
+    if not task:
+        raise ApiError("TASK_NOT_FOUND", "Task not found in project", http_status=404)
+
+    existing = (
+        db.query(ProjectCycleTask)
+        .filter(
+            ProjectCycleTask.business_id == business_id,
+            ProjectCycleTask.cycle_id == cycle_id,
+            ProjectCycleTask.task_id == task_id,
+        )
+        .first()
+    )
+    if existing:
+        return False
+    db.add(
+        ProjectCycleTask(
+            business_id=business_id,
+            cycle_id=cycle_id,
+            task_id=task_id,
+        )
+    )
+    db.commit()
+    return True
+
+
+def _carry_over_task_ids(
+    source_rows: list[tuple[int, Optional[datetime]]],
+    existing_target_ids: set[int],
+) -> list[int]:
+    return [
+        int(task_id)
+        for task_id, completed_at in source_rows
+        if completed_at is None and int(task_id) not in existing_target_ids
+    ]
+
+
+def carry_over_project_cycle_tasks(
+    db: Session,
+    business_id: int,
+    project_id: int,
+    source_cycle_id: int,
+    target_cycle_id: int,
+) -> list[int]:
+    _require_project_in_business(db, business_id, project_id)
+    if source_cycle_id == target_cycle_id:
+        raise ApiError(
+            "PROJECT_CYCLE_CARRY_OVER_SAME_CYCLE",
+            "Source and target cycles must be different",
+            http_status=400,
+        )
+
+    cycles = (
+        db.query(ProjectCycle)
+        .filter(
+            ProjectCycle.business_id == business_id,
+            ProjectCycle.project_id == project_id,
+            ProjectCycle.id.in_([source_cycle_id, target_cycle_id]),
+        )
+        .all()
+    )
+    by_id = {int(cycle.id): cycle for cycle in cycles}
+    source = by_id.get(int(source_cycle_id))
+    target = by_id.get(int(target_cycle_id))
+    if source is None or target is None:
+        raise ApiError(
+            "PROJECT_CYCLE_NOT_FOUND",
+            "Source or target cycle was not found",
+            http_status=404,
+        )
+    if source.status not in {"active", "completed"}:
+        raise ApiError(
+            "PROJECT_CYCLE_CARRY_OVER_SOURCE_INVALID",
+            "Carry-over source must be active or completed",
+            http_status=400,
+        )
+    if target.status not in {"planned", "active"}:
+        raise ApiError(
+            "PROJECT_CYCLE_CARRY_OVER_TARGET_INVALID",
+            "Carry-over target must be planned or active",
+            http_status=400,
+        )
+
+    source_rows = (
+        db.query(Task.id, Task.completed_at)
+        .join(ProjectCycleTask, ProjectCycleTask.task_id == Task.id)
+        .filter(
+            ProjectCycleTask.business_id == business_id,
+            ProjectCycleTask.cycle_id == source_cycle_id,
+            Task.business_id == business_id,
+            Task.project_id == project_id,
+            Task.deleted_at.is_(None),
+        )
+        .all()
+    )
+    existing_target_ids = {
+        int(row[0])
+        for row in db.query(ProjectCycleTask.task_id)
+        .filter(
+            ProjectCycleTask.business_id == business_id,
+            ProjectCycleTask.cycle_id == target_cycle_id,
+        )
+        .all()
+    }
+    task_ids = _carry_over_task_ids(source_rows, existing_target_ids)
+    for task_id in task_ids:
+        db.add(
+            ProjectCycleTask(
+                business_id=business_id,
+                cycle_id=target_cycle_id,
+                task_id=task_id,
+            )
+        )
+    if task_ids:
+        db.commit()
+    return task_ids
 
 
 def create_project_cycle(

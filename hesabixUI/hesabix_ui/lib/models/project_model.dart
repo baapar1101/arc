@@ -290,12 +290,16 @@ class ProjectCycleModel {
   final String? goal;
   final DateTime? startAt, endAt;
   final double progressPercent;
+  final List<int> taskIds;
+  final List<int> incompleteTaskIds;
 
   const ProjectCycleModel({
     required this.id, required this.businessId, required this.projectId,
     required this.name, this.goal, this.startAt, this.endAt,
     required this.status, required this.taskTotal, required this.taskCompleted,
     required this.progressPercent,
+    this.taskIds = const [],
+    this.incompleteTaskIds = const [],
   });
 
   factory ProjectCycleModel.fromJson(Map<String, dynamic> json) =>
@@ -311,5 +315,14 @@ class ProjectCycleModel {
         taskTotal: (json['task_total'] as num?)?.toInt() ?? 0,
         taskCompleted: (json['task_completed'] as num?)?.toInt() ?? 0,
         progressPercent: (json['progress_percent'] as num?)?.toDouble() ?? 0,
+        taskIds: ((json['task_ids'] as List?) ?? const [])
+            .whereType<num>()
+            .map((e) => e.toInt())
+            .toList(),
+        incompleteTaskIds:
+            ((json['incomplete_task_ids'] as List?) ?? const [])
+                .whereType<num>()
+                .map((e) => e.toInt())
+                .toList(),
       );
 }

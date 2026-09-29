@@ -44,6 +44,7 @@ class _ProjectWorkspacePageState extends State<ProjectWorkspacePage>
   List<ProjectModel> _projects = const [];
   List<ProjectMilestoneModel> _milestones = const [];
   List<ProjectCycleModel> _cycles = const [];
+  Set<int> _cycleBacklogTaskIds = <int>{};
   List<Map<String, dynamic>> _projectActivity = const [];
   List<Map<String, dynamic>> _projectFiles = const [];
   final Set<int> _busyFileIds = <int>{};
@@ -84,7 +85,7 @@ class _ProjectWorkspacePageState extends State<ProjectWorkspacePage>
           businessId: widget.businessId,
           projectId: widget.projectId,
         ),
-        _projectsService.listCycles(
+        _projectsService.getCycleWorkflow(
           businessId: widget.businessId,
           projectId: widget.projectId,
         ),
@@ -117,7 +118,12 @@ class _ProjectWorkspacePageState extends State<ProjectWorkspacePage>
                 .map((e) => Map<String, dynamic>.from(e))
                 .toList();
         _milestones = r[6] as List<ProjectMilestoneModel>;
-        _cycles = r[7] as List<ProjectCycleModel>;
+        final cycleWorkflow = r[7] as ({
+          List<ProjectCycleModel> cycles,
+          Set<int> backlogTaskIds,
+        });
+        _cycles = cycleWorkflow.cycles;
+        _cycleBacklogTaskIds = cycleWorkflow.backlogTaskIds;
         _projectActivity = r[8] as List<Map<String, dynamic>>;
         _projectFiles = r[9] as List<Map<String, dynamic>>;
         _loading = false;
@@ -884,8 +890,14 @@ class _ProjectWorkspacePageState extends State<ProjectWorkspacePage>
     businessId: widget.businessId,
     projectId: widget.projectId,
     cycles: _cycles,
+    tasks: _tasks,
+    backlogTaskIds: _cycleBacklogTaskIds,
     service: _projectsService,
-    onChanged: (items) => setState(() => _cycles = items),
+    onOpenTask: _openTask,
+    onChanged: (items, backlogIds) => setState(() {
+      _cycles = items;
+      _cycleBacklogTaskIds = backlogIds;
+    }),
   );
 
   Widget _milestonesView() => ProjectMilestonesView(

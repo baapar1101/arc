@@ -53,3 +53,7 @@ class ProjectCycleUpdateRequest(BaseModel):
     start_at: datetime | None = None
     end_at: datetime | None = None
     status: str | None = None
+
+
+class ProjectCycleCarryOverRequest(BaseModel):
+    target_cycle_id: int = Field(..., gt=0)

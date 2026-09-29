@@ -1,0 +1,40 @@
+name: Cycle Workflow Regression
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - 'hesabixAPI/app/services/project_service.py'
+      - 'hesabixAPI/adapters/api/v1/projects.py'
+      - 'hesabixAPI/adapters/api/v1/schema_models/project_workspace.py'
+      - 'hesabixAPI/tests/test_project_cycle_workflow.py'
+      - '.github/workflows/test-project-cycle-workflow.yml'
+  workflow_dispatch:
+
+jobs:
+  cycle-workflow-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: hesabixAPI
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+          cache-dependency-path: hesabixAPI/pyproject.toml
+
+      - name: Install API test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev]"
+
+      - name: Run cycle workflow regression suite
+        run: pytest -q tests/test_project_cycle_workflow.py

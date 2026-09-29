@@ -28,6 +28,9 @@ from app.services.project_service import (
 	get_project_timeline,
 	list_project_milestones,
 	list_project_cycles,
+	list_project_cycle_backlog_task_ids,
+	add_task_to_project_cycle,
+	carry_over_project_cycle_tasks,
 	create_project_cycle,
 	update_project_cycle,
 	delete_project_cycle,
@@ -47,6 +50,7 @@ from adapters.api.v1.schema_models.project_workspace import (
     ProjectMilestoneUpdateRequest,
     ProjectCycleCreateRequest,
     ProjectCycleUpdateRequest,
+    ProjectCycleCarryOverRequest,
 )
 from adapters.api.v1.schema_models.project import (
 	ProjectCreateRequest,
@@ -542,6 +546,8 @@ def _format_project_cycle(row: Dict[str, Any]) -> Dict[str, Any]:
         "task_total": row.get("task_total", 0),
         "task_completed": row.get("task_completed", 0),
         "progress_percent": row.get("progress_percent", 0.0),
+        "task_ids": row.get("task_ids", []),
+        "incomplete_task_ids": row.get("incomplete_task_ids", []),
     }
 
 
@@ -624,14 +630,85 @@ async def list_project_cycles_endpoint(
 ):
     del ctx
     rows = list_project_cycles(db, business_id, project_id)
+    backlog_task_ids = list_project_cycle_backlog_task_ids(
+        db,
+        business_id,
+        project_id,
+    )
     return success_response(
         data=format_datetime_fields(
-            {"items": [_format_project_cycle(row) for row in rows]},
+            {
+                "items": [_format_project_cycle(row) for row in rows],
+                "backlog_task_ids": backlog_task_ids,
+            },
             request,
             business_id,
         ),
         request=request,
         message="PROJECT_CYCLES_FETCHED",
+    )
+
+
+@router.post(
+    "/businesses/{business_id}/projects/{project_id}/cycles/{cycle_id}/tasks/{task_id}",
+    summary="افزودن کار به چرخه",
+)
+@require_business_access("business_id")
+async def add_task_to_project_cycle_endpoint(
+    request: Request,
+    business_id: int = Path(..., gt=0),
+    project_id: int = Path(..., gt=0),
+    cycle_id: int = Path(..., gt=0),
+    task_id: int = Path(..., gt=0),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+):
+    del ctx
+    added = add_task_to_project_cycle(
+        db,
+        business_id,
+        project_id,
+        cycle_id,
+        task_id,
+    )
+    return success_response(
+        data={"task_id": task_id, "cycle_id": cycle_id, "added": added},
+        request=request,
+        message="PROJECT_CYCLE_TASK_ADDED",
+    )
+
+
+@router.post(
+    "/businesses/{business_id}/projects/{project_id}/cycles/{cycle_id}/carry-over",
+    summary="انتقال کارهای ناتمام چرخه به چرخه بعدی",
+)
+@require_business_access("business_id")
+async def carry_over_project_cycle_endpoint(
+    request: Request,
+    data: ProjectCycleCarryOverRequest,
+    business_id: int = Path(..., gt=0),
+    project_id: int = Path(..., gt=0),
+    cycle_id: int = Path(..., gt=0),
+    db: Session = Depends(get_db),
+    ctx: AuthContext = Depends(get_current_user),
+):
+    del ctx
+    task_ids = carry_over_project_cycle_tasks(
+        db,
+        business_id,
+        project_id,
+        cycle_id,
+        data.target_cycle_id,
+    )
+    return success_response(
+        data={
+            "source_cycle_id": cycle_id,
+            "target_cycle_id": data.target_cycle_id,
+            "task_ids": task_ids,
+            "count": len(task_ids),
+        },
+        request=request,
+        message="PROJECT_CYCLE_TASKS_CARRIED_OVER",
     )
 
 

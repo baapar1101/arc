@@ -226,9 +226,63 @@ class ProjectService {
     required int businessId,
     required int projectId,
   }) async {
-    final r = await apiClient.get('/api/v1/businesses/$businessId/projects/$projectId/cycles');
-    final items = (r.data['data']?['items'] as List?) ?? const [];
-    return items.whereType<Map>().map((e) => ProjectCycleModel.fromJson(Map<String,dynamic>.from(e))).toList();
+    final workflow = await getCycleWorkflow(
+      businessId: businessId,
+      projectId: projectId,
+    );
+    return workflow.cycles;
+  }
+
+  Future<({List<ProjectCycleModel> cycles, Set<int> backlogTaskIds})>
+      getCycleWorkflow({
+    required int businessId,
+    required int projectId,
+  }) async {
+    final response = await apiClient.get(
+      '/api/v1/businesses/$businessId/projects/$projectId/cycles',
+    );
+    final data = Map<String, dynamic>.from(response.data['data'] as Map);
+    final items = (data['items'] as List?) ?? const [];
+    final cycles = items
+        .whereType<Map>()
+        .map(
+          (e) => ProjectCycleModel.fromJson(
+            Map<String, dynamic>.from(e),
+          ),
+        )
+        .toList();
+    final backlog = ((data['backlog_task_ids'] as List?) ?? const [])
+        .whereType<num>()
+        .map((e) => e.toInt())
+        .toSet();
+    return (cycles: cycles, backlogTaskIds: backlog);
+  }
+
+  Future<void> addTaskToCycle({
+    required int businessId,
+    required int projectId,
+    required int cycleId,
+    required int taskId,
+  }) async {
+    await apiClient.post(
+      '/api/v1/businesses/$businessId/projects/$projectId/cycles/$cycleId/tasks/$taskId',
+    );
+  }
+
+  Future<List<int>> carryOverCycle({
+    required int businessId,
+    required int projectId,
+    required int sourceCycleId,
+    required int targetCycleId,
+  }) async {
+    final response = await apiClient.post(
+      '/api/v1/businesses/$businessId/projects/$projectId/cycles/$sourceCycleId/carry-over',
+      data: {'target_cycle_id': targetCycleId},
+    );
+    return ((response.data['data']?['task_ids'] as List?) ?? const [])
+        .whereType<num>()
+        .map((e) => e.toInt())
+        .toList();
   }
 
   Future<ProjectCycleModel> createCycle({
