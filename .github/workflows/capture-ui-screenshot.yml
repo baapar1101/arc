@@ -1,0 +1,86 @@
+name: Capture Flutter Web UI Screenshot
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - '.github/workflows/capture-ui-screenshot.yml'
+  workflow_dispatch:
+
+jobs:
+  capture-ui:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      PUB_HOSTED_URL: https://pub.dev
+      FLUTTER_STORAGE_BASE_URL: https://storage.googleapis.com
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Install Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Enable Flutter Web
+        run: flutter config --enable-web
+
+      - name: Build production frontend
+        shell: bash
+        run: |
+          set -euo pipefail
+          chmod +x build_web.sh
+          ./build_web.sh \
+            --project hesabixUI/hesabix_ui \
+            --mode release \
+            --clean \
+            --install-deps \
+            --api-base-url https://tamastore.ir
+
+      - name: Capture compiled UI
+        shell: bash
+        run: |
+          set -euo pipefail
+          DIST_DIR="$GITHUB_WORKSPACE/hesabixUI/hesabix_ui/build/web"
+          python3 -m http.server 8080 --bind 127.0.0.1 --directory "$DIST_DIR" \
+            >/tmp/hesabix-ui-server.log 2>&1 &
+          SERVER_PID=$!
+          trap 'kill "$SERVER_PID" 2>/dev/null || true' EXIT
+
+          for _ in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:8080/ >/dev/null; then
+              break
+            fi
+            sleep 1
+          done
+
+          BROWSER="$(command -v google-chrome || command -v chromium-browser || command -v chromium || true)"
+          if [ -z "$BROWSER" ]; then
+            echo "No Chromium/Chrome binary available on runner" >&2
+            exit 1
+          fi
+
+          "$BROWSER" \
+            --headless=new \
+            --no-sandbox \
+            --disable-dev-shm-usage \
+            --hide-scrollbars \
+            --window-size=1440,1000 \
+            --force-device-scale-factor=1 \
+            --virtual-time-budget=15000 \
+            --screenshot="$GITHUB_WORKSPACE/hesabix-ui.png" \
+            http://127.0.0.1:8080/
+
+          test -s "$GITHUB_WORKSPACE/hesabix-ui.png"
+
+      - name: Upload UI screenshot
+        uses: actions/upload-artifact@v4
+        with:
+          name: hesabix-ui-screenshot
+          path: hesabix-ui.png
+          if-no-files-found: error
+          retention-days: 7
