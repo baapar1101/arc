@@ -15,6 +15,7 @@ jobs:
     env:
       PUB_HOSTED_URL: https://pub.dev
       FLUTTER_STORAGE_BASE_URL: https://storage.googleapis.com
+      PRODUCTION_URL: https://hesabix-arc.vercel.app
 
     steps:
       - name: Checkout source
@@ -41,7 +42,7 @@ jobs:
             --install-deps \
             --api-base-url https://tamastore.ir
 
-      - name: Capture compiled UI
+      - name: Capture compiled and deployed UI
         shell: bash
         run: |
           set -euo pipefail
@@ -57,6 +58,9 @@ jobs:
             fi
             sleep 1
           done
+
+          curl -fsS "$PRODUCTION_URL/version.json?ci_run=$GITHUB_RUN_ID" \
+            -o "$GITHUB_WORKSPACE/hesabix-production-version.json"
 
           cd "$RUNNER_TEMP"
           npm init -y >/dev/null 2>&1
@@ -77,59 +81,91 @@ jobs:
               '--enable-unsafe-swiftshader',
             ],
           });
-          const context = await browser.newContext({
-            viewport: { width: 1440, height: 1000 },
-            deviceScaleFactor: 1,
-            locale: 'en-US',
-            timezoneId: 'UTC',
-          });
-          await context.addInitScript(() => {
-            // shared_preferences web uses the flutter. prefix. Force a
-            // supported locale for deterministic CI rendering.
-            localStorage.setItem('flutter.app_locale_code', 'en-US');
-          });
-          const page = await context.newPage();
 
-          page.on('console', (msg) => {
-            console.log(`[browser:${msg.type()}] ${msg.text()}`);
-          });
-          page.on('pageerror', (error) => {
-            console.error(`[pageerror] ${error.message}`);
-          });
-          page.on('requestfailed', (request) => {
-            console.error(
-              `[requestfailed] ${request.url()} :: ${request.failure()?.errorText ?? ''}`,
-            );
-          });
+          async function capture(url, outputName, label, requireFlutter) {
+            const context = await browser.newContext({
+              viewport: { width: 1440, height: 1000 },
+              deviceScaleFactor: 1,
+              locale: 'en-US',
+              timezoneId: 'UTC',
+              serviceWorkers: 'block',
+            });
+            await context.addInitScript(() => {
+              // shared_preferences web uses the flutter. prefix. Force a
+              // supported locale for deterministic CI rendering.
+              localStorage.setItem('flutter.app_locale_code', 'en-US');
+            });
+            const page = await context.newPage();
 
-          await page.goto('http://127.0.0.1:8080/', {
-            waitUntil: 'domcontentloaded',
-            timeout: 60000,
-          });
-          await page.waitForFunction(
-            () => Boolean(
-              document.querySelector('flt-glass-pane') ||
-              document.querySelector('canvas'),
-            ),
-            null,
-            { timeout: 60000 },
+            page.on('console', (msg) => {
+              console.log(`[${label}:browser:${msg.type()}] ${msg.text()}`);
+            });
+            page.on('pageerror', (error) => {
+              console.error(`[${label}:pageerror] ${error.message}`);
+            });
+            page.on('requestfailed', (request) => {
+              console.error(
+                `[${label}:requestfailed] ${request.url()} :: ${request.failure()?.errorText ?? ''}`,
+              );
+            });
+
+            await page.goto(url, {
+              waitUntil: 'domcontentloaded',
+              timeout: 60000,
+            });
+
+            try {
+              await page.waitForFunction(
+                () => Boolean(
+                  document.querySelector('flt-glass-pane') ||
+                  document.querySelector('canvas'),
+                ),
+                null,
+                { timeout: 60000 },
+              );
+            } catch (error) {
+              if (requireFlutter) throw error;
+              console.warn(
+                `[${label}] Flutter surface did not appear before timeout; capturing the real deployed page state.`,
+              );
+            }
+
+            await page.waitForTimeout(12000);
+            console.log(`[${label}:capture] url=${page.url()} title=${await page.title()}`);
+            await page.screenshot({
+              path: process.env.GITHUB_WORKSPACE + '/' + outputName,
+              fullPage: true,
+            });
+            await context.close();
+          }
+
+          await capture(
+            'http://127.0.0.1:8080/',
+            'hesabix-ui.png',
+            'compiled',
+            true,
           );
-          await page.waitForTimeout(12000);
-          console.log(`[capture] url=${page.url()} title=${await page.title()}`);
-          await page.screenshot({
-            path: process.env.GITHUB_WORKSPACE + '/hesabix-ui.png',
-            fullPage: true,
-          });
+          await capture(
+            process.env.PRODUCTION_URL + '/',
+            'hesabix-production-ui.png',
+            'production',
+            false,
+          );
           await browser.close();
           NODE
 
           node capture-ui.mjs
           test -s "$GITHUB_WORKSPACE/hesabix-ui.png"
+          test -s "$GITHUB_WORKSPACE/hesabix-production-ui.png"
+          test -s "$GITHUB_WORKSPACE/hesabix-production-version.json"
 
-      - name: Upload UI screenshot
+      - name: Upload UI screenshots
         uses: actions/upload-artifact@v4
         with:
           name: hesabix-ui-screenshot
-          path: hesabix-ui.png
+          path: |
+            hesabix-ui.png
+            hesabix-production-ui.png
+            hesabix-production-version.json
           if-no-files-found: error
           retention-days: 7
